@@ -22,6 +22,20 @@
 
       <!-- Title -->
       <text class="lg-title">{{ titleText }}</text>
+      <!-- #ifdef APP-PLUS -->
+      <view class="lg-recovery-notice"><text>{{ t.login.takeoverNotice }}</text></view>
+      <!-- #endif -->
+      <view v-if="loginRecoveryPending" class="lg-recovery-notice lg-recovery" data-testid="login-recovery" role="status">
+        <text class="lg-recovery-notice__t">{{ replayAvailable ? t.login.retryOriginalHint : loginResultUnknown ? t.login.unknownAttempt : t.login.verificationPending }}</text>
+        <view v-if="loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="recoverLoginResult" @keydown.enter.prevent="recoverLoginResult" @keydown.space.prevent="recoverLoginResult"><text>{{ t.login.recoverAttempt }}</text></view>
+        <view v-if="replayAvailable" class="lg-col">
+          <text class="lg-recovery__account">{{ retryContext?.context.countryCode }} {{ retryContext?.context.phone }}</text>
+          <input class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
+          <input class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
+          <view class="lg-cta lg-recovery__action" :class="canRetryOriginal ? 'lg-cta--on' : ''" role="button" :tabindex="canRetryOriginal ? 0 : -1" :aria-disabled="!canRetryOriginal" @click="retryOriginalLogin()" @keydown.enter.prevent="retryOriginalLogin()" @keydown.space.prevent="retryOriginalLogin()"><text class="lg-cta__t" :class="canRetryOriginal ? 'lg-cta__t--on' : ''">{{ t.login.retryOriginal }}</text></view>
+        </view>
+        <view v-if="!loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="cancelLoginVerification" @keydown.enter.prevent="cancelLoginVerification" @keydown.space.prevent="cancelLoginVerification"><text>{{ t.ui.cancel }}</text></view>
+      </view>
       <view v-if="modeLabel" class="lg-mode-badge" data-testid="auth-runtime-label">
         <text class="lg-mode-badge__t">{{ modeLabel }}</text>
       </view>
@@ -38,7 +52,7 @@
       <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
 
       <!-- Body -->
-      <view class="lg-body">
+      <view v-if="!loginRecoveryPending" class="lg-body">
         <!-- Step 1: phone (+ password for password mode) -->
         <view v-if="step === 1" class="lg-col">
           <view class="lg-phone" :class="{ 'lg-phone--err': phone && !phoneOk }">
@@ -94,44 +108,44 @@
       </view>
 
       <!-- Error -->
-      <view v-if="error" class="lg-error" role="alert" aria-live="assertive">
+      <view v-if="error && !(loginRecoveryPending && error === t.login.unknownAttempt)" class="lg-error" role="alert" aria-live="assertive">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="lg-error__t">{{ error }}</text>
       </view>
 
       <!-- Primary CTA -->
-      <view class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading && (phoneTouched || submitAttempted) ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter.prevent="onPrimary" @keydown.space.prevent="onPrimary">
+      <view v-if="!loginRecoveryPending" class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading && (phoneTouched || submitAttempted) ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter.prevent="onPrimary" @keydown.space.prevent="onPrimary">
         <text v-if="loading" class="lg-cta__t lg-cta__t--on">···</text>
         <text v-else class="lg-cta__t" :class="canPrimary ? 'lg-cta__t--on' : ''">{{ primaryText }}</text>
       </view>
       <!-- 简报 #211:空白表单首次展示必须中性 —— 只在用户已与手机号字段交互或尝试提交后
            才给出禁用原因。此前它从首帧起就存在(空表单天然 canPrimary=false),而 sr-only
            的 clip 裁不住 uni-app 内部的 <span>,导致文本提取/自动化会读到用户从未触发的错误。 -->
-      <text v-if="!canPrimary && !loading && (phoneTouched || submitAttempted)" id="lg-cta-reason" class="lg-sr-only">{{ primaryDisabledReason }}</text>
+      <text v-if="!loginRecoveryPending && !canPrimary && !loading && (phoneTouched || submitAttempted)" id="lg-cta-reason" class="lg-sr-only">{{ primaryDisabledReason }}</text>
 
       <!-- Mode switch (password ↔ otp), only on step 1 non-reset -->
-      <view v-if="step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter.prevent="toggleMode" @keydown.space.prevent="toggleMode">
+      <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter.prevent="toggleMode" @keydown.space.prevent="toggleMode">
         <text class="lg-switch__t">{{ mode === 'password' ? t.login.useCodeInstead : t.login.usePasswordInstead }}</text>
       </view>
 
       <!-- OAuth (step 1, not reset) -->
-      <view v-if="step === 1 && mode !== 'reset' && !remoteApiEnabled" class="lg-oauth">
+      <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset' && !remoteApiEnabled" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
         <AuthProviderGrid :busy="loading" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
       </view>
 
       <!-- Footer -->
       <!-- #ifdef APP-PLUS -->
-      <InviteScanEntry v-if="step === 1 && mode !== 'reset'" :disabled="loading" />
+      <InviteScanEntry v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" :disabled="loading" />
       <!-- #endif -->
       <view class="lg-footer">
-        <text v-if="step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister">{{ t.login.signUp }}</text></text>
+        <text v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister">{{ t.login.signUp }}</text></text>
       </view>
     </view>
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
     <!-- i18n-en-ok: Server CAPTCHA protocol scene enum, sent only to backend verification and never rendered. -->
-    <ServerCaptchaSlider v-if="showCaptcha && remoteApiEnabled" :phone="fullPhone" :scene='(captchaPurpose === "password" ? "LOGIN" : otpScene === "reset" ? "RESET" : "LOGIN")' @success="onCaptchaOk" @close="showCaptcha = false" />
+    <ServerCaptchaSlider v-if="showCaptcha && remoteApiEnabled" :phone="captchaPurpose === 'replay' ? `${retryContext?.context.countryCode ?? ''}${retryContext?.context.phone ?? ''}` : fullPhone" :scene='(captchaPurpose === "password" || captchaPurpose === "replay" ? "LOGIN" : otpScene === "reset" ? "RESET" : "LOGIN")' @success="onCaptchaOk" @close="showCaptcha = false" />
     <CaptchaSlider v-else-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </StandalonePageShell>
@@ -161,12 +175,14 @@ import { normalizeRefCode } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
 import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
+import { stageRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
+import type { LocaleCode } from "@/i18n";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
 import { apiRuntimeConfig, authApi, h5RefreshCookieEnabled, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";
-import type { UserSession } from "@/api/contracts";
+import type { RegistrationReceipt, UserSession } from "@/api/contracts";
 import { dialCodeForLocale, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
 import { resolveRemoteLoginErrorKind } from "@/lib/remote-login-error";
 
@@ -227,6 +243,82 @@ const phoneTouched = ref(false);
 const submitAttempted = ref(false);
 const resendLeft = ref(0);
 const loading = ref(false);
+const loginRecoveryPending = ref(false);
+const loginResultUnknown = ref(false);
+const replayAvailable = ref(false);
+const retryContext = ref<ReturnType<typeof authApi.pendingLoginContext>>(null);
+const retryPassword = ref("");
+const retryCode = ref("");
+const retryNeedsPassword = computed(() => ["PASSWORD", "TWO_FACTOR", "REGISTRATION"].includes(retryContext.value?.authMethod ?? ""));
+const retryNeedsCode = computed(() => ["OTP", "TWO_FACTOR", "REGISTRATION"].includes(retryContext.value?.authMethod ?? "")
+  || !!retryContext.value?.context.challengeNo);
+const canRetryOriginal = computed(() => !loading.value && replayAvailable.value
+  && (!retryNeedsPassword.value || !!retryPassword.value)
+  && (!retryNeedsCode.value || /^\d{6}$/.test(retryCode.value)));
+function syncLoginRecovery() {
+  retryContext.value = authApi.pendingLoginContext();
+  loginResultUnknown.value = authApi.pendingLogin();
+  loginRecoveryPending.value = loginResultUnknown.value || !!retryContext.value;
+  if (!loginResultUnknown.value) replayAvailable.value = !!retryContext.value;
+}
+function cancelLoginVerification() {
+  if (loading.value || authApi.pendingLogin()) return;
+  authApi.cancelLoginChallenge();
+  error.value = null;
+  retryPassword.value = ""; retryCode.value = ""; showCaptcha.value = false;
+  remoteTwoFactorChallenge.value = null; step.value = 1;
+  syncLoginRecovery();
+}
+async function retryOriginalLogin(captchaTicket?: string) {
+  if (loading.value || !replayAvailable.value || !retryContext.value) return;
+  if ((retryNeedsPassword.value && !retryPassword.value) || (retryNeedsCode.value && !/^\d{6}$/.test(retryCode.value))) return;
+  error.value = null;
+  loading.value = true;
+  const originalContext = retryContext.value;
+  try {
+    const result = await authApi.retryLogin({ password: retryPassword.value || undefined, code: retryCode.value || undefined,
+      ...(typeof captchaTicket === "string" ? { captchaTicket } : {}) });
+    if (!mounted) {
+      if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
+      return;
+    }
+    syncLoginRecovery();
+    if (result.kind === "challenge") {
+      replayAvailable.value = true; retryCode.value = "";
+    } else finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete,
+      serverProfile: result.user, serverSessionRevision: result.vaultRevision,
+      recoveredRegistration: originalContext?.authMethod === "REGISTRATION", registrationReceipt: result.registrationReceipt,
+      registrationLanguage: originalContext?.context.language });
+  } catch (cause) { if (mounted) {
+    syncLoginRecovery();
+    if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") { captchaPurpose.value = "replay"; showCaptcha.value = true; }
+    else error.value = remoteLoginError(cause);
+  } }
+  finally { if (!showCaptcha.value || captchaPurpose.value !== "replay") { retryPassword.value = ""; retryCode.value = ""; } if (mounted) loading.value = false; }
+}
+async function recoverLoginResult() {
+  if (loading.value || !authApi.pendingLogin()) return;
+  error.value = null;
+  loading.value = true;
+  const originalContext = retryContext.value;
+  try {
+    const result = await authApi.recoverLogin();
+    if (!mounted) {
+      if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
+      return;
+    }
+    syncLoginRecovery();
+    replayAvailable.value = false;
+    if (result.kind === "authenticated") finishSignIn({ accountId: authenticatedAccountId(result.user),
+      onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision,
+      recoveredRegistration: originalContext?.authMethod === "REGISTRATION", registrationReceipt: result.registrationReceipt,
+      registrationLanguage: originalContext?.context.language });
+  } catch (cause) {
+    if (!mounted) return;
+    syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
+    error.value = cause instanceof Error && cause.message === "APP_REPLACED" ? t.value.login.sessionReplaced : t.value.login.unknownAttempt;
+  } finally { if (mounted) loading.value = false; }
+}
 const returnParam = ref<string | null>(null);
 const refOnLogin = ref<string | null>(null);
 const otpRequestId = ref<string | null>(null);
@@ -245,6 +337,7 @@ let otpFlowVersion = 0;
 let mounted = true;
 
 onLoad((options) => {
+  syncLoginRecovery();
   const o = (options || {}) as Record<string, string>;
   const forwarded = new URLSearchParams(takeNavigationQuery("/pages/login/login")).get("return");
   if (forwarded || o.return) returnParam.value = forwarded || o.return;
@@ -258,7 +351,7 @@ onLoad((options) => {
 });
 
 const showCaptcha = ref(false);
-const captchaPurpose = ref<"otp" | "password">("otp");
+const captchaPurpose = ref<"otp" | "password" | "replay">("otp");
 
 const phoneClean = computed(() => sanitizePhoneInput(phone.value));
 const phoneOk = computed(() => validateNationalPhone(country.value, phoneClean.value));
@@ -485,21 +578,32 @@ function geoText(code: unknown): string | null {
 // snapshot, claims this carrier's session, then enters only a safe business
 // return target or Home. Registration and device setup own their own routes.
 function finishSignIn(
-  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number },
+  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number;
+    recoveredRegistration?: boolean; registrationReceipt?: RegistrationReceipt | null; registrationLanguage?: string | null },
   context: OtpFlowContext | null = null,
 ) {
   signInTimer = undefined;
   if (!mounted || (context && !isCurrentOtpFlow(context))) return;
+  let registrationDestination = "/pages/register/success";
+  // #ifndef H5
+  registrationDestination = "/pages/onboarding/estimator";
+  // #endif
   const result = completeSignIn({
     identity: session.accountId,
-    returnTo: returnParam.value,
+    returnTo: session.recoveredRegistration ? registrationDestination : returnParam.value,
     sponsorCode: refOnLogin.value,
     idempotencyKey: session.signInIdempotencyKey,
     onboardingComplete: session.onboardingComplete,
     serverProfile: session.serverProfile,
     serverSessionRevision: session.serverSessionRevision,
+    deferNavigation: session.recoveredRegistration,
+    registrationLocale: session.recoveredRegistration && ["zh", "vi", "en"].includes(session.registrationLanguage ?? "")
+      ? session.registrationLanguage as LocaleCode : undefined,
   });
-  if (!result.ok) {
+  if (result.ok && session.recoveredRegistration) {
+    stageRemoteRegistrationReceipt(session.registrationReceipt, session.accountId);
+    navReset({ url: registrationDestination, fail: () => {} });
+  } else if (!result.ok) {
     loading.value = false;
     error.value = geoText(result.error)
       ?? (result.error === "account_pending"
@@ -598,6 +702,7 @@ async function requestCode(captchaTicket?: string) {
 }
 function onCaptchaOk(ticket: string) {
   showCaptcha.value = false;
+  if (captchaPurpose.value === "replay") { void retryOriginalLogin(ticket); return; }
   if (captchaPurpose.value === "password") {
     void signInWithPassword(ticket);
     return;
@@ -616,6 +721,7 @@ function goSendCode() {
   void requestCode();
 }
 function remoteLoginError(error: unknown): string {
+  syncLoginRecovery();
   const code = error instanceof ApiError ? error.message : "";
   // #ifdef H5
   if (code === "COOKIE_LOCK_UNAVAILABLE") return t.value.session.secureBrowserUnsupported;
@@ -631,7 +737,7 @@ function remoteLoginError(error: unknown): string {
     case "accountBlocked": return t.value.login.errorAccountBlocked;
     case "passwordResetRequired": return t.value.login.errorPasswordResetRequired;
     case "signInStateChanged": return t.value.login.errorSignInStateChanged;
-    default: return t.value.authOtp.errorServiceUnavailable;
+    default: return loginResultUnknown.value ? t.value.login.unknownAttempt : t.value.authOtp.errorServiceUnavailable;
   }
 }
 
@@ -865,6 +971,7 @@ async function finishReset() {
 }
 
 function onPrimary() {
+  if (authApi.pendingLogin()) { loginRecoveryPending.value = true; void recoverLoginResult(); return; }
   submitAttempted.value = true;
   if (step.value === 1) { if (mode.value === "password") signInWithPassword(); else goSendCode(); }
   else if (step.value === 2) verifyCode();
@@ -944,6 +1051,12 @@ onUnmounted(() => cleanup());
 .lg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
 .lg-mode-badge__t { font-size: 12px; font-weight: 600; color: var(--v5-warning); }
 .lg-recovery-notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 12%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 34%, transparent); }
+.lg-recovery { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+.lg-recovery__account { font-size: 15px; color: var(--v5-ink); }
+.lg-recovery__input { box-sizing: border-box; height: 56px; padding: 0 16px; border-radius: 16px; background: var(--v5-surface); color: var(--v5-ink); font-size: 15px; }
+.lg-recovery .lg-recovery__action { margin-top: 4px; }
+.lg-recovery__secondary { min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--v5-brand); }
+.lg-recovery__secondary[aria-disabled="true"] { opacity: .5; }
 .lg-recovery-notice__t { display: block; font-size: 13px; line-height: 1.5; color: var(--v5-ink-2); }
 .lg-sub { display: block; margin-top: 8px; font-size: 13px; color: var(--v5-ink-3); }
 .lg-sub__ph { font-family: var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }

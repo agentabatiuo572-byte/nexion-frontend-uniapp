@@ -106,7 +106,7 @@ let clientSurface: "APP" | undefined;
 clientSurface = "APP";
 // #endif
 export const serverSessionRestoreEnabled = h5RefreshCookieEnabled || !!nativeSessionStorage;
-let unauthorizedHandler: (() => void | Promise<void>) | undefined;
+let unauthorizedHandler: ((reason?: string) => void | Promise<void>) | undefined;
 
 function isLoopbackSameOriginPreview(baseUrl: string): boolean {
   if (typeof window === "undefined" || window.location.origin !== baseUrl) return false;
@@ -120,14 +120,22 @@ export const apiClient = createRuntimeApiClient({
   vault: sessionVault,
   development: import.meta.env.DEV,
   localPreview: isLoopbackSameOriginPreview(apiRuntimeConfig.baseUrl),
-  onUnauthorized: () => unauthorizedHandler?.(),
+  onUnauthorized: reason => unauthorizedHandler?.(reason),
   onSessionRefreshed: renewAppConversationRealtime,
   refreshCredentialMode,
   nativeRefreshRecovery: !!nativeSessionStorage,
 });
 // Authentication is server-backed in both dev and prod; Java active profile
 // selects the development challenge or production provider flow.
-export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface });
+export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface,
+  installationId: () => clientSurface === "APP" ? getDeviceId() : "",
+  executionSupported: () => false,
+  attemptStorage: typeof sessionStorage !== "undefined" ? {
+    get: () => { const value = sessionStorage.getItem("uvel-login-attempt"); return value ? JSON.parse(value) : null; },
+    set: value => sessionStorage.setItem("uvel-login-attempt", JSON.stringify(value)),
+    remove: () => sessionStorage.removeItem("uvel-login-attempt"),
+  } : undefined,
+});
 export const accountApi = createAccountApi(apiClient);
 export const paymentApi = createPaymentApi(apiClient, expectedApiEnvironment);
 export const cregisDepositApi = createCregisDepositApi(apiClient);
@@ -198,6 +206,6 @@ export const goalsApi = createGoalsApi(apiClient, expectedApiEnvironment);
 export const howContentApi = createHowContentApi(apiClient, expectedApiEnvironment);
 export const privacyPolicyApi = createPrivacyPolicyApi(apiClient, expectedApiEnvironment);
 
-export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
+export function setRemoteUnauthorizedHandler(handler: ((reason?: string) => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;
 }

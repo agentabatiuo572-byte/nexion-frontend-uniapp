@@ -562,6 +562,12 @@ function beginServerSessionRestore(): Promise<boolean> {
     serverSessionRestoreState = "ready";
     return Promise.resolve(true);
   }
+  if (authApi.pendingLogin()) {
+    // A lost issuance response may already have set the cookie. Rotating it
+    // here would consume the original attempt before its result is recovered.
+    serverSessionRestoreState = "ready";
+    return Promise.resolve(false);
+  }
   if (serverSessionRestoreInFlight) return serverSessionRestoreInFlight;
   if (serverSessionRestoreRetryAt && canRefreshRemoteAccount(useAuth())) {
     // A successful explicit login is stronger evidence than an older retry.
@@ -702,6 +708,10 @@ function checkAuthGuard(): boolean {
     // guard retry. Re-launching the same login route resets in-progress input.
     if (route.startsWith("pages/login/")) pendingServerSessionRecovery = false;
     return false;
+  }
+  if (remoteApiEnabled && authApi.pendingLogin()) {
+    navReset({ url: "/pages/login/login" });
+    return true;
   }
   const auth = useAuth();
   const serverSession = remoteApiEnabled ? sessionVault.read() : null;
