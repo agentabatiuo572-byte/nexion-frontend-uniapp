@@ -20,18 +20,18 @@ test("login and registration share country-aware phone validation", async () => 
   assert.match(countrySheet, /item\.iso/);
 });
 
-test("registered-number runtime fixtures stay on the selectable development country code", async () => {
+test("registered-number runtime fixtures stay on the selectable country code", async () => {
   const runtime = await read("scripts/auth-register-existing-runtime.mjs");
   assert.doesNotMatch(runtime, /\+1/);
-  assert.match(runtime, /const fullPhone = `\+86\$\{phoneDigits\}`/);
-  assert.match(runtime, /hasText: "\+86"/);
-  assert.match(runtime, /solveCaptchaSlider\(frame, `\+86\$\{digits\}`\)/);
+  assert.match(runtime, /const fullPhone = `\+84\$\{phoneDigits\}`/);
+  assert.match(runtime, /hasText: "\+84"/);
+  assert.match(runtime, /solveCaptchaSlider\(frame, `\+84\$\{digits\}`\)/);
 });
 
-test("keyboard auth regression uses valid phones for both selectable country codes", async () => {
+test("keyboard auth regression uses valid phones for the selectable country code", async () => {
   const keyboardRuntime = await read("scripts/keyboard-submit-h5.e2e.mjs");
   assert.match(keyboardRuntime, /countryCode === "\+84" \? "912345678"/);
-  assert.match(keyboardRuntime, /countryCode === "\+86" \? "13800138000"/);
+  assert.doesNotMatch(keyboardRuntime, /countryCode === "\+86"/);
   assert.doesNotMatch(keyboardRuntime, /\+81|4155550123/);
 });
 
@@ -43,7 +43,7 @@ test("four auth providers stay visible only in the development mock runtime", as
   ]);
   for (const page of [login, register]) {
     assert.match(page, /AuthProviderGrid/);
-    assert.match(page, /v-if="step === 1[^\"]*!remoteApiEnabled/);
+    assert.match(page, /v-if="(?:!loginRecoveryPending && )?step === 1[^\"]*!remoteApiEnabled/);
     assert.match(page, /data-testid="auth-runtime-label"/);
     assert.doesNotMatch(page, /const oauth\s*=/);
     assert.doesNotMatch(page, /oauthDisplayLabel/);
@@ -82,6 +82,6 @@ test("authentication failures are announced immediately to assistive technology"
     read("src/pages/register/register.vue"),
   ]);
   for (const page of [login, register]) {
-    assert.match(page, /v-if="error"[^>]*role="alert"[^>]*aria-live="assertive"/);
+    assert.match(page, /v-if="error(?: && [^"]+)?"[^>]*role="alert"[^>]*aria-live="assertive"/);
   }
 });
