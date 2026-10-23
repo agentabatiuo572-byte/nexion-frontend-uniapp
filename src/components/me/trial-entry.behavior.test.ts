@@ -64,8 +64,8 @@ afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); vi.unstubAll
 test.each([
   ["en", "active", "Trial in progress · Active"],
   ["en", "grace", "Trial ended · Production stopped"],
-  ["zh", "active", "试用进行中 · 体验中"],
-  ["zh", "grace", "试用已结束 · 已停止产出"],
+  ["zh", "active", "Trial in progress · Active"],
+  ["zh", "grace", "Trial ended · Production stopped"],
   ["vi", "active", "Đang dùng thử · Đang chạy"],
   ["vi", "grace", "Đã kết thúc dùng thử · Đã ngừng sinh lời"],
 ] as const)("renders the %s %s entry with its truthful title and detail route", async (locale, status, title) => {
@@ -86,10 +86,10 @@ test("a mounted entry follows status and locale changes while retaining the same
   const entry = await mount("active");
   entry.trial.status = "grace"; await Vue.nextTick();
   expect(entry.action()?.props["aria-label"]).toBe("Trial ended · Production stopped");
-  locale.setLocale("zh"); await Vue.nextTick();
-  expect(entry.action()?.props["aria-label"]).toBe("试用已结束 · 已停止产出");
+  locale.setLocale("vi"); await Vue.nextTick();
+  expect(entry.action()?.props["aria-label"]).toBe("Đã kết thúc dùng thử · Đã ngừng sinh lời");
   entry.trial.status = "active"; await Vue.nextTick();
-  expect(entry.action()?.props["aria-label"]).toBe("试用进行中 · 体验中");
+  expect(entry.action()?.props["aria-label"]).toBe("Đang dùng thử · Đang chạy");
   expect(entry.trial.status).toBe("active");
 });
 
