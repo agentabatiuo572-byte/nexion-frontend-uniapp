@@ -31,7 +31,7 @@ test("registered-number runtime fixtures stay on the selectable country code", a
 test("keyboard auth regression uses valid phones for the selectable country code", async () => {
   const keyboardRuntime = await read("scripts/keyboard-submit-h5.e2e.mjs");
   assert.match(keyboardRuntime, /countryCode === "\+84" \? "912345678"/);
-  assert.doesNotMatch(keyboardRuntime, /countryCode === "\+86"/);
+  assert.match(keyboardRuntime, /countryCode === "\+86" \? "13800138000"/);
   assert.doesNotMatch(keyboardRuntime, /\+81|4155550123/);
 });
 

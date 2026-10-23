@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.APP_H5_BASE_URL || "http://127.0.0.1:5173";
-const expectedDefault = process.env.EXPECTED_DIAL_CODE || "+84";
-assert(expectedDefault === "+84", `unsupported EXPECTED_DIAL_CODE: ${expectedDefault}`);
+const expectedDefault = process.env.EXPECTED_DIAL_CODE || "+86";
+assert(["+84", "+86"].includes(expectedDefault), `unsupported EXPECTED_DIAL_CODE: ${expectedDefault}`);
 
 const browser = await chromium.launch({ headless: true });
 
@@ -15,7 +15,7 @@ async function assertSelector(page, route, pagePrefix) {
   assert.equal((await currentCode.innerText()).trim(), expectedDefault, `${route} default country code`);
   const phoneInput = page.locator(`.${pagePrefix}-phone__in`);
   const phoneControl = phoneInput.locator("input");
-  const expectedPhone = "912345678";
+  const expectedPhone = expectedDefault === "+86" ? "13800138000" : "912345678";
   await phoneControl.fill(expectedPhone);
   assert.equal(await phoneInput.getAttribute("aria-invalid"), "false", `${route} default phone must validate`);
 
@@ -33,8 +33,8 @@ async function assertSelector(page, route, pagePrefix) {
   })));
   const enabled = matrix.filter((row) => row.ariaDisabled === "false");
   const disabled = matrix.filter((row) => row.ariaDisabled === "true");
-  assert.deepEqual(enabled.map((row) => row.code), ["+84"], `${route} selectable codes`);
-  assert.equal(disabled.length, 15, `${route} disabled country count`);
+  assert.deepEqual(enabled.map((row) => row.code), ["+84", "+86"], `${route} selectable codes`);
+  assert.equal(disabled.length, 14, `${route} disabled country count`);
   assert(enabled.every((row) => row.tabIndex === "0"), `${route} enabled rows must remain keyboard focusable`);
   assert(disabled.every((row) => row.tabIndex === "-1" && Number(row.opacity) < 0.5), `${route} disabled rows must be gray and out of Tab order`);
 
@@ -55,10 +55,10 @@ async function assertSelector(page, route, pagePrefix) {
   await page.keyboard.press("Space");
   assert.equal((await currentCode.innerText()).trim(), expectedDefault, `${route} disabled keyboard activation changed country code`);
 
-  const alternate = "+84";
+  const alternate = expectedDefault === "+86" ? "+84" : "+86";
   await rows.filter({ hasText: alternate }).first().click();
   assert.equal((await currentCode.innerText()).trim(), alternate, `${route} enabled alternate code was not selectable`);
-  const alternatePhone = "912345678";
+  const alternatePhone = alternate === "+86" ? "13800138000" : "912345678";
   await phoneControl.fill(alternatePhone);
   assert.equal(await phoneInput.getAttribute("aria-invalid"), "false", `${route} alternate phone must validate`);
 }
@@ -68,7 +68,7 @@ try {
   await assertSelector(login, "/pages/login/login", "lg");
   const register = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await assertSelector(register, "/pages/register/register", "rg");
-  console.log(`country-code-selector-h5:PASS default=${expectedDefault} routes=2 rows=16 enabled=1 disabled=15`);
+  console.log(`country-code-selector-h5:PASS default=${expectedDefault} routes=2 rows=16 enabled=2 disabled=14`);
 } finally {
   await browser.close();
 }
