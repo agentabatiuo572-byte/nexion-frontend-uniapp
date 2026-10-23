@@ -10,7 +10,6 @@ const pageOptions = { viewport: { width: 390, height: 844 } };
 async function validPhoneFor(page) {
   const countryCode = (await page.locator(".lg-phone__cc-t, .rg-phone__cc-t").innerText()).trim();
   const phoneNumber = countryCode === "+84" ? "912345678"
-    : countryCode === "+86" ? "13800138000"
       : null;
   assert(phoneNumber, `unexpected selectable country code in keyboard auth regression: ${countryCode}`);
   return {
