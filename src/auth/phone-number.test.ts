@@ -8,37 +8,37 @@ import {
 } from "./phone-number";
 
 describe("country-aware phone validation", () => {
-  it("keeps Vietnam selectable and China visible but disabled", () => {
+  it("keeps Vietnam and China selectable for the demonstration", () => {
     expect(PHONE_COUNTRIES.slice(0, 2)).toEqual([
       expect.objectContaining({ iso: "VN", dialCode: "+84", selectable: true }),
-      expect.objectContaining({ iso: "CN", dialCode: "+86", selectable: false }),
+      expect.objectContaining({ iso: "CN", dialCode: "+86", selectable: true }),
     ]);
     expect(PHONE_COUNTRIES).toHaveLength(16);
     expect(PHONE_COUNTRIES.slice(2)).toHaveLength(14);
     expect(PHONE_COUNTRIES.slice(2).every((country) => !country.selectable)).toBe(true);
   });
 
-  it("defaults every build to the selectable +84 country code", () => {
+  it("defaults Chinese to +86 and other supported locales to +84 in every build", () => {
     expect(dialCodeForLocale("vi", false)).toBe("+84");
-    expect(dialCodeForLocale("zh", false)).toBe("+84");
+    expect(dialCodeForLocale("zh", false)).toBe("+86");
     expect(dialCodeForLocale("vi", true)).toBe("+84");
   });
 
   it("does not expose an input hint for disabled or unknown country codes", () => {
     expect(phoneFormatHint("+84")).toBe("0912 345 678");
-    expect(phoneFormatHint("+86")).toBe("");
+    expect(phoneFormatHint("+86")).toBe("138 0013 8000");
     expect(phoneFormatHint("+81")).toBe("");
     expect(phoneFormatHint("+999")).toBe("");
   });
 
   it.each([
-    ["+84", "0912345678"], ["+84", "912345678"],
+    ["+84", "0912345678"], ["+84", "912345678"], ["+86", "13800138000"],
   ])("accepts a valid %s national format", (dialCode, phone) => {
     expect(validateNationalPhone(dialCode, phone)).toBe(true);
   });
 
   it.each([
-    ["+86", "13800138000"], ["+1", "4155552671"], ["+44", "07123456789"],
+    ["+1", "4155552671"], ["+44", "07123456789"],
     ["+49", "015123456789"], ["+33", "0612345678"],
     ["+34", "612345678"], ["+81", "09012345678"],
     ["+82", "01012345678"], ["+55", "11912345678"],

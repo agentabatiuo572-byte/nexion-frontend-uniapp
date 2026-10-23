@@ -54,7 +54,7 @@ export const useLocaleStore = defineStore("locale", () => {
     persist();
   }
 
-  // Keep the first screen in English unless an explicit or account preference exists.
+  // Keep the first screen in Chinese unless an explicit or account preference exists.
   // The legacy method name is retained for existing startup callers.
   function ensureSystemDetected() {
     if (userSet.value || localeResolved) return;
