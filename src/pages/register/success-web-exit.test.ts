@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import ts from "typescript";
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 import source from "./success.vue?raw";
 import { appDownloadUrl } from "@/lib/app-download-url";
 
@@ -10,14 +10,32 @@ function downloads(links = { officialUrl: "https://uvel.example/", iosUrl: "http
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
   const window = { location: { assign: vi.fn() } };
+  const cfg = reactive({ config: { share: { appDownload: links } } });
   const page = new Function("cfg", "t", "computed", "window", "appDownloadUrl", code)(
-    { config: { share: { appDownload: links } } }, { value: { register: { doneIosDownload: "iOS", doneAndroidDownload: "Android" } } },
+    cfg, { value: { register: { doneIosDownload: "iOS", doneAndroidDownload: "Android" } } },
     computed, window, appDownloadUrl,
   );
-  return { page, window };
+  return { page, window, cfg };
 }
 
 describe("H5 Lite website distribution destinations", () => {
+  it("updates both button destinations when a newly fetched configuration replaces the previous snapshot", () => {
+    const { page, cfg, window } = downloads();
+    expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual([
+      "https://download.example/app.ipa", "https://download.example/app.apk",
+    ]);
+    cfg.config.share.appDownload = {
+      officialUrl: "https://uvel.example/new-landing",
+      iosUrl: "https://download.example/new.ipa",
+      androidUrl: "https://download.example/new.apk",
+      apkUrl: "",
+    };
+    for (const item of page.platformDownloads.value) page.openDownload(item.url);
+    expect(window.location.assign.mock.calls).toEqual([
+      ["https://download.example/new.ipa"], ["https://download.example/new.apk"],
+    ]);
+    expect(page.officialDownloadUrl.value).toBe("https://uvel.example/new-landing");
+  });
   it("uses the corresponding A3 platform URL while keeping the landing page separate", () => {
     const { page } = downloads();
     expect(page.officialDownloadUrl.value).toBe("https://uvel.example/");
