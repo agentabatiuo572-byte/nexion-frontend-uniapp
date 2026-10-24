@@ -20,13 +20,13 @@ function downloads(links = { officialUrl: "https://uvel.example/", iosUrl: "", a
 describe("H5 Lite website distribution destinations", () => {
   it("routes every platform through the configured website without requiring package URLs", () => {
     const { page } = downloads();
-    expect(page.officialDownloadUrl.value).toBe("https://uvel.example/download/?platform=auto&source=button");
+    expect(page.officialDownloadUrl.value).toBe("https://uvel.example/");
     expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual([
-      "https://uvel.example/download/?platform=ios&source=button", "https://uvel.example/download/?platform=android&source=button",
+      "https://uvel.example/", "https://uvel.example/",
     ]);
   });
   it("follows management changes and has no hardcoded website fallback", () => {
-    expect(downloads({ officialUrl: "https://uvel.example.com/download", iosUrl: "", androidUrl: "", apkUrl: "" }).page.officialDownloadUrl.value).toBe("https://uvel.example.com/download/?platform=auto&source=button");
+    expect(downloads({ officialUrl: "https://uvel.example.com/download", iosUrl: "", androidUrl: "", apkUrl: "" }).page.officialDownloadUrl.value).toBe("https://uvel.example.com/download");
     expect(downloads({ officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "" }).page.officialDownloadUrl.value).toBe("");
     expect(source).not.toContain("VITE_H5_OFFICIAL_DOWNLOAD_URL");
   });
@@ -44,12 +44,12 @@ describe("H5 Lite website distribution destinations", () => {
     page.openDownload("");
     expect(window.location.assign).not.toHaveBeenCalled();
     page.openOfficialDownload();
-    expect(window.location.assign).toHaveBeenCalledExactlyOnceWith("https://uvel.example/download/?platform=auto&source=button");
+    expect(window.location.assign).toHaveBeenCalledExactlyOnceWith("https://uvel.example/");
     for (const item of page.platformDownloads.value) page.openDownload(item.url);
     expect(window.location.assign.mock.calls).toEqual([
-      ["https://uvel.example/download/?platform=auto&source=button"],
-      ["https://uvel.example/download/?platform=ios&source=button"],
-      ["https://uvel.example/download/?platform=android&source=button"],
+      ["https://uvel.example/"],
+      ["https://uvel.example/"],
+      ["https://uvel.example/"],
     ]);
   });
 });

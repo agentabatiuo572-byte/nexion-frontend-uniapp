@@ -3,8 +3,7 @@
   规格: PRD/specs/FEAT-SHARE01-invite-chain.md [FEAT-SHARE5]。
   仅 H5 注册链路到达(register.vue finish 的 #ifdef H5 分支);APP 壳内注册直进
   onboarding。bare 全屏页(无 chassis)→ 自带 GlobalUi 宿主(PORT-PITFALLS P-062)。
-  H5 官网地址读取 share.appDownload.officialUrl，所有下载入口统一前往
-  官网 /download/，platform 区分 ios/android/auto，source=button 标识按钮来源；空值
+  H5 官网地址读取 share.appDownload.officialUrl，所有下载入口原样打开该地址；空值
   显示不可用占位,不制造死链接。App 编译不渲染下载提醒。返回键视同
   「继续」:H5 进首页,App 进 onboarding(禁回注册流)。
 -->
@@ -321,8 +320,8 @@ const officialDownloadUrl = computed(() => appDownloadUrl(
   cfg.config.share.appDownload.officialUrl,
 ));
 const platformDownloads = computed(() => [
-  { platform: "ios", label: t.value.register.doneIosDownload, url: appDownloadUrl(cfg.config.share.appDownload.officialUrl, "ios") },
-  { platform: "android", label: t.value.register.doneAndroidDownload, url: appDownloadUrl(cfg.config.share.appDownload.officialUrl, "android") },
+  { platform: "ios", label: t.value.register.doneIosDownload, url: officialDownloadUrl.value },
+  { platform: "android", label: t.value.register.doneAndroidDownload, url: officialDownloadUrl.value },
 ]);
 
 function openOfficialDownload() {
