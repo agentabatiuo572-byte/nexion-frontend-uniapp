@@ -308,8 +308,8 @@ async function refreshDetailFacts(): Promise<void> {
   // failure. Trust must begin after that boundary or its valid public response
   // is discarded by the Trust generation fence.
   await refreshProductCatalog(true);
-  if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
   await nextTick();
+  if (readEpoch !== detailFactsEpoch || !isCurrentAccountScope(accountScope)) return;
   if (remoteApiEnabled && (eligibility.value.status === "error"
     || eligibility.value.status === "ready" && purchaseEligibilityMessage.value === "error")) {
     void retryEligibility();
