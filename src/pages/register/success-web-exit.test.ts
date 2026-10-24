@@ -4,7 +4,7 @@ import { computed } from "vue";
 import source from "./success.vue?raw";
 import { appDownloadUrl } from "@/lib/app-download-url";
 
-function downloads(links = { officialUrl: "https://uvel.example/", iosUrl: "", androidUrl: "", apkUrl: "" }) {
+function downloads(links = { officialUrl: "https://uvel.example/", iosUrl: "https://download.example/app.ipa", androidUrl: "https://download.example/app.apk", apkUrl: "" }) {
   const script = source.slice(source.indexOf("const officialDownloadUrl ="), source.indexOf("function retryDownloadConfig("));
   const code = ts.transpileModule(script + "\nreturn { officialDownloadUrl, platformDownloads, openOfficialDownload, openDownload };", {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
@@ -18,11 +18,11 @@ function downloads(links = { officialUrl: "https://uvel.example/", iosUrl: "", a
 }
 
 describe("H5 Lite website distribution destinations", () => {
-  it("routes every platform through the configured website without requiring package URLs", () => {
+  it("uses the corresponding A3 platform URL while keeping the landing page separate", () => {
     const { page } = downloads();
     expect(page.officialDownloadUrl.value).toBe("https://uvel.example/");
     expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual([
-      "https://uvel.example/", "https://uvel.example/",
+      "https://download.example/app.ipa", "https://download.example/app.apk",
     ]);
   });
   it("follows management changes and has no hardcoded website fallback", () => {
@@ -30,12 +30,13 @@ describe("H5 Lite website distribution destinations", () => {
     expect(downloads({ officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "" }).page.officialDownloadUrl.value).toBe("");
     expect(source).not.toContain("VITE_H5_OFFICIAL_DOWNLOAD_URL");
   });
-  it("does not bypass a missing website with legacy platform package URLs", () => {
+  it("does not substitute the landing page or legacy APK field for a missing platform URL", () => {
     const { page } = downloads({ officialUrl: "", iosUrl: "https://download.example.com/app.ipa", androidUrl: "", apkUrl: "https://download.example.com/app.apk" });
-    expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual(["", ""]);
+    expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual(["https://download.example.com/app.ipa", ""]);
+    expect(downloads({ officialUrl: "https://uvel.example/", iosUrl: "", androidUrl: "", apkUrl: "" }).page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual(["", ""]);
   });
-  it("does not create links from an unsafe website configuration", () => {
-    const { page } = downloads({ officialUrl: "javascript:alert(1)", iosUrl: "https://download.example/app.ipa", androidUrl: "https://download.example/app.apk", apkUrl: "" });
+  it("rejects unsafe destinations independently for all three links", () => {
+    const { page } = downloads({ officialUrl: "javascript:alert(1)", iosUrl: "javascript:alert(2)", androidUrl: "http://download.example/app.apk", apkUrl: "" });
     expect(page.officialDownloadUrl.value).toBe("");
     expect(page.platformDownloads.value.map((item: { url: string }) => item.url)).toEqual(["", ""]);
   });
@@ -48,8 +49,8 @@ describe("H5 Lite website distribution destinations", () => {
     for (const item of page.platformDownloads.value) page.openDownload(item.url);
     expect(window.location.assign.mock.calls).toEqual([
       ["https://uvel.example/"],
-      ["https://uvel.example/"],
-      ["https://uvel.example/"],
+      ["https://download.example/app.ipa"],
+      ["https://download.example/app.apk"],
     ]);
   });
 });
