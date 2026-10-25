@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import CalculatorWebviewAccessibility from "./calculator-webview-accessibility.vue";
 import { ref, computed, nextTick, watch, type CSSProperties } from "vue";

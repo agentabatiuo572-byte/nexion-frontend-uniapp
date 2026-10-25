@@ -89,6 +89,17 @@ it.each(["zh", "en", "vi"])("keeps the clipboard sentinel and hides sharing on c
   expect(text(p.page.root)).toContain("123.45");
   await p.actions.copyLink(); expect(p.clipboard()).toBe("https://example.invalid/ref/TESTCODE");
   expect(p.toast.success).toHaveBeenCalledWith(p.copy.proof.copiedToast, "");
+  for (const [variant, fact] of [["earnings", "123.45"], ["streak", "7"], ["network", "9"]]) {
+    p.actions.variant.value = variant;
+    await p.actions.copyShareText("Telegram");
+    expect(p.clipboard()).toContain(fact);
+    expect(p.clipboard()).toContain("https://example.invalid/ref/TESTCODE");
+    expect(p.clipboard()).not.toMatch(/\{\w+\}|passive UVT/);
+    p.actions.nativeShare();
+    expect(p.uni.share.mock.lastCall?.[0]).toMatchObject({ title: p.copy.proof.shareTitle, summary: p.clipboard() });
+  }
+  p.actions.variant.value = "earnings";
+  await p.actions.copyLink();
   await p.actions.downloadPng();
   expect(p.ctx.fillText).toHaveBeenCalledWith("123.45", 124, 580);
   expect(p.ctx.fillText).toHaveBeenCalledWith(p.clipboard(), 124, 986);

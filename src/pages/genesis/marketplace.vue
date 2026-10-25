@@ -125,7 +125,7 @@
           <EmptyState v-else-if="genesis.remotePublicReadState === 'unavailable'" kind="empty-list" :compact="secondaryBlock !== null"
             :title="t.marketplace.marketUnavailable" :desc="t.marketplace.marketUnavailableHint"
           />
-          <view v-else-if="mergedActivity.length > 0" class="nx-glass-card overflow-hidden" :style="listCardStyle">
+          <view v-else-if="mergedActivity.length > 0" :style="listCardStyle">
             <ActivityRow v-for="(e, i) in mergedActivity" :key="e.id" :e="e" :is-last="i === mergedActivity.length - 1" />
           </view>
           <!-- 同上:零事件时原样渲染 listCardStyle 会留一个零高度的空 surface 盒子。 -->
@@ -615,11 +615,8 @@ function sortPillStyle(active: boolean): CSSProperties {
     justifyContent: "center",
   };
 }
-// Activity feed — single filled surface container, no border (rows carry hairlines).
-const listCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-};
+// Activity is an open ledger; listings and owned tokens retain their entity cards.
+const listCardStyle: CSSProperties = { paddingBlock: "4px" };
 // Empty state — dashed outline, no fill (whitelist empty-state idiom).
 const emptyCardStyle: CSSProperties = {
   borderRadius: "16px",

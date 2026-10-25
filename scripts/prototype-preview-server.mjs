@@ -12,7 +12,7 @@ await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.t
 const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{code:'zh',userSet:true}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json']});res.end(JSON.stringify(value));};
-const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications|app\/trade-in\/(eligibility|capacity-quote)))$/;
+const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|capacity-quote)))$/;
 http.createServer(async(req,res)=>{
   try {
     const url=new URL(req.url,'http://127.0.0.1:'+port);
@@ -29,13 +29,14 @@ http.createServer(async(req,res)=>{
         if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}
         if(update.ambassadorState)for(const key of ['ambassadorSubmission','ambassadorCommands'])delete state[key];
         if(update.eventState)for(const key of ['eventStatuses','reminders','spun','spinHistory','raffleEntries'])delete state[key];
+        if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
       }
       return sendJson(res,{state,options:demoOptions,simulation:true});
     }
-    if(url.pathname==='/preview-language'){locale=['zh','en','vi'].includes(url.searchParams.get('code'))?url.searchParams.get('code'):'zh';return res.end('OK');}
+    if(url.pathname==='/preview-language'){locale=['zh','en','vi'].includes(url.searchParams.get('code'))?url.searchParams.get('code'):'zh';if(state.profile)state.profile.language=locale;return res.end('OK');}
     if(/^\/(api|auth)\//.test(url.pathname)) {
       if(url.pathname==='/auth/users/refresh')return sendJson(res,{code:0,message:'OK',data:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:{userId:900001,countryCode:'+86',phone:'13800000000',nickname:'Alex',onboardingComplete:true}}});
       if(req.method!=='GET'&&!modeledWrite.test(url.pathname))return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);

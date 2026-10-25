@@ -113,7 +113,7 @@
                 @keydown.enter.stop.prevent="copyLink" @keydown.space.stop.prevent="copyLink"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                <text style="margin-left: 4px; pointer-events: none">{{ referralLink }}</text>
+                <text style="margin-left: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; pointer-events: none">{{ referralLink }}</text>
               </view>
             </view>
             <view class="grid place-items-center shrink-0" :style="qrBoxStyle">
@@ -354,13 +354,19 @@ const topPct = computed(() => remoteApiEnabled ? remoteSnapshot.value?.topPercen
 const topPctText = computed(() => topPct.value === null ? "—" : `Top ${topPct.value}%`);
 
 const shareText = computed(() => {
+  const copy = t.value.proof;
+  const link = referralLink.value;
   if (variant.value === "streak")
     return longestOrCurrent.value === null
-      ? `🔥 My UVEL streak is not available right now. Daily check-ins = passive UVT. Join me: ${referralLink.value}`
-      : `🔥 ${longestOrCurrent.value}-day streak on UVEL. Daily check-ins = passive UVT. Join me: ${referralLink.value}`;
+      ? fmt(copy.shareIntro, { link })
+      : fmt(copy.shareStreak, { days: longestOrCurrent.value, link });
   if (variant.value === "network")
-    return `🌐 My UVEL network has ${totalMembers.value ?? "—"} members. Explore UVEL: ${referralLink.value}`;
-  return `💸 Earned ${earningsTotalText.value} on UVEL in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
+    return totalMembers.value === null
+      ? fmt(copy.shareIntro, { link })
+      : fmt(copy.shareNetwork, { members: totalMembers.value, link });
+  return earningsTotal.value === null || activeDays.value === null
+    ? fmt(copy.shareIntro, { link })
+    : fmt(copy.shareEarnings, { amount: earningsTotalText.value, days: activeDays.value, link });
 });
 
 // ── derived labels ──
@@ -396,7 +402,7 @@ function nativeShare() {
       provider: "weixin",
       type: 0,
       href: referralLink.value,
-      title: "UVEL · Proof of Contribution",
+      title: t.value.proof.shareTitle,
       summary: text,
       success: () => {},
       fail: () => { if (current()) void copyText(text, t.value.proof.sharedToast, "", current); },
@@ -409,7 +415,7 @@ function copyLink() {
   return copyText(referralLink.value, t.value.proof.copiedToast);
 }
 function copyShareText(networkName: string) {
-  return copyText(shareText.value, t.value.proof.sharedToast, `Open ${networkName} and paste`);
+  return copyText(shareText.value, t.value.proof.sharedToast, fmt(t.value.proof.sharePasteHint, { channel: networkName }));
 }
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1350;
@@ -694,6 +700,12 @@ const refCodeStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const refLinkStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: "0",
+  boxSizing: "border-box",
+  overflowWrap: "anywhere",
+  wordBreak: "break-all",
   marginTop: "4px",
   minHeight: "44px",
   marginLeft: "-4px",
@@ -711,7 +723,7 @@ const qrGridStyle = computed<CSSProperties>(() => ({
   padding: "4px",
 }));
 function qrCellStyle(on: boolean): CSSProperties {
-  return { width: "100%", height: "100%", background: on ? "var(--v5-on-brand)" : "transparent" };
+  return { width: "100%", height: "100%", background: on ? "#121212" : "transparent" };
 }
 const posterCanvasStyle: CSSProperties = {
   position: "fixed",

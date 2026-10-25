@@ -225,7 +225,7 @@ const refreshErrorStyle: CSSProperties = {
 };
 const refreshErrorTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
 const refreshRetryStyle: CSSProperties = {
-  minHeight: "34px",
+  minHeight: "44px",
   marginTop: "8px",
   padding: "0 12px",
   borderRadius: "999px",
