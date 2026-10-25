@@ -65,6 +65,14 @@ it("rejects missing eligibility, corrupt money/progress and mismatched event ide
   expect(request.mock.calls[0][0].path).toBe("/api/events/wrong-event/detail?locale=zh");
 });
 
+it('keeps personal paid pool rewards distinct from missing results, including paid zero',()=>{
+  expect(parseEventDetail(detail()).myRewardAmount).toBeUndefined();
+  expect(parseEventDetail({...detail(),myRewardAmount:null}).myRewardAmount).toBeNull();
+  for(const amount of [0,0.17196,0.002634,0.000001])expect(parseEventDetail({...detail(),myRewardAmount:amount}).myRewardAmount).toBe(amount);
+  expect(parseEventDetail({...detail(),myRewardAmount:'0.171960'}).myRewardAmount).toBe(0.17196);
+  for(const amount of [-1,NaN,Infinity,'',false,{},'not-paid'])expect(()=>parseEventDetail({...detail(),myRewardAmount:amount})).toThrow('EVENT_DETAIL_INVALID');
+});
+
 it("keeps earned rewards claimable after closure or expiry without reopening participation", () => {
   const value = detail();
   for (const enabled of [true, false]) {
