@@ -4,6 +4,7 @@ import type { ApiClient } from "@/api/api-client";
 import { eventDetailCopy } from "@/i18n/event-detail";
 import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref } from "./event-detail-display";
 import { promotionDetailHref,promotionCheckoutHref,voucherEntryContext } from '@/lib/promotion-entry';
+import { nativeTabEntry,nativeTabUrl } from '@/lib/native-tab-navigation';
 
 function queryValues(query:URLSearchParams){const values:Record<string,string>={};query.forEach((value,key)=>{values[key]=value;});return values;}
 function detail(): EventDetail {
@@ -14,7 +15,9 @@ it('seasonal BF20 keeps the whole hardware store and passes voucher context thro
   const value=detail();value.event.kind='seasonal';value.event.trackable=false;value.rules={voucherId:'BF20',promotionActivityId:'Pro upgrade'};
   const store=new URL(eventDetailHref(value),'https://app.test');
   expect(store.pathname).toBe('/pages/store/store');expect(store.searchParams.get('scope')).toBe('all');expect(store.searchParams.has('activityId')).toBe(false);
-  const context=voucherEntryContext(queryValues(store.searchParams));
+  const nativeStore=nativeTabEntry({target:nativeTabUrl(eventDetailHref(value)).split('?target=')[1]});
+  expect(nativeStore.tab).toBe('store');expect(nativeStore.query).toEqual(queryValues(store.searchParams));
+  const context=voucherEntryContext(nativeStore.query);
   const product=new URL(promotionDetailHref('ordinary sku',undefined,context),'https://app.test');
   const checkout=new URL(promotionCheckoutHref([{productNo:'ordinary sku',quantity:3}],undefined,voucherEntryContext(queryValues(product.searchParams))),'https://app.test');
   expect(checkout.searchParams.get('voucherId')).toBe('BF20');expect(checkout.searchParams.get('upgradeActivityId')).toBe('Pro upgrade');expect(checkout.searchParams.has('activityId')).toBe(false);
