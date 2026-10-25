@@ -680,8 +680,8 @@ const lifecycle = computed(() => {
 });
 const chipColor = computed(() => {
   const s = lifecycle.value;
-  if (!s) return "var(--v5-tech-cyan)";
-  return s.efficiency >= 0.85 ? "var(--v5-tech-cyan)" : s.efficiency >= 0.65 ? "var(--v5-warning)" : "var(--v5-brand-2)";
+  if (!s) return "var(--v5-ink-3)";
+  return s.efficiency >= 0.85 ? "var(--v5-brand)" : s.efficiency >= 0.65 ? "var(--v5-warning)" : "var(--v5-brand-2)";
 });
 const monthsLabel = computed(() => {
   const s = lifecycle.value;

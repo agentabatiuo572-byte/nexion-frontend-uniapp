@@ -25,7 +25,7 @@
         </view>
       </view>
       <template v-for="(block, index) in content.blocks.slice(1)" :key="block.id">
-        <HowSection v-if="block.kind !== 'callout'" :title="block.title" :accent="index % 2 ? 'purple' : 'lemon'">
+        <HowSection v-if="block.kind !== 'callout'" :title="block.title" :accent="neutral ? 'neutral' : index % 2 ? 'purple' : 'lemon'">
           <text class="block" :style="bodyStyle">{{ block.body }}</text>
           <view v-if="block.items?.length" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
             <view v-for="item in block.items" :key="item" style="display: flex; gap: 8px">
@@ -33,7 +33,7 @@
             </view>
           </view>
         </HowSection>
-        <HowCalloutBox v-else class="mx-4" :title="block.title" :body="block.body" tone="purple" />
+        <HowCalloutBox v-else class="mx-4" :title="block.title" :body="block.body" :tone="neutral ? 'neutral' : 'purple'" />
       </template>
     </view>
   </view>
@@ -51,7 +51,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { PublishedContentRequestFence } from "./p3-14-published-request-fence";
 
-const props = defineProps<{ contentKey: HowContentKey; back: string }>();
+const props = defineProps<{ contentKey: HowContentKey; back: string; neutral?: boolean }>();
 const emit = defineEmits<{ unavailable: [] }>();
 const locale = useLocaleStore();
 const t = useT();

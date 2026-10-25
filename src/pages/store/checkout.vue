@@ -639,16 +639,19 @@ function trialQuoteAt(now: number): TrialQuote {
   const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
   const trialProductId = resolveTrialCheckoutProductId(cfg.trialProductId);
   if ((r.status !== "active" && r.status !== "grace") || !trialProductId || productId.value !== trialProductId) return NO_TRIAL;
-  // 影子口径与 free-trial.liveShadow* 同一条规则(active 按冻结窗口累计 /
-  // grace 取边界定格值),但锚在本次解析出的行上,不再各读各的时钟。
-  const acc = accruedShadow(r, now, cfg);
-  const split = computeTrialOffset(cfg, r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
+  // Remote credit is the same server projection shown by free-trial.liveShadow*.
+  // Only local mode accrues by time; recomputing remote credit would quote a
+  // different discount from the trial page and the conversion authority.
+  const acc = remoteApiEnabled
+    ? { usd: freeTrial.authoritativeShadowUSD, nex: freeTrial.authoritativeShadowNEX }
+    : accruedShadow(r, now, cfg);
+  const split = computeTrialOffset(cfg, remoteApiEnabled || r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
   return {
     applied: true,
     promo: computeDiscountedPrice(cfg).discount,
     offsetUSD: split.offsetUSD,
     remainderUSD: split.remainderUSD,
-    shadowNEX: r.status === "active" ? acc.nex : r.shadowFrozenAtNEX,
+    shadowNEX: remoteApiEnabled || r.status === "active" ? acc.nex : r.shadowFrozenAtNEX,
   };
 }
 

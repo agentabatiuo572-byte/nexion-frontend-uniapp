@@ -319,7 +319,7 @@ function paint(link: string, myToken: number) {
   const bg = ctx.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, "#242629"); bg.addColorStop(1, "#101113");
   ctx.setFillStyle(bg); ctx.fillRect(0, 0, W, H);
-  if (brandLogoPath) ctx.drawImage(brandLogoPath, 16, 10, 120, 40);
+  if (brandLogoPath) ctx.drawImage(brandLogoPath, 16, 10, 144, 144 * 246 / 712);
   else fitText(ctx, "UVEL", 20, 37, 120, 15, INK_ON_DARK);
   ctx.setTextAlign("right"); fitText(ctx, ts(), W - 20, 34, 150, 9, FAINT_ON_DARK); ctx.setTextAlign("left");
 

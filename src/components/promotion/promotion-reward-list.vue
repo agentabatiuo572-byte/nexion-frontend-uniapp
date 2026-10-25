@@ -11,7 +11,7 @@
       <text class="promotion-copy">{{ t.promotion.emptyNote }}</text>
       <PromotionAction role="button" tabindex="0" @click="navTo('/store')" @keydown.enter.prevent="navTo('/store')" @keydown.space.prevent="navTo('/store')"><text>{{ t.promotion.buyMore }}</text></PromotionAction>
     </view>
-    <view v-if="rewards.length" class="promotion-flat"><RewardRows :rewards="rewards" /></view>
+    <view v-if="rewards.length" class="promotion-reward-rows"><RewardRows :rewards="rewards" /></view>
     <PromotionAction v-if="hasMore" role="button" tabindex="0" :aria-disabled="loading" @click="load(false)" @keydown.enter.prevent="load(false)" @keydown.space.prevent="load(false)"><text>{{ t.promotion.more }}</text></PromotionAction>
     <NxSheet :open="stateSheetOpen" :title="t.promotion.allStates" @close="closeStateSheet">
       <view class="reward-state-options" role="group" :aria-label="t.promotion.allStates">

@@ -138,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
 import { formatComputePoints, sumComputePoints } from "@/i18n/compute-points";
 import ReferralProgress from '@/components/promotion/referral-progress.vue';
 import { navTo } from "@/lib/route";
@@ -274,7 +274,7 @@ const binary = computed(() => {
   const match = Math.min(Math.min(L / 30, R / 30) * 0.1, 5000);
   return { binaryMatch: match, leftVol: L, rightVol: R };
 });
-const binaryMatchText = computed(() => binary.value === null ? "—" : `$${formatAmount(binary.value.binaryMatch)}`);
+const binaryMatchText = computed(() => binary.value === null ? "—" : formatUsd(binary.value.binaryMatch));
 const leftVolText = computed(() => formatComputePoints(remoteApiEnabled ? commission.binarySnapshot?.trackAComputePoints : sumComputePoints(members.value.filter(m => m.binary === 'left').map(m => m.monthComputePoints)), locale.code));
 const rightVolText = computed(() => formatComputePoints(remoteApiEnabled ? commission.binarySnapshot?.trackBComputePoints : sumComputePoints(members.value.filter(m => m.binary === 'right').map(m => m.monthComputePoints)), locale.code));
 
@@ -285,7 +285,7 @@ const projectedPayout = computed(() => remoteApiEnabled ? remotePool.value?.proj
 const leadershipPoolUnlocked = computed(() => myVotes.value > 0);
 const leadershipPoolTotal = computed(() => remoteApiEnabled ? remotePool.value?.currentWeekPoolUSDT ?? 0 : pool.currentWeekPoolUSDT);
 const leadershipPoolPrimary = computed(() =>
-  remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : leadershipPoolUnlocked.value ? `$${formatAmount(projectedPayout.value)}` : `$${formatAmount(leadershipPoolTotal.value)}`,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : formatUsd(leadershipPoolUnlocked.value ? projectedPayout.value : leadershipPoolTotal.value),
 );
 const leadershipPoolLineA = computed(() =>
   remoteApiEnabled && remotePoolState.value !== "ready" ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,

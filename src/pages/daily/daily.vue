@@ -461,7 +461,7 @@ const heroLineText = computed(() =>
       }) : t.value.daily.noNextMilestone,
 );
 const nextClaimText = computed(() => fmt(t.value.daily.nextClaimIn, { time: formatCountdown(nextResetMs.value) }));
-const saverHeadlineText = computed(() => fmt(t.value.daily.saver.headline, { n: streak.value || "0" }));
+const saverHeadlineText = computed(() => t.value.daily.saver.headline);
 const saverCountText = computed(() =>
   faucet.streakSavers > 0 ? fmt(t.value.daily.saver.count, { n: faucet.streakSavers }) : t.value.daily.saver.empty,
 );

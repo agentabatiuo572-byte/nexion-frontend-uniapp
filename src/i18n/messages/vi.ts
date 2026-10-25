@@ -5730,11 +5730,11 @@ annualBudget: "Hạn mức ngân sách năm: $40,000.00 USDT",
     },
     saver: {
       label: "CỨU CHUỖI",
-      headline: "Đừng để mất chuỗi {n} ngày",
+      headline: "Dùng thẻ để khôi phục chuỗi bị gián đoạn",
       count: "Còn {n} thẻ cứu chuỗi",
       use: "Dùng 1 thẻ",
       empty: "Chưa có thẻ cứu chuỗi khả dụng",
-      restored: "Đã khôi phục chuỗi! Mai điểm danh để tiếp tục.",
+      restored: "Đã khôi phục chuỗi",
       onlyWhenBroken: "Thẻ cứu chuỗi chỉ dùng được sau khi bạn lỡ một ngày.",
     },
     topStreakers: {

@@ -12,7 +12,7 @@ withDefaults(defineProps<{
   label: string;
   title: string;
   sub: string;
-  accent?: "lemon" | "purple" | "amber" | "violet" | "nex";
+  accent?: "lemon" | "purple" | "amber" | "violet" | "nex" | "neutral";
 }>(), { accent: "lemon" });
 </script>
 
