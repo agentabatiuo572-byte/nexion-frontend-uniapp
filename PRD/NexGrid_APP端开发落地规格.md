@@ -582,6 +582,9 @@ namespace 含:tabs/headerTitles(60+ 路由)/headerSubtitles(23)/home/earn/store/
 - **§9.11 防篡改**:13 条 localStorage 篡改路径统一 server canonical+client UI cache(trial 重置/walletPaired/risk accepted/MAX_DEVICES/OTP/Bills push/ID mint 全 server enforce);Kill-switch 8 项;A/B 值 server-driven(chargeFailRate/unilevel mult/lucky mult/PHASES/NEX 曲线);跨 store mutation 原子+IK;组合攻击路径(养号闭环)须整体防御。
 
 ### 6.5 验收 & KPI(§17)
+
+2026-10-25（#649）Android 标准基座真机已验证原 BF20 报价 1039.20 USDT 的三态：有效时确认可用，前台自然等待超过 60 秒 TTL 后禁用，正常重报价后恢复。对应源码 `9209ee22`；未点击确认订单/支付，不将其写成实际建单付款通过，亦未实测深度休眠或 iOS。详细回执与活动其他边界见[首页与活动规则 §6.1](UVEL_首页信任与活动规则_20261025.md#61-2026-10-25-test-实际验收结果)。
+
 - **功能验收**:`bash scripts/verify.sh all` → 全过;`npx tsc --noEmit` → 0 errors。每路由:HTTP 200+关键文案+主交互可点。
 - **KPI**:Day0 自动接入 >95%(注册→90s 首 receipt)· Day7 留存 >60% · L2→L3(进 store)>30% · L3→L4(下单)5-10% · L4→L5(推广)>40% · Nova push CTR >25% · 团队佣金触发率 >80% · Genesis 售罄 <14 天。
 
