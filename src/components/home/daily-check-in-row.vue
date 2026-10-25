@@ -87,6 +87,6 @@ async function checkIn() {
 .daily-check-in-row__days .today { border:1px solid rgba(200,242,90,.6);box-shadow:0 0 0 3px rgba(158,220,29,.10),0 6px 16px rgba(158,220,29,.18);background:linear-gradient(180deg,rgba(158,220,29,.22),rgba(158,220,29,.06));color:var(--ui-lime-pale); }
 .day-mark { font-size: 12px; font-weight: 600; }
 .daily-check-in-row__days .gift { color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 12%,transparent); border: 1px solid color-mix(in srgb,var(--v5-nex) 24%,transparent); box-sizing: border-box; }
-.daily-check-in-row__gift-hint { color: var(--v5-nex); }
+.daily-check-in-row__gift-hint { display: inline-block; max-width: 100%; color: var(--v5-nex); }
 @media(max-width:350px) { .daily-check-in-row {gap:0 8px;padding-inline:12px;grid-template-columns:40px minmax(0,1fr);}.daily-check-in-row :deep(.nx-button) {grid-column:1 / -1;margin-top:12px;}.daily-check-in-row :deep(.nx-button__surface) {padding-inline:12px;}.daily-check-in-row__title {font-size:14px;} }
 </style>

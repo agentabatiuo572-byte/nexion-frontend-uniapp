@@ -5840,11 +5840,11 @@ annualBudget: "Annual budget allowance: $40,000.00 USDT",
     },
     saver: {
       label: "STREAK SAVER",
-      headline: "Don't lose your {n}-day streak",
+      headline: "Restore a broken streak with a saver",
       count: "{n} saver available",
       use: "Use 1 saver",
       empty: "No streak savers available",
-      restored: "Streak restored! Sign in tomorrow to continue.",
+      restored: "Streak restored",
       onlyWhenBroken: "Streak Savers only work after you miss a day.",
     },
     topStreakers: {

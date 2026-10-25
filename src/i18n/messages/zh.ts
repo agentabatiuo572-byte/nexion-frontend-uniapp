@@ -5729,11 +5729,11 @@ annualBudget: "年度预算额度:$40,000.00 USDT",
     },
     saver: {
       label: "断签复活卡",
-      headline: "别让 {n} 天连签断掉",
+      headline: "中断连签后可用复活卡恢复",
       count: "{n} 张复活卡可用",
       use: "使用 1 张",
       empty: "暂无可用复活卡",
-      restored: "连签已恢复!明天继续签到即可。",
+      restored: "连签已恢复",
       onlyWhenBroken: "断签时才能使用复活卡。",
     },
     topStreakers: {

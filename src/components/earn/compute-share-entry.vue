@@ -1,7 +1,7 @@
 <template>
   <view v-if="enabled" class="nx-glass-card compute-share-entry" :class="{ 'mx-4': context === 'devices' }" :style="rootStyle" data-proof="compute-share-entry">
     <view :style="iconStyle">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="4" width="18" height="12" rx="2" />
         <path d="M8 21h8" />
         <path d="m12 16 1 5" />
@@ -57,13 +57,13 @@ const iconStyle: CSSProperties = {
   borderRadius: "10px",
   display: "grid",
   placeItems: "center",
-  background: "color-mix(in srgb, var(--v5-tech-cyan) 13%, transparent)",
+  background: "var(--v5-surface-2)",
   flexShrink: 0,
 };
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
-  color: "var(--v5-tech-cyan-ink)",
+  color: "var(--v5-ink-2)",
   letterSpacing: "0.06em",
 };
 const titleStyle: CSSProperties = {

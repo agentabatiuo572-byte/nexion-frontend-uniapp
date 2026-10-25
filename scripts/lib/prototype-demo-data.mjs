@@ -13,6 +13,7 @@ import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
 import { demoNotifications } from './prototype-demo-notifications.mjs';
 import { accountDemo } from './prototype-demo-account.mjs';
+import { bankDemo } from './prototype-demo-bank.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
@@ -20,7 +21,7 @@ const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-export const demoDefaults = {catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
@@ -29,6 +30,8 @@ export const demoOptions = {
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
+  stakingState:[['enabled','正常开放'],['delisted','功能下架']],
+  bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
 };
@@ -105,12 +108,16 @@ export function demoFixture(url,locale,state,request) {
   if(request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
+    config.featureFlags.stakingVisible=state.stakingState!=='delisted';
+    config.featureFlags.homeWeeklyPromoEnabled=true;
+    config.share.baseUrl='https://demo.uvel.example/ref/';
     Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:30,registeredUsersTickStep:1,virtualUserCount:0});
     if(empty){delete config.publicStats.registeredUsersBase;config.publicStats.networkPulse=null;}
-    return config;
+    return withDemoShareChannels(config,state);
   }
   const learning=learningDemo(url,locale,state,request);if(learning!==undefined)return learning;
   const account=accountDemo(url,locale,state,request);if(account!==undefined)return account;
+  const bank=bankDemo(url,state,request);if(bank!==undefined)return bank;
   if(pathname==='/api/app/home/overview') {
     const overview=structuredClone(base());
     overview.earningsLedger=empty?[]:[['DEMO-EARNING-1','Demo Studio','SDXL',2.34],['DEMO-EARNING-2','Demo Lab','Llama',.00032],['DEMO-EARNING-3','Demo Lab','Whisper',.00005]].map(([id,client,model,rewardUsdt],index)=>({id,client,model,rewardUsdt,completedAt:new Date(now-(index+1)*600000).toISOString(),synthetic:false}));
@@ -167,12 +174,6 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);
   if(pathname==='/api/genesis/account') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:{...authority,series:null,sale:null,eligibility:null,marketEnabled:false,emissionOpen:false,holdings:[],emissions:[],orders:[],walletBalanceUsdt:5280};
   if(pathname==='/api/genesis/eligibility') return {...authority,eligible:false,reasons:['SALE_NOT_OPEN'],ownedCount:0,maxPerUser:2,remainingCap:2,minAccountAgeDays:0,accountAgeDays:42,status:'NOT_ELIGIBLE',reservedAllocation:null,reservedAllocationUnit:'NEX',priorityRank:null,priorityTier:'NONE',qualificationReasonCodes:['NO_ACTIVE_HOLDINGS'],policyVersion:null,effectiveAt:null,asOf:iso,serverTime:iso,provenance:{source:'nx_genesis_holding+nx_config_item',environment:'PRODUCTION',runId:''},halted:false};
-  if(pathname==='/api/config/platform') {
-    const data=structuredClone(base());
-    data.featureFlags.homeWeeklyPromoEnabled=true;
-    data.share.baseUrl='https://demo.uvel.example/ref/';
-    return withDemoShareChannels(data,state);
-  }
   if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:empty?[]:[...(state.createdOrders||[]),...demoOrders(products,state,now)],nextCursor:null};
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
