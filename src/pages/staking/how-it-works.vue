@@ -25,7 +25,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
         </template>
         <text class="block" :style="captionStyle">{{ w.s2Caption }}</text>
-        <view v-if="configAvailable" class="nx-glass-card" :style="tableStyle">
+        <view v-if="configAvailable" :style="tableStyle">
           <view class="flex" :style="tableHeadStyle">
             <text class="text-left" :style="thCellLeft">{{ w.colTerm }}</text>
             <text class="text-right" :style="thCellRight">{{ w.colApy }}</text>
@@ -208,27 +208,28 @@ const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
 const captionStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const retryStyle: CSSProperties = { minHeight: "44px", marginTop: "8px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px" };
 const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
-const tableStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-  overflow: "hidden",
+const tableStyle: CSSProperties = {
+  paddingBlock: "4px",
 };
 const tableHeadStyle: CSSProperties = {
   fontSize: "12px",
-  letterSpacing: "0.14em",
-  color: "var(--v5-ink-3)",
+  lineHeight: 1.5,
+  color: "var(--v5-ink-2)",
+  borderBottom: "1px solid var(--v5-border)",
 };
-const thCellLeft: CSSProperties = { flex: "1 1 0", minWidth: 0, padding: "8px 6px", fontWeight: 500 };
+const thCellLeft: CSSProperties = { flex: "1 1 0", minWidth: 0, overflowWrap: "anywhere", padding: "8px 6px", fontWeight: 500 };
 const thCellRight: CSSProperties = { ...thCellLeft };
 function tableRowStyle(isFirst: boolean): CSSProperties {
   return {
-    fontSize: "12px",
+    fontSize: "13px",
+    lineHeight: 1.6,
     borderTop: isFirst ? "none" : "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)",
   };
 }
 const tdTermStyle: CSSProperties = {
   flex: "1 1 0",
   minWidth: 0,
+  overflowWrap: "anywhere",
   padding: "8px 6px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
