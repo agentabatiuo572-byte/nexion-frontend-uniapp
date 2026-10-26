@@ -20,7 +20,8 @@
     <!-- Simulated device status bar (preview shell only) — bare page draws its own. -->
     <DeviceStatusBar />
 
-    <!-- Header -->
+    <!-- Only the individual controls paint glass; messages scroll beneath this transparent overlay. -->
+    <view ref="topOverlayHost" class="cp-top-overlay">
     <view class="cp-head" :style="{ paddingTop: statusBarHeight + 10 + 'px' }">
       <view class="cp-back active:opacity-60" role="button" tabindex="0" :aria-label="t.conversations.back" @click="goBack"  @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)">
         <LiquidGlass :radius="22" />
@@ -41,7 +42,7 @@
       <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation"  @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)"><LiquidGlass :radius="22" />
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12v6a2 2 0 0 1-2 2H6l-3 2V6a2 2 0 0 1 2-2h6" /><path d="M17 2v8m-4-4h8" /></svg>
       </view>
-      <view v-else class="cp-head-spacer cp-ava" :style="avaStyle" aria-hidden="true"><view class="cp-ava-icon" v-html="headerIcon" /></view>
+      <view v-else class="cp-head-spacer" aria-hidden="true" />
     </view>
 
     <view v-if="advisorApplies && convStore.advisorError" class="cp-history-error" role="alert">
@@ -71,10 +72,12 @@
     </view>
     <view v-if="humanHistoryError || humanHistoryListError" class="cp-history-error" role="alert"><text>{{ t.conversations.loadError }}</text><view class="cp-history-text-action" role="button" :tabindex="humanHistoryRetryBusy || humanEarlierBusy ? -1 : 0" :aria-disabled="humanHistoryRetryBusy || humanEarlierBusy" :aria-busy="humanHistoryRetryBusy" @click="retryHumanHistory" @keydown.enter.prevent="onKeyboardActivate($event, retryHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, retryHumanHistory)"><text>{{ t.conversations.retry }}</text></view></view>
     <view v-if="showUnassignedReceived" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ t.conversations.image.unassignedReceived }}</text></view>
+    </view>
 
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
       ref="conversationThread"
+      :top-inset="topOverlayHeight"
       :time-locale="locale.code"
       @typing="!isAi && convStore.setTyping($event)"
       :messages="threadMessages"
@@ -147,7 +150,7 @@
 
 <script setup lang="ts">
 import { catalogSkuBrandText, catalogSkuRecommendationBody } from "@/lib/brand-copy";
-import { ref, shallowRef, computed, watch, onUnmounted, type CSSProperties } from "vue";
+import { ref, shallowRef, computed, watch, nextTick, onMounted, onUnmounted, getCurrentInstance, type CSSProperties } from "vue";
 import { onLoad, onUnload, onShow, onHide } from "@dcloudio/uni-app";
 import NovaAvatar from "@/components/nova/nova-avatar.vue";
 import ConversationThread from "@/components/support/conversation-thread.vue";
@@ -694,6 +697,7 @@ onLoad((q) => {
 // sessionStatus guards) makes redundant ticks free. A real backend pushes these
 // events — the interval then becomes a harmless no-op.
 onShow(async () => {
+  measureTopOverlay();
   if (hiddenAiRoute.value) return;
   novaPageVisible = true;
   if (!isAi.value) { humanShowRevision.value += 1; return; }
@@ -752,9 +756,6 @@ onHide(() => {
   }
   stopHumanThreadPolling();
 });
-
-const ADVISOR_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M6 21a6 6 0 0 1 12 0" /></svg>`;
-const SUPPORT_ICON = `<svg width="20" height="20" viewBox="0 -1.5 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" /></svg>`;
 
 watch(() => app.accountKey, () => {
   if (!isAi.value || !remoteApiEnabled) return;
@@ -908,11 +909,6 @@ const dotStyle = computed<CSSProperties>(() =>
     ? { background: "var(--v5-ink-4)", animation: "none" }
     : { background: isAi.value ? headerTint.value : "var(--nx-presence-green)" },
 );
-const headerIcon = computed(() => (humanType.value === "advisor" ? ADVISOR_ICON : SUPPORT_ICON));
-const avaStyle = computed<CSSProperties>(() => ({
-  color: "var(--v5-ink-2)",
-  background: "var(--v5-surface-2)",
-}));
 
 const inputPlaceholder = computed(() =>
   isAi.value && novaProviderHold.value
@@ -1689,6 +1685,40 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   void action();
 }
 
+const topOverlayHost = ref<unknown>(null);
+const topOverlayHeight = ref(statusBarHeight.value + 74);
+const chatInstance = getCurrentInstance()?.proxy;
+let topOverlayObserver: ResizeObserver | undefined;
+function measureTopOverlay() {
+  void nextTick(() => {
+    if (chatDisposed) return;
+    const apply = (height?: number) => {
+      if (!chatDisposed && height && Number.isFinite(height)) topOverlayHeight.value = height;
+    };
+    const node = (topOverlayHost.value as { $el?: HTMLElement } | null)?.$el ?? topOverlayHost.value as HTMLElement | null;
+    if (node?.getBoundingClientRect) { apply(node.getBoundingClientRect().height); return; }
+    if (typeof uni === 'undefined' || !uni.createSelectorQuery) return;
+    try {
+      const query = uni.createSelectorQuery().in(chatInstance);
+      query.select('.cp-top-overlay').boundingClientRect();
+      query.exec(rows => apply((rows[0] as UniApp.NodeInfo)?.height));
+    } catch { /* Keep the conservative status-bar and control spacing. */ }
+  });
+}
+onMounted(() => {
+  measureTopOverlay();
+  const node = (topOverlayHost.value as { $el?: HTMLElement } | null)?.$el ?? topOverlayHost.value as HTMLElement | null;
+  if (typeof ResizeObserver !== 'undefined' && node?.getBoundingClientRect) {
+    topOverlayObserver = new ResizeObserver(measureTopOverlay);
+    topOverlayObserver.observe(node);
+  }
+});
+watch(() => [headerName.value, headerRole.value, locale.code, convStore.advisorError,
+  humanHistoryError.value, humanHistoryListError.value, showUnassignedReceived.value,
+  conv.value?.historyTruncated, conv.value?.historyNextCursor,
+  nova.historyTruncated, nova.historyNextCursor, handoffRecommended.value], measureTopOverlay);
+onUnmounted(() => topOverlayObserver?.disconnect());
+
 import LiquidGlass from "@/components/liquid-glass.vue";
 </script>
 
@@ -1712,6 +1742,19 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   padding: 10px 16px 12px;
   /* top padding is bound inline to the device status-bar height (see cp-head :style) */
 }
+.cp-top-overlay {
+  position: absolute; inset: 0 0 auto; z-index: 4;
+  background: transparent; pointer-events: none;
+}
+.cp-top-overlay > * { pointer-events: auto; }
+.cp-top-overlay .cp-head { pointer-events: none; }
+.cp-head > :not(.cp-head-spacer) { pointer-events: auto; }
+.cp-head {
+  --v5-liquid-tint: rgba(38, 42, 44, .46);
+  --v5-liquid-shadow: inset 0 1px 1px rgba(255,255,255,.1), 0 2px 8px rgba(0,0,0,.12);
+}
+:global([data-theme="light"] .cp-head) { --v5-liquid-tint: rgba(255,255,255,.58); --v5-liquid-shadow: inset 0 1px 1px rgba(255,255,255,.8), 0 2px 8px rgba(30,45,65,.06); }
+.cp-head :deep(.nx-liquid-glass[data-glass-strategy="frosted"]) { backdrop-filter: blur(18px) saturate(135%); -webkit-backdrop-filter: blur(18px) saturate(135%); }
 .cp-ai-safety {
   padding: 8px 16px;
   background: color-mix(in srgb, var(--v5-tech-cyan) 8%, var(--v5-bg));
@@ -1744,6 +1787,10 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   border-radius: 50%;
   position: relative;
 }
+.cp-back, .cp-ticket, .cp-identity {
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  backdrop-filter: blur(16px) saturate(135%);
+}
 .cp-head-spacer { width: 44px; height: 44px; pointer-events: none; }
 .cp-identity {
   position: relative; isolation: isolate; min-height: 44px; padding: 5px 18px; border-radius: 24px; box-sizing: border-box;
@@ -1754,17 +1801,6 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   min-width: 0;
   max-width: 100%;
 }
-.cp-ava {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.cp-head-spacer.cp-ava { width: 44px; height: 44px; border-radius: 50%; }
-.cp-ava-icon { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; line-height: 0; }
-.cp-ava-icon :deep(svg) { display: block; }
 .cp-meta {
   min-width: 0;
   position: relative; text-align: center;
