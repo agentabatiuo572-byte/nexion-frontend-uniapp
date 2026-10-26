@@ -19,6 +19,10 @@
 - 独立UI/i18n/模型审查（Curie）：9.0/10，已查看320越南文详情截图；地图点击证据来自主agent CUA，非其独立重放。
 - 审查发现并已修复：三语key误放层级、旧“实际负载”图例、欧洲节点点击重叠。低于9分的中间结论不作为最终签项。
 
+## Home Indicator 追加修正
+
+原弹窗容器只有固定16px底部间距，未读取系统安全区。现改为16px加上系统安全区与24px中的较大值，桌面手机预览至少40px，iOS实际安全区34px时为50px；弹窗最大高度受容器限制并支持内容内滚动。该项属于展示修正，已同步前端日志。
+
 ## 证据与未覆盖边界
 
 截图及日志保存在本机 `D:/WORKS/PLAN/.wt/uvel-design-preview/`：`globe-simulation-vi-320.png`、`globe-simulation-zh-detail.png`、`globe-simulation-en-320.png`、`globe-center-tests.log`、`globe-center-types.log`、`globe-center-build.log`；这些路径仅是本地证据，不冒称远端附件。

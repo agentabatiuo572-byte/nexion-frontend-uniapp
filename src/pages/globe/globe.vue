@@ -414,6 +414,9 @@ const regionRateStyle: CSSProperties = {
 const drawerCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   width: "100%",
   maxWidth: "420px",
+  maxHeight: "100%",
+  overflowY: "auto",
+  boxSizing: "border-box",
   background: "var(--nx-glass-fill)",
   borderColor: "transparent",
   padding: "20px",
@@ -504,7 +507,8 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () =>
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0 12px 16px;
+  box-sizing: border-box;
+  padding: 12px 12px calc(16px + max(env(safe-area-inset-bottom, 0px), 24px));
 }
 .nx-globe-scrim {
   position: absolute;
