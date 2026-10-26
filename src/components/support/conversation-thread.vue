@@ -15,7 +15,7 @@
          stays "" and domToBottom() handles it (uni's declarative scroll lands short
          of a freshly-laid-out bubble). -->
     <scroll-view ref="listHost" scroll-y class="nx-conv-list" :scroll-top="scrollTop" :scroll-into-view="scrollAnchor" :scroll-with-animation="scrollAnimated" :show-scrollbar="false" @scroll="onThreadScroll">
-      <view class="nx-conv-content" :style="{ paddingBottom: composerVisible ? (composerMeasured ? composerSpace + 'px' : 'calc(' + composerSpace + 'px + env(safe-area-inset-bottom))') : undefined }">
+      <view class="nx-conv-content" :style="{ paddingTop: (topInset || 0) + 'px', paddingBottom: composerVisible ? (composerMeasured ? composerSpace + 'px' : 'calc(' + composerSpace + 'px + env(safe-area-inset-bottom))') : undefined }">
       <view v-if="messages.length === 0 && emptyHint" class="nx-conv-empty">
         <text class="nx-conv-empty-t">{{ emptyHint }}</text>
       </view>
@@ -136,6 +136,7 @@
     <view class="nx-conv-input-row">
       <view v-if="imageLabels" class="nx-conv-attach-trigger family-control" role="button" :tabindex="attachDisabled ? -1 : 0" :aria-label="attachDisabled && attachUnavailable ? imageLabels.attach + ' · ' + attachUnavailable : imageLabels.attach" :aria-disabled="attachDisabled ? 'true' : 'false'" :style="attachDisabled ? { opacity: 0.45 } : undefined" @click="!attachDisabled && emit('attach')" @keydown.enter.prevent="!attachDisabled && emit('attach')" @keydown.space.prevent="!attachDisabled && emit('attach')"><LiquidGlass :radius="22" /><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></view>
       <view class="nx-conv-compose-field">
+      <LiquidGlass :radius="25" />
       <textarea
         class="nx-conv-input"
         :value="draft"
@@ -184,6 +185,8 @@ import { bubbleViewportPosition, bubbleFill, compactMessageGroups } from './conv
 
 const props = defineProps<{
   messages: ThreadMsg[];
+  /** Measured floating header height; only the first message reserves it. */
+  topInset?: number;
   /** False while an authoritative history snapshot is being read. */
   entranceReady?: boolean;
   timeLocale?: string;
@@ -581,7 +584,7 @@ function measureBubblePositions() {
     const next: Record<string, number> = {};
     messages.forEach((message, index) => {
       const rect = rects[index];
-      if (rect?.top !== undefined && rect.height !== undefined) next[message.id] = bubbleViewportPosition(rect.top, rect.height, viewport.top!, Math.max(1, viewport.height! - (composerVisible.value ? composerSpace.value : 0)));
+      if (rect?.top !== undefined && rect.height !== undefined) next[message.id] = bubbleViewportPosition(rect.top, rect.height, viewport.top! + (props.topInset || 0), Math.max(1, viewport.height! - (props.topInset || 0) - (composerVisible.value ? composerSpace.value : 0)));
     });
     if (JSON.stringify(next) !== JSON.stringify(bubblePositions.value)) bubblePositions.value = next;
   };
@@ -598,7 +601,7 @@ function measureBubblePositions() {
     query.exec(rows => apply(rows[0] as UniApp.NodeInfo, rows[1] as UniApp.NodeInfo[]));
   } catch { /* An unavailable native bridge keeps a safe, uniform theme colour. */ }
 }
-watch(() => [props.messages.map(m => [m.id, m.text, m.imageSrc, m.deliveryState]), props.composerKey, props.revealTick, props.timeLocale], () => {
+watch(() => [props.messages.map(m => [m.id, m.text, m.imageSrc, m.deliveryState]), props.composerKey, props.revealTick, props.timeLocale, props.topInset], () => {
   cancelBubblePositions(); void nextTick(scheduleBubblePositions);
 }, { flush: 'post' });
 onMounted(() => {
@@ -923,22 +926,27 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   align-items: flex-end;
   gap: 8px;
   padding: 0 12px 8px;
+  --v5-liquid-tint: rgba(40,43,42,.46);
 }
+:global([data-theme="light"] .nx-conv-input-row) { --v5-liquid-tint: rgba(255,255,255,.58); }
 .nx-conv-compose-field {
   position: relative; isolation: isolate; display: flex; align-items: flex-end;
   gap: 6px; flex: 1; min-width: 0; padding: 5px 5px 5px 14px;
-  border: 1px solid rgba(255,255,255,.14); border-radius: 25px;
-  background: rgba(40,43,42,.68);
-  -webkit-backdrop-filter: blur(24px) saturate(125%); backdrop-filter: blur(24px) saturate(125%);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.1);
+  border: 1px solid transparent; border-radius: 25px;
+  background: transparent;
+  -webkit-backdrop-filter: blur(24px) saturate(135%); backdrop-filter: blur(24px) saturate(135%);
+  --v5-liquid-tint: rgba(40,43,42,.46);
+  --v5-liquid-shadow: inset 0 1px 1px rgba(255,255,255,.1);
 }
+.nx-conv-compose-field > :not(.nx-liquid-glass) { position: relative; }
+.nx-conv-compose-field > :deep(.nx-liquid-glass[data-glass-strategy="frosted"]) { -webkit-backdrop-filter: blur(24px) saturate(135%); backdrop-filter: blur(24px) saturate(135%); }
 .nx-conv-compose-field::before {
   content: ''; position: absolute; z-index: -1; inset: -1px 18px auto; height: 12px;
   border-radius: 50%; pointer-events: none;
   background: radial-gradient(ellipse at top, rgba(133,181,46,.28), transparent 72%);
   filter: blur(3px);
 }
-:global([data-theme="light"] .nx-conv-compose-field) { background: rgba(255,255,255,.7); border-color: rgba(45,65,105,.14); box-shadow: inset 0 1px 1px rgba(255,255,255,.95); }
+:global([data-theme="light"] .nx-conv-compose-field) { --v5-liquid-tint: rgba(255,255,255,.58); --v5-liquid-shadow: inset 0 1px 1px rgba(255,255,255,.8); }
 :global([data-theme="light"] .nx-conv-compose-field::before) { background: radial-gradient(ellipse at top, rgba(103,83,235,.28), transparent 72%); }
 .nx-conv-compose-field .nx-conv-send { flex-shrink: 0; }
 .nx-conv-compose-field :deep(textarea:focus-within),
