@@ -20,7 +20,7 @@
         <text class="nx-conv-empty-t">{{ emptyHint }}</text>
       </view>
 
-      <view v-for="m in messages" :key="m.id" class="nx-conv-msg-row" :class="{ 'nx-conv-msg-row--joined': compactGroups[m.id] }">
+      <view v-for="m in messages" :key="messageKey(m)" class="nx-conv-msg-row" :class="{ 'nx-conv-msg-row--joined': compactGroups[m.id] }">
         <view v-if="timeGroups[m.id]" class="nx-conv-time-divider" role="separator" :aria-label="messageTimes[m.id]?.full">
           <text>{{ timeGroups[m.id] }}</text>
         </view>
@@ -264,7 +264,7 @@ watch(() => [preferences.soundEnabled, app.accountKey, app.accountBindingEpoch, 
 watch(() => props.sendSuccessRevision, (revision, previous) => {
   if (previous !== undefined && revision !== undefined && revision > previous) sounds.play('send');
 }, { flush: 'post' });
-const { entranceBindings } = useConversationEntrance(() => ({
+const { entranceBindings, messageKey } = useConversationEntrance(() => ({
   identity: JSON.stringify([app.accountKey, app.accountBindingEpoch, props.composerKey, props.revealTick, entranceReveal.value]),
   visible: threadVisible.value, ready: props.entranceReady === true, messages: props.messages,
 }), () => sounds.play('receive'));
@@ -664,25 +664,39 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   align-items: flex-end;
 }
 .nx-conv-bubble {
+  position: relative;
+  isolation: isolate;
+  --nx-bubble-fill: var(--nx-chat-incoming);
   display: flow-root;
   max-width: 89%;
   min-width: 0;
   padding: 6px 10px 5px;
   border-radius: 17px;
   border: 1px solid var(--nx-chat-stroke);
-  background-color: var(--nx-chat-incoming);
+  background-color: transparent;
   background-image: none;
-  -webkit-backdrop-filter: blur(16px) saturate(125%);
-  backdrop-filter: blur(16px) saturate(125%);
   color: var(--v5-ink);
   font-family: var(--font-v5);
   font-size: 14px;
   line-height: 21px;
   overflow-wrap: anywhere;
 }
+/* One continuous paint layer, independent of inline text/float compositing. */
+.nx-conv-bubble::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: var(--nx-bubble-fill);
+  background-image: none;
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
+}
 .nx-conv-right .nx-conv-bubble {
-  background-color: var(--nx-chat-out-bottom);
-  background-color: color-mix(in srgb, var(--nx-chat-out-top) calc(100% - var(--nx-bubble-position, 50%)), var(--nx-chat-out-bottom) var(--nx-bubble-position, 50%));
+  --nx-bubble-fill: var(--nx-chat-out-bottom);
+  --nx-bubble-fill: color-mix(in srgb, var(--nx-chat-out-top) calc(100% - var(--nx-bubble-position, 50%)), var(--nx-chat-out-bottom) var(--nx-bubble-position, 50%));
   color: var(--nx-chat-out-ink);
   border-bottom-right-radius: 6px;
 }
