@@ -174,7 +174,7 @@ import { onHide, onShow } from '@/composables/use-tab-page-lifecycle';
 import { useApp } from '@/store/app';
 import { useConversationEntrance } from './conversation-entrance';
 import { conversationScrollChange, preservedConversationTop } from './conversation-scroll';
-import { buildConversationTimeGroups, formatConversationTime } from './conversation-time';
+import { buildConversationTimeGroups, formatConversationTime, type ConversationTimeOptions } from './conversation-time';
 
 const props = defineProps<{
   messages: ThreadMsg[];
@@ -240,7 +240,7 @@ onMounted(startClock);
 onShow(startClock);
 onHide(stopClock);
 onScopeDispose(stopClock);
-const timeOptions = computed(() => {
+const timeOptions = computed<ConversationTimeOptions>(() => {
   const language = props.timeLocale ?? 'zh';
   return { locale: language === 'zh' || language === 'vi' ? language : 'en' as const, now: clockNow.value };
 });
