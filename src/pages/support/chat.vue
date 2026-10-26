@@ -28,10 +28,8 @@
       </view>
 
       <view class="cp-identity">
+        <LiquidGlass :radius="24" />
         <NovaAvatar v-if="isAi" :size="32" pulse />
-        <view v-else class="cp-ava" :style="avaStyle" aria-hidden="true">
-          <view class="cp-ava-icon" v-html="headerIcon" />
-        </view>
         <view class="cp-meta">
           <text class="cp-name">{{ headerName }}</text>
           <view v-if="headerRole" class="cp-role" :class="{ 'cp-role--online': !isAi && headerRole === t.conversations.online }">
@@ -43,7 +41,7 @@
       <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation"  @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)"><LiquidGlass :radius="22" />
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12v6a2 2 0 0 1-2 2H6l-3 2V6a2 2 0 0 1 2-2h6" /><path d="M17 2v8m-4-4h8" /></svg>
       </view>
-      <view v-else class="cp-head-spacer" aria-hidden="true" />
+      <view v-else class="cp-head-spacer cp-ava" :style="avaStyle" aria-hidden="true"><view class="cp-ava-icon" v-html="headerIcon" /></view>
     </view>
 
     <view v-if="advisorApplies && convStore.advisorError" class="cp-history-error" role="alert">
@@ -86,6 +84,7 @@
 	      :send-label="t.conversations.send"
       :status-labels="t.conversations.delivery"
       :send-success-revision="sendSuccessRevision"
+      :send-success-owner="sendSuccessOwner"
       :quick-chips="quickChips"
       :empty-hint="emptyHint"
       :typing="agentTyping"
@@ -96,7 +95,8 @@
       :queue-labels="isAi && remoteApiEnabled ? t.nova.queue : undefined"
       :composer-key="isAi ? app.accountKey + ':' + nova.conversationId : app.accountBindingEpoch + ':' + convStore.scopeInvalidated + ':' + (cid || startType || '')"
       :initial-draft="!isAi ? draftText : undefined"
-      :max-input-length="isAi && remoteApiEnabled ? 2000 : undefined"
+      :max-input-length="MESSAGE_MAX_LENGTH"
+      :input-limit-hint="fmt(t.conversations.messageTooLong, { n: MESSAGE_MAX_LENGTH })"
       :image-labels="!isAi ? t.conversations.image : undefined"
       :attach-disabled="!isAi && (!supportSessionReady || attachmentPolicy?.available !== true)"
       :attach-unavailable="!isAi && attachmentPolicy?.available !== true ? (!remoteApiEnabled || attachmentPolicyError || attachmentPolicy?.available === false ? t.conversations.image.unavailable : t.conversations.image.checkingPolicy) : undefined"
@@ -160,7 +160,8 @@ import { fmt } from "@/i18n/format";
 import { localizedIdleClose } from "@/lib/support-idle-message";
 import { navTo, navBack, navReplace } from "@/lib/route";
 import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
-import { createSendLimiter } from "@/lib/send-limiter";
+import { conversationSendLimiter } from "@/lib/send-limiter";
+import { MESSAGE_MAX_LENGTH, normalizeMessageText } from '@/lib/message-length-policy';
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { useConversations, type CategoryRefreshOutcome, type HumanComposer } from "@/store/conversations";
@@ -205,9 +206,13 @@ const humanSendBusy = ref(false);
 const localHumanSend = ref<ThreadMsg | null>(null);
 let localHumanSequence = 0;
 const sendSuccessRevision = ref(0);
+const sendSuccessOwner = ref('');
 const pendingNovaSounds = new Set<string>();
 function noteSendSuccess() {
-  if (novaPageVisible && !chatDisposed) sendSuccessRevision.value++;
+  if (novaPageVisible && !chatDisposed) {
+    sendSuccessOwner.value = JSON.stringify([app.accountKey, app.accountBindingEpoch, threadComposerKey.value]);
+    sendSuccessRevision.value++;
+  }
 }
 const queuedSendVisuals = new Map<string, (accepted?: boolean) => void>();
 function clearQueuedSendVisuals() {
@@ -445,7 +450,7 @@ async function retryHumanSend() {
       }
     } catch { return; }
   }
-  if (!current()) return;
+  if (!current() || !acquireSendSlot()) return;
   failedHumanSend.value = null;
   humanSendBusy.value = true;
   try { await sendHumanMessage(failed.text, failed.attachmentId, undefined, failed.attempts + 1); }
@@ -460,6 +465,8 @@ function editHumanSend() {
 
 const cid = ref("");
 const isAi = ref(false);
+const threadComposerKey = computed(() => isAi.value ? app.accountKey + ':' + nova.conversationId
+  : app.accountBindingEpoch + ':' + convStore.scopeInvalidated + ':' + (cid.value || startType.value || ''));
 const hiddenAiRoute = ref(false);
 const initialPrompt = ref("");
 // Nova availability belongs only to ?type=ai. Human advisor/support routes must
@@ -1007,6 +1014,7 @@ const threadMessages = computed<ThreadMsg[]>(() => {
       id: localHumanSend.value?.id ?? `pending-human:${humanComposerKey.value}`,
       side: 'right', tone: 'user', text: failed.text || t.value.conversations.image.message,
       timestamp: localHumanSend.value?.timestamp, meta: t.value.conversations.image.you,
+      clientMessageId: localHumanSend.value?.clientMessageId,
       imageSrc: failed.attachmentId ? imageDraft.value?.filePath : undefined,
       deliveryState: failed.settled ? 'failed' : 'unknown', localSend: true,
     } : null;
@@ -1032,7 +1040,8 @@ const threadMessages = computed<ThreadMsg[]>(() => {
   const last = c.messages[c.messages.length - 1];
   const idleClose = c.status === "closed" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE" && (!last || c.lastTs > last.ts)
     ? localizedIdleClose(c.lastMessage, t.value.conversations) : null;
-  if (pending) messages.push(pending);
+  const confirmedPending = pending?.clientMessageId && c.messages.some(message => message.sender === 'user' && message.clientMessageId === pending.clientMessageId);
+  if (pending && !confirmedPending) messages.push(pending);
   return idleClose ? [...messages, {
     id: `idle-close:${c.id}:${c.lastTs}`, side: "left" as const,
     tone: "system" as const, text: idleClose, timestamp: c.lastTs,
@@ -1276,18 +1285,18 @@ onUnmounted(cleanup);
 
 // ── send rate limit — anti-spam guard across every channel of this chat
 // (advisor / support / AI free text, incl. quick chips). A real backend answers
-// 429 + Retry-After with the same policy; the limiter mirrors that contract.
+// 429 + Retry-After remains authoritative; the local budget protects the UI.
 const SEND_MAX = 5; // max sends…
 const SEND_WINDOW_MS = 15_000; // …per rolling window
 const SEND_MIN_GAP_MS = 1000; // min gap between two consecutive sends
-const sendLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
+const sendLimiter = () => conversationSendLimiter(app.accountKey, isAi.value ? 'nova:' + nova.conversationId : cid.value || 'start:' + startType.value,
+  SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
 // Continuous input is accepted immediately. Apply the original anti-spam
 // budget to actual dispatch (including retries), without discarding input.
-let novaDispatchLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
-let novaDispatchAccount = app.accountKey;
+const novaDispatchLimiter = () => conversationSendLimiter(app.accountKey, 'nova:' + nova.conversationId, SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
 
 function acquireSendSlot(): boolean {
-  const verdict = sendLimiter.tryAcquire();
+  const verdict = sendLimiter().tryAcquire();
   if (!verdict.ok) {
     toast.warn(
       t.value.conversations.rateLimited,
@@ -1319,6 +1328,8 @@ async function onSend(text: string, restore?: () => void, settled?: (accepted?: 
   let queuedVisualTurn: string | undefined;
   let accepted = false;
   try {
+  try { text = normalizeMessageText(text, { allowEmpty: !isAi.value && imageDraft.value?.state === 'ready' }); }
+  catch { restore?.(); toast.warn(fmt(t.value.conversations.messageTooLong, { n: MESSAGE_MAX_LENGTH })); return; }
   if (!isAi.value && !supportSessionReady.value) { restore?.(); return; }
   if (isAi.value && remoteApiEnabled) {
     const accountKey = app.accountKey;
@@ -1450,8 +1461,9 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
     }
     if (!stageHumanSend(text, attachmentId, attempts, restore)) { humanCreateRecovery.finish(); return; }
     try {
-      const createdId = await convStore.startConversation(type, text, attachmentId);
+      const createdId = await convStore.startConversation(type, text, attachmentId, bindHumanDispatchKey());
       if (!humanCreateRecovery.isCurrent(creation) || supportScope !== convStore.scopeInvalidated) return;
+      conversationSendLimiter.transfer(app.accountKey, 'start:' + type, createdId);
       humanCreateRecovery.complete(createdId, creation);
       if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
       convStore.saveComposer(`start:${type}`, { text: draftText.value, imageDraft: null, failedSend: null, recoveredId: createdId });
@@ -1474,7 +1486,7 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
   const replyBinding = app.accountBindingEpoch;
   if (!stageHumanSend(text, attachmentId, attempts, restore)) return;
   try {
-    await convStore.sendUser(id, text, attachmentId);
+    await convStore.sendUser(id, text, attachmentId, bindHumanDispatchKey());
     if (replyBinding !== app.accountBindingEpoch || cid.value !== id || supportScope !== convStore.scopeInvalidated) return;
     if (imageDraft.value?.attachmentId === attachmentId) imageDraft.value = null;
     if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: null });
@@ -1484,6 +1496,14 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
     if (replyBinding !== app.accountBindingEpoch || cid.value !== id || supportScope !== convStore.scopeInvalidated) return;
     humanSendFailed(text, attachmentId, cause, attempts);
   }
+}
+
+function bindHumanDispatchKey() {
+  const owner = threadComposerKey.value, binding = app.accountBindingEpoch, localId = localHumanSend.value?.id;
+  return (key: string) => {
+    if (owner === threadComposerKey.value && binding === app.accountBindingEpoch && localId && localHumanSend.value?.id === localId)
+      localHumanSend.value = { ...localHumanSend.value, clientMessageId: key };
+  };
 }
 
 function stageHumanSend(text: string, attachmentId: string | undefined, attempts: number, restore?: () => void): boolean {
@@ -1508,6 +1528,7 @@ function stageHumanSend(text: string, attachmentId: string | undefined, attempts
 }
 
 function humanSendFailed(text: string, attachmentId: string | undefined, cause: unknown, attempts: number) {
+  if (cause instanceof ApiError && cause.retryAfterMs !== undefined) sendLimiter().defer(cause.retryAfterMs);
   const expired = isSupportAttachmentNotReady(cause);
   const settled = expired || !isConversationDeliveryAmbiguous(cause);
   const draft = imageDraft.value;
@@ -1527,6 +1548,8 @@ async function drainNovaQueue() {
   const headDelivery = nova.pendingRemote[0]?.delivery;
   if (!headDelivery || !["queued", "tracking"].includes(headDelivery) || novaDispatchTimer !== undefined) return;
   const headTurnId = nova.pendingRemote[0].turnId!;
+  const retainedDeadline = nova.pendingRemote[0].replyDeadlineAt;
+  novaReplyDeadline = retainedDeadline === undefined ? undefined : { turnId: headTurnId, expiresAt: retainedDeadline };
   if (headDelivery === "tracking" && novaReplyDeadline?.turnId === headTurnId
       && Date.now() >= novaReplyDeadline.expiresAt) {
     nova.failRemote(headTurnId, "timeout");
@@ -1535,25 +1558,19 @@ async function drainNovaQueue() {
     handoffRecommended.value = true;
     return;
   }
-  if (novaDispatchAccount !== app.accountKey) {
-    novaDispatchAccount = app.accountKey;
-    novaDispatchLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
-  }
-  if (headDelivery === "queued") {
-    const verdict = novaDispatchLimiter.tryAcquire();
+  {
+    const verdict = headDelivery === "queued" ? novaDispatchLimiter().tryAcquire() : novaDispatchLimiter().peek();
     if (!verdict.ok) {
       novaDispatchTimer = setTimeout(() => {
         novaDispatchTimer = undefined;
         void drainNovaQueue();
-      }, verdict.retryInSec * 1000);
+      }, Math.min(verdict.retryInSec * 1000, novaReplyDeadline ? Math.max(0, novaReplyDeadline.expiresAt - Date.now()) : Infinity));
       return;
     }
   }
-  const item = nova.claimRemote();
+  const item = nova.claimRemote(retainedDeadline ?? Date.now() + NOVA_REPLY_DEADLINE_MS);
   if (!item) return;
-  if (!novaReplyDeadline || novaReplyDeadline.turnId !== item.turnId || headDelivery === "queued") {
-    novaReplyDeadline = { turnId: item.turnId, expiresAt: Date.now() + NOVA_REPLY_DEADLINE_MS };
-  }
+  novaReplyDeadline = { turnId: item.turnId, expiresAt: nova.pendingRemote[0].replyDeadlineAt! };
   const accountKey = app.accountKey;
   const conversationId = nova.conversationId;
   const requestStartedAt = novaThinkingNow();
@@ -1575,6 +1592,7 @@ async function drainNovaQueue() {
     handoffRecommended.value = !!result.handoffReason;
   } catch (error) {
     if (current()) {
+      if (error instanceof ApiError && error.retryAfterMs !== undefined) novaDispatchLimiter().defer(error.retryAfterMs);
       const failure = novaFailure(error);
       if (Date.now() < novaReplyDeadline!.expiresAt
           && (failure === "timeout" || failure === "network" || (item.tracking && failure === "busy"))) {
@@ -1582,7 +1600,7 @@ async function drainNovaQueue() {
         novaDispatchTimer = setTimeout(() => {
           novaDispatchTimer = undefined;
           void drainNovaQueue();
-        }, Math.min(NOVA_SERVER_TRACK_RETRY_MS, novaReplyDeadline!.expiresAt - Date.now()));
+        }, Math.min(Math.max(NOVA_SERVER_TRACK_RETRY_MS, error instanceof ApiError ? error.retryAfterMs ?? 0 : 0), novaReplyDeadline!.expiresAt - Date.now()));
       } else {
         nova.failRemote(item.turnId, Date.now() >= novaReplyDeadline!.expiresAt ? "timeout" : failure);
         novaReplyDeadline = undefined;
@@ -1693,7 +1711,6 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   flex-shrink: 0;
   padding: 10px 16px 12px;
   /* top padding is bound inline to the device status-bar height (see cp-head :style) */
-  border-bottom: 1px solid color-mix(in srgb, var(--v5-border) 55%, transparent);
 }
 .cp-ai-safety {
   padding: 8px 16px;
@@ -1729,6 +1746,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 }
 .cp-head-spacer { width: 44px; height: 44px; pointer-events: none; }
 .cp-identity {
+  position: relative; isolation: isolate; min-height: 44px; padding: 5px 18px; border-radius: 24px; box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1744,16 +1762,18 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   place-items: center;
   flex-shrink: 0;
 }
+.cp-head-spacer.cp-ava { width: 44px; height: 44px; border-radius: 50%; }
 .cp-ava-icon { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; line-height: 0; }
 .cp-ava-icon :deep(svg) { display: block; }
 .cp-meta {
   min-width: 0;
+  position: relative; text-align: center;
 }
 .cp-name {
   display: block;
   font-family: var(--font-v5);
   font-weight: 600;
-  font-size: 20px;
+  font-size: 17px;
   line-height: 1.3;
   overflow-wrap: anywhere;
   letter-spacing: -0.008em;
@@ -1762,6 +1782,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 .cp-role {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   margin-top: 2px;
 }
