@@ -629,7 +629,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 .nx-conv-image { width: min(220px, 58vw); max-height: 280px; border-radius: 10px; }
 .nx-conv-image-caption { color: var(--v5-ink-3); font-size: 12px; line-height: 1.5; }
 .nx-conv-right .nx-conv-image-caption { color: var(--nx-chat-out-meta); }
-.nx-conv-time-divider { display:flex; justify-content:center; padding:8px 0 12px; color:var(--v5-ink-3); font-family:var(--font-v5); font-size:11px; line-height:18px; text-align:center; overflow-wrap:anywhere; }
+.nx-conv-time-divider { display:flex; justify-content:center; padding:8px 0 12px; color:var(--v5-ink-3); font-family:var(--font-v5); font-size:12px; line-height:18px; text-align:center; overflow-wrap:anywhere; }
 .nx-conv-attachment { margin: 6px 14px; padding: 10px 0; border-top: 1px solid var(--v5-border); color: var(--v5-ink); font-size: 13px; }
 .nx-conv-attachment-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .nx-conv-attachment-action { display: flex; align-items: center; min-height: 44px; color: var(--v5-brand); }
