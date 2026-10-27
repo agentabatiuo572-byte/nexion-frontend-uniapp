@@ -113,6 +113,25 @@ test('check-in reserves seven cells before its read, then replaces them in place
   faucet.remoteMilestones[0].status='CLAIMED';await Vue.nextTick();expect(classNode(root,'gift')).toBeUndefined();
 });
 
+test('a confirmed check-in row stays visible while its next visit reads, without granting check-in authority', async () => {
+  const faucet = Vue.reactive({ remoteReadState: 'ready', remoteHasSnapshot: true, remoteCheckedInToday: false, signInStreak: 2,
+    remoteRules: [{key:'baseline',value:'2'}], remoteMilestones: [], ensureRemote: vi.fn(), checkInRemote: vi.fn() });
+  const navTo = vi.fn();
+  const root = mount(dailyRaw, { ...common(), '@/store/nex-faucet': { useNexFaucet: () => faucet }, '@/store/app': { useApp: () => ({}) },
+    '@/composables/use-tab-page-lifecycle': { onShow: () => {}, onHide: () => {} }, '@/lib/route': { navTo },
+    '@/i18n/audit-ui': { useAuditUiCopy: () => Vue.ref(auditUiCopy.zh) }, '@/store/ui': { toast: {} },
+    '@/i18n/continuity-fixes': { continuityCopy }, '@/store/locale': { useLocaleStore: () => ({ code: 'zh' }) },
+    '@/pages/daily/daily-success-copy': { dailyCheckInSuccessCopy }, '@/pages/daily/daily-reward-view': { dailyBaseReward, dailyMilestoneRewardText, dailyRewardLabels },
+    '@/components/ui/nx-button.vue': sfc({setup:(_p,ctx)=>()=>Vue.h('button',{onClick:()=>ctx.emit('click')},ctx.slots.default?.())}) });
+  const before = text(root);
+  faucet.remoteReadState = 'loading'; await Vue.nextTick();
+  expect(text(root)).toBe(before);
+  const click = all(root).find(n => n.props.onClick)!.props.onClick;
+  (Array.isArray(click) ? click : [click]).forEach(fn => fn());
+  expect(faucet.checkInRemote).not.toHaveBeenCalled(); expect(navTo).toHaveBeenCalledWith('/pages/daily/daily');
+  faucet.remoteHasSnapshot = false; await Vue.nextTick(); expect(text(root)).not.toBe(before);
+});
+
 test.each(['zh', 'en', 'vi'] as const)('checked-in copy in %s uses the published base reward or a non-numeric tomorrow hint', async language => {
   const copy = { zh, en, vi: vietnamese }[language], labels = auditUiCopy[language];
   const faucet = Vue.reactive({ remoteReadState: 'ready', remoteCheckedInToday: false, signInStreak: 2,
@@ -129,7 +148,7 @@ test.each(['zh', 'en', 'vi'] as const)('checked-in copy in %s uses the published
   for (const value of ['', 'invalid', '-1', '0']) {
     faucet.remoteRules[0].value = value; await Vue.nextTick(); expect(hint()).toBe(labels.tomorrow);
   }
-  faucet.remoteReadState = 'error'; await Vue.nextTick(); expect(hint()).toBe(labels.viewDaily);
+  faucet.remoteReadState = 'error'; await Vue.nextTick(); expect(hint()).toBe(copy.daily.checkInUnconfirmed);
 });
 
 test('to-do waits for its initial reads and trial progress opens the trial page', async () => {

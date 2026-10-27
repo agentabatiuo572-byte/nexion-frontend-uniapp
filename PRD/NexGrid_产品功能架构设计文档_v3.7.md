@@ -2981,7 +2981,7 @@ Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.
    - 大字 NEX 余额 + 副字 `NEX`
    - 右侧 USD 估值 + `▲/▼ XX.XX% (24h)`
    - sparkline area chart
-   - `View market →` 链 `/market`
+   - `View market →` 链 `/market`，按普通子页压栈保留钱包入口；行情顶部返回及原生系统返回优先回到原钱包页面并保留原滚动位置，余额继续按钱包原有权威读取更新。只有无上一级页面的行情直达/冷开，才沿用首页返回目标；不以清栈打开行情，不改变买卖方向、报价或交易资格。
 
 2. **Quick Actions 4-cell**:
    - Buy(TrendingUp)→ `/me/wallet/exchange`

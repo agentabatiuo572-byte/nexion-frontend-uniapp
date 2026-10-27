@@ -41,6 +41,11 @@
           <text>{{ t.empty.errorCta }}</text>
         </view>
       </view>
+      <view v-if="!inventoryReady" class="mx-4" :style="meterBlockStyle">
+        <text :style="meterLabelStyle">{{ t.myDevices.inventorySlotsLabel }}</text>
+        <text class="block" :style="meterCountStyle">—</text>
+        <view class="flex items-center justify-center" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore"><text :style="ctaLabelStyle">{{ t.myDevices.inventoryCtaGoStore }}</text></view>
+      </view>
       <view v-if="inventoryReady" class="mx-4">
         <!-- Slot meter — de-carded: sits on the page floor. -->
         <view :style="meterBlockStyle" role="group" :aria-label="slotMeterLabel">

@@ -101,8 +101,8 @@
         </template>
         <!-- Refresh feedback follows the retained content: its insertion/removal
              must not move the reader's anchor while a hidden page returns. -->
-        <view v-if="refreshing || refreshError" class="trust-refresh-status" :class="{ 'nx-inline-recovery': refreshError }" role="status" aria-live="polite">
-          <text class="nx-inline-recovery__copy">{{ refreshing ? continuity.trustRefreshing : continuity.trustRefreshFailed }}</text>
+        <view v-if="refreshError" class="trust-refresh-status" :class="{ 'nx-inline-recovery': refreshError }" role="status" aria-live="polite">
+          <text class="nx-inline-recovery__copy">{{ continuity.trustRefreshFailed }}</text>
           <NxButton v-if="refreshError" class="nx-inline-recovery__action" variant="text" :label="t.ui.retry" @click="loadTrustSections" />
         </view>
       </view>

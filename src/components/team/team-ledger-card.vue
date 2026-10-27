@@ -15,12 +15,10 @@
       <view><view class="team-ledger__settlement-icon" aria-hidden="true"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg></view><view class="team-ledger__settlement-copy"><text>{{ t.teamV3.coolingDown }}</text><text class="tabular-nums">{{ hasAmounts ? formatUsd(coolingUSDT) : '—' }}</text></view></view>
     </view>
     <view class="team-ledger__control">
-      <view class="team-ledger__breakdown" :class="{ 'is-hidden': loading || failed }" role="button" :tabindex="hasAmounts && !loading ? 0 : -1" :aria-disabled="!hasAmounts || loading" :aria-hidden="loading || failed" :aria-expanded="breakdownOpen" @click="toggleBreakdown" @keydown.enter.prevent="toggleBreakdown" @keydown.space.prevent="toggleBreakdown"><text>{{ copy.lifetimeBreakdown }}</text><text aria-hidden="true">{{ breakdownOpen ? '−' : '+' }}</text></view>
+      <view class="team-ledger__breakdown" :class="{ 'is-hidden': (loading && !hasAmounts) || failed, 'is-unknown': !hasAmounts }" role="button" :tabindex="hasAmounts && !loading && !failed ? 0 : -1" :aria-disabled="!hasAmounts || loading || failed" :aria-hidden="(loading && !hasAmounts) || failed" :aria-expanded="breakdownOpen" @click="toggleBreakdown" @keydown.enter.prevent="toggleBreakdown" @keydown.space.prevent="toggleBreakdown"><text>{{ copy.lifetimeBreakdown }}</text><text aria-hidden="true">{{ breakdownOpen ? '−' : '+' }}</text></view>
       <!-- Feedback shares the existing control row; the ready state does not
            reserve a second empty row. Localized errors can grow naturally. -->
       <view class="team-ledger__feedback" role="status" aria-live="polite" aria-atomic="true">
-        <view class="team-ledger__feedback-item" :class="{ 'is-active': loading && !failed && !hasAmounts }" :aria-hidden="!(loading && !failed && !hasAmounts)"><text>{{ t.network.projectionLoadingTitle }}</text></view>
-        <view class="team-ledger__feedback-item" :class="{ 'is-active': loading && !failed && hasAmounts }" :aria-hidden="!(loading && !failed && hasAmounts)"><text>{{ t.network.projectionRefreshing }}</text></view>
         <view class="team-ledger__feedback-item" :class="{ 'is-active': failed }" :aria-hidden="!failed">
           <text>{{ t.network.projectionErrorDesc }}</text>
           <view class="team-ledger__retry" role="button" :tabindex="failed ? 0 : -1" :aria-disabled="!failed" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry">{{ t.network.retry }}</view>
@@ -75,10 +73,10 @@ const t = useT();
 const locale = useLocaleStore();
 const copy = computed(() => teamRedesignCopy(locale.code));
 const breakdownOpen = ref(false);
-const hasAmounts = computed(() => props.available && !props.failed);
+const hasAmounts = computed(() => props.available);
 
 function toggleBreakdown() {
-  if (hasAmounts.value && !props.loading) breakdownOpen.value = !breakdownOpen.value;
+  if (hasAmounts.value && !props.loading && !props.failed) breakdownOpen.value = !breakdownOpen.value;
 }
 function retry() {
   if (props.failed) emit('retry');
@@ -111,7 +109,7 @@ function goCommissions() {
 .team-ledger__nex { display: block; margin-top: 6px; font: 600 18px/1.4 var(--font-v5); color: var(--v5-brand); white-space: nowrap; overflow-x: auto; }
 .team-ledger__breakdown { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); min-height: 44px; font: 400 12px/1.5 var(--font-v5); color: var(--v5-ink-3); }
 .team-ledger__breakdown:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.team-ledger__breakdown[aria-disabled='true'] { opacity: .6; }
+.team-ledger__breakdown.is-unknown { opacity: .6; }
 .team-ledger__control { display: grid; }
 .team-ledger__breakdown,.team-ledger__feedback { grid-area: 1 / 1; }
 .team-ledger__breakdown.is-hidden { visibility: hidden; pointer-events: none; }

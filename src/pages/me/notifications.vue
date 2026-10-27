@@ -4,10 +4,10 @@
     <view class="message-center message-page" :style="{ top: top + 'px' }">
       <view class="message-nav">
         <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.profile.back" @click="navBack('/pages/me/me')"><LiquidGlass :radius="22" tone="navigation" /><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg></view>
-        <view v-if="center.error" class="message-summary-recovery" role="alert"><text v-if="!headerState.title" class="message-recovery-title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text><view class="message-button" role="button" :tabindex="center.loading ? -1 : 0" :aria-disabled="center.loading" :aria-label="actionCopy.refreshFailed + ' · ' + t.ui.retry" @click="center.refresh()" @keydown.enter.prevent="center.refresh()" @keydown.space.prevent="center.refresh()"><text>{{ actionCopy.refreshFailed }} · {{ t.ui.retry }}</text></view></view>
+        <view v-if="summaryRecovery.visible" class="message-summary-recovery" role="alert"><text v-if="!headerState.title" class="message-recovery-title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text><view class="message-button" role="button" :tabindex="summaryRecovery.busy ? -1 : 0" :aria-disabled="summaryRecovery.busy" :aria-label="summaryRecovery.label + ' · ' + t.ui.retry" @click="retrySummary" @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"><text>{{ summaryRecovery.label }} · {{ t.ui.retry }}</text></view></view>
         <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.notifs.preferences" @click="navTo('/pages/me/preferences')"><LiquidGlass :radius="22" tone="navigation" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></view>
       </view>
-      <view v-if="!center.error" class="message-compact" :class="{ 'message-compact--visible': !headerState.title }" :aria-hidden="headerState.title"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
+      <view v-if="!summaryRecovery.visible" class="message-compact" :class="{ 'message-compact--visible': !headerState.title }" :aria-hidden="headerState.title"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
       <view class="message-collapse" :class="{ 'message-collapse--hidden': !headerState.title }" :style="collapseStyle('title')" :aria-hidden="!headerState.title" :inert="!headerState.title ? true : undefined" @focusin="headerFocused = true" @focusout="headerFocused = false">
         <view class="message-heading">
           <view class="message-heading-row">
@@ -65,6 +65,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ServiceMessageList from "@/components/support/service-message-list.vue";
+import { useConversations } from "@/store/conversations";
 import { useMessageDrawer, type MessageSection } from "@/store/message-drawer";
 import { notificationCategory, type NotificationCategory } from "@/lib/notification-category";
 import { useT } from "@/i18n/use-t";
@@ -104,6 +105,7 @@ function isCurrentIntent(intent: ReturnType<typeof captureIntent>) {
 const notifsErrorText = computed(() => notifs.error ? t.value.notifs.loadFailed : "");
 
 const center = useMessageDrawer();
+const conversations = useConversations();
 let sectionLoaded = false;
 let sectionAccountWasBound = app.accountKey !== "default";
 const initialSectionAccountEpoch = app.accountBindingEpoch;
@@ -114,6 +116,18 @@ const section = computed({ get: () => center.section, set: (value: MessageSectio
   if (!sectionAccountWasBound && sectionEntryAllowed) initialSection = value;
   preserveSectionInH5();
 } });
+const summaryRecovery = computed(() => ({
+  visible: !!center.error || (section.value === "service" && conversations.realtimeFallback),
+  label: center.error ? actionCopy.value.refreshFailed : actionCopy.value.liveUnavailable,
+  busy: center.loading || (section.value === "service" && conversations.categoryLoading),
+}));
+function retrySummary() {
+  if (!pageVisible || disposed || summaryRecovery.value.busy) return;
+  if (section.value === "service" && conversations.realtimeFallback) {
+    conversations.stopRealtime(); conversations.startRealtime();
+  }
+  void center.refresh();
+}
 function preserveSectionInH5() {
   if (!sectionLoaded || disposed || !pageVisible || typeof window === "undefined"
     || typeof window.history?.replaceState !== "function") return;

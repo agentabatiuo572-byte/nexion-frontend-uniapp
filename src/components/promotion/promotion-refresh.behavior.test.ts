@@ -7,6 +7,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import homeSource from './promotion-entry.vue?raw';
 import teamSource from './referral-progress.vue?raw';
 import catalogSource from '@/store/product-catalog.ts?raw';
+import homeReadSource from '@/store/home-promotions.ts?raw';
+import homePageSource from '@/pages/index/index.vue?raw';
 import type { PublicPromotion, PublicPromotionPage } from '@/api/promotion-contracts';
 import type { ProductCatalogSnapshot } from '@/api/product-catalog-api';
 import * as promotionEntry from '@/lib/promotion-entry';
@@ -15,6 +17,7 @@ import { promotionMachineSlots } from '@/components/catalog-machine-image';
 import { promotionZH } from '@/i18n/messages/promotion';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
 import { fmt } from '@/i18n/format';
+import { ApiError } from '@/api/errors';
 
 const transpile = (text: string) => ts.transpileModule(text, { compilerOptions: {
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS,
@@ -30,6 +33,7 @@ function evaluate(text: string, modules: Record<string, unknown>) {
 }
 const flush = async () => { await Vue.nextTick(); for (let i = 0; i < 16; i++) await Promise.resolve(); await Vue.nextTick(); };
 const cleanups: Array<() => void> = [];
+function expirePassiveRead() { const clock=vi.spyOn(Date,'now').mockReturnValue(Date.now()+15_001);cleanups.push(()=>clock.mockRestore()); }
 afterEach(() => cleanups.splice(0).forEach(fn => fn()));
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -73,8 +77,10 @@ function platform(signedIn = true) {
   const catalog = evaluate(catalogSource, {
     vue: Vue, '@/api/runtime': runtime, '@/api/order-api': { advanceRuntimeRevision() {} },
     '@/lib/brand-copy': { nexGridBrandText: (text: string) => text },
+    '@/api/errors': { ApiError },
     '@/mock/products': { clearProductCatalog() { products = []; }, replaceProductCatalog(rows: typeof products) { products = rows; } },
   });
+  const homeRead = evaluate(homeReadSource, { '@/api/runtime': runtime, '@/api/errors': { ApiError } });
   function mount(kind: 'home' | 'team', supplied?: PublicPromotion[]) {
     const shown: Array<() => void> = [], hidden: Array<() => void> = [], mounted: Array<() => void> = [], unmounted: Array<() => void> = [];
     const source = kind === 'home' ? homeSource : teamSource;
@@ -83,6 +89,7 @@ function platform(signedIn = true) {
       vue: { ...Vue, onMounted: (fn: () => void) => mounted.push(fn), onBeforeUnmount: (fn: () => void) => unmounted.push(fn) },
       '@/composables/use-tab-page-lifecycle': { onShow: (fn: () => void) => shown.push(fn), onHide: (fn: () => void) => hidden.push(fn) },
       '@/api/runtime': runtime, '@/store/app': { useApp: () => app }, '@/store/auth': { useAuth: () => ({ get isAuthenticated() { return signed.value; } }) },
+      '@/store/home-promotions': homeRead,
       '@/store/locale': { useLocaleStore: () => ({ code: 'zh' }) }, '@/i18n/use-t': { useT: () => Vue.ref({ promotion: promotionZH }) },
       '@/store/theme': { useTheme: () => ({ resolved: 'dark' }) },
       '@/i18n/team-redesign': { teamRedesignCopy }, '@/i18n/format': { fmt }, '@/lib/route': { navTo() {} },
@@ -107,8 +114,26 @@ function platform(signedIn = true) {
       },
     };
   }
-  return { app, signed, list, referral, catalogApi, catalog, mount };
+  function mountHomePage(){
+    const hooks={show:[] as Array<()=>void>,hide:[] as Array<()=>void>};
+    const deps={ref:Vue.ref,watch:Vue.watch,app,locale:{code:'zh',ensureSystemDetected(){}},config:{load:async()=>{}},remoteApiEnabled:true,promotionApi:runtime.promotionApi,sessionVault:runtime.sessionVault,...homeRead,
+      createPromotionReadFence:promotionEntry.createPromotionReadFence,isPromotionActive:promotionEntry.isPromotionActive,onShow:(fn:()=>void)=>hooks.show.push(fn),onHide:(fn:()=>void)=>hooks.hide.push(fn),onUnmounted:()=>{},onLoad:()=>{}};
+    const script=homePageSource.slice(homePageSource.indexOf('const homePromotions ='),homePageSource.indexOf('</script>'));
+    const scope=Vue.effectScope();cleanups.push(()=>scope.stop());
+    const view=scope.run(()=>new Function('deps',`const {${Object.keys(deps).join(',')}}=deps;${ts.transpileModule(script,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText};return {homePromotions,homePromotionStatus};`)(deps));
+    return{view,show:()=>hooks.show.forEach(fn=>fn()),hide:()=>hooks.hide.forEach(fn=>fn())};
+  }
+  return { app, signed, list, referral, catalogApi, catalog, mount, mountHomePage };
 }
+
+it('the actual Home page and Store advert share one placement read and keep warming while hidden',async()=>{
+  const p=platform(),pending=deferred<PublicPromotionPage>();p.list.mockReturnValueOnce(pending.promise);
+  const home=p.mountHomePage();home.show();const store=p.mount('home');expect(p.list).toHaveBeenCalledTimes(1);
+  home.hide();store.hide();pending.resolve(page([activity()]));await flush();
+  expect(home.view.homePromotions.value).toHaveLength(1);expect(store.view.items.value).toHaveLength(1);
+  for(let round=0;round<3;round++){home.show();store.show();home.hide();store.hide();}await flush();
+  expect(p.list).toHaveBeenCalledTimes(1);expect(p.catalogApi).toHaveBeenCalledTimes(1);
+});
 
 it('the actual team refresh button re-reads list rules, catalog and progress and preserves expansion', async () => {
   const p = platform(), team = p.mount('team'); await flush();
@@ -139,6 +164,7 @@ it('team reset replaces paginated rules and drops removed or paused activities',
 it.each(['home', 'team'] as const)('%s return re-reads changed SKU rules and recovers a failed catalog through the APIs', async kind => {
   const p = platform(); p.catalogApi.mockRejectedValueOnce(new Error('catalog offline'));
   const screen = p.mount(kind); await flush(); expect(p.catalog.productCatalogState.status).toBe('error');
+  expirePassiveRead();
   screen.hide();
   p.list.mockResolvedValueOnce(page([activity('new-sku', { version: 2 })]));
   p.catalogApi.mockResolvedValueOnce(snapshot('new-sku', 'https://images.example/recovered'));
@@ -177,6 +203,28 @@ it('home and team join an existing shared catalog request instead of superseding
   expect(p.catalogApi).toHaveBeenCalledTimes(1);
   pending.resolve(snapshot()); await flush();
   expect(home.view.items.value).toHaveLength(1); expect(team.view.activities.value).toHaveLength(1);
+});
+
+it('home retains the confirmed card through a warm read and ordinary failure, then accepts an empty publication', async () => {
+  const p = platform(), screen = p.mount('home'); await flush();
+  const confirmed = screen.view.items.value[0];
+  expirePassiveRead();
+  screen.hide(); const pending = deferred<PublicPromotionPage>(); p.list.mockReturnValueOnce(pending.promise); screen.show();
+  expect(screen.view.items.value[0]).toBe(confirmed);
+  pending.resolve(page([activity('new-sku')])); await flush();
+  p.list.mockRejectedValueOnce(new Error('offline')); await screen.view.load(true);
+  expect(screen.view.items.value[0].productNos).toEqual(['new-sku']); expect(screen.view.status.value).toBe('error');
+  p.list.mockResolvedValueOnce(page([])); await screen.view.load(true); expect(screen.view.items.value).toEqual([]);
+});
+
+it('an already empty Home placement stays absent through its next passive read',async()=>{
+  const p=platform();p.list.mockResolvedValueOnce(page([]));const screen=p.mount('home');await flush();expect(screen.view.listRead.value).toBe(true);
+  expirePassiveRead();const pending=deferred<PublicPromotionPage>();p.list.mockReturnValueOnce(pending.promise);screen.hide();screen.show();
+  expect(find(await screen.node(),n=>String(n.props?.class??'').includes('entry-placeholder'))).toBeUndefined();
+  pending.resolve(page([]));await flush();expect(screen.view.items.value).toEqual([]);
+});
+it.each([401,403])('the actual advert clears old promotion presentation on exact HTTP %s',async status=>{
+ const p=platform(),screen=p.mount('home');await flush();p.list.mockRejectedValueOnce(new ApiError({kind:'http',status,message:'denied'}));await screen.view.load(true);expect(screen.view.items.value).toEqual([]);expect(screen.view.status.value).toBe('error');
 });
 
 it.each(['home', 'team'] as const)('%s does not request a private catalog anonymously or while hidden', async kind => {

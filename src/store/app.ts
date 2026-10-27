@@ -1,3 +1,4 @@
+import { runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import type { Device, CurrentTask, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
@@ -19,6 +20,7 @@ import { matchGpuTier } from "@/lib/gpu-tiers";
 import { publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
 import { useSession } from "@/store/session";
+import { useLocaleStore } from "@/store/locale";
 import { accumulateUsdAccrual, completedUsdCentDelta } from "@/lib/earnings-accrual";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import {
@@ -48,6 +50,7 @@ import {
 import {
   deviceE3Api,
   appHomeApi,
+  apiRuntimeConfig,
   fundsServerEnabled,
   expectedApiEnvironment,
   remoteApiEnabled,
@@ -60,6 +63,7 @@ import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import { ApiError, asApiError } from "@/api/errors";
+import { isHttpReadRateLimit } from "@/lib/remote-read-failure";
 import type { UserSession } from "@/api/contracts";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -399,7 +403,32 @@ export const useApp = defineStore("app", () => {
   const homeTruth = ref<AppHomeOverview | null>(null);
   const homeTruthStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const homeTruthError = ref<string | null>(null);
+  const homeTruthRateLimited = ref(false);
+  const homeTruthTransientFailure = ref(false);
+  let homeTruthOwnerEpoch = 0;
+
+  let homeTruthRetryAt = 0;
+  let homeTruthEnvironmentInvalidated = false;
   let homeTruthRefreshInFlight: { key: string; request: Promise<boolean> } | null = null;
+  function invalidateHomeTruth(): void {
+    homeTruthOwnerEpoch += 1;
+    homeTruthRefreshInFlight = null;
+
+    homeTruth.value = null;
+    homeTruthTransientFailure.value = false;
+    homeTruthRateLimited.value = Date.now() < homeTruthRetryAt;
+    homeTruthStatus.value = homeTruthRateLimited.value ? "error" : "idle";
+    if (!homeTruthRateLimited.value) homeTruthError.value = null;
+  }
+  if (remoteApiEnabled) {
+    const locale = useLocaleStore();
+    watch(() => locale.code, invalidateHomeTruth, { flush: "sync" });
+    watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
+      // The existing API client belongs to its boot environment until reload.
+      homeTruthEnvironmentInvalidated = true;
+      invalidateHomeTruth();
+    }, { flush: "sync" });
+  }
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
   const remoteFleetHasSnapshot = ref(!remoteApiEnabled);
@@ -900,30 +929,67 @@ export const useApp = defineStore("app", () => {
     };
   }
 
+  function ensureHomeTruth(): Promise<boolean> {
+    const request = remoteAccountEpoch.snapshot();
+    if (remoteApiEnabled && !hasHomeSession(request)) { invalidateHomeTruth(); return Promise.resolve(false); }
+    if (Date.now() < homeTruthRetryAt) return Promise.resolve(false);
+    return runPassiveTabRead("home-truth", () => refreshHomeTruth(request), [request, homeTruthOwnerEpoch]);
+  }
+
+  function hasHomeSession(request: RemoteAccountRequest): boolean {
+    const activeSession = sessionVault.read();
+    return !!activeSession && request.accountKey === `user:${activeSession.user.userId}`;
+  }
+
   function refreshHomeTruth(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+    invalidateBeforePassiveTabRead("home-truth");
     if (!remoteApiEnabled) return Promise.resolve(true);
-    const key = `${request.accountKey}:${request.epoch}`;
+    if (!remoteAccountEpoch.isCurrent(request) || homeTruthEnvironmentInvalidated) return Promise.resolve(false);
+    if (!hasHomeSession(request)) {
+      invalidateHomeTruth();
+      return Promise.resolve(false);
+    }
+    if (Date.now() < homeTruthRetryAt) return Promise.resolve(false);
+    const ownerEpoch = homeTruthOwnerEpoch;
+    const current = () => remoteAccountEpoch.isCurrent(request) && ownerEpoch === homeTruthOwnerEpoch
+      && !homeTruthEnvironmentInvalidated;
+    const key = `${request.accountKey}:${request.epoch}:${ownerEpoch}`;
     if (homeTruthRefreshInFlight?.key === key) return homeTruthRefreshInFlight.request;
     const refresh = (async () => {
-      const activeSession = sessionVault.read();
-      if (!activeSession || request.accountKey !== `user:${activeSession.user.userId}`) return false;
       homeTruthStatus.value = "loading";
       homeTruthError.value = null;
+
+      homeTruthRateLimited.value = false;
+      homeTruthTransientFailure.value = false;
       try {
         const projection = await appHomeApi.fetch();
-        if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
+        if (!current()) return false;
+        if (!hasHomeSession(request)) { invalidateHomeTruth(); return false; }
         homeTruth.value = projection;
         applyHomeEarnings(projection);
+
+        homeTruthRetryAt = 0;
         homeTruthStatus.value = "ready";
         return true;
       } catch (cause) {
-        if (remoteAccountEpoch.isCurrent(request)) {
+        if (current()) {
+          if (!hasHomeSession(request)) { invalidateHomeTruth(); return false; }
+          const error = cause instanceof ApiError ? cause : null;
+          const denied = !!error && (["auth", "business", "protocol", "configuration"].includes(error.kind)
+            || error.status === 401 || error.status === 403 || error.code === 401 || error.code === 403);
+          const limited = isHttpReadRateLimit(cause);
+          if (limited) homeTruthRetryAt = Date.now() + (error?.retryAfterMs ?? 30_000);
+          homeTruthRateLimited.value = limited;
+          homeTruthTransientFailure.value = !!error && !denied && (limited || error.kind === "network"
+            || (error.kind === "http" && error.status !== undefined && error.status >= 500 && error.status <= 599));
+          if (!homeTruthTransientFailure.value) homeTruth.value = null;
           homeTruthStatus.value = "error";
           homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
         }
         return false;
       }
     })();
+    rememberPassiveTabRead("home-truth", refresh, [request, ownerEpoch]);
     homeTruthRefreshInFlight = { key, request: refresh };
     void refresh.finally(() => {
       if (homeTruthRefreshInFlight?.request === refresh) homeTruthRefreshInFlight = null;
@@ -933,6 +999,7 @@ export const useApp = defineStore("app", () => {
 
   function invalidateRemoteFleet(request?: RemoteAccountRequest): void {
     if (request && !remoteAccountEpoch.isCurrent(request)) return;
+    invalidateBeforePassiveTabRead("remote-fleet");
     remoteFleetRefreshCoordinator.invalidate();
     remoteFleetRefreshSequence += 1;
   }
@@ -941,6 +1008,7 @@ export const useApp = defineStore("app", () => {
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
     options: RemoteFleetRefreshOptions = {},
   ): Promise<boolean> {
+    invalidateBeforePassiveTabRead("remote-fleet");
     if (!remoteApiEnabled) return true;
     const expectedAccountKey = request.accountKey;
     const runScope = captureRuntimeRevision();
@@ -1068,6 +1136,12 @@ export const useApp = defineStore("app", () => {
       homeTruth.value = null;
       homeTruthStatus.value = "idle";
       homeTruthError.value = null;
+      homeTruthOwnerEpoch += 1;
+      homeTruthRefreshInFlight = null;
+
+      homeTruthRetryAt = 0;
+      homeTruthRateLimited.value = false;
+      homeTruthTransientFailure.value = false;
       // The authenticated catalog/bootstrap helper owns the first fleet read.
       // A bare account rebind has no authority to fetch a mixed old/new projection.
       void refreshRemoteWithdrawalList(key);
@@ -2436,10 +2510,10 @@ export const useApp = defineStore("app", () => {
   return {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, myTotalHashrateAt, earnings, global,
-    homeTruth, homeTruthStatus, homeTruthError,
+    homeTruth, homeTruthStatus, homeTruthError, homeTruthRateLimited, homeTruthTransientFailure,
     remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePhoneBindingInvalid,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, pauseLocalPhoneRuntimeBeforeSignOut,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, pauseLocalPhoneRuntimeBeforeSignOut,
     tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining, acceptPhoneActivation,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,

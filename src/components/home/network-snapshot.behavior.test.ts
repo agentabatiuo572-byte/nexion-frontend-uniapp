@@ -14,7 +14,7 @@ function mount() {
     publicStats: { registeredUsersBase: 100, registeredUsersAnchorAt: Date.now() - 9000, registeredUsersTickIntervalSec: 10, registeredUsersTickStep: 1 },
     networkPulse: { registeredUsers: 99999, onlineDevices: 200 },
   } });
-  const rank = vue.reactive({ status: 'ready', snapshot: { state: 'ranked', currentRank: 12 } as { state: string; currentRank: number | null } | null, bindAccount: vi.fn(), refresh: vi.fn() });
+  const rank = vue.reactive({ status: 'ready', snapshot: { state: 'ranked', currentRank: 12 } as { state: string; currentRank: number | null } | null, bindAccount: vi.fn(), ensure: vi.fn(), refresh: vi.fn() });
   const props = vue.reactive({ compactView: true, estimated: true, registeredDisplay: 100 as number | null });
   const hooks = { show: [] as Array<() => void>, hide: [] as Array<() => void>, unmount: [] as Array<() => void> };
   const modules: Record<string, unknown> = {
@@ -53,9 +53,12 @@ describe('optional compact network summary', () => {
     h.cfg.config.publicStats.registeredUsersTickIntervalSec = 10; await vue.nextTick();
     expect(h.snapshot.available.value).toBe(true); expect(vi.getTimerCount()).toBe(1);
   });
-  it('hides loading, errors and partial data, then restores only a healthy summary', async () => {
+  it('keeps confirmed summary during warm loading, hides errors and partial data, then restores healthy data', async () => {
     const h = mount();
-    for (const field of ['loading', 'syncFailed'] as const) {
+    h.cfg.loading = true; await vue.nextTick();
+    expect(h.snapshot.available.value).toBe(true); expect(h.pulse.compactAvailable.value).toBe(true); expect(vi.getTimerCount()).toBe(1);
+    h.cfg.loading = false; await vue.nextTick();
+    for (const field of ['syncFailed'] as const) {
       h.cfg[field] = true; await vue.nextTick();
       expect(h.snapshot.available.value).toBe(false); expect(h.pulse.compactAvailable.value).toBe(false);
       expect(vi.getTimerCount()).toBe(0); h.cfg[field] = false; await vue.nextTick();

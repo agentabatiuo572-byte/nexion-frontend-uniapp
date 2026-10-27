@@ -175,3 +175,27 @@ it("leaves no trial row after the confirmed lifecycle exits the active queue", (
   const screen = mount(); screen.presentation.active.value = false;
   expect(screen.byClass("trial-device-row")).toBeUndefined();
 });
+
+it("silently retains trial presentation during a warm read without enabling actions", () => {
+  const screen = mount();
+  screen.byClass("trial-device-row__heading")!.props!.onClick();
+  screen.emit.mockClear();
+  screen.presentation.actionsReady.value = false;
+  expect(screen.byClass("trial-device-row__notice")).toBeUndefined();
+  expect(screen.byClass("trial-device-row__amount")!.children).toBe("$5.00");
+  screen.byClass("trial-device-row__buy")!.props!.onClick(); screen.byClass("trial-device-row__cancel")!.props!.onClick();
+  expect(screen.navTo).not.toHaveBeenCalled(); expect(screen.emit).not.toHaveBeenCalled();
+});
+
+it("keeps static trial actions at full read-pending contrast while real unavailable/cancel-busy styles remain", () => {
+  const screen = mount();
+  screen.byClass("trial-device-row__heading")!.props!.onClick();
+  screen.presentation.actionsReady.value = false;
+  expect(screen.byClass("trial-device-row__buy")!.props!.style).toMatchObject({ opacity: 1 });
+  expect(screen.byClass("trial-device-row__cancel")!.props!.style).toMatchObject({ opacity: 1 });
+  expect(screen.byClass("trial-device-row__buy")!.props!["aria-disabled"]).toBe(true);
+  screen.props.cancelBusy = true;
+  expect(screen.byClass("trial-device-row__cancel")!.props!.style?.opacity).not.toBe(1);
+  screen.presentation.presentationReady.value = false;
+  expect(screen.byClass("trial-device-row__buy")!.props!.style?.opacity).not.toBe(1);
+});

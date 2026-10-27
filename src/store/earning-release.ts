@@ -3,6 +3,7 @@ import type { EarningsReleaseStatus } from "@/api/earnings-release-api";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import type { RiskClusterSummary } from "@/store/risk-cluster";
 import { shallowRef } from "vue";
+import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
 
 export type LedgerRoute = "pending_review" | "bonus_locked";
 export type ReleaseSource = "attest" | "manual";
@@ -30,6 +31,7 @@ export function bindEarningsReleaseAccount(accountKey: string): void {
 export async function refreshEarningsReleaseStatus(
   requestedAccountKey = activeEarningsReleaseAccountKey,
 ): Promise<EarningsReleaseStatus> {
+  invalidateBeforePassiveTabRead("earning-release");
   // A caller that already belongs to an older account generation must not
   // advance the current request sequence or put the current account into a
   // loading state. Its request has no financial authority here.

@@ -36,7 +36,7 @@
         </NxListGroup>
       </NxSection>
 
-      <view v-if="remoteApiEnabled && remoteOrdersLoading" class="mx-0 flex items-center" style="gap: 8px; min-height: 32px" data-me-orders-state="loading">
+      <view v-if="remoteApiEnabled && remoteOrdersLoading && !remoteOrdersHasRead" class="mx-0 flex items-center" style="gap: 8px; min-height: 32px" data-me-orders-state="loading">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>
       </view>
       <view v-else-if="remoteApiEnabled && remoteOrdersFailed" class="mx-0 flex items-center justify-between" style="gap: 12px; min-height: 44px" data-me-orders-state="failed">
@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow, onUnload } from "@/composables/use-tab-page-lifecycle";
@@ -108,7 +109,7 @@ import { runRemoteOrdersRefresh } from "@/lib/remote-orders-refresh";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { settleRemoteMeLoaders } from "@/lib/remote-me-refresh";
-import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
+import { revalidateProductCatalog } from "@/store/product-catalog";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { compiledResourceVersion, formatResourceVersion, readNativeResourceVersion } from "@/lib/app-version";
 
@@ -155,6 +156,7 @@ const themePickerOpen = ref(false);
 const remoteSecurity = ref<SecurityState | null>(null);
 const remoteOrdersLoading = ref(false);
 const remoteOrdersFailed = ref(false);
+const remoteOrdersHasRead = ref(false);
 let remoteSecurityRequest = 0;
 let remoteOrdersRequest = 0;
 let remoteMeActive = false;
@@ -339,19 +341,21 @@ const networkItems = computed(() => quickSections.value.find(section => section.
 const settingSections = computed(() => quickSections.value.filter(section => !['network','devices'].includes(section.key)).map(section => ({ ...section, items: section.items.filter(item => !frequentKeys.some(key => key === item.key) && item.key !== 'profile') })));
 
 async function refreshRemoteFunds() {
-  await deposits.refreshRemoteVietQrDeposits();
+  await runPassiveTabRead('deposits-bank-history', () => deposits.refreshRemoteVietQrDeposits(), undefined, () => deposits.remoteReceiptInitialStatus === 'ready');
 }
 
-async function refreshRemoteOrders() {
+async function refreshRemoteOrders(passive: unknown = false) {
   if (!remoteApiEnabled) return;
   const request = ++remoteOrdersRequest;
   const accountKey = app.accountKey;
+  const readScope = passiveTabReadScope();
   await runRemoteOrdersRefresh(
-    () => orders.refreshRemote(),
+    () => passive === true ? runPassiveTabRead('orders', () => orders.refreshRemote().then(() => true)).then(() => undefined) : (invalidatePassiveTabRead('orders'), orders.refreshRemote()),
     (state) => {
-      if (request !== remoteOrdersRequest || accountKey !== app.accountKey) return;
-      remoteOrdersLoading.value = state.loading;
-      remoteOrdersFailed.value = state.failed;
+      if (request !== remoteOrdersRequest || accountKey !== app.accountKey || readScope !== passiveTabReadScope()) return;
+      remoteOrdersLoading.value = state.loading && passive === true && remoteOrdersFailed.value ? false : state.loading;
+      remoteOrdersFailed.value = state.loading && passive === true ? remoteOrdersFailed.value : state.failed;
+      if (remoteMeActive && !state.loading && !state.failed) remoteOrdersHasRead.value = true;
     },
   );
 }
@@ -366,10 +370,11 @@ async function refreshRemoteSecurity() {
   const accountKey = app.accountKey;
   const binding = app.accountBindingEpoch;
   const scope = captureAccountScope();
+  const readScope = passiveTabReadScope();
   const current = () => remoteMeActive && request === remoteSecurityRequest
-    && accountKey === app.accountKey && binding === app.accountBindingEpoch && isCurrentAccountScope(scope);
+    && accountKey === app.accountKey && binding === app.accountBindingEpoch && isCurrentAccountScope(scope) && readScope === passiveTabReadScope();
   try {
-    const snapshot = await accountApi.securityOverview();
+    const snapshot = await runPassiveTabRead('security-overview', () => accountApi.securityOverview());
     if (!current()) return;
     remoteSecurity.value = snapshot;
   } catch {
@@ -382,35 +387,37 @@ async function refreshRemoteTrial() {
   // 7.0s 第二次置 loading 又把它禁掉,用户看到两段抖动。
   // GET /api/trial/state 的权威答复里已经带 canStart/eligibilityReason,
   // 一次读取就能定态;eligibility 读取只留作 state 读失败后的修复路径。
-  if (await trial.refreshRemote(true)) return;
-  await trial.refreshEligibilityRemote();
+  if (await runPassiveTabRead('trial-state', () => trial.refreshRemote())) return;
+  await runPassiveTabRead('trial-eligibility', () => trial.refreshEligibilityRemote());
 }
 
 async function refreshRemoteMe() {
   if (!remoteApiEnabled) return;
   await settleRemoteMeLoaders([
-    ["home", () => app.refreshHomeTruth()],
-    ["commission", () => commission.refreshCanonicalEvents()],
-    ["withdrawals", () => app.refreshRemoteWithdrawalList()],
-    ["fleet", async () => { await refreshRemoteFleetAfterCatalog(app.accountKey); await refreshEarningsReleaseStatus(); }],
+    ["home", () => app.ensureHomeTruth()],
+    ["commission", () => commission.ensureCanonicalEvents()],
+    ["withdrawals", () => runPassiveTabRead('withdrawals', () => app.refreshRemoteWithdrawalList())],
+    ["fleet", async () => { await revalidateProductCatalog(); await runPassiveTabRead('remote-fleet', () => app.refreshRemoteFleet(undefined, { coalesce: true })); await runPassiveTabRead('earning-release', () => refreshEarningsReleaseStatus()); }],
     ["funds", refreshRemoteFunds],
-    ["orders", refreshRemoteOrders],
+    ["orders", () => refreshRemoteOrders(true)],
     ["security", refreshRemoteSecurity],
-    ["notifications", () => notifications.refreshRemote()],
-    ["conversations", () => conversations.refresh()],
+    ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.error)],
+    ["conversations", () => runPassiveTabRead('conversations', () => conversations.refresh(), { owner: conversations.scopeInvalidated }, () => !conversations.loading && !conversations.error)],
     ["trial", refreshRemoteTrial],
-    ["vouchers", () => voucher.refreshRemote()],
-    ["rank", () => vrank.refreshCanonicalVRank()],
-    ["genesis", () => genesis.syncRemote()],
-    ["bills", () => bills.refreshSummary()],
-    ["market", () => market.syncRemote()],
-    ["config", () => config.load()],
+    ["vouchers", () => voucher.revalidateRemote()],
+    ["rank", () => vrank.ensureCanonicalVRank()],
+    ["genesis", () => runPassiveTabRead('genesis-state', () => genesis.syncRemote())],
+    ["bills", () => runPassiveTabRead('bills-summary', () => bills.refreshSummary(), undefined, () => bills.summaryStatus === 'ready')],
+    ["market", () => runPassiveTabRead('market', () => market.syncRemote())],
+    ["config", () => config.revalidate()],
   ]);
 }
 
 watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId, () => auth.isAuthenticated], () => {
   remoteSecurityRequest += 1;
   remoteSecurity.value = null;
+  remoteOrdersHasRead.value = false;
+  remoteOrdersRequest += 1;
 }, { flush: "sync" });
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (remoteApiEnabled) void refreshRemoteMe();
@@ -427,14 +434,16 @@ onHide(() => {
 // Catalog replacement clears the shared order list even without an account change.
 const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled) return;
+  invalidatePassiveTabRead("orders");
+  invalidatePassiveTabRead("earning-release");
   remoteOrdersRequest += 1;
   if (remoteMeActive && binarySessionReady({
     remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
     accountId: auth.accountId, appAccountKey: app.accountKey,
     sessionUserId: sessionVault.read()?.user.userId ?? null,
   })) {
-    void refreshRemoteOrders();
-    void refreshEarningsReleaseStatus().catch(() => undefined);
+    void refreshRemoteOrders(true);
+    void runPassiveTabRead("earning-release", () => refreshEarningsReleaseStatus()).catch(() => undefined);
   }
 });
 onUnmounted(() => {

@@ -76,6 +76,8 @@ import { getDeviceId } from "@/lib/device-id";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 
 export const apiRuntimeConfig = readApiRuntimeConfig();
+/** Immutable identity of the client constructed below; mutable UI config cannot rebind it. */
+export const apiRuntimeClientOrigin = Object.freeze({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl });
 export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
 export const remoteApiEnabled = true;
 // The formal App uses the Java service's canonical development contract in
