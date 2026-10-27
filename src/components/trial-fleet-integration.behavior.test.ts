@@ -5,6 +5,8 @@ import ts from "typescript";
 import { afterEach, expect, it, vi } from "vitest";
 import homeSource from "./home/my-fleet-section.vue?raw";
 import inventorySource from "@/pages/me/devices.vue?raw";
+import earnSource from "@/pages/earn/earn.vue?raw";
+import earnFleetSource from "./earn/empty-slots-hint.vue?raw";
 import { en } from "@/i18n/messages/en";
 import { trialFleetCopy } from "@/i18n/trial-fleet";
 import * as slotPolicy from "@/lib/device-slot-policy";
@@ -69,6 +71,45 @@ it.each([["Home", homeSource], ["management", inventorySource]])("counts a trial
   // The hidden paid capacity remains in the authoritative count even though
   // only one paid row is visible under the current product flag.
   expect(screen.app.visibleDevices).toHaveLength(1);
+});
+
+it.each([["Home", homeSource, "home"], ["management", inventorySource, "inventory"]])("uses the matching existing device-row presentation on %s", (_label, source, variant) => {
+  const screen = mount(source);
+  expect(tree(screen.node()).find(node => node.type === "TrialDeviceRow")!.props!.variant).toBe(variant);
+});
+
+it("connects the trial to the Earn accordion so a paid row closes it and preserves the first paid divider", () => {
+  const script = parse(earnSource).descriptor.scriptSetup!.content;
+  const ast = ts.createSourceFile("earn.ts", script, ts.ScriptTarget.Latest, true);
+  const declarations = ast.statements.filter(statement => ts.isFunctionDeclaration(statement)
+    ? statement.name?.text === "toggleDevice"
+    : ts.isVariableStatement(statement) && statement.declarationList.declarations.some(item => item.name.getText(ast) === "expandedId"));
+  const actualAccordion = ts.transpileModule(declarations.map(item => item.getText(ast)).join("\n") + "\nreturn { expandedId, toggleDevice };",
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const accordion = new Function("ref", actualAccordion)(Vue.ref);
+  const template = earnSource.match(/<EmptySlotsHint\b[\s\S]*?<\/EmptySlotsHint>/)![0];
+  const render = new Function("Vue", compile(template, { mode: "function", prefixIdentifiers: true, isCustomElement: () => true }).code)(Vue);
+  const context = Vue.proxyRefs({ ...accordion, fleetReady: true, devices: [{ id: "paid-1" }], trialPresentation: { active: Vue.ref(true) } });
+  const node = () => render(context, []) as Vue.VNode;
+  const paidRow = () => tree(node()).find(item => item.type === "DeviceCardPC")!;
+
+  expect(node().props!["trial-expanded"]).toBe(false);
+  node().props!.onToggleTrial();
+  expect(node().props!["trial-expanded"]).toBe(true);
+  expect(paidRow().props!.expanded).toBe(false);
+  expect(paidRow().props!.divider).toBe(true);
+  const trialTemplate = earnFleetSource.match(/<TrialDeviceRow\b[^>]*\/>/)![0];
+  const renderTrial = new Function("Vue", compile(trialTemplate, { mode: "function", prefixIdentifiers: true, isCustomElement: () => true }).code)(Vue);
+  const emit = vi.fn();
+  const trialRow = renderTrial({ trialExpanded: node().props!["trial-expanded"], emit }, []) as Vue.VNode;
+  expect(trialRow.props).toMatchObject({ variant: "earn", expanded: true });
+  trialRow.props!.onToggle(); expect(emit).toHaveBeenCalledExactlyOnceWith("toggleTrial");
+
+  paidRow().props!.onToggle();
+  expect(node().props!["trial-expanded"]).toBe(false);
+  expect(paidRow().props!.expanded).toBe(true);
+  context.trialPresentation.active.value = false;
+  expect(paidRow().props!.divider).toBe(false);
 });
 
 it("keeps purchased rows visible after a trial read failure on both parent templates", () => {

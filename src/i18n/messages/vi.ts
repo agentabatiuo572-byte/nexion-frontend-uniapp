@@ -1938,6 +1938,7 @@ catalog: {
     inventorySlotMeter: "{active}/{max} khe đang chạy",
     inventorySlotsLabel: "Khe tính toán",
     inventorySectionActive: "Đang chạy",
+    inventorySectionDevices: "Thiết bị của bạn",
     inventorySectionInventory: "Trong kho",
     inventorySectionActivationUnconfirmed: "Trạng thái chờ xác nhận",
     inventoryActivationUnconfirmed: "Bản ghi kích hoạt thiết bị đang chờ xác nhận nên chưa thể kích hoạt. Hãy làm mới và thử lại hoặc liên hệ hỗ trợ.",

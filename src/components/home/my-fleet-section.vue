@@ -3,7 +3,7 @@
   <view class="hf-section" data-home-section="fleet">
     <NxSection :title="t.home.myFleet" :meta="fleetCountText" :action="t.home.fleetManage" @action="goManage">
     <view v-if="fleetVisible || trialPresentation.active.value" class="hf-grid">
-      <TrialDeviceRow v-if="trialPresentation.active.value" key="trial:current" />
+      <TrialDeviceRow v-if="trialPresentation.active.value" key="trial:current" variant="home" />
       <DeviceRow v-for="d in devices" :key="d.id" :device="d" :runtime-confirmed="fleetReady" />
       <AddDeviceRow v-if="countReady && slotsUsed < app.slotCap" />
     </view>
