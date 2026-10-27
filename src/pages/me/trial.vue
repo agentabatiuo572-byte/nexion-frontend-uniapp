@@ -350,7 +350,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-read-skeleton { display:flex;flex-direction:column;gap:14px; }
 .trial-read-skeleton > view { height:24px;width:70%;border-radius:8px;background:var(--v5-surface-2); }
 .trial-read-skeleton > view:first-child { height:100px;width:100%;border-radius:20px; }
-.trial-read-retry { min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--v5-surface-2);color:var(--v5-ink); }
+.trial-read-retry { min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--v5-surface-2);color:var(--v5-ink);font:600 13px/20px var(--font-v5); }
 .trial-estimate-row { display:flex;justify-content:space-between;gap:12px;margin-top:10px;color:var(--v5-ink-3);font-size:12px;line-height:1.5; }
 .trial-estimate-row > text:last-child { flex-shrink:0;font-variant-numeric:tabular-nums; }
 .trial-early-note { display:block;margin-top:12px;font-size:12px;line-height:1.6;color:var(--v5-ink-2); }
