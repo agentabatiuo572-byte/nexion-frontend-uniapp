@@ -7,7 +7,7 @@
     <DeviceSlot :device="device" :online="false" />
     <view class="hf-device-meta">
       <text class="hf-device-name">{{ displayName }}</text>
-      <text class="hf-device-status" :class="{ 'hf-device-status--offline': onlineState === 'offline' }"><text class="hf-status-dot" :style="dotStyle" />{{ statusText }}</text>
+      <view class="hf-device-status" :class="{ 'hf-device-status--offline': onlineState === 'offline' }"><view class="hf-status-dot" :style="dotStyle" aria-hidden="true" /><text>{{ statusText }}</text></view>
     </view>
     <view class="hf-device-income"><text class="font-mono-tabular">{{ runtimeConfirmed ? (device.todayEarnings > 0 ? '+' : '') + fmtMoney(device.todayEarnings) : '-' }}</text><text class="hf-device-today">{{ copy.today }}</text></view>
     <view class="nx-home-arrow" aria-hidden="true">

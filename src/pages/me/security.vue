@@ -19,7 +19,7 @@
       </view>
       <view v-if="remoteApiEnabled && !remoteSecurity" class="mx-4 flex items-center justify-between" :style="remoteSecurityUnavailableStyle" data-testid="remote-security-unavailable" aria-live="polite">
         <text :style="remoteSecurityUnavailableTextStyle">{{ remoteSecurityLoading ? "…" : t.security.opFailed }}</text>
-        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70" :style="remoteSecurityRetryStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity"  @keydown.enter.prevent="loadRemoteSecurity" @keydown.space.prevent="loadRemoteSecurity">
+        <view v-if="!remoteSecurityLoading" class="flex items-center justify-center active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" :aria-label="t.ui.retry" @click="loadRemoteSecurity"  @keydown.enter.prevent="loadRemoteSecurity" @keydown.space.prevent="loadRemoteSecurity">
           <text :style="remoteSecurityRetryTextStyle">{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -1115,12 +1115,6 @@ const remoteSecurityUnavailableTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
-};
-const remoteSecurityRetryStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 10px",
-  borderRadius: "7px",
-  background: "var(--v5-surface-3)",
 };
 const remoteSecurityRetryTextStyle: CSSProperties = {
   font: "600 13px/20px var(--font-v5)",

@@ -1,6 +1,6 @@
 <!--
   Wallet — ported from Nexion-prototype/app/(main)/me/wallet/page.tsx.
-  iOS-Wallet pattern, top→bottom: balance hero (USDT 48px + NEX link + 3 quick
+  iOS-Wallet pattern, top→bottom: balance hero (responsive USDT + NEX link + 3 quick
   actions) → Earnings list (Today / Pending / All-time) → Activity list (Daily
   check-in / Transaction history / Bank cards / conditional in-flight withdrawal).
 
@@ -20,7 +20,7 @@
       <!-- Balance hero — de-carded: balance + actions sit on the page floor. -->
       <view :style="heroStyle">
         <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
-        <text class="block tabular-nums" :style="heroNumStyle">{{ usdtBalanceReadable ? `$${formatAmount(usdt)}` : "—" }}</text>
+        <text class="wallet-balance-amount block tabular-nums" :style="heroNumStyle">{{ usdtBalanceLabel }}</text>
         <view v-if="fundsReadable" class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" role="button" tabindex="0" :aria-label="t.wallet.nexBalance" @click="goNex">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
           <text style="font-size: 13px; color: var(--v5-ink-3)">{{ nexLabel }} UVT</text>
@@ -57,19 +57,19 @@
       <view v-if="fundsAuthorityUnavailable" :style="syncFailBoxStyle">
         <text class="block" :style="syncFailTitleStyle">{{ t.wallet.fundsUnavailableTitle }}</text>
         <text class="block" :style="syncFailBodyStyle">{{ app.remoteFleetHasSnapshot ? t.wallet.fundsStaleBody : app.remoteWalletReceiptHasSnapshot ? t.wallet.fundsReceiptOnlyBody : t.wallet.fundsUnavailableBody }}</text>
-        <view role="button" tabindex="0" :aria-label="t.wallet.retryFunds" :style="retryFundsStyle" @click="retryFundsAuthority">
+        <view role="button" tabindex="0" :aria-label="t.wallet.retryFunds" class="nx-card-recovery-action nx-card-recovery-action--quiet" @click="retryFundsAuthority">
           <text>{{ t.wallet.retryFunds }}</text>
         </view>
       </view>
       <view v-if="releaseAuthorityUnavailable" :style="syncFailBoxStyle">
         <text class="block" :style="syncFailBodyStyle">{{ t.wallet.releaseDetailsUnavailable }}</text>
-        <view role="button" tabindex="0" :aria-label="t.wallet.retryFunds" :style="retryFundsStyle" @click="retryReleaseAuthority" @keydown.enter.prevent="retryReleaseAuthority" @keydown.space.prevent="retryReleaseAuthority">
+        <view role="button" tabindex="0" :aria-label="t.wallet.retryFunds" class="nx-card-recovery-action nx-card-recovery-action--quiet" @click="retryReleaseAuthority" @keydown.enter.prevent="retryReleaseAuthority" @keydown.space.prevent="retryReleaseAuthority">
           <text>{{ t.wallet.retryFunds }}</text>
         </view>
       </view>
       <view v-if="remoteApiEnabled && !earningsReadPending && allTimeEarned === null" :style="syncFailBoxStyle">
         <text class="block" :style="syncFailBodyStyle">{{ t.wallet.earningsUnavailable }}</text>
-        <view role="button" tabindex="0" :aria-label="t.ui.retry" :style="retryFundsStyle" @click="retryEarningsAuthority">
+        <view role="button" tabindex="0" :aria-label="t.ui.retry" class="nx-card-recovery-action nx-card-recovery-action--quiet" @click="retryEarningsAuthority">
           <text>{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -243,6 +243,7 @@ const buckets = computed(() => ({
 // 2026-07-31:充值本金可提后,「可提现 USDT」= 总余额(held 两桶本就账外,不含在内)。
 // 必须与 wallet-withdraw 的 maxWithdrawable 同源,否则钱包页显示的数与实际能提的数对不上。
 const usdt = computed(() => app.user.usdtBalance);
+const usdtBalanceLabel = computed(() => usdtBalanceReadable.value ? `$${formatAmount(usdt.value)}` : "—");
 const nexLabel = computed(() => formatAmount(app.user.nexBalance));
 const pending = computed(() => app.user.pendingEarnings);
 const todayEarnings = computed(() => resolveWalletTodayEarnings({
@@ -343,15 +344,16 @@ const heroLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-const heroNumStyle: CSSProperties = {
+const heroNumStyle = computed<CSSProperties>(() => ({
   marginTop: "6px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "56px",
+  fontSize: `min(clamp(30px, 9.25vw, 36px), calc((100vw - 36px) / ${Math.max(usdtBalanceLabel.value.length, 10) * 0.65}))`,
   letterSpacing: "-0.034em",
   color: "var(--v5-ink)",
-  lineHeight: 1,
-};
+  lineHeight: 1.15,
+  whiteSpace: "nowrap",
+}));
 const actionIconStyle: CSSProperties = {
   width: "48px",
   height: "48px",
@@ -396,18 +398,6 @@ const syncFailBodyStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.45,
-};
-const retryFundsStyle: CSSProperties = {
-  marginTop: "10px",
-  minHeight: "44px",
-  padding: "0 16px",
-  borderRadius: "999px",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "var(--v5-surface)",
-  color: "var(--v5-ink-2)",
-  font: "600 13px/20px var(--font-v5)",
 };
 </script>
 

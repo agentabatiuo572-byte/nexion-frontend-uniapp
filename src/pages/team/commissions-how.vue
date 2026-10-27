@@ -8,7 +8,7 @@
 
       <view v-if="state.loading || state.error || content.incomplete" class="mx-4" style="padding: 18px 0; border-block: 1px solid var(--v5-border)" aria-live="polite">
         <text class="block" :style="paraStyle">{{ state.loading ? content.copy.loading : content.copy.unavailable }}</text>
-        <view v-if="!state.loading" role="button" tabindex="0" class="reward-cta" style="margin-top: 12px" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"><text>{{ content.copy.retry }}</text></view>
+        <view v-if="!state.loading" role="button" tabindex="0" class="nx-card-recovery-action nx-card-recovery-action--glass" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"><text>{{ content.copy.retry }}</text></view>
       </view>
 
       <template v-if="!state.loading && !state.error && !content.incomplete">

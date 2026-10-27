@@ -223,4 +223,12 @@ function retryEligibility() {
   .nx-trial-hero--card-entry .trial-art { width:96px;height:96px;margin-top:4px; }
   .nx-trial-hero--card-entry .trial-art .nx-home-art { width:96px;height:96px; }
 }
+@media (max-width:350px) {
+  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-meta { padding:12px 12px 0; }
+  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-badge { font-size:11.5px;line-height:16px; }
+  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-title { font-size:13px;line-height:18px;margin-top:6px; }
+  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-reassurance { font-size:11px;line-height:16px; }
+  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-art { margin-bottom:0; }
+  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-cta { margin:0 12px 10px;max-width:calc(100% - 24px);padding:0 10px;font:600 12px/16px var(--font-v5); }
+}
 </style>

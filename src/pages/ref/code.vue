@@ -74,7 +74,7 @@
       </view>
       <view v-if="remoteApiEnabled && (remotePreviewState === 'unavailable' || remotePreviewState === 'loading')" class="ref-preview-status" role="status" aria-live="polite" :aria-busy="remotePreviewState === 'loading'">
         <text>{{ remotePreviewState === 'loading' ? recoveryCopy.referralLoading : requestedCode ? recoveryCopy.referralUnavailable : recoveryCopy.referralInvalid }}</text>
-        <view v-if="requestedCode" class="ref-preview-retry" role="button" :tabindex="remotePreviewState === 'loading' ? -1 : 0" :aria-disabled="remotePreviewState === 'loading'" @click="loadRemotePreview" @keydown.enter.prevent="loadRemotePreview" @keydown.space.prevent="loadRemotePreview">
+        <view v-if="requestedCode" class="ref-preview-retry nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" :tabindex="remotePreviewState === 'loading' ? -1 : 0" :aria-disabled="remotePreviewState === 'loading'" @click="loadRemotePreview" @keydown.enter.prevent="loadRemotePreview" @keydown.space.prevent="loadRemotePreview">
           <text>{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -426,7 +426,6 @@ const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", display: "inl
 .ref-signin-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 6px; }
 .ref-preview-status { display: flex; align-items: center; gap: 12px; padding: 16px 0; font-size: 13px; line-height: 1.55; color: var(--v5-ink-3); }
 .ref-preview-status > text { flex: 1; }
-.ref-preview-retry { flex-shrink: 0; min-height: 44px; padding: 0 14px; display: flex; align-items: center; border-radius: 9999px; background: var(--v5-surface); color: var(--v5-brand); }
 .ref-preview-retry[aria-disabled="true"] { opacity: 0.5; }
 .ref-preview-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 /* 《08》§2:footer 的两个法务链接是 inline style 对象驱动的,加不了 :active,故走 class。
