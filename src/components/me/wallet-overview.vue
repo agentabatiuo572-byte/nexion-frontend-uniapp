@@ -64,6 +64,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
@@ -93,9 +94,11 @@ const bucketsReadable = computed(() => !remoteApiEnabled || (earningsReleaseHasS
   && (earningsReleaseStatus.value === "ready" || earningsReleaseStatus.value === "loading")));
 
 function retryFundsAuthority() {
+  invalidatePassiveTabRead("remote-fleet");
   void app.refreshRemoteFleet();
 }
 function retryReleaseAuthority() {
+  invalidatePassiveTabRead("earning-release");
   if (earningsReleaseStatus.value === "loading") return;
   void refreshEarningsReleaseStatus().catch(() => undefined);
 }

@@ -158,6 +158,9 @@ const isShare = computed(() => props.product.productType === "SHARE");
 const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");
 const marketingPromotion=computed(()=>isPromotionActive(props.promotion)?props.promotion:null);
 const promotionUnavailable=computed(()=>!!props.activityId&&(!props.promotionReady||!canPreviewPromotion(props.promotion??null)||!props.promotion?.productNos.includes(props.product.id)));
+// The catalog supplies a scoped retained activity only for read-only labels.
+const promotionPresentationReady=computed(()=>!!props.activityId&&canPreviewPromotion(props.promotion??null)&&!!props.promotion?.productNos.includes(props.product.id));
+const promotionPresentationSignIn=computed(()=>promotionPresentationReady.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
 const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
 const stockUnavailable = computed(() => props.product.inventoryMode === "FINITE"
   && props.product.stock === 0);
@@ -245,7 +248,7 @@ const gateProgressText = computed(() =>
   fmt(t.value.store.gateProgress, { pct: Math.round(gate.value.progressPct * 100) }),
 );
 const buyLabel = computed(() =>
-  promotionSignIn.value ? t.value.promotion.signIn : promotionUnavailable.value ? t.value.promotion.unavailable : catalogUnavailable.value
+  promotionPresentationSignIn.value ? t.value.promotion.signIn : promotionUnavailable.value && !promotionPresentationReady.value ? t.value.promotion.unavailable : catalogUnavailable.value
     ? productCatalogState.status === "loading" ? t.value.store.catalogLoadingTitle : t.value.store.catalogErrorTitle
     : stockUnavailable.value
     ? t.value.store.temporarilyOutOfStock

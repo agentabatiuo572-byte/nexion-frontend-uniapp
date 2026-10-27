@@ -87,7 +87,7 @@ const app = useApp();
 const cfg = useConfig();
 const remoteRank = useNetworkRank();
 function refreshRankMoment() {
-  if (remoteApiEnabled) void remoteRank.refresh();
+  if (remoteApiEnabled) void remoteRank.ensure();
 }
 onMounted(refreshRankMoment);
 watch(() => app.accountKey, (accountKey) => {
@@ -132,7 +132,7 @@ const compactAvailable = computed(() => {
   const members = props.estimated ? props.registeredDisplay : cfg.config.networkPulse?.registeredUsers;
   const devices = cfg.config.networkPulse?.onlineDevices;
   const currentRank = rank.value;
-  return !cfg.loading && !cfg.syncFailed && remoteRank.status !== 'error'
+  return !cfg.syncFailed && remoteRank.status !== 'error'
     && typeof members === 'number' && Number.isSafeInteger(members) && members >= 0
     && typeof devices === 'number' && Number.isSafeInteger(devices) && devices >= 0
     && (currentRank.kind === 'unranked'

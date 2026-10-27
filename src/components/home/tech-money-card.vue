@@ -47,9 +47,9 @@
       </view>
 
       <!-- 《02》§7:混合内容整句禁 Mono;保留 tabular-nums 让数字仍等宽对齐 -->
-      <view class="earnings-feedback" :class="{ 'nx-inline-recovery': remoteApiEnabled && (app.homeTruthStatus === 'error' || retrying) }" :aria-busy="retrying ? 'true' : 'false'">
-        <template v-if="remoteApiEnabled && (app.homeTruthStatus === 'error' || retrying)">
-          <text class="nx-inline-recovery__copy" role="status">{{ retrying ? t.home.techEarningsLoading : t.coreReview.earningsReadFailed }}</text>
+      <view class="earnings-feedback" :class="{ 'nx-inline-recovery': remoteApiEnabled && (app.homeTruthStatus === 'error' || (retrying && !app.homeTruth)) }" :aria-busy="retrying ? 'true' : 'false'">
+        <template v-if="remoteApiEnabled && (app.homeTruthStatus === 'error' || (retrying && !app.homeTruth))">
+          <text class="nx-inline-recovery__copy" role="status">{{ app.homeTruthStatus === 'error' ? t.coreReview.earningsReadFailed : t.home.techEarningsLoading }}</text>
           <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying ? 'true' : 'false'" class="earnings-retry nx-inline-recovery__action" @click="retryEarnings" @keydown.enter.prevent="retryEarnings" @keydown.space.prevent="retryEarnings"><text>{{ t.ui.retry }}</text></view>
         </template>
         <text v-else class="tabular-nums" style="color: var(--v5-success-ink)">{{ earningsSubtitle }}</text>
@@ -99,7 +99,7 @@ const remoteTodayVsYesterdayPct = computed<number | null>(() => remoteApiEnabled
   : null);
 const earningsSubtitle = computed(() => homeEarningsSubtitle(
   remoteApiEnabled,
-  app.homeTruthStatus,
+  app.homeTruthStatus === 'loading' && app.homeTruth ? 'ready' : app.homeTruthStatus,
   remoteToday.value,
   remoteJobCount.value,
   remoteTodayVsYesterdayPct.value,

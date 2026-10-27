@@ -43,7 +43,7 @@ function mount() {
     '@/components/catalog-machine-image.vue': { default: {} },
     '@/components/catalog-machine-image': { promotionMachineSlots },
     '@/mock/products': { getProduct:(id:string)=>products[id] },
-    '@/store/product-catalog': { productCatalogState:catalog,refreshProductCatalog },
+    '@/store/product-catalog': { productCatalogState:catalog,refreshProductCatalog,revalidateProductCatalog:refreshProductCatalog },
   };
   const exports = { default: {} as { setup: (props: object, context: { emit: () => void; expose: () => void }) => View } };
   new Function('require', 'exports', code)((id: string) => {

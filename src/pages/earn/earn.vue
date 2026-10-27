@@ -123,6 +123,7 @@
 </template>
 
 <script setup lang="ts">
+import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsdOverviewParts } from "@/lib/usd-display";
 import { onUnmounted, computed, nextTick, ref, watch, type CSSProperties } from "vue";
@@ -188,9 +189,9 @@ let earnObservationEpoch = 0;
 onShow(() => {
   earnPageVisible = true;
   if (remoteApiEnabled) {
-    void freeTrial.refreshRemote(true);
-    void app.refreshRemoteFleet(undefined, { coalesce: true }).catch(() => undefined);
-    void app.refreshHomeTruth().catch(() => undefined);
+    void runPassiveTabRead('trial-state', () => freeTrial.refreshRemote());
+    void runPassiveTabRead('remote-fleet', () => app.refreshRemoteFleet(undefined, { coalesce: true })).catch(() => undefined);
+    void app.ensureHomeTruth().catch(() => undefined);
     void observeDayOneEarnPage();
   }
 });
@@ -225,7 +226,7 @@ watch([() => app.homeTruthStatus, () => app.remoteFleetStatus, () => app.homeTru
   void observeDayOneEarnPage();
 });
 
-function retryFleet() { void app.refreshRemoteFleet().catch(() => undefined); }
+function retryFleet() { invalidatePassiveTabRead('remote-fleet'); void app.refreshRemoteFleet().catch(() => undefined); }
 /** Retry the summary read itself (Home overview), not just the fleet. */
 function retrySummary() { void app.refreshHomeTruth().catch(() => undefined); }
 function rangeLabel(r: Range): string { return r === "Today" ? t.value.earn.rangeToday : r === "Week" ? t.value.earn.rangeWeek : r === "Month" ? t.value.earn.rangeMonth : t.value.earn.rangeAll; }
@@ -269,8 +270,9 @@ const fleetCountText = computed(() => fleetReady.value && trialPresentation.rese
 
 // ── HERO total earned ──
 const serverPeriod = computed(() => {
-  // Keep a confirmed snapshot during loading, but hide figures after a failed read.
-  if (remoteApiEnabled && app.homeTruthStatus !== "ready" && app.homeTruthStatus !== "loading") return null;
+  // An explicit transient read failure may retain history; live guards still require ready.
+  if (remoteApiEnabled && app.homeTruthStatus !== "ready" && app.homeTruthStatus !== "loading"
+    && !(app.homeTruthStatus === "error" && app.homeTruthTransientFailure)) return null;
   const e = app.homeTruth?.earnings;
   if (!e) return null;
   return range.value === "Today" ? e.today : range.value === "Week" ? e.week : range.value === "Month" ? e.month : e.all;

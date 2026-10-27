@@ -35,16 +35,18 @@ const faucet = useNexFaucet(), app = useApp(), copy = useAuditUiCopy(), t = useT
 const locale = useLocaleStore();
 const submitting = ref(false);
 let visible = true, visit = 0;
-const ready = computed(() => remoteApiEnabled && faucet.remoteReadState === 'ready');
+const ready = computed(() => remoteApiEnabled && (faucet.remoteReadState === 'ready'
+  || (['loading','error'].includes(faucet.remoteReadState) && faucet.remoteHasSnapshot)));
 const checked = computed(() => ready.value && faucet.remoteCheckedInToday);
 const rewardHint = computed(() => {
+  if (faucet.remoteReadState === 'error') return t.value.daily.checkInUnconfirmed;
   if (!ready.value) return copy.value.viewDaily;
   const base = dailyBaseReward(faucet.remoteRules);
   if (checked.value) return base === null ? copy.value.tomorrow
     : fmt(continuityCopy(locale.code).tomorrowBaseReward, { n: base });
   return base === null ? copy.value.viewDaily : fmt(copy.value.todayReward, { n: base });
 });
-const checkInLabel = computed(() => checked.value ? copy.value.checkedIn : copy.value.checkIn);
+const checkInLabel = computed(() => faucet.remoteReadState === 'error' ? copy.value.viewDaily : checked.value ? copy.value.checkedIn : copy.value.checkIn);
 const days = computed(() => {
   const streak = faucet.signInStreak, current = Math.max(1, streak + (checked.value ? 0 : 1));
   const start = Math.floor((current - 1) / 7) * 7;
@@ -55,7 +57,7 @@ function giftText(gift:CanonicalDailyMilestone){return dailyMilestoneRewardText(
 // seven labels. The other dates share the remaining space in the same row.
 const dayColumns = computed(() => days.value.map(day => day.today && locale.code === 'vi' ? 'minmax(52px,1.5fr)' : 'minmax(0,1fr)').join(' '));
 const milestoneHint=computed(()=>{if(!ready.value)return '';const gift=days.value.find(day=>day.gift)?.gift;return gift?fmt(t.value.daily.milestones.dayLabel,{n:gift.milestoneDay})+' '+giftText(gift):'';});
-function refresh() { if (visible && remoteApiEnabled) void faucet.ensureRemote(); }
+function refresh() { if (visible && remoteApiEnabled) void faucet.ensureRemote(10_000); }
 onMounted(refresh);
 onShow(() => { visible = true; refresh(); });
 onHide(() => { visible = false; visit++; });
@@ -63,7 +65,7 @@ onUnmounted(() => { visible = false; visit++; });
 watch(() => [app.accountKey, app.accountBindingEpoch], refresh);
 async function checkIn() {
   if (submitting.value || !visible) return;
-  if (!ready.value || checked.value) { navTo('/pages/daily/daily'); return; }
+  if (faucet.remoteReadState !== 'ready' || checked.value) { navTo('/pages/daily/daily'); return; }
   const scope = `${app.accountKey}:${app.accountBindingEpoch}:${visit}`;
   submitting.value = true;
   try {

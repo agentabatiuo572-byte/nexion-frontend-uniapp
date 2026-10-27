@@ -3,7 +3,7 @@
     <SubPageHeader back="/pages/events/events?source=legacy" :title="copy.title" />
     <text class="raffle-copy">{{ copy.intro }}</text>
     <view class="raffle-status" role="status" aria-live="polite">
-      <text v-if="loading">{{ copy.loading }}</text>
+      <text v-if="loading && !snapshot">{{ copy.loading }}</text>
       <text v-else-if="error && snapshot">{{ copy.refreshError }}</text>
     </view>
     <view v-if="error && !snapshot" class="nx-glass-card raffle-card" role="alert"><text>{{ copy.error }}</text><view class="raffle-link" role="button" tabindex="0" @click="load" @keydown.enter.prevent="activate($event, load)" @keydown.space.prevent="activate($event, load)"><text class="raffle-read-retry-label">{{ copy.retry }}</text></view></view>

@@ -236,7 +236,6 @@ const maxVram = computed(() => app.visibleDevices.reduce(
   0,
 ));
 const lockedTeasers = computed(() => earnConfig.lockedTeasers(maxVram.value, 3));
-watch(maxVram, (value) => { void earnConfig.refreshRoute(value); }, { immediate: true });
 
 const historyHintText = computed(() =>
   t.value.taskHistory.historyHint.replace("{n}", String(allRecent.value.length)),

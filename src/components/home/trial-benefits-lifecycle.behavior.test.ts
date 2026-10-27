@@ -12,6 +12,7 @@ import { zh } from '@/i18n/messages/zh';
 import { vi as vietnamese } from '@/i18n/messages/vi';
 import { fmt } from '@/i18n/format';
 import { formatAmount } from '@/lib/amount-display';
+import { voucherSupportsSurface } from '@/lib/voucher-sheet-authority';
 
 type Node = { type: string; text: string; parent: Node | null; children: Node[]; props: Record<string, unknown> };
 const node = (type: string, text = ''): Node => ({ type, text, parent: null, children: [], props: {} });
@@ -64,11 +65,13 @@ async function mount(locale: 'zh' | 'en' | 'vi', initialStatus = 'active', surfa
     remainingMs: Vue.computed(() => trial.authorityStatus === 'error' ? null : remainingMs.value),
     estimatedOffsetUSD: Vue.computed(() => trial.authorityStatus === 'error' ? null : 50), refresh: vi.fn(),
   };
-  const voucher = Vue.reactive({ claimable: true, claimedUnused: [] as string[], hasClaimableForSurface: () => voucher.claimable });
+  const voucher = Vue.reactive({ claimable: true, claimedUnused: [] as string[], hasClaimableForSurface: () => voucher.claimable,
+    presentationOffers: [{id:'offer',claimSurfaces:['home']}], presentationClaimable: [{id:'offer',claimSurfaces:['home']}] });
   const show = vi.fn(), navTo = vi.fn(), messages = { zh, en, vi: vietnamese }[locale], copy = trialLifecycleCopy[locale];
   const section = { setup: (_props: unknown, context: { slots: Vue.Slots }) => () => Vue.h('section', context.slots.default?.()) };
   const modules: Record<string, unknown> = {
     vue: Vue, '@/store/free-trial': { useFreeTrial: () => trial },
+    '@/api/runtime': { remoteApiEnabled: true }, '@/lib/voucher-sheet-authority': { voucherSupportsSurface },
     '@/store/trial-config': { useTrialConfig: () => ({ config: { seatsLeftToday: 5, trialDays: 3 } }) },
     '@/composables/use-trial-presentation': { useTrialPresentation: () => projection },
     '@/store/trial-claim-sheet': { useTrialClaimSheet: () => ({ show }) },
@@ -209,7 +212,7 @@ test.each(['active', 'grace', 'ended', 'converted'])('benefits keeps the %s tria
   const view = await mount('en', status, 'benefits');
   expect(find(view.root, item => item.type === 'trial-card')).toBeDefined();
   expect(byClass(view.root, 'home-benefits__grid--single')).toBeUndefined();
-  view.voucher.claimable = false; await Vue.nextTick();
+  view.voucher.claimable = false; view.voucher.presentationOffers=[]; view.voucher.presentationClaimable=[]; await Vue.nextTick();
   expect(find(view.root, item => item.type === 'trial-card')).toBeDefined();
   expect(byClass(view.root, 'home-benefits__grid--single')).toBeDefined();
   view.trial.status = 'none'; view.trial.authorityStatus = 'error'; await Vue.nextTick();

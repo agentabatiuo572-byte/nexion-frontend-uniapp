@@ -88,10 +88,10 @@ describe('R1-TV04 ledger state continuity', () => {
     const hero = find(p.root, 'team-ledger'), amount = find(p.root, 'team-ledger__amount');
     const settlement = find(p.root, 'team-ledger__settlement'), feedback = find(p.root, 'team-ledger__feedback');
     const slots = all(feedback).filter(item => hasClass(item, 'team-ledger__feedback-item'));
-    expect(slots).toHaveLength(3);
+    expect(slots).toHaveLength(1);
     expect(text(amount)).toBe('—');
     expect(text(settlement)).not.toContain('$');
-    expect(accessibleText(feedback)).toBe(copy.network.projectionLoadingTitle);
+    expect(accessibleText(feedback)).toBe('');
     expect(hero.props['aria-busy']).toBe(true);
     const retry = find(p.root, 'team-ledger__retry');
     expect(retry.props.tabindex).toBe(-1);
@@ -111,8 +111,16 @@ describe('R1-TV04 ledger state continuity', () => {
     expect(text(find(p.root, 'team-ledger__lifetime'))).toContain('$800.00');
     await p.set({ loading: true }); sameSlots();
     expect(text(amount)).toBe('$1,234.56');
-    expect(accessibleText(feedback)).toBe(copy.network.projectionRefreshing);
-    expect(find(p.root, 'team-ledger__breakdown').props['aria-expanded']).toBe(true);
+    expect(accessibleText(feedback)).toBe('');
+    const breakdown = find(p.root, 'team-ledger__breakdown');
+    expect(hasClass(breakdown, 'is-hidden')).toBe(false);
+    expect(hasClass(breakdown, 'is-unknown')).toBe(false);
+    expect(breakdown.props['aria-hidden']).toBe(false);
+    expect(breakdown.props['aria-disabled']).toBe(true);
+    expect(breakdown.props.tabindex).toBe(-1);
+    breakdown.props.onClick(); await Vue.nextTick();
+    expect(breakdown.props['aria-expanded']).toBe(true);
+    expect(hero.props['aria-busy']).toBe(true);
     await p.set({ failed: true, loading: false, available: false }); sameSlots();
     expect(text(amount)).toBe('—');
     expect(text(find(p.root, 'team-ledger__lifetime'))).not.toContain('$800.00');
@@ -120,7 +128,7 @@ describe('R1-TV04 ledger state continuity', () => {
     expect(retry.props.tabindex).toBe(0);
     retry.props.onClick(); expect(onRetry).toHaveBeenCalledOnce();
     await p.set({ failed: false, loading: true }); sameSlots();
-    expect(accessibleText(feedback)).toBe(copy.network.projectionLoadingTitle);
+    expect(accessibleText(feedback)).toBe('');
     await p.set({ available: true, loading: false, monthUSDT: 0, monthNEX: 0, unlockedUSDT: 0, coolingUSDT: 0 }); sameSlots();
     expect(text(amount)).toBe('$0.00');
     expect(text(find(p.root, 'team-ledger__nex'))).toBe('+ 0.00 UVT');
@@ -142,12 +150,30 @@ describe('R1-TV04 ledger state continuity', () => {
     const cards = template.match(/<TeamLedgerCard\b[\s\S]*?\/>/g)!;
     expect(cards).toHaveLength(1);
     expect(cards[0]).not.toMatch(/v-if|v-else/);
-    for (const binding of [':available="ledgerVisible"', ':loading="ledgerLoading"', ':failed="ledgerFailed"', '@retry="refreshRemoteLedger"']) expect(cards[0]).toContain(binding);
+    for (const binding of [':available="ledgerVisible"', ':loading="ledgerLoading"', ':failed="ledgerFailureFeedback"', '@retry="refreshRemoteLedger"']) expect(cards[0]).toContain(binding);
     expect(template).not.toContain('toolCellStyle(0)');
   });
 });
 
 describe('R1-TV01 summary count and container contracts (not pixel measurements)', () => {
+  it.each(['zh', 'en', 'vi'] as const)('%s retains the decorative arrow slot without making a loading or failed member card actionable', async locale => {
+    const onOpen = vi.fn();
+    const p = await mount(summarySource, { status: 'ready', hasSnapshot: true, total: 12, direct: 10, onOpen }, locale);
+    const arrow = find(p.root, 'team-summary__arrow'), card = find(p.root, 'team-summary');
+    expect(arrow.props['aria-hidden']).toBe('true');
+    card.props.onClick(); expect(onOpen).toHaveBeenCalledOnce();
+    for (const status of ['loading', 'error', 'idle']) {
+      await p.set({ status });
+      expect(find(p.root, 'team-summary__arrow')).toBe(arrow);
+      expect(arrow.props.style.visibility).toBe('hidden');
+      expect(card.props.role).toBeUndefined();
+      card.props.onClick(); expect(onOpen).toHaveBeenCalledOnce();
+    }
+    await p.set({ status: 'ready' }); expect(arrow.props.style.visibility).toBe('visible');
+    card.props.onClick(); expect(onOpen).toHaveBeenCalledTimes(2);
+    await p.set({ total: 0 }); expect(arrow.props.style.visibility).toBe('hidden');
+  });
+
   it('preserves default and explicitly requested art sizes for the other consumers', async () => {
     const p = await mount(artSource, { kind: 'gift' });
     const art = find(p.root, 'team-art');
@@ -199,4 +225,13 @@ describe('R1-TV01 summary count and container contracts (not pixel measurements)
     expect(ledgerCss).toMatch(/\.team-ledger__feedback-item\s*\{[^}]*grid-area: 1 \/ 1;[^}]*visibility: hidden/);
     expect(ledgerCss).toMatch(/\.team-ledger__feedback-item\.is-active\s*\{[^}]*visibility: visible/);
   });
+});
+
+it.each(['zh','en','vi'] as const)('%s main-Team cold unknown keeps static shell and placeholders without reading copy',async locale=>{
+ const p=await mount(summarySource,{status:'idle',hasSnapshot:false,total:0,direct:0},locale);
+ const card=find(p.root,'team-summary'),count=find(p.root,'team-summary__number');
+ expect(text(count)).toBe('—');expect(text(find(p.root,'team-summary__direct'))).toContain('—');expect(text(card)).not.toContain(dictionaries[locale].team.summaryLoading);
+ expect(all(p.root).some(n=>hasClass(n,'team-summary__status'))).toBe(false);
+ await p.set({status:'loading'});expect(text(count)).toBe('—');expect(text(card)).not.toContain(dictionaries[locale].team.summaryLoading);
+ expect(all(p.root).some(n=>hasClass(n,'team-summary__status'))).toBe(false);
 });

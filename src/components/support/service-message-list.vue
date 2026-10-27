@@ -2,10 +2,6 @@
   <view class="service-messages" :aria-busy="loading">
     <GlassSegments v-if="!hideFilters" v-model="filter" :options="filters" layout="scroll" semantics="radio" :label="t.notifs.serviceFilterLabel" />
     <view v-if="loading && !rows.length" class="service-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
-    <view v-if="!failed && conversations.realtimeFallback" class="service-state nx-inline-recovery" role="status">
-      <text class="nx-inline-recovery__copy">{{ t.conversations.realtimeFallback }}</text>
-      <view class="service-button service-retry nx-inline-recovery__action" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry"><text>{{ t.ui.retry }}</text></view>
-    </view>
     <view v-if="!loading && !failed && !rows.length" class="service-state service-empty">
       <text class="service-empty-title">{{ t.notifs.serviceEmpty }}</text>
       <text>{{ t.notifs.serviceEmptyHint }}</text>
@@ -30,6 +26,10 @@
         <view class="service-meta"><view v-if="unreadUnavailable(row) || row.unread > 0" class="service-unread"><text>{{ unreadUnavailable(row) ? '-' : formatUnreadBadge(row.unread) }}</text></view></view>
       </view>
     </ConversationSwipeRow>
+    <view v-if="!failed && conversations.realtimeFallback" class="service-state nx-inline-recovery" role="status">
+      <text class="nx-inline-recovery__copy">{{ t.conversations.realtimeFallback }}</text>
+      <view class="service-button service-retry nx-inline-recovery__action" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry"><text>{{ t.ui.retry }}</text></view>
+    </view>
     <view v-if="failed" class="service-state nx-inline-recovery" role="alert">
       <text class="nx-inline-recovery__copy">{{ rows.length ? t.conversations.staleSnapshot : t.conversations.loadError }}</text>
       <view class="service-button service-retry nx-inline-recovery__action" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry">
