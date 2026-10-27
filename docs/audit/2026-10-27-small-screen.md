@@ -116,3 +116,9 @@
 - [独立视觉A](2026-10-27-small-screen/r22-visual-a/review-r22-frozen-visual-a.md) 9.2、[独立交互B](2026-10-27-small-screen/r22-interaction-b/review-r22-interaction-b.md) 9.3。中英越标签均USDT，320/390明暗代表未裁切、挤压或横溢；签到10.5px与浅色蓝光增量回归通过。
 - 原5237静态资源已更新，实读入口/哈希与冻结包一致；刷新后恢复原320×693、中文、暗色。USDT实际12px、今天10.5px/14px，更新前后演示状态相同。未重启服务或重置聊天/试用记录。
 - 本轮构建、定向测试及用户入口证据见[validation-r22](2026-10-27-small-screen/validation-r22.md)。H5最终同步和新个人中心恢复字体补验仍待办，不把已验收小改动说成全站完成。
+
+### r23/r24远端合并与最终原入口增量
+
+- 推送前正常合入远端80e18f8f试用早购、e10f6825 iPhone校准功能；四处语言/日志冲突保留短文、USDT和新平台语义，功能PRD随远端完整保留。原APP目录WIP不重置，继续源码为独立integrate工作树。
+- R23定向107项通过，额外旧Node契约10pass/2fail如实保留；R24定向7文件111项、类型、浏览器及APP资源构建通过。新功能实景和真实业务不借USDT评分签核。
+- 5237最终入口index-Ddn2nKUH.js；原演示进程/状态保留，用户标签恢复320中文暗色。USDT12px、今天10.5px/14px。最后只读增量独立视觉9.2、交互9.3，无该范围新增P2。证据及剩余项见[validation-r24](2026-10-27-small-screen/validation-r24.md)。
