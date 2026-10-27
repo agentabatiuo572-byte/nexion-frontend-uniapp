@@ -2,7 +2,9 @@ import * as Vue from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import { compile } from "@vue/compiler-dom";
 import ts from "typescript";
-import { expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { createPinia } from "pinia";
+import { useDataVisibility } from "@/store/data-visibility";
 import source from "./trial-device-row.vue?raw";
 import { trialFleetCopy } from "@/i18n/trial-fleet";
 import { formatTrialRemaining } from "@/i18n/trial-lifecycle";
@@ -13,6 +15,8 @@ import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 
 const messages = { en, zh, vi: vietnamese };
+beforeEach(() => vi.stubGlobal("uni", { getStorageSync: () => false, setStorageSync: vi.fn() }));
+afterEach(() => vi.unstubAllGlobals());
 
 const descriptor = parse(source).descriptor;
 const code = ts.transpileModule(compileScript(descriptor, { id: "trial-device-row" }).content,
@@ -24,6 +28,7 @@ function nodes(node: Vue.VNode): Vue.VNode[] {
   return [node, ...(Array.isArray(node.children) ? node.children.flatMap(child => Vue.isVNode(child) ? nodes(child) : []) : [])];
 }
 function mount(variant: "home" | "earn" | "inventory" = "earn", locale: keyof typeof trialFleetCopy = "en") {
+  const visibility = useDataVisibility(createPinia());
   const presentation = {
     active: Vue.ref(true), status: Vue.ref("active"), deviceName: Vue.ref("Server Trial B"), productId: Vue.ref<string | null>("stellarbox-s1"), remainingMs: Vue.ref<number | null>(48 * 3_600_000),
     offsetUSD: Vue.ref<number | null>(5), estimatedOffsetUSD: Vue.ref<number | null>(21), offsetProgress: Vue.ref<number | null>(5 / 21),
@@ -32,6 +37,7 @@ function mount(variant: "home" | "earn" | "inventory" = "earn", locale: keyof ty
   const props = Vue.reactive({ variant, expanded: undefined as boolean | undefined, showCancel: true, cancelBusy: false });
   const navTo = vi.fn(), emit = vi.fn();
   const modules: Record<string, unknown> = {
+    "@/store/data-visibility": { useDataVisibility: () => visibility },
     vue: Vue,
     "@/composables/use-trial-presentation": { useTrialPresentation: () => presentation },
     "@/i18n/trial-fleet": { useTrialFleetCopy: () => Vue.ref(trialFleetCopy[locale]) },
@@ -46,7 +52,7 @@ function mount(variant: "home" | "earn" | "inventory" = "earn", locale: keyof ty
   const view = exports.default.setup(props, { expose() {}, emit });
   const node = () => render(Vue.proxyRefs({ ...props, ...view }), []) as Vue.VNode;
   const byClass = (className: string) => nodes(node()).find(vnode => vnode.props?.class?.split(" ").includes(className));
-  return { props, presentation, navTo, emit, node, byClass };
+  return { props, presentation, navTo, emit, node, byClass, visibility, view };
 }
 
 it("renders a collapsed trial row with the actual model image, trial image badge and countdown only", () => {
@@ -198,4 +204,61 @@ it("keeps static trial actions at full read-pending contrast while real unavaila
   expect(screen.byClass("trial-device-row__cancel")!.props!.style?.opacity).not.toBe(1);
   screen.presentation.presentationReady.value = false;
   expect(screen.byClass("trial-device-row__buy")!.props!.style?.opacity).not.toBe(1);
+});
+
+it.each((['en', 'zh', 'vi'] as const).flatMap(locale => (['home', 'earn'] as const).map(variant => ({ locale, variant }))))(
+  '$locale $variant masks only personal amounts/progress while keeping labels, countdown and actions', ({ locale, variant }) => {
+    const screen = mount(variant, locale); screen.props.expanded = true;
+    const heading = screen.byClass('trial-device-row__heading')!.props!['aria-label'];
+    const countdown = screen.byClass('trial-device-row__remaining')!.children;
+    expect(screen.view.money(screen.presentation.offsetUSD.value)).toBe('$5.00');
+    screen.visibility.toggle();
+    expect(screen.view.money(screen.presentation.offsetUSD.value)).toBe('••••');
+    expect(screen.view.money(screen.presentation.estimatedOffsetUSD.value)).toBe('••••');
+    expect(screen.byClass('trial-device-row__heading')!.props!['aria-label']).toBe(heading);
+    expect(screen.byClass('trial-device-row__remaining')!.children).toBe(countdown);
+    expect(screen.byClass('trial-device-row__progress')).toBeUndefined();
+    expect(nodes(screen.node()).some(n => n.props?.['aria-valuenow'] !== undefined)).toBe(false);
+    if (variant === 'earn') {
+      expect(screen.byClass('trial-device-row__amount')!.children).toBe('••••');
+      const words = nodes(screen.node()).filter(n => typeof n.children === 'string').map(n => n.children).join(' ');
+      expect(words).toContain(trialFleetCopy[locale].availableCredit);
+      expect(words).toContain(trialFleetCopy[locale].estimate);
+      expect(words).toContain(trialFleetCopy[locale].detailsAction);
+      expect(words).not.toContain('$5.00'); expect(words).not.toContain('$21.00');
+      screen.presentation.actionsReady.value = false;
+      screen.byClass('trial-device-row__buy')!.props!.onClick(); expect(screen.navTo).not.toHaveBeenCalled();
+    }
+    screen.visibility.toggle();
+    expect(screen.view.money(screen.presentation.offsetUSD.value)).toBe('$5.00');
+    if (variant === 'earn') expect(screen.byClass('trial-device-row__progress')!.props!['aria-valuenow']).toBe(24);
+    expect(screen.presentation.offsetUSD.value).toBe(5);
+    expect(screen.presentation.estimatedOffsetUSD.value).toBe(21);
+    expect(screen.presentation.offsetProgress.value).toBe(5 / 21);
+  },
+);
+
+it('keeps inventory independent and applies the correct boundary when the same row changes variant', () => {
+  const screen = mount('inventory'); screen.props.expanded = true; screen.visibility.toggle();
+  expect(screen.byClass('trial-device-row__amount')!.children).toBe('$5.00');
+  expect(screen.byClass('trial-device-row__progress')!.props!['aria-valuenow']).toBe(24);
+  expect(screen.view.money(screen.presentation.estimatedOffsetUSD.value)).toBe('$21.00');
+  screen.props.variant = 'earn';
+  expect(screen.byClass('trial-device-row__amount')!.children).toBe('••••');
+  expect(screen.byClass('trial-device-row__progress')).toBeUndefined();
+  screen.props.variant = 'inventory';
+  expect(screen.byClass('trial-device-row__amount')!.children).toBe('$5.00');
+  expect(screen.byClass('trial-device-row__progress')!.props!['aria-valuenow']).toBe(24);
+});
+
+it('retains unknown and real zero semantics when revealing a masked row', () => {
+  const screen = mount('earn'); screen.props.expanded = true;
+  screen.presentation.offsetUSD.value = null; screen.presentation.estimatedOffsetUSD.value = null;
+  screen.presentation.offsetProgress.value = null; screen.visibility.toggle();
+  expect(screen.byClass('trial-device-row__amount')!.children).toBe('••••');
+  screen.visibility.toggle(); expect(screen.byClass('trial-device-row__amount')!.children).toBe('—');
+  expect(screen.view.money(screen.presentation.estimatedOffsetUSD.value)).toBe('—');
+  screen.presentation.offsetUSD.value = 0;
+  screen.visibility.toggle(); expect(screen.byClass('trial-device-row__amount')!.children).toBe('••••');
+  screen.visibility.toggle(); expect(screen.byClass('trial-device-row__amount')!.children).toBe('$0.00');
 });

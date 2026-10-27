@@ -2,7 +2,9 @@ import * as Vue from 'vue';
 import type { Component } from 'vue';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { createPinia } from 'pinia';
+import { useDataVisibility } from '@/store/data-visibility';
 import heroSource from '../trial-hero-banner.vue?raw';
 import benefitsSource from './home-benefits.vue?raw';
 import { trialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecycle';
@@ -49,9 +51,11 @@ function dispatch(target: Node, type: 'click' | 'keydown', key?: string) {
   return event;
 }
 const cleanups: Array<() => void> = [];
-afterEach(() => cleanups.splice(0).forEach(cleanup => cleanup()));
+beforeEach(() => vi.stubGlobal('uni', { getStorageSync: () => false, setStorageSync: vi.fn() }));
+afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.unstubAllGlobals(); });
 
-async function mount(locale: 'zh' | 'en' | 'vi', initialStatus = 'active', surface: 'hero' | 'benefits' = 'hero') {
+async function mount(locale: 'zh' | 'en' | 'vi', initialStatus = 'active', surface: 'hero' | 'benefits' = 'hero', embedded = true) {
+  const visibility = useDataVisibility(createPinia());
   const trial = Vue.reactive({ status: initialStatus, authorityStatus: 'ready', reason: 'in-progress',
     eligibility: () => ({ ok: trial.authorityStatus === 'ready' && trial.reason === '', reason: trial.reason }),
     confirmedOfferState: () => trial.reason === '' ? 'claimable' : 'unavailable', showHeroPromo: () => trial.status === 'none' && trial.reason === '',
@@ -70,6 +74,7 @@ async function mount(locale: 'zh' | 'en' | 'vi', initialStatus = 'active', surfa
   const show = vi.fn(), navTo = vi.fn(), messages = { zh, en, vi: vietnamese }[locale], copy = trialLifecycleCopy[locale];
   const section = { setup: (_props: unknown, context: { slots: Vue.Slots }) => () => Vue.h('section', context.slots.default?.()) };
   const modules: Record<string, unknown> = {
+    '@/store/data-visibility': { useDataVisibility: () => visibility },
     vue: Vue, '@/store/free-trial': { useFreeTrial: () => trial },
     '@/api/runtime': { remoteApiEnabled: true }, '@/lib/voucher-sheet-authority': { voucherSupportsSurface },
     '@/store/trial-config': { useTrialConfig: () => ({ config: { seatsLeftToday: 5, trialDays: 3 } }) },
@@ -89,9 +94,9 @@ async function mount(locale: 'zh' | 'en' | 'vi', initialStatus = 'active', surfa
   const code = ts.transpileModule(compiled, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   const exports = { default: {} as Component };
   new Function('require', 'exports', code)((id: string) => { if (!(id in modules)) throw new Error(id); return modules[id]; }, exports);
-  const root = node('root'), app = renderer.createApp(exports.default, { embedded: true });
+  const root = node('root'), app = renderer.createApp(exports.default, { embedded });
   app.mount(root); cleanups.push(() => app.unmount()); await Vue.nextTick();
-  return { root, trial, retainedStatus, remainingMs, projection, show, navTo, voucher, copy,
+  return { root, trial, retainedStatus, remainingMs, projection, show, navTo, voucher, copy, visibility,
     click: () => dispatch(byClass(root, 'nx-trial-hero--card-entry') ?? byClass(root, 'trial-cta')!, 'click'),
   };
 }
@@ -217,4 +222,46 @@ test.each(['active', 'grace', 'ended', 'converted'])('benefits keeps the %s tria
   expect(byClass(view.root, 'home-benefits__grid--single')).toBeDefined();
   view.trial.status = 'none'; view.trial.authorityStatus = 'error'; await Vue.nextTick();
   expect(find(view.root, item => item.type === 'trial-card')).toBeDefined();
+});
+
+test.each((['zh', 'en', 'vi'] as const).flatMap(locale => ['active', 'grace'].map(status => ({ locale, status }))))(
+  '$locale embedded $status hides accrued credit without masking labels, countdown or destination', async ({ locale, status }) => {
+    const screen = await mount(locale, status);
+    const countdown = textContent(byClass(screen.root, 'trial-header-countdown')!);
+    const countdownName = byClass(screen.root, 'trial-header-countdown')!.props['aria-label'];
+    const cardName = byClass(screen.root, 'nx-trial-hero--card-entry')!.props['aria-label'];
+    expect(textContent(byClass(screen.root, 'trial-lifecycle-credit')!)).toContain('$11.37');
+    screen.visibility.toggle(); await Vue.nextTick();
+    expect(textContent(byClass(screen.root, 'trial-lifecycle-credit')!)).toContain(screen.copy.creditLabel);
+    expect(textContent(byClass(screen.root, 'trial-lifecycle-credit')!)).toContain('••••');
+    expect(textContent(screen.root)).not.toContain('$11.37');
+    expect(textContent(byClass(screen.root, 'trial-header-countdown')!)).toBe(countdown);
+    expect(byClass(screen.root, 'trial-header-countdown')!.props['aria-label']).toBe(countdownName);
+    expect(byClass(screen.root, 'nx-trial-hero--card-entry')!.props['aria-label']).toBe(cardName);
+    screen.click(); expect(screen.navTo).toHaveBeenCalledExactlyOnceWith('/pages/me/trial');
+    expect(screen.projection.offsetUSD.value).toBe(11.37);
+    screen.visibility.toggle(); await Vue.nextTick();
+    expect(textContent(byClass(screen.root, 'trial-lifecycle-credit')!)).toContain('$11.37');
+  },
+);
+
+test('standalone hero and public estimate rules retain their existing scope', async () => {
+  const standalone = await mount('en', 'active', 'hero', false);
+  standalone.visibility.toggle(); await Vue.nextTick();
+  expect(textContent(byClass(standalone.root, 'trial-lifecycle-credit')!)).toContain('$11.37');
+  const offer = await mount('en', 'none', 'hero', false);
+  offer.trial.reason = ''; offer.visibility.toggle(); await Vue.nextTick();
+  expect(textContent(byClass(offer.root, 'trial-value')!)).toBe('$50.00');
+  expect(offer.projection.estimatedOffsetUSD.value).toBe(50);
+  expect(textContent(offer.root)).not.toContain('••••');
+});
+
+test('a masked embedded credit does not turn a failed unknown read into zero', async () => {
+  const screen = await mount('zh');
+  screen.visibility.toggle(); screen.trial.authorityStatus = 'error'; await Vue.nextTick();
+  expect(textContent(byClass(screen.root, 'trial-lifecycle-credit')!)).toContain('••••');
+  screen.visibility.toggle(); await Vue.nextTick();
+  expect(textContent(byClass(screen.root, 'trial-lifecycle-credit')!)).toContain('-');
+  expect(textContent(screen.root)).not.toContain('$0.00');
+  expect(screen.projection.offsetUSD.value).toBeNull();
 });

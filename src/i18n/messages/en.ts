@@ -918,7 +918,7 @@ trustReserve: "No verifiable reserve information available.",
     rangeMonth: "Month",
     rangeAll: "All",
     computeEarned: "Compute earned",
-    jobsCount: "{n} jobs",
+    jobsCount: "{n} jobs completed",
     taskLockTitle: "Job lock",
     taskLockRemaining: "{n} min",
 

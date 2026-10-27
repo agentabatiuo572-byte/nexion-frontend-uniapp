@@ -13,10 +13,10 @@
         <template v-else>
           <view v-if="rewards.error || !recordsPresentation" class="invite-detail__read" role="status" :aria-busy="rewards.loading"><text>{{ rewards.loading ? t.team.rewardLoading : t.team.settlementUnavailable }}</text><NxButton v-if="!rewards.loading" class="nx-retry-action" :label="t.network.retry" variant="text" size="medium" @click="rewards.refresh()" /></view>
           <template>
-            <view class="invite-detail__total"><text>{{ copy.totalEarned }}</text><text>{{ recordsPresentation ? formatAmount(recordsPresentation.lifetimeInviterNex) : '—' }} UVT</text></view>
-            <view class="invite-detail__counts"><text>{{ copy.settled }} {{ recordsPresentation?.settledCount ?? '—' }}</text><text>{{ copy.pending }} {{ recordsPresentation?.pendingCount ?? '—' }}</text></view>
+            <view class="invite-detail__total"><text>{{ copy.totalEarned }}</text><text>{{ visibility.mask(recordsPresentation ? formatAmount(recordsPresentation.lifetimeInviterNex) : '—') }} UVT</text></view>
+            <view class="invite-detail__counts"><text>{{ copy.settled }} {{ visibility.mask(recordsPresentation?.settledCount ?? '—') }}</text><text>{{ copy.pending }} {{ visibility.mask(recordsPresentation?.pendingCount ?? '—') }}</text></view>
             <text class="invite-detail__caption">{{ copy.recentRewards }}</text>
-            <view v-for="row in (recordsPresentation?.recentRewards ?? [])" :key="row.settlementNo" class="invite-detail__record"><view><text>{{ date(row.settledAt) }}</text><text class="invite-detail__muted">{{ referralSettlementStatus(locale.code,row.releaseBucket) }}</text></view><text>+{{ formatAmount(row.amountNex) }} UVT</text></view>
+            <view v-for="row in (recordsPresentation?.recentRewards ?? [])" :key="row.settlementNo" class="invite-detail__record"><view><text>{{ date(row.settledAt) }}</text><text class="invite-detail__muted">{{ referralSettlementStatus(locale.code,row.releaseBucket) }}</text></view><text>{{ visibility.mask('+' + formatAmount(row.amountNex)) }} UVT</text></view>
             <text v-if="recordsPresentation && !recordsPresentation.recentRewards.length" class="invite-detail__paragraph">{{ t.team.noSettledRewards }}</text>
             <text v-else-if="recordsPresentation" class="invite-detail__muted">{{ copy.latestRecords }}</text>
           </template>
@@ -43,9 +43,11 @@ import TeamArt from './team-art.vue';
 import InviteRuleContent from './invite-rule-content.vue';
 import NxButton from '@/components/ui/nx-button.vue';
 import LiquidGlass from '@/components/liquid-glass.vue';
+import { useDataVisibility } from '@/store/data-visibility';
 const props = defineProps<{ open: boolean; mode: 'rules' | 'records' }>();
 const emit = defineEmits<{ (e: 'close'): void; (e: 'records'): void }>();
 const t = useT(), locale = useLocaleStore(), rewards = useReferralReward();
+const visibility = useDataVisibility();
 const copy = computed(() => teamRedesignCopy(locale.code));
 const app = useApp();
 const recordsPresentation = ref<Pick<ReferralRewardSnapshot, 'lifetimeInviterNex' | 'settledCount' | 'pendingCount' | 'recentRewards'> | null>(null);

@@ -68,7 +68,7 @@ async function mount(copy: Messages = zh, device = cloudDevice(), expanded = fal
   const toggle = vi.fn();
   const app = Vue.reactive({ accountKey: "render-only", visibleDevices: [device], remotePhoneBindingInvalid: false, setPhoneRuntime });
   const blank = Vue.defineComponent({ setup: () => () => Vue.h("view") });
-  const dependencies: Record<string, unknown> = {
+  const dependencies: Record<string, unknown> = { '@/store/data-visibility': { useDataVisibility: () => ({ hidden: false, mask: String }) },
     "@/composables/use-tab-page-lifecycle": tabLifecycle,
     "@/lib/amount-display": { formatAmount },
     "@/lib/usd-display": { formatUsd },

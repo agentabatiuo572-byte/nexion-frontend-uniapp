@@ -902,7 +902,7 @@ trustReserve: "暂无可核验的储备资料。",
     rangeMonth: "本月",
     rangeAll: "全部",
     computeEarned: "算力收益",
-    jobsCount: "{n} 个作业",
+    jobsCount: "已完成{n}个任务作业",
     taskLockTitle: "作业锁定",
     taskLockRemaining: "{n} 分钟",
 

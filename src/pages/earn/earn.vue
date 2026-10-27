@@ -44,16 +44,16 @@
         <view class="relative overflow-hidden" :style="totalCardStyle">
           <view class="relative" style="z-index: 1">
             <view class="flex justify-between items-center gap-2">
-              <text style="font-size: 13px; color: var(--v5-ink-2)">{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text>
+              <view class="flex items-center gap-1 min-w-0"><text style="font-size: 13px; color: var(--v5-ink-2)">{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text><DataVisibilityToggle /></view>
               <text class="earn-scope">{{ auditCopy.revenueScope }}</text>
             </view>
 
             <view class="mt-2.5 flex items-baseline gap-1" style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)">
-              <text v-if="totalKnown" style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">{{ totalPrefix }}</text>
-              <text class="tabular-nums" style="font-size: 56px">{{ totalInt }}<text v-if="totalKnown" style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
+              <text v-if="totalKnown && !visibility.hidden" style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">{{ totalPrefix }}</text>
+              <text v-if="visibility.hidden" class="tabular-nums" style="font-size: 56px">{{ visibility.mask(totalInt) }}</text>
+              <text v-else class="tabular-nums" style="font-size: 56px">{{ totalInt }}<text v-if="totalKnown" style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
             </view>
-            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-nex); font-weight: 600">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">UVT</text></text>
-            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ jobsText }}</text>
+            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-nex); font-weight: 600">{{ visibility.mask(`+${nexFmt}`) }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">UVT</text></text>
             <!-- 只有**确实请求失败**时才说不可用并给重试;零值已在上面显示为 0(#128)。 -->
             <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="nx-inline-recovery mt-2" role="status" aria-live="polite">
               <view class="nx-inline-recovery__copy">
@@ -75,25 +75,26 @@
         </view>
       </view>
 
-      <!-- My devices header -->
-      <view class="mx-4 mt-2 mb-1 px-1 flex items-center justify-between">
-        <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }}</text>
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2)">{{ fleetCountText }}</text>
-      </view>
-      <!-- FEAT-DEV01: 任务池升级提示线(信息态 · 行内展开;详情入口 → W-CAP1 说明弹层) -->
-      <!-- 仅 @click:uni 编译器在小程序端将 click 映射为 tap;H5 下 @tap+@click 双绑会双触发(本页实测,开关类必单绑) -->
-      <view class="mx-4 mb-2 rounded-xl active:opacity-90" style="background: var(--v5-surface-1); padding: 9px 12px; min-height: 44px; display: flex; flex-direction: column; justify-content: center" role="button" tabindex="0" :aria-label="t.earn.taskPoolLineTitle" :aria-expanded="taskPoolOpen" @click="taskPoolOpen = !taskPoolOpen" @keydown.enter.stop.prevent="taskPoolOpen = !taskPoolOpen" @keydown.space.stop.prevent="taskPoolOpen = !taskPoolOpen">
+      <!-- My devices header and selected-period completed jobs. -->
+      <view class="mx-4 mt-2 mb-1 px-1">
         <view class="flex items-center justify-between gap-2">
-          <view class="flex items-center gap-1.5 min-w-0">
-            <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-            <text class="truncate" style="font-size: 12px; font-weight: 600; color: var(--v5-ink-2)">{{ t.earn.taskPoolLineTitle }}</text>
+          <view class="flex items-center min-w-0">
+            <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }}</text>
+            <view class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.taskPoolLineTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
+              <svg class="earn-capacity-info__glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <g class="earn-capacity-info__rocket">
+                  <path d="M8 14 5 17v3l4-2m7-4 3 3v3l-4-2" />
+                  <path d="M12 2c-3.3 2.7-4.7 7.5-3.5 13.5L10 18h4l1.5-2.5C16.7 9.5 15.3 4.7 12 2Z" fill="currentColor" fill-opacity=".12" />
+                  <circle cx="12" cy="9" r="2" />
+                  <path class="earn-capacity-info__flame" d="M10.2 18.5c-.7 1.5.2 3 1.8 4 1.6-1 2.5-2.5 1.8-4" fill="currentColor" stroke="none" />
+                  <path class="earn-capacity-info__exhaust" d="M8 21v1m8-1v1" stroke-width="1.2" />
+                </g>
+              </svg>
+            </view>
           </view>
-          <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: taskPoolOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }"><path d="m6 9 6 6 6-6" /></svg>
+          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2)">{{ visibility.mask(fleetCountText) }}</text>
         </view>
-        <view v-if="taskPoolOpen" style="margin-top: 6px">
-          <text style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.55">{{ t.earn.taskPoolLineBody }}</text>
-          <text class="block" style="min-height: 44px; display: flex; align-items: center; margin-top: 6px; font-size: 12px; color: var(--v5-brand); font-weight: 600" role="button" tabindex="0" :aria-label="t.earn.capExplainTitle" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">{{ t.earn.capExplainTitle }} →</text>
-        </view>
+        <text class="block" style="font-size: 12px; line-height: 18px; color: var(--v5-ink-3)">{{ jobsText }}</text>
       </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
       <EmptySlotsHint v-if="fleetReady" :trial-expanded="expandedId === 'trial:current'" @toggle-trial="toggleDevice('trial:current')">
@@ -155,12 +156,15 @@ import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/
 import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
+import { useDataVisibility } from "@/store/data-visibility";
+import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
 
 type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
 
 const app = useApp();
 const t = useT();
+const visibility = useDataVisibility();
 const auditCopy = useAuditUiCopy();
 const remainderCopy = useRemainderUiCopy();
 const config = useConfig();
@@ -241,8 +245,7 @@ function moveRange(index: number, delta: number): void {
   });
 }
 
-// FEAT-DEV01: 任务池提示线展开态 + W-CAP1 弹层入口。
-const taskPoolOpen = ref(false);
+// Queue information opens the existing capacity explanation directly.
 const capacityExplainer = useCapacityExplainer();
 function openExplainer() {
   capacityExplainer.open();
@@ -314,7 +317,7 @@ const jobsCount = computed(() => {
   if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
   return serverPeriodValue.value?.jobCount ?? null;
 });
-const jobsText = computed(() => jobsCount.value === null ? "—" : fmt(t.value.earn.jobsCount, { n: jobsCount.value.toLocaleString() }));
+const jobsText = computed(() => jobsCount.value === null ? visibility.mask("—") : fmt(t.value.earn.jobsCount, { n: visibility.mask(jobsCount.value.toLocaleString()) }));
 
 // drifting hero dots
 const HERO_DOTS = [
@@ -377,6 +380,17 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 </script>
 
 <style scoped>
+.earn-capacity-info { width:44px; height:44px; flex:none; display:grid; place-items:center; color:var(--v5-brand); background:transparent; cursor:pointer; }
+/* App renders small SVGs through NxNativeSvg/v-html, so inner nodes need deep selectors. */
+.earn-capacity-info :deep(.earn-capacity-info__glyph) { display:block; overflow:visible; }
+.earn-capacity-info :deep(.earn-capacity-info__rocket) { animation:earn-rocket-hop 1.6s ease-in-out infinite; }
+.earn-capacity-info :deep(.earn-capacity-info__flame) { transform-origin:12px 18.5px; animation:earn-rocket-flame .72s ease-in-out infinite; }
+.earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:earn-rocket-exhaust .9s ease-out infinite; }
+@keyframes earn-rocket-hop { 0%,100% { transform:translateY(1px); } 50% { transform:translateY(-1.5px); } }
+@keyframes earn-rocket-flame { 0%,100% { transform:scaleY(.6); opacity:.55; } 50% { transform:scaleY(1.15); opacity:1; } }
+@keyframes earn-rocket-exhaust { 0% { transform:translateY(0); opacity:0; } 25% { opacity:.65; } 100% { transform:translateY(2.5px); opacity:0; } }
+@media (prefers-reduced-motion:reduce) { .earn-capacity-info :deep(.earn-capacity-info__rocket),.earn-capacity-info :deep(.earn-capacity-info__flame),.earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:none; }.earn-capacity-info :deep(.earn-capacity-info__exhaust) { opacity:0; } }
+.earn-capacity-info:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; border-radius:12px; }
 .earn-scope { color: var(--v5-ink-2); font: 400 12px/1.4 var(--font-v5); text-align: right; max-width: 50%; }
 .earn-more-ways :deep(.nx-section__title) { font-size: 20px; line-height: 1.25; }
 </style>

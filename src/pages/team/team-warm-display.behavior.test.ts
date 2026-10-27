@@ -5,6 +5,7 @@ import { ApiError } from '@/api/errors';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
 import { createPinia, disposePinia, setActivePinia } from 'pinia';
+import { useDataVisibility } from '@/store/data-visibility';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { installSupportStorage } from '@/test/storage-setup';
 import { refreshProductCatalog, productCatalogState, productCatalogDisplayProof, productCatalogPresentation, prepareProductCatalog, isProductCatalogDisplayCurrent } from '@/store/product-catalog';
@@ -46,7 +47,7 @@ const renderer=Vue.createRenderer<Host,Host>({createElement:t=>node(t),createTex
 const all=(n:Host):Host[]=>[n,...n.children.flatMap(all)],text=(n:Host):string=>n.text+n.children.map(text).join('');
 let catalogVersion=0;
 const mounted:Vue.App[]=[];let pinia:ReturnType<typeof createPinia>;
-beforeEach(()=>{catalogVersion=0;pinia=createPinia();setActivePinia(pinia);vi.clearAllMocks();remote.apiRuntimeConfig=Vue.reactive({...remote.apiRuntimeConfig,environment:'dev',baseUrl:'https://test.invalid'});
+beforeEach(()=>{catalogVersion=0;pinia=createPinia();setActivePinia(pinia);vi.clearAllMocks();vi.stubGlobal('uni',{getStorageSync:()=>undefined,setStorageSync:vi.fn()});remote.apiRuntimeConfig=Vue.reactive({...remote.apiRuntimeConfig,environment:'dev',baseUrl:'https://test.invalid'});
 remote.teamNetworkApi.snapshot.mockResolvedValue({...proof,totalMembers:0,members:[],monthVolumeUsdt:0,lifetimeVolumeUsdt:0});// These scenarios exercise actual catalog replacement, so each default fixture response carries a new revision.
 remote.productCatalogApi.catalog.mockImplementation(async()=>({...proof,products:[],revision:'catalog-'+(++catalogVersion)}));remote.commissionConfigApi.rates.mockResolvedValue({});remote.commissionConfigApi.binary.mockResolvedValue({...proof,estimatedAmountUsdt:0,trackA:0,trackB:0});remote.teamInsightsApi.commissions.mockResolvedValue(commissions());remote.teamInsightsApi.leadershipPool.mockResolvedValue({...proof,myVotes:1,unlockRank:3,mySharePct:.1,projectedPayoutUSDT:17.25,currentWeekPoolUSDT:5000,injectRate:.05});remote.referralRewardApi.snapshot.mockResolvedValue(reward());remote.vRankApi.ladder.mockResolvedValue(ladder);remote.vRankApi.current.mockResolvedValue(rank);});
 afterEach(()=>{mounted.splice(0).forEach(a=>a.unmount());disposePinia(pinia);vi.unstubAllGlobals();vi.useRealTimers();});
@@ -65,6 +66,7 @@ const modules:Record<string,any>={'@/lib/passive-tab-read':passive,'@test/ledger
  '@/lib/account-scope':{captureAccountScope:()=>({account:app.accountKey,epoch:app.accountBindingEpoch}),isCurrentAccountScope:(s:any)=>s.account===app.accountKey&&s.epoch===app.accountBindingEpoch},'@/lib/leadership-pool-state':{leadershipPoolFailureState},'@/lib/v-rank-copy':{rankLabel},'@/i18n/compute-points':{formatComputePoints,sumComputePoints},'@/lib/amount-display':{formatAmount},'@/lib/usd-display':{formatUsd,formatUsdOverviewParts},'@/store/ui':{toast:{info:vi.fn(),success:vi.fn()}},'@/lib/share':{copyText,buildShareLink:(code:string)=>code?'https://test.invalid/'+code:'',recordShareEvent:vi.fn()},
  '@/components/tab-page-frame.vue':{default:{setup:(_:unknown,{slots}:any)=>()=>Vue.h('view',slots.default?.())}}};
 const runtimeHooks={load:null as any,show:[] as Array<()=>void>,hide:[] as Array<()=>void>};
+modules['@/store/data-visibility']={useDataVisibility};
 modules['@/components/ui/nx-button.vue']={default:{props:['label'],emits:['click'],setup:(props:any,{emit}:any)=>()=>Vue.h('button',{onClick:()=>emit('click')},props.label)}};
 modules['@/components/team/team-summary-card.vue']={default:compile(summarySource,modules)};
 modules['@/components/team/team-ledger-card.vue']={default:compile(ledgerSource.replace('<script setup lang="ts">','<script setup lang="ts">\nimport { watch } from "vue"; import { record } from "@test/ledger-probe";').replace('</script>','watch(() => ({failed:props.failed,loading:props.loading}),record,{immediate:true,flush:"sync"});\n</script>'),modules)};modules['@/components/team/invite-earn-card.vue']={default:compile(inviteSource,modules)};

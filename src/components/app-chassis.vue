@@ -138,7 +138,6 @@
               <template v-if="tab.icon2"><path :d="tab.icon2" /></template>
             </svg>
           </view>
-          <text class="nx-tab__label" :style="{ color: selected ? 'var(--v5-brand)' : 'var(--v5-ink-2)' }">{{ tab.label }}</text>
         </template>
       </GlassSegments>
       <DeviceHomeIndicator />
@@ -586,7 +585,7 @@ const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HE
 const showFloatingSupport = computed(() => isTabRoute.value && ['home', 'earn', 'team'].includes(activeTab.value));
 // Let the last page action scroll fully above the floating support shortcut.
 const contentBottom = computed(() => isTabRoute.value
-  ? `calc(var(--nx-tabbar-height, 68px) + ${TABBAR_CLEARANCE + (showFloatingSupport.value ? 60 : 0)}px)`
+  ? `calc(var(--nx-tabbar-height, 56px) + ${TABBAR_CLEARANCE + (showFloatingSupport.value ? 60 : 0)}px)`
   : `${SUB_BOTTOM}px`);
 // ── 待支付浮动条的落位 ──
 // 浮动条永远占 chrome 之下自己的一条带(top = contentTop + 8),页面内容整体下让 PENDING_BAR_INSET,
@@ -717,6 +716,7 @@ export default chassisView;
 
 <style scoped>
 .nx-chassis {
+  --nx-tabbar-height: 56px;
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -1002,7 +1002,6 @@ export default chassisView;
 .nx-icon-btn > svg { position:relative;z-index:1; }
 .nx-header-scan-icon { position:relative;z-index:1;display:flex;align-items:center;justify-content:center; }
 @media (max-width:374px) {
-  .nx-chassis { --nx-tabbar-height: 56px; }
   .nx-header__l { width:124px; height:43px; }
 }
 @media (max-width:350px) {

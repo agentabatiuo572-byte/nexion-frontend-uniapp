@@ -916,7 +916,7 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
     rangeMonth: "Tháng",
     rangeAll: "Tất cả",
     computeEarned: "Thu nhập điện toán",
-    jobsCount: "{n} tác vụ",
+    jobsCount: "Đã hoàn thành {n} tác vụ",
     taskLockTitle: "Khóa nhiệm vụ",
     taskLockRemaining: "{n} phút",
 

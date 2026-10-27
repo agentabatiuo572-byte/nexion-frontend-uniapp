@@ -77,6 +77,7 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useNetworkRank } from "@/store/network-rank";
+import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
 import { compactNumber as compact } from "@/lib/platform-stats";
 import { confirm } from "@/store/ui";
@@ -86,6 +87,7 @@ const t = useT();
 const app = useApp();
 const cfg = useConfig();
 const remoteRank = useNetworkRank();
+const visibility = useDataVisibility();
 function refreshRankMoment() {
   if (remoteApiEnabled) void remoteRank.ensure();
 }
@@ -196,7 +198,7 @@ const metrics = computed<Cell[]>(() => {
   const retainedRank = remoteRank.status === "error" && remoteRank.snapshot !== null;
   const rankCell: Cell = {
     k: t.value.home.networkYourRank,
-    v: r.kind === "ranked" ? `#${compact(r.rank)}`
+    v: r.kind === "ranked" ? visibility.mask(`#${compact(r.rank)}`)
       : r.kind === "unranked" ? t.value.home.networkRankUnranked : "-",
     vSize: r.kind === "ranked" ? "20px" : "12px",
     tone: r.kind === "ranked" ? "var(--v5-brand)" : "var(--v5-ink-3)",

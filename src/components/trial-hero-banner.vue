@@ -9,7 +9,7 @@
       <text class="trial-title">{{ trialView.deviceName.value ?? t.trial.heroDeviceName }}</text>
       <template v-if="status === 'active' || status === 'grace'">
         <view v-if="!cardEntry" class="trial-lifecycle-time"><text>{{ status === 'grace' ? lifecycleCopy.creditUntilLabel : lifecycleCopy.remainingLabel }}</text><text class="trial-countdown font-mono-tabular">{{ remainingText }}</text></view>
-        <view class="trial-lifecycle-credit"><text>{{ lifecycleCopy.creditLabel }}</text><text class="font-mono-tabular">{{ creditText }}</text></view>
+        <view class="trial-lifecycle-credit"><text>{{ lifecycleCopy.creditLabel }}</text><text class="font-mono-tabular">{{ embedded ? visibility.mask(creditText) : creditText }}</text></view>
       </template>
       <text v-else-if="status === 'ended' || status === 'converted'" class="trial-lifecycle-body">{{ status === 'ended' ? lifecycleCopy.endedBody : lifecycleCopy.convertedBody }}</text>
       <template v-else>
@@ -29,6 +29,7 @@
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
 import { computed } from "vue";
+import { useDataVisibility } from "@/store/data-visibility";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -42,6 +43,7 @@ import { navTo } from '@/lib/route';
 import LiquidGlass from "@/components/liquid-glass.vue";
 
 const props = defineProps<{ embedded?: boolean }>();
+const visibility = useDataVisibility();
 
 const trial = useFreeTrial();
 const trialCfg = useTrialConfig();

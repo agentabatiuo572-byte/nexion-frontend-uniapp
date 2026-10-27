@@ -38,7 +38,7 @@
           <view class="team-rank__header"><text class="team-rank__title">{{ designCopy.myRank }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></view>
           <view class="team-rank__emblem">
             <view class="team-rank__outline"><svg width="68" height="78" viewBox="0 0 68 78" fill="none" aria-hidden="true"><path d="M34 2 65 20v38L34 76 3 58V20Z" fill="var(--v5-surface)" stroke="var(--v5-ink-2)" stroke-width="2"/><path d="M34 6 61 22v34L34 72 7 56V22Z" stroke="var(--v5-brand)" stroke-opacity=".25"/></svg></view>
-            <text class="team-rank__level">{{ myRankDisplay }}</text>
+            <text class="team-rank__level">{{ visibility.mask(myRankDisplay) }}</text>
           </view>
           <text class="team-rank__hint">{{ designCopy.benefitsAndRewards }}</text>
           <view v-if="vrank.remoteError" class="team-rank__status" role="status"><text>{{ t.rank.loadError }}</text><view class="team-rank__retry" role="button" tabindex="0" @click.stop="vrank.refreshCanonicalVRank()" @keydown.enter.stop.prevent="vrank.refreshCanonicalVRank()" @keydown.space.stop.prevent="vrank.refreshCanonicalVRank()">{{ t.rank.retry }}</view></view>
@@ -81,7 +81,7 @@
               </view>
             </view>
             <view :style="quickRowValueWrapStyle">
-              <text class="font-display tabular-nums" :style="quickRowValueStyle">{{ totalMembersCountText }}</text>
+              <text class="font-display tabular-nums" :style="quickRowValueStyle">{{ visibility.mask(totalMembersCountText) }}</text>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
@@ -96,11 +96,11 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.todayMatch }}</text>
-                <text class="block" :style="quickRowMetaStyle">A · {{ leftVolText }}  /  B · {{ rightVolText }}</text>
+                <text class="block" :style="quickRowMetaStyle">A · {{ visibility.mask(leftVolText) }}  /  B · {{ visibility.mask(rightVolText) }}</text>
               </view>
             </view>
             <view :style="quickRowValueWrapStyle">
-              <view class="team-estimate"><text class="team-estimate__label">{{ designCopy.estimated }}</text><text class="font-display tabular-nums" :style="quickRowValueStyle">{{ binaryMatchText }}</text></view>
+              <view class="team-estimate"><text class="team-estimate__label">{{ designCopy.estimated }}</text><text class="font-display tabular-nums" :style="quickRowValueStyle">{{ visibility.mask(binaryMatchText) }}</text></view>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
@@ -119,7 +119,7 @@
               </view>
             </view>
             <view :style="quickRowValueWrapStyle">
-              <view class="team-estimate"><text v-if="leadershipPoolUnlocked && remotePoolReadable" class="team-estimate__label">{{ designCopy.estimated }}</text><text class="font-display tabular-nums" :style="quickRowValueStyle">{{ leadershipPoolPrimary }}</text></view>
+              <view class="team-estimate"><text v-if="leadershipPoolUnlocked && remotePoolReadable" class="team-estimate__label">{{ designCopy.estimated }}</text><text class="font-display tabular-nums" :style="quickRowValueStyle">{{ visibility.mask(leadershipPoolPrimary) }}</text></view>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
@@ -170,10 +170,12 @@ import type { TeamCommissionSnapshot, TeamLeadershipPoolSnapshot } from "@/api/t
 import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
 import { useReferralReward } from "@/store/referral-reward";
 import { useApp } from "@/store/app";
+import { useDataVisibility } from '@/store/data-visibility';
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
+const visibility = useDataVisibility();
 const app = useApp();
 const vrank = useVRank();
 const locale = useLocaleStore();
@@ -335,7 +337,7 @@ const leadershipPoolPrimary = computed(() =>
   !remotePoolReadable.value ? "—" : formatUsd(leadershipPoolUnlocked.value ? projectedPayout.value : leadershipPoolTotal.value),
 );
 const leadershipPoolLineA = computed(() =>
-  !remotePoolReadable.value ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
+  !remotePoolReadable.value ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${visibility.mask(myVotes.value)} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
 );
 const poolThisWeekText = computed(() => {
   const rate = remoteApiEnabled ? remotePool.value?.injectRate : 0.05;
@@ -347,7 +349,7 @@ const poolThisWeekText = computed(() => {
 // lineA,操作入口是整行点击进详情页;此前这里塞过 t.network.retry(「重新加载」),把一个
 // 动作标签放进了状态位,还留下一个悬空的「/」(zentao #206)。
 const leadershipPoolLineB = computed(() =>
-  !remotePoolReadable.value ? "" : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : poolThisWeekText.value,
+  !remotePoolReadable.value ? "" : leadershipPoolUnlocked.value ? visibility.mask(`${(myShare.value * 100).toFixed(2)}%`) : poolThisWeekText.value,
 );
 
 function go(url: string) {
