@@ -44,7 +44,7 @@ const t = useT();
 const localExpanded = ref(false);
 const isExpanded = computed(() => props.expanded ?? localExpanded.value);
 const productMedia = computed(() => getProductMedia(presentation.productId.value));
-const statusText = computed(() => !presentation.presentationReady.value ? t.value.earn.runtimeUnknown
+const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
   : presentation.status.value === "active" ? t.value.earn.online : t.value.earn.offline);
 const remainingText = computed(() => presentation.remainingMs.value === null ? "—" : formatTrialRemaining(presentation.remainingMs.value, copy.value.longRemaining));
 function money(value: number | null) { return value === null ? "—" : `$${formatAmount(value)}`; }
@@ -104,7 +104,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__image { width:40px; height:40px; }
 .trial-device-row--inventory .trial-device-row__image-badge { right:1px; padding:1px; font-size:8.5px; }
 .trial-device-row--inventory .trial-device-row__name { font-size:13px; }
-.trial-device-row--inventory .trial-device-row__remaining { font-size:13px; }
+.trial-device-row--inventory .trial-device-row__remaining { font-family:var(--font-v5); font-size:13px; font-variant-numeric:tabular-nums; }
 .trial-device-row--inventory .trial-device-row__body { padding:0 16px 12px; }
 [role="button"] { cursor:pointer; }
 [role="button"]:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
@@ -119,6 +119,8 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
   .trial-device-row--home .trial-device-row__remaining { font-size:12px; line-height:1.2; }
   .trial-device-row--home .trial-device-row__name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .trial-device-row--home .trial-device-row__status { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trial-device-row--inventory .trial-device-row__time { font-size:11px; line-height:1.2; }
+  .trial-device-row--inventory .trial-device-row__remaining { font-size:12px; line-height:1.2; }
 }
 @media (prefers-reduced-motion:reduce) { .trial-device-row__chevron svg { transition:none; } }
 </style>

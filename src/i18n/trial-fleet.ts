@@ -3,7 +3,7 @@ import { useLocaleStore } from "@/store/locale";
 
 export const trialFleetCopy = {
   zh: {
-    imageBadge: "试用",
+    imageBadge: "试用", statusUnknown: "状态未知",
     longRemaining: '{days}天 {hours}小时',
     grace: "试用已停止，抵扣仍可用", remaining: "剩余时间", creditRemaining: "抵扣剩余",
     availableCredit: "当前可抵扣", estimate: "预计试用抵扣", details: "试用详情", buyEarly: "提前购买", buy: "使用抵扣购机",
@@ -11,7 +11,7 @@ export const trialFleetCopy = {
     slotsUnknown: "设备容量暂不可用，请刷新后重试", slotsChecking: "正在确认设备容量，请稍候", cancelBusy: "正在取消试用", cancel: "取消试用",
   },
   en: {
-    imageBadge: "Trial",
+    imageBadge: "Trial", statusUnknown: "Status unknown",
     longRemaining: '{days}d {hours}h',
     grace: "Trial stopped · credit available", remaining: "Remaining", creditRemaining: "Credit expires in",
     availableCredit: "Available credit", estimate: "Estimated trial credit", details: "Trial details", buyEarly: "Buy early", buy: "Buy with credit",
@@ -19,7 +19,7 @@ export const trialFleetCopy = {
     slotsUnknown: "Device capacity is unavailable. Refresh and try again.", slotsChecking: "Checking device capacity. Please wait.", cancelBusy: "Cancelling trial", cancel: "Cancel trial",
   },
   vi: {
-    imageBadge: "Dùng thử",
+    imageBadge: "Dùng thử", statusUnknown: "Chưa xác định",
     longRemaining: '{days} ngày {hours} giờ',
     grace: "Đã dừng dùng thử · còn khoản khấu trừ", remaining: "Còn lại", creditRemaining: "Khấu trừ còn",
     availableCredit: "Khoản khấu trừ khả dụng", estimate: "Khoản khấu trừ dự kiến", details: "Chi tiết dùng thử", buyEarly: "Mua sớm", buy: "Mua bằng khoản khấu trừ",

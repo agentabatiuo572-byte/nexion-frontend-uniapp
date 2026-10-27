@@ -157,10 +157,10 @@ it.each(["zh", "en", "vi"] as const)("keeps a confirmed refreshing snapshot read
     screen.presentation.actionsReady.value = false;
     expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.online);
     screen.presentation.presentationReady.value = false;
-    expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.runtimeUnknown);
-    expect(screen.byClass("trial-device-row__heading")!.props!["aria-label"]).toContain(messages[locale].earn.runtimeUnknown);
+    expect(screen.byClass("trial-device-row__status")!.children).toBe(trialFleetCopy[locale].statusUnknown);
+    expect(screen.byClass("trial-device-row__heading")!.props!["aria-label"]).toContain(trialFleetCopy[locale].statusUnknown);
     screen.presentation.status.value = "grace";
-    expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.runtimeUnknown);
+    expect(screen.byClass("trial-device-row__status")!.children).toBe(trialFleetCopy[locale].statusUnknown);
     screen.presentation.presentationReady.value = true;
     expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.offline);
   }
