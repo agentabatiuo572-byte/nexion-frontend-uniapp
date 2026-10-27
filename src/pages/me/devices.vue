@@ -163,7 +163,6 @@
         </view>
 
         <view class="device-inventory-section device-inventory-connections" data-inventory-section="connections">
-          <ComputeShareEntry context="devices" compact />
           <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
             <view class="flex items-start" style="gap: 10px">
               <view class="grid place-items-center shrink-0" :style="phoneActivationIconStyle">
@@ -202,7 +201,6 @@ import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
-import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import TrialDeviceRow from "@/components/trial-device-row.vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
