@@ -59,7 +59,7 @@
       <view v-if="loadError" class="tos-fail" role="alert">
         <text class="tos-fail__message">{{ loadError }}</text>
         <view class="tos-fail__retry active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
-          <text>{{ loadingTerms ? "…" : t.ui.retry }}</text>
+          <text :class="{ 'tos-fail__retry-label': !loadingTerms }">{{ loadingTerms ? "…" : t.ui.retry }}</text>
         </view>
       </view>
       <view v-else-if="loaded" class="tos-sections">
@@ -405,6 +405,7 @@ function confirmTerms(event?: Event) {
   font-size: 13px;
   font-weight: 600;
 }
+.tos-fail__retry-label { font: 600 13px/20px var(--font-v5); }
 .tos-block {
   padding: 14px 0;
 }

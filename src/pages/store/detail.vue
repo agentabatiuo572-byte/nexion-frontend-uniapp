@@ -196,7 +196,7 @@
             </template>
             <template v-else>
               <text class="block" :style="trustBodyStyle">{{ trustStatus === 'error' ? t.store.relatedMaterialsLoadFailed : t.store.relatedMaterialsEmpty }}</text>
-              <view v-if="trustStatus === 'error'" class="product-material-retry" role="button" tabindex="0" @click="refreshTrustMaterial" @keydown.enter.prevent="refreshTrustMaterial" @keydown.space.prevent="refreshTrustMaterial"><text>{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
+              <view v-if="trustStatus === 'error'" class="product-material-retry" role="button" tabindex="0" @click="refreshTrustMaterial" @keydown.enter.prevent="refreshTrustMaterial" @keydown.space.prevent="refreshTrustMaterial"><text class="product-material-retry__label">{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
             </template>
           </view>
         </template>
@@ -899,6 +899,7 @@ const faqQStyle: CSSProperties = {
 <style src="@/components/promotion/promotion.css"></style>
 <style scoped>
 .product-material-retry { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 16px; margin-top: 12px; border: 1px solid var(--v5-border); border-radius: 999px; color: var(--v5-ink); font-size: 13px; }
+.product-material-retry__label { font: 600 13px/20px var(--font-v5); }
 .product-material-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .promotion-quantity-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;overflow:hidden; }
 .promotion-quantity-stepper view { min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--v5-surface-2); }

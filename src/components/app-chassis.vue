@@ -20,7 +20,7 @@
     <!-- Header brand row — TAB routes only (sub-pages carry their own back row) -->
     <view v-if="isTabRoute" class="nx-header" :style="{ top: statusBarHeight + 'px' }">
       <view class="nx-header__l">
-        <BrandLockup :height="50" />
+        <BrandLockup :height="50" style="width:100%;height:100%" />
       </view>
       <view class="nx-header__center" />
       <view class="nx-header__r">
@@ -998,6 +998,12 @@ export default chassisView;
 .nx-icon-btn { isolation:isolate;border-radius:50%; }
 .nx-icon-btn > svg { position:relative;z-index:1; }
 .nx-header-scan-icon { position:relative;z-index:1;display:flex;align-items:center;justify-content:center; }
+@media (max-width:374px) {
+  .nx-header__l { width:124px; height:43px; }
+}
+@media (max-width:350px) {
+  .nx-header__l { width:112px; height:39px; }
+}
 </style>
 
 <style scoped>

@@ -88,5 +88,17 @@ async function checkIn() {
 .day-mark { font-size: 12px; font-weight: 600; }
 .daily-check-in-row__days .gift { color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 12%,transparent); border: 1px solid color-mix(in srgb,var(--v5-nex) 24%,transparent); box-sizing: border-box; }
 .daily-check-in-row__gift-hint { display: inline-block; max-width: 100%; color: var(--v5-nex); }
-@media(max-width:350px) { .daily-check-in-row {gap:0 8px;padding-inline:12px;grid-template-columns:40px minmax(0,1fr);}.daily-check-in-row :deep(.nx-button) {grid-column:1 / -1;margin-top:12px;}.daily-check-in-row :deep(.nx-button__surface) {padding-inline:12px;}.daily-check-in-row__title {font-size:14px;} }
+@media(max-width:374px) {
+  .daily-check-in-row { gap:0 8px;padding-inline:12px;grid-template-columns:32px minmax(0,1fr) auto;align-items:start; }
+  .daily-check-in-row__flame { width:32px;height:32px;border-radius:11px;margin-top:6px; }
+  .daily-check-in-row__flame > svg { width:18px;height:18px; }
+  .daily-check-in-row__flame :deep(.nx-native-svg) { width:18px;height:18px;max-width:18px;max-height:18px; }
+  .daily-check-in-row__flame :deep(.nx-native-svg svg) { width:100%;height:100%;display:block; }
+  .daily-check-in-row :deep(.nx-button) { font-size:12px;padding-block:6px;justify-self:end;align-self:start; }
+  .daily-check-in-row :deep(.nx-button__surface) { min-height:32px;padding:6px 10px;box-shadow:0 3px 10px color-mix(in srgb,var(--v5-brand) 15%,transparent),inset 0 1px 0 rgba(255,255,255,.45); }
+  .daily-check-in-row :deep(.nx-button__content) { gap:4px;white-space:nowrap; }
+  .daily-check-in-row__title { font-size:13px;line-height:18px; }
+  .daily-check-in-row__meta { font-size:11px;line-height:16px; }
+  .daily-check-in-row__days { margin-top:12px; }
+}
 </style>

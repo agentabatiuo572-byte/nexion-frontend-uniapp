@@ -135,7 +135,7 @@ const ctaLabelStyle: CSSProperties = {
 .earn-fleet-content > :deep(.trial-device-row:first-child) { border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; }
 .earn-trial-reservation { display: flex; justify-content: space-between; gap: 12px; margin: 0 16px; padding: 14px 0 10px; font: 500 12px/1.4 var(--font-v5); color: var(--v5-ink-2); border-bottom: 1px solid var(--v5-border); }
 .earn-add-wrap { padding: 4px 14px 14px; }
-.earn-add-device { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 18px; font: 600 15px/1.4 var(--font-v5); transition: transform .4s cubic-bezier(.16,1.4,.3,1); }
+.earn-add-device { display: flex; align-items: center; justify-content: center; box-sizing:border-box; gap: 10px; min-height: 44px; padding: 10px 18px; font: 600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); transition: transform .4s cubic-bezier(.16,1.4,.3,1); }
 .earn-add-device:active { transform: scale(.975); }
 .earn-add-device[aria-busy="true"] { opacity: .6; }
 @media (prefers-reduced-motion: reduce) { .earn-add-device { transition: none; transform: none; } }

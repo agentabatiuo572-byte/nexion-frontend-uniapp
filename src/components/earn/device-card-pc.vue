@@ -49,7 +49,7 @@
     </view>
 
     <view v-if="detailPage" class="device-management-heading">
-      <view><text class="block device-section-title">{{ t.coreReview.management }}</text><text class="block" style="font-size:12px;margin-top:4px" :style="{ color: statusColor }">{{ statusLabel }}</text></view>
+      <view><text class="block device-section-title">{{ t.coreReview.management }}</text><text class="block" :class="{ 'device-status-online': statusOnline }" style="font-size:12px;margin-top:4px" :style="{ color: statusColor }">{{ statusLabel }}</text></view>
       <NxButton v-if="phoneLocalReady || degradable" size="small" :label="t.home.fleetManage" @click="openMenu" />
     </view>
     <view v-else-if="showManage && (phoneLocalReady || degradable)" class="flex justify-end" style="padding:8px 16px"><NxButton size="small" :label="t.home.fleetManage" @click="openMenu" /></view>
@@ -73,7 +73,7 @@
         <view class="earn-device-meta">
           <text class="earn-device-name">{{ displayName }}</text>
           <view class="earn-device-status">
-            <text class="nx-device-status-label" style="font-size: 12px" :style="{ color: statusColor }">{{ statusLabel }}</text>
+            <text class="nx-device-status-label" :class="{ 'device-status-online': statusOnline }" :style="{ color: statusColor }">{{ statusLabel }}</text>
           </view>
         </view>
       </view>
@@ -189,7 +189,7 @@
         <view><text class="block device-statistics__label">{{ t.earn.todayEarnings }}</text><text class="block device-statistics__amount">{{ phoneLocalReady ? formatUsd(device.todayEarnings) : '—' }}</text><text class="block device-statistics__label">{{ phoneLocalReady ? `${formatAmount(device.todayEarningsNEX)} UVT` : '—' }}</text></view>
         <view><text class="block device-statistics__label">{{ t.coreReview.cumulativeEarnings }}</text><text class="block device-statistics__amount">{{ phoneLocalReady ? formatUsd(device.cumulativeEarningsUsdt) : '—' }}</text></view>
       </view>
-      <view v-if="remoteApiEnabled && phoneLocalReady" class="device-statistics__status"><text>{{ statisticsCopy.currentStatus }}</text><text class="device-statistics__label">{{ device.runtimeStatus === 'ONLINE' ? t.earn.online : device.runtimeStatus === 'OFFLINE' ? t.earn.offline : t.earn.runtimeUnknown }}</text></view>
+      <view v-if="remoteApiEnabled && phoneLocalReady" class="device-statistics__status"><text>{{ statisticsCopy.currentStatus }}</text><text class="device-statistics__label" :class="{ 'device-status-online': statusOnline }">{{ statusLabel }}</text></view>
       <text class="block device-statistics__scope">{{ statisticsCopy.scope }}</text>
     </view>
     <text v-if="detailPage" class="block device-section-title" style="padding:16px 20px 12px">{{ t.coreReview.jobs }}</text>
@@ -516,13 +516,9 @@ const statusLabel = computed(() => {
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (task.value?.status === "PAUSED") return t.value.earn.phoneTaskPaused;
   if (idleGated.value) return t.value.earn.idle;
-  if (props.device.capacitySource === "server" && props.device.kind === "phone") {
+  if (props.device.capacitySource === "server") {
     if (props.device.runtimeStatus === "ONLINE") return t.value.earn.online;
     if (props.device.runtimeStatus === "OFFLINE") return t.value.earn.offline;
-    return t.value.earn.runtimeUnknown;
-  }
-  if (props.device.kind !== "phone" && props.device.capacitySource === "server"
-      && (props.device.runtimeStatus == null || props.device.runtimeStatus === "UNKNOWN")) {
     return t.value.earn.runtimeUnknown;
   }
   if (!deviceOnline.value) {
@@ -541,7 +537,9 @@ const statusColor = computed(() => {
   if (idleGated.value || !deviceOnline.value) return "var(--v5-ink-3)";
   return "var(--v5-brand)";
 });
-const statusGlow = computed(() => phoneLocalReady.value && !props.device.pendingDeactivate && !reconnecting.value && !idleGated.value && deviceOnline.value);
+const statusOnline = computed(() => phoneLocalReady.value && !props.device.pendingDeactivate && !reconnecting.value
+  && task.value?.status !== "PAUSED" && !idleGated.value
+  && (props.device.capacitySource === "server" ? props.device.runtimeStatus === "ONLINE" : deviceOnline.value));
 
 const elapsedRemaining = computed(() => {
   const tk = task.value;
@@ -944,12 +942,14 @@ import DeviceSlot from "@/components/home/device-slot.vue";
 .earn-device-art :deep(.hf-computer) { width: 52px; height: 56px; }
 .earn-device-art :deep(.hf-computer svg) { width: 38px; height: 38px; }
 .earn-device-meta { flex: 1; min-width: 0; }
-.earn-device-name { display: block; font: 600 15px/1.4 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.earn-device-name { display: block; font: 600 clamp(13px,3.85vw,15px)/1.4 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
 .earn-device-status { margin-top: 4px; line-height: 1.45; overflow-wrap: anywhere; }
+.nx-device-status-label { font-size:clamp(11px,3.08vw,12px); }
+.device-status-online::before { content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:var(--v5-success); vertical-align:1px; }
 .nx-device-card__numbers { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 152px; }
 .earn-device-amount { text-align: right; min-width: 0; }
-.earn-device-amount-label { display: block; font: 400 12px/1.4 var(--font-v5); color: var(--v5-ink-3); }
-.earn-device-value { display: block; margin-top: 4px; font: 600 15px/1.3 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.earn-device-amount-label { display: block; font: 400 clamp(11px,3.08vw,12px)/1.4 var(--font-v5); color: var(--v5-ink-3); }
+.earn-device-value { display: block; margin-top: 4px; font: 600 clamp(13px,3.85vw,15px)/1.3 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
 .nx-device-card__details { animation: earn-detail-in .2s ease-out; }
 .device-management-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px; }
 .device-section-title { font:600 15px/22px var(--font-v5);color:var(--v5-ink); }
