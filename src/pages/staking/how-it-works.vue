@@ -210,7 +210,7 @@ function goStaking() {
 const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
 const captionStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
-const retryStyle: CSSProperties = { minHeight: "44px", marginTop: "8px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px" };
+const retryStyle: CSSProperties = { minHeight: "44px", marginTop: "8px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", font: "600 13px/20px var(--font-v5)" };
 const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
 const tableStyle: CSSProperties = {
   paddingBlock: "4px",

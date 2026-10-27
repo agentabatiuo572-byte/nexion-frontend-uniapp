@@ -4,10 +4,12 @@
       <SubPageHeader back="/pages/team/team" :title="t.tree.pageTitle" />
 
       <view class="team-tree-content">
-        <view v-if="remoteApiEnabled && network.remoteStatus === 'error'" :style="errorStateStyle">
-          <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-          <view role="button" tabindex="0" :style="retryStyle" @click="network.refreshCanonicalNetwork()" @keydown.enter.prevent="network.refreshCanonicalNetwork()" @keydown.space.prevent="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
+        <view v-if="remoteApiEnabled && network.remoteStatus === 'error'" class="nx-inline-recovery" :style="errorStateStyle">
+          <view class="nx-inline-recovery__copy">
+            <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
+            <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
+          </view>
+          <view class="nx-inline-recovery__action" role="button" tabindex="0" :style="retryStyle" @click="network.refreshCanonicalNetwork()" @keydown.enter.prevent="network.refreshCanonicalNetwork()" @keydown.space.prevent="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
         </view>
         <view class="tree-hero">
           <view class="tree-hero-copy">
@@ -118,7 +120,7 @@ const extendedSubtitle = computed(() =>
 const expanded = reactive<Record<"direct" | "extended", boolean>>({ direct: true, extended: true });
 
 const errorStateStyle: CSSProperties = { padding: "12px 0", borderBottom: "1px solid var(--v5-border)", color: "var(--v5-ink)" };
-const retryStyle: CSSProperties = { marginTop: "10px", minHeight: "44px", display: "flex", justifyContent: "center", alignItems: "center", gap: "12px", padding: "8px 16px", borderRadius: "999px", border: "1px solid var(--v5-border)", background: "color-mix(in srgb, var(--v5-ink) 6%, transparent)", color: "var(--v5-ink)" };
+const retryStyle: CSSProperties = { marginTop: "0", minHeight: "44px", display: "flex", justifyContent: "center", alignItems: "center", gap: "12px", padding: "8px 16px", borderRadius: "999px", border: "1px solid var(--v5-border)", background: "color-mix(in srgb, var(--v5-ink) 6%, transparent)", color: "var(--v5-ink)" };
 const readStateStyle: CSSProperties = { minHeight: "88px", display: "grid", placeItems: "center", color: "var(--v5-ink-3)", fontSize: "13px" };
 const metricLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 </script>

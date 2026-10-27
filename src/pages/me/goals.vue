@@ -26,7 +26,7 @@
 
       <view v-if="remoteApiEnabled && !editorHasSnapshot" class="mx-4" :style="emptyStateStyle" role="status" :aria-busy="goalsStore.status !== 'error'">
         <text>{{ goalsStore.status === 'error' ? t.goals.serverUnavailable : t.goals.loading }}</text>
-        <view v-if="goalsStore.status === 'error'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="recCtaLabelStyle">{{ t.ui.retry }}</text></view>
+        <view v-if="goalsStore.status === 'error'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="[recCtaLabelStyle, { font: '600 13px/20px var(--font-v5)' }]">{{ t.ui.retry }}</text></view>
       </view>
 
       <!-- Setter — de-carded: labels + L1-filled input sit on the page floor -->
@@ -89,7 +89,7 @@
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ goalsStore.recommendationError === 'GOAL_NO_ELIGIBLE_PRODUCT' ? t.goals.noEligibleProduct : t.goals.serverUnavailable }}</text>
         <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"  @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals">
-          <text :style="recCtaLabelStyle">{{ t.ui.retry }}</text>
+          <text :style="[recCtaLabelStyle, { font: '600 13px/20px var(--font-v5)' }]">{{ t.ui.retry }}</text>
         </view>
       </view>
       <view v-else-if="target > 0 && (!remoteApiEnabled || (!editorBlocked && goalsStore.recommendationStatus === 'ready' && goalsStore.recommendation?.purchaseRequired === true && goalsStore.recommendation.targetUsdt === target))" class="mx-4" :style="recCardStyle">

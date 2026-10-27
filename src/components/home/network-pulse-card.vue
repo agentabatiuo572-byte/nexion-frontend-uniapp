@@ -47,10 +47,10 @@
             <!-- Retry has its own tap target; explanation uses the whole rank cell. -->
             <text
               v-if="m.subTap"
-              class="block mt-1 font-mono-tabular truncate active:opacity-70"
+              class="block mt-1 truncate active:opacity-70"
               role="button"
               tabindex="0"
-              :style="{ fontSize: '12px', color: m.subTone ?? 'var(--v5-ink-4)', padding: '14px 0', margin: '-14px 0' }"
+              :style="{ font: '600 13px/20px var(--font-v5)', color: m.subTone ?? 'var(--v5-ink-4)', padding: '14px 0', margin: '-14px 0' }"
               @click.stop="m.subTap()"
 
               @keydown.enter.stop.prevent="activate(m.subTap)" @keydown.space.stop.prevent="activate(m.subTap)"
@@ -222,4 +222,5 @@ const metrics = computed<Cell[]>(() => {
 .network-compact__label {min-height:36px;}
 .network-compact__value {display:block;margin-top:4px;font:600 18px/24px var(--font-v5);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
 .network-compact__retry {font-size:11px;}
+.network-compact__retry[role='button'] {font:600 13px/20px var(--font-v5);}
 </style>

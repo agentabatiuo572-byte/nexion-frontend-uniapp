@@ -616,7 +616,7 @@ function tint(svg: string, color: string): string {
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px 32px" };
 const remoteErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "var(--ui-space-inline)", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
-const remoteRetryStyle: CSSProperties = { minHeight: "44px", display: "grid", placeItems: "center", marginTop: "6px", color: "var(--v5-warning)" };
+const remoteRetryStyle: CSSProperties = { minHeight: "44px", display: "grid", placeItems: "center", marginTop: "6px", color: "var(--v5-warning)", font: "600 13px/20px var(--font-v5)" };
 const variantLabelStyle: CSSProperties = {
   marginBottom: "6px",
   fontSize: "12px",

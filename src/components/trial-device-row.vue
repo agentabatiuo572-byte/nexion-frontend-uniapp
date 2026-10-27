@@ -9,7 +9,7 @@
     <view class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
     <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
     <text class="trial-device-row__note">{{ copy.creditNote }}</text>
-    <view v-if="!presentation.actionsReady.value" class="trial-device-row__notice" role="status"><text>{{ presentation.presentationReady.value ? copy.loading : copy.unknown }}</text><view v-if="!presentation.presentationReady.value" class="trial-device-row__retry" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
+    <view v-if="!presentation.actionsReady.value" class="trial-device-row__notice" :class="{ 'nx-inline-recovery': !presentation.presentationReady.value }" role="status"><text class="nx-inline-recovery__copy">{{ presentation.presentationReady.value ? copy.loading : copy.unknown }}</text><view v-if="!presentation.presentationReady.value" class="trial-device-row__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
     <view class="trial-device-row__actions">
       <view class="trial-device-row__details" role="button" tabindex="0" @click="goDetails"><text>{{ copy.details }}</text></view>
       <view class="trial-device-row__buy" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy"><text>{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }}</text><text aria-hidden="true">→</text></view>
@@ -52,6 +52,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__estimate { margin-top:6px; }
 .trial-device-row__note { display:block; margin-top:8px; font:400 11px/17px var(--font-v5); color:var(--v5-ink-3); }
 .trial-device-row__notice { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; margin-top:8px; color:var(--v5-warning-ink); font:400 12px/18px var(--font-v5); }
+.trial-device-row__notice.nx-inline-recovery { display:grid; gap:12px; }
 .trial-device-row__retry { display:flex; align-items:center; min-height:44px; padding:0 8px; color:var(--v5-brand); }
 .trial-device-row__actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .trial-device-row__actions > view { display:flex; flex:1 1 110px; align-items:center; justify-content:center; min-height:44px; box-sizing:border-box; padding:10px 12px; border-radius:var(--v5-radius-full); font:500 13px/18px var(--font-v5); text-align:center; }

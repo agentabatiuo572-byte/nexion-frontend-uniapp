@@ -65,7 +65,7 @@
         <view v-if="needsRecovery" class="nx-glass-card mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px" data-testid="order-recovery">
           <text class="block" style="font-size: 13px; line-height: 1.6; color: var(--v5-ink-2)">{{ recoveryHint }}</text>
           <view class="order-recovery-actions">
-            <view role="button" tabindex="0" :aria-disabled="remoteOrderRefreshing" :style="notFoundBtnStyle" @click="refreshOrder" @keydown.enter.prevent="refreshOrder" @keydown.space.prevent="refreshOrder"><text>{{ t.store.catalogRetry }}</text></view>
+            <view role="button" tabindex="0" :aria-disabled="remoteOrderRefreshing" :style="notFoundBtnStyle" @click="refreshOrder" @keydown.enter.prevent="refreshOrder" @keydown.space.prevent="refreshOrder"><text style="font: 600 13px/20px var(--font-v5)">{{ t.store.catalogRetry }}</text></view>
             <view role="button" tabindex="0" :style="notFoundBtnStyle" @click="contactOrderSupport" @keydown.enter.prevent="contactOrderSupport" @keydown.space.prevent="contactOrderSupport"><text>{{ t.orders.copyAndSupport }}</text></view>
           </view>
         </view>
@@ -746,7 +746,7 @@ const remoteErrorStyle: CSSProperties = {
   padding: "10px 12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };
-const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
+const retryBtnStyle: CSSProperties = { minHeight: "44px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", font: "600 13px/20px var(--font-v5)" };
 
 
 </script>

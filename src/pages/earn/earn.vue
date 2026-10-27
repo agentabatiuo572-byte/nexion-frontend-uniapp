@@ -17,19 +17,21 @@
 <template>
   <AppChassis active="earn">
     <CardStagger class="pt-6 pb-4 space-y-6" style="color: var(--v5-ink)">
-      <view v-if="app.remoteFleetStatus === 'error'" class="mx-4 rounded-xl" style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
-        <text class="block" style="font-size: 13px; font-weight: 600">{{ t.coreReview.fleetReadFailed }}</text>
-        <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.coreReview.fleetReadRetry }}</text>
+      <view v-if="app.remoteFleetStatus === 'error'" class="nx-inline-recovery mx-4 rounded-xl" style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
+        <view class="nx-inline-recovery__copy">
+          <text class="block" style="font-size: 13px; font-weight: 600">{{ t.coreReview.fleetReadFailed }}</text>
+          <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.coreReview.fleetReadRetry }}</text>
+        </view>
         <!-- 文案必须裹 <text>:uni 下 <view> 里的裸 {{ }} 在 App 端不保证渲染。
              顺带补 role/tabindex —— 这是个真控件(重试),本仓禁原生 button,
              键盘语义由 lib/a11y-activate.ts 平台层按 role+tabindex 自动补上。 -->
         <view
-          class="inline-flex items-center active:opacity-70"
-          style="min-height: 44px; margin-top: 4px; color: var(--v5-brand)"
+          class="nx-inline-recovery__action active:opacity-70"
+          style="color: var(--v5-brand)"
           role="button" tabindex="0"
           @click="retryFleet"
         >
-          <text>{{ t.tradein.errPleaseRetry }}</text>
+          <text>{{ t.ui.retry }}</text>
         </view>
       </view>
       <!-- ===== HERO: pill tabs ===== -->
@@ -53,18 +55,20 @@
             <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-nex); font-weight: 600">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">UVT</text></text>
             <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ jobsText }}</text>
             <!-- 只有**确实请求失败**时才说不可用并给重试;零值已在上面显示为 0(#128)。 -->
-            <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="mt-2" role="status" aria-live="polite">
-              <text class="block" style="font-size: 12px; font-weight: 600; color: var(--v5-danger)">{{ t.earn.summaryUnavailableTitle }}</text>
-              <text class="block" style="font-size: 12px; margin-top: 2px; color: var(--v5-ink-3)">{{ t.earn.summaryUnavailableBody }}</text>
+            <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="nx-inline-recovery mt-2" role="status" aria-live="polite">
+              <view class="nx-inline-recovery__copy">
+                  <text class="block" style="font-size: 12px; font-weight: 600; color: var(--v5-danger)">{{ t.earn.summaryUnavailableTitle }}</text>
+                  <text class="block" style="font-size: 12px; margin-top: 2px; color: var(--v5-ink-3)">{{ t.earn.summaryUnavailableBody }}</text>
+              </view>
               <view
-                class="inline-flex items-center active:opacity-70"
-                style="min-height: 44px; margin-top: 2px; color: var(--v5-brand); font-size: 12px; font-weight: 600"
+                class="nx-inline-recovery__action active:opacity-70"
+                  style="color: var(--v5-brand)"
                 role="button" tabindex="0"
                 @click="retrySummary"
 
                 @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"
               >
-                <text>{{ t.tradein.errPleaseRetry }}</text>
+                <text>{{ t.ui.retry }}</text>
               </view>
             </view>
           </view>
