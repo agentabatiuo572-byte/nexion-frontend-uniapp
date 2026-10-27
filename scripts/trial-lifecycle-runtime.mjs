@@ -23,7 +23,7 @@ const assets=[...index.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map(m=>m
 const build=hash(Buffer.concat([Buffer.from(index),...await Promise.all(assets.map(asset=>readFile(path.join('dist/build/h5',asset.replace(/^\//,'')))))]));
 const records=[],errors=[],startedAt=new Date().toISOString();
 const setState=async changes=>{const response=await fetch(base+'/__demo/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(changes)});assert.equal(response.status,200);return response.json();};
-const variants=process.env.TRIAL_QUICK?[[390,'zh','dark']]:[320,390].flatMap(width=>['zh','en','vi'].flatMap(locale=>['dark','light'].map(theme=>[width,locale,theme])));
+const variants=process.env.TRIAL_QUICK?[[390,'zh','dark'],[320,'vi','light']]:[320,390].flatMap(width=>['zh','en','vi'].flatMap(locale=>['dark','light'].map(theme=>[width,locale,theme])));
 const browser=await chromium.launch();
 let failure;
 try{
