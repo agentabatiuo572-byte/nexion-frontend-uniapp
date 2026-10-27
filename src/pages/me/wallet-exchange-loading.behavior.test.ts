@@ -1,3 +1,4 @@
+import * as businessCalendar from "@/lib/business-calendar";
 import { formatAmount } from "@/lib/amount-display";
 import * as Vue from "vue";
 import type { Component } from "vue";
@@ -98,7 +99,7 @@ async function mount(direction = "nex2usdt") {
     "@/components/sub-page-header.vue": { default: header },
     "@/lib/route": { navTo }, "@/lib/exchange-quote": { exchangeQuote },
     "@/i18n/use-t": { useT: () => Vue.ref(en) },
-    "@/i18n/format": { dateLocale: () => "en", fmt: (text: string, values: Record<string, string>) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key]) },
+    "@/lib/business-calendar": businessCalendar, "@/i18n/format": { dateLocale: () => "en", fmt: (text: string, values: Record<string, string>) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key]) },
     "@/api/geo-policy-error": { geoPolicyUserMessage: vi.fn() },
     "@/lib/remote-authority-display": { remoteAuthorityStatus },
     "@/store/ui": { toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() }, confirm },
