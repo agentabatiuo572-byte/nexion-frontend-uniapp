@@ -1,9 +1,9 @@
 <template>
   <view class="team-summary" data-testid="team-summary" :role="canOpen ? 'link' : undefined" :tabindex="canOpen ? 0 : undefined" :aria-label="canOpen ? t.team.summaryView : undefined" :aria-busy="status === 'idle' || status === 'loading'" @click="open" @keydown.enter.prevent="open" @keydown.space.prevent="open">
     <view class="team-summary__header"><text class="team-summary__title">{{ copy.myTeam }}</text><text class="team-summary__arrow" :style="{ visibility: canOpen ? 'visible' : 'hidden' }" aria-hidden="true">›</text></view>
-    <view class="team-summary__body" :class="{ 'team-summary__body--long-count': readable && String(total).length > 6 }"><TeamArt kind="members" :size="56" /><view class="team-summary__metrics"><text class="team-summary__number" :style="{ '--team-summary-count-units': countUnits }">{{ readable ? total : '—' }}</text><text class="team-summary__label">{{ copy.members }}</text></view></view>
-    <view class="team-summary__direct"><text>{{ copy.directInvites }}</text><text>{{ readable ? direct : '—' }}</text></view>
-    <view v-if="readable && !total && status !== 'error'" class="team-summary__empty"><text>{{ t.team.summaryEmpty }}</text><NxButton class="team-summary__action" :label="copy.inviteFriends" variant="secondary" size="medium" @click="$emit('invite')" /></view>
+    <view class="team-summary__body" :class="{ 'team-summary__body--long-count': readable && !visibility.hidden && String(total).length > 6 }"><TeamArt kind="members" :size="56" /><view class="team-summary__metrics"><text class="team-summary__number" :style="{ '--team-summary-count-units': countUnits }">{{ totalText }}</text><text class="team-summary__label">{{ copy.members }}</text></view></view>
+    <view class="team-summary__direct"><text>{{ copy.directInvites }}</text><text>{{ visibility.mask(readable ? direct : '—') }}</text></view>
+    <view v-if="readable && !total && status !== 'error'" class="team-summary__empty"><text v-if="!visibility.hidden">{{ t.team.summaryEmpty }}</text><NxButton class="team-summary__action" :label="copy.inviteFriends" variant="secondary" size="medium" @click="$emit('invite')" /></view>
     <view v-else-if="status === 'error'" class="team-summary__status" role="status"><text>{{ t.team.summaryUnavailable }}</text><NxButton v-if="status === 'error'" class="team-summary__action" :label="t.network.retry" variant="text" size="medium" @click="$emit('retry')" /></view>
   </view>
 </template>
@@ -14,13 +14,16 @@ import { useLocaleStore } from '@/store/locale';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
 import TeamArt from './team-art.vue';
 import NxButton from '@/components/ui/nx-button.vue';
+import { useDataVisibility } from '@/store/data-visibility';
 const props=defineProps<{status:'idle'|'loading'|'ready'|'error'; total:number; direct:number; hasSnapshot?:boolean;transientFailure?:boolean}>();
 const emit=defineEmits<{(event:'invite'):void;(event:'open'):void;(event:'retry'):void}>();
 const t=useT(), locale=useLocaleStore(), copy=computed(()=>teamRedesignCopy(locale.code));
+const visibility=useDataVisibility();
 const canOpen=computed(()=>props.status==='ready' && props.total>0);
 const readable=computed(()=>props.status==='ready'||(props.hasSnapshot&&(props.status==='loading'||(props.status==='error'&&props.transientFailure))));
-// Size the real count; never abbreviate it to fit a decorative image.
-const countUnits=computed(()=>Math.max(1, String(readable.value ? props.total : '—').length * .7));
+// Size the rendered text so masking also conceals the original digit count.
+const totalText=computed(()=>visibility.mask(readable.value ? props.total : '—'));
+const countUnits=computed(()=>Math.max(1, totalText.value.length * .7));
 function open(){if(canOpen.value)emit('open');}
 </script>
 <style scoped>

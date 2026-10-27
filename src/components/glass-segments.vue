@@ -132,9 +132,8 @@ export default viewImplementation;
 .nx-glass-segments--wrap .nx-glass-option { flex: 0 1 auto; padding-inline: 16px; }
 .nx-glass-segments--vertical { flex-direction: column; }
 .nx-glass-segments--vertical .nx-glass-option { flex: 0 0 auto; }
-.nx-glass-segments--navigation { height: var(--nx-tabbar-height, 68px); padding: 5px; gap: 2px; box-sizing: border-box; background: transparent; border-radius: 32px; }
-.nx-glass-segments--navigation .nx-glass-option { flex-direction: column; gap: 3px; padding: 4px 2px; border-radius: 28px; }
-.nx-glass-segments--navigation :deep(.nx-tab__label) { font-family: var(--font-v5); font-size: clamp(10.5px, 3.28vw, 12px); line-height: 14px; font-weight: 600; white-space: nowrap; text-align: center; text-shadow: 0 1px 2px var(--v5-tabbar-ink-halo), 0 0 4px var(--v5-tabbar-ink-halo); }
+.nx-glass-segments--navigation { --nx-tab-icon-scale: 1.09; height: var(--nx-tabbar-height, 56px); padding: 5px; gap: 2px; box-sizing: border-box; background: transparent; border-radius: 32px; }
+.nx-glass-segments--navigation .nx-glass-option { gap: 0; padding: 4px 2px; border-radius: 28px; }
 .nx-glass-segments--navigation :deep(.nx-tab__icon) { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex-shrink: 0; line-height: 0; filter: drop-shadow(0 1px 1px var(--v5-tabbar-ink-halo)); transition: transform 160ms cubic-bezier(.2,.8,.2,1); transform-origin: center; }
 .nx-glass-segments--navigation .nx-glass-option--selected :deep(.nx-tab__icon) { transform: translateY(-1px); }
 @keyframes nx-tab-select {
@@ -142,14 +141,9 @@ export default viewImplementation;
   40% { transform: scale(calc(var(--nx-tab-icon-scale, 1) * 1.16)); }
   72% { transform: scale(calc(var(--nx-tab-icon-scale, 1) * .96)); }
 }
-@media (max-width: 374px) {
-  .nx-glass-segments--navigation { --nx-tab-icon-scale: 1.09; }
-  .nx-glass-segments--navigation .nx-glass-option { gap: 0; }
-  .nx-glass-segments--navigation :deep(.nx-tab__label) { display: none; }
-  .nx-glass-segments--navigation :deep(.nx-tab__icon),
-  .nx-glass-segments--navigation .nx-glass-option--selected :deep(.nx-tab__icon) { transform: scale(var(--nx-tab-icon-scale)); transition: none; }
-  .nx-glass-segments--navigation .nx-tab--bounce :deep(.nx-tab__icon) { animation: nx-tab-select 260ms cubic-bezier(.2,.8,.2,1) 1; }
-}
+.nx-glass-segments--navigation :deep(.nx-tab__icon),
+.nx-glass-segments--navigation .nx-glass-option--selected :deep(.nx-tab__icon) { transform: scale(var(--nx-tab-icon-scale)); transition: none; }
+.nx-glass-segments--navigation .nx-tab--bounce :deep(.nx-tab__icon) { animation: nx-tab-select 260ms cubic-bezier(.2,.8,.2,1) 1; }
 @media (prefers-reduced-motion: reduce) { .nx-glass-option, .nx-glass-indicator { transition: none; } .nx-glass-option:active { transform: none; } .nx-glass-segments--navigation .nx-tab--bounce :deep(.nx-tab__icon) { animation: none; } .nx-glass-segments--navigation :deep(.nx-tab__icon), .nx-glass-segments--navigation .nx-glass-option--selected :deep(.nx-tab__icon) { transform: scale(var(--nx-tab-icon-scale, 1)); transition: none; } }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .nx-glass-segments--navigation { background: var(--v5-surface); } .nx-glass-option--selected { background: var(--v5-brand-soft); } }
 </style>

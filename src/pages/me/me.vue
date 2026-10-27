@@ -21,13 +21,13 @@
         <view class="me-network-grid">
           <view v-for="item in networkItems" :key="item.key" class="me-network-item" :data-quick-key="item.key" role="button" tabindex="0" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
             <view class="me-row-icon" :class="'me-tone--' + (item.tone || 'muted')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg></view>
-            <view class="me-network-item__copy"><text class="me-network-item__label">{{ item.label }}</text><text class="me-network-item__meta">{{ item.meta }}</text></view>
+            <view class="me-network-item__copy"><text class="me-network-item__label">{{ item.label }}</text><text class="me-network-item__meta">{{ item.key === 'rank' ? visibility.mask(item.meta ?? '—') : item.meta }}</text></view>
           </view>
         </view>
       </NxSection>
-      <NxSection v-for="section in settingSections" :key="section.key" :title="section.title" :meta="section.count == null ? undefined : String(section.count)">
+      <NxSection v-for="section in settingSections" :key="section.key" :title="section.title" :meta="section.count == null ? undefined : visibility.mask(section.count)">
         <NxListGroup>
-          <NxListRow v-for="item in section.items" :key="item.key" :data-quick-key="item.key" :title="item.label" :value="item.meta" @click="handleQuickItem(item)">
+          <NxListRow v-for="item in section.items" :key="item.key" :data-quick-key="item.key" :title="item.label" :value="['inventory', 'slots', 'orders', 'genesis'].includes(item.key) && item.meta ? visibility.mask(item.meta) : item.meta" @click="handleQuickItem(item)">
             <template #leading><view class="me-row-icon" :class="'me-tone--' + (item.tone || 'muted')">
               <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg>
               <view v-if="item.dot || item.badge" class="me-row-dot" />
@@ -41,8 +41,8 @@
       </view>
       <view v-else-if="remoteApiEnabled && remoteOrdersFailed" class="mx-0 flex items-center justify-between" style="gap: 12px; min-height: 44px" data-me-orders-state="failed">
         <text class="flex-1" style="font-size: 12px; color: var(--v5-danger)">{{ t.orders.refreshFailed }}</text>
-        <view class="shrink-0 inline-flex items-center justify-center active:scale-[0.98] transition-transform" style="min-height: 44px; padding: 0 12px; border-radius: 999px; background: var(--v5-danger-soft); color: var(--v5-danger);" data-me-action="retry-orders" role="button" tabindex="0" :aria-label="t.orders.retry" @click="refreshRemoteOrders"  @keydown.enter.prevent="refreshRemoteOrders" @keydown.space.prevent="refreshRemoteOrders">
-          <text>{{ t.orders.retry }}</text>
+        <view class="shrink-0 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline active:opacity-70" data-me-action="retry-orders" role="button" tabindex="0" :aria-label="t.ui.retry" @click="refreshRemoteOrders"  @keydown.enter.prevent="refreshRemoteOrders" @keydown.space.prevent="refreshRemoteOrders">
+          <text>{{ t.ui.retry }}</text>
         </view>
       </view>
 
@@ -62,6 +62,7 @@
 
 <script setup lang="ts">
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
+import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow, onUnload } from "@/composables/use-tab-page-lifecycle";
@@ -131,6 +132,7 @@ onUnload(() => { ++resourceVersionRequest; });
 // #endif
 
 const t = useT();
+const visibility = useDataVisibility();
 const app = useApp();
 const auth = useAuth();
 const session = useSession();
@@ -664,11 +666,14 @@ const signOutStyle: CSSProperties = {
 .me-tone--success { --me-icon: var(--v5-success-ink); --me-icon-bg: var(--v5-success-soft); }
 .me-tone--danger { --me-icon: var(--v5-danger); --me-icon-bg: var(--v5-danger-soft); }
 .me-row-dot { position: absolute; right: 0; top: 0; width: var(--v5-space-2); height: var(--v5-space-2); border-radius: var(--v5-radius-full); background: var(--v5-danger); box-shadow: 0 0 0 2px var(--v5-bg); }
-.me-network-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--v5-space-3); padding: var(--v5-space-3) 0; }
-.me-network-item { display: flex; align-items: center; gap: var(--v5-space-2); min-width: 0; min-height: 56px; cursor: pointer; }
-.me-network-item__copy { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }
-.me-network-item__label { font-size: var(--v5-type-body-m); line-height: var(--v5-type-body-m-lh); }
-.me-network-item__meta { font-size: var(--v5-type-body-s); line-height: var(--v5-type-body-s-lh); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.me-network-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--v5-space-2) var(--v5-space-3); padding: var(--v5-space-1) 0 var(--v5-space-2); }
+.me-network-item { display: flex; align-items: center; gap: var(--v5-space-2); min-width: 0; min-height: 52px; cursor: pointer; }
+.me-network-item__copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.me-network-item__label { font: 500 13px/18px var(--font-v5); overflow-wrap: anywhere; }
+.me-network-item__meta { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+@media (max-width: 374px) {
+  .me-network-item__label { font-size: 12px; line-height: 16px; }
+}
 .me-shortcut:focus-visible, .me-network-item:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: var(--v5-radius-s); }
 .me-shortcut:active, .me-network-item:active { opacity: .72; }
 </style>

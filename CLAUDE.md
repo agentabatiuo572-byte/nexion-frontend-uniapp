@@ -63,7 +63,7 @@ verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另�
 
 ## 工作约定
 
-- 设计/UI/文案/新组件前强制加载 `nexion-design` skill（V5 dark + 生产级真平台标准 + 产品内 0 meta）。
+- 设计/UI/文案/新组件使用 [UVEL APP UI/UX 设计规范系统](https://github.com/agentabatiuo572-byte/uvel-docs/tree/main/design-system)。旧 NexGrid 浅／深色 skill 不再作为执行依据；通用设计、生图和浏览器技能保留。用户最新明确要求、批准稿及页面例外优先，规范发布不代表全站验收完成。
 - 完成自检走 `done-review`；功能性任务后走 `nexion-audit`（3-agent 并行修到 P0=0）。
 - 删除文件先 Move 到 `<root>\.trash\<时间戳>`，禁 `Remove-Item -Force`（用户级 PreToolUse 守卫 hook 兜底，缓存目录放行）。
 

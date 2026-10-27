@@ -1,5 +1,6 @@
 import * as Vue from 'vue';
 import { createPinia, setActivePinia, disposePinia } from 'pinia';
+import { useDataVisibility } from '@/store/data-visibility';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { mountEntry, flush, text, slot } from '@/lib/entry-review.test-support';
 import rulesSource from './invite-rule-content.vue?raw';
@@ -18,14 +19,15 @@ const {useReferralReward}=await import('@/store/referral-reward');
 function deferred<T=any>(){let resolve!:(value:T)=>void,reject!:(error:unknown)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no});return{promise,resolve,reject};}
 const snapshot=(amount=.015)=>({source:'ledger' as const,sourceEnvironment:'PRODUCTION' as const,runId:null,referralCode:'CURRENT',rewardEnabled:true,inviterRewardNex:amount,invitedCount:2,pendingCount:1,settledCount:1,lifetimeInviterNex:7,walletNexAvailable:7,recentRewards:[{settlementNo:'s1',amountNex:7,settledAt:'2026-10-22T00:00:00Z',releaseBucket:'AVAILABLE',status:'SETTLED'}],limit:10,factSources:[],refreshedAt:'2026-10-27T00:00:00Z'});
 let pinia:ReturnType<typeof createPinia>;const cleanup:Array<()=>void>=[];
-beforeEach(()=>{pinia=createPinia();setActivePinia(pinia);vi.clearAllMocks();remote.apiRuntimeConfig=Vue.reactive({environment:'dev'});});
-afterEach(()=>{cleanup.splice(0).forEach(fn=>fn());disposePinia(pinia);});
+beforeEach(()=>{pinia=createPinia();setActivePinia(pinia);vi.clearAllMocks();vi.stubGlobal('uni',{getStorageSync:()=>undefined,setStorageSync:vi.fn()});remote.apiRuntimeConfig=Vue.reactive({environment:'dev'});});
+afterEach(()=>{cleanup.splice(0).forEach(fn=>fn());disposePinia(pinia);vi.unstubAllGlobals();});
 async function screen(source:string,copy=en,props={}){
  const app=Vue.reactive({accountKey:'user:7',accountBindingEpoch:1}),locale=Vue.reactive({code:copy===zh?'zh':copy===vietnamese?'vi':'en'}),rewards=useReferralReward();
  remote.referralRewardApi.snapshot.mockResolvedValue(snapshot());rewards.bindAccount('user:7');await flush();
  const cfg=Vue.reactive({configStatus:'ready',loading:false,config:{rewards:{enabled:true,effectiveAt:'2026-10-22T00:00:00Z',inviterReward:{nexAmount:.015}},share:{channels:[]}},ensureLoaded:vi.fn(),revalidate:vi.fn(),load:vi.fn()});
  const copyText=vi.fn(async()=>true);
  const deps:Record<string,unknown>={vue:Vue,'@/store/app':{useApp:()=>app},'@/store/locale':{useLocaleStore:()=>locale},'@/store/referral-reward':{useReferralReward:()=>rewards},'@/store/config':{useConfig:()=>cfg},'@/api/runtime':remote,'@/i18n/use-t':{useT:()=>Vue.ref(copy)},'@/i18n/team-redesign':{teamRedesignCopy,referralSettlementStatus},'@/i18n/format':{fmt,dateLocale:()=>locale.code},'@/lib/amount-display':{formatAmount},'@/lib/display-date':{formatDisplayDate},'@/lib/route':{navTo:vi.fn()},'@/composables/use-dialog-a11y':{useDialogA11y:()=>{}},'@/composables/use-product-phase':{useProductPhase:()=>Vue.ref({inviteBonusMultiplier:1})},'@/store/ui':{toast:{info:vi.fn(),success:vi.fn()}},'@/lib/share':{currentShareReferralCode:()=>rewards.snapshot?.referralCode??'',buildShareLink:()=>rewards.snapshot?.referralCode?'https://example.invalid/'+rewards.snapshot.referralCode:'',visibleChannels:()=>[],copyText,activateChannel:vi.fn(),INVITER_REWARD_USDT_ESTIMATE:1},'./team-art.vue':slot,'./invite-rule-content.vue':slot,'@/components/liquid-glass.vue':slot,'@/components/ui/nx-button.vue':slot};
+ deps['@/store/data-visibility']={useDataVisibility};
  const p=mountEntry(source,deps,props);cleanup.push(p.unmount);await flush();return{...p,rewards,cfg,app,locale,copyText};
 }
 it.each([en,zh,vietnamese])('keeps this rule read through a warm refresh and clears real failures',async copy=>{

@@ -13,7 +13,7 @@
     <view v-if="variant !== 'home' && isExpanded" :id="`trial-device-details-${variant}`" class="trial-device-row__body">
       <text v-if="presentation.status.value === 'grace'" class="trial-device-row__state">{{ copy.grace }}</text>
       <view class="trial-device-row__credit"><text>{{ copy.availableCredit }}</text><text class="trial-device-row__amount font-mono-tabular">{{ money(presentation.offsetUSD.value) }}</text></view>
-      <view class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
+      <view v-if="!hidePersonalData" class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text>
       <view v-if="!presentation.presentationReady.value" class="trial-device-row__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view v-if="!presentation.presentationReady.value" class="trial-device-row__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
@@ -27,6 +27,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDataVisibility } from "@/store/data-visibility";
 import { computed, ref } from "vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
@@ -37,6 +38,8 @@ import { navTo } from "@/lib/route";
 import { getProductMedia } from "@/lib/product-media";
 
 const props = withDefaults(defineProps<{ variant?: "home" | "earn" | "inventory"; expanded?: boolean; showCancel?: boolean; cancelBusy?: boolean }>(), { variant: "earn", expanded: undefined });
+const visibility = useDataVisibility();
+const hidePersonalData = computed(() => props.variant !== "inventory" && visibility.hidden);
 const emit = defineEmits<{ (event: "cancel"): void; (event: "toggle"): void }>();
 const presentation = useTrialPresentation();
 const copy = useTrialFleetCopy();
@@ -48,7 +51,10 @@ const isOnline = computed(() => presentation.presentationReady.value && presenta
 const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
   : isOnline.value ? t.value.earn.online : t.value.earn.offline);
 const remainingText = computed(() => presentation.remainingMs.value === null ? "—" : formatTrialRemaining(presentation.remainingMs.value, copy.value.longRemaining));
-function money(value: number | null) { return value === null ? "—" : `$${formatAmount(value)}`; }
+function money(value: number | null) {
+  const formatted = value === null ? "—" : `$${formatAmount(value)}`;
+  return props.variant === "inventory" ? formatted : visibility.mask(formatted);
+}
 function goDetails() { navTo("/pages/me/trial"); }
 function onRowClick() {
   if (props.variant === "home") { goDetails(); return; }

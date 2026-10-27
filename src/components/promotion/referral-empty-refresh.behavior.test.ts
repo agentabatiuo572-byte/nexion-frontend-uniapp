@@ -2,7 +2,9 @@ import { createPassiveTabReadFixture } from '@/lib/passive-tab-read.test-support
 import * as Vue from 'vue';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createPinia, disposePinia, setActivePinia } from 'pinia';
+import { useDataVisibility } from '@/store/data-visibility';
 import * as lifecycle from '@/composables/use-tab-page-lifecycle';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
 import { localized } from '@/lib/promotion-display';
@@ -31,7 +33,12 @@ function deferred<T = any>() { let resolve!: (value: T) => void, reject!: (error
 const empty = () => ({ items: [], nextCursor: null, hasMore: false });
 const activity = (id = 'A') => ({ activityId: id, version: 1, template: 'DIRECT_REFERRAL', state: 'ACTIVE', title: { zh: '首购', en: 'First purchase', vi: 'Mua lần đầu' }, rewardRules: [] });
 const mounted: Vue.App[] = [];
-afterEach(() => { mounted.splice(0).forEach(app => app.unmount()); vi.useRealTimers(); });
+let pinia: ReturnType<typeof createPinia>;
+beforeEach(() => {
+  pinia = createPinia(); setActivePinia(pinia);
+  vi.stubGlobal('uni', { getStorageSync: () => undefined, setStorageSync: vi.fn() });
+});
+afterEach(() => { mounted.splice(0).forEach(app => app.unmount()); disposePinia(pinia); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function screen(language: 'zh' | 'en' | 'vi' = 'zh') {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -42,6 +49,7 @@ function screen(language: 'zh' | 'en' | 'vi' = 'zh') {
   passive.notifyPageActivation('/pages/team/team');
   const modules: Record<string, any> = {
     '@/lib/passive-tab-read': passive,
+    '@/store/data-visibility': { useDataVisibility },
     vue: Vue, '@/composables/use-tab-page-lifecycle': lifecycle,
     '@/api/runtime': { remoteApiEnabled: true, sessionVault: { read: () => auth.isAuthenticated ? { user: {} } : null }, promotionApi: { list, referral } },
     '@/store/app': { useApp: () => app }, '@/store/auth': { useAuth: () => auth }, '@/store/locale': { useLocaleStore: () => locale },

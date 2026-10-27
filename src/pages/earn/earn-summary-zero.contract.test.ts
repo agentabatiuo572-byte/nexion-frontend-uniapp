@@ -40,6 +40,7 @@ function hero(range: Range, homeTruth: unknown, realized: { usdt: number; nex: n
   const passiveReads = createPassiveTabReadFixture(() => app.accountKey);
   const load = (id: string) => {
     if (id === "@/lib/passive-tab-read") return passiveReads;
+    if (id === "@/store/data-visibility") return { useDataVisibility: () => ({ hidden: false, mask: String }) };
     if (id === "@/lib/amount-display") return { formatAmount };
     if (id === "@/lib/usd-display") return { formatUsdOverviewParts };
     if (id === "@/i18n/remainder-ui") return { useRemainderUiCopy: () => Vue.ref(remainderUiCopy[copy === zh ? "zh" : copy === vietnamese ? "vi" : "en"]) };

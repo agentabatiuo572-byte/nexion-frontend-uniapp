@@ -1,7 +1,7 @@
 <!-- One large, accessible card per active device; manage opens the inventory. -->
 <template>
   <view class="hf-section" data-home-section="fleet">
-    <NxSection :title="t.home.myFleet" :meta="fleetCountText" :action="t.home.fleetManage" @action="goManage">
+    <NxSection :title="t.home.myFleet" :meta="visibility.mask(fleetCountText)" :action="t.home.fleetManage" @action="goManage">
     <view v-if="fleetVisible || trialPresentation.active.value" class="hf-grid">
       <TrialDeviceRow v-if="trialPresentation.active.value" key="trial:current" variant="home" />
       <DeviceRow v-for="d in devices" :key="d.id" :device="d" :runtime-confirmed="fleetReady" />
@@ -14,6 +14,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDataVisibility } from "@/store/data-visibility";
 import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -30,6 +31,7 @@ import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useFreeTrial } from "@/store/free-trial";
 import { deviceOnlineState } from '@/lib/hashpower';
 
+const visibility = useDataVisibility();
 const t = useT();
 const copy = useAuditUiCopy();
 const app = useApp();

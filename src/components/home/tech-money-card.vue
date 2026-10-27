@@ -30,7 +30,7 @@
 
     <view class="relative" style="z-index: 1">
       <view class="flex justify-between items-center gap-2">
-        <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.techTodaysEarnings }}</text>
+        <view class="flex items-center gap-1 min-w-0"><text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.techTodaysEarnings }}</text><DataVisibilityToggle /></view>
         <text
           class="inline-flex items-center gap-1 font-mono-tabular"
           style="font-size: 12px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan-ink); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
@@ -41,8 +41,9 @@
         class="mt-2.5 flex items-baseline gap-1"
         style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)"
       >
-        <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-        <text v-if="remoteApiEnabled && remoteToday === null" class="tabular-nums" style="font-size: 56px">—</text>
+        <text v-if="!visibility.hidden" style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
+        <text v-if="visibility.hidden" class="tabular-nums" style="font-size: 56px">{{ visibility.mask(intPart) }}</text>
+        <text v-else-if="remoteApiEnabled && remoteToday === null" class="tabular-nums" style="font-size: 56px">—</text>
         <text v-else class="tabular-nums" style="font-size: 56px">{{ intPart }}<text style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
       </view>
 
@@ -69,8 +70,11 @@ import { useTicker } from "@/composables/use-ticker";
 import { remoteApiEnabled } from "@/api/runtime";
 import { homeEarningsSubtitle } from "./home-real-copy";
 import { fmt } from "@/i18n/format";
+import { useDataVisibility } from "@/store/data-visibility";
+import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
 
 const t = useT();
+const visibility = useDataVisibility();
 const app = useApp();
 const retrying = ref(false);
 async function retryEarnings() {
@@ -97,21 +101,22 @@ const remoteJobCount = computed<number | null>(() => remoteApiEnabled
 const remoteTodayVsYesterdayPct = computed<number | null>(() => remoteApiEnabled
   ? app.homeTruth?.earnings.todayVsYesterdayPct ?? null
   : null);
+const settledSubtitle = computed(() => fmt(t.value.home.techSettledJobs, {
+  arrow: visibility.hidden || remoteTodayVsYesterdayPct.value === null ? "" : remoteTodayVsYesterdayPct.value > 0 ? "↑" : remoteTodayVsYesterdayPct.value < 0 ? "↓" : "→",
+  delta: visibility.mask(remoteTodayVsYesterdayPct.value === null ? "—" : `${remoteTodayVsYesterdayPct.value > 0 ? "+" : ""}${remoteTodayVsYesterdayPct.value.toFixed(1)}%`),
+  count: visibility.mask(remoteJobCount.value ?? 0),
+}));
 const earningsSubtitle = computed(() => homeEarningsSubtitle(
   remoteApiEnabled,
   app.homeTruthStatus === 'loading' && app.homeTruth ? 'ready' : app.homeTruthStatus,
   remoteToday.value,
   remoteJobCount.value,
   remoteTodayVsYesterdayPct.value,
-  t.value.home.techVsYesterday,
+  visibility.hidden ? settledSubtitle.value : t.value.home.techVsYesterday,
   t.value.home.techEarningsLoading,
   t.value.uiChrome.unavailable,
   t.value.home.techEarningsEmpty,
-  fmt(t.value.home.techSettledJobs, {
-    arrow: remoteTodayVsYesterdayPct.value === null ? "" : remoteTodayVsYesterdayPct.value > 0 ? "↑" : remoteTodayVsYesterdayPct.value < 0 ? "↓" : "→",
-    delta: remoteTodayVsYesterdayPct.value === null ? "—" : `${remoteTodayVsYesterdayPct.value > 0 ? "+" : ""}${remoteTodayVsYesterdayPct.value.toFixed(1)}%`,
-    count: remoteJobCount.value ?? 0,
-  }),
+  settledSubtitle.value,
 ));
 
 // Mock-only streaming number. Remote mode renders the exact server snapshot or

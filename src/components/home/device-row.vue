@@ -9,7 +9,7 @@
       <text class="hf-device-name">{{ displayName }}</text>
       <view class="hf-device-status" :class="{ 'hf-device-status--offline': onlineState === 'offline' }"><view class="hf-status-dot" :style="dotStyle" aria-hidden="true" /><text>{{ statusText }}</text></view>
     </view>
-    <view class="hf-device-income"><text class="font-mono-tabular">{{ runtimeConfirmed ? (device.todayEarnings > 0 ? '+' : '') + fmtMoney(device.todayEarnings) : '-' }}</text><text class="hf-device-today">{{ copy.today }}</text></view>
+    <view class="hf-device-income"><text class="font-mono-tabular">{{ visibility.mask(runtimeConfirmed ? (device.todayEarnings > 0 ? '+' : '') + fmtMoney(device.todayEarnings) : '-') }}</text><text class="hf-device-today">{{ copy.today }}</text></view>
     <view class="nx-home-arrow" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
     </view>
@@ -17,6 +17,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { fmtMoney } from '@/i18n/format';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
@@ -27,6 +28,7 @@ import { deviceOnlineState } from "@/lib/hashpower";
 import { deviceName } from "@/lib/device-copy";
 import type { Device } from "@/store/types";
 
+const visibility = useDataVisibility();
 const props = defineProps<{ device: Device; divider?: boolean; runtimeConfirmed: boolean }>();
 const t = useT();
 const copy = useAuditUiCopy();

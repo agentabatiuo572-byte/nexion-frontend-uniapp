@@ -2,6 +2,7 @@ import * as displayDate from "@/lib/display-date";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import * as Vue from "vue";
 import { createPinia, setActivePinia } from "pinia";
+import { useDataVisibility } from '@/store/data-visibility';
 import { formatAmount } from "@/lib/amount-display";
 import type { Component } from "vue";
 import { compileScript, compileStyle, parse } from "@vue/compiler-sfc";
@@ -64,6 +65,7 @@ function compile(source: string, dependencies: Record<string, unknown>) {
     if (id === "@/lib/finance-amount-display") return { formatFinanceAmount };
     if (id === "@/lib/amount-display") return { formatAmount };
     if (id === "vue") return Vue;
+    if (id === '@/store/data-visibility') return { useDataVisibility };
     if (id === "@/composables/use-tab-page-lifecycle") return tabLifecycle;
     if (id in dependencies) return dependencies[id];
     if (id === "@/lib/route") return { navTo: vi.fn() };
@@ -124,8 +126,29 @@ async function invitation(copy = en, initial: ReferralRewardSnapshot | null = sn
   return { root, rewards, copyText, recordShareEvent, notifyUnavailableShareLink, toast, pageApp, runtime, catalog };
 }
 
-beforeEach(() => { vi.useFakeTimers(); setActivePinia(createPinia()); });
-afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); setActivePinia(undefined); vi.useRealTimers(); });
+beforeEach(() => { vi.stubGlobal('uni', { getStorageSync: () => undefined, setStorageSync: vi.fn() }); vi.useFakeTimers(); setActivePinia(createPinia()); });
+afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); setActivePinia(undefined); vi.useRealTimers(); vi.unstubAllGlobals(); });
+test.each([en, zh, vietnamese])('shared hiding masks personal reward records but retains the public reward and dates', async copy => {
+  const card = await invitation(copy), visibility = useDataVisibility();
+  card.rewards.snapshot = { ...snapshot(true), inviterRewardNex: 10, lifetimeInviterNex: 876.54, invitedCount: 55, settledCount: 34, pendingCount: 21,
+    recentRewards: [{ settlementNo: 'private-row', amountNex: 123.45, balanceAfter: 876.54,
+      ledgerStatus: 'SUCCESS', releaseBucket: 'withdrawable', sourceEnvironment: 'PRODUCTION', settledAt: '2026-10-19T12:00:00Z' }] };
+  await Vue.nextTick();
+  find(card.root, 'invite-card__history').props.onClick(); await Vue.nextTick();
+  const dateBefore = text(find(card.root, 'invite-detail__record').children[0]);
+  expect(text(find(card.root, 'invite-detail__total'))).toContain('876.54');
+  visibility.toggle(); await Vue.nextTick();
+  expect(text(find(card.root, 'invite-card__amount'))).toBe('10');
+  expect(text(find(card.root, 'invite-detail__total'))).toContain('•••• UVT');
+  expect(text(find(card.root, 'invite-detail__counts'))).not.toMatch(/34|21/);
+  expect(text(find(card.root, 'invite-detail__record'))).not.toContain('123.45');
+  expect(text(find(card.root, 'invite-detail__record').children[0])).toBe(dateBefore);
+  expect(accessibleText(find(card.root, 'invite-detail'))).not.toMatch(/876\.54|123\.45/);
+  expect(card.rewards.snapshot.lifetimeInviterNex).toBe(876.54);
+  visibility.toggle(); await Vue.nextTick();
+  expect(text(find(card.root, 'invite-detail__total'))).toContain('876.54');
+  expect(text(find(card.root, 'invite-detail__record'))).toContain('+123.45');
+});
 test('visible invitation refreshes after a catalog revision invalidates its snapshot', async () => {
   const card=await invitation();const before=card.rewards.ensure.mock.calls.length;
   advanceRuntimeRevision();await Vue.nextTick();expect(card.rewards.ensure.mock.calls.length).toBe(before+1);
@@ -587,7 +610,9 @@ test("wallet valuation names USDT for both values and preserves the remote unava
   market.remoteReady = false; await Vue.nextTick();
   expect(text(find(root, "nx-wallet-valuation"))).toContain("≈ — USDT · 1 UVT = — USDT");
   expect(text(find(root, "nx-wallet-valuation"))).not.toContain("0.124");
-  find(root, "nx-wallet-heading").props.onClick();
+  const billsLink = find(root, "nx-wallet-heading-link");
+  expect(billsLink.props.role).toBe('link');
+  billsLink.props.onClick();
   expect(navTo).toHaveBeenCalledExactlyOnceWith("/pages/me/wallet-bills");
   navTo.mockClear();
   find(root, "nx-wallet-nex").props.onClick();

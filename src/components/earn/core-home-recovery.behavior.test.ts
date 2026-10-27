@@ -21,6 +21,7 @@ import { dailyCheckInSuccessCopy } from '@/pages/daily/daily-success-copy';
 import { continuityCopy } from '@/i18n/continuity-fixes';
 import * as workload from '@/lib/workload-label';
 import { nexGridBrandText } from '@/lib/brand-copy';
+import { createPassiveTabReadFixture } from '@/lib/passive-tab-read.test-support';
 
 type Host = { text: string; props: Record<string, any>; parent: Host | null; children: Host[] };
 const node = (text = ''): Host => ({ text, props: {}, parent: null, children: [] });
@@ -60,12 +61,13 @@ function mount(raw: string, deps: Record<string, unknown>) {
   app.mount(root); stops.push(() => app.unmount()); return root;
 }
 function common(copy = zh) {
-  return { vue: Vue, '@/lib/amount-display': { formatAmount }, '@/i18n/format': { fmt },
+  const visibilityToggle = { '@/components/ui/data-visibility-toggle.vue': blank };
+  return { ...visibilityToggle, '@/store/data-visibility': { useDataVisibility: () => ({ hidden: false, mask: String }) }, vue: Vue, '@/lib/amount-display': { formatAmount }, '@/i18n/format': { fmt },
     '@/i18n/use-t': { useT: () => Vue.ref(copy) }, '@/api/runtime': { remoteApiEnabled: true } };
 }
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason: Error) => void;
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
-async function settle() { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); await Vue.nextTick(); }
+async function settle() { for (let i = 0; i < 12; i++) await Promise.resolve(); await Vue.nextTick(); }
 
 test.each([zh, en, vietnamese])('earnings retry reads the overview once, preserves unknown, and recovers', async copy => {
   const pending = deferred<void>();
@@ -154,9 +156,10 @@ test.each(['zh', 'en', 'vi'] as const)('checked-in copy in %s uses the published
 test('to-do waits for its initial reads and trial progress opens the trial page', async () => {
   const pending = deferred<void>(); const navTo = vi.fn();
   const deps: Record<string, unknown> = { ...common(), '@/store/app': { useApp: () => ({ accountKey: 'A', accountBindingEpoch: 1 }) },
+    '@/lib/passive-tab-read': createPassiveTabReadFixture(() => 'A:1'),
     '@/store/session': { useSession: () => ({}) }, '@/store/quest': { useQuest: () => ({ remoteStatus: 'ready', refreshRemote: () => pending.promise, remoteQuests: [] }) },
     '@/store/orders': { useOrders: () => ({ orders: [], refreshRemote: async () => true }) },
-    '@/store/voucher': { useVoucher: () => ({ claimedUnused: [], refreshRemote: async () => true }) },
+    '@/store/voucher': { useVoucher: () => ({ claimedUnused: [], revalidateRemote: async () => true }) },
     '@/store/free-trial': { useFreeTrial: () => ({ status: 'active', refreshRemote: async () => true }) },
     '@/store/config': { useConfig: () => ({ isEnabled: () => false }) },
     '@/api/runtime': { remoteApiEnabled: true, accountApi: { securityOverview: async () => ({ twoFactorEnabled: true }) } },

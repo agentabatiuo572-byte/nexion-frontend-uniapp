@@ -6,7 +6,7 @@
       <view class="referral-hero">
         <view class="referral-copy">
           <text class="referral-title">{{ localized(activity.title,locale.code) || copy.firstPurchase }}</text>
-          <view class="referral-count" aria-live="polite"><text class="referral-number">{{ qualifyingCount(activity.activityId) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
+          <view class="referral-count" aria-live="polite"><text class="referral-number">{{ visibility.mask(qualifyingCount(activity.activityId)) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
           <view class="referral-actions"><NxButton class="referral-cta referral-progress-link" variant="secondary" size="medium" :disabled="progressBusy[activity.activityId] || !auth.isAuthenticated" :aria-expanded="expandedActivity===activity.activityId" :label="copy.viewProgress" @click="showProgress(activity.activityId)"><text>{{ copy.viewProgress }}</text><text aria-hidden="true">→</text></NxButton></view>
         </view>
         <view class="referral-art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /></view>
@@ -15,7 +15,7 @@
         <text class="referral-activity-title">{{ localized(activity.title,locale.code) }}</text>
         <text class="promotion-copy">{{ t.promotion.inviteNote }}</text>
         <text v-if="progressErrors[activity.activityId]" class="promotion-copy" role="alert">{{ t.promotion.error }}</text>
-        <RewardRows v-if="progress[activity.activityId]" :rewards="progress[activity.activityId].ownRewards" />
+        <RewardRows v-if="progress[activity.activityId]" :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
         <NxButton class="referral-cta" size="medium" :busy="loading || progressBusy[activity.activityId]" :label="t.promotion.refresh" @click="loadActivities(true)"><text>{{ t.promotion.refresh }}</text><text aria-hidden="true">→</text></NxButton>
         <view class="referral-rule-link" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
       </view>
@@ -29,6 +29,7 @@
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import{computed,ref,watch,onBeforeUnmount}from'vue';import{promotionApi,remoteApiEnabled,sessionVault}from'@/api/runtime';import type{PublicPromotion,ReferralProgress}from'@/api/promotion-contracts';import{useApp}from'@/store/app';import{useAuth}from'@/store/auth';import{useT}from'@/i18n/use-t';import{useLocaleStore}from'@/store/locale';import{localized}from'@/lib/promotion-display';import RewardRows from'./reward-rows.vue';
 import { onHide,onShow } from '@/composables/use-tab-page-lifecycle';
+import { useDataVisibility } from '@/store/data-visibility';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
 import NxButton from '@/components/ui/nx-button.vue';
 import PromotionTerms from './promotion-terms.vue';
@@ -38,6 +39,7 @@ import { promotionMachineSlots } from '@/components/catalog-machine-image';
 import { getProduct } from '@/mock/products';
 import { productCatalogState,refreshProductCatalog,revalidateProductCatalog } from '@/store/product-catalog';
 const emit=defineEmits<{(e:'share'):void}>(),t=useT(),app=useApp(),auth=useAuth(),locale=useLocaleStore();const activities=ref<PublicPromotion[]>([]),progress=ref<Record<string,ReferralProgress>>({}),loading=ref(false),error=ref(false),hasMore=ref(false),listRead=ref(false);let cursor:string|null=null,generation=0,alive=true,visible=true;
+const visibility=useDataVisibility();
 const copy=computed(()=>teamRedesignCopy(locale.code)),expandedActivity=ref<string|null>(null);
 const termsActivity=ref<PublicPromotion|null>(null);
 const progressBusy=ref<Record<string,boolean>>({}),progressErrors=ref<Record<string,boolean>>({});

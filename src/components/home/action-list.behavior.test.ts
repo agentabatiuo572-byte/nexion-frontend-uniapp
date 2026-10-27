@@ -18,6 +18,7 @@ describe('home action priority', () => {
       remoteQuests: [{ questCode: 'one', layer: 'DAY_ONE', status: 'PENDING', eligible: true, eligibleFrom: new Date(now - 10000).toISOString(), eligibleUntil: new Date(now + 60000).toISOString() }], refreshRemote: vi.fn() };
     const modules: Record<string, unknown> = {
       '@/lib/passive-tab-read': createPassiveTabReadFixture(() => JSON.stringify([app.accountKey, app.accountBindingEpoch])),
+      '@/store/data-visibility': { useDataVisibility: () => ({ hidden: false, mask: String }) },
       vue: { ...vue, onMounted: vi.fn(), onUnmounted: vi.fn(), watch: vi.fn() },
       '@/composables/use-tab-page-lifecycle': { onShow: vi.fn(), onHide: vi.fn() }, '@/store/app': { useApp: () => app },
       '@/store/session': { useSession: () => ({ isCurrentDeviceCalibrated: () => true }) }, '@/store/quest': { useQuest: () => quest },

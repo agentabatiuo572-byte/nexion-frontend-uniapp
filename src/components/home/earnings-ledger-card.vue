@@ -22,7 +22,7 @@
         <view class="min-w-0">
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink)">{{ r.model }}<text style="color: var(--v5-ink-3)"> · {{ r.who }}</text></text>
         </view>
-        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ r.amt }}</text>
+        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ visibility.mask(r.amt) }}</text>
         <text data-home-ledger-time="true" class="font-mono-tabular text-right" style="grid-column: 1 / -1; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 18px; font-size: 12px; color: var(--v5-ink-4)">{{ r.t }}</text>
       </view>
       <view v-if="remoteApiEnabled && rows.length === 0" class="nx-inline-recovery px-2 py-3">
@@ -34,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDataVisibility } from "@/store/data-visibility";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
 import { computed } from "vue";
@@ -43,6 +44,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { formatHomeFeedTime } from "./home-live-feed";
 
+const visibility = useDataVisibility();
 const t = useT();
 const app = useApp();
 const locale = useLocaleStore();
