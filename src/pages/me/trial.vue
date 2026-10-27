@@ -42,12 +42,24 @@
           </view>
 
           <!-- Accrued credit + conversion CTA -->
-          <view :style="creditWrapStyle">
-            <view class="flex items-center justify-between">
-              <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.trial.offsetAccruedLabel }}</text>
-              <text class="font-mono-tabular" style="font-size: 15px; font-weight: 600; color: var(--v5-tech-cyan); white-space: nowrap">${{ formatAmount(trialOffset.offsetUSD) }}</text>
-            </view>
-            <text v-if="trialOffset.remainderUSD > 0" class="block" :style="remainderNoteStyle">{{ offsetRemainderNote }}</text>
+          <view :style="creditWrapStyle" data-testid="trial-credit-summary">
+            <!-- FEAT-TRIAL05: every amount below is the server quote convert() will settle. -->
+            <template v-if="earlyQuote">
+              <text class="trial-early-headline" data-testid="trial-early-headline">{{ earlyHeadline }}</text>
+              <view class="trial-early-row"><text>{{ earlyCopy.accruedLabel }}</text><text>${{ formatAmount(earlyQuote.accruedUSD) }} · {{ formatAmount(earlyQuote.accruedNEX) }} UVT</text></view>
+              <view class="trial-early-row"><text>{{ earlyCopy.earlyRewardLabel }}</text><text>+${{ formatAmount(earlyQuote.earlyRewardUSD) }} · +{{ formatAmount(earlyQuote.earlyRewardNEX) }} UVT</text></view>
+              <view class="trial-early-row"><text>{{ t.store.coRowTrialOffset }}</text><text>−${{ formatAmount(earlyQuote.offsetUSD) }}</text></view>
+              <view v-if="earlyQuote.earlyDiscountUSD > 0" class="trial-early-row"><text>{{ earlyCopy.earlyDiscountLabel }}</text><text>−${{ formatAmount(earlyQuote.earlyDiscountUSD) }}</text></view>
+              <view class="trial-early-row"><text>{{ earlyCopy.afterPurchaseLabel }}</text><text>{{ earlyRewardsText }}</text></view>
+              <text class="trial-early-note">{{ earlyCopy.earlyNote }}</text>
+            </template>
+            <template v-else>
+              <view class="flex items-center justify-between">
+                <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.trial.offsetAccruedLabel }}</text>
+                <text class="font-mono-tabular" style="font-size: 15px; font-weight: 600; color: var(--v5-tech-cyan); white-space: nowrap">${{ formatAmount(trialOffset.offsetUSD) }}</text>
+              </view>
+              <text v-if="trialOffset.remainderUSD > 0" class="block" :style="remainderNoteStyle">{{ offsetRemainderNote }}</text>
+            </template>
             <view
               class="w-full flex items-center justify-center"
               :class="trialProductUnavailable ? '' : 'active:scale-[0.98] active:opacity-85'"
@@ -162,7 +174,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
-import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CountdownHero from "@/components/me/trial-countdown-hero.vue";
@@ -177,6 +189,8 @@ import { getProduct } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useTrialEarlyPurchaseCopy } from "@/i18n/trial-early-purchase";
 
 const t = useT();
 const freeTrial = useFreeTrial();
@@ -215,6 +229,23 @@ const shadowUSD = computed(() => liveShadowUSD(now.value));
 const shadowNEX = computed(() => liveShadowNEX(now.value));
 const remainingMsValue = computed(() => remainingMs(now.value));
 const trialOffset = computed(() => computeTrialOffset(cfg.value, shadowUSD.value));
+// FEAT-TRIAL05: shown only while the server says the original term is still running.
+// Once its end passes, the quote is stale: hide it and re-read rather than show a lapsed offer.
+const earlyCopy = useTrialEarlyPurchaseCopy();
+const earlyQuoteLapsed = computed(() => {
+  const quote = freeTrial.authoritativeQuote;
+  return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && now.value >= quote.earlyEndsAt;
+});
+const earlyQuote = computed(() => remoteApiEnabled && status.value === "active" && freeTrial.authoritativeQuote?.earlyPurchase
+  && !earlyQuoteLapsed.value ? freeTrial.authoritativeQuote : null);
+watch(earlyQuoteLapsed, (lapsed) => { if (lapsed) void freeTrial.refreshRemote(true); });
+const earlyHeadline = computed(() => fmt(earlyCopy.value.earlyHeadline, { discount: formatAmount(earlyQuote.value?.earlyDiscountUSD ?? 0) }));
+const earlyRewardsText = computed(() => {
+  const quote = earlyQuote.value;
+  if (!quote) return "";
+  const nex = `${formatAmount(quote.rewardNEX)} UVT`;
+  return quote.remainderUSD > 0 ? `${formatAmount(quote.remainderUSD)} USDT · ${nex}` : nex;
+});
 
 const w = computed(() => t.value.trial);
 const idleBody = computed(() => freeTrial.authorityStatus === "mock" || freeTrial.authorityServerState !== null
@@ -236,6 +267,7 @@ const trialBuyCtaText = computed(() => {
     return productCatalogState.status === "error" ? t.value.store.catalogErrorTitle : t.value.store.catalogLoadingTitle;
   }
   if (trialProductUnavailable.value) return t.value.store.temporarilyOutOfStock;
+  if (earlyQuote.value) return fmt(earlyCopy.value.earlyBuyCta, { amount: formatAmount(earlyQuote.value.amountUSD) });
   return status.value === "ended" ? w.value.buyCtaPlain : buyCtaText.value;
 });
 // none-state eligibility (异常2 — concrete reason, never a generic error).
@@ -267,6 +299,10 @@ const rulesLines = computed(() => [
   fmt(w.value.rulesBefore, { cap: formatAmount(cfg.value.trialOffsetCapUSD) }),
   w.value.rulesNoCash,
   w.value.rulesAfter,
+  ...(earlyQuote.value ? [
+    fmt(earlyCopy.value.rulesEarly, { discount: formatAmount(earlyQuote.value.earlyDiscountConfiguredUSD) }),
+    earlyCopy.value.rulesRefund,
+  ] : []),
   w.value.rulesExpiry,
 ]);
 
@@ -329,6 +365,10 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 </script>
 
 <style scoped>
+.trial-early-headline { display:block;font-size:14px;font-weight:600;line-height:1.5;color:var(--v5-brand);text-wrap:pretty; }
+.trial-early-row { display:flex;justify-content:space-between;gap:12px;margin-top:10px;color:var(--v5-ink-3);font-size:12px;line-height:1.5; }
+.trial-early-row > text:last-child { flex-shrink:0;font-variant-numeric:tabular-nums; }
+.trial-early-note { display:block;margin-top:12px;font-size:12px;line-height:1.6;color:var(--v5-ink-2); }
 .trs-root {
   position: fixed;
   inset: 0;
