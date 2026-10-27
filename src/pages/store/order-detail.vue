@@ -21,7 +21,7 @@
       <view v-if="remoteOrderError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.orders.refreshFailed }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrderRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrder">
+          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" :aria-disabled="remoteOrderRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrder">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
@@ -746,7 +746,6 @@ const remoteErrorStyle: CSSProperties = {
   padding: "10px 12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };
-const retryBtnStyle: CSSProperties = { minHeight: "44px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", font: "600 13px/20px var(--font-v5)" };
 
 
 </script>

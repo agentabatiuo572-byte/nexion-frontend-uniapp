@@ -18,7 +18,7 @@
       <view v-if="remoteApiEnabled && (remoteRefreshError || faucet.remoteReadState === 'error')" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.authOtp.errorServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily"  @keydown.enter.prevent="refreshDaily" @keydown.space.prevent="refreshDaily">
+          <view class="nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline active:opacity-70" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily"  @keydown.enter.prevent="refreshDaily" @keydown.space.prevent="refreshDaily">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
@@ -156,7 +156,7 @@
         <text v-if="remoteApiEnabled" class="block" :style="statSubStyle">{{ t.daily.ledgerScope }}</text>
         <view v-if="remoteApiEnabled && app.remoteFleetStatus === 'error'" role="status">
           <text class="block" :style="statSubStyle">{{ app.remoteFleetHasSnapshot ? t.wallet.fundsStaleBody : t.wallet.fundsUnavailableBody }}</text>
-          <view class="inline-flex active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshBalance(false)"  @keydown.enter.prevent="refreshBalance(false)" @keydown.space.prevent="refreshBalance(false)">
+          <view class="nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-70" role="button" tabindex="0" @click="refreshBalance(false)"  @keydown.enter.prevent="refreshBalance(false)" @keydown.space.prevent="refreshBalance(false)">
             <text>{{ t.wallet.retryFunds }}</text>
           </view>
         </view>
@@ -181,7 +181,7 @@
           <view :style="historyCardStyle">
             <view v-if="remoteApiEnabled && bills.summaryStatus !== 'ready'" class="p-4">
               <text>{{ bills.summaryStatus === 'error' ? t.home.quickFactsFailed : t.home.quickFactsLoading }}</text>
-              <view v-if="bills.summaryStatus === 'error'" class="inline-flex active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshLedger()"  @keydown.enter.prevent="refreshLedger()" @keydown.space.prevent="refreshLedger()">
+              <view v-if="bills.summaryStatus === 'error'" class="nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-70" role="button" tabindex="0" @click="refreshLedger()"  @keydown.enter.prevent="refreshLedger()" @keydown.space.prevent="refreshLedger()">
                 <text>{{ t.store.catalogRetry }}</text>
               </view>
             </view>
@@ -958,14 +958,6 @@ const remoteErrorStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "10px 12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-};
-const retryBtnStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 10px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-ink)",
-  fontSize: "12px",
 };
 
 

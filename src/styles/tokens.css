@@ -652,6 +652,17 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
+/* Mobile page and sheet scrollports keep native scrolling without desktop
+   scrollbar tracks. The prototype's outer controls are a separate document. */
+:where(html, body, .nx-chassis, .nx-chassis *, .nx-standalone-page, .nx-standalone-page *, .nx-glass-sheet, .nx-glass-sheet *) {
+  scrollbar-width: none;
+}
+:where(html, body, .nx-chassis, .nx-chassis *, .nx-standalone-page, .nx-standalone-page *, .nx-glass-sheet, .nx-glass-sheet *)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 @keyframes scan {
   0% { background-position: -100% 0; }
   100% { background-position: 200% 0; }
@@ -1075,4 +1086,87 @@ uni-input {
 }
 @media (max-width: 350px) {
   .nx-header__r, .message-nav, .cp-head { --ui-header-glass-inset: 3px; --ui-header-icon-size: 18px; }
+}
+
+/* Card read recovery: a 32px surface inside an unchanged 44px hit target.
+   The combined selector also wins over the later inline-recovery stylesheet. */
+.nx-card-recovery-action,
+.nx-inline-recovery__action.nx-card-recovery-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  flex-shrink: 0;
+  margin: 8px 0 0 auto;
+  align-self: flex-end;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9999px;
+  background: none;
+  color: var(--v5-on-brand);
+  font: 600 13px/20px var(--font-v5);
+  white-space: nowrap;
+  text-align: center;
+  cursor: pointer;
+}
+.nx-card-recovery-action::before {
+  content: "";
+  position: absolute;
+  inset: 6px 0;
+  z-index: -1;
+  box-sizing: border-box;
+  border-radius: inherit;
+  background: var(--v5-brand);
+  pointer-events: none;
+}
+.nx-card-recovery-action.nx-card-recovery-action--quiet {
+  color: var(--v5-ink);
+}
+.nx-card-recovery-action--quiet::before {
+  background: var(--v5-surface-2);
+  border: 1px solid var(--v5-border);
+}
+.nx-card-recovery-action.nx-card-recovery-action--inline {
+  margin: 0 0 0 auto;
+  align-self: flex-end;
+}
+/* Retain the reward controls' existing glass, edge, arrow and focus treatment. */
+.nx-card-recovery-action.nx-card-recovery-action--glass {
+  gap: 9px;
+  color: #f7f8fa;
+}
+.nx-card-recovery-action--glass::before {
+  background: var(--reward-glass);
+  border: 1px solid var(--reward-edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.nx-card-recovery-action--glass::after {
+  content: "→";
+  flex-shrink: 0;
+  font-size: 19px;
+  font-weight: 400;
+}
+.nx-card-recovery-action--glass:focus-visible {
+  outline: 2px solid var(--reward-accent);
+  outline-offset: 3px;
+}
+.nx-card-recovery-action--glass[aria-disabled="true"] {
+  opacity: .5;
+  cursor: default;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .nx-card-recovery-action--glass::before {
+    background: #27292d;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }

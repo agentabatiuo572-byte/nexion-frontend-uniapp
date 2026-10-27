@@ -56,7 +56,7 @@
       <view class="nx-glass-card" v-else-if="catalogStatus === 'error' && !catalogHasProducts" data-testid="store-catalog-error" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
-        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog">
+        <view class="nx-card-recovery-action active:opacity-70" role="button" tabindex="0" @click="retryCatalog">
           <text>{{ t.store.catalogRetry }}</text>
         </view>
       </view>
@@ -384,16 +384,6 @@ const catalogStateBodyStyle: CSSProperties = {
   fontSize: "13px",
   lineHeight: "19px",
   color: "var(--v5-ink-3)",
-};
-const catalogRetryStyle: CSSProperties = {
-  minHeight: "44px",
-  alignItems: "center",
-  padding: "0 14px",
-  borderRadius: "9999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontSize: "13px",
-  fontWeight: 600,
 };
 
 // Goal-recommendation context card — same filled/no-border L1 idiom as the

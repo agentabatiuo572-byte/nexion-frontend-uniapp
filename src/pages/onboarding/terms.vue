@@ -58,7 +58,7 @@
       <!-- Numbered sections -->
       <view v-if="loadError" class="tos-fail" role="alert">
         <text class="tos-fail__message">{{ loadError }}</text>
-        <view class="tos-fail__retry active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
+        <view class="tos-fail__retry nx-card-recovery-action active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
           <text :class="{ 'tos-fail__retry-label': !loadingTerms }">{{ loadingTerms ? "…" : t.ui.retry }}</text>
         </view>
       </view>
@@ -395,17 +395,6 @@ function confirmTerms(event?: Event) {
   display: block;
   line-height: 1.55;
 }
-.tos-fail__retry {
-  width: fit-content;
-  margin-top: 12px;
-  padding: 8px 14px;
-  border-radius: 9999px;
-  color: var(--v5-on-brand);
-  background: var(--v5-brand);
-  font-size: 13px;
-  font-weight: 600;
-}
-.tos-fail__retry-label { font: 600 13px/20px var(--font-v5); }
 .tos-block {
   padding: 14px 0;
 }

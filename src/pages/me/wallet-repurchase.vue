@@ -57,7 +57,7 @@
         <template v-else>
         <view v-if="repurchase.historyLoading || repurchase.historyError" :style="cardStyle" role="status" aria-live="polite">
           <text>{{ repurchase.historyLoading ? w.historySyncing : w.historySyncFailed }}</text>
-          <view v-if="!repurchase.historyLoading" role="button" tabindex="0" :style="retryCtaStyle" @click="repurchase.refreshHistory()"  @keydown.enter.prevent="repurchase.refreshHistory()" @keydown.space.prevent="repurchase.refreshHistory()">
+          <view v-if="!repurchase.historyLoading" role="button" tabindex="0" class="nx-card-recovery-action nx-card-recovery-action--quiet" @click="repurchase.refreshHistory()"  @keydown.enter.prevent="repurchase.refreshHistory()" @keydown.space.prevent="repurchase.refreshHistory()">
             <text>{{ retryLabel }}</text>
           </view>
         </view>

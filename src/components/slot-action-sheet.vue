@@ -16,7 +16,7 @@
   <view v-if="sheet.open" class="sas-root" role="dialog" aria-modal="true" :aria-label="t.slotSheet.title">
     <view class="sas-backdrop" @click="hide" />
 
-    <view class="sas-panel" @click.stop>
+    <view class="sas-panel nx-glass-sheet" @click.stop>
       <!-- header -->
       <view class="sas-head">
         <view class="sas-head-meta">
@@ -228,8 +228,7 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   box-sizing: border-box;
   max-height: calc(100% - var(--nx-overlay-top));
   overflow-y: auto;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
+  border-radius: 16px 16px 0 0;
   background: var(--nx-glass-fill);
   border-top: 1px solid var(--v5-border);
   padding: 18px 16px;

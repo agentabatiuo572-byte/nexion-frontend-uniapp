@@ -19,7 +19,7 @@
       <view v-if="orderPanels.showSourceOutage" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view v-for="source in unavailableOrderSources" :key="source.label" class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ source.label }} · {{ source.message }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
+          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
@@ -335,14 +335,6 @@ const remoteErrorStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "10px 12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-};
-const retryBtnStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 10px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-ink)",
-  font: "600 13px/20px var(--font-v5)",
 };
 const loadMoreBtnStyle: CSSProperties = {
   minHeight: "44px",

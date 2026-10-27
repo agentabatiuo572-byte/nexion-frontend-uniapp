@@ -112,8 +112,8 @@
         <view v-if="bankHistoryStatus === 'idle' || bankHistoryStatus === 'loading'" class="nx-dep-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
         <view v-else-if="bankHistoryStatus === 'error'" style="margin-top: 8px">
           <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
-          <view class="nx-dep-history-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshBankHistory">
-            <text style="font: 600 13px/20px var(--font-v5); color: var(--v5-ink)">{{ t.ui.retry }}</text>
+          <view class="nx-dep-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refreshBankHistory">
+            <text>{{ t.ui.retry }}</text>
           </view>
         </view>
 
