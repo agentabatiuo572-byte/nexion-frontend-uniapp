@@ -109,7 +109,6 @@
         <EarnWayCard v-if="stakingVisible" eyebrow="UVT" :title="remainderCopy.stakingTitle" :body="remainderCopy.earnWays.stakingBody"
           image="/static/img/earn-20261027/staking.webp" :action="remainderCopy.stakingAction" @click="goStaking" />
         <ComputeShareEntry context="earn" />
-        <TrialGhostSlot />
       </NxSection>
       <MarketBoard />
       <TaskCenter />
@@ -134,7 +133,7 @@ import { useRemainderUiCopy } from "@/i18n/remainder-ui";
 import { useConfig } from "@/store/config";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { navTo } from "@/lib/route";
-import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
+import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 
@@ -252,14 +251,15 @@ function toggleDevice(id: string) {
 
 // Earn shows ACTIVE fleet only (inventory lives in /me/devices).
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
+const trialPresentation = useTrialPresentation();
 // A background refresh remains authoritative only for fresh mutations. For
 // read-only presentation, keep the bound account's last confirmed fleet visible
 // until the next response resolves; a first read and every error stay unknown.
 const fleetReady = computed(() => !remoteApiEnabled
   || app.remoteFleetStatus === "ready"
   || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
-const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
-  n: devices.value.filter(isActiveSlotDevice).length,
+const fleetCountText = computed(() => fleetReady.value && trialPresentation.reservedSlots.value !== null ? fmt(t.value.home.fleetOfMax, {
+  n: app.activeSlotCount + (trialPresentation.reservedSlots.value ?? 0),
   max: app.slotCap,
 }) : "— / —");
 
