@@ -20,7 +20,7 @@
         <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.displayName[0] }}</text></view>
         <view class="rg-sponsor__body">
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.displayName }}</text> {{ t.ref.invitedYou }}</text>
-          <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} NEX</text>
+          <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} UVT</text>
         </view>
         <text class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
       </view>
@@ -232,7 +232,7 @@ const giftNex = computed(() => remoteApiEnabled
   : localGift.value.nexAmount);
 const giftLabel = computed(() => [
   giftUsdt.value > 0 ? `${formatAmount(giftUsdt.value)} USDT` : "",
-  giftNex.value > 0 ? `${formatAmount(giftNex.value)} NEX` : "",
+  giftNex.value > 0 ? `${formatAmount(giftNex.value)} UVT` : "",
 ].filter(Boolean).join(" + "));
 
 type Step = 1 | 2 | 3;
@@ -906,7 +906,7 @@ async function finish() {
         if (!usdtBill || !nexBill) throw new Error("gift_bill_unavailable");
         if (posted && giftPosted) {
           toast.success(
-            `+$${formatAmount(gift.usdt)} + ${formatAmount(gift.nex)} NEX`,
+            `+$${formatAmount(gift.usdt)} + ${formatAmount(gift.nex)} UVT`,
             sponsorPreview.value
               ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: sponsorPreview.value.displayName })
               : t.value.register.giftCreditedToastSub,
