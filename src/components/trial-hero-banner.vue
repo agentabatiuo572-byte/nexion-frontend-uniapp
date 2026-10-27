@@ -1,8 +1,8 @@
 <!-- Trial eligibility and claim flow remain owned by the existing trial stores. -->
 <template>
   <view v-if="visible" class="nx-trial-hero" :class="{ 'nx-trial-hero--embedded': embedded, 'nx-trial-hero--long-copy': embedded && locale.code !== 'zh', 'nx-trial-hero--lifecycle': hasLifecycle || capacityFull, 'nx-trial-hero--card-entry': cardEntry }" :data-trial-state="status" :role="cardEntry ? 'button' : undefined" :tabindex="cardEntry ? 0 : undefined" :aria-label="cardEntry ? `${badgeText} · ${trialView.deviceName.value ?? t.trial.heroDeviceName} · ${ctaText}` : undefined" :aria-busy="trial.authorityStatus === 'loading'" @click="onClick" @keydown.enter.self.prevent="cardEntry && onClick()" @keydown.space.self.prevent="cardEntry && onClick()">
-    <view class="trial-aura" aria-hidden="true" />
-    <view class="trial-art" aria-hidden="true"><view class="nx-home-art" /></view>
+    <view v-if="!embedded" class="trial-aura" aria-hidden="true" />
+    <view class="trial-art" aria-hidden="true"><view v-if="embedded" class="trial-floor" /><view class="nx-home-art" /></view>
     <view class="trial-meta">
       <view v-if="cardEntry && (status === 'active' || status === 'grace')" class="trial-status-row"><text class="trial-badge" :aria-label="badgeText">{{ status === 'active' ? lifecycleCopy.cardActiveTitle : lifecycleCopy.cardGraceTitle }}</text><text class="trial-header-countdown" :aria-label="`${status === 'grace' ? lifecycleCopy.creditUntilLabel : lifecycleCopy.remainingLabel} ${remainingText}`">{{ cardRemainingText }}</text></view>
       <text v-else class="trial-badge">{{ badgeText }}</text>
@@ -13,12 +13,12 @@
       </template>
       <text v-else-if="status === 'ended' || status === 'converted'" class="trial-lifecycle-body">{{ status === 'ended' ? lifecycleCopy.endedBody : lifecycleCopy.convertedBody }}</text>
       <template v-else>
-        <view v-if="embedded" class="trial-reassurance"><text>{{ t.trial.homeFreeTrial }}</text><text>{{ t.trial.homeNoPayment }}</text></view>
-        <template v-else><text class="trial-tagline">{{ taglineText }}</text><view class="trial-estimate"><text class="trial-estimate-label">{{ earnLabelText }}</text><text class="trial-value font-mono-tabular">{{ estimateText }}</text></view><text class="trial-estimate-label">{{ creditBasisText }}</text></template>
+        <view v-if="embedded && !capacityFull" class="trial-reassurance"><text>{{ t.trial.homeNoPayment }}</text></view>
+        <template v-else-if="!embedded"><text class="trial-tagline">{{ taglineText }}</text><view class="trial-estimate"><text class="trial-estimate-label">{{ earnLabelText }}</text><text class="trial-value font-mono-tabular">{{ estimateText }}</text></view><text class="trial-estimate-label">{{ creditBasisText }}</text></template>
       </template>
-      <text v-if="capacityFull && !hasLifecycle" class="trial-lifecycle-body">{{ lifecycleCopy.capacityFull }}</text>
+      <text v-if="capacityFull && !hasLifecycle" class="trial-lifecycle-body">{{ embedded ? lifecycleCopy.cardCapacityFull : lifecycleCopy.capacityFull }}</text>
     </view>
-    <view v-if="!cardEntry" class="trial-cta nx-design-glass" role="button" :tabindex="canOpen ? 0 : -1" :aria-disabled="canOpen ? 'false' : 'true'" :aria-label="ctaText" @click.stop="onClick"><LiquidGlass :radius="999" tone="control" /><text>{{ ctaText }}</text></view>
+    <view v-if="!cardEntry" class="trial-cta" role="button" :tabindex="canOpen ? 0 : -1" :aria-disabled="canOpen ? 'false' : 'true'" :aria-label="ctaText" @click.stop="onClick"><view class="trial-cta__surface nx-design-glass"><LiquidGlass :radius="999" tone="control" /><text>{{ embedded && capacityFull ? lifecycleCopy.cardManage : embedded && canClaim ? t.trial.homeClaimShort : ctaText }}</text></view></view>
       <view v-if="trial.authorityStatus === 'error'" role="button" tabindex="0" :aria-label="t.trial.entryRetry"
         class="trial-retry" @click.stop="retryEligibility">
         <text>{{ t.trial.entryRetry }}</text>
@@ -144,91 +144,51 @@ function retryEligibility() {
 .trial-estimate { margin-top: 12px; }
 .trial-estimate-label { display: block; font-size: 12px; line-height: 1.4; color: var(--v5-ink-2); }
 .trial-value { display: block; margin-top: 3px; font: 600 26px/1.15 var(--font-v5); }
-.trial-cta { position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; max-width: 100%; gap: 8px; margin-top: 12px; padding: 0 16px; border-radius: 999px; font: 600 14px/1.4 var(--font-v5); }
-.trial-cta > text, .trial-cta > svg { position: relative; z-index: 1; }
-.trial-cta.nx-design-glass :deep(.nx-liquid-tint) { box-shadow: inset 0 1px 0 rgba(var(--ui-glass-rgb),.42), inset 0 -1px 1px rgba(var(--ui-glass-rgb),.08), inset 0 0 14px rgba(var(--ui-glass-rgb),.05); }
-.trial-cta text { white-space: normal; overflow-wrap: anywhere; }
-.trial-cta svg { flex: none; }
+/* The touch target stays 44px; the glass surface can be visually compact. */
+.trial-cta { position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;margin-top:12px;border-radius:999px;font:600 14px/1.4 var(--font-v5); }
+.trial-cta__surface { position:relative;isolation:isolate;display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;max-width:100%;padding:0 16px;border-radius:inherit; }
+.trial-cta__surface > text { position:relative;z-index:1;white-space:normal;overflow-wrap:anywhere; }
+.trial-cta__surface :deep(.nx-liquid-tint) { box-shadow:inset 0 1px 0 rgba(var(--ui-glass-rgb),.42),inset 0 -1px 1px rgba(var(--ui-glass-rgb),.08); }
 .trial-retry { position:relative;z-index:1;padding:8px 14px;font:600 13px/20px var(--font-v5);color:var(--v5-warning); }
 .trial-art { position: absolute; width: 43%; aspect-ratio: 1; right: 0; top: 50%; margin-top: -21.5%; pointer-events: none; }
 .trial-art .nx-home-art { width: 100%; height: 100%; background-image: url('/static/img/home-glass-20260928/s1.webp'); }
 .trial-aura { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(ellipse at 83% 54%, color-mix(in srgb, var(--v5-brand) 12%, transparent), transparent 65%); }
-.nx-trial-hero--embedded { min-height:0;height:184px;min-width:0;padding:0;border:1px solid var(--v5-border);background:radial-gradient(70% 45% at 70% 92%,color-mix(in srgb,var(--v5-brand) 22%,transparent),transparent 70%),linear-gradient(180deg,var(--ui-trial-top),var(--ui-ticket-bottom)); }
-.nx-trial-hero--embedded .trial-art { position:absolute;right:-6px;bottom:8px;top:auto;width:118px;height:118px;margin:0; }
-.nx-trial-hero--embedded .trial-art .nx-home-art { width:118px;height:118px;margin:0; animation:trial-home-float 4.2s ease-in-out infinite; }
+/* Each benefit has one copy zone and one full-size device zone. */
+.nx-trial-hero--embedded { display:flex;flex-direction:column;box-sizing:border-box;height:100%;min-height:200px;min-width:0;padding:0;border:1px solid var(--v5-border);background:linear-gradient(180deg,var(--ui-trial-top),var(--ui-ticket-bottom)); }
+.nx-trial-hero--embedded .trial-meta { position:relative;order:0;z-index:1;flex:none;width:auto;padding:12px 12px 0; }
+.nx-trial-hero--embedded .trial-badge { display:block;padding:0;background:none;border-radius:0;color:var(--ui-lime-soft);font:500 12px/18px var(--font-v5); }
+.nx-trial-hero--embedded .trial-title { font:600 16px/20px var(--font-v5);margin-top:6px;letter-spacing:0; }
+.trial-reassurance { margin-top:4px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3); }
+.nx-trial-hero--embedded .trial-art { position:relative;order:1;align-self:center;flex:none;top:auto;right:auto;bottom:auto;width:118px;height:118px;margin:2px 0 6px; }
+.nx-trial-hero--embedded:not(.nx-trial-hero--card-entry) .trial-art { align-self:flex-start;margin:2px 0 14px 2px; }
+.nx-trial-hero--embedded .trial-art .nx-home-art { position:relative;z-index:1;width:118px;height:118px;animation:trial-home-float 4.2s ease-in-out infinite; }
+.trial-floor { position:absolute;left:10%;bottom:4px;width:80%;height:18px;border-radius:50%;background:radial-gradient(ellipse,color-mix(in srgb,var(--v5-brand) 48%,transparent),transparent 70%);filter:blur(2px);animation:trial-floor-float 4.2s ease-in-out infinite; }
 @keyframes trial-home-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
-.nx-trial-hero--embedded .trial-aura {inset:auto;right:6px;bottom:18px;width:110px;height:22px;background:radial-gradient(closest-side,rgba(158,220,29,.42),transparent);filter:blur(2px);}
-.nx-trial-hero--embedded .trial-meta { position:relative;width:auto;padding:14px 14px 0; }
-.nx-trial-hero--embedded .trial-badge { display:block;padding:0;background:none;border-radius:0;color:var(--ui-lime-soft);font:500 12.5px/20px var(--font-v5); }
-.nx-trial-hero--embedded .trial-title { font:600 18px/22px var(--font-v5);margin-top:8px;letter-spacing:0; }
-.trial-reassurance { display:flex;flex-direction:column;max-width:110px;margin-top:6px;font:400 13px/18px var(--font-v5);color:var(--v5-ink-3); }
-.nx-trial-hero--embedded .trial-cta { position:absolute;left:14px;bottom:14px;min-height:44px;margin:0;padding:0 14px;font:600 13px/1.3 var(--font-v5); }
-.nx-trial-hero--long-copy { display:flex;flex-direction:column;box-sizing:border-box;height:auto;min-height:200px; }
-.nx-trial-hero--long-copy .trial-meta { order:1; }
-.nx-trial-hero--long-copy .trial-reassurance { max-width:none; }
-.nx-trial-hero--long-copy .trial-art { position:relative;order:2;align-self:flex-end;right:-6px;bottom:auto;flex:none;width:102px;height:102px;margin:0 0 8px; }
-.nx-trial-hero--long-copy .trial-art .nx-home-art { width:102px;height:102px; }
-.nx-trial-hero--long-copy:not(.nx-trial-hero--lifecycle) .trial-cta { position:relative;order:3;align-self:flex-start;left:auto;bottom:auto;max-width:calc(100% - 28px);box-sizing:border-box;margin:0 14px 14px; }
-.nx-trial-hero--lifecycle { display:flex;flex-direction:column;min-height:216px; }
+@keyframes trial-floor-float { 0%,100% { transform:scaleX(1);opacity:1; } 50% { transform:scaleX(.9);opacity:.7; } }
+.nx-trial-hero--embedded .trial-cta { position:absolute;right:10px;bottom:4px;z-index:2;min-height:44px;max-width:calc(100% - 20px);margin:0;font:600 12px/16px var(--font-v5); }
+.nx-trial-hero--embedded .trial-cta__surface { min-height:32px;padding:8px 12px; }
+.nx-trial-hero--embedded .trial-cta[aria-disabled="true"] { opacity:.5; }
 .trial-lifecycle-time { display:flex;flex-direction:column;gap:4px;margin-top:14px;font:400 11px/1.5 var(--font-v5);color:var(--v5-ink-3); }
 .trial-countdown { font:600 21px/1.3 var(--font-v5);color:var(--v5-ink);letter-spacing:.02em; }
-.trial-lifecycle-credit { display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin-top:10px;font:400 11px/1.5 var(--font-v5);color:var(--v5-ink-3); }
-.trial-lifecycle-credit > text:last-child { color:var(--v5-brand);font-weight:600;font-size:14px; }
-.trial-lifecycle-body { display:block;margin-top:16px;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }
-.nx-trial-hero--embedded.nx-trial-hero--lifecycle { height:auto;min-height:226px; }
-.nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-meta { flex:1;z-index:1;width:auto;order:0; }
-.nx-trial-hero--lifecycle .trial-badge { line-height:1.5; }
-.nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-title { font-size:16px;line-height:1.35;margin-top:9px;padding-right:24px; }
-.nx-trial-hero--lifecycle .trial-art { position:absolute;right:-8px;bottom:auto;top:40px;width:72px;height:72px;opacity:.4;margin:0; }
-.nx-trial-hero--lifecycle .trial-art .nx-home-art { width:72px;height:72px; }
-.nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-cta { position:relative;align-self:flex-start;left:auto;bottom:auto;max-width:calc(100% - 28px);box-sizing:border-box;margin:14px;min-height:44px;padding:7px 12px;order:1; }
-.nx-trial-hero--lifecycle .trial-retry { order:2; }
-@media(max-width:350px) {
-  .nx-trial-hero--embedded { display:flex;flex-direction:column;box-sizing:border-box;height:auto;min-height:200px; }
-  .nx-trial-hero--embedded .trial-meta { order:1;padding-inline:12px; }
-  .nx-trial-hero--embedded .trial-title { font-size:16px; }
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-art { position:relative;order:2;align-self:flex-end;right:-6px;bottom:auto;flex:none;width:92px;height:92px;margin:0 0 8px; }
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-art .nx-home-art {width:92px;height:92px;}
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-cta { position:relative;order:3;align-self:flex-start;left:auto;bottom:auto;max-width:calc(100% - 28px);box-sizing:border-box;margin:0 14px 14px; }
-}
-@media (prefers-reduced-motion: reduce) { .nx-trial-hero { transition: none; } .nx-trial-hero--embedded .trial-art .nx-home-art { animation:none; } }
-@media (max-width: 350px) {
-  .nx-trial-hero:not(.nx-trial-hero--embedded) { padding: 18px; }
-  .nx-trial-hero:not(.nx-trial-hero--embedded) .trial-meta { width: 62%; }
-  .nx-trial-hero:not(.nx-trial-hero--embedded) .trial-art { width: 39%; margin-top: -19.5%; }
-  .trial-cta { padding-inline: 14px; }
-}
-/* After claiming, the complete card is the action; the device sits on the floor glow. */
-.nx-trial-hero--embedded.nx-trial-hero--card-entry { box-sizing:border-box;min-height:200px;padding-bottom:6px;cursor:pointer; }
-.nx-trial-hero--embedded.nx-trial-hero--card-entry .trial-meta { flex:0; }
-.nx-trial-hero--embedded.nx-trial-hero--card-entry .trial-title { padding-right:0;margin-top:6px; }
+.trial-lifecycle-credit { display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px;margin-top:6px;font:400 11px/16px var(--font-v5);color:var(--v5-ink-3); }
+.trial-lifecycle-credit > text:last-child { color:var(--v5-brand);font-weight:600;font-size:14px;white-space:nowrap; }
+.trial-lifecycle-body { display:block;margin-top:6px;font:400 12px/18px var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }
+.nx-trial-hero--card-entry { cursor:pointer; }
 .trial-status-row { display:flex;align-items:baseline;justify-content:space-between;gap:4px; }
 .trial-status-row .trial-badge { white-space:nowrap; }
 .trial-header-countdown { font:400 11px/18px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink-3); }
-.nx-trial-hero--card-entry .trial-lifecycle-credit { margin-top:6px; }
-.nx-trial-hero--card-entry .trial-art { position:relative;order:1;align-self:center;top:auto;right:auto;bottom:auto;width:108px;height:108px;opacity:1;margin:2px 0 0;flex:none; }
-.nx-trial-hero--card-entry .trial-art .nx-home-art { width:108px;height:108px; }
-.nx-trial-hero--card-entry .trial-aura { right:calc(50% - 55px);bottom:14px; }
-/* Preserve the approved offer card; only narrow lifecycle copy needs smaller type. */
-@media (max-width:374px) {
-  .nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-meta { padding:12px 12px 0; }
-  .nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-badge { font-size:11.5px;line-height:16px; }
-  .nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-title { font-size:13px;line-height:18px;margin-top:6px;padding-right:14px; }
-  .nx-trial-hero--lifecycle .trial-lifecycle-credit { margin-top:8px;gap:2px 6px;font-size:11px;line-height:16px; }
-  .nx-trial-hero--lifecycle .trial-lifecycle-credit > text:last-child { font-size:13px;white-space:nowrap; }
-  .nx-trial-hero--lifecycle .trial-lifecycle-body { margin-top:10px;font-size:12px;line-height:18px; }
-  .nx-trial-hero--embedded.nx-trial-hero--card-entry .trial-title { padding-right:0; }
-  .trial-status-row .trial-badge { font-size:11px; }
-  .trial-header-countdown { font-size:10.5px;line-height:16px; }
-  .nx-trial-hero--card-entry .trial-art { width:96px;height:96px;margin-top:4px; }
-  .nx-trial-hero--card-entry .trial-art .nx-home-art { width:96px;height:96px; }
+@media(max-width:350px) {
+  .nx-trial-hero--embedded .trial-meta { padding:10px 10px 0; }
+  .nx-trial-hero--embedded .trial-badge { font-size:11px;line-height:16px; }
+  .nx-trial-hero--embedded .trial-title { font-size:14px;line-height:18px;margin-top:5px; }
+  .nx-trial-hero--embedded .trial-reassurance { font-size:11px;line-height:16px; }
+  .trial-header-countdown { font-size:10px;line-height:16px; }
+  .nx-trial-hero:not(.nx-trial-hero--embedded) { padding:18px; }
+  .nx-trial-hero:not(.nx-trial-hero--embedded) .trial-meta { width:62%; }
+  .nx-trial-hero:not(.nx-trial-hero--embedded) .trial-art { width:39%;margin-top:-19.5%; }
 }
-@media (max-width:350px) {
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-meta { padding:12px 12px 0; }
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-badge { font-size:11.5px;line-height:16px; }
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-title { font-size:13px;line-height:18px;margin-top:6px; }
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-reassurance { font-size:11px;line-height:16px; }
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-art { margin-bottom:0; }
-  .nx-trial-hero--embedded:not(.nx-trial-hero--lifecycle) .trial-cta { margin:0 12px 10px;max-width:calc(100% - 24px);padding:0 10px;font:600 12px/16px var(--font-v5); }
+@media(prefers-reduced-motion:reduce) {
+  .nx-trial-hero { transition:none; }
+  .nx-trial-hero--embedded .trial-art .nx-home-art,.trial-floor { animation:none; }
 }
 </style>
