@@ -3,7 +3,7 @@
   <view class="earn-fleet-list mx-4">
     <view class="nx-home-glass-panel" aria-hidden="true" />
     <view class="earn-fleet-content">
-      <TrialDeviceRow />
+      <TrialDeviceRow variant="earn" :expanded="trialExpanded" @toggle="emit('toggleTrial')" />
       <slot />
       <view class="earn-add-wrap">
         <view class="earn-add-device nx-home-pill" role="button" tabindex="0"
@@ -28,6 +28,8 @@ import { useT } from "@/i18n/use-t";
 
 const app = useApp();
 const t = useT();
+defineProps<{ trialExpanded?: boolean }>();
+const emit = defineEmits<{ (event: "toggleTrial"): void }>();
 
 const activeDevices = computed(() => app.visibleDevices.filter(isActiveSlotDevice));
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));

@@ -1936,6 +1936,7 @@ catalog: {
     inventorySlotMeter: "{active}/{max} 个槽位已激活",
     inventorySlotsLabel: "算力槽位",
     inventorySectionActive: "已激活",
+    inventorySectionDevices: "设备列表",
     inventorySectionInventory: "待激活",
     inventorySectionActivationUnconfirmed: "状态待确认",
     inventoryActivationUnconfirmed: "设备激活记录待确认，暂不能激活；请刷新后重试或联系支持。",
