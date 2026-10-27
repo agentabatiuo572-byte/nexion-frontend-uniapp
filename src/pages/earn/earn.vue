@@ -100,14 +100,14 @@
       <NxSection class="mx-4 earn-more-ways" :title="auditCopy.moreWays">
         <!-- #ifdef H5 -->
         <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
-          image="/static/img/earn-20261027/phone.webp" :action="remainderCopy.downloadApp" @click="goPhoneDownload" />
+          artwork="phone" :action="remainderCopy.downloadApp" @click="goPhoneDownload" />
         <!-- #endif -->
         <!-- #ifndef H5 -->
         <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
-          image="/static/img/earn-20261027/phone.webp" :action="nativePhoneAvailable ? remainderCopy.earnWays.phoneAction : remainderCopy.earnWays.phoneReadOnly" @click="goPhoneCompute" />
+          artwork="phone" :action="nativePhoneAvailable ? remainderCopy.earnWays.phoneAction : remainderCopy.earnWays.phoneReadOnly" @click="goPhoneCompute" />
         <!-- #endif -->
         <EarnWayCard v-if="stakingVisible" eyebrow="UVT" :title="remainderCopy.stakingTitle" :body="remainderCopy.earnWays.stakingBody"
-          image="/static/img/earn-20261027/staking.webp" :action="remainderCopy.stakingAction" @click="goStaking" />
+          artwork="staking" :action="remainderCopy.stakingAction" @click="goStaking" />
         <ComputeShareEntry context="earn" />
         <TrialGhostSlot />
       </NxSection>
