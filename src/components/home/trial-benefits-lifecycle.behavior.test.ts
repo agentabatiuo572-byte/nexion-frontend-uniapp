@@ -160,9 +160,10 @@ test('header countdown rounds partial minutes up and carries hours and days with
 
 test('a full queue leaves the offer visible and routes to management instead of claiming', async () => {
   const view = await mount('zh', 'none'); view.trial.reason = 'capacity-full'; await Vue.nextTick();
-  expect(textContent(view.root)).toContain(view.copy.capacityFull);
+  expect(textContent(view.root)).toContain(view.copy.cardCapacityFull);
   expect(byClass(view.root, 'nx-trial-hero--card-entry')).toBeUndefined();
-  expect(textContent(byClass(view.root, 'trial-cta')!)).toBe(view.copy.manageDevices);
+  expect(textContent(byClass(view.root, 'trial-cta')!)).toBe(view.copy.cardManage);
+  expect(byClass(view.root, 'trial-cta')!.props['aria-label']).toBe(view.copy.manageDevices);
   view.click(); expect(view.navTo).toHaveBeenCalledExactlyOnceWith('/pages/me/devices'); expect(view.show).not.toHaveBeenCalled();
 });
 
