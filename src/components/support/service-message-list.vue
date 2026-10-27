@@ -1,7 +1,7 @@
 <template>
-  <view class="service-messages">
+  <view class="service-messages" :aria-busy="loading">
     <GlassSegments v-if="!hideFilters" v-model="filter" :options="filters" layout="scroll" semantics="radio" :label="t.notifs.serviceFilterLabel" />
-    <view v-if="loading" class="service-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
+    <view v-if="loading && !rows.length" class="service-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
     <view v-if="failed" class="service-state" role="alert">
       <text>{{ rows.length ? t.conversations.staleSnapshot : t.conversations.loadError }}</text>
       <view class="service-button service-retry" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry">
@@ -25,8 +25,9 @@
           <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h3" /></svg>
         </view>
         <view class="service-content">
-          <view class="service-rowtop"><text class="service-title">{{ row.title }}</text><text class="service-time">{{ timeAgo(row.ts) }}</text></view>
+          <view class="service-rowtop"><text class="service-title">{{ row.title }}</text></view>
           <view class="service-rowbottom"><text class="service-preview">{{ row.preview }}</text><view v-if="unreadUnavailable(row) || row.unread > 0" class="service-unread"><text>{{ unreadUnavailable(row) ? '-' : formatUnreadBadge(row.unread) }}</text></view></view>
+          <text class="service-time">{{ activityTime(row.ts) }}</text>
         </view>
         <svg class="service-chevron" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
       </view>
@@ -46,7 +47,8 @@ import { useConversations } from "@/store/conversations";
 
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { fmt, dateLocale } from "@/i18n/format";
+import { formatDisplayDateTime } from "@/lib/display-date";
 import { navTo } from "@/lib/route";
 import { localizedIdleClose } from "@/lib/support-idle-message";
 import { formatUnreadBadge } from "@/lib/unread-badge";
@@ -83,10 +85,8 @@ const rows = computed<Row[]>(() => {
   return human.filter(row => selected === "all" || row.kind === (selected === "support" ? "advisor" : selected))
     .sort((a, b) => b.ts - a.ts || a.key.localeCompare(b.key));
 });
-function timeAgo(ts: number) {
-  const minutes = Math.max(1, Math.floor((Date.now() - ts) / 60_000));
-  return minutes < 60 ? fmt(t.value.notifs.minutesAgo, { n: minutes }) : minutes < 1440
-    ? fmt(t.value.notifs.hoursAgo, { n: Math.floor(minutes / 60) }) : fmt(t.value.notifs.daysAgo, { n: Math.floor(minutes / 1440) });
+function activityTime(ts: number) {
+  return formatDisplayDateTime(ts, dateLocale());
 }
 function go(route: string) { emit("navigate"); navTo(route); }
 function openRow(row: Row) {
@@ -112,7 +112,7 @@ function retry() {
 .service-rowtop, .service-rowbottom { display: flex; justify-content: space-between; gap: 8px; }
 .service-rowtop { align-items: baseline; flex-wrap: wrap; }
 .service-title { color: var(--v5-ink); font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
-.service-time { font-size: 12px; color: var(--v5-ink-3); white-space: nowrap; }
+.service-time { display: block; margin-top: 5px; font-size: 12px; color: var(--v5-ink-3); text-align: right; white-space: normal; overflow-wrap: anywhere; }
 .service-rowbottom { align-items: center; margin-top: 5px; }
 .service-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; color: var(--v5-ink-2); font-size: 13px; line-height: 1.5; }
 .service-unread { flex-shrink: 0; align-self: flex-start; min-width: 20px; height: 20px; padding: 0 4px; box-sizing: border-box; border-radius: var(--v5-radius-full); display: grid; place-items: center; background: var(--v5-brand-soft); color: var(--v5-brand); font-size: 12px; font-weight: 600; }
