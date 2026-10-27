@@ -1,7 +1,7 @@
 <template>
   <EarnWayCard v-if="enabled && context === 'earn'" eyebrow="DESKTOP" :title="remainderCopy.earnWays.gpuTitle"
     :body="remainderCopy.earnWays.gpuBody" :action="remainderCopy.earnWays.gpuAction"
-    image="/static/img/earn-20261027/gpu.webp" :notice="slotsFull ? t.computeShare.entryFull : undefined"
+    artwork="gpu" :notice="slotsFull ? t.computeShare.entryFull : undefined"
     data-proof="compute-share-entry" @click="goDownload" />
   <view v-else-if="enabled && compact" class="compute-share-entry compute-share-entry--compact" data-proof="compute-share-entry">
     <view class="compute-share-entry__heading">
