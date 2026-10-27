@@ -128,9 +128,13 @@ export default viewImplementation;
 .nx-glass-segments--vertical .nx-glass-option { flex: 0 0 auto; }
 .nx-glass-segments--navigation { height: 68px; padding: 5px; gap: 2px; box-sizing: border-box; background: transparent; border-radius: 32px; }
 .nx-glass-segments--navigation .nx-glass-option { flex-direction: column; gap: 3px; padding: 4px 2px; border-radius: 28px; }
-.nx-glass-segments--navigation :deep(.nx-tab__label) { font-family: var(--font-v5); font-size: 12px; line-height: 14px; font-weight: 600; white-space: nowrap; text-shadow: 0 1px 2px var(--v5-tabbar-ink-halo), 0 0 4px var(--v5-tabbar-ink-halo); }
+.nx-glass-segments--navigation :deep(.nx-tab__label) { font-family: var(--font-v5); font-size: clamp(10.5px, 3.28vw, 12px); line-height: 14px; font-weight: 600; white-space: nowrap; text-align: center; text-shadow: 0 1px 2px var(--v5-tabbar-ink-halo), 0 0 4px var(--v5-tabbar-ink-halo); }
 .nx-glass-segments--navigation :deep(.nx-tab__icon) { filter: drop-shadow(0 1px 1px var(--v5-tabbar-ink-halo)); transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
 .nx-glass-segments--navigation .nx-glass-option--selected :deep(.nx-tab__icon) { transform: translateY(-1px); }
+@media (max-width: 350px) {
+  .nx-glass-segments--navigation .nx-glass-option { gap: 2px; }
+  .nx-glass-segments--navigation :deep(.nx-tab__label) { line-height: 13px; font-weight: 500; letter-spacing: -.01em; }
+}
 @media (prefers-reduced-motion: reduce) { .nx-glass-option, .nx-glass-indicator { transition: none; } .nx-glass-option:active, .nx-glass-option--selected :deep(.nx-tab__icon) { transform: none; } }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .nx-glass-segments--navigation { background: var(--v5-surface); } .nx-glass-option--selected { background: var(--v5-brand-soft); } }
 </style>

@@ -132,7 +132,7 @@
           <EmptyState v-else kind="empty-list" :title="t.empty.genesisActivityTitle" :desc="t.empty.genesisActivityDesc" />
           <view v-if="genesis.activityPage.cursor" class="active:opacity-70" role="button" tabindex="0" :aria-disabled="genesis.activityPage.busy ? 'true' : 'false'"
             :aria-busy="genesis.activityPage.busy ? 'true' : 'false'" style="padding:var(--ui-space-inline);text-align:center;color:var(--v5-brand)" @click="!genesis.activityPage.busy && genesis.loadMoreActivity()">
-            <text>{{ genesis.activityPage.error ? t.orders.retry : t.orders.loadMore }}</text>
+            <text :class="{ 'nx-market-read-retry-label': genesis.activityPage.error }">{{ genesis.activityPage.error ? t.orders.retry : t.orders.loadMore }}</text>
           </view>
         </template>
 
@@ -159,7 +159,7 @@
         <text class="block px-2" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ marketplaceRoyaltyText }}</text>
         <view v-if="marketReadNeedsRetry" class="nx-market-retry" role="button" :tabindex="marketplaceRead.busy ? -1 : 0" :aria-busy="marketplaceRead.busy" :aria-disabled="marketplaceRead.busy"
           @click="retryMarketplaceFacts()" @keydown.enter.prevent="retryMarketplaceFacts()" @keydown.space.prevent="retryMarketplaceFacts()">
-          <text>{{ marketplaceRead.busy ? t.marketplace.marketLoading : t.marketplace.retry }}</text>
+          <text :class="{ 'nx-market-read-retry-label': !marketplaceRead.busy }">{{ marketplaceRead.busy ? t.marketplace.marketLoading : t.marketplace.retry }}</text>
         </view>
       </view>
     </view>
@@ -658,6 +658,7 @@ const sortOptions = computed(() => [
   font-weight: 600;
 }
 .nx-market-retry { align-self: flex-start; padding: 0 12px; }
+.nx-market-read-retry-label { font: 600 13px/20px var(--font-v5); }
 .nx-market-retry[aria-disabled="true"] { opacity: 0.6; }
 .nx-sort-row {
   width: 100%;

@@ -66,10 +66,10 @@ import DeviceSlot from "./device-slot.vue";
 .nx-device-row :deep(.nx-home-art) { width: 52px;max-width:none; height: 52px; animation: none; }
 .nx-device-row :deep(.hf-computer) { height: 48px; }
 .hf-device-meta { min-width: 0; flex: 1; }
-.hf-device-name { display: block; font: 500 15px/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.hf-device-status { display: flex;align-items:center;gap:6px; margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+.hf-device-name { display: block; font: 500 clamp(13px,3.85vw,15px)/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.hf-device-status { display: flex;align-items:center;gap:6px; margin-top: 2px; font: 400 clamp(11px,3.08vw,12px)/18px var(--font-v5); color: var(--v5-ink-3); }
 .hf-device-status--offline { color: var(--v5-warning-ink); }
-.hf-device-income { flex-shrink: 0; font: 600 15px/20px var(--font-v5); color: var(--v5-brand);text-align:right; }
-.hf-device-today {display:block;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);}
+.hf-device-income { flex-shrink: 0; font: 600 clamp(13px,3.85vw,15px)/20px var(--font-v5); color: var(--v5-brand);text-align:right; }
+.hf-device-today {display:block;font:400 clamp(11px,3.08vw,12px)/18px var(--font-v5);color:var(--v5-ink-3);}
 .nx-home-arrow { display: flex; align-items: center; width: 16px; color: var(--v5-ink-4);background:none;box-shadow:none; }
 </style>

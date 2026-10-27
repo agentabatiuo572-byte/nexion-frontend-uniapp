@@ -270,16 +270,19 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   text-wrap: pretty;
 }
 .sas-close {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 4px;
   border-radius: 999px;
   background: var(--v5-surface-2);
+  background-clip: content-box;
   display: grid;
   place-items: center;
   flex-shrink: 0;
 }
 .sas-close:active {
-  background: var(--v5-surface-3);
+  background-color: var(--v5-surface-3);
 }
 /* primary CTA — brand fill, recommended weight */
 .sas-store-cta {

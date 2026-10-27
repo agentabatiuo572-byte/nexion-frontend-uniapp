@@ -4,7 +4,7 @@
     <text v-if="loading" class="event-copy" role="status">{{ copy.loading }}</text>
     <view v-else-if="error || !detail" class="event-section event-section--plain" role="alert">
       <text class="event-copy">{{ copy.unavailable }}</text>
-      <view class="event-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="activate($event, load)" @keydown.space.prevent="activate($event, load)"><text>{{ copy.retry }}</text></view>
+      <view class="event-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="activate($event, load)" @keydown.space.prevent="activate($event, load)"><text class="event-read-retry-label">{{ copy.retry }}</text></view>
     </view>
     <template v-else>
       <view class="nx-glass-card event-section">
@@ -23,7 +23,7 @@
       <view class="event-section event-section--plain">
         <text class="event-heading">{{ copy.rules }}</text>
         <view v-for="row in ruleRows" :key="row.label" class="event-row" :class="{'event-rule-paragraph':[copy.labels.description,copy.labels.terms].includes(row.label)}"><text>{{ row.label }}</text><text>{{ row.value }}</text></view>
-        <template v-if="!ruleRows.length"><text class="event-copy">{{ copy.rulesUnavailable }}</text><view class="event-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ copy.retry }}</text></view></template>
+        <template v-if="!ruleRows.length"><text class="event-copy">{{ copy.rulesUnavailable }}</text><view class="event-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text class="event-read-retry-label">{{ copy.retry }}</text></view></template>
       </view>
       <view v-if="detail.event.kind !== 'regional' && detail.targetValue > 0" class="event-section event-section--plain">
         <view class="event-row"><text class="event-heading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
@@ -134,6 +134,7 @@ onUnmounted(() => { visible = false; reset(); unsubscribe(); });
 .event-progress > view { height:100%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
 .event-action, .event-primary { display:flex; justify-content:center; margin-top:16px; padding:13px 16px; border-radius:24px; font-size:13px; font-weight:600; color:var(--v5-brand); }
+.event-read-retry-label { font: 600 13px/20px var(--font-v5); }
 .event-primary { background:var(--v5-brand); color:var(--v5-on-brand); }
 .event-navigate { margin-top:16px; width:100%; }
 .event-rule-paragraph { display:block; }

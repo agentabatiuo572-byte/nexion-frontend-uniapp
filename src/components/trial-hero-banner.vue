@@ -1,13 +1,14 @@
 <!-- Trial eligibility and claim flow remain owned by the existing trial stores. -->
 <template>
-  <view v-if="visible" class="nx-trial-hero" :class="{ 'nx-trial-hero--embedded': embedded, 'nx-trial-hero--long-copy': embedded && locale.code !== 'zh', 'nx-trial-hero--lifecycle': hasLifecycle || capacityFull }" :data-trial-state="status" :aria-busy="trial.authorityStatus === 'loading'" @click="onClick">
+  <view v-if="visible" class="nx-trial-hero" :class="{ 'nx-trial-hero--embedded': embedded, 'nx-trial-hero--long-copy': embedded && locale.code !== 'zh', 'nx-trial-hero--lifecycle': hasLifecycle || capacityFull, 'nx-trial-hero--card-entry': cardEntry }" :data-trial-state="status" :role="cardEntry ? 'button' : undefined" :tabindex="cardEntry ? 0 : undefined" :aria-label="cardEntry ? `${badgeText} · ${trialView.deviceName.value ?? t.trial.heroDeviceName} · ${ctaText}` : undefined" :aria-busy="trial.authorityStatus === 'loading'" @click="onClick" @keydown.enter.self.prevent="cardEntry && onClick()" @keydown.space.self.prevent="cardEntry && onClick()">
     <view class="trial-aura" aria-hidden="true" />
     <view class="trial-art" aria-hidden="true"><view class="nx-home-art" /></view>
     <view class="trial-meta">
-      <text class="trial-badge">{{ badgeText }}</text>
+      <view v-if="cardEntry && (status === 'active' || status === 'grace')" class="trial-status-row"><text class="trial-badge" :aria-label="badgeText">{{ status === 'active' ? lifecycleCopy.cardActiveTitle : lifecycleCopy.cardGraceTitle }}</text><text class="trial-header-countdown" :aria-label="`${status === 'grace' ? lifecycleCopy.creditUntilLabel : lifecycleCopy.remainingLabel} ${remainingText}`">{{ cardRemainingText }}</text></view>
+      <text v-else class="trial-badge">{{ badgeText }}</text>
       <text class="trial-title">{{ trialView.deviceName.value ?? t.trial.heroDeviceName }}</text>
       <template v-if="status === 'active' || status === 'grace'">
-        <view class="trial-lifecycle-time"><text>{{ status === 'grace' ? lifecycleCopy.creditUntilLabel : lifecycleCopy.remainingLabel }}</text><text class="trial-countdown font-mono-tabular">{{ remainingText }}</text></view>
+        <view v-if="!cardEntry" class="trial-lifecycle-time"><text>{{ status === 'grace' ? lifecycleCopy.creditUntilLabel : lifecycleCopy.remainingLabel }}</text><text class="trial-countdown font-mono-tabular">{{ remainingText }}</text></view>
         <view class="trial-lifecycle-credit"><text>{{ lifecycleCopy.creditLabel }}</text><text class="font-mono-tabular">{{ creditText }}</text></view>
       </template>
       <text v-else-if="status === 'ended' || status === 'converted'" class="trial-lifecycle-body">{{ status === 'ended' ? lifecycleCopy.endedBody : lifecycleCopy.convertedBody }}</text>
@@ -17,7 +18,7 @@
       </template>
       <text v-if="capacityFull && !hasLifecycle" class="trial-lifecycle-body">{{ lifecycleCopy.capacityFull }}</text>
     </view>
-    <view class="trial-cta nx-design-glass" role="button" :tabindex="canOpen ? 0 : -1" :aria-disabled="canOpen ? 'false' : 'true'" :aria-label="ctaText" @click.stop="onClick"><LiquidGlass :radius="999" tone="control" /><text>{{ ctaText }}</text></view>
+    <view v-if="!cardEntry" class="trial-cta nx-design-glass" role="button" :tabindex="canOpen ? 0 : -1" :aria-disabled="canOpen ? 'false' : 'true'" :aria-label="ctaText" @click.stop="onClick"><LiquidGlass :radius="999" tone="control" /><text>{{ ctaText }}</text></view>
       <view v-if="trial.authorityStatus === 'error'" role="button" tabindex="0" :aria-label="t.trial.entryRetry"
         class="trial-retry" @click.stop="retryEligibility">
         <text>{{ t.trial.entryRetry }}</text>
@@ -40,7 +41,7 @@ import { useTrialPresentation } from '@/composables/use-trial-presentation';
 import { navTo } from '@/lib/route';
 import LiquidGlass from "@/components/liquid-glass.vue";
 
-defineProps<{ embedded?: boolean }>();
+const props = defineProps<{ embedded?: boolean }>();
 
 const trial = useFreeTrial();
 const trialCfg = useTrialConfig();
@@ -63,6 +64,7 @@ const visible = computed(() => trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0
   && (trial.showHeroPromo() || capacityFull.value) || hasLifecycle.value);
 const canOpen = computed(() => hasLifecycle.value || canClaim.value || capacityFull.value);
+const cardEntry = computed(() => props.embedded && hasLifecycle.value);
 
 const trialDays = computed(() => trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
 const dailyEarn = computed(() => trialView.config.value?.shadowDailyUSD);
@@ -74,6 +76,13 @@ const dailyEarn = computed(() => trialView.config.value?.shadowDailyUSD);
 const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
 const creditText = computed(() => trialView.offsetUSD.value === null ? '-' : `$${formatAmount(trialView.offsetUSD.value)}`);
 const remainingText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.value.longRemaining));
+const cardRemainingText = computed(() => {
+  if (trialView.remainingMs.value === null) return '-';
+  const minutes = Math.max(0, Math.ceil(trialView.remainingMs.value / 60000));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor(minutes % 1440 / 60);
+  return `${days}d ${hours}h:${String(minutes % 60).padStart(2, '0')}`;
+});
 const badgeText = computed(() => {
   if (status.value === 'active') return lifecycleCopy.value.activeTitle;
   if (status.value === 'grace') return lifecycleCopy.value.graceTitle;
@@ -188,5 +197,30 @@ function retryEligibility() {
   .nx-trial-hero:not(.nx-trial-hero--embedded) .trial-meta { width: 62%; }
   .nx-trial-hero:not(.nx-trial-hero--embedded) .trial-art { width: 39%; margin-top: -19.5%; }
   .trial-cta { padding-inline: 14px; }
+}
+/* After claiming, the complete card is the action; the device sits on the floor glow. */
+.nx-trial-hero--embedded.nx-trial-hero--card-entry { box-sizing:border-box;min-height:200px;padding-bottom:6px;cursor:pointer; }
+.nx-trial-hero--embedded.nx-trial-hero--card-entry .trial-meta { flex:0; }
+.nx-trial-hero--embedded.nx-trial-hero--card-entry .trial-title { padding-right:0;margin-top:6px; }
+.trial-status-row { display:flex;align-items:baseline;justify-content:space-between;gap:4px; }
+.trial-status-row .trial-badge { white-space:nowrap; }
+.trial-header-countdown { font:400 11px/18px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink-3); }
+.nx-trial-hero--card-entry .trial-lifecycle-credit { margin-top:6px; }
+.nx-trial-hero--card-entry .trial-art { position:relative;order:1;align-self:center;top:auto;right:auto;bottom:auto;width:108px;height:108px;opacity:1;margin:2px 0 0;flex:none; }
+.nx-trial-hero--card-entry .trial-art .nx-home-art { width:108px;height:108px; }
+.nx-trial-hero--card-entry .trial-aura { right:calc(50% - 55px);bottom:14px; }
+/* Preserve the approved offer card; only narrow lifecycle copy needs smaller type. */
+@media (max-width:374px) {
+  .nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-meta { padding:12px 12px 0; }
+  .nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-badge { font-size:11.5px;line-height:16px; }
+  .nx-trial-hero--embedded.nx-trial-hero--lifecycle .trial-title { font-size:13px;line-height:18px;margin-top:6px;padding-right:14px; }
+  .nx-trial-hero--lifecycle .trial-lifecycle-credit { margin-top:8px;gap:2px 6px;font-size:11px;line-height:16px; }
+  .nx-trial-hero--lifecycle .trial-lifecycle-credit > text:last-child { font-size:13px;white-space:nowrap; }
+  .nx-trial-hero--lifecycle .trial-lifecycle-body { margin-top:10px;font-size:12px;line-height:18px; }
+  .nx-trial-hero--embedded.nx-trial-hero--card-entry .trial-title { padding-right:0; }
+  .trial-status-row .trial-badge { font-size:11px; }
+  .trial-header-countdown { font-size:10.5px;line-height:16px; }
+  .nx-trial-hero--card-entry .trial-art { width:96px;height:96px;margin-top:4px; }
+  .nx-trial-hero--card-entry .trial-art .nx-home-art { width:96px;height:96px; }
 }
 </style>

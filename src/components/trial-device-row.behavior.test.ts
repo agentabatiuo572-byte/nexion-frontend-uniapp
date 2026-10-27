@@ -118,7 +118,8 @@ it.each(["zh", "en", "vi"] as const)("anchors the %s trial badge inside each ima
     expect(nodes(imageSlot).filter(node => node.props?.class === "trial-device-row__image-badge").map(node => node.children)).toEqual([trialFleetCopy[locale].imageBadge]);
     expect(nodes(identity).some(node => String(node.props?.class).includes("badge"))).toBe(false);
     expect(screen.byClass("trial-device-row__name")!.children).toBe("Server Trial B");
-    expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.online);
+    expect(screen.byClass("trial-device-row__status")!.children).toBe("Online");
+    expect(screen.byClass("trial-device-row__status--online")).toBeDefined();
   }
 });
 
@@ -141,9 +142,11 @@ it("lets the Earn parent control disclosure so another device can close the tria
 
 it.each(["zh", "en", "vi"] as const)("preserves active and grace semantics in %s without inventing an unknown product image", locale => {
   const screen = mount("earn", locale); const copy = trialFleetCopy[locale];
-  expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.online);
+  expect(screen.byClass("trial-device-row__status")!.children).toBe("Online");
+  expect(screen.byClass("trial-device-row__status--online")).toBeDefined();
   screen.presentation.status.value = "grace";
   expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.offline);
+  expect(screen.byClass("trial-device-row__status--online")).toBeUndefined();
   screen.byClass("trial-device-row__heading")!.props!.onClick();
   expect(screen.byClass("trial-device-row__state")!.children).toBe(copy.grace);
   expect(screen.byClass("trial-device-row__cancel")).toBeUndefined();
@@ -156,8 +159,10 @@ it.each(["zh", "en", "vi"] as const)("keeps a confirmed refreshing snapshot read
     const screen = mount(variant, locale);
     screen.presentation.actionsReady.value = false;
     expect(screen.byClass("trial-device-row__status")!.children).toBe(messages[locale].earn.online);
+    expect(screen.byClass("trial-device-row__status--online")).toBeDefined();
     screen.presentation.presentationReady.value = false;
     expect(screen.byClass("trial-device-row__status")!.children).toBe(trialFleetCopy[locale].statusUnknown);
+    expect(screen.byClass("trial-device-row__status--online")).toBeUndefined();
     expect(screen.byClass("trial-device-row__heading")!.props!["aria-label"]).toContain(trialFleetCopy[locale].statusUnknown);
     screen.presentation.status.value = "grace";
     expect(screen.byClass("trial-device-row__status")!.children).toBe(trialFleetCopy[locale].statusUnknown);

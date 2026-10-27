@@ -1980,8 +1980,8 @@ catalog: {
     phoneActivationTitle: "Activate this phone",
     phoneActivationBody: "Calibrate and bind this phone to start receiving compute jobs.",
     phoneActivationCta: "Calibrate and bind this phone",
-    phoneActivationAppOnlyTitle: "Phone compute requires Android",
-    phoneActivationAppOnlyBody: "Sign in to the Android App to calibrate and activate your phone.",
+    phoneActivationAppOnlyTitle: "On-device phone compute",
+    phoneActivationAppOnlyBody: "Calibrate, activate and run phone compute in the Android App.",
     phoneActivationNativeUnavailableTitle: "Phone calibration unavailable",
     phoneActivationNativeUnavailableBody: "Phone activation is unavailable on this device. View your linked devices below.",
     // Trade-in promo banner — surfaces when user has an eligible device for
