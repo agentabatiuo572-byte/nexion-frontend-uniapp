@@ -573,7 +573,7 @@ export const useApp = defineStore("app", () => {
   );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
   // cfg 声明已随「在线设备锚配置化」上移到 global 初始化之前(同一个实例,别再声明第二个)
-  const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
+  const computeShareEnabled = computed(() => false);
   const slotDevices = computed(() =>
     computeShareEnabled.value ? devices.value : devices.value.filter((d) => d.kind !== "pc-gpu"),
   );
@@ -602,7 +602,7 @@ export const useApp = defineStore("app", () => {
    */
   function myTotalHashrateAt(now: number): number {
     // GPU 档位表从配置 store 穿进去(运营在 E6 改档 / 加识别词,排名要跟着走),
-    // 与 connectComputeShareDevice / download 页同一单源 —— 禁读编译期常量。
+    // 与 历史显卡设备同一单源 —— 禁读编译期常量。
     return accountTotalHashrate(visibleDevices.value, now, cfg.config.onlineBonus, cfg.config.computeShare.gpuTiers);
   }
   // When the session is invalidated (logged in elsewhere / logged out / admin
@@ -1318,7 +1318,7 @@ export const useApp = defineStore("app", () => {
    *  GET/SSE contract in PRD §9.11c.1; no settle mutation endpoint is frozen. */
   function settle() {
     // 🔴 与上面的 tick() 同一道闸(此前只 tick 有,settle 漏了 —— 而 settle 是**唯一**的
-    // 计收路径,且 App.vue 的 ensureBusinessLoopsRunning / connectComputeShareDevice 都直调它)。
+    // 计收路径,且 App.vue 的 ensureBusinessLoopsRunning 都直调它)。
     // 远端模式下这里每跑一次就凭设备墙钟给自己发一次钱:earnings.* 之外还经 bucketUserEarnings +
     // applyReleaseOutcome 直写 usdtBalance / nexBalance / withdrawableUsdt。收益归服务端
     // (GET /api/me/earnings —— PRD §9.11c.1),client 不自算。
@@ -1549,28 +1549,6 @@ export const useApp = defineStore("app", () => {
       return null;
     }
     return id;
-  }
-
-  function connectComputeShareDevice(gpuModel = "NVIDIA GeForce RTX 4070", reservedSlots = 0): {
-    ok: boolean;
-    deviceId?: string;
-    reason?: "disabled" | "slots-full" | "activation-failed";
-  } {
-    if (!computeShareEnabled.value) return { ok: false, reason: "disabled" };
-    if (activeSlotCount.value + reservedSlots >= slotCap.value) return { ok: false, reason: "slots-full" };
-
-    const normalizedModel = gpuModel.trim() || "NVIDIA GeForce RTX 4070";
-    const gpuTier = matchGpuTier(normalizedModel, cfg.config.computeShare.gpuTiers);
-    const deviceId = addDevice("pc-gpu", { gpuModel: normalizedModel, gpuTier });
-    if (!deviceId) return { ok: false, reason: "activation-failed" };
-    const ok = activateDevice(deviceId, reservedSlots);
-    if (!ok) {
-      // persist-verdict-ok: 撤回刚生的设备;撤不掉也只是多一台未激活库存机,下面照样返回失败
-      discardSpawnedDevice(deviceId);
-      return { ok: false, reason: "activation-failed" };
-    }
-    settle();
-    return { ok: true, deviceId };
   }
 
   // Sprint #146-1 — activation toggle. Slot cap (MAX_DEVICES) applies to ACTIVE
@@ -2520,6 +2498,6 @@ export const useApp = defineStore("app", () => {
     submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refreshRemoteWithdrawalList,
     refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
-    addDevice, discardSpawnedDevice, retireDevice, restoreDevice, patchDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
+    addDevice, discardSpawnedDevice, retireDevice, restoreDevice, patchDevice, activateDevice, deactivateDevice, scheduleDeactivation,
   };
 });

@@ -179,7 +179,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (request.method === "GET") return false;
     const path = request.url.slice(baseUrl.length).split("?")[0];
     // Browsing observations and phone runtime reporting keep their own cadence.
-    return !/^\/api\/(?:app\/analytics\/events|tasks\/phone\/runtime|app\/janus\/(?:reports|commands\/ack|takeover\/progress)|growth\/day-one\/page-observations|store\/products\/[^/]+\/detail-observation|genesis\/secondary-market\/observation|share\/event)(?:$|\/)/.test(path)
+    return !/^\/api\/(?:app\/analytics\/events|tasks\/phone\/runtime|growth\/day-one\/page-observations|store\/products\/[^/]+\/detail-observation|genesis\/secondary-market\/observation|share\/event)(?:$|\/)/.test(path)
       && !path.startsWith("/auth/");
   }
 

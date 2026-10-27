@@ -113,7 +113,6 @@
         <!-- #endif -->
         <EarnWayCard v-if="stakingVisible" eyebrow="UVT" :title="remainderCopy.stakingTitle" :body="remainderCopy.earnWays.stakingBody"
           artwork="staking" :action="remainderCopy.stakingAction" @click="goStaking" />
-        <ComputeShareEntry context="earn" />
       </NxSection>
       <MarketBoard />
       <TaskCenter />
@@ -143,7 +142,6 @@ import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 
-import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
 import MarketBoard from "@/components/earn/market-board.vue";
 import TaskCenter from "@/components/earn/task-center.vue";
