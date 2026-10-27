@@ -411,7 +411,7 @@ function paint(link: string, myToken: number) {
     ctx.fillText(fmt(t.value.share.posterYieldUnit, { n: runningDevices.value }), 20, 280);
     ctx.setFillStyle(brand);
     ctx.fillText(
-      rewardEnabled.value ? `${usd} + ${nex} NEX` : t.value.share.posterYieldInviteValueNoReward,
+      rewardEnabled.value ? `${usd} + ${nex} UVT` : t.value.share.posterYieldInviteValueNoReward,
       110,
       280,
     );
