@@ -1,14 +1,20 @@
 import ts from "typescript";
 import * as vue from "vue";
+import { compile } from "@vue/compiler-dom";
+import { parse } from "@vue/compiler-sfc";
+import { renderToString } from "@vue/server-renderer";
 import { describe, expect, it, vi } from "vitest";
 import source from "./service-message-list.vue?raw";
 import { zh } from "@/i18n/messages/zh";
 import { fmt } from "@/i18n/format";
+import { formatDisplayDateTime } from "@/lib/display-date";
 import { localizedIdleClose } from "@/lib/support-idle-message";
 import { formatUnreadBadge } from "@/lib/unread-badge";
+const render = new Function('Vue', compile(parse(source).descriptor.template!.content, { mode: 'function', prefixIdentifiers: true,
+  isCustomElement: tag => ['view', 'text'].includes(tag) }).code)(vue);
 function mount() {
   const conversations = vue.reactive({
-    loading: false, error: null, categoryLoading: false, categoryAvailabilityStatus: "ready", realtimeFallback: false,
+    loading: false, error: null as string | null, categoryLoading: false, categoryAvailabilityStatus: "ready", realtimeFallback: false,
     dismissalAvailable: true, dismissingIds: {} as Record<string, boolean>, typingIds: {} as Record<string, boolean>,
     byType: (kind: string) => kind === "advisor" ? [{ id: "advisor/1", lastTs: 40, lastMessage: "Advisor reply", messages: [], unread: 2, roleKey: "typeAdvisor" }] : [{ id: "support/1", lastTs: 20, lastMessage: "Latest server summary", messages: [{ ts: 10, text: "Old loaded reply", sender: "agent" }], unread: 1, roleKey: "typeSupport" }],
     dismissConversation: vi.fn(async () => {}), stopRealtime: vi.fn(), startRealtime: vi.fn(),
@@ -20,17 +26,44 @@ function mount() {
     vue: { ...vue, watch: vi.fn() }, "@/store/conversations": { useConversations: () => conversations },
     "@/store/tickets": { useTickets: () => tickets }, "@/store/message-drawer": { useMessageDrawer: () => ({ refresh }) },
     "@/store/app": { useApp: () => ({ accountBindingEpoch: 0 }) }, "@/i18n/use-t": { useT: () => vue.ref(zh) },
-    "@/i18n/format": { fmt }, "@/lib/route": { navTo }, "@/lib/support-idle-message": { localizedIdleClose },
+    "@/i18n/format": { fmt, dateLocale: () => "zh-CN" }, "@/lib/display-date": { formatDisplayDateTime }, "@/lib/route": { navTo }, "@/lib/support-idle-message": { localizedIdleClose },
     "@/lib/unread-badge": { formatUnreadBadge },
   };
   const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
   const js = ts.transpileModule(script, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-  const worker = new Function("require", "exports", "defineProps", "withDefaults", "defineEmits", js + ";return { rows, openRow, retry };")(
+  const worker = new Function("require", "exports", "defineProps", "withDefaults", "defineEmits", js + ";return { rows, openRow, retry, loading, failed, filter, filters, t, conversations, unreadUnavailable, activityTime, go };")(
     (name: string) => name.endsWith(".vue") ? {} : modules[name], {}, () => props, (value: unknown) => value, () => emit,
   );
-  return { worker, props, navTo, emit, refresh, conversations, tickets };
+  return { worker, props, navTo, emit, refresh, conversations, tickets,
+    html: () => renderToString(vue.createSSRApp({ components: { GlassSegments: { render: () => null }, LiquidGlass: { render: () => null } },
+      render: () => render(vue.proxyRefs({ ...vue.toRefs(props), ...worker, fmt, formatUnreadBadge }), []) })) };
 }
 describe("unified service rows", () => {
+  it.each(['loading', 'categoryLoading'] as const)('warm %s changes busy state without adding/removing flow content', async state => {
+    const h = mount(), normalize = (html: string) => html.replace(/ aria-busy="(?:true|false)"/g, '');
+    const before = await h.html(), ids = h.worker.rows.value.map((row: { id: string }) => row.id);
+    h.conversations[state] = true; const pending = await h.html();
+    expect(normalize(pending)).toBe(normalize(before)); expect(pending).not.toContain(zh.help.loadingMore); expect(pending).toContain('aria-busy="true"');
+    expect(h.worker.rows.value.map((row: { id: string }) => row.id)).toEqual(ids);
+    h.conversations[state] = false; expect(await h.html()).toBe(before);
+  });
+  it('cold/cleared selected results keep visible loading and never retain old row content', async () => {
+    const h = mount(); h.props.filter = 'ticket'; h.conversations.loading = true;
+    expect(h.worker.rows.value).toHaveLength(0); expect(await h.html()).toContain(zh.help.loadingMore);
+    h.props.filter = 'all'; h.conversations.byType = () => []; const cold = await h.html();
+    expect(cold).toContain(zh.help.loadingMore); expect(cold).toContain('role="status"');
+    expect(cold).not.toContain('Advisor reply'); expect(cold).not.toContain('Latest server summary');
+  });
+  it('real warm errors/retry and realtime fallback remain visible and retry stays single-flight', async () => {
+    const h = mount(); h.conversations.error = 'offline';
+    expect(await h.html()).toContain(zh.conversations.staleSnapshot); expect(await h.html()).toContain('role="alert"');
+    h.worker.retry(); expect(h.refresh).toHaveBeenCalledOnce();
+    h.conversations.loading = true; h.worker.retry(); expect(h.refresh).toHaveBeenCalledOnce();
+    h.conversations.loading = false; h.conversations.error = null; h.conversations.realtimeFallback = true;
+    expect(await h.html()).toContain(zh.conversations.realtimeFallback);
+    h.worker.retry(); expect(h.conversations.stopRealtime).toHaveBeenCalledOnce(); expect(h.conversations.startRealtime).toHaveBeenCalledOnce();
+    h.conversations.byType = () => []; h.conversations.error = 'offline'; expect(await h.html()).toContain(zh.conversations.loadError);
+  });
   it("keeps each conversation's unread count, latest preview and target together", () => {
     const h = mount();
     expect(h.worker.rows.value.map((row: { kind: string }) => row.kind)).toEqual(["advisor", "advisor"]);
