@@ -96,8 +96,8 @@
         </view>
       </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
-      <EmptySlotsHint v-if="fleetReady">
-        <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0" @toggle="toggleDevice(d.id)" />
+      <EmptySlotsHint v-if="fleetReady" :trial-expanded="expandedId === 'trial:current'" @toggle-trial="toggleDevice('trial:current')">
+        <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0 || trialPresentation.active.value" @toggle="toggleDevice(d.id)" />
       </EmptySlotsHint>
 
       <EarningsLedgerCard class="mx-4" />

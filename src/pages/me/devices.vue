@@ -41,13 +41,9 @@
           <text>{{ t.empty.errorCta }}</text>
         </view>
       </view>
-      <view v-if="inventoryReady" class="mx-4" :style="slotCaptionStyle">
-        <text class="block" :style="subtitleStyle">{{ slotMeterLabel }}</text>
-      </view>
-
       <view v-if="inventoryReady" class="mx-4">
         <!-- Slot meter — de-carded: sits on the page floor. -->
-        <view :style="meterBlockStyle">
+        <view :style="meterBlockStyle" role="group" :aria-label="slotMeterLabel">
           <view class="flex items-center justify-between">
             <text :style="meterLabelStyle">{{ t.myDevices.inventorySlotsLabel }}</text>
             <view class="flex items-baseline" style="gap: 4px">
@@ -60,37 +56,20 @@
           </view>
         </view>
 
-        <ComputeShareEntry context="devices" />
-
-        <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
-          <view class="flex items-start" style="gap: 12px">
-            <view class="grid place-items-center shrink-0" :style="phoneActivationIconStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" /><path d="M12 18h.01" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="phoneActivationTitleStyle">{{ phoneActivationGuidance.title }}</text>
-              <text class="block" :style="phoneActivationBodyStyle">{{ phoneActivationGuidance.body }}</text>
-            </view>
-          </view>
-          <view v-if="nativePhoneAvailable" class="flex items-center justify-center active:scale-[0.98]" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation"  @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
-            <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
-          </view>
-        </view>
-
-        <TrialDeviceRow v-if="trialPresentation.active.value" key="trial:current" :style="trialCardStyle" show-cancel :cancel-busy="cancelTrialBusy" @cancel="handleCancelTrial" />
-
-        <!-- Active fleet -->
-        <view v-if="activeDevices.length > 0" style="margin-top: 12px">
+        <!-- Trial and activated devices share one list; the count describes rows, not capacity. -->
+        <view v-if="activeDevices.length > 0 || trialPresentation.active.value" class="device-inventory-section" data-inventory-section="devices">
           <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
-            <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionActive }}</text>
-            <text :style="sectionCountStyle">{{ activeDevices.length }}</text>
+            <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionDevices }}</text>
+            <text :style="sectionCountStyle">{{ activeDevices.length + (trialPresentation.active.value ? 1 : 0) }}</text>
           </view>
-          <view style="display: flex; flex-direction: column; gap: 8px">
+          <view class="device-inventory-list">
+            <TrialDeviceRow v-if="trialPresentation.active.value" key="trial:current" variant="inventory" :style="trialRowStyle" show-cancel :cancel-busy="cancelTrialBusy" @cancel="handleCancelTrial" />
             <DeviceInventoryRow
               v-for="d in activeDevices"
               :key="d.id"
               :device="d"
               :active="true"
+              :runtime-confirmed="!remoteApiEnabled || app.remoteFleetStatus === 'ready' || app.remoteFleetStatus === 'loading'"
               :show-action="canControlDevice(d)"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
@@ -106,12 +85,12 @@
         </view>
 
         <!-- Inventory (purchased but not activated) -->
-        <view v-if="inactiveDevices.length > 0" style="margin-top: 12px">
+        <view v-if="inactiveDevices.length > 0" class="device-inventory-section" data-inventory-section="pending">
           <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
             <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionInventory }}</text>
             <text :style="sectionCountStyle">{{ inactiveDevices.length }}</text>
           </view>
-          <view style="display: flex; flex-direction: column; gap: 8px">
+          <view class="device-inventory-list">
             <DeviceInventoryRow
               v-for="d in inactiveDevices"
               :key="d.id"
@@ -137,12 +116,12 @@
         </view>
 
         <!-- Remote active lifecycle without activation time: support-visible, never activatable. -->
-        <view v-if="unconfirmedDevices.length > 0" style="margin-top: 12px">
+        <view v-if="unconfirmedDevices.length > 0" class="device-inventory-section" data-inventory-section="unconfirmed">
           <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
             <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionActivationUnconfirmed }}</text>
             <text :style="sectionCountStyle">{{ unconfirmedDevices.length }}</text>
           </view>
-          <view style="display: flex; flex-direction: column; gap: 8px">
+          <view class="device-inventory-list">
             <DeviceInventoryRow
               v-for="d in unconfirmedDevices"
               :key="d.id"
@@ -173,9 +152,27 @@
         />
 
         <!-- Add-device CTA -->
-        <view v-else class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
+        <view v-else class="flex items-center justify-center active:opacity-70" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           <text :style="ctaLabelStyle">{{ t.myDevices.inventoryCtaGoStore }}</text>
+        </view>
+
+        <view class="device-inventory-section device-inventory-connections" data-inventory-section="connections">
+          <ComputeShareEntry context="devices" compact />
+          <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
+            <view class="flex items-start" style="gap: 10px">
+              <view class="grid place-items-center shrink-0" :style="phoneActivationIconStyle">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" /><path d="M12 18h.01" /></svg>
+              </view>
+              <view class="flex-1 min-w-0">
+                <text class="block" :style="phoneActivationTitleStyle">{{ phoneActivationGuidance.title }}</text>
+                <text class="block" :style="phoneActivationBodyStyle">{{ phoneActivationGuidance.body }}</text>
+              </view>
+            </view>
+            <view v-if="nativePhoneAvailable" class="flex items-center justify-center active:opacity-70" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation"  @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
+              <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
+            </view>
+          </view>
         </view>
       </view>
     </view>
@@ -629,16 +626,6 @@ function segStyle(i: number): CSSProperties {
   };
 }
 
-// Lead caption sits at the content edge (2px inset); no top margin (global gap).
-const slotCaptionStyle: CSSProperties = {
-  padding: "0 2px",
-  marginBottom: "10px",
-};
-const subtitleStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
 // De-carded: slot meter sits on the page floor (2px optical inset).
 const meterBlockStyle: CSSProperties = {
   padding: "0 2px",
@@ -659,15 +646,15 @@ const meterMaxStyle: CSSProperties = {
   fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
-// De-carded device card (form b): filled surface, no border.
-const trialCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  marginTop: "12px",
-  borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
+const trialRowStyle: CSSProperties = {
+  boxShadow: "none",
+  borderRadius: "0",
+  background: "transparent",
 };
 const sectionTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
+  lineHeight: "18px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -724,21 +711,20 @@ const ctaLabelStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
 };
 const phoneActivationCardStyle: CSSProperties = {
-  marginTop: "12px",
-  borderRadius: "16px",
+  marginTop: "8px",
+  borderRadius: "var(--ui-radius-surface)",
   border: "1px solid var(--v5-border)",
   background: "var(--v5-surface)",
   padding: "12px",
 };
 const phoneActivationIconStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  borderRadius: "12px",
-  background: "color-mix(in oklab, var(--v5-brand) 13%, var(--v5-surface))",
+  width: "28px",
+  height: "28px",
 };
 const phoneActivationTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "13px",
+  lineHeight: "18px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -750,17 +736,28 @@ const phoneActivationBodyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const phoneActivationCtaStyle: CSSProperties = {
-  marginTop: "12px",
+  marginTop: "8px",
   minHeight: "44px",
+  boxSizing: "border-box",
+  padding: "10px 12px",
   borderRadius: "999px",
-  background: "var(--v5-brand)",
+  background: "var(--v5-brand-soft)",
 };
 const phoneActivationCtaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-on-brand)",
+  lineHeight: "18px",
+  fontWeight: 500,
+  color: "var(--v5-brand)",
 };
 
 
 </script>
+
+<style scoped>
+.device-inventory-section { margin-top: 18px; min-width: 0; }
+.device-inventory-list { overflow: hidden; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+.device-inventory-list > :deep(.device-inventory-row + .device-inventory-row),
+.device-inventory-list > :deep(.trial-device-row + .device-inventory-row) { border-top: 1px solid var(--v5-border); }
+.device-inventory-connections:empty { display: none; }
+</style>
