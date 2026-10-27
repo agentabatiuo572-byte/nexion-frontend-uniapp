@@ -47,10 +47,10 @@
       </view>
 
       <!-- 《02》§7:混合内容整句禁 Mono;保留 tabular-nums 让数字仍等宽对齐 -->
-      <view class="earnings-feedback" :aria-busy="retrying ? 'true' : 'false'">
+      <view class="earnings-feedback" :class="{ 'nx-inline-recovery': remoteApiEnabled && (app.homeTruthStatus === 'error' || retrying) }" :aria-busy="retrying ? 'true' : 'false'">
         <template v-if="remoteApiEnabled && (app.homeTruthStatus === 'error' || retrying)">
-          <text role="status">{{ retrying ? t.home.techEarningsLoading : t.coreReview.earningsReadFailed }}</text>
-          <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying ? 'true' : 'false'" class="earnings-retry" @click="retryEarnings" @keydown.enter.prevent="retryEarnings" @keydown.space.prevent="retryEarnings"><text>{{ t.ui.retry }}</text></view>
+          <text class="nx-inline-recovery__copy" role="status">{{ retrying ? t.home.techEarningsLoading : t.coreReview.earningsReadFailed }}</text>
+          <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying ? 'true' : 'false'" class="earnings-retry nx-inline-recovery__action" @click="retryEarnings" @keydown.enter.prevent="retryEarnings" @keydown.space.prevent="retryEarnings"><text>{{ t.ui.retry }}</text></view>
         </template>
         <text v-else class="tabular-nums" style="color: var(--v5-success-ink)">{{ earningsSubtitle }}</text>
       </view>
@@ -136,5 +136,6 @@ function dotStyle(d:Dot):CSSProperties {
 <style scoped>
 @keyframes home-earning-dot {0%,100% {transform:translateY(0);opacity:.7;}50% {transform:translateY(-7px);opacity:1;}}
 .earnings-feedback { display:flex; align-items:center; gap:12px; min-height:44px; margin-top:4px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.earnings-feedback.nx-inline-recovery { display:grid; }
 .earnings-retry { display:flex; align-items:center; min-height:44px; padding-inline:8px; color:var(--v5-brand); font-weight:600; flex-shrink:0; }
 </style>

@@ -5,9 +5,9 @@
       <view class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.space.prevent="navTo('/pages/me/rewards-list?cat=promotion')"><text>{{ t.promotion.rewards }}</text><text aria-hidden="true">›</text></view>
     </view>
     <view v-if="status==='loading'&&!items.length" class="entry-status" role="status" aria-live="polite"><text>{{ t.promotion.loading }}</text></view>
-    <view v-if="status==='error'" class="entry-status" role="alert">
-      <text class="promotion-title">{{ t.promotion.error }}</text><text class="promotion-copy">{{ t.promotion.errorNote }}</text>
-      <NxButton class="entry-retry" variant="text" size="medium" :label="t.promotion.retry" @click="load(true)"><text>{{ t.promotion.retry }}</text><text aria-hidden="true">→</text></NxButton>
+    <view v-if="status==='error'" class="entry-status nx-inline-recovery" role="alert">
+      <view class="nx-inline-recovery__copy"><text class="promotion-title">{{ t.promotion.error }}</text><text class="promotion-copy">{{ t.promotion.errorNote }}</text></view>
+      <NxButton class="entry-retry nx-inline-recovery__action" variant="text" size="medium" :label="t.promotion.retry" @click="load(true)"><text>{{ t.promotion.retry }}</text><text aria-hidden="true">→</text></NxButton>
     </view>
     <view v-if="status==='ready'&&!items.length&&mode==='events'" class="entry-status">
       <text class="promotion-title">{{ t.promotion.empty }}</text><text class="promotion-copy">{{ t.promotion.emptyNote }}</text>
@@ -165,8 +165,10 @@ onBeforeUnmount(()=>{visible=false;fence.invalidate();clear();});
 <style scoped>
 .promotion-entry { display: flex; flex-direction: column; gap: var(--ui-space-inset); }
 .promotion-entry-home { gap: 0; }
-.entry-retry { width: 100%; }
+.entry-retry { width: auto; }
 .entry-status { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ui-space-row-y); padding: var(--ui-space-inline) 0; }
+.entry-status.nx-inline-recovery { display:grid; align-items:center; gap:12px; }
+.entry-status.nx-inline-recovery .promotion-title { text-wrap: balance; }
 .entry-advert,.entry-event { position: relative; overflow: hidden; border: 1px solid var(--v5-border); border-radius: 24px; background: linear-gradient(140deg,var(--ui-spotlight-top),var(--ui-ticket-bottom)); }
 .entry-advert { min-height: 146px; border: 0; background: radial-gradient(70% 90% at 82% 72%,rgba(158,220,29,.24),transparent 62%),radial-gradient(50% 70% at 100% 0%,rgba(255,255,255,.08),transparent 60%),linear-gradient(135deg,#171717,#101010); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
 .entry-advert[data-color-scheme="light"] { --promotion-copy-ink: var(--v5-ink); background: radial-gradient(70% 90% at 82% 72%,color-mix(in srgb,var(--v5-brand) 12%,transparent),transparent 64%),linear-gradient(135deg,var(--ui-spotlight-top),var(--ui-ticket-bottom)); box-shadow: inset 0 0 0 1px var(--v5-border); }

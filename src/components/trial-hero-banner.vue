@@ -140,7 +140,7 @@ function retryEligibility() {
 .trial-cta.nx-design-glass :deep(.nx-liquid-tint) { box-shadow: inset 0 1px 0 rgba(var(--ui-glass-rgb),.42), inset 0 -1px 1px rgba(var(--ui-glass-rgb),.08), inset 0 0 14px rgba(var(--ui-glass-rgb),.05); }
 .trial-cta text { white-space: normal; overflow-wrap: anywhere; }
 .trial-cta svg { flex: none; }
-.trial-retry { position:relative;z-index:1;padding:8px 14px;font:500 12px/1.5 var(--font-v5);color:var(--v5-warning); }
+.trial-retry { position:relative;z-index:1;padding:8px 14px;font:600 13px/20px var(--font-v5);color:var(--v5-warning); }
 .trial-art { position: absolute; width: 43%; aspect-ratio: 1; right: 0; top: 50%; margin-top: -21.5%; pointer-events: none; }
 .trial-art .nx-home-art { width: 100%; height: 100%; background-image: url('/static/img/home-glass-20260928/s1.webp'); }
 .trial-aura { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(ellipse at 83% 54%, color-mix(in srgb, var(--v5-brand) 12%, transparent), transparent 65%); }

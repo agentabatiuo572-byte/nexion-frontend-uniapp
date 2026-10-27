@@ -18,6 +18,7 @@ import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
 import { syncExplicitProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import "./styles/tokens.css";
+import "./styles/inline-recovery.css";
 import "uno.css";
 
 declare global {

@@ -7,9 +7,9 @@
   <AppChassis active="me">
     <view class="message-family" style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" />
-      <view v-if="prefs.error" class="mx-4" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
-        <text>{{ preferenceError }}</text>
-        <view class="family-control family-control--text preferences-retry" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
+      <view v-if="prefs.error" class="mx-4 nx-inline-recovery" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
+        <text class="nx-inline-recovery__copy">{{ preferenceError }}</text>
+        <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
           <text>{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -57,9 +57,9 @@
       <view class="mx-4 notification-management">
         <text class="block" :style="headingStyle">{{ t.notifs.drawerTitle }}</text>
         <text v-if="notifs.loading" class="block" role="status" aria-live="polite">{{ t.help.loadingMore }}</text>
-        <view v-if="notifs.error" class="notification-management-error" role="alert" data-testid="notification-clear-error">
-          <text>{{ t.notifs.loadFailed }}</text>
-          <view class="family-control family-control--text preferences-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="refreshNotifications"><text>{{ t.ui.retry }}</text></view>
+        <view v-if="notifs.error" class="notification-management-error nx-inline-recovery" role="alert" data-testid="notification-clear-error">
+          <text class="nx-inline-recovery__copy">{{ t.notifs.loadFailed }}</text>
+          <view class="family-control family-control--text nx-inline-recovery__action" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="refreshNotifications"><text>{{ t.ui.retry }}</text></view>
         </view>
         <view class="family-control notification-clear-read" role="button" :tabindex="clearingRead || notifs.loading ? -1 : 0" :aria-disabled="clearingRead || notifs.loading" :aria-label="t.notifs.clearReadAria" @click="confirmClearRead"><LiquidGlass :radius="24" /><text>{{ t.notifs.clearReadAria }}</text></view>
       </view>
@@ -196,7 +196,6 @@ const footerStyle: CSSProperties = {
 </script>
 
 <style scoped>
-.preferences-retry { margin-top: 8px; }
 .notification-management { margin-top: 20px; }
 .notification-clear-read { min-height: 44px; margin-top: 8px; }
 .notification-management-error { color: var(--v5-danger); }

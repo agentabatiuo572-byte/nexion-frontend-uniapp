@@ -39,6 +39,7 @@ function open(){if(canOpen.value)emit('open');}
 .team-summary__number::-webkit-scrollbar,.team-summary__direct > text:last-child::-webkit-scrollbar { display: none; }
 .team-summary__empty,.team-summary__status { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .team-summary__action { max-width: 100%; }
+.team-summary__status .team-summary__action { font: 600 13px/20px var(--font-v5); }
 .team-summary[role='link'] { cursor: pointer; }
 .team-summary[role='link']:active { opacity: .8; }
 .team-summary:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }

@@ -407,8 +407,7 @@ const retryFundsStyle: CSSProperties = {
   justifyContent: "center",
   background: "var(--v5-surface)",
   color: "var(--v5-ink-2)",
-  fontSize: "13px",
-  fontWeight: 600,
+  font: "600 13px/20px var(--font-v5)",
 };
 </script>
 

@@ -5,7 +5,7 @@
       <view v-if="loading" class="learning-state" role="status"><text>{{ t.learning.centerLoading }}</text></view>
       <view v-else-if="error" class="learning-state" role="alert" aria-live="assertive">
         <text class="block">{{ errorText }}</text>
-        <NxButton class="learning-retry" variant="text" :label="t.ui.retry" @click="load" />
+        <NxButton class="learning-retry nx-retry-action" variant="text" :label="t.ui.retry" @click="load" />
       </view>
       <view v-else-if="overview">
         <view class="learning-summary">

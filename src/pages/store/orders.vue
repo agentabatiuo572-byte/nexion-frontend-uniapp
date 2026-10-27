@@ -74,7 +74,7 @@
           <text>{{ t.orders.loadMore }}{{ orders.loadingMore ? '…' : '' }}</text>
         </view>
         <view v-if="remoteApiEnabled && genesis.orderPage.cursor" class="active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="genesis.orderPage.busy ? 'true' : 'false'" :aria-busy="genesis.orderPage.busy ? 'true' : 'false'" @click="!genesis.orderPage.busy && genesis.loadMoreGenesisOrders()">
-          <text>{{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}</text>
+          <text :class="{ 'order-read-retry-label': genesis.orderPage.error }">{{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}</text>
         </view>
       </view>
     </view>
@@ -337,12 +337,12 @@ const remoteErrorStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };
 const retryBtnStyle: CSSProperties = {
-  minHeight: "32px",
+  minHeight: "44px",
   padding: "0 10px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink)",
-  fontSize: "12px",
+  font: "600 13px/20px var(--font-v5)",
 };
 const loadMoreBtnStyle: CSSProperties = {
   minHeight: "44px",
@@ -396,3 +396,7 @@ function statusChipStyle(status: OrderStatus): CSSProperties {
   };
 }
 </script>
+
+<style scoped>
+.order-read-retry-label { font: 600 13px/20px var(--font-v5); }
+</style>

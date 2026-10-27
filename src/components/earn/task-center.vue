@@ -66,19 +66,21 @@
     </view>
     <view
       v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'"
-      class="mb-3 rounded-xl"
+      class="mb-3 rounded-xl nx-inline-recovery"
       style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)"
     >
-      <text class="block" style="font-size: 12px; font-weight: 600">{{ t.wallet.assignmentsUnavailableTitle }}</text>
-      <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.assignmentsUnavailableBody }}</text>
+      <view class="nx-inline-recovery__copy">
+        <text class="block" style="font-size: 12px; font-weight: 600">{{ t.wallet.assignmentsUnavailableTitle }}</text>
+        <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.assignmentsUnavailableBody }}</text>
+      </view>
       <view
-        class="inline-flex items-center active:opacity-70"
-        style="min-height: 44px; margin-top: 4px; color: var(--v5-brand)"
+        class="nx-inline-recovery__action active:opacity-70"
+        style="color: var(--v5-brand)"
         role="button"
         tabindex="0"
         @click="retryAssignments"
       >
-        <text>{{ t.tradein.errPleaseRetry }}</text>
+        <text>{{ t.ui.retry }}</text>
       </view>
     </view>
     <view

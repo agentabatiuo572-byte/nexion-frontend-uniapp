@@ -13,7 +13,7 @@
       <view v-else-if="error" class="course-state" role="alert" aria-live="assertive">
         <text class="block" style="text-wrap: pretty">{{ errorText }}</text>
         <text v-if="error === 'courseIdMissing'" class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses" @keydown.enter.prevent="onKeyboardActivate($event, backToCourses)" @keydown.space.prevent="onKeyboardActivate($event, backToCourses)">{{ t.learning.centerTitle }}</text>
-        <text v-else class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.ui.retry" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text>
+        <text v-else class="block active:opacity-70" style="margin-top: 12px; min-height: 44px; font: 600 13px/20px var(--font-v5); color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.ui.retry" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text>
       </view>
       <view v-else-if="course && serverCompleted" class="course-completed">
         <view class="course-result" role="status" aria-live="polite">
@@ -30,9 +30,9 @@
             <NxButton data-testid="learning-next-course" class="course-next__cta" variant="primary" :label="completionCopy.startNext" @click="openNextCourse" />
           </view>
           <view v-else-if="nextLoading" class="course-next-state" role="status"><text>{{ completionCopy.nextLoading }}</text></view>
-          <view v-else-if="nextError" class="course-next-state" role="alert">
-            <text>{{ completionCopy.nextUnavailable }}</text>
-            <NxButton class="course-next__retry" variant="text" :label="t.ui.retry" @click="loadNextCourses" />
+          <view v-else-if="nextError" class="course-next-state nx-inline-recovery" role="alert">
+            <text class="nx-inline-recovery__copy">{{ completionCopy.nextUnavailable }}</text>
+            <NxButton class="nx-inline-recovery__action" variant="text" :label="t.ui.retry" @click="loadNextCourses" />
           </view>
           <view v-else-if="nextOverview" class="course-next-state"><text>{{ auditCopy.allCoursesDone }}</text><text class="course-next__reward">{{ fmt(auditCopy.earned, { n: formatAmount(nextOverview.earnedNex) }) }}</text></view>
           <NxButton class="course-result__back" variant="text" :label="completionCopy.backToCenter" @click="backToCourses" />
@@ -601,7 +601,7 @@ onUnmounted(resetNextCourses);
 .course-quiz-result__retry { width:100%;margin-top:8px; }
 .course-next-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px; text-align: center; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); }
 .learning-course .course-result__back { display: flex; box-sizing: border-box; width: 100%; min-height: 44px; margin-top: var(--v5-space-2); padding: var(--v5-space-2) var(--v5-space-3); font-size: 14px; font-weight: 400; color: var(--v5-ink-2); }
-.course-next__retry { margin-top: var(--v5-space-1); }
+.course-next-state.nx-inline-recovery { display: grid; align-items: center; gap: 12px; text-align: start; }
 [role="radio"] { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 12px; border: 1px solid var(--v5-border); border-radius: 14px; font: 400 14px/1.5 var(--font-v5); }
 [role="radio"][aria-checked="true"] { border-color: var(--v5-brand); background: color-mix(in srgb,var(--v5-brand) 6%,transparent); }
 .course-radio { width: 18px; height: 18px; border: 1px solid var(--v5-ink-3); border-radius: 50%; flex: none; }

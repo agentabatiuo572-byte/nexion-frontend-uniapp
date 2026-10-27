@@ -42,7 +42,7 @@
           </view>
           <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ platformDisplayText(n.body) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="22" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
         </view>
-        <view v-if="notifs.error" data-testid="notification-error" class="message-state" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()" @keydown.enter.prevent="notifs.retryRemote()" @keydown.space.prevent="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
+        <view v-if="notifs.error" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()" @keydown.enter.prevent="notifs.retryRemote()" @keydown.space.prevent="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
         <view v-if="notifs.loading && !filtered.length" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
         <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loading ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
         <view v-if="notifs.items.length || notifs.nextCursor" class="notification-management">
@@ -342,7 +342,7 @@ watch(section, () => { resetHeader(); preserveSectionInH5(); });
 <style scoped>
 .message-recovery-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .message-nav .message-summary-recovery { flex: 1; min-width: 0; margin: 0 8px; }
-.message-nav .message-summary-recovery .message-button { font-size: 12px; line-height: 18px; text-align: center; }
+.message-nav .message-summary-recovery .message-button { font: 600 13px/20px var(--font-v5); text-align: center; }
 .notification-management { display: flex; justify-content: flex-end; padding: 4px 0 8px; }
 /* Keep the shared segment semantics and keyboard handling; only this page's
    rails use the reference's green primary selection and neutral category glass. */

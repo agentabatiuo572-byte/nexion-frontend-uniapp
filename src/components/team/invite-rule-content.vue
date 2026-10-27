@@ -46,6 +46,6 @@ onMounted(() => {
 <style scoped>
 .invite-rules-content { color: var(--v5-ink-2); font: 400 14px/1.6 var(--font-v5); }
 .invite-rules-content > text { display: block; margin-bottom: 12px; }
-.invite-rules-retry { min-height: 44px; display: flex; align-items: center; color: var(--v5-brand); }
+.invite-rules-retry { min-height: 44px; display: flex; align-items: center; color: var(--v5-brand); font: 600 13px/20px var(--font-v5); }
 .invite-rules-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 </style>
