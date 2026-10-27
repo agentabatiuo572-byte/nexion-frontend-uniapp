@@ -1955,6 +1955,7 @@ catalog: {
     inventorySlotMeter: "{active}/{max} slots active",
     inventorySlotsLabel: "Compute slots",
     inventorySectionActive: "Active",
+    inventorySectionDevices: "Your devices",
     inventorySectionInventory: "Inventory",
     inventorySectionActivationUnconfirmed: "Status unconfirmed",
     inventoryActivationUnconfirmed: "The device activation record is pending confirmation and cannot be activated yet. Refresh and try again, or contact support.",

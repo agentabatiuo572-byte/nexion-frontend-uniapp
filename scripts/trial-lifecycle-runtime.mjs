@@ -65,7 +65,8 @@ try{
     await page.waitForFunction(()=>JSON.stringify(document.querySelector('[data-home-section=fleet] .nx-section__meta')?.textContent?.match(/\d+/g))==='["3","6"]');
     await page.locator('[data-home-section=fleet]').scrollIntoViewIfNeeded();const active=await capture('active-fleet');
     assert.deepEqual(await bounds('.trial-device-row,.trial-cta,.tcs-panel'),[]);
-    await page.locator('[data-home-section=fleet] .trial-device-row__details').click();await page.waitForURL(/pages\/me\/trial/);
+    assert.equal(await page.locator('[data-home-section=fleet] .trial-device-row__body').count(),0,'Home trial stays a compact device row');
+    await page.locator('[data-home-section=fleet] .trial-device-row__heading').click();await page.waitForURL(/pages\/me\/trial/);
     await page.locator('[data-testid=trial-credit-summary]').waitFor();
     const detail=await capture('detail');
     const buy=page.locator('[data-testid=trial-credit-summary] [role=button]');await buy.click();await page.waitForURL(/pages\/store\/checkout/);
@@ -74,10 +75,45 @@ try{
     const checkout=await capture('early-checkout');
     const checkoutRoute=new URL(page.url()).hash;
     await go('/pages/me/devices');await page.locator('[data-trial-device-row]').waitFor();
-    assert.equal(await page.locator('[data-trial-device-row]').count(),1);const management=await capture('management');
+    assert.equal(await page.locator('[data-trial-device-row]').count(),1);
+    await page.locator('.device-inventory-row__heading').first().waitFor();
+    assert.equal(await page.locator('.device-inventory-row').count(),2,'Management preserves both purchased devices');
+    assert.equal(await page.locator('.device-inventory-row__action').count(),0,'Management actions belong to the expanded detail area');
+    const inventoryGeometry=await page.evaluate(()=>{
+      const trial=document.querySelector('.trial-device-row__heading'),paid=document.querySelector('.device-inventory-row__heading');
+      const a=trial.getBoundingClientRect(),b=paid.getBoundingClientRect();
+      const tn=trial.querySelector('.trial-device-row__name'),pn=paid.querySelector('.device-inventory-row__name');
+      const art=trial.querySelector('.trial-device-row__art').getBoundingClientRect(),badge=trial.querySelector('.trial-device-row__image-badge').getBoundingClientRect();
+      return {trialHeight:a.height,paidHeight:b.height,trialNameX:tn.getBoundingClientRect().x,paidNameX:pn.getBoundingClientRect().x,trialFont:getComputedStyle(tn).font,paidFont:getComputedStyle(pn).font,badgeInside:badge.left>=art.left-.5&&badge.right<=art.right+.5&&badge.top>=art.top-.5&&badge.bottom<=art.bottom+.5,badgeAtTop:badge.top-art.top<3};
+    });
+    assert.ok(Math.abs(inventoryGeometry.trialHeight-inventoryGeometry.paidHeight)<=1,'Management trial and purchased rows share the same height');
+    assert.ok(Math.abs(inventoryGeometry.trialNameX-inventoryGeometry.paidNameX)<=1,'Management device names align');
+    assert.equal(inventoryGeometry.trialFont,inventoryGeometry.paidFont,'Management device names use the same typography');
+    assert.ok(inventoryGeometry.badgeInside&&inventoryGeometry.badgeAtTop,'Trial image badge remains contained at the top');
+    await page.locator('.device-inventory-row__heading').first().focus();await page.keyboard.press('Enter');
+    await page.locator('.device-inventory-row__action').first().waitFor();
+    await page.locator('.device-inventory-row__heading').first().click();
+    assert.equal(await page.locator('.device-inventory-row__action').count(),0);
+    const management=await capture('management');
     await go('/pages/earn/earn');await page.locator('[data-trial-device-row]').waitFor();
     assert.ok(await page.locator('.earn-fleet-content > [data-trial-device-row]').evaluate(el=>{const s=getComputedStyle(el);return parseFloat(s.borderTopLeftRadius)>0&&parseFloat(s.borderTopRightRadius)>0;}),'Earn trial row preserves the fleet card corners');
-    assert.equal(await page.locator('[data-trial-device-row]').count(),1);const earn=await capture('earn');
+    assert.equal(await page.locator('[data-trial-device-row]').count(),1);
+    assert.equal(await page.locator('.trial-device-row__body').count(),0,'Trial details must be collapsed initially');
+    await page.locator('.nx-device-card__header').first().waitFor();
+    const rowGeometry=await page.evaluate(()=>{
+      const trial=document.querySelector('.trial-device-row__heading'),paid=document.querySelector('.nx-device-card__header');
+      const a=trial.getBoundingClientRect(),b=paid.getBoundingClientRect();
+      return {trialHeight:a.height,paidHeight:b.height,trialBackground:getComputedStyle(trial).backgroundColor,paidBackground:getComputedStyle(paid).backgroundColor,trialNameX:trial.querySelector('.trial-device-row__name').getBoundingClientRect().x,paidNameX:paid.querySelector('.earn-device-name').getBoundingClientRect().x,trialImage:trial.querySelector('img')?.getAttribute('src'),paidImage:paid.querySelector('img')?.getAttribute('src')};
+    });
+    assert.ok(Math.abs(rowGeometry.trialHeight-rowGeometry.paidHeight)<=1,'Trial and paid Earn rows use the same compact height');
+    assert.ok(Math.abs(rowGeometry.trialNameX-rowGeometry.paidNameX)<=1,'Trial and paid names share the same axis');
+    assert.equal(rowGeometry.trialBackground,rowGeometry.paidBackground);
+    assert.ok(rowGeometry.trialImage?.endsWith('/s1.webp'));assert.equal(rowGeometry.trialImage,rowGeometry.paidImage);
+    const earn=await capture('earn');
+    await page.locator('.trial-device-row__heading').focus();await page.keyboard.press('Enter');await page.locator('.trial-device-row__body').waitFor();
+    await page.locator('.nx-device-card__header').first().click();
+    assert.equal(await page.locator('.trial-device-row__heading').getAttribute('aria-expanded'),'false','Paid and trial details share one expanded row');
+    assert.equal(await page.locator('.trial-device-row__body').count(),0);
     await go(checkoutRoute);await page.locator('.checkout-sticky .nx-button').click();
     await page.locator('.nx-mask--confirm').waitFor();const payment=await capture('payment-confirm');
     await page.locator('.nx-modal__actions .nx-btn--primary').click();await page.waitForURL(/pages\/store\/order-detail/);
@@ -117,7 +153,7 @@ try{
     await page.locator('[role=button][aria-disabled=false]').click();await page.locator('.tcs-panel').waitFor();
     await page.locator('.tcs-claim').click();await page.locator('.tcs-success').waitFor();const restarted=await capture('restarted');
     assert.equal((await (await fetch(base+'/__demo/state')).json()).state.trialRow.state,'ACTIVE');
-    records.push({key,unclaimed,confirm,success,active,detail,checkout,management,earn,payment,convertedOrder,convertedFleet,error,restarted,panel,states,evidence:['claim→authoritative readback→success','home 3/6 with exactly one trial','reload retains active trial','details→early checkout→explicit payment→paid activated order','conversion replaces trial with third paid device after reload','replaying one conversion command keeps order count and wallet unchanged','management and Earn trial and paid devices coexist','grace retains one slot, ended/converted remove only trial','failure→explicit retry→success','eligible-after-cooldown home and detail can reopen confirmation','320 reduced motion or 390 ordinary motion','selected extra note absent']});
+    records.push({key,unclaimed,confirm,success,active,detail,checkout,management,earn,rowGeometry,inventoryGeometry,payment,convertedOrder,convertedFleet,error,restarted,panel,states,evidence:['claim→authoritative readback→success','home 3/6 with exactly one trial','reload retains active trial','details→early checkout→explicit payment→paid activated order','conversion replaces trial with third paid device after reload','replaying one conversion command keeps order count and wallet unchanged','management and Earn trial and paid devices coexist','management trial and purchased rows align in height and typography with image-top badge','management action is keyboard-accessible inside the expanded row','trial and paid Earn rows match height/background/art/name axis','trial keyboard expansion and paid expansion are mutually exclusive','grace retains one slot, ended/converted remove only trial','failure→explicit retry→success','eligible-after-cooldown home and detail can reopen confirmation','320 reduced motion or 390 ordinary motion','selected extra note absent']});
     await context.close();
     console.log(key+' passed');
   }
