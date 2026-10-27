@@ -28,7 +28,8 @@
 - `runtime-acceptance/report.json` 为 simulation=true、pass=true、errors=[]，包含 320/390 × zh/en/vi × light/dark 共 12 组。审查者已亲看这 12 组确认层截图和 12 组首页 active-fleet 截图；另亲看成功、失败、最后 12 小时、grace、ended、converted、详情、管理、Earn、支付二次确认、转购订单及第三台设备截图。没有把读取 report.json 当作自己点击过。
 - 12 组确认层均无被要求删除的说明；产品、3 天、预计抵扣与激活按钮清楚，长语言没有横向裁切。报告中 12 组底部 padding/bottomGap 为 38px，dismiss 高度为 44px；这只证明浏览器布局，不能代替原生安全区实测。
 - 首次 12 组证据 source=`0eb1973db4ad8dd71681709f4e1cf5c8670872ad4e27c8d75ca13e46603dba1b`、build=`65b7c249b687ccf6728198abdff021b55db23f5540dbf58975da56976e81eb4f`。已用 `git diff --name-only e5810fc5 19f1a42b... -- src scripts` 确认该次快进仅涉及钱包、消息、通知及相应测试，未改变试用 UI 源。
-- 随后 `runtime-integrated/report.json` 的新快照 source=`30f1a8570569394389af647243954e992761c9e5cee053a3f03eb9a0ad4b7924`、build=`9f3c4c5c8e91394b9a7f0912e7a5258e58fb36f8eb69ac9a3346204e30220747`、`index-ChX2izrk.js`，390-zh-dark 完整模拟链 pass。此后 Earn 圆角及检查脚本继续修改，最终通过必须绑定后续新构建。
+- 随后 `runtime-integrated/report.json` 的新快照 source=`30f1a8570569394389af647243954e992761c9e5cee053a3f03eb9a0ad4b7924`、build=`9f3c4c5c8e91394b9a7f0912e7a5258e58fb36f8eb69ac9a3346204e30220747`、`index-ChX2izrk.js`，390-zh-dark 完整模拟链 pass。此后 Earn 圆角及检查脚本继续修改，因此该次通过保留为历史证据，最终签署已绑定本报告顶部的新构建。
+- 释放浏览器后，主线生成 `.cache/trial-lifecycle/runtime-final-approved/report.json`；本审查者随后亲自读取其元数据，确认 source=`fa477e96988a9d887dd804d0d27205351539293b7a3eaadfa4be42d5da47a0e0`、build=`a80abea6f1a40f40561485691d41fdc9d26729f5a8981ddba156a30b744e4152` 与本次独立指纹完全一致，390-zh-dark 完整链 pass=true、errors=0。这是主线运行的附加证据，不替代下文独立实操。
 
 ## Findings
 
