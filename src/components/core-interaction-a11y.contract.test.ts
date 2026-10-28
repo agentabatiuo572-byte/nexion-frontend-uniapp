@@ -68,7 +68,6 @@ describe("core interaction accessibility contracts", () => {
     for (const click of [
       '@click="goBack"',
       '@click="onStartNewConversation"',
-      '@click="onConvertToTicket"',
       '@click="loadEarlierNovaHistory"',
       '@click="loadEarlierHumanHistory"',
     ]) {

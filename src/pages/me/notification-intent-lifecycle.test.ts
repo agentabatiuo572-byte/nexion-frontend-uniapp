@@ -296,7 +296,7 @@ describe("message primary partition route lifecycle", () => {
     const browser = h5Entry(); const h = mount(); h.fire("load", {});
     h.fire("hide"); h.drawer.section = "service"; await vue.nextTick();
     expect(browser.history.replaceState).not.toHaveBeenCalled();
-    browser.location.hash = "#/pages/me/support-tickets?mode=list";
+    browser.location.hash = "#/pages/me/help";
     h.fire("show"); await vue.nextTick();
     expect(browser.history.replaceState).not.toHaveBeenCalled();
     browser.location.hash = "#/pages/me/notifications?section=notifications&from=me";

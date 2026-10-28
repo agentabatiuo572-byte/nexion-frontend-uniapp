@@ -49,6 +49,7 @@ function pageHarness() {
   const declaration = (name: string) => ast.statements.find(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(item => item.name.getText(ast) === name))?.getText(ast);
   // The fallback is unused by the old page and lets the same executable test prove its missing guard.
   parts.unshift(declaration("humanShowRevision") ?? "const humanShowRevision = ref(0);");
+  parts.unshift(declaration("humanHistoryListError") ?? "const humanHistoryListError = ref(false);");
   parts.unshift(declaration("humanCreateRecovery")!);
   parts.unshift(declaration("chatDisposed") ?? "let chatDisposed = false;");
   parts.unshift(declaration("supportSessionReady") ?? `const supportSessionReady = computed(() => {
@@ -270,7 +271,7 @@ function attachmentCancelBoundaryHarness() {
   const code = ts.transpileModule(ast.statements.filter(node => ts.isFunctionDeclaration(node) && names.has(node.name?.text ?? ""))
     .map(node => node.getText(ast)).join("\n") + "\n" + reset.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const deps = { app, convStore, imageDraft, supportSessionReady, humanComposerKey, toast, supportApi: api, asApiError, watch,
-    failedHumanSend: ref(null), draftText: ref(""), attachmentPolicy: ref(null), attachmentPolicyError: ref(false), ticketCreationBlock: ref(null),
+    failedHumanSend: ref(null), draftText: ref(""), attachmentPolicy: ref(null), attachmentPolicyError: ref(false),
     imageSources: ref({}), imageFailures: ref({}), isAi: ref(false), t: ref({ conversations: { image: { cancelFailed: "CANCEL_FAILED" } } }) };
   const scope = effectScope();
   const ops = scope.run(() => new Function("deps", `const {${Object.keys(deps).join(",")}} = deps;

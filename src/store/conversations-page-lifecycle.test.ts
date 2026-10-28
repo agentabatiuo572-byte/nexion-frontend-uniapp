@@ -12,14 +12,13 @@ installSupportStorage();
 
 const runtime = vi.hoisted(() => ({ remoteApiEnabled: true, supportApi: {
   authorityRevision: vi.fn(), commandResult: vi.fn(), conversations: vi.fn(),
-  conversationDismissals: vi.fn(), conversationCategories: vi.fn(), tickets: vi.fn(),
-  startConversation: vi.fn(), createTicket: vi.fn(), advisor: vi.fn(),
+  conversationDismissals: vi.fn(), conversationCategories: vi.fn(),
+  startConversation: vi.fn(), advisor: vi.fn(),
 } }));
 const notificationFixture = vi.hoisted(() => ({ store: null as any }));
 vi.mock('@/api/runtime', () => runtime);
 vi.mock('./notifications', () => ({ useNotifications: () => notificationFixture.store }));
 const { useConversations } = await import('./conversations');
-const { useTickets } = await import('./tickets');
 const { useMessageDrawer } = await import('./message-drawer');
 const available = { advisor: true, support: true, ai: false };
 function deferred<T>() {
@@ -36,7 +35,6 @@ beforeEach(() => {
   runtime.supportApi.conversations.mockResolvedValue({ items: [] });
   runtime.supportApi.conversationDismissals.mockResolvedValue([]);
   runtime.supportApi.conversationCategories.mockResolvedValue(available);
-  runtime.supportApi.tickets.mockResolvedValue({ items: [] });
   runtime.supportApi.advisor.mockResolvedValue({ assignmentId: null, currentAdvisorId: null,
     currentAdvisorName: null, assignmentState: 'UNBOUND', availability: 'UNBOUND' });
   notificationFixture.store = reactive({ unread: 0, loading: false, error: null,
@@ -140,8 +138,8 @@ it('the actual template loading branch cannot conceal a known list failure while
 function mountNotifications() {
   const scope = effectScope();
   const app = reactive({ accountKey: 'user:A', accountBindingEpoch: 1 });
-  const conversations = useConversations(), tickets = useTickets(), center = useMessageDrawer();
-  conversations.bindAccount(app.accountKey); tickets.bindAccount(app.accountKey);
+  const conversations = useConversations(), center = useMessageDrawer();
+  conversations.bindAccount(app.accountKey);
   const hooks: Record<string, Array<() => void>> = { onMounted: [], onShow: [], onHide: [], onUnmounted: [] };
   const script = notificationsPage.split('<script setup lang="ts">')[1].split('</script>')[0];
   const ast = ts.createSourceFile('notifications.ts', script, ts.ScriptTarget.ES2022, true);
@@ -166,25 +164,21 @@ function mountNotifications() {
     || (ts.isFunctionDeclaration(node) && node.name?.text === 'retry')
   ).map(node => node.getText(serviceAst));
   let controls!: { loading: { value: boolean }; failed: { value: boolean }; retry: () => void };
-  scope.run(() => run(serviceParts.join('\n') + '\ncapture({ loading, failed, retry });', { computed, conversations, tickets, center,
+  scope.run(() => run(serviceParts.join('\n') + '\ncapture({ loading, failed, retry });', { computed, conversations, center,
     capture: (value: typeof controls) => { controls = value; } }));
   const emptyCondition = serviceList.match(/v-if="([^"]+)" class="service-state service-empty"/)![1];
   const state = () => ({ loading: controls.loading.value, failed: controls.failed.value,
     empty: new Function('loading', 'failed', 'rows', `return (${emptyCondition});`)(controls.loading.value, controls.failed.value,
-      [...conversations.conversations, ...tickets.tickets]) });
+      conversations.conversations) });
   const fire = (name: string) => hooks[name].forEach(callback => callback());
   cleanups.push(() => { fire('onUnmounted'); scope.stop(); center.stopRefresh(); });
-  function create(kind: 'conversations' | 'tickets', failure: ApiError) {
-    if (kind === 'conversations') {
-      runtime.supportApi.startConversation.mockRejectedValueOnce(failure);
-      return conversations.startConversation('support', 'controlled request');
-    }
-    runtime.supportApi.createTicket.mockRejectedValueOnce(failure);
-    return tickets.createTicket({ category: 'technical', subject: 'Controlled', body: 'Details' });
+  function create(kind: 'conversations', failure: ApiError) {
+    runtime.supportApi.startConversation.mockRejectedValueOnce(failure);
+    return conversations.startConversation('support', 'controlled request');
   }
-  return { conversations, tickets, center, state, retry: () => controls.retry(), show: () => fire('onShow'), hide: () => fire('onHide'),
+  return { conversations, center, state, retry: () => controls.retry(), show: () => fire('onShow'), hide: () => fire('onHide'),
     create, unmount: () => fire('onUnmounted'), bind(key: string) {
-      app.accountKey = key; app.accountBindingEpoch++; center.bindAccount(); conversations.bindAccount(key); tickets.bindAccount(key);
+      app.accountKey = key; app.accountBindingEpoch++; center.bindAccount(); conversations.bindAccount(key);
     } };
 }
 
@@ -222,9 +216,9 @@ it('message Service defers hidden bindings until show and never resumes after un
   expect(page.conversations.categoryAvailabilityStatus).toBe('loading');
 });
 
-it.each(['conversations', 'tickets'] as const)('message Service exposes a retryable error after current %s recovery fails', async kind => {
+it.each(['conversations'] as const)('message Service exposes a retryable error after current %s recovery fails', async kind => {
   const page = mountNotifications(); page.show(); await settle();
-  const api = runtime.supportApi[kind], store = kind === 'conversations' ? page.conversations : page.tickets;
+  const api = runtime.supportApi[kind], store = page.conversations;
   const older = deferred<any>(), recovery = deferred<any>(), count = api.mock.calls.length;
   api.mockReturnValueOnce(older.promise).mockReturnValueOnce(recovery.promise);
   const initial = store.refresh(); await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(count + 1));
@@ -239,9 +233,9 @@ it.each(['conversations', 'tickets'] as const)('message Service exposes a retrya
   expect(store.error).toBeNull(); expect(page.state()).toEqual({ loading: false, failed: false, empty: true });
 });
 
-it.each(['conversations', 'tickets'] as const)('message Service clears an earlier %s list error when current recovery succeeds', async kind => {
+it.each(['conversations'] as const)('message Service clears an earlier %s list error when current recovery succeeds', async kind => {
   const page = mountNotifications(); page.show(); await settle();
-  const store = kind === 'conversations' ? page.conversations : page.tickets;
+  const store = page.conversations;
   store.error = 'earlier list read failed';
   const originalFailure = new ApiError({ kind: 'network', message: 'original command failure' });
   const outcome = page.create(kind, originalFailure);

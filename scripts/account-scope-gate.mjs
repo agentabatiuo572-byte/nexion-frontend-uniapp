@@ -35,7 +35,7 @@ check(`① 切号收口面非空(实测 ${rebound.length} 个 store)`, rebound.l
   `只找到 ${rebound.length} 个 —— 判据失效,判红`);
 
 // ② 三个本轮点名的 store 必须在收口面里(不管用 bindAccount 还是 reset)
-for (const want of ["Conversations", "Tickets", "WeeklyQuest"]) {
+for (const want of ["Conversations", "WeeklyQuest"]) {
   const hit = rebound.find((r) => r.store === want);
   check(`② ${want} 在切号收口面里(实测 ${hit ? hit.how : "缺席"})`, !!hit,
     `account-scope.ts 里没有 use${want}().bindAccount/reset —— 切号会串账`);
@@ -49,7 +49,7 @@ for (const want of ["Conversations", "Tickets", "WeeklyQuest"]) {
 //    强行留下它 = 45 条常驻误报 = 这道门的信号价值归零。故撤回,不写进判据。
 //    「按账号存的东西不许漏账号维」这条不变量,由 account-scoped-storage 的行级 API 自身保证。
 
-const FLOOR = 4;
+const FLOOR = 3; // tickets store retired with user tickets (2026-10-28)
 if (total < FLOOR) {
   console.log(`FAIL  只跑了 ${total} 格,低于登记的 ${FLOOR} 格 —— 靶被删或没执行`);
   process.exit(1);

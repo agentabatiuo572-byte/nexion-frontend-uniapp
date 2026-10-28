@@ -1,3 +1,4 @@
+import { createSupportApi } from '@/api/support-api';
 // @ts-expect-error Node-only SFC test harness.
 import { readFileSync } from "node:fs";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -249,14 +250,13 @@ import * as chatSecure from "@/lib/secure-command-id";
 import * as chatFormat from "@/i18n/format";
 import * as chatApiErrors from "@/api/errors";
 import { isSupportAttachmentNotReady, type CurrentAdvisor } from "@/api/support-api";
-import * as ticketPolicy from '@/api/support-ticket-policy';
 import { useAuth } from "@/store/auth";
 import { createSessionVault } from "@/api/session-vault";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 
 const chatTransport = vi.hoisted(() => ({
   authorityRevision: vi.fn(async () => "canonical-v1"), commandResult: vi.fn(async () => null),
-  conversation: vi.fn(), replyConversation: vi.fn(), startConversation: vi.fn(), convertConversationToTicket: vi.fn(),
+  conversation: vi.fn(), replyConversation: vi.fn(), startConversation: vi.fn(),
   conversationCategories: vi.fn(async () => ({ advisor: true, support: true, ai: false })),
   conversations: vi.fn(async () => ({ items: [] as ReturnType<typeof humanSnapshot>[] })), conversationDismissals: vi.fn(async () => []),
   advisor: vi.fn(async (): Promise<CurrentAdvisor> => ({ assignmentId: null, currentAdvisorId: null, currentAdvisorName: null, assignmentState: "UNBOUND", availability: "UNBOUND" })),
@@ -284,7 +284,6 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }, 
   chatTransport.replyConversation.mockReset().mockResolvedValue(humanSnapshot());
   chatTransport.startConversation.mockReset().mockResolvedValue(humanSnapshot());
   chatTransport.commandResult.mockReset().mockResolvedValue(null);
-  chatTransport.convertConversationToTicket.mockReset().mockResolvedValue({ conversation: humanSnapshot(), ticket: { id: "TK-fixture" } });
   chatTransport.conversationCategories.mockReset().mockResolvedValue({ advisor: true, support: true, ai: false });
   const store = useConversations(); store.bindAccount("user:1");
   const watchRealtime = vi.spyOn(store, "watchRealtime");
@@ -313,12 +312,11 @@ function mountRealHumanChat(query: Record<string, string> = { cid: "CV-cold" }, 
     "@/mock/nova-templates": {}, "@/api/runtime": { novaAiApi: {}, remoteApiEnabled: true, sessionVault, supportApi: chatTransport },
     "@/api/errors": chatApiErrors,
     "@/api/support-api": { isSupportAttachmentNotReady },
-    '@/api/support-ticket-policy': ticketPolicy,
     "@/lib/nova-failure": chatFailure, "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/lib/secure-command-id": chatSecure, "@/lib/nova-thinking": chatThinking, "./conversation-realtime-page": chatRealtime,
   };
   const scope = Vue.effectScope();
-  const page = scope.run(() => new Function("require", "exports", humanChatScript + ";return { onSend, onRestart, goBack, cleanup, ticketCreationBlock, ticketCreationBlockText, headerName, headerRole, emptyHint, humanType, isClosedSession, waitingForAgent, showUnassignedReceived, humanHistoryError, humanHistoryListError, retryHumanHistory, conv };")((name: string) => {
+  const page = scope.run(() => new Function("require", "exports", humanChatScript + ";return { onSend, onRestart, goBack, cleanup,  headerName, headerRole, emptyHint, humanType, isClosedSession, waitingForAgent, showUnassignedReceived, humanHistoryError, humanHistoryListError, retryHumanHistory, conv };")((name: string) => {
     if (name.endsWith(".vue")) return {}; if (!(name in modules)) throw new Error(`Unexpected chat dependency: ${name}`); return modules[name];
   }, {}));
   hooks.onLoad(query); chatCleanups.push(() => { page.cleanup(); scope.stop(); });
@@ -478,7 +476,7 @@ describe("real chat and store account recovery", () => {
     expect(fullSource).not.toContain("/pages/me/support-tickets");
     await current.page.onSend("Continue the conversation", vi.fn());
     expect(chatTransport.replyConversation).toHaveBeenCalledTimes(1);
-    expect(chatTransport.convertConversationToTicket).not.toHaveBeenCalled();
+    expect(Object.keys(createSupportApi({ request: vi.fn() } as never))).not.toContain("convertConversationToTicket");
     expect(current.navigation.navTo).not.toHaveBeenCalled();
   });
   it("redirects an old AI link before opening a category or sending a request", async () => {

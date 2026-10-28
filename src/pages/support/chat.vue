@@ -39,10 +39,10 @@
           <text class="cp-role-t">{{ headerRole }}</text>
         </view>
       </view>
-      <view v-if="isAi && remoteApiEnabled" class="cp-ticket active:opacity-70 family-control" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation"  @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)"><LiquidGlass :radius="22" />
+      <view v-if="isAi && remoteApiEnabled" class="cp-restart active:opacity-70 family-control" role="button" tabindex="0" :aria-label="t.conversations.restartSession" @click="onStartNewConversation"  @keydown.enter.prevent="onKeyboardActivate($event, onStartNewConversation)" @keydown.space.prevent="onKeyboardActivate($event, onStartNewConversation)"><LiquidGlass :radius="22" />
         <text>{{ t.conversations.restartSession }}</text>
       </view>
-      <view v-if="advisorApplies && convStore.advisorError" class="cp-ticket active:opacity-70 family-control" role="button" tabindex="0" :aria-label="t.conversations.image.retryPolicy" @click="convStore.refreshAdvisor()"  @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()"><LiquidGlass :radius="22" /><text>{{ t.conversations.image.retryPolicy }}</text></view>
+      <view v-if="advisorApplies && convStore.advisorError" class="cp-restart active:opacity-70 family-control" role="button" tabindex="0" :aria-label="t.conversations.image.retryPolicy" @click="convStore.refreshAdvisor()"  @keydown.enter.prevent="convStore.refreshAdvisor()" @keydown.space.prevent="convStore.refreshAdvisor()"><LiquidGlass :radius="22" /><text>{{ t.conversations.image.retryPolicy }}</text></view>
     </view>
 
     <view v-if="isAi && remoteApiEnabled" class="cp-ai-safety" role="note">
@@ -164,7 +164,6 @@ import type { ConversationType, ConvMessage } from "@/domain/support";
 
 import { ApiError, isSettledRejection, asApiError } from "@/api/errors";
 import { isSupportAttachmentNotReady, type SupportAttachmentPolicy } from "@/api/support-api";
-import type { TicketCreationPolicy } from '@/api/support-ticket-policy';
 import { novaFailure } from "@/lib/nova-failure";
 import { useLocaleStore } from "@/store/locale";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
@@ -190,17 +189,6 @@ type FailedHumanSend = { text: string; attachmentId?: string; kind: "unknown" | 
 const imageDraft = ref<ImageDraft | null>(null);
 const failedHumanSend = ref<FailedHumanSend | null>(null);
 const humanSendBusy = ref(false);
-const ticketCreationBlock = ref<TicketCreationPolicy | null>(null);
-const ticketCreationBlockText = computed(() => {
-  const policy = ticketCreationBlock.value;
-  if (!policy) return '';
-  switch (policy.reasonCode) {
-    case 'SUPPORT_TICKET_CREATE_ACTIVE_LIMIT': return fmt(t.value.tickets.policyActiveLimit, { n: policy.activeTickets });
-    case 'SUPPORT_TICKET_CREATE_DAILY_LIMIT': return fmt(t.value.tickets.policyDailyLimit, { hours: policy.windowHours });
-    case 'SUPPORT_TICKET_CREATE_DUPLICATE': return t.value.tickets.policyDuplicate;
-    default: return t.value.tickets.policyCooldown;
-  }
-});
 const draftText = ref("");
 const attachmentPolicy = ref<SupportAttachmentPolicy | null>(null);
 const attachmentPolicyError = ref(false);
@@ -219,7 +207,6 @@ watch(() => [app.accountBindingEpoch, convStore.scopeInvalidated], () => {
   humanComposerResetting = true;
   try {
     clearPrivateImages(); imageDraft.value = null; failedHumanSend.value = null; draftText.value = ""; attachmentPolicy.value = null; attachmentPolicyError.value = false;
-    ticketCreationBlock.value = null;
   } finally { humanComposerResetting = false; }
   if (novaPageVisible && !isAi.value && remoteApiEnabled && supportSessionReady.value) { void convStore.refreshAdvisor(); void loadAttachmentPolicy(); }
 }, { flush: "sync" });
@@ -441,7 +428,6 @@ let categoryGate: {
 } | null = null;
 const novaRequestControl = createLatestAbortableRequest();
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
-watch([cid, startType], () => { ticketCreationBlock.value = null; });
 const humanComposerKey = computed(() => cid.value ? `conversation:${cid.value}` : startType.value ? `start:${startType.value}` : "");
 let recoveredNavigation = "";
 function restoreRecoveredComposer(saved: HumanComposer | null | undefined, key: string) {
@@ -874,7 +860,7 @@ const quickChips = computed<QuickChip[]>(() =>
     ? [
         ...(initialPrompt.value ? [{ key: "search-query", emoji: "🔎", label: initialPrompt.value }] : []),
         { key: "explain-today", emoji: "📦", label: quickLabel("explain-today") },
-        { key: "how-to-boost", emoji: "🎫", label: quickLabel("how-to-boost") },
+        { key: "how-to-boost", emoji: "💸", label: quickLabel("how-to-boost") },
         { key: "whats-hot", emoji: "🔐", label: quickLabel("whats-hot") },
         { key: "show-top-jobs", emoji: "💬", label: quickLabel("show-top-jobs") },
       ]
@@ -1077,7 +1063,7 @@ function quickLabel(k: QuickPromptKey): string {
   if (remoteApiEnabled) {
     switch (k) {
       case "explain-today": return t.value.nova.localQOrder;
-      case "how-to-boost": return t.value.nova.localQTicket;
+      case "how-to-boost": return t.value.nova.localQWithdraw;
       case "whats-hot": return t.value.nova.localQSecurity;
       case "show-top-jobs": return t.value.nova.localQHuman;
     }
@@ -1560,8 +1546,6 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 </script>
 
 <style scoped>
-.cp-ticket-limit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 16px; padding: 12px 0; color: var(--v5-ink-3); font-size: 13px; line-height: 1.6; border-bottom: 1px solid var(--v5-border); }
-.cp-ticket-limit > text { flex-basis: 100%; }
 .cp-root {
   position: fixed;
   inset: 0;
@@ -1621,7 +1605,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   flex: 1;
   min-width: 100px;
 }
-.cp-ticket {
+.cp-restart {
   min-height: 44px;
   padding: 0 16px;
   display: flex;
