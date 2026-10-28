@@ -401,7 +401,7 @@ describe("Daily wallet ledger authority", () => {
     await bills.refreshSummary();
     const refresh = vi.spyOn(bills, 'refreshSummary');
     const run = (h: ReturnType<typeof commands>) => action === 'check-in' ? h.handleCheckIn()
-      : h.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'nex', amount: 5 } });
+      : h.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'uvt', amount: 5 } });
     const refused = commands(bills, false);
     await run(refused);
     expect(refresh).not.toHaveBeenCalled();
@@ -420,7 +420,7 @@ describe("Daily wallet ledger authority", () => {
     remote.walletBillsApi.summary.mockRejectedValueOnce(new Error('ledger unavailable'));
     const accepted = commands(bills, true);
     if (action === 'check-in') await accepted.handleCheckIn();
-    else await accepted.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'nex', amount: 5 } });
+    else await accepted.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'uvt', amount: 5 } });
     await vi.waitFor(() => expect(bills.summaryStatus).toBe('error'));
     expect(view.lifetimeEarned.value).toBe('—');
     expect(view.lifetimeSpent.value).toBe('—');
