@@ -147,7 +147,7 @@
                 <text class="truncate font-mono-tabular" :style="rowSubStyle">{{ netShort(r.channel) }} · {{ r.depositId }}</text>
                 <text v-if="stateText(r)" :style="stateTextStyle(r)">{{ stateText(r) }}</text>
               </view>
-              <view v-if="isInFlight(r)" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
+              <view v-if="isInFlight(r) && r.requiredConfirmations != null" class="nx-dep-progress" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
               <view v-if="noteText(r)"><text class="block" :style="noteStyle">{{ noteText(r) }}</text></view>
             </view>
           </view>
@@ -273,7 +273,7 @@ function load(background = false) {
           address: row.address, grossAmountUsdt: row.grossAmountUsdt,
           feeUsdt: row.creditedUsdt > 0 ? row.grossAmountUsdt - row.creditedUsdt : 0,
           creditedUsdt: row.creditedUsdt,
-          confirmations: row.confirmations, requiredConfirmations: confirmations.value,
+          confirmations: row.confirmations, requiredConfirmations: row.requiredConfirmations ?? undefined,
           reviewHold: row.status === "REVIEW_HOLD",
           status: row.status === "CREDITED" ? "credited"
             : row.status === "REORG_INVESTIGATING" ? "reorg_investigating"
@@ -444,8 +444,7 @@ function stateText(r: PaneDepositRecord): string {
   if (r.status === "credited") return tc.depositCredited;
   if (r.status === "returned") return tc.depositReturned;
   if (isInFlight(r)) {
-    const total = r.requiredConfirmations ?? 1;
-    return fmt(tc.confirmingProgress, { n: Math.min(r.confirmations ?? 0, total), total });
+    return fmt(tc.confirmingProgress, { n: r.confirmations ?? 0, total: r.requiredConfirmations ?? "-" });
   }
   return ""; // dust_hold:右侧留空,整句人工处理说明走 note 行
 }

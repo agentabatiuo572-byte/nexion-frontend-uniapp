@@ -78,7 +78,7 @@ const rows = statuses.map((status, index) => ({ depositId: `CR-${index + 1}`, st
   txHash: "0x" + String(index + 1).repeat(64), address: address.address,
   grossAmountUsdt: status === "DUST_HOLD" ? 5 : 10.125,
   creditedUsdt: ["CREDITED", "REORG_INVESTIGATING", "PROVIDER_CONFLICT_HOLD"].includes(status) ? 9.125 : 0,
-  confirmations: status === "CONFIRMING" ? 3 : 15,
+  confirmations: status === "CONFIRMING" ? 3 : 15, requiredConfirmations: 15,
   createdAt: 1_791_072_000_000 + index,
 }));
 type Messages = typeof zh | typeof en | typeof vietnamese;
@@ -520,4 +520,21 @@ test("polling is independently staggered and error recovery backs off", async ()
   random.mockReturnValue(0.999999);expect(delay("preparing")).toBe(10000);expect(delay("ready")).toBe(45000);
   expect(delay("error",0)).toBe(15000);expect(delay("error",2)).toBe(45000);expect(delay("error",20)).toBe(45000);
   random.mockRestore();
+});
+
+
+test.each([zh, en, vietnamese])("each pending deposit uses its own confirmation requirement and unknown stays unknown", async messages => {
+  const pending = [
+    { ...rows[0], depositId: "CR-11", confirmations: 3, requiredConfirmations: 20 },
+    { ...rows[0], depositId: "CR-12", confirmations: 16, requiredConfirmations: 15 },
+    { ...rows[0], depositId: "CR-13", confirmations: 3, requiredConfirmations: null },
+    { ...rows[0], depositId: "CR-14", confirmations: 2, requiredConfirmations: undefined },
+  ];
+  const h = await pane({ ...address, confirmations: 30, creditEnabled: true }, pending, messages);
+  const records = controls(h.root, "nx-dep-record-row");
+  for (const [id, n, total, bars] of [["CR-11", 3, 20, 1], ["CR-12", 16, 15, 1], ["CR-13", 3, "-", 0], ["CR-14", 2, "-", 0]] as const) {
+    const row = records.find(record => textOf(record).includes(id))!;
+    expect(textOf(row)).toContain(fmt(messages.topupChrome.confirmingProgress, { n, total }));
+    expect(controls(row, "nx-dep-progress")).toHaveLength(bars);
+  }
 });

@@ -70,3 +70,15 @@ describe("Cregis deposit API", () => {
     await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
   });
 });
+
+
+it.each([15, 20, null, undefined])("accepts per-deposit confirmation requirement %s", async requiredConfirmations => {
+  const row = { ...deposit, status: "CONFIRMING", requiredConfirmations };
+  const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue([row]) } as unknown as ApiClient);
+  await expect(api.list()).resolves.toEqual([row]);
+});
+
+it.each([14, 15.5, -1, "15", true])("rejects invalid per-deposit confirmation requirement %s", async requiredConfirmations => {
+  const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue([{ ...deposit, status: "CONFIRMING", requiredConfirmations }]) } as unknown as ApiClient);
+  await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
+});

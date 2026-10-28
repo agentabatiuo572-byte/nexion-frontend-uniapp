@@ -19,6 +19,7 @@ export interface CregisDeposit {
   grossAmountUsdt: number;
   creditedUsdt: number;
   confirmations: number;
+  requiredConfirmations?: number | null;
   status: "CONFIRMING" | "CREDITED" | "DUST_HOLD" | "REVIEW_HOLD"
     | "REORG_INVESTIGATING" | "PROVIDER_CONFLICT_HOLD" | "REFUNDED" | "REORG_REVERSED";
   createdAt: number;
@@ -53,6 +54,7 @@ export function createCregisDepositApi(client: ApiClient) {
           || typeof row.grossAmountUsdt !== "number" || row.grossAmountUsdt <= 0
           || typeof row.creditedUsdt !== "number" || row.creditedUsdt < 0
           || !Number.isInteger(row.confirmations) || row.confirmations < 0
+          || (row.requiredConfirmations != null && (!Number.isSafeInteger(row.requiredConfirmations) || row.requiredConfirmations < 15))
           || typeof row.createdAt !== "number" || !Number.isFinite(row.createdAt)
           || !["CONFIRMING", "CREDITED", "DUST_HOLD", "REVIEW_HOLD",
             "REORG_INVESTIGATING", "PROVIDER_CONFLICT_HOLD", "REFUNDED", "REORG_REVERSED"].includes(String(row.status)))) {
