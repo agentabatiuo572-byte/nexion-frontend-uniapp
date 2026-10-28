@@ -63,7 +63,7 @@ const totalCopy = {
   vi: "Gồm thưởng đang xử lý. Số dư khả dụng xem trong ví.",
 };
 const fixture = (status: Bill["status"], type: Bill["type"] = "refer"): Bill => ({
-  id: "WL-840781", type, amount: 99.5, symbol: "NEX", status,
+  id: "WL-840781", type, amount: 99.5, symbol: "UVT", status,
   ts: Date.parse("2026-10-05T11:48:21Z"), memo: "", memoKey: "refer", ref: "F2-NETWORK-NEX-376",
 });
 async function mount(localeCode: Locale, rows: Bill[] = [], page: keyof typeof codes = "list", category?: string, initialReadFailed = false) {

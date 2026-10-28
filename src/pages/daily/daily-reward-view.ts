@@ -95,8 +95,8 @@ export function dailyMilestoneRewardText(reward: {
   }
   const unit = type === "POINTS" ? labels.points
     : type === "SPIN" ? labels.spin
-    : type === "NEX" ? labels.nex
+    : type === "UVT" ? labels.nex
     : type === "USDT" ? labels.usdt
     : labels.unknown;
-  return `${unit} ${type === "USDT" || type === "NEX" ? formatAmount(reward.rewardAmount) : reward.rewardAmount}`;
+  return `${unit} ${type === "USDT" || type === "UVT" ? formatAmount(reward.rewardAmount) : reward.rewardAmount}`;
 }

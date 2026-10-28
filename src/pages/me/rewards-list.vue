@@ -220,9 +220,9 @@ const voucherKnownEmpty = computed(() => (!remoteApiEnabled || voucher.remoteSta
 function retryVouchers() { void voucher.refreshRemote(); }
 
 // ── reward records (per-symbol, newest-first from the ledger) ──
-const symbol = computed(() => (cat.value === "nex" ? "NEX" : "USDT"));
+const symbol = computed(() => (cat.value === "nex" ? "UVT" : "USDT"));
 const usdtRewardsPager = bills.getLedger({ asset: "USDT", category: "REWARD" });
-const nexRewardsPager = bills.getLedger({ asset: "NEX", category: "REWARD" });
+const nexRewardsPager = bills.getLedger({ asset: "UVT", category: "REWARD" });
 const activePager = computed(() => cat.value === "nex" ? nexRewardsPager : usdtRewardsPager);
 const records = computed(() => fundsServerEnabled
   ? activePager.value.rows

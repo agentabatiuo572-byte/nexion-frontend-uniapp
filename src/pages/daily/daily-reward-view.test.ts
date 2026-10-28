@@ -5,7 +5,7 @@ const labels = dailyRewardLabels({
   badgeLabel: "Badge",
   rewardPoints: "Points",
   rewardSpin: "Spin tickets",
-  rewardNex: "NEX",
+  rewardNex: "UVT",
   rewardUsdt: "USDT",
   rewardUnknown: "Reward",
   badgeStreakMaster: "Streak Master",
