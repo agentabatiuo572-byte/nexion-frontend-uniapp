@@ -574,7 +574,7 @@ async function handleCheckIn() {
   // 对策照仓里既有的自愈教条(App.vue reconcileBills:「别记,从现有数据推出来」)——
   // ref 用**当天日期**保持稳定,进页面时若发现「今天签过但账上没有那条分录」就补发;
   // 幂等出口保证补发不会变成第二次发钱。
-  const paid = postMoneyBillsOnce([{ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted",
+  const paid = postMoneyBillsOnce([{ type: "bonus", symbol: "UVT", amount: r.gained, status: "posted",
     memo: `Daily check-in · ${r.streak}-day streak`, ref: signInRef(faucet.lastSignedInAt) }]);
   // 签到发奖这一跳就是上面那个 POST /api/faucet/sign-in —— 地区拒绝以它的结果回来。
   // 🔴 翻译不出来(`null`)就是普通结果,原样落回下面的 `!== "ok"` 出口:
@@ -644,7 +644,7 @@ async function handleClaimMilestone(m: Milestone) {
     // 发钱失败对用户是**响的**(有失败提示),不是静默吞掉。
     const paid = postMoneyBillsOnce([{
       type: "bonus",
-      symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
+      symbol: m.reward.type === "usdt" ? "USDT" : "UVT",
       amount: m.reward.amount,
       status: "posted",
       memo: `Streak milestone · Day-${m.day}`,

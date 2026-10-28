@@ -110,7 +110,7 @@ const primary = (root: RenderNode) => pageButtons(root).find(el =>
 const stat = (root: RenderNode, label: string) => renderText(renderNodes(root).find(el => el.children.some(child => renderText(child) === label))!.children[1]);
 async function settlePage() { for (let n = 0; n < 20; n++) await Promise.resolve(); await Vue.nextTick(); }
 function pointsState(signed = false) {
-  return { rewardAsset: "NEX", serverDate: "2026-10-01", nextResetAtUtc: "2026-10-01T17:00:00Z",
+  return { rewardAsset: "UVT", serverDate: "2026-10-01", nextResetAtUtc: "2026-10-01T17:00:00Z",
     streak: { currentStreak: 1, longestStreak: 1, streakSavers: 1, lastCheckInDate: signed ? "2026-10-01" : null, checkedInToday: signed },
     dailyMilestones: [], earningMilestones: [], badgeAchievements: [], powerUps: [], topStreakers: [],
     rules: [{ key: "baseline", value: "2" }], source: "nx_user_streak + nx_daily_check_in",
