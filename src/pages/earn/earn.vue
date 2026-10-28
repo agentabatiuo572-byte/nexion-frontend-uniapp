@@ -111,7 +111,6 @@
         <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0" @toggle="toggleDevice(d.id)" />
       </EmptySlotsHint>
 
-      <ComputeShareEntry />
       <!-- Loss-aversion — moved directly above the market board -->
       <MissedIncomeBanner />
       <MarketBoard />
@@ -133,7 +132,6 @@ import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 import MissedIncomeBanner from "@/components/earn/missed-income-banner.vue";
-import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
 import MarketBoard from "@/components/earn/market-board.vue";
 import TaskCenter from "@/components/earn/task-center.vue";

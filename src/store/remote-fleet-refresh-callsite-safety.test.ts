@@ -21,7 +21,6 @@ describe("remote fleet refresh callsite safety", () => {
 
   it("keeps every existing mutation, recovery, and retry readback fresh by default", () => {
     const mutationOrRecoveryCallers = [
-      "../pages/compute-share/download.vue",
       "../pages/me/wallet.vue",
       "../pages/me/wallet-withdraw.vue",
       "../pages/onboarding/connect.vue",
