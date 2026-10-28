@@ -74,7 +74,7 @@
                 <text class="block truncate" :style="{ fontSize: '12px' }">{{ wing.top.name }}</text>
                 <view class="flex items-center" style="gap: 4px; margin-top: 2px">
                   <VBadge :v="wing.top.vRank" size="sm" :show-title="false" />
-                  <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">${{ formatAmount(wing.top.monthVolumeUSD) }}</text>
+                  <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ formatComputePoints(wing.top.monthComputePoints, locale.code) }}</text>
                 </view>
               </view>
             </view>
@@ -115,6 +115,8 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { formatComputePoints } from "@/i18n/compute-points";
+import { useLocaleStore } from "@/store/locale";
 import { computed, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -139,6 +141,7 @@ import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 
 const t = useT();
+const locale = useLocaleStore();
 const network = useNetwork();
 const commission = useCommission();
 const phase = useProductPhase();
@@ -193,7 +196,7 @@ const recentBinaries = computed(() =>
 const spilloverCount = computed(() => remoteApiEnabled ? snapshot.value?.autoPlacedMembers ?? 0 : network.members.filter((m) => m.isSpillover).length);
 
 function topOf(members: NetworkMember[]): NetworkMember | undefined {
-  return [...members].sort((a, b) => b.monthVolumeUSD - a.monthVolumeUSD)[0];
+  return [...members].sort((a, b) => (b.monthComputePoints ?? -1) - (a.monthComputePoints ?? -1))[0];
 }
 
 interface Wing {

@@ -13,9 +13,9 @@ vi.mock("@/api/runtime", () => remote);
 const { useNetwork } = await import("./network");
 
 const snapshot = (id: string) => ({
-  totalMembers: 1, directMembers: 1, activeMembers: 1, monthVolumeUsdt: 10, lifetimeVolumeUsdt: null,
+  totalMembers: 1, directMembers: 1, activeMembers: 1, monthComputePoints: 10, lifetimeComputePoints: null,
   members: [{ id, name: id, avatarUrl: null, vRank: 1, layer: 1 as const, leg: "A" as const,
-    joinedAt: "2026-08-13T00:00:00Z", monthVolumeUsdt: 10, lifetimeVolumeUsdt: null,
+    joinedAt: "2026-08-13T00:00:00Z", monthComputePoints: 10, lifetimeComputePoints: null,
     status: "ACTIVE" as const, region: "SG" }], source: "server" as const,
   sourceEnvironment: "SANDBOX" as const, runId: "TEAM-RUN-20260816", serverCanonical: true as const,
   generatedAt: "2026-08-13T00:00:00Z",

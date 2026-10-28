@@ -1,3 +1,4 @@
+import { computePointsCopy, formatComputePoints } from "@/i18n/compute-points";
 import { describe, expect, it, vi } from "vitest";
 import { rankConditionsText, rankGapText, rankLabel, rankName } from "./v-rank-copy";
 import { en } from "@/i18n/messages/en";
@@ -47,16 +48,11 @@ describe("canonical V-rank title locale", () => {
     expect(rankName({ title: "𠮷田团队", cnTitle: "𠮷田团队" }, "en")).toBe("");
     expect(rankName({ title: "Server Rank", cnTitle: "注册会员" }, "en")).toBe("Server Rank");
   });
-  it.each([
-    ["en", en, "Self-buy $0.00 more", "$765.88 more team volume", "Team $1234.12"],
-    ["zh", zh, "再自买 $0.00", "团队再 $765.88", "团队 $1234.12"],
-    ["vi", vietnamese, "Tự mua thêm $0.00", "Thêm $765.88 doanh số nhóm", "Doanh số nhóm $1234.12"],
-  ] as const)("renders %s monetary thresholds and gaps with two decimals without Intl", (locale, copy, tiny, teamGap, threshold) => {
-    vi.stubGlobal("Intl", undefined);
-    try {
-      expect(rankGapText(copy, { kind: "selfBuy", amount: 500 - 499.999999 }, locale, [])).toBe(tiny);
-      expect(rankGapText(copy, { kind: "teamVolume", amount: 2_000 - 1234.123456 }, locale, [])).toBe(teamGap);
-      expect(rankConditionsText(copy, { teamVolumeUSD: 1234.123456 }, locale)).toBe(threshold);
-    } finally { vi.unstubAllGlobals(); }
+  it.each([["en", en], ["zh", zh], ["vi", vietnamese]] as const)("renders %s rank thresholds and gaps in compute points", (locale, copy) => {
+    expect(rankGapText(copy, { kind: "selfComputePoints", amount: 720 }, locale, [])).toBe(computePointsCopy(locale).needSelf.replace("{n}", formatComputePoints(720, locale)));
+    expect(rankGapText(copy, { kind: "teamComputePoints", amount: 7200 }, locale, [])).toBe(computePointsCopy(locale).needTeam.replace("{n}", formatComputePoints(7200, locale)));
+    const text = rankConditionsText(copy, { teamComputePoints: 20000 }, locale);
+    expect(text).toBe(`${computePointsCopy(locale).team} ≥ ${formatComputePoints(20000, locale)}`);
+    expect(text).not.toMatch(/USD|\$/);
   });
 });

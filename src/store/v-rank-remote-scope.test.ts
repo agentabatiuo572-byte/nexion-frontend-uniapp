@@ -36,21 +36,21 @@ describe("V-rank remote authority state", () => {
     const store = useVRank();
     const canonicalLadder: VRankDef[] = [
     { v: 0, title: "Remote Base", cnTitle: "Remote Base CN", conditions: {}, directBonus: 0, unilevelDepth: 1, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [] },
-    { v: 1, title: "Remote Apex", cnTitle: "Remote Apex CN", conditions: { teamVolumeUSD: 100 }, directBonus: 0, unilevelDepth: 2, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [] },
+    { v: 1, title: "Remote Apex", cnTitle: "Remote Apex CN", conditions: { teamComputePoints: 100 }, directBonus: 0, unilevelDepth: 2, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [] },
     ];
 
     const state: VRankData = {
       myRank: 0,
-      selfBuyUSD: 0,
+      selfComputePoints: 0,
       directRefs: 0,
-      teamVolumeUSD: 0,
+      teamComputePoints: 0,
       vDownlineCounts: {},
     };
     const progress = nextRankProgress(state, canonicalLadder);
     const gap = nextRankGap(state, canonicalLadder);
 
     expect(progress.next?.title).toBe("Remote Apex");
-    expect(progress.missing[0]).toMatchObject({ kind: "teamVolume", amount: 100 });
+    expect(progress.missing[0]).toMatchObject({ kind: "teamComputePoints", amount: 100 });
     expect(gap.next?.title).toBe("Remote Apex");
   });
 
@@ -67,7 +67,7 @@ describe("V-rank remote authority state", () => {
       peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [], visible: true,
     })) });
     resolveCurrent({ source: "server", rankCode: "V2", progress: {
-      selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {},
+      selfComputePoints: 0, directRefs: 0, teamComputePoints: 0, vDownlineCounts: {},
     } });
     await pending;
 
@@ -90,7 +90,7 @@ describe("V-rank remote authority state", () => {
       peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0, rewards: [], visible: true,
     })) });
     resolveCurrent({ source: "stale", rankCode: "V5", progress: {
-      selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {},
+      selfComputePoints: 0, directRefs: 0, teamComputePoints: 0, vDownlineCounts: {},
     } });
     await pending;
 

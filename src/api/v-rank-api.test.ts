@@ -32,11 +32,11 @@ it("preserves every configured reward type for App display without issuing a rew
       { type: "SKU", voucherId: undefined, skuId: "SKU-PRO", customLabel: undefined },
       { type: "CUSTOM", voucherId: undefined, skuId: undefined, customLabel: "Event access" }]);
 });
-const ladder = () => Array.from({ length: 13 }, (_, v) => row(v));
+const ladder = () => Array.from({ length: 9 }, (_, v) => row(v));
 const current = {
   source: "nx_team_member + server VRankPerformanceRepository",
   serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-  rankCode: "V2", progress: { selfBuyUSD: 100, directRefs: 2, teamVolumeUSD: 300, vDownlineCounts: {} },
+  rankCode: "V2", progress: { selfComputePoints: 100, directRefs: 2, teamComputePoints: 300, vDownlineCounts: {} },
 };
 
 describe("v-rank API authority provenance", () => {
@@ -57,7 +57,7 @@ describe("v-rank API authority provenance", () => {
     });
     const result = await createVRankApi({ request } as never, "prod").ladder();
     expect(result.capabilities).toEqual({ peer: false, genesis: false });
-    expect(result.ranks).toHaveLength(13);
+    expect(result.ranks).toHaveLength(9);
   });
 
   it("rejects non-boolean capability values", async () => {

@@ -134,7 +134,7 @@ function current(rankCode: string) {
   return {
     source: "server",
     rankCode,
-    progress: { selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {} },
+    progress: { selfComputePoints: 0, directRefs: 0, teamComputePoints: 0, vDownlineCounts: {} },
   };
 }
 

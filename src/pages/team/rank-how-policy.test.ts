@@ -23,8 +23,8 @@ describe("rank-how server policy boundary", () => {
   it("formats only server-provided ladder conditions", () => {
     expect(formatCanonicalRankConditions({
       v: 4,
-      conditions: { selfBuyUSD: 299, teamVolumeUSD: 50_000, vDownlines: { 2: 3 } },
-    }, labels)).toEqual(["Self-buy ≥ $299.00", "Team $50000.00", "3× V2"]);
+      conditions: { selfComputePoints: 2990, teamComputePoints: 50_000, vDownlines: { 2: 3 } },
+    }, labels)).toEqual(["Own compute ≥ 2,990 compute pts", "Team compute ≥ 50,000 compute pts", "3× V2"]);
     expect(formatCanonicalRankConditions({ v: 0, conditions: {} }, labels))
       .toEqual(["Register immediately"]);
   });

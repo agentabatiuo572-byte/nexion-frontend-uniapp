@@ -1,4 +1,5 @@
 import { formatAmount } from "./amount-display";
+import { computePointsCopy, formatComputePoints } from "../i18n/compute-points";
 // V 级晋升缺口的本地化文案。
 //
 // 为什么要这一层(2026-08-17,英文文案哨兵配套):`nextRankProgress` 原来直接返回**英文句子**
@@ -51,8 +52,8 @@ export function rankLabel(v: number, locale: LocaleCode, ladder: readonly VRankD
 /** 一条晋升缺口 → 当前语言的一句话。 */
 export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladder: readonly VRankDef[]): string {
   switch (gap.kind) {
-    case "selfBuy":
-      return fmt(t.rank.needSelfBuy, { n: formatAmount(gap.amount) });
+    case "selfComputePoints":
+      return computePointsCopy(locale).needSelf.replace("{n}", formatComputePoints(gap.amount, locale));
     case "directRefs":
       // 🔴 英文单复数:改成读词典时我漏了旧码的 `invite${n === 1 ? "" : "s"}`,n=1 渲染成
       //    「1 more direct invites」(独立验收抓到,我先前「en 逐字未变」那句话对 n=1 是错的)。
@@ -62,8 +63,8 @@ export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladde
       //    (词法判据才抗变异),该改的是我的写法。
       if (gap.n === 1) return fmt(t.rank.needRefsOne, { n: formatHowNumber(gap.n, locale) });
       return fmt(t.rank.needRefs, { n: formatHowNumber(gap.n, locale) });
-    case "teamVolume":
-      return fmt(t.rank.needTeam, { n: formatAmount(gap.amount) });
+    case "teamComputePoints":
+      return computePointsCopy(locale).needTeam.replace("{n}", formatComputePoints(gap.amount, locale));
     case "vDownlines":
       return fmt(t.rank.needV, { n: formatHowNumber(gap.n, locale), title: rankTitle(gap.vLevel, locale, ladder), v: gap.vLevel });
   }
@@ -71,15 +72,16 @@ export function rankGapText(t: Messages, gap: RankGap, locale: LocaleCode, ladde
 
 /** 一阶 V 级的达成条件 → 当前语言的一句话(条件之间用 ` + ` 连,无条件时给「注册即得」)。 */
 export function rankConditionsText(t: Messages, conds: {
-  selfBuyUSD?: number;
+  selfComputePoints?: number;
   directRefs?: number;
-  teamVolumeUSD?: number;
+  teamComputePoints?: number;
   vDownlines?: Record<string, number>;
 }, locale: LocaleCode = "en"): string {
   const parts: string[] = [];
-  if (conds.selfBuyUSD) parts.push(fmt(t.rank.cond.selfBuy, { n: formatAmount(conds.selfBuyUSD) }));
+  const points = computePointsCopy(locale);
+  if (conds.selfComputePoints) parts.push(`${points.self} ≥ ${formatComputePoints(conds.selfComputePoints, locale)}`);
   if (conds.directRefs) parts.push(fmt(t.rank.cond.directRefs, { n: formatHowNumber(conds.directRefs, locale) }));
-  if (conds.teamVolumeUSD) parts.push(fmt(t.rank.cond.teamVol, { n: formatAmount(conds.teamVolumeUSD) }));
+  if (conds.teamComputePoints) parts.push(`${points.team} ≥ ${formatComputePoints(conds.teamComputePoints, locale)}`);
   if (conds.vDownlines) {
     for (const [v, n] of Object.entries(conds.vDownlines)) parts.push(fmt(t.rank.cond.vDownlines, { n: formatHowNumber(n, locale), v }));
   }

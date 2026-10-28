@@ -260,9 +260,9 @@ const commissionAggregate = computed(() => commission.eventsEvidence?.aggregate 
 const rankInfo = computed(() =>
   nextRankProgress({
     myRank: vrank.myRank,
-    selfBuyUSD: vrank.selfBuyUSD,
+    selfComputePoints: vrank.selfComputePoints,
     directRefs: vrank.directRefs,
-  teamVolumeUSD: vrank.teamVolumeUSD,
+  teamComputePoints: vrank.teamComputePoints,
   vDownlineCounts: vrank.vDownlineCounts,
 }, vrank.ladder),
 );

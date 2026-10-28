@@ -28,8 +28,8 @@
             <text class="block" :style="metricSuffixStyle">{{ members.length === 1 ? t.tree.member : t.tree.membersPlural }}</text>
           </view>
           <view class="nx-glass-card rounded-2xl" :style="metricCardStyle">
-            <text class="block" :style="metricLabelStyle">{{ t.tree.monthlyVolume }}</text>
-            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : `$${formatAmount(totalVol / 1000)}K` }}</text>
+            <text class="block" :style="metricLabelStyle">{{ computePointsCopy(locale.code).month }}</text>
+            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : formatComputePoints(totalPoints, locale.code) }}</text>
             <text class="block" :style="metricSuffixStyle">{{ t.tree.acrossNetwork }}</text>
           </view>
         </view>
@@ -77,6 +77,8 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { computePointsCopy, formatComputePoints, sumComputePoints } from "@/i18n/compute-points";
+import { useLocaleStore } from "@/store/locale";
 import { computed, onMounted, reactive, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -89,6 +91,7 @@ import { UNILEVEL_USDT } from "@/store/commission";
 import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
+const locale = useLocaleStore();
 const network = useNetwork();
 onMounted(() => { if (remoteApiEnabled) void network.ensureCanonicalNetwork(); });
 onShow(() => { if (remoteApiEnabled) void network.ensureCanonicalNetwork(); });
@@ -97,7 +100,7 @@ const members = computed(() => network.members);
 const direct = computed(() => members.value.filter((m) => m.layer === 1));
 const extended = computed(() => members.value.filter((m) => m.layer !== 1));
 
-const totalVol = computed(() => members.value.reduce((s, m) => s + m.monthVolumeUSD, 0));
+const totalPoints = computed(() => sumComputePoints(members.value.map(m => m.monthComputePoints)));
 const directVol = computed(() => direct.value.reduce((s, m) => s + m.monthVolumeUSD, 0));
 const extendedRoyalty = computed(() =>
   extended.value.reduce((sum, m: NetworkMember) => sum + m.monthVolumeUSD * (UNILEVEL_USDT[m.layer] ?? 0), 0),
@@ -106,12 +109,14 @@ const directRoyalty = computed(() => directVol.value * UNILEVEL_USDT[1]);
 
 const directSubtitle = computed(() =>
   remoteApiEnabled
-    ? fmt(t.value.tree.serverVolumeSubtitle, { n: direct.value.length, volume: formatAmount(directVol.value) })
+    ? computePointsCopy(locale.code).memberSummary.replace("{n}", String(direct.value.length))
+      .replace("{points}", formatComputePoints(sumComputePoints(direct.value.map(m => m.monthComputePoints)), locale.code))
     : fmt(t.value.tree.directSubtitle, { n: direct.value.length, amount: formatAmount(directRoyalty.value) }),
 );
 const extendedSubtitle = computed(() =>
   remoteApiEnabled
-    ? fmt(t.value.tree.serverVolumeSubtitle, { n: extended.value.length, volume: formatAmount(extended.value.reduce((sum, m) => sum + m.monthVolumeUSD, 0)) })
+    ? computePointsCopy(locale.code).memberSummary.replace("{n}", String(extended.value.length))
+      .replace("{points}", formatComputePoints(sumComputePoints(extended.value.map(m => m.monthComputePoints)), locale.code))
     : fmt(t.value.tree.extendedSubtitle, { n: extended.value.length, amount: formatAmount(extendedRoyalty.value) }),
 );
 
