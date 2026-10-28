@@ -90,7 +90,7 @@
       <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
     </view>
     <view v-else-if="allRecent.length === 0" class="pb-4">
-      <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.historyEmpty }}</text>
+      <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.home.ledgerEmpty }}</text>
     </view>
     <view v-else class="earn-history-list pb-3 space-y-1.5">
       <view

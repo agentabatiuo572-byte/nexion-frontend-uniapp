@@ -42,7 +42,7 @@
       </view>
 
       <!-- 模板轮播(yield 无设备自动隐藏,异常3) -->
-      <GlassSegments :model-value="tpl" :options="templateOptions" class="ps-thumbs" :label="t.share.posterTitle" @select="pickTpl" />
+      <GlassSegments :model-value="tpl" :options="templateOptions" surface="open" class="ps-thumbs" :label="t.share.posterTitle" @select="pickTpl" />
 
       <view class="ps-reward">
         <text class="ps-reward__t">{{ posterRewardLine }}</text>
