@@ -407,12 +407,13 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
   const flags = compute.flags.map(record);
   const coefficients = compute.coefficients.map(record);
   const yields = compute.yieldEstimate.map(record);
-  exactKeySet(flags, FLAG_KEYS);
+  if (flags.length) exactKeySet(flags, FLAG_KEYS);
   exactKeySet(coefficients, COEFFICIENT_KEYS);
   exactKeySet(yields, YIELD_KEYS);
 
   const flag = flags[0];
-  if (typeof flag.enabled !== "boolean" || flag.enabled !== featureFlags.computeShareEnabled) return invalid();
+  if (flag ? typeof flag.enabled !== "boolean" || flag.enabled !== featureFlags.computeShareEnabled
+    : featureFlags.computeShareEnabled !== false) return invalid();
   const coefficientValues = Object.fromEntries(
     coefficients.map((row) => {
       const key = nonEmptyString(row.key);
@@ -432,7 +433,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
   const sources = Array.isArray(compute.sources) ? compute.sources.map(nonEmptyString) : invalid();
 
   return {
-    featureFlags: experience.featureFlags,
+    featureFlags: { ...experience.featureFlags, computeShareEnabled: false },
     publicStats: publicStatsProjection.config,
     publicStatsAuthority: publicStatsProjection.authority,
     verifiedStats: parseVerifiedStats(root.publicStats && typeof root.publicStats === "object"
@@ -446,7 +447,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
         enTitle: string(download.enTitle),
         enGuide: string(download.enGuide),
       },
-      gpuTiers: parseGpuTiers(compute.gpuTiers),
+      gpuTiers: Array.isArray(compute.gpuTiers) && compute.gpuTiers.length === 0 ? [] : parseGpuTiers(compute.gpuTiers),
     },
     // H8 is fetched from its own bounded context and merged by createPlatformConfigApi.
     rewards: {

@@ -60,7 +60,6 @@
           </view>
         </view>
 
-        <ComputeShareEntry context="devices" />
 
         <!-- #ifdef APP-PLUS -->
         <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
@@ -222,7 +221,6 @@ import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
-import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
 import { trialCardLabels } from "@/lib/trial-card-copy";
