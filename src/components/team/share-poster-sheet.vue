@@ -32,8 +32,8 @@
         <view v-else-if="genState === 'failed'" class="ps-fail">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <text class="ps-fail__t">{{ t.share.genFailed }}</text>
-          <view tabindex="0" class="ps-fail__btn active:opacity-80" role="button"  @click="regenerate"  @keydown.enter.prevent="regenerate" @keydown.space.prevent="regenerate">
-            <LiquidGlass :radius="999" tone="control" /><text class="ps-fail__btn-t">{{ t.share.retry }}</text>
+          <view tabindex="0" class="ps-fail__btn nx-frosted-button active:opacity-80" role="button"  @click="regenerate"  @keydown.enter.prevent="regenerate" @keydown.space.prevent="regenerate">
+            <text class="ps-fail__btn-t">{{ t.share.retry }}</text>
           </view>
         </view>
         <view v-else class="ps-skeleton">

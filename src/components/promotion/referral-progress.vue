@@ -126,34 +126,7 @@ onBeforeUnmount(()=>{alive=false;visible=false;stopProgressUpdates();generation+
 .referral-art { position: relative; flex: 0 0 144px; height: 124px; overflow: hidden; }
 .referral-gift { position: absolute; inset: 0; width: 100%; height: 100%; }
 .referral-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-top: var(--ui-space-inline); }
-.referral-progress-link { max-width: 100%; }
-/* This CTA owns one frosted surface; the neutral LiquidGlass layers must not cover its brand tint. */
-.referral-progress-link :deep(.nx-button__surface) {
-  color: var(--v5-brand);
-  background: linear-gradient(145deg, color-mix(in srgb, var(--v5-brand) 18%, transparent), color-mix(in srgb, var(--v5-brand) 10%, transparent));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-brand) 36%, transparent), inset 0 1px 1px var(--v5-liquid-highlight);
-  backdrop-filter: blur(12px) saturate(125%);
-  -webkit-backdrop-filter: blur(12px) saturate(125%);
-}
-.referral-progress-link :deep(.nx-liquid-glass) { display: none; }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .referral-progress-link :deep(.nx-button__surface) {
-    background: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface));
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
-@media (forced-colors: active) {
-  .referral-progress-link :deep(.nx-button__surface) {
-    color: ButtonText;
-    background: ButtonFace;
-    box-shadow: none;
-    outline: 1px solid ButtonText;
-    outline-offset: -1px;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
+.referral-progress-link { max-width:100%;--ui-button-ink:var(--v5-brand);--ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent);--ui-button-solid:color-mix(in srgb,var(--v5-brand) 12%,var(--v5-surface)); }
 .referral-details { margin-top: var(--ui-space-inset); padding-top: 16px; border-top: 1px solid var(--v5-border); }
 .referral-activity-title { display: block; margin-bottom: 6px; font: 600 14px/1.5 var(--font-v5); }
 .referral-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 0 12px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); }

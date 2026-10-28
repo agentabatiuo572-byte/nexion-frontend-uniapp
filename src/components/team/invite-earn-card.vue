@@ -19,7 +19,7 @@
           <text class="invite-card__description" :class="{ 'is-active': rewardCaption === 'error' }" :aria-hidden="rewardCaption !== 'error'">{{ t.team.settlementUnavailable }}</text>
           <text class="invite-card__description" :class="{ 'is-active': rewardCaption === 'unavailable' }" :aria-hidden="rewardCaption !== 'unavailable'">{{ t.share.linkUnavailable }}</text>
         </view>
-        <view class="invite-card__action invite-card__primary nx-team-share-now" role="button" :tabindex="referralCode ? 0 : -1" :aria-disabled="!referralCode" :aria-label="copy.inviteFriends" @click="openShare" @keydown.enter.prevent="openShare" @keydown.space.prevent="openShare"><LiquidGlass :radius="999" tone="control" /><text>{{ copy.inviteFriends }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view>
+        <view class="invite-card__action invite-card__primary nx-team-share-now nx-frosted-button" role="button" :tabindex="referralCode ? 0 : -1" :aria-disabled="!referralCode" :aria-label="copy.inviteFriends" @click="openShare" @keydown.enter.prevent="openShare" @keydown.space.prevent="openShare"><text>{{ copy.inviteFriends }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view>
       </view>
       <view class="invite-card__art"><TeamArt kind="invite" :size="128" /></view>
       <view class="invite-card__actions nx-invite-actions">
@@ -41,7 +41,6 @@ import ShareChannelSheet from './share-channel-sheet.vue';
 import SharePosterSheet from './share-poster-sheet.vue';
 import InviteDetailSheet from './invite-detail-sheet.vue';
 import TeamArt from './team-art.vue';
-import LiquidGlass from '@/components/liquid-glass.vue';
 import { useApp } from '@/store/app';
 import { useReferralReward } from '@/store/referral-reward';
 import { useLocaleStore } from '@/store/locale';
