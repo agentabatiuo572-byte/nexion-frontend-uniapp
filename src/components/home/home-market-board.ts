@@ -1,7 +1,7 @@
 import type { AppHomeWorkload } from "@/api/app-home-api";
 import type { TaskCategory } from "@/store/types";
 import type { Messages } from "@/i18n/messages/en";
-import { marketWorkloadCopy } from "@/lib/workload-label";
+import { compactMarketUnit, marketWorkloadCopy } from "@/lib/workload-label";
 import { formatUsd } from "@/lib/usd-display";
 
 export type HomeMarketDeltaTone = "positive" | "negative" | "neutral";
@@ -40,7 +40,7 @@ export function presentHomeMarketWorkload(row: AppHomeWorkload, t: Messages): Ho
     tag: Object.prototype.hasOwnProperty.call(MARKET_TAGS, row.code) ? MARKET_TAGS[row.code] : row.code,
     name: copy.name,
     priceText: formatPrice(row.price),
-    unitText: copy.unit,
+    unitText: compactMarketUnit(row.code, copy.unit),
     deltaText: row.deltaPct === null
       ? "—"
       : `${row.deltaPct >= 0 ? "+" : ""}${row.deltaPct.toFixed(1)}%`,

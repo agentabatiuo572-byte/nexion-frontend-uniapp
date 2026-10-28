@@ -65,6 +65,7 @@ import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
 import { createPinia, setActivePinia } from 'pinia';
 import { zh } from '@/i18n/messages/zh';
+import { en } from '@/i18n/messages/en';
 import { fmt, dateLocale } from '@/i18n/format';
 import { formatDisplayDateTime } from '@/lib/display-date';
 import { workloadLabel } from '@/lib/workload-label';
@@ -127,6 +128,7 @@ async function setup() {
     if(id==='@/store/app')return{useApp:()=>app};
     if(id==='@/store/ui')return{toast};
     if(id==='@/i18n/use-t')return{useT:()=>Vue.ref(zh)};
+    if(id==='@/i18n/messages/en')return{en};
     if(id==='@/i18n/format')return{fmt,dateLocale};
     if(id==='@/lib/display-date')return{formatDisplayDateTime};
     if(id==='@/lib/workload-label')return{workloadLabel};

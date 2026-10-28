@@ -22,10 +22,12 @@ const render = new Function("Vue", compile(descriptor.template!.content, {
 }).code)(Vue);
 
 // Execute the real setup, mounted read and template; adapt only the remote boundary.
-async function proofView(copy: typeof en, name: string | null, theme: string) {
+async function proofView(copy: typeof en, name: string | null, theme: string, live = false) {
   const mounted: Array<() => void> = [];
   const unmounted: Array<() => void> = [];
-  const snapshot = { productName: name, windowSales: 0, cumulativeSales: 7, windowDays: 30 };
+  const snapshot = { productName: name, windowSales: 0, cumulativeSales: 7, windowDays: 30, ...(live ? { liveActivity: { viewers: 32, sales24h: 12, sales30m: 3 } } : {}) };
+  let tick = () => {};
+  const inView = Vue.ref(true);
   const socialProof = vi.fn(() => name === null ? Promise.reject(new Error("unavailable")) : Promise.resolve(snapshot));
   const imports: Record<string, unknown> = {
     vue: { ...Vue, onMounted: (fn: () => void) => mounted.push(fn), onUnmounted: (fn: () => void) => unmounted.push(fn) },
@@ -36,6 +38,8 @@ async function proofView(copy: typeof en, name: string | null, theme: string) {
     "@/store/product-catalog": { productCatalogState: Vue.reactive({ status: "ready", source: "server", revision: 1 }) },
     "@/api/order-api": { captureRuntimeRevision: () => 1, isCurrentRuntimeRevision: () => true },
     "@/mock/storefront-social-proof": fixtures,
+    "@/composables/use-scroll-grow-progress": { useScrollGrowProgress: () => ({ elRef: Vue.ref(null), inView }) },
+    "@/composables/use-tab-page-lifecycle": { useVisibleInterval: (fn: () => void) => { tick = fn; } },
   };
   const exports = { default: {} as { setup: (...args: unknown[]) => Record<string, unknown> } };
   new Function("require", "exports", code)((id: string) => {
@@ -49,6 +53,13 @@ async function proofView(copy: typeof en, name: string | null, theme: string) {
     const loading = await html();
     mounted.forEach(fn => fn());
     await Promise.resolve(); await Promise.resolve();
+    if (live) {
+      inView.value = false; tick();
+      expect(socialProof).toHaveBeenCalledTimes(1);
+      inView.value = true; tick();
+      await Promise.resolve(); await Promise.resolve();
+      expect(socialProof).toHaveBeenCalledTimes(2);
+    }
     return { loading, body: `<main data-theme="${theme}">${await html()}</main>`, snapshot, socialProof };
   } finally {
     unmounted.forEach(fn => fn());
@@ -57,6 +68,11 @@ async function proofView(copy: typeof en, name: string | null, theme: string) {
 }
 
 for (const [locale, copy] of [["en", en], ["zh", zh], ["vi", vietnamese]] as const) {
+  it(`${locale}: renders live activity supplied by the endpoint and polls only in view`, async () => {
+    const result = await proofView(copy, "UVEL Box S1", "dark", true);
+    for (const label of [copy.store.liveProof.viewingLabel, copy.store.liveProof.sold24hLabel, copy.store.liveProof.sold30mLabel]) expect(result.body).toContain(label);
+    for (const count of [32, 12, 3]) expect(result.body).toContain(`>${count}</text>`);
+  });
   for (const theme of ["light", "dark"]) {
     it(`${locale}/${theme}: normalizes the hero accessible name without changing the snapshot, product key or counts`, async () => {
       const original = "NexGridBox Pro v2";

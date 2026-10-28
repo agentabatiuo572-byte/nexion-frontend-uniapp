@@ -20,6 +20,7 @@
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
         <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.n.toLocaleString() }}</text>
         <text class="truncate" :style="labelStyle">{{ r.label }}</text>
+        <svg v-if="r.hot" class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2"><path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z" /></svg>
       </view>
     </view>
     <text v-else-if="remoteUnavailable" class="truncate" :style="unavailableStyle">{{ w.unavailableLabel }}</text>
@@ -48,6 +49,7 @@ import { useApp } from "@/store/app";
 import { productCatalogState } from "@/store/product-catalog";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from "@/mock/storefront-social-proof";
 
@@ -61,6 +63,9 @@ const remoteUnavailable = ref(false);
 const remoteEpoch = createRemoteAccountEpoch(app.accountKey);
 let remoteMounted = false;
 let remoteRequest = 0;
+useVisibleInterval(() => {
+  if (remoteApiEnabled && remoteMounted && proofInView.value && remoteProof.value?.liveActivity) loadRemoteProof();
+}, 4_000);
 
 function hashId(id: string): number {
   let h = 0x811c9dc5;
@@ -164,6 +169,11 @@ const remoteRows = computed<FlatRow[]>(() => {
     { n: proof.windowSales, label: `${t.value.store.soldLabel} · ${fmt(t.value.store.detPaybackDays, { n: proof.windowDays })}`, color: "var(--v5-brand)" },
     { n: proof.cumulativeSales, label: t.value.store.liveProof.cumulativeSalesLabel, color: "var(--v5-success-ink)" },
   ];
+  if (proof.liveActivity) return [
+    { n: proof.liveActivity.viewers, label: w.value.viewingLabel, color: "var(--v5-tech-cyan-ink)" },
+    { n: proof.liveActivity.sales24h, label: w.value.sold24hLabel, color: "var(--v5-brand)" },
+    { n: proof.liveActivity.sales30m, label: w.value.sold30mLabel, color: "var(--v5-brand-2)", hot: true },
+  ];
   const stock = props.product.stock;
   if (stock !== undefined && stock < 50) {
     rows.push({ n: stock, label: w.value.stockShortLabel, color: "var(--v5-brand-2)" });
@@ -186,6 +196,7 @@ const doubled = computed(() => [...flat.value, ...flat.value]);
 const duration = computed(() => flat.value.length * 2);
 
 const rootStyle: CSSProperties = {
+  position: "absolute",
   left: "4px",
   bottom: "12px",
   width: "156px",

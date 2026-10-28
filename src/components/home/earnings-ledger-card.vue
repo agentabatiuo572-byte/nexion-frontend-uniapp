@@ -5,7 +5,7 @@
   canonical projection; only the local demo uses mock rows.
 -->
 <template>
-  <view data-home-section="earnings-ledger" :data-ledger-mode="app.homeTruth?.earningsLedgerMode ?? 'UNAVAILABLE'">
+  <view class="earnings-ledger-card" data-home-section="earnings-ledger" :data-ledger-mode="app.homeTruth?.earningsLedgerMode ?? 'UNAVAILABLE'">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: var(--ui-type-section); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.earningsLedgerTitle }}<text v-if="app.homeTruthStatus === 'error' && app.homeTruth" style="font-size: 12px; color: var(--v5-warning)"> · {{ t.home.networkStale }}</text></text>
       <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" data-home-action="earnings-ledger-all" @click="goAll" @keydown.enter.stop.prevent="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
@@ -16,14 +16,14 @@
         v-for="(r, i) in rows"
         :key="r.id"
         data-home-ledger-row="true"
-        class="grid items-center gap-2.5"
-        :style="{ gridTemplateColumns: 'minmax(0, 1fr) auto', minHeight: '56px', rowGap: '4px', padding: '10px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
+        class="grid items-center gap-x-2"
+        :style="{ gridTemplateColumns: 'minmax(0, 1fr) auto minmax(64px, 26%)', minHeight: '40px', padding: '6px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
       >
-        <view class="min-w-0">
+        <view class="earnings-ledger-identity min-w-0" :title="`${r.model} · ${r.who}`">
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ r.model }}<text style="color: var(--v5-ink-3)"> · {{ r.who }}</text></text>
         </view>
         <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ visibility.mask(r.amt) }}</text>
-        <text data-home-ledger-time="true" class="font-mono-tabular text-right" style="grid-column: 1 / -1; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 18px; font-size: 12px; color: var(--v5-ink-2)">{{ r.t }}</text>
+        <text data-home-ledger-time="true" class="font-mono-tabular text-right" style="min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 16px; font-size: 12px; color: var(--v5-ink-2)">{{ r.t }}</text>
       </view>
       <view v-if="remoteApiEnabled && rows.length === 0" class="nx-inline-recovery px-2 py-3">
         <text class="nx-inline-recovery__copy" style="font-size: 12px; color: var(--v5-ink-3)">{{ ledgerStatusText }}</text>
@@ -89,3 +89,7 @@ function goAll() {
   navTo("/pages/me/wallet-bills");
 }
 </script>
+<style scoped>
+.earnings-ledger-card { padding: 4px 16px 6px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+.earnings-ledger-identity :deep(*) { white-space: nowrap; }
+</style>
