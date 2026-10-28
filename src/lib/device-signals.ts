@@ -21,8 +21,8 @@ function iosModel(): string {
  * The iPhone's OS version and screen (points and scale) as the SDK reports them. The server
  * compares them with the reported model; a missing value is left out, never guessed.
  */
-function iosFacts(): Pick<CalibrationRequestSignals, "osVersion" | "screenWidth" | "screenHeight" | "pxDensity"> {
-  const facts: Pick<CalibrationRequestSignals, "osVersion" | "screenWidth" | "screenHeight" | "pxDensity"> = { pxDensity: null };
+function iosFacts(): Pick<CalibrationRequestSignals, "osVersion" | "screenWidth" | "screenHeight" | "pixelRatio"> {
+  const facts: Pick<CalibrationRequestSignals, "osVersion" | "screenWidth" | "screenHeight" | "pixelRatio"> = {};
   try {
     const device = (typeof uni.getDeviceInfo === "function" ? uni.getDeviceInfo() : uni.getSystemInfoSync()) as { osVersion?: unknown };
     const window = (typeof uni.getWindowInfo === "function" ? uni.getWindowInfo() : uni.getSystemInfoSync()) as
@@ -32,7 +32,7 @@ function iosFacts(): Pick<CalibrationRequestSignals, "osVersion" | "screenWidth"
     const width = integer(window.screenWidth), height = integer(window.screenHeight);
     if (width && height) { facts.screenWidth = width; facts.screenHeight = height; }
     if (typeof window.pixelRatio === "number" && Number.isFinite(window.pixelRatio) && window.pixelRatio >= 1 && window.pixelRatio <= 10)
-      facts.pxDensity = window.pixelRatio;
+      facts.pixelRatio = window.pixelRatio;
   } catch { /* Unknown facts stay out of the report. */ }
   return facts;
 }
