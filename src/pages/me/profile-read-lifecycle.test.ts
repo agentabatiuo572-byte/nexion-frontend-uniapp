@@ -92,7 +92,7 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh", platform: "app" | "h5" = "
       const title = published && v < 2 ? ["注册会员", "活跃新星"][v] : `级别${v}`;
       return { v, title: published ? title : `Rank ${v}`, cnTitle: title, rewards: [] };
     }) });
-    reads[index].current.resolve({ rankCode: `V${value}`, progress: { selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {} } });
+    reads[index].current.resolve({ rankCode: `V${value}`, progress: { selfComputePoints: 0, directRefs: 0, teamComputePoints: 0, vDownlineCounts: {} } });
   };
   return { page, rank, reads, accept, app, auth, payout, profile, profileReads, toast, fire, chooseImage, uploadAvatar, cryptoUuid };
 }

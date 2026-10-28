@@ -1,3 +1,4 @@
+import { formatComputePoints } from "@/i18n/compute-points";
 import * as Vue from "vue";
 import { formatAmount } from "@/lib/amount-display";
 import type { Component } from "vue";
@@ -81,7 +82,7 @@ async function mount(platform: "app" | "h5" = "app", canonicalNetwork?: ReturnTy
   const shows: Array<() => void> = [];
   const slot = { setup: (_props: unknown, { slots }: any) => () => Vue.h("view", slots.default?.()) };
   const deps: Record<string, unknown> = {
-    "@/lib/amount-display": { formatAmount },
+    "@/lib/amount-display": { formatAmount }, "@/i18n/compute-points": { formatComputePoints },
     vue: Vue, "@/components/svg-text": { default: SvgText },
     "@/components/app-chassis.vue": { default: slot },
     "@/components/sub-page-header.vue": { default: { render: () => Vue.h("view") } },
@@ -111,7 +112,7 @@ async function mount(platform: "app" | "h5" = "app", canonicalNetwork?: ReturnTy
 
 function member(id: string, layer: NetworkMember["layer"], status: NetworkMember["status"] = "active"): NetworkMember {
   return { id, name: `Member ${id}`, avatar: "M", vRank: 2, layer, status, binary: "unassigned", isSpillover: false,
-    joinedAt: Date.now() - 86400000, monthVolumeUSD: 17, totalVolumeUSD: null, city: "Fixture City" };
+    joinedAt: Date.now() - 86400000, monthVolumeUSD: 0, totalVolumeUSD: null, monthComputePoints: 17, lifetimeComputePoints: null, city: "Fixture City" };
 }
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { unmounts.splice(0).forEach((unmount) => unmount()); vi.useRealTimers(); });
@@ -152,7 +153,7 @@ test("APP real projection binds direct/extended nodes, touch details, close and 
   let sheet = all(page.root).find((item) => item.props.role === "dialog")!;
   expect(text(sheet)).toContain("Member three");
   expect(text(sheet)).toContain("Fixture City");
-  expect(text(sheet)).toContain("$17");
+  expect(text(sheet)).toContain("17 compute pts");
   expect(text(sheet)).toContain("—"); // Unknown all-time volume remains unknown.
   emit(all(sheet).find((item) => item.props["aria-label"] === en.ui.close)!, "onClick");
   await Vue.nextTick();
@@ -285,10 +286,10 @@ test.each(["app", "h5"] as const)("%s confirmed selection survives retry and rea
   page.network.remoteStatus = "error";
   await Vue.nextTick();
   expect(text(page.sheet()!)).toContain("Fixture City");
-  page.network.members = [{ ...member("original", 1), name: "Updated canonical member", monthVolumeUSD: 93, city: "Updated city" }];
+  page.network.members = [{ ...member("original", 1), name: "Updated canonical member", monthComputePoints: 93, city: "Updated city" }];
   await Vue.nextTick();
   expect(text(page.sheet()!)).toContain("Updated canonical member");
-  expect(text(page.sheet()!)).toContain("$93");
+  expect(text(page.sheet()!)).toContain("93 compute pts");
   expect(text(page.sheet()!)).toContain("Updated city");
   expect(text(page.sheet()!)).not.toContain("Member original");
   expect(text(page.sheet()!)).not.toContain("Fixture City");

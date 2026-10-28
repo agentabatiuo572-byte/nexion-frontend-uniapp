@@ -49,7 +49,6 @@ export const reviewedCopyR2 = [
   {"key":"binary.memberDetailsUnavailable","placeholders":[],"consumers":[{"file":"src/pages/team/binary.vue","expression":"t.binary.memberDetailsUnavailable"}]},
   {"key":"repurchase.claimMessage","placeholders":["amount","order"],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.claimMessage"}]},
   {"key":"repurchase.earlyMessage","placeholders":["amount","order","penalty"],"consumers":[{"file":"src/pages/me/wallet-repurchase.vue","expression":"w.value.earlyMessage"}]},
-  {"key":"tree.serverVolumeSubtitle","placeholders":["n","volume"],"consumers":[{"file":"src/pages/team/tree.vue","expression":"t.value.tree.serverVolumeSubtitle"}]}, // i18n-raw-ok: non-rendered test expression string
   {"key":"agent.serverApplication","placeholders":[],"consumers":[{"file":"src/pages/team/agent.vue","expression":"t.agent.serverApplication"}]},
   {"key":"daily.powerUps.footer","placeholders":[],"consumers":[{"file":"src/components/daily/streak-power-ups.vue","expression":"w.footer"}]},
   {"key":"ref.unavailableScope","placeholders":[],"consumers":[{"file":"src/pages/ref/code.vue","expression":"t.ref.unavailableScope"}]},

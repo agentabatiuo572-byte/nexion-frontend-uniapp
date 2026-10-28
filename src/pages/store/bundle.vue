@@ -668,7 +668,7 @@ async function onCheckout() {
   const gateCtx = {
     rank: vRank.myRank,
     activeDirect: network.members.filter((m) => m.layer === 1 && m.status === "active").length,
-    teamVolumeUSD: vRank.teamVolumeUSD,
+    teamComputePoints: vRank.teamComputePoints,
   };
   const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
   if (blocked) {

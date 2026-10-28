@@ -90,6 +90,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { formatComputePoints } from "@/i18n/compute-points";
 import { navTo } from "@/lib/route";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { isEntitlementVRankReward, rankEntitlementLabel } from "@/lib/rank-entitlement-label";
@@ -127,9 +128,9 @@ const currentDef = computed(() => rankDefs.value[vState.myRank] ?? {
 // each required rank. This projection is only for the observed progress display.
 const previewData = computed(() => ({
   myRank: vState.myRank,
-  selfBuyUSD: vState.selfBuyUSD,
+  selfComputePoints: vState.selfComputePoints,
   directRefs: vState.directRefs,
-  teamVolumeUSD: vState.teamVolumeUSD,
+  teamComputePoints: vState.teamComputePoints,
   vDownlineCounts: Object.fromEntries(rankDefs.value.map(({ v }) => [v,
     Object.entries(vState.vDownlineCounts).reduce((sum, [level, count]) => sum + (Number(level) >= v ? count : 0), 0),
   ])) as Partial<Record<VRank, number>>,
@@ -147,17 +148,18 @@ const nextConditions = computed(() => {
     const add = (conditions: VRankConditions, current: number, required: number, kind: RankGap["kind"], vLevel?: number) => {
       const gap = preview.missing.find((item) => item.kind === kind
         && (item.kind !== "vDownlines" || item.vLevel === vLevel));
-      const unit = kind === "selfBuy" || kind === "teamVolume" ? "$" : "";
+      const points = kind === "selfComputePoints" || kind === "teamComputePoints";
+      const valueText = (value: number) => points ? formatComputePoints(value, locale.code) : formatHowNumber(value, locale.code);
       rows.push({
         key: `${rank.v}-${kind}-${vLevel ?? ""}`,
         label: `V${rank.v} · ${rankConditionsText(t.value, conditions, locale.code)}`,
-        values: `${unit}${unit ? formatAmount(current) : formatHowNumber(current, locale.code)} / ${unit}${unit ? formatAmount(required) : formatHowNumber(required, locale.code)}`,
+        values: `${valueText(current)} / ${valueText(required)}`,
         gap: gap ? rankGapText(t.value, gap, locale.code, rankDefs.value) : t.value.rank.done,
       });
     };
-    if (c.selfBuyUSD) add({ selfBuyUSD: c.selfBuyUSD }, vState.selfBuyUSD, c.selfBuyUSD, "selfBuy");
+    if (c.selfComputePoints) add({ selfComputePoints: c.selfComputePoints }, vState.selfComputePoints, c.selfComputePoints, "selfComputePoints");
     if (c.directRefs) add({ directRefs: c.directRefs }, vState.directRefs, c.directRefs, "directRefs");
-    if (c.teamVolumeUSD) add({ teamVolumeUSD: c.teamVolumeUSD }, vState.teamVolumeUSD, c.teamVolumeUSD, "teamVolume");
+    if (c.teamComputePoints) add({ teamComputePoints: c.teamComputePoints }, vState.teamComputePoints, c.teamComputePoints, "teamComputePoints");
     for (const [level, required] of Object.entries(c.vDownlines ?? {})) {
       if (required) add({ vDownlines: { [level]: required } }, previewData.value.vDownlineCounts[Number(level) as VRank] ?? 0, required, "vDownlines", Number(level));
     }

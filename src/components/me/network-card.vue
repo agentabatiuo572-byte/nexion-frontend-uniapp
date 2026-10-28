@@ -58,6 +58,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { computePointsCopy, formatComputePoints } from "@/i18n/compute-points";
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import SectionHeader from "@/components/me/section-header.vue";
@@ -99,10 +100,10 @@ const towardLine = computed(() =>
 
 function formatPrimaryGap(g: PrimaryGap): string {
   switch (g.kind) {
-    case "teamVolume":
-      return fmt(t.value.me.networkCardGapTeamVolume, { amount: formatAmount(g.remaining) });
-    case "selfBuy":
-      return fmt(t.value.me.networkCardGapSelfBuy, { amount: formatAmount(g.remaining) });
+    case "teamComputePoints":
+      return computePointsCopy(locale.code).needTeam.replace("{n}", formatComputePoints(g.remaining, locale.code));
+    case "selfComputePoints":
+      return computePointsCopy(locale.code).needSelf.replace("{n}", formatComputePoints(g.remaining, locale.code));
     case "directRefs":
       return fmt(t.value.me.networkCardGapDirectRefs, {
         n: g.remaining,

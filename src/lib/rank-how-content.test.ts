@@ -2,85 +2,56 @@ import { describe, expect, it, vi } from "vitest";
 import type { CanonicalVRankRow } from "@/api/v-rank-api";
 import type { RankHowPolicy } from "@/api/rank-how-policy-api";
 import { buildRankHowContent, createRankHowResource } from "./rank-how-content";
+import { formatComputePoints } from "../i18n/compute-points";
 
 const labels = { selfBuy: "自购 ${n}", directRefs: "合格直推 {n}", teamVol: "团队 ${n}", register: "注册", vDownlines: "{n} 个 V{v}" };
 const rank = (v: number, patch: Partial<CanonicalVRankRow> = {}): CanonicalVRankRow => ({ v, title: `Title ${v}`, cnTitle: `头衔${v}`, directBonus: .123456, unilevelDepth: 99, peerBonus: .0275, leadershipVotes: 17, cultivationBonus: 321.123456, rewards: [], visible: true, ...patch });
-const ranks = [rank(0), rank(1, { selfBuyUSD: 789.123456, directRefs: 8 }), rank(2, { selfBuyUSD: 987, directRefs: 9, teamVolumeUSD: 45678.123456, requiredDownlineRank: 1, requiredDownlineCount: 6 })];
+const ranks = [rank(0), rank(1, { selfComputePoints: 7891, directRefs: 8 }), rank(2, { selfComputePoints: 9870, directRefs: 9, teamComputePoints: 456781, requiredDownlineRank: 1, requiredDownlineCount: 6 })];
 const enabled = { peer: true, genesis: false } as const;
 const unavailable = { peer: false, genesis: false } as const;
-const policy: RankHowPolicy = { version: "p1", locale: "zh", hero: "Published hero", source: "server", sourceEnvironment: "PRODUCTION", runId: "", rules: { permanentProtection: false, qualifiedReferralSelfBuyUSD: 789.123456, leadershipConfigured: false }, sections: [
-  { id: "example", title: "{fromRank} → {toRank}", body: "{selfBuy} / {directRefs} / {teamVolume} / {rankLegs}", order: 1 },
+const policy: RankHowPolicy = { version: "p1", locale: "zh", hero: "Published hero", source: "server", sourceEnvironment: "PRODUCTION", runId: "", rules: { permanentProtection: false, qualifiedReferralSelfComputePoints: 7891, leadershipConfigured: false }, sections: [
+  { id: "example", title: "{fromRank} → {toRank}", body: "{selfComputePoints} / {directRefs} / {teamComputePoints} / {rankLegs}", order: 1 },
   { id: "rewards", title: "奖励", body: "{directRate} / {peerRate} / {votes} / {cultivation} / {leadershipStatus}", order: 2 },
   { id: "protection", title: "保级", body: "{protection}", order: 3 },
   { id: "requirement-direct", title: "合格直推", body: "{referralThreshold}", order: 4 },
 ] };
 
 describe("rank-how published presentation", () => {
-  it("displays canonical money with two decimals and preserves rate precision", () => {
+  it("shows thresholds in compute points and preserves rate precision", () => {
     const content = buildRankHowContent(policy, ranks, enabled, "zh", labels);
     expect(content.section("example").title).toBe("V1 → V2");
-    expect(content.section("example").body).toContain("45678.12 USDT");
+    expect(content.section("example").body).toContain("456,781 算力点");
     expect(content.section("example").body).toContain("6 个 V1");
+    expect(content.section("example").body).not.toMatch(/USD|\$/);
     expect(content.section("rewards").body).toContain("12.3456%");
     expect(content.section("rewards").body).toContain("2.75%");
     expect(content.section("rewards").body).toContain("321.12 UVT");
     expect(content.section("rewards").body).toContain("暂不可结算");
-    expect(content.section("requirement-direct").body).toBe("789.12 USDT");
+    expect(content.section("requirement-direct").body).toBe("7,891 算力点");
     expect(content.section("protection").body).toContain("未开启");
-    expect(content.section("example").body).not.toMatch(/50,000|52,300|22,000/);
   });
-  it.each([
-    ["zh", "1234567.99 USDT", "1.23 USDT"],
-    ["en", "1234567.99 USDT", "1.23 USDT"],
-    ["vi", "1234567.99 USDT", "1.23 USDT"],
-  ])("renders server numbers in %s when native Intl is absent", (locale, large, rounded) => {
+  it.each(["zh", "en", "vi"])("renders large point thresholds in %s when native Intl is absent", locale => {
+    const expected = formatComputePoints(1234567, locale);
     vi.stubGlobal("Intl", undefined);
     try {
-      const changed = ranks.map(row => row.v === 2 ? { ...row, teamVolumeUSD: 1234567.987654, selfBuyUSD: 1.23456789 } : row);
+      const changed = ranks.map(row => row.v === 2 ? { ...row, teamComputePoints: 1234567 } : row);
       const content = buildRankHowContent(policy, changed, enabled, locale, labels);
-      expect(content.section("example").body).toContain(large);
-      expect(content.section("example").body).toContain(rounded);
+      expect(content.section("example").body).toContain(expected);
       expect(content.section("rewards").body).toContain("321.12 UVT");
     } finally {
       vi.unstubAllGlobals();
     }
   });
-  it.each([
-    ["zh", "1000000000000000000000.00 USDT", "1.23 USDT", "0.00 USDT"],
-    ["en", "1000000000000000000000.00 USDT", "1.23 USDT", "0.00 USDT"],
-    ["vi", "1000000000000000000000.00 USDT", "1.23 USDT", "0.00 USDT"],
-  ])("renders extreme and sub-cent server money in %s without Intl", (locale, huge, rounded, tiny) => {
-    vi.stubGlobal("Intl", undefined);
-    try {
-      const changed = ranks.map(row => row.v === 2 ? { ...row, teamVolumeUSD: 1e21, selfBuyUSD: 1.2345655 } : row);
-      const changedPolicy = { ...policy, rules: { ...policy.rules, qualifiedReferralSelfBuyUSD: 0.0000005 } };
-      const content = buildRankHowContent(changedPolicy, changed, enabled, locale, labels);
-      expect(content.section("example").body).toContain(huge);
-      expect(content.section("example").body).toContain(rounded);
-      expect(content.section("requirement-direct").body).toContain(tiny);
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-  it("carries money rounding into the whole number without Intl", () => {
-    vi.stubGlobal("Intl", undefined);
-    try {
-      const changed = ranks.map(row => row.v === 2 ? { ...row, selfBuyUSD: 9.9999995 } : row);
-      expect(buildRankHowContent(policy, changed, enabled, "en", labels).section("example").body).toContain("10.00 USDT");
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
   it("recomputes values after PC configuration changes", () => {
-    const changed = ranks.map(r => r.v === 2 ? { ...r, teamVolumeUSD: 123, leadershipVotes: 29 } : r);
+    const changed = ranks.map(r => r.v === 2 ? { ...r, teamComputePoints: 123, leadershipVotes: 29 } : r);
     const content = buildRankHowContent({ ...policy, rules: { ...policy.rules!, permanentProtection: true, leadershipConfigured: true } }, changed, enabled, "zh", labels);
-    expect(content.section("example").body).toContain("123.00 USDT");
+    expect(content.section("example").body).toContain("123 算力点");
     expect(content.section("rewards").body).toContain("29");
     expect(content.section("protection").body).toContain("已开启");
   });
   it("distinguishes a configured zero referral minimum from unavailable configuration", () => {
-    const content = buildRankHowContent({ ...policy, rules: { ...policy.rules, qualifiedReferralSelfBuyUSD: 0 } }, ranks, enabled, "zh", labels);
-    expect(content.section("requirement-direct").body).toBe("0.00 USDT（不要求正数自购）");
+    const content = buildRankHowContent({ ...policy, rules: { ...policy.rules, qualifiedReferralSelfComputePoints: 0 } }, ranks, enabled, "zh", labels);
+    expect(content.section("requirement-direct").body).toBe("不要求自购算力点");
     expect(content.section("requirement-direct").available).toBe(true);
   });
   it("keeps the full ladder range independent of the example pair", () => {
@@ -96,7 +67,7 @@ describe("rank-how published presentation", () => {
     expect(partial.section("rewards").available).toBe(false);
   });
   it("ignores zero gates and hidden ranks; never fabricates an unlimited payout", () => {
-    const content = buildRankHowContent(policy, [rank(0), rank(1, { selfBuyUSD: 0, directRefs: 0 }), rank(2, { visible: false })], enabled, "zh", labels);
+    const content = buildRankHowContent(policy, [rank(0), rank(1, { selfComputePoints: 0, directRefs: 0 }), rank(2, { visible: false })], enabled, "zh", labels);
     expect(content.ladder.map(r => r.v)).toEqual([0, 1]);
     expect(content.example).toBeNull();
     expect(content.section("example").body).not.toContain("99");

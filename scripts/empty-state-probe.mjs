@@ -42,7 +42,7 @@ function formalEmptyResponse(url) {
   };
   if (url.pathname === "/api/app/team/network") return {
     source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-    totalMembers: 0, directMembers: 0, activeMembers: 0, monthVolumeUsdt: 0, lifetimeVolumeUsdt: null,
+    totalMembers: 0, directMembers: 0, activeMembers: 0, monthComputePoints: 0, lifetimeComputePoints: null,
     members: [], generatedAt: "2026-09-14T00:00:00Z", nextCursor: null,
   };
   if (url.pathname === "/api/app/team/insights/unilevel") return {

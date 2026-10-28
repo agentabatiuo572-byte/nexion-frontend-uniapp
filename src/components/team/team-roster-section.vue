@@ -46,7 +46,7 @@
           </view>
           <view class="text-right shrink-0">
             <text v-if="showContribution" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: accentText }">+${{ formatAmount(contribution(m)) }}</text>
-            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ fmt(t.uiChrome.volumeShort, { amount: `$${formatAmount(m.monthVolumeUSD)}` }) }}</text>
+            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ formatComputePoints(m.monthComputePoints, locale.code) }}</text>
           </view>
         </view>
       </view>
@@ -56,6 +56,8 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { formatComputePoints } from "@/i18n/compute-points";
+import { useLocaleStore } from "@/store/locale";
 import { computed, type CSSProperties } from "vue";
 import VBadge from "./v-badge.vue";
 import type { NetworkMember, MemberStatus } from "@/store/network";
@@ -78,9 +80,10 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ toggle: [] }>();
 const t = useT();
+const locale = useLocaleStore();
 const showContribution = computed(() => props.showContribution !== false);
 
-const sortedMembers = computed(() => [...props.members].sort((a, b) => b.monthVolumeUSD - a.monthVolumeUSD));
+const sortedMembers = computed(() => [...props.members].sort((a, b) => (b.monthComputePoints ?? -1) - (a.monthComputePoints ?? -1)));
 
 function contribution(m: NetworkMember): number {
   const layer = m.layer;

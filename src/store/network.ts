@@ -33,6 +33,9 @@ export interface NetworkMember {
   joinedAt: number; // epoch ms
   monthVolumeUSD: number;
   totalVolumeUSD: number | null;
+  /** Member contribution shown to the user; the server reports it in compute points only. */
+  monthComputePoints: number | null;
+  lifetimeComputePoints: number | null;
   status: MemberStatus;
   city: string;
 }
@@ -79,6 +82,8 @@ function mk(
     joinedAt: Date.now() - (((i * 11) % 90) + 1) * ONE_DAY,
     monthVolumeUSD: monthVol,
     totalVolumeUSD: totalVol,
+    monthComputePoints: monthVol * 10,
+    lifetimeComputePoints: totalVol * 10,
     status: opts.status ?? (i % 5 === 0 ? "idle" : i % 11 === 0 ? "offline" : "active"),
     city: CITIES[i % CITIES.length],
   };
@@ -190,14 +195,15 @@ export const useNetwork = defineStore("network", () => {
         id: member.id, name: member.name, avatar: member.avatarUrl ?? member.name.slice(0, 1).toUpperCase(),
         vRank: member.vRank as VRank, layer: member.layer,
         binary: member.leg === "A" ? "left" : member.leg === "B" ? "right" : "unassigned",
-        isSpillover: false, joinedAt: Date.parse(member.joinedAt), monthVolumeUSD: member.monthVolumeUsdt,
-        totalVolumeUSD: member.lifetimeVolumeUsdt,
+        // USD volume only feeds the local demo's commission estimates and stays unknown here.
+        isSpillover: false, joinedAt: Date.parse(member.joinedAt), monthVolumeUSD: 0, totalVolumeUSD: null,
+        monthComputePoints: member.monthComputePoints, lifetimeComputePoints: member.lifetimeComputePoints,
         status: member.status === "ACTIVE" ? "active" : member.status === "IDLE" ? "idle" : "offline",
         city: member.region ?? "—",
       }));
       totalMembers.value = snapshot.totalMembers;
-      totalMonthVolumeUSD.value = snapshot.monthVolumeUsdt;
-      totalAllTimeVolumeUSD.value = snapshot.lifetimeVolumeUsdt;
+      totalMonthVolumeUSD.value = 0;
+      totalAllTimeVolumeUSD.value = null;
       remoteStatus.value = "ready";
       hasRemoteSnapshot.value = true;
       return true;
@@ -278,6 +284,8 @@ export const useNetwork = defineStore("network", () => {
       joinedAt: now - i * 60000,
       monthVolumeUSD: 0,
       totalVolumeUSD: 0,
+      monthComputePoints: 0,
+      lifetimeComputePoints: 0,
       status: "active",
       city: "Auto-placed",
     }));

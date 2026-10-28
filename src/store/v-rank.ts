@@ -23,9 +23,9 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionS
 export type VRank = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 export interface VRankConditions {
-  selfBuyUSD?: number;        // 自买设备累计
+  selfComputePoints?: number;        // 自买设备累计
   directRefs?: number;        // 直推数
-  teamVolumeUSD?: number;     // 团队总业绩
+  teamComputePoints?: number;     // 团队总业绩
   vDownlines?: Partial<Record<VRank, number>>; // 下面需要 N 个 V 级
 }
 
@@ -70,87 +70,59 @@ export const V_RANKS: VRankDef[] = [
   },
   {
     v: 1, title: "Pilot", cnTitle: "飞行员",
-    conditions: { selfBuyUSD: 299, directRefs: 3 },
+    conditions: { selfComputePoints: 2990, directRefs: 3 },
     directBonus: 0.10, unilevelDepth: 2,
     peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 500, rewards: [],
   },
   {
     v: 2, title: "Operator", cnTitle: "操作员",
-    conditions: { teamVolumeUSD: 5000 },
+    conditions: { teamComputePoints: 50_000 },
     directBonus: 0.10, unilevelDepth: 3,
     peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 2000, rewards: [],
   },
   {
     v: 3, title: "Captain", cnTitle: "舰长",
-    conditions: { teamVolumeUSD: 20_000, vDownlines: { 1: 2 } },
+    conditions: { teamComputePoints: 200_000, vDownlines: { 1: 2 } },
     directBonus: 0.10, unilevelDepth: 4,
     peerBonus: 0.05, leadershipVotes: 1,
     cultivationBonus: 10_000, rewards: [],
   },
   {
     v: 4, title: "Commander", cnTitle: "指挥官",
-    conditions: { teamVolumeUSD: 50_000, vDownlines: { 2: 3 } },
+    conditions: { teamComputePoints: 500_000, vDownlines: { 2: 3 } },
     directBonus: 0.10, unilevelDepth: 5,
     peerBonus: 0.05, leadershipVotes: 2,
     cultivationBonus: 50_000, rewards: [],
   },
   {
     v: 5, title: "Wing Leader", cnTitle: "翼领",
-    conditions: { teamVolumeUSD: 150_000, vDownlines: { 3: 4 } },
+    conditions: { teamComputePoints: 1_500_000, vDownlines: { 3: 4 } },
     directBonus: 0.10, unilevelDepth: 6,
     peerBonus: 0.05, leadershipVotes: 4,
     cultivationBonus: 200_000, rewards: [],
   },
   {
     v: 6, title: "Squadron", cnTitle: "中队长",
-    conditions: { teamVolumeUSD: 500_000, vDownlines: { 4: 5 } },
+    conditions: { teamComputePoints: 5_000_000, vDownlines: { 4: 5 } },
     directBonus: 0.10, unilevelDepth: 7,
     peerBonus: 0.05, leadershipVotes: 8,
     cultivationBonus: 800_000, rewards: [],
   },
   {
     v: 7, title: "Fleet Cmdr", cnTitle: "舰队司令",
-    conditions: { teamVolumeUSD: 1_000_000, vDownlines: { 5: 6 } },
+    conditions: { teamComputePoints: 10_000_000, vDownlines: { 5: 6 } },
     directBonus: 0.10, unilevelDepth: 8,
     peerBonus: 0.05, leadershipVotes: 16,
     cultivationBonus: 3_200_000, rewards: [],
   },
   {
     v: 8, title: "Star Admiral", cnTitle: "星上将",
-    conditions: { teamVolumeUSD: 3_000_000, vDownlines: { 6: 7 } },
+    conditions: { teamComputePoints: 30_000_000, vDownlines: { 6: 7 } },
     directBonus: 0.10, unilevelDepth: 9,
     peerBonus: 0.05, leadershipVotes: 32,
     cultivationBonus: 10_000_000, rewards: [],
-  },
-  {
-    v: 9, title: "Galaxy Lord", cnTitle: "星河领主",
-    conditions: { teamVolumeUSD: 10_000_000 },
-    directBonus: 0.10, unilevelDepth: 10,
-    peerBonus: 0.05, leadershipVotes: 64,
-    cultivationBonus: 0, rewards: [],
-  },
-  {
-    v: 10, title: "UVEL Founder", cnTitle: "联合创始",
-    conditions: { teamVolumeUSD: 30_000_000 },
-    directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 128,
-    cultivationBonus: 0, rewards: [],
-  },
-  {
-    v: 11, title: "Cosmic Sovereign", cnTitle: "宇宙至尊",
-    conditions: { teamVolumeUSD: 100_000_000 },
-    directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 256,
-    cultivationBonus: 0, rewards: [],
-  },
-  {
-    v: 12, title: "Singularity", cnTitle: "奇点",
-    conditions: { teamVolumeUSD: 500_000_000 },
-    directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 512,
-    cultivationBonus: 0, rewards: [],
   },
 ];
 
@@ -161,9 +133,9 @@ export const V_RANKS: VRankDef[] = [
  */
 export interface VRankData {
   myRank: VRank;
-  selfBuyUSD: number;
+  selfComputePoints: number;
   directRefs: number;
-  teamVolumeUSD: number;
+  teamComputePoints: number;
   vDownlineCounts: Partial<Record<VRank, number>>;
 }
 
@@ -176,9 +148,9 @@ const EMPTY_V_RANK: VRankDef = {
 
 function canonicalRank(row: Awaited<ReturnType<typeof vRankApi.ladder>>["ranks"][number]): VRankDef {
   const conditions: VRankConditions = {};
-  if (row.selfBuyUSD !== undefined) conditions.selfBuyUSD = row.selfBuyUSD;
+  if (row.selfComputePoints !== undefined) conditions.selfComputePoints = row.selfComputePoints;
   if (row.directRefs !== undefined) conditions.directRefs = row.directRefs;
-  if (row.teamVolumeUSD !== undefined) conditions.teamVolumeUSD = row.teamVolumeUSD;
+  if (row.teamComputePoints !== undefined) conditions.teamComputePoints = row.teamComputePoints;
   if (row.requiredDownlineRank !== undefined && row.requiredDownlineCount !== undefined) {
     conditions.vDownlines = { [row.requiredDownlineRank as VRank]: row.requiredDownlineCount };
   }
@@ -197,9 +169,9 @@ const DEFAULT_V_RANK: VRankData = {
   // 新账号 seed 人设:V2 Operator(刚到,正冲 V3)—— 与 account-cloud
   // createSeedSnapshot 的统一 seed 口径一致。
   myRank: 2,
-  selfBuyUSD: 1198,        // S1 + Pro 已买
+  selfComputePoints: 11_980,      // S1 + Pro 已买
   directRefs: 5,
-  teamVolumeUSD: 5_240,    // 刚过 V2 门槛
+  teamComputePoints: 52_400,    // 刚过 V2 门槛
   vDownlineCounts: { 1: 3 }, // 下面有 3 个 V1
 };
 
@@ -221,11 +193,11 @@ export const useVRank = defineStore("vRank", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const init = remoteApiEnabled ? { myRank: 0 as VRank, selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {} } : hydrate(boundKey);
+  const init = remoteApiEnabled ? { myRank: 0 as VRank, selfComputePoints: 0, directRefs: 0, teamComputePoints: 0, vDownlineCounts: {} } : hydrate(boundKey);
   const myRank = ref<VRank>(init.myRank);
-  const selfBuyUSD = ref(init.selfBuyUSD);
+  const selfComputePoints = ref(init.selfComputePoints);
   const directRefs = ref(init.directRefs);
-  const teamVolumeUSD = ref(init.teamVolumeUSD);
+  const teamComputePoints = ref(init.teamComputePoints);
   const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
   // 服务端能力位:某类收益今天是否真的会派发(与佣金指南同源)。等级阶梯里的
@@ -239,9 +211,9 @@ export const useVRank = defineStore("vRank", () => {
 
   function clearRemoteFacts(): void {
     myRank.value = 0;
-    selfBuyUSD.value = 0;
+    selfComputePoints.value = 0;
     directRefs.value = 0;
-    teamVolumeUSD.value = 0;
+    teamComputePoints.value = 0;
     vDownlineCounts.value = {};
     ladder.value = [];
     capabilities.value = { peer: false, genesis: false };
@@ -253,9 +225,9 @@ export const useVRank = defineStore("vRank", () => {
     if (remoteApiEnabled) return;
     writeAccountRow<VRankData>(ACCOUNTS_KEY, boundKey, {
       myRank: myRank.value,
-      selfBuyUSD: selfBuyUSD.value,
+      selfComputePoints: selfComputePoints.value,
       directRefs: directRefs.value,
-      teamVolumeUSD: teamVolumeUSD.value,
+      teamComputePoints: teamComputePoints.value,
       vDownlineCounts: vDownlineCounts.value,
     });
   }
@@ -271,9 +243,9 @@ export const useVRank = defineStore("vRank", () => {
     }
     const next = hydrate(boundKey);
     myRank.value = next.myRank;
-    selfBuyUSD.value = next.selfBuyUSD;
+    selfComputePoints.value = next.selfComputePoints;
     directRefs.value = next.directRefs;
-    teamVolumeUSD.value = next.teamVolumeUSD;
+    teamComputePoints.value = next.teamComputePoints;
     vDownlineCounts.value = next.vDownlineCounts;
   }
 
@@ -301,9 +273,9 @@ export const useVRank = defineStore("vRank", () => {
       prizeName.value = remoteLadder.prizeName;
       capabilities.value = remoteLadder.capabilities;
       myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
-      selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
+      selfComputePoints.value = remoteCurrent.progress.selfComputePoints;
       directRefs.value = remoteCurrent.progress.directRefs;
-      teamVolumeUSD.value = remoteCurrent.progress.teamVolumeUSD;
+      teamComputePoints.value = remoteCurrent.progress.teamComputePoints;
       vDownlineCounts.value = Object.fromEntries(
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Partial<Record<VRank, number>>;
@@ -344,15 +316,15 @@ export const useVRank = defineStore("vRank", () => {
   }
   function setProgress(p: VRankProgressPatch) {
     if (remoteApiEnabled) return;
-    if (p.selfBuyUSD !== undefined) selfBuyUSD.value = p.selfBuyUSD;
+    if (p.selfComputePoints !== undefined) selfComputePoints.value = p.selfComputePoints;
     if (p.directRefs !== undefined) directRefs.value = p.directRefs;
-    if (p.teamVolumeUSD !== undefined) teamVolumeUSD.value = p.teamVolumeUSD;
+    if (p.teamComputePoints !== undefined) teamComputePoints.value = p.teamComputePoints;
     if (p.vDownlineCounts !== undefined) vDownlineCounts.value = p.vDownlineCounts;
     persist();
   }
 
   return {
-    myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder, prizeName,
+    myRank, selfComputePoints, directRefs, teamComputePoints, vDownlineCounts, ladder, prizeName,
     capabilities,
     remoteReady, remoteError,
     setMyRank, setProgress, bindAccount, refreshCanonicalVRank,
@@ -368,9 +340,9 @@ export const useVRank = defineStore("vRank", () => {
  * (`src/lib/v-rank-copy.ts` 的 `rankGapText`),store 只给事实。
  */
 export type RankGap =
-  | { kind: "selfBuy"; amount: number }
+  | { kind: "selfComputePoints"; amount: number }
   | { kind: "directRefs"; n: number }
-  | { kind: "teamVolume"; amount: number }
+  | { kind: "teamComputePoints"; amount: number }
   // 只给档位号,头衔名由 copy 层按语言解析(`lib/v-rank-copy` 的 rankTitle)——
   // store 存一份英文 title 就等于把「中文界面显示什么」定死在数据层。
   | { kind: "vDownlines"; n: number; vLevel: number };
@@ -387,10 +359,10 @@ export function nextRankProgress(state: VRankData, ladder: VRankDef[] = []): {
   const missing: RankGap[] = [];
   const checks: number[] = [];
 
-  if (c.selfBuyUSD) {
-    checks.push(Math.min(1, state.selfBuyUSD / c.selfBuyUSD));
-    if (state.selfBuyUSD < c.selfBuyUSD) {
-      missing.push({ kind: "selfBuy", amount: c.selfBuyUSD - state.selfBuyUSD });
+  if (c.selfComputePoints) {
+    checks.push(Math.min(1, state.selfComputePoints / c.selfComputePoints));
+    if (state.selfComputePoints < c.selfComputePoints) {
+      missing.push({ kind: "selfComputePoints", amount: c.selfComputePoints - state.selfComputePoints });
     }
   }
   if (c.directRefs) {
@@ -399,10 +371,10 @@ export function nextRankProgress(state: VRankData, ladder: VRankDef[] = []): {
       missing.push({ kind: "directRefs", n: c.directRefs - state.directRefs });
     }
   }
-  if (c.teamVolumeUSD) {
-    checks.push(Math.min(1, state.teamVolumeUSD / c.teamVolumeUSD));
-    if (state.teamVolumeUSD < c.teamVolumeUSD) {
-      missing.push({ kind: "teamVolume", amount: c.teamVolumeUSD - state.teamVolumeUSD });
+  if (c.teamComputePoints) {
+    checks.push(Math.min(1, state.teamComputePoints / c.teamComputePoints));
+    if (state.teamComputePoints < c.teamComputePoints) {
+      missing.push({ kind: "teamComputePoints", amount: c.teamComputePoints - state.teamComputePoints });
     }
   }
   if (c.vDownlines) {
@@ -420,8 +392,8 @@ export function nextRankProgress(state: VRankData, ladder: VRankDef[] = []): {
 }
 
 export type PrimaryGap =
-  | { kind: "teamVolume"; remaining: number; progress: number }
-  | { kind: "selfBuy"; remaining: number; progress: number }
+  | { kind: "teamComputePoints"; remaining: number; progress: number }
+  | { kind: "selfComputePoints"; remaining: number; progress: number }
   | { kind: "directRefs"; remaining: number; progress: number }
   | { kind: "vDownlines"; remaining: number; progress: number; vLevel: VRank };
 
@@ -468,11 +440,11 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
   const gaps: PrimaryGap[] = [];
   const checks: number[] = [];
 
-  if (c.selfBuyUSD) {
-    const progress = Math.min(1, state.selfBuyUSD / c.selfBuyUSD);
+  if (c.selfComputePoints) {
+    const progress = Math.min(1, state.selfComputePoints / c.selfComputePoints);
     checks.push(progress);
-    if (state.selfBuyUSD < c.selfBuyUSD) {
-      gaps.push({ kind: "selfBuy", remaining: c.selfBuyUSD - state.selfBuyUSD, progress });
+    if (state.selfComputePoints < c.selfComputePoints) {
+      gaps.push({ kind: "selfComputePoints", remaining: c.selfComputePoints - state.selfComputePoints, progress });
     }
   }
   if (c.directRefs) {
@@ -482,11 +454,11 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
       gaps.push({ kind: "directRefs", remaining: c.directRefs - state.directRefs, progress });
     }
   }
-  if (c.teamVolumeUSD) {
-    const progress = Math.min(1, state.teamVolumeUSD / c.teamVolumeUSD);
+  if (c.teamComputePoints) {
+    const progress = Math.min(1, state.teamComputePoints / c.teamComputePoints);
     checks.push(progress);
-    if (state.teamVolumeUSD < c.teamVolumeUSD) {
-      gaps.push({ kind: "teamVolume", remaining: c.teamVolumeUSD - state.teamVolumeUSD, progress });
+    if (state.teamComputePoints < c.teamComputePoints) {
+      gaps.push({ kind: "teamComputePoints", remaining: c.teamComputePoints - state.teamComputePoints, progress });
     }
   }
   if (c.vDownlines) {

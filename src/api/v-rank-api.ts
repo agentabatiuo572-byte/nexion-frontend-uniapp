@@ -18,9 +18,9 @@ export interface CanonicalVRankRow {
   v: number;
   title: string;
   cnTitle: string;
-  selfBuyUSD?: number;
+  selfComputePoints?: number;
   directRefs?: number;
-  teamVolumeUSD?: number;
+  teamComputePoints?: number;
   requiredDownlineRank?: number;
   requiredDownlineCount?: number;
   directBonus: number;
@@ -58,7 +58,7 @@ export interface CanonicalVRankLadder {
    * 服务端能力位:某类收益今天是否真的会派发。
    *
    * 🔴 等级阶梯里的 peerBonus 是「该等级配置的比例」,不是「现在会发」。没有这个
-   *   能力位,App 只能把配置比例当成已生效权益展示(V3–V12 逐级「平级 5%」),
+   *   能力位,App 只能把配置比例当成已生效权益展示(V3–V8 逐级「平级 5%」),
    *   与玩法说明的「未开放」自相矛盾(zentao #79)。
    */
   capabilities: CommissionCapabilities;
@@ -75,9 +75,9 @@ export interface CanonicalVRankState {
   runId: string;
   rankCode: string;
   progress: {
-    selfBuyUSD: number;
+    selfComputePoints: number;
     directRefs: number;
-    teamVolumeUSD: number;
+    teamComputePoints: number;
     vDownlineCounts: Record<string, number>;
   };
 }
@@ -140,7 +140,7 @@ function reward(value: unknown): CanonicalVRankReward {
 function rankRow(value: unknown): CanonicalVRankRow {
   const source = record(value);
   const v = integer(source.v);
-  if (v > 12 || typeof source.visible !== "boolean") return invalid();
+  if (v > 8 || typeof source.visible !== "boolean") return invalid();
   const requiredRank = source.requiredDownlineRank == null || source.requiredDownlineRank === ""
     ? undefined
     : integer(String(source.requiredDownlineRank).replace(/^V/i, ""));
@@ -149,9 +149,9 @@ function rankRow(value: unknown): CanonicalVRankRow {
     v,
     title: text(source.title),
     cnTitle: text(source.cnTitle),
-    selfBuyUSD: optionalNumber(source.selfBuyUSD),
+    selfComputePoints: optionalNumber(source.selfComputePoints),
     directRefs: optionalNumber(source.directRefs),
-    teamVolumeUSD: optionalNumber(source.teamVolumeUSD),
+    teamComputePoints: optionalNumber(source.teamComputePoints),
     requiredDownlineRank: requiredRank,
     requiredDownlineCount: optionalNumber(source.requiredDownlineCount),
     directBonus: number(source.directBonus),
@@ -179,7 +179,7 @@ function ladder(value: unknown, mode: ApiEnvironment): CanonicalVRankLadder {
   const proof = provenance(source, mode);
   if (!Array.isArray(source.ranks)) return invalid();
   const ranks = source.ranks.map(rankRow).sort((left, right) => left.v - right.v);
-  if (ranks.length !== 13 || ranks.some((rank, index) => rank.v !== index)) return invalid();
+  if (ranks.length !== 9 || ranks.some((rank, index) => rank.v !== index)) return invalid();
   // 旧后端(尚未下发能力位)不能让整个阶梯判非法 —— 那会把等级页变成「数据不可用」,
   // 连配置比例都读不到。缺字段一律**失败关闭**为「不派发」:宁可少承诺,不能把配置
   // 比例写成已生效权益(#79)。字段在但类型不对属于协议违规,仍判非法。
@@ -202,19 +202,19 @@ function current(value: unknown, mode: ApiEnvironment): CanonicalVRankState {
   const rawCounts = record(progress.vDownlineCounts);
   const counts: Record<string, number> = {};
   for (const [key, count] of Object.entries(rawCounts)) {
-    if (!/^(?:[0-9]|1[0-2])$/.test(key)) return invalid();
+    if (!/^[0-8]$/.test(key)) return invalid();
     counts[key] = integer(count);
   }
   const rankCode = text(source.rankCode).toUpperCase();
-  if (!/^V(?:[0-9]|1[0-2])$/.test(rankCode)) return invalid();
+  if (!/^V[0-8]$/.test(rankCode)) return invalid();
   return {
     source: text(source.source),
     ...proof,
     rankCode,
     progress: {
-      selfBuyUSD: number(progress.selfBuyUSD),
+      selfComputePoints: number(progress.selfComputePoints),
       directRefs: integer(progress.directRefs),
-      teamVolumeUSD: number(progress.teamVolumeUSD),
+      teamComputePoints: number(progress.teamComputePoints),
       vDownlineCounts: counts,
     },
   };
