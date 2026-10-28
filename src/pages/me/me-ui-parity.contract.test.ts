@@ -32,7 +32,6 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   "rewards.vue",
   "risk-disclosure.vue",
   "security.vue",
-  "support-tickets.vue",
   "support.vue",
   "trial.vue",
   "wallet-address-rebind.vue",
@@ -80,7 +79,6 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "security.vue": "97dd537c7c35262b3946475b4f897fd499de49437050c08e66c937f291b8a4ed",
   // Reviewed #439: BASIC retains the existing hint; enhanced policy owns retry timing and existing-ticket/retry actions.
   // Reviewed #470: cursor-spacing=72 on the detail reply textarea only.
-  "support-tickets.vue": "4504cb6168c6e939402a4be14b5f39caeaaa8ab9deda42433c7b91eacf12fce8",
   "support.vue": "9a89c364bbc52d36f0218752b5bb69ffbba692fd113feaf285e7d0273180bad0",
   // Reviewed removal of the retired card-migration notice; trial amounts, deadlines and actions remain covered.
   // Reviewed #535: active/grace catalog CTA/ARIA and ready-only unavailability hint.
@@ -114,7 +112,6 @@ const EXPECTED_STYLE_PAIR_SHA256: Record<string, string> = {
   "notifications.vue": "e065437c45004cdd395d81d27ebc06f17e7f3e4c5da3e9e9f7092d8204e2d30a",
   "preferences.vue": "2329be1da2edb9adaa473f5ef7408aa3edd688413331fdf42c4abd406c57415f",
   "proof.vue": "c21851c57140a23d48746e19c798781a56bccc946028165e9f3f61323e6eb2bd",
-  "support-tickets.vue": "3f3dc61ed7dbf90e34e879979cb6f4c1ed0d2d3f1d83176b371c8ded789cca0b",
   "wallet-repurchase.vue": "49b410e94f8d119d898b3c05f01d735af70aac979d6f8d8559341b13841d1477"
 };
 
@@ -179,13 +176,6 @@ describe("Me page 5174 normal-state UI parity", () => {
     expect(block(shared + "\n" + local, "style")).toBe(shared + "\n" + local);
     expect(block(shared + "\n" + local.replace("center", "left"), "style")).not.toBe(block(shared + "\n" + local, "style"));
   });
-  it("detects ticket layout changes after its shared stylesheet import", () => {
-    const ticket = readFileSync(new URL("./support-tickets.vue", import.meta.url), "utf8");
-    const changed = ticket.replace("grid-template-columns: repeat(3, minmax(0, 1fr))", "grid-template-columns: repeat(1, minmax(0, 1fr))");
-    expect(changed).not.toBe(ticket);
-    const digest = (value: string) => createHash("sha256").update(block(value, "style")).digest("hex");
-    expect(digest(changed)).not.toBe(digest(ticket));
-  });
   it("checks the message center stylesheet content", () => {
     const css = readFileSync(new URL("../../styles/message-center.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
     const digest = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -194,20 +184,6 @@ describe("Me page 5174 normal-state UI parity", () => {
     const changed = css.replace("font-size: 34px", "font-size: 44px");
     expect(changed).not.toBe(css);
     expect(digest(changed)).not.toBe(expected);
-  });
-  it("pins the approved ticket timeline component and its account-scoped disclosure wiring", () => {
-    const record = readFileSync(new URL("../../components/me/ticket-message.vue", import.meta.url), "utf8");
-    const ticket = readFileSync(new URL("./support-tickets.vue", import.meta.url), "utf8");
-    const surface = (value: string) => createHash("sha256").update(block(value, "template")).update("\0").update(block(value, "style")).digest("hex");
-    expect(surface(record)).toBe("4c88bb8dde28774be8d7a67c81cb7edd3f921679cbc5e0d222b9e3bec54477d8");
-    expect(ticket).toContain(':scope="`${app.accountKey}:${detailTicket.id}`"');
-    expect(ticket).toContain(':key="`${app.accountKey}:${detailTicket.id}:${m.id}`"');
-    expect(ticket).toContain(':show-date="index === 0 || messageDay(m.ts) !== messageDay(detailTicket.messages[index - 1].ts)"');
-    expect(record).toContain('@keydown.enter.prevent="toggle"');
-    expect(record).toContain('@keydown.space.prevent="toggle"');
-    const changed = record.replace("font-size: 15px; font-weight: 400", "font-size: 13px; font-weight: 400");
-    expect(changed).not.toBe(record);
-    expect(surface(changed)).not.toBe(surface(record));
   });
   it("keeps 16px inline padding on message text actions and both segment layouts", () => {
     const rules = [
@@ -239,7 +215,7 @@ describe("Me page 5174 normal-state UI parity", () => {
       });
     }
     const imports = vueFiles(srcDir).filter(name => readFileSync(new URL(name, srcDir), "utf8").includes('<style src="@/styles/message-family.css">')).sort();
-    expect(imports).toEqual(["components/support/conversation-thread.vue", "pages/me/preferences.vue", "pages/me/support-tickets.vue", "pages/support/chat.vue", "pages/support/messages.vue"]);
+    expect(imports).toEqual(["components/support/conversation-thread.vue", "pages/me/preferences.vue", "pages/support/chat.vue", "pages/support/messages.vue"]);
     for (const name of imports) expect(block(readFileSync(new URL(name, srcDir), "utf8"), "template"), name).toMatch(/class="[^"]*\bmessage-family\b/);
   });
   it("keeps the same five large modules and quick-entry order", () => {
@@ -247,7 +223,7 @@ describe("Me page 5174 normal-state UI parity", () => {
     expect(quickKeys("devices")).toEqual(["inventory", "add", "slots", "goals"]);
     expect(quickKeys("account")).toEqual(["rewards", "receipts", "orders", "genesis", "cards", "profile", "security"]);
     expect(quickKeys("preferences")).toEqual(["preferences", "theme", "language"]);
-    expect(quickKeys("help")).toEqual(["messages", "support", "faq", "tickets", "trust", "learning", "risk", "developer"]);
+    expect(quickKeys("help")).toEqual(["messages", "support", "faq", "trust", "learning", "risk", "developer"]);
   });
 
   it("preserves the overview order without an unsolicited withdrawal warning", () => {

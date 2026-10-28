@@ -169,9 +169,9 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextE
 
 function timeAgo(ts: number): string {
   const mins = Math.max(1, Math.floor((Date.now() - ts) / 60_000));
-  if (mins < 60) return fmt(t.value.tickets.timeMinutesAgo, { n: mins });
-  if (mins < 1440) return fmt(t.value.tickets.timeHoursAgo, { n: Math.floor(mins / 60) });
-  return fmt(t.value.tickets.timeDaysAgo, { n: Math.floor(mins / 1440) });
+  if (mins < 60) return fmt(t.value.notifs.timeMinutesAgo, { n: mins });
+  if (mins < 1440) return fmt(t.value.notifs.timeHoursAgo, { n: Math.floor(mins / 60) });
+  return fmt(t.value.notifs.timeDaysAgo, { n: Math.floor(mins / 1440) });
 }
 
 async function onTap(n: Notification) {

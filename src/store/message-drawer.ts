@@ -13,8 +13,7 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
   const advisorUnread = computed(() => conversations.byType("advisor").reduce((sum, row) => sum + row.unread, 0));
   const supportUnread = computed(() => conversations.byType("support").reduce((sum, row) => sum + row.unread, 0));
   const humanUnread = computed(() => advisorUnread.value + supportUnread.value);
-  const ticketUnread = computed(() => 0);
-  const serviceUnread = computed(() => humanUnread.value + ticketUnread.value);
+  const serviceUnread = computed(() => humanUnread.value);
   const totalUnread = computed(() => notifications.unread + serviceUnread.value);
   const loading = computed(() => notifications.loading || conversations.loading);
   const error = computed(() => notifications.error || conversations.error
@@ -82,6 +81,6 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
     section.value = "notifications";
   }
 
-  return { section, show, advisorUnread, supportUnread, humanUnread, ticketUnread, serviceUnread, totalUnread,
+  return { section, show, advisorUnread, supportUnread, humanUnread, serviceUnread, totalUnread,
     loading, error, refresh, startRefresh, stopRefresh, bindAccount };
 });

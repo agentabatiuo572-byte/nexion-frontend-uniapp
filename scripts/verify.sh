@@ -2013,7 +2013,7 @@ sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-po
 # P2-8 batch-4 记录/账户:通知/凭证/工单/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红)
 sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 account-scope helper rebinds tickets" src/lib/account-scope.ts 'useTickets\(\)\.bindAccount\(accountKey\)'
+sentinel_absent "retired support tickets have no client store" 'useTickets|store/tickets'
 # 🔴 2026-08-13 三条钉函数名的哨兵已退役,换成 account-scope-gate.mjs:
 #   它们钉的是 `writeAccountRow` / `useConversations().reset()` 这类**具体写法**,
 #   而实现换了更严的机制之后全红 —— tickets 改按「账号+运行会话」双维拼键、
