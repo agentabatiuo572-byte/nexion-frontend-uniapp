@@ -40,13 +40,13 @@ describe("native device signals", () => {
     vi.stubGlobal("plus", { os: { name: "iOS" }, ios: { importClass: () => ({ currentDevice: () => device }), deleteObject: () => {} } });
     vi.stubGlobal("uni", { getDeviceInfo: () => ({ deviceModel: "iPhone17,1", osVersion: "18.1.1" }),
       getWindowInfo: () => ({ screenWidth: 402, screenHeight: 874, pixelRatio: 3 }) });
-    expect(collectDeviceSignals()).toMatchObject({ model: "iPhone17,1", osVersion: "18.1.1", screenWidth: 402, screenHeight: 874, pxDensity: 3 });
+    expect(collectDeviceSignals()).toMatchObject({ model: "iPhone17,1", osVersion: "18.1.1", screenWidth: 402, screenHeight: 874, pixelRatio: 3, pxDensity: null });
     vi.stubGlobal("uni", { getDeviceInfo: () => ({ deviceModel: "iPhone17,1", osVersion: "iOS 18" }),
       getWindowInfo: () => ({ screenWidth: 0, screenHeight: 874, pixelRatio: Number.NaN }) });
     const partial = collectDeviceSignals();
     expect(partial).not.toHaveProperty("osVersion");
     expect(partial).not.toHaveProperty("screenWidth");
-    expect(partial.pxDensity).toBeNull();
+    expect(partial).not.toHaveProperty("pixelRatio");
   });
   it("does not accept a WebView renderer as a native phone signal outside Android", () => {
     vi.stubGlobal("plus", undefined);
