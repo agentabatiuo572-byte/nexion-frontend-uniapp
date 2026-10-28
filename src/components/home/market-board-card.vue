@@ -4,7 +4,7 @@
   stay explicit instead of being replaced with local mock movement or volume.
 -->
 <template>
-  <view data-home-section="compute-market">
+  <view class="home-market" data-home-section="compute-market">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: var(--ui-type-section); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text><text v-if="app.homeTruthStatus === 'error' && app.homeTruth" style="font-size: 12px; color: var(--v5-warning)"> · {{ t.home.networkStale }}</text></text>
       <view
@@ -19,10 +19,10 @@
     </view>
 
     <view v-if="homeMarketRows.length" style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
-      <view class="grid gap-2 font-mono-tabular" :style="{ gridTemplateColumns: marketGridColumns, padding: '9px 14px', background: 'var(--v5-surface-2)', borderBottom: '1px solid var(--v5-border)', fontSize: '12px', color: 'var(--v5-ink-4)' }">
+      <view class="home-market-grid grid font-mono-tabular" :style="{ gridTemplateColumns: marketGridColumns, padding: '9px 12px', background: 'var(--v5-surface-2)', borderBottom: '1px solid var(--v5-border)', fontSize: '12px', color: 'var(--v5-ink-4)' }">
         <text>{{ t.home.mbColTag }}</text>
         <text>{{ t.home.mbColModel }}</text>
-        <text class="text-right">{{ t.home.mbCol1h }}</text>
+        <text class="home-market-spark text-right">{{ t.home.mbCol1h }}</text>
         <text class="text-right">{{ t.home.mbColPrice }}</text>
         <text class="text-right">{{ t.home.mbCol24h }}</text>
       </view>
@@ -31,10 +31,10 @@
         v-for="(row, i) in homeMarketRows"
         :key="row.code"
         data-home-market-row="true"
-        class="grid items-center gap-2 active:scale-[0.98] transition-transform"
+        class="home-market-grid grid items-center active:scale-[0.98] transition-transform"
         role="link"
         tabindex="0"
-        :style="{ gridTemplateColumns: marketGridColumns, padding: '10px 14px', borderBottom: i < homeMarketRows.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
+        :style="{ gridTemplateColumns: marketGridColumns, padding: '10px 12px', borderBottom: i < homeMarketRows.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         @click="goEarn"
         @keydown.enter.stop.prevent="goEarn"
       >
@@ -43,7 +43,7 @@
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink); letter-spacing: -0.008em">{{ displayRow(row).name }}</text>
           <text class="block font-mono-tabular mt-0.5" style="font-size: 12px; color: var(--v5-ink-4)">{{ unavailableVolumeText }}</text>
         </view>
-        <view class="min-w-0 text-right">
+        <view class="home-market-spark min-w-0 text-right">
           <HomeSparkline v-if="displayRow(row).sparkline" :data="displayRow(row).sparkline!" :color="deltaColor(row)" :height="18" :fill="false" />
           <text v-else class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ marketBoardUnavailable }}</text>
         </view>
@@ -74,7 +74,7 @@ import { createMarketBoardNavigation } from "./market-board-navigation";
 
 const t = useT();
 const app = useApp();
-const marketGridColumns = "36px minmax(0, 1fr) 60px 76px 58px";
+const marketGridColumns = "var(--home-market-columns)";
 const marketBoardUnavailable = "—";
 const homeMarketRows = computed(() => app.homeTruth?.marketBoard.workloads ?? []);
 const unavailableVolumeText = computed(() => fmt(t.value.home.marketBoardVol, { n: marketBoardUnavailable }));
@@ -103,6 +103,12 @@ function retryHome() {
 </script>
 
 <style scoped>
+.home-market { --home-market-columns: 32px minmax(0, 1fr) 40px 64px 50px; }
+.home-market-grid { gap: 6px; }
+@media (max-width: 360px) {
+  .home-market { --home-market-columns: 32px minmax(0, 1fr) 64px 50px; }
+  .home-market-spark { display: none; }
+}
 .market-board-open:focus,
 .market-board-open:focus-visible {
   outline: 2px solid var(--v5-brand);

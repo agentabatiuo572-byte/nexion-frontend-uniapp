@@ -9,11 +9,10 @@
       </view>
       <view class="agent-content">
         <view class="agent-hero">
+          <view class="agent-hero-medal" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg></view>
           <view class="agent-hero-copy">
             <text class="agent-headline">{{ t.agent.heroHeadline }}</text>
-            <text class="agent-hero-caption">{{ t.agent.heroLabel }}</text>
           </view>
-          <TeamArt kind="growth" :size="80" />
         </view>
         <text class="agent-intro">{{ fmt(t.agent.heroBody, { rank: requiredRankLabel }) }}</text>
 
@@ -55,9 +54,9 @@
             <view class="flex-1 min-w-0">
               <view class="flex items-center justify-between" style="gap: 6px; flex-wrap: wrap">
                 <text class="agent-bucket-title">{{ b.title }}</text>
+                <text class="agent-bucket-range tabular-nums" :style="{ color: 'var(--v5-ink)' }">{{ b.range }}</text>
                 <svg v-if="selectedBucketId === b.id" class="agent-bucket-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
               </view>
-              <text class="agent-bucket-range tabular-nums" :style="{ color: 'var(--v5-ink)' }">{{ b.range }}</text>
               <text class="agent-bucket-rule">{{ b.rule }}</text>
             </view>
           </view>
@@ -175,7 +174,6 @@ import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
-import TeamArt from "@/components/team/team-art.vue";
 import TeamRankEmblem from "@/components/team/team-rank-emblem.vue";
 import { useVRank } from "@/store/v-rank";
 import { rankTitle, rankLabel } from "@/lib/v-rank-copy";
@@ -531,10 +529,10 @@ function go(url: string) {
 const pathCtaStyle: CSSProperties = { color: "var(--v5-ink)" };
 const bucketsGroupStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" };
 function bucketRowStyle(isLast: boolean): CSSProperties {
-  return { padding: "18px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "13px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 const selectedBucketStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
-const bucketIconStyle: CSSProperties = { width: "32px", height: "32px" };
+const bucketIconStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "var(--v5-surface)" };
 const formBlockStyle: CSSProperties = { paddingTop: "8px" };
 const formCapStyle: CSSProperties = { color: "var(--v5-ink)" };
 const fieldStyle: CSSProperties = { padding: "8px 0" };
@@ -562,8 +560,8 @@ function caseRowStyle(isLast: boolean): CSSProperties {
 .agent-application-budget { color: var(--v5-ink-2); font-variant-numeric: tabular-nums; }
 .agent-content { display: flex; flex-direction: column; gap: 24px; padding: var(--ui-space-inset) 20px 24px; }
 .agent-hero { display: flex; align-items: center; gap: var(--ui-space-inline); }
+.agent-hero-medal { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 12px; background: var(--v5-surface); }
 .agent-hero-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.agent-hero-caption { display: block; margin-top: 10px; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-3); }
 .agent-headline { display: block; font-size: var(--ui-type-page-title); font-weight: 600; line-height: var(--ui-type-page-title-lh); text-wrap: balance; }
 .agent-intro { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.7; margin-top: -12px; }
 .agent-eligibility { display: grid; grid-template-columns:52px minmax(0,1fr); align-items: center; gap: var(--ui-space-inline); padding: var(--ui-space-inset); border: 1px solid var(--v5-border); border-radius: 16px; background: var(--v5-surface); }
@@ -581,7 +579,7 @@ function caseRowStyle(isLast: boolean): CSSProperties {
 .agent-section-title { display: block; font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: 600; color: var(--v5-ink); }
 .agent-support-types > .agent-section-title { margin-bottom: 14px; }
 .agent-bucket-title { font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; }
-.agent-bucket-range { display: block; margin-top: 6px; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); overflow-wrap: anywhere; }
+.agent-bucket-range { display: block; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); overflow-wrap: anywhere; }
 .agent-bucket-rule { display: block; margin-top: 6px; font-size: var(--ui-type-list-subtitle); line-height: 1.6; color: var(--v5-ink-3); }
 .agent-form-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 12px; }
 .agent-selected-type { color: var(--v5-ink-3); }
