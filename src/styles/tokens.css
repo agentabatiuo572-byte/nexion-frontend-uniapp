@@ -1187,6 +1187,9 @@ uni-input .uni-input-placeholder {
   --ui-type-body: 15px; --ui-type-body-lh: 22px;
   --ui-type-list-title: 15px; --ui-type-list-title-lh: 20px;
   --ui-type-list-subtitle: 13px; --ui-type-list-subtitle-lh: 18px;
+  --ui-type-message-title: 14px; --ui-type-message-title-lh: 20px;
+  --ui-type-message-preview: 12.5px; --ui-type-message-preview-lh: 18px;
+  --ui-type-message-meta: 12px; --ui-type-message-meta-lh: 16px;
   --ui-type-meta: 12px; --ui-type-meta-lh: 16px;
   --ui-type-profile: 20px; --ui-type-profile-lh: 28px;
   --ui-type-button: 14px; --ui-type-button-lh: 20px;
@@ -1202,6 +1205,9 @@ uni-input .uni-input-placeholder {
     --ui-type-body: 13px; --ui-type-body-lh: 20px;
     --ui-type-list-title: 13px; --ui-type-list-title-lh: 18px;
     --ui-type-list-subtitle: 12px; --ui-type-list-subtitle-lh: 16px;
+    --ui-type-message-title: 12.5px; --ui-type-message-title-lh: 18px;
+    --ui-type-message-preview: 12px; --ui-type-message-preview-lh: 17px;
+    --ui-type-message-meta: 12px; --ui-type-message-meta-lh: 16px;
     --ui-type-profile: 18px; --ui-type-profile-lh: 24px;
     --ui-type-button: 13px; --ui-type-button-lh: 18px;
     --ui-type-long-form: 14px; --ui-type-long-form-lh: 21px;
@@ -1215,6 +1221,9 @@ uni-input .uni-input-placeholder {
     --ui-type-body: 14px; --ui-type-body-lh: 21px;
     --ui-type-list-title: 14px; --ui-type-list-title-lh: 20px;
     --ui-type-list-subtitle: 12px; --ui-type-list-subtitle-lh: 16px;
+    --ui-type-message-title: 13px; --ui-type-message-title-lh: 18px;
+    --ui-type-message-preview: 12px; --ui-type-message-preview-lh: 17px;
+    --ui-type-message-meta: 12px; --ui-type-message-meta-lh: 16px;
     --ui-type-profile: 19px; --ui-type-profile-lh: 26px;
     --ui-type-button: 13px; --ui-type-button-lh: 18px;
     --ui-type-long-form: 14px; --ui-type-long-form-lh: 21px;
@@ -1224,6 +1233,7 @@ uni-input .uni-input-placeholder {
 @media (min-width: 375px) and (max-width: 389px) {
   :root {
     --ui-type-page-title: 23px; --ui-type-page-title-lh: 31px;
+    --ui-type-message-title: 13.5px; --ui-type-message-title-lh: 19px;
     --ui-type-body: 14px; --ui-type-body-lh: 21px;
     --ui-type-long-form: 14px; --ui-type-long-form-lh: 21px;
     --ui-type-wallet-amount: 34px; --ui-type-wallet-amount-lh: 40px;
@@ -1232,6 +1242,8 @@ uni-input .uni-input-placeholder {
 @media (min-width: 414px) {
   :root {
     --ui-type-section: 16px; --ui-type-section-lh: 22px;
+    --ui-type-message-preview: 13px; --ui-type-message-preview-lh: 19px;
+    --ui-type-message-meta: 12px; --ui-type-message-meta-lh: 16px;
     --ui-type-button: 15px; --ui-type-button-lh: 20px;
   }
 }
