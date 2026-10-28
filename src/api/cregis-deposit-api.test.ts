@@ -71,3 +71,14 @@ it.each([14, 15.5, -1, "15", true])("rejects invalid per-deposit confirmation re
   const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue([{ ...deposit, status: "CONFIRMING", requiredConfirmations }]) } as unknown as ApiClient);
   await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
 });
+
+
+it("retains precise string amounts and rejects malformed exact fields", async () => {
+  const request = vi.fn().mockResolvedValue({ ...address, feeUsdt: 999999999999, feeUsdtExact: "999999999999.000001", minDepositUsdtExact: "0.000001" });
+  const api = createCregisDepositApi({ request } as unknown as ApiClient);
+  await expect(api.address()).resolves.toMatchObject({ feeUsdtExact: "999999999999.000001", minDepositUsdtExact: "0.000001" });
+  request.mockResolvedValueOnce([{ ...deposit, status: "CREDITED", grossAmountUsdtExact: "999999999999.000001", creditedUsdtExact: "0.004999" }]);
+  await expect(api.list()).resolves.toMatchObject([{ grossAmountUsdtExact: "999999999999.000001", creditedUsdtExact: "0.004999" }]);
+  request.mockResolvedValueOnce([{ ...deposit, status: "CREDITED", creditedUsdtExact: "1.0000001" }]);
+  await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
+});

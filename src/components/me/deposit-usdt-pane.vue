@@ -157,7 +157,9 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount as formatBaseAmount } from "@/lib/amount-display";
+import { exactDepositAmount } from "@/api/cregis-deposit-api";
+const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 6);
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import qrcode from "qrcode-generator";
 import { cregisDepositApi, fundsServerEnabled, sessionVault } from "@/api/runtime";
@@ -225,11 +227,13 @@ const historyLoaded = ref(false);
 type PaneDepositRecord = Omit<DepositRecord, "status"> & {
   status: DepositRecord["status"] | "reorg_investigating" | "provider_conflict_hold" | "reorg_reversed";
   reviewHold?: boolean;
+  grossExact?: string | null;
+  creditedExact?: string | null;
 };
 const serverRecords = ref<PaneDepositRecord[]>([]);
 const copied = ref(false);
-const minDeposit = ref(MIN_DEPOSIT_USDT);
-const feeUsdt = ref(0);
+const minDeposit = ref<string | number | null>(MIN_DEPOSIT_USDT);
+const feeUsdt = ref<string | number | null>(0);
 const confirmations = ref(CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"]);
 function refreshBankHistory(): void {
   if (fundsServerEnabled && remoteSessionReady.value && dep.currentAccountKey() === app.accountKey
@@ -255,8 +259,8 @@ function load(background = false) {
         serverEnabled.value = snapshot.enabled;
         serverCreditEnabled.value = snapshot.creditEnabled === true;
         serverAddress.value = snapshot.enabled ? snapshot.address ?? "" : "";
-        minDeposit.value = snapshot.minDepositUsdt ?? MIN_DEPOSIT_USDT;
-        feeUsdt.value = snapshot.feeUsdt ?? 0;
+        minDeposit.value = snapshot.minDepositUsdt == null ? MIN_DEPOSIT_USDT : exactDepositAmount(snapshot.minDepositUsdt, snapshot.minDepositUsdtExact);
+        feeUsdt.value = snapshot.feeUsdt == null ? 0 : exactDepositAmount(snapshot.feeUsdt, snapshot.feeUsdtExact);
         confirmations.value = snapshot.confirmations ?? CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"];
         copied.value = false;
         phase.value = "ready";
@@ -266,6 +270,8 @@ function load(background = false) {
         serverRecords.value = deposits.map((row) => ({
           depositId: row.depositId, channel: "usdt-bep20", txHash: row.txHash,
           address: row.address, grossAmountUsdt: row.grossAmountUsdt,
+          grossExact: exactDepositAmount(row.grossAmountUsdt, row.grossAmountUsdtExact),
+          creditedExact: exactDepositAmount(row.creditedUsdt, row.creditedUsdtExact),
           feeUsdt: row.creditedUsdt > 0 ? row.grossAmountUsdt - row.creditedUsdt : 0,
           creditedUsdt: row.creditedUsdt,
           confirmations: row.confirmations, requiredConfirmations: row.requiredConfirmations ?? undefined,
@@ -425,7 +431,7 @@ function isRiskHold(r: PaneDepositRecord): boolean {
 }
 function rowAmount(r: PaneDepositRecord): string {
   const value = r.status === "reorg_reversed" || isRiskHold(r) || r.creditedUsdt > 0 ? r.creditedUsdt : r.grossAmountUsdt;
-  return formatAmount(value);
+  return formatAmount("grossExact" in r ? (value === r.creditedUsdt ? r.creditedExact : r.grossExact) : value);
 }
 function netShort(c: DepositChannel): string {
   return CHANNEL_SHORT[c];
@@ -455,7 +461,7 @@ function noteText(r: PaneDepositRecord): string {
 }
 /** 法币轨恒可点(跳账单页);链上轨只有已入账(credited)有交易详情可看(与 goRecord 同判据)。 */
 function recordClickable(r: PaneDepositRecord): boolean {
-  return !isChainChannel(r.channel) || r.status === "credited";
+  return !isChainChannel(r.channel) || (r.status === "credited" && (!("grossExact" in r) || r.grossExact !== null));
 }
 /** 不可点记录行不注册 click 监听(同 wallet-bills.billRowOn:防 tap-feedback 门判死控件)。 */
 function recordRowOn(r: PaneDepositRecord) {
@@ -476,8 +482,7 @@ function goRecord(r: PaneDepositRecord) {
   // 网络、确认数、专属收款地址、发生时间——tx 页入参优先,防种子假数据与本笔矛盾。
   const p = new URLSearchParams({
     hash: r.txHash ?? r.depositId,
-    amount: fundsServerEnabled ? r.grossAmountUsdt.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")
-      : r.grossAmountUsdt.toFixed(2),
+    amount: fundsServerEnabled ? (r.grossExact ?? String(r.grossAmountUsdt)) : r.grossAmountUsdt.toFixed(2),
     net: CHANNEL_SHORT[r.channel],
     confs: String(r.confirmations ?? 0),
     age: String(Math.max(1, Math.round((mockServerNow() - r.createdAt) / 60_000))),
