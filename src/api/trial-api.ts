@@ -11,6 +11,13 @@ export type TrialSettlementPolicy = "FULL_TERM_ON_CONVERSION" | "ACCRUED_ON_CONV
  * displays it and echoes `quoteVersion` back on convert; it never derives
  * credit, rewards or the early discount itself.
  */
+export interface TrialConversionOutcome {
+  orderNo: string | null;
+  refunded: boolean;
+  /** Full-term conversions take their trial rewards back on refund; older rules do not. */
+  rewardsReversed: boolean;
+}
+
 export interface TrialConversionQuote {
   settlementPolicy: TrialSettlementPolicy;
   quoteVersion: string;
@@ -54,6 +61,8 @@ export interface TrialAuthorityState {
   shadowNEX: number;
   /** FEAT-TRIAL05 server quote. Missing on older servers and terminal claims: keep the local presentation. */
   quote?: TrialConversionQuote;
+  /** Redeemed claims: the purchase may have been refunded since. Missing on older servers. */
+  conversion?: TrialConversionOutcome;
   source: string;
   serverCanonical: true;
   sourceEnvironment: "PRODUCTION";
@@ -260,6 +269,13 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
   if (serverState === "EXTENDED" && extendedEndsAt === null) return invalid();
   const finishedAt = timestamp(row.finishedAtEpochMs ?? row.finishedAt);
   const cooldownUntil = timestamp(row.cooldownUntilEpochMs ?? row.cooldownUntil);
+  const conversion = typeof row.conversionRefunded === "boolean"
+    ? {
+      orderNo: typeof row.conversionOrderNo === "string" && row.conversionOrderNo.trim() ? row.conversionOrderNo.trim() : null,
+      refunded: row.conversionRefunded,
+      rewardsReversed: row.conversionRewardsReversed === true,
+    }
+    : null;
   if (["ACTIVE", "GRACE", "EXTENDED", "REDEEMED"].includes(serverState)
       && (startedAt === null || expiresAt === null)) return invalid();
 
@@ -281,6 +297,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
     shadowUSD,
     shadowNEX,
     ...(quote ? { quote } : {}),
+    ...(conversion ? { conversion } : {}),
     source,
     serverCanonical: true,
     sourceEnvironment: "PRODUCTION",

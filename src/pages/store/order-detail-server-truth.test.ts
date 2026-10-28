@@ -1,4 +1,4 @@
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { compile } from "@vue/compiler-dom";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import { renderToString } from "@vue/server-renderer";
@@ -14,6 +14,9 @@ import { en } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 import source from "./order-detail.vue?raw";
+import { fmt } from "@/i18n/format";
+import { trialPurchaseCopy } from "@/i18n/trial-purchase";
+import { trialEarlyPurchaseCopy } from "@/i18n/trial-early-purchase";
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
@@ -72,7 +75,7 @@ async function detail(dataCenter: string | null, copy = en, status: CanonicalOrd
   const copyRef = Vue.ref(copy);
   const navTo = vi.fn();
   const load = (id: string) => {
-    if (id === "@/lib/amount-display") return { formatAmount };
+    if (id === "@/lib/amount-display") return { formatAmount, formatGroupedAmount };
     if (id === "vue") return { ...Vue, onUnmounted: Vue.onScopeDispose };
     if (id === "@dcloudio/uni-app") return {
       onLoad: (callback: typeof onLoad) => { onLoad = callback; }, onShow: () => {}, onHide: () => {}, onUnload: () => {},
@@ -81,7 +84,9 @@ async function detail(dataCenter: string | null, copy = en, status: CanonicalOrd
     if (id === "@/store/app") return { useApp: () => ({}) };
     if (id === "@/store/auth") return { useAuth: () => ({ isAuthenticated: true, accountId: "user:server-truth" }) };
     if (id === "@/i18n/use-t") return { useT: () => copyRef };
-    if (id === "@/i18n/format") return { dateLocale: () => "en-US" };
+    if (id === "@/i18n/format") return { dateLocale: () => "en-US", fmt };
+    if (id === "@/i18n/trial-purchase") return { useTrialPurchaseCopy: () => Vue.computed(() => trialPurchaseCopy[Vue.toRaw(copyRef.value) === zh ? "zh" : Vue.toRaw(copyRef.value) === en ? "en" : "vi"]) };
+    if (id === "@/i18n/trial-early-purchase") return { useTrialEarlyPurchaseCopy: () => Vue.computed(() => trialEarlyPurchaseCopy[Vue.toRaw(copyRef.value) === zh ? "zh" : Vue.toRaw(copyRef.value) === en ? "en" : "vi"]) };
     if (id === "@/lib/brand-copy") return { nexGridBrandText };
     if (id === "@/lib/trial-date") return { formatTrialDateTime };
     if (id === "@/store/free-trial") return { trialReservesSlotNow: () => false };

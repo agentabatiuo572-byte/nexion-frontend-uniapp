@@ -92,7 +92,7 @@ function mount(options: { params?: Record<string, unknown>; hash?: string; boots
     "@/lib/amount-display": { formatAmount },
     "@/lib/rank-how-content": { formatHowNumber },
     vue: Vue, "@dcloudio/uni-app": Object.fromEntries(["onLoad", "onShow", "onHide", "onUnload"].map(name => [name, (fn: typeof invalidateRuntime) => { hooks[name] = fn; }])),
-    "@/components/app-chassis.vue": { default: presentation }, "@/components/sub-page-header.vue": { default: { render: () => null } },
+    "@/components/app-chassis.vue": { default: presentation }, "@/components/sub-page-header.vue": { default: { render: () => null } }, "@/components/copy-code-button.vue": { default: { render: () => null } },
     "@/i18n/use-t": { useT: () => Vue.ref(en) }, "@/i18n/format": { dateLocale: () => "en-US" },
     "@/store/app": { useApp: () => app }, "@/api/runtime": { apiClient: { request } },
     "@/api/order-api": { captureRuntimeRevision: () => runtimeRevision, isCurrentRuntimeRevision: (value: number) => value === runtimeRevision,

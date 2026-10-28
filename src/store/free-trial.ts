@@ -5,7 +5,7 @@ import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, writeAccountRow } from "./account-scoped-storage";
 import { remoteApiEnabled, trialApi } from "@/api/runtime";
-import type { TrialAuthorityState, TrialConversionQuote } from "@/api/trial-api";
+import type { TrialAuthorityState, TrialConversionOutcome, TrialConversionQuote } from "@/api/trial-api";
 import { asApiError, isAmbiguousOutcome } from "@/api/errors";
 import {
   resolveTrialAt,
@@ -187,6 +187,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const authoritativeShadowNEX = ref(0);
   /** FEAT-TRIAL05 server conversion quote; null on older servers or terminal claims. */
   const authoritativeQuote = ref<TrialConversionQuote | null>(null);
+  const authoritativeConversion = ref<TrialConversionOutcome | null>(null);
   const remoteCanStart = ref(false);
   // Presentation only: keep the last confirmed promotion mounted during reads.
   // Never use this retained value to authorize a claim; canStart stays fail-closed.
@@ -252,6 +253,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authoritativeShadowUSD.value = 0;
     authoritativeShadowNEX.value = 0;
     authoritativeQuote.value = null;
+    authoritativeConversion.value = null;
     remoteCanStart.value = false;
     remoteEligibilityReason.value = "unknown";
     authorityClaimNo.value = null;
@@ -291,6 +293,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authoritativeShadowUSD.value = next.shadowUSD;
     authoritativeShadowNEX.value = next.shadowNEX;
     authoritativeQuote.value = next.quote ?? null;
+    authoritativeConversion.value = next.conversion ?? null;
     remoteCanStart.value = next.canStart;
     confirmedPromoVisible.value = next.canStart && next.status === "none";
     confirmedPromoKnown.value = true;
@@ -737,7 +740,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   return {
     status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
-    authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX, authoritativeQuote,
+    authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
