@@ -43,7 +43,7 @@ describe("Cregis deposit API", () => {
 
   it("accepts all six existing states together and preserves historical credit", async () => {
     const statuses: CregisDeposit["status"][] = ["CONFIRMING", "CREDITED", "DUST_HOLD", "REVIEW_HOLD",
-      "REORG_INVESTIGATING", "PROVIDER_CONFLICT_HOLD"];
+      "REORG_INVESTIGATING", "PROVIDER_CONFLICT_HOLD", "REFUNDED", "REORG_REVERSED"];
     const rows = statuses.map((status, index) => ({ ...deposit, depositId: `CR-${index + 1}`, status,
       creditedUsdt: ["CREDITED", "REORG_INVESTIGATING", "PROVIDER_CONFLICT_HOLD"].includes(status) ? 9 : 0 }));
     const request = vi.fn().mockResolvedValue(rows);
@@ -58,4 +58,16 @@ describe("Cregis deposit API", () => {
     ]) } as unknown as ApiClient);
     await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
   });
+});
+
+
+it.each([15, 20, null, undefined])("accepts per-deposit confirmation requirement %s", async requiredConfirmations => {
+  const row = { ...deposit, status: "CONFIRMING", requiredConfirmations };
+  const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue([row]) } as unknown as ApiClient);
+  await expect(api.list()).resolves.toEqual([row]);
+});
+
+it.each([14, 15.5, -1, "15", true])("rejects invalid per-deposit confirmation requirement %s", async requiredConfirmations => {
+  const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue([{ ...deposit, status: "CONFIRMING", requiredConfirmations }]) } as unknown as ApiClient);
+  await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
 });

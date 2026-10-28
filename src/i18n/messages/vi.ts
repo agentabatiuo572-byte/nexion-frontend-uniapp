@@ -6312,6 +6312,7 @@ openSeaErrorPool: {
     topupNotCreditedYet: "Đang xác nhận khoản nạp — tiền không bị mất. Làm mới lại sau nhé.",
     depositOpFailedNote: "Thông tin nạp tiền tạm thời chưa khả dụng. Vui lòng làm mới hoặc liên hệ hỗ trợ.",
     addrLoadFailed: "Không tải được địa chỉ nạp",
+    addressStatusUnverified: "Không thể xác nhận trạng thái địa chỉ nạp. Đừng chuyển tiền; hãy thử lại trước.",
     cardFeeLabel: "Phí thẻ {rate}",
     cardLimitHint: "Hạn mức mỗi giao dịch {min} – {max}",
     payCta: "Thanh toán {amount}",

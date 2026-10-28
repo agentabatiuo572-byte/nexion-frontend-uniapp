@@ -29,6 +29,10 @@
     </view>
 
     <template v-else>
+      <view v-if="refreshFailed" class="nx-dep-background-error" role="status">
+        <text :style="noteStyle">{{ addressVerified ? t.topupChrome.depositOpFailedNote : t.topupChrome.addressStatusUnverified }}</text>
+        <view class="nx-dep-background-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="load(true)"><text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text></view>
+      </view>
       <!-- ── 三网络 chip ── -->
       <view class="flex" style="gap: 8px">
         <view
@@ -42,7 +46,7 @@
         >
           <text :style="chipLabelStyle(nw.id)">{{ nw.label }}</text>
           <text v-if="nw.id === 'usdt-trc20'" :style="chipTagStyle">{{ t.topupChrome.netRecommended }}</text>
-          <text v-else :style="chipSubStyle" style="white-space: nowrap">{{ fmt(t.topupChrome.netFee, { fee: formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
+          <text v-else :style="chipSubStyle" style="white-space: nowrap">{{ fmt(t.topupChrome.netFee, { fee: addressVerified ? formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) : "—" }) }}</text>
         </view>
       </view>
 
@@ -52,25 +56,25 @@
         <view v-if="fundsServerEnabled && !serverCreditEnabled" class="nx-dep-credit-paused-note" :style="warnlineStyle">
           <text :style="warnTextStyle">{{ t.topupChrome.creditPausedNote }}</text>
         </view>
-        <view v-if="address" class="nx-dep-qr-box" :style="qrBoxStyle">
+        <view v-if="address && addressVerified" class="nx-dep-qr-box" :style="qrBoxStyle">
           <image class="nx-dep-qr-image" :src="qrImage" mode="aspectFit" :style="qrImageStyle" aria-hidden="true" />
         </view>
-        <view><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text></view>
-        <view class="nx-dep-amount-note"><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.amountAtSenderNote }}</text></view>
+        <view v-if="addressVerified"><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text></view>
+        <view v-if="addressVerified" class="nx-dep-amount-note"><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.amountAtSenderNote }}</text></view>
         <view class="flex items-center rounded-xl" :style="addressRowStyle">
           <view class="flex-1 min-w-0">
             <text class="font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); white-space: nowrap">{{ shortAddr }}</text>
           </view>
-          <view class="nx-dep-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" :aria-label="copied ? t.topupChrome.addrCopied : t.topupChrome.copyAddress" @click="copyAddr">
+          <view v-if="addressVerified" class="nx-dep-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" :aria-label="copied ? t.topupChrome.addrCopied : t.topupChrome.copyAddress" @click="copyAddr">
             <svg v-if="copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
         </view>
         <!-- 费用/最低额/确认数 — deposits-core 常量单源派生 -->
         <view class="flex items-center justify-between" style="margin-top: 12px; gap: 8px">
-          <view><text :style="metaCapStyle">{{ t.topupChrome.minDeposit }} <text :style="metaValStyle">${{ formatAmount(minDeposit) }}</text></text></view>
-          <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text :style="metaValStyle">{{ formatAmount(feeUsdt) }} USDT</text></text></view>
-          <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text :style="metaValStyle">{{ confirmations }}</text></text></view>
+          <view><text :style="metaCapStyle">{{ t.topupChrome.minDeposit }} <text class="nx-dep-min-value" :style="metaValStyle">{{ addressVerified ? `$${formatAmount(minDeposit)}` : "—" }}</text></text></view>
+          <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text class="nx-dep-fee-value" :style="metaValStyle">{{ addressVerified ? `${formatAmount(feeUsdt)} USDT` : "—" }}</text></text></view>
+          <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text class="nx-dep-confirmations-value" :style="metaValStyle">{{ addressVerified ? confirmations : "—" }}</text></text></view>
         </view>
       </view>
 
@@ -83,7 +87,7 @@
       </view>
 
       <!-- ── 可用专属地址警示:地址恒定 + 错网络不可找回(规格 ⑦ 语义)── -->
-      <view v-if="activeNet && address" class="flex" :style="warnlineStyle">
+      <view v-if="activeNet && address && addressVerified" class="flex" :style="warnlineStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
         <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.topupChrome.depositAddrNote }}</text></view>
       </view>
@@ -112,7 +116,7 @@
           </view>
         </view>
 
-        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready'" class="flex flex-col items-center" style="padding: 26px 0 18px">
+        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || historyLoaded) && !refreshFailed" class="flex flex-col items-center" style="padding: 26px 0 18px">
           <view class="grid place-items-center" :style="stateIconBoxStyle">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
           </view>
@@ -142,7 +146,7 @@
                 <text class="truncate font-mono-tabular" :style="rowSubStyle">{{ netShort(r.channel) }} · {{ r.depositId }}</text>
                 <text v-if="stateText(r)" :style="stateTextStyle(r)">{{ stateText(r) }}</text>
               </view>
-              <view v-if="isInFlight(r)" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
+              <view v-if="isInFlight(r) && r.requiredConfirmations != null" class="nx-dep-progress" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
               <view v-if="noteText(r)"><text class="block" :style="noteStyle">{{ noteText(r) }}</text></view>
             </view>
           </view>
@@ -215,8 +219,11 @@ let loadGeneration = 0;
 const serverAddress = ref("");
 const serverEnabled = ref(false);
 const serverCreditEnabled = ref(false);
+const addressVerified = ref(!fundsServerEnabled);
+const refreshFailed = ref(false);
+const historyLoaded = ref(false);
 type PaneDepositRecord = Omit<DepositRecord, "status"> & {
-  status: DepositRecord["status"] | "reorg_investigating" | "provider_conflict_hold";
+  status: DepositRecord["status"] | "reorg_investigating" | "provider_conflict_hold" | "reorg_reversed";
   reviewHold?: boolean;
 };
 const serverRecords = ref<PaneDepositRecord[]>([]);
@@ -238,34 +245,51 @@ function load(background = false) {
     const account = app.accountKey;
     const bindingEpoch = app.accountBindingEpoch;
     void (async () => {
+      let addressReceived = false;
       try {
         const snapshot = await cregisDepositApi.address();
-        const deposits = await cregisDepositApi.list();
         if (generation !== loadGeneration || account !== app.accountKey
             || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
+        addressReceived = true;
+        addressVerified.value = true;
         serverEnabled.value = snapshot.enabled;
         serverCreditEnabled.value = snapshot.creditEnabled === true;
         serverAddress.value = snapshot.enabled ? snapshot.address ?? "" : "";
         minDeposit.value = snapshot.minDepositUsdt ?? MIN_DEPOSIT_USDT;
         feeUsdt.value = snapshot.feeUsdt ?? 0;
         confirmations.value = snapshot.confirmations ?? CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"];
+        copied.value = false;
+        phase.value = "ready";
+        const deposits = await cregisDepositApi.list();
+        if (generation !== loadGeneration || account !== app.accountKey
+            || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
         serverRecords.value = deposits.map((row) => ({
           depositId: row.depositId, channel: "usdt-bep20", txHash: row.txHash,
           address: row.address, grossAmountUsdt: row.grossAmountUsdt,
           feeUsdt: row.creditedUsdt > 0 ? row.grossAmountUsdt - row.creditedUsdt : 0,
           creditedUsdt: row.creditedUsdt,
-          confirmations: row.confirmations, requiredConfirmations: confirmations.value,
+          confirmations: row.confirmations, requiredConfirmations: row.requiredConfirmations ?? undefined,
           reviewHold: row.status === "REVIEW_HOLD",
           status: row.status === "CREDITED" ? "credited"
             : row.status === "REORG_INVESTIGATING" ? "reorg_investigating"
             : row.status === "PROVIDER_CONFLICT_HOLD" ? "provider_conflict_hold"
+            : row.status === "REFUNDED" ? "returned"
+            : row.status === "REORG_REVERSED" ? "reorg_reversed"
             : row.status === "CONFIRMING" ? "confirming" : "dust_hold",
           createdAt: row.createdAt, creditedAt: row.creditedAt ?? undefined,
         }));
+        historyLoaded.value = true;
         phase.value = "ready";
+        refreshFailed.value = false;
       } catch {
         if (generation === loadGeneration && account === app.accountKey
             && bindingEpoch === app.accountBindingEpoch && remoteSessionReady.value) {
+          if (!addressReceived) { addressVerified.value = false; copied.value = false; }
+          if (background && phase.value === "ready") {
+            refreshFailed.value = true;
+            return;
+          }
+          if (addressReceived) { refreshFailed.value = true; return; }
           serverAddress.value = "";
           serverEnabled.value = false;
           serverCreditEnabled.value = false;
@@ -286,7 +310,10 @@ watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch],
   serverAddress.value = "";
   serverEnabled.value = false;
   serverCreditEnabled.value = false;
+  addressVerified.value = false;
   serverRecords.value = [];
+  historyLoaded.value = false;
+  refreshFailed.value = false;
   copied.value = false;
   phase.value = "loading";
   if (ready) load();
@@ -332,7 +359,7 @@ const shortAddr = computed(() => {
 });
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 function copyAddr() {
-  if (!address.value) return;
+  if (!address.value || !addressVerified.value) return;
   uni.setClipboardData({
     data: address.value,
     showToast: false, // 关掉 uni 系统 toast(恒中文「内容已复制」),只留应用内三语 toast
@@ -397,7 +424,7 @@ function isRiskHold(r: PaneDepositRecord): boolean {
   return r.status === "reorg_investigating" || r.status === "provider_conflict_hold";
 }
 function rowAmount(r: PaneDepositRecord): string {
-  const value = isRiskHold(r) || r.creditedUsdt > 0 ? r.creditedUsdt : r.grossAmountUsdt;
+  const value = r.status === "reorg_reversed" || isRiskHold(r) || r.creditedUsdt > 0 ? r.creditedUsdt : r.grossAmountUsdt;
   return formatAmount(value);
 }
 function netShort(c: DepositChannel): string {
@@ -410,11 +437,11 @@ function stateText(r: PaneDepositRecord): string {
   const tc = t.value.topupChrome;
   if (r.status === "reorg_investigating") return tc.reorgInvestigating;
   if (r.status === "provider_conflict_hold") return tc.providerConflictHold;
+  if (r.status === "reorg_reversed") return t.value.commissions.reversedTag;
   if (r.status === "credited") return tc.depositCredited;
   if (r.status === "returned") return tc.depositReturned;
   if (isInFlight(r)) {
-    const total = r.requiredConfirmations ?? 1;
-    return fmt(tc.confirmingProgress, { n: Math.min(r.confirmations ?? 0, total), total });
+    return fmt(tc.confirmingProgress, { n: r.confirmations ?? 0, total: r.requiredConfirmations ?? "-" });
   }
   return ""; // dust_hold:右侧留空,整句人工处理说明走 note 行
 }
@@ -584,7 +611,7 @@ function stateTextStyle(r: PaneDepositRecord): CSSProperties {
     fontSize: "12px",
     whiteSpace: isRiskHold(r) ? "normal" : "nowrap",
     textAlign: "right",
-    color: isRiskHold(r) ? "var(--v5-warning)" : r.status === "credited" ? "var(--v5-brand)" : r.status === "returned" ? "var(--v5-ink-4)" : "var(--v5-ink-3)",
+    color: isRiskHold(r) ? "var(--v5-warning)" : r.status === "credited" ? "var(--v5-brand)" : ["returned", "reorg_reversed"].includes(r.status) ? "var(--v5-ink-4)" : "var(--v5-ink-3)",
   };
 }
 const progTrackStyle: CSSProperties = {
