@@ -17,7 +17,8 @@ function screen(messages = zh) {
   const deps = {
     checkoutWalletRefreshing: ref(false), step: ref("confirm"), netPrice: ref(50), cardFee: ref(0),
     captureCheckoutRoute: () => ({}), isCurrentCheckoutRoute: () => current,
-    t: ref(messages), formatAmount, fmt, dialogOwner: "test-checkout",
+    t: ref(messages), formatAmount, formatGroupedAmount: formatAmount, fmt, dialogOwner: "test-checkout",
+    trialConversionMode: ref(false), product: ref(null), purchaseCopy: ref({}), trialCreditText: ref(""),
     confirm: vi.fn(() => new Promise<boolean>(resolve => { accept = resolve; })),
     onConfirmPay: vi.fn().mockResolvedValue(undefined), toast: { warn: vi.fn() },
   };

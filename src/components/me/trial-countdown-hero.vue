@@ -14,8 +14,8 @@
 
     <!-- Shadow earnings -->
     <view class="flex items-baseline" style="gap: 6px; margin-top: 12px">
-      <text :style="dollarStyle">$</text>
-      <text :style="shadowUsdStyle">{{ formatAmount(shadowUSD) }}</text>
+      <text :style="shadowUsdStyle">{{ formatGroupedAmount(shadowUSD) }}</text>
+      <text :style="dollarStyle">USDT</text>
       <text :style="shadowNexStyle">+ {{ formatAmount(shadowNEX) }} UVT</text>
     </view>
     <text class="block" :style="ctaLineStyle">{{ cta }}</text>
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { computed, type CSSProperties } from "vue";
 import Cell from "@/components/me/trial-time-cell.vue";
 import { useT } from "@/i18n/use-t";

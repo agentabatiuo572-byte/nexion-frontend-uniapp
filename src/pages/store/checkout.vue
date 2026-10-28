@@ -161,17 +161,21 @@
             <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
             <!-- Subtotal revealed when any deduction applies (to anchor the
                  discount rows) or when a card fee applies. -->
-            <CheckoutRow v-if="hasVoucher || isCard || hasTradein || trialConversionMode" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
-            <CheckoutRow v-if="promoDiscount > 0" :label="promoRowLabel" :value="`−$${promoDiscountText}`" />
-            <CheckoutRow v-if="trialOffsetView.offsetUSD > 0" :label="t.store.coRowTrialOffset" :value="`−$${trialOffsetText}`" />
-            <CheckoutRow v-if="trialOffsetView.earlyDiscountUSD > 0" :label="earlyCopy.earlyDiscountLabel" :value="`−$${trialEarlyDiscountText}`" />
+            <CheckoutRow v-if="hasVoucher || isCard || hasTradein || trialConversionMode" :label="t.store.coRowSubtotal" :value="trialConversionMode ? `${formatGroupedAmount(priceText)} USDT` : `$${priceText}`" />
+            <CheckoutRow v-if="promoDiscount > 0" :label="promoRowLabel" :value="`−${formatGroupedAmount(promoDiscountText)} USDT`" />
+            <CheckoutRow v-if="trialOffsetView.offsetUSD > 0" :label="t.store.coRowTrialOffset" :value="`−${formatGroupedAmount(trialOffsetText)} USDT`" />
+            <CheckoutRow v-if="trialOffsetView.earlyDiscountUSD > 0" :label="earlyCopy.earlyDiscountLabel" :value="`−${formatGroupedAmount(trialEarlyDiscountText)} USDT`" />
             <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
             <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="`−$${tradeinCreditText}`" />
             <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="`$${cardFeeText}`" />
             <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
-            <CheckoutRow :label="t.store.coRowTotal" :value="`$${confirmTotalText}`" big />
-            <text v-if="trialEarlyNote" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty" data-testid="checkout-trial-early-note">{{ trialEarlyNote }}</text>
+            <CheckoutRow :label="t.store.coRowTotal" :value="trialConversionMode ? `${formatGroupedAmount(confirmTotalText)} USDT` : `$${confirmTotalText}`" big />
+            <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
+              <text>{{ earlyCopy.afterPurchaseLabel }}</text>
+              <text class="checkout-trial-credit-value">{{ trialCreditText }}</text>
+            </view>
+            <text v-if="trialConversionMode" class="block" style="font-size: var(--ui-type-meta, 12px); color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ purchaseCopy.refundClause }}</text>
             <!-- 异常4: $0 due keeps the explicit confirm; surplus never refunds -->
             <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
           </view>
@@ -263,7 +267,8 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { useTrialEarlyPurchaseCopy } from "@/i18n/trial-early-purchase";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
@@ -697,15 +702,17 @@ const trialOffsetText = computed(() => formatAmount(trialOffsetView.value.offset
 const earlyCopy = useTrialEarlyPurchaseCopy();
 const trialEarlyDiscountText = computed(() => formatAmount(trialOffsetView.value.earlyDiscountUSD));
 watch(trialEarlyQuoteLapsed, (lapsed) => { if (lapsed) void freeTrial.refreshRemote(true); });
-const trialEarlyNote = computed(() => {
+const purchaseCopy = useTrialPurchaseCopy();
+// What the trial purchase credits right after payment (server quote convert() settles).
+const trialCreditText = computed(() => {
   const quote = remoteApiEnabled && trialConversionMode.value && !trialEarlyQuoteLapsed.value ? freeTrial.authoritativeQuote : null;
-  if (!quote?.earlyPurchase) return "";
-  const nex = `${formatAmount(quote.rewardNEX)} UVT`;
-  return fmt(earlyCopy.value.earlyCheckoutNote, {
-    rewards: quote.remainderUSD > 0 ? `${formatAmount(quote.remainderUSD)} USDT · ${nex}` : nex,
-  });
+  if (!quote) return "";
+  const nex = `${formatGroupedAmount(quote.rewardNEX)} UVT`;
+  return quote.remainderUSD > 0 ? `${formatGroupedAmount(quote.remainderUSD)} USDT · ${nex}` : nex;
 });
-const promoRowLabel = computed(() => fmt(t.value.store.coRowTrialDiscount, { pct: (trialCfg.value.discountRate * 100).toFixed(0) }));
+const promoRowLabel = computed(() => fmt(t.value.store.coRowTrialDiscount, {
+  pct: (trialCfg.value.discountRate * 100).toFixed(0), cap: String(Number(trialCfg.value.discountCapUSD)),
+}));
 
 // ─── Voucher redemption ──────────────────────────────────────────────────
 // Best claimed-unused voucher applicable to this SKU at its base price. The
@@ -1157,9 +1164,14 @@ async function requestConfirmPay() {
   purchaseConfirmationOpen = true;
   dialogsOpen += 1;
   try {
+    const trialDevice = trialConversionMode.value ? product.value?.name ?? "" : "";
     const accepted = await confirm({
-      title: t.value.store.coConfirmPurchase,
-      message: fmt(t.value.store.coConfirmPurchaseMessage, { amount: formatAmount(amount) }),
+      title: trialDevice ? fmt(purchaseCopy.value.confirmTitle, { device: trialDevice }) : t.value.store.coConfirmPurchase,
+      message: trialDevice
+        ? [fmt(purchaseCopy.value.confirmPay, { amount: formatGroupedAmount(amount) }),
+          ...(trialCreditText.value ? [fmt(purchaseCopy.value.confirmCredit, { rewards: trialCreditText.value })] : []),
+          purchaseCopy.value.confirmRun].join("\n")
+        : fmt(t.value.store.coConfirmPurchaseMessage, { amount: formatAmount(amount) }),
       confirmLabel: t.value.store.coConfirmPayment,
       cancelLabel: t.value.store.coCancel,
       owner: dialogOwner,
@@ -1236,7 +1248,7 @@ async function onConfirmPay() {
       orderId.value = conversion.orderNo;
       // Replace checkout with the canonical order URL. A browser refresh now
       // reloads the paid server order instead of reopening a fresh purchase.
-      navReplace({ url: `/pages/store/order-detail?id=${encodeURIComponent(conversion.orderNo)}` });
+      navReplace({ url: `/pages/store/order-detail?id=${encodeURIComponent(conversion.orderNo)}&result=trial` });
       return;
     }
     await submitRemoteOrder();
@@ -2327,6 +2339,8 @@ const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-r
 </script>
 
 <style scoped>
+.checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-2); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle, 13px); font-weight:600; color:var(--v5-ink-2); }
+.checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .nx-step-in {
   animation: nx-step-in 0.28s var(--ease-out, ease-out) both;
 }

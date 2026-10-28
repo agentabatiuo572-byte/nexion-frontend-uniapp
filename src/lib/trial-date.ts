@@ -14,3 +14,11 @@ export function formatTrialDateTime(timestamp: number): string {
   const date = new Date(timestamp);
   return `${day} ${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}:${twoDigits(date.getSeconds())}`;
 }
+
+/** Deadlines in compact rows and chips: minute precision is enough. */
+export function formatTrialDeadline(timestamp: number): string {
+  const day = formatTrialDate(timestamp);
+  if (day === "—") return day;
+  const date = new Date(timestamp);
+  return `${day} ${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
+}
