@@ -55,7 +55,7 @@ export const vi: Messages = {
     otpRateLimited: "Gửi mã quá thường xuyên hoặc đã đạt giới hạn ngày. Vui lòng thử lại sau.",
 
     type: "Tài khoản ngân hàng", securityNote: "Dùng để rút tiền · xác nhận để lưu",
-    accountLabel: "Số tài khoản nhận tiền", accountPlaceholder: "Nhập số tài khoản nhận tiền; số này có thể khác số trên thẻ",
+    accountLabel: "Số tài khoản nhận tiền", accountPlaceholder: "Nhập số tài khoản nhận tiền", accountHint: "Số này có thể khác số trên thẻ.",
     holderLabel: "Tên chủ tài khoản", holderPlaceholder: "Họ tên đầy đủ đã đăng ký tại ngân hàng", notApplicable: "Không áp dụng", required: "Bắt buộc", continue: "Xác nhận liên kết",
     accountRoutedLabel: "Tài khoản nhận tiền", reviewTitle: "Kiểm tra tài khoản nhận tiền", reviewHint: "Vui lòng kiểm tra số tài khoản và tên chủ tài khoản trước khi lưu.", confirmSave: "Xác nhận và lưu", editDetails: "Sửa thông tin",
     defaultLabel: "Tài khoản rút tiền mặc định", singleAccount: "Hiện chỉ hỗ trợ một tài khoản rút tiền tại một thời điểm.",

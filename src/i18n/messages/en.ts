@@ -54,7 +54,7 @@ export const en = {
     otpRateLimited: "Too many SMS requests or the daily limit was reached. Try later.",
 
     type: "Bank account", securityNote: "For bank withdrawals · confirm to save",
-    accountLabel: "Receiving account number", accountPlaceholder: "Enter the receiving bank account number; it may differ from the card number",
+    accountLabel: "Receiving account number", accountPlaceholder: "Enter the receiving account number", accountHint: "This may differ from the number on the card.",
     holderLabel: "Account holder name", holderPlaceholder: "Full name as registered with the bank", notApplicable: "Not applicable", required: "Required", continue: "Confirm binding",
     accountRoutedLabel: "Receiving account", reviewTitle: "Review receiving account", reviewHint: "Check the account number and holder name before saving.", confirmSave: "Confirm and save", editDetails: "Edit details",
     defaultLabel: "Default withdrawal account", singleAccount: "One withdrawal account is supported at a time.",
