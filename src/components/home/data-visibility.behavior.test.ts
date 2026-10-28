@@ -1,3 +1,5 @@
+import { formatConversationTime } from '@/components/support/conversation-time';
+import { parseServerTimestamp } from '@/api/server-time';
 import * as Vue from 'vue';
 import { createPinia } from 'pinia';
 import { compileScript, parse } from '@vue/compiler-sfc';
@@ -68,7 +70,7 @@ function fixture(copy = zh) {
   const passiveReads = createPassiveTabReadFixture(() => JSON.stringify([app.accountKey, app.accountBindingEpoch]));
   const dependencies: Record<string, unknown> = {
     '@/lib/passive-tab-read': passiveReads,
-    vue: Vue, '@/store/data-visibility': { useDataVisibility: () => visibility },
+    vue: Vue, '@/components/support/conversation-time': { formatConversationTime }, '@/api/server-time': { parseServerTimestamp }, '@/store/data-visibility': { useDataVisibility: () => visibility },
     '@/i18n/use-t': { useT: () => Vue.ref(copy) }, '@/i18n/format': { fmt, fmtMoney },
     '@/store/locale': { useLocaleStore: () => ({ code: copy === zh ? 'zh' : copy === vietnamese ? 'vi' : 'en' }) },
     '@/api/runtime': { remoteApiEnabled: true }, '@/store/app': { useApp: () => app },
@@ -84,7 +86,7 @@ function fixture(copy = zh) {
     '@/composables/use-trial-presentation': { useTrialPresentation: () => ({ active: Vue.ref(false), reservedSlots: Vue.ref(0) }) },
     '@/store/free-trial': { useFreeTrial: () => ({ refreshRemote: vi.fn() }) },
     '@/composables/use-capacity-explainer': { useCapacityExplainer: () => ({ open }) },
-    '@/composables/use-tab-page-lifecycle': { onShow() {}, onHide() {} },
+    '@/composables/use-tab-page-lifecycle': { onShow() {}, onHide() {}, useVisibleInterval() {} },
     '@/lib/device-slot-policy': {}, '@/lib/account-scope': {}, '@/lib/day-one-page-observation': {},
     '@/lib/device-copy': { deviceName: () => 'Device' }, '@/lib/hashpower': { deviceOnlineState: () => 'online' },
   };

@@ -14,7 +14,7 @@
   disclosures; unavailable material is shown as unavailable.
 -->
 <template>
-  <AppChassis active="store">
+  <AppChassis active="store" class="product-detail-page">
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
@@ -66,11 +66,11 @@
       <!-- Full detail -->
       <template v-else>
         <!-- === Section 1: Hero === -->
-        <view class="mx-4 nx-glass-card overflow-hidden relative">
+        <view class="mx-4 nx-glass-card overflow-hidden relative detail-hero">
           <view aria-hidden :style="auroraStyle" />
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
-            <ProductRender :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
+            <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <!-- Folded-corner ribbon -->
             <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
               <text>{{ copy.badge }}</text>
@@ -733,15 +733,13 @@ const heroCardStyle: CSSProperties = {
 };
 const auroraStyle: CSSProperties = {
   position: "absolute",
-  inset: "-20%",
+  inset: 0,
   background:
     "radial-gradient(40% 50% at 80% 20%, var(--v5-tech-cyan-soft) 0%, transparent 60%)," +
     "radial-gradient(40% 50% at 10% 80%, var(--v5-brand-soft) 0%, transparent 60%)," +
     "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.18) 0%, transparent 60%)",
-  filter: "blur(10px)",
   pointerEvents: "none",
   opacity: 0.7,
-  animation: "v5-aurora-drift 14s ease-in-out infinite",
 };
 const ribbonStyle: CSSProperties = {
   top: 0,
@@ -901,6 +899,33 @@ const faqQStyle: CSSProperties = {
 </script>
 <style src="@/components/promotion/promotion.css"></style>
 <style scoped>
+/* One outer corner clip; the catalog image and its pedestal keep their full size. */
+.detail-hero :deep(.detail-product-render) { border-radius:0 !important; }
+.detail-hero :deep(.detail-product-render > [aria-hidden]:not(:first-child)) {
+  background:linear-gradient(to top, var(--v5-content-surface) 0%, color-mix(in srgb, var(--v5-content-surface) 60%, transparent) 50%, transparent 100%) !important;
+}
+.detail-hero :deep(.detail-product-render .text-right > :last-child) { color:var(--v5-ink-2) !important; }
+.detail-hero :deep(.detail-product-render :is(image, uni-image)) { animation:detail-machine-float 5s ease-in-out infinite; }
+@keyframes detail-machine-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+.product-detail-page[data-page-visible="false"] :deep(.detail-product-render :is(image, uni-image)),
+.product-detail-page[data-scrolling="true"] :deep(.detail-product-render :is(image, uni-image)) { animation-play-state:paused; }
+@media (prefers-reduced-motion:reduce) {
+  .detail-hero :deep(.detail-product-render :is(image, uni-image)) { animation:none; transform:none; }
+}
+/* Keep the frosted glass on one stationary decoration layer, separate from
+   price/quantity/button paints. The outer clip also bounds its sampling edge. */
+.product-detail-page :deep(.scb-outer) { overflow:hidden; }
+.product-detail-page :deep(.scb-bar) {
+  position:relative;isolation:isolate;
+  background:transparent !important;border-top-color:transparent !important;
+  backdrop-filter:none !important;-webkit-backdrop-filter:none !important;
+}
+.product-detail-page :deep(.scb-bar::before) {
+  content:"";position:absolute;inset:-1px 0 0;z-index:-1;pointer-events:none;
+  background:var(--v5-sticky-bar-bg);
+  backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);
+  box-shadow:inset 0 1px 0 var(--v5-sticky-bar-border);
+}
 .product-material-retry { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 16px; margin-top: 12px; border: 1px solid var(--v5-border); border-radius: 999px; color: var(--v5-ink); font-size: var(--ui-type-list-subtitle); }
 .product-material-retry__label { font: 600 13px/20px var(--font-v5); }
 .product-material-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }

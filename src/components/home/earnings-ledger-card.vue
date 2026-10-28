@@ -23,7 +23,7 @@
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ r.model }}<text style="color: var(--v5-ink-3)"> · {{ r.who }}</text></text>
         </view>
         <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ visibility.mask(r.amt) }}</text>
-        <text data-home-ledger-time="true" class="font-mono-tabular text-right" style="grid-column: 1 / -1; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 18px; font-size: 12px; color: var(--v5-ink-4)">{{ r.t }}</text>
+        <text data-home-ledger-time="true" class="font-mono-tabular text-right" style="grid-column: 1 / -1; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 18px; font-size: 12px; color: var(--v5-ink-2)">{{ r.t }}</text>
       </view>
       <view v-if="remoteApiEnabled && rows.length === 0" class="nx-inline-recovery px-2 py-3">
         <text class="nx-inline-recovery__copy" style="font-size: 12px; color: var(--v5-ink-3)">{{ ledgerStatusText }}</text>
@@ -37,17 +37,21 @@
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
-import { formatHomeFeedTime } from "./home-live-feed";
+import { formatConversationTime } from "@/components/support/conversation-time";
+import { parseServerTimestamp } from "@/api/server-time";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 
 const visibility = useDataVisibility();
 const t = useT();
 const app = useApp();
 const locale = useLocaleStore();
+const clockNow = ref(Date.now());
+useVisibleInterval(() => { clockNow.value = Date.now(); }, 60_000);
 const ROWS = [
   { id: 1, who: "Pocket Studios", model: "SDXL Turbo", amt: formatUsd(0.00032, "detail", true), t: "2s" },
   { id: 2, who: "Echo Earbuds", model: "Whisper tiny", amt: formatUsd(0.00005, "detail", true), t: "14s" },
@@ -58,14 +62,17 @@ const ROWS = [
 
 const remoteRows = computed(() => (app.homeTruth?.earningsLedger ?? [])
   .slice()
-  .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))
+  .sort((a, b) => (parseServerTimestamp(b.completedAt) ?? 0) - (parseServerTimestamp(a.completedAt) ?? 0))
   .slice(0, 5)
   .map((entry) => ({
     id: entry.id,
     who: entry.client,
     model: entry.model,
     amt: formatUsd(entry.rewardUsdt, "detail", !entry.synthetic),
-    t: formatHomeFeedTime(entry.completedAt, locale.code),
+    t: formatConversationTime(parseServerTimestamp(entry.completedAt) ?? undefined, {
+      locale: locale.code === "zh" || locale.code === "vi" ? locale.code : "en",
+      now: clockNow.value,
+    })?.group ?? "—",
   })));
 const rows = computed(() => remoteApiEnabled ? remoteRows.value : ROWS);
 const ledgerStatusText = computed(() => {

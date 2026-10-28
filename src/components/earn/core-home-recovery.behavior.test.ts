@@ -134,7 +134,7 @@ test('a confirmed check-in row stays visible while its next visit reads, without
   faucet.remoteHasSnapshot = false; await Vue.nextTick(); expect(text(root)).not.toBe(before);
 });
 
-test.each(['zh', 'en', 'vi'] as const)('checked-in copy in %s uses the published base reward or a non-numeric tomorrow hint', async language => {
+test.each(['zh', 'en', 'vi'] as const)('checked-in copy in %s omits tomorrow reward while retaining read failure feedback', async language => {
   const copy = { zh, en, vi: vietnamese }[language], labels = auditUiCopy[language];
   const faucet = Vue.reactive({ remoteReadState: 'ready', remoteCheckedInToday: false, signInStreak: 2,
     remoteRules: [{ key: 'baseline', value: '17' }], ensureRemote: vi.fn() });
@@ -143,12 +143,12 @@ test.each(['zh', 'en', 'vi'] as const)('checked-in copy in %s uses the published
     '@/i18n/audit-ui': { useAuditUiCopy: () => Vue.ref(labels) }, '@/store/ui': { toast: {} },
     '@/i18n/continuity-fixes': { continuityCopy }, '@/store/locale': { useLocaleStore: () => ({ code: language }) },
     '@/pages/daily/daily-success-copy': { dailyCheckInSuccessCopy }, '@/pages/daily/daily-reward-view': { dailyBaseReward }, '@/components/ui/nx-button.vue': blank });
-  const hint = () => text(classNode(root, 'daily-check-in-row__meta')!);
-  expect(hint()).toBe(fmt(labels.todayReward, { n: 17 }));
+  const hint = () => { const meta = classNode(root, 'daily-check-in-row__meta'); return meta ? text(meta) : ''; };
+  expect(hint()).toBe('');
   faucet.remoteCheckedInToday = true; await Vue.nextTick();
-  expect(hint()).toBe(fmt(continuityCopy(language).tomorrowBaseReward, { n: 17 }));
+  expect(hint()).toBe('');
   for (const value of ['', 'invalid', '-1', '0']) {
-    faucet.remoteRules[0].value = value; await Vue.nextTick(); expect(hint()).toBe(labels.tomorrow);
+    faucet.remoteRules[0].value = value; await Vue.nextTick(); expect(hint()).toBe('');
   }
   faucet.remoteReadState = 'error'; await Vue.nextTick(); expect(hint()).toBe(copy.daily.checkInUnconfirmed);
 });

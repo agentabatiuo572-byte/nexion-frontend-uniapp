@@ -263,7 +263,7 @@
     <!-- Every device has its own canonical task stream. Keep the active task above;
          this list only mirrors settled task previews returned for this device. -->
     <view v-if="phoneLocalReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
-      <view class="flex items-center justify-between" style="margin-bottom: 8px">
+      <view class="flex items-center justify-between" :style="{ marginBottom: taskHistoryReady && !deviceTodayCompleted.length ? '0' : '8px' }">
         <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ visibility.mask(deviceTodayCompleted.length) }})</template></text>
         <view
           class="active:opacity-60"
@@ -295,7 +295,6 @@
           <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ localClockTime(task.completedAt) }}</text>
         </view>
       </view>
-      <text v-else class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.historyEmpty }}</text>
     </view>
 
     <!-- Phone: background mode toggles -->
