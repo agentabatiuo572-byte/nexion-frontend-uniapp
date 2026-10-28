@@ -80,20 +80,20 @@
           <view class="border-b" :style="payHeadStyle">
             <view class="flex items-center justify-between">
               <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
-              <text class="tabular-nums" :style="payTotalStyle">${{ netPriceText }}</text>
+              <text class="tabular-nums" :style="payTotalStyle">{{ trialConversionMode ? `${formatGroupedAmount(netPriceText)} USDT` : `$${netPriceText}` }}</text>
             </view>
             <!-- FEAT-TRIAL02: conversion credit chips (promo + accrued credit) -->
             <view v-if="promoDiscount > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ promoRowLabel }} −${{ promoDiscountText }}</text>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ promoRowLabel }} −{{ formatGroupedAmount(promoDiscountText) }} USDT</text>
             </view>
             <view v-if="trialOffsetView.offsetUSD > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 7v5l3.5 2" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ t.store.coRowTrialOffset }} −${{ trialOffsetText }}</text>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ t.store.coRowTrialOffset }} −{{ formatGroupedAmount(trialOffsetText) }} USDT</text>
             </view>
             <view v-if="trialOffsetView.earlyDiscountUSD > 0" class="flex items-center" style="gap: 5px; margin-top: 6px" data-testid="checkout-trial-early-discount">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ earlyCopy.earlyDiscountLabel }} −${{ trialEarlyDiscountText }}</text>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ earlyCopy.earlyDiscountLabel }} −{{ formatGroupedAmount(trialEarlyDiscountText) }} USDT</text>
             </view>
             <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
             <view v-if="hasVoucher" class="flex items-center" style="gap: 5px; margin-top: 6px">
