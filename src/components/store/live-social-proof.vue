@@ -47,6 +47,7 @@ import type { StorefrontSocialProof } from "@/api/storefront-activity-api";
 import { useApp } from "@/store/app";
 import { productCatalogState } from "@/store/product-catalog";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
@@ -62,8 +63,9 @@ const remoteUnavailable = ref(false);
 const remoteEpoch = createRemoteAccountEpoch(app.accountKey);
 let remoteMounted = false;
 let remoteRequest = 0;
+let remoteInFlight = 0;
 useVisibleInterval(() => {
-  if (remoteApiEnabled && remoteMounted && proofInView.value && remoteProof.value?.liveActivity) loadRemoteProof();
+  if (remoteApiEnabled && remoteMounted && proofInView.value && (!remoteProof.value || remoteProof.value.liveActivity)) loadRemoteProof();
 }, 4_000);
 
 function hashId(id: string): number {
@@ -102,7 +104,9 @@ function clearRemoteProof(unavailable = false): void {
 }
 
 function loadRemoteProof(request = remoteEpoch.snapshot()): void {
+  if (remoteInFlight !== 0 && remoteInFlight === remoteRequest) return;
   const generation = ++remoteRequest;
+  remoteInFlight = generation;
   const expectedAccount = String(app.accountKey);
   const runScope = captureRuntimeRevision();
   void storefrontActivityApi.socialProof(props.product.id, 30).then((snapshot) => {
@@ -111,9 +115,12 @@ function loadRemoteProof(request = remoteEpoch.snapshot()): void {
       remoteProof.value = snapshot;
       remoteUnavailable.value = false;
     }
-  }).catch(() => {
+  }).catch((cause: unknown) => {
     if (remoteMounted && generation === remoteRequest && remoteEpoch.isCurrent(request)
-        && expectedAccount === String(app.accountKey) && isCurrentRuntimeRevision(runScope)) clearRemoteProof(true);
+        && expectedAccount === String(app.accountKey) && isCurrentRuntimeRevision(runScope)
+        && !(remoteProof.value && isTransientReadFailure(cause))) clearRemoteProof(true);
+  }).finally(() => {
+    if (remoteInFlight === generation) remoteInFlight = 0;
   });
 }
 

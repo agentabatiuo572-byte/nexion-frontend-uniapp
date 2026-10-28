@@ -20,3 +20,11 @@
 Vue 类型检查通过；APP 目标 `uni build -p app` 编译通过，输出 `artifacts/native-post-ui/app`，未覆盖既有构建证据。日志位于同目录的 targeted-tests.log、integration-tests.log、fixture-recheck.log、typecheck.log、build.log，不纳入提交。
 
 核对合并后的新增生产源码，没有新增旧 NEX 资产请求、旧兑换方向或名称替换。仍保留 amountNEX/monthNEX 等既有协议字段与历史命令恢复兼容，含义不等同于资产枚举。`brand-copy` 入口保持原值返回。最新 UI 提交的三份 PRD 增量原样保留，并在 UVT 规范记录整合边界。
+
+## 销量弹幕失败恢复补充
+
+独审复现：成功读取 liveActivity 后一次轮询失败清空快照，后续轮询以 liveActivity 存在为条件，因此永久停止恢复。修复时复用已有临时读错误分类；明确 network/HTTP 5xx/429 的暖失败保留当前有效快照，认证/权限/协议错误仍清空。无快照或已有 liveActivity 时可见时钟可重读，同作用域请求进行中不重叠；账号/商品切换仍先清空并拒绝迟到响应。没有新增可见提示或本地事实。
+
+恢复计划：真实组件 setup 执行成功→临时失败→可见恢复；初始失败→离屏不读→可见恢复；认证/权限/协议失败清空；同作用域八个 tick 合并；账号/商品迟到响应隔离；三语源名/滚动/API 边界回归。类型检查与全新 APP 输出 `artifacts/native-post-ui-recovery/app`，不重跑无关 38 套。浏览器/真机仍未验收。
+
+恢复结果：live-social-proof-brand.behavior 24 项（含新增 9 项失败恢复边界）、contract 2 项、storefront-activity-api 6 项，共 32 项通过；最终类型检查退出 0；新 APP 目标编译退出 0。日志保存在 `artifacts/native-post-ui-recovery`，未提交构建产物；独立复验由主任务安排。
