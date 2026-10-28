@@ -355,9 +355,9 @@ export function evaluatePurchaseGate(
     return { gated: false, eligible: true, soldOut: false, blocked: false, remaining: null, conditions: [], unmet: [], progressPct: 1 };
   }
   const conditions: GateCondition[] = [];
-  if (g.rankMin != null) conditions.push({ kind: "rank", need: g.rankMin, have: ctx.rank, met: ctx.rank >= g.rankMin });
-  if (g.activeDirectMin != null) conditions.push({ kind: "activeDirect", need: g.activeDirectMin, have: ctx.activeDirect, met: ctx.activeDirect >= g.activeDirectMin });
-  if (g.teamComputePointsMin != null) conditions.push({ kind: "teamComputePoints", need: g.teamComputePointsMin, have: ctx.teamComputePoints, met: ctx.teamComputePoints >= g.teamComputePointsMin });
+  if (g.rankMin != null && g.rankMin > 0) conditions.push({ kind: "rank", need: g.rankMin, have: ctx.rank, met: ctx.rank >= g.rankMin });
+  if (g.activeDirectMin != null && g.activeDirectMin > 0) conditions.push({ kind: "activeDirect", need: g.activeDirectMin, have: ctx.activeDirect, met: ctx.activeDirect >= g.activeDirectMin });
+  if (g.teamComputePointsMin != null && g.teamComputePointsMin > 0) conditions.push({ kind: "teamComputePoints", need: g.teamComputePointsMin, have: ctx.teamComputePoints, met: ctx.teamComputePoints >= g.teamComputePointsMin });
 
   const eligible =
     conditions.length === 0 ? true : g.mode === "all" ? conditions.every((c) => c.met) : conditions.some((c) => c.met);

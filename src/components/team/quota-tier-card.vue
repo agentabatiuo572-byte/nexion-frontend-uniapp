@@ -75,7 +75,7 @@ const productImage = computed(() => getProductMedia(props.tier.productId)?.src ?
 const { elRef: stockBarRef, inView: stockBarInView } = useScrollGrowProgress();
 const unlocked = computed(() => {
   const met = props.tier.conditions.map(condition => condition.current >= condition.required);
-  return props.tier.unlockKind === 'either' ? met.some(Boolean) : met.every(Boolean);
+  return met.length === 0 || (props.tier.unlockKind === 'either' ? met.some(Boolean) : met.every(Boolean));
 });
 const stockPct = computed(() => props.tier.monthlyStock > 0 ? Math.min(1, props.tier.soldThisMonth / props.tier.monthlyStock) : 1);
 const stockLeft = computed(() => Math.max(0, props.tier.monthlyStock - props.tier.soldThisMonth));
