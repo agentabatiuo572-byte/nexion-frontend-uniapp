@@ -1,4 +1,11 @@
 import { formatAmount } from "../../lib/amount-display";
+export type DailyMilestoneRewardKind = "usdt" | "uvt" | "spin" | "badge" | "unknown";
+
+export function dailyMilestoneRewardKind(value: string): DailyMilestoneRewardKind {
+  const kind = value.trim().toLowerCase();
+  return kind === "usdt" || kind === "uvt" || kind === "spin" || kind === "badge" ? kind : "unknown";
+}
+
 export interface DailyRule { key: string; value: string }
 
 export function dailyBaseReward(rules: readonly DailyRule[]): number | null {

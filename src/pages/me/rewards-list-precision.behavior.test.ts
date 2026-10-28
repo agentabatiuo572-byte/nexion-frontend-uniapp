@@ -64,7 +64,7 @@ async function mount(localeCode: "zh" | "en" | "vi", rows: Bill[], vouchers?: Vo
     "@/lib/brand-copy": brandCopy,
     "@/lib/amount-display": { formatAmount, formatGroupedAmount },
     "@/lib/usd-display": { formatUsd },
-    vue: Vue, "@dcloudio/uni-app": { onLoad: (callback: (options: { cat: string }) => void) => callback({ cat: vouchers ? "voucher" : rows[0]?.symbol === "UVT" ? "nex" : "usdt" }),
+    vue: Vue, "@dcloudio/uni-app": { onLoad: (callback: (options: { cat: string }) => void) => callback({ cat: vouchers ? "voucher" : rows[0]?.symbol === "UVT" ? "uvt" : "usdt" }),
       onShow: (callback: () => void) => shown.push(callback) },
     "@/components/app-chassis.vue": { default: chassis }, "@/components/empty-state.vue": { default: Vue.defineComponent(() => () => Vue.h("empty")) },
     "@/components/sub-page-header.vue": { default: Vue.defineComponent(() => () => Vue.h("header")) },

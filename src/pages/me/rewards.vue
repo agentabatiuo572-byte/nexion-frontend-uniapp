@@ -167,7 +167,7 @@ const cats = computed<CatCard[]>(() => [
     desc: t.value.rewards.catUsdtDesc,
   },
   {
-    key: "nex",
+    key: "uvt",
     label: t.value.rewards.catNex,
     big: displayNexTotal.value === null ? "-" : formatAmount(displayNexTotal.value),
     unit: "UVT",
