@@ -76,7 +76,7 @@
               <text>{{ copy.badge }}</text>
             </view>
             <!-- Live activity danmaku -->
-
+            <LiveSocialProof :product="product" />
           </view>
 
           <view class="relative" style="padding: 20px">
@@ -161,11 +161,8 @@
 
         <!-- === Section 6: AI performance spec === -->
         <template v-if="aiPerfRows.length">
-          <view v-if="hasAiPerformance" style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detAiPerf" /></view>
-          <view v-else style="margin: 12px 16px 0; min-height: 44px; display: flex; align-items: center; justify-content: space-between" role="button" tabindex="0" :aria-expanded="aiExpanded" @click="aiExpanded=!aiExpanded" @keydown.enter.prevent="aiExpanded=!aiExpanded" @keydown.space.prevent="aiExpanded=!aiExpanded">
-            <SectionHeader :title="t.store.detAiPerf" /><text aria-hidden="true">{{ aiExpanded ? '−' : '+' }}</text>
-          </view>
-          <SpecTable v-if="hasAiPerformance || aiExpanded" :rows="aiPerfRows" brand-value />
+          <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detAiPerf" /></view>
+          <SpecTable :rows="aiPerfRows" brand-value />
         </template>
 
         <!-- === Section 7: Trust material === -->
@@ -514,8 +511,6 @@ const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
 });
 const bundleActivityVisible = computed(()=>(productCatalogPresentation.value?.products??[]).filter(p=>p.productType!=='SHARE'&&activity.value?.productNos.includes(p.id)&&isProductAvailable(p,phase.value)).length>=2);
 const canBundleActivity = computed(() => promotionAvailable.value && bundleActivityVisible.value);
-const aiExpanded = ref(false);
-const hasAiPerformance = computed(() => aiPerfRows.value.some(row => row.v !== '-'));
 
 const productAuditSection = computed(() => trustSections.value.find((section) => section.sectionKey === "auditsReserves"));
 const productTrustTitle = computed(() => t.value.store.detTrustedBy);

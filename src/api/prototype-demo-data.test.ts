@@ -1,4 +1,6 @@
 import { createProofApi } from "./proof-api";
+import { createStorefrontActivityApi } from './storefront-activity-api';
+import { createEarnConfigApi } from './earn-config-api';
 import { parseAppHomeOverview } from './app-home-api';
 import { createDirectReferralApi } from "./direct-referral-api";
 import { describe, expect, it } from 'vitest';
@@ -92,6 +94,24 @@ describe('prototype account readbacks', () => {
       expect(d.get('/api/app/proof').currentStreak).toBe(d.get('/api/points/state').streak.currentStreak);
       expect(d.get('/api/app/proof').longestStreak).toBe(d.get('/api/points/state').streak.longestStreak);
     }
+  });
+});
+
+describe('restored storefront sales proof', () => {
+  it('supplies validated phone tiers for the phone comparison', async () => {
+    const result = await createEarnConfigApi(demo().client).phoneTiers();
+    expect(result.tiers).toHaveLength(5);
+    expect(result.tiers.find(row => row.tier === 3)?.baseRateUsdt).toBe(.06);
+  });
+  it('provides the requested sales window without changing demo state', async () => {
+    const d = demo();
+    const before = structuredClone(d.state);
+    const result = await createStorefrontActivityApi(d.client).socialProof('stellarbox-pro', 30);
+    expect(result).toMatchObject({ productName: 'UVELBox Pro', windowDays: 30, cumulativeSales: 55, windowSales: 18 });
+    expect(d.state).toEqual(before);
+    const empty = demo('zh', { dataState: 'empty' });
+    expect(await createStorefrontActivityApi(empty.client).socialProof('stellarbox-pro', 7))
+      .toMatchObject({ windowDays: 7, cumulativeSales: 0, windowSales: 0 });
   });
 });
 

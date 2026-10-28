@@ -10,19 +10,19 @@
   tasks banner below it on /earn.
 -->
 <template>
-  <view v-if="(!remoteApiEnabled || app.homeTruthStatus !== 'error') && (priceIndex.length || deviceRankings.length)" class="nx-earn-market-board nx-glass-card mx-4 p-4">
+  <view class="nx-earn-market-board nx-glass-card mx-4 p-4">
     <view class="flex items-center justify-between mb-2 px-0">
       <text style="font-family: var(--font-v5); font-size: var(--ui-type-section); font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.market.title }}</text>
-      <view class="flex items-center gap-1" style="font-size: 12px; color: var(--v5-ink-3)">
+      <view v-if="!remoteApiEnabled || app.homeTruthStatus === 'ready'" class="flex items-center gap-1" style="font-size: 12px; color: var(--v5-ink-3)">
         <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 6px color-mix(in srgb, var(--v5-brand) 70%, transparent)" />
         <text>{{ t.market.liveLabel }}</text>
       </view>
     </view>
 
     <!-- Price Index -->
-    <view v-if="priceIndex.length">
+    <view>
       <text class="block" :style="sectionLabelStyle">{{ t.market.priceIndex }}</text>
-      <text v-if="!priceIndex.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
+      <text v-if="!priceIndex.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
       <view
         v-for="(w, i) in priceIndex"
         :key="w.code"
@@ -37,7 +37,7 @@
             </view>
             <text v-if="w.flagshipDelta !== null" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ t.market.flagshipRow }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagshipDelta.toFixed(1) }}%</text></text>
           </view>
-          <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2); width: 64px">{{ w.price === null ? "—" : `$${formatAmount(w.price)}` }}</text>
+          <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2); width: 64px">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
           <text class="tabular-nums shrink-0 text-right" style="font-size: 12px; width: 48px" :style="{ color: arrowColor(w) }">{{ w.delta === null ? "—" : `${arrow(w)} ${Math.abs(w.delta).toFixed(1)}%` }}</text>
           <svg v-if="w.spark.length" class="shrink-0" width="48" height="16" viewBox="0 0 48 16">
             <polyline :points="sparkPoints(w.spark)" fill="none" :stroke="w.delta !== null && w.delta < -0.05 ? 'var(--v5-brand-2)' : 'var(--v5-brand)'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
@@ -47,9 +47,9 @@
     </view>
 
     <!-- Device earnings ranking -->
-    <view v-if="deviceRankings.length" :class="priceIndex.length ? 'mt-4 pt-4' : ''" :style="{ borderTop: priceIndex.length ? '1px solid var(--v5-border)' : 'none' }">
+    <view :class="priceIndex.length ? 'mt-4 pt-4' : ''" :style="{ borderTop: priceIndex.length ? '1px solid var(--v5-border)' : 'none' }">
       <text class="block" :style="sectionLabelStyle">{{ t.market.deviceRanking }}</text>
-      <text v-if="!deviceRankings.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
+      <text v-if="!deviceRankings.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
       <view
         v-for="(d, i) in deviceRankings"
         :key="d.rank"
@@ -58,7 +58,8 @@
         :style="{ borderTop: i !== 0 ? '1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)' : 'none' }"
         :role="d.kind ? 'link' : undefined"
         :tabindex="d.kind ? 0 : undefined"
-        v-on="d.kind ? { click: () => d.kind && goDetail(d.kind) } : {}"
+        @click="d.kind && goDetail(d.kind)"
+        @keydown.enter.stop.prevent="d.kind && goDetail(d.kind)"
       >
         <view class="flex-1 min-w-0">
           <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name ?? t.market.yourPhone }}</text>
@@ -68,11 +69,13 @@
         <svg v-if="d.kind" class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
+    <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="inline-flex items-center" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()">{{ t.uiChrome.unavailable }} · {{ t.ui.retry }}</view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import type { CSSProperties } from "vue";

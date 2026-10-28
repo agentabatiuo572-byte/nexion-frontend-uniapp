@@ -24,6 +24,12 @@
         </view>
         <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" />
         <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :target="upgrade.target" />
+        <template v-if="!voucherContext.voucherId">
+          <StoreHero :multiplier="yieldAuthority.multiplier" />
+          <ClusterLadder :authority="yieldAuthority" :owned="ownedHardware" />
+          <VsPhoneHero :authority="yieldAuthority" />
+          <TradeinWindowBanner />
+        </template>
       </template>
 
       <view v-if="publicOnly" class="promotion" data-testid="promotion-public-store">
@@ -126,6 +132,10 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
+import StoreHero from "@/components/store/store-hero.vue";
+import ClusterLadder from "@/components/store/cluster-ladder.vue";
+import VsPhoneHero from "@/components/store/vs-phone-hero.vue";
+import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
 import { useApp } from "@/store/app";
@@ -185,6 +195,7 @@ onShow(() => {
   void runPassiveTabRead('genesis-state', () => genesis.syncRemote());
   void runPassiveTabRead('product-phase', () => refreshServerProductPhase(true));
   void revalidateProductCatalog();
+  void runPassiveTabRead('earn-config', () => earnConfig.refresh());
   void observeDayOneStorePage();
 });
 onHide(() => {
