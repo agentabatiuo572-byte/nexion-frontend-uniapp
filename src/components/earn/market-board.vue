@@ -20,8 +20,8 @@
     </view>
 
     <!-- Price Index -->
-    <view>
-      <text class="block" :style="sectionLabelStyle">{{ t.market.priceIndex }}</text>
+    <view class="earn-price-index" lang="en">
+      <text class="block" :style="sectionLabelStyle">{{ en.market.priceIndex }}</text>
       <text v-if="!priceIndex.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
       <view
         v-for="(w, i) in priceIndex"
@@ -33,13 +33,13 @@
           <view class="flex-1 min-w-0">
             <view class="flex items-baseline gap-1.5">
               <text class="truncate" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink)">{{ workloadCopy(w).name }}</text>
-              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ workloadCopy(w).unit }}</text>
+              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-2)">{{ workloadCopy(w).unit }}</text>
             </view>
-            <text v-if="w.flagshipDelta !== null" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ t.market.flagshipRow }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagshipDelta.toFixed(1) }}%</text></text>
+            <text v-if="w.flagshipDelta !== null" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ en.market.flagshipRow }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagshipDelta.toFixed(1) }}%</text></text>
           </view>
           <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2); width: 64px">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
           <text class="tabular-nums shrink-0 text-right" style="font-size: 12px; width: 48px" :style="{ color: arrowColor(w) }">{{ w.delta === null ? "—" : `${arrow(w)} ${Math.abs(w.delta).toFixed(1)}%` }}</text>
-          <svg v-if="w.spark.length" class="shrink-0" width="48" height="16" viewBox="0 0 48 16">
+          <svg v-if="w.spark.length" class="earn-market-spark shrink-0" width="48" height="16" viewBox="0 0 48 16">
             <polyline :points="sparkPoints(w.spark)" fill="none" :stroke="w.delta !== null && w.delta < -0.05 ? 'var(--v5-brand-2)' : 'var(--v5-brand)'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
           </svg>
         </view>
@@ -53,7 +53,7 @@
       <view
         v-for="(d, i) in deviceRankings"
         :key="d.rank"
-        class="flex items-center gap-3 py-2.5"
+        class="earn-ranking-row flex items-center gap-2 py-2"
         :class="d.kind ? 'active:opacity-70 transition-opacity' : ''"
         :style="{ borderTop: i !== 0 ? '1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)' : 'none' }"
         :role="d.kind ? 'link' : undefined"
@@ -62,11 +62,13 @@
         @keydown.enter.stop.prevent="d.kind && goDetail(d.kind)"
       >
         <view class="flex-1 min-w-0">
-          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name ?? t.market.yourPhone }}</text>
-          <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">#{{ d.rank }}<template v-if="d.bestFor"> · {{ d.bestFor }}</template></text>
+          <text class="block truncate" :style="{ fontSize: '13px', color: 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }"><text style="margin-right: 8px; font-size: 12px; font-weight: 400">#{{ d.rank }}</text>{{ d.name ?? t.market.yourPhone }}</text>
+          <text v-if="d.bestFor" class="block truncate" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ d.bestFor }}</text>
         </view>
-        <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning-ink)' }">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
-        <svg v-if="d.kind" class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <view class="earn-ranking-value">
+          <text class="tabular-nums" :style="{ fontFamily: 'var(--font-v5)', fontSize: '13px', fontWeight: 400, color: 'var(--v5-warning-ink)' }">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
+          <svg v-if="d.kind" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        </view>
       </view>
     </view>
     <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="inline-flex items-center" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()">{{ t.uiChrome.unavailable }} · {{ t.ui.retry }}</view>
@@ -84,7 +86,8 @@ import type { DeviceKind, TaskCategory } from "@/store/types";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
 import { nexGridBrandText } from "@/lib/brand-copy";
-import { marketWorkloadCopy } from "@/lib/workload-label";
+import { compactMarketUnit, marketWorkloadCopy } from "@/lib/workload-label";
+import { en } from "@/i18n/messages/en";
 
 interface WorkloadPrice {
   code: TaskCategory;
@@ -131,7 +134,10 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
-const workloadCopy = (row: WorkloadPrice) => marketWorkloadCopy(t.value, row.code, row.name, row.unit);
+const workloadCopy = (row: WorkloadPrice) => {
+  const copy = marketWorkloadCopy(en, row.code, row.name, row.unit);
+  return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
+};
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
@@ -166,3 +172,12 @@ const sectionLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 </script>
+<style scoped>
+.nx-earn-market-board { background: var(--v5-surface); }
+.earn-ranking-row { min-height: 44px; box-sizing: border-box; }
+.earn-ranking-value { display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-height:32px;flex-shrink:0; }
+.earn-price-index :deep(uni-text), .earn-price-index :deep(text) { font-size:11px !important; }
+@media (max-width: 350px) {
+  .earn-market-spark { display: none; }
+}
+</style>

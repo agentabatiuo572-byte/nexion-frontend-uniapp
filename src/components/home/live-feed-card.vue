@@ -5,7 +5,7 @@
   by Java. High-fidelity Mock data remains isolated in the 5174 prototype repo.
 -->
 <template>
-  <view data-home-section="live-feed" data-feed-mode="CANONICAL">
+  <view class="nx-home-live-feed" data-home-section="live-feed" data-feed-mode="CANONICAL">
     <!-- Tab switcher + see-all shortcut -->
     <view class="px-0.5 pt-1 pb-2.5 flex items-center justify-between gap-2">
       <GlassSegments
@@ -176,6 +176,7 @@ function goEarnings() {
 </script>
 
 <style scoped>
-.nx-home-feed-tabs { flex: 0 0 auto; width: 180px; min-width: 0; }
+.nx-home-live-feed { padding: 12px 16px 6px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+.nx-home-feed-tabs { flex: 0 1 180px; width: 180px; min-width: 0; }
 .nx-home-feed-tabs :deep(.nx-glass-option__label) { white-space: nowrap; }
 </style>

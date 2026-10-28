@@ -115,7 +115,8 @@ export function demoFixture(url,locale,state,request) {
     if (!product) return undefined;
     return { ...authority, source:'nx_product/nx_order/nx_order_item', productName:product.name,
       cumulativeSales:empty?0:product.sold, windowDays:Number(url.searchParams.get('windowDays') || 30),
-      windowSales:empty?0:Math.floor(product.sold / 3) };
+      windowSales:empty?0:Math.floor(product.sold / 3),
+      liveActivity: { viewers:empty?0:24+Math.floor(Math.random()*92), sales24h:empty?0:8+Math.floor(Math.random()*30), sales30m:empty?0:1+Math.floor(Math.random()*7) } };
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   const trial=trialDemo(url,locale,state,request);if(trial!==undefined)return trial;
