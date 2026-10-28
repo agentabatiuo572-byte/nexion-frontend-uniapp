@@ -67,6 +67,6 @@ describe('detail header controls', () => {
     expect(source).toContain('if (event.repeat) return;');
     expect(source).toContain('min-height: 44px');
     expect(source).toContain('.spv--plain .spv-glass { width: 44px; height: 44px; }');
-    expect(source).toContain('grid-template-columns: 72px minmax(0, 1fr) 72px');
+    expect(source).toContain('grid-template-columns: minmax(72px, max-content) minmax(0, 1fr) minmax(72px, max-content)');
   });
 });
