@@ -55,7 +55,7 @@ export const zh: Messages = {
     otpRateLimited: "验证码发送过于频繁或今日次数已用完，请稍后再试。",
 
     type: "银行账户", securityNote: "用于银行卡提现 · 确认后保存",
-    accountLabel: "收款账号", accountPlaceholder: "请输入银行收款账号，可能与卡面卡号不同",
+    accountLabel: "收款账号", accountPlaceholder: "请输入银行收款账号", accountHint: "收款账号可能与卡面卡号不同",
     holderLabel: "收款户名", holderPlaceholder: "请填写银行登记的完整户名", notApplicable: "不适用", required: "必填", continue: "确认绑定",
     accountRoutedLabel: "收款账号", reviewTitle: "核对收款账户", reviewHint: "请核对收款账号和户名后保存。", confirmSave: "确认并保存", editDetails: "返回修改",
     defaultLabel: "设为默认提现账户", singleAccount: "当前支持一个提现账户，绑定后默认用于银行卡提现。",
