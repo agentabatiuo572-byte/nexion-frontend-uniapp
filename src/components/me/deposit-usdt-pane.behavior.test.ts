@@ -78,7 +78,7 @@ const rows = statuses.map((status, index) => ({ depositId: `CR-${index + 1}`, st
   txHash: "0x" + String(index + 1).repeat(64), address: address.address,
   grossAmountUsdt: status === "DUST_HOLD" ? 5 : 10.125,
   creditedUsdt: ["CREDITED", "REORG_INVESTIGATING", "PROVIDER_CONFLICT_HOLD"].includes(status) ? 9.125 : 0,
-  confirmations: status === "CONFIRMING" ? 3 : 15,
+  confirmations: status === "CONFIRMING" ? 3 : 15, requiredConfirmations: 15,
   createdAt: 1_791_072_000_000 + index,
 }));
 type Messages = typeof zh | typeof en | typeof vietnamese;
@@ -439,4 +439,126 @@ test.each(["a", "b"])("the rendered QR bitmap decodes to the server address %s w
     reader.decode(bitmap.bitmap);
   });
   expect(decoded).toBe(serverAddress);
+});
+
+
+test.each([zh, en, vietnamese])("each pending deposit uses its own confirmation requirement and unknown stays unknown", async messages => {
+  const pending = [
+    { ...rows[0], depositId: "CR-11", confirmations: 3, requiredConfirmations: 20 },
+    { ...rows[0], depositId: "CR-12", confirmations: 16, requiredConfirmations: 15 },
+    { ...rows[0], depositId: "CR-13", confirmations: 3, requiredConfirmations: null },
+    { ...rows[0], depositId: "CR-14", confirmations: 2, requiredConfirmations: undefined },
+  ];
+  const h = await pane({ ...address, confirmations: 30, creditEnabled: true }, pending, messages);
+  const records = controls(h.root, "nx-dep-record-row");
+  for (const [id, n, total, bars] of [["CR-11", 3, 20, 1], ["CR-12", 16, 15, 1], ["CR-13", 3, "-", 0], ["CR-14", 2, "-", 0]] as const) {
+    const row = records.find(record => textOf(record).includes(id))!;
+    expect(textOf(row)).toContain(fmt(messages.topupChrome.confirmingProgress, { n, total }));
+    expect(controls(row, "nx-dep-progress")).toHaveLength(bars);
+  }
+});
+
+test.each([zh, en, vietnamese])("mixed history retains refunded and reversed deposits without presenting them as new credits", async messages => {
+  const terminal = ["REFUNDED", "REORG_REVERSED"].map((status, index) => ({ ...rows[1], depositId: `CR-${index + 7}`, status, creditedUsdt: 0 }));
+  const h = await pane({ ...address, creditEnabled: true }, [...rows, ...terminal], messages);
+  const records = controls(h.root, "nx-dep-record-row");
+  expect(records).toHaveLength(8);
+  const refunded = records.find(record => textOf(record).includes("CR-7"))!;
+  const reversed = records.find(record => textOf(record).includes("CR-8"))!;
+  expect(textOf(refunded)).toContain(messages.topupChrome.depositReturned);
+  expect(textOf(reversed)).toContain(messages.commissions.reversedTag);
+  expect(textOf(reversed)).toContain("0.00");
+  expect(refunded.props.onClick).toBeUndefined();
+  expect(reversed.props.onClick).toBeUndefined();
+  expect(h.text()).toContain(fmt(messages.topupChrome.confirmingProgress, { n: 3, total: 15 }));
+});
+
+test("a failed background refresh preserves the snapshot and can recover on retry", async () => {
+  const interval = vi.spyOn(globalThis, "setInterval");
+  const h = await pane({ ...address, creditEnabled: true }, [rows[0]]);
+  h.request.mockRejectedValue(new Error("temporary failure"));
+  (h.state.load as (background: boolean) => void)(true);
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(h.text()).toContain("CR-1");
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
+  expect(h.text()).toContain(zh.topupChrome.addressStatusUnverified);
+  expect(controls(h.root, "nx-dep-background-error")).toHaveLength(1);
+  expect((h.state.phase as Vue.Ref<string>).value).toBe("ready");
+  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : [{ ...rows[0], confirmations: 6 }]);
+  (controls(h.root, "nx-dep-background-retry")[0].props.onClick as () => void)();
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(controls(h.root, "nx-dep-background-error")).toHaveLength(0);
+  expect(h.text()).toContain(fmt(zh.topupChrome.confirmingProgress, { n: 6, total: 15 }));
+  h.request.mockRejectedValue(new Error("temporary failure"));
+  (h.state.load as (background: boolean) => void)(true);
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : [{ ...rows[0], confirmations: 8 }]);
+  const periodic = interval.mock.calls.find(([, delay]) => delay === 30_000)![0] as () => void;
+  periodic();
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(controls(h.root, "nx-dep-background-error")).toHaveLength(0);
+  expect(h.text()).toContain(fmt(zh.topupChrome.confirmingProgress, { n: 8, total: 15 }));
+  interval.mockRestore();
+});
+
+test.each([zh, en, vietnamese])("a paused address takes effect before a failing history refresh", async messages => {
+  const h = await pane({ ...address, creditEnabled: true }, [rows[0]], messages);
+  let rejectHistory!: (error: Error) => void;
+  h.request.mockImplementation(({ path }) => path.startsWith("/api/deposits/address")
+    ? Promise.resolve({ enabled: false, network: "BEP20" })
+    : new Promise((_resolve, reject) => { rejectHistory = reject; }));
+  (h.state.load as (background: boolean) => void)(true);
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
+  expect(h.text()).toContain(messages.topupChrome.allNetworksPaused);
+  expect(h.text()).toContain("CR-1");
+  rejectHistory(new Error("history failed"));
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(h.text()).toContain("CR-1");
+  expect(controls(h.root, "nx-dep-background-retry")).toHaveLength(1);
+});
+
+test("a new fee takes effect even when history fails, and an unverified address cannot be copied", async () => {
+  const clipboard = vi.fn();
+  vi.stubGlobal("uni", { setClipboardData: clipboard });
+  const h = await pane({ ...address, creditEnabled: true }, [rows[0]]);
+  h.request.mockImplementation(async ({ path }) => {
+    if (path.startsWith("/api/deposits/address")) return { ...address, minDepositUsdt: 1, feeUsdt: 0, confirmations: 20 };
+    throw new Error("history failed");
+  });
+  (h.state.load as (background: boolean) => void)(true);
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(h.text()).toContain("$1.00");
+  expect(h.text()).toContain("0.00 USDT");
+  expect(h.text()).toContain("CR-1");
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(1);
+  h.request.mockRejectedValue(new Error("address failed"));
+  (h.state.load as (background: boolean) => void)(true);
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
+  (h.state.copyAddr as () => void)();
+  expect(clipboard).not.toHaveBeenCalled();
+  expect(h.text()).toContain(zh.topupChrome.addressStatusUnverified);
+  for (const field of ["nx-dep-min-value", "nx-dep-fee-value", "nx-dep-confirmations-value"]) {
+    expect(textOf(controls(h.root, field)[0])).toBe("—");
+  }
+  expect(textOf(controls(h.root, "nx-dep-net-bep20")[0])).toContain("—");
+  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address")
+    ? { ...address, minDepositUsdt: 2, feeUsdt: 0.5, confirmations: 25 } : [rows[0]]);
+  (controls(h.root, "nx-dep-background-retry")[0].props.onClick as () => void)();
+  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect(textOf(controls(h.root, "nx-dep-min-value")[0])).toBe("$2.00");
+  expect(textOf(controls(h.root, "nx-dep-fee-value")[0])).toBe("0.50 USDT");
+  expect(textOf(controls(h.root, "nx-dep-confirmations-value")[0])).toBe("25");
+  expect(textOf(controls(h.root, "nx-dep-net-bep20")[0])).toContain("0.50");
+});
+
+test("initial history failure does not claim that deposit history is empty", async () => {
+  const h = await pane(address, Promise.reject(new Error("history unavailable")));
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(1);
+  expect(h.text()).not.toContain(zh.topupChrome.noDepositsYet);
+  expect(controls(h.root, "nx-dep-background-retry")).toHaveLength(1);
 });

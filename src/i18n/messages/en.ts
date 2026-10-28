@@ -6466,6 +6466,7 @@ openSeaErrorPool: {
     topupNotCreditedYet: "Confirming your deposit — funds aren't lost. Refresh shortly.",
     depositOpFailedNote: "Deposit information is temporarily unavailable. Refresh or contact support.",
     addrLoadFailed: "Couldn't load your deposit address",
+    addressStatusUnverified: "The deposit address status can't be confirmed. Do not transfer; try again first.",
     cardFeeLabel: "Card fee {rate}",
     cardLimitHint: "Per-transaction limit {min} – {max}",
     payCta: "Pay {amount}",

@@ -6305,6 +6305,7 @@ openSeaErrorPool: {
     topupNotCreditedYet: "入账确认中,资金不会丢失;稍后刷新查看",
     depositOpFailedNote: "充值信息暂不可用，请刷新或联系客服。",
     addrLoadFailed: "充值地址加载失败",
+    addressStatusUnverified: "暂时无法确认充值地址状态，请勿转账，重试后再操作。",
     cardFeeLabel: "卡通道费 {rate}",
     cardLimitHint: "单笔限额 {min} ~ {max}",
     payCta: "支付 {amount}",
