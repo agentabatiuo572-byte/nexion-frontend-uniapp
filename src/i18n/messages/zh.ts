@@ -1698,6 +1698,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     bannerUse: "去使用",
     checkoutRowLabel: "代金券",
     expiredNote: "你领取的本设备代金券已过期",
+    noneAvailable: "暂无可用代金券",
     quoteChanged: "代金券抵扣已变化,请重新确认最新金额后再支付",
 
 },

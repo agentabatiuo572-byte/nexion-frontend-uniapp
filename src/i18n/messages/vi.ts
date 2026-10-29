@@ -1694,6 +1694,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     bannerUse: "Sử dụng",
     checkoutRowLabel: "Voucher",
     expiredNote: "Một voucher đã nhận cho thiết bị này đã hết hạn",
+    noneAvailable: "Chưa có voucher khả dụng",
     quoteChanged: "Ưu đãi voucher đã thay đổi — vui lòng xem lại tổng mới trước khi thanh toán",
 
 },

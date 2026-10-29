@@ -1717,6 +1717,7 @@ chooseMethod: "Choose how to join the UVEL network",
     bannerUse: "Use now",
     checkoutRowLabel: "Voucher",
     expiredNote: "A claimed voucher for this device has expired",
+    noneAvailable: "No vouchers available",
     quoteChanged: "Voucher discount changed — review the updated total before paying",
 
 },
