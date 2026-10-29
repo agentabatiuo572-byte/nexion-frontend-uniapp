@@ -80,6 +80,7 @@ async function mount(copy: Messages = zh, device = cloudDevice(), expanded = fal
     vue: Vue, "@/components/home/device-slot.vue": { __esModule: true, default: blank },
     "@/components/ui/nx-button.vue": { __esModule: true, default: blank },
     "@/components/ui/nx-tag.vue": { __esModule: true, default: blank },
+    "@/components/liquid-glass.vue": { __esModule: true, default: blank },
     "@/store/app": { useApp: () => app },
     "@/store/session": { useSession: () => ({ isCurrentDeviceCalibrated: () => calibrated }) },
     "@/store/config": { useConfig: () => ({ config: { onlineBonus: {} } }) },
@@ -242,6 +243,9 @@ for (const [locale, copy] of [["en", en], ["zh", zh], ["vi", vietnamese]] as con
     await vi.advanceTimersByTimeAsync(1);
     const dialog = menu(view.root)!;
     expect(dialog.props.role).toBe("dialog");
+    expect(find(dialog, "nx-action-sheet")).toBeDefined();
+    expect(find(dialog, "nx-action-sheet__handle")).toBeDefined();
+    expect(find(dialog, "nx-action-sheet__cancel")).toBeDefined();
     expect(text(dialog)).toContain(copy.earn.quickMenu.stats);
     expect(text(dialog)).toContain(copy.earn.quickMenu.cancel);
     await fire(card, "onTouchend");
