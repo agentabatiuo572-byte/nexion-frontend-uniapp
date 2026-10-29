@@ -4761,7 +4761,6 @@ openseaLine: "View on OpenSea · floor",
 
 
     submitReasonUnderReview: "Your last withdrawal is still going through its safety check. You can send another one as soon as that clears — support can give you an update from the withdrawal status page.",
-    exchangePoolToday: "Platform pool today",
     // Sprint A-1 / B.2 — Reverse-talk staking alternative
     stakeAlt: {
       label: "What this becomes if you stake instead",

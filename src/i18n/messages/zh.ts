@@ -4634,7 +4634,6 @@ openseaLine: "在 OpenSea 查看 · 地板价",
 
 
     submitReasonUnderReview: "上一笔还在做安全确认,确认完就能再提。想知道进度可以在提现进度页找客服。",
-    exchangePoolToday: "今日平台资金池",
     // Sprint A-1 / B.2 — 反向劝阻 staking 备选
     stakeAlt: {
       label: "如果改去 staking,这笔钱会变成",

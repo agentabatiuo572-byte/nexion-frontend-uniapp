@@ -132,7 +132,6 @@ async function mount(direction = "nex2usdt") {
     textContent(button(en.uiChrome.max).children[1]),
     textContent(label(en.exchange.netReceive).parent!.children[2].children[0]),
     textContent(label(en.exchange.yourDaily).parent!.children[1]).trim(),
-    textContent(label(en.walletV3.exchangePoolToday).parent!.children[1]).trim(),
   ];
   show(); await flush();
   return {
@@ -164,13 +163,13 @@ describe("mounted exchange balance authority", () => {
     expect(s.amount()).toBe("10");
     expect(s.text()).toContain(en.wallet.loadingTransactions);
     expect(s.text()).toContain(en.exchange.remoteNotProvided);
-    expect(s.compactValues()).toEqual(["-", "-", "-", "-"]);
+    expect(s.compactValues()).toEqual(["-", "-", "-"]);
     expect(s.text()).not.toContain(insufficient(sym));
     expect(s.text()).not.toContain(en.exchange.belowFee);
     expect(s.button(en.exchange.confirm).props["aria-disabled"]).toBe("true");
     s.requests.at(-1)!.reject(new Error("authority unavailable")); await flush();
     expect(s.text()).toContain(en.exchange.remoteUnavailableClosed);
-    expect(s.compactValues()).toEqual(["-", "-", "-", "-"]);
+    expect(s.compactValues()).toEqual(["-", "-", "-"]);
     expect(s.text()).not.toContain(insufficient(sym));
     expect(s.text()).not.toContain(en.exchange.belowFee);
     s.button(en.exchange.confirm).props.onClick(); await flush();
@@ -178,7 +177,7 @@ describe("mounted exchange balance authority", () => {
     s.button(en.exchange.refreshRate).props.onClick(); await s.settle(snapshot());
     expect(s.amount()).toBe("10");
     expect(s.text()).toContain(en.exchange.swapPaused);
-    expect(s.compactValues()).toEqual([direction === "nex2usdt" ? "124.00" : "110.10", en.exchange.rate.replace("{rate}", "0.12400"), "$0.00/ $49.00", "$0.00K/ $20.00K"]);
+    expect(s.compactValues()).toEqual([direction === "nex2usdt" ? "124.00" : "110.10", en.exchange.rate.replace("{rate}", "0.12400"), "$0.00/ $49.00"]);
     expect(s.text()).not.toContain(insufficient(sym));
     s.button(en.exchange.confirm).props.onClick(); await flush();
     expect(s.button(en.exchange.confirm).props["aria-disabled"]).toBe("true");
@@ -206,7 +205,7 @@ describe("mounted exchange balance authority", () => {
     state.wallet.usdtAvailable = 0; state.wallet.nexAvailable = 0;
     await s.settle(state);
     expect(s.compactValues()[0]).toBe("0.00");
-    expect(s.compactValues().slice(2)).toEqual(["$0.00/ $49.00", "$0.00K/ $20.00K"]);
+    expect(s.compactValues().slice(2)).toEqual(["$0.00/ $49.00"]);
     expect(s.receive()).toBe("0.00");
   });
 
