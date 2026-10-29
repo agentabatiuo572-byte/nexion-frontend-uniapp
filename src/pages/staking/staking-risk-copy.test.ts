@@ -23,9 +23,11 @@ describe('staking risk copy uses current policy and evidenced claims',()=>{
     it(`${locale} explains early exit without promising direct use of locked funds`,()=>{
       const {r1Body,r2Label,r2Body}=messages.stakingHowItWorks;
       expect(r1Body).toMatch(/不能直接|cannot be withdrawn|không thể rút trực tiếp/i);
-      expect(r1Body).toMatch(/提前赎回|early withdrawal|rút sớm/i);
-      expect(r2Label).toMatch(/本金.*利息|principal.*interest|gốc.*lãi/i);
-      expect(r2Body).toMatch(/已有持仓|existing positions|vị thế hiện có/i);
+      expect(r1Body).toMatch(/提前解锁|unlock early|mở khóa sớm/i);
+      expect(r2Label).toMatch(/扣费.*奖励|charge.*rewards|phí.*thưởng/i);
+      expect(r2Body).toMatch(/锁定金额|locked amount|số tiền khóa/i);
+      // Existing stakes keep their recorded terms; the page states it once, in the third rule.
+      expect(messages.stakingHowItWorks.r3Body).toMatch(/已开始的质押|Existing stakes|các khoản đang staking/i);
       expect(r1Body).not.toMatch(/到期日前无法用作任何事|cannot be used for anything else until|không thể dùng vào việc gì khác cho tới/i);
     });
     it(`${locale} does not retain the unapproved reserve guarantee`,()=>{
