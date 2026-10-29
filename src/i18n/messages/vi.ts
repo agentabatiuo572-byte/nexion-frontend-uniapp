@@ -4623,7 +4623,6 @@ openseaLine: "Xem trên OpenSea · giá sàn",
 
 
     submitReasonUnderReview: "Lệnh rút trước vẫn đang trong bước kiểm tra an toàn. Xong bước đó là bạn rút tiếp được — hỗ trợ có thể cập nhật tiến độ ở trang trạng thái rút tiền.",
-    exchangePoolToday: "Quỹ nền tảng hôm nay",
     stakeAlt: {
       label: "Số này sẽ thành bao nhiêu nếu bạn khóa staking",
       headline: "{amount} khóa trong {days} ngày ở APY đỉnh sẽ thành {peak}.",
