@@ -130,6 +130,7 @@
               <text class="checkout-trial-credit-value">{{ trialCreditText }}</text>
             </view>
             <text v-if="trialZeroDue" class="checkout-note">{{ t.store.coTrialZeroNote }}</text>
+            <view v-if="tradeinPlacementText" class="checkout-note"><text>{{ tradeinPlacementText }}</text></view>
             <view v-if="capped" class="checkout-note checkout-note--warning"><text>{{ slotsFullText }}</text></view>
             <view class="checkout-policy-notice" data-testid="checkout-policy-notice"><text>{{ policyHasDevice ? policyCopy.deviceScope+t.store.faq.refund.a+(trialConversionMode ? purchaseCopy.refundClause : '') : policyCopy.review }}</text><button class="checkout-policy-link" @click="purchasePolicyOpen=true">{{ policyCopy.entry }}</button></view>
             <view class="checkout-legal"><text>{{ legalCopy.before }}</text><text class="checkout-legal-link" role="link" tabindex="0" @click="navTo('/pages/onboarding/terms')" @keydown.enter.prevent="navTo('/pages/onboarding/terms')">{{ auditCopy.terms }}</text><text>{{ legalCopy.join }}</text><text class="checkout-legal-link" role="link" tabindex="0" @click="navTo('/pages/me/risk-disclosure')" @keydown.enter.prevent="navTo('/pages/me/risk-disclosure')">{{ t.me.riskRow }}</text><text>{{ legalCopy.end }}</text></view>
@@ -843,6 +844,10 @@ const tradeinChipText = computed(() => {
     credit: tradeinCreditText.value,
   });
 });
+const tradeinPlacementText = computed(() => !appliedTradeinView.value ? ""
+  : (appliedTradeinView.value.canonicalQuote ? appliedTradeinView.value.canonicalQuote.targetDeviceStatus === "ACTIVE"
+    : appliedTradeinView.value.device.activatedAt != null)
+    ? t.value.tradein.inheritActiveHint : t.value.tradein.inheritInventoryHint);
 const removedTradein = ref(false);
 const reAddingTradein = ref(false);
 function removeTradein() {
@@ -1113,7 +1118,7 @@ const targetOccupiesPhysicalSlot = computed(() => product.value?.productType !==
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
-const capped = computed(() => targetOccupiesPhysicalSlot.value && (
+const capped = computed(() => !hasTradein.value && targetOccupiesPhysicalSlot.value && (
   trialConversionMode.value ? app.activeSlotCount >= app.slotCap : cappedRaw.value
 ));
 
@@ -1143,9 +1148,9 @@ const activatingSubText = computed(() => {
 });
 const completedOrder = computed(() => orders.orders.find(order => order.id === orderId.value));
 const completedOrderTitle = computed(() => completedOrder.value?.status === 'activated'
-  ? t.value.orders.statusActivated : t.value.orders.title);
+  ? t.value.orders.statusActivated : completedOrder.value?.status === 'inventory' ? t.value.orders.statusInventory : t.value.orders.title);
 const orderPlacedBody = computed(() => completedOrder.value?.status === 'activated'
-  ? t.value.orders.activatedToast : t.value.orders.resultReadback);
+  ? t.value.orders.activatedToast : completedOrder.value?.status === 'inventory' ? t.value.orders.inventoryToast : t.value.orders.resultReadback);
 
 // ── stepper ──
 const stepLabels = computed(() => [
@@ -1551,8 +1556,10 @@ async function increaseCheckoutQuantity(): Promise<void> {
 // 这把钥匙跨 App 重启都稳,是全仓最强的一处;现铸分支只在「这个 intent 头一次」时走到。
 function remoteOrderIntent(): string {
   const p = product.value;
-  return [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
+  const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
     tradein.appliedTradein?.canonicalQuote?.sourceDeviceId ?? "ordinary"].join("|");
+  const sourceVersion = tradein.appliedTradein?.canonicalQuote?.sourceRowVersion;
+  return sourceVersion == null ? intent : `${intent}|${sourceVersion}`;
 }
 
 function remoteOrderKey(): string {
@@ -1562,9 +1569,7 @@ function remoteOrderKey(): string {
 }
 
 function retireRemoteOrderKey(): void {
-  const p = product.value;
-  const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
-    tradein.appliedTradein?.canonicalQuote?.sourceDeviceId ?? "ordinary"].join("|");
+  const intent = remoteOrderIntent();
   const accountKey = orders.currentAccountKey();
   const persisted = readAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey);
   if (persisted?.commands?.[intent]) {
@@ -1654,6 +1659,7 @@ async function submitRemoteOrder(): Promise<void> {
       throw new Error("E3_TRADEIN_QUOTE_REQUIRED");
     }
     if (tradeinContext) {
+      const expectedActive = tradeinContext.canonicalQuote!.targetDeviceStatus === "ACTIVE";
       await completeVerifiedMutation({
         submit: () => {
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
@@ -1676,10 +1682,10 @@ async function submitRemoteOrder(): Promise<void> {
           if (!persisted || persisted.tradeinNo !== submitted.tradeinNo
               || persisted.sourceDeviceId !== submitted.sourceDeviceId
               || persisted.targetDeviceId !== submitted.targetDeviceId
-              || persisted.canonicalStatus !== "activated"
+              || persisted.canonicalStatus !== (expectedActive ? "activated" : "inventory")
               || persisted.paymentStatus.toUpperCase() !== "PAID"
               || persisted.orderStatus.toUpperCase() !== "COMPLETED"
-              || persisted.activationStatus.toUpperCase() !== "ACTIVATED"
+              || persisted.activationStatus.toUpperCase() !== (expectedActive ? "ACTIVATED" : "INVENTORY")
               || typeof persisted.amountUsdt !== "number"
               || Math.abs(persisted.amountUsdt - submitted.walletDebitUsdt) > 0.000001
               || Math.abs(persisted.discountUsdt - submitted.discountUsdt) > 0.000001) {
@@ -1702,15 +1708,16 @@ async function submitRemoteOrder(): Promise<void> {
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
           const source = app.devices.find((device) => device.id === String(submitted.sourceDeviceId));
-          if (!target || target.activatedAt == null || (source && source.activatedAt != null)) {
+          if (!target || target.activationUnconfirmed || (target.activatedAt != null) !== expectedActive
+              || (source && source.activatedAt != null)) {
             throw new Error("E3_TRADEIN_FLEET_READBACK_MISMATCH");
           }
         },
         commit(submitted) {
           if (!scopeIsCurrent()) return;
           orderId.value = submitted.orderNo;
-          tradein.clearApplied();
           retireRemoteOrderKey();
+          tradein.clearApplied();
           remoteTradeinRecoveryRequired.value = false;
           step.value = "live";
         },

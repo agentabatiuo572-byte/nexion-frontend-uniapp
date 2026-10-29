@@ -131,6 +131,7 @@
           </view>
         </view>
 
+        <text class="tis-disclaimer">{{ tradeinView.placementHint }}</text>
         <text class="tis-disclaimer">{{ t.tradein.sheetDisclaimer }}</text>
 
         <view class="tis-cta" :style="ctaHalo" role="button" :tabindex="confirming ? -1 : 0" :aria-disabled="confirming" :aria-busy="confirming" @click="onConfirmTradein"  @keydown.enter.prevent="onKeyboardActivate($event, onConfirmTradein)" @keydown.space.prevent="onKeyboardActivate($event, onConfirmTradein)">
@@ -606,6 +607,8 @@ const tradeinView = computed(() => {
       ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
       : "—",
     credit: formatAmount(credit),
+    placementHint: (remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null)
+      ? t.value.tradein.inheritActiveHint : t.value.tradein.inheritInventoryHint,
     estNet: formatAmount(estNet),
     ctaText: fmt(t.value.tradein.sheetCta, { amount: formatAmount(estNet) }),
   };
@@ -628,7 +631,7 @@ function onConfirmTradein() {
   }
   confirming.value = true;
   // FEAT-DEV02:确认 = 写入结算抵扣上下文,原子事务(净额扣款 + 移除旧机 + 新机
-  // 未激活入库)统一发生在结算页持久块——本弹层不再直接动钱/动设备数组。
+  // 新机继承原位置)统一发生在结算页持久块——本弹层不再直接动钱/动设备数组。
   sheet.applyTradein(oldDevice.id, s.newKind, remoteApiEnabled ? canonicalQuote.value ?? undefined : undefined);
   const targetId = s.newKind;
   hide();
