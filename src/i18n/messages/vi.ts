@@ -1209,7 +1209,7 @@ estimateDisclaimer: "Ước tính chưa trừ chi phí mua; thu nhập giảm d�
     s4Body: "Thời gian xử lý rút tiền theo trạng thái lệnh. Mỗi lần rút trả một khoản phí xác nhận mạng cố định thiết lập theo từng mạng; phí không thay đổi theo số tiền và một số mạng có thể miễn phí. Bạn có thể tùy chọn trả phí này bằng UVT — tùy chọn mặc định tắt, không bật thì không dùng UVT. Kiếm UVT qua điểm danh / tác vụ tính toán / giới thiệu.",
     s4BodyLargeAmount: "Lệnh rút trên ${large} có thể cần thêm bước xác nhận an toàn trong {d} ngày; thời điểm về ví lấy mốc muộn hơn trong hai mốc.",
     s5Title: "Khóa staking là không thể đảo ngược",
-    s5Body: "Tiền staking bị khóa trong suốt kỳ hạn. Mở khóa sớm sẽ bị trừ một phần số tiền khóa theo kỳ hạn và mất thưởng đã tích lũy; tỷ lệ được hiển thị trên trang staking. Vui lòng đọc kỹ từng gói trước khi staking.",
+    s5Body: "Tiền staking bị khóa trong suốt kỳ hạn. Mở khóa sớm sẽ bị trừ lần lượt 5% / 15% / 30% / 50% số tiền khóa với các gói 30 / 90 / 180 / 365 ngày và mất thưởng đã tích lũy. Vui lòng đọc kỹ từng gói trước khi staking.",
     s6Title: "Thưởng mời bạn",
     s6Body: "Thưởng mời bạn được chi trả theo quy tắc của nền tảng và phụ thuộc vào việc người được mời hoàn thành các hành động hợp lệ. Đăng ký hàng loạt hoặc giới thiệu spam sẽ bị hủy và có thể dẫn tới khóa tài khoản.",
     s7Title: "Lưu ký, tuân thủ và thẩm quyền pháp lý",
