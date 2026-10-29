@@ -50,8 +50,10 @@ it.each(["zh", "en", "vi"] as const)("keeps the %s purchased row compact and rev
   const screen = mount(locale);
   expect(screen.byClass("device-inventory-row__name")!.children).toBe("UVELBox Pro v2");
   expect(screen.byClass("device-inventory-row__image")!.props!.src).toBe(getProductMedia("stellarbox-pro-v2")!.src);
-  expect(screen.byClass("device-inventory-row__status")!.children).toBe("Online");
-  expect(screen.byClass("device-inventory-row__status--online")).toBeDefined();
+  expect(screen.byClass("device-inventory-row__state")!.children).toBe("Online");
+  expect(screen.byClass("device-inventory-row__status")).toBeUndefined();
+  expect(nodes(screen.node()).filter(node => node.children === "Online")).toHaveLength(1);
+  expect(screen.byClass("device-inventory-row__state--active")).toBeDefined();
   expect(screen.byClass("device-inventory-row__body")).toBeUndefined();
   const heading = screen.byClass("device-inventory-row__heading")!;
   expect(heading.props).toMatchObject({ role: "button", tabindex: "0", "aria-expanded": false });
@@ -84,23 +86,25 @@ it("preserves disabled activation, remote pending-deactivation, and read-only co
 it("keeps a confirmed pending-deactivation visible before opening the row", () => {
   const screen = mount(); screen.device.pendingDeactivate = true;
   expect(screen.byClass("device-inventory-row__body")).toBeUndefined();
-  expect(screen.byClass("device-inventory-row__status")!.children).toBe(`${screen.t.earn.online} · ${screen.t.myDevices.inventoryPendingDeactivateChip}`);
-  expect(screen.byClass("device-inventory-row__status--online")).toBeDefined();
+  expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.myDevices.inventoryPendingDeactivateChip);
+  expect(screen.byClass("device-inventory-row__state--active")).toBeDefined();
 });
 
 it.each(["zh", "en", "vi"] as const)("shows only activated Online and preserves read failure in %s", locale => {
   const screen = mount(locale);
   for (const runtime of ["OFFLINE", "UNKNOWN"] as const) {
     screen.device.runtimeStatus = runtime;
-    expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.online);
-    expect(screen.byClass("device-inventory-row__status--online")).toBeDefined();
+    expect(screen.byClass("device-inventory-row__state")!.children).toBe(screen.t.earn.online);
+    expect(screen.byClass("device-inventory-row__status")).toBeUndefined();
+    expect(screen.byClass("device-inventory-row__state--active")).toBeDefined();
   }
   screen.props.runtimeConfirmed = false;
   expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.runtimeUnknown);
+  expect(screen.byClass("device-inventory-row__state")).toBeUndefined();
   screen.props.runtimeConfirmed = true;
   screen.props.active = false; screen.device.activatedAt = null;
   expect(screen.byClass("device-inventory-row__status")).toBeUndefined();
-  expect(screen.byClass("device-inventory-row__status--online")).toBeUndefined();
+  expect(screen.byClass("device-inventory-row__state--active")).toBeUndefined();
   screen.device.activationUnconfirmed = true;
   expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.runtimeUnknown);
   expect(screen.t.myDevices.inventorySectionDevices).toBe("Online");
