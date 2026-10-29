@@ -1275,7 +1275,8 @@ estimateDisclaimer: "Estimate before purchase cost; earnings decrease with time 
     sheetNetCostLabel: "Est. payable",
     sheetCta: "Confirm · checkout ${amount}",
     sheetCancel: "Cancel",
-    inheritActiveHint: "After payment, the old device is deactivated and traded in. The new device takes its compute slot and activates automatically.",
+    recoveryPending: "The previous trade-in result is not confirmed. Retry to check its outcome.",
+    inheritActiveHint: "After payment, the old device’s unfinished task is cancelled and the device is recovered for trade-in. The new device takes its compute slot and activates automatically.",
     inheritInventoryHint: "After payment, the old device is traded in and removed. The new device stays in inventory and can be activated later.",
     sheetDisclaimer: "After confirming, you pay at checkout. Once paid, the old device stops taking tasks and is removed from your devices. The credit only applies to this purchase; it does not go to your balance and cannot be withdrawn. The sooner you trade in, the more credit you get.",
     // Checkout credit row

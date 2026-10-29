@@ -625,7 +625,7 @@ function onConfirmTradein() {
   }
   // 入口后任务才开始的竞态:退回阻断提示(规格 DEV02A 异常2)。判定单源
   // isDeviceTaskBlocked——库存机的出厂任务不在跑,不阻断。
-  if (isDeviceTaskBlocked(oldDevice)) {
+  if (!remoteApiEnabled && isDeviceTaskBlocked(oldDevice)) {
     sheet.showRetireBlock(oldDevice.id, oldDevice.name);
     return;
   }

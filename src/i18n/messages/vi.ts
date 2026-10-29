@@ -1273,7 +1273,8 @@ estimateDisclaimer: "Ước tính chưa trừ chi phí mua; thu nhập giảm d�
     sheetNetCostLabel: "Dự kiến phải trả",
     sheetCta: "Xác nhận · thanh toán ${amount}",
     sheetCancel: "Hủy",
-    inheritActiveHint: "Sau thanh toán, thiết bị cũ được tắt và đổi bù. Thiết bị mới tiếp quản khe tính toán và tự động kích hoạt.",
+    recoveryPending: "Chưa xác nhận được kết quả đổi bù trước đó. Hãy thử lại để kiểm tra.",
+    inheritActiveHint: "Sau thanh toán, tác vụ chưa hoàn tất của thiết bị cũ sẽ bị hủy và thiết bị được thu hồi để đổi bù. Thiết bị mới tiếp quản khe tính toán và tự động kích hoạt.",
     inheritInventoryHint: "Sau thanh toán, thiết bị cũ được đổi bù và xóa. Thiết bị mới ở trong kho và có thể kích hoạt sau.",
     sheetDisclaimer: "Sau khi xác nhận, bạn thanh toán ở bước thanh toán. Khi thanh toán xong, thiết bị cũ ngừng nhận tác vụ và được gỡ khỏi danh sách thiết bị của bạn. Khoản khấu trừ chỉ áp dụng cho lần mua này, không vào số dư và không thể rút. Đổi càng sớm, mức khấu trừ càng cao.",
     // Checkout credit row
