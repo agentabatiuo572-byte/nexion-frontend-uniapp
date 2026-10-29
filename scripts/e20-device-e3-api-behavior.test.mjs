@@ -71,8 +71,8 @@ const validKeepResult = {
   operationNo: "CPK-1",
   orderNo: "CKO-1",
   targetDeviceId: 44,
-  deviceStatus: "INACTIVE",
-  orderStatus: "PAID",
+  deviceStatus: "ACTIVE",
+  orderStatus: "COMPLETED",
   walletDebitUsdt: 1000,
   walletBalanceAfterUsdt: 500,
 };
@@ -233,11 +233,16 @@ test("E20 keep-and-buy uses the atomic capacity endpoint and validates the quote
   assert.equal(request.path, "/api/app/trade-in/capacity-keep");
   assert.deepEqual(request.body, { targetProductNo: "stellarbox-pro-v2", expectedPayableUsdt: 1000 });
   assert.equal(request.idempotencyKey, "keep-key");
-  assert.equal(accepted.deviceStatus, "INACTIVE");
+  assert.equal(accepted.deviceStatus, "ACTIVE");
   assert.equal(accepted.targetDeviceId, 44);
 });
 
-test("E20 keep-and-buy rejects a pending order or a result whose debit drifted", async () => {
+test("E20 keep-and-buy rejects inactive or pending results and debit drift", async () => {
+  await assert.rejects(
+    apiReturning({ ...validKeepResult, deviceStatus: "INACTIVE", orderStatus: "PAID" })
+      .capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote),
+    /E3_CANONICAL_RESPONSE_INVALID/,
+  );
   await assert.rejects(
     apiReturning({ ...validKeepResult, orderStatus: "PENDING_PAYMENT" })
       .capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote),

@@ -7,7 +7,7 @@
     <DeviceSlot :device="device" :online="false" />
     <view class="hf-device-meta">
       <text class="hf-device-name">{{ displayName }}</text>
-      <view class="hf-device-status" :class="{ 'hf-device-status--offline': onlineState === 'offline' }"><view class="hf-status-dot" :style="dotStyle" aria-hidden="true" /><text>{{ statusText }}</text></view>
+      <view v-if="statusText" class="hf-device-status"><view class="hf-status-dot" :style="dotStyle" aria-hidden="true" /><text>{{ statusText }}</text></view>
     </view>
     <view class="hf-device-income"><text class="font-mono-tabular">{{ visibility.mask(runtimeConfirmed ? (device.todayEarnings > 0 ? '+' : '') + fmtMoney(device.todayEarnings) : '-') }}</text><text class="hf-device-today">{{ copy.today }}</text></view>
     <view class="nx-home-arrow" aria-hidden="true">
@@ -37,7 +37,7 @@ const displayName = computed(() => deviceName(t.value, props.device));
 
 const onlineState = computed(() => deviceOnlineState(props.device, Date.now(), props.runtimeConfirmed));
 const isOnline = computed(() => onlineState.value === "online");
-const statusText = computed(() => onlineState.value === "unknown" ? t.value.earn.runtimeUnknown : isOnline.value ? t.value.earn.online : t.value.earn.offline);
+const statusText = computed(() => onlineState.value === "unknown" ? t.value.earn.runtimeUnknown : isOnline.value ? t.value.earn.online : "");
 const rowStyle = computed<CSSProperties>(() => ({
   padding: "13px 14px",
   borderBottom: props.divider ? "1px solid var(--v5-border)" : "none",
@@ -70,7 +70,6 @@ import DeviceSlot from "./device-slot.vue";
 .hf-device-meta { min-width: 0; flex: 1; }
 .hf-device-name { display: block; font: 500 clamp(13px,3.85vw,15px)/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
 .hf-device-status { display: flex;align-items:center;gap:6px; margin-top: 2px; font: 400 clamp(11px,3.08vw,12px)/18px var(--font-v5); color: var(--v5-ink-3); }
-.hf-device-status--offline { color: var(--v5-warning-ink); }
 .hf-device-income { flex-shrink: 0; font: 600 clamp(13px,3.85vw,15px)/20px var(--font-v5); color: var(--v5-brand);text-align:right; }
 .hf-device-today {display:block;font:400 clamp(11px,3.08vw,12px)/18px var(--font-v5);color:var(--v5-ink-3);}
 .nx-home-arrow { display: flex; align-items: center; width: 16px; color: var(--v5-ink-4);background:none;box-shadow:none; }
