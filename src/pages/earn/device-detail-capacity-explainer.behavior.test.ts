@@ -119,7 +119,7 @@ async function mount(copy: Messages, device = serverDevice()) {
       onShow: (callback: () => void) => onShow.push(callback) },
     "@/components/app-chassis.vue": sfc(passthrough), "@/components/empty-state.vue": sfc(blank),
     "@/components/sub-page-header.vue": sfc(blank), "@/components/home/device-slot.vue": sfc(blank),
-    "@/components/liquid-glass.vue": sfc(blank),
+    "@/components/liquid-glass.vue": sfc(blank), "@/components/ui/nx-tag.vue": sfc(blank),
     "@/store/app": { useApp: () => app },
     "@/store/session": { useSession: () => ({ isCurrentDeviceCalibrated: () => true }) },
     "@/store/config": { useConfig: () => ({ config: { onlineBonus: {} } }) },

@@ -79,6 +79,7 @@ async function mount(copy: Messages = zh, device = cloudDevice(), expanded = fal
     "@/i18n/device-statistics-capability": { useDeviceStatisticsCapabilityCopy: () => Vue.ref(deviceStatisticsCapabilityCopy[copy === zh ? "zh" : copy === vietnamese ? "vi" : "en"]) },
     vue: Vue, "@/components/home/device-slot.vue": { __esModule: true, default: blank },
     "@/components/ui/nx-button.vue": { __esModule: true, default: blank },
+    "@/components/ui/nx-tag.vue": { __esModule: true, default: blank },
     "@/store/app": { useApp: () => app },
     "@/store/session": { useSession: () => ({ isCurrentDeviceCalibrated: () => calibrated }) },
     "@/store/config": { useConfig: () => ({ config: { onlineBonus: {} } }) },

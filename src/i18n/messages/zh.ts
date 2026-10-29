@@ -1258,7 +1258,8 @@ estimateDisclaimer: "预估值，未扣除购买成本，收益会随使用时�
     sheetNetCostLabel: "预计应付",
     sheetCta: "确认置换 · 去结算 ${amount}",
     sheetCancel: "取消",
-    inheritActiveHint: "支付完成后，旧设备停用并抵扣，新设备接替原算力槽并自动激活。",
+    recoveryPending: "上次抵扣升级的结果尚未确认，请重试查询。",
+    inheritActiveHint: "支付完成后，旧设备当前未完成任务将取消，旧设备回收并抵扣，新设备接替原算力槽并自动激活。",
     inheritInventoryHint: "支付完成后，旧设备完成抵扣并移除，新设备保留在仓库，可稍后选择激活。",
     sheetDisclaimer: "确认后前往结算页支付；支付完成后，旧设备停止接单并从你的设备中移除。抵扣仅用于本次购买，不进入余额，不可提现。越早置换，抵扣越多。",
     // 结算页抵扣行
