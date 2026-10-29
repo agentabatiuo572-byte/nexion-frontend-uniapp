@@ -129,8 +129,8 @@ export interface CanonicalCapacityKeepResult {
   operationNo: string;
   orderNo: string;
   targetDeviceId: number;
-  deviceStatus: "INACTIVE";
-  orderStatus: "PAID";
+  deviceStatus: "ACTIVE";
+  orderStatus: "COMPLETED";
   walletDebitUsdt: number;
   walletBalanceAfterUsdt: number;
 }
@@ -408,13 +408,13 @@ function capacityKeepResult(value: unknown): CanonicalCapacityKeepResult {
   const source = record(value);
   const deviceStatus = string(source.deviceStatus).toUpperCase();
   const orderStatus = string(source.orderStatus).toUpperCase();
-  if (deviceStatus !== "INACTIVE" || orderStatus !== "PAID") return invalid();
+  if (deviceStatus !== "ACTIVE" || orderStatus !== "COMPLETED") return invalid();
   return {
     operationNo: string(source.operationNo),
     orderNo: string(source.orderNo),
     targetDeviceId: integer(source.targetDeviceId, 1),
-    deviceStatus: "INACTIVE",
-    orderStatus: "PAID",
+    deviceStatus: "ACTIVE",
+    orderStatus: "COMPLETED",
     walletDebitUsdt: number(source.walletDebitUsdt),
     walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt),
   };

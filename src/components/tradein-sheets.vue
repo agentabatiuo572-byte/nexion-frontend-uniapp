@@ -906,10 +906,10 @@ async function submitCanonicalKeepBuy(
         requireCurrentAccount();
         if (!persisted || persisted.productNo !== newKind
             || persisted.orderType.toUpperCase() !== "CAPACITY_KEEP"
-            || persisted.canonicalStatus !== "paid"
+            || persisted.canonicalStatus !== "activated"
             || persisted.paymentStatus.toUpperCase() !== "PAID"
-            || persisted.orderStatus.toUpperCase() !== "PAID"
-            || persisted.activationStatus.toUpperCase() !== "WAITING_PROVISIONING"
+            || persisted.orderStatus.toUpperCase() !== "COMPLETED"
+            || persisted.activationStatus.toUpperCase() !== "ACTIVATED"
             || persisted.targetDeviceId !== submitted.targetDeviceId
             || !persisted.targetDeviceInstanceNo
             || typeof persisted.amountUsdt !== "number"
@@ -931,7 +931,7 @@ async function submitCanonicalKeepBuy(
       verifyFleet(submitted) {
         requireCurrentAccount();
         const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
-        if (!target || target.activatedAt !== null) {
+        if (!target || target.activatedAt == null || target.activationUnconfirmed) {
           throw new Error("CAPACITY_KEEP_FLEET_READBACK_MISMATCH");
         }
       },

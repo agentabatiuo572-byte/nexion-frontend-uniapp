@@ -1,3 +1,4 @@
+vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
 import * as Vue from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import { compile } from "@vue/compiler-dom";
@@ -87,19 +88,23 @@ it("keeps a confirmed pending-deactivation visible before opening the row", () =
   expect(screen.byClass("device-inventory-row__status--online")).toBeDefined();
 });
 
-it.each(["zh", "en", "vi"] as const)("preserves online, offline and unknown status meanings in %s", locale => {
+it.each(["zh", "en", "vi"] as const)("shows only activated Online and preserves read failure in %s", locale => {
   const screen = mount(locale);
-  screen.device.runtimeStatus = "OFFLINE"; expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.offline);
-  expect(screen.byClass("device-inventory-row__status--online")).toBeUndefined();
-  screen.device.runtimeStatus = "UNKNOWN"; expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.runtimeUnknown);
-  expect(screen.byClass("device-inventory-row__status--online")).toBeUndefined();
-  screen.device.runtimeStatus = "ONLINE"; screen.props.runtimeConfirmed = false;
+  for (const runtime of ["OFFLINE", "UNKNOWN"] as const) {
+    screen.device.runtimeStatus = runtime;
+    expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.online);
+    expect(screen.byClass("device-inventory-row__status--online")).toBeDefined();
+  }
+  screen.props.runtimeConfirmed = false;
   expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.runtimeUnknown);
+  screen.props.runtimeConfirmed = true;
+  screen.props.active = false; screen.device.activatedAt = null;
+  expect(screen.byClass("device-inventory-row__status")).toBeUndefined();
   expect(screen.byClass("device-inventory-row__status--online")).toBeUndefined();
-  screen.props.active = false; expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.myDevices.inventorySectionInventory);
-  expect(screen.byClass("device-inventory-row__status--online")).toBeUndefined();
-  screen.device.activationUnconfirmed = true; expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.runtimeUnknown);
-  expect(screen.byClass("device-inventory-row__status--online")).toBeUndefined();
+  screen.device.activationUnconfirmed = true;
+  expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.earn.runtimeUnknown);
+  expect(screen.t.myDevices.inventorySectionDevices).toBe("Online");
+  expect(screen.t.myDevices.inventorySectionInventory).not.toBe("Offline");
 });
 
 it.each(["stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2", "cloud-share"] as const)("uses the actual %s product artwork", kind => {
