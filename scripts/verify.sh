@@ -920,8 +920,8 @@ if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev
 else
   ok "staking disclosure includes canonical high-tier penalties"
 fi
-sentinel_present "staking risk disclosure EN names all four penalties" src/i18n/messages/en.ts '5% / 15% / 30% / 50% of principal'
-sentinel_present "staking risk disclosure ZH names all four penalties" src/i18n/messages/zh.ts '5% / 15% / 30% / 50% 本金'
+sentinel_present "staking risk disclosure EN names all four penalties" src/i18n/messages/en.ts '5% / 15% / 30% / 50% of the locked amount'
+sentinel_present "staking risk disclosure ZH names all four penalties" src/i18n/messages/zh.ts '锁定金额的 5% / 15% / 30% / 50%'
 # The explanation renders current pool penalties. Fixed default strings cannot
 # prove that operator changes (including fractional rates) reach all locales.
 staking_display_log="${VERIFY_LOG_PREFIX}-staking-display.log"
