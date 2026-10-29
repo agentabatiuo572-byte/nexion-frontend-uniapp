@@ -1,23 +1,60 @@
 <template>
   <AppChassis active="me">
-    <CardStagger style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/me" />
+    <CardStagger class="trust-root" style="padding-bottom: 24px">
+      <SubPageHeader back="/pages/me/me" plain solid />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <view class="nx-glass-card" :style="heroStyle">
-          <view class="flex items-center" style="gap: 10px">
-            <view class="grid place-items-center" :style="heroIconStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+        <view class="nx-glass-card trust-hero">
+          <view class="trust-hero__identity">
+            <view class="trust-hero__mark" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
             </view>
-            <view class="min-w-0" style="flex: 1">
-              <text class="block" :style="heroLabelStyle">{{ sectionLabel(sectionKey.nexNarrative) }}</text>
-              <text class="block" :style="heroHeadlineStyle">{{ narrativeHero || "—" }}</text>
-              <text v-if="narrativeSubhero" class="block" :style="heroBodyStyle">{{ narrativeSubhero }}</text>
+            <view class="min-w-0">
+              <text class="block trust-eyebrow">{{ center.operator }}</text>
+              <text class="block trust-hero__name">{{ profile ? profile.legalName : "UVEL" }}</text>
             </view>
           </view>
-          <view v-if="verified" class="grid text-center" :style="heroStatsStyle">
-            <Stat :label="tr.activeNodes" :value="activeDevicesText" />
+          <view>
+            <text class="block trust-hero__headline">{{ center.headline }}</text>
+            <text class="block trust-hero__body">{{ center.subtitle }}</text>
           </view>
+          <view v-if="profile" class="trust-chips">
+            <view v-for="chip in center.chips" :key="chip" class="trust-chip"><text>✓ {{ chip }}</text></view>
+          </view>
+          <view v-if="profile" class="trust-facts">
+            <view v-for="fact in profileFacts" :key="fact.label" class="trust-fact">
+              <text class="block trust-fact__label">{{ fact.label }}</text>
+              <text class="block trust-fact__value" :class="{ 'trust-fact__value--small': fact.small }">{{ fact.value }}</text>
+            </view>
+          </view>
+        </view>
+
+        <SectionHeader :label="center.credentialsTitle" />
+        <view v-if="!documents" class="nx-glass-card" :style="stateCardStyle">
+          <text :style="bodyStyle">{{ documentsStatus === 'error' ? center.documentsError : center.documentsLoading }}</text>
+          <text v-if="documentsStatus === 'error'" class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="refreshDocuments">{{ t.ui.retry }}</text>
+        </view>
+        <view v-for="card in credentialCards" v-else :key="card.slot" class="nx-glass-card trust-credential">
+          <text class="block trust-credential__title">{{ card.title }}</text>
+          <text class="block trust-credential__issuer">{{ card.issuer }}</text>
+          <text v-if="card.note" class="block trust-credential__note">{{ card.note }}</text>
+          <view class="trust-credential__facts">
+            <view v-for="fact in card.facts" :key="fact.label" class="trust-credential__fact"><text>{{ fact.label }}</text><text class="trust-credential__value">{{ fact.value }}</text></view>
+          </view>
+          <view class="trust-credential__actions">
+            <text v-if="card.verifyUrl" class="trust-link" role="link" tabindex="0" @click="openHref(card.verifyUrl)">{{ card.verifyLabel }} ↗</text>
+            <view v-else />
+            <text class="trust-view" role="button" tabindex="0" @click="navTo(`/pages/trust/document?slot=${card.slot}`)">{{ card.viewLabel }}</text>
+          </view>
+        </view>
+
+        <view v-if="whitepaper" class="trust-whitepaper" role="link" tabindex="0" @click="navTo('/pages/trust/whitepaper')">
+          <text class="block trust-whitepaper__eyebrow">WHITEPAPER{{ whitepaper.version ? ` · ${whitepaper.version}` : "" }}</text>
+          <view class="trust-whitepaper__copy">
+            <text class="block trust-whitepaper__title">{{ center.whitepaperTitle }}</text>
+            <text class="block trust-whitepaper__body">{{ center.whitepaperBody }}</text>
+          </view>
+          <view class="trust-whitepaper__bottom"><text class="trust-whitepaper__meta">{{ whitepaperMeta }}</text><text class="trust-whitepaper__cta">{{ center.readWhitepaper }}</text></view>
         </view>
 
         <view class="nx-glass-card" v-if="loading" :style="stateCardStyle"><text :style="bodyStyle">{{ tr.loadingDisclosure }}</text></view>
@@ -86,6 +123,8 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import SectionHeader from "@/components/trust/trust-section-header.vue";
 import Stat from "@/components/trust/trust-stat.vue";
 import { useT } from "@/i18n/use-t";
+import { trustCenterCopy } from "@/i18n/trust-center";
+import { useTrustDocuments } from "@/composables/use-trust-documents";
 import { useLocaleStore } from "@/store/locale";
 import { useConfig } from "@/store/config";
 import { toast } from "@/store/ui";
@@ -145,6 +184,47 @@ const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ??
 const verifiedAuditRows = computed(() => auditRows.value.filter((row) => safeHref(row.Url)));
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
 const verifiedLeadershipRows = computed(() => leadershipRows.value.filter((row) => safeHref(row.Url)));
+
+const center = computed(() => trustCenterCopy(language.value));
+const { documents, status: documentsStatus, refresh: refreshDocuments } = useTrustDocuments();
+const profile = computed(() => documents.value?.profile ?? null);
+const profileFacts = computed(() => {
+  const value = profile.value;
+  if (!value) return [];
+  return [
+    { label: center.value.factJurisdiction, value: value.jurisdiction === "New York, USA" ? center.value.newYork : value.jurisdiction, small: false },
+    { label: center.value.factDosId, value: value.nyDosId, small: false },
+    { label: center.value.factCapital, value: `US$${value.authorizedCapitalUsd.toLocaleString("en-US")}`, small: false },
+    { label: center.value.factAddress, value: value.registeredAddress, small: true },
+  ];
+});
+const credentialCards = computed(() => {
+  const value = documents.value;
+  if (!value) return [];
+  const copy = center.value;
+  const { incorporation, msb, ein } = value.documents;
+  return [
+    { slot: incorporation.slot, title: copy.incorporationTitle, issuer: copy.incorporationIssuer, note: "",
+      facts: [{ label: copy.dosIdLabel, value: incorporation.referenceNo ?? value.profile.nyDosId }, { label: copy.filingNumberLabel, value: value.profile.nyFilingNumber }],
+      verifyUrl: incorporation.verifyUrl, verifyLabel: copy.incorporationVerify, viewLabel: copy.incorporationView },
+    { slot: msb.slot, title: copy.msbTitle, issuer: copy.msbIssuer, note: copy.msbNote,
+      facts: msb.referenceNo ? [{ label: copy.msbNumberLabel, value: msb.referenceNo }] : [],
+      verifyUrl: msb.verifyUrl, verifyLabel: copy.msbVerify, viewLabel: copy.msbView },
+    { slot: ein.slot, title: copy.einTitle, issuer: copy.einIssuer, note: "",
+      facts: ein.referenceNo ? [{ label: copy.einLabel, value: ein.referenceNo }] : [],
+      verifyUrl: ein.verifyUrl, verifyLabel: copy.einVerify, viewLabel: copy.einView },
+  ];
+});
+const whitepaper = computed(() => documents.value?.documents.whitepaper ?? null);
+const whitepaperMeta = computed(() => {
+  const value = whitepaper.value;
+  if (!value) return "";
+  const size = value.sizeBytes >= 1024 * 1024 ? `${(value.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(value.sizeBytes / 1024))} KB`;
+  return ["PDF", value.language, size].filter(Boolean).join(" · ");
+});
+
+// Company documents are public and independent of the published sections' view counting.
+onShow(() => { void refreshDocuments(); });
 
 let trustPageVisible = false;
 let trustVisibleEpoch = 0;
@@ -241,3 +321,42 @@ const retryStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", fontWei
 
 
 </script>
+
+<style scoped>
+.trust-eyebrow { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.trust-hero { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+.trust-hero__identity { display: flex; align-items: center; gap: 12px; }
+.trust-hero__mark { width: 48px; height: 48px; flex-shrink: 0; display: grid; place-items: center; border-radius: var(--v5-radius-s); background: var(--v5-brand); color: var(--v5-on-brand); }
+.trust-hero__name { font: 700 20px/28px var(--font-v5); color: var(--v5-ink); }
+.trust-hero__headline { font: 700 24px/32px var(--font-v5); color: var(--v5-ink); }
+.trust-hero__body { margin-top: 6px; font: 400 15px/22px var(--font-v5); color: var(--v5-ink-2); }
+.trust-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.trust-chip { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand-deep); font: 600 12px/16px var(--font-v5); }
+.trust-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border-radius: var(--v5-radius-m); background: var(--v5-border); }
+.trust-fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 12px; background: var(--v5-surface-2); }
+.trust-fact__label { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.trust-fact__value { font: 600 15px/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.trust-fact__value--small { font-size: 13px; line-height: 18px; }
+.trust-credential { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
+.trust-credential__title { font: 600 15px/20px var(--font-v5); color: var(--v5-ink); }
+.trust-credential__issuer, .trust-credential__note { font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+.trust-credential__facts { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: var(--v5-radius-s); background: var(--v5-surface-2); }
+.trust-credential__fact { display: flex; justify-content: space-between; gap: 12px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+.trust-credential__value { font-weight: 600; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
+.trust-credential__actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.trust-link { font: 600 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+.trust-view { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand-deep); font: 600 13px/18px var(--font-v5); cursor: pointer; }
+/* The pill stays 32px tall as drawn; the hit area grows to 44px. */
+.trust-view::after { content: ""; position: absolute; inset: -6px 0; }
+.trust-whitepaper { display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: var(--v5-radius-xl); background: var(--v5-brand); color: var(--v5-on-brand); cursor: pointer; }
+.trust-whitepaper__eyebrow { font: 600 12px/16px var(--font-v5); letter-spacing: .6px; opacity: .9; }
+.trust-whitepaper__copy { display: flex; flex-direction: column; gap: 6px; }
+.trust-whitepaper__title { font: 700 20px/28px var(--font-v5); }
+.trust-whitepaper__body { font: 400 13px/18px var(--font-v5); opacity: .92; }
+.trust-whitepaper__bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.trust-whitepaper__meta { font: 400 12px/16px var(--font-v5); opacity: .85; }
+.trust-whitepaper__cta { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: var(--v5-radius-full); background: var(--v5-on-brand); color: var(--v5-brand); font: 700 13px/18px var(--font-v5); }
+.trust-link:focus-visible, .trust-view:focus-visible, .trust-whitepaper:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+/* The design sets the header title at 15px on this page. */
+.trust-root :deep(.spv-title) { font-size: 15px; line-height: 20px; }
+</style>

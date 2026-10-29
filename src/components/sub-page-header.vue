@@ -4,10 +4,12 @@
   it and restores it at the top. The row keeps its height and content spacing.
 
   The plain variant keeps the title bare and gives the back control its own
-  round glass surface. An optional action replaces the message bell.
+  round glass surface. An optional action replaces the message bell. The solid
+  variant swaps the glass for an opaque surface, for pages whose content stays
+  bright under the controls.
 -->
 <template>
-  <view class="spv" :class="{ 'spv--plain': plain }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
+  <view class="spv" :class="{ 'spv--plain': plain, 'spv--solid': solid }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
     <view
       class="spv-side spv-back"
       role="button"
@@ -57,7 +59,7 @@ import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
-const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void; plain?: boolean; actionLabel?: string; action?: () => void }>();
+const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void; plain?: boolean; solid?: boolean; actionLabel?: string; action?: () => void }>();
 // 待支付浮动条在场时 chassis 让内容整体下让一带,并把同一个值 provide 下来:sticky 行钉在带的下沿,
 // 不与浮动条重叠(chassis 外渲染 / 无条时为 0)。
 const pendingBarInset = inject(PENDING_BAR_INSET_KEY, ref(0));
@@ -163,6 +165,10 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 .spv-glass > svg { position: relative; z-index: 1; }
 .spv--plain { display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px; border-radius: 0; padding: 0; }
 .spv--plain .spv-glass { width: 44px; height: 44px; }
+.spv--solid .spv-glass { background: var(--v5-surface-2); }
+.spv--solid .spv-glass > .nx-liquid-glass { display: none; }
+.spv--solid .spv-glass > svg { width: 20px; height: 20px; stroke: var(--v5-ink); }
+:global([data-theme="light"] .spv--solid .spv-glass) { background: var(--v5-surface); box-shadow: 0 2px 6px rgba(23,31,45,.12); }
 .spv-action { position: relative; z-index: 1; min-height: 44px; width: 92px; max-width: 100%; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); font-size: 12px; font-weight: 500; line-height: 16px; border-radius: 22px; }
 .spv-action-surface { position: absolute; inset: 4px 0; border-radius: 18px; pointer-events: none; }
 .spv-action > text { position: relative; z-index: 1; }
