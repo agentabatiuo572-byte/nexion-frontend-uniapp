@@ -1,3 +1,4 @@
+import * as progress from "@/lib/task-progress";
 vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
 import * as Vue from "vue";
 import * as tabLifecycle from "@/composables/use-tab-page-lifecycle";
@@ -87,7 +88,7 @@ async function mount(copy: Messages = zh, device = cloudDevice(), expanded = fal
     "@/lib/route": { navTo }, "@/composables/use-capacity-explainer": { useCapacityExplainer },
     "@/lib/server-deadline-clock": deadline, "@/lib/phone-activation-guidance": phoneGuidance,
     "@/store/device-types": deviceTypes, "@/lib/workload-label": workload,
-    "@/lib/task-result-confirmation": confirmation, "@/lib/device-copy": deviceCopy,
+    "@/lib/task-result-confirmation": confirmation, "@/lib/task-progress": progress, "@/lib/device-copy": deviceCopy,
     "@/store/device-lifecycle": lifecycle, "@/store/interrupt": interrupt,
     "@/lib/hashpower": hashpower, "@/lib/device-capability": capability,
     "@/lib/today-completed-tasks": completions, "@/i18n/format": { fmt },

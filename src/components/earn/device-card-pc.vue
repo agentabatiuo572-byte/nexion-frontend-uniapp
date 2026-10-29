@@ -432,6 +432,7 @@ import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
+import { taskProgressPercent } from "@/lib/task-progress";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import type { LockedTeaser } from "@/mock/tasks";
@@ -522,16 +523,7 @@ const taskLockRemainingMinutes = computed(() => {
   return lockUntil > liveTaskNow.value ? Math.max(1, Math.ceil((lockUntil - liveTaskNow.value) / 60000)) : 0;
 });
 const reconnecting = computed(() => phoneFactsReady.value && props.device.kind === "phone" && props.device.interruptedAt != null);
-const elapsedRatio = computed(() => {
-  const tk = task.value;
-  if (!tk) return 0;
-  const progressNow = tk.status === "PAUSED" ? tk.pausedAt
-    : reconnecting.value ? props.device.interruptedAt
-    : liveTaskNow.value;
-  if (progressNow == null) return null;
-  return Math.min(1, Math.max(0, ((progressNow - tk.startedAt) / 1000 - (tk.pausedSeconds ?? 0)) / tk.totalSec));
-});
-const progressPct = computed(() => elapsedRatio.value == null ? null : Math.round(elapsedRatio.value * 100));
+const progressPct = computed(() => taskProgressPercent(task.value, liveTaskNow.value, props.device.interruptedAt));
 const progressLabel = computed(() => visibility.mask(progressPct.value == null ? "-" : `${progressPct.value}%`));
 const awaitingExecutionResultConfirmation = computed(() => {
   const tk = task.value;
