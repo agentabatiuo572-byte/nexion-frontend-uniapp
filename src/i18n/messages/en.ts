@@ -761,6 +761,11 @@ export const en = {
     // LiveFeedCard (tabs + chrome)
     liveFeedTabActivity: "Activity",
     liveFeedTabEarnings: "Earnings",
+    liveFeedTitleActivity: "My compute activity",
+    liveFeedTitleEarnings: "Recent income",
+    feedRunning: "Running",
+    feedEstimated: "Est.",
+    incomeEmpty: "No income yet.",
     liveFeedLive: "live",
     liveFeedBought: "bought {product}",
     liveFeedSeeAll: "See all",
