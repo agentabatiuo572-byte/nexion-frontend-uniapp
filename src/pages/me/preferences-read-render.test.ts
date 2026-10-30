@@ -5,9 +5,15 @@ import { parse } from "@vue/compiler-sfc";
 import * as Vue from "vue";
 import { renderToString } from "@vue/server-renderer";
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 import { isMandatoryNotifKind } from "@/store/preferences";
 
-const template = parse(readFileSync(new URL("./preferences.vue", import.meta.url), "utf8")).descriptor.template!.content;
+const page = parse(readFileSync(new URL("./preferences.vue", import.meta.url), "utf8")).descriptor;
+const template = page.template!.content;
+const script = ts.createSourceFile("preferences.ts", page.scriptSetup!.content, ts.ScriptTarget.Latest, true);
+const kindsDeclaration = script.statements.flatMap(statement => ts.isVariableStatement(statement) ? [...statement.declarationList.declarations] : [])
+  .find(declaration => declaration.name.getText(script) === "notifKinds")!;
+const visibleKinds = (kindsDeclaration.initializer as ts.ArrayLiteralExpression).elements.map(element => (element as ts.StringLiteral).text);
 const render = new Function("Vue", compile(template, { mode: "function", prefixIdentifiers: true }).code)(Vue);
 const wrapper = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("section", slots.default?.()) });
 const toggle = Vue.defineComponent({ props: ["label", "value"], setup: props => () => Vue.h("button", { role: "switch", "aria-checked": String(props.value) }, String(props.label)) });
@@ -17,9 +23,9 @@ async function show(ready: boolean, error: string | null) {
     prefs: { remoteReady: ready, error, soundEnabled: false, hapticsEnabled: true, notifPrefs: Object.fromEntries(kinds.map(k => [k, true])), refreshRemote() {}, toggleSound() {}, toggleHaptics() {}, toggleNotifKind() {} },
     t: { ui: { retry: "Retry" } }, preferenceError: "Read unavailable",
     w: { loading: "Loading settings", feedbackHeading: "Feedback", soundLabel: "Sound", soundHint: "", hapticsLabel: "Haptics", hapticsHint: "", notifHeading: "Notifications", notifKinds: Object.fromEntries(kinds.map(k => [k, k])), notifFooter: "" },
-    notifKinds: kinds, isMandatoryNotifKind, headingStyle: {}, cardStyle: {}, footerStyle: {}, dotStyle: () => ({}),
+    notifKinds: visibleKinds, isMandatoryNotifKind, headingStyle: {}, cardStyle: {}, footerStyle: {}, dotStyle: () => ({}),
   }) });
-  app.component("AppChassis", wrapper); app.component("SubPageHeader", wrapper); app.component("ToggleRow", toggle);
+  app.component("AppChassis", wrapper); app.component("SubPageHeader", wrapper); app.component("ToggleRow", toggle); app.component("LiquidGlass", wrapper);
   return renderToString(app);
 }
 describe("notification settings unknown state", () => {
@@ -35,9 +41,14 @@ describe("notification settings unknown state", () => {
     expect(html).not.toContain("Loading settings");
     expect(html.match(/role="switch"/g)).toHaveLength(2);
   });
-  it("retains six confirmed remote settings during a later read failure", async () => {
+  it("retains five visible confirmed remote settings during a later read failure", async () => {
     const html = await show(true, "unavailable");
-    expect(html.match(/role="switch"/g)).toHaveLength(8);
+    expect(html.match(/role="switch"/g)).toHaveLength(7);
     expect(html).toContain("Retry");
+  });
+  it("hides staking even when its stored preference is enabled", async () => {
+    const html = await show(true, null);
+    expect(html).not.toContain(">staking<");
+    for (const kind of ["commission", "team", "market", "genesis", "system"]) expect(html).toContain(`>${kind}<`);
   });
 });
