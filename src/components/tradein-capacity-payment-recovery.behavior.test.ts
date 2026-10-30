@@ -7,6 +7,7 @@ import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, wri
 import { zh } from '@/i18n/messages/zh';
 import type { CanonicalCapacityReplaceQuote } from '@/api/device-e3-api';
 import { readPendingKeepCommand } from '@/lib/keep-command-recovery';
+import type { TradeinSheetState } from '@/store/tradein-sheet';
 
 const script=parse(source).descriptor.scriptSetup!.content;
 const ast=ts.createSourceFile('capacity.ts',script,ts.ScriptTarget.Latest,true);
@@ -15,7 +16,7 @@ const code=ts.transpileModule(ast.statements.filter(ts.isFunctionDeclaration).fi
 const quote:CanonicalCapacityReplaceQuote={decision:'REPLACE_REQUIRED',sourceDeviceId:11,sourceDeviceName:'Old',targetProductNo:'stellarbox-s1',targetProductId:22,targetProductName:'Device',targetPriceUsdt:100,payableUsdt:100,maxActiveDevices:2,activeDevices:2,walletBalanceUsdt:1000,sufficientFunds:true,decisionSource:'server'};
 function page(storage=new Map<string,unknown>()){
   vi.stubGlobal('uni',{getStorageSync:(key:string)=>storage.get(key),setStorageSync:(key:string,value:unknown)=>storage.set(key,structuredClone(value))});
-  const props={active:true},state=ref({kind:'replace',newKind:quote.targetProductNo,canonicalCapacityQuote:{...quote}});
+  const props={active:true},state=ref<TradeinSheetState>({kind:'replace',newKind:quote.targetProductNo,canonicalCapacityQuote:{...quote}});
   const scope={accountKey:'account-a',epoch:1};
   const replacement={tradeinNo:'TI-1',orderNo:'ORDER-1',sourceDeviceId:11,targetDeviceId:31,targetDeviceStatus:'ACTIVE',applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:0,walletDebitUsdt:100,walletBalanceAfterUsdt:900};
   const deviceE3Api={capacityReplace:vi.fn().mockResolvedValue(replacement),capacityKeep:vi.fn(),replayCapacityKeep:vi.fn()};
@@ -60,7 +61,7 @@ describe('actual capacity purchase result recovery',()=>{
   it('capacity keep also recovers its paid receipt without issuing another purchase or requiring PIN',async()=>{
     const p=page();p.deviceE3Api.capacityKeep.mockRejectedValueOnce(new Error('timeout'));
     const available:CanonicalCapacityReplaceQuote={...p.quote,decision:'CAPACITY_AVAILABLE',sourceDeviceId:null,sourceDeviceName:null};
-    p.state.value.canonicalCapacityQuote=available;
+    p.state.value={kind:'replace',newKind:p.quote.targetProductNo,canonicalCapacityQuote:available};
     await p.actual.submitCanonicalKeepBuy(p.quote.targetProductNo,available);
     p.readPaymentCommand.mockResolvedValue({status:'SUCCEEDED',canResumeSameKey:false,receipt:{operationNo:'KEEP-1',orderNo:'KEEP-ORDER',targetDeviceId:32,deviceStatus:'ACTIVE',orderStatus:'COMPLETED',walletDebitUsdt:100,walletBalanceAfterUsdt:900}});
     await p.actual.recoverCapacityPurchase(false);
@@ -84,7 +85,7 @@ describe('actual capacity purchase result recovery',()=>{
     await p.actual.submitCanonicalCapacityReplacement(p.quote,p.quote.targetProductNo);
     expect(p.storage.size).toBe(0);expect(p.deviceE3Api.capacityReplace).not.toHaveBeenCalled();
     p.executePaymentWithPassword.mockImplementationOnce(async(_context,command,current)=>{
-      p.state.value.canonicalCapacityQuote.payableUsdt=101;
+      p.state.value={kind:'replace',newKind:p.quote.targetProductNo,canonicalCapacityQuote:{...p.quote,payableUsdt:101}};
       return current()?command({paymentPassword:'039417'}):null;
     });
     await p.actual.submitCanonicalCapacityReplacement(p.quote,p.quote.targetProductNo);
@@ -126,7 +127,7 @@ describe('actual capacity purchase result recovery',()=>{
   it('the dedicated KEEP recovery surface permits only the explicitly allowed original-key PIN resume',async()=>{
     const p=page(),intent='keep|1156|stellarbox-pro-v2|5|2639|2639|6';
     writeAccountRow(p.CAPACITY_COMMAND_TABLE,'account-a',{commands:{[intent]:'legacy-keep-key'}});
-    p.state.value={kind:'keep-recovery',targetKind:'stellarbox-pro-v2'} as typeof p.state.value;
+    p.state.value={kind:'keep-recovery',targetKind:'stellarbox-pro-v2'};
     p.readPaymentCommand.mockResolvedValue({status:'NOT_SEEN',canResumeSameKey:true});
     p.deviceE3Api.replayCapacityKeep.mockRejectedValueOnce(new Error('response lost again'));
     await p.actual.recoverCapacityPurchase(false);
