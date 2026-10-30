@@ -6,6 +6,7 @@ import source from './tradein-sheets.vue?raw';
 import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, writeAccountRow } from '@/store/account-scoped-storage';
 import { zh } from '@/i18n/messages/zh';
 import type { CanonicalCapacityReplaceQuote } from '@/api/device-e3-api';
+import { readPendingKeepCommand } from '@/lib/keep-command-recovery';
 
 const script=parse(source).descriptor.scriptSetup!.content;
 const ast=ts.createSourceFile('capacity.ts',script,ts.ScriptTarget.Latest,true);
@@ -22,7 +23,7 @@ function page(storage=new Map<string,unknown>()){
   const executePaymentWithPassword=vi.fn(async(_context,command,current)=>current()?command({paymentPassword:'039417',credentialVersion:1,attemptNo:'fixture-attempt'}):null);
   const completeVerifiedMutation=vi.fn(async steps=>steps.submit());
   const deps={ref,props,state,app:{accountKey:'account-a',devices:[]},captureAccountScope:()=>scope,isCurrentAccountScope:(value:unknown)=>value===scope,
-    acquireAccountCommandKey,readAccountRow,releaseAccountCommandKey,writeAccountRow,deviceE3Api,readPaymentCommand,executePaymentWithPassword,completeVerifiedMutation,
+    acquireAccountCommandKey,readAccountRow,readPendingKeepCommand,releaseAccountCommandKey,writeAccountRow,deviceE3Api,readPaymentCommand,executePaymentWithPassword,completeVerifiedMutation,
     apiClient:{},parseCanonicalTradeinResult:(value:unknown)=>value,parseCanonicalCapacityKeepResult:(value:unknown)=>value,
     capacityCommandKey:ref(null),CAPACITY_COMMAND_TABLE:'nexgrid-e3-capacity-commands-accounts-v1',CAPACITY_RECOVERY_TABLE:'nexgrid-e3-capacity-payment-accounts-v1',
     capacityRecovery:ref(null),capacityRecoveryBusy:ref(false),capacityResumeAllowed:ref(false),capacityRecoveryUnavailable:ref(false),recoveryCopy:ref({paymentPending:'Confirming',rejected:'Declined'}),
@@ -121,6 +122,19 @@ describe('actual capacity purchase result recovery',()=>{
     expect(p.deviceE3Api.capacityKeep).not.toHaveBeenCalled();expect(p.deviceE3Api.capacityReplace).not.toHaveBeenCalled();
     expect(JSON.stringify([...p.storage.values()])).not.toContain('039417');
     expect(p.capacityRecovery.value).toMatchObject({quote:null});
+  });
+  it('the dedicated KEEP recovery surface permits only the explicitly allowed original-key PIN resume',async()=>{
+    const p=page(),intent='keep|1156|stellarbox-pro-v2|5|2639|2639|6';
+    writeAccountRow(p.CAPACITY_COMMAND_TABLE,'account-a',{commands:{[intent]:'legacy-keep-key'}});
+    p.state.value={kind:'keep-recovery',targetKind:'stellarbox-pro-v2'} as typeof p.state.value;
+    p.readPaymentCommand.mockResolvedValue({status:'NOT_SEEN',canResumeSameKey:true});
+    p.deviceE3Api.replayCapacityKeep.mockRejectedValueOnce(new Error('response lost again'));
+    await p.actual.recoverCapacityPurchase(false);
+    expect(p.executePaymentWithPassword).not.toHaveBeenCalled();
+    await p.actual.recoverCapacityPurchase(true);
+    expect(p.deviceE3Api.replayCapacityKeep).toHaveBeenCalledExactlyOnceWith('stellarbox-pro-v2','legacy-keep-key',2639,
+      {paymentPassword:'039417',credentialVersion:1,attemptNo:'fixture-attempt'});
+    expect(p.deviceE3Api.capacityKeep).not.toHaveBeenCalled();expect(p.deviceE3Api.capacityReplace).not.toHaveBeenCalled();
   });
   it('a fresh full-capacity KEEP is rejected before asking for PIN or storing a new command',async()=>{
     const p=page();
