@@ -21,6 +21,7 @@ const receipt = request => ({ commandKey: request.headers()["idempotency-key"], 
 const reply = (route, data, status = 200, message = "OK") => route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ code: status === 200 ? 0 : status, message, data }) });
 const pageErrors = [];
 const consoleErrors = [], expectedTransportErrors = [];
+const focusedPinStages = [];
 const requestPaths = [];
 try {
   await context.route("**/*", async route => {
@@ -108,14 +109,30 @@ try {
   const pinInput = () => page.locator(".payment-pin-mask .payment-pin-input input");
   const primary = () => page.locator(".payment-pin-mask .payment-pin-primary");
   const screenshot = name => page.screenshot({ path: new URL(name, output).pathname.replace(/^\/(\w:)/, "$1"), fullPage: true });
+  const assertPinFocused = async stage => {
+    await page.waitForFunction(() => {
+      const input = document.querySelector(".payment-pin-mask .payment-pin-input input");
+      return input && !input.disabled && document.activeElement === input;
+    }, undefined, { timeout: 5000 });
+    assert.equal(await pinInput().evaluate(input => document.activeElement === input), true, `${stage}: PIN input must own keyboard focus`);
+    focusedPinStages.push(stage);
+  };
+  const typeFocusedPin = async (value, stage) => { await assertPinFocused(stage); await page.keyboard.type(value); };
 
   // The personal-center source shares setup content without promising a payment.
   await page.locator(".payment-pin-page__primary").click();
   await page.locator(".payment-pin-mask").getByText("您暂未设置支付密码，这是初次设置，设置成功后请牢记。", { exact: true }).waitFor();
+  await assertPinFocused("personal-first-setup");
+  assert.equal(await page.locator(".payment-pin-title").getAttribute("aria-live"), "polite");
   assert.equal(await page.locator(".payment-pin-mask").getByText("设置完成后，请再次输入支付密码，继续本笔支付。", { exact: true }).count(), 0);
   await page.locator(".payment-pin-close").click();
   await openPayment();
   await page.getByText("您暂未设置支付密码，这是初次设置，设置成功后请牢记。", { exact: true }).waitFor();
+  assert.deepEqual(await page.locator(".payment-pin-sheet").evaluate(sheet => ({
+    inset: getComputedStyle(sheet).padding,
+    gap: getComputedStyle(sheet.querySelector(".payment-pin-input__cells")).gap,
+    radius: getComputedStyle(sheet.querySelector(".payment-pin-input__cell")).borderRadius,
+  })), { inset: "20px", gap: "8px", radius: "12px" });
   await screenshot("01-first-setup-zh-390.png");
   await typeFocusedPin("039417", "checkout-first-setup"); await primary().click();
   await typeFocusedPin("039418", "setup-confirm"); await primary().click();
@@ -128,6 +145,7 @@ try {
   await page.getByText("支付密码已设置，请牢记。请再次输入，完成本笔支付。", { exact: true }).waitFor();
   assert.equal(await pinInput().inputValue(), "");
   assert.equal(await page.evaluate(() => window.__paymentPinResult === undefined), true, "Setup must not authorize payment");
+  await assertPinFocused("fresh-third-payment");
   await page.getByText("展开明细", { exact: true }).click();
   await screenshot("02-third-entry-details-zh-390.png");
   await page.keyboard.press("Tab");
@@ -142,6 +160,7 @@ try {
 
   lockedUntil = new Date(Date.now() + 1500).toISOString(); remaining = 0; await openPayment();
   assert.equal(await pinInput().isDisabled(), true);
+  assert.equal(await pinInput().evaluate(input => document.activeElement === input), false, "A locked PIN input must not take focus");
   await screenshot("03-locked-zh-390.png");
   await page.waitForTimeout(1800); lockedUntil = null; remaining = 5;
   await page.locator(".payment-pin-mask .payment-pin-link").filter({ hasText: /^重试$/ }).click();
@@ -185,6 +204,9 @@ try {
   assert.equal(await page.evaluate(() => JSON.stringify(uni.getStorageSync("nexgrid-payment-password-commands-accounts-v1")).includes('"pending":null')), true);
   await bindPinModule(); await screenshot("05b-change-reload-recovery-zh-390.png");
 
+  // Use an available page action as the origin; page PIN fields themselves
+  // are intentionally disabled while the shared dialog is busy.
+  await page.locator(".payment-pin-page__link").focus();
   statusFailure = true; await openPayment();
   await page.locator(".payment-pin-mask").getByText("暂时无法读取支付密码状态，请重试", { exact: true }).waitFor();
   assert.equal(await pinInput().count(), 0, "An unreadable status must not render setup or payment inputs");
@@ -224,6 +246,7 @@ try {
   assert.equal(await page.evaluate(() => window.__quoteResult === null && window.__quotePosts === 0), true);
   await openPayment(); assert.equal(await pinInput().inputValue(), "", "A quote change must clear the partial PIN");
   await page.locator(".payment-pin-close").click();
+  await page.getByText("订单信息已更新，请重新确认后支付", { exact: true }).waitFor({ state: "hidden" });
 
   for (const [locale, width] of [["en", 320], ["vi", 390]]) {
     await page.setViewportSize({ width, height: 844 });
@@ -255,26 +278,3 @@ try {
   console.error(JSON.stringify({ requestPaths: requestPaths.slice(-30), pageErrors }));
   throw error;
 } finally { await context.close(); await browser.close(); }
-const focusedPinStages = [];
-  const assertPinFocused = async stage => {
-    await page.waitForFunction(() => {
-      const input = document.querySelector(".payment-pin-mask .payment-pin-input input");
-      return input && !input.disabled && document.activeElement === input;
-    }, undefined, { timeout: 5000 });
-    assert.equal(await pinInput().evaluate(input => document.activeElement === input), true, `${stage}: PIN input must own keyboard focus`);
-    focusedPinStages.push(stage);
-  };
-  const typeFocusedPin = async (value, stage) => { await assertPinFocused(stage); await page.keyboard.type(value); };
-  await assertPinFocused("personal-first-setup");
-  assert.equal(await page.locator(".payment-pin-title").getAttribute("aria-live"), "polite");
-  assert.deepEqual(await page.locator(".payment-pin-sheet").evaluate(sheet => ({
-    inset: getComputedStyle(sheet).padding,
-    gap: getComputedStyle(sheet.querySelector(".payment-pin-input__cells")).gap,
-    radius: getComputedStyle(sheet.querySelector(".payment-pin-input__cell")).borderRadius,
-  })), { inset: "20px", gap: "8px", radius: "12px" });
-  await assertPinFocused("fresh-third-payment");
-  assert.equal(await pinInput().evaluate(input => document.activeElement === input), false, "A locked PIN input must not take focus");
-  // Use an available page action as the origin; page PIN fields themselves
-  // are intentionally disabled while the shared dialog is busy.
-  await page.locator(".payment-pin-page__link").focus();
-  await page.getByText("订单信息已更新，请重新确认后支付", { exact: true }).waitFor({ state: "hidden" });

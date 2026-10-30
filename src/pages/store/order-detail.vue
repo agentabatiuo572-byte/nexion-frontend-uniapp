@@ -293,6 +293,7 @@ const auth = useAuth();
 
 const id = ref("");
 const autoPayRequested = ref(false);
+let pendingPaymentIntentAccount = '';
 // FEAT-TRIAL05: `?result=trial` (set by checkout) opens the purchase result once; the order view is one tap away.
 const showTrialResult = ref(false);
 const paymentResultVisible = ref(false);
@@ -301,6 +302,7 @@ const ordersBackHref = ref("/store/orders");
 let detailMounted = true;
 let detailVisible = false;
 let detailEpoch = 0;
+let pendingPaymentSequence = 0;
 
 interface DetailRequestScope {
   pageEpoch: number;
@@ -360,6 +362,7 @@ const remoteOrderRefreshing = ref(false);
 const remoteOrderAttempted = ref(false);
 let remoteOrderRefreshSequence = 0;
 let activeRemoteOrderScope: DetailRequestScope | null = null;
+let pendingPaymentReadScope: DetailRequestScope | null = null;
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
 async function refreshOrderWallet(): Promise<boolean> {
@@ -397,16 +400,22 @@ async function refreshOrder() {
       remoteOrderRefreshing.value = false;
       activeRemoteOrderScope = null;
       if (autoPayRequested.value) {
-        autoPayRequested.value = false;
         if (remoteOrderError.value) {
+          autoPayRequested.value = false;
+          pendingPaymentIntentAccount = '';
+          pendingPaymentReadScope = null;
           paymentNoticeReason.value = pendingCopy.value.queryFailed;
           paymentNotice.value = 'query';
-        } else void requestPendingPayment(true);
+        } else {
+          pendingPaymentReadScope = scope;
+          void requestPendingPayment(true);
+        }
       }
     }
   }
 }
 onShow(() => {
+  if (detailVisible) return;
   detailMounted = true;
   detailVisible = true;
   detailEpoch += 1;
@@ -422,6 +431,9 @@ onHide(() => {
   paymentSheetOpen.value = false;
   paymentNotice.value = '';
   pendingPaymentChecking.value = false;
+  autoPayRequested.value = false;
+  pendingPaymentIntentAccount = '';
+  pendingPaymentReadScope = null;
 });
 
 const liveOrder = computed(() => orders.orders.find((o) => o.id === id.value));
@@ -433,6 +445,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value],
   paymentResultOrder.value = null; paymentResultVisible.value = false;
   paymentSheetOpen.value = false; paymentNotice.value = '';
   pendingPaymentChecking.value = false;
+  pendingPaymentReadScope = null;
 }, { flush: 'sync' });
 watch(liveOrder, value => {
   if (value && !orderEnvironmentInvalidated.value) orderPresentation.value = value;
@@ -771,10 +784,20 @@ async function offerWalletTopup(requiredUsdt: number): Promise<void> {
   if (accepted && isCurrentDetailScope(scope)) navTo("/pages/me/wallet-topup");
 }
 
-/** The original order owns its stock/slot reservations; never subtract them again. */
+/** Unpaid orders reserve no stock: read current stock at entry and again before pay. */
 async function requestPendingPayment(originalJustRead = false): Promise<void> {
   if (!remoteApiEnabled || pendingPaymentChecking.value || payingFromWallet.value || cancellingOrder.value || orderCommandQuerying.value) return;
   const scope = captureDetailScope();
+  if (originalJustRead && pendingPaymentIntentAccount && pendingPaymentIntentAccount !== scope.accountScope.accountKey) {
+    autoPayRequested.value = false;
+    pendingPaymentIntentAccount = '';
+    pendingPaymentReadScope = null;
+    return;
+  }
+  const attempt = ++pendingPaymentSequence;
+  autoPayRequested.value = true;
+  pendingPaymentIntentAccount = scope.accountScope.accountKey;
+  pendingPaymentReadScope = null;
   pendingPaymentChecking.value = true;
   paymentSheetError.value = '';
   paymentNotice.value = '';
@@ -782,6 +805,7 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
   try {
     if (!originalJustRead) await refreshOrder();
     if (!isCurrentDetailScope(scope)) return;
+    pendingPaymentReadScope = null;
     if (remoteOrderError.value || remoteOrderRefreshing.value || !liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
     let original = liveOrder.value;
     restoreOrderAction();
@@ -801,11 +825,13 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
       return;
     }
     if (original.promotionQuoteId) {
+      autoPayRequested.value = false;
+      pendingPaymentIntentAccount = '';
       await navTo(`/pages/store/checkout?orderNo=${encodeURIComponent(original.id)}`);
       return;
     }
-    // This endpoint has no order/quantity context. Only explicit non-reservation
-    // qualification denials are safe here; stock, slots and F4B quotas stay with pay.
+    // This endpoint has no quantity context; use its explicit qualification
+    // denials, read stock separately, and leave final quotas/capacity to pay.
     const eligibility = await purchaseEligibilityApi.get(original.productId);
     if (!isCurrentDetailScope(scope)) return;
     if (eligibility.policies.some(policy => policy.policy === 'E1' && !policy.eligible
@@ -814,6 +840,9 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
       paymentNotice.value = 'blocked';
       return;
     }
+    await assertCheckoutPurchaseStock(original.lineItems?.map(item => ({ productNo: item.sku, quantity: item.quantity }))
+      ?? [{ productNo: original.productId, quantity: original.quantity }]);
+    if (!isCurrentDetailScope(scope)) return;
     const walletReady = await refreshOrderWallet();
     if (!isCurrentDetailScope(scope)) return;
     if (!walletReady) throw new Error('WALLET_READ_UNAVAILABLE');
@@ -825,12 +854,27 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     }
     paymentSheetAmount.value = original.total;
     paymentSheetOpen.value = true;
-  } catch {
+  } catch (error) {
     if (isCurrentDetailScope(scope)) {
-      paymentNoticeReason.value = pendingCopy.value.queryFailed;
-      paymentNotice.value = 'query';
+      paymentNoticeReason.value = error instanceof CheckoutPurchaseCheckError && error.reason === 'stock' ? t.value.store.temporarilyOutOfStock
+        : error instanceof CheckoutPurchaseCheckError && error.reason === 'unavailable' ? t.value.store.productUnavailable : pendingCopy.value.queryFailed;
+      paymentNotice.value = error instanceof CheckoutPurchaseCheckError && (error.reason === 'stock' || error.reason === 'unavailable') ? 'blocked' : 'query';
     }
-  } finally { if (isCurrentDetailScope(scope)) pendingPaymentChecking.value = false; }
+  } finally {
+    // Data authority may expire during bootstrap; the attempt still owns its
+    // local lock, but must never unlock a newer attempt after hide/re-entry.
+    if (attempt === pendingPaymentSequence) {
+      pendingPaymentChecking.value = false;
+      if (isCurrentDetailScope(scope) && (paymentSheetOpen.value || paymentResultVisible.value || paymentNotice.value || orderAction.value || orderCommandUnavailable.value)) {
+        autoPayRequested.value = false;
+        pendingPaymentIntentAccount = '';
+        pendingPaymentReadScope = null;
+      }
+      // A newer authoritative read may have finished while this obsolete
+      // attempt was busy. Consume that read once; never start a retry timer.
+      if (autoPayRequested.value && pendingPaymentReadScope && isCurrentDetailScope(pendingPaymentReadScope)) void requestPendingPayment(true);
+    }
+  }
 }
 
 function topupPendingOrder(): void {
