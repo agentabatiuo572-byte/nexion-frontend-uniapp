@@ -51,16 +51,16 @@
         <!-- Rewards: one card per reward with its own accent and mini visual (P-41) -->
         <view>
           <text class="team-section-title">{{ designCopy.rewardsSection }}</text>
-          <view class="team-bento">
-            <view class="nx-team-leaderboard-link team-bento__card team-bento__card--wide team-bento__card--gold" role="link" tabindex="0" @click="go('/pages/team/leaderboard')" @keydown.enter.prevent="go('/pages/team/leaderboard')">
+          <view ref="bentoEl" class="team-bento nx-viz-motion">
+            <view class="nx-team-leaderboard-link team-bento__card nx-viz-press team-bento__card--wide team-bento__card--gold" role="link" tabindex="0" @click="go('/pages/team/leaderboard')" @keydown.enter.prevent="go('/pages/team/leaderboard')">
               <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
-              <view class="team-bento__podium" aria-hidden="true"><view /><view /><view /></view>
+              <view class="team-bento__podium" aria-hidden="true"><view v-for="(bar, index) in PODIUM_BARS" :key="index" :style="{ height: bentoInView === false ? '0px' : `${bar.height}px`, transition: VIZ_GROW_HEIGHT_TRANSITION, transitionDelay: vizStagger(bar.order) }" /></view>
               <view class="team-bento__foot">
                 <text class="team-bento__headline">{{ t.teamV3.leaderboardCard.subtitle }}</text>
                 <text class="team-bento__caption">{{ t.teamV3.leaderboardCard.title }}</text>
               </view>
             </view>
-            <view class="nx-team-royalty-network-link team-bento__card team-bento__card--brand" role="button" tabindex="0" :aria-label="t.teamV3.sevenLayerNetwork" @click="openReferralNetwork" @keydown.enter.prevent="openReferralNetwork">
+            <view class="nx-team-royalty-network-link team-bento__card nx-viz-press team-bento__card--brand" role="button" tabindex="0" :aria-label="t.teamV3.sevenLayerNetwork" @click="openReferralNetwork" @keydown.enter.prevent="openReferralNetwork">
               <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view v-if="memberInitials.length" class="team-bento__avatars" aria-hidden="true">
                 <text v-for="(initial, index) in memberInitials" :key="index" class="team-bento__avatar">{{ initial }}</text>
@@ -70,19 +70,19 @@
                 <text class="team-bento__caption">{{ designCopy.teamRewards }} · <text class="team-bento__muted">{{ designCopy.memberCountLabel }}</text></text>
               </view>
             </view>
-            <view class="nx-team-binary-link team-bento__card team-bento__card--cyan" role="link" tabindex="0" @click="go('/pages/team/binary')" @keydown.enter.prevent="go('/pages/team/binary')">
+            <view class="nx-team-binary-link team-bento__card nx-viz-press team-bento__card--cyan" role="link" tabindex="0" @click="go('/pages/team/binary')" @keydown.enter.prevent="go('/pages/team/binary')">
               <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
-              <view class="team-bento__split" aria-hidden="true"><view :style="{ flexGrow: binarySplit.left }" /><view :style="{ flexGrow: binarySplit.right }" /></view>
+              <view class="team-bento__split" aria-hidden="true"><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.left}%`, transition: PROGRESS_GROW_TRANSITION }" /><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.right}%`, transition: PROGRESS_GROW_TRANSITION, transitionDelay: vizStagger(1) }" /></view>
               <text class="team-bento__meta">A · {{ visibility.mask(leftVolText) }}  /  B · {{ visibility.mask(rightVolText) }}</text>
               <view class="team-bento__foot">
                 <text class="team-bento__value">{{ visibility.mask(binaryMatchText) }}</text>
                 <text class="team-bento__caption">{{ designCopy.twoGroupRewards }} · <text class="team-bento__muted">{{ designCopy.estimated }}</text></text>
               </view>
             </view>
-            <view class="nx-team-leadership-pool-link team-bento__card team-bento__card--wide team-bento__card--violet" role="link" tabindex="0" @click="go('/pages/team/leadership-pool')" @keydown.enter.prevent="go('/pages/team/leadership-pool')">
+            <view class="nx-team-leadership-pool-link team-bento__card nx-viz-press team-bento__card--wide team-bento__card--violet" role="link" tabindex="0" @click="go('/pages/team/leadership-pool')" @keydown.enter.prevent="go('/pages/team/leadership-pool')">
               <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view class="team-bento__pool">
-                <view class="team-bento__ring" aria-hidden="true" :style="{ background: `conic-gradient(var(--v5-nex) ${poolRingPct}%, var(--v5-surface-3) 0)` }"><view /></view>
+                <view class="team-bento__ring" aria-hidden="true" :style="{ '--nx-viz-ring': bentoInView === false ? 0 : poolRingPct, transition: VIZ_RING_TRANSITION }"><view /></view>
                 <view class="team-bento__pool-copy">
                   <view class="team-estimate"><text v-if="leadershipPoolUnlocked && remotePoolReadable" class="team-estimate__label">{{ designCopy.estimated }}</text><text class="team-bento__value">{{ visibility.mask(leadershipPoolPrimary) }}</text></view>
                   <text class="team-bento__caption">{{ t.teamV3.weeklyPool }}</text>
@@ -108,6 +108,7 @@
 </template>
 
 <script setup lang="ts">
+import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { formatUsd } from "@/lib/usd-display";
 import { formatComputePoints, sumComputePoints } from "@/i18n/compute-points";
@@ -339,8 +340,12 @@ const memberInitials = computed(() => {
 });
 const binarySplit = computed(() => {
   const left = binary.value?.leftVol ?? 0, right = binary.value?.rightVol ?? 0;
-  return left + right > 0 ? { left, right } : { left: 1, right: 1 };
+  // Each side's share of the track, leaving room for the 3px gap.
+  return left + right > 0 ? { left: left / (left + right) * 98, right: right / (left + right) * 98 } : { left: 49, right: 49 };
 });
+// Decorative pedestals (2nd, 1st, 3rd); they rise 3rd → 2nd → 1st.
+const PODIUM_BARS = [{ height: 26, order: 1 }, { height: 40, order: 2 }, { height: 18, order: 0 }];
+const { elRef: bentoEl, inView: bentoInView } = useScrollGrowProgress();
 const poolRingPct = computed(() => remotePoolReadable.value && leadershipPoolUnlocked.value
   ? Math.min(100, Math.max(0, myShare.value * 100)) : 0);
 
@@ -563,7 +568,6 @@ const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus
 .team-bento__card--brand { --accent: var(--v5-brand); }
 .team-bento__card--cyan { --accent: var(--ui-device-ink); }
 .team-bento__card--violet { --accent: var(--v5-nex); }
-.team-bento__card:active { opacity: .85; }
 .team-bento__card:focus-visible, .team-tool:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .team-bento__head { display: flex; align-items: center; justify-content: space-between; }
 .team-bento__icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -576,9 +580,9 @@ const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus
 .team-bento__meta { overflow: hidden; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; text-overflow: ellipsis; }
 .team-bento__podium { position: absolute; right: var(--ui-space-inset); bottom: 14px; display: flex; align-items: flex-end; gap: var(--v5-space-1); }
 .team-bento__podium > view { width: 22px; border-radius: 6px 6px 2px 2px; }
-.team-bento__podium > view:nth-child(1) { height: 26px; background: linear-gradient(180deg, var(--v5-ink-2), color-mix(in srgb, var(--v5-ink-2) 25%, transparent)); }
-.team-bento__podium > view:nth-child(2) { height: 40px; background: linear-gradient(180deg, var(--v5-warning), color-mix(in srgb, var(--v5-warning) 25%, transparent)); }
-.team-bento__podium > view:nth-child(3) { height: 18px; background: linear-gradient(180deg, var(--v5-brand-2), color-mix(in srgb, var(--v5-brand-2) 25%, transparent)); }
+.team-bento__podium > view:nth-child(1) { background: linear-gradient(180deg, var(--v5-ink-2), color-mix(in srgb, var(--v5-ink-2) 25%, transparent)); }
+.team-bento__podium > view:nth-child(2) { background: linear-gradient(180deg, var(--v5-warning), color-mix(in srgb, var(--v5-warning) 25%, transparent)); }
+.team-bento__podium > view:nth-child(3) { background: linear-gradient(180deg, var(--v5-brand-2), color-mix(in srgb, var(--v5-brand-2) 25%, transparent)); }
 .team-bento__avatars { display: flex; }
 .team-bento__avatar { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: -6px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; background: var(--v5-brand); box-shadow: 0 0 0 2px var(--v5-surface); font: 600 10px/1 var(--font-v5); color: var(--v5-on-brand); }
 .team-bento__avatar:first-child { margin-left: 0; }
@@ -589,7 +593,7 @@ const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus
 .team-bento__split > view { height: 8px; min-width: 8px; border-radius: 999px; background: var(--ui-device-ink); }
 .team-bento__split > view:last-child { background: color-mix(in srgb, var(--ui-device-ink) 35%, transparent); }
 .team-bento__pool { display: flex; align-items: center; gap: var(--ui-space-inline); margin-top: auto; }
-.team-bento__ring { display: grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: 999px; }
+.team-bento__ring { display: grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: 999px; background: conic-gradient(var(--v5-nex) calc(var(--nx-viz-ring) * 1%), var(--v5-surface-3) 0); }
 .team-bento__ring > view { width: 40px; height: 40px; border-radius: 999px; background: var(--v5-surface); }
 .team-bento__pool-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .team-bento__pool .team-estimate { flex-direction: row; align-items: baseline; gap: var(--v5-space-2); }
