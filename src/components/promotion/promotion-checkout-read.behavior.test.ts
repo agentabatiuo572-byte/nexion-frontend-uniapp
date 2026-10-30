@@ -18,10 +18,12 @@ import { asApiError,ApiError } from '@/api/errors';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord } from '@/lib/promotion-checkout-session';
 import { projectServerNow } from '@/lib/server-deadline-clock';
 import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
-import { formatAmount } from '@/lib/amount-display';
+import { formatAmount,formatGroupedAmount } from '@/lib/amount-display';
 import { nexGridBrandText } from '@/lib/brand-copy';
 import { computeVoucherDiscount,isVoucherValid,voucherAppliesToSku,type VoucherDef } from '@/mock/vouchers';
 import { commerceCopy } from '@/lib/commerce-review';
+import { CheckoutPurchaseCheckError } from '@/lib/checkout-purchase-check';
+import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { fmt } from '@/i18n/format';
 import { validatePromotionItems,createPromotionApi,parsePromotedOrder } from '@/api/promotion-api';
 import * as entry from '@/lib/promotion-entry';
@@ -62,7 +64,7 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
   let rows:Record<string,PromotionCheckoutRecord>=stored?{[intent]:structuredClone(stored)}:{};
   let writable=true;
   const save=vi.fn((_table:string,_account:string,value:Record<string,PromotionCheckoutRecord>)=>{if(!writable)return false;rows=structuredClone(value);return true;});
-  const api={quote:vi.fn().mockResolvedValue(quote()),get:vi.fn().mockResolvedValue(activity()),create:vi.fn().mockResolvedValue(receipt()),pay:vi.fn().mockResolvedValue({...receipt(),paymentStatus:'PAID',orderStatus:'COMPLETED'}),cancel:vi.fn(),command:vi.fn().mockResolvedValue({status:'PROCESSING',order:null}),findOrder:vi.fn().mockResolvedValue(receipt())};
+  const api={quote:vi.fn().mockResolvedValue(quote()),get:vi.fn().mockResolvedValue(activity()),create:vi.fn().mockResolvedValue(receipt()),pay:vi.fn().mockResolvedValue({...receipt(),paymentStatus:'PAID',orderStatus:'COMPLETED'}),cancel:vi.fn(),command:vi.fn().mockResolvedValue({status:'PROCESSING',order:null}),paymentCommand:vi.fn().mockResolvedValue({status:'NOT_SEEN',canResumeSameKey:true}),findOrder:vi.fn().mockResolvedValue(receipt())};
   const app=Vue.reactive({accountKey:'user:7',accountBindingEpoch:1,remoteFleetHasSnapshot:true,remoteSlotsUsed:null as number|null,slotCap:6,user:{usdtBalance:150},captureRemoteAccountRequest:vi.fn(()=>({accountKey:'user:7',epoch:1})),refreshRemoteFleet:vi.fn().mockResolvedValue(true)});
   const mounted:Array<()=>Promise<void>>=[],unmounted:Array<()=>void>=[],guardDisposal=vi.fn(),guardRegistration=vi.fn(()=>guardDisposal);
   const key=vi.fn(()=> 'original-key'),fleet=vi.fn().mockResolvedValue({serverNow:Date.parse(serverTime)});
@@ -70,9 +72,17 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
   const refreshCatalog=vi.fn(adapters?.refreshCatalog??(async()=>true));
   vi.stubGlobal('setInterval',vi.fn(()=>0));vi.stubGlobal('clearInterval',vi.fn());
   const confirm=vi.fn().mockResolvedValue(false),clearConfirmsBy=vi.fn();
+  const authorization={paymentPassword:'583719',version:1};
+  const pin=vi.fn(async(_context:any,command:any,current:()=>boolean)=>current()?command(authorization):null);
+  const stockCheck=vi.fn().mockResolvedValue(undefined);
+  const canonical=vi.fn().mockResolvedValue({id:'o1',status:'activated'}),navTo=vi.fn(),navBack=vi.fn();
   const vouchers={remoteStatus:'ready',catalog:[] as {id:string;name:string}[],claimedUnused:[] as VoucherDef[],claimableVouchers:[] as {id:string;name:string;claimSurfaces:string[]}[],refreshRemote:vi.fn().mockResolvedValue(true),claimRemote:vi.fn().mockResolvedValue(true)};
   const modules:Record<string,unknown>={
-    '@/lib/amount-display':{formatAmount},
+    '@/lib/amount-display':{formatAmount,formatGroupedAmount},
+    '@/lib/authorized-payment':{executePaymentWithPassword:pin},
+    '@/lib/checkout-purchase-check':{assertCheckoutPurchaseStock:stockCheck,CheckoutPurchaseCheckError},
+    '@/lib/checkout-flow-copy':{checkoutFlowCopy},
+    '@/store/orders':{useOrders:()=>({ensureRemoteOrder:canonical})},
     '@/lib/brand-copy':{nexGridBrandText},
     '@/lib/commerce-review':{commerceCopy},
     '@/mock/vouchers':{computeVoucherDiscount,isVoucherValid,voucherAppliesToSku},
@@ -84,7 +94,7 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
     '@/i18n/use-t':{useT:()=>Vue.ref(zh)},'@/store/locale':{useLocaleStore:()=>locale},'@/store/app':{useApp:()=>adapters?.app??app},'@/store/auth':{useAuth:()=>auth},
     '@/store/voucher':{useVoucher:()=>vouchers},'@/mock/products':{getProduct},
     '@/store/product-catalog':{productCatalogState:catalog,productCatalogPresentation:presentation,refreshProductCatalog:refreshCatalog},
-    '@/lib/route':{navTo:vi.fn(),navBack:vi.fn()},'@/store/ui':{confirm,useUI:()=>({clearConfirmsBy})},
+    '@/lib/route':{navTo,navBack},'@/store/ui':{confirm,useUI:()=>({clearConfirmsBy})},
     '@/lib/promotion-checkout-session':{PromotionCheckoutSession,selectPromotionCheckoutRecord},
     '@/lib/promotion-entry':entry,
     '@/store/account-scoped-storage':{readAccountRow:()=>rows,writeAccountRow:save,acquireAccountCommandKey:key},
@@ -101,17 +111,19 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
   const scope=Vue.effectScope(),view=scope.run(()=>componentExports.default.setup(props,{expose:value=>{exposed=value;}}))!;
   cleanup.push(()=>{unmounted.forEach(fn=>fn());scope.stop();});
   const passthrough={setup:(_props:unknown,{slots}:Vue.SetupContext)=>()=>Vue.h('view',slots.default?.())};
-  const html=()=>renderToString(Vue.createSSRApp({components:{PromotionAction:passthrough,PromotionTerms:empty,RewardRows:empty,LiquidGlass:empty,NxSheet:empty},render:()=>render(Vue.proxyRefs({$slots:{},...Vue.toRefs(props),...view}),[])}));
-  return{view,exposed,api,save,key,app,fleet,props,auth,locale,vouchers,getProduct,catalog,presentation,refreshCatalog,html,confirm,clearConfirmsBy,start:()=>Promise.all(mounted.map(fn=>fn())),saved:()=>rows[intent],failStorage:()=>{writable=false;}};
+  const amount={props:['value','currency','showCurrency'],setup:(props:any)=>()=>Vue.h('text',formatGroupedAmount(props.value)+(props.showCurrency===false?'':' '+props.currency))};
+  const result={props:['state','productName','amount'],setup:(props:any)=>()=>Vue.h('view',{'data-result':props.state},[props.productName,' ',formatGroupedAmount(props.amount)+' USDT'])};
+  const html=()=>renderToString(Vue.createSSRApp({components:{PromotionAction:passthrough,PromotionTerms:empty,RewardRows:empty,LiquidGlass:empty,NxSheet:empty,CheckoutPaymentSheet:empty,CheckoutAmount:amount,CheckoutResult:result},render:()=>render(Vue.proxyRefs({$slots:{},...Vue.toRefs(props),...view}),[])}));
+  return{view,exposed,api,save,key,app,fleet,props,auth,locale,vouchers,getProduct,catalog,presentation,refreshCatalog,html,confirm,clearConfirmsBy,pin,stockCheck,authorization,canonical,navTo,navBack,start:()=>Promise.all(mounted.map(fn=>fn())),saved:()=>rows[intent],failStorage:()=>{writable=false;}};
 }
 
-it('order creation, recovery and payment keep the UVEL display name without rewriting the receipt snapshot',async()=>{
+it('creation, recovery and payment preserve the source-owned historical receipt name',async()=>{
   const page=screen(),originalName='NexGridBox S1',order={...receipt(),items:[{lineId:'9001',productNo:'sku',productName:originalName,quantity:1}]};
   page.getProduct.mockReturnValue({name:'UVELBox S1'});
   page.api.create.mockResolvedValue(order);page.api.findOrder.mockResolvedValue(order);page.api.pay.mockResolvedValue({...order,paymentStatus:'PAID',orderStatus:'COMPLETED'});
   await page.start();expect(await page.html()).toContain('UVELBox S1');
   for(const action of [()=>page.view.createOrder(),()=>page.view.recover(),()=>{page.confirm.mockResolvedValueOnce(true);return page.view.pay();}]){
-    await action();const html=await page.html();expect(html).toContain('UVELBox S1');expect(html).not.toContain(originalName);
+    await action();const html=await page.html();expect(html).toContain(originalName);
     expect(page.saved().order?.items?.[0]?.productName).toBe(originalName);
   }
 });
@@ -137,7 +149,8 @@ it('refreshes wallet and quote automatically while visible without manual refres
   automatic();await flush();
   expect(page.app.refreshRemoteFleet).toHaveBeenCalledTimes(reads+1);
   expect(page.api.quote).toHaveBeenCalledTimes(quotes+1);
-  expect(await page.html()).toContain('200.00 USDT');
+  expect(await page.html()).toContain('200.00');
+  expect(await page.html()).not.toContain('200.00 USDT');
   page.exposed.hide();automatic();await flush();
   expect(page.app.refreshRemoteFleet).toHaveBeenCalledTimes(reads+1);
   expect(page.api.quote).toHaveBeenCalledTimes(quotes+1);
@@ -161,7 +174,7 @@ it('retains wallet text silently during a read without making old balance paymen
   const page=screen();await page.start();await page.view.createOrder();
   const pending=deferred<boolean>();page.app.refreshRemoteFleet.mockReturnValueOnce(pending.promise);
   const reading=page.view.refreshWallet();await flush();
-  expect(await page.html()).toContain('150.00 USDT');
+  expect(await page.html()).toContain('150.00');
   expect(await page.html()).not.toContain(commerceCopy('zh').walletLoading);
   expect(await page.html()).not.toContain(commerceCopy('zh').walletRefresh);
   expect(page.view.walletState.value).toBe('loading');expect(page.view.canPay.value).toBe(false);
@@ -214,27 +227,152 @@ it('an order discount keeps the quoted amount through create, recovery and payme
   await page.start();expect(page.exposed.footer.value.amount).toBe('799.00 USDT');
   await page.view.createOrder();expect(page.saved().order?.amountUsdt).toBe('799.000000');expect(page.saved().order?.rewards?.[0].reward.type).toBe('DISCOUNT_USDT');
   await page.view.recover();expect(page.exposed.footer.value.amount).toBe('799.00 USDT');
-  page.confirm.mockResolvedValueOnce(true);await page.view.pay();
-  expect(page.confirm).toHaveBeenCalledWith(expect.objectContaining({message:'确认支付 799.00 USDT 购买所选商品？'}));
+  await page.view.pay();await page.view.confirmPayment();
+  expect(page.pin).toHaveBeenCalledWith(expect.objectContaining({amount:'799.000000',currency:'USDT'}),expect.any(Function),expect.any(Function));
   expect(page.api.pay).toHaveBeenCalledOnce();expect(page.saved().order?.paymentStatus).toBe('PAID');
 });
 
-it('payment confirmation cancels without a command, then an explicit acceptance pays the same order once',async()=>{
+it('closing method selection preserves the order; confirming it requests PIN and pays the same order once',async()=>{
   const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();
   await page.view.pay();expect(page.api.pay).not.toHaveBeenCalled();expect(page.saved().order?.paymentStatus).toBe('PENDING');
-  expect(page.confirm).toHaveBeenCalledWith(expect.objectContaining({message:'确认支付 120.00 USDT 购买所选商品？'}));
-  const decision=deferred<boolean>();page.confirm.mockReturnValueOnce(decision.promise);
-  const pending=page.view.pay();await page.view.pay();expect(page.confirm).toHaveBeenCalledTimes(2);
-  decision.resolve(true);await pending;expect(page.api.pay).toHaveBeenCalledOnce();
-  expect(page.api.pay).toHaveBeenCalledWith('o1','original-key');expect(page.saved().order?.paymentStatus).toBe('PAID');
+  expect(page.view.paymentSheetOpen.value).toBe(true);expect(page.pin).not.toHaveBeenCalled();
+  page.view.paymentSheetOpen.value=false;expect(page.api.cancel).not.toHaveBeenCalled();
+  await page.view.pay();const pending=page.view.confirmPayment();await page.view.confirmPayment();await pending;
+  expect(page.pin).toHaveBeenCalledOnce();expect(page.confirm).not.toHaveBeenCalled();
+  expect(page.api.pay).toHaveBeenCalledWith('o1','original-key',page.authorization);expect(page.saved().order?.paymentStatus).toBe('PAID');
 });
-it.each(['hide','account','expired'] as const)('a delayed payment confirmation after %s does not pay',async change=>{
+it.each(['hide','account','expired'] as const)('a delayed PIN after %s cannot submit payment',async change=>{
   const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();
-  const decision=deferred<boolean>();page.confirm.mockReturnValueOnce(decision.promise);const pending=page.view.pay();
+  const decision=deferred<boolean>();page.pin.mockImplementationOnce(async(_context,command,current)=>{await decision.promise;page.view.updateClock();return current()?command(page.authorization):null;});await page.view.pay();const pending=page.view.confirmPayment();
   if(change==='hide'){page.exposed.hide();expect(page.clearConfirmsBy).toHaveBeenCalledWith(expect.stringContaining('promotion-payment:'));}
   if(change==='account')page.app.accountBindingEpoch++;
   if(change==='expired')page.view.order.value.payBy='2026-10-07T00:00:00Z';
   decision.resolve(true);await pending;expect(page.api.pay).not.toHaveBeenCalled();
+});
+
+it('new items checkout opens the method sheet after one create action without submitting payment',async()=>{
+  const page=screen();await page.start();await page.exposed.footer.value.action();
+  expect(page.api.create).toHaveBeenCalledOnce();expect(page.view.paymentSheetOpen.value).toBe(true);
+  expect(page.pin).not.toHaveBeenCalled();expect(page.api.pay).not.toHaveBeenCalled();
+});
+it('PIN cancellation retains the original pending order and never cancels or creates another',async()=>{
+  const page=screen();await page.start();await page.view.createOrder();page.pin.mockResolvedValueOnce(null);
+  await page.view.confirmPayment();expect(page.saved().order?.orderNo).toBe('o1');
+  expect(page.saved().order?.paymentStatus).toBe('PENDING');expect(page.api.create).toHaveBeenCalledOnce();
+  expect(page.api.pay).not.toHaveBeenCalled();expect(page.api.cancel).not.toHaveBeenCalled();
+  expect(page.stockCheck).not.toHaveBeenCalled();
+});
+it('payment rereads stock for the original multi-quantity and Cloud Share lines without requoting',async()=>{
+  const q=quote();q.quantity=3;q.itemCount=2;q.items=[{...q.items[0],quantity:2},{...q.items[0],lineId:'share',productNo:'cloud-share',quantity:1}];
+  const original={...receipt(q),quantity:3,items:[{lineId:'9001',productNo:'sku',productName:'Device',quantity:2},{lineId:'9002',productNo:'cloud-share',productName:'Cloud Share',quantity:1}]};
+  const page=screen({quote:q,order:original,pending:null});page.api.findOrder.mockResolvedValue(original);page.api.pay.mockResolvedValue({...original,paymentStatus:'PAID',orderStatus:'COMPLETED'});
+  await page.start();await page.view.pay();expect(page.stockCheck).not.toHaveBeenCalled();await page.view.confirmPayment();
+  expect(page.stockCheck).toHaveBeenCalledExactlyOnceWith([{productNo:'sku',quantity:2},{productNo:'cloud-share',quantity:1}]);
+  expect(page.stockCheck.mock.invocationCallOrder[0]).toBeLessThan(page.api.pay.mock.invocationCallOrder[0]);
+  expect(page.api.quote).not.toHaveBeenCalled();expect(page.api.create).not.toHaveBeenCalled();expect(page.saved().order?.amountUsdt).toBe(original.amountUsdt);
+});
+it.each(['stock','unavailable'] as const)('a pre-submit %s rejection offers original-order cancellation without payment',async reason=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();await page.view.pay();
+  page.stockCheck.mockRejectedValueOnce(new CheckoutPurchaseCheckError(reason));page.confirm.mockResolvedValueOnce(true);
+  const cancelled={...receipt(),paymentStatus:'CANCELLED',orderStatus:'CANCELLED'};
+  page.api.cancel.mockResolvedValue(cancelled);page.api.findOrder.mockResolvedValueOnce(receipt()).mockResolvedValueOnce(cancelled);
+  await page.view.confirmPayment();
+  expect(page.confirm).toHaveBeenCalledWith(expect.objectContaining({title:checkoutFlowCopy('zh').cannotPay,message:reason==='stock'?zh.store.temporarilyOutOfStock:zh.store.productUnavailable,confirmLabel:zh.promotion.cancelOrder}));
+  expect(page.api.pay).not.toHaveBeenCalled();expect(page.api.cancel).toHaveBeenCalledOnce();expect(page.saved().order?.paymentStatus).toBe('CANCELLED');
+});
+it.each(['read','items'] as const)('a pre-submit %s failure remains a retryable original order, never an unknown payment',async reason=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();await page.view.pay();
+  page.stockCheck.mockRejectedValueOnce(new CheckoutPurchaseCheckError(reason));await page.view.confirmPayment();
+  expect(page.view.error.value).toBe(checkoutFlowCopy('zh').queryFailed);expect(page.view.unknown.value).toBe(false);
+  expect(page.saved().pending).toBeNull();expect(page.api.pay).not.toHaveBeenCalled();expect(page.confirm).not.toHaveBeenCalled();expect(page.api.cancel).not.toHaveBeenCalled();
+  await page.view.pay();await page.view.confirmPayment();expect(page.api.pay).toHaveBeenCalledOnce();expect(page.api.create).not.toHaveBeenCalled();
+});
+it.each(['account','hide','order','amount','expired'] as const)('a %s change during the stock read prevents the payment command',async change=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();await page.view.pay();
+  const stock=deferred<void>();page.stockCheck.mockReturnValueOnce(stock.promise);const payment=page.view.confirmPayment();await flush();
+  if(change==='account')page.app.accountBindingEpoch++;
+  if(change==='hide')page.exposed.hide();
+  if(change==='order')page.view.order.value.orderNo='other-order';
+  if(change==='amount')page.view.order.value.amountUsdt='121';
+  if(change==='expired')page.view.order.value.payBy='2026-10-07T00:00:00Z';
+  stock.resolve();await payment;expect(page.api.pay).not.toHaveBeenCalled();expect(page.saved().pending).toBeNull();
+});
+it('an already sent unknown payment is read only and cannot run another stock check or payment',async()=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();await page.view.pay();
+  page.api.pay.mockRejectedValueOnce(new ApiError({kind:'network',message:'timeout'}));await page.view.confirmPayment();
+  page.api.paymentCommand.mockResolvedValue({status:'PROCESSING',canResumeSameKey:false});await page.view.recover();await page.view.pay();await page.view.confirmPayment();
+  expect(page.api.paymentCommand).toHaveBeenCalled();expect(page.view.unknown.value).toBe(true);expect(page.api.pay).toHaveBeenCalledOnce();expect(page.stockCheck).toHaveBeenCalledOnce();
+});
+it('top-up closes the method sheet while preserving the original pending order',async()=>{
+  const page=screen();await page.start();await page.view.createOrder();page.view.openWalletTopup();
+  expect(page.view.paymentSheetOpen.value).toBe(false);expect(page.navTo).toHaveBeenCalledWith('/pages/me/wallet-topup');
+  expect(page.saved().order?.paymentStatus).toBe('PENDING');expect(page.api.cancel).not.toHaveBeenCalled();
+  await expect(page.view.allowAuxiliaryNavigation()).resolves.toBe(true);
+});
+it('top return cancels the original order and waits for its canonical cancelled readback',async()=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();
+  const closed={...receipt(),paymentStatus:'CANCELLED' as const,orderStatus:'CANCELLED' as const};
+  const read=deferred<OrderReceipt>();page.api.cancel.mockResolvedValue(closed);
+  page.api.findOrder.mockResolvedValueOnce(receipt()).mockReturnValueOnce(read.promise);
+  const exit=page.view.requestLeave();await flush();expect(page.api.cancel).toHaveBeenCalledWith('o1','original-key');
+  expect(page.view.leaving.value).toBe(true);expect(page.navBack).not.toHaveBeenCalled();
+  read.resolve(closed);await expect(exit).resolves.toBe(true);expect(page.saved().order?.paymentStatus).toBe('CANCELLED');
+});
+it('a failed cancellation readback stays on the original order and exposes a retry',async()=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();
+  page.api.cancel.mockRejectedValue(new ApiError({kind:'network',message:'OFFLINE'}));
+  await expect(page.view.requestLeave()).resolves.toBe(false);expect(page.navBack).not.toHaveBeenCalled();
+  expect(page.saved().pending).toMatchObject({operation:'cancelOrder',targetId:'o1',key:'original-key'});
+  expect(page.view.error.value).toBe(checkoutFlowCopy('zh').cancelFailed);expect(page.api.create).not.toHaveBeenCalled();
+  const closed={...receipt(),paymentStatus:'CANCELLED' as const,orderStatus:'CANCELLED' as const};
+  page.api.command.mockResolvedValue({status:'SUCCEEDED',order:closed});
+  await expect(page.view.requestLeave()).resolves.toBe(true);expect(page.api.cancel).toHaveBeenCalledOnce();
+});
+it('a cancellation acknowledgement without its required readback never permits leaving',async()=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();
+  const closed={...receipt(),paymentStatus:'CANCELLED' as const,orderStatus:'CANCELLED' as const};
+  page.api.cancel.mockResolvedValue(closed);page.api.findOrder.mockResolvedValueOnce(receipt()).mockRejectedValue(new Error('readback offline'));
+  await expect(page.view.requestLeave()).resolves.toBe(false);expect(page.saved().order?.paymentStatus).toBe('CANCELLED');
+  await expect(page.view.requestLeave()).resolves.toBe(false);expect(page.navBack).not.toHaveBeenCalled();
+  page.api.findOrder.mockResolvedValue(closed);await expect(page.view.requestLeave()).resolves.toBe(true);
+  expect(page.api.cancel).toHaveBeenCalledOnce();
+});
+it('an original-order read failure cannot open payment from an earlier pending receipt',async()=>{
+  const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();
+  page.api.findOrder.mockRejectedValue(new Error('offline'));await page.view.pay();
+  expect(page.view.paymentSheetOpen.value).toBe(false);expect(page.pin).not.toHaveBeenCalled();expect(page.api.pay).not.toHaveBeenCalled();
+});
+it('an unknown payment command cannot be raced by a top-return cancellation',async()=>{
+  const page=screen({quote:quote(),order:receipt(),pending:{operation:'payOrder',targetId:'o1',key:'original-pay'}});
+  page.api.paymentCommand.mockResolvedValue({status:'PROCESSING',canResumeSameKey:false});await page.start();
+  await expect(page.view.requestLeave()).resolves.toBe(false);expect(page.api.cancel).not.toHaveBeenCalled();
+  expect(page.saved().pending?.key).toBe('original-pay');
+});
+it('missing trusted order time disables top return without discarding the original order',async()=>{
+  const original={...receipt(),payBy:undefined};
+  const page=screen({quote:null,order:original,pending:null});page.api.findOrder.mockResolvedValue(original);await page.start();
+  expect(page.exposed.backDisabled.value).toBe(true);await expect(page.view.requestLeave()).resolves.toBe(false);
+  expect(page.api.cancel).not.toHaveBeenCalled();expect(page.saved().order?.orderNo).toBe('o1');
+});
+it.each(['activated','inventory','provisioning'] as const)('PAID waits for canonical %s plus a fresh fleet and never repays',async status=>{
+  const paid={...receipt(),paymentStatus:'PAID' as const,orderStatus:'COMPLETED' as const};
+  const page=screen({quote:quote(),order:paid,pending:null}),read=deferred<{id:string;status:string}>();
+  page.api.findOrder.mockResolvedValue(paid);page.canonical.mockReturnValueOnce(read.promise);
+  const start=page.start();await flush();expect(page.view.resultState.value).toBe('processing');
+  read.resolve({id:'o1',status});await start;
+  expect(page.view.resultState.value).toBe(status==='provisioning'?'processing':status);
+  expect(page.api.pay).not.toHaveBeenCalled();expect(page.app.refreshRemoteFleet).toHaveBeenCalled();
+  page.view.viewDevices();expect(page.navTo).toHaveBeenCalledWith('/pages/me/devices');
+});
+it('a failed or stale activation read cannot celebrate a paid receipt',async()=>{
+  const paid={...receipt(),paymentStatus:'PAID' as const,orderStatus:'COMPLETED' as const};
+  const page=screen({quote:quote(),order:paid,pending:null});page.api.findOrder.mockResolvedValue(paid);
+  page.canonical.mockRejectedValueOnce(new Error('unavailable'));await page.start();
+  expect(page.view.resultState.value).toBe('error');expect(page.api.pay).not.toHaveBeenCalled();
+  page.view.viewDevices();expect(page.navTo).toHaveBeenCalledWith('/pages/me/devices');
+  const read=deferred<{id:string;status:string}>();page.canonical.mockReturnValueOnce(read.promise);
+  const retry=page.view.readActivation();await flush();page.exposed.hide();read.resolve({id:'o1',status:'activated'});await retry;
+  expect(page.view.resultState.value).not.toBe('activated');expect(page.api.pay).not.toHaveBeenCalled();
 });
 
 it('fresh hide invalidates and persists the unlocked quote, closes terms, then show obtains a new quote',async()=>{
@@ -299,7 +437,9 @@ it.each(['createOrder','payOrder','cancelOrder'] as const)('hide/show preserves 
   const page=screen({quote:q,order,pending});page.api.command.mockResolvedValue({status:'NOT_FOUND',order:null});await page.start();
   expect(page.view.session.retryOriginal).toBe(true);const before=structuredClone(page.view.session.record);page.exposed.hide();
   expect(page.view.session.record).toEqual(before);expect(page.saved()).toEqual(before);
-  page.exposed.show();await flush();expect(page.api.command).toHaveBeenLastCalledWith('original-key',operation,pending.targetId);
+  page.exposed.show();await flush();
+  if(operation==='payOrder')expect(page.api.paymentCommand).toHaveBeenLastCalledWith('original-key');
+  else expect(page.api.command).toHaveBeenLastCalledWith('original-key',operation,pending.targetId);
   expect(page.view.session.record.pending).toEqual(pending);expect(page.view.session.record.quote).toEqual(q);expect(page.view.session.retryOriginal).toBe(true);
   expect(page.api.quote).not.toHaveBeenCalled();expect(page.api.create).not.toHaveBeenCalled();expect(page.api.pay).not.toHaveBeenCalled();expect(page.api.cancel).not.toHaveBeenCalled();
   if(operation==='createOrder'){await page.view.createOrder();expect(page.api.create).toHaveBeenCalledWith(q,'original-key',null);expect(page.key).not.toHaveBeenCalled();}
@@ -345,7 +485,7 @@ it('quantity edits discard the old quote and rewards before awaiting canonical e
   expect(page.api.quote).toHaveBeenCalledTimes(2);expect(page.api.create).not.toHaveBeenCalled();
   next.resolve(selectedQuote([{productNo:'sku',quantity:2}]));await edit;
   expect(page.exposed.footer.value).toMatchObject({amount:'2,580.87 USDT',disabled:false});
-  const html=await page.html();expect(html).toContain('2,598.00 USDT');expect(html).toContain('17.13 USDT');
+  const html=await page.html();expect(html).toContain('2,598.00');expect(html).toContain('17.13');expect(html).not.toContain('2,598.00 USDT');
   expect(page.view.quote.value.amountUsdt).toBe('2580.87');expect(page.api.pay).not.toHaveBeenCalled();
   expect(html).toContain('data-testid="checkout-item-decrease"');expect(html).toContain('data-testid="checkout-item-increase"');
   page.api.quote.mockResolvedValueOnce(quote('single-again'));await page.view.changeQuantity('sku',-1);
@@ -512,7 +652,7 @@ it('a canonical BF20-only S1 quote creates and pays 80 USDT without any promotio
   page.api.quote.mockResolvedValue(q);page.api.create.mockResolvedValue(order);page.api.pay.mockResolvedValue({...order,paymentStatus:'PAID',orderStatus:'COMPLETED'});
   await page.start();expect(page.exposed.footer.value).toMatchObject({amount:'80.00 USDT',disabled:false});
   await page.view.createOrder();expect(page.api.create).toHaveBeenCalledWith(q,'original-key','BF20');
-  page.confirm.mockResolvedValue(true);await page.view.pay();expect(page.api.pay).toHaveBeenCalledWith('o1','original-key');
+  await page.view.confirmPayment();expect(page.api.pay).toHaveBeenCalledWith('o1','original-key',page.authorization);
   expect(page.saved().order).toMatchObject({amountUsdt:'80.000000',paymentStatus:'PAID',rewards:[]});
 });
 it.each(['INELIGIBLE','UNKNOWN'] as const)('BF20 must never override a selected promotion whose quote is %s',async eligibility=>{
@@ -526,21 +666,21 @@ it('loads the authoritative balance on entry and hides stale money until a faile
   page.app.refreshRemoteFleet.mockReturnValueOnce(read.promise);
   const initial=page.start();await flush();expect(page.view.walletState.value).toBe('loading');
   read.resolve(false);await initial;
-  expect(page.view.walletState.value).toBe('error');expect(await page.html()).not.toContain('999.00 USDT');
+  expect(page.view.walletState.value).toBe('error');expect(await page.html()).not.toContain('999.00');
   expect(await page.html()).toContain(zh.empty.errorCta);
   expect(await page.html()).not.toContain(commerceCopy('zh').walletRefresh);
   await page.view.createOrder();expect(page.view.canPay.value).toBe(false);
   page.app.refreshRemoteFleet.mockImplementation(async()=>{page.app.user.usdtBalance=150;return true;});
-  await page.view.refreshWallet();expect(page.view.canPay.value).toBe(true);expect(await page.html()).toContain('150.00 USDT');
+  await page.view.refreshWallet();expect(page.view.canPay.value).toBe(true);expect(await page.html()).toContain('150.00');
 });
 it('refreshes the post-payment balance and keeps a wallet read failure separate from the paid receipt',async()=>{
-  const page=screen();await page.start();await page.view.createOrder();page.confirm.mockResolvedValue(true);
-  page.app.refreshRemoteFleet.mockResolvedValueOnce(false);await page.view.pay();
+  const page=screen();await page.start();await page.view.createOrder();
+  page.app.refreshRemoteFleet.mockResolvedValueOnce(false);await page.view.confirmPayment();
   expect(page.saved().order?.paymentStatus).toBe('PAID');expect(page.view.walletState.value).toBe('error');
   expect(page.api.pay).toHaveBeenCalledOnce();expect(await page.html()).not.toContain('150.00 USDT');
   page.api.findOrder.mockResolvedValue({...receipt(),paymentStatus:'PAID',orderStatus:'COMPLETED'});
   page.app.refreshRemoteFleet.mockImplementation(async()=>{page.app.user.usdtBalance=30;return true;});
-  await page.view.recover();expect(await page.html()).toContain('30.00 USDT');expect(page.api.pay).toHaveBeenCalledOnce();
+  await page.view.recover();expect(page.app.user.usdtBalance).toBe(30);expect(page.view.resultState.value).toBe('activated');expect(page.api.pay).toHaveBeenCalledOnce();
 });
 it.each(['hide','account'])('a late wallet read after %s cannot mark the balance ready or unlock payment',async boundary=>{
   const page=screen();await page.start();await page.view.createOrder();const read=deferred<boolean>();
@@ -562,8 +702,8 @@ it('a server-confirmed zero-pay voucher order remains executable without inventi
   page.api.quote.mockResolvedValue(q);page.api.create.mockResolvedValue(order);
   page.api.pay.mockResolvedValue({...order,paymentStatus:'PAID',orderStatus:'COMPLETED'});
   page.app.refreshRemoteFleet.mockResolvedValue(false);await page.start();await page.view.createOrder();
-  expect(page.view.canPay.value).toBe(true);page.confirm.mockResolvedValue(true);await page.view.pay();
-  expect(page.api.pay).toHaveBeenCalledWith('o1','original-key');expect(page.saved().order?.paymentStatus).toBe('PAID');
+  expect(page.view.canPay.value).toBe(true);await page.view.confirmPayment();
+  expect(page.pin).toHaveBeenCalledOnce();expect(page.api.pay).toHaveBeenCalledWith('o1','original-key',page.authorization);expect(page.saved().order?.paymentStatus).toBe('PAID');
   expect(page.view.walletState.value).toBe('error');
 });
 
@@ -609,7 +749,7 @@ it.each([
   walletRead.resolve(walletFleet(10000));await initial;
   expect(page.view.walletState.value).toBe('ready');expect(app.user.usdtBalance).toBe(10000);
   await page.view.createOrder();expect(page.view.canPay.value).toBe(true);
-  expect(await page.html()).toContain('10,000.00 USDT');expect(await page.html()).not.toContain(commerceCopy('zh').walletError);
+  expect(await page.html()).toContain('10,000.00');expect(await page.html()).not.toContain(commerceCopy('zh').walletError);
 });
 it('does not join a pre-catalog fleet read even when that old read finishes after the current wallet',async()=>{
   const {page,app,catalogRead,walletRead:stale}=walletRace(),fresh=deferred<CanonicalE3Fleet>();
@@ -630,7 +770,7 @@ it('joins an in-flight current-scope lifecycle read but forces a fresh balance a
   // A new background read was captured before payment; the mutation readback
   // must supersede it, rather than reusing its pre-payment balance.
   const stale=deferred<CanonicalE3Fleet>();walletRemote.deviceE3Api.fleet.mockReset().mockReturnValueOnce(stale.promise).mockReturnValueOnce(afterPay.promise);
-  const old=app.refreshRemoteFleet();page.confirm.mockResolvedValueOnce(true);const paid=page.view.pay();
+  const old=app.refreshRemoteFleet();const paid=page.view.confirmPayment();
   await flush();expect(walletRemote.deviceE3Api.fleet).toHaveBeenCalledTimes(2);expect(page.view.walletState.value).toBe('loading');
   afterPay.resolve(walletFleet(30));await paid;stale.resolve(walletFleet(150));await expect(old).resolves.toBe(false);
   expect(page.saved().order?.paymentStatus).toBe('PAID');expect(page.api.pay).toHaveBeenCalledOnce();
@@ -660,9 +800,9 @@ it.each(['hide','account'] as const)('catalog completion after %s cannot launch 
 });
 
 it.each([
-  ['0.000000','0.00'],['0.000001','0.000001'],['0.004000','0.004'],
-  ['0.009000','0.009'],['0.010000','0.01'],['1.234567','1.234567'],
-])('R1-F1: %s USDT stays exact in quote, receipt, fees, footer and payment confirmation',async(amount,display)=>{
+  ['0.000000','0.00'],['0.000001','0.00'],['0.004000','0.00'],
+  ['0.009000','0.01'],['0.010000','0.01'],['1.234567','1.23'],
+])('two-decimal presentation of %s USDT preserves the original quote, PIN amount and receipt',async(amount,display)=>{
   const q={...quote(),amountUsdt:amount,subtotalUsdt:amount,discountUsdt:'0.000000',expectedRewards:[],items:quote().items.map(item=>({...item,unitPriceUsdt:amount,subtotalUsdt:amount,discountUsdt:'0.000000',payableUsdt:amount}))};
   const original={...receipt(q),amountUsdt:amount,subtotalUsdt:amount,discountUsdt:'0.000000',rewards:[]};
   expect((await createPromotionApi({request:vi.fn().mockResolvedValue(q)} as any).quote([{productNo:'sku',quantity:1}],'a1')).amountUsdt).toBe(amount);
@@ -675,14 +815,14 @@ it.each([
   expect(page.exposed.footer.value.amount).toBe(display+' USDT');
   expect(await page.html()).toMatch(new RegExp('class="promotion-summary total"[^]*?'+display.replace('.', '\\.')+' USDT'));
   await page.view.pay();expect(page.api.pay).not.toHaveBeenCalled();
-  expect(page.confirm).toHaveBeenLastCalledWith(expect.objectContaining({message:fmt(zh.store.coConfirmPurchaseMessage,{amount:display})}));
-  page.confirm.mockResolvedValueOnce(true);await page.view.pay();
-  expect(page.api.pay).toHaveBeenCalledWith(original.orderNo,'original-key');
+  expect(page.pin).not.toHaveBeenCalled();await page.view.confirmPayment();
+  expect(page.pin).toHaveBeenCalledWith(expect.objectContaining({amount,currency:'USDT'}),expect.any(Function),expect.any(Function));
+  expect(page.api.pay).toHaveBeenCalledWith(original.orderNo,'original-key',page.authorization);
   expect(page.api.create.mock.calls[0][0].amountUsdt).toBe(amount);
   expect(page.saved().order).toMatchObject({amountUsdt:amount,paymentStatus:'PAID'});expect(page.view.unknown.value).toBe(false);
 });
 
-it.each([[undefined,'-'],[null,'-'],['invalid','-'],['9007199254740993.123456','9,007,199,254,740,993.123456'],[1e-7,'0.0000001']])('checkout display preserves unknown/precise value %s',async(value,display)=>{
+it.each([[undefined,'-'],[null,'-'],['invalid','-'],['9007199254740993.123456','9,007,199,254,740,993.12'],[1e-7,'0.00']])('checkout display preserves unknown and rounds presentation of %s to two decimals',async(value,display)=>{
   const page=screen();await page.start();expect(page.view.formatAmount(value)).toBe(display);
 });
 
@@ -691,22 +831,22 @@ it.each(['0.000000','10.000000',undefined])('voucher row attributes only explici
   const q={...voucherOnlyQuote('sku'),discountUsdt:'20.000000',promotionDiscountUsdt};page.api.quote.mockResolvedValue(q);await page.start();
   const html=await page.html(),coupon=html.split('data-testid="checkout-event-voucher"')[1].split('data-testid="checkout-payment"')[0];
   if(promotionDiscountUsdt==='0.000000'){
-    expect(page.view.voucherOnlyDiscount.value).toBe('20.000000');expect(coupon).toContain('−20.00 USDT');expect(html).not.toContain('data-testid="checkout-total-discount"');
+    expect(page.view.voucherOnlyDiscount.value).toBe('20.000000');expect(coupon).toContain('−20.00');expect(coupon).not.toContain('−20.00 USDT');expect(html).not.toContain('data-testid="checkout-total-discount"');
   }else{
     expect(page.view.voucherOnlyDiscount.value).toBeUndefined();expect(coupon).not.toContain('- USDT');expect(html).toContain('data-testid="checkout-total-discount"');
   }
-  expect(html).toContain('−20.00 USDT');expect(page.saved().quote?.discountUsdt).toBe('20.000000');
+  expect(html).toContain('−20.00');expect(page.saved().quote?.discountUsdt).toBe('20.000000');
 });
 
 it('regular selected voucher shows only its confirmed deduction, while no voucher stays unclaimed',async()=>{
   const page=screen();page.vouchers.catalog=[bf20];page.vouchers.claimedUnused=[bf20];
   page.api.quote.mockImplementation(async(_items,_activity,voucherId)=>voucherId?{...voucherOnlyQuote('sku'),discountUsdt:'20.000000'}:{...quote(),expectedRewards:[]});
   await page.start();const html=await page.html();
-  expect(html).toMatch(/class="checkout-discount-row promotion-link checkout-voucher-row"[^]*?−20.00 USDT/);
+  expect(html).toMatch(/class="checkout-discount-row promotion-link checkout-voucher-row"[^]*?−20.00/);
   expect(page.saved().voucherId).toBe('BF20');
   await page.view.chooseVoucher();await page.view.selectVoucher(null);
   expect(await page.html()).toContain(zh.promotion.noVoucher);expect(page.view.voucherOnlyDiscount.value).toBeUndefined();
-  expect(await page.html()).not.toContain('−20.00 USDT');
+  expect(await page.html()).not.toContain('−20.00');
 });
 
 it('an unresolved event-voucher order keeps its total deduction when the editable voucher row is hidden',async()=>{
@@ -715,16 +855,16 @@ it('an unresolved event-voucher order keeps its total deduction when the editabl
   page.api.command.mockResolvedValue({status:'OUTCOME_UNKNOWN',order:null});await page.start();
   expect(page.view.unknown.value).toBe(true);expect(page.exposed.footer.value).toBeNull();
   const html=await page.html();expect(html).not.toContain('data-testid="checkout-event-voucher"');
-  expect(html).toContain('data-testid="checkout-total-discount"');expect(html).toContain('−20.00 USDT');
+  expect(html).toContain('data-testid="checkout-total-discount"');expect(html).toContain('−20.00');
   expect(page.saved().pending).toEqual(pending);expect(page.api.pay).not.toHaveBeenCalled();
 });
 
-it('discount signs do not turn zero or unknown into a positive deduction or lose sub-cent precision',async()=>{
+it('discount signs do not turn zero, rounded zero or unknown into a positive deduction',async()=>{
   const page=screen();await page.start();
-  for(const [value,display] of [['0','0.00'],['0.000001','−0.000001'],['50','−50.00'],[undefined,'-']] as const)expect(page.view.formatDiscount(value)).toBe(display);
+  for(const [value,display] of [['0','0.00'],['0.000001','0.00'],['50','−50.00'],[undefined,'-']] as const)expect(page.view.formatDiscount(value)).toBe(display);
   const original={...receipt(),promotionQuoteId:'other-quote',discountUsdt:undefined};
   const recovered=screen({quote:quote(),order:original,pending:null});recovered.api.findOrder.mockResolvedValue(original);await recovered.start();
-  expect(await recovered.html()).toContain('- USDT');expect(recovered.view.summary.value.discountUsdt).toBeUndefined();
+  expect(await recovered.html()).toContain('>-</');expect(recovered.view.summary.value.discountUsdt).toBeUndefined();
 });
 
 const policySetup=ts.transpileModule(checkoutSource.slice(checkoutSource.indexOf('const purchasePolicyOpen ='),checkoutSource.indexOf('const reviewCopy =')),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
@@ -751,11 +891,10 @@ it.each(['zh','en','vi'])('R1-F2: %s policy points only to reward terms actually
   const before=JSON.stringify(page.saved());sheet!.props!.onClose();expect(state.purchasePolicyOpen.value).toBe(false);expect(JSON.stringify(page.saved())).toBe(before);
 });
 
-it.each(['PENDING','PAID','CANCELLED','EXPIRED','REFUNDED'] as const)('step highlight respects %s without inventing activation',async paymentStatus=>{
+it.each(['PENDING','PAID','CANCELLED','EXPIRED','REFUNDED'] as const)('only PAID %s enters the canonical activation readback result',async paymentStatus=>{
   const original={...receipt(),paymentStatus},page=screen({quote:quote(),order:original,pending:null});page.api.findOrder.mockResolvedValue(original);await page.start();
-  const html=await page.html();expect(page.view.checkoutStep.value).toBe(['PENDING','PAID'].includes(paymentStatus)?1:-1);
-  expect((html.match(/checkout-step-fill--active/g)??[]).length).toBe(['PENDING','PAID'].includes(paymentStatus)?2:0);
-  expect(page.view.checkoutStep.value).not.toBe(2);
+  const html=await page.html();expect(html.includes('data-result=')).toBe(paymentStatus==='PAID');
+  expect(page.canonical).toHaveBeenCalledTimes(paymentStatus==='PAID'?1:0);
 });
 
 
