@@ -89,12 +89,12 @@ onMounted(() => { timer = setInterval(pin.tick, 1000); if (typeof document !== "
 onUnmounted(() => { clear(); clearInterval(timer); unsubscribe?.(); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
 </script>
 <style scoped>
-.payment-pin-page { padding: 16px 20px calc(28px + env(safe-area-inset-bottom)); max-width: 480px; margin: 0 auto; color: var(--v5-ink); }
-.payment-pin-page__note { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.65; margin-bottom: 16px; }
-.payment-pin-page__field { margin-top: 24px; }
+.payment-pin-page { padding: var(--v5-space-4) var(--v5-space-5) calc(var(--v5-space-6) + var(--v5-space-1) + env(safe-area-inset-bottom)); max-width: 480px; margin: 0 auto; color: var(--v5-ink); }
+.payment-pin-page__note { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.65; margin-bottom: var(--v5-space-4); }
+.payment-pin-page__field { margin-top: var(--v5-space-6); }
 .payment-pin-page__label { display: block; font-size: var(--ui-type-list-title); font-weight: 600; line-height: 1.5; }
-.payment-pin-page__error { display: block; color: var(--v5-danger); font-size: var(--ui-type-list-subtitle); line-height: 1.6; margin: 10px 0; }
-.payment-pin-page__primary { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 16px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font-size: var(--ui-type-button); font-weight: 600; text-align: center; margin-top: 20px; }
+.payment-pin-page__error { display: block; color: var(--v5-danger); font-size: var(--ui-type-list-subtitle); line-height: 1.6; margin: var(--ui-space-row-y) 0; }
+.payment-pin-page__primary { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font-size: var(--ui-type-button); font-weight: 600; text-align: center; margin-top: var(--v5-space-5); }
 .payment-pin-page__primary[aria-disabled="true"] { opacity: .45; }
-.payment-pin-page__link { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 8px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
+.payment-pin-page__link { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--v5-space-2); color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
 </style>

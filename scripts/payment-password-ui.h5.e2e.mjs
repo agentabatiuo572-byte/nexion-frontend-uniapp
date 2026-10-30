@@ -21,6 +21,7 @@ const receipt = request => ({ commandKey: request.headers()["idempotency-key"], 
 const reply = (route, data, status = 200, message = "OK") => route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ code: status === 200 ? 0 : status, message, data }) });
 const pageErrors = [];
 const consoleErrors = [], expectedTransportErrors = [];
+const focusedPinStages = [];
 const requestPaths = [];
 try {
   await context.route("**/*", async route => {
@@ -108,39 +109,58 @@ try {
   const pinInput = () => page.locator(".payment-pin-mask .payment-pin-input input");
   const primary = () => page.locator(".payment-pin-mask .payment-pin-primary");
   const screenshot = name => page.screenshot({ path: new URL(name, output).pathname.replace(/^\/(\w:)/, "$1"), fullPage: true });
+  const assertPinFocused = async stage => {
+    await page.waitForFunction(() => {
+      const input = document.querySelector(".payment-pin-mask .payment-pin-input input");
+      return input && !input.disabled && document.activeElement === input;
+    }, undefined, { timeout: 5000 });
+    assert.equal(await pinInput().evaluate(input => document.activeElement === input), true, `${stage}: PIN input must own keyboard focus`);
+    focusedPinStages.push(stage);
+  };
+  const typeFocusedPin = async (value, stage) => { await assertPinFocused(stage); await page.keyboard.type(value); };
 
   // The personal-center source shares setup content without promising a payment.
   await page.locator(".payment-pin-page__primary").click();
   await page.locator(".payment-pin-mask").getByText("您暂未设置支付密码，这是初次设置，设置成功后请牢记。", { exact: true }).waitFor();
+  await assertPinFocused("personal-first-setup");
+  assert.equal(await page.locator(".payment-pin-title").getAttribute("aria-live"), "polite");
   assert.equal(await page.locator(".payment-pin-mask").getByText("设置完成后，请再次输入支付密码，继续本笔支付。", { exact: true }).count(), 0);
   await page.locator(".payment-pin-close").click();
   await openPayment();
   await page.getByText("您暂未设置支付密码，这是初次设置，设置成功后请牢记。", { exact: true }).waitFor();
+  assert.deepEqual(await page.locator(".payment-pin-sheet").evaluate(sheet => ({
+    inset: getComputedStyle(sheet).padding,
+    gap: getComputedStyle(sheet.querySelector(".payment-pin-input__cells")).gap,
+    radius: getComputedStyle(sheet.querySelector(".payment-pin-input__cell")).borderRadius,
+  })), { inset: "20px", gap: "8px", radius: "12px" });
   await screenshot("01-first-setup-zh-390.png");
-  await pinInput().fill("039417"); await primary().click();
-  await pinInput().fill("039418"); await primary().click();
+  await typeFocusedPin("039417", "checkout-first-setup"); await primary().click();
+  await typeFocusedPin("039418", "setup-confirm"); await primary().click();
   await page.getByText("两次输入的新支付密码不一致，请重新输入", { exact: true }).waitFor();
   assert.equal(await pinInput().inputValue(), "");
-  await pinInput().fill("039417"); await primary().click();
+  await typeFocusedPin("039417", "setup-confirm-after-mismatch"); await primary().click();
   await page.locator(".payment-pin-mask").getByText("正在确认设置结果，请勿重复提交修改", { exact: true }).waitFor();
   assert.equal(setupCalls, 1); assert.equal(await pinInput().count(), 0);
   await page.locator(".payment-pin-mask").getByText("查询结果", { exact: true }).click();
   await page.getByText("支付密码已设置，请牢记。请再次输入，完成本笔支付。", { exact: true }).waitFor();
   assert.equal(await pinInput().inputValue(), "");
   assert.equal(await page.evaluate(() => window.__paymentPinResult === undefined), true, "Setup must not authorize payment");
+  await assertPinFocused("fresh-third-payment");
   await page.getByText("展开明细", { exact: true }).click();
   await screenshot("02-third-entry-details-zh-390.png");
-  await pinInput().fill("039417"); await page.locator(".payment-pin-mask").waitFor({ state: "hidden" });
+  await page.keyboard.press("Tab");
+  await typeFocusedPin("039417", "payment-after-details-keyboard-tab"); await page.locator(".payment-pin-mask").waitFor({ state: "hidden" });
   assert.equal(await page.evaluate(() => window.__paymentPinResult.paymentPassword === "039417" && window.__paymentPinResult.credentialVersion === 1), true);
   const firstAttempt = await page.evaluate(() => window.__paymentPinResult.attemptNo);
   await page.evaluate(async () => { const { reportPaymentPasswordError } = window.__paymentPinModule; const current = performance.getEntriesByType("resource").map(entry => entry.name).filter(name => name.includes("/src/api/errors.ts")).at(-1); const { ApiError } = await import(current || "/src/api/errors.ts"); reportPaymentPasswordError(new ApiError({ kind: "business", status: 422, message: "PAYMENT_PASSWORD_INCORRECT" })); });
   remaining = 4; await openPayment();
   await page.locator(".payment-pin-mask").getByText("支付密码不正确，还可尝试 4 次", { exact: true }).waitFor();
-  await pinInput().fill("493017"); await page.locator(".payment-pin-mask").waitFor({ state: "hidden" });
+  await typeFocusedPin("493017", "payment-after-incorrect-pin"); await page.locator(".payment-pin-mask").waitFor({ state: "hidden" });
   assert.notEqual(await page.evaluate(() => window.__paymentPinResult.attemptNo), firstAttempt);
 
   lockedUntil = new Date(Date.now() + 1500).toISOString(); remaining = 0; await openPayment();
   assert.equal(await pinInput().isDisabled(), true);
+  assert.equal(await pinInput().evaluate(input => document.activeElement === input), false, "A locked PIN input must not take focus");
   await screenshot("03-locked-zh-390.png");
   await page.waitForTimeout(1800); lockedUntil = null; remaining = 5;
   await page.locator(".payment-pin-mask .payment-pin-link").filter({ hasText: /^重试$/ }).click();
@@ -150,12 +170,12 @@ try {
   await screenshot("04-bound-phone-recovery-zh-390.png");
   await page.locator(".payment-pin-code input, input.payment-pin-code").fill("012345");
   await primary().click();
-  await pinInput().fill("039417"); await primary().click();
-  await pinInput().fill("039418"); await primary().click();
+  await typeFocusedPin("039417", "reset-first-input"); await primary().click();
+  await typeFocusedPin("039418", "reset-confirm"); await primary().click();
   assert.equal(await pinInput().inputValue(), "");
-  await pinInput().fill("039417"); await primary().click();
+  await typeFocusedPin("039417", "reset-confirm-after-mismatch"); await primary().click();
   await page.getByText("支付密码已重置，请输入新密码，继续本笔支付", { exact: true }).waitFor();
-  await pinInput().fill("039417"); await page.locator(".payment-pin-mask").waitFor({ state: "hidden" });
+  await typeFocusedPin("039417", "fresh-payment-after-reset"); await page.locator(".payment-pin-mask").waitFor({ state: "hidden" });
   assert.equal(resetCalls, 1);
 
   await page.evaluate(async () => { const { navTo } = await import("/src/lib/route.ts"); await navTo("/me/payment-password"); });
@@ -184,11 +204,20 @@ try {
   assert.equal(await page.evaluate(() => JSON.stringify(uni.getStorageSync("nexgrid-payment-password-commands-accounts-v1")).includes('"pending":null')), true);
   await bindPinModule(); await screenshot("05b-change-reload-recovery-zh-390.png");
 
+  // Use an available page action as the origin; page PIN fields themselves
+  // are intentionally disabled while the shared dialog is busy.
+  await page.locator(".payment-pin-page__link").focus();
   statusFailure = true; await openPayment();
   await page.locator(".payment-pin-mask").getByText("暂时无法读取支付密码状态，请重试", { exact: true }).waitFor();
   assert.equal(await pinInput().count(), 0, "An unreadable status must not render setup or payment inputs");
   statusFailure = false; await primary().click(); await pinInput().waitFor();
-  await pinInput().fill("039"); await page.locator(".payment-pin-close").click();
+  await typeFocusedPin("039", "payment-after-status-retry");
+  for (let tab = 0; tab < 12; tab++) {
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => !!document.activeElement?.closest(".payment-pin-mask")), true, "Tab must stay in the payment dialog");
+  }
+  await page.locator(".payment-pin-close").click();
+  await page.waitForFunction(() => document.activeElement === document.querySelector(".payment-pin-page__link"));
   await openPayment(); assert.equal(await pinInput().inputValue(), "", "Closing must clear the partial PIN");
   await page.locator(".payment-pin-mask").getByText("忘记支付密码", { exact: true }).click();
   await page.locator(".payment-pin-mask").getByText("+84 *** 1234", { exact: true }).waitFor();
@@ -217,6 +246,7 @@ try {
   assert.equal(await page.evaluate(() => window.__quoteResult === null && window.__quotePosts === 0), true);
   await openPayment(); assert.equal(await pinInput().inputValue(), "", "A quote change must clear the partial PIN");
   await page.locator(".payment-pin-close").click();
+  await page.getByText("订单信息已更新，请重新确认后支付", { exact: true }).waitFor({ state: "hidden" });
 
   for (const [locale, width] of [["en", 320], ["vi", 390]]) {
     await page.setViewportSize({ width, height: 844 });
@@ -229,18 +259,18 @@ try {
   assert.equal(setupCalls, 1); assert.deepEqual(pageErrors, []); assert.deepEqual(consoleErrors, []);
   const steps = [
     { id: "pin-quote-invalidated", status: "pass", evidence: ["With three PIN digits visible, a same-amount quote version change immediately closed the prompt, showed a review notice, cleared the input and issued zero purchase commands."] },
-    { id: "pin-setup", status: "pass", evidence: ["Exact Chinese first-setup reminder rendered; mismatch cleared the second field; setupCalls=1; the setup receipt left the payment promise unresolved until a third complete input."] },
-    { id: "pin-attempt", status: "pass", evidence: ["A rejected payment PIN reopened the same displayed amount and returned the server's four remaining attempts; the next complete input generated a distinct attempt number."] },
+    { id: "pin-setup", status: "pass", evidence: ["Exact Chinese first-setup reminder rendered; real keyboard input reached the focused first setup, second confirmation, mismatch retry and fresh third payment input; setupCalls=1; setup alone did not authorize payment. The heading retained its polite announcement, and Tab from expanded details reached the PIN input."] },
+    { id: "pin-attempt", status: "pass", evidence: ["A rejected payment PIN reopened the same displayed amount and returned the server's four remaining attempts; the retry automatically focused the real input and accepted keyboard digits, generating a distinct attempt number."] },
     { id: "pin-lock", status: "pass", evidence: ["The PIN input was disabled during the lock; after the deadline it remained blocked until the Retry action read fresh server state."] },
     { id: "pin-recovery", status: "pass", evidence: ["The recovery challenge sent no phone field; the bound masked phone was shown; SMS verification led to two new PIN inputs and resetCalls=1; a fresh payment PIN was then required."] },
     { id: "pin-change", status: "pass", evidence: ["Three independent masked inputs rendered; a wrong current PIN cleared only the current input and retained the new input; a correct retry produced a receipt and returned to the personal center. A later committed change lost its response; reloading recovered the persisted command with GET and did not repeat its POST; total changeCalls=3."] },
     { id: "pin-locales", status: "pass", evidence: ["Rendered Chinese at 390×844, English at 320×844 and Vietnamese at 390×844; the sheet width stayed within its viewport; screenshots 01 through 06 are in the report directory."] },
-    { id: "pin-recovery-statuses", status: "pass", evidence: ["A setup response was lost after commit; querying the original command completed setup with no second POST. An unavailable status showed retry with no password field. Closing cleared a partial PIN. Phone-unavailable showed support guidance with no arbitrary phone input."] },
+    { id: "pin-recovery-statuses", status: "pass", evidence: ["A setup response was lost after commit; querying the original command completed setup with no second POST. An unavailable status showed retry with no password field; successful retry focused the PIN input. Twelve Tab presses stayed inside the dialog, and closing restored focus to the original available page action and cleared the partial PIN. Phone-unavailable showed support guidance with no arbitrary phone input."] },
     { id: "pin-runtime-errors", status: "pass", evidence: ["The isolated browser session reported zero uncaught page errors and zero unexpected console errors; deliberately injected HTTP failures were recorded separately."] },
   ];
   const report = { capability: "runtime", verdict: "pass", mode: "full", treeMoved: false,
     taskId: process.env.WORKFLOW_TASK_ID || "standalone", stepId: process.env.WORKFLOW_STEP_ID || "standalone", checkId: process.env.WORKFLOW_CHECK_ID || "standalone", runId: process.env.WORKFLOW_RUN_ID || "standalone", repo: process.env.WORKFLOW_REPO || "standalone", snapshotHash: process.env.WORKFLOW_SNAPSHOT_HASH || "standalone",
-    source: "isolated browser server fixture; not a real backend payment", passed: true, viewport: ["390×844", "320×844"], locales: ["zh", "en", "vi"], setupCalls, resetCalls, changeCalls, pageErrors, consoleErrors, expectedTransportErrors, steps };
+    source: "isolated browser server fixture; not a real backend payment", passed: true, viewport: ["390×844", "320×844"], locales: ["zh", "en", "vi"], focusedPinStages, setupCalls, resetCalls, changeCalls, pageErrors, consoleErrors, expectedTransportErrors, steps };
   await writeFile(new URL("ui-fixture-report.json", output), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
 } catch (error) {

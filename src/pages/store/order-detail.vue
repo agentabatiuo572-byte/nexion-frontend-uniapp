@@ -193,7 +193,7 @@
         </view>
 
         <!-- Pending remote orders can retry only the idempotent UVEL wallet debit. -->
-        <view v-if="orderAction || orderCommandUnavailable" class="nx-glass-card mx-4 rounded-2xl" style="padding:16px;margin-top:12px" role="status">
+        <view v-if="orderAction || orderCommandUnavailable" class="nx-glass-card mx-4 rounded-2xl" style="padding:var(--v5-space-4);margin-top:var(--v5-space-3)" role="status">
           <text class="block">{{ orderAction?.kind==='cancel' ? recoveryCopy.cancelPending : recoveryCopy.paymentPending }}</text>
           <view class="flex flex-wrap gap-2 mt-3">
             <NxButton variant="secondary" size="small" :label="recoveryCopy.query" :busy="orderCommandQuerying" :disabled="payingFromWallet || cancellingOrder" @click="recoverOrderAction(false)" />
