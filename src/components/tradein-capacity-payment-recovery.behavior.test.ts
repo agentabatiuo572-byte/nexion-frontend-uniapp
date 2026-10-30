@@ -16,7 +16,7 @@ const code=ts.transpileModule(ast.statements.filter(ts.isFunctionDeclaration).fi
 const quote:CanonicalCapacityReplaceQuote={decision:'REPLACE_REQUIRED',sourceDeviceId:11,sourceDeviceName:'Old',targetProductNo:'stellarbox-s1',targetProductId:22,targetProductName:'Device',targetPriceUsdt:100,payableUsdt:100,maxActiveDevices:2,activeDevices:2,walletBalanceUsdt:1000,sufficientFunds:true,decisionSource:'server'};
 function page(storage=new Map<string,unknown>()){
   vi.stubGlobal('uni',{getStorageSync:(key:string)=>storage.get(key),setStorageSync:(key:string,value:unknown)=>storage.set(key,structuredClone(value))});
-  const props={active:true},state=ref<TradeinSheetState>({kind:'replace',newKind:'stellarbox-s1',canonicalCapacityQuote:{...quote}});
+  const props={active:true},state=ref<TradeinSheetState>({kind:'replace',newKind:'stellarbox-s1',newPrice:100,oldDeviceId:'11',canonicalCapacityQuote:{...quote}});
   const scope={accountKey:'account-a',epoch:1};
   const replacement={tradeinNo:'TI-1',orderNo:'ORDER-1',sourceDeviceId:11,targetDeviceId:31,targetDeviceStatus:'ACTIVE',applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:0,walletDebitUsdt:100,walletBalanceAfterUsdt:900};
   const deviceE3Api={capacityReplace:vi.fn().mockResolvedValue(replacement),capacityKeep:vi.fn(),replayCapacityKeep:vi.fn()};
@@ -61,7 +61,7 @@ describe('actual capacity purchase result recovery',()=>{
   it('capacity keep also recovers its paid receipt without issuing another purchase or requiring PIN',async()=>{
     const p=page();p.deviceE3Api.capacityKeep.mockRejectedValueOnce(new Error('timeout'));
     const available:CanonicalCapacityReplaceQuote={...p.quote,decision:'CAPACITY_AVAILABLE',sourceDeviceId:null,sourceDeviceName:null};
-    p.state.value={kind:'replace',newKind:'stellarbox-s1',canonicalCapacityQuote:available};
+    p.state.value={kind:'replace',newKind:'stellarbox-s1',newPrice:100,oldDeviceId:'11',canonicalCapacityQuote:available};
     await p.actual.submitCanonicalKeepBuy(p.quote.targetProductNo,available);
     p.readPaymentCommand.mockResolvedValue({status:'SUCCEEDED',canResumeSameKey:false,receipt:{operationNo:'KEEP-1',orderNo:'KEEP-ORDER',targetDeviceId:32,deviceStatus:'ACTIVE',orderStatus:'COMPLETED',walletDebitUsdt:100,walletBalanceAfterUsdt:900}});
     await p.actual.recoverCapacityPurchase(false);
@@ -85,7 +85,7 @@ describe('actual capacity purchase result recovery',()=>{
     await p.actual.submitCanonicalCapacityReplacement(p.quote,p.quote.targetProductNo);
     expect(p.storage.size).toBe(0);expect(p.deviceE3Api.capacityReplace).not.toHaveBeenCalled();
     p.executePaymentWithPassword.mockImplementationOnce(async(_context,command,current)=>{
-      p.state.value={kind:'replace',newKind:'stellarbox-s1',canonicalCapacityQuote:{...p.quote,payableUsdt:101}};
+      p.state.value={kind:'replace',newKind:'stellarbox-s1',newPrice:100,oldDeviceId:'11',canonicalCapacityQuote:{...p.quote,payableUsdt:101}};
       return current()?command({paymentPassword:'039417'}):null;
     });
     await p.actual.submitCanonicalCapacityReplacement(p.quote,p.quote.targetProductNo);
