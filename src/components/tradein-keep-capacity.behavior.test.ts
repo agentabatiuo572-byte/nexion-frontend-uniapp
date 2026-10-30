@@ -87,13 +87,15 @@ it("recovers a pre-upgrade KEEP after a lost response using the stored key and p
 });
 
 it.each(["malformed", []])("does not treat an invalid commands container as a missing legacy KEEP: %s", async commands => {
-  const deps = { app: { accountKey: "user:7" }, CAPACITY_COMMAND_TABLE: "keep-commands",
+  const deps = { app: { accountKey: "user:7" }, CAPACITY_COMMAND_TABLE: "keep-commands", CAPACITY_RECOVERY_TABLE: 'capacity-payment',
     readPendingKeepCommand: (account: string, target: string) => parsePendingKeepCommand({ "user:7": { commands } }, account, target),
+    readAccountRow: () => null, capacityRecovery: ref(null), capacityRecoveryBusy: ref(false), capacityRecoveryUnavailable: ref(false), capacityResumeAllowed: ref(false),
+    recoveryCopy: ref({ paymentPending: zh.tradein.keepRecoveryReadError }),
     captureAccountScope: () => ({}), isCurrentAccountScope: () => true, canonicalCapacityKey: vi.fn(),
     deviceE3Api: { capacityKeep: vi.fn(), replayCapacityKeep: vi.fn() },
     refreshKeepRecovery: vi.fn(), toast: { warn: vi.fn() }, t: ref(zh), confirming: ref(true) };
   const functions = ast.statements.filter(node => ts.isFunctionDeclaration(node)
-    && ["readPendingKeep", "capacityIntent", "submitCanonicalKeepBuy"].includes(node.name?.text ?? ""));
+    && ["readPendingKeep", "capacityIntent", "submitCanonicalKeepBuy", "readCapacityPending", "runCanonicalCapacityPurchase"].includes(node.name?.text ?? ""));
   const compiled = ts.transpileModule(functions.map(node => node.getText(ast)).join("\n"),
     { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const submit = new Function(...Object.keys(deps), `${compiled};return submitCanonicalKeepBuy;`)(...Object.values(deps));
@@ -101,7 +103,7 @@ it.each(["malformed", []])("does not treat an invalid commands container as a mi
   expect(deps.canonicalCapacityKey).not.toHaveBeenCalled();
   expect(deps.deviceE3Api.capacityKeep).not.toHaveBeenCalled();
   expect(deps.deviceE3Api.replayCapacityKeep).not.toHaveBeenCalled();
-  expect(deps.toast.warn).toHaveBeenCalledWith(zh.tradein.errPleaseRetry);
+  expect(deps.toast.warn).toHaveBeenCalledWith(zh.tradein.keepRecoveryReadError);
 });
 
 it("distinguishes missing history from malformed rows and rejects two matching KEEP keys in either order", () => {
