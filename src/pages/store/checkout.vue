@@ -12,6 +12,10 @@
       <view v-if="pendingCheckoutCreate && !createdCheckoutOrder && !paymentFlowBusy" class="checkout-exit-error" role="status">
         <text>{{ t.store.coRecoverOriginalOrder }}</text><NxButton :label="t.store.catalogRetry" :busy="checkoutLeaving" @click="recoverCheckoutCreation" />
       </view>
+      <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:20px">
+        <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : t.tradein.keepRecoveryPending }}</text>
+        <NxButton :label="t.tradein.keepRecoveryAction" @click="recoverKeepBeforePurchase([keepCheckoutTarget])" />
+      </view>
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:20px">
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);margin-bottom:12px">{{ t.tradein.recoveryPending }}</text>
         <NxButton :label="t.store.catalogRetry" :busy="remoteTradeinRecoveryBusy" @click="resumePendingRemoteTradein(captureCheckoutRoute(), true, true)" />
@@ -242,7 +246,7 @@
         <view class="checkout-sticky-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue ?? '-'" currency="USDT" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
       </view>
-      <view v-if="!promotionRoute && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky">
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky">
         <view class="checkout-sticky-copy"><CheckoutAmount class="checkout-total" :value="netPrice + cardFee" currency="USDT" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
@@ -267,6 +271,7 @@ import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
+import { readPendingKeepCommand } from '@/lib/keep-command-recovery';
 import { validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
 import { takeNavigationQuery } from '@/lib/route';
 import { promotionCheckoutHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
@@ -379,6 +384,7 @@ const legalCopy = computed(() => locale.code === 'zh'
     : { before: 'Before paying, review ', join: ' and ', end: '.' });
 const app = useApp();
 const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string}&VoucherEntryContext)|null>(null);
+const keepCheckoutTarget = ref<string | null>(null), keepCheckoutReadError = ref(false);
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 const checkoutResultVisible = computed(() => promotionRoute.value ? promotionCheckout.value?.resultVisible === true : remoteApiEnabled && settledResultReplay.value);
 const policyHasDevice=computed(()=>promotionRoute.value ? promotionCheckout.value?.hasDevicePolicy===true : !!product.value&&product.value.productType!=='SHARE');
@@ -539,6 +545,20 @@ function purchaseEligibilityFailureCopy(): string {
   return purchaseGate.value.soldOut
     ? t.value.store.gateSoldOutToast
     : t.value.store.gateBlockedToast;
+}
+
+function recoverKeepBeforePurchase(targets: string[]): boolean {
+  keepCheckoutTarget.value = null; keepCheckoutReadError.value = false;
+  if (!remoteApiEnabled) return false;
+  for (const target of targets) {
+    try { if (!readPendingKeepCommand(app.accountKey, target)) continue; }
+    catch { keepCheckoutReadError.value = true; }
+    keepCheckoutTarget.value = target;
+    productId.value = target;
+    tradein.showKeepRecovery(target as DeviceKind);
+    return true;
+  }
+  return false;
 }
 
 onLoad(async (options) => {
@@ -1003,6 +1023,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   receiptRetrying.value = false;
   restoreReceiptRecovery();
   remoteTradeinRecoveryRequired.value = false;
+  keepCheckoutTarget.value = null; keepCheckoutReadError.value = false;
   remoteTradeinRecoveryError.value = false;
   remoteTradeinRecoveryBusy.value = false;
   remoteOrderCommandKey.clear();
@@ -2030,7 +2051,8 @@ function resumeServerOrder(routeScope = captureCheckoutRoute()): Promise<boolean
     isCurrent: () => isCurrentCheckoutRoute(routeScope),
     isCurrentAccount: () => isCurrentAccountScope({ accountKey: routeScope.accountKey, epoch: routeScope.accountEpoch }),
     navigate: (url) => isCurrentCheckoutRoute(routeScope) ? navReplace(url) : Promise.resolve(false),
-  })).finally(() => { if (serverOrderRecovery?.key === key) serverOrderRecovery = null; });
+  })).then(recovered => recovered || (isCurrentCheckoutRoute(routeScope) && recoverKeepBeforePurchase([routeScope.productNo])))
+    .finally(() => { if (serverOrderRecovery?.key === key) serverOrderRecovery = null; });
   serverOrderRecovery = { key, promise };
   return promise;
 }

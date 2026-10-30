@@ -7,6 +7,7 @@ import { zh } from "@/i18n/messages/zh";
 import { completeVerifiedMutation } from "@/domain/e20-capacity-coordinator";
 import { createDeviceE3Api } from "@/api/device-e3-api";
 import type { ApiClient } from "@/api/api-client";
+import { parsePendingKeepCommand } from "@/lib/keep-command-recovery";
 import { readPaymentCommand } from "@/api/payment-command-api";
 import { parseCanonicalCapacityKeepResult } from "@/api/device-e3-api";
 
@@ -53,6 +54,7 @@ it("recovers a pre-upgrade KEEP after a lost response using the stored key and p
   });
   const deps = { app: { accountKey: "user:7", devices: [{ id: "1204", activatedAt: 1 }], refreshRemoteFleet: vi.fn(async () => true) },
     CAPACITY_COMMAND_TABLE: "nexgrid-e3-capacity-commands-accounts-v1",CAPACITY_RECOVERY_TABLE:'capacity-payment',
+    readPendingKeepCommand: (account: string, target?: string) => parsePendingKeepCommand({ "user:7": { commands } }, account, target),
     readAccountRow: vi.fn(table => table==='capacity-payment'?{pending}:{commands}),writeAccountRow:vi.fn((_table,_account,value)=>{pending=value.pending;return true;}),
     captureAccountScope: () => ({ accountKey: "user:7" }), isCurrentAccountScope: () => true,
     canonicalCapacityKey, deviceE3Api: createDeviceE3Api(transport as unknown as ApiClient), completeVerifiedMutation,
@@ -82,6 +84,48 @@ it("recovers a pre-upgrade KEEP after a lost response using the stored key and p
   expect(releaseAccountCommandKey).toHaveBeenCalledExactlyOnceWith(deps.CAPACITY_COMMAND_TABLE, "user:7", legacyIntent, "legacy-keep-key");
   expect(deps.toast.success).toHaveBeenCalledOnce();
   expect(deps.goDevices).toHaveBeenCalledOnce();
+});
+
+it.each(["malformed", []])("does not treat an invalid commands container as a missing legacy KEEP: %s", async commands => {
+  const deps = { app: { accountKey: "user:7" }, CAPACITY_COMMAND_TABLE: "keep-commands", CAPACITY_RECOVERY_TABLE: 'capacity-payment',
+    readPendingKeepCommand: (account: string, target: string) => parsePendingKeepCommand({ "user:7": { commands } }, account, target),
+    readAccountRow: () => null, capacityRecovery: ref(null), capacityRecoveryBusy: ref(false), capacityRecoveryUnavailable: ref(false), capacityResumeAllowed: ref(false),
+    recoveryCopy: ref({ paymentPending: zh.tradein.keepRecoveryReadError }),
+    captureAccountScope: () => ({}), isCurrentAccountScope: () => true, canonicalCapacityKey: vi.fn(),
+    deviceE3Api: { capacityKeep: vi.fn(), replayCapacityKeep: vi.fn() },
+    refreshKeepRecovery: vi.fn(), toast: { warn: vi.fn() }, t: ref(zh), confirming: ref(true) };
+  const functions = ast.statements.filter(node => ts.isFunctionDeclaration(node)
+    && ["readPendingKeep", "capacityIntent", "submitCanonicalKeepBuy", "readCapacityPending", "runCanonicalCapacityPurchase"].includes(node.name?.text ?? ""));
+  const compiled = ts.transpileModule(functions.map(node => node.getText(ast)).join("\n"),
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const submit = new Function(...Object.keys(deps), `${compiled};return submitCanonicalKeepBuy;`)(...Object.values(deps));
+  await submit("stellarbox-s1", { decision: "CAPACITY_AVAILABLE", targetProductNo: "stellarbox-s1", decisionSource: "server" });
+  expect(deps.canonicalCapacityKey).not.toHaveBeenCalled();
+  expect(deps.deviceE3Api.capacityKeep).not.toHaveBeenCalled();
+  expect(deps.deviceE3Api.replayCapacityKeep).not.toHaveBeenCalled();
+  expect(deps.toast.warn).toHaveBeenCalledWith(zh.tradein.keepRecoveryReadError);
+});
+
+it("distinguishes missing history from malformed rows and rejects two matching KEEP keys in either order", () => {
+  const handler = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "readPendingKeep")!;
+  const compiled = ts.transpileModule(handler.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  let stored: unknown = "";
+  const read = new Function("app", "readPendingKeepCommand", `${compiled};return readPendingKeep;`)(
+    { accountKey: "user:7" }, (account: string, target: string) => parsePendingKeepCommand(stored, account, target));
+  expect(read("stellarbox-s1")).toBeNull();
+  stored = {}; expect(read("stellarbox-s1")).toBeNull();
+  stored = { "user:7": { commands: {} } }; expect(read("stellarbox-s1")).toBeNull();
+  for (const invalid of ["malformed", [], null, {}]) {
+    stored = { "user:7": invalid };
+    expect(() => read("stellarbox-s1")).toThrow("CAPACITY_KEEP_COMMAND_STORAGE_INVALID");
+  }
+  const entries = [["keep|1156|stellarbox-s1|1|1299|1299|6", "first"], ["keep|1157|stellarbox-s1|1|1399|1399|6", "second"]];
+  for (const ordered of [entries, [...entries].reverse()]) {
+    stored = { "user:7": { commands: Object.fromEntries(ordered) } };
+    const before = JSON.stringify(stored);
+    expect(() => read("stellarbox-s1")).toThrow("CAPACITY_KEEP_ORIGINAL_COMMAND_AMBIGUOUS");
+    expect(JSON.stringify(stored)).toBe(before);
+  }
 });
 
 it("checks the original KEEP before obtaining a new full-price capacity quote", async () => {
