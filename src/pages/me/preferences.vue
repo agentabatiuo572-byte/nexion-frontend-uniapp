@@ -74,7 +74,7 @@ const preferenceError = computed(() => {
   return prefs.error === "updateFailed" ? labels.updateFailed : labels.unavailable;
 });
 
-const notifKinds: NotifKind[] = ["commission", "team", "staking", "market", "genesis", "system"];
+const notifKinds: NotifKind[] = ["commission", "team", "market", "genesis", "system"];
 const NOTIF_COLOR: Record<NotifKind, string> = {
   commission: "var(--v5-brand)",
   team: "var(--v5-tech-cyan)",
