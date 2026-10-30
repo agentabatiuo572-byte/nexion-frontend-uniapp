@@ -746,6 +746,11 @@ export const zh: Messages = {
     // LiveFeedCard (tabs + chrome)
     liveFeedTabActivity: "动态",
     liveFeedTabEarnings: "收益",
+    liveFeedTitleActivity: "我的算力动态",
+    liveFeedTitleEarnings: "最近收入",
+    feedRunning: "进行中",
+    feedEstimated: "预计",
+    incomeEmpty: "暂无收入记录。",
     liveFeedLive: "实时",
     liveFeedBought: "购买了 {product}",
     liveFeedSeeAll: "查看全部",

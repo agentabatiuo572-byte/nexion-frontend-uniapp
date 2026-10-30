@@ -759,6 +759,11 @@ export const vi: Messages = {
     // LiveFeedCard (tabs + chrome)
     liveFeedTabActivity: "Hoạt động",
     liveFeedTabEarnings: "Thu nhập",
+    liveFeedTitleActivity: "Hoạt động tính toán",
+    liveFeedTitleEarnings: "Thu nhập gần đây",
+    feedRunning: "Đang chạy",
+    feedEstimated: "Dự kiến",
+    incomeEmpty: "Chưa có khoản thu nào.",
     liveFeedLive: "trực tiếp",
     liveFeedBought: "vừa mua {product}",
     liveFeedSeeAll: "Xem tất cả",

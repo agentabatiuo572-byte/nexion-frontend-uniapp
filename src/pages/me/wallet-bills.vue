@@ -109,7 +109,6 @@
 <script setup lang="ts">
 import { platformDisplayText } from "@/lib/brand-copy";
 
-import { formatUsd } from "@/lib/usd-display";
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -120,7 +119,7 @@ import BillTypeIcon from "@/components/me/bill-type-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { walletBillMonthKey, walletBillMonthLabel, walletBillTimeLabel } from "@/lib/wallet-bill-date";
-import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
+import { WALLET_BILL_TYPE_COLOR, formatWalletBillDecimal, resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
 import { useApp } from "@/store/app";
@@ -209,23 +208,7 @@ const refreshErrorWithRows = computed(() => fundsServerEnabled && activePager.va
 const appendError = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.rows.length > 0 && Boolean(activePager.value.error));
 const showManualLoadMore = computed(() => fundsServerEnabled && !ledgerBizNo.value && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore && !appendError.value && !refreshErrorWithRows.value);
 
-// Type accent colours. Most map to tokens; refer/topup use official accents
-// (like the card-brand colours) kept literal on purpose.
-const TYPE_COLOR: Record<BillType, string> = {
-  earn: "var(--v5-brand)",
-  refer: "#86E81F",
-  bonus: "var(--v5-warning)",
-  topup: "#3DA9FF",
-  withdraw: "var(--v5-brand-2)",
-  purchase: "var(--v5-tech-cyan)",
-  refund: "var(--v5-tech-cyan)",
-  swap: "var(--v5-brand)",
-  verification: "var(--v5-tech-cyan)",
-  stake: "var(--v5-warning)",
-  unstake: "var(--v5-ink-3)",
-  achievement: "var(--v5-warning)",
-  other: "var(--v5-ink-3)",
-};
+const TYPE_COLOR = WALLET_BILL_TYPE_COLOR;
 function typeColor(type: BillType): string {
   return TYPE_COLOR[type];
 }
@@ -283,9 +266,7 @@ function billMemo(b: Bill): string {
 }
 function toggleSourceRef(id: string) { sourceRefOpen.value = sourceRefOpen.value === id ? "" : id; }
 function decimalLabel(exact: string | undefined, fallback: number, symbol: Bill['symbol']): string {
-  const amount = exact === undefined ? Math.abs(fallback) : exact.replace(/^-/, "");
-  const formatted = formatUsd(amount, symbol === 'USDT' ? 'detail' : 'overview').replace('$', '');
-  return dateLocale().startsWith('vi') ? formatted.replace(/[.,]/g, mark => mark === '.' ? ',' : '.') : formatted;
+  return formatWalletBillDecimal(exact, fallback, symbol, dateLocale());
 }
 function isDebit(b: Bill): boolean {
   return b.amountExact === undefined ? b.amount < 0 : b.amountExact.startsWith("-");
