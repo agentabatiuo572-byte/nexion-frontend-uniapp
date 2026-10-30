@@ -29,13 +29,13 @@ function onInput(event: Event) {
 }
 </script>
 <style scoped>
-.payment-pin-input { position: relative; width: 100%; min-width: 0; margin: 12px 0; }
-.payment-pin-input__cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; }
-.payment-pin-input__cell { height: 52px; display: flex; align-items: center; justify-content: center; background: var(--v5-surface-2); border: 1px solid var(--v5-border); border-radius: 10px; }
+.payment-pin-input { position: relative; width: 100%; min-width: 0; margin: var(--v5-space-3) 0; }
+.payment-pin-input__cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--v5-space-2); }
+.payment-pin-input__cell { height: 52px; display: flex; align-items: center; justify-content: center; background: var(--v5-surface-2); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-s); }
 .payment-pin-input__cell--active { border-color: var(--v5-brand); }
 .payment-pin-input__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--v5-ink); }
 .payment-pin-input__control { position: absolute; inset: 0; width: 100%; height: 52px; opacity: 0; caret-color: transparent; color: transparent; }
 .payment-pin-input--disabled { opacity: .55; }
-.payment-pin-input--focused .payment-pin-input__cells { outline: 2px solid var(--v5-brand); outline-offset: 3px; border-radius: 10px; }
+.payment-pin-input--focused .payment-pin-input__cells { outline: 2px solid var(--v5-brand); outline-offset: 3px; border-radius: var(--v5-radius-s); }
 .payment-pin-input__status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 </style>

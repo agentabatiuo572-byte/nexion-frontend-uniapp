@@ -40,7 +40,7 @@
         <template v-else>
           <text v-if="ui.stage !== 'pay'" class="payment-pin-step">{{ confirming ? t.paymentPin.stepTwo : t.paymentPin.stepOne }}</text>
           <text class="payment-pin-note">{{ confirming ? t.paymentPin.repeatDigits : t.paymentPin.sixDigits }}</text>
-          <PaymentPasswordInput :key="`${ui.stage}:${ui.revision}`" v-model="password" :label="title" :auto-focus="ui.stage === 'pay' && ui.error === 'incorrect'" :disabled="ui.busy || (ui.stage === 'pay' && !!ui.state?.lockedUntil)" @complete="complete" />
+          <PaymentPasswordInput :key="`${ui.stage}:${ui.revision}`" v-model="password" :label="title" :auto-focus="!ui.busy && !(ui.stage === 'pay' && !!ui.state?.lockedUntil)" :disabled="ui.busy || (ui.stage === 'pay' && !!ui.state?.lockedUntil)" @complete="complete" />
           <template v-if="ui.stage === 'pay'">
             <text class="payment-pin-note">{{ Number(ui.context?.amount) === 0 ? t.paymentPin.autoConfirm : t.paymentPin.autoSubmit }}</text>
             <text v-if="pin.locked()" class="payment-pin-error" role="alert">{{ lockMessage }}</text>
@@ -109,26 +109,26 @@ onUnmounted(() => { clearInterval(timer); if (typeof document !== "undefined") d
 useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
 </script>
 <style scoped>
-.payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: var(--nx-overlay-top) 12px var(--nx-overlay-bottom); background: var(--v5-bg-color-mask); }
-.payment-pin-sheet { width: 100%; max-width: 440px; max-height: calc(100dvh - var(--nx-overlay-top) - var(--nx-overlay-bottom)); overflow-y: auto; overscroll-behavior: contain; padding: 20px; background: var(--v5-surface); color: var(--v5-ink); border-radius: 16px; box-shadow: 0 16px 48px var(--v5-bg-color-mask); }
-.payment-pin-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: var(--nx-overlay-top) var(--v5-space-3) var(--nx-overlay-bottom); background: var(--v5-bg-color-mask); }
+.payment-pin-sheet { width: 100%; max-width: 440px; max-height: calc(100dvh - var(--nx-overlay-top) - var(--nx-overlay-bottom)); overflow-y: auto; overscroll-behavior: contain; padding: var(--v5-space-5); background: var(--v5-surface); color: var(--v5-ink); border-radius: var(--v5-radius-m); box-shadow: 0 16px 48px var(--v5-bg-color-mask); }
+.payment-pin-header { display: flex; align-items: flex-start; gap: var(--v5-space-3); margin-bottom: var(--v5-space-4); }
 .payment-pin-title { flex: 1; font-size: var(--ui-type-section); font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
 .payment-pin-close { width: 44px; min-height: 44px; flex: 0 0 44px; margin-top: -10px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); }
-.payment-pin-body { display: flex; flex-direction: column; gap: 8px; }
+.payment-pin-body { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .payment-pin-note { display: block; color: var(--v5-ink-2); font-size: var(--ui-type-list-subtitle); line-height: 1.65; }
 .payment-pin-note--important { color: var(--v5-ink); }
-.payment-pin-step { color: var(--v5-ink-3); font-size: var(--ui-type-meta); margin-top: 8px; }
-.payment-pin-summary { padding: 12px 0; margin-bottom: 4px; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
+.payment-pin-step { color: var(--v5-ink-3); font-size: var(--ui-type-meta); margin-top: var(--v5-space-2); }
+.payment-pin-summary { padding: var(--v5-space-3) 0; margin-bottom: var(--v5-space-1); border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
 .payment-pin-summary__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-type-list-subtitle); }
-.payment-pin-summary__amount { display: block; margin-top: 8px; font-weight: 650; font-size: var(--ui-type-card-title); overflow-wrap: anywhere; }
+.payment-pin-summary__amount { display: block; margin-top: var(--v5-space-2); font-weight: 650; font-size: var(--ui-type-card-title); overflow-wrap: anywhere; }
 .payment-pin-details { font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: anywhere; }
-.payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 10px; padding: 12px 16px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: 600; }
+.payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--ui-space-row-y); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: 600; }
 .payment-pin-primary[aria-disabled="true"] { opacity: .45; }
 .payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
 .payment-pin-link--muted { color: var(--v5-ink-2); }
 .payment-pin-link[aria-disabled="true"] { opacity: .45; }
-.payment-pin-phone { display: block; font-weight: 600; margin-top: 8px; }
-.payment-pin-code { width: 100%; min-height: 48px; padding: 12px; border-radius: 12px; color: var(--v5-ink); background: var(--v5-surface-2); border: 1px solid var(--v5-border); }
+.payment-pin-phone { display: block; font-weight: 600; margin-top: var(--v5-space-2); }
+.payment-pin-code { width: 100%; min-height: 48px; padding: var(--v5-space-3); border-radius: var(--v5-radius-s); color: var(--v5-ink); background: var(--v5-surface-2); border: 1px solid var(--v5-border); }
 .payment-pin-error { display: block; color: var(--v5-danger); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
 @media (min-width: 500px) { .payment-pin-mask { align-items: center; } }
 </style>
