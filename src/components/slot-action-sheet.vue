@@ -116,7 +116,7 @@ const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableIn
 const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
 const activeCount = computed(() => app.activeSlotCount);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const slotsUsed = computed(() => activeCount.value + reservedSlots.value);
+const slotsUsed = computed(() => app.remoteSlotsUsed ?? activeCount.value + reservedSlots.value);
 const slotsFull = computed(() => slotsUsed.value >= app.slotCap);
 
 const activateRowText = computed(() =>

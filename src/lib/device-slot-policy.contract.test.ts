@@ -20,6 +20,7 @@ describe("device slot policy consumers", () => {
     expect(checkout).not.toContain("targetOccupiesPhysicalSlot");
     expect(deviceInventory).toContain(':disabled="slotsFull || !activationReady"');
     expect(deviceInventory).toContain("if (slotsFull.value)");
-    expect(slots).toContain('v-if="app.activeSlotCount + trialSlot < app.slotCap"');
+    expect(slots).toContain('v-if="slotsUsed < app.slotCap"');
+    expect(slots).toContain('app.remoteSlotsUsed ?? app.activeSlotCount + trialSlot.value');
   });
 });
