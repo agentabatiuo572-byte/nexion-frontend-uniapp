@@ -171,11 +171,11 @@ describe("Me wallet and device authority", () => {
     s.devices.push({ kind: "phone", activatedAt: 1 }, { kind: "stellarbox-s1", activatedAt: 1, pendingDeactivate: true },
       { kind: "cloud-share", activatedAt: 1, pendingDeactivate: true }, { kind: "stellarbox-s1", activatedAt: null },
       { kind: "cloud-share", activatedAt: null, activationUnconfirmed: true });
-    expect(s.readDevices()).toEqual({ count: "1 / 3", active: "3 active", open: "2 slots open", walletSummary: "3 active · 2 slots open", warehouseActive: 3 });
+    expect(s.readDevices()).toEqual({ count: "3 / 3", active: "3 active", open: "0 slots open", walletSummary: null, warehouseActive: 3 });
     s.devices[1].pendingDeactivate = false;
-    expect(s.readDevices()).toMatchObject({ count: "2 / 3", active: "3 active", open: "1 slot open", walletSummary: "3 active · 1 slot open" });
+    expect(s.readDevices()).toMatchObject({ count: "3 / 3", active: "3 active", open: "0 slots open", walletSummary: null });
     s.devices[1].activatedAt = null;
-    expect(s.readDevices()).toMatchObject({ count: "1 / 3", active: "2 active", open: "2 slots open", walletSummary: "2 active · 2 slots open", warehouseActive: 2 });
+    expect(s.readDevices()).toMatchObject({ count: "2 / 3", active: "2 active", open: "1 slot open", walletSummary: "2 active · 1 slot open", warehouseActive: 2 });
   });
 
   it("keeps hidden PC share occupancy while counting only the visible activated fleet", () => {
