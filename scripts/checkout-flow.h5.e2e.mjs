@@ -10,6 +10,7 @@ await mkdir(output,{recursive:true});
 const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 const sourceDiff=()=>createHash('sha256').update(execFileSync('git',['diff','HEAD','--binary'],{maxBuffer:16*1024*1024})).digest('hex');
 const sourceDiffHash=sourceDiff();
+const sourceMoved=()=>sourceCommit!==execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()||sourceDiffHash!==sourceDiff();
 const entry=(await readFile('dist/build/h5/index.html','utf8')).match(/assets\/index-[^" ]+\.js/)[0];
 const artifact={entry,sha256:createHash('sha256').update(await readFile('dist/build/h5/'+entry)).digest('hex')};
 const recordBase={capability:'runtime',mode:'full',taskId:process.env.WORKFLOW_TASK_ID??'standalone',stepId:process.env.WORKFLOW_STEP_ID??'standalone',checkId:process.env.WORKFLOW_CHECK_ID??'standalone',runId:process.env.WORKFLOW_RUN_ID??randomUUID(),repo:process.env.WORKFLOW_REPO??process.cwd(),snapshotHash:process.env.WORKFLOW_SNAPSHOT_HASH??`${sourceCommit}:${sourceDiffHash}`,sourceCommit,sourceDiffHash,artifact,source:'built APP, isolated synthetic network; not real backend payment'};
@@ -46,6 +47,25 @@ try {
     await writeFile(path.join(output,'cold-original-failure.json'),JSON.stringify({error:String(error),responses:coldResponses,body:await coldPage.locator('body').innerText()},null,2));
     throw error;
   } finally {await coldContext.close();}
+  const deniedContext=await browser.newContext({viewport:{width:390,height:844}});
+  try {
+    await deniedContext.route('**/api/store/purchase-eligibility?**',async intercepted=>{
+      const response=await intercepted.fetch(),body=await response.json();
+      body.data.eligible=false;
+      body.data.decisionCode='F4B_QUOTA_REACHED';
+      const quota=body.data.policies.find(policy=>policy.policy==='F4B');
+      quota.eligible=false;quota.decisionCode='F4B_QUOTA_REACHED';
+      await intercepted.fulfill({response,json:body});
+    });
+    const deniedPage=await deniedContext.newPage();
+    await deniedPage.goto(base+'/?nx_device_inner=1#/pages/store/order-detail?id=DEMO-ORDER-001&from=me&pay=1');
+    await deniedPage.getByText('暂时无法支付',{exact:true}).waitFor({timeout:15000});
+    assert.equal(await deniedPage.getByRole('button',{name:'确认支付',exact:true}).count(),0);
+    assert.equal(await deniedPage.locator('.payment-pin-mask').count(),0);
+    assert.equal((await state()).payWrites,0);assert.equal((await state()).orders.length,0);
+    await deniedPage.screenshot({path:path.join(output,'00b-original-quota-rejected.png'),fullPage:true});
+    steps.push({id:'original-eligibility-rejection',status:'pass',evidence:['Authoritative overall eligibility false with F4B quota refusal blocks method selection and PIN; no order creation or payment.','00b-original-quota-rejected.png']});
+  } finally {await deniedContext.close();}
   await route('/pages/store/checkout?product=stellarbox-s1');
   await page.getByRole('button',{name:'立即支付',exact:true}).waitFor();
   assert.equal(await page.locator('.checkout-cancel').count(),0);
@@ -116,8 +136,8 @@ try {
   steps.push({id:'fresh-stock-after-pin',status:'pass',evidence:['Original pending order: stock changed to zero while PIN was open. Fresh catalogue GET happened after PIN; payment POST did not happen, debit count unchanged, and a small rejection dialog offered cancellation.','09-stock-changed-after-pin.png']});
   assert.deepEqual(errors,[]);
   await writeFile(path.join(output,'requests.json'),JSON.stringify(requests,null,2));
-  const treeMoved=sourceDiffHash!==sourceDiff();assert.equal(treeMoved,false,'source changed during runtime acceptance');
+  const treeMoved=sourceMoved();assert.equal(treeMoved,false,'source changed during runtime acceptance');
   await writeFile(path.join(output,'record.json'),JSON.stringify({...recordBase,verdict:'pass',treeMoved,steps,innerSkipped:0},null,2));
   console.log('PASS actual APP payment/activation runtime; synthetic commerce only.');
-} catch(error) {await capture('failure').catch(()=>{});await writeFile(path.join(output,'record.json'),JSON.stringify({...recordBase,verdict:'fail',treeMoved:sourceDiffHash!==sourceDiff(),steps,error:String(error)},null,2));await writeFile(path.join(output,'failure.json'),JSON.stringify({error:String(error),errors,requests,body:await page.locator('body').innerText().catch(()=>''),logs},null,2));throw error;}
+} catch(error) {await capture('failure').catch(()=>{});await writeFile(path.join(output,'record.json'),JSON.stringify({...recordBase,verdict:'fail',treeMoved:sourceMoved(),steps,error:String(error)},null,2));await writeFile(path.join(output,'failure.json'),JSON.stringify({error:String(error),errors,requests,body:await page.locator('body').innerText().catch(()=>''),logs},null,2));throw error;}
 finally {await context.close();await browser.close();server.kill();}

@@ -830,12 +830,11 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
       await navTo(`/pages/store/checkout?orderNo=${encodeURIComponent(original.id)}`);
       return;
     }
-    // This endpoint has no quantity context; use its explicit qualification
-    // denials, read stock separately, and leave final quotas/capacity to pay.
+    // The backend owns ALL/EITHER qualification semantics; do not recompute
+    // its overall decision from individual policy conditions.
     const eligibility = await purchaseEligibilityApi.get(original.productId);
     if (!isCurrentDetailScope(scope)) return;
-    if (eligibility.policies.some(policy => policy.policy === 'E1' && !policy.eligible
-        && policy.conditions.some(condition => ['rank','activeDirect','teamComputePoints'].includes(condition.kind) && !condition.met))) {
+    if (!eligibility.eligible) {
       paymentNoticeReason.value = t.value.store.gateBlockedToast;
       paymentNotice.value = 'blocked';
       return;
