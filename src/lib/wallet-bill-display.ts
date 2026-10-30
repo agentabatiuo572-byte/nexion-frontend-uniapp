@@ -46,15 +46,14 @@ export function formatWalletBillDecimal(exact: string | undefined, fallback: num
   return locale.startsWith("vi") ? formatted.replace(/[.,]/g, mark => mark === "." ? "," : ".") : formatted;
 }
 
-// Type accent colours. Most map to tokens; refer/topup use official accents
-// (like the card-brand colours) kept literal on purpose.
+// Type accent colours, all from tokens.
 export const WALLET_BILL_TYPE_COLOR: Record<BillType, string> = {
   earn: "var(--v5-brand)",
-  refer: "#86E81F",
+  refer: "var(--v5-brand-2)",
   bonus: "var(--v5-warning)",
-  topup: "#3DA9FF",
-  withdraw: "var(--v5-brand-2)",
-  purchase: "var(--v5-tech-cyan)",
+  topup: "var(--ui-device-ink)",
+  withdraw: "var(--v5-ink-2)",
+  purchase: "var(--v5-nex)",
   refund: "var(--v5-tech-cyan)",
   swap: "var(--v5-brand)",
   verification: "var(--v5-tech-cyan)",
@@ -63,3 +62,11 @@ export const WALLET_BILL_TYPE_COLOR: Record<BillType, string> = {
   achievement: "var(--v5-warning)",
   other: "var(--v5-ink-3)",
 };
+
+/** Icon tile tint for a bill type: neutral types stay faint, warm accents a little stronger. */
+export function walletBillTypeTint(type: BillType): string {
+  const percent = type === "withdraw" || type === "unstake" || type === "other" ? 8
+    : type === "bonus" || type === "achievement" || type === "stake" ? 20
+      : type === "refer" || type === "purchase" || type === "refund" || type === "verification" ? 18 : 16;
+  return `color-mix(in srgb, ${WALLET_BILL_TYPE_COLOR[type]} ${percent}%, transparent)`;
+}

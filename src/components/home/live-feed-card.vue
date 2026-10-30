@@ -36,7 +36,7 @@
         :class="{ 'nx-home-feed-row--entering': r.k === enteringId }"
       >
         <view class="nx-feed-icon nx-feed-icon--done" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
         </view>
         <view class="nx-feed-copy">
           <text class="nx-feed-title">{{ r.model }}</text>
@@ -52,13 +52,13 @@
 
     <!-- Earnings tab -->
     <view v-show="tab === 'earnings'" ref="earningsPanel" id="home-live-feed-panel-earnings" :style="tab === 'earnings' ? heldPanelStyle : undefined" role="tabpanel" aria-labelledby="home-live-feed-tab-earnings" :aria-hidden="tab !== 'earnings'" :tabindex="tab === 'earnings' ? 0 : -1">
-      <HomeIncomeList />
+      <HomeIncomeList :active="tab === 'earnings'" />
     </view>
 
     <view class="nx-home-feed-footer">
       <view class="nx-home-feed-more" role="link" tabindex="0" @click.stop="goAll" @keydown.enter.stop.prevent="goAll">
         <text>{{ t.home.liveFeedSeeAll }}</text>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+        <text aria-hidden="true">›</text>
       </view>
     </view>
   </view>
@@ -200,40 +200,44 @@ function goAll() {
 </script>
 
 <style scoped>
-.nx-home-live-feed { padding: 12px 16px 4px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); }
-.nx-home-feed-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding-bottom:4px;border-bottom:1px solid var(--v5-border); }
+.nx-home-live-feed { padding: var(--ui-space-inline) 16px 4px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); }
+.nx-home-feed-heading { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);min-height:44px; }
 .nx-home-feed-identity { display:flex;align-items:center;gap:10px;min-width:0; }
-.nx-home-feed-mark { display:flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;border-radius:50%;background:color-mix(in srgb,var(--v5-brand) 12%,transparent);color:var(--v5-brand); }
-.nx-home-feed-title { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5);overflow-wrap:anywhere; }
+.nx-home-feed-mark { display:flex;align-items:center;justify-content:center;flex:none;width:30px;height:30px;border-radius:50%;background:color-mix(in srgb,var(--v5-brand) 10%,transparent);color:var(--v5-brand); }
+.nx-home-feed-title { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:anywhere; }
 .nx-home-feed-tabs { flex:0 0 90px;width:90px;height:26px;min-width:0;padding:2px;gap:1px; }
 .nx-home-feed-tabs :deep(.nx-glass-option) { min-height:22px;padding:0; }
 .nx-home-feed-tabs :deep(.nx-glass-option::after) { content:"";position:absolute;inset:-11px 0; }
-.nx-home-feed-tabs :deep(.nx-glass-option__label) { font-size:10px;font-weight:500;line-height:12px;white-space:nowrap; }
+.nx-home-feed-tabs :deep(.nx-glass-option__label) { font-size:10px;font-weight:600;line-height:12px;white-space:nowrap; }
 .nx-home-feed-tabs--vi :deep(.nx-glass-option__label) { font-size:9px;letter-spacing:-.4px; }
 /* Feed rows (also rendered by the running-task and income children). One height for every row. */
-.nx-home-live-feed :deep(.nx-feed-row) { position:relative;display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:12px;box-sizing:border-box;min-height:64px;padding:12px 0;border-bottom:1px solid var(--v5-border); }
+.nx-home-live-feed :deep(.nx-feed-row) { position:relative;display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);box-sizing:border-box;min-height:63px;padding:var(--ui-space-inline) 0; }
+/* Every row (and the empty state) carries its own top divider, so the first row is no taller than the rest. */
+.nx-home-live-feed :deep(.nx-feed-row), .nx-home-live-feed :deep(.nx-feed-state) { border-top:1px solid var(--v5-border); }
+/* A running row sits higher so its progress bar keeps clear of the divider below. */
+.nx-home-live-feed :deep(.nx-feed-row--running) { padding:var(--v5-space-2) 0 var(--ui-space-inset); }
 .nx-home-live-feed :deep(.nx-feed-icon) { display:grid;place-items:center;width:32px;height:32px;border-radius:10px; }
-.nx-home-live-feed :deep(.nx-feed-icon--done) { background:var(--v5-success-soft);color:var(--v5-success); }
+.nx-home-live-feed :deep(.nx-feed-icon--done) { background:color-mix(in srgb,var(--v5-success) 16%,transparent);color:var(--v5-success); }
 .nx-home-live-feed :deep(.nx-feed-icon--running) { background:color-mix(in srgb,var(--ui-device-ink) 16%,transparent);color:var(--ui-device-ink); }
-.nx-home-live-feed :deep(.nx-feed-copy) { display:flex;flex-direction:column;gap:2px;min-width:0; }
-.nx-home-live-feed :deep(.nx-feed-title-row) { display:flex;align-items:center;gap:8px;min-width:0; }
-.nx-home-live-feed :deep(.nx-feed-title) { overflow:hidden;font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);white-space:nowrap;text-overflow:ellipsis; }
+.nx-home-live-feed :deep(.nx-feed-copy) { display:flex;flex-direction:column;min-width:0; }
+.nx-home-live-feed :deep(.nx-feed-title-row) { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
+.nx-home-live-feed :deep(.nx-feed-title) { overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);white-space:nowrap;text-overflow:ellipsis; }
 .nx-home-live-feed :deep(.nx-feed-sub) { overflow:hidden;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);white-space:nowrap;text-overflow:ellipsis; }
-.nx-home-live-feed :deep(.nx-feed-sub--split) { display:flex;gap:4px; }
-.nx-home-live-feed :deep(.nx-feed-sub__lead) { overflow:hidden;min-width:0;text-overflow:ellipsis; }
+.nx-home-live-feed :deep(.nx-feed-sub--split) { display:flex;gap:var(--v5-space-1); }
+.nx-home-live-feed :deep(.nx-feed-sub__lead) { overflow:hidden;min-width:0;text-overflow:ellipsis;white-space:nowrap; }
 .nx-home-live-feed :deep(.nx-feed-sub__time) { flex:none; }
-.nx-home-live-feed :deep(.nx-feed-amount) { display:flex;align-items:baseline;gap:4px;font:500 14px/20px var(--font-metric);white-space:nowrap; }
+.nx-home-live-feed :deep(.nx-feed-amount) { display:flex;align-items:baseline;gap:9px;font:500 14px/20px var(--font-metric);white-space:nowrap; }
 .nx-home-live-feed :deep(.nx-feed-amount--earned), .nx-home-live-feed :deep(.nx-feed-list .nx-feed-amount) { color:var(--v5-success-ink); }
-.nx-home-live-feed :deep(.nx-feed-unit) { font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
-.nx-home-live-feed :deep(.nx-feed-figure) { display:flex;flex-direction:column;align-items:flex-end;gap:2px; }
+.nx-home-live-feed :deep(.nx-feed-unit) { font:500 12px/16px var(--font-metric);color:var(--v5-ink-3); }
+.nx-home-live-feed :deep(.nx-feed-figure) { display:flex;flex-direction:column;align-items:flex-end; }
 .nx-home-live-feed :deep(.nx-feed-pct) { font:500 14px/20px var(--font-metric);color:var(--ui-device-ink); }
-.nx-home-live-feed :deep(.nx-feed-est) { font:400 12px/16px var(--font-metric);color:var(--v5-ink-3);white-space:nowrap; }
-.nx-home-live-feed :deep(.nx-feed-progress) { position:absolute;left:44px;right:0;bottom:5px;height:3px;overflow:hidden;border-radius:999px;background:var(--v5-surface-2); }
+.nx-home-live-feed :deep(.nx-feed-est) { font:400 12px/18px var(--font-metric);color:var(--v5-ink-3);white-space:nowrap; }
+.nx-home-live-feed :deep(.nx-feed-progress) { position:absolute;left:0;right:0;bottom:var(--v5-space-2);height:4px;overflow:hidden;border-radius:999px;background:var(--v5-surface-3); }
 .nx-home-live-feed :deep(.nx-feed-progress__fill) { height:100%;border-radius:inherit;background:var(--ui-device-ink);transition:width 1s linear; }
-.nx-home-live-feed :deep(.nx-feed-state) { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
+.nx-home-live-feed :deep(.nx-feed-state) { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);min-height:64px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .nx-home-live-feed :deep(.nx-feed-retry) { display:inline-flex;align-items:center;min-height:44px;padding:0 12px;font:500 13px/18px var(--font-v5);color:var(--v5-brand); }
 .nx-home-feed-footer { display:flex;justify-content:flex-end; }
-.nx-home-feed-more { display:inline-flex;align-items:center;gap:2px;min-height:44px;font:500 13px/18px var(--font-v5);color:var(--v5-ink-3); }
+.nx-home-feed-more { display:inline-flex;align-items:center;gap:var(--v5-space-1);min-height:44px;font:500 13px/18px var(--font-v5);color:var(--v5-ink-3); }
 /* A newly settled row opens from zero height at the top, pushing older rows down. */
 .nx-home-feed-row--entering { overflow: hidden; animation: nx-home-feed-row-in .6s cubic-bezier(.2,.8,.2,1); }
 @keyframes nx-home-feed-row-in {
