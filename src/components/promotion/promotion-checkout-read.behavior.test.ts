@@ -176,13 +176,13 @@ it('a KEEP written after mount closes fresh Promotion create without minting a n
   expect(page.tradein.showKeepRecovery).toHaveBeenCalledExactlyOnceWith('sku');
 });
 
-it('creation, recovery and payment preserve the source-owned historical receipt name',async()=>{
+it('order creation, recovery and payment use the source receipt name without rewriting its snapshot',async()=>{
   const page=screen(),originalName='NexGridBox S1',order={...receipt(),items:[{lineId:'9001',productNo:'sku',productName:originalName,quantity:1}]};
   page.getProduct.mockReturnValue({name:'UVELBox S1'});
   page.api.create.mockResolvedValue(order);page.api.findOrder.mockResolvedValue(order);page.api.pay.mockResolvedValue({...order,paymentStatus:'PAID',orderStatus:'COMPLETED'});
   await page.start();expect(await page.html()).toContain('UVELBox S1');
   for(const action of [()=>page.view.createOrder(),()=>page.view.recover(),()=>{page.confirm.mockResolvedValueOnce(true);return page.view.pay();}]){
-    await action();const html=await page.html();expect(html).toContain(originalName);
+    await action();const html=await page.html();expect(html).toContain(originalName);expect(html).not.toContain('UVELBox S1');
     expect(page.saved().order?.items?.[0]?.productName).toBe(originalName);
   }
 });
