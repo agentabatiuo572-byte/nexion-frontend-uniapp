@@ -18,16 +18,16 @@
           <template v-else>
             <view v-if="!pointsRankingAvailable" class="leader-state" role="status"><text>{{ pointsCopy.unavailable }}</text></view>
             <view v-else class="leader-list">
-              <view v-for="group in rankingGroups" :key="group.id" :class="group.featured ? 'leader-podium' : 'leader-flat'">
+              <view v-for="group in rankingGroups" :key="group.id" :class="group.featured ? 'leader-podium nx-viz-motion' : 'leader-flat'">
               <view v-for="row in group.rows" :key="row.rank" class="leader-row" :class="group.featured ? `leader-row--podium leader-row--p${row.rank}` : ''" :data-rank="visibility.hidden ? undefined : row.rank">
                 <template v-if="group.featured">
                   <view class="leader-podium__badge">
-                    <svg v-if="row.rank === 1" class="leader-podium__crown" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
+                    <svg v-if="row.rank === 1" class="leader-podium__crown nx-viz-pop" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
                     <TeamRankEmblem v-if="!visibility.hidden" :rank="row.vRank" :size="row.rank === 1 ? 48 : 42" /><view v-else class="leader-podium__blank" aria-hidden="true" />
                   </view>
                   <text class="leader-name">{{ row.handle }}</text>
                   <view class="leader-points"><text class="nx-num-metric">{{ visibility.mask(formatComputePoints(row.computePoints, locale.code)) }}</text></view>
-                  <view class="leader-podium__step"><text class="leader-position nx-num-metric">{{ visibility.mask(row.rank) }}</text></view>
+                  <view class="leader-podium__step nx-viz-rise" :style="{ animationDelay: vizStagger(3 - row.rank, 120) }"><text class="leader-position nx-num-metric">{{ visibility.mask(row.rank) }}</text></view>
                 </template>
                 <template v-else>
                   <text class="leader-position nx-num-metric">{{ visibility.mask(row.rank) }}</text>
@@ -45,7 +45,7 @@
               <view class="leader-my-rank"><text class="nx-num-metric">{{ visibility.mask(!pointsRankingAvailable || me.rank === null ? '—' : '#' + myRankDisplay) }}</text><text class="leader-total">/ {{ visibility.mask(pointsRankingAvailable ? totalRows.toLocaleString() : '—') }}</text></view>
               <view class="leader-me__body">
                 <view class="leader-me__line"><text class="leader-caption">{{ t.leaderboard.myRank.label }}</text><text class="leader-gap">{{ visibility.mask(gapText) }}</text></view>
-                <view v-if="myProgress !== null && !visibility.hidden" class="leader-me__bar" aria-hidden="true"><view :style="{ width: `${myProgress}%` }" /></view>
+                <view v-if="myProgress !== null && !visibility.hidden" class="leader-me__bar nx-viz-motion" aria-hidden="true"><view class="nx-viz-grow" :style="{ width: `${myProgress}%`, animationDelay: '600ms' }" /></view>
               </view>
             </view>
             <view v-if="hasMore" class="leader-more" role="button" :tabindex="remoteState !== 'ready' || remoteLoadingMore ? -1 : 0" :aria-disabled="remoteState !== 'ready' || remoteLoadingMore" :aria-busy="remoteLoadingMore" @click="loadMore" @keydown.enter.prevent="loadMore" @keydown.space.prevent="loadMore">
@@ -68,6 +68,7 @@ import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { leaderboardPointsCopy } from "@/i18n/leaderboard-points-copy";
 import { navTo } from "@/lib/route";
+import { vizStagger } from "@/composables/use-scroll-grow-progress";
 import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -274,11 +275,12 @@ const periodOptions = computed(() => PERIODS.map(value => ({ value, label: t.val
 .leader-row--p2 { order: 1; --step: 92px; --tone: var(--v5-ink-2); }
 .leader-row--p3 { order: 3; --step: 72px; --tone: var(--v5-brand-2); }
 .leader-podium__badge { position: relative; display: grid; place-items: center; }
-.leader-podium__crown { position: absolute; top: -20px; color: var(--v5-warning); }
+.leader-podium__crown { position: absolute; top: -20px; color: var(--v5-warning); animation-delay: 1000ms; }
 .leader-podium__blank { width: 42px; height: 42px; }
 .leader-row--podium .leader-name { max-width: 100%; overflow: hidden; text-align: center; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
 .leader-row--podium .leader-points { max-width: 100%; text-align: center; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); color: var(--v5-ink-3); }
-.leader-podium__step { display: flex; justify-content: center; width: 100%; height: var(--step); box-sizing: border-box; padding-top: 10px; border-radius: 16px 16px 6px 6px; background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 40%, transparent), color-mix(in srgb, var(--tone) 4%, transparent)); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+/* Pedestals rise 3rd → 2nd → 1st as the podium renders; the crown lands last (DS-29). */
+.leader-podium__step { display: flex; justify-content: center; width: 100%; height: var(--step); overflow: hidden; box-sizing: border-box; padding-top: 10px; border-radius: 16px 16px 6px 6px; background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 40%, transparent), color-mix(in srgb, var(--tone) 4%, transparent)); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
 .leader-podium__step .leader-position { font: 600 26px/30px var(--font-metric); color: var(--tone); }
 .leader-flat { margin-top: var(--ui-space-inline); padding: 0 var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .leader-flat > .leader-row:first-child { border-top: 0; }
