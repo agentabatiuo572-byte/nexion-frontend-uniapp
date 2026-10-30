@@ -55,7 +55,7 @@ const body = source.slice(source.indexOf('const id = ref("");'), source.indexOf(
   + source.slice(source.indexOf("const needsRecovery"), source.indexOf("const STATUS_COLORS"))
   + source.slice(source.indexOf("async function offerWalletTopup"), source.indexOf("function goOrders"))
   + source.slice(source.indexOf("function cleanup()"), source.indexOf("// ─── styles"));
-const js = ts.transpileModule(body + "\nreturn { order, refundChannelLabel, showRemoteOrderLoading, showOrderNotFound, remoteOrderError, refreshOrder, handleWalletPayment, payingFromWallet, canPayFromWallet, cancellable, contactOrderSupport, recoverOrderAction, orderAction, resumePaymentAllowed, requestPendingPayment, runPaymentNoticeAction, paymentSheetOpen, paymentSheetAmount, paymentNotice, paymentNoticeReason, noticeCancelFailed, paymentResultVisible, paymentResultState, topupPendingOrder };",
+const js = ts.transpileModule(body + "\nreturn { order, refundChannelLabel, showRemoteOrderLoading, showOrderNotFound, remoteOrderError, refreshOrder, handleWalletPayment, payingFromWallet, canPayFromWallet, cancellable, contactOrderSupport, recoverOrderAction, orderAction, resumePaymentAllowed, requestPendingPayment, runPaymentNoticeAction, paymentSheetOpen, paymentSheetAmount, paymentNotice, paymentNoticeReason, noticeCancelFailed, paymentResultVisible, paymentResultState, topupPendingOrder, pendingPaymentChecking, autoPayRequested };",
   { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 const disposals: (() => void)[] = [];
 async function settle() { for (let i = 0; i < 12; i++) await Promise.resolve(); await nextTick(); }
@@ -104,6 +104,7 @@ function harness(mode: "dev" | "prod" = "prod") {
     payingFromWallet: Ref<boolean>; canPayFromWallet: ComputedRef<boolean>; cancellable: ComputedRef<boolean>;
     requestPendingPayment():Promise<void>;runPaymentNoticeAction():Promise<void>;topupPendingOrder():void;
     paymentSheetOpen:Ref<boolean>;paymentSheetAmount:Ref<number|string>;paymentNotice:Ref<string>;paymentNoticeReason:Ref<string>;noticeCancelFailed:Ref<boolean>;paymentResultVisible:Ref<boolean>;paymentResultState:Ref<string>;
+    pendingPaymentChecking:Ref<boolean>;autoPayRequested:Ref<boolean>;
   };
   hooks.load.forEach(fn => fn({ id: original.orderNo }));
   const show = () => hooks.show.forEach(fn => fn());
@@ -127,14 +128,95 @@ afterEach(() => { disposals.splice(0).forEach(dispose => dispose());vi.unstubAll
 
 describe('original pending order payment entry',()=>{
   async function pending(){const h=harness();h.requests[0].resolve(list([placed]));await settle();return h;}
+  it('cold pay intent reaches the method sheet when an already visible page receives another onShow',async()=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();
+    expect(h.page.pendingPaymentChecking.value).toBe(true);h.show();await settle();
+    h.requests.slice(1).forEach(request=>request.resolve(list([placed])));await settle();
+    eligibility.resolve({eligible:true,policies:[]});await settle();
+    expect(h.page.pendingPaymentChecking.value).toBe(false);expect(h.page.paymentSheetOpen.value).toBe(true);
+    expect(h.requests).toHaveLength(1);
+    expect(h.payments).toHaveLength(0);expect(h.authorize).not.toHaveBeenCalled();
+  });
+  it('retains cold pay intent and consumes the newer authoritative read after the obsolete preflight settles',async()=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();
+    expect(h.page.pendingPaymentChecking.value).toBe(true);remote.productCatalogApi.catalog.mockResolvedValueOnce(catalog);
+    await refreshProductCatalog(true);await settle();h.requests[1].resolve(list([placed]));await settle();
+    eligibility.resolve({eligible:true,policies:[]});await settle();
+    expect(h.page.pendingPaymentChecking.value).toBe(false);expect(h.page.paymentSheetOpen.value).toBe(true);
+    expect(h.page.autoPayRequested.value).toBe(false);expect(h.requests).toHaveLength(2);expect(remote.purchaseEligibilityApi.get).toHaveBeenCalledTimes(2);
+    expect(h.payments).toHaveLength(0);expect(h.authorize).not.toHaveBeenCalled();
+  });
+  it('also resumes once when the replacement read finishes after the obsolete preflight',async()=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();
+    remote.productCatalogApi.catalog.mockResolvedValueOnce(catalog);await refreshProductCatalog(true);await settle();
+    eligibility.resolve({eligible:true,policies:[]});await settle();expect(h.page.pendingPaymentChecking.value).toBe(false);
+    expect(h.page.autoPayRequested.value).toBe(true);expect(h.page.paymentSheetOpen.value).toBe(false);
+    h.requests[1].resolve(list([placed]));await settle();expect(h.page.paymentSheetOpen.value).toBe(true);expect(h.page.autoPayRequested.value).toBe(false);
+    expect(h.requests).toHaveLength(2);expect(remote.purchaseEligibilityApi.get).toHaveBeenCalledTimes(2);expect(h.payments).toHaveLength(0);
+  });
+  it('consumes the intent with a visible retry error when the new authoritative read fails',async()=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();
+    remote.productCatalogApi.catalog.mockResolvedValueOnce(catalog);await refreshProductCatalog(true);await settle();h.requests[1].reject(new Error('read failed'));await settle();
+    eligibility.resolve({eligible:true,policies:[]});await settle();expect(h.page.pendingPaymentChecking.value).toBe(false);
+    expect(h.page.autoPayRequested.value).toBe(false);expect(h.page.paymentNotice.value).toBe('query');expect(h.page.paymentSheetOpen.value).toBe(false);expect(h.requests).toHaveLength(2);
+  });
+  it.each(['cancelled','activated'] as const)('uses the newer %s original as the terminal intent outcome',async status=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();remote.productCatalogApi.catalog.mockResolvedValueOnce(catalog);await refreshProductCatalog(true);await settle();
+    h.requests[1].resolve(list([status==='activated'?original:{...placed,canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED'}]));await settle();
+    eligibility.resolve({eligible:true,policies:[]});await settle();expect(h.page.pendingPaymentChecking.value).toBe(false);expect(h.page.autoPayRequested.value).toBe(false);expect(h.page.paymentSheetOpen.value).toBe(false);
+    expect(status==='activated'?h.page.paymentResultVisible.value:h.page.paymentNotice.value==='blocked').toBe(true);expect(h.payments).toHaveLength(0);expect(remote.purchaseEligibilityApi.get).toHaveBeenCalledOnce();
+  });
+  it('does not replay a pending intent after the page is hidden',async()=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();remote.productCatalogApi.catalog.mockResolvedValueOnce(catalog);await refreshProductCatalog(true);await settle();h.requests[1].resolve(list([placed]));await settle();
+    h.hide();eligibility.resolve({eligible:true,policies:[]});await settle();expect(h.page.autoPayRequested.value).toBe(false);expect(h.page.paymentSheetOpen.value).toBe(false);expect(h.payments).toHaveLength(0);
+  });
+  it('does not transfer the former account payment intent to the new account read',async()=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();h.account.bind('b');h.auth.accountId='b';h.orders.bindAccount('b');await settle();
+    h.requests.at(-1)!.resolve(list([placed]));await settle();eligibility.resolve({eligible:true,policies:[]});await settle();
+    expect(h.page.autoPayRequested.value).toBe(false);expect(h.page.paymentSheetOpen.value).toBe(false);expect(h.payments).toHaveLength(0);expect(remote.purchaseEligibilityApi.get).toHaveBeenCalledOnce();
+  });
+  it('consumes a new same-scope read only once when the current preflight can already finish',async()=>{
+    const h=harness(),eligibility=deferred<{eligible:boolean;policies:[]}>();remote.purchaseEligibilityApi.get.mockReturnValueOnce(eligibility.promise);
+    h.page.autoPayRequested.value=true;h.requests[0].resolve(list([placed]));await settle();
+    const reread=h.page.refreshOrder();await settle();h.requests[1].resolve(list([placed]));await reread;
+    eligibility.resolve({eligible:true,policies:[]});await settle();await settle();
+    expect(h.page.paymentSheetOpen.value).toBe(true);expect(h.page.autoPayRequested.value).toBe(false);expect(h.page.pendingPaymentChecking.value).toBe(false);
+    expect(h.requests).toHaveLength(2);expect(remote.purchaseEligibilityApi.get).toHaveBeenCalledOnce();expect(h.stockCheck).toHaveBeenCalledOnce();expect(h.payments).toHaveLength(0);
+  });
+  it.each(['stock','unavailable','read','items'] as const)('checks current stock at pending entry and shows the %s outcome without method/PIN/payment',async reason=>{
+    const h=await pending();h.stockCheck.mockRejectedValue(new CheckoutPurchaseCheckError(reason));
+    const opening=h.page.requestPendingPayment();await settle();h.requests[1].resolve(list([placed]));await opening;
+    expect(h.stockCheck).toHaveBeenCalledExactlyOnceWith([{productNo:'cloud-share',quantity:1}]);expect(h.page.paymentSheetOpen.value).toBe(false);
+    expect(h.page.paymentNotice.value).toBe(reason==='stock'||reason==='unavailable'?'blocked':'query');expect(h.page.autoPayRequested.value).toBe(false);
+    expect(h.payments).toHaveLength(0);expect(h.authorize).not.toHaveBeenCalled();
+  });
+  it('does not let the former preflight completion unlock a newer visible attempt',async()=>{
+    const h=await pending(),oldEligibility=deferred<{eligible:boolean;policies:[]}>(),newEligibility=deferred<{eligible:boolean;policies:[]}>();
+    remote.purchaseEligibilityApi.get.mockReturnValueOnce(oldEligibility.promise).mockReturnValueOnce(newEligibility.promise);
+    const old=h.page.requestPendingPayment();await settle();h.requests[1].resolve(list([placed]));await settle();h.hide();h.show();await settle();h.requests[2].resolve(list([placed]));await settle();
+    const current=h.page.requestPendingPayment();await settle();h.requests[3].resolve(list([placed]));await settle();
+    expect(h.page.pendingPaymentChecking.value).toBe(true);oldEligibility.resolve({eligible:true,policies:[]});await old;
+    expect(h.page.pendingPaymentChecking.value).toBe(true);expect(h.page.paymentSheetOpen.value).toBe(false);
+    newEligibility.resolve({eligible:true,policies:[]});await current;
+    expect(h.page.pendingPaymentChecking.value).toBe(false);expect(h.page.paymentSheetOpen.value).toBe(true);
+  });
   it('reads the original, opens only its USDT wallet sheet, and does not charge or request PIN yet',async()=>{
     const h=await pending(),opening=h.page.requestPendingPayment();await settle();
     expect(h.page.paymentSheetOpen.value).toBe(false);expect(h.requests).toHaveLength(2);
     h.requests[1].resolve(list([placed]));await opening;
     expect(h.page.paymentSheetOpen.value).toBe(true);expect(h.page.paymentSheetAmount.value).toBe(19.9);
-    expect(remote.purchaseEligibilityApi.get).toHaveBeenCalledWith('cloud-share');expect(h.payments).toHaveLength(0);expect(h.authorize).not.toHaveBeenCalled();
+    expect(remote.purchaseEligibilityApi.get).toHaveBeenCalledExactlyOnceWith('cloud-share');expect(h.stockCheck).toHaveBeenCalledOnce();
+    await settle();expect(h.requests).toHaveLength(2);expect(h.page.autoPayRequested.value).toBe(false);expect(h.page.pendingPaymentChecking.value).toBe(false);
+    expect(h.payments).toHaveLength(0);expect(h.authorize).not.toHaveBeenCalled();
   });
-  it('does not re-subtract an original reservation using aggregate quota denial',async()=>{
+  it('does not infer an order-specific quantity denial from a generic aggregate quota response',async()=>{
     const h=await pending();remote.purchaseEligibilityApi.get.mockResolvedValue({eligible:false,policies:[{policy:'F4B',eligible:false,conditions:[{kind:'monthlyQuota',met:false}]}]});
     const opening=h.page.requestPendingPayment();await settle();h.requests[1].resolve(list([placed]));await opening;
     expect(h.page.paymentSheetOpen.value).toBe(true);expect(h.payments).toHaveLength(0);

@@ -1,11 +1,19 @@
 // Executes the built APP against loopback-only synthetic commerce/PIN data.
 import assert from 'node:assert/strict';
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile,access} from 'node:fs/promises';
+import {spawn,execFileSync} from 'node:child_process';
+import {mkdir,writeFile,readFile,access} from 'node:fs/promises';
+import {createHash,randomUUID} from 'node:crypto';
 import path from 'node:path';
 import {chromium} from 'playwright';
 const output=process.env.CHECKOUT_FLOW_OUTPUT||'D:/WORKS/PLAN/output/payment-flow-20261031-implementation/runtime';
 await mkdir(output,{recursive:true});
+const sourceCommit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+const sourceDiff=()=>createHash('sha256').update(execFileSync('git',['diff','HEAD','--binary'],{maxBuffer:16*1024*1024})).digest('hex');
+const sourceDiffHash=sourceDiff();
+const entry=(await readFile('dist/build/h5/index.html','utf8')).match(/assets\/index-[^" ]+\.js/)[0];
+const artifact={entry,sha256:createHash('sha256').update(await readFile('dist/build/h5/'+entry)).digest('hex')};
+const recordBase={capability:'runtime',mode:'full',taskId:process.env.WORKFLOW_TASK_ID??'standalone',stepId:process.env.WORKFLOW_STEP_ID??'standalone',checkId:process.env.WORKFLOW_CHECK_ID??'standalone',runId:process.env.WORKFLOW_RUN_ID??randomUUID(),repo:process.env.WORKFLOW_REPO??process.cwd(),snapshotHash:process.env.WORKFLOW_SNAPSHOT_HASH??`${sourceCommit}:${sourceDiffHash}`,sourceCommit,sourceDiffHash,artifact,source:'built APP, isolated synthetic network; not real backend payment'};
+await writeFile(path.join(output,'record.json'),JSON.stringify({...recordBase,verdict:'running',steps:[]},null,2));
 const seed=path.join(output,'seed.json');
 await writeFile(seed,JSON.stringify({state:{trialState:'ended',benefitState:'finished',offers:false,promotions:false}}));
 const port=Number(process.env.CHECKOUT_FLOW_PORT||5608),base=`http://127.0.0.1:${port}`;
@@ -24,6 +32,20 @@ const mask=page.locator('.payment-pin-mask'),pin=mask.locator('input').first();
 const steps=[];
 try {
   for(let attempt=0;attempt<100;attempt++){if(server.exitCode!==null)throw new Error('Preview stopped: '+logs);try{if((await fetch(base)).ok)break;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}
+  const coldContext=await browser.newContext({viewport:{width:390,height:844}});
+  const coldPage=await coldContext.newPage(),coldResponses=[];
+  coldPage.on('response',response=>{const url=new URL(response.url());if(url.origin===base&&url.pathname.startsWith('/api/'))coldResponses.push({path:url.pathname,status:response.status()});});
+  try {
+    await coldPage.goto(base+'/?nx_device_inner=1#/pages/store/order-detail?id=DEMO-ORDER-001&from=me&pay=1');
+    await coldPage.getByRole('button',{name:'确认支付',exact:true}).waitFor({timeout:15000});
+    assert.equal((await state()).payWrites,0);assert.equal((await state()).orders.length,0);
+    await coldPage.screenshot({path:path.join(output,'00-cold-original-method.png'),fullPage:true});
+    steps.push({id:'cold-original-payment-entry',status:'pass',evidence:['A fresh browser context restores login and opens the original order payment sheet without hanging in the eligibility read; no create/pay writes.','00-cold-original-method.png']});
+  } catch(error) {
+    await coldPage.screenshot({path:path.join(output,'cold-original-failure.png'),fullPage:true});
+    await writeFile(path.join(output,'cold-original-failure.json'),JSON.stringify({error:String(error),responses:coldResponses,body:await coldPage.locator('body').innerText()},null,2));
+    throw error;
+  } finally {await coldContext.close();}
   await route('/pages/store/checkout?product=stellarbox-s1');
   await page.getByRole('button',{name:'立即支付',exact:true}).waitFor();
   assert.equal(await page.locator('.checkout-cancel').count(),0);
@@ -94,7 +116,8 @@ try {
   steps.push({id:'fresh-stock-after-pin',status:'pass',evidence:['Original pending order: stock changed to zero while PIN was open. Fresh catalogue GET happened after PIN; payment POST did not happen, debit count unchanged, and a small rejection dialog offered cancellation.','09-stock-changed-after-pin.png']});
   assert.deepEqual(errors,[]);
   await writeFile(path.join(output,'requests.json'),JSON.stringify(requests,null,2));
-  await writeFile(path.join(output,'record.json'),JSON.stringify({capability:'runtime',verdict:'pass',mode:'full',treeMoved:false,taskId:process.env.WORKFLOW_TASK_ID??'standalone',stepId:process.env.WORKFLOW_STEP_ID??'standalone',checkId:process.env.WORKFLOW_CHECK_ID??'standalone',runId:process.env.WORKFLOW_RUN_ID??'standalone',repo:process.env.WORKFLOW_REPO??process.cwd(),snapshotHash:process.env.WORKFLOW_SNAPSHOT_HASH??'standalone',source:'built APP, isolated synthetic network; not real backend payment',steps,innerSkipped:0},null,2));
+  const treeMoved=sourceDiffHash!==sourceDiff();assert.equal(treeMoved,false,'source changed during runtime acceptance');
+  await writeFile(path.join(output,'record.json'),JSON.stringify({...recordBase,verdict:'pass',treeMoved,steps,innerSkipped:0},null,2));
   console.log('PASS actual APP payment/activation runtime; synthetic commerce only.');
-} catch(error) {await capture('failure').catch(()=>{});await writeFile(path.join(output,'failure.json'),JSON.stringify({error:String(error),errors,requests,body:await page.locator('body').innerText().catch(()=>''),logs},null,2));throw error;}
+} catch(error) {await capture('failure').catch(()=>{});await writeFile(path.join(output,'record.json'),JSON.stringify({...recordBase,verdict:'fail',treeMoved:sourceDiffHash!==sourceDiff(),steps,error:String(error)},null,2));await writeFile(path.join(output,'failure.json'),JSON.stringify({error:String(error),errors,requests,body:await page.locator('body').innerText().catch(()=>''),logs},null,2));throw error;}
 finally {await context.close();await browser.close();server.kill();}

@@ -69,6 +69,3 @@ scripts/.baseline/_check/sticky-frost.png
 .verify-cache/
 .verify-chain.code
 .cache/vite/
-
-# Payment PIN browser evidence is regenerated locally and shared through uvel-docs.
-/output/payment-pin-20261030/
