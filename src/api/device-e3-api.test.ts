@@ -44,6 +44,13 @@ describe("settled trade-in wallet receipt", () => {
     await expect(createDeviceE3Api(client(keepReceipt), "dev").capacityKeep(quote.targetProductNo, "original-keep-key", availableKeepQuote))
       .resolves.toEqual(keepReceipt);
   });
+  it("replays a persisted legacy KEEP key with its original payable instead of requiring a fresh quote", async () => {
+    const transport = client(keepReceipt);
+    await expect(createDeviceE3Api(transport, "dev").replayCapacityKeep(quote.targetProductNo, "legacy-keep-key", 2639))
+      .resolves.toEqual(keepReceipt);
+    expect(transport.request).toHaveBeenCalledExactlyOnceWith({ method: "POST", path: "/api/app/trade-in/capacity-keep",
+      body: { targetProductNo: quote.targetProductNo, expectedPayableUsdt: 2639 }, idempotencyKey: "legacy-keep-key" });
+  });
   it("accepts an authoritative replacement balance while retaining the quoted debit and zero discount", async () => {
     const response = { ...receipt, targetDeviceStatus: "ACTIVE", discountUsdt: 0, walletDebitUsdt: keepQuote.payableUsdt };
     await expect(createDeviceE3Api(client(response), "dev").capacityReplace(1156, quote.targetProductNo, "original-replace-key", keepQuote))

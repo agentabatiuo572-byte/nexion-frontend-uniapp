@@ -185,6 +185,8 @@ export interface DeviceE3Api {
     idempotencyKey: string,
     expectedQuote: CanonicalCapacityReplaceQuote,
   ): Promise<CanonicalCapacityKeepResult>;
+  /** Replay only an existing durable command with its original payable and key. */
+  replayCapacityKeep(targetProductNo: string, idempotencyKey: string, expectedPayableUsdt: number): Promise<CanonicalCapacityKeepResult>;
   submit(
     sourceDeviceId: number,
     targetProductNo: string,
@@ -592,6 +594,18 @@ function validTargetNo(value: string): string {
   return normalized;
 }
 
+async function sendCapacityKeep(client: ApiClient, targetProductNo: string, idempotencyKey: string, expectedPayableUsdt: number): Promise<CanonicalCapacityKeepResult> {
+  const key = idempotencyKey.trim();
+  if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
+  const payable = number(expectedPayableUsdt);
+  const parsed = capacityKeepResult(await client.request<unknown>({
+    method: "POST", path: "/api/app/trade-in/capacity-keep",
+    body: { targetProductNo: validTargetNo(targetProductNo), expectedPayableUsdt: payable }, idempotencyKey: key,
+  }));
+  if (!sameMoney(parsed.walletDebitUsdt, payable)) return invalid("E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH");
+  return parsed;
+}
+
 export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "prod"): DeviceE3Api {
   return {
     async fleet() {
@@ -646,26 +660,15 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
       });
     },
     async capacityKeep(targetProductNo, idempotencyKey, expectedQuote) {
-      const key = idempotencyKey.trim();
-      if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
       if (expectedQuote.decision !== "CAPACITY_AVAILABLE"
           || expectedQuote.targetProductNo !== targetProductNo
           || expectedQuote.decisionSource !== "server") {
         throw new ApiError({ kind: "configuration", message: "CAPACITY_KEEP_QUOTE_CONTEXT_INVALID" });
       }
-      const parsed = capacityKeepResult(await client.request<unknown>({
-        method: "POST",
-        path: "/api/app/trade-in/capacity-keep",
-        body: {
-          targetProductNo: validTargetNo(targetProductNo),
-          expectedPayableUsdt: number(expectedQuote.payableUsdt),
-        },
-        idempotencyKey: key,
-      }));
-      if (!sameMoney(parsed.walletDebitUsdt, expectedQuote.payableUsdt)) {
-        return invalid("E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH");
-      }
-      return parsed;
+      return sendCapacityKeep(client, targetProductNo, idempotencyKey, expectedQuote.payableUsdt);
+    },
+    async replayCapacityKeep(targetProductNo, idempotencyKey, expectedPayableUsdt) {
+      return sendCapacityKeep(client, targetProductNo, idempotencyKey, expectedPayableUsdt);
     },
     async submit(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote) {
       const key = idempotencyKey.trim();
