@@ -216,10 +216,15 @@ describe('original pending order payment entry',()=>{
     await settle();expect(h.requests).toHaveLength(2);expect(h.page.autoPayRequested.value).toBe(false);expect(h.page.pendingPaymentChecking.value).toBe(false);
     expect(h.payments).toHaveLength(0);expect(h.authorize).not.toHaveBeenCalled();
   });
-  it('does not infer an order-specific quantity denial from a generic aggregate quota response',async()=>{
+  it('blocks an authoritative overall F4B denial before method, PIN or payment',async()=>{
     const h=await pending();remote.purchaseEligibilityApi.get.mockResolvedValue({eligible:false,policies:[{policy:'F4B',eligible:false,conditions:[{kind:'monthlyQuota',met:false}]}]});
     const opening=h.page.requestPendingPayment();await settle();h.requests[1].resolve(list([placed]));await opening;
-    expect(h.page.paymentSheetOpen.value).toBe(true);expect(h.payments).toHaveLength(0);
+    expect(h.page.paymentSheetOpen.value).toBe(false);expect(h.page.paymentNotice.value).toBe('blocked');expect(h.stockCheck).not.toHaveBeenCalled();expect(h.authorize).not.toHaveBeenCalled();expect(h.payments).toHaveLength(0);
+  });
+  it('follows an authoritative overall EITHER approval without recomputing a rejected subcondition',async()=>{
+    const h=await pending();remote.purchaseEligibilityApi.get.mockResolvedValue({eligible:true,policies:[{policy:'E1',mode:'EITHER',eligible:false,conditions:[{kind:'rank',met:false}]},{policy:'F4B',mode:'EITHER',eligible:true,conditions:[{kind:'monthlyQuota',met:true}]}]});
+    const opening=h.page.requestPendingPayment();await settle();h.requests[1].resolve(list([placed]));await opening;
+    expect(h.page.paymentSheetOpen.value).toBe(true);expect(h.page.paymentNotice.value).toBe('');expect(h.authorize).not.toHaveBeenCalled();expect(h.payments).toHaveLength(0);
   });
   it('keeps a known qualification failure in a small notice and leaves cancellation failure there to retry',async()=>{
     const h=await pending();remote.purchaseEligibilityApi.get.mockResolvedValue({eligible:false,policies:[{policy:'E1',eligible:false,conditions:[{kind:'rank',met:false}]}]});
