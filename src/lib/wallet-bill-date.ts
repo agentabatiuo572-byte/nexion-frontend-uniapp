@@ -64,3 +64,14 @@ export function walletBillClockLabel(ts: number): string {
   const date = new Date(ts);
   return Number.isNaN(date.getTime()) ? "—" : `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
+
+/** Short row time: today "08:15", yesterday's word, otherwise "10/30 08:15" (vi "30/10 08:15"). */
+export function walletBillShortTime(ts: number, locale: string, now: number, yesterday: string): string {
+  const clock = walletBillClockLabel(ts);
+  if (clock === "—") return clock;
+  const key = walletBillDayKey(ts), previous = new Date(now); previous.setDate(previous.getDate() - 1);
+  if (key === walletBillDayKey(now)) return clock;
+  if (key === walletBillDayKey(previous.getTime())) return yesterday;
+  const date = new Date(ts), day = date.getDate(), month = date.getMonth() + 1;
+  return `${locale.startsWith("vi") ? `${day}/${month}` : `${month}/${day}`} ${clock}`;
+}

@@ -79,10 +79,9 @@
                 </view>
                 <view :class="b.memoKey === 'learningReward' ? '' : 'truncate'" class="bills-row__sub">
                   <text>{{ billMemo(b) }}</text>
-                  <text v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'" class="bills-row__dot">·</text>
+                  <text v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'"> · </text>
                   <text v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'" class="font-mono-tabular">{{ b.ref }}</text>
-                  <text class="bills-row__dot">·</text>
-                  <text>{{ fmtClock(b.ts) }}</text>
+                  <text> · {{ fmtClock(b.ts) }}</text>
                 </view>
                 <view v-if="b.type === 'refund' && b.ref" class="flex items-center" style="gap: var(--v5-space-2)" @click.stop>
                   <text class="font-mono-tabular min-w-0" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
@@ -93,7 +92,7 @@
               </view>
               <view class="bills-row__figure">
                 <view class="bills-row__amount" :class="{ 'bills-row__amount--in': !isDebit(b) }">
-                  <text class="nx-num-metric">{{ isDebit(b) ? "−" : "+" }}{{ fmtAmount(b) }}</text>
+                  <text>{{ isDebit(b) ? "−" : "+" }}{{ fmtAmount(b) }}</text>
                   <text class="bills-row__unit">{{ platformDisplayText(b.symbol) }}</text>
                 </view>
                 <text v-if="b.balanceAfter !== undefined && b.symbol === 'USDT'" class="bills-row__balance tabular-nums">{{ runningBalanceLabel(b) }}</text>
@@ -140,7 +139,7 @@
           <view class="bills-sheet__fact"><text>{{ t.bills.detailSource }}</text><text class="bills-sheet__value">{{ billMemo(detail) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status)" /></view>
           <view v-if="detail.ref" class="bills-sheet__fact"><text>{{ t.bills.detailRef }}</text><view class="bills-sheet__ref"><text class="font-mono-code bills-sheet__value">{{ detail.ref }}</text><CopyCodeButton :value="detail.ref" :label="t.bills.detailRef" /></view></view>
-          <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value nx-num-metric">{{ decimalLabel(detail.balanceAfterExact, detail.balanceAfter, detail.symbol) }}</text></view>
+          <view v-if="detail.balanceAfter !== undefined && detail.symbol === 'USDT'" class="bills-sheet__fact"><text>{{ t.bills.runningBalance }}</text><text class="bills-sheet__value tabular-nums">{{ decimalLabel(detail.balanceAfterExact, detail.balanceAfter, detail.symbol) }}</text></view>
         </view>
         <view class="bills-sheet__close" role="button" tabindex="0" @click="detail = null" @keydown.enter.prevent="detail = null" @keydown.space.prevent="detail = null"><LiquidGlass :radius="24" tone="control" /><text>{{ t.bills.detailClose }}</text></view>
       </view>
@@ -164,7 +163,7 @@ import NxTag from "@/components/ui/nx-tag.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { walletBillClockLabel, walletBillDayKey, walletBillDayLabel, walletBillTimeLabel } from "@/lib/wallet-bill-date";
-import { WALLET_BILL_TYPE_COLOR, formatWalletBillDecimal, resolveWalletBillMemo } from "@/lib/wallet-bill-display";
+import { WALLET_BILL_TYPE_COLOR, formatWalletBillDecimal, resolveWalletBillMemo, walletBillTypeTint } from "@/lib/wallet-bill-display";
 import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
@@ -198,9 +197,11 @@ const asset = ref<"USDT" | "UVT">("USDT");
 onLoad(options => {
   const query = new URLSearchParams(takeNavigationQuery("/pages/me/wallet-bills"));
   ledgerBizNo.value = String(options?.ledgerBizNo ?? query.get("ledgerBizNo") ?? "").trim();
-  // Entries such as the home income list preset a filter (?filter=in).
+  // Entries such as the home income list preset a filter and asset (?filter=in&asset=UVT).
   const filter = String(options?.filter ?? query.get("filter") ?? "");
   if ((TABS as string[]).includes(filter)) tab.value = filter as Tab;
+  const presetAsset = String(options?.asset ?? query.get("asset") ?? "");
+  if (presetAsset === "USDT" || presetAsset === "UVT") asset.value = presetAsset;
 });
 const deposits = useDeposits();
 const remoteSessionReady = computed(() => binarySessionReady({
@@ -473,63 +474,62 @@ const manualLoadMoreStyle: CSSProperties = {
   minHeight: "40px", margin: "4px 0 0", padding: "0 14px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "12px",
 };
 function iconChipStyle(type: BillType): CSSProperties {
-  return { background: `color-mix(in srgb, ${TYPE_COLOR[type]} 14%, transparent)` };
+  return { background: walletBillTypeTint(type) };
 }
 </script>
 
 <style scoped>
 .bills-page { color: var(--v5-ink); padding-bottom: 24px; }
-.bills-assets { margin: 0 16px 12px; }
-.bills-overview { display:flex;flex-direction:column;gap:4px;margin:0 16px 24px;padding:20px;border:1px solid var(--v5-border);border-radius:var(--ui-radius-surface);background:var(--v5-surface); }
+.bills-assets { margin: 0 16px 16px; }
+.bills-overview { display:flex;flex-direction:column;gap:var(--v5-space-1);margin:0 16px 16px;padding:var(--ui-space-inset-hero);border:1px solid var(--v5-border);border-radius:var(--ui-radius-surface);background:var(--v5-surface); }
 .bills-overview__label { font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3); }
-.bills-overview__amount { display:flex;align-items:baseline;font-size:36px;font-weight:500;line-height:44px;letter-spacing:-.02em; }
+.bills-overview__amount { display:flex;align-items:baseline;font-size:var(--ui-type-wallet-amount);font-weight:var(--ui-type-wallet-amount-weight);line-height:var(--ui-type-wallet-amount-lh);letter-spacing:-.02em; }
 .bills-overview__minor { color:var(--v5-ink-3); }
-.bills-overview__currency { margin-right:2px;font-size:max(12px,.55em); }
-.bills-overview__stats { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--v5-border); }
-.bills-overview__stat { display:flex;flex-direction:column;gap:4px;min-width:0; }
+.bills-overview__currency { font-size:max(12px,.55em); }
+.bills-overview__stats { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--ui-space-inline);margin-top:var(--ui-space-inline);padding-top:16px;border-top:1px solid var(--v5-border); }
+.bills-overview__stat { display:flex;flex-direction:column;gap:var(--v5-space-1);min-width:0; }
 .bills-overview__stat-label { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
-.bills-overview__stat-value { overflow:hidden;font-size:16px;font-weight:500;line-height:22px;text-overflow:ellipsis;white-space:nowrap; }
-.bills-filters { display:flex;gap:8px;margin:0 16px 16px; }
-.bills-filter { display:inline-flex;align-items:center;justify-content:center;min-width:52px;height:32px;padding:0 12px;border-radius:999px;font:500 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer; }
+.bills-overview__stat-value { overflow:hidden;font-size:15px;font-weight:500;line-height:20px;text-overflow:ellipsis;white-space:nowrap; }
+.bills-filters { display:flex;gap:var(--v5-space-1);margin:0 16px 16px; }
+.bills-filter { display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 12px;border-radius:999px;font:500 13px/18px var(--font-v5);color:var(--v5-ink-3);cursor:pointer; }
 .bills-filter::after { content:"";position:absolute;inset:-6px 0; }
 .bills-filter { position:relative; }
-.bills-filter--on { background:var(--v5-surface-2);color:var(--v5-ink); }
+.bills-filter--on { background:color-mix(in srgb,var(--v5-ink) 10%,transparent);color:var(--v5-ink); }
 .bills-filter:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
 .bills-list { margin: 0 16px 12px; }
-.bills-day { margin-bottom: 20px; }
+.bills-day { margin-bottom: var(--ui-space-inset); }
 .bills-day__label { display:block;padding:0 4px 8px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
 .bills-day__group { overflow:hidden;border:1px solid var(--v5-border);border-radius:var(--ui-radius-surface);background:var(--v5-surface); }
-.bills-row { display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:12px;min-height:64px;box-sizing:border-box;padding:12px 16px;cursor:pointer; }
+.bills-row { display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);min-height:64px;box-sizing:border-box;padding:var(--ui-space-inline) 16px;cursor:pointer; }
 .bills-row + .bills-row { border-top:1px solid var(--v5-border); }
 .bills-row:active { background:var(--v5-surface-2); }
 .bills-row:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
 .bills-row__icon { display:grid;place-items:center;width:32px;height:32px;border-radius:10px; }
-.bills-row__copy { display:flex;flex-direction:column;gap:2px;min-width:0; }
-.bills-row__title-row { display:flex;align-items:center;gap:8px;min-width:0; }
-.bills-row__title { overflow:hidden;font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);text-overflow:ellipsis;white-space:nowrap; }
+.bills-row__copy { display:flex;flex-direction:column;min-width:0; }
+.bills-row__title-row { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
+.bills-row__title { overflow:hidden;font:var(--ui-type-message-title-weight) var(--ui-type-message-title)/var(--ui-type-message-title-lh) var(--font-v5);text-overflow:ellipsis;white-space:nowrap; }
 .bills-row__sub { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
-.bills-row__dot { margin:0 4px;color:var(--v5-ink-4); }
-.bills-row__figure { display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:4px; }
-.bills-row__amount { display:flex;align-items:baseline;gap:4px;font-size:14px;font-weight:500;line-height:20px;white-space:nowrap;color:var(--v5-ink); }
+.bills-row__figure { display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:var(--v5-space-1); }
+.bills-row__amount { display:flex;align-items:baseline;gap:var(--v5-space-1);font:500 15px/22px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--v5-ink); }
 .bills-row__amount--in { color:var(--v5-success-ink); }
 .bills-row__unit { font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
 .bills-row__balance { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
-.bills-end { display:block;padding:8px 0 4px;text-align:center;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
+.bills-end { display:block;padding:0 0 4px;text-align:center;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-4); }
 .bills-sheet-root { position:fixed;inset:0;z-index:790;display:flex;align-items:flex-end; }
 .bills-sheet-scrim { position:absolute;inset:0;background:var(--v5-bg-color-mask); }
-.bills-sheet { position:relative;display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box;padding:8px 16px calc(16px + var(--nx-overlay-safe-bottom, 0px));border-radius:28px 28px 0 0;background:var(--v5-surface); }
+.bills-sheet { position:relative;display:flex;flex-direction:column;gap:var(--ui-space-inset);width:100%;box-sizing:border-box;padding:var(--v5-space-2) 16px calc(16px + var(--nx-overlay-safe-bottom, 0px));border-radius:28px 28px 0 0;background:var(--v5-surface); }
 .bills-sheet__handle { align-self:center;width:36px;height:4px;border-radius:999px;background:color-mix(in srgb,var(--v5-ink) 18%,transparent); }
-.bills-sheet__head { display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:8px; }
+.bills-sheet__head { display:flex;flex-direction:column;align-items:center;gap:var(--v5-space-2);padding:var(--v5-space-2) 0 6px; }
 .bills-sheet__icon { display:grid;place-items:center;width:48px;height:48px;border-radius:14px; }
 .bills-sheet__type { font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3); }
-.bills-sheet__amount { display:flex;align-items:baseline;gap:6px;font-size:36px;font-weight:500;line-height:44px;letter-spacing:-.02em;color:var(--v5-ink); }
+.bills-sheet__amount { display:flex;align-items:baseline;gap:10px;font-size:var(--ui-type-wallet-amount);font-weight:var(--ui-type-wallet-amount-weight);line-height:var(--ui-type-wallet-amount-lh);color:var(--v5-ink); }
 .bills-sheet__amount--in { color:var(--v5-success-ink); }
 .bills-sheet__unit { font:500 14px/20px var(--font-v5);color:var(--v5-ink-3); }
-.bills-sheet__facts { display:flex;flex-direction:column;border-radius:16px;background:var(--v5-surface-2); }
-.bills-sheet__fact { display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;padding:0 16px;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3); }
+.bills-sheet__facts { display:flex;flex-direction:column;border-radius:var(--ui-radius-surface);background:var(--v5-surface-2); }
+.bills-sheet__fact { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inset);min-height:48px;box-sizing:content-box;padding:0 16px;font:400 14px/20px var(--font-v5);color:var(--v5-ink-3); }
 .bills-sheet__fact + .bills-sheet__fact { border-top:1px solid var(--v5-border); }
-.bills-sheet__value { min-width:0;font-weight:500;text-align:right;color:var(--v5-ink);overflow-wrap:anywhere; }
-.bills-sheet__ref { display:flex;align-items:center;gap:8px;min-width:0; }
+.bills-sheet__value { min-width:0;font-weight:400;text-align:right;color:var(--v5-ink);overflow-wrap:anywhere; }
+.bills-sheet__ref { display:flex;align-items:center;gap:var(--v5-space-2);min-width:0; }
 .bills-sheet__close { position:relative;isolation:isolate;display:grid;place-items:center;min-height:48px;border-radius:24px;color:var(--v5-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);cursor:pointer; }
 .bills-sheet__close > text { position:relative;z-index:1; }
 </style>
