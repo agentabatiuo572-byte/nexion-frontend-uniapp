@@ -524,7 +524,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 转移:`active→matured`(unlockTs 到期,4s tick 累息)/ `matured→claimed`/ `active→early-withdrawn`(罚款 5/15/30/50% 本金+forfeit 利息)。资金锁定整期,无手动暂停;APY 浮动但已质押按原利率。
 
 ### 5.7 Device 激活/库存(§11.1/§12.2)
-`activatedAt: null`(库存)↔`number`(在槽);辅 `pendingDeactivate`。actions:`addDevice`(入库无上限)/`activateDevice`(守卫 `(active+trialReserves?1:0)<MAX_DEVICES=6` 返 bool)/`deactivateDevice`(清遥测+currentTask)/`scheduleDeactivation`(有任务则置 pendingDeactivate,等完成 tick 自动出槽)。取消激活 UI 分支:无任务→confirm;有任务→3 选 sheet(等完成/强制/返回)。
+`activatedAt: null`(库存)↔`number`(在槽);辅 `pendingDeactivate`。actions:`addDevice`(入库无上限)/`activateDevice`(守卫 `(active+trialReserves?1:0)<MAX_DEVICES=6` 返 bool)/`deactivateDevice`(清遥测+currentTask)/`scheduleDeactivation`(有任务则置 pendingDeactivate,等完成 tick 自动出槽)。2026-10-30 容量纠正：`pendingDeactivate=true` 仅表示等待停用，实际停用前仍为已激活 Online 且占一槽；必须在任务完成或合法强制停用后，权威激活事实变为未激活才释放，不得提前允许第七台。取消激活 UI 分支:无任务→confirm;有任务→3 选 sheet(等完成/强制/返回)。
 
 ### 5.8 Device 衰减曲线(§6.8,平滑非离散)
 按 `getMonthsOwned` 浮点月:月1-3 −4%/月4-8 −6%/月9-12+ **−23.7%**→22% floor(`MIN_EFFICIENCY=0.22`);豁免 phone/cloud-share;client 60s 重算(展示用非权威)。

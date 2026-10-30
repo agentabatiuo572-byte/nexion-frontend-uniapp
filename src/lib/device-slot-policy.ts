@@ -7,9 +7,9 @@ type SlotDevice = {
   pendingDeactivate?: boolean;
 };
 
-/** Every activated device instance, including Cloud Share, uses one activation slot. */
+/** Every activated instance keeps its slot until actual deactivation, including while waiting for its task. */
 export function isActiveSlotDevice(device: SlotDevice): boolean {
-  return device.activatedAt !== null && !device.pendingDeactivate;
+  return device.activatedAt !== null;
 }
 
 /** A remote lifecycle row without its activation timestamp must be reconciled before activation. */

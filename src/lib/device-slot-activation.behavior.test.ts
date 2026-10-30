@@ -27,6 +27,27 @@ function actualFunction(source: string, name: string, deps: Record<string, unkno
 }
 
 describe("all-device activation capacity", () => {
+  it.each<DeviceKind>(["cloud-share", "phone", "pc-gpu", "stellarbox-s1", "stellarbox-pro-v2", "stellarrack-p2"])("keeps %s waiting for task completion in its slot and permits a replacement only after actual deactivation", kind => {
+    const task = { id: "running-task" };
+    const devices = ref(Array.from({ length: 7 }, (_, index) => ({ id: String(index), kind,
+      activatedAt: index < 6 ? 123 as number | null : null,
+      pendingDeactivate: false, currentTask: index === 0 ? task : null,
+    })));
+    const count = computed(() => devices.value.filter(isActiveSlotDevice).length);
+    const deps = { devices, activeSlotCount: count, slotCap: ref(6), computeShareEnabled: ref(true), persistAccountSnapshot: vi.fn(() => true) };
+    const activate = actualFunction(appSource, "activateDevice", deps);
+    actualFunction(appSource, "scheduleDeactivation", deps)("0");
+    expect(devices.value[0]).toMatchObject({ activatedAt: 123, pendingDeactivate: true, currentTask: task });
+    expect(count.value).toBe(6);
+    expect(activate("6")).toBe(false);
+    expect(count.value).toBe(6);
+    expect(actualFunction(appSource, "deactivateDevice", deps)("0")).toBe(true);
+    expect(devices.value[0]).toMatchObject({ activatedAt: null, pendingDeactivate: false, currentTask: null });
+    expect(count.value).toBe(5);
+    expect(activate("6")).toBe(true);
+    expect(count.value).toBe(6);
+  });
+
   it.each<DeviceKind>(["cloud-share", "phone", "pc-gpu", "stellarbox-s1", "stellarbox-pro-v2", "stellarrack-p2"])("allows %s as device six, blocks device seven, and retains the trial reservation", kind => {
     const devices = ref(Array.from({ length: 6 }, (_, index) => ({ id: String(index), kind, activatedAt: index < 5 ? 123 as number | null : null })));
     const persistAccountSnapshot = vi.fn(() => true);
