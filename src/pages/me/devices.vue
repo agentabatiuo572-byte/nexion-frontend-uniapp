@@ -102,7 +102,7 @@
               :device="d"
               :active="false"
               :show-action="canControlDevice(d)"
-              :disabled="(slotsFull || !activationReady) && occupiesDeviceSlot(d.kind)"
+              :disabled="slotsFull || !activationReady"
               :disabled-label="slotsUsed === null || !activationReady ? slotUnavailableText : undefined"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
@@ -114,7 +114,7 @@
               @ladder="ladderDevice = d"
             />
           </view>
-          <view v-if="slotsUsed !== null && slotsFull && inactiveDevices.some((d) => occupiesDeviceSlot(d.kind))" class="flex items-center" :style="slotsFullWarnStyle">
+          <view v-if="slotsUsed !== null && slotsFull && inactiveDevices.length > 0" class="flex items-center" :style="slotsFullWarnStyle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
             <text>{{ t.myDevices.inventorySlotsFullWarning }}</text>
           </view>
@@ -221,7 +221,7 @@ import { apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogState } from "@/store/product-catalog";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
-import { isActivatableInventoryDevice, occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
+import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 
 const t = useT();
 const app = useApp();
@@ -305,11 +305,11 @@ async function handleActivate(d: Device) {
     goPhoneActivation();
     return;
   }
-  if (occupiesDeviceSlot(d.kind) && (slotsUsed.value === null || !activationReady.value)) {
+  if (slotsUsed.value === null || !activationReady.value) {
     toast.warn(slotUnavailableText.value);
     return;
   }
-  if (occupiesDeviceSlot(d.kind) && slotsFull.value) {
+  if (slotsFull.value) {
     toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: app.slotCap }));
     return;
   }

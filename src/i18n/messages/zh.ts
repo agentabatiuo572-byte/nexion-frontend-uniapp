@@ -1709,10 +1709,10 @@ progressLabel: "进度",
   // SlotActionSheet — tap an empty compute slot in Earn.
   slotSheet: {
     title: "填满算力槽位",
-    desc: "买一台新设备,空槽位立刻开始产出",
+    desc: "所有设备（含 Cloud Share）合计最多激活 {max} 台。",
     goStoreCta: "购买新设备",
     activateRow: "激活已有设备({n} 台)",
-    toastSlotsFull: "槽位已满 {max}/{max}",
+    toastSlotsFull: "槽位已满 {max}/{max}，请先取消激活一台设备。",
     toastActivated: "已激活 {name}",
 
 chooseMethod: "选择方式，开始接入 UVEL 网络",

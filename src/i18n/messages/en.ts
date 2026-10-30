@@ -1728,10 +1728,10 @@ progressLabel: "Progress",
   // SlotActionSheet — tap an empty compute slot in Earn.
   slotSheet: {
     title: "Fill compute slots",
-    desc: "Add a new device — empty slots start earning right away",
+    desc: "Activate up to {max} devices in total, including Cloud Share.",
     goStoreCta: "Buy a new device",
     activateRow: "Activate an existing device ({n})",
-    toastSlotsFull: "Slots full {max}/{max}",
+    toastSlotsFull: "Slots full {max}/{max}. Deactivate one device first.",
     toastActivated: "{name} activated",
 
 chooseMethod: "Choose how to join the UVEL network",

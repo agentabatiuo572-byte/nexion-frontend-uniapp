@@ -21,7 +21,7 @@ function mount(locale: keyof typeof messages = "en") {
     app: { slotCap: 6, remoteFleetStatus: "ready" }, slotMeterLabel: "3/6", slotsUsed: 3, segStyle: () => ({}),
     activeDevices: [paid], inactiveDevices: [pending], unconfirmedDevices: [unconfirmed], inventoryEmpty: false,
     trialPresentation: { active: { value: true } }, cancelTrialBusy: false, handleCancelTrial: vi.fn(),
-    remoteApiEnabled: true, canControlDevice: () => true, tradeinStrip: () => ({}), occupiesDeviceSlot: () => true,
+    remoteApiEnabled: true, canControlDevice: () => true, tradeinStrip: () => ({}),
     handleActivate: vi.fn(), handleDeactivate: vi.fn(), handleTradein: vi.fn(), ladderDevice: null,
     slotsFull: false, activationReady: true, phoneNeedsActivation: true, nativePhoneAvailable: false,
     phoneActivationGuidance: { title: "Phone", body: "Connect in the Android app" }, goPhoneActivation: vi.fn(),
