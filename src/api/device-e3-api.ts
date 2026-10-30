@@ -52,7 +52,7 @@ export interface CanonicalE3Fleet {
   serverNow: number;
   timezone: string;
   slotCap: number;
-  /** Server total includes active instances, trial and unfulfilled order reservations. */
+  /** Authoritative capacity includes order reservations and the trial exactly once. */
   slotsUsed?: number;
   reservedSlotCount?: number;
   trialSlotCount?: number;
@@ -330,9 +330,9 @@ function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
     serverNow,
     timezone: string(source.timezone),
     slotCap: integer(source.slotCap, 1),
-    slotsUsed: source.slotsUsed == null ? undefined : integer(source.slotsUsed),
-    reservedSlotCount: source.reservedSlotCount == null ? undefined : integer(source.reservedSlotCount),
-    trialSlotCount: source.trialSlotCount == null ? undefined : integer(source.trialSlotCount),
+    slotsUsed: source.slotsUsed === undefined ? undefined : integer(source.slotsUsed),
+    reservedSlotCount: source.reservedSlotCount === undefined ? undefined : integer(source.reservedSlotCount),
+    trialSlotCount: source.trialSlotCount === undefined ? undefined : integer(source.trialSlotCount),
     devices,
     capacitySchedule: stringMap(source.capacitySchedule),
     source: string(source.source),
@@ -648,7 +648,7 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
     async capacityKeep(targetProductNo, idempotencyKey, expectedQuote) {
       const key = idempotencyKey.trim();
       if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
-      if (expectedQuote.decision !== "REPLACE_REQUIRED"
+      if (expectedQuote.decision !== "CAPACITY_AVAILABLE"
           || expectedQuote.targetProductNo !== targetProductNo
           || expectedQuote.decisionSource !== "server") {
         throw new ApiError({ kind: "configuration", message: "CAPACITY_KEEP_QUOTE_CONTEXT_INVALID" });

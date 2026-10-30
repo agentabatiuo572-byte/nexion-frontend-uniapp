@@ -131,6 +131,10 @@ function hide() {
 const activationInFlight = ref(new Set<string>());
 
 async function onActivate(d: Device) {
+  if (remoteApiEnabled && app.remoteFleetStatus !== "ready") {
+    toast.warn(t.value.myDevices.inventoryStaleWarning);
+    return;
+  }
   if (requiresActivationConfirmation(d)) {
     toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
     return;

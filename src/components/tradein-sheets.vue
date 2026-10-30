@@ -185,6 +185,7 @@
           <text class="tis-cta-text">{{ replaceView.replaceCta }}</text>
         </view>
         <view
+          v-if="!remoteApiEnabled || (state.kind === 'replace' && state.canonicalCapacityQuote?.decision === 'CAPACITY_AVAILABLE')"
           class="tis-secondary"
           :class="{ 'tis-cta-disabled': replaceView.insufficient || confirming }"
           role="button"
@@ -596,7 +597,7 @@ async function onChooseFullPrice() {
   }
   // If slot full, hand off to the replace sheet; else just dismiss (caller's
   // checkout flow proceeds normally to payment).
-  if (app.activeSlotCount + reservedSlots.value >= app.slotCap) {
+  if ((app.remoteSlotsUsed ?? (app.activeSlotCount + reservedSlots.value)) >= app.slotCap) {
     sheet.showReplace(s.targetKind, s.newPrice);
   } else {
     hide();
@@ -990,7 +991,7 @@ function onReplace() {
   }
   // 先算再动:停掉旧机后新机能不能占到槽,用同一个谓词事先判(审计 R9 P1:事后失败再回滚,回滚里的再激活撞的是
   // 同一个槽位谓词,必然连环失败,把一台已付费旧机甩进库存)。
-  if (app.activeSlotCount - 1 + reservedSlots.value >= app.slotCap) {
+  if ((app.remoteSlotsUsed ?? (app.activeSlotCount + reservedSlots.value)) - 1 >= app.slotCap) {
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
     return;
@@ -1058,7 +1059,7 @@ async function submitCanonicalKeepBuy(
     if (!isCurrentAccountScope(requestScope)) throw new Error("ACCOUNT_SCOPE_CHANGED");
   };
   try {
-    if (quote.decision !== "REPLACE_REQUIRED" || quote.targetProductNo !== newKind
+    if (quote.decision !== "CAPACITY_AVAILABLE" || quote.targetProductNo !== newKind
         || quote.decisionSource !== "server") {
       throw new Error("CAPACITY_KEEP_QUOTE_INVALID");
     }
@@ -1136,6 +1137,10 @@ function onKeepBuy() {
   if (remoteApiEnabled) {
     if (!s.canonicalCapacityQuote) {
       toast.warn(t.value.tradein.errPleaseRetry);
+      return;
+    }
+    if (s.canonicalCapacityQuote.decision !== "CAPACITY_AVAILABLE") {
+      toast.warn(t.value.tradein.errReplaceSlotConflict);
       return;
     }
     confirming.value = true;
@@ -1226,7 +1231,7 @@ function onForce() {
   //   activate(new) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。Each failure restores the old device's task.
   const taskSnapshot = lowest.currentTask;
   // 先算再动:停掉旧机后新机能不能占到槽,用同一个谓词事先判(与 onReplace 同一条;审计 R9 P1)。
-  if (app.activeSlotCount - 1 + reservedSlots.value >= app.slotCap) {
+  if ((app.remoteSlotsUsed ?? (app.activeSlotCount + reservedSlots.value)) - 1 >= app.slotCap) {
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
     return;
