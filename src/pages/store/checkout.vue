@@ -1185,7 +1185,7 @@ const checkoutCapacityMessage = computed(() => remoteCapacityGate.pending ? t.va
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
 const capped = computed(() => !hasTradein.value && (
-  trialConversionMode.value ? app.activeSlotCount >= app.slotCap : cappedRaw.value
+  trialConversionMode.value ? (app.remoteSlotUsage ? app.remoteSlotUsage.slotsUsed - (app.remoteSlotUsage.trialSlotCount ?? reservedSlots.value) : app.activeSlotCount) >= app.slotCap : cappedRaw.value
 ));
 
 // ── derived text ──

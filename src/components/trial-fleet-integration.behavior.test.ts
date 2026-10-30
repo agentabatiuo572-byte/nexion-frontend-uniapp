@@ -7,6 +7,7 @@ import homeSource from "./home/my-fleet-section.vue?raw";
 import inventorySource from "@/pages/me/devices.vue?raw";
 import earnSource from "@/pages/earn/earn.vue?raw";
 import earnFleetSource from "./earn/empty-slots-hint.vue?raw";
+import slotSheetSource from "./slot-action-sheet.vue?raw";
 import { en } from "@/i18n/messages/en";
 import { trialFleetCopy } from "@/i18n/trial-fleet";
 import * as slotPolicy from "@/lib/device-slot-policy";
@@ -26,7 +27,11 @@ function mount(source: string) {
     isCustomElement: () => true }).code)(Vue);
   const paid = { id: "paid-1", kind: "stellarbox-s1", activatedAt: 1, rowVersion: 1 };
   const app = Vue.reactive({ accountKey: "user:1", accountBindingEpoch: 1, remoteFleetHasSnapshot: true, remoteFleetStatus: "ready", remotePhoneBindingInvalid: false,
-    slotCap: 6, remoteSlotsUsed: null as number | null, activeSlotCount: 5, visibleDevices: [paid], devices: [paid], user: { joinedAt: 1 } });
+    slotCap: 6, activeSlotCount: 5,
+    get remoteSlotsUsed(): number | null { return this.remoteSlotUsage?.slotsUsed ?? null; },
+    set remoteSlotsUsed(value: number | null) { this.remoteSlotUsage = value === null ? null : { slotsUsed: value, reservedSlotCount: 0, trialSlotCount: 0 }; },
+    remoteSlotUsage: null as { slotsUsed: number; reservedSlotCount: number; trialSlotCount: number } | null,
+    visibleDevices: [paid], devices: [paid], user: { joinedAt: 1 } });
   const trial = Vue.reactive({ authorityStatus: "ready", status: "active", poll: vi.fn(async () => true), cancel: vi.fn(async () => ({ ok: true })) });
   const presentation = { active: Vue.ref(true), reservedSlots: Vue.ref<number | null>(1), actionsReady: Vue.ref(true) };
   const navTo = vi.fn(), confirm = vi.fn(async () => true), toast = { warn: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn() };
@@ -35,7 +40,9 @@ function mount(source: string) {
     "@/store/data-visibility": { useDataVisibility: () => ({ hidden: false, mask: String }) },
     vue: Vue, "@/lib/amount-display": { formatAmount: (n: number) => n.toFixed(2) },
     "@/lib/route": { navTo, navReset: vi.fn() }, "@/store/app": { useApp: () => app },
-    "@/store/free-trial": { useFreeTrial: () => trial },
+    "@/store/free-trial": { useFreeTrial: () => trial, trialReservesSlotNow: () => presentation.reservedSlots.value === 1 },
+    "@/store/slot-action-sheet": { useSlotActionSheet: () => ({ open: true, hide: vi.fn() }) },
+    "@/composables/use-dialog-a11y": { useDialogA11y: vi.fn() },
     "@/composables/use-trial-presentation": { useTrialPresentation: () => presentation },
     "@/i18n/trial-fleet": { useTrialFleetCopy: () => Vue.ref(trialFleetCopy.en) },
     "@/i18n/use-t": { useT: () => Vue.ref(en) },
@@ -81,6 +88,25 @@ it.each([["Home", homeSource], ["management", inventorySource]])("uses server re
   expect(screen.view.slotsUsed.value).toBe(7);
   screen.app.remoteSlotsUsed = 0;
   expect(screen.view.slotsUsed.value).toBe(0);
+});
+
+it("blocks a Cloud activation in the actual chooser when five Online devices and one order reservation use all slots", async () => {
+  const screen = mount(slotSheetSource); screen.presentation.reservedSlots.value = 0;
+  screen.app.remoteSlotUsage = { slotsUsed: 6, reservedSlotCount: 1, trialSlotCount: 0 };
+  expect(screen.view.slotsUsed.value).toBe(6);
+  expect(screen.view.slotsFull.value).toBe(true);
+  await screen.view.onActivate({ id: "stock-cloud", kind: "cloud-share", activatedAt: null, rowVersion: 1 });
+  expect(screen.toast.warn).toHaveBeenCalledWith(en.slotSheet.toastSlotsFull.replaceAll("{max}", "6"));
+  expect(screen.toast.success).not.toHaveBeenCalled();
+});
+
+it.each([["Home", homeSource], ["management", inventorySource]])("counts authoritative order and trial reservations exactly once on %s", (_label, source) => {
+  const screen = mount(source); screen.presentation.reservedSlots.value = 1;
+  screen.app.activeSlotCount = 4;
+  screen.app.remoteSlotUsage = { slotsUsed: 6, reservedSlotCount: 1, trialSlotCount: 1 };
+  expect(screen.view.slotsUsed.value).toBe(6);
+  expect(screen.app.activeSlotCount).toBe(4);
+  expect(tree(screen.node()).some(node => node.type === "AddDeviceRow")).toBe(false);
 });
 
 it.each([["Home", homeSource], ["management", inventorySource]])("counts a trial once with the full paid capacity on %s", (_label, source) => {
