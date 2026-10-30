@@ -57,6 +57,7 @@
       <!-- ─────────── 1. choice — trade-in or full price ─────────── -->
       <template v-if="keepRecovery || keepRecoveryError">
         <view class="tis-head"><text class="tis-title">{{ t.tradein.keepRecoveryPending }}</text></view>
+        <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
         <view class="tis-cta" :class="{ 'tis-cta-disabled': confirming }" role="button" :tabindex="confirming ? -1 : 0" :aria-disabled="confirming"
           @click="onRecoverKeep" @keydown.enter.prevent="onKeyboardActivate($event, onRecoverKeep)" @keydown.space.prevent="onKeyboardActivate($event, onRecoverKeep)">
           <text class="tis-cta-text">{{ t.tradein.keepRecoveryAction }}</text>
@@ -291,8 +292,9 @@ import { useOrders } from "@/store/orders";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision } from "@/domain/e20-capacity-coordinator";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { acquireAccountCommandKey, releaseAccountCommandKey, readAccountRow } from "@/store/account-scoped-storage";
+import { acquireAccountCommandKey, releaseAccountCommandKey } from "@/store/account-scoped-storage";
 import { readCheckoutTradein } from "@/lib/checkout-order-recovery";
+import { CAPACITY_COMMAND_TABLE, readPendingKeepCommand, type PendingKeepCommand } from "@/lib/keep-command-recovery";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
 const sheet = useTradeinSheet();
@@ -319,26 +321,14 @@ const remoteRetireEligibleTargets = ref<Set<string>>(new Set());
 const remoteRetirePayables = ref<Map<string, number>>(new Map());
 const remoteRetireTargetsReady = ref(!remoteApiEnabled);
 const capacityCommandKey = ref<string | null>(null);
-const CAPACITY_COMMAND_TABLE = "nexgrid-e3-capacity-commands-accounts-v1";
-type PendingKeep = { intent: string; key: string; targetProductNo: DeviceKind; payableUsdt: number };
-const keepRecovery = ref<PendingKeep | null>(null);
+const keepRecovery = ref<PendingKeepCommand | null>(null);
 const keepRecoveryError = ref(false);
 function keepTarget(): DeviceKind | null {
   const current = state.value;
-  return current.kind === "choice" ? current.targetKind : current.kind === "replace" ? current.newKind : null;
+  return current.kind === "choice" || current.kind === "keep-recovery" ? current.targetKind : current.kind === "replace" ? current.newKind : null;
 }
-function readPendingKeep(targetProductNo: DeviceKind): PendingKeep | null {
-  const commands = readAccountRow<{ commands: Record<string, string> }>(CAPACITY_COMMAND_TABLE, app.accountKey, true)?.commands ?? {};
-  for (const [intent, key] of Object.entries(commands)) {
-    const fields = intent.split("|");
-    if (fields[0] !== "keep" || fields[2] !== targetProductNo) continue;
-    const payableUsdt = Number(fields[5]);
-    if (fields.length !== 7 || !fields[5]?.trim() || !Number.isFinite(payableUsdt) || payableUsdt < 0 || typeof key !== "string" || !key.trim()) {
-      throw new Error("CAPACITY_KEEP_ORIGINAL_COMMAND_INVALID");
-    }
-    return { intent, key, targetProductNo, payableUsdt };
-  }
-  return null;
+function readPendingKeep(targetProductNo: DeviceKind): PendingKeepCommand | null {
+  return readPendingKeepCommand(app.accountKey, targetProductNo);
 }
 function refreshKeepRecovery(target: DeviceKind | null = keepTarget()): void {
   keepRecovery.value = null; keepRecoveryError.value = false;
@@ -353,7 +343,7 @@ function onRecoverKeep(): void {
   const command = keepRecovery.value;
   if (!command) return;
   confirming.value = true;
-  void submitCanonicalKeepBuy(command.targetProductNo);
+  void submitCanonicalKeepBuy(command.targetProductNo as DeviceKind);
 }
 const quoteRequestGeneration = ref(0);
 const quoteLoading = ref(false);
