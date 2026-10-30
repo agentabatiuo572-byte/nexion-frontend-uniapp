@@ -1209,7 +1209,7 @@ onLaunch(() => {
   const auth = useAuth();
   // #ifdef APP-PLUS
   installNativePush({ client: apiClient, vault: sessionVault,
-    canNavigate: () => canRefreshRemoteAccount(useAuth()) && useAuth().onboardingComplete
+    canNavigate: () => canRefreshRemoteAccount(useAuth())
       && !!readCurrentRoute() && !isAuthWhitelisted(readCurrentRoute()) && !isStaticReviewRoute(readCurrentRoute()),
     received: () => { if (canRefreshRemoteAccount(useAuth())) void useNotifications().refreshRemote(); },
   });
