@@ -113,7 +113,7 @@
           <view role="button" tabindex="0" :style="earnBtnStyle" @click="navTo('/pages/me/devices')" @keydown.enter.prevent="navTo('/pages/me/devices')"><text>{{ t.myDevices.inventoryTitle }} →</text></view>
         </view>
         <!-- Order summary -->
-        <view class="nx-glass-card mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
+        <view class="order-summary nx-glass-card mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
           <text class="block" :style="sectionLabelStyle">{{ t.orders.orderSummary }}</text>
           <DetailRow :label="t.orders.orderIdLabel" :value="order.id" mono copyable />
           <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
@@ -1175,6 +1175,7 @@ const remoteErrorStyle: CSSProperties = {
 
 <style scoped>
 .order-payment-result { display:flex; flex-direction:column; gap:var(--v5-space-3); }
+.order-summary :deep(.copy-code-button) { width:44px; height:44px; margin:0; }
 .pending-notice-mask { position:fixed; z-index:900; inset:0; display:flex; align-items:center; justify-content:center; padding:var(--nx-overlay-top) var(--v5-space-4) var(--nx-overlay-bottom); background:var(--v5-bg-color-mask); }
 .pending-order-notice { width:100%; max-width:344px; max-height:100%; overflow:auto; padding:var(--v5-space-5); border-radius:var(--v5-radius-xl); background:var(--v5-surface); color:var(--v5-ink); display:flex; flex-direction:column; gap:var(--v5-space-4); }
 .pending-notice-head { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); font:600 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
