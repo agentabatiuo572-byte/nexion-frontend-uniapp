@@ -57,7 +57,8 @@
       <!-- ─────────── 1. choice — trade-in or full price ─────────── -->
       <template v-if="capacityRecovery || capacityRecoveryUnavailable || keepRecoveryError">
         <view class="tis-head"><text class="tis-title">{{ capacityRecovery?.operation === 'keep' || keepRecoveryError ? t.tradein.keepRecoveryPending : recoveryCopy.paymentPending }}</text></view>
-        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo) }} · {{ formatAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
+        <text v-if="keepRecoveryError" class="tis-disclaimer" role="alert">{{ t.tradein.keepRecoveryReadError }}</text>
+        <text v-if="capacityRecovery" class="tis-card-line">{{ capacityRecovery.quote ? capacityRecovery.quote.targetProductName : kindLabel(capacityRecovery.targetProductNo as DeviceKind) }} · {{ formatAmount(capacityRecovery.quote ? capacityRecovery.quote.payableUsdt : capacityRecovery.payableUsdt) }} USDT</text>
         <view class="tis-cta" :class="{ 'tis-cta-disabled': capacityRecoveryBusy }" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(false)" @keydown.enter.prevent="recoverCapacityPurchase(false)" @keydown.space.prevent="recoverCapacityPurchase(false)"><text class="tis-cta-text">{{ recoveryCopy.query }}</text></view>
         <view v-if="capacityResumeAllowed" class="tis-secondary" role="button" :tabindex="capacityRecoveryBusy ? -1 : 0" :aria-disabled="capacityRecoveryBusy" @click="recoverCapacityPurchase(true)" @keydown.enter.prevent="recoverCapacityPurchase(true)" @keydown.space.prevent="recoverCapacityPurchase(true)"><text class="tis-secondary-text">{{ recoveryCopy.resume }}</text></view>
         <view class="tis-ghost" role="button" tabindex="0" @click="hide" @keydown.enter.prevent="hide" @keydown.space.prevent="hide"><text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text></view>
@@ -297,6 +298,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { acquireAccountCommandKey, releaseAccountCommandKey,readAccountRow,writeAccountRow } from "@/store/account-scoped-storage";
 import { readCheckoutTradein } from "@/lib/checkout-order-recovery";
+import { CAPACITY_COMMAND_TABLE, readPendingKeepCommand, type PendingKeepCommand } from "@/lib/keep-command-recovery";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
 const sheet = useTradeinSheet();
@@ -325,26 +327,14 @@ const remoteRetireEligibleTargets = ref<Set<string>>(new Set());
 const remoteRetirePayables = ref<Map<string, number>>(new Map());
 const remoteRetireTargetsReady = ref(!remoteApiEnabled);
 const capacityCommandKey = ref<string | null>(null);
-const CAPACITY_COMMAND_TABLE = "nexgrid-e3-capacity-commands-accounts-v1";
-type PendingKeep = { intent: string; key: string; targetProductNo: DeviceKind; payableUsdt: number };
-const keepRecovery = ref<PendingKeep | null>(null);
+const keepRecovery = ref<PendingKeepCommand | null>(null);
 const keepRecoveryError = ref(false);
 function keepTarget(): DeviceKind | null {
   const current = state.value;
-  return current.kind === "choice" ? current.targetKind : current.kind === "replace" ? current.newKind : null;
+  return current.kind === "choice" || current.kind === "keep-recovery" ? current.targetKind : current.kind === "replace" ? current.newKind : null;
 }
-function readPendingKeep(targetProductNo?: DeviceKind): PendingKeep | null {
-  const commands = readAccountRow<{ commands: Record<string, string> }>(CAPACITY_COMMAND_TABLE, app.accountKey, true)?.commands ?? {};
-  for (const [intent, key] of Object.entries(commands)) {
-    const fields = intent.split("|");
-    if (fields[0] !== "keep" || targetProductNo && fields[2] !== targetProductNo) continue;
-    const payableUsdt = Number(fields[5]);
-    if (fields.length !== 7 || !fields[5]?.trim() || !Number.isFinite(payableUsdt) || payableUsdt < 0 || typeof key !== "string" || !key.trim()) {
-      throw new Error("CAPACITY_KEEP_ORIGINAL_COMMAND_INVALID");
-    }
-    return { intent, key, targetProductNo: fields[2] as DeviceKind, payableUsdt };
-  }
-  return null;
+function readPendingKeep(targetProductNo?: DeviceKind): PendingKeepCommand | null {
+  return readPendingKeepCommand(app.accountKey, targetProductNo);
 }
 function refreshKeepRecovery(target: DeviceKind | null = keepTarget()): void {
   keepRecovery.value = null; keepRecoveryError.value = false;
@@ -362,7 +352,7 @@ function onRecoverKeep(): void {
 }
 const CAPACITY_RECOVERY_TABLE = "nexgrid-e3-capacity-payment-accounts-v1";
 type CapacityPending = {operation:"replace"|"keep";intent:string;key:string;quote:CanonicalCapacityReplaceQuote}
-  | (PendingKeep & {operation:"keep";quote:null});
+  | (PendingKeepCommand & {operation:"keep";quote:null});
 const capacityRecovery = ref<CapacityPending|null>(null);
 const capacityRecoveryBusy = ref(false);
 const capacityResumeAllowed = ref(false);
@@ -1001,11 +991,11 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
     const frozen=original?original.quote:{...requestedQuote!};
     const effectiveOperation=original?.operation??operation;
     const intent=original?.intent??capacityIntent(effectiveOperation,frozen!);
-    const target=frozen?frozen.targetProductNo:(original as PendingKeep).targetProductNo;
-    const payable=frozen?frozen.payableUsdt:(original as PendingKeep).payableUsdt;
+    const target=frozen?frozen.targetProductNo:(original as PendingKeepCommand).targetProductNo;
+    const payable=frozen?frozen.payableUsdt:(original as PendingKeepCommand).payableUsdt;
     const summary=frozen?frozen.targetProductName:kindLabel(target as DeviceKind);
     if (!receipt) {
-      const current=()=>isCurrentAccountScope(scope)&&props.active&&(state.value.kind==='replace'||state.value.kind==='choice')
+      const current=()=>isCurrentAccountScope(scope)&&props.active&&(state.value.kind==='replace'||state.value.kind==='choice'||allowOriginalResume&&state.value.kind==='keep-recovery')
         &&(allowOriginalResume?readCapacityPending(scope.accountKey)?.intent===intent
           :state.value.kind==='replace'&&state.value.newKind===newKind&&!!state.value.canonicalCapacityQuote&&capacityIntent(operation,state.value.canonicalCapacityQuote)===requestedIntent);
       receipt=await executePaymentWithPassword({amount:payable,currency:'USDT',summary},async authorization=>{

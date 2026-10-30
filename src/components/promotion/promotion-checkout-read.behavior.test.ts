@@ -16,6 +16,8 @@ import { en } from '@/i18n/messages/en';
 import { vi as vietnamese } from '@/i18n/messages/vi';
 import { asApiError,ApiError } from '@/api/errors';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord } from '@/lib/promotion-checkout-session';
+import { parsePendingKeepCommand } from '@/lib/keep-command-recovery';
+import type { PaymentPasswordAuthorization } from '@/api/payment-password-api';
 import { projectServerNow } from '@/lib/server-deadline-clock';
 import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { formatAmount,formatGroupedAmount } from '@/lib/amount-display';
@@ -63,6 +65,8 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
   const intent=selectPromotionCheckoutRecord({},props).intent;
   let rows:Record<string,PromotionCheckoutRecord>=stored?{[intent]:structuredClone(stored)}:{};
   let writable=true;
+  let keepHistory:unknown;
+  const tradein={showKeepRecovery:vi.fn()};
   const save=vi.fn((_table:string,_account:string,value:Record<string,PromotionCheckoutRecord>)=>{if(!writable)return false;rows=structuredClone(value);return true;});
   const api={quote:vi.fn().mockResolvedValue(quote()),get:vi.fn().mockResolvedValue(activity()),create:vi.fn().mockResolvedValue(receipt()),pay:vi.fn().mockResolvedValue({...receipt(),paymentStatus:'PAID',orderStatus:'COMPLETED'}),cancel:vi.fn(),command:vi.fn().mockResolvedValue({status:'PROCESSING',order:null}),paymentCommand:vi.fn().mockResolvedValue({status:'NOT_SEEN',canResumeSameKey:true}),findOrder:vi.fn().mockResolvedValue(receipt())};
   const app=Vue.reactive({accountKey:'user:7',accountBindingEpoch:1,remoteFleetHasSnapshot:true,remoteSlotsUsed:null as number|null,slotCap:6,user:{usdtBalance:150},captureRemoteAccountRequest:vi.fn(()=>({accountKey:'user:7',epoch:1})),refreshRemoteFleet:vi.fn().mockResolvedValue(true)});
@@ -72,7 +76,7 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
   const refreshCatalog=vi.fn(adapters?.refreshCatalog??(async()=>true));
   vi.stubGlobal('setInterval',vi.fn(()=>0));vi.stubGlobal('clearInterval',vi.fn());
   const confirm=vi.fn().mockResolvedValue(false),clearConfirmsBy=vi.fn();
-  const authorization={paymentPassword:'583719',version:1};
+  const authorization:PaymentPasswordAuthorization={paymentPassword:'583719',credentialVersion:1,attemptNo:'fixture-attempt'};
   const pin=vi.fn(async(_context:any,command:any,current:()=>boolean)=>current()?command(authorization):null);
   const stockCheck=vi.fn().mockResolvedValue(undefined);
   const canonical=vi.fn().mockResolvedValue({id:'o1',status:'activated'}),navTo=vi.fn(),navBack=vi.fn();
@@ -96,6 +100,8 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
     '@/store/product-catalog':{productCatalogState:catalog,productCatalogPresentation:presentation,refreshProductCatalog:refreshCatalog},
     '@/lib/route':{navTo,navBack},'@/store/ui':{confirm,useUI:()=>({clearConfirmsBy})},
     '@/lib/promotion-checkout-session':{PromotionCheckoutSession,selectPromotionCheckoutRecord},
+    '@/lib/keep-command-recovery':{readPendingKeepCommand:(account:string,productNo:string)=>parsePendingKeepCommand(keepHistory,account,productNo)},
+    '@/store/tradein-sheet':{useTradeinSheet:()=>tradein},
     '@/lib/promotion-entry':entry,
     '@/store/account-scoped-storage':{readAccountRow:()=>rows,writeAccountRow:save,acquireAccountCommandKey:key},
     '@/lib/promotion-leave-guard':{registerCheckoutLeaveGuard:guardRegistration,requestCheckoutLeave:vi.fn().mockResolvedValue(true)},
@@ -114,8 +120,61 @@ function screen(stored?:PromotionCheckoutRecord,input?:{activityId?:string;items
   const amount={props:['value','currency','showCurrency'],setup:(props:any)=>()=>Vue.h('text',formatGroupedAmount(props.value)+(props.showCurrency===false?'':' '+props.currency))};
   const result={props:['state','productName','amount'],setup:(props:any)=>()=>Vue.h('view',{'data-result':props.state},[props.productName,' ',formatGroupedAmount(props.amount)+' USDT'])};
   const html=()=>renderToString(Vue.createSSRApp({components:{PromotionAction:passthrough,PromotionTerms:empty,RewardRows:empty,LiquidGlass:empty,NxSheet:empty,CheckoutPaymentSheet:empty,CheckoutAmount:amount,CheckoutResult:result},render:()=>render(Vue.proxyRefs({$slots:{},...Vue.toRefs(props),...view}),[])}));
-  return{view,exposed,api,save,key,app,fleet,props,auth,locale,vouchers,getProduct,catalog,presentation,refreshCatalog,html,confirm,clearConfirmsBy,pin,stockCheck,authorization,canonical,navTo,navBack,start:()=>Promise.all(mounted.map(fn=>fn())),saved:()=>rows[intent],failStorage:()=>{writable=false;}};
+  return{view,exposed,api,save,key,app,fleet,props,auth,locale,vouchers,getProduct,catalog,presentation,refreshCatalog,html,confirm,clearConfirmsBy,pin,stockCheck,authorization,canonical,navTo,navBack,tradein,setKeepHistory:(history:unknown)=>{keepHistory=history;},start:()=>Promise.all(mounted.map(fn=>fn())),saved:()=>rows[intent],failStorage:()=>{writable=false;}};
 }
+
+const oldKeepIntent='keep|1156|sku|1|1299|1299|6';
+const oldKeepHistory=()=>({'user:7':{commands:{[oldKeepIntent]:'old-keep-key'}}});
+async function parentItemsRoute(){
+  const ast=ts.createSourceFile('parent.ts',parse(checkoutSource).descriptor.scriptSetup!.content,ts.ScriptTarget.Latest,true);
+  const node=ast.statements.find(node=>ts.isExpressionStatement(node)&&ts.isCallExpression(node.expression)&&node.expression.expression.getText(ast)==='onLoad') as ts.ExpressionStatement;
+  const callback=((node.expression as ts.CallExpression).arguments[0]).getText(ast);
+  const code=ts.transpileModule(`return (${callback});`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
+  const promotionRoute=Vue.ref(null),recoverKeepBeforePurchase=vi.fn(()=>true);
+  const deps={promotionRoute,recoverKeepBeforePurchase,takeNavigationQuery:()=>'',URLSearchParams,validatePromotionItems,voucherEntryContext:entry.voucherEntryContext,toast:{warn:vi.fn()},t:Vue.ref(zh),navTo:vi.fn()};
+  await new Function('deps',`with(deps){${code}}`)(deps)({items:JSON.stringify([{productNo:'sku',quantity:1}])});
+  expect(recoverKeepBeforePurchase).not.toHaveBeenCalled();
+  return promotionRoute.value!;
+}
+it.each(['order','pending'] as const)('items without orderNo recover the original Promotion %s before a same-SKU KEEP',async state=>{
+  const q=quote(),pending=state==='pending'?{key:'old-promotion-key',operation:'createOrder' as const,targetId:q.quoteId}:null;
+  const route=await parentItemsRoute();
+  const page=screen({quote:q,order:state==='order'?receipt(q):null,pending},route);
+  page.setKeepHistory(oldKeepHistory());
+  await page.start();
+  expect(page.api.quote).not.toHaveBeenCalled();expect(page.api.create).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();
+  expect(page.tradein.showKeepRecovery).not.toHaveBeenCalled();
+  if(state==='order'){
+    expect(page.api.findOrder).toHaveBeenCalledExactlyOnceWith('o1');expect(page.saved().order?.orderNo).toBe('o1');
+  }else{
+    expect(page.api.command).toHaveBeenCalledExactlyOnceWith('old-promotion-key','createOrder','q1');
+    expect(page.saved().pending).toEqual(pending);
+    page.api.command.mockResolvedValueOnce({status:'NOT_FOUND',order:null});await page.view.recover();await page.view.createOrder();
+    expect(page.api.create).toHaveBeenCalledExactlyOnceWith(q,'old-promotion-key',null);
+    expect(page.key).not.toHaveBeenCalled();expect(page.api.quote).not.toHaveBeenCalled();
+  }
+});
+it('fresh items stop before quoting or creating for an old KEEP, then quote after verified recovery clears its key',async()=>{
+  const page=screen(undefined,{activityId:''}),history=oldKeepHistory();page.setKeepHistory(history);await page.start();
+  expect(page.api.quote).not.toHaveBeenCalled();expect(page.tradein.showKeepRecovery).toHaveBeenCalledExactlyOnceWith('sku');
+  expect(page.exposed.footer.value).toBeNull();expect(await page.html()).toContain(zh.tradein.keepRecoveryPending);
+  await page.view.createOrder();expect(page.api.create).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();
+  page.setKeepHistory({'user:7':{commands:{}}});await page.view.loadQuote();expect(page.api.quote).toHaveBeenCalledOnce();
+  expect(page.view.canCreate.value).toBe(true);
+});
+it.each(['malformed',[],{[oldKeepIntent]:'first','keep|1157|sku|1|1399|1399|6':'second'}])('fresh Promotion items fail closed for invalid or ambiguous KEEP storage: %s',async commands=>{
+  const page=screen(undefined,{activityId:''}),history={'user:7':{commands}},before=JSON.stringify(history);
+  page.setKeepHistory(history);await page.start();await page.view.createOrder();
+  expect(page.api.quote).not.toHaveBeenCalled();expect(page.api.create).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();
+  expect(await page.html()).toContain(zh.tradein.keepRecoveryReadError);expect(page.exposed.footer.value).toBeNull();
+  expect(JSON.stringify(history)).toBe(before);
+});
+it('a KEEP written after mount closes fresh Promotion create without minting a new command',async()=>{
+  const page=screen(undefined,{activityId:''});await page.start();expect(page.view.canCreate.value).toBe(true);
+  page.setKeepHistory(oldKeepHistory());await page.view.createOrder();
+  expect(page.api.create).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();expect(page.exposed.footer.value).toBeNull();
+  expect(page.tradein.showKeepRecovery).toHaveBeenCalledExactlyOnceWith('sku');
+});
 
 it('creation, recovery and payment preserve the source-owned historical receipt name',async()=>{
   const page=screen(),originalName='NexGridBox S1',order={...receipt(),items:[{lineId:'9001',productNo:'sku',productName:originalName,quantity:1}]};
@@ -672,6 +731,56 @@ it('loads the authoritative balance on entry and hides stale money until a faile
   await page.view.createOrder();expect(page.view.canPay.value).toBe(false);
   page.app.refreshRemoteFleet.mockImplementation(async()=>{page.app.user.usdtBalance=150;return true;});
   await page.view.refreshWallet();expect(page.view.canPay.value).toBe(true);expect(await page.html()).toContain('150.00');
+});
+it('returning from top-up restores the rendered quote, wallet and create action after the hidden page rendered',async()=>{
+  const page=screen(undefined,{activityId:''});await page.start();
+  expect(page.exposed.footer.value).toMatchObject({amount:'120.00 USDT',disabled:false});
+  expect(await page.html()).toContain('data-testid="checkout-payment"');
+  page.exposed.hide();await flush();
+  expect(page.view.displayQuote.value).toBeNull();expect(page.view.canCreate.value).toBe(false);
+  expect(await page.html()).not.toContain('data-testid="checkout-payment"');
+  page.api.quote.mockResolvedValue({...quote('returned'),amountUsdt:'119',subtotalUsdt:'119'});
+  page.app.refreshRemoteFleet.mockImplementation(async()=>{page.app.user.usdtBalance=20;return true;});
+  page.exposed.show();await flush();
+  expect(page.view.displayQuote.value?.quoteId).toBe('returned');
+  expect(page.exposed.footer.value).toMatchObject({amount:'119.00 USDT',disabled:false});
+  const html=await page.html();expect(html).toContain('data-testid="checkout-payment"');expect(html).toContain('20.00');expect(html).not.toContain('20.00 USDT');expect(html).toContain('data-testid="checkout-fees"');
+  expect(page.api.quote).toHaveBeenCalledTimes(2);expect(page.api.create).not.toHaveBeenCalled();expect(page.api.pay).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();
+});
+it.each(['hidden','returned'] as const)('top-up return recovers after an old quote finishes while %s',async boundary=>{
+  const page=screen(undefined,{activityId:''});await page.start();
+  const late=deferred<Quote>();page.api.quote.mockReturnValueOnce(late.promise);
+  const read=page.view.loadQuote();await flush();page.exposed.hide();await flush();
+  expect(page.view.displayQuote.value).toBeNull();expect(page.view.canCreate.value).toBe(false);await page.html();
+  page.api.quote.mockResolvedValue({...quote('returned'),amountUsdt:'119'});
+  if(boundary==='returned')page.exposed.show();
+  late.resolve(quote('hidden-read'));await read;await flush();
+  if(boundary==='hidden')page.exposed.show();await flush();
+  expect(page.view.loading.value).toBe(false);expect(page.view.busy.value).toBe(false);
+  expect(page.view.displayQuote.value?.quoteId).toBe('returned');
+  expect(page.exposed.footer.value).toMatchObject({amount:'119.00 USDT',disabled:false});
+  expect(page.api.quote).toHaveBeenCalledTimes(3);expect(page.api.create).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();
+});
+it('a failed top-up return offers retry and restores only the newly read quote',async()=>{
+  const page=screen(undefined,{activityId:''});await page.start();page.exposed.hide();await page.html();
+  page.api.quote.mockRejectedValueOnce(new ApiError({kind:'network',message:'offline'}));
+  page.exposed.show();await flush();
+  expect(page.view.displayQuote.value).toBeNull();expect(page.view.canCreate.value).toBe(false);
+  expect(await page.html()).toContain(zh.empty.errorCta);
+  page.api.quote.mockResolvedValue(quote('retry'));await page.view.loadQuote();
+  expect(page.view.displayQuote.value?.quoteId).toBe('retry');expect(page.exposed.footer.value.disabled).toBe(false);
+  expect(page.api.create).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();
+});
+it('returning after an account change cannot revive the hidden account checkout',async()=>{
+  const page=screen(undefined,{activityId:''});await page.start();
+  const late=deferred<Quote>();page.api.quote.mockReturnValueOnce(late.promise);
+  const read=page.view.loadQuote();page.exposed.hide();await page.html();
+  page.app.accountKey='user:8';page.app.accountBindingEpoch++;
+  late.resolve(quote('old-account'));await read;page.exposed.show();await flush();
+  expect(page.view.displayQuote.value).toBeNull();expect(page.view.canCreate.value).toBe(false);
+  await page.view.createOrder();expect(page.api.create).not.toHaveBeenCalled();expect(page.key).not.toHaveBeenCalled();
+  expect(page.api.quote).toHaveBeenCalledTimes(2);expect(page.app.refreshRemoteFleet).toHaveBeenCalledOnce();
+  expect(await page.html()).not.toContain('data-testid="checkout-payment"');
 });
 it('refreshes the post-payment balance and keeps a wallet read failure separate from the paid receipt',async()=>{
   const page=screen();await page.start();await page.view.createOrder();

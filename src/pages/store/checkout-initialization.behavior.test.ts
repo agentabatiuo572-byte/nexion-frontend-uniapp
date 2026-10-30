@@ -27,6 +27,7 @@ function page(){
     receiptWriteFailure:ref(null),receiptRetrying:ref(false),restoreReceiptRecovery:vi.fn(),remoteTradeinRecoveryRequired:ref(false),
     remoteTradeinRecoveryError:ref(false),remoteTradeinRecoveryBusy:ref(false),remoteOrderCommandKey:{clear:vi.fn()},activeSession:ref(null),
     dialogsOpen:0,step:ref('select-payment'),checkoutRouteInitialized:true,pageAlive:true,pageVisible:true,
+    keepCheckoutTarget:ref(null),keepCheckoutReadError:ref(false),
     invalidateCheckoutRoute:()=>{fence.invalidate();deps.activeCheckoutLoad=null;},
   };
   const api=new Function('deps',`with(deps){${code};return {initializeCheckout,accountChanged};}`)(deps);
