@@ -615,6 +615,12 @@ onLoad(async (options) => {
     // the server-order recovery branch above.
     if (resumeSessionId && resumePendingSession(resumeSessionId)) return;
     if (!isCurrentCheckoutRoute(routeScope)) return;
+    // New Share purchases use the ordinary server quote. Recovery above keeps
+    // its original order/session rather than migrating a committed intent.
+    if (remoteApiEnabled && pp.productType === 'SHARE' && !trialConversion) {
+      promotionRoute.value = { activityId: '', items: [{ productNo: pp.id, quantity: 1 }] };
+      return;
+    }
     fireTradeinIntercept();
   } finally {
     if (activeCheckoutLoad?.generation === routeScope.generation
@@ -1167,7 +1173,7 @@ function retryReceiptWrite() {
 
 const isCard = computed(() => payment.value === "card");
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const cappedRaw = computed(() => app.activeSlotCount + reservedSlots.value >= app.slotCap);
+const cappedRaw = computed(() => (app.remoteSlotsUsed ?? app.activeSlotCount + reservedSlots.value) >= app.slotCap);
 const checkoutCapacityRequired = computed(() => remoteApiEnabled && !trialConversionMode.value
   && !freeTrial.hasPendingConversion() && product.value?.productType !== "SHARE"
   && KNOWN_KINDS.includes(productId.value as DeviceKind));
@@ -1607,6 +1613,7 @@ function cancelCheckout() {
 
 function canIncreaseCheckoutQuantity(): boolean {
   if(voucherSelecting.value)return false;
+  if(app.remoteSlotsUsed != null && app.slotCap - app.remoteSlotsUsed < 2)return false;
   return pageAlive && pageVisible && quantityReady.value && checkoutRouteInitialized && !activeCheckoutLoad
     && !promotionRoute.value && !!product.value && !purchaseUnavailable.value
     && (step.value === 'select-payment' || step.value === 'confirm')

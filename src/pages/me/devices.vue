@@ -13,12 +13,12 @@
   with content (no chassis-level back row in uni — see sub-page-header.vue).
 
   FEAT-DEV02: each paid eligible device row carries an upgrade trade-in strip
-  (「可抵 $X」chip → ladder sheet · 「升级置换」CTA → retire flow via the
+  (「可抵 $X」chip → quote tooltip · 「升级置换」CTA → retire flow via the
   chassis-mounted TradeinSheets). Free devices (paidPriceUsdt=0) show no trace;
-  a device with no higher-priced target shows the disabled reason instead.
+  a device with no qualified upgrade target shows no trade-in entry.
 -->
 <template>
-  <AppChassis active="me">
+  <AppChassis active="me" @click="quoteInfoDeviceId = null">
     <view class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.myDevices.inventoryTitle" />
 
@@ -82,9 +82,10 @@
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
               :action-disabled="remoteApiEnabled && !!d.pendingDeactivate"
               v-bind="tradeinStrip(d)"
+              :quote-info-open="quoteInfoDeviceId === d.id"
+              @quote-info="quoteInfoDeviceId = $event ? d.id : null"
               @toggle="handleDeactivate(d)"
               @tradein="handleTradein(d)"
-              @ladder="ladderDevice = d"
             />
           </view>
         </view>
@@ -109,9 +110,10 @@
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
               v-bind="tradeinStrip(d)"
+              :quote-info-open="quoteInfoDeviceId === d.id"
+              @quote-info="quoteInfoDeviceId = $event ? d.id : null"
               @toggle="handleActivate(d)"
               @tradein="handleTradein(d)"
-              @ladder="ladderDevice = d"
             />
           </view>
           <view v-if="slotsUsed !== null && slotsFull && inactiveDevices.length > 0" class="flex items-center" :style="slotsFullWarnStyle">
@@ -140,6 +142,8 @@
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
               v-bind="tradeinStrip(d)"
+              :quote-info-open="quoteInfoDeviceId === d.id"
+              @quote-info="quoteInfoDeviceId = $event ? d.id : null"
             />
           </view>
         </view>
@@ -187,7 +191,6 @@
       @force="onSheetForce"
       @dismiss="sheetDevice = null"
     />
-    <TradeinLadderSheet :device="ladderDevice" @close="ladderDevice = null" />
   </AppChassis>
 </template>
 
@@ -200,7 +203,6 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
-import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
 import TrialDeviceRow from "@/components/trial-device-row.vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
@@ -232,6 +234,7 @@ const trial = useFreeTrial();
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
+const quoteInfoDeviceId = ref<string | null>(null);
 
 // A failed trial read cannot remove the account's previously confirmed devices.
 // Slot counts and mutations have their own stricter readiness below.
@@ -263,8 +266,9 @@ const phoneNeedsActivation = computed(() => {
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = trialPresentation.reservedSlots;
-const slotsUsed = computed(() => trialReserved.value === null || (remoteApiEnabled && app.remoteFleetStatus !== "ready"
-  && app.remoteFleetStatus !== "loading") ? null : app.activeSlotCount + trialReserved.value);
+const slotsUsed = computed(() => remoteApiEnabled && app.remoteFleetStatus !== "ready"
+  && app.remoteFleetStatus !== "loading" ? null : app.remoteSlotsUsed
+    ?? (trialReserved.value === null ? null : app.activeSlotCount + trialReserved.value));
 const slotsFull = computed(() => slotsUsed.value === null || slotsUsed.value >= app.slotCap);
 const activationReady = computed(() => !remoteApiEnabled
   || (app.remoteFleetStatus === "ready" && trialPresentation.actionsReady.value));
@@ -292,7 +296,6 @@ onLoad(async options => {
   if (device) await handleDeactivate(device);
 });
 
-const ladderDevice = ref<Device | null>(null);
 const { tradeinStrip, handleTradein } = useTradeinStrip();
 
 async function handleActivate(d: Device) {
