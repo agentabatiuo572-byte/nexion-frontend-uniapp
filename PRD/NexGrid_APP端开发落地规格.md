@@ -378,7 +378,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **首日 6 任务单项**:bind_bank_card +50/visit_earn +30/visit_store +50/...(§5.15.4)。
 - **Quest 层最大奖**:L1 Daily 100 NEX(streak +500)/L2 Weekly 3,000/L3 Monthly 10,000+勋章。
 - **Lucky Spin**:每日免费 1 次(UTC 日桶,`eventId×userId×spinDate` 计次)+Day-30 里程碑券;8 档 server RNG,概率和 100%;真实奖三护栏+兑付红线自动降级。
-- **设备激活槽位守卫**:`activateDevice()` 守卫 `激活数 < MAX_DEVICES=6`(试用预留计入)。
+- **设备激活槽位守卫（2026-10-30 更新）**:`activateDevice()` 守卫 `激活数 + 原有有效预留 < MAX_DEVICES=6`。Cloud Share、手机、PC 算力、Box、Rack 全部按实例各占一槽，同款多台分别计数；未激活、取消激活或已回收设备不占槽。取消 Cloud Share 免槽，取代 2026-08-25 相关规则；不改购买资格、收益与原有试用/订单预留规则。首页、赚取、仓库及选择弹窗共用该口径，满槽时所有型号均不能新增激活。
 - **任务中断宽限**:`INTERRUPT_GRACE_MS=30,000`(30s)、`INTERRUPT_MAX_RETRIES=5`(每 6s);窗口内续跑原任务,超时取消派新。
 
 ### 3.N 礼包/常量 — §13.3/§8.1.1

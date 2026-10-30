@@ -7,13 +7,9 @@ type SlotDevice = {
   pendingDeactivate?: boolean;
 };
 
-/** Cloud Share is virtual capacity; only physical/host devices use one of the six activation slots. */
-export function occupiesDeviceSlot(kind: DeviceKind): boolean {
-  return kind !== "cloud-share";
-}
-
+/** Every activated device instance, including Cloud Share, uses one activation slot. */
 export function isActiveSlotDevice(device: SlotDevice): boolean {
-  return device.activatedAt !== null && !device.pendingDeactivate && occupiesDeviceSlot(device.kind);
+  return device.activatedAt !== null && !device.pendingDeactivate;
 }
 
 /** A remote lifecycle row without its activation timestamp must be reconciled before activation. */

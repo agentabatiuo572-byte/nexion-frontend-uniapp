@@ -1707,10 +1707,10 @@ progressLabel: "Tiến độ",
   },
   slotSheet: {
     title: "Lấp đầy khe tính toán",
-    desc: "Thêm thiết bị mới — khe trống sẽ sinh lời ngay lập tức",
+    desc: "Kích hoạt tối đa tổng cộng {max} thiết bị, bao gồm Cloud Share.",
     goStoreCta: "Mua thiết bị mới",
     activateRow: "Kích hoạt thiết bị có sẵn ({n})",
-    toastSlotsFull: "Đã đầy khe {max}/{max}",
+    toastSlotsFull: "Đã đầy khe {max}/{max}. Vui lòng hủy kích hoạt một thiết bị trước.",
     toastActivated: "Đã kích hoạt {name}",
 
 chooseMethod: "Chọn cách kết nối mạng UVEL",
