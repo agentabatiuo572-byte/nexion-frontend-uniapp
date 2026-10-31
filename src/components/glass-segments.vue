@@ -126,6 +126,9 @@ export default viewImplementation;
 .nx-glass-segments[data-glass-dragging="true"] { cursor: grabbing; }
 .nx-glass-indicator { inset: auto; left: 0; top: 0; z-index: 1; transform-origin: 0 0; visibility: hidden; }
 .nx-flat-indicator { position: absolute; pointer-events: none; border-radius: 24px; background: var(--v5-brand-soft); }
+/* Design system 03 §3.7 (2026-11): a filter's selected option sits in a semi-transparent black well; label stays brand. */
+.nx-glass-segments--filter .nx-flat-indicator { background: rgba(0,0,0,.5); box-shadow: inset 0 1px 2px rgba(0,0,0,.35); }
+[data-theme="light"] .nx-glass-segments--filter .nx-flat-indicator { background: rgba(0,0,0,.07); box-shadow: inset 0 1px 2px rgba(0,0,0,.06); }
 .nx-glass-option { position: relative; z-index: 2; flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 10px; box-sizing: border-box; border-radius: 24px; color: var(--v5-ink-2); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: color 150ms, transform 100ms cubic-bezier(.2,.8,.2,1); }
 .nx-glass-option--selected { color: var(--v5-brand); }
 .nx-glass-option:active { opacity: .78; }
