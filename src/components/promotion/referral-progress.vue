@@ -18,7 +18,11 @@
       <!-- Progress opens as a sheet; expandedActivity stays the single source of which one is open. -->
       <NxSheet :open="expandedActivity===activity.activityId" :title="localized(activity.title,locale.code) || copy.firstPurchase" @close="expandedActivity=null">
         <view class="referral-details">
-          <view class="referral-summary"><text class="referral-number">{{ visibility.mask(qualifyingCount(activity.activityId)) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
+          <view class="referral-summary">
+            <view class="referral-art referral-summary__art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /></view>
+            <text v-if="deadlineText(activity)" class="referral-deadline">{{ deadlineText(activity) }}</text>
+            <view class="referral-count"><text class="referral-number">{{ visibility.mask(qualifyingCount(activity.activityId)) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
+          </view>
           <text class="referral-activity-title">{{ copy.rewardRecords }}</text>
           <view v-if="progressErrors[activity.activityId]" class="nx-inline-recovery"><text class="promotion-copy nx-inline-recovery__copy" role="alert">{{ t.promotion.error }}</text><NxButton class="referral-retry nx-inline-recovery__action" variant="text" size="medium" :busy="progressBusy[activity.activityId]" :label="t.promotion.retry" @click="loadProgress(activity.activityId,true)" /></view>
           <RewardRows v-else-if="progress[activity.activityId]?.ownRewards.length" :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
@@ -146,8 +150,11 @@ onBeforeUnmount(()=>{alive=false;visible=false;stopProgressUpdates();generation+
 .referral-actions > .referral-progress-link { flex: 1; }
 .referral-progress-link { max-width: 100%; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
-.referral-summary { display: flex; align-items: baseline; gap: 6px; padding: var(--v5-space-4); border-radius: 20px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-brand-2) 12%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
-.referral-share { margin-top: var(--v5-space-2); }
+.referral-summary { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-brand-2) 12%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.referral-share { margin-top: var(--v5-space-2); box-shadow: 0 8px 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
+.referral-summary__art { top: -6px; right: -10px; width: 132px; height: 132px; }
+.referral-summary > .referral-count { position: relative; margin-top: auto; }
+.referral-details > .referral-rule-link { min-height: 48px; margin-top: 4px; border-top: 1px solid var(--v5-border); color: var(--v5-ink-2); font: 400 14px/20px var(--font-v5); }
 .referral-activity-title { display: block; margin-top: var(--v5-space-2); font: 600 14px/20px var(--font-v5); }
 .referral-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 0 12px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); }
 .referral-details > .referral-cta { margin-top: var(--ui-space-inline); }
