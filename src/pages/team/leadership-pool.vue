@@ -340,7 +340,7 @@ function historyRowStyle(isLast: boolean): CSSProperties {
 .pool-decimals { color: var(--v5-ink-3); }
 .pool-payout { display: flex; align-items: center; gap: var(--v5-space-2); min-height: 44px; margin-top: var(--v5-space-4); padding: var(--ui-space-row-y) var(--v5-space-4); border-radius: 16px; background: var(--v5-surface-2); color: var(--v5-ink); font-size: 14px; font-weight: 600; }
 .pool-payout > svg { color: var(--v5-nex); flex: none; }
-.pool-payout__days { margin-right: 6px; font-size: 18px; line-height: 22px; font-weight: 700; }
+.pool-payout__days { font-size: 18px; line-height: 22px; font-weight: 700; }
 /* Personal share (P-41): ring for my share, dot grid for votes, faint violet tint (DS-28/29). */
 .pool-personal { padding: var(--v5-space-4); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .pool-share { display: flex; align-items: center; gap: var(--v5-space-4); }
