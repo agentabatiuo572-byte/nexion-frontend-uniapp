@@ -5517,7 +5517,7 @@ openSeaErrorPool: {
     expectedLabel: "Amount due",
     receivedLabel: "Received",
     newTopupCta: "Start a new top-up",
-    bankDeposit: "Bank transfer deposit",
+    bankDeposit: "Bank card top-up",
     dailyCapacityExceeded: "That exceeds today's remaining capacity. You can top up up to {max} today.",
     dailyCapacityExhaustedTitle: "Today's bank top-up capacity is used up",
     dailyCapacityExhaustedBody: "Today's remaining capacity is {remaining}, below the {min} minimum. You can top up again tomorrow.",

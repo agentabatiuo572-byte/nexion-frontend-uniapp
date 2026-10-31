@@ -5423,7 +5423,7 @@ openSeaErrorPool: {
     expectedLabel: "应付金额",
     receivedLabel: "实际到账",
     newTopupCta: "重新发起充值",
-    bankDeposit: "银行转账充值",
+    bankDeposit: "银行卡充值",
     dailyCapacityExceeded: "超出今日剩余额度，今日最多还可充值 {max}。",
     dailyCapacityExhaustedTitle: "今日银行充值额度已用完",
     dailyCapacityExhaustedBody: "今日剩余额度 {remaining}，低于最低充值 {min}；明日可继续充值。",
