@@ -240,14 +240,17 @@ it.each((['en', 'zh', 'vi'] as const).flatMap(locale => (['home', 'earn'] as con
 
 it('keeps inventory independent and applies the correct boundary when the same row changes variant', () => {
   const screen = mount('inventory'); screen.props.expanded = true; screen.visibility.toggle();
-  expect(screen.byClass('trial-device-row__amount')!.children).toBe('$5.00');
+  // Inventory renders the cents as a dimmed child; together they still read the real, unmasked amount.
+  const inventoryAmount = () => { const amount = screen.byClass('trial-device-row__amount')! as any; return amount.children.map((child: any) => typeof child.children === 'string' ? child.children : '').join(''); };
+  expect(inventoryAmount()).toBe('$5.00');
+  expect(screen.byClass('trial-device-row__dec')!.children).toBe('.00');
   expect(screen.byClass('trial-device-row__progress')!.props!['aria-valuenow']).toBe(24);
   expect(screen.view.money(screen.presentation.estimatedOffsetUSD.value)).toBe('$21.00');
   screen.props.variant = 'earn';
   expect(screen.byClass('trial-device-row__amount')!.children).toBe('••••');
   expect(screen.byClass('trial-device-row__progress')).toBeUndefined();
   screen.props.variant = 'inventory';
-  expect(screen.byClass('trial-device-row__amount')!.children).toBe('$5.00');
+  expect(inventoryAmount()).toBe('$5.00');
   expect(screen.byClass('trial-device-row__progress')!.props!['aria-valuenow']).toBe(24);
 });
 

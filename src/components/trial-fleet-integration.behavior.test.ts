@@ -23,7 +23,8 @@ function mount(source: string) {
     { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   // Render the actual parent template; child components remain named VNodes so
   // the assertions can observe the exact fleet identities passed to each row.
-  const render = new Function("Vue", compile(descriptor.template!.content, { mode: "function", prefixIdentifiers: true,
+  // AppChassis renders as a plain element here, so its fixed-bar slot (tested separately) is left out.
+  const render = new Function("Vue", compile(descriptor.template!.content.replace(/<template #pageFixed>[\s\S]*?<\/template>/, ""), { mode: "function", prefixIdentifiers: true,
     isCustomElement: () => true }).code)(Vue);
   const paid = { id: "paid-1", kind: "stellarbox-s1", activatedAt: 1 as number | null, rowVersion: 1 };
   const app = Vue.reactive({ accountKey: "user:1", accountBindingEpoch: 1, remoteFleetHasSnapshot: true, remoteFleetStatus: "ready", remotePhoneBindingInvalid: false,
@@ -33,7 +34,8 @@ function mount(source: string) {
     remoteSlotUsage: null as { slotsUsed: number; reservedSlotCount: number; trialSlotCount: number } | null,
     visibleDevices: [paid], devices: [paid], user: { joinedAt: 1 }, refreshRemoteFleet: vi.fn(async () => true) });
   const trial = Vue.reactive({ authorityStatus: "ready", status: "active", poll: vi.fn(async () => true), cancel: vi.fn(async () => ({ ok: true })) });
-  const presentation = { active: Vue.ref(true), reservedSlots: Vue.ref<number | null>(1), actionsReady: Vue.ref(true) };
+  const presentation = { active: Vue.ref(true), reservedSlots: Vue.ref<number | null>(1), actionsReady: Vue.ref(true),
+    deviceName: Vue.ref("Trial device"), productId: Vue.ref("stellarbox-s1") };
   const navTo = vi.fn(), confirm = vi.fn(async () => true), toast = { warn: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn() };
   const activateRemote = vi.fn(async () => {});
   const modules: Record<string, unknown> = {
@@ -64,6 +66,7 @@ function mount(source: string) {
     "@/store/product-catalog": { productCatalogState: { status: "ready" }, refreshProductCatalog: async () => false },
     "@/lib/e3-fleet-bootstrap": { refreshRemoteFleetAfterCatalog: async () => true },
     "@/composables/use-device-deactivation": { useDeviceDeactivation: () => ({ sheetDevice: Vue.ref(null), handleDeactivate: vi.fn(), onSheetWait: vi.fn(), onSheetForce: vi.fn(), runRemoteDeviceCommand: vi.fn() }) },
+    "@/lib/product-media": { getProductMedia: () => ({ src: "/static/trial.webp" }) },
     "@/composables/use-tradein-strip": { useTradeinStrip: () => ({ tradeinStrip: () => ({}), handleTradein: vi.fn() }) },
   };
   const exports: Record<string, any> = {};

@@ -8,7 +8,8 @@ import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 
 const messages = { en, zh, vi: vietnamese };
-const render = new Function("Vue", compile(parse(source).descriptor.template!.content, {
+// AppChassis renders as a plain element here, so its fixed-bar slot is asserted on the source instead.
+const render = new Function("Vue", compile(parse(source).descriptor.template!.content.replace(/<template #pageFixed>[\s\S]*?<\/template>/, ""), {
   mode: "function", prefixIdentifiers: true, isCustomElement: () => true,
 }).code)(Vue);
 function nodes(node: Vue.VNode): Vue.VNode[] {
@@ -26,6 +27,8 @@ function mount(locale: keyof typeof messages = "en") {
     slotsFull: false, activationReady: true, phoneNeedsActivation: true, nativePhoneAvailable: false,
     phoneActivationGuidance: { title: "Phone", body: "Connect in the Android app" }, goPhoneActivation: vi.fn(),
     goStore: vi.fn(), sheetDevice: null, onSheetWait: vi.fn(), onSheetForce: vi.fn(),
+    bays: [] as Array<Record<string, unknown>>, openBay: vi.fn(), onlineCount: 2, trialCopy: { imageBadge: "Trial" },
+    fmt: (text: string, args: Record<string, unknown>) => text.replace(/\{(\w+)\}/g, (_, key) => String(args[key])),
   };
   const node = () => render(context, []) as Vue.VNode;
   return { context, paid, pending, node };
@@ -55,9 +58,17 @@ it("keeps original paid and trial action handlers and the native phone gate", ()
   rows[0].props!.onQuoteInfo(true); expect(screen.context.quoteInfoDeviceId).toBe(screen.paid.id);
   tree.find(node => node.type === "AppChassis")!.props!.onClick(); expect(screen.context.quoteInfoDeviceId).toBeNull();
   tree.find(node => node.type === "TrialDeviceRow")!.props!.onCancel(); expect(screen.context.handleCancelTrial).toHaveBeenCalledTimes(1);
-  const phoneCta = () => nodes(screen.node()).find(node => Array.isArray(node.children)
-    && node.children.some(child => Vue.isVNode(child) && child.children === en.myDevices.phoneActivationCta));
+  const phoneCta = () => nodes(screen.node()).find(node => node.props?.label === en.myDevices.phoneActivationCta);
   expect(phoneCta()).toBeUndefined();
   screen.context.nativePhoneAvailable = true;
   phoneCta()!.props!.onClick(); expect(screen.context.goPhoneActivation).toHaveBeenCalledTimes(1);
+});
+
+it("puts the store action in the bottom bar and turns free bays into store entries", () => {
+  expect(source).toMatch(/<template #pageFixed>\s*<view class="device-page__bar"><NxButton class="device-page__bar-btn" variant="primary" :label="t\.myDevices\.inventoryCtaGoStore" @click="goStore">/);
+  const screen = mount("zh");
+  screen.context.bays = [{ key: "empty:0", kind: "empty" }];
+  const free = nodes(screen.node()).find(node => String(node.props?.class ?? "").includes("device-bay-slot--empty"))!;
+  expect(free.props!["aria-label"]).toBe(messages.zh.myDevices.inventoryCtaGoStore);
+  free.props!.onClick(); expect(screen.context.goStore).toHaveBeenCalledTimes(1);
 });

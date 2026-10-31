@@ -32,8 +32,9 @@ function inventoryState(
 
 describe("device inventory first render", () => {
   it("waits for fleet and trial authority before exposing slots, binding, or empty inventory", () => {
-    expect(source).toContain('v-if="inventoryLoading"');
-    expect(source).toContain('v-else-if="inventoryError"');
+    expect(source).toContain('v-if="inventoryLoading" class="device-hero__loading"');
+    expect(source).toContain('v-if="inventoryError"');
+    expect(source).toContain('v-if="!inventoryError" class="device-stage');
     expect(source).toContain('v-if="inventoryReady" class="mx-4"');
     const app: Record<string, unknown> = { remoteFleetHasSnapshot: false, remoteFleetStatus: "idle" };
     const trial: Record<string, unknown> = { authorityStatus: "unknown", authorityServerState: null };

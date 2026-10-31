@@ -39,6 +39,9 @@ function mount(locale: keyof typeof messages = "en") {
   const modules: Record<string, unknown> = { vue: Vue, "@/i18n/use-t": { useT: () => Vue.ref(t) },
     "@/lib/device-copy": { deviceName }, "@/lib/hashpower": { deviceOnlineState },
     "@/i18n/format": { fmtMoney }, "@/store/data-visibility": { useDataVisibility: () => visibility },
+    "@/components/ui/nx-button.vue": { name: "NxButton" }, "@/composables/use-tab-page-lifecycle": { useVisibleInterval() {} },
+    "@/lib/server-deadline-clock": { advanceMonotonicHighWater: (value: number) => value, projectServerNow: (value: number) => value, readMonotonicNowMs: () => 0 },
+    "@/lib/task-progress": { taskProgressPercent: () => 50 },
     "@/composables/use-device-product-image": { useDeviceProductImage: (device: () => Device) => ({ imageSrc: Vue.computed(() => `https://catalog.example/${device().productCode}`), imageError() {} }) } };
   const exports: Record<string, any> = {};
   new Function("require", "exports", code)((id: string) => {
@@ -50,52 +53,54 @@ function mount(locale: keyof typeof messages = "en") {
   return { props, device, emit, node, byClass, t, visibility };
 }
 
-it.each(["zh", "en", "vi"] as const)("keeps the %s purchased row compact and reveals all actions only after expansion", locale => {
+it.each(["zh", "en", "vi"] as const)("shows the %s purchased card open with its job, earnings and actions", locale => {
   const screen = mount(locale);
   expect(screen.byClass("device-inventory-row__name")!.children).toBe("UVELBox Pro v2");
   expect(screen.byClass("device-inventory-row__image")!.props!.src).toBe("https://catalog.example/stellarbox-pro-v2");
-  expect(screen.byClass("device-inventory-row__state")!.children).toBe("Online");
+  expect(nodes(screen.byClass("device-inventory-row__state")!).some(node => node.children === "Online")).toBe(true);
   expect(screen.byClass("device-inventory-row__status")).toBeUndefined();
-  expect(nodes(screen.node()).filter(node => node.children === "Online")).toHaveLength(1);
-  expect(screen.byClass("device-inventory-row__state--active")).toBeDefined();
-  expect(screen.byClass("device-inventory-row__body")).toBeUndefined();
+  expect(screen.byClass("device-inventory-row__heading")).toBeUndefined();
   expect(screen.byClass("device-inventory-row__earned")!.children).toBe("$1,234.50");
-  expect(nodes(screen.byClass("device-inventory-row__today")!).some(node => node.children === "+$12.34")).toBe(true);
-  const heading = screen.byClass("device-inventory-row__heading")!;
-  expect(heading.props).toMatchObject({ role: "button", tabindex: "0", "aria-expanded": false });
-  heading.props!.onClick();
-  expect(screen.emit).not.toHaveBeenCalled();
-  expect(screen.byClass("device-inventory-row__body")!.props!.id).toBe(heading.props!["aria-controls"]);
-  expect(screen.byClass("device-inventory-row__earned")!.children).toBe("$1,234.50");
-  expect(screen.byClass("device-inventory-row__credit")!.props!.role).toBeUndefined();
-  expect(nodes(screen.byClass("device-inventory-row__quote-label")!).some(node => node.children === screen.t.tradein.inventoryCreditLabel)).toBe(true);
-  expect(nodes(screen.byClass("device-inventory-row__credit")!).some(node => node.children === "$ 200.00")).toBe(true);
-  screen.byClass("device-inventory-row__tradein-cta")!.props!.onClick({ stopPropagation() {} });
-  screen.byClass("device-inventory-row__action")!.props!.onClick();
+  expect(screen.byClass("device-inventory-row__today")!.children).toBe("+$12.34");
+  expect(nodes(screen.byClass("device-inventory-row__task")!).some(node => node.children === screen.t.earn.noCurrentTask)).toBe(true);
+  expect(nodes(screen.byClass("device-inventory-row__quote")!).some(node => node.children === screen.t.tradein.inventoryCreditLabel)).toBe(true);
+  expect(screen.byClass("device-inventory-row__credit")!.children).toBe("$200.00");
+  const cta = screen.byClass("device-inventory-row__tradein-cta")!, action = screen.byClass("device-inventory-row__action")!;
+  expect(cta.props).toMatchObject({ variant: "brand", label: screen.t.tradein.stripCta });
+  expect(action.props).toMatchObject({ variant: "secondary", label: screen.t.myDevices.inventoryRowDeactivate, disabled: false });
+  cta.props!.onClick(); action.props!.onClick();
   expect(screen.emit.mock.calls).toEqual([["quote-info", false], ["tradein"], ["toggle"]]);
-  screen.byClass("device-inventory-row__heading")!.props!.onClick();
-  expect(screen.byClass("device-inventory-row__body")).toBeUndefined();
+});
+
+it("shows the live job with its progress while the device runs it", () => {
+  const screen = mount("zh");
+  screen.device.currentTask = { id: "T-1", model: "SDXL", status: "RUNNING", startedAt: 0, totalSec: 100 } as unknown as Device["currentTask"];
+  expect(nodes(screen.byClass("device-inventory-row__task")!).some(node => node.children === "50%")).toBe(true);
+  expect(screen.byClass("device-inventory-row__fill")!.props!.style).toMatchObject({ width: "50%" });
+  screen.visibility.hidden = true;
+  expect(screen.byClass("device-inventory-row__fill")).toBeUndefined();
 });
 
 it("preserves disabled activation, remote pending-deactivation, and read-only controls", () => {
-  const screen = mount(); screen.byClass("device-inventory-row__heading")!.props!.onClick();
+  const screen = mount();
   screen.props.active = false; screen.props.disabled = true;
-  expect(screen.byClass("device-inventory-row__action")!.children).toHaveLength(1);
-  expect(screen.byClass("device-inventory-row__action")!.props).toMatchObject({ tabindex: -1, "aria-disabled": true });
-  screen.byClass("device-inventory-row__action")!.props!.onClick(); expect(screen.emit).not.toHaveBeenCalled();
+  const activate = () => screen.byClass("device-inventory-row__action")!;
+  expect(activate().props).toMatchObject({ variant: "brand", disabled: true, label: screen.t.myDevices.inventoryRowSlotsFull });
+  activate().props!.onClick(); expect(screen.emit).not.toHaveBeenCalled();
+  expect(screen.byClass("device-inventory-row__task")).toBeUndefined();
+  expect(screen.byClass("device-inventory-row__tradein-cta")!.props!.variant).toBe("secondary");
   screen.props.disabledLabel = "Refresh before activation";
-  expect(nodes(screen.node()).some(item => item.children === "Refresh before activation")).toBe(true);
+  expect(activate().props!.label).toBe("Refresh before activation");
   screen.props.active = true; screen.props.disabled = false; screen.props.actionDisabled = true; screen.device.pendingDeactivate = true;
   expect(screen.byClass("device-inventory-row__pending")).toBeDefined();
-  screen.byClass("device-inventory-row__action")!.props!.onClick(); expect(screen.emit).not.toHaveBeenCalled();
+  activate().props!.onClick(); expect(screen.emit).not.toHaveBeenCalled();
   screen.props.showAction = false; expect(screen.byClass("device-inventory-row__action")).toBeUndefined();
   expect(screen.byClass("device-inventory-row__tradein-cta")).toBeUndefined();
 });
 
-it("keeps a confirmed pending-deactivation visible before opening the row", () => {
+it("keeps a confirmed pending-deactivation visible on the card", () => {
   const screen = mount(); screen.device.pendingDeactivate = true;
-  expect(screen.byClass("device-inventory-row__body")).toBeUndefined();
-  expect(screen.byClass("device-inventory-row__status")!.children).toBe(screen.t.myDevices.inventoryPendingDeactivateChip);
+  expect(nodes(screen.byClass("device-inventory-row__pending")!).some(node => node.children === screen.t.myDevices.inventoryPendingDeactivateChip)).toBe(true);
   expect(screen.byClass("device-inventory-row__state--active")).toBeDefined();
 });
 
@@ -103,7 +108,7 @@ it.each(["zh", "en", "vi"] as const)("shows only activated Online and preserves 
   const screen = mount(locale);
   for (const runtime of ["OFFLINE", "UNKNOWN"] as const) {
     screen.device.runtimeStatus = runtime;
-    expect(screen.byClass("device-inventory-row__state")!.children).toBe(screen.t.earn.online);
+    expect(nodes(screen.byClass("device-inventory-row__state")!).some(node => node.children === screen.t.earn.online)).toBe(true);
     expect(screen.byClass("device-inventory-row__status")).toBeUndefined();
     expect(screen.byClass("device-inventory-row__state--active")).toBeDefined();
   }
@@ -126,18 +131,18 @@ it.each(["stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1
 });
 
 it("masks hidden earnings and does not claim an amount before the fleet read is confirmed", () => {
-  const screen = mount("zh"); screen.byClass("device-inventory-row__heading")!.props!.onClick();
+  const screen = mount("zh");
   screen.visibility.hidden = true;
   expect(screen.byClass("device-inventory-row__earned")!.children).toBe("••••");
-  expect(nodes(screen.byClass("device-inventory-row__today")!).some(node => node.children === "••••")).toBe(true);
+  expect(screen.byClass("device-inventory-row__today")!.children).toBe("••••");
   expect(screen.byClass("device-inventory-row__info")!.props!["aria-label"]).not.toContain("200.00");
   screen.visibility.hidden = false; screen.props.runtimeConfirmed = false;
   expect(screen.byClass("device-inventory-row__earned")!.children).toBe("—");
-  expect(nodes(screen.byClass("device-inventory-row__today")!).some(node => node.children === "—")).toBe(true);
+  expect(screen.byClass("device-inventory-row__today")!.children).toBe("—");
 });
 
 it("opens quote help with the keyboard and closes it on Escape or Tab without moving focus", () => {
-  const screen = mount("zh"); screen.byClass("device-inventory-row__heading")!.props!.onClick();
+  const screen = mount("zh");
   const key = (value: string) => {
     const handlers = screen.byClass("device-inventory-row__info")!.props!.onKeydown;
     for (const handler of [handlers].flat()) handler({ key: value, stopPropagation() {}, preventDefault() {} });
@@ -149,7 +154,7 @@ it("opens quote help with the keyboard and closes it on Escape or Tab without mo
 });
 
 it("shows quote help in a dismissible bubble, including when the quote is unavailable", () => {
-  const screen = mount("zh"); screen.byClass("device-inventory-row__heading")!.props!.onClick();
+  const screen = mount("zh");
   screen.props.tradeinQuoteAmount = undefined;
   expect(screen.byClass("device-inventory-row__tradein-disabled")!.children).toBe(screen.t.tradein.quoteUnavailable);
   expect(screen.byClass("device-inventory-row__info")!.props!["aria-label"]).toContain(screen.t.tradein.quoteUnavailable);

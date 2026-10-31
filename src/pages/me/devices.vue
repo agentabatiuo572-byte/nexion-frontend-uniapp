@@ -19,14 +19,11 @@
 -->
 <template>
   <AppChassis active="me" @click="quoteInfoDeviceId = null">
-    <view class="pb-8" style="color: var(--v5-ink)">
+    <view class="device-page" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.myDevices.inventoryTitle" />
 
-      <view v-if="inventoryLoading" class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px">
-        <text>{{ t.earn.deviceLoading }}</text>
-      </view>
       <EmptyState
-        v-else-if="inventoryError"
+        v-if="inventoryError"
         class="mx-4"
         kind="recoverable-error"
         :title="t.empty.errorTitle"
@@ -35,40 +32,61 @@
         emphasis
         @cta="retryInventory"
       />
-      <view v-if="inventoryStale" class="mx-4 nx-inline-recovery" role="status" style="padding: 12px; border-radius: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
+      <view v-if="inventoryStale" class="mx-4 nx-inline-recovery" role="status" style="margin-bottom: 12px; padding: 12px; border-radius: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
         <text class="block nx-inline-recovery__copy" style="font-size: var(--ui-type-list-subtitle)">{{ t.myDevices.inventoryStaleWarning }}</text>
-        <view class="nx-inline-recovery__action" style="color: var(--v5-brand)" role="button" tabindex="0" @click="retryInventory"  @keydown.enter.prevent="retryInventory" @keydown.space.prevent="retryInventory">
+        <view class="nx-inline-recovery__action" style="color: var(--v5-brand)" role="button" tabindex="0" @click="retryInventory">
           <text>{{ t.empty.errorCta }}</text>
         </view>
       </view>
-      <view v-if="!inventoryReady" class="mx-4" :style="meterBlockStyle">
-        <text :style="meterLabelStyle">{{ t.myDevices.inventorySlotsLabel }}</text>
-        <text class="block" :style="meterCountStyle">—</text>
-        <view class="flex items-center justify-center" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore" @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore"><text :style="ctaLabelStyle">{{ t.myDevices.inventoryCtaGoStore }}</text></view>
-      </view>
-      <view v-if="inventoryReady" class="mx-4">
-        <!-- Slot meter — de-carded: sits on the page floor. -->
-        <view :style="meterBlockStyle" role="group" :aria-label="slotMeterLabel">
-          <view class="flex items-center justify-between">
-            <text :style="meterLabelStyle">{{ t.myDevices.inventorySlotsLabel }}</text>
-            <view class="flex items-baseline" style="gap: 4px">
-              <text :style="meterCountStyle">{{ slotsUsed === null ? '—' : slotsUsed }}</text>
-              <text :style="meterMaxStyle">/ {{ app.slotCap }}</text>
+
+      <!-- Slot chassis: a liquid-glass panel whose bays show which device holds each compute slot. -->
+      <view v-if="!inventoryError" class="device-stage mx-4">
+        <view class="device-stage__aura" aria-hidden="true"><view /><view /></view>
+        <view class="device-hero" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
+          <view class="device-hero__top">
+            <view>
+              <text class="device-hero__title">{{ t.myDevices.inventorySlotsLabel }}</text>
+              <view class="device-hero__count"><text class="device-hero__used">{{ slotsUsed === null ? '—' : slotsUsed }}</text><text class="device-hero__max">/ {{ app.slotCap }}</text></view>
+            </view>
+            <view class="device-hero__tags">
+              <view v-if="inventoryLoading" class="device-hero__loading" role="status"><view class="device-hero__spin" aria-hidden="true" /><text>{{ t.earn.deviceLoading }}</text></view>
+              <template v-else>
+                <view v-if="onlineCount > 0" class="device-hero__tag"><view class="device-hero__dot" aria-hidden="true" /><text>{{ fmt(t.myDevices.activatedLabel, { n: onlineCount }) }}</text></view>
+                <view v-if="slotsUsed !== null && slotsFull" class="device-hero__tag device-hero__tag--warn"><text>{{ t.myDevices.inventoryRowSlotsFull }}</text></view>
+                <view v-else-if="slotsUsed !== null" class="device-hero__tag"><text>{{ fmt(t.myDevices.emptySlots, { n: app.slotCap - slotsUsed }) }}</text></view>
+                <view v-else class="device-hero__tag"><text>{{ slotUnavailableText }}</text></view>
+              </template>
             </view>
           </view>
-          <view class="flex" style="gap: 6px; margin-top: 8px">
-            <view v-for="i in app.slotCap" :key="i" :style="segStyle(i - 1)" />
+          <view class="device-bays">
+            <view v-for="(bay, i) in bays" :key="bay.key" class="device-bays__cell" :style="{ '--i': i }">
+              <DeviceBay v-if="bay.kind === 'device' || bay.kind === 'trial'" :device="bay.device" :image="bay.image" :name="bay.name"
+                :online="bay.online" :badge="bay.kind === 'trial' ? trialCopy.imageBadge : undefined" :label="bay.label" @open="openBay(bay.target)" />
+              <view v-else-if="bay.kind === 'reserved'" class="device-bay-slot device-bay-slot--reserved" role="img" :aria-label="t.orders.statusProvisioning">
+                <view class="device-hero__spin device-hero__spin--lg" aria-hidden="true" /><text>{{ t.orders.statusProvisioning }}</text>
+              </view>
+              <view v-else-if="bay.kind === 'empty'" class="device-bay-slot device-bay-slot--empty" role="button" tabindex="0" :aria-label="t.myDevices.inventoryCtaGoStore" @click="goStore">
+                <view class="device-bay-slot__plus nx-frosted-button" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view>
+              </view>
+              <view v-else class="device-bay-slot device-bay-slot--loading" aria-hidden="true" />
+            </view>
+          </view>
+          <view v-if="inventoryEmpty" class="device-hero__empty">
+            <text class="device-hero__empty-title">{{ t.empty.devicesTitle }}</text>
+            <text class="device-hero__empty-desc">{{ t.empty.devicesDesc }}</text>
           </view>
         </view>
+      </view>
 
+      <view v-if="inventoryReady" class="mx-4">
         <!-- Trial and activated devices share one list; the count describes rows, not capacity. -->
         <view v-if="activeDevices.length > 0 || trialPresentation.active.value" class="device-inventory-section" data-inventory-section="devices">
-          <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
-            <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionDevices }}</text>
-            <text :style="sectionCountStyle">{{ activeDevices.length + (trialPresentation.active.value ? 1 : 0) }}</text>
+          <view class="device-inventory-section__head">
+            <text class="device-inventory-section__title">{{ t.myDevices.inventorySectionDevices }}</text>
+            <text class="device-inventory-section__count">{{ activeDevices.length + (trialPresentation.active.value ? 1 : 0) }}</text>
           </view>
           <view class="device-inventory-list">
-            <TrialDeviceRow v-if="trialPresentation.active.value" key="trial:current" variant="inventory" :style="trialRowStyle" show-cancel :cancel-busy="cancelTrialBusy" @cancel="handleCancelTrial" />
+            <TrialDeviceRow v-if="trialPresentation.active.value" id="device-card-trial" key="trial:current" variant="inventory" show-cancel :cancel-busy="cancelTrialBusy" @cancel="handleCancelTrial" />
             <DeviceInventoryRow
               v-for="d in activeDevices"
               :key="d.id"
@@ -92,9 +110,9 @@
 
         <!-- Inventory (purchased but not activated) -->
         <view v-if="inactiveDevices.length > 0" class="device-inventory-section" data-inventory-section="pending">
-          <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
-            <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionInventory }}</text>
-            <text :style="sectionCountStyle">{{ inactiveDevices.length }}</text>
+          <view class="device-inventory-section__head">
+            <text class="device-inventory-section__title">{{ t.myDevices.inventorySectionInventory }}</text>
+            <text class="device-inventory-section__count">{{ inactiveDevices.length }}</text>
           </view>
           <view class="device-inventory-list">
             <DeviceInventoryRow
@@ -116,17 +134,17 @@
               @tradein="handleTradein(d)"
             />
           </view>
-          <view v-if="slotsUsed !== null && slotsFull && inactiveDevices.length > 0" class="flex items-center" :style="slotsFullWarnStyle">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+          <view v-if="slotsUsed !== null && slotsFull && inactiveDevices.length > 0" class="device-inventory-warn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
             <text>{{ t.myDevices.inventorySlotsFullWarning }}</text>
           </view>
         </view>
 
         <!-- Remote active lifecycle without activation time: support-visible, never activatable. -->
         <view v-if="unconfirmedDevices.length > 0" class="device-inventory-section" data-inventory-section="unconfirmed">
-          <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
-            <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionActivationUnconfirmed }}</text>
-            <text :style="sectionCountStyle">{{ unconfirmedDevices.length }}</text>
+          <view class="device-inventory-section__head">
+            <text class="device-inventory-section__title">{{ t.myDevices.inventorySectionActivationUnconfirmed }}</text>
+            <text class="device-inventory-section__count">{{ unconfirmedDevices.length }}</text>
           </view>
           <view class="device-inventory-list">
             <DeviceInventoryRow
@@ -148,41 +166,19 @@
           </view>
         </view>
 
-        <!-- 空库存 —— 《06》的转化型空态 no-owned-asset:插画 + 引导 + 明确 CTA。
-             空态自带 CTA,所以下面那个常驻「去商店」按钮此时收起,不重复两个同义按钮。 -->
-        <EmptyState
-          v-if="inventoryEmpty"
-          kind="no-owned-asset"
-          :title="t.empty.devicesTitle"
-          :desc="t.empty.devicesDesc"
-          :cta-label="t.empty.devicesCta"
-          emphasis
-          @cta="goStore"
-        />
-
-        <!-- Add-device CTA -->
-        <view v-else class="flex items-center justify-center active:opacity-70" :style="ctaStyle" style="margin-top: 12px" role="button" tabindex="0" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-          <text :style="ctaLabelStyle">{{ t.myDevices.inventoryCtaGoStore }}</text>
-        </view>
-
+        <!-- Phone compute invites the user like an empty slot: dashed outline, the phone art and its activation step. -->
         <view class="device-inventory-section device-inventory-connections" data-inventory-section="connections">
-          <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
-            <view class="flex items-start" style="gap: 10px">
-              <view class="grid place-items-center shrink-0" :style="phoneActivationIconStyle">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" /><path d="M12 18h.01" /></svg>
-              </view>
-              <view class="flex-1 min-w-0">
-                <text class="block" :style="phoneActivationTitleStyle">{{ phoneActivationGuidance.title }}</text>
-                <text class="block" :style="phoneActivationBodyStyle">{{ phoneActivationGuidance.body }}</text>
-              </view>
+          <view v-if="phoneNeedsActivation" class="device-phone-card">
+            <view class="device-phone-card__copy">
+              <text class="device-phone-card__title">{{ phoneActivationGuidance.title }}</text>
+              <text class="device-phone-card__body">{{ phoneActivationGuidance.body }}</text>
+              <NxButton v-if="nativePhoneAvailable" class="device-phone-card__cta" variant="brand" size="medium" :label="t.myDevices.phoneActivationCta" @click="goPhoneActivation" />
             </view>
-            <view v-if="nativePhoneAvailable" class="flex items-center justify-center active:opacity-70" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation"  @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
-              <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
-            </view>
+            <view class="device-phone-card__art" aria-hidden="true"><image class="device-phone-card__img" src="/static/img/home-glass-20260928/phone.webp" mode="aspectFit" /><view class="device-phone-card__floor" /></view>
           </view>
         </view>
       </view>
+      <view class="device-page__bar-space" aria-hidden="true" />
     </view>
 
     <DeviceDeactivateSheet
@@ -191,16 +187,22 @@
       @force="onSheetForce"
       @dismiss="sheetDevice = null"
     />
+    <!-- Buying more devices is the page's main action, in the thumb zone (DS-30). -->
+    <template #pageFixed>
+      <view class="device-page__bar"><NxButton class="device-page__bar-btn" variant="primary" :label="t.myDevices.inventoryCtaGoStore" @click="goStore"><view class="device-page__bar-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg><text>{{ t.myDevices.inventoryCtaGoStore }}</text></view></NxButton></view>
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { onLoad, onUnload } from '@dcloudio/uni-app';
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
+import DeviceBay from "@/components/me/device-bay.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TrialDeviceRow from "@/components/trial-device-row.vue";
@@ -216,6 +218,8 @@ import { useSession } from "@/store/session";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { canControlDevice } from "@/lib/device-control-platform";
+import { getProductMedia } from "@/lib/product-media";
+import { deviceOnlineState } from "@/lib/hashpower";
 import { useFreeTrial } from "@/store/free-trial";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
@@ -279,6 +283,37 @@ const slotMeterLabel = computed(() =>
   slotsUsed.value === null ? slotUnavailableText.value
     : fmt(t.value.myDevices.inventorySlotMeter, { active: slotsUsed.value, max: app.slotCap }),
 );
+
+// Hero bays: the trial and activated devices hold slots first, then server-reserved
+// (provisioning) slots, then free ones. Unknown capacity shows placeholders only.
+type Bay = { key: string; kind: "device" | "trial" | "reserved" | "empty" | "loading"; device?: Device; image?: string;
+  name: string; online: boolean; label: string; target: string };
+const deviceOnline = (d: Device) => deviceOnlineState(d, Date.now(), !remoteApiEnabled || app.remoteFleetStatus === "ready" || app.remoteFleetStatus === "loading") === "online";
+const onlineCount = computed(() => activeDevices.value.filter(deviceOnline).length + (trialPresentation.active.value && trial.status === "active" ? 1 : 0));
+const bays = computed<Bay[]>(() => {
+  const blank = (kind: Bay["kind"], i: number): Bay => ({ key: `${kind}:${i}`, kind, name: "", online: false, label: "", target: "" });
+  if (slotsUsed.value === null) return Array.from({ length: app.slotCap }, (_, i) => blank("loading", i));
+  const list: Bay[] = [];
+  if (trialPresentation.active.value) {
+    const name = trialPresentation.deviceName.value || "—";
+    const online = trial.status === "active";
+    list.push({ key: "trial", kind: "trial", image: getProductMedia(trialPresentation.productId.value)?.src, name, online,
+      label: `${name} · ${trialCopy.value.imageBadge}${online ? " · " + t.value.earn.online : ""}`, target: "trial" });
+  }
+  for (const d of activeDevices.value) {
+    const name = deviceName(t.value, d), online = deviceOnline(d);
+    list.push({ key: d.id, kind: "device", device: d, name, online, label: online ? `${name} · ${t.value.earn.online}` : name, target: d.id });
+  }
+  const reserved = app.remoteSlotUsage?.reservedSlotCount ?? 0;
+  for (let i = 0; i < reserved && list.length < app.slotCap; i++) list.push(blank("reserved", i));
+  while (list.length < app.slotCap) list.push(blank("empty", list.length));
+  return list;
+});
+function openBay(target: string) {
+  if (typeof document === "undefined") return;
+  const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(`device-card-${target}`)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+}
 
 // Deactivate sheet (running-task branch) — page-driven (no chassis store).
 const { sheetDevice, handleDeactivate, onSheetWait, onSheetForce, runRemoteDeviceCommand } = useDeviceDeactivation();
@@ -361,148 +396,64 @@ function goStore() {
   navReset({ url: "/pages/store/store", fail: () => {} });
 }
 
-// ── styles ──
-function segStyle(i: number): CSSProperties {
-  return {
-    flex: 1,
-    height: "6px",
-    borderRadius: "999px",
-    background: slotsUsed.value !== null && i < slotsUsed.value ? "var(--v5-brand)" : "var(--v5-surface-3)",
-  };
-}
-
-// De-carded: slot meter sits on the page floor (2px optical inset).
-const meterBlockStyle: CSSProperties = {
-  padding: "0 2px",
-};
-const meterLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-const meterCountStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const meterMaxStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-list-subtitle)",
-  color: "var(--v5-ink-3)",
-};
-const trialRowStyle: CSSProperties = {
-  boxShadow: "none",
-  borderRadius: "0",
-  background: "transparent",
-};
-const sectionTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  lineHeight: "18px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const sectionCountStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-const slotsFullWarnStyle: CSSProperties = {
-  gap: "6px",
-  marginTop: "8px",
-  fontSize: "12px",
-  color: "var(--v5-warning)",
-};
-// Empty state (de-card whitelist): dashed outline, no fill.
-const emptyCardStyle: CSSProperties = {
-  marginTop: "12px",
-  borderRadius: "16px",
-  border: "1px dashed var(--v5-border-strong)",
-  padding: "32px 20px",
-  textAlign: "center",
-};
-const emptyIconStyle: CSSProperties = {
-  width: "48px",
-  height: "48px",
-  margin: "0 auto",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-};
-const emptyTitleStyle: CSSProperties = {
-  marginTop: "12px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-card-title)",
-  fontWeight: "var(--ui-type-card-title-weight)",
-  color: "var(--v5-ink)",
-};
-const emptyBodyStyle: CSSProperties = {
-  marginTop: "4px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.375,
-};
-const ctaStyle: CSSProperties = {
-  gap: "6px",
-  height: "48px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-};
-const ctaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 500,
-  color: "var(--v5-on-brand)",
-};
-const phoneActivationCardStyle: CSSProperties = {
-  marginTop: "8px",
-  borderRadius: "var(--ui-radius-surface)",
-  border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
-  padding: "12px",
-};
-const phoneActivationIconStyle: CSSProperties = {
-  width: "28px",
-  height: "28px",
-};
-const phoneActivationTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  lineHeight: "18px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const phoneActivationBodyStyle: CSSProperties = {
-  marginTop: "4px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  lineHeight: 1.5,
-  color: "var(--v5-ink-3)",
-};
-const phoneActivationCtaStyle: CSSProperties = {
-  marginTop: "8px",
-  minHeight: "44px",
-  boxSizing: "border-box",
-  padding: "10px 12px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-soft)",
-};
-const phoneActivationCtaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  lineHeight: "18px",
-  fontWeight: 500,
-  color: "var(--v5-brand)",
-};
-
-
 </script>
 
 <style scoped>
-.device-inventory-section { margin-top: 18px; min-width: 0; }
-.device-inventory-list { overflow: hidden; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
-.device-inventory-list > :deep(.device-inventory-row + .device-inventory-row),
-.device-inventory-list > :deep(.trial-device-row + .device-inventory-row) { border-top: 1px solid var(--v5-border); }
+.device-stage { position: relative; margin-top: 15px; }
+.device-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
+.device-stage__aura > view { position: absolute; width: 190px; height: 150px; border-radius: 50%; filter: blur(42px); }
+.device-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-brand) 26%, transparent); }
+.device-stage__aura > view:last-child { right: -14px; bottom: 20px; background: color-mix(in srgb, var(--v5-tech-cyan) 30%, transparent); }
+[data-theme="light"] .device-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
+[data-theme="light"] .device-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 18%, transparent); }
+/* Liquid-glass soft edge: frosted fill, soft inner rim; bays sit in it as recessed wells. */
+.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl); background: rgba(255,255,255,.045);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
+  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); }
+[data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); background: rgba(255,255,255,.58);
+  box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
+.device-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.device-hero__title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.device-hero__count { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
+.device-hero__used { font-size: 44px; font-weight: 500; line-height: 48px; letter-spacing: -.02em; }
+.device-hero__max { color: var(--v5-ink-3); font-size: 20px; font-weight: 500; line-height: 24px; }
+.device-hero__tags { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 2px; }
+.device-hero__tag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); white-space: nowrap; }
+.device-hero__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); flex: none; }
+.device-hero__tag--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
+.device-hero__loading { display: inline-flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
+.device-hero__spin { width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); border-top-color: var(--v5-brand); animation: spin 1s linear infinite; }
+.device-hero__spin--lg { width: 22px; height: 22px; }
+.device-bays__cell { min-width: 0; }
+.device-bays { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+.device-bay-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 112px; box-sizing: border-box; border-radius: var(--v5-radius-m); }
+.device-bay-slot--empty { border: 1.5px dashed var(--v5-border-strong); cursor: pointer; }
+.device-bay-slot--empty:active { transform: scale(.97); }
+.device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--v5-ink-3); }
+.device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
+.device-bay-slot--loading { background: linear-gradient(100deg, color-mix(in srgb, var(--v5-ink) 4%, transparent) 30%, color-mix(in srgb, var(--v5-ink) 10%, transparent) 50%, color-mix(in srgb, var(--v5-ink) 4%, transparent) 70%); background-size: 300% 100%; animation: device-shimmer 1.6s linear infinite; }
+.device-hero__empty { margin-top: 16px; text-align: center; }
+.device-hero__empty-title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.device-hero__empty-desc { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.device-inventory-section { margin-top: var(--ui-space-section-gap, 32px); min-width: 0; }
+.device-inventory-section__head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; margin-bottom: 12px; }
+.device-inventory-section__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
+.device-inventory-section__count { color: var(--v5-ink-3); font: 500 13px/18px var(--font-metric); }
+.device-inventory-list { display: flex; flex-direction: column; gap: 12px; }
+.device-inventory-warn { display: flex; align-items: center; gap: 6px; margin: 10px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .device-inventory-connections:empty { display: none; }
+.device-phone-card { display: grid; grid-template-columns: minmax(0, 1fr) 84px; align-items: center; gap: 12px; padding: 16px; border-radius: var(--ui-radius-surface); border: 1.5px dashed var(--v5-border-strong); background: color-mix(in srgb, var(--v5-ink) 3%, transparent); }
+.device-phone-card__title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.device-phone-card__body { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.device-phone-card__cta { display: inline-flex; margin-top: 12px; }
+.device-phone-card__art { position: relative; width: 84px; height: 72px; }
+.device-phone-card__img { position: absolute; left: 3px; top: 2px; width: 78px; height: 64px; }
+.device-phone-card__floor { position: absolute; left: 20%; right: 20%; bottom: 2px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
+[data-theme="light"] .device-phone-card__floor { background: radial-gradient(closest-side, rgba(20,16,8,.20), transparent); }
+.device-page__bar-space { height: calc(110px + env(safe-area-inset-bottom)); }
+.device-page__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.device-page__bar-btn { display: flex; flex: 1; }
+.device-page__bar-label { display: flex; align-items: center; gap: 6px; }
+@keyframes device-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .device-hero__spin, .device-bay-slot--loading { animation: none; } }
 </style>

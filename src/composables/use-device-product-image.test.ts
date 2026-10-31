@@ -46,7 +46,10 @@ function mount(raw: string, device: Device) {
     "@/i18n/use-t": { useT: () => Vue.ref(en) }, "@/lib/amount-display": { formatAmount: String },
     "@/lib/device-copy": { deviceName: () => device.name, deviceGpuLabel: () => "GPU" },
     "@/lib/hashpower": { deviceOnlineState: () => "online" }, "@/i18n/format": { fmtMoney: String },
-    "@/store/data-visibility": { useDataVisibility: () => ({ hidden: false, mask: String }) } };
+    "@/store/data-visibility": { useDataVisibility: () => ({ hidden: false, mask: String }) },
+    "@/components/ui/nx-button.vue": {}, "@/composables/use-tab-page-lifecycle": { useVisibleInterval() {} },
+    "@/lib/server-deadline-clock": { advanceMonotonicHighWater: (value: number) => value, projectServerNow: (value: number) => value, readMonotonicNowMs: () => 0 },
+    "@/lib/task-progress": { taskProgressPercent: () => null } };
   const exports: Record<string, any> = {};
   new Function("require", "exports", code)((id: string) => modules[id], exports);
   const props = Vue.reactive({ device, online: true, active: true, runtimeConfirmed: true, showAction: false });
