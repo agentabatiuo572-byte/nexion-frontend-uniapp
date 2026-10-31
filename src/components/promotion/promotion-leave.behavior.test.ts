@@ -69,7 +69,7 @@ it('projects server time again when leaving an order that was open across its de
 });
 it('the real leave action persists before display and a recreated page restores its once-only decision',async()=>{
   let saved:PromotionCheckoutRecord={quote:null,order:null,pending:null};
-  const ports={api:{create:vi.fn(),pay:vi.fn(),cancel:vi.fn(),command:vi.fn(),findOrder:vi.fn()},save:vi.fn(record=>{saved=JSON.parse(JSON.stringify(record));}),key:()=>'',current:()=>true};
+  const ports={api:{create:vi.fn(),pay:vi.fn(),cancel:vi.fn(),command:vi.fn(),paymentCommand:vi.fn(),findOrder:vi.fn()},save:vi.fn(record=>{saved=JSON.parse(JSON.stringify(record));}),key:()=>'',current:()=>true};
   const guard=harness({built:false,quoteClock:true,checkoutSession:new PromotionCheckoutSession(ports,saved)});
   const first=guard.requestLeave();expect(saved.leavePromptShown).toBe(true);expect(ports.save).toHaveBeenCalledOnce();expect(guard.leaveOpen.value).toBe(true);
   guard.finishLeave(true);expect(await first).toBe(true);
@@ -81,7 +81,7 @@ it('the real leave action persists before display and a recreated page restores 
 });
 it('a failed reminder save permits navigation while preserving the existing financial storage guard',async()=>{
   const quote={quoteId:'Q1',eligibility:'ELIGIBLE',items:[{productNo:'sku-a',quantity:1}]} as Quote;
-  const ports={api:{create:vi.fn(),pay:vi.fn(),cancel:vi.fn(),command:vi.fn(),findOrder:vi.fn()},save:vi.fn(()=>{throw new Error('storage unavailable');}),key:()=>'',current:()=>true};
+  const ports={api:{create:vi.fn(),pay:vi.fn(),cancel:vi.fn(),command:vi.fn(),paymentCommand:vi.fn(),findOrder:vi.fn()},save:vi.fn(()=>{throw new Error('storage unavailable');}),key:()=>'',current:()=>true};
   const session=new PromotionCheckoutSession(ports,{quote,order:null,pending:null});
   const guard=harness({built:false,quoteClock:true,checkoutSession:session});
   expect(await guard.requestLeave()).toBe(true);expect(guard.leaveOpen.value).toBe(false);expect(session.record.leavePromptShown).toBeUndefined();
@@ -112,6 +112,7 @@ function purchaseHarness({rewardRows=[] as unknown[],built=false,busy=false,unkn
   const canExecute=vi.fn(()=>executable),create=vi.fn(async()=>{}),pay=vi.fn(async()=>{}),recover=vi.fn(async()=>{});
   const fleet=vi.fn(async()=>({serverNow:Date.parse(serverTime),devices:[]}));
   const deps={computed,current:()=>current,visible:true,readGeneration:0,readCurrent:()=>current,
+    executeSelectedPurchase:async(_context:unknown,command:(authorization:unknown)=>Promise<unknown>,isCurrent:()=>boolean)=>isCurrent()?command({paymentPassword:'039417',credentialVersion:1,attemptNo:'fixture-attempt'}):null,
     confirm:vi.fn().mockResolvedValue(true),fmt,formatAmount,t:ref(zh),busy:ref(busy),unknown:ref(unknown),error:ref(''),
     props:{items:[]},quote:ref({expectedRewards:rewardRows,eligibility,items:bundle?[{},{}]:[{}],serverTime,expiresAt:fresh?'2026-10-08T00:00:05Z':serverTime}),
     order:ref(built?{orderNo:'ORD-1',amountUsdt:'50.00',rewards:rewardRows,paymentStatus:status,payBy:paymentDeadline}:null),quoteFresh:ref(fresh),payWindow:ref<boolean|null>(null),

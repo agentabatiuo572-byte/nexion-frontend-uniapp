@@ -24,7 +24,7 @@ const base = {
     sourceEnvironment: "PRODUCTION",
     runId: "",
   },
-  paymentRail: "NEXION_USDT_WALLET",
+  paymentRail: "UVEL_USDT_WALLET",
   config: {
     trialDays: "3", graceDays: "7", discountRate: "0.15", discountCapUSD: "20",
     trialOffsetCapUSD: "50", trialProductId: "stellarbox-s1", trialProductName: "NexGridBox S1", trialPriceUSD: "1299",
@@ -35,9 +35,34 @@ const base = {
 };
 
 describe("trial conversion contract", () => {
+  it("reads explicit expiry evidence and keeps older responses compatible", () => {
+    const parsed = parseTrialAuthorityState({ ...base, state: "CANCELLED", eligibilityReason: "used",
+      endReason: "expired", finishedAtEpochMs: 1_724_259_201_000 });
+    expect(parsed).toMatchObject({ status: "ended", endReason: "expired",
+      finishedAt: 1_724_259_201_000 });
+    expect(parseTrialAuthorityState({ ...base, endReason: "cancelled" })).toMatchObject({ endReason: "cancelled" });
+    expect(parseTrialAuthorityState(base)).not.toHaveProperty("endReason");
+  });
+  it.each([{ endReason: "auto_end" }, { finishedAtEpochMs: "invalid" }, { finishedAtEpochMs: 0 }])
+    ("rejects malformed expiry authority %j", patch => {
+      expect(() => parseTrialAuthorityState({ ...base, ...patch })).toThrow("TRIAL_RESPONSE_INVALID");
+    });
+  it.each(["NEXION_USDT_WALLET", "OTHER_WALLET"])("rejects a retired or unknown payment rail %s", paymentRail => {
+    expect(() => parseTrialAuthorityState({ ...base, paymentRail })).toThrow("TRIAL_RESPONSE_INVALID");
+  });
+  it("retains the claim's canonical split even when current policy differs", () => {
+    expect(parseTrialAuthorityState({ ...base, offsetUsdt: "5", remainderUsdt: "5", priceUsdt: "649" }))
+      .toMatchObject({ shadowUSD: 10, offsetUSD: 5, remainderUSD: 5, priceUSD: 649 });
+  });
+  it.each([{ offsetUsdt: -1, remainderUsdt: 0, priceUsdt: 649 }, { offsetUsdt: 5 },
+    { offsetUsdt: 5, remainderUsdt: "invalid", priceUsdt: 649 }])("rejects an incomplete or invalid canonical split", amounts => {
+    expect(() => parseTrialAuthorityState({ ...base, ...amounts })).toThrow("TRIAL_RESPONSE_INVALID");
+  });
   it("reads whether a redeemed trial's purchase was refunded, and only when the server says so", () => {
     expect(parseTrialAuthorityState({ ...base, conversionOrderNo: "TRC-1", conversionRefunded: true, conversionRewardsReversed: true }))
       .toMatchObject({ conversion: { orderNo: "TRC-1", refunded: true, rewardsReversed: true } });
+    expect(parseTrialAuthorityState({ ...base, conversionOrderNo: null, conversionRefunded: false }))
+      .toMatchObject({ conversion: { orderNo: null, refunded: false, rewardsReversed: false } });
     expect(parseTrialAuthorityState(base)).not.toHaveProperty("conversion");
   });
   it("retains the extended purchase deadline without resuming production", () => {

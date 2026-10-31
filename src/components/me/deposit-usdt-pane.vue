@@ -254,6 +254,8 @@ function load(background = false) {
         const snapshot = await cregisDepositApi.address();
         if (generation !== loadGeneration || account !== app.accountKey
             || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
+        if (snapshot.enabled && (snapshot.minDepositUsdt == null || !Number.isSafeInteger(Number(snapshot.minDepositUsdt))
+            || Number(snapshot.minDepositUsdt) < 1)) throw new Error('CREGIS_MINIMUM_INVALID');
         addressReceived = true;
         addressVerified.value = true;
         serverEnabled.value = snapshot.enabled;

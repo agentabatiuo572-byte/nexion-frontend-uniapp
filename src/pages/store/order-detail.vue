@@ -231,6 +231,8 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
+import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
+import { paidOrderReceipt } from '@/api/order-api';
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
@@ -442,6 +444,7 @@ const canPayFromWallet = computed(() => remoteApiEnabled
   && cancellable.value && !walletRefreshing.value && !paymentExpired.value);
 const isProvisioning = computed(() => order.value?.status === "provisioning");
 const STATUS_COLORS: Record<OrderStatus, string> = {
+  inventory: "var(--v5-brand)",
   placed: "var(--v5-ink-3)",
   paid: "var(--v5-brand)",
   provisioning: "var(--v5-warning)",
@@ -458,6 +461,7 @@ const statusColor = computed(() => (order.value ? STATUS_COLORS[order.value.stat
 // lucide outline paths per status (Clock / CheckCircle2 / Server / Cpu / XCircle)
 function iconFor(status: OrderStatus): string[] {
   switch (status) {
+    case "inventory": return ["M4 4h16v16H4z", "M8 9h8"];
     case "placed": return ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"];
     case "paid": return ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "m9 11 3 3L22 4"];
     case "provisioning": return ["M5 2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", "M5 14h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M6 6h.01", "M6 18h.01"];
@@ -477,6 +481,7 @@ function stageIcon(stage: OrderStatus): string[] {
 
 function statusLabel(s: OrderStatus): string {
   switch (s) {
+    case "inventory": return t.value.orders.statusInventory;
     case "placed": return t.value.orders.statusPlaced;
     case "paid": return t.value.orders.statusPaid;
     case "provisioning": return t.value.orders.statusProvisioning;
@@ -570,14 +575,14 @@ async function handleWalletPayment() {
   const requestOrderNo = order.value.id;
   const requestAmountUsdt = order.value.total;
   const receiptScope = app.captureRemoteAccountRequest();
-  if (app.user.usdtBalance + 0.000001 < requestAmountUsdt) {
-    await offerWalletTopup(requestAmountUsdt);
-    return;
-  }
   payingFromWallet.value = true;
   let paymentConfirmed = false;
   try {
-    const receipt = await orderApi.pay(requestOrderNo, `wallet-pay:${requestOrderNo}`);
+    const paymentCurrent = () => isCurrentDetailScope(scope) && order.value?.id === requestOrderNo && order.value?.total === requestAmountUsdt;
+    const receipt = await executeSelectedPurchase({ amount: requestAmountUsdt, currency: 'USDT', summary: order.value.productName },
+      authorization => orderApi.pay(requestOrderNo, `wallet-pay:${requestOrderNo}`, authorization), paymentCurrent,
+      { kind: 'ORDER_PAY', payload: { orderNo: requestOrderNo }, commandKey: () => `wallet-pay:${requestOrderNo}`, parseReceipt: paidOrderReceipt });
+    if (!receipt) return;
     if (!isCurrentDetailScope(scope)) return;
     if (receipt.orderNo !== requestOrderNo) {
       throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");

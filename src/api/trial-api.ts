@@ -2,7 +2,7 @@ import type { ApiClient } from "./api-client";
 import type { TrialStatus } from "../store/trial-boundary";
 
 export type TrialEligibilityReason =
-  "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "unknown";
+  "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
 export type TrialConfigValue = string | boolean;
 export type TrialSettlementPolicy = "FULL_TERM_ON_CONVERSION" | "ACCRUED_ON_CONVERSION";
 
@@ -55,11 +55,17 @@ export interface TrialAuthorityState {
   expiresAt: number | null;
   graceEndsAt: number | null;
   extendedEndsAt?: number | null;
+  /** Explicit server expiry/cancellation classification; absent on older servers. */
+  endReason?: "expired" | "cancelled" | null;
   finishedAt: number | null;
   cooldownUntil: number | null;
   shadowUSD: number;
   shadowNEX: number;
-  /** FEAT-TRIAL05 server quote. Missing on older servers and terminal claims: keep the local presentation. */
+  /** Claim-snapshot amounts. Missing on older responses; never infer available credit. */
+  offsetUSD?: number;
+  remainderUSD?: number;
+  priceUSD?: number;
+  /** Missing on older servers and on terminal claims: keep the accrued-only presentation. */
   quote?: TrialConversionQuote;
   /** Redeemed claims: the purchase may have been refunded since. Missing on older servers. */
   conversion?: TrialConversionOutcome;
@@ -73,7 +79,7 @@ export interface TrialAuthorityState {
     sourceEnvironment: "PRODUCTION";
     runId: "";
   };
-  paymentRail: "NEXION_USDT_WALLET";
+  paymentRail: "UVEL_USDT_WALLET";
   config: Record<string, TrialConfigValue>;
 }
 
@@ -117,7 +123,7 @@ export interface TrialApi {
   eligibility(): Promise<TrialAuthorityState>;
   start(idempotencyKey: string, deviceName: string): Promise<TrialAuthorityState>;
   convert(productNo: string, expectedAmountUsdt: number | null, quoteVersion: string | null,
-    idempotencyKey: string): Promise<TrialConvertReceipt>;
+    idempotencyKey: string, authorization?: import('./payment-password-api').PaymentPasswordAuthorization): Promise<TrialConvertReceipt>;
   cancel(reason: "explicit" | "unbind", idempotencyKey: string): Promise<TrialAuthorityState>;
 }
 
@@ -125,7 +131,7 @@ const SERVER_STATES = new Set([
   "ELIGIBLE", "ACTIVE", "GRACE", "EXTENDED", "REDEEMED", "FAILED", "CANCELLED",
 ]);
 const REASONS = new Set([
-  "in-progress", "converted", "used", "phase-closed", "quota-exhausted", "risk", "product-unavailable", "unknown",
+  "in-progress", "converted", "used", "phase-closed", "quota-exhausted", "risk", "product-unavailable", "capacity-full", "unknown",
 ]);
 
 function invalid(): never {
@@ -139,6 +145,7 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 function finiteNumber(value: unknown, min = 0): number | null {
+  if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return null;
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) && parsed >= min ? parsed : null;
 }
@@ -190,7 +197,11 @@ function receiptSettlement(row: Record<string, unknown>): TrialConvertReceipt["s
 }
 
 export function parseTrialConvertReceipt(value: unknown): TrialConvertReceipt {
-  const row = record(value);
+  const row = record(value) ? { ...record(value)! } : null;
+  if (row && (row.paymentMethod === 'HDPAY_BANK' || row.paymentMethod === 'CREGIS_USDT_BSC') && typeof row.amountUsdt === 'string') {
+    if (!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(row.amountUsdt)) return invalid();
+    row.amountUsdt = Number(row.amountUsdt);
+  }
   const orderNo = typeof row?.orderNo === "string" ? row.orderNo.trim() : "";
   const productNo = typeof row?.productNo === "string" ? row.productNo.trim() : "";
   const amountUsdt = finiteNumber(row?.amountUsdt);
@@ -249,12 +260,17 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
   const claimNo = row.claimNo == null ? null : String(row.claimNo).trim();
   const shadowUSD = finiteNumber(row.shadowUsdt ?? 0);
   const shadowNEX = finiteNumber(row.shadowNex ?? 0);
+  const hasAmounts = ["offsetUsdt", "remainderUsdt", "priceUsdt"].some(key => key in row);
+  const offsetUSD = hasAmounts ? finiteNumber(row.offsetUsdt) : null;
+  const remainderUSD = hasAmounts ? finiteNumber(row.remainderUsdt) : null;
+  const priceUSD = hasAmounts ? finiteNumber(row.priceUsdt) : null;
+  if (hasAmounts && (offsetUSD === null || remainderUSD === null || priceUSD === null)) return invalid();
   const quote = row.quote == null ? undefined : parseTrialConversionQuote(row.quote);
   if (typeof canStart !== "boolean" || serverNow === null || version === null || !Number.isInteger(version)
       || !source || row.serverCanonical !== true || row.sourceEnvironment !== "PRODUCTION" || row.runId !== ""
       || provenance?.serverCanonical !== true || provenance.source !== source
       || provenance.sourceEnvironment !== "PRODUCTION" || provenance.runId !== ""
-      || row.paymentRail !== "NEXION_USDT_WALLET"
+      || row.paymentRail !== "UVEL_USDT_WALLET"
       || (reason !== undefined && !REASONS.has(reason))
       || (canStart && reason !== undefined)
       || (!canStart && reason === undefined)
@@ -268,6 +284,8 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
   const extendedEndsAt = timestamp(row.extendedEndsAtEpochMs ?? row.extendedEndsAt);
   if (serverState === "EXTENDED" && extendedEndsAt === null) return invalid();
   const finishedAt = timestamp(row.finishedAtEpochMs ?? row.finishedAt);
+  const endReason = row.endReason;
+  if (endReason !== undefined && endReason !== null && endReason !== "expired" && endReason !== "cancelled") return invalid();
   const cooldownUntil = timestamp(row.cooldownUntilEpochMs ?? row.cooldownUntil);
   const conversion = typeof row.conversionRefunded === "boolean"
     ? {
@@ -292,10 +310,12 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
     expiresAt,
     graceEndsAt,
     extendedEndsAt,
+    ...(endReason !== undefined ? { endReason } : {}),
     finishedAt,
     cooldownUntil,
     shadowUSD,
     shadowNEX,
+    ...(hasAmounts ? { offsetUSD: offsetUSD!, remainderUSD: remainderUSD!, priceUSD: priceUSD! } : {}),
     ...(quote ? { quote } : {}),
     ...(conversion ? { conversion } : {}),
     source,
@@ -308,7 +328,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
       sourceEnvironment: "PRODUCTION",
       runId: "",
     },
-    paymentRail: "NEXION_USDT_WALLET",
+    paymentRail: "UVEL_USDT_WALLET",
     config: trialConfig(row.config),
   };
 }
@@ -325,12 +345,13 @@ export function createTrialApi(client: ApiClient): TrialApi {
       body: { deviceName },
       idempotencyKey,
     }),
-    convert: async (productNo, expectedAmountUsdt, quoteVersion, idempotencyKey) => parseTrialConvertReceipt(await client.request({
+    convert: async (productNo, expectedAmountUsdt, quoteVersion, idempotencyKey, authorization) => parseTrialConvertReceipt(await client.request({
       method: "POST",
       path: "/api/trial/convert",
       // Older intents carry no version; omitting it keeps their idempotent replay byte-identical.
-      body: quoteVersion ? { productNo, expectedAmountUsdt, quoteVersion } : { productNo, expectedAmountUsdt },
+      body: { productNo, expectedAmountUsdt, ...(quoteVersion ? { quoteVersion } : {}), ...authorization },
       idempotencyKey,
+      retryAfterAuth: false,
     })),
     cancel: (reason, idempotencyKey) => parse({
       method: "POST",

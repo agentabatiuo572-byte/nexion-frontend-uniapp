@@ -13,6 +13,9 @@ function harness() {
   const order = { orderNo: "ORDER-1", productNo: "sku", quantity: 1, amountUsdt: 100, discountUsdt: 0,
     paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT", activationStatus: "WAITING_PAYMENT", canonicalStatus: "placed" };
   const deps = {
+    executeSelectedPurchase: async (_context: unknown, command: (authorization: unknown) => Promise<unknown>, current: () => boolean) =>
+      current() ? command({ paymentPassword: '039417', credentialVersion: 1, attemptNo: 'fixture-attempt' }) : null,
+    paidOrderReceipt: (raw: unknown) => raw,
     captureAccountScope: () => ({}), isCurrentAccountScope: () => true,
     app: { captureRemoteAccountRequest: () => ({}), user: { usdtBalance: 100 }, adoptCommerceWallet: vi.fn(), refreshRemoteFleet: vi.fn() },
     product: ref({ id: "sku" }), purchaseUnavailable: ref(false), voucherQuote: { id: null }, quotedTotal: 100,

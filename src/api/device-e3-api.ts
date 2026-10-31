@@ -52,6 +52,10 @@ export interface CanonicalE3Fleet {
   serverNow: number;
   timezone: string;
   slotCap: number;
+  /** Authoritative capacity includes order reservations and the trial exactly once. */
+  slotsUsed?: number;
+  reservedSlotCount?: number;
+  trialSlotCount?: number;
   devices: CanonicalE3Device[];
   capacitySchedule: Record<string, string>;
   source: string;
@@ -95,6 +99,8 @@ export interface CanonicalTradeinEligibility {
 
 export interface CanonicalTradeinQuote {
   sourceDeviceId: number;
+  sourceRowVersion: number;
+  targetDeviceStatus: "ACTIVE" | "INACTIVE";
   sourceProductName: string;
   targetProductId: number;
   targetProductNo: string;
@@ -114,10 +120,13 @@ export interface CanonicalTradeinQuote {
 }
 
 export interface CanonicalTradeinResult {
+  paymentMethod?: 'HDPAY_BANK' | 'CREGIS_USDT_BSC';
+  amountUsdt?: number;
   tradeinNo: string;
   orderNo: string;
   sourceDeviceId: number;
   targetDeviceId: number;
+  targetDeviceStatus?: "ACTIVE" | "INACTIVE";
   applicationStatus: string;
   orderStatus: string;
   discountUsdt: number;
@@ -126,11 +135,13 @@ export interface CanonicalTradeinResult {
 }
 
 export interface CanonicalCapacityKeepResult {
+  paymentMethod?: 'HDPAY_BANK' | 'CREGIS_USDT_BSC';
+  amountUsdt?: number;
   operationNo: string;
   orderNo: string;
   targetDeviceId: number;
-  deviceStatus: "INACTIVE";
-  orderStatus: "PAID";
+  deviceStatus: "ACTIVE";
+  orderStatus: "COMPLETED";
   walletDebitUsdt: number;
   walletBalanceAfterUsdt: number;
 }
@@ -172,17 +183,23 @@ export interface DeviceE3Api {
     targetProductNo: string,
     idempotencyKey: string,
     expectedQuote: CanonicalCapacityReplaceQuote,
+    authorization?: import('./payment-password-api').PaymentPasswordAuthorization,
   ): Promise<CanonicalTradeinResult>;
   capacityKeep(
     targetProductNo: string,
     idempotencyKey: string,
     expectedQuote: CanonicalCapacityReplaceQuote,
+    authorization?: import('./payment-password-api').PaymentPasswordAuthorization,
   ): Promise<CanonicalCapacityKeepResult>;
+  /** Replay only an existing durable command with its original payable and key. */
+  replayCapacityKeep(targetProductNo: string, idempotencyKey: string, expectedPayableUsdt: number,
+    authorization?: import('./payment-password-api').PaymentPasswordAuthorization): Promise<CanonicalCapacityKeepResult>;
   submit(
     sourceDeviceId: number,
     targetProductNo: string,
     idempotencyKey: string,
     expectedQuote: CanonicalTradeinQuote,
+    authorization?: import('./payment-password-api').PaymentPasswordAuthorization,
   ): Promise<CanonicalTradeinResult>;
   activate(deviceId: number, expectedVersion: number, clientMaxDevices: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
   deactivate(deviceId: number, expectedVersion: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
@@ -323,6 +340,9 @@ function fleet(value: unknown, mode: ApiEnvironment): CanonicalE3Fleet {
     serverNow,
     timezone: string(source.timezone),
     slotCap: integer(source.slotCap, 1),
+    slotsUsed: source.slotsUsed === undefined ? undefined : integer(source.slotsUsed),
+    reservedSlotCount: source.reservedSlotCount === undefined ? undefined : integer(source.reservedSlotCount),
+    trialSlotCount: source.trialSlotCount === undefined ? undefined : integer(source.trialSlotCount),
     devices,
     capacitySchedule: stringMap(source.capacitySchedule),
     source: string(source.source),
@@ -355,10 +375,14 @@ function config(value: unknown): CanonicalTradeinConfig {
 
 function quote(value: unknown): CanonicalTradeinQuote {
   const source = record(value);
+  const targetDeviceStatus = string(source.targetDeviceStatus).toUpperCase();
+  if (targetDeviceStatus !== "ACTIVE" && targetDeviceStatus !== "INACTIVE") return invalid();
   const discountToWallet = boolean(source.discountToWallet);
   if (discountToWallet) return invalid("TRADEIN_WALLET_CREDIT_FORBIDDEN");
   const result: CanonicalTradeinQuote = {
     sourceDeviceId: integer(source.sourceDeviceId, 1),
+    sourceRowVersion: integer(source.sourceRowVersion),
+    targetDeviceStatus,
     sourceProductName: string(source.sourceProductName),
     targetProductId: integer(source.targetProductId, 1),
     targetProductNo: string(source.targetProductNo),
@@ -387,13 +411,38 @@ function quote(value: unknown): CanonicalTradeinQuote {
   return result;
 }
 
-function result(value: unknown): CanonicalTradeinResult {
-  const source = record(value);
+function purchaseReceiptRecord(value: unknown): Record<string, unknown> {
+  const source = { ...record(value) };
+  if (source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC') {
+    for (const key of ['amountUsdt', 'walletDebitUsdt', 'walletBalanceAfterUsdt', 'discountUsdt']) {
+      const raw = source[key];
+      if (typeof raw === 'string') {
+        if (!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(raw)) return invalid();
+        source[key] = Number(raw);
+      }
+    }
+  }
+  return source;
+}
+function externalPurchaseFields(source: Record<string, unknown>): { paymentMethod?: 'HDPAY_BANK' | 'CREGIS_USDT_BSC'; amountUsdt?: number } {
+  if (source.paymentMethod !== 'HDPAY_BANK' && source.paymentMethod !== 'CREGIS_USDT_BSC') return {};
+  if (number(source.walletDebitUsdt) !== 0) return invalid();
+  return { paymentMethod: source.paymentMethod, amountUsdt: number(source.amountUsdt) };
+}
+export function purchasePrincipalUsdt(receipt: CanonicalTradeinResult | CanonicalCapacityKeepResult): number {
+  return receipt.paymentMethod ? receipt.amountUsdt! : receipt.walletDebitUsdt;
+}
+export function parseCanonicalTradeinResult(value: unknown): CanonicalTradeinResult {
+  const source = purchaseReceiptRecord(value);
+  const targetDeviceStatus = source.targetDeviceStatus == null ? undefined : string(source.targetDeviceStatus).toUpperCase();
+  if (targetDeviceStatus !== undefined && targetDeviceStatus !== "ACTIVE" && targetDeviceStatus !== "INACTIVE") return invalid();
   const parsed = {
+    ...externalPurchaseFields(source),
     tradeinNo: string(source.tradeinNo),
     orderNo: string(source.orderNo),
     sourceDeviceId: integer(source.sourceDeviceId, 1),
     targetDeviceId: integer(source.targetDeviceId, 1),
+    targetDeviceStatus: targetDeviceStatus as CanonicalTradeinResult["targetDeviceStatus"],
     applicationStatus: string(source.applicationStatus).toUpperCase(),
     orderStatus: string(source.orderStatus).toUpperCase(),
     discountUsdt: number(source.discountUsdt),
@@ -404,17 +453,18 @@ function result(value: unknown): CanonicalTradeinResult {
   return parsed;
 }
 
-function capacityKeepResult(value: unknown): CanonicalCapacityKeepResult {
-  const source = record(value);
+export function parseCanonicalCapacityKeepResult(value: unknown): CanonicalCapacityKeepResult {
+  const source = purchaseReceiptRecord(value);
   const deviceStatus = string(source.deviceStatus).toUpperCase();
   const orderStatus = string(source.orderStatus).toUpperCase();
-  if (deviceStatus !== "INACTIVE" || orderStatus !== "PAID") return invalid();
+  if (deviceStatus !== "ACTIVE" || orderStatus !== "COMPLETED") return invalid();
   return {
+    ...externalPurchaseFields(source),
     operationNo: string(source.operationNo),
     orderNo: string(source.orderNo),
     targetDeviceId: integer(source.targetDeviceId, 1),
-    deviceStatus: "INACTIVE",
-    orderStatus: "PAID",
+    deviceStatus: "ACTIVE",
+    orderStatus: "COMPLETED",
     walletDebitUsdt: number(source.walletDebitUsdt),
     walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt),
   };
@@ -503,12 +553,12 @@ function sameMoney(actual: number, expected: number): boolean {
 
 function assertResultMatchesQuote(
   parsed: CanonicalTradeinResult,
-  expected: { sourceDeviceId: number; discountUsdt: number; payableUsdt: number; walletBalanceUsdt: number },
+  expected: { sourceDeviceId: number; discountUsdt: number; payableUsdt: number; targetDeviceStatus?: "ACTIVE" | "INACTIVE" },
 ): CanonicalTradeinResult {
   if (parsed.sourceDeviceId !== expected.sourceDeviceId
+      || (expected.targetDeviceStatus != null && parsed.targetDeviceStatus !== expected.targetDeviceStatus)
       || !sameMoney(parsed.discountUsdt, expected.discountUsdt)
-      || !sameMoney(parsed.walletDebitUsdt, expected.payableUsdt)
-      || !sameMoney(parsed.walletBalanceAfterUsdt, expected.walletBalanceUsdt - expected.payableUsdt)) {
+      || !sameMoney(parsed.walletDebitUsdt, expected.payableUsdt)) {
     return invalid("E3_TRADEIN_RESULT_QUOTE_MISMATCH");
   }
   return parsed;
@@ -575,6 +625,20 @@ function validTargetNo(value: string): string {
   return normalized;
 }
 
+async function sendCapacityKeep(client: ApiClient, targetProductNo: string, idempotencyKey: string, expectedPayableUsdt: number,
+  authorization?: import('./payment-password-api').PaymentPasswordAuthorization): Promise<CanonicalCapacityKeepResult> {
+  const key = idempotencyKey.trim();
+  if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
+  const payable = number(expectedPayableUsdt);
+  const parsed = parseCanonicalCapacityKeepResult(await client.request<unknown>({
+    method: "POST", path: "/api/app/trade-in/capacity-keep",
+    retryAfterAuth: false,
+    body: { ...authorization, targetProductNo: validTargetNo(targetProductNo), expectedPayableUsdt: payable }, idempotencyKey: key,
+  }));
+  if (!sameMoney(parsed.walletDebitUsdt, payable)) return invalid("E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH");
+  return parsed;
+}
+
 export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "prod"): DeviceE3Api {
   return {
     async fleet() {
@@ -604,7 +668,7 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
         body: { targetProductNo: validTargetNo(targetProductNo) },
       }));
     },
-    async capacityReplace(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote) {
+    async capacityReplace(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote, authorization) {
       const key = idempotencyKey.trim();
       if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
       if (expectedQuote.decision !== "REPLACE_REQUIRED"
@@ -613,10 +677,12 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
           || expectedQuote.decisionSource !== "server") {
         throw new ApiError({ kind: "configuration", message: "CAPACITY_REPLACEMENT_QUOTE_CONTEXT_INVALID" });
       }
-      return assertResultMatchesQuote(result(await client.request<unknown>({
+      return assertResultMatchesQuote(parseCanonicalTradeinResult(await client.request<unknown>({
         method: "POST",
         path: "/api/app/trade-in/capacity-replace",
+        retryAfterAuth: false,
         body: {
+          ...authorization,
           sourceDeviceId: integer(sourceDeviceId, 1),
           targetProductNo: validTargetNo(targetProductNo),
           expectedPayableUsdt: number(expectedQuote.payableUsdt),
@@ -626,45 +692,35 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
         sourceDeviceId,
         discountUsdt: 0,
         payableUsdt: expectedQuote.payableUsdt,
-        walletBalanceUsdt: expectedQuote.walletBalanceUsdt,
       });
     },
-    async capacityKeep(targetProductNo, idempotencyKey, expectedQuote) {
-      const key = idempotencyKey.trim();
-      if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
-      if (expectedQuote.decision !== "REPLACE_REQUIRED"
+    async capacityKeep(targetProductNo, idempotencyKey, expectedQuote, authorization) {
+      if (expectedQuote.decision !== "CAPACITY_AVAILABLE"
           || expectedQuote.targetProductNo !== targetProductNo
           || expectedQuote.decisionSource !== "server") {
         throw new ApiError({ kind: "configuration", message: "CAPACITY_KEEP_QUOTE_CONTEXT_INVALID" });
       }
-      const parsed = capacityKeepResult(await client.request<unknown>({
-        method: "POST",
-        path: "/api/app/trade-in/capacity-keep",
-        body: {
-          targetProductNo: validTargetNo(targetProductNo),
-          expectedPayableUsdt: number(expectedQuote.payableUsdt),
-        },
-        idempotencyKey: key,
-      }));
-      if (!sameMoney(parsed.walletDebitUsdt, expectedQuote.payableUsdt)
-          || !sameMoney(parsed.walletBalanceAfterUsdt,
-            expectedQuote.walletBalanceUsdt - expectedQuote.payableUsdt)) {
-        return invalid("E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH");
-      }
-      return parsed;
+      return sendCapacityKeep(client, targetProductNo, idempotencyKey, expectedQuote.payableUsdt, authorization);
     },
-    async submit(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote) {
+    async replayCapacityKeep(targetProductNo, idempotencyKey, expectedPayableUsdt, authorization) {
+      return sendCapacityKeep(client, targetProductNo, idempotencyKey, expectedPayableUsdt, authorization);
+    },
+    async submit(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote, authorization) {
       const key = idempotencyKey.trim();
       if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
       if (expectedQuote.sourceDeviceId !== sourceDeviceId
-          || expectedQuote.targetProductNo !== targetProductNo) {
+          || expectedQuote.targetProductNo !== targetProductNo
+          || !["ACTIVE", "INACTIVE"].includes(expectedQuote.targetDeviceStatus)) {
         throw new ApiError({ kind: "configuration", message: "TRADEIN_QUOTE_CONTEXT_INVALID" });
       }
-      return assertResultMatchesQuote(result(await client.request<unknown>({
+      return assertResultMatchesQuote(parseCanonicalTradeinResult(await client.request<unknown>({
         method: "POST",
         path: "/api/app/trade-in/submit",
+        retryAfterAuth: false,
         body: {
+          ...authorization,
           sourceDeviceId: integer(sourceDeviceId, 1),
+          expectedSourceVersion: integer(expectedQuote.sourceRowVersion),
           targetProductNo: validTargetNo(targetProductNo),
           expectedPayableUsdt: number(expectedQuote.payableUsdt),
           expectedDiscountUsdt: number(expectedQuote.discountUsdt),

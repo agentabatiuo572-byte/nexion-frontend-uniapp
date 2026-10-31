@@ -1,9 +1,11 @@
+import { paymentPinVI } from './payment-password';
 import { promotionVI } from "./promotion";
 import type { Messages } from "./en";
 
 // Vietnamese (Tiếng Việt) — professional yet friendly register (bạn). Keys mirror en.ts exactly.
 
 export const vi: Messages = {
+  paymentPin: paymentPinVI,
   promotion: promotionVI,
   inviteScan: {
     open: "Quét mã QR lời mời",
@@ -3665,6 +3667,7 @@ earningsMilestone: "Mốc thu nhập ${threshold}",
     saveShare: "Lưu & chia sẻ",
   },
   orders: {
+    statusInventory: "Thiết bị đã vào kho",
     title: "Đơn hàng của tôi",
     orderSummary: "Tóm tắt đơn hàng",
     orderIdLabel: "Mã đơn hàng",
@@ -6378,7 +6381,7 @@ openSeaErrorPool: {
     termsRecoveryCta: "Đọc và xác nhận điều khoản",
     segBank: "Chuyển khoản",
     amountLabel: "Số tiền nạp (USDT)",
-    amountFormatError: "Nhập số tiền dương dạng thập phân, tối đa 2 chữ số sau dấu chấm.",
+    amountFormatError: "Nhập số tiền gốc là số nguyên dương.",
     approx: "≈ {vnd}",
     limitError: "Nạp tối thiểu {min}, tối đa {max} mỗi lệnh",
     minimumLimitExceeded: "Số tiền nạp tối thiểu là {min}",

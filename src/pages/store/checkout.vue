@@ -312,6 +312,10 @@ import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
+import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
+import { paidOrderReceipt } from '@/api/order-api';
+import { parseTrialConvertReceipt } from '@/api/trial-api';
+import { parseCanonicalTradeinResult, purchasePrincipalUsdt } from '@/api/device-e3-api';
 import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
@@ -1229,7 +1233,18 @@ async function onConfirmPay() {
         step.value = "select-payment";
         return;
       }
-      const conversion = await freeTrial.convert(p.id, quotedTotal, trialQuote.quoteVersion);
+      let conversion = await freeTrial.convert(p.id, quotedTotal, trialQuote.quoteVersion);
+      if (conversion.reason === 'payment-required') {
+        const originalAmount = quotedTotal, originalVersion = trialQuote.quoteVersion;
+        const authorized = await executeSelectedPurchase({ amount: originalAmount, currency: 'USDT', summary: p.name },
+          authorization => freeTrial.convert(p.id, originalAmount, originalVersion, authorization),
+          () => isCurrentCheckoutRoute(confirmationScope) && originalAmount === netPrice.value + cardFee.value && originalVersion === trialView.value.quoteVersion,
+          { kind: 'TRIAL_CONVERT', payload: { productNo: p.id, expectedAmountUsdt: originalAmount, quoteVersion: originalVersion },
+            commandKey: () => freeTrial.conversionPaymentKey(p.id, originalAmount, originalVersion),
+            parseReceipt: async raw => { const receipt = parseTrialConvertReceipt(raw); const result = await freeTrial.convert(p.id, originalAmount, originalVersion); if (!result.ok || result.orderNo !== receipt.orderNo) throw new Error('TRIAL_CONVERT_RESULT_UNKNOWN'); return result; } });
+        if (!authorized) { confirming = false; return; }
+        conversion = authorized;
+      }
       if (!isCurrentCheckoutRoute(confirmationScope)) { confirming = false; return; }
       confirming = false;
       if (!conversion.ok || !conversion.orderNo) {
@@ -1519,11 +1534,6 @@ async function submitRemoteOrder(): Promise<void> {
     step.value = "select-payment";
     return;
   }
-  if (app.user.usdtBalance + 0.000001 < quotedTotal) {
-    confirming = false;
-    await offerWalletTopup(quotedTotal, submissionScope);
-    return;
-  }
   const eligibility = await refreshPurchaseEligibility(submissionScope);
   if (eligibility !== "eligible") {
     confirming = false;
@@ -1548,15 +1558,15 @@ async function submitRemoteOrder(): Promise<void> {
     }
     if (tradeinContext) {
       await completeVerifiedMutation({
-        submit: () => {
+        submit: async () => {
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           remoteTradeinRecoveryRequired.value = true;
-          return deviceE3Api.submit(
-            Number(tradeinContext.device.id),
-            p.id,
-            remoteOrderKey().replace("h7-order:", "e3-tradein:"),
-            tradein.appliedTradein!.canonicalQuote!,
-          );
+          const quote = tradein.appliedTradein!.canonicalQuote!, key = remoteOrderKey().replace('h7-order:', 'e3-tradein:');
+          const receipt = await executeSelectedPurchase({ amount: quote.payableUsdt, currency: 'USDT', summary: p.name },
+            authorization => deviceE3Api.submit(Number(tradeinContext.device.id), p.id, key, quote, authorization), scopeIsCurrent,
+            { kind: 'TRADE_IN', payload: { sourceDeviceId: quote.sourceDeviceId, expectedSourceVersion: quote.sourceRowVersion, targetProductNo: p.id, expectedPayableUsdt: quote.payableUsdt, expectedDiscountUsdt: quote.discountUsdt }, commandKey: () => key, parseReceipt: parseCanonicalTradeinResult });
+          if (!receipt) throw new Error('PURCHASE_SELECTION_CANCELLED');
+          return receipt;
         },
         readback: async (submitted) => {
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
@@ -1574,7 +1584,7 @@ async function submitRemoteOrder(): Promise<void> {
               || persisted.orderStatus.toUpperCase() !== "COMPLETED"
               || persisted.activationStatus.toUpperCase() !== "ACTIVATED"
               || typeof persisted.amountUsdt !== "number"
-              || Math.abs(persisted.amountUsdt - submitted.walletDebitUsdt) > 0.000001
+              || Math.abs(persisted.amountUsdt - purchasePrincipalUsdt(submitted)) > 0.000001
               || Math.abs(persisted.discountUsdt - submitted.discountUsdt) > 0.000001) {
             throw new Error("E3_TRADEIN_READBACK_MISMATCH");
           }
@@ -1656,7 +1666,10 @@ async function submitRemoteOrder(): Promise<void> {
     }
     if (alreadySettled) { await resumeServerOrder(submissionScope); return; }
     canonicalOrderCommitted = true;
-    const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
+    const paid = await executeSelectedPurchase({ amount: created.amountUsdt, currency: 'USDT', summary: p.name },
+      authorization => orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`, authorization), scopeIsCurrent,
+      { kind: 'ORDER_PAY', payload: { orderNo: created.orderNo }, commandKey: () => `wallet-pay:${created.orderNo}`, parseReceipt: paidOrderReceipt });
+    if (!paid) return;
     if (!scopeIsCurrent()) return;
     if (paid.orderNo !== created.orderNo) {
       throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");

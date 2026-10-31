@@ -47,6 +47,8 @@ export interface HttpDownloadRequest {
 }
 
 export interface ApiRequest {
+  /** Secret-bearing wallet commands must ask again after authentication. */
+  retryAfterAuth?: boolean;
   path: string;
   method?: HttpMethod;
   body?: unknown;
@@ -405,6 +407,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       if (terminalAuthFailure(apiError.status ?? 0, apiError.code, apiError.message)) {
         return terminateSession(sessionRevision, apiError.message, apiError.status ?? 403, apiError.code ?? 403);
       }
+      if (apiRequest.retryAfterAuth === false) throw apiError;
       const latest = options.vault.read();
       if (!session || !latest || latest.user.userId !== session.user.userId
           || (options.vault.revision() !== sessionRevision && !options.vault.isRefreshContinuation(sessionRevision))) {
