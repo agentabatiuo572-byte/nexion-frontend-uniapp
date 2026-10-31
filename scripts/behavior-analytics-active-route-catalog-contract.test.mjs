@@ -22,8 +22,8 @@ function manifestRoutes() {
   return pages.pages.filter(({ path }) => path !== "pages/tabs/tabs").map(({ path }) => `/${path}`).sort();
 }
 
-function catalogRoutes(sql) {
-  const active = new Map();
+function catalogRoutes(sql, existingRoutes = []) {
+  const active = new Map(existingRoutes.map((route) => [route, true]));
   for (const [statement] of sql.matchAll(/(?:INSERT INTO|UPDATE)\s+nx_behavior_page_catalog\b[\s\S]*?;/gi)) {
     if (/^INSERT/i.test(statement)) {
       assert.match(statement, /ON DUPLICATE KEY UPDATE[\s\S]*tracked=1[\s\S]*is_deleted=0/);
@@ -31,10 +31,10 @@ function catalogRoutes(sql) {
       assert.ok(rows.length > 0, "catalog inserts must expose their literal routes");
       for (const [, route] of rows) active.set(route, true);
     } else {
-      assert.match(statement, /SET tracked=0,is_deleted=0,[\s\S]*WHERE route IN \(/);
+      assert.match(statement, /SET\s+tracked=0,(?:is_deleted=0,)?[\s\S]*WHERE\s+(?:BINARY\s+)?route\s*(?:IN\s*\(|=)/i);
       for (const [, route] of statement.matchAll(/'(\/pages\/[^']+)'/g)) {
-        assert.ok(active.has(route), `retirement must retain an existing row: ${route}`);
-        active.set(route, false);
+        // UPDATE retires an existing historical row; it does not create one in a fresh catalog.
+        if (active.has(route)) active.set(route, false);
       }
     }
   }
@@ -45,6 +45,13 @@ test("every normalized UniApp business page route has one tracked backend catalo
   const migration = catalogMigrations().join("\n");
   assert.deepEqual(catalogRoutes(migration), manifestRoutes());
   assert.match(migration, /ON DUPLICATE KEY UPDATE[\s\S]*tracked=1[\s\S]*is_deleted=0/);
+});
+
+test("upgraded catalogs retire the KYC row from the original installed seed", { skip: backendMissing }, () => {
+  const legacy = readFileSync(resolve(backendRoot, "scripts/migrations/20260723_l6_behavior_analytics.sql"), "utf8");
+  const row = legacy.match(/^\('(\/pages\/me\/kyc)',[^\r\n]+,1,'pages-i18n-20260723',0\),?$/m);
+  assert.ok(row, "the historical fixture must come from the original tracked KYC seed");
+  assert.deepEqual(catalogRoutes(catalogMigrations().join("\n"), [row[1]]), manifestRoutes());
 });
 
 test("runtime route normalization accepts exactly the pages.json route form", () => {
