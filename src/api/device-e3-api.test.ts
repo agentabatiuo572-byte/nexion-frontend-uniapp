@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "./api-client";
-import { createDeviceE3Api } from "./device-e3-api";
+import { createDeviceE3Api, type CanonicalTradeinQuote, type CanonicalCapacityReplaceQuote } from "./device-e3-api";
 
 function client(payload: unknown): ApiClient {
   return {
@@ -9,6 +9,76 @@ function client(payload: unknown): ApiClient {
     refreshSession: vi.fn(),
   } as unknown as ApiClient;
 }
+
+describe("settled trade-in wallet receipt", () => {
+  const quote: CanonicalTradeinQuote = {
+    sourceDeviceId: 1156, sourceRowVersion: 1, targetProductNo: "stellarbox-pro-v2", targetDeviceStatus: "INACTIVE",
+    sourceProductName: "S1", targetProductId: 5, targetProductName: "Pro v2", sourceActualPaidUsdt: 1299,
+    cumulativeOutputUsdt: 0, outputRatioPct: 0, creditRatePct: 75, discountUsdt: 974.25, targetPriceUsdt: 2639,
+    payableUsdt: 1664.75, walletBalanceUsdt: 10302.12, walletShortfallUsdt: 0, sufficientFunds: true,
+    discountToWallet: false, pricingSource: "server",
+  };
+  const receipt = { tradeinNo: "TIN-C22", orderNo: "TIO-C22", sourceDeviceId: 1156, targetDeviceId: 1204,
+    applicationStatus: "COMPLETED", orderStatus: "COMPLETED", discountUsdt: 974.25,
+    walletDebitUsdt: 1664.75, walletBalanceAfterUsdt: 8637.443405, targetDeviceStatus: "INACTIVE" };
+  const keepQuote: CanonicalCapacityReplaceQuote = { decision: "REPLACE_REQUIRED", activeDevices: 6, maxActiveDevices: 6,
+    sourceDeviceId: 1156, sourceDeviceName: "S1", targetProductId: 5, targetProductNo: quote.targetProductNo,
+    targetProductName: "Pro v2", targetPriceUsdt: 2639, payableUsdt: 2639, walletBalanceUsdt: 10302.12,
+    sufficientFunds: true, decisionSource: "server" };
+  const keepReceipt = { operationNo: "KEEP-C22", orderNo: "ORD-C22", targetDeviceId: 1204,
+    deviceStatus: "ACTIVE", orderStatus: "COMPLETED", walletDebitUsdt: 2639, walletBalanceAfterUsdt: 7663.193405 };
+  const availableKeepQuote: CanonicalCapacityReplaceQuote = { ...keepQuote, decision: "CAPACITY_AVAILABLE", activeDevices: 5 };
+  it("rejects a full-capacity KEEP before sending a purchase command", async () => {
+    const transport = client(keepReceipt);
+    await expect(createDeviceE3Api(transport, "dev").capacityKeep(quote.targetProductNo, "full-keep", keepQuote)).rejects.toBeDefined();
+    expect(transport.request).not.toHaveBeenCalled();
+  });
+
+  it.each([8637.443405, 8000, 0])("accepts authoritative RETIRE balance %s after other wallet activity and on same-key replay", async walletBalanceAfterUsdt => {
+    const response = { ...receipt, walletBalanceAfterUsdt };
+    const api = createDeviceE3Api(client(response), "dev");
+    for (let replay = 0; replay < 2; replay++) await expect(api.submit(1156, quote.targetProductNo, "original-c22-key", quote))
+      .resolves.toEqual(response);
+  });
+  it("accepts an authoritative KEEP balance after other wallet activity", async () => {
+    await expect(createDeviceE3Api(client(keepReceipt), "dev").capacityKeep(quote.targetProductNo, "original-keep-key", availableKeepQuote))
+      .resolves.toEqual(keepReceipt);
+  });
+  it("replays a persisted legacy KEEP key with its original payable instead of requiring a fresh quote", async () => {
+    const transport = client(keepReceipt);
+    await expect(createDeviceE3Api(transport, "dev").replayCapacityKeep(quote.targetProductNo, "legacy-keep-key", 2639))
+      .resolves.toEqual(keepReceipt);
+    expect(transport.request).toHaveBeenCalledExactlyOnceWith({ method: "POST", path: "/api/app/trade-in/capacity-keep",
+      retryAfterAuth: false, body: { targetProductNo: quote.targetProductNo, expectedPayableUsdt: 2639 }, idempotencyKey: "legacy-keep-key" });
+  });
+  it("sends fresh PIN authorization once with the frozen legacy KEEP payload", async () => {
+    const transport=client(keepReceipt),authorization={paymentPassword:'039417',credentialVersion:2,attemptNo:'fresh-attempt'};
+    await createDeviceE3Api(transport,'dev').replayCapacityKeep(quote.targetProductNo,'legacy-keep-key',2639,authorization);
+    expect(transport.request).toHaveBeenCalledExactlyOnceWith({method:'POST',path:'/api/app/trade-in/capacity-keep',
+      retryAfterAuth:false,body:{...authorization,targetProductNo:quote.targetProductNo,expectedPayableUsdt:2639},idempotencyKey:'legacy-keep-key'});
+  });
+  it("accepts an authoritative replacement balance while retaining the quoted debit and zero discount", async () => {
+    const response = { ...receipt, targetDeviceStatus: "ACTIVE", discountUsdt: 0, walletDebitUsdt: keepQuote.payableUsdt };
+    await expect(createDeviceE3Api(client(response), "dev").capacityReplace(1156, quote.targetProductNo, "original-replace-key", keepQuote))
+      .resolves.toEqual(response);
+  });
+  it.each([-1, NaN, Infinity, "8637.443405"])("rejects invalid authoritative wallet balance %s", async walletBalanceAfterUsdt => {
+    await expect(createDeviceE3Api(client({ ...receipt, walletBalanceAfterUsdt }), "dev")
+      .submit(1156, quote.targetProductNo, "original-c22-key", quote)).rejects.toBeDefined();
+    await expect(createDeviceE3Api(client({ ...keepReceipt, walletBalanceAfterUsdt }), "dev")
+      .capacityKeep(quote.targetProductNo, "original-keep-key", availableKeepQuote)).rejects.toBeDefined();
+  });
+  it.each([{ sourceDeviceId: 999 }, { targetDeviceStatus: "ACTIVE" }, { walletDebitUsdt: 1664.76 },
+    { discountUsdt: 974.26 }, { applicationStatus: "PENDING" }, { orderStatus: "PENDING" }])("retains RETIRE identity, placement, amount and completion checks: %j", async changed => {
+    await expect(createDeviceE3Api(client({ ...receipt, ...changed }), "dev")
+      .submit(1156, quote.targetProductNo, "original-c22-key", quote)).rejects.toBeDefined();
+  });
+  it("retains KEEP debit and activation checks", async () => {
+    for (const changed of [{ walletDebitUsdt: 2638 }, { deviceStatus: "INACTIVE" }]) await expect(
+      createDeviceE3Api(client({ ...keepReceipt, ...changed }), "dev").capacityKeep(quote.targetProductNo, "original-keep-key", availableKeepQuote),
+    ).rejects.toBeDefined();
+  });
+});
 
 describe("device E3 eligibility API", () => {
   function fleetPayload(capacityPct: number) {
@@ -39,6 +109,16 @@ describe("device E3 eligibility API", () => {
     };
   }
 
+  it("retains authoritative order and trial capacity without creating devices", async () => {
+    const parsed = await createDeviceE3Api(client({ ...fleetPayload(100), slotsUsed: 6, reservedSlotCount: 4, trialSlotCount: 1 }), "dev").fleet();
+    expect(parsed).toMatchObject({ slotsUsed: 6, reservedSlotCount: 4, trialSlotCount: 1 });
+    expect(parsed.devices).toHaveLength(1);
+    expect((await createDeviceE3Api(client(fleetPayload(100)), "dev").fleet()).slotsUsed).toBeUndefined();
+  });
+  it.each([null, -1, 1.5, "6", Infinity])("rejects malformed authoritative slot usage %s", async slotsUsed => {
+    await expect(createDeviceE3Api(client({ ...fleetPayload(100), slotsUsed }), "dev").fleet()).rejects.toBeDefined();
+  });
+
   it.each([[-0.0001, "below zero"], [100.0001, "above one hundred"]] as const)(
     "rejects E3 capacityPct %s (%s) instead of accepting an impossible projection",
     async (capacityPct) => {
@@ -46,6 +126,17 @@ describe("device E3 eligibility API", () => {
       await expect(api.fleet()).rejects.toMatchObject({ message: "E3_CANONICAL_RESPONSE_INVALID" });
     },
   );
+
+  it("retains authoritative reservations and over-capacity totals while older servers stay unspecified", async () => {
+    const payload = { ...fleetPayload(100), slotsUsed: 8, reservedSlotCount: 3, trialSlotCount: 1 };
+    await expect(createDeviceE3Api(client(payload), "dev").fleet()).resolves.toMatchObject({
+      slotCap: 6, slotsUsed: 8, reservedSlotCount: 3, trialSlotCount: 1,
+    });
+    expect((await createDeviceE3Api(client(fleetPayload(100)), "dev").fleet()).slotsUsed).toBeUndefined();
+    for (const value of [-1, 1.5, "6", Infinity]) {
+      await expect(createDeviceE3Api(client({ ...payload, slotsUsed: value }), "dev").fleet()).rejects.toBeDefined();
+    }
+  });
 
   it("accepts the Java canonical fleet in development mode", async () => {
     const api = createDeviceE3Api(client(fleetPayload(66.5)), "dev");

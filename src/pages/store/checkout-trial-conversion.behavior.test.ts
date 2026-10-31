@@ -44,7 +44,7 @@ describe("real trial checkout refusal and recovery feedback", () => {
     const h = harness(); h.freeTrial.convert.mockResolvedValue({ ok: false, reason: "insufficient-funds" });
     await h.pay();
     expect(h.freeTrial.convert).toHaveBeenCalledOnce();
-    expect(h.freeTrial.convert).toHaveBeenCalledWith("stellarbox-s1", 1247.73);
+    expect(h.freeTrial.convert).toHaveBeenCalledWith("stellarbox-s1", 1247.73, undefined);
     expect(h.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: en.errors.insufficientBalanceTitle,
       message: en.errors.insufficientBalanceMsg, confirmLabel: en.me.topup }));
     expect(h.navTo).toHaveBeenCalledWith("/pages/me/wallet-topup");

@@ -53,6 +53,7 @@ function isUsableNavigationHref(href: unknown): href is string {
 export function toUniRoute(href: string): { url: string; tab: boolean } {
   const qi = href.indexOf("?");
   const path = qi >= 0 ? href.slice(0, qi) : href;
+  if (path === "/me/payment-password") return { url: "/pages/me/payment-password" + (qi >= 0 ? href.slice(qi) : ""), tab: false };
   const query = qi >= 0 ? href.slice(qi) : "";
   // Already a uni route → pass through, while still recognizing real tab roots.
   // Calling navigateTo for a tabBar page fails on App/mini-program runtimes.

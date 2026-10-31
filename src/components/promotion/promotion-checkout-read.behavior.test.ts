@@ -35,7 +35,7 @@ function screen(stored?:PromotionCheckoutRecord){
   let rows:Record<string,PromotionCheckoutRecord>=stored?{[intent]:structuredClone(stored)}:{};
   let writable=true;
   const save=vi.fn((_table:string,_account:string,value:Record<string,PromotionCheckoutRecord>)=>{if(!writable)return false;rows=structuredClone(value);return true;});
-  const api={quote:vi.fn().mockResolvedValue(quote()),get:vi.fn().mockResolvedValue(activity()),create:vi.fn().mockResolvedValue(receipt()),pay:vi.fn().mockResolvedValue({...receipt(),paymentStatus:'PAID',orderStatus:'COMPLETED'}),cancel:vi.fn(),command:vi.fn().mockResolvedValue({status:'PROCESSING',order:null}),findOrder:vi.fn().mockResolvedValue(receipt())};
+  const api={quote:vi.fn().mockResolvedValue(quote()),get:vi.fn().mockResolvedValue(activity()),create:vi.fn().mockResolvedValue(receipt()),pay:vi.fn().mockResolvedValue({...receipt(),paymentStatus:'PAID',orderStatus:'COMPLETED'}),cancel:vi.fn(),command:vi.fn().mockResolvedValue({status:'PROCESSING',order:null}),paymentCommand:vi.fn().mockResolvedValue({status:'PROCESSING',canResumeSameKey:false}),findOrder:vi.fn().mockResolvedValue(receipt())};
   const app=Vue.reactive({accountKey:'user:7',accountBindingEpoch:1,remoteFleetHasSnapshot:true,user:{usdtBalance:150}});
   const mounted:Array<()=>Promise<void>>=[],unmounted:Array<()=>void>=[],guardDisposal=vi.fn(),guardRegistration=vi.fn(()=>guardDisposal);
   const key=vi.fn(()=> 'original-key'),fleet=vi.fn().mockResolvedValue({serverNow:Date.parse(serverTime)});
@@ -43,6 +43,8 @@ function screen(stored?:PromotionCheckoutRecord){
   vi.stubGlobal('setInterval',vi.fn(()=>0));vi.stubGlobal('clearInterval',vi.fn());
   const confirm=vi.fn().mockResolvedValue(false),clearConfirmsBy=vi.fn();
   const modules:Record<string,unknown>={
+    '@/lib/selected-purchase-payment':{executeSelectedPurchase:async(_context:unknown,command:(authorization:unknown)=>Promise<unknown>,current:()=>boolean)=>current()?command({paymentPassword:'039417',credentialVersion:1,attemptNo:'fixture-attempt'}):null},
+    '@/api/promotion-api':{parsePromotedOrder:(raw:unknown)=>raw},
     '@/lib/amount-display':{formatAmount},
     '@/i18n/format':{fmt},
     vue:{...Vue,onMounted:(fn:()=>Promise<void>)=>mounted.push(fn),onBeforeUnmount:(fn:()=>void)=>unmounted.push(fn)},
@@ -78,7 +80,7 @@ it('payment confirmation cancels without a command, then an explicit acceptance 
   const decision=deferred<boolean>();page.confirm.mockReturnValueOnce(decision.promise);
   const pending=page.view.pay();await page.view.pay();expect(page.confirm).toHaveBeenCalledTimes(2);
   decision.resolve(true);await pending;expect(page.api.pay).toHaveBeenCalledOnce();
-  expect(page.api.pay).toHaveBeenCalledWith('o1','original-key');expect(page.saved().order?.paymentStatus).toBe('PAID');
+  expect(page.api.pay).toHaveBeenCalledWith('o1','original-key',{paymentPassword:'039417',credentialVersion:1,attemptNo:'fixture-attempt'});expect(page.saved().order?.paymentStatus).toBe('PAID');
 });
 it.each(['hide','account','expired'] as const)('a delayed payment confirmation after %s does not pay',async change=>{
   const page=screen({quote:quote(),order:receipt(),pending:null});await page.start();
@@ -146,12 +148,15 @@ it('a confirmed original order remains intact on hide and show reads the same re
   page.exposed.show();await flush();expect(page.api.findOrder).toHaveBeenLastCalledWith('o1');expect(page.view.session.confirmed).toBe(true);expect(page.view.canPay.value).toBe(true);
   expect(page.api.quote).not.toHaveBeenCalled();expect(page.api.get).not.toHaveBeenCalled();expect(page.api.pay).not.toHaveBeenCalled();
 });
-it.each(['createOrder','payOrder','cancelOrder'] as const)('hide/show preserves the original %s body/key and NOT_FOUND recovery path',async operation=>{
+it.each(['createOrder','payOrder','cancelOrder'] as const)('hide/show preserves the original %s body/key and its authorized recovery path',async operation=>{
   const q=quote(),order=operation==='createOrder'?null:receipt(q),pending={operation,key:'original-key',targetId:order?.orderNo??q.quoteId};
-  const page=screen({quote:q,order,pending});page.api.command.mockResolvedValue({status:'NOT_FOUND',order:null});await page.start();
+  const page=screen({quote:q,order,pending});page.api.command.mockResolvedValue({status:'NOT_FOUND',order:null});
+  page.api.paymentCommand.mockResolvedValue({status:'NOT_SEEN',canResumeSameKey:true});await page.start();
   expect(page.view.session.retryOriginal).toBe(true);const before=structuredClone(page.view.session.record);page.exposed.hide();
   expect(page.view.session.record).toEqual(before);expect(page.saved()).toEqual(before);
-  page.exposed.show();await flush();expect(page.api.command).toHaveBeenLastCalledWith('original-key',operation,pending.targetId);
+  page.exposed.show();await flush();
+  if(operation==='payOrder'){expect(page.api.paymentCommand).toHaveBeenLastCalledWith('original-key');expect(page.api.command).not.toHaveBeenCalled();}
+  else expect(page.api.command).toHaveBeenLastCalledWith('original-key',operation,pending.targetId);
   expect(page.view.session.record.pending).toEqual(pending);expect(page.view.session.record.quote).toEqual(q);expect(page.view.session.retryOriginal).toBe(true);
   expect(page.api.quote).not.toHaveBeenCalled();expect(page.api.create).not.toHaveBeenCalled();expect(page.api.pay).not.toHaveBeenCalled();expect(page.api.cancel).not.toHaveBeenCalled();
   if(operation==='createOrder'){await page.view.createOrder();expect(page.api.create).toHaveBeenCalledWith(q,'original-key',null);expect(page.key).not.toHaveBeenCalled();}

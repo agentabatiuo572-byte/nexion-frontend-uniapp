@@ -19,8 +19,10 @@ import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { createAccountRowCommit } from "./account-scoped-storage";
+import { beginOrderAction,clearOrderAction,readOrderAction } from '@/lib/order-command-fence';
+import { asApiError,isSettledRejection } from '@/api/errors';
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
-import type { CanonicalOrder, CanonicalOrderStatus, OrderRefundReasonCode } from "@/api/order-api";
+import type { CanonicalOrder, CanonicalOrderStatus, OrderCloseReasonCode, OrderRefundReasonCode } from "@/api/order-api";
 import type { OrderLineItem } from "@/lib/order-line-items";
 import {
   captureRuntimeRevision,
@@ -75,6 +77,7 @@ export interface Order {
   refundChannel?: string;
   refundBillNo?: string;
   refundReasonCode?: OrderRefundReasonCode;
+  closeReasonCode?: OrderCloseReasonCode;
   timeline: OrderTimelineEvent[];
   deviceId?: string;        // the spawned device id once activated
   /** Canonical server data-center; null means the location is not known. */
@@ -248,14 +251,14 @@ export const useOrders = defineStore("orders", () => {
       ...(row.refundChannel != null && { refundChannel: row.refundChannel }),
       ...(row.refundBillNo != null && { refundBillNo: row.refundBillNo }),
       ...(row.refundReasonCode != null && { refundReasonCode: row.refundReasonCode }),
+      ...(row.closeReasonCode != null && { closeReasonCode: row.closeReasonCode }),
       ...(row.targetDeviceId != null && { deviceId: String(row.targetDeviceId) }),
       timeline,
       dataCenter: row.dataCenter,
     };
   }
 
-  async function refreshRemote(): Promise<void> {
-    if (!remoteApiEnabled) return;
+  async function refreshRemote(): Promise<void> {    if (!remoteApiEnabled) return;
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
     const requestGeneration = ++refreshGeneration;
@@ -331,18 +334,26 @@ export const useOrders = defineStore("orders", () => {
     const requestRunScope = captureRuntimeRevision();
     const isCurrent = () => boundKey === requestBoundKey && boundEpoch === requestEpoch
       && isCurrentRuntimeRevision(requestRunScope);
+    const prior=readOrderAction(requestBoundKey,id);
+    if (prior?.kind==='pay') return false;
     try {
-      await orderApi.cancel(id, `order-cancel:${id}`);
+      const action=beginOrderAction(requestBoundKey,'cancel',id,null);
+      await orderApi.cancel(id, action.key);
       if (!isCurrent()) return false;
       await ensureRemoteOrder(id);
       if (!isCurrent()) return false;
+      if (orders.value.some(item=>item.id===id&&item.status!=='placed')) clearOrderAction(requestBoundKey,id,action.key);
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
-    } catch {
+    } catch (error) {
       if (!isCurrent()) return false;
       // The command may have committed before the response was lost. Read-back is
       // the only safe result for the UI; never project a local cancellation.
       try { await ensureRemoteOrder(id); } catch { return false; }
       if (!isCurrent()) return false;
+      const latest=orders.value.find(item=>item.id===id),failure=asApiError(error);
+      if (latest && (latest.status!=='placed' || (isSettledRejection(error)
+          && !failure.message.startsWith('IDEMPOTENCY_') && (failure.status??0)<500)))
+        clearOrderAction(requestBoundKey,id,`order-cancel:${id}`);
       return orders.value.some((item) => item.id === id && item.status === "cancelled");
     }
   }

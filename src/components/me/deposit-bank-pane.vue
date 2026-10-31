@@ -44,7 +44,7 @@
               class="flex-1 min-w-0 tabular-nums"
               :style="amountInputStyle"
               type="text"
-              inputmode="decimal"
+              inputmode="numeric"
               :value="amount"
               placeholder="0.00"
               :disabled="creating || !fxUsable || dailyCapacityExhausted"
@@ -463,9 +463,9 @@ function onAmount(e: Event) {
   // 保留原输入；非法符号或超精度必须提示，不能静默变成另一笔金额。
   amount.value = (e as unknown as { detail?: { value?: string } }).detail?.value ?? "";
 }
-// 沿用两位充值精度，允许普通十进制编辑态「25.」和「.5」。
-const amountValid = computed(() => /^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(amount.value)
-  && Number.isFinite(Number(amount.value)));
+// Recharge principal is a positive integer; direct purchase payments keep decimal amounts.
+const amountValid = computed(() => /^[1-9]\d*$/.test(amount.value)
+  && Number.isSafeInteger(Number(amount.value)));
 const amountNum = computed(() => amountValid.value ? Number(amount.value) : 0);
 const minDeposit = computed(() => remoteApiEnabled ? fx.minDepositUsdt : MIN_DEPOSIT_USDT);
 const maxDeposit = computed(() => remoteApiEnabled ? fx.maxDepositUsdt : BANK_MAX_DEPOSIT_USDT);
@@ -548,7 +548,7 @@ watch(() => app.accountBindingEpoch, () => {
 let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
-  if ((presetUsdt === undefined && !amountValid.value) || !Number.isFinite(usdt)
+  if ((presetUsdt === undefined && !amountValid.value) || !Number.isSafeInteger(usdt)
     || creating.value || !fxUsable.value || usdt < minDeposit.value
     || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
@@ -680,10 +680,15 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       // 曾仍传 "VIETQR_CREATE_FAILED",lib 改版后它从「极端边界才漏出」变成「每次失败必弹」。
     }, t.value.bankPane.createFailedNote);
 }
-/** 拒绝/过期态显式重试保留原金额；命令键与最终结果仍由 store 决定。 */
+/** 整数金额可显式重建；历史小数单保留原快照并返回整数输入。 */
 function regen() {
   const it = intent.value;
   if (!it) return;
+  if (!Number.isSafeInteger(it.usdtAmount)) {
+    startNewTopup(); amount.value = "";
+    createError.value = t.value.bankPane.amountFormatError;
+    return;
+  }
   createOrder(it.usdtAmount);
 }
 async function finishCreditedFlow() {

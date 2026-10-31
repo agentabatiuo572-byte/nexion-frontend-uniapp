@@ -328,6 +328,7 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
       { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
       { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value === null ? "—" : twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value === null ? "muted" : twoFactorEnabled.value ? "muted" : "orange" },
+      { key: "payment-password", label: t.value.paymentPin.title, href: "/me/payment-password", icon: "lock", meta: t.value.paymentPin.purpose, tone: "muted" },
     ],
   },
   {

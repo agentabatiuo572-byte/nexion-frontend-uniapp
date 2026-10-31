@@ -1,9 +1,11 @@
+import { paymentPinZH } from './payment-password';
 import { promotionZH } from "./promotion";
 import type { Messages } from "./en";
 
 // Simplified Chinese — natural Mandarin phrasing. Keys mirror en.ts exactly.
 
 export const zh: Messages = {
+  paymentPin: paymentPinZH,
   promotion: promotionZH,
   inviteScan: {
     open: "扫描邀请二维码",
@@ -3692,6 +3694,7 @@ earningsMilestone: "收益里程碑 ${threshold}",
     saveShare: "保存并分享",
   },
   orders: {
+    statusInventory: "设备已入仓库",
     title: "我的订单",
     orderSummary: "订单摘要",
     orderIdLabel: "订单编号",
@@ -6370,7 +6373,7 @@ openSeaErrorPool: {
     termsRecoveryCta: "阅读并确认条款",
     segBank: "银行转账",
     amountLabel: "充值金额(USDT)",
-    amountFormatError: "请输入正数金额，最多两位小数。",
+    amountFormatError: "请输入正整数充值本金。",
     approx: "≈ {vnd}",
     limitError: "最低充值 {min},单笔上限 {max}",
     minimumLimitExceeded: "最低充值 {min}",

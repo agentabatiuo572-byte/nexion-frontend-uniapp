@@ -155,7 +155,7 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); vi.spyOn(console, 
 afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("mounted bank top-up amount", () => {
-  it.each(["0x20", "-20", "+20", "2e1", "20USD", "20.1.2", "25.123", " 20", "20 ", "20,50", "２０"])(
+  it.each(["0x20", "-20", "+20", "2e1", "20USD", "20.1.2", "25.123", " 20", "20 ", "20,50", "２０", "25.", "25.1", "0025.12", "25.12", "0"] )(
     "keeps invalid input visible, clears the numeric preview and blocks creation: %s", async amount => {
       const pane = await mount(); await pane.enter(amount);
       expect(pane.input().props.value).toBe(amount);
@@ -164,9 +164,8 @@ describe("mounted bank top-up amount", () => {
       await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
     });
 
-  it.each([["10", "263900.00₫"], ["100", "2639000.00₫"], ["25", "659750.00₫"],
-    ["25.", "659750.00₫"], ["25.1", "662389.00₫"], ["25.12", "662917.00₫"], ["0025.12", "662917.00₫"]])(
-    "uses the visible legal decimal for the preview and local mocked create argument: %s", async (amount, vnd) => {
+  it.each([["10", "263900.00₫"], ["100", "2639000.00₫"], ["25", "659750.00₫"]])(
+    "uses the visible positive integer for the preview and local mocked create argument: %s", async (amount, vnd) => {
       const pane = await mount(); await pane.enter(amount);
       expect(pane.input().props.value).toBe(amount);
       expect(pane.text()).toContain(fmt(en.bankPane.approx, { vnd }));
@@ -182,11 +181,11 @@ describe("mounted bank top-up amount", () => {
     await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
   });
 
-  it("keeps the existing leading-dot decimal edit and its minimum limit", async () => {
+  it("rejects the leading-dot fraction without creating an order", async () => {
     const pane = await mount(); await pane.enter(".5");
     expect(pane.input().props.value).toBe(".5");
-    expect(pane.text()).toContain(fmt(en.bankPane.approx, { vnd: "13195.00₫" }));
-    expect(pane.text()).toContain(fmt(en.bankPane.minimumLimitExceeded, { min: "$10.00" }));
+    expect(pane.text()).toContain(fmt(en.bankPane.approx, { vnd: "—" }));
+    expect(pane.text()).toContain(en.bankPane.amountFormatError);
     await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
   });
 
@@ -197,30 +196,30 @@ describe("mounted bank top-up amount", () => {
   });
 
   it("holds the submitted visible amount while generation is in progress", async () => {
-    const pane = await mount(); await pane.enter("25.12");
+    const pane = await mount(); await pane.enter("25");
     pane.control("nx-bank-create-cta").props.onClick(); await Vue.nextTick();
     expect(pane.input().props.disabled).toBe(true);
-    await pane.enter("-20"); expect(pane.input().props.value).toBe("25.12");
+    await pane.enter("-20"); expect(pane.input().props.value).toBe("25");
     await vi.advanceTimersByTimeAsync(600); await flush();
-    expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(25.12, accountKey);
+    expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(25, accountKey);
   });
 
   it("holds the amount during a delayed local transport and restores editing and the same retry key after failure", async () => {
     const pane = await mount(); let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; }), requests = localTransport(pane.dep, [503, 200], gate);
-    await pane.enter("25.12"); pane.control("nx-bank-create-cta").props.onClick();
+    await pane.enter("25"); pane.control("nx-bank-create-cta").props.onClick();
     await vi.advanceTimersByTimeAsync(600); await flush();
     expect(requests).toHaveBeenCalledTimes(1); expect(pane.input().props.disabled).toBe(true);
-    await pane.enter("-20"); expect(pane.input().props.value).toBe("25.12");
+    await pane.enter("-20"); expect(pane.input().props.value).toBe("25");
     release(); await vi.waitFor(() => expect(pane.input().props.disabled).toBe(false));
     expect(pane.text()).toContain(en.bankPane.createFailedNote);
-    await pane.enter("25.13"); expect(pane.input().props.value).toBe("25.13"); await pane.enter("25.12");
+    await pane.enter("26"); expect(pane.input().props.value).toBe("26"); await pane.enter("25");
     await pane.click(); expect(requests).toHaveBeenCalledTimes(2);
     const [first, retry] = requests.mock.calls.map(([request]) => request);
-    expect(first.body).toEqual({ usdtAmount: 25.12 }); expect(retry.body).toEqual(first.body);
+    expect(first.body).toEqual({ usdtAmount: 25 }); expect(retry.body).toEqual(first.body);
     expect(first.headers["Idempotency-Key"]).toBeTruthy();
     expect(retry.headers["Idempotency-Key"]).toBe(first.headers["Idempotency-Key"]);
-    expect(pane.dep.intents[0].usdtAmount).toBe(25.12);
+    expect(pane.dep.intents[0].usdtAmount).toBe(25);
   });
 
   it("never reaches the production create method or local transport for illegal input", async () => {
@@ -231,25 +230,26 @@ describe("mounted bank top-up amount", () => {
     expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled(); expect(requests).not.toHaveBeenCalled();
   });
 
-  it("sends the existing rejected order's original amount through the production method and local transport", async () => {
+  it("preserves the historical fractional snapshot without submitting a replacement", async () => {
     const original = { ...payment(37.12), paymentMode: "hosted" as const, providerStatus: "rejected" as const };
     const pane = await mount(en, original), requests = localTransport(pane.dep);
     await pane.click("nx-bank-regen-cta");
-    expect(requests).toHaveBeenCalledTimes(1); expect(requests.mock.calls[0][0].body).toEqual({ usdtAmount: 37.12 });
-    expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(37.12, accountKey);
+    expect(requests).not.toHaveBeenCalled(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+    expect(pane.dep.intents[0]).toEqual(original); expect(pane.input().props.value).toBe("");
+    expect(pane.text()).toContain(en.bankPane.amountFormatError);
   });
 
   it("recovers from an invalid edit without retaining its stripped amount", async () => {
     const pane = await mount(); await pane.enter("-20"); await pane.click();
-    expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled(); await pane.enter("25.12");
-    await pane.click(); expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(25.12, accountKey);
+    expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled(); await pane.enter("25");
+    await pane.click(); expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(25, accountKey);
   });
 
   it.each([zh, en, vietnamese])("retains translated limits and blocks out-of-range decimals (%#)", async messages => {
     const pane = await mount(messages);
-    for (const [amount, error] of [["9.99", fmt(messages.bankPane.minimumLimitExceeded, { min: "$10.00" })],
-      ["5000.01", fmt(messages.bankPane.singleLimitExceeded, { max: "$5000.00" })],
-      ["100.01", fmt(messages.bankPane.dailyCapacityExceeded, { max: "$100.00" })]]) {
+    for (const [amount, error] of [["9", fmt(messages.bankPane.minimumLimitExceeded, { min: "$10.00" })],
+      ["5001", fmt(messages.bankPane.singleLimitExceeded, { max: "$5000.00" })],
+      ["101", fmt(messages.bankPane.dailyCapacityExceeded, { max: "$100.00" })]]) {
       await pane.enter(amount); expect(pane.input().props.value).toBe(amount); expect(pane.text()).toContain(error);
       expect(pane.control("nx-bank-create-cta").props["aria-disabled"]).toBe(true); await pane.click();
     }
@@ -258,16 +258,16 @@ describe("mounted bank top-up amount", () => {
 
   it("keeps the amount across a failed local mocked create and explicit form retry", async () => {
     const pane = await mount(); pane.dep.createRemoteBankIntent.mockRejectedValueOnce(new Error("LOCAL_ONLY_FAILURE"));
-    await pane.enter("25.12"); await pane.click();
-    expect(pane.input().props.value).toBe("25.12"); expect(pane.text()).toContain(en.bankPane.createFailedNote);
+    await pane.enter("25"); await pane.click();
+    expect(pane.input().props.value).toBe("25"); expect(pane.text()).toContain(en.bankPane.createFailedNote);
     expect(pane.control("nx-bank-create-cta").props["aria-disabled"]).toBe(false);
-    await pane.click(); expect(pane.dep.createRemoteBankIntent.mock.calls).toEqual([[25.12, accountKey], [25.12, accountKey]]);
+    await pane.click(); expect(pane.dep.createRemoteBankIntent.mock.calls).toEqual([[25, accountKey], [25, accountKey]]);
   });
 
-  it("keeps an existing rejected order's original amount on explicit retry", async () => {
-    const original = { ...payment(37.12), paymentMode: "hosted" as const, providerStatus: "rejected" as const };
+  it("keeps an existing integer order's original amount on explicit retry", async () => {
+    const original = { ...payment(37), paymentMode: "hosted" as const, providerStatus: "rejected" as const };
     const pane = await mount(en, original); await pane.click("nx-bank-regen-cta");
-    expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(37.12, accountKey);
+    expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(37, accountKey);
   });
 
   it.each([zh, en, vietnamese])("explains illegal syntax and excess precision in the active locale (%#)", async messages => {

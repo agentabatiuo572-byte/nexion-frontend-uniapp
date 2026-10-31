@@ -1,8 +1,10 @@
+import { paymentPinEN } from './payment-password';
 import { promotionEN } from "./promotion";
 // English message dictionary — the source of truth for all keys.
 // Messages type is exported so other locales must match its shape.
 
 export const en = {
+  paymentPin: paymentPinEN,
   promotion: promotionEN,
   inviteScan: {
     open: "Scan an invitation QR code",
@@ -3792,6 +3794,7 @@ earningsMilestone: "Earnings milestone ${threshold}",
     saveShare: "Save & Share",
   },
   orders: {
+    statusInventory: "Device in inventory",
     title: "My Orders",
     orderSummary: "Order summary",
     orderIdLabel: "Order ID",
@@ -6531,7 +6534,7 @@ openSeaErrorPool: {
     termsRecoveryCta: "Read and acknowledge terms",
     segBank: "Bank transfer",
     amountLabel: "Top-up amount (USDT)",
-    amountFormatError: "Enter a positive decimal amount with up to 2 decimal places.",
+    amountFormatError: "Enter a positive whole-number principal amount.",
     approx: "≈ {vnd}",
     limitError: "Minimum {min} · maximum {max} per order",
     minimumLimitExceeded: "Minimum top-up {min}",

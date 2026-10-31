@@ -73,6 +73,8 @@ import type { LocalizedText,RewardDisclosure } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
 import { useVoucher } from '@/store/voucher';
 import { asApiError } from '@/api/errors';
+import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
+import { parsePromotedOrder } from '@/api/promotion-api';
 import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
 import { navTo,navBack } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
 import { fmt } from '@/i18n/format';
@@ -146,6 +148,7 @@ async function pay(){
   const expectedOrder=order.value,generation=readGeneration;
   if(!expectedOrder)return;
   const {orderNo,amountUsdt}=expectedOrder;
+  if (typeof amountUsdt !== 'string' && typeof amountUsdt !== 'number') return;
   paymentConfirming=true;
   try{
     const accepted=await confirm({
@@ -155,7 +158,13 @@ async function pay(){
     });
     updateClock();
     if(!accepted||!readCurrent(generation)||!canPay.value||order.value?.orderNo!==orderNo||order.value?.amountUsdt!==amountUsdt)return;
-    await run(()=>session.pay());
+    await run(async () => {
+      await executeSelectedPurchase({ amount: amountUsdt, currency: 'USDT', summary: t.value.store.coConfirmPurchase },
+        async authorization => { await session.pay(authorization); return true; },
+        () => readCurrent(generation) && order.value?.orderNo === orderNo && order.value?.amountUsdt === amountUsdt,
+        { kind: 'ORDER_PAY', payload: { orderNo }, commandKey: () => session.externalPaymentKey(),
+          parseReceipt: async raw => { parsePromotedOrder(raw); await session.acceptExternalPayment(raw); return true; } });
+    });
   }finally{paymentConfirming=false;}
 }
 async function recover(){await run(async()=>{await session.recover();if(!current())return;revision.value++;await loadOrderClock();});}

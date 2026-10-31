@@ -222,6 +222,8 @@ import { quoteBundleAmountUsdt } from "@/api/bundle-quote";
 import { restoreBundleCommand, type PendingBundleCommand } from "@/api/bundle-command";
 import type { BundleDiscountSnapshot } from "@/api/bundle-discount-api";
 import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
+import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
+import { paidOrderReceipt } from '@/api/order-api';
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -562,10 +564,6 @@ async function onCheckout() {
         return;
       }
       const command = acquireBundleCommand(list, accountKey, quotedTotal);
-      if (app.user.usdtBalance + 0.000001 < command.expectedAmountUsdt) {
-        await offerBundleWalletTopup(command.expectedAmountUsdt);
-        return;
-      }
       let canonicalOrderCommitted = false;
       let paymentConfirmed = false;
       let confirmedOrderNo = "";
@@ -579,7 +577,10 @@ async function onCheckout() {
         if (!matchesBundleQuote(created, command.productNos, command.expectedAmountUsdt)) {
           throw new ApiError({ kind: "protocol", message: "BUNDLE_QUOTE_RECEIPT_MISMATCH" });
         }
-        const paid = await orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`);
+        const paid = await executeSelectedPurchase({ amount: created.amountUsdt, currency: 'USDT', summary: t.value.bundle.checkoutSuccessTitle },
+          authorization => orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`, authorization), scopeIsCurrent,
+          { kind: 'ORDER_PAY', payload: { orderNo: created.orderNo }, commandKey: () => `wallet-pay:${created.orderNo}`, parseReceipt: paidOrderReceipt });
+        if (!paid) return;
         if (!scopeIsCurrent()) return;
         if (paid.orderNo !== created.orderNo
             || (paid.paymentMethod === "WALLET"

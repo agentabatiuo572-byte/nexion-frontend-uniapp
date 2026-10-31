@@ -292,6 +292,7 @@ interface Badge {
 }
 function badge(status: OrderStatus): Badge {
   switch (status) {
+    case "inventory": return { label: t.value.orders.statusInventory, color: "var(--v5-brand)", bg: "var(--v5-surface-2)", icon: ["M4 4h16v16H4z", "M8 9h8"] };
     case "placed":
       return { label: t.value.orders.statusPlaced, color: "var(--v5-ink-3)", bg: "var(--v5-surface-2)", icon: ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"] };
     case "paid":
