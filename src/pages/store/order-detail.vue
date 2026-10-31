@@ -82,39 +82,22 @@
           </view>
 
           <view v-if="trackSteps.length" class="order-track" :style="{ gridTemplateColumns: `repeat(${trackSteps.length}, minmax(0, 1fr))` }" role="list" :aria-label="t.orders.timelineTitle">
-            <view v-for="(step, i) in trackSteps" :key="step.stage" class="order-track__step" role="listitem">
+            <view v-for="(step, i) in trackSteps" :key="step.stage" class="order-track__step" role="listitem" :aria-hidden="step.state === 'todo' ? 'true' : undefined">
               <view v-if="i < trackSteps.length - 1" class="order-track__segment"><view v-if="step.segmentDone" class="order-track__fill nx-viz-grow" /></view>
               <view class="order-track__dot" :class="[`order-track__dot--${step.state}`, { 'order-track__dot--live': step.state === 'current' && (isProvisioning || order.status === 'paid') }]">
                 <svg v-if="step.state === 'done'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
                 <svg v-else-if="step.state === 'failed' || step.state === 'stopped'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
               </view>
-              <text class="order-track__label" :class="[`order-track__label--${step.state}`, { 'order-track__label--waiting': step.state === 'current' && order.status === 'placed' }]">{{ step.label }}</text>
+              <!-- Steps not reached yet show only their dot; the label appears once the order gets there. -->
+              <text v-if="step.state !== 'todo'" class="order-track__label" :class="[`order-track__label--${step.state}`, { 'order-track__label--waiting': step.state === 'current' && order.status === 'placed' }]">{{ step.label }}</text>
             </view>
           </view>
 
-          <view v-if="pendingOrderActionsVisible" class="order-hero__actions">
-            <NxButton class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
-            <NxButton v-if="remoteApiEnabled && !paymentExpired" class="order-hero__pay" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
-          </view>
-          <view v-else-if="needsRecovery" data-testid="order-recovery">
-            <text class="order-hero__note">{{ recoveryHint }}</text>
-            <view class="order-hero__actions order-hero__actions--stack">
-              <NxButton v-if="canBuyAgain" variant="brand" :label="t.promotion.buyAgain" @click="goStore" />
-              <NxButton variant="secondary" :label="t.orders.copyAndSupport" @click="contactOrderSupport" />
-            </view>
-          </view>
-          <view v-else-if="order.status === 'activated' || order.status === 'inventory'" class="order-hero__actions">
-            <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
-            <NxButton v-if="order.status === 'activated'" variant="brand" :label="t.uiChrome.viewOnEarn" @click="goEarn"><text>{{ t.uiChrome.viewOnEarn }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
-            <NxButton v-else variant="brand" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')"><text>{{ t.myDevices.inventoryTitle }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
-          </view>
-          <view v-else-if="canBuyAgain" class="order-hero__actions">
-            <NxButton variant="brand" :label="t.promotion.buyAgain" @click="goStore" />
-          </view>
+          <text v-if="needsRecovery" class="order-hero__note" data-testid="order-recovery">{{ recoveryHint }}</text>
         </view>
 
         <!-- Pending remote orders can retry only the idempotent UVEL wallet debit. -->
-        <view v-if="orderAction || orderCommandUnavailable" class="order-block" role="status">
+        <view v-if="(orderAction || orderCommandUnavailable) && !externalPayment" class="order-block" role="status">
           <text class="block">{{ orderAction?.kind==='cancel' ? recoveryCopy.cancelPending : recoveryCopy.paymentPending }}</text>
           <view class="flex flex-wrap gap-2 mt-3">
             <NxButton variant="secondary" size="small" :label="recoveryCopy.query" :busy="orderCommandQuerying" :disabled="payingFromWallet || cancellingOrder" @click="recoverOrderAction(false)" />
@@ -171,18 +154,32 @@
         </view>
 
         <OrderRewards v-if="remoteApiEnabled && id" :order-no="id" :payment-allowed="order.status === 'placed' && !paymentExpired && !remoteOrderError && !remoteOrderRefreshing" />
-        <view style="height: 24px" />
+        <view :style="{ height: stickyActionsVisible ? '120px' : '24px' }" />
       </template>
     </view>
     <template #pageFixed>
-      <view v-if="paymentNotice" class="pending-notice-mask">
-        <view class="pending-order-notice" role="dialog" aria-modal="true" :aria-label="paymentNotice === 'query' ? pendingCopy.queryFailed : pendingCopy.cannotPay">
-          <view class="pending-notice-head"><text class="pending-notice-title" tabindex="-1" role="heading">{{ paymentNotice === 'query' ? pendingCopy.queryFailed : pendingCopy.cannotPay }}</text><NxButton variant="text" :label="t.store.coCancel" :disabled="cancellingOrder" @click="paymentNotice = ''" /></view>
-          <text class="pending-notice-body">{{ paymentNoticeReason }}</text>
-          <text v-if="noticeCancelFailed" class="pending-notice-error" role="alert">{{ pendingCopy.cancelFailed }}</text>
-          <NxButton :label="paymentNotice === 'query' ? pendingCopy.retry : orderAction?.kind === 'cancel' ? recoveryCopy.retryCancel : orderAction || orderCommandUnavailable ? recoveryCopy.query : liveOrder?.status === 'placed' ? pendingCopy.cancelOrder : pendingCopy.viewDetails" :busy="pendingPaymentChecking || cancellingOrder || orderCommandQuerying" @click="runPaymentNoticeAction" />
-        </view>
+      <!-- The order's next actions sit in the thumb zone at the bottom of the page (DS-30), whatever its state. -->
+      <view v-if="order && stickyActionsVisible" class="order-sticky">
+        <template v-if="pendingOrderActionsVisible">
+          <NxButton class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
+          <NxButton v-if="remoteApiEnabled && !paymentExpired" class="order-hero__pay" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
+        </template>
+        <template v-else-if="needsRecovery">
+          <NxButton v-if="canBuyAgain" variant="brand" :label="t.promotion.buyAgain" @click="goStore" />
+          <NxButton variant="secondary" :label="t.orders.copyAndSupport" @click="contactOrderSupport" />
+        </template>
+        <template v-else-if="order.status === 'activated' || order.status === 'inventory'">
+          <NxButton v-if="canBuyAgain" variant="secondary" :label="t.promotion.buyAgain" @click="goStore" />
+          <NxButton v-if="order.status === 'activated'" variant="brand" :label="t.uiChrome.viewOnEarn" @click="goEarn"><text>{{ t.uiChrome.viewOnEarn }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
+          <NxButton v-else variant="brand" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')"><text>{{ t.myDevices.inventoryTitle }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
+        </template>
+        <NxButton v-else-if="canBuyAgain" variant="brand" :label="t.promotion.buyAgain" @click="goStore" />
       </view>
+      <NxNoticeDialog class="pending-order-notice" :open="!!paymentNotice" :title="paymentNotice === 'query' ? pendingCopy.queryFailed : pendingCopy.cannotPay" :body="paymentNoticeReason"
+        :icon="paymentNotice === 'query' ? 'alert' : 'info'" :primary="paymentNotice === 'query' ? pendingCopy.retry : orderAction?.kind === 'cancel' ? recoveryCopy.retryCancel : orderAction || orderCommandUnavailable ? recoveryCopy.query : liveOrder?.status === 'placed' ? pendingCopy.cancelOrder : pendingCopy.viewDetails"
+        :secondary="t.store.coCancel" :busy="pendingPaymentChecking || cancellingOrder || orderCommandQuerying" @primary="runPaymentNoticeAction" @secondary="paymentNotice = ''">
+        <text v-if="noticeCancelFailed" class="pending-notice-error" role="alert">{{ pendingCopy.cancelFailed }}</text>
+      </NxNoticeDialog>
     </template>
   </AppChassis>
 </template>
@@ -193,18 +190,19 @@ import { commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
-import { ref, computed, watch, onUnmounted, nextTick, type CSSProperties } from "vue";
+import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import { pendingOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue";
 import CheckoutResult from "@/components/checkout/CheckoutResult.vue";
 import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
-import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { getProductMedia } from "@/lib/product-media";
 import { useT } from "@/i18n/use-t";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
@@ -563,24 +561,19 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
   } finally { orderCommandQuerying.value=false; }
 }
 const pendingOrderActionsVisible = computed(() => order.value?.status === "placed" && !order.value.promotionQuoteId && !walletPaymentConfirmed.value);
+// Any state with a next action gets the bottom action bar.
+const stickyActionsVisible = computed(() => !!order.value && (pendingOrderActionsVisible.value || needsRecovery.value
+  || order.value.status === 'activated' || order.value.status === 'inventory' || canBuyAgain.value));
 const cancellable = computed(() => canCancelCurrentOrder()
   && !cancellingOrder.value);
 const paymentExpired = computed(() => order.value?.expiresAt != null
   && order.value.expiresAt <= detailNow.value);
 const canPayFromWallet = computed(() => remoteApiEnabled
   && currentOrderPayable()&&!cancellingOrder.value&&!orderCommandQuerying.value&&!orderCommandUnavailable.value
-  && (!orderAction.value || (orderAction.value.kind==='pay'&&resumePaymentAllowed.value))
+  // An external payment already underway resumes its own intent; it never debits the wallet again.
+  && (!orderAction.value || (orderAction.value.kind==='pay'&&(resumePaymentAllowed.value||externalPayment.value)))
   && !walletRefreshing.value && !paymentExpired.value);
 const isProvisioning = computed(() => order.value?.status === "provisioning");
-useDialogA11y(computed(() => Boolean(paymentNotice.value)), '.pending-order-notice', () => { if (!cancellingOrder.value) paymentNotice.value = ''; }, true, 5);
-watch([cancellingOrder,orderCommandQuerying,pendingPaymentChecking], ([cancelling,querying,checking]) => {
-  if (!paymentNotice.value || cancelling || querying || checking) return;
-  void nextTick(() => {
-    if (typeof document === 'undefined' || !paymentNotice.value) return;
-    const notice = document.querySelector('.pending-order-notice');
-    if (notice && !notice.contains(document.activeElement)) notice.querySelector<HTMLElement>('.pending-notice-title')?.focus();
-  });
-});
 // Orders that closed without completing; their close reason is shown when the backend sent one.
 const CLOSED_STATUSES: OrderStatus[] = ['cancelled', 'expired', 'payment_failed', 'provisioning_failed', 'chargeback'];
 const needsRecovery = computed(() => !!order.value && ['payment_failed','provisioning_failed','chargeback','expired'].includes(order.value.status));
@@ -629,6 +622,9 @@ const STATUS_TONES: Record<OrderStatus, "neutral" | "brand" | "success" | "warni
 };
 const statusColor = computed(() => (order.value ? STATUS_COLORS[order.value.status] : "var(--v5-ink-3)"));
 const statusTone = computed(() => (order.value ? STATUS_TONES[order.value.status] : "neutral"));
+// An external payment for this order is underway: the hero says so and resumes it.
+const purchasePaymentState = usePurchasePayment().state;
+const externalPayment = computed(() => { purchasePaymentState.revision; return order.value?.status === 'placed' && !!pendingOrderPayment(app.accountKey, id.value); });
 const heroImage = computed(() => order.value
   ? (getProductMedia(order.value.productId) ?? getProductMedia(order.value.lineItems?.[0]?.sku))?.src
   : undefined);
@@ -693,7 +689,7 @@ const heroHint = computed(() => {
   if (!current) return "";
   if (current.status === "placed") {
     const left = current.expiresAt == null ? 0 : current.expiresAt - detailNow.value;
-    return left > 0 ? fmt(t.value.orders.pendingCloseIn, { min: Math.ceil(left / 60000) }) : "";
+    return left > 0 ? fmt(externalPayment.value ? t.value.orders.paymentInProgress : t.value.orders.pendingCloseIn, { min: Math.ceil(left / 60000) }) : "";
   }
   if (current.status === "inventory") return t.value.orders.inventoryToast;
   if (current.status === "refunded") return current.refundReasonCode ? t.value.orders.refundReasons[current.refundReasonCode] : "";
@@ -801,7 +797,7 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     if (remoteOrderError.value || remoteOrderRefreshing.value || !liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
     let original = liveOrder.value;
     restoreOrderAction();
-    if (orderAction.value || orderCommandUnavailable.value) {
+    if ((orderAction.value || orderCommandUnavailable.value) && !externalPayment.value) {
       await recoverOrderAction(false);
       if (!isCurrentDetailScope(scope) || orderAction.value || orderCommandUnavailable.value) return;
       if (!liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
@@ -941,7 +937,8 @@ async function handleWalletPayment() {
             throw error;
           }
         },
-        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt});
+        paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
+          orderNo:requestOrderNo,deadlineAt:liveOrder.value.expiresAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')});
       if (!receipt) return;
     if (!isCurrentDetailScope(scope)) return;
     if (receipt.orderNo !== requestOrderNo) {
@@ -1090,15 +1087,12 @@ const remoteErrorStyle: CSSProperties = {
 .order-hero__icon { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin: 22px; border-radius: 50%; background: color-mix(in srgb, var(--order-tone) 12%, transparent); }
 .order-hero__note { display: block; margin-top: 20px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 /* Buttons sit side by side while their labels fit, otherwise each takes a full row. */
-.order-hero__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-.order-hero__note + .order-hero__actions { margin-top: 12px; }
 /* 40px basis = the L button's side padding, so a 1:2 pair splits the remaining width like the design. */
-.order-hero__actions > * { flex: 1 1 40px; min-width: fit-content; }
-.order-hero__actions--stack { flex-direction: column; }
-.order-hero__actions--stack > * { flex: none; min-width: 0; }
 .order-hero__pay { flex-grow: 2; }
+.order-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-wrap: wrap; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
+.order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
 /* Paired buttons share a card row, so they take the M side padding (16px) to fit two labels. */
-.order-hero__actions :deep(.nx-button__surface) { padding-inline: 16px; }
 .order-hero__cancel { --ui-button-ink: var(--v5-danger); }
 /* Progress track: 24px steps joined by 2px segments; done segments grow in (DS-29). */
 .order-track { display: grid; margin-top: 20px; }
@@ -1115,7 +1109,7 @@ const remoteErrorStyle: CSSProperties = {
 /* Break between words; a single word wider than its column is hyphenated (the page sets <html lang>). */
 .order-track__label { max-width: 100%; padding: 0 2px; color: var(--v5-ink); overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 /* A step that waits on the user (unpaid) reads as not done yet; server-side progress stays in primary ink. */
-.order-track__label--todo, .order-track__label--stopped, .order-track__label--waiting { color: var(--v5-ink-3); font-weight: 400; }
+.order-track__label--stopped, .order-track__label--waiting { color: var(--v5-ink-3); font-weight: 400; }
 .order-track__label--failed { color: var(--v5-danger); }
 @keyframes order-track-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--order-tone) 8%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .order-track__dot--live { animation: none; } }
@@ -1140,11 +1134,7 @@ const remoteErrorStyle: CSSProperties = {
 .order-payment-result { display:flex; flex-direction:column; gap:var(--v5-space-3); }
 .order-summary :deep(.copy-code-button) { width:44px; height:44px; margin:-6px -12px -6px -4px; }
 .order-summary :deep(.copy-code-button svg) { width:16px; height:16px; }
-.pending-notice-mask { position:fixed; z-index:900; inset:0; display:flex; align-items:center; justify-content:center; padding:var(--nx-overlay-top) var(--v5-space-4) var(--nx-overlay-bottom); background:var(--v5-bg-color-mask); }
-.pending-order-notice { width:100%; max-width:344px; max-height:100%; overflow:auto; padding:var(--v5-space-5); border-radius:var(--v5-radius-xl); background:var(--v5-surface); color:var(--v5-ink); display:flex; flex-direction:column; gap:var(--v5-space-4); }
-.pending-notice-head { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); font:600 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.pending-notice-body { font:400 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color:var(--v5-ink-2); overflow-wrap:anywhere; }
-.pending-notice-error { font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color:var(--v5-danger); }
+.pending-notice-error { display:block; margin-top:var(--v5-space-3); font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color:var(--v5-danger); }
 
 .trial-result { display:flex;flex-direction:column;gap:var(--v5-space-3); }
 .trial-result-head { display:flex;flex-direction:column;align-items:center;gap:var(--v5-space-2);padding:var(--v5-space-4) 0;text-align:center; }
