@@ -63,3 +63,14 @@ describe('external purchase contracts', () => {
     await expect(api.find('ORDER_PAY', 'original-key')).rejects.toThrow();
   });
 });
+
+
+it('binds ERC20 quotes and intents to their original network and preserves exact fees', async () => {
+  const erc20 = { ...intent(), paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20' };
+  expect(parsePurchaseQuote(erc20)).toMatchObject({ paymentMethod: 'CREGIS_USDT_ERC20', totalUsdt: '102.00', networkConfirmFeeUsdt: '0.25' });
+  expect(parsePurchaseIntent(erc20)).toMatchObject({ network: 'ERC20', address: erc20.address });
+  for (const network of ['BSC', 'BEP20', null]) expect(() => parsePurchaseIntent({ ...erc20, network })).toThrow();
+  const request = vi.fn().mockResolvedValue(erc20);
+  await createPurchasePaymentApi({ request } as unknown as ApiClient).quote('ORDER_PAY', 'CREGIS_USDT_ERC20', { orderNo: 'ORD-1' });
+  expect(request.mock.calls[0][0].body).toEqual({ kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_ERC20', payload: { orderNo: 'ORD-1' } });
+});
