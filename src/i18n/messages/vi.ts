@@ -5418,7 +5418,7 @@ openSeaErrorPool: {
     expectedLabel: "Số tiền phải chuyển",
     receivedLabel: "Thực nhận",
     newTopupCta: "Nạp lại từ đầu",
-    bankDeposit: "Nạp qua chuyển khoản",
+    bankDeposit: "Nạp tiền bằng thẻ ngân hàng",
     dailyCapacityExceeded: "Số tiền vượt quá hạn mức còn lại hôm nay. Hôm nay bạn có thể nạp tối đa {max}.",
     dailyCapacityExhaustedTitle: "Hạn mức nạp qua ngân hàng hôm nay đã hết",
     dailyCapacityExhaustedBody: "Hạn mức còn lại hôm nay là {remaining}, thấp hơn mức nạp tối thiểu {min}. Bạn có thể nạp lại vào ngày mai.",
