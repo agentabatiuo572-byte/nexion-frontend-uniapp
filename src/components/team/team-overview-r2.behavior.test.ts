@@ -105,7 +105,7 @@ describe('team statistics use the shared visibility preference', () => {
     const visibility = useDataVisibility();
     const toggle = find(ledger.root, 'data-visibility-toggle');
     expect(toggle.parent).toBe(find(ledger.root, 'team-ledger__header'));
-    find(ledger.root, 'team-ledger__breakdown').props.onClick(); await Vue.nextTick();
+    // P-42: the lifetime composition is always open.
     expect(all(find(ledger.root, 'team-ledger__bar')).some(item => item.props.style?.width === '75%')).toBe(true);
     toggle.props.onClick({ stopPropagation: vi.fn() }); await Vue.nextTick();
     expect(visibility.hidden).toBe(true);
@@ -130,7 +130,7 @@ describe('team statistics use the shared visibility preference', () => {
     expect(ledger.props.monthUSDT).toBe(7654.32);
     expect(ledger.props.directUSDT).toBe(600);
     const details = find(ledger.root, 'team-ledger__details');
-    expect(details.parent).toBe(find(ledger.root, 'team-ledger__nex').parent);
+    expect(details.parent).toBe(find(ledger.root, 'team-ledger__header'));
     expect(details.props.role).toBe('link'); expect(details.props.tabindex).toBe('0');
     details.props.onClick(); expect(ledger.navTo).toHaveBeenCalledWith('/pages/team/commissions');
     // A different consumer uses the same store; revealing restores the latest read.
@@ -268,7 +268,6 @@ describe('R1-TV04 ledger state continuity', () => {
     expect(text(amount)).toBe('$1,234.56');
     expect(accessibleText(feedback)).toBe('');
     expect(hero.props['aria-busy']).toBe(false);
-    find(p.root, 'team-ledger__breakdown').props.onClick(); await Vue.nextTick();
     expect(text(find(p.root, 'team-ledger__lifetime'))).toContain('$800.00');
     await p.set({ loading: true }); sameSlots();
     expect(text(amount)).toBe('$1,234.56');
@@ -277,10 +276,9 @@ describe('R1-TV04 ledger state continuity', () => {
     expect(hasClass(breakdown, 'is-hidden')).toBe(false);
     expect(hasClass(breakdown, 'is-unknown')).toBe(false);
     expect(breakdown.props['aria-hidden']).toBe(false);
-    expect(breakdown.props['aria-disabled']).toBe(true);
-    expect(breakdown.props.tabindex).toBe(-1);
-    breakdown.props.onClick(); await Vue.nextTick();
-    expect(breakdown.props['aria-expanded']).toBe(true);
+    // A same-account refresh keeps the confirmed composition but marks it as not current.
+    expect(breakdown.props['data-state']).toBe('loading');
+    expect(text(find(p.root, 'team-ledger__lifetime'))).toContain('$800.00');
     expect(hero.props['aria-busy']).toBe(true);
     await p.set({ failed: true, loading: false, available: false }); sameSlots();
     expect(text(amount)).toBe('—');
@@ -292,7 +290,7 @@ describe('R1-TV04 ledger state continuity', () => {
     expect(accessibleText(feedback)).toBe('');
     await p.set({ available: true, loading: false, monthUSDT: 0, monthNEX: 0, unlockedUSDT: 0, coolingUSDT: 0 }); sameSlots();
     expect(text(amount)).toBe('$0.00');
-    expect(text(find(p.root, 'team-ledger__nex'))).toBe('+ 0.00 UVT');
+    expect(text(find(p.root, 'team-ledger__nex'))).toBe('+0.00 UVT');
     find(p.root, 'team-ledger__details').props.onClick();
     expect(p.navTo).toHaveBeenCalledWith('/pages/team/commissions');
   });
@@ -302,8 +300,8 @@ describe('R1-TV04 ledger state continuity', () => {
     await p.set({ available: false });
     expect(text(find(p.root, 'team-ledger__amount'))).toBe('—');
     expect(text(find(p.root, 'team-ledger__settlement'))).not.toContain('$');
-    find(p.root, 'team-ledger__breakdown').props.onClick(); await Vue.nextTick();
-    expect(find(p.root, 'team-ledger__breakdown').props['aria-expanded']).toBe(false);
+    expect(find(p.root, 'team-ledger__breakdown').props['data-state']).toBe('unknown');
+    expect(text(find(p.root, 'team-ledger__breakdown'))).not.toContain('$');
   });
 
   it('wires the page into a single unconditional ledger rather than a second loading block', () => {
