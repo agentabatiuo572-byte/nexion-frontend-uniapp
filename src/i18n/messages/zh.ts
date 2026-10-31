@@ -245,7 +245,6 @@ export const zh: Messages = {
     teamAgent: "区域大使",
     storeCheckout: "结算",
     storeOrders: "我的订单",
-    storeOrderDetail: "订单详情",
     storeProduct: "商品",
     storeBundle: "组合套餐",
     genesisMarketplace: "转让市场",
@@ -3143,7 +3142,7 @@ earningsMilestone: "收益里程碑 ${threshold}",
   orders: {
     resultReadback: "请查看订单详情，确认最新付款与开通状态。",
     copyAndSupport: "复制订单号并联系支持",
-    recoveryNext: "请先刷新订单状态。若仍未恢复，可携订单号联系支持；请勿重复付款。",
+    recoveryNext: "如有疑问，请携订单号联系支持，请勿重复付款。",
     expiredNext: "此订单已过期，无法继续支付。你可以重新选购；若已转账，请携订单号联系支持。",
 
     title: "我的订单",

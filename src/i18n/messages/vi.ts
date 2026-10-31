@@ -249,7 +249,6 @@ export const vi: Messages = {
     // Store subtree
     storeCheckout: "Thanh toán",
     storeOrders: "Đơn hàng",
-    storeOrderDetail: "Đơn hàng",
     storeProduct: "Sản phẩm",
     storeBundle: "Gói combo",
     // Genesis subtree
@@ -3117,7 +3116,7 @@ earningsMilestone: "Mốc thu nhập ${threshold}",
   orders: {
     resultReadback: "Mở chi tiết đơn hàng để kiểm tra trạng thái thanh toán và kích hoạt mới nhất.",
     copyAndSupport: "Sao chép mã đơn và liên hệ hỗ trợ",
-    recoveryNext: "Hãy làm mới trạng thái đơn hàng trước. Nếu vẫn chưa khôi phục, liên hệ hỗ trợ kèm mã đơn. Không thanh toán lại.",
+    recoveryNext: "Nếu có thắc mắc, vui lòng liên hệ hỗ trợ kèm mã đơn hàng và không thanh toán lại.",
     expiredNext: "Đơn đã hết hạn và không thể thanh toán. Bạn có thể mua lại. Nếu đã chuyển tiền, hãy liên hệ hỗ trợ kèm mã đơn.",
 
     title: "Đơn hàng của tôi",

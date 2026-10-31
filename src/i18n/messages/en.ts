@@ -248,7 +248,6 @@ export const en = {
     // Store subtree
     storeCheckout: "Checkout",
     storeOrders: "Orders",
-    storeOrderDetail: "Order",
     storeProduct: "Product",
     storeBundle: "Bundle",
     // Genesis subtree
@@ -3189,7 +3188,7 @@ earningsMilestone: "Earnings milestone ${threshold}",
   orders: {
     resultReadback: "Open the order details to check the latest payment and activation status.",
     copyAndSupport: "Copy order number and contact support",
-    recoveryNext: "Refresh the order status first. If it has not recovered, contact support with your order number. Do not pay again.",
+    recoveryNext: "Questions? Contact support with your order number. Please don't pay again.",
     expiredNext: "This order has expired and can no longer be paid. You can shop again. If you already transferred funds, contact support with your order number.",
 
     title: "My Orders",
