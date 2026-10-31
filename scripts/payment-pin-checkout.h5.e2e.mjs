@@ -53,8 +53,8 @@ try {
   await mask.getByText('输入支付密码',{exact:true}).waitFor();
   fixture.state.dropNextPayment=true;
   await input.fill('039417');await mask.waitFor({state:'hidden'});
-  assert.equal(fixture.state.payWrites,2);
   await page.locator('.checkout-result').or(page.getByText('查询原订单',{exact:true})).first().waitFor();
+  assert.equal(fixture.state.payWrites,2);
   if(!await page.locator('.checkout-result').isVisible())await page.getByText('查询原订单',{exact:true}).first().click();
   await page.locator('.checkout-result__art.is-complete').waitFor({timeout:12000});
   assert.equal(fixture.state.payWrites,2,'a lost payment response must be recovered without a second debit');
