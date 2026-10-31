@@ -260,9 +260,9 @@
 </template>
 
 <script setup lang="ts">
-import { runPassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
+import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
@@ -281,7 +281,7 @@ import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { deviceName, deviceNameByKind } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
-import { apiClient,deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
+import { apiClient, apiRuntimeConfig, deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { resolvePurchaseEligibilityMessage } from "@/lib/purchase-eligibility-copy";
 import PurchaseEligibilityPanel from "@/components/store/purchase-eligibility-panel.vue";
@@ -511,17 +511,35 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   remoteRetireRequest += 1;
   capacityCommandKey.value = null;
   quoteLoading.value = false;
-  void loadCanonicalTradeinConfig();
+  // app.bindAccount is followed by the global account rebind in the same stack.
+  void nextTick(() => loadCanonicalTradeinConfig());
 }, { flush: "sync" });
-async function loadCanonicalTradeinConfig() {
-  if (!remoteApiEnabled) return;
+watch([() => apiRuntimeConfig.environment, () => apiRuntimeConfig.baseUrl], () => {
+  canonicalTradeinConfig.value = null;
+  void nextTick(() => loadCanonicalTradeinConfig());
+}, { flush: "sync" });
+let canonicalTradeinConfigRead: { key: string; result: Promise<void> } | null = null;
+function canonicalTradeinConfigScope(): string {
+  return JSON.stringify([captureAccountScope(), app.accountKey, app.accountBindingEpoch,
+    apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl]);
+}
+function loadCanonicalTradeinConfig(retry = false): Promise<void> {
+  if (!remoteApiEnabled || !purchaseMounted) return Promise.resolve();
+  const key = canonicalTradeinConfigScope();
+  if (canonicalTradeinConfigRead?.key === key) return canonicalTradeinConfigRead.result;
+  if (retry) invalidatePassiveTabRead("tradein-config");
   const requestScope = captureAccountScope();
-  const readScope = passiveTabReadScope();
-  await runPassiveTabRead("tradein-config", () => deviceE3Api.tradeinConfig()).then((value) => {
-    if (isCurrentAccountScope(requestScope) && readScope === passiveTabReadScope()) canonicalTradeinConfig.value = value;
+  // Read-only POSTs can advance the passive write revision; they do not change this config's owner.
+  const current = () => purchaseMounted && key === canonicalTradeinConfigScope() && isCurrentAccountScope(requestScope);
+  const result = runPassiveTabRead("tradein-config", () => deviceE3Api.tradeinConfig()).then((value) => {
+    if (current()) canonicalTradeinConfig.value = value;
   }).catch(() => {
-    if (isCurrentAccountScope(requestScope) && readScope === passiveTabReadScope()) canonicalTradeinConfig.value = null;
+    if (current()) canonicalTradeinConfig.value = null;
+  }).finally(() => {
+    if (canonicalTradeinConfigRead?.result === result) canonicalTradeinConfigRead = null;
   });
+  canonicalTradeinConfigRead = { key, result };
+  return result;
 }
 onMounted(() => {
   void loadCanonicalTradeinConfig();
@@ -711,6 +729,7 @@ async function loadRemoteRetireTargets() {
   if (!config || !source || productCatalogState.status !== "ready") {
     remoteRetireEligibleTargets.value = new Set();
     remoteRetireTargetsReady.value = false;
+    if (!config) void loadCanonicalTradeinConfig(true);
     return;
   }
   if (!config.enabled) {
