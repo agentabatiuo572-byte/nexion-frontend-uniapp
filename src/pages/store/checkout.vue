@@ -1174,8 +1174,8 @@ function presentSettledPurchase(firstHardwareOrder: boolean, onResultShown: (() 
   forgetSettledOrder = onResultShown;
   settledResultReplay.value = true;
   step.value = "confirmed";
-  // The authoritative result is now rendered by CheckoutResult. It owns only
-  // the presentation animation; JS timers never decide when its bar is full.
+  // CheckoutResult renders the authoritative result and owns only its
+  // presentation timing; the order status alone decides success.
   void nextTick(() => { if (pageAlive && settledResultReplay.value) { forgetSettledOrder?.(); forgetSettledOrder = null; } });
 }
 const checkoutResultState = computed(() => completedOrder.value?.status === 'activated' ? 'activated'
