@@ -10,8 +10,8 @@
     <view class="team-ledger__amount tabular-nums"><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__currency">{{ monthUSDTParts.prefix }}</text><text>{{ visibility.mask(intPart) }}</text><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__fraction">.{{ fracPart }}</text></view>
     <text class="team-ledger__nex tabular-nums">{{ visibility.mask(hasAmounts ? '+' + formatAmount(monthNEX) : '—') }} UVT</text>
     <view class="team-ledger__settlement" :aria-label="copy.settlementScope">
-      <view><text class="team-ledger__settlement-label"><view class="team-ledger__dot" aria-hidden="true" />{{ t.teamV3.settled }}</text><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(unlockedUSDT) : '—') }}</text></view>
-      <view><text class="team-ledger__settlement-label"><view class="team-ledger__dot team-ledger__dot--cooling" aria-hidden="true" />{{ t.teamV3.coolingDown }}</text><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(coolingUSDT) : '—') }}</text></view>
+      <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot" aria-hidden="true" /><text>{{ t.teamV3.settled }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(unlockedUSDT) : '—') }}</text></view>
+      <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot team-ledger__dot--cooling" aria-hidden="true" /><text>{{ t.teamV3.coolingDown }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(coolingUSDT) : '—') }}</text></view>
     </view>
     <view class="team-ledger__control">
       <!-- Lifetime composition stays open; data-state says whether its figures are current. -->
