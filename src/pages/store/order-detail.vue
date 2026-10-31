@@ -788,6 +788,7 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     return;
   }
   const attempt = ++pendingPaymentSequence;
+  let waitingForRead = false;
   autoPayRequested.value = true;
   pendingPaymentIntentAccount = scope.accountScope.accountKey;
   pendingPaymentReadScope = null;
@@ -799,7 +800,10 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     if (!originalJustRead) await refreshOrder();
     if (!isCurrentDetailScope(scope)) return;
     pendingPaymentReadScope = null;
-    if (remoteOrderError.value || remoteOrderRefreshing.value || !liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
+    // Another read of this order is still running (e.g. the page just came back to the
+    // foreground): keep the pay intent and continue when that read lands, as on a cold ?pay=1.
+    if (remoteOrderRefreshing.value && !remoteOrderError.value) { waitingForRead = true; return; }
+    if (remoteOrderError.value || !liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
     let original = liveOrder.value;
     restoreOrderAction();
     if ((orderAction.value || orderCommandUnavailable.value) && !externalPayment.value) {
@@ -857,7 +861,7 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     // local lock, but must never unlock a newer attempt after hide/re-entry.
     if (attempt === pendingPaymentSequence) {
       pendingPaymentChecking.value = false;
-      if (isCurrentDetailScope(scope) && (paymentSheetOpen.value || payingFromWallet.value || paymentResultVisible.value || paymentNotice.value || orderAction.value || orderCommandUnavailable.value)) {
+      if (!waitingForRead && isCurrentDetailScope(scope) && (paymentSheetOpen.value || payingFromWallet.value || paymentResultVisible.value || paymentNotice.value || orderAction.value || orderCommandUnavailable.value)) {
         autoPayRequested.value = false;
         pendingPaymentIntentAccount = '';
         pendingPaymentReadScope = null;
