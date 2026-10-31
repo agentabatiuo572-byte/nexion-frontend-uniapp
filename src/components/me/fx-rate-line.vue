@@ -12,7 +12,8 @@
 -->
 <template>
   <view>
-    <view class="flex items-center" style="gap: 6px; padding: 0 4px; min-height: 28px">
+    <view class="flex items-center" style="gap: 6px; padding: 0 0 0 2px; min-height: 44px">
+      <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
       <template v-if="status === 'ready'">
         <text :style="capStyle">{{ t.fx.rateLabel }}</text>
         <text class="whitespace-nowrap" :style="valueStyle">{{ rateLine }}</text>
@@ -34,9 +35,7 @@
         :aria-label="t.fx.infoAria"
         @click="sheetOpen = true"
       >
-        <view class="grid place-items-center transition active:bg-[var(--v5-surface-3)]" :style="infoBtnStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-        </view>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9h.01" /></svg>
       </view>
     </view>
 
@@ -87,30 +86,25 @@ const sheetBody1 = computed(() =>
   fmt(t.value.fx.sheetBody1, { min: fx.lockWindowMin > 0 ? fx.lockWindowMin : "—" }),
 );
 
+// P-44: muted 13/18 caption with the rate itself in the mono metric face; a bare info glyph in a 44px target.
 const capStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12px",
+  fontSize: "13px",
+  lineHeight: "18px",
   color: "var(--v5-ink-3)",
 };
 const valueStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-metric)",
   fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink-2)",
+  lineHeight: "18px",
+  fontWeight: 500,
+  color: "var(--v5-ink)",
 };
 const infoHitStyle: CSSProperties = {
   width: "44px",
   height: "44px",
-  marginTop: "-8px",
-  marginBottom: "-8px",
-  marginRight: "-8px",
   marginLeft: "auto",
-};
-const infoBtnStyle: CSSProperties = {
-  width: "28px",
-  height: "28px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
+  marginRight: "-2px",
 };
 // 🔴 790/800 = 业务半屏带(理由同 device-deactivate-sheet.vue:原 79/80 低于庆祝 780,
 // 会被盖住并吞点击;写成 JS 样式对象所以此前逃过机器门,2026-08-17 补齐)。

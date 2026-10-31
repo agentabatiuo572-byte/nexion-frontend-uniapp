@@ -93,7 +93,8 @@ function mount(options: { params?: Record<string, unknown>; hash?: string; boots
   });
   vi.stubGlobal("uni", { getStorageSync: (key: string) => storage.get(key),
     setStorageSync: (key: string, value: unknown) => storage.set(key, value), removeStorageSync: (key: string) => storage.delete(key) });
-  const presentation = { setup: (_props: unknown, { slots }: { slots: Vue.Slots }) => () => Vue.h("view", slots.default?.()) };
+  // Mirrors AppChassis: page content plus its fixed bottom-bar slot.
+  const presentation = { setup: (_props: unknown, { slots }: { slots: Vue.Slots }) => () => Vue.h("view", [slots.default?.(), slots.pageFixed?.({ top: 0 })]) };
   const modules: Record<string, unknown> = {
     "@/lib/amount-display": { formatAmount },
     "@/lib/finance-amount-display": { formatFinanceAmount },
@@ -132,11 +133,11 @@ afterEach(() => { cleanups.splice(0).forEach(fn => fn()); vi.unstubAllGlobals();
 
 describe("bank order tracking reload", () => {
   it.each(["account", "binding"])("does not retag old config when %s changes immediately before native onShow", async boundary => {
-    const s = mount(); s.show(); await settle(); expect(s.text()).toContain("****1234");
+    const s = mount(); s.show(); await settle(); expect(s.text()).toContain("•••• 1234");
     s.request.mockImplementationOnce(() => new Promise(() => {}));
     if (boundary === "account") s.app.accountKey = "user:8"; else s.app.accountBindingEpoch++;
     s.show(); await settle();
-    expect(s.text()).not.toContain("****1234");
+    expect(s.text()).not.toContain("•••• 1234");
     expect(unusable(s.find("bank-continue")!)).toBe(true);
   });
 
@@ -145,43 +146,43 @@ describe("bank order tracking reload", () => {
     const reads: Array<{ resolve(value: unknown): void; reject(cause: unknown): void }> = [];
     s.request.mockImplementation(() => new Promise((resolve, reject) => reads.push({ resolve, reject })));
     s.app.accountKey = "user:8"; s.show(); s.app.accountKey = "user:7"; s.show(); await settle();
-    expect(s.text()).not.toContain("****1234"); expect(reads).toHaveLength(2);
+    expect(s.text()).not.toContain("•••• 1234"); expect(reads).toHaveLength(2);
     reads[1].resolve({ ...config, beneficiary: { ...config.beneficiary, maskedAccount: "****9999" } }); await settle();
-    expect(s.text()).toContain("****9999");
+    expect(s.text()).toContain("•••• 9999");
     if (outcome === "success") reads[0].resolve({ ...config, beneficiary: { ...config.beneficiary, maskedAccount: "****7777" } });
     else reads[0].reject(new ApiError({ kind: "http", status: 403, message: "OLD_FORBIDDEN" }));
-    await settle(); expect(s.text()).toContain("****9999"); expect(s.text()).not.toContain("****7777");
+    await settle(); expect(s.text()).toContain("•••• 9999"); expect(s.text()).not.toContain("•••• 7777");
     expect(s.text()).not.toContain(en.bankWithdrawal.error);
-    s.show(); await settle(); expect(s.text()).toContain("****9999");
+    s.show(); await settle(); expect(s.text()).toContain("•••• 9999");
     expect(unusable(s.find("bank-continue")!)).toBe(true);
   });
 
   it.each([401, 403])("drops retained config on a current %s without making unknown actions usable", async status => {
-    const s = mount(); s.show(); await settle(); expect(s.text()).toContain("****1234");
+    const s = mount(); s.show(); await settle(); expect(s.text()).toContain("•••• 1234");
     s.request.mockRejectedValueOnce(new ApiError({ kind: "http", status, message: "DENIED" }));
     s.show(); await settle();
-    expect(s.text()).not.toContain("****1234"); expect(s.text()).toContain(en.bankWithdrawal.error);
+    expect(s.text()).not.toContain("•••• 1234"); expect(s.text()).toContain(en.bankWithdrawal.error);
     expect(unusable(s.find("bank-continue")!)).toBe(true);
     expect(s.find("bank-quote")).toBeUndefined();
     s.request.mockImplementationOnce(() => new Promise(() => {})); s.show(); await settle();
-    expect(s.text()).not.toContain("****1234");
+    expect(s.text()).not.toContain("•••• 1234");
   });
   it("keeps the known new-withdrawal static shell without inventing a recipient through cold, warm and failed config reads", async () => {
     const s = mount({ deferredConfig: true }); s.show(); await settle();
     for (const label of [en.bankWithdrawal.recipientTitle, en.bankWithdrawal.recipientSubtitle, en.bankWithdrawal.continueWithdrawal]) expect(s.text()).toContain(label);
-    expect(s.text()).not.toContain("****1234"); expect(s.text()).not.toContain(en.bankWithdrawal.unboundNotice);
+    expect(s.text()).not.toContain("•••• 1234"); expect(s.text()).not.toContain(en.bankWithdrawal.unboundNotice);
     expect(unusable(s.find("bank-continue")!)).toBe(true);
     expect(s.find("bank-continue")!.props.onClick).toBeUndefined(); expect(s.find("bank-amount")).toBeUndefined();
-    s.release(config); await settle(); expect(s.text()).toContain("****1234");
+    s.release(config); await settle(); expect(s.text()).toContain("•••• 1234");
     let fail!: (cause: Error) => void;
     s.request.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
     s.show(); await settle();
-    expect(s.text()).toContain("****1234"); expect(s.text()).not.toContain(en.bankWithdrawal.loading);
+    expect(s.text()).toContain("•••• 1234"); expect(s.text()).not.toContain(en.bankWithdrawal.loading);
     expect(unusable(s.find("bank-continue")!)).toBe(true);
     s.find("bank-continue")!.props.onClick(); await settle(); expect(s.find("bank-amount")).toBeUndefined();
     fail(new Error("unavailable")); await settle();
     expect(s.text()).toContain(en.bankWithdrawal.error); expect(s.text()).toContain(en.bankWithdrawal.recipientTitle);
-    expect(s.text()).not.toContain("****1234"); expect(unusable(s.find("bank-continue")!)).toBe(true);
+    expect(s.text()).not.toContain("•••• 1234"); expect(unusable(s.find("bank-continue")!)).toBe(true);
     expect(s.request.mock.calls.every(([input]) => !input.method || input.method === "GET")).toBe(true);
   });
   it("silently reads a retained order but keeps cold loading and a real failure", async () => {
@@ -205,15 +206,15 @@ describe("bank order tracking reload", () => {
   });
 
   it("clears config presentation on same-account rebinding and rejects the previous read without releasing quote actions", async () => {
-    const s = mount(); s.show(); await settle(); expect(s.text()).toContain("****1234");
+    const s = mount(); s.show(); await settle(); expect(s.text()).toContain("•••• 1234");
     const completions: Array<(value: unknown) => void> = [];
     s.request.mockImplementation(() => new Promise(resolve => completions.push(resolve)));
-    s.show(); await settle(); expect(s.text()).toContain("****1234");
-    s.app.accountBindingEpoch++; await settle(); expect(s.text()).not.toContain("****1234");
-    completions[0](config); await settle(); expect(s.text()).not.toContain("****1234");
+    s.show(); await settle(); expect(s.text()).toContain("•••• 1234");
+    s.app.accountBindingEpoch++; await settle(); expect(s.text()).not.toContain("•••• 1234");
+    completions[0](config); await settle(); expect(s.text()).not.toContain("•••• 1234");
     expect(unusable(s.find("bank-continue")!)).toBe(true);
     completions[1]({ ...config, beneficiary: null }); await settle();
-    expect(s.text()).toContain(en.bankWithdrawal.unboundNotice); expect(s.text()).not.toContain("****1234");
+    expect(s.text()).toContain(en.bankWithdrawal.unboundNotice); expect(s.text()).not.toContain("•••• 1234");
     expect(s.find("bank-continue")).toBeUndefined(); expect(s.find("bank-quote")).toBeUndefined();
     expect(s.request.mock.calls.every(([input]) => !input.method || input.method === "GET")).toBe(true);
   });

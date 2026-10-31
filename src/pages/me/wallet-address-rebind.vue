@@ -13,25 +13,21 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet-withdraw" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
-      <!-- ── 网络切换(与提现页同语汇)── -->
-      <view class="mx-4" style="padding: 0 2px">
-        <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.networkLabel }}</text></view>
-        <view class="flex" style="gap: 8px; margin-top: 8px" role="radiogroup" :aria-label="t.addrRebind.networkLabel">
+      <!-- ── 网络:上下排列的单选行(选中 = 品牌描边 + 实心点),与充值页同语汇 ── -->
+      <view class="mx-4 rb-nets-wrap">
+        <text class="rb-k">{{ t.addrRebind.networkLabel }}</text>
+        <view class="rb-nets" role="radiogroup" :aria-label="t.addrRebind.networkLabel">
           <view
             v-for="nw in NETWORKS"
             :key="nw.id"
-            :class="['flex-1 flex flex-col items-center justify-center active:opacity-85 nx-rebind-network-radio', `nx-rebind-net-${nw.label.toLowerCase()}`]"
-            :style="netChipStyle(nw.id)"
+            :class="['nx-rebind-network-radio', `nx-rebind-net-${nw.label.toLowerCase()}`, 'rb-net', { 'rb-net--on': network === nw.id }]"
             role="radio" :tabindex="network === nw.id ? 0 : -1"
             :aria-checked="network === nw.id"
             @click="switchNetwork(nw.id)"
-
-
-
             @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
           >
-            <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
-            <text v-if="nw.id === 'usdt-trc20'" :style="netChipTagStyle">{{ t.topupChrome.netRecommended }}</text>
+            <view class="rb-net__nm"><text class="rb-net__name">{{ nw.label }}</text><text v-if="nw.id === 'usdt-trc20'" class="rb-net__sub">{{ t.topupChrome.netRecommended }}</text></view>
+            <view class="rb-net__ck" aria-hidden="true" />
           </view>
         </view>
       </view>
@@ -108,53 +104,33 @@
         </view>
       </view>
 
-      <!-- ── 表单(添加 / 更换共用:新地址输入 + 安全提示)── -->
-      <view v-else-if="step === 'form'" class="mx-4" style="padding: 0 2px">
-        <view v-if="mode === 'add'" style="margin-top: 16px">
-          <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.addrRebind.emptyGuideTitle }}</text>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.5">{{ t.addrRebind.emptyGuideBody }}</text>
+      <!-- ── 表单(添加 / 更换共用:标题说明 + 地址井(可粘贴)+ 安全提示;主操作在底部栏)── -->
+      <view v-else-if="step === 'form'" class="mx-4 rb-form">
+        <text class="rb-title">{{ mode === 'add' ? t.addrRebind.emptyGuideTitle : t.addrRebind.newAddressLabel }}</text>
+        <text v-if="mode === 'add'" class="rb-desc">{{ t.addrRebind.emptyGuideBody }}</text>
+        <view class="rb-field">
+          <input
+            class="nx-rebind-address-input rb-field__input"
+            type="text"
+            :value="newAddress"
+            :placeholder="addressPlaceholder"
+            :aria-label="t.addrRebind.newAddressLabel"
+            aria-required="true"
+            :aria-invalid="addrError ? 'true' : 'false'"
+            :aria-describedby="addrError ? 'rebind-address-error' : undefined"
+            @input="onAddressInput"
+          />
+          <view class="rb-paste nx-frosted-button" role="button" tabindex="0" :aria-label="t.addrRebind.pasteCta" @click="pasteAddress" @keydown.enter.prevent="pasteAddress" @keydown.space.prevent="pasteAddress"><text>{{ t.addrRebind.pasteCta }}</text></view>
         </view>
-        <view style="margin-top: 16px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.newAddressLabel }}</text></view>
-        <input
-          class="nx-rebind-address-input mt-2 w-full font-mono"
-          :style="addressInputStyle"
-          type="text"
-          :value="newAddress"
-          :placeholder="addressPlaceholder"
-          :aria-label="t.addrRebind.newAddressLabel"
-          aria-required="true"
-          :aria-invalid="addrError ? 'true' : 'false'"
-          :aria-describedby="addrError ? 'rebind-address-error' : undefined"
-          @input="onAddressInput"
-        />
         <view v-if="addrError"><text id="rebind-address-error" class="block" :style="errorTextStyle">{{ addrError }}</text></view>
 
-        <!-- 安全提示:添加/更换均冻结 24h;每 7 天最多设置一次。 -->
-        <view v-if="mode === 'change'" class="flex" :style="warnlineStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ safetyNoteText }}</text></view>
+        <!-- 安全提示:添加/更换均冻结 24h;每 7 天最多设置一次(纯文字,不加底色)。 -->
+        <view class="rb-lock">
+          <svg v-if="mode === 'change'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+          <text>{{ mode === 'change' ? safetyNoteText : holdNoteText }}</text>
         </view>
-        <view v-else class="flex" :style="warnlineStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
-        </view>
-
-        <view
-          class="nx-rebind-start-cta w-full grid place-items-center"
-          :class="{ 'active:opacity-90 transition-opacity': canProceed && !otpSending }"
-          role="button" tabindex="0"
-          :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
-          :style="startCtaStyle"
-          @click="proceedToOtp"
-        >
-          <text :style="ctaTextStyle">{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
-        </view>
-        <view v-if="mode === 'change'" class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="backToBase">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
-        <view v-else class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="leave">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
+        <view class="rb-bar-space" />
       </view>
 
       <!-- ── 默认态:当前地址 + 更换入口 + 历史(规格 ⑤)── -->
@@ -245,6 +221,23 @@
       </view>
     </view>
     <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
+    <template #pageFixed>
+      <view v-if="step === 'form'" class="rb-bar">
+        <view class="nx-rebind-cancel-link rb-bar__btn rb-bar__btn--ghost nx-frosted-button" role="button" tabindex="0" @click="cancelForm" @keydown.enter.prevent="cancelForm" @keydown.space.prevent="cancelForm">
+          <text>{{ t.addrRebind.cancelCta }}</text>
+        </view>
+        <view
+          class="nx-rebind-start-cta rb-bar__btn"
+          :class="{ 'rb-bar__btn--on': canProceed && !otpSending }"
+          role="button" tabindex="0"
+          :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
+          @click="proceedToOtp"
+          @keydown.enter.prevent="proceedToOtp" @keydown.space.prevent="proceedToOtp"
+        >
+          <text>{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
+        </view>
+      </view>
+    </template>
   </AppChassis>
 </template>
 
@@ -341,6 +334,12 @@ const canProceed = computed(() => newAddress.value.trim().length > 0);
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
+// Paste from the clipboard into the address well; validation runs on proceed exactly as for typed input.
+function pasteAddress() {
+  uni.getClipboardData({ success: (result) => { newAddress.value = String(result.data ?? "").trim(); addrError.value = ""; }, fail: () => {} });
+}
+// Cancel in the fixed bar: back to the current address when changing, otherwise leave the page.
+function cancelForm() { if (mode.value === "change") backToBase(); else leave(); }
 function onAddressInput(e: Event) {
   newAddress.value = detailVal(e);
   addrError.value = "";
@@ -761,30 +760,6 @@ const errorTextStyle: CSSProperties = {
   color: "var(--v5-danger)",
   lineHeight: 1.4,
 };
-function netChipStyle(id: ChainDepositChannel): CSSProperties {
-  const on = network.value === id;
-  return {
-    minHeight: "56px",
-    borderRadius: "16px",
-    gap: "2px",
-    padding: "8px 6px",
-    background: on ? "var(--v5-brand-soft)" : "var(--v5-surface)",
-  };
-}
-function netChipLabelStyle(id: ChainDepositChannel): CSSProperties {
-  return {
-    fontSize: "13px",
-    fontWeight: 600,
-    color: network.value === id ? "var(--v5-brand)" : "var(--v5-ink-2)",
-  };
-}
-const netChipTagStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "var(--v5-brand)",
-  textAlign: "center",
-  lineHeight: 1.3,
-};
 const warnlineStyle: CSSProperties = {
   marginTop: "16px",
   padding: "12px",
@@ -818,13 +793,6 @@ const historyRowStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
 };
-const startCtaStyle = computed<CSSProperties>(() => ({
-  marginTop: "20px",
-  height: "48px",
-  borderRadius: "999px",
-  background: canProceed.value && !otpSending.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: canProceed.value && !otpSending.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-}));
 const otpConfirmStyle = computed<CSSProperties>(() => ({
   marginTop: "20px",
   height: "48px",
@@ -903,6 +871,38 @@ const successRowValStyle: CSSProperties = {
 </script>
 
 <style scoped>
+/* P-45 address: network radio rows, address well with paste, plain safety note, fixed actions. */
+.rb-nets-wrap { margin-top: 15px; }
+.rb-k { display: block; margin: 0 4px 8px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.rb-nets { display: flex; flex-direction: column; gap: 8px; }
+.rb-net { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 16px; box-sizing: border-box; border-radius: var(--v5-radius-m); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+.rb-net:active { transform: scale(.97); }
+.rb-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.rb-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
+.rb-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.rb-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.rb-net--on .rb-net__name { color: var(--v5-brand); }
+.rb-net__sub { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.rb-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
+.rb-net--on .rb-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
+.rb-net--on .rb-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
+.rb-form { margin-top: 24px; }
+.rb-title { display: block; padding: 0 4px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.rb-desc { display: block; margin-top: 4px; padding: 0 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.rb-field { display: flex; align-items: center; gap: 10px; min-height: 56px; margin-top: 8px; padding: 8px 8px 8px 14px; box-sizing: border-box; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .rb-field { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.rb-field__input { flex: 1; min-width: 0; height: 40px; min-height: 40px; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); }
+.rb-paste { position: relative; flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.rb-paste::after { content: ""; position: absolute; inset: -6px -2px; }
+.rb-lock { display: flex; align-items: center; gap: 8px; margin: 12px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
+.rb-lock > svg { flex: none; }
+.rb-bar-space { height: 110px; }
+.rb-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
+.rb-bar__btn--on, .rb-bar__btn--ghost { opacity: 1; cursor: pointer; }
+.rb-bar__btn--ghost.nx-frosted-button { background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-ink) 7%, transparent); box-shadow: var(--ui-glass-edge-shadow); color: var(--v5-ink); }
+.rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .rb-net { transition: none; } .rb-net:active, .rb-bar__btn--on:active, .rb-bar__btn--ghost:active { transform: none; } }
 .nx-rebind-resend-label { display: flex; align-items: center; white-space: pre; font-size: 12px; }
 .nx-rebind-resend-seconds { display: inline-block; flex-shrink: 0; text-align: center; font-family: monospace; font-variant-numeric: tabular-nums; }
 

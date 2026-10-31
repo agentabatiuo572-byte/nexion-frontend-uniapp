@@ -75,6 +75,8 @@ async function mount(messages = en, initial?: DepositIntent) {
   const open = vi.fn(() => true), toast = { error: vi.fn(), success: vi.fn(), warn: vi.fn() };
   const modules: Record<string, unknown> = {
     "@/lib/amount-display": { formatAmount },
+    "@/lib/display-date": { formatDisplayDateTime: (value: number) => new Date(value).toISOString() },
+    "@/store/locale": { useLocaleStore: () => ({ code: "en" }) },
     "@/lib/finance-amount-display": { formatFinanceAmount },
     vue: Vue, "@/components/me/fx-rate-line.vue": { default: Vue.defineComponent(() => () => Vue.h("aside")) },
     "@/i18n/use-t": { useT: () => Vue.ref(messages) }, "@/i18n/format": { fmt },
@@ -95,7 +97,12 @@ async function mount(messages = en, initial?: DepositIntent) {
     if (!(id in modules)) throw new Error(`Unexpected bank amount dependency: ${id}`);
     return modules[id];
   }, exports);
-  const root = node(), app = renderer.createApp(exports.default);
+  // wallet-topup renders the create action in its fixed bar from the pane's exposed state; mirror that host.
+  type Action = { className: string; label: string; enabled: boolean; run: () => void };
+  const pane = Vue.ref<{ primaryAction: Action | null; secondaryAction: Action | null } | null>(null);
+  const bar = (action?: Action | null) => action ? Vue.h("view", { class: action.className, "aria-disabled": !action.enabled, onClick: () => action.run() }, action.label) : null;
+  const host = Vue.defineComponent(() => () => [Vue.h(exports.default, { ref: pane }), bar(pane.value?.secondaryAction), bar(pane.value?.primaryAction)]);
+  const root = node(), app = renderer.createApp(host);
   app.mount(root); cleanups.push(() => app.unmount()); await flush();
   const control = (className: string) => {
     const target = nodes(root).find(entry => String(entry.props.class).split(" ").includes(className));

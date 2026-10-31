@@ -63,33 +63,41 @@
         </view>
       </view>
 
-      <!-- Amount input — de-carded: the field sits on the page floor (topup tone). -->
-      <view class="mx-4" style="padding: 0 2px">
-        <view class="flex items-center justify-between">
-          <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax"  @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
-            <text style="font-size: 12px; color: var(--v5-brand)">{{ t.wallet.useMax }}</text>
+      <!-- P-45: withdrawable balance card — amount anatomy ($ and cents in ink-3) plus what is held back. -->
+      <view class="wd-bal mx-4">
+        <text class="wd-k">{{ t.wallet.withdrawableLabel }}</text>
+        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt"><text class="wd-cur">$</text>{{ amountParts(maxWithdrawable)[0] }}<text class="wd-dec">{{ amountParts(maxWithdrawable)[1] }}</text></text>
+        <text v-else class="wd-bal__amt">—</text>
+        <view v-if="withdrawalFactsDisplayable && heldBuckets" class="wd-locks">
+          <view class="wd-locks__i"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ t.wallet.heldReviewChip }}</text><text class="wd-locks__v">${{ formatAmount(heldBuckets.review) }}</text></view>
+          <view class="wd-locks__i"><text>{{ t.wallet.heldLockedChip }}</text><text class="wd-locks__v">${{ formatAmount(heldBuckets.locked) }}</text></view>
+          <text>{{ t.wallet.heldNotYet }}</text>
+        </view>
+      </view>
+
+      <!-- Amount on a liquid-glass slab over the aura; the minimum sits right under it. -->
+      <view class="wd-stage mx-4">
+        <view class="wd-aura" aria-hidden="true"><view /><view /></view>
+        <view class="wd-slab">
+          <view class="wd-slab__head">
+            <text class="wd-k">{{ t.wallet.amountLabel }}</text>
+            <view class="wd-max" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax"  @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
+              <text>{{ t.wallet.useMax }}</text>
+            </view>
           </view>
+          <view class="wd-amtrow">
+            <text class="wd-amtrow__cur">$</text>
+            <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
+            <text class="wd-amtrow__unit">USDT</text>
+          </view>
+          <view class="wd-k wd-min"><text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}</text><text v-else>—</text></view>
+          <text v-if="withdrawalFactsNeedsRetry || (!withdrawalQuoteRefreshing && !withdrawalActionsFresh)" class="wd-line" role="status">{{ withdrawalReadStatusText }}</text>
+          <view v-if="withdrawalFactsNeedsRetry" class="wd-link" role="button" tabindex="0" :aria-label="t.wallet.retryFunds" @click="retryWithdrawalFacts"  @keydown.enter.prevent="retryWithdrawalFacts" @keydown.space.prevent="retryWithdrawalFacts">
+            <text>{{ t.wallet.retryFunds }}</text>
+          </view>
+          <text v-if="withdrawalFactsDisplayable && withdrawalRatioLine" class="wd-line">{{ withdrawalRatioLine }}</text>
+          <text v-if="withdrawalFactsDisplayable && withdrawalPolicy && limitFacts.perWithdrawalMaximum < maxWithdrawable" class="wd-line">{{ perWithdrawalLimitText }}</text>
         </view>
-        <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
-          <text style="font-family: var(--font-v5); font-size: 26px; color: var(--v5-ink-3)" class="shrink-0">$</text>
-          <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
-          <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
-        </view>
-        <view class="flex items-center justify-between" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">
-          <text v-if="withdrawalFactsDisplayable">{{ t.wallet.withdrawableAvailable }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-v5)">${{ formatAmount(maxWithdrawable) }}</text></text>
-          <text v-else>{{ t.wallet.withdrawableAvailable }} —</text>
-          <text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}</text>
-          <text v-else>—</text>
-        </view>
-        <text v-if="withdrawalFactsNeedsRetry || (!withdrawalQuoteRefreshing && !withdrawalActionsFresh)" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-2)" role="status">{{ withdrawalReadStatusText }}</text>
-        <view v-if="withdrawalFactsNeedsRetry" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.wallet.retryFunds" @click="retryWithdrawalFacts"  @keydown.enter.prevent="retryWithdrawalFacts" @keydown.space.prevent="retryWithdrawalFacts">
-          <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline">{{ t.wallet.retryFunds }}</text>
-        </view>
-        <!-- SPEC-7 ⑤ 默认态: 折叠展示不可提部分(审核中/锁定不参与最大值) -->
-        <text v-if="withdrawalFactsDisplayable && heldLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ heldLine }}</text>
-        <text v-if="withdrawalFactsDisplayable && withdrawalRatioLine" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ withdrawalRatioLine }}</text>
-        <text v-if="withdrawalFactsDisplayable && withdrawalPolicy && limitFacts.perWithdrawalMaximum < maxWithdrawable" class="block tabular-nums" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ perWithdrawalLimitText }}</text>
       </view>
 
       <view v-if="withdrawalRiskNotice" class="mx-4 mt-3 flex items-start" :style="holdBannerStyle">
@@ -102,65 +110,49 @@
         </view>
       </view>
 
-      <!-- 提现网络 — 可选(每网络各有独立当前地址;RM01a ③) -->
-      <view class="mx-4 mt-4" style="padding: 0 2px">
-        <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.networkLabel }}</text>
-        <view class="flex" style="gap: 8px; margin-top: 8px" role="radiogroup" :aria-label="t.wallet.networkLabel">
-          <view
-            v-for="nw in NETWORKS"
-            :key="nw.id"
-            :class="['flex-1 grid place-items-center active:opacity-85 nx-withdraw-network-radio', `nx-withdraw-net-${nw.id.slice(5)}`]"
-            :style="netChipStyle(nw.id)"
-            role="radio" :tabindex="network === nw.id ? 0 : -1"
-            :aria-checked="network === nw.id"
-            @click="pickNetwork(nw.id)"
-
-
-
-            @keydown.enter.prevent="pickNetwork(nw.id)" @keydown.space.prevent="pickNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
-          >
-            <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
+      <!-- 收款信息卡:网络单选(选中=品牌标签)+ 当前网络地址掩码 + 「管理」;未设置 → 卡内引导(RM01a ③⑤) -->
+      <view class="wd-route mx-4">
+        <view class="wd-route__r">
+          <text class="wd-k wd-route__k">{{ t.wallet.networkLabel }}</text>
+          <view class="wd-nets" role="radiogroup" :aria-label="t.wallet.networkLabel">
+            <view
+              v-for="nw in NETWORKS"
+              :key="nw.id"
+              :class="['nx-withdraw-network-radio', `nx-withdraw-net-${nw.id.slice(5)}`, 'wd-net', { 'wd-net--on': network === nw.id }]"
+              role="radio" :tabindex="network === nw.id ? 0 : -1"
+              :aria-checked="network === nw.id"
+              @click="pickNetwork(nw.id)"
+              @keydown.enter.prevent="pickNetwork(nw.id)" @keydown.space.prevent="pickNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
+            >
+              <text>{{ nw.label }}</text>
+            </view>
           </view>
+          <text class="wd-route__note">{{ networkHint(network) }}</text>
         </view>
-        <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ networkHint(network) }}</text>
-        <text v-if="withdrawalChannelStatusText" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ withdrawalChannelStatusText }}</text>
-      </view>
-
-      <!-- 提现地址(RM01a ⑤:当前网络地址掩码中段 + 「管理」入口;未设置 → 内联引导卡,不是拦截态) -->
-      <view class="mx-4 mt-4" style="padding: 0 2px">
-        <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.withdrawAddressLabel }}</text>
-        <view v-if="boundAddress" class="mt-2 flex items-center" :style="boundAddrRowStyle">
-          <view class="flex-1 min-w-0">
-            <text class="font-mono" style="font-size: 13px; color: var(--v5-ink); white-space: nowrap">{{ boundAddressShort }}</text>
-          </view>
+        <view class="wd-route__r">
+          <text class="wd-k wd-route__k">{{ t.wallet.withdrawAddressLabel }}</text>
+          <text v-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
+          <text v-else class="wd-route__a wd-route__a--empty">{{ t.addrRebind.emptyGuideTitle }}</text>
           <view
-            class="nx-withdraw-manage-entry grid place-items-center shrink-0 active:opacity-80"
-            :style="manageEntryStyle"
+            v-if="boundAddress"
+            class="nx-withdraw-manage-entry wd-manage nx-frosted-button"
             role="button" tabindex="0"
             :aria-label="t.addrRebind.manageCta"
             @click="goManage"
-
             @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage"
           >
-            <text :style="manageEntryTextStyle">{{ t.addrRebind.manageCta }}</text>
+            <text>{{ t.addrRebind.manageCta }}</text>
           </view>
         </view>
-        <!-- 空状态引导卡(一次设置长期使用;非报错态) -->
-        <view v-else class="mt-2" :style="addrGuideStyle">
-          <view class="flex items-start" style="gap: 10px">
-            <view class="shrink-0 grid place-items-center" :style="addrGuideIconStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.addrRebind.emptyGuideTitle }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.4">{{ t.addrRebind.emptyGuideBody }}</text>
-            </view>
-          </view>
-          <view class="nx-withdraw-add-address-cta mt-3 w-full grid place-items-center active:opacity-85" :style="addrGuideCtaStyle" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage"  @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
-            <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 600">{{ t.addrRebind.addCta }}</text>
+        <!-- 空状态引导(一次设置长期使用;非报错态) -->
+        <view v-if="!boundAddress" class="wd-route__guide">
+          <text class="wd-route__guide-body">{{ t.addrRebind.emptyGuideBody }}</text>
+          <view class="nx-withdraw-add-address-cta wd-add nx-frosted-button" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage"  @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
+            <text>{{ t.addrRebind.addCta }}</text>
           </view>
         </view>
       </view>
+      <text v-if="withdrawalChannelStatusText" class="wd-note mx-4">{{ withdrawalChannelStatusText }}</text>
 
       <!-- Summary: gross fee → NEX offset → net fee → receive (de-carded to floor) -->
       <!-- FEAT-WD01c ⑤ 明细区四态。优先级:失败 > 加载 > 未输入金额 > 默认。
@@ -169,102 +161,51 @@
       <!-- 🔴 加载态必须排在失败态**前面**(2026-07-31 复验漏网点):
            重试只可能从失败态发起,若失败态 v-if 在前,骨架永远抢不到 —— 那是死 UI。
            顺序:加载中 > 不可用 > 未输入金额 > 默认。 -->
+      <!-- 明细井:网络确认费 → UVT 抵扣开关 → 实际到账(画板顺序);各态条件与原先一致。 -->
+      <view v-if="withdrawalPolicyCurrent || (feeConfigUsable && amountNum > 0 && !quoteBlocked)" class="wd-fee mx-4">
       <template v-if="withdrawalPolicyCurrent">
-      <view v-if="feeConfigLoading" class="mx-4 mt-4 space-y-1.5" style="padding: 0 2px">
+      <view v-if="feeConfigLoading" class="wd-fee__sk">
         <view v-for="i in 3" :key="i" class="flex items-center justify-between">
           <view :style="feeSkeletonLabelStyle" />
           <view :style="feeSkeletonValueStyle" />
         </view>
       </view>
-      <view v-else-if="withdrawalPolicyCurrent && NETWORKS.length === 0" class="mx-4 mt-4" style="padding: 0 2px">
-        <text style="font-size: 12px; color: var(--v5-warning)">{{ t.wallet.withdrawalChannelsClosed }}</text>
+      <view v-else-if="withdrawalPolicyCurrent && NETWORKS.length === 0" class="wd-fee__msg">
+        <text class="wd-warn">{{ t.wallet.withdrawalChannelsClosed }}</text>
       </view>
-      <view v-else-if="!feeConfigUsable" class="mx-4 mt-4" style="padding: 0 2px">
+      <view v-else-if="!feeConfigUsable" class="wd-fee__msg">
         <view class="flex items-center justify-between">
-          <text style="font-size: 12px; color: var(--v5-warning)">{{ t.walletV3.feeConfigUnavailableTitle }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px"
-            role="button" tabindex="0" :aria-label="t.walletV3.feeConfigRetry" @click="retryFeeConfig"
+          <text class="wd-warn">{{ t.walletV3.feeConfigUnavailableTitle }}</text>
+          <view class="wd-link" role="button" tabindex="0" :aria-label="t.walletV3.feeConfigRetry" @click="retryFeeConfig"
              @keydown.enter.prevent="retryFeeConfig" @keydown.space.prevent="retryFeeConfig">
-            <text style="font-size: 12px; color: var(--v5-brand)">{{ t.walletV3.feeConfigRetry }}</text>
+            <text>{{ t.walletV3.feeConfigRetry }}</text>
           </view>
         </view>
-        <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.4">{{ t.walletV3.feeConfigUnavailableBody }}</text>
+        <text class="wd-line">{{ t.walletV3.feeConfigUnavailableBody }}</text>
       </view>
       <!-- 空状态:金额未输入 —— 给占位说明,不留空白也不显示 $0.00 假明细 -->
-      <view v-else-if="amountNum <= 0" class="mx-4 mt-4" style="padding: 0 2px">
-        <text class="block" style="font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ t.walletV3.feeDetailPlaceholder }}</text>
+      <view v-else-if="amountNum <= 0" class="wd-fee__msg">
+        <text class="wd-line">{{ t.walletV3.feeDetailPlaceholder }}</text>
       </view>
-      <!-- 🔴 金额超出可提范围:**给原因,不给报价**(2026-08-01 走查 P0-3)。
-           实测余额 $24,856 时输 99999,页面照样算完整套明细并写「你会收到 $84,750.20」,
-           下面还接一张「质押 180 天将变成 $139,450」的预测卡 —— 一整屏精确到分的数字
-           在给一个根本提交不了的金额背书,只有最底下按钮的小字说余额不够。
-           低于最低额($19)同理。报价必须只对真能提交的金额出。 -->
-      <view v-else-if="quoteBlocked" class="mx-4 mt-4" style="padding: 0 2px">
-        <text v-if="withdrawalActionsFresh" class="block" style="font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ submitDisabledReason }}</text>
+      <!-- 🔴 金额超出可提范围:**给原因,不给报价**(2026-08-01 走查 P0-3)。报价必须只对真能提交的金额出。 -->
+      <view v-else-if="quoteBlocked" class="wd-fee__msg">
+        <text v-if="withdrawalActionsFresh" class="wd-warn">{{ submitDisabledReason }}</text>
       </view>
-      <view v-else class="mx-4 mt-4 space-y-1.5" style="padding: 0 2px">
-        <!-- FEAT-WD02:单行网络确认费(每笔固定,按当前绑定网络取键;$0 显示 $0.00 不藏行)。
-             「?」打开费用说明半屏(规格 ⑥ 新增交付物)。 -->
-        <view class="flex items-center justify-between">
-          <view class="inline-flex items-center" style="gap: 2px">
-            <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.walletV3.feeConfirmRow }}</text>
-            <view class="grid place-items-center active:opacity-60" style="min-width: 44px; min-height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true"  @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
-            </view>
+      <!-- FEAT-WD02:单行网络确认费(每笔固定;$0 显示 $0.00 不藏行)。「?」打开费用说明半屏。 -->
+      <view v-else class="wd-fee__r">
+        <view class="inline-flex items-center" style="gap: 2px">
+          <text class="wd-k">{{ t.walletV3.feeConfirmRow }}</text>
+          <view class="grid place-items-center active:opacity-60" style="min-width: 44px; min-height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true"  @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
           </view>
-          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">−${{ formatAmount(networkConfirmUsd) }}</text>
         </view>
-        <view v-if="nexBurned > 0" class="flex items-center justify-between">
-          <text style="font-size: 12px; color: var(--v5-brand)">{{ t.walletV3.feeOffsetRow }}</text>
-          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-brand)">+${{ formatAmount(feeWaived) }} · {{ fmtNex(nexBurned) }} UVT</text>
-        </view>
-        <view v-if="offsetWithNex" class="flex items-center justify-between">
-          <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.walletV3.feeCharged }}</text>
-          <text class="tabular-nums" :style="{ fontSize: '13px', fontWeight: 600, color: fee > 0 ? 'var(--v5-ink)' : 'var(--v5-brand)' }">${{ formatAmount(fee) }}</text>
-        </view>
-        <view class="flex items-center justify-between" style="margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--v5-border)">
-          <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.wallet.receiveLabel }}</text>
-          <text class="tabular-nums" style="font-size: 20px; font-weight: 600">${{ formatAmount(receive) }}</text>
-        </view>
+        <text class="wd-fee__v">−${{ formatAmount(networkConfirmUsd) }}</text>
       </view>
-
       </template>
-      <!-- Known withdrawal conditions; read failures have one recovery above. -->
-      <view v-if="withdrawalPolicyCurrent && dailyFactsDisplayable && ((feeConfigUsable && amountNum > 0 && !quoteBlocked) || limitFacts.dailyLimitConfigured)" class="mx-4 mt-3 rounded-2xl" :style="warnBoxStyle">
-        <view class="flex items-start" style="gap: 8px; font-size: 12px; color: var(--v5-warning)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-          <view class="space-y-1" style="line-height: 1.4">
-            <!-- 最低额只在金额区显示一次(minAmountLine);这里只留抵扣提示。抵扣提示单独挂 feeConfigUsable 门:
-                 费率不可用时上方已换成「费率更新中」,这句再说「上方手续费可抵扣」就是悬空指代。 -->
-            <!-- 抵扣半句必须同时满足:费率可用 **且** 已输入金额。
-                 少任一个都会变成悬空指代 —— 未输入金额时明细区是「输入金额后显示费用明细」,
-                 上方并没有任何手续费可言;而这正是打开提现页的落地首屏,看的人最多。
-                 分隔空格用 {{ ' ' }} 显式写,直接写在标签间的前导空格会被编译器吃掉
-                 (实测渲染成 `$20.The fee…` 粘在一起)。 -->
-            <text v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked" class="block">{{ t.wallet.minWithdrawNoteOffset }}</text>
-            <!-- 🔴 这句只在**闸真的会拦**时才出现:limitCount ≤0 = 服务端没配 / policy 拉不到,
-                 判定层按「不限制」走,这时再说一句「每日限额:0 笔/日」就是当场撒谎
-                 (实景实测:后端不可达时它真的渲染成 0 笔/日)。
-                 「有没有这句话」与「闸生不生效」从此是同一个条件,不会再各走各的。 -->
-            <text v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- Reverse-talk staking alternative -->
-      <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
-
-      <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关;取代旧「强制自动抵扣 + 进度条」面板) -->
-      <!-- 🔴 费率不可用时整块隐藏(历史漏网教训保留):
-           本面板文案全从费用算出来,坏配置下会渲染 NaN;失败态下更糟 —— 上方写着
-           「费率不可用、已暂停提交」,这里同屏还笃定显示抵扣数字,自相矛盾。
-           凡是吃费用数据的区块,都必须挂同一个 feeConfigUsable 门,不能只给费用明细区加。 -->
-      <view v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked" class="mx-4 mt-3 rounded-2xl" :style="nexGateStyle">
-        <view class="flex items-center justify-between" style="gap: 12px">
-          <view class="flex items-center min-w-0" :style="nexGateLabelStyle">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="offsetWithNex ? 'var(--v5-brand)' : 'var(--v5-brand-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 3 1.9 4.6L16 9.5l-4.6 1.9L9.5 16l-1.9-4.6L3 9.5l4.6-1.9z" /></svg>
-            <text style="margin-left: 6px">{{ t.walletV3.feeOffsetToggle }}</text>
-          </view>
+      <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关)。🔴 费率不可用时整块隐藏:凡是吃费用数据的区块都挂 feeConfigUsable 门。 -->
+      <view v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked" class="wd-fee__offset">
+        <view class="wd-fee__r">
+          <text class="wd-k">{{ t.walletV3.feeOffsetToggle }}</text>
           <!-- 自绘开关(禁用原生 button/switch 元素,uni 默认样式过重):外层 44pt 热区,内层 track+knob。
                NEX=0 置灰不可开,原因写在下方 hint + 去赚 NEX 入口。 -->
           <view
@@ -284,12 +225,38 @@
             </view>
           </view>
         </view>
-        <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4">{{ offsetHintText }}</text>
+        <text class="wd-fee__hint">{{ offsetHintText }}</text>
         <!-- NEX=0:开关置灰 + 去赚 NEX 入口(复用 earn 路由;去了再回来,页面实例保留,开关状态不丢) -->
-        <view v-if="offsetToggleDisabled" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex"  @keydown.enter.prevent="goEarnNex" @keydown.space.prevent="goEarnNex">
-          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.walletV3.earnNexCta }} →</text>
+        <view v-if="offsetToggleDisabled" class="wd-link" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex"  @keydown.enter.prevent="goEarnNex" @keydown.space.prevent="goEarnNex">
+          <text>{{ t.walletV3.earnNexCta }} →</text>
         </view>
       </view>
+      <template v-if="withdrawalPolicyCurrent && feeDetailReady">
+        <view v-if="nexBurned > 0" class="wd-fee__r">
+          <text class="wd-k wd-k--brand">{{ t.walletV3.feeOffsetRow }}</text>
+          <text class="wd-fee__v wd-fee__v--brand">+${{ formatAmount(feeWaived) }} · {{ fmtNex(nexBurned) }} UVT</text>
+        </view>
+        <view v-if="offsetWithNex" class="wd-fee__r">
+          <text class="wd-k">{{ t.walletV3.feeCharged }}</text>
+          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">${{ formatAmount(fee) }}</text>
+        </view>
+        <view class="wd-fee__r wd-fee__r--net">
+          <text class="wd-k">{{ t.wallet.receiveLabel }}</text>
+          <text class="wd-fee__net"><text class="wd-cur">$</text>{{ amountParts(receive)[0] }}<text class="wd-dec">{{ amountParts(receive)[1] }}</text></text>
+        </view>
+      </template>
+      </view>
+
+      <!-- 当日额度:圆点 = 每日笔数(已用为实心);「有没有这句话」与「闸生不生效」同一个条件(limitCount ≤0 不显示)。 -->
+      <template v-if="withdrawalPolicyCurrent">
+        <view v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="wd-quota mx-4">
+          <view v-for="i in Math.min(dailyFacts.limitCount, 10)" :key="i" class="wd-quota__pip" :class="{ 'wd-quota__pip--used': i <= limitFacts.dailyUsedCount }" aria-hidden="true" />
+          <text>{{ dailyUsageText }}</text>
+        </view>
+      </template>
+
+      <!-- Reverse-talk staking alternative -->
+      <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
 
       <!-- 费用说明半屏(规格 ⑥ 新增):仅网络确认费含义 + NEX 抵扣规则,无按金额比例的旧费率段落。
            范式同 device-deactivate-sheet(scrim z79 + slide-up panel z80,safe-area padding)。 -->
@@ -309,29 +276,21 @@
         </view>
       </view>
 
-      <!-- Sticky submit -->
-      <view class="mx-4 mt-4" style="padding-bottom: 12px">
+      <view class="wd-bar-space" />
+    </view>
+    <!-- 主操作在底部固定栏(DS-30);不可提交时原因写在按钮上方。 -->
+    <template #pageFixed>
+      <view class="wd-bar">
+        <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why">{{ submitDisabledReason }}</text>
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
-        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" :style="submitBtnStyle" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
+        <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
-            <template v-if="submitting">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-              <text>{{ t.wallet.submitChecking }}</text>
-            </template>
-            <template v-else-if="canSubmitAction">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <text>{{ pendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.submitCtaPaired }}</text>
-            </template>
-            <template v-else>
-              <view class="grid place-items-center" style="gap: 2px">
-                <text>{{ t.walletV3.submitCtaDisabled }}</text>
-                <text v-if="submitHintVisible" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ submitDisabledReason }}</text>
-              </view>
-            </template>
+            <svg v-if="submitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+            <text>{{ submitting ? t.wallet.submitChecking : canSubmitAction ? (pendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.submitCtaPaired) : t.walletV3.submitCtaDisabled }}</text>
           </view>
         </view>
       </view>
-    </view>
+    </template>
   </AppChassis>
 </template>
 
@@ -951,7 +910,6 @@ const nexBurned = computed(() => activeFee.value.nexBurned);
 const feeWaived = computed(() => activeFee.value.feeWaived);
 const fee = computed(() => activeFee.value.actualFee);
 const receive = computed(() => activeFee.value.netReceive);
-const fullyWaived = computed(() => amountNum.value > 0 && fee.value <= 0.001);
 /** 开关置灰判据:没有 NEX 可抵(NEX=0 → 置灰 + 去赚 NEX 入口,规格 ② 异常1)。 */
 const offsetToggleDisabled = computed(() => nexBalance.value <= 0);
 function toggleOffset() {
@@ -1035,14 +993,16 @@ function clearSubmitFreeze() {
   submittingNexBalance.value = null;
 }
 // ⑤ 默认态: 审核中/锁定金额折叠展示(不参与可提最大值)。
-const heldLine = computed(() => {
+// Held funds shown as chips on the balance card (confirming / pending release); nothing when both are zero.
+const heldBuckets = computed(() => {
   const b = earningsReleaseSnapshot.value?.buckets;
-  if (!b || (b.pending_review <= 0 && b.bonus_locked <= 0)) return "";
-  return fmt(t.value.wallet.heldBucketsLine, {
-    p: formatAmount(b.pending_review),
-    l: formatAmount(b.bonus_locked),
-  });
+  return !b || (b.pending_review <= 0 && b.bonus_locked <= 0) ? null : { review: b.pending_review, locked: b.bonus_locked };
 });
+// Amount anatomy: whole part and cents rendered separately so the cents can sit in ink-3.
+function amountParts(value: number): [string, string] {
+  const text = formatAmount(value), at = text.lastIndexOf(".");
+  return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
+}
 // 风控提示按命中原因给业务话术(工程码不直出;空时退回通用文案;码表单源 lib/risk-reason-text)。
 // ── 🔴 小额免审快车道的**双向告知**(走查:能力在跑,但一个字都没告诉用户)──
 /** 小额线(后台 D5 可配,禁写死 —— 运营调了这里必须跟着变)。 */
@@ -1061,6 +1021,8 @@ const quoteDisplayBlocked = computed(() =>
   && !withdrawalQuoteRefreshing.value
   && submitDisabledReason.value !== "",
 );
+// The fee detail rows (confirm fee + receive) show only for an amount that can actually be quoted.
+const feeDetailReady = computed(() => !feeConfigLoading.value && NETWORKS.value.length > 0 && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value);
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );
@@ -1256,21 +1218,16 @@ async function handleSubmit() {
   submittingNexBalance.value = app.user.nexBalance;
   // FEAT-WD02 ⑥「提交提现 → 现有确认弹窗」:金额 / 单行网络确认费 / NEX 抵扣消耗(开了才显)
   // / 到手金额;取消 = 弹窗自带 Cancel,退出且不建单(业务链取消出口)。
-  // message 为纯文本(ui store MVP text-only),费用行以 i18n 拼串表达,不动 ConfirmOptions。
-  const confirmBody =
-    snap.quote.nexBurned > 0
-      ? fmt(t.value.walletV3.withdrawConfirmBodyNex, {
-          amount: formatAmount(snap.amount),
-          fee: formatAmount(snap.quote.networkConfirmUsd),
-          waived: formatAmount(snap.quote.feeWaived),
-          nex: fmtNex(snap.quote.nexBurned),
-          receive: formatAmount(snap.quote.netReceive),
-        })
-      : fmt(t.value.walletV3.withdrawConfirmBody, {
-          amount: formatAmount(snap.amount),
-          fee: formatAmount(snap.quote.networkConfirmUsd),
-          receive: formatAmount(snap.quote.netReceive),
-        });
+  // 新提现用明细行(ConfirmOptions.rows);重放仍是纯文本说明。
+  // The same frozen quote as rows: amount, network fee, UVT offset (only when used), network, address, received.
+  const confirmRows = [
+    { label: t.value.walletV3.withdrawRowAmount, value: `$${formatAmount(snap.amount)} USDT` },
+    { label: t.value.walletV3.feeConfirmRow, value: `−$${formatAmount(snap.quote.networkConfirmUsd)}` },
+    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+$${formatAmount(snap.quote.feeWaived)} · ${fmtNex(snap.quote.nexBurned)} UVT` }] : []),
+    { label: t.value.wallet.networkLabel, value: NETWORKS.value.find((nw) => nw.id === snap.network)?.label ?? "" },
+    { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address) },
+    { label: t.value.wallet.receiveLabel, value: `$${formatAmount(snap.quote.netReceive)}`, amount: true },
+  ];
   // 重放走**另一份**确认文案:用户点的是「提现」,发出去的却是上一笔 —— 不明说等于替他做主。
   // 这里打冻结件的金额/网络/地址,不打新报价:重放的费用由服务端按冻结的 policyVersion 定,
   // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。
@@ -1286,7 +1243,10 @@ async function handleSubmit() {
   try {
     confirmed = await uiConfirm({
       title: pending ? t.value.walletV3.withdrawResendTitle : t.value.walletV3.withdrawConfirmTitle,
-      message: pending ? resendBody : confirmBody,
+      // A new withdrawal shows the frozen quote as a detail list (P-45); the replay keeps its own wording.
+      message: pending ? resendBody : undefined,
+      rows: pending ? undefined : confirmRows,
+      glyph: pending ? undefined : "withdraw",
       confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
     });
   } finally {
@@ -1514,41 +1474,7 @@ async function handleSubmit() {
 
 // ── styles ──
 // 空态引导卡(brand soft tint,非报错态;卡内嵌套零 border)。
-const addrGuideStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--v5-brand) 8%, transparent)",
-  borderRadius: "16px",
-  padding: "16px",
-};
-const addrGuideIconStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "10px",
-  background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
-};
-const addrGuideCtaStyle: CSSProperties = {
-  height: "48px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-  // 🔴 亮底文字必须用 --v5-on-brand(主 CTA 同规)。
-  color: "var(--v5-on-brand)",
-};
 // 网络 chips(与地址管理页同语汇;选中 brand-soft,未选 surface)。
-function netChipStyle(id: CryptoNetwork): CSSProperties {
-  const on = network.value === id;
-  return {
-    minHeight: "44px",
-    borderRadius: "12px",
-    padding: "8px 6px",
-    background: on ? "var(--v5-brand-soft)" : "var(--v5-surface)",
-  };
-}
-function netChipLabelStyle(id: CryptoNetwork): CSSProperties {
-  return {
-    fontSize: "13px",
-    fontWeight: 600,
-    color: network.value === id ? "var(--v5-brand)" : "var(--v5-ink-2)",
-  };
-}
 const resetBtnStyle: CSSProperties = {
   height: "28px",
   padding: "0 8px",
@@ -1568,44 +1494,7 @@ const holdIconStyle: CSSProperties = {
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
 };
-const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
-const amountInputStyle: CSSProperties = {
-  background: "transparent",
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
 // 地址行(L1 零描边)+ 「管理」入口(tap ≥ 44)。
-const boundAddrRowStyle: CSSProperties = {
-  minHeight: "48px",
-  // 该行贴在页面底上:原 surface-3 对页面底亮色仅 ΔE 2.7(分不出),改 L1
-  // (与 goals 的目标输入框同型处理)。行内那颗改绑按钮仍是 surface-2/brand-soft,
-  // 对新的白底 ΔE 4.6,不撞色。
-  background: "var(--v5-surface)",
-  borderRadius: "12px",
-  padding: "2px 2px 2px 12px",
-  boxSizing: "border-box",
-  gap: "8px",
-};
-const manageEntryStyle: CSSProperties = {
-  minHeight: "44px", // tap ≥ 44
-  minWidth: "64px",
-  padding: "0 14px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-soft)",
-};
-const manageEntryTextStyle: CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-brand)",
-};
 // 冻结横幅(danger soft tint;prototype wd-freeze 同款语汇)。
 const freezeBannerStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
@@ -1618,25 +1507,7 @@ const freezeIconStyle: CSSProperties = {
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-danger) 16%, transparent)",
 };
-const warnBoxStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-  padding: "16px",
-};
 // 抵扣面板:soft tint 无描边(卡内嵌套禁 border);开着且全额抵扣 → brand,其余 → brand-2。
-const nexGateStyle = computed<CSSProperties>(() => ({
-  padding: "14px 16px",
-  background: offsetWithNex.value && fullyWaived.value
-    ? "color-mix(in srgb, var(--v5-brand) 8%, transparent)"
-    : "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-}));
-const nexGateLabelStyle = computed<CSSProperties>(() => ({
-  gap: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: offsetWithNex.value ? "var(--v5-brand)" : "var(--v5-brand-2)",
-}));
 // 自绘开关:外层热区 ≥44pt(负 margin 不撑行高),内层 track 44×26 + knob 20。
 const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", margin: "-9px -6px" };
 const switchTrackStyle = computed<CSSProperties>(() => ({
@@ -1657,11 +1528,9 @@ const switchKnobStyle = computed<CSSProperties>(() => ({
   width: "20px",
   height: "20px",
   borderRadius: "999px",
-  background: offsetToggleDisabled.value
-    ? "var(--v5-ink-4)"
-    : offsetWithNex.value
-      ? "var(--v5-on-brand)"
-      : "var(--v5-ink-3)",
+  // Hardware-white knob on both themes (board .sw), dimmed only when the toggle cannot be used.
+  background: offsetToggleDisabled.value ? "var(--v5-ink-4)" : "white",
+  boxShadow: "0 1px 3px rgba(0,0,0,.3)",
   transform: offsetWithNex.value ? "translateX(18px)" : "translateX(0)",
   transition: "transform 160ms ease",
 }));
@@ -1715,20 +1584,86 @@ const feeWhyBodyStyle: CSSProperties = {
   lineHeight: 1.5,
 };
 useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () => { feeWhyOpen.value = false; });
-const submitBtnStyle = computed<CSSProperties>(() => ({
-  height: "48px",
-  borderRadius: "999px",
-  background: canSubmitAction.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  // 🔴 页面主 CTA。用 --v5-ink 实测对比度 **1.54:1**(暗色主题下亮绿底配浅色字),
-  // 换成 --v5-on-brand 是 11.98:1。禁用态是灰底灰字,不走 on-brand。
-  color: canSubmitAction.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-button)",
-  fontWeight: 600,
-}));
 
 
 
 
 
 </script>
+
+<style scoped>
+/* P-45 USDT withdrawal: balance card, amount on liquid glass, route card, recessed fee well, quota pips, fixed submit. */
+.wd-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.wd-k--brand { color: var(--v5-brand); }
+.wd-cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
+.wd-dec { color: var(--v5-ink-3); }
+.wd-bal { margin-top: 15px; padding: 16px 16px 14px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.wd-bal > .wd-k { padding-top: 3px; }
+.wd-bal__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 30px/36px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wd-locks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.wd-locks__i { display: inline-flex; align-items: center; gap: 4px; }
+.wd-locks__v { color: var(--v5-ink-2); font: 500 12px/16px var(--font-metric); }
+.wd-stage { position: relative; margin-top: 12px; }
+.wd-aura { position: absolute; inset: -8px -6px; pointer-events: none; }
+.wd-aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
+.wd-aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-brand) 22%, transparent); }
+.wd-aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent); }
+[data-theme="light"] .wd-aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
+[data-theme="light"] .wd-aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
+.wd-slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl);
+  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 15%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent), transparent 70%), rgba(255,255,255,.085);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
+  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); }
+[data-theme="light"] .wd-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
+  box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
+.wd-slab__head { display: flex; align-items: center; justify-content: space-between; }
+.wd-max { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.wd-max::after { content: ""; position: absolute; inset: -6px -8px; }
+.wd-max[aria-disabled="true"] { opacity: .5; }
+.wd-amtrow { display: flex; align-items: baseline; margin-top: 4px; }
+.wd-amtrow__cur { margin-right: 2px; color: var(--v5-ink-3); font: 500 22px/48px var(--font-amount); }
+.wd-amtrow__input { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 64px); height: 48px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.wd-amtrow__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
+.wd-min { margin-top: 2px; }
+.wd-line { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); font-variant-numeric: tabular-nums; }
+.wd-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--v5-brand); font: 500 12px/18px var(--font-v5); cursor: pointer; }
+.wd-route { margin-top: 12px; padding: 4px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.wd-route__r { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.wd-route__r + .wd-route__r { border-top: 1px solid var(--v5-border); }
+.wd-route__k { flex: none; width: 52px; }
+.wd-nets { display: flex; flex: none; gap: 6px; }
+.wd-net { position: relative; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); cursor: pointer; }
+.wd-net::after { content: ""; position: absolute; inset: -10px -2px; }
+.wd-net--on { background: var(--v5-brand-soft); color: var(--v5-brand); }
+.wd-net:focus-visible, .wd-manage:focus-visible, .wd-add:focus-visible, .wd-submit:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.wd-route__note { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-route__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
+.wd-route__a--empty { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.wd-manage, .wd-add { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.wd-manage::after, .wd-add::after { content: ""; position: absolute; inset: -6px -2px; }
+.wd-route__guide { padding: 0 0 14px; }
+.wd-route__guide-body { display: block; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-add { margin-top: 10px; --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); color: var(--v5-brand); }
+.wd-note { display: block; margin-top: 6px; padding: 0 4px; color: var(--v5-ink-4); font: 400 12px/18px var(--font-v5); }
+.wd-fee { margin-top: 12px; padding: 4px 16px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .wd-fee { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.wd-fee__r { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; border-top: 1px solid var(--v5-border); }
+.wd-fee > .wd-fee__r:first-child, .wd-fee > .wd-fee__offset:first-child > .wd-fee__r, .wd-fee__r--net { border-top: 0; }
+.wd-fee__v { color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wd-fee__v--brand { color: var(--v5-brand); }
+.wd-fee__hint { display: block; margin: -4px 0 10px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-fee__net { color: var(--v5-ink); font: 500 22px/28px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wd-fee__msg, .wd-fee__sk { padding: 12px 0; }
+.wd-fee__sk { display: flex; flex-direction: column; gap: 8px; }
+.wd-warn { display: block; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
+.wd-quota { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 0 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-quota__pip { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
+.wd-quota__pip--used { background: var(--v5-ink-3); box-shadow: none; }
+.wd-bar-space { height: 120px; }
+.wd-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.wd-bar__why { position: absolute; left: 16px; right: 16px; top: -28px; text-align: center; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
+.wd-submit--on { opacity: 1; cursor: pointer; }
+.wd-submit--on:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .wd-submit--on:active { transform: none; } }
+</style>

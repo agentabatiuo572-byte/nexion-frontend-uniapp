@@ -445,7 +445,7 @@ test("Native display rounds to two places while preserving six-decimal credit an
     const transfer = { ...rows[1], grossAmountUsdt: 10.123456, creditedUsdt: 9.123456 };
     const h = await pane({ ...address, creditEnabled: true }, [transfer]);
     const record = controls(h.root, "nx-dep-record-row")[0];
-    expect(nodesOf(record).filter(target => target.kind === "text").map(textOf)).toContain("9.12");
+    expect(nodesOf(record).filter(target => target.kind === "text").map(textOf)).toContain("+9.12"); // credited rows lead with "+"
     expect(h.text()).toContain("$10.00");
     expect(h.text()).toContain("1.00 USDT");
     expect((h.state.serverRecords as Vue.Ref<unknown[]>).value[0]).toMatchObject({

@@ -58,9 +58,10 @@ check("不可用时提交被拦(submitDisabledReason 里有这道门)",
 //    改法:锚定**这个门和 NEX 面板的容器写在同一个标签上**。
 check("🔴 NEX 抵扣面板本体挂了 feeConfigUsable 门(坏配置不渲染 NaN)",
   // 结构锚定 + **允许附加条件**:pin 整串会在正当地多挂一道门时假红(2026-08-01 加
-  // quoteBlocked「提交不了就不给报价」时踩到),但仍必须与 nexGateStyle 写在同一标签上。
+  // quoteBlocked「提交不了就不给报价」时踩到),但仍必须与面板容器写在同一标签上。
+  // 2026-11-01 P-45 改版:面板并入明细井,容器锚点由 :style="nexGateStyle" 换成 class="wd-fee__offset"。
   (() => {
-    const m = code.match(/<view v-if="([^"]*)"[^>]*:style="nexGateStyle">/);
+    const m = code.match(/<view v-if="([^"]*)"[^>]*class="wd-fee__offset">/);
     return !!m && m[1].includes("feeConfigUsable") && m[1].includes("amountNum > 0");
   })(),
   "该面板只按金额门控 = 坏配置漏 NaN + 失败态显示与提示矛盾的费用数字");
@@ -72,9 +73,15 @@ check("费用明细区在不可用时整块换成失败态",
 // 上方并无任何手续费,这句就成了悬空指代;而那正是打开提现页的落地首屏。
 check("🔴 警告框的抵扣提示同时挂「费率可用」与「已输入金额」两个门",
   (() => {
-    // 同上:锚定到抵扣半句**自己**那个 <text> 的 v-if,允许其上再叠别的门。
-    const m = code.match(/<text v-if="([^"]*)"[^>]*>\{\{ t\.wallet\.minWithdrawNoteOffset \}\}<\/text>/);
-    return !!m && m[1].includes("feeConfigUsable") && m[1].includes("amountNum > 0");
+    // 同上:锚定到抵扣说明**自己**所在容器的 v-if,允许其上再叠别的门。
+    // 2026-11-01 P-45 改版:警告框撤掉,抵扣说明只剩开关下的 offsetHintText(全页唯一一处);
+    // 旧半句 minWithdrawNoteOffset 若再出现,同样必须两门齐挂。
+    const m = code.match(/<view v-if="([^"]*)" class="wd-fee__offset">[\s\S]*?\{\{ offsetHintText \}\}/);
+    const legacy = [...code.matchAll(/<text v-if="([^"]*)"[^>]*>\{\{ t\.wallet\.minWithdrawNoteOffset \}\}<\/text>/g)];
+    const gated = (cond) => cond.includes("feeConfigUsable") && cond.includes("amountNum > 0");
+    return !!m && gated(m[1]) && code.split("{{ offsetHintText }}").length === 2
+      && code.split("t.wallet.minWithdrawNoteOffset").length === legacy.length + 1
+      && legacy.every((x) => gated(x[1]));
   })(),
   "少任一个都会变成悬空指代(失败态 / 未输入金额态)");
 // 🔴 分隔符必须放在**各语言串自身**,模板里不得硬编码空格。
@@ -114,7 +121,7 @@ check("🔴 加载态排在失败态之前(否则重试期间骨架永远抢不�
 check("空状态(未输入金额)存在且排在默认态之前",
   orderEmpty > orderUnusable);
 check("四态齐(加载 / 不可用 / 未输入 / 默认)",
-  orderLoading >= 0 && orderUnusable >= 0 && orderEmpty >= 0 && /v-else class="mx-4 mt-4 space-y-1\.5"/.test(code));
+  orderLoading >= 0 && orderUnusable >= 0 && orderEmpty >= 0 && /<view v-else class="wd-fee__r">/.test(code));
 check("失败态给了重试出口",
   /@click="retryFeeConfig"/.test(code) && /async function retryFeeConfig/.test(code));
 check("重试真能重拉配置(不是只清本地标志)",

@@ -47,13 +47,13 @@ function pane(fx: ReturnType<typeof useFx>) {
   const end = source.indexOf('function regen()', start);
   expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start);
   const code = ts.transpileModule(source.slice(start, end) + `
-    return { amount, minLabel, maxLabel, limitLine, dailyCapacityKnown, todayRemainingLabel, todayRemainingLine, feeNote, amountError,
+    return { amount, minLabel, maxLabel, limitFact, dailyCapacityKnown, todayRemainingLabel, todayRemainingFact, feeFact, quickAmounts, pickAmount, amountError,
       vndPreview, dailyCapacityExhausted, bankRailAvailable, fxUsable, inRange, ctaEnabled,
       creating, createError, createRecovery, goCreateRecovery, createOrder, completeCreateOrder, onAmount };
   `, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const dep = { currentAccountKey: () => "user:7", createRemoteBankIntent: vi.fn(async () => ({ intentId: "owned-intent" })) };
   const toast = { error: vi.fn() };
-  const args = { ref: Vue.ref, computed: Vue.computed, watch: Vue.watch, fx, paymentSessionReady: Vue.ref(true), remoteApiEnabled: true, MIN_DEPOSIT_USDT: 10,
+  const args = { ref: Vue.ref, computed: Vue.computed, watch: Vue.watch, defineExpose: () => {}, paneView: Vue.ref("form"), fx, paymentSessionReady: Vue.ref(true), remoteApiEnabled: true, MIN_DEPOSIT_USDT: 10,
     BANK_MAX_DEPOSIT_USDT: 5000, dep, toast, t: Vue.ref(en), fmt, fmtVnd, vndForUsdt,
     runRecoverableFundsOperation, ApiError, autoResumePending: Vue.ref(false), viewIntentId: Vue.ref(null),
     readError: Vue.ref(""), readBusy: Vue.ref(false), paidPressed: Vue.ref(false), pageActive: Vue.ref(true), openHostedOrder: vi.fn(),
@@ -88,8 +88,10 @@ test("unknown capacity survives real API and FX store, renders no fake limit, an
   expect(fx).toMatchObject({ configReady: true, dailyCapacityKnown: false, todayRemainingDepositUsdt: 0 });
   expect(view.bindings.ctaEnabled.value).toBe(true);
   const html = await show(view, fx);
-  expect(html).toContain(fmt(en.bankPane.limitNote, { min: "$10.00", max: "$5,000.00" }));
-  expect(html).not.toContain(fmt(en.bankPane.todayRemainingNote, { remaining: "$0.00" }));
+  // Facts well: the configured per-transaction range shows; unknown daily capacity reads "—", never a fake $0.00.
+  expect(html).toContain("$10–$5,000");
+  expect(view.bindings.todayRemainingFact.value).toBe("—");
+  expect(html).not.toContain("$0.00");
   expect(html).not.toContain(en.bankPane.dailyCapacityExhaustedTitle.replaceAll("'", "&#39;"));
   expect(html).not.toMatch(/Infinity|∞/);
   view.bindings.createOrder(); await vi.advanceTimersByTimeAsync(600);
@@ -123,7 +125,8 @@ test.each([true, undefined])("known or legacy zero capacity remains exhausted: %
   expect(view.bindings.ctaEnabled.value).toBe(false);
   const html = await show(view, fx);
   expect(html).toContain(en.bankPane.dailyCapacityExhaustedTitle.replaceAll("'", "&#39;"));
-  expect(html).toContain(fmt(en.bankPane.todayRemainingNote, { remaining: "$0.00" }));
+  expect(view.bindings.todayRemainingFact.value).toBe("$0.00");
+  expect(html).toContain("$0.00");
   view.bindings.createOrder(); await vi.advanceTimersByTimeAsync(600);
   expect(view.dep.createRemoteBankIntent).not.toHaveBeenCalled();
 });

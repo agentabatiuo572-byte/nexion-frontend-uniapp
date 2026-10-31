@@ -28,27 +28,32 @@
       <!-- 同 staking:开发诊断,DEV 构建才渲染,裸英文字面量不进三语词典。 i18n-en-ok: 工程话诊断横幅,仅 DEV 构建渲染 -->
       <text v-else-if="isDevBuild && !remoteApiEnabled" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
 
-      <!-- How-it-works entry + refresh — pill compacted to match the other pages;
-           it stays paired with the rate-refresh button (no de-carded hero here to
-           merge into — owner 2026-07-09). -->
-      <view class="flex items-center" :style="topRowStyle">
-        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" role="button" tabindex="0" :aria-label="t.exchange.howItWorksEntry" @click="goHowItWorks"  @keydown.enter.prevent="goHowItWorks" @keydown.space.prevent="goHowItWorks">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
-          <text style="margin: 0 6px">{{ t.exchange.howItWorksEntry }}</text>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+      <!-- How-it-works entry + rate freshness ring + refresh (P-46). -->
+      <view class="ex-top">
+        <view class="ex-how" role="button" tabindex="0" :aria-label="t.exchange.howItWorksEntry" @click="goHowItWorks"  @keydown.enter.prevent="goHowItWorks" @keydown.space.prevent="goHowItWorks">
+          <text>{{ t.exchange.howItWorksEntry }} ›</text>
         </view>
-        <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" role="button" tabindex="0" :aria-disabled="remoteApiEnabled && exchangeAuthorityStatus === 'loading'" :aria-label="t.exchange.refreshRate" @click="onRefresh"  @keydown.enter.prevent="onRefresh" @keydown.space.prevent="onRefresh">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
+        <view class="ex-fresh">
+          <svg class="ex-fresh__ring" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle class="ex-fresh__trk" cx="9" cy="9" r="7" /><circle class="ex-fresh__val" cx="9" cy="9" r="7" :style="{ strokeDashoffset: `${(44 * (1 - rateFreshness)).toFixed(1)}` }" /></svg>
+          <text class="ex-k ex-fresh__t">{{ updatedLabel }}</text>
+        <view class="ex-refresh" role="button" tabindex="0" :aria-disabled="remoteApiEnabled && exchangeAuthorityStatus === 'loading'" :aria-label="t.exchange.refreshRate" @click="onRefresh"  @keydown.enter.prevent="onRefresh" @keydown.space.prevent="onRefresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" /><path d="M21 3v5h-5" /></svg>
+        </view>
         </view>
       </view>
 
-      <!-- Pay card -->
-      <view class="nx-glass-card" :style="swapCardStyle">
-        <text class="block" :style="cardLabelStyle">{{ t.exchange.pay }}</text>
-        <view class="flex items-baseline" style="margin-top: 6px; gap: 4px">
-          <input
-            class="flex-1 min-w-0 tabular-nums"
-            :style="amountInputStyle"
+      <!-- Pay / receive legs with the direction swap floating between them. -->
+      <view class="ex-pair">
+        <view class="ex-leg">
+          <view class="ex-leg__h">
+            <text class="ex-k">{{ t.exchange.pay }}</text>
+            <view class="ex-max" role="button" tabindex="0" :aria-label="t.uiChrome.max" @click="setMax"  @keydown.enter.prevent="setMax" @keydown.space.prevent="setMax">
+              <text class="ex-k">{{ t.exchange.balanceLabel }} </text><text class="ex-bal" :class="fromSym === 'UVT' ? 'ex-bal--uvt' : ''">{{ fromBalLabel }}</text><text class="ex-bal" :class="fromSym === 'UVT' ? 'ex-bal--uvt' : ''"> {{ platformDisplayText(fromSym) }}</text><text class="ex-k"> · </text><text class="ex-max__all">{{ t.uiChrome.max }}</text>
+            </view>
+          </view>
+          <view class="ex-leg__m">
+            <input
+            class="ex-amt-input"
             type="text"
             inputmode="decimal"
             :value="input"
@@ -58,47 +63,28 @@
             :aria-label="fmt(t.exchange.payAmountLabel, { sym: platformDisplayText(fromSym) })"
             @input="onInput"
             @blur="onInputBlur"
-          />
-          <text class="shrink-0" style="font-size: var(--ui-type-body); color: var(--v5-ink-3)">{{ platformDisplayText(fromSym) }}</text>
-        </view>
-        <view class="flex items-center justify-between" style="margin-top: 6px">
-          <text style="font-size: 12px; color: var(--v5-ink-4)">{{ minLabel }}</text>
-          <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" role="button" tabindex="0" :aria-label="t.uiChrome.max" @click="setMax"  @keydown.enter.prevent="setMax" @keydown.space.prevent="setMax">
-            <text style="color: var(--v5-brand)">{{ platformDisplayText(fromSym) }} </text>
-            <text class="tabular-nums" style="color: var(--v5-brand)">{{ fromBalLabel }}</text>
-            <text style="color: var(--v5-brand)"> · {{ t.uiChrome.max }}</text>
+            />
+            <view class="ex-coin" :class="fromSym === 'UVT' ? 'ex-coin--uvt' : 'ex-coin--usdt'"><text class="ex-coin__i">{{ fromSym === 'UVT' ? 'U' : '₮' }}</text><text>{{ platformDisplayText(fromSym) }}</text></view>
           </view>
+          <text class="ex-k ex-leg__f">{{ minLabel }}</text>
+        </view>
+        <view class="ex-swap nx-frosted-button" role="button" tabindex="0" :aria-label="t.exchange.flip" @click="flip"  @keydown.enter.prevent="flip" @keydown.space.prevent="flip">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
+        </view>
+        <view class="ex-leg">
+          <text class="ex-k ex-leg__label">{{ remoteApiEnabled ? t.exchange.netReceive : t.exchange.receive }}</text>
+          <view class="ex-leg__m">
+            <text class="ex-amt">{{ toParts[0] }}<text class="ex-dec">{{ toParts[1] }}</text></text>
+            <view class="ex-coin" :class="toSym === 'UVT' ? 'ex-coin--uvt' : 'ex-coin--usdt'"><text class="ex-coin__i">{{ toSym === 'UVT' ? 'U' : '₮' }}</text><text>{{ platformDisplayText(toSym) }}</text></view>
+          </view>
+          <view class="ex-leg__f"><text class="ex-k ex-mono">{{ rateLabel }}</text></view>
         </view>
       </view>
 
-      <!-- Flip -->
-      <view class="flex justify-center" style="margin: 8px 0">
-        <view class="grid place-items-center active:opacity-80" :style="flipBtnStyle" role="button" tabindex="0" :aria-label="t.exchange.flip" @click="flip"  @keydown.enter.prevent="flip" @keydown.space.prevent="flip">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
-        </view>
-      </view>
-
-      <!-- Receive card -->
-      <view class="nx-glass-card" :style="swapCardStyle">
-        <text class="block" :style="cardLabelStyle">{{ remoteApiEnabled ? t.exchange.netReceive : t.exchange.receive }}</text>
-        <view class="flex items-baseline" style="margin-top: 6px; gap: 4px">
-          <text class="flex-1 min-w-0 tabular-nums truncate" :style="receiveValueStyle">{{ toAmountLabel }}</text>
-          <text class="shrink-0" style="font-size: var(--ui-type-body); color: var(--v5-ink-3)">{{ platformDisplayText(toSym) }}</text>
-        </view>
-        <view class="flex items-center justify-between" style="margin-top: 6px">
-          <text style="font-size: 12px; color: var(--v5-ink-4)">{{ rateLabel }}</text>
-          <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-4)">{{ updatedLabel }}</text>
-        </view>
-      </view>
-
-      <!-- Fee -->
-      <view v-if="remoteApiEnabled" class="flex items-center justify-between" :style="feeRowStyle">
-        <text>{{ t.exchange.exchangeFee }}</text>
-        <text>{{ remoteQuote ? `${amtLabel(remoteQuote.feeUsdt)} USDT` : '—' }}</text>
-      </view>
-      <view class="flex items-center justify-between" :style="feeRowStyle">
-        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.exchange.feeLabel }}</text>
-        <text style="font-size: 12px; color: var(--v5-brand)">{{ t.exchange.feeFree }}</text>
+      <!-- Fees well -->
+      <view class="ex-fees">
+        <view v-if="remoteApiEnabled" class="ex-fees__r"><text class="ex-k">{{ t.exchange.exchangeFee }}</text><text class="ex-fees__v">{{ remoteQuote ? `${amtLabel(remoteQuote.feeUsdt)} USDT` : '—' }}</text></view>
+        <view class="ex-fees__r"><text class="ex-k">{{ t.exchange.feeLabel }}</text><text class="ex-tag-ok">{{ t.exchange.feeFree }}</text></view>
       </view>
 
       <!-- Error -->
@@ -106,7 +92,6 @@
         <text>{{ errorLabel }}</text>
       </view>
 
-      <!-- Confirm CTA -->
       <view v-if="remoteApiEnabled && pendingExchangeLeases.length" style="margin: 16px 16px 0">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.exchange.pendingRecoveryHint }}</text>
         <view role="button" tabindex="0" :aria-disabled="recoveringExchange ? 'true' : 'false'"
@@ -115,41 +100,32 @@
           <text>{{ recoveringExchange ? t.exchange.recoveryChecking : t.exchange.recoverPending }}</text>
         </view>
       </view>
-      <view style="margin: 16px 16px 0">
-        <!-- 金额无效 / 本次兑换在途时点了没用 → 显式 aria-disabled + 置灰(《05》§6.1
-             disabled 派生:文字降 ink-4 + 填充降 surface 系),而不是靠「没有按下反馈」暗示 -->
-        <view class="grid place-items-center" :class="{ 'active:opacity-90': ctaEnabled }" role="button" tabindex="0" :aria-disabled="ctaEnabled ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
-          <text :style="confirmTextStyle">{{ t.exchange.confirm }}</text>
-        </view>
+      <!-- UVT note (plain text, no box) -->
+      <view class="ex-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+        <text>{{ t.exchange.nexInfo }}</text>
       </view>
 
-      <!-- NEX info -->
-      <view class="flex items-start" :style="infoStyle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-        <text style="margin-left: 8px">{{ t.exchange.nexInfo }}</text>
-      </view>
-
-      <!-- v3 risk-control dashboard -->
-      <view :style="dashStyle">
-        <view class="flex items-center justify-between" style="margin-bottom: 12px">
-          <text :style="dashTitleStyle">{{ t.exchange.capsLabel }}</text>
-          <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.exchange.capsReset, { zone: businessOffsetLabel("LEGACY") }) }}</text>
-        </view>
-
-        <!-- Per-user cap -->
-        <view style="margin-bottom: 12px">
-          <view class="flex items-center justify-between" style="margin-bottom: 4px">
-            <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.exchange.yourDaily }}</text>
-            <view class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">
-              <text>{{ remoteApiEnabled && !remoteState ? '-' :`$${formatAmount(displayUserUsed)}` }} </text>
-              <text v-if="!remoteApiEnabled || remoteState" style="color: var(--v5-ink-3)">/ ${{ formatAmount(displayUserCap) }}</text>
+      <!-- Daily cap as a ring card (risk-control dashboard), queue below when present. -->
+      <view class="ex-quota">
+        <view class="ex-quota__top">
+          <view class="ex-ring" role="img" :aria-label="`${t.exchange.yourDaily} ${userCapPct}%`">
+            <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true"><circle class="ex-ring__trk" cx="30" cy="30" r="26" /><circle class="ex-ring__val" cx="30" cy="30" r="26" :style="{ strokeDashoffset: `${(163 * (1 - userCapPct / 100)).toFixed(1)}` }" /></svg>
+            <text class="ex-ring__b">{{ remoteApiEnabled && !remoteState ? '—' : `${userCapPct}%` }}</text>
+          </view>
+          <view class="ex-quota__grow">
+            <text class="ex-quota__t">{{ t.exchange.capsLabel }}</text>
+            <!-- DOM order [label, value, reset] keeps the label/value pair together; CSS lifts the value above (board order). -->
+            <view class="ex-quota__row">
+              <text class="ex-k">{{ t.exchange.yourDaily }}</text>
+              <view class="ex-quota__v font-mono-tabular tabular-nums">
+                <text>{{ remoteApiEnabled && !remoteState ? '-' :`$${formatAmount(displayUserUsed)}` }} </text>
+                <text v-if="!remoteApiEnabled || remoteState" class="ex-quota__cap">/ ${{ formatAmount(displayUserCap) }}</text>
+              </view>
+              <text class="ex-k">&nbsp;· {{ fmt(t.exchange.capsReset, { zone: businessOffsetLabel("LEGACY") }) }}</text>
             </view>
           </view>
-          <view :style="barTrackStyle">
-            <view :style="userBarStyle" />
-          </view>
         </view>
-
         <!-- Queue -->
         <view v-if="displayQueue.length > 0" :style="queueWrapStyle">
           <view class="flex items-center" :style="queueTitleStyle">
@@ -178,17 +154,17 @@
       </view>
 
       <!-- History -->
-      <view v-if="!remoteApiEnabled || exchangeAuthorityStatus === 'ready'" style="margin: 20px 16px 24px">
-        <text class="block" :style="historyTitleStyle">{{ t.exchange.historyTitle }}</text>
+      <view v-if="!remoteApiEnabled || exchangeAuthorityStatus === 'ready'" class="ex-hist">
+        <text class="ex-sec">{{ t.exchange.historyTitle }}</text>
         <EmptyState v-if="history.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
-        <view v-else :style="historyListStyle">
-          <view v-for="(h, i) in history" :key="h.id" class="flex items-center" :style="historyRowStyle(i)">
-            <view class="grid place-items-center shrink-0" :style="historyIconStyle">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
+        <view v-else class="ex-rows">
+          <view v-for="h in history" :key="h.id" class="ex-row">
+            <view class="ex-row__ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block tabular-nums" :style="historyMainStyle">{{ swapLine(h) }}</text>
-              <text class="block" :style="historySubStyle">@ {{ h.rate.toFixed(5) }} · {{ formatDisplayDateTime(h.ts, dateLocale(), true) }}</text>
+              <text class="ex-row__p">{{ swapLine(h) }}</text>
+              <text class="ex-k ex-mono">@ {{ h.rate.toFixed(5) }} · {{ formatDisplayDateTime(h.ts, dateLocale(), true) }}</text>
             </view>
           </view>
         </view>
@@ -196,7 +172,16 @@
           <text>{{ historyLoadingMore ? t.exchange.loadingMore : t.exchange.loadMore }}</text>
         </view>
       </view>
+      <view class="ex-bar-space" />
     </view>
+    <!-- 金额无效 / 本次兑换在途时点了没用 → 显式 aria-disabled + 置灰;主操作在底部固定栏(DS-30)。 -->
+    <template #pageFixed>
+      <view class="ex-bar">
+        <view class="ex-confirm" :class="{ 'ex-confirm--on': ctaEnabled }" role="button" tabindex="0" :aria-disabled="ctaEnabled ? 'false' : 'true'" @click="handleConfirm">
+          <text>{{ t.exchange.confirm }}</text>
+        </view>
+      </view>
+    </template>
   </AppChassis>
 </template>
 
@@ -1027,6 +1012,14 @@ const rateLabel = computed(() => exchangeSnapshotReady.value
 const updatedLabel = computed(() => exchangeSnapshotReady.value
   ? t.value.exchange.rateLastUpdated.replace("{n}", String(secsAgo.value))
   : t.value.exchange.remoteNotProvided);
+// Rate freshness ring: the share of the 15 s refresh window still ahead (resets on every refresh).
+const rateFreshness = computed(() => exchangeSnapshotReady.value ? Math.max(0, 1 - Math.min(secsAgo.value, 15) / 15) : 0);
+// Receive amount anatomy: cents in ink-3; "—" stays whole.
+const toParts = computed<[string, string]>(() => {
+  const text = toAmountLabel.value, at = text.lastIndexOf(".");
+  return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
+});
+const userCapPct = computed(() => displayUserCap.value > 0 ? Math.min(100, Math.max(0, Math.round(displayUserUsed.value / displayUserCap.value * 100))) : 0);
 const errorLabel = computed(() =>
   overBalance.value
     ? t.value.exchange.insufficientMessage.replace("{sym}", platformDisplayText(fromSym.value))
@@ -1040,65 +1033,8 @@ function swapLine(h: SwapEvent): string {
 }
 
 // ── styles ──
-const topRowStyle: CSSProperties = { padding: "0 16px 8px", gap: "8px" };
-const howStyle: CSSProperties = {
-  height: "44px",  // 《07》tap≥44(原 34)
-  padding: "0 12px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-2)",
-};
-const refreshBtnStyle: CSSProperties = {
-  marginLeft: "auto",
-  width: "44px",
-  height: "44px",
-  borderRadius: "999px",
-  background: "var(--v5-surface)",
-};
 // Recessed swap field (topup tone): surface-2 fill, no border — pay/receive read
 // as a matched field pair around the flip control, numbers stay full-ink.
-const swapCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  margin: "0 16px",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
-  padding: "16px",
-};
-const cardLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: "var(--v5-ink-3)",
-};
-const amountInputStyle: CSSProperties = {
-  background: "transparent",
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const receiveValueStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const maxBtnStyle: CSSProperties = {
-  minHeight: "44px",
-  margin: "-12px -8px -12px 0",
-  padding: "0 10px",
-  borderRadius: "6px",
-  fontSize: "12px",
-};
-const flipBtnStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
-};
-const feeRowStyle: CSSProperties = { margin: "8px 16px 0" };
 const errorStyle: CSSProperties = {
   margin: "12px 16px 0",
   padding: "8px 12px",
@@ -1107,56 +1043,8 @@ const errorStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-brand-2)",
 };
-const confirmStyle = computed<CSSProperties>(() => ({
-  height: "44px",
-  borderRadius: "12px",
-  background: ctaEnabled.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-}));
-const confirmTextStyle = computed<CSSProperties>(() => ({
-  fontSize: "13px",
-  fontWeight: 600,
-  color: ctaEnabled.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-}));
-const infoStyle: CSSProperties = {
-  margin: "16px 16px 0",
-  padding: "10px 12px",
-  borderRadius: "12px",
-  background: "var(--v5-surface-2)",
-  fontSize: "12px",
-  color: "var(--v5-ink-2)",
-  lineHeight: 1.625,
-};
 // De-carded: the risk-control dashboard sits on the page floor; the mono title
 // opens it and the inner queue hairlines carry the section breaks.
-const dashStyle: CSSProperties = {
-  margin: "16px 16px 0",
-  padding: "0 2px",
-};
-const dashTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: "var(--v5-ink-3)",
-};
-const barTrackStyle: CSSProperties = {
-  height: "6px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  overflow: "hidden",
-};
-const userBarStyle = computed<CSSProperties>(() => {
-  const pct = remoteApiEnabled
-    ? Math.min(1, displayUserUsed.value / Math.max(displayUserCap.value, 1))
-    : dailyUserPctUsed(v3.todayUserUsedUSD);
-  return {
-    height: "100%",
-    width: `${pct * 100}%`,
-    borderRadius: "999px",
-    background: pct >= 0.85 ? "var(--v5-brand-2)" : "var(--v5-brand)",
-    transition: "width 600ms cubic-bezier(0.16,1,0.3,1)",
-  };
-});
 const queueWrapStyle: CSSProperties = {
   marginTop: "12px",
   paddingTop: "12px",
@@ -1171,14 +1059,6 @@ const queueTitleStyle: CSSProperties = {
   color: "var(--v5-warning)",
 };
 // Section label (de-card spec): 15px/600/ink at the 18px content edge.
-const historyTitleStyle: CSSProperties = {
-  padding: "0 2px 12px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-section)",
-  fontWeight: 600,
-  letterSpacing: "-0.012em",
-  color: "var(--v5-ink)",
-};
 const historyAuthorityStateStyle: CSSProperties = {
   padding: "16px 0",
   fontSize: "12px",
@@ -1194,29 +1074,84 @@ const historyEmptyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 // Transparent hairline group: container border-top opens it, rows self-divide.
-const historyListStyle: CSSProperties = {
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
-};
-function historyRowStyle(i: number): CSSProperties {
-  return {
-    gap: "12px",
-    padding: "12px 0",
-    borderTop: i !== 0 ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
-  };
-}
-const historyIconStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "8px",
-  background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
-};
-const historyMainStyle: CSSProperties = {
-  fontSize: "var(--ui-type-list-subtitle)",
-  fontWeight: 500,
-  color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
-};
-const historySubStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
 
 
 </script>
+
+<style scoped>
+/* P-46 exchange: pay/receive legs with a floating swap, fees well, UVT note, daily-cap ring card, history rows, fixed confirm. */
+.ex-k { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.ex-mono { font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
+.ex-top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: -5px 16px 0; }
+.ex-how { display: inline-flex; align-items: center; min-height: 44px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.ex-fresh { display: flex; align-items: center; gap: 6px; }
+.ex-fresh__ring { transform: rotate(-90deg); }
+.ex-fresh__trk { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 12%, transparent); stroke-width: 2.5; }
+.ex-fresh__val { fill: none; stroke: var(--v5-brand); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 44; transition: stroke-dashoffset .5s linear; }
+.ex-refresh { display: grid; place-items: center; width: 44px; height: 44px; color: var(--v5-ink-3); cursor: pointer; }
+.ex-refresh[aria-disabled="true"] { opacity: .5; }
+.ex-pair { position: relative; display: flex; flex-direction: column; gap: 8px; margin: 0 16px; }
+.ex-leg { padding: 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.ex-leg__h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ex-leg__m { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
+.ex-leg__f { display: block; margin-top: 4px; }
+.ex-leg__f > text { display: block; }
+.ex-fresh__t { margin-right: 4px; }
+.ex-max { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.ex-max::after { content: ""; position: absolute; inset: -14px -4px; }
+.ex-max > text + text { margin-left: 4px; }
+.ex-max > .ex-bal + .ex-bal { margin-left: 7px; }
+.ex-bal { color: var(--v5-ink-2); font: 400 12px/16px var(--font-metric); }
+.ex-bal--uvt { color: var(--v5-nex-ink); }
+.ex-max__all { color: var(--v5-brand); font: 500 12px/16px var(--font-v5); }
+.ex-amt-input, .ex-amt { flex: 1; min-width: 0; height: 44px; color: var(--v5-ink); font: 500 36px/44px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.ex-amt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-dec { color: var(--v5-ink-3); }
+.ex-coin { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 6px; border-radius: var(--v5-radius-full); font: 500 14px/20px var(--font-v5); }
+.ex-coin__i { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font: 600 11px/1 var(--font-metric); }
+.ex-coin--uvt { background: var(--v5-nex-soft); color: var(--v5-nex-ink); }
+.ex-coin--uvt .ex-coin__i { background: var(--v5-nex); color: white; }
+.ex-coin--usdt { background: var(--v5-surface-3); color: var(--v5-ink); }
+.ex-coin--usdt .ex-coin__i { background: var(--v5-ink); color: var(--v5-bg); }
+.ex-swap { position: absolute; left: 50%; top: 50%; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand); cursor: pointer;
+  box-shadow: 0 0 0 4px var(--v5-bg), var(--ui-glass-edge-shadow); transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+.ex-swap > svg { animation: ex-flip 700ms 520ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes ex-flip { from { transform: rotate(-180deg); } }
+.ex-swap:active { transform: scale(.97); }
+.ex-fees { margin: 12px 16px 0; padding: 4px 16px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .ex-fees { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.ex-fees__r { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.ex-fees__r + .ex-fees__r { border-top: 1px solid var(--v5-border); }
+.ex-fees__v { color: var(--v5-ink); font: 500 14px/20px var(--font-metric); }
+.ex-tag-ok { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-success-soft); color: var(--v5-success-ink); font: 500 12px/16px var(--font-v5); }
+.ex-note { display: flex; align-items: flex-start; gap: 8px; margin: 12px 20px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.ex-note > svg { flex: none; margin-top: 2px; color: var(--v5-nex-ink); }
+.ex-quota { margin: 16px 16px 0; padding: 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.ex-quota__top { display: flex; align-items: center; gap: 16px; }
+.ex-ring { position: relative; flex: none; width: 60px; height: 60px; }
+.ex-ring > svg { transform: rotate(-90deg); }
+.ex-ring__trk { fill: none; stroke: var(--v5-surface-3); stroke-width: 6; }
+.ex-ring__val { fill: none; stroke: var(--v5-brand); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 163; animation: ex-ring-draw 1400ms cubic-bezier(.16,1,.3,1) both; }
+@keyframes ex-ring-draw { from { stroke-dashoffset: 163; } }
+.ex-ring__b { position: absolute; inset: 0; display: grid; place-items: center; color: var(--v5-ink); font: 500 12px/16px var(--font-metric); }
+.ex-quota__grow { flex: 1; min-width: 0; }
+.ex-quota__t { display: block; color: var(--v5-ink); font: 600 15px/22px var(--font-v5); }
+.ex-quota__row { display: flex; flex-wrap: wrap; align-items: baseline; }
+.ex-quota__row > .ex-k { padding-top: 4px; }
+.ex-quota__v { order: -1; flex-basis: 100%; margin-top: 2px; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); }
+.ex-leg__label { display: block; }
+.ex-quota__cap { margin-left: 6px; color: var(--v5-ink-3); }
+.ex-hist { margin: 0 16px 24px; }
+.ex-sec { display: block; margin: 32px 4px 12px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
+.ex-rows { overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.ex-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.ex-row + .ex-row { border-top: 1px solid var(--v5-border); }
+.ex-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); background: var(--v5-nex-soft); color: var(--v5-nex-ink); }
+.ex-row__p { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; }
+.ex-bar-space { height: 110px; }
+.ex-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.ex-confirm { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
+.ex-confirm--on { opacity: 1; cursor: pointer; }
+.ex-confirm--on:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .ex-swap > svg, .ex-ring__val { animation: none; } .ex-swap:active, .ex-confirm--on:active { transform: none; } .ex-fresh__val { transition: none; } }
+</style>

@@ -73,6 +73,18 @@ describe("USDT guide accuracy", () => {
     expect(takeNavigationQuery).toHaveBeenCalledExactlyOnceWith('/pages/me/wallet-topup');
   });
 
+  it('renders the bank pane stage actions in the fixed bottom bar from the pane state (DS-30)', () => {
+    expect(topupSource).toMatch(/<DepositBankPane v-else-if="seg === 'bank'" ref="bankPane" \/>/);
+    expect(topupSource).toMatch(/const bankAction = computed\(\(\) => seg\.value === "bank" \? bankPane\.value\?\.primaryAction \?\? null : null\)/);
+    const bar = /<view v-else-if="bankAction" class="topup-sticky">([\s\S]*?)<\/view>\n    <\/template>/.exec(topupSource)?.[1] ?? '';
+    expect(bar).toContain(`:class="['topup-sticky__btn', bankAction.className]"`);
+    expect(bar).toContain(':disabled="!bankAction.enabled"');
+    expect(bar).toContain('@click="bankAction.run()"');
+    expect(bar).toContain('@click="bankSecondary.run()"');
+    // A covered order keeps "back to pay" as the only main action.
+    expect(topupSource.indexOf('v-if="orderFunded" class="topup-sticky"')).toBeLessThan(topupSource.indexOf('v-else-if="bankAction"'));
+  });
+
   it('keeps the unpaid order in view and leads back to its payment once the balance covers it', () => {
     let load!: (query: unknown) => void;
     const navTo = vitest.fn(), app = Vue.reactive({ user: { usdtBalance: 820.64 }, remoteFleetHasSnapshot: true });
