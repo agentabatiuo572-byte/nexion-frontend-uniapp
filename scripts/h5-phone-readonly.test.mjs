@@ -122,8 +122,11 @@ test("phone action is absent from all H5 inventory groups and the hidden row can
   assert.equal(rows.length, 3);
   for (const [row] of rows) assert.match(row, /:show-action="canControlDevice\(d\)"/);
   const row = compile("src/components/me/device-inventory-row.vue", "h5");
-  // The action button now sits inside a showAction-gated group (with the optional trade-in CTA).
-  assert.match(row, /<view v-if="showAction" class="device-inventory-row__actions"[^>]*>\s*<view class="device-inventory-row__action"[^>]*\s*role="button"[^>]*@click="onAction"/);
+  // The action buttons (NxButton, deactivate for active rows / activate for inactive ones) sit inside a showAction-gated group with the trade-in CTA.
+  const actions = /<view v-if="showAction" class="device-inventory-row__actions"[^>]*>([\s\S]*?)\n      <\/view>/.exec(row)?.[1] ?? "";
+  assert.match(actions, /<NxButton v-if="active" class="device-inventory-row__action"[^>]*@click="onAction"/);
+  assert.match(actions, /<NxButton v-if="!active" class="device-inventory-row__action device-inventory-row__action--activate"[^>]*@click="onAction"/);
+  assert.equal((row.match(/@click="onAction"/g) ?? []).length, 2);
   for (const showAction of [false, true]) {
     const events = [];
     const sandbox = { exports: {}, props: { showAction }, actionDisabled: { value: false }, emit: (name) => events.push(name) };

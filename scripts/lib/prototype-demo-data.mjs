@@ -43,6 +43,7 @@ export const demoOptions = {
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
   streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
+  fleetState:[['normal','默认设备'],['inventory','含仓库未激活设备'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['erc20-off','ERC20 未开通'],['low-balance','钱包余额不足（820.64 USDT）']],
 };
 const skuDefinitions = [
@@ -441,6 +442,16 @@ export function demoFixture(url,locale,state,request) {
     }
     // Traded-in devices leave the fleet.
     if(state.retiredDeviceIds?.length)data.devices=data.devices.filter(device=>!state.retiredDeviceIds.includes(device.id));
+    // Device warehouse scenarios: an idle purchased device, a full fleet, or a slot held for provisioning.
+    if(!empty&&state.fleetState&&state.fleetState!=='normal'){
+      const clone=(id,code,name,daily,paid,extra)=>({...data.devices[0],id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
+      if(state.fleetState==='inventory')data.devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
+      if(state.fleetState==='full'){
+        data.devices.push(clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),clone(46,'CLOUD-SHARE','Cloud Share',0.6,19.9,{todayEarningsUsdt:.2}));
+        data.devices.push(clone(47,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
+      }
+      if(state.fleetState==='reserved'){const trialSlots=['active','final-day','grace'].includes(state.trialState)?1:0;data.slotsUsed=data.devices.filter(d=>d.activatedAt!==null).length+trialSlots+1;data.reservedSlotCount=1;data.trialSlotCount=trialSlots;}
+    }
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
