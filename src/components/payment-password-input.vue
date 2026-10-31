@@ -15,7 +15,7 @@
 import { ref } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-const props = defineProps<{ modelValue: string; label: string; disabled?: boolean; autoFocus?: boolean; adjustPosition?: boolean }>();
+const props = withDefaults(defineProps<{ modelValue: string; label: string; disabled?: boolean; autoFocus?: boolean; adjustPosition?: boolean }>(), { adjustPosition: true });
 const emit = defineEmits<{ (event: "update:modelValue", value: string): void; (event: "complete", value: string): void }>();
 const t = useT();
 const focused = ref(false);
