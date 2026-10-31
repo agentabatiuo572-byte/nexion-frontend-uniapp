@@ -106,3 +106,9 @@ it("requests ERC20 explicitly and rejects a BEP20 response instead of reusing it
   request.mockResolvedValueOnce([{ ...deposit, network: "TRC20", status: "CREDITED" }]);
   await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
 });
+
+
+it.each([{ txHash: [deposit.txHash] }, { address: [deposit.address] }, { status: ["CREDITED"] }])("rejects JSON array coercion in a deposit record %j", patch => {
+  const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue([{ ...deposit, status: "CREDITED", ...patch }]) } as unknown as ApiClient);
+  return expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
+});

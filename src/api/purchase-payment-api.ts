@@ -42,7 +42,8 @@ const timestamp = (raw: unknown): string => {
   return value;
 };
 function common(raw: Record<string, unknown>) {
-  if (!purchaseKinds.includes(raw.kind as PurchaseKind) || !['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].includes(String(raw.paymentMethod))) throw invalid();
+  if (!purchaseKinds.includes(raw.kind as PurchaseKind) || typeof raw.paymentMethod !== 'string'
+    || !['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].includes(raw.paymentMethod)) throw invalid();
   const paymentMethod = raw.paymentMethod as ExternalPaymentMethod;
   const network = raw.network == null ? null : text(raw.network);
   if (paymentMethod === 'CREGIS_USDT_BSC' && !['BSC', 'BEP20', 'USDT-BSC'].includes(network ?? '')) throw invalid();

@@ -74,3 +74,9 @@ it('binds ERC20 quotes and intents to their original network and preserves exact
   await createPurchasePaymentApi({ request } as unknown as ApiClient).quote('ORDER_PAY', 'CREGIS_USDT_ERC20', { orderNo: 'ORD-1' });
   expect(request.mock.calls[0][0].body).toEqual({ kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_ERC20', payload: { orderNo: 'ORD-1' } });
 });
+
+
+it.each([['CREGIS_USDT_ERC20'], ['CREGIS_USDT_BSC'], { value: 'CREGIS_USDT_ERC20' }, null, 1].map(paymentMethod => ({ paymentMethod })))('rejects a non-string payment rail %j', ({ paymentMethod }) => {
+  expect(() => parsePurchaseQuote({ ...quote(), paymentMethod, network: 'ERC20' })).toThrow('PURCHASE_PAYMENT_RESPONSE_INVALID');
+  expect(() => parsePurchaseIntent({ ...intent(), paymentMethod, network: 'ERC20' })).toThrow('PURCHASE_PAYMENT_RESPONSE_INVALID');
+});
