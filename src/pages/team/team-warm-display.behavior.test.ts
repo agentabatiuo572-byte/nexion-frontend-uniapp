@@ -68,6 +68,7 @@ const modules:Record<string,any>={'@/lib/passive-tab-read':passive,'@test/ledger
  '@/components/tab-page-frame.vue':{default:{setup:(_:unknown,{slots}:any)=>()=>Vue.h('view',slots.default?.())}}};
 const runtimeHooks={load:null as any,show:[] as Array<()=>void>,hide:[] as Array<()=>void>};
 modules['@/store/data-visibility']={useDataVisibility};
+modules['@/lib/team-rank-progress']=await import('@/lib/team-rank-progress');modules['@/i18n/audit-ui']=await import('@/i18n/audit-ui');modules['@/components/team/team-rank-emblem.vue']={default:{props:['rank','size'],setup:(props:any)=>()=>Vue.h('view',{class:'team-rank-emblem','data-rank':props.rank})}};
 modules['@/components/ui/nx-button.vue']={default:{props:['label'],emits:['click'],setup:(props:any,{emit}:any)=>()=>Vue.h('button',{onClick:()=>emit('click')},props.label)}};
 modules['@/components/team/team-summary-card.vue']={default:compile(summarySource,modules)};
 modules['@/components/team/team-ledger-card.vue']={default:compile(ledgerSource.replace('<script setup lang="ts">','<script setup lang="ts">\nimport { watch } from "vue"; import { record } from "@test/ledger-probe";').replace('</script>','watch(() => ({failed:props.failed,loading:props.loading}),record,{immediate:true,flush:"sync"});\n</script>'),modules)};modules['@/components/team/invite-earn-card.vue']={default:compile(inviteSource,modules)};

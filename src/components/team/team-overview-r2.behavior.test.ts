@@ -12,6 +12,7 @@ import { fmt } from '@/i18n/format';
 import summarySource from './team-summary-card.vue?raw';
 import artSource from './team-art.vue?raw';
 import ledgerSource from './team-ledger-card.vue?raw';
+import { auditUiCopy } from '@/i18n/audit-ui';
 import teamSource from '@/pages/team/team.vue?raw';
 import { en } from '@/i18n/messages/en';
 import { zh } from '@/i18n/messages/zh';
@@ -187,6 +188,10 @@ async function teamHome(locale: Locale) {
     '@/components/team/invite-earn-card.vue': { default: slot },
     '@/components/promotion/referral-progress.vue': { default: slot },
     '@/components/team/network-orb-backdrop.vue': { default: slot },
+    '@/components/team/team-rank-emblem.vue': { default: slot },
+    // This fixture's rank store has no ladder, so the next-rank card shows no bars.
+    '@/lib/team-rank-progress': { teamRankProgress: () => ({ next: null, rows: [], missing: [], unknown: [] }) },
+    '@/i18n/audit-ui': { useAuditUiCopy: () => Vue.computed(() => auditUiCopy[locale]) },
     '@/store/v-rank': { useVRank: () => ({ myRank: 4, remoteReady: true, remoteError: null, remoteTransientFailure: false,
       refreshCanonicalVRank: vi.fn(), ensureCanonicalVRank: vi.fn(), invalidateReadOwner: vi.fn() }), nextRankProgress: () => null },
     '@/lib/v-rank-copy': { rankLabel: () => 'V4' },
