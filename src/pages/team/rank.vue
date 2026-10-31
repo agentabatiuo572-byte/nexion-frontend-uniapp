@@ -322,7 +322,7 @@ const upcomingPeerNotice = computed(() => prog.value.next && prog.value.next.pee
 .rank-condition--ring .rank-condition__value { justify-content:center;margin-left:0;font:500 11px/14px var(--font-metric); }
 .rank-condition--ring .rank-condition__gap { margin-top:0;font-size:11px;line-height:14px; }
 .rank-ring { display:grid;place-items:center;width:80px;height:80px;margin-top:0;border-radius:999px;background:conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%),var(--v5-surface-3) 0); }
-.rank-ring__hole { display:grid;place-items:center;width:66px;height:66px;border-radius:999px;background:var(--v5-surface); }
+.rank-progress-track.rank-ring > .rank-ring__hole { display:grid;place-items:center;width:66px;height:66px;border-radius:999px;background:var(--v5-surface);box-shadow:none; }
 .rank-ring__value { font:600 15px/18px var(--font-metric);color:var(--v5-ink); }
 .rank-upcoming { padding:12px 14px;border-radius:16px;background:color-mix(in srgb,var(--v5-nex) 10%,transparent); }
 .rank-ladder { display:flex;gap:6px;overflow-x:auto;padding:4px 2px 2px;border:0;border-radius:0;background:transparent;scrollbar-width:none; }
