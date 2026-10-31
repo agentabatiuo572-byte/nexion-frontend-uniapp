@@ -46,7 +46,8 @@ function component(source: string, modules: Record<string, unknown>, components 
   }).code)(Vue) as Vue.RenderFunction;
   let state: Record<string, unknown> = {};
   return { definition: { components, render, setup: () => {
-    state = new Function("require", "exports", script)((name: string) => {
+    // defineExpose is a compiler macro; the raw setup runs here, so it is a no-op.
+    state = new Function("require", "exports", `const defineExpose = () => {};\n${script}`)((name: string) => {
       if (!(name in modules)) throw new Error(`Unexpected payment dependency: ${name}`);
       return modules[name];
     }, {}) as Record<string, unknown>;
@@ -146,6 +147,8 @@ function harness(options: { warm?: boolean; quoteFailure?: boolean; existing?: b
   const modules: Record<string, unknown> = {
     "@/lib/amount-display": { formatAmount },
     "@/lib/finance-amount-display": { formatFinanceAmount },
+    "@/lib/display-date": { formatDisplayDateTime: (value: number) => new Date(value).toISOString() },
+    "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     vue: Vue, "@/store/fx": { useFx: () => fx }, "@/store/app": { useApp: () => app },
     "@/store/auth": { useAuth: () => auth }, "@/store/deposits": { useDeposits: () => dep },
     "@/api/runtime": { remoteApiEnabled: true, sessionVault: vault }, "@/api/errors": { ApiError },
@@ -163,7 +166,15 @@ function harness(options: { warm?: boolean; quoteFailure?: boolean; existing?: b
     auth.accountId = `user:${boundUserId}`; app.accountKey = auth.accountId;
     remoteAccountScope.bind(app.accountKey); app.accountBindingEpoch++; };
   if (options.warm) restore();
-  const root = node("root"), mounted = renderer.createApp(pane.definition);
+  // wallet-topup renders the pane's stage actions in its fixed bar; mirror that host next to the real template.
+  type Action = { className: string; label: string; enabled: boolean; run: () => void };
+  const paneRender = pane.definition.render, paneState = pane.state;
+  const button = (action?: Action | null) => action ? Vue.h("view", { class: action.className, "aria-disabled": !action.enabled, onClick: () => action.run() }, action.label) : null;
+  const withBar = { ...pane.definition, render(this: unknown, ...args: unknown[]) {
+    const state = paneState() as { primaryAction?: Vue.Ref<Action | null>; secondaryAction?: Vue.Ref<Action | null> };
+    return Vue.h(Vue.Fragment, [(paneRender as (...input: unknown[]) => Vue.VNode).apply(this, args), button(state.secondaryAction?.value), button(state.primaryAction?.value)]);
+  } };
+  const root = node("root"), mounted = renderer.createApp(withBar);
   mounted.mount(root);
   let disposed = false;
   const unmount = () => { if (!disposed) { disposed = true; mounted.unmount(); } };

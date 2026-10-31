@@ -23,30 +23,27 @@
 
       <!-- Bound account overview: change entry, or why it is locked. -->
       <template v-else-if="screen === 'overview' && state.config?.beneficiary">
-        <view class="account-card bound-summary">
-          <view class="account-head">
-            <view class="account-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18" /><path d="M5 10v8" /><path d="M9.5 10v8" /><path d="M14.5 10v8" /><path d="M19 10v8" /><path d="M3 21h18" /><path d="m12 3 9 5H3z" /></svg></view>
-            <view class="account-title">
-              <text class="row-title">{{ c.currentAccount }}</text>
-              <text class="hint">{{ t.bankWithdrawal.recipientSubtitle }}</text>
-            </view>
-            <NxTag :tone="accountNotice === 'ready' ? 'success' : 'warning'" :label="accountNotice === 'ready' ? c.statusReady : c.statusUnavailable" />
+        <!-- P-52: the bound account as a physical bank card; rules as a numbered list; the change action sits in the page bar. -->
+        <view class="bcard" :aria-label="`${c.currentAccount} ${state.config.beneficiary.maskedAccount}`">
+          <view class="bcard__top">
+            <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
+            <text class="bcard__nm">{{ t.bankWithdrawal.recipientSubtitle }}</text>
+            <text class="bcard__tag" :class="{ warn: accountNotice !== 'ready' }">{{ accountNotice === 'ready' ? c.statusReady : c.statusUnavailable }}</text>
           </view>
-          <view class="account-number">
-            <text class="mono account-masked">{{ state.config.beneficiary.maskedAccount }}</text>
-            <text class="hint">{{ t.bankWithdrawal.effective }}: {{ displayDate(state.config.beneficiary.effectiveAt) }}</text>
+          <view class="bcard__bot">
+            <text class="bcard__lb">{{ c.accountLabel }}</text>
+            <text class="bcard__no">{{ dots(state.config.beneficiary.maskedAccount) }}</text>
+            <text class="bcard__eff">{{ t.bankWithdrawal.effective }} {{ displayDate(state.config.beneficiary.effectiveAt) }}</text>
           </view>
-          <text v-if="accountNotice !== 'ready'" class="hint warn-text" data-testid="bank-binding-status">{{ accountStatus }}</text>
         </view>
+        <text v-if="accountNotice !== 'ready'" class="hint warn-text" data-testid="bank-binding-status">{{ accountStatus }}</text>
         <template v-if="changeLocked">
-          <view class="glass-action is-locked" data-testid="bank-change"><LiquidGlass :radius="24" tone="control" /><text>{{ c.locked }}</text></view>
           <text class="hint">{{ c.lockedReason }}</text>
           <view class="link-row" role="link" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw"><text>{{ c.viewWithdrawal }}</text><text aria-hidden="true">›</text></view>
         </template>
-        <view v-else-if="directBankBindingAvailable(state.config)" class="glass-action change-action" role="button" tabindex="0" data-testid="bank-change" @click="startChange" @keydown.enter.prevent="startChange" @keydown.space.prevent="startChange"><LiquidGlass :radius="24" tone="control" /><text>{{ c.changeAccount }}</text></view>
-        <view class="rules" role="group" :aria-label="copy.bankRules">
-          <text class="rules-title">{{ copy.bankRules }}</text>
-          <text v-for="rule in rules" :key="rule" class="hint rule">{{ rule }}</text>
+        <text class="sec-title">{{ copy.bankRules }}</text>
+        <view class="rules-card" role="group" :aria-label="copy.bankRules">
+          <view v-for="(rule, i) in rules" :key="rule" class="rule-item"><text class="rule-num">{{ i + 1 }}</text><text class="rule-text">{{ rule }}</text></view>
         </view>
       </template>
 
@@ -71,16 +68,19 @@
         <text v-if="state.challengeNo" class="hint" role="status" data-testid="bank-otp-status">{{ state.otpExpiresAt > now ? c.otpSentValid.replace('{m}', String(otpMinutesLeft)) : c.otpExpired }}</text>
         <text v-else class="hint">{{ c.otpHint }}</text>
         </view>
-        <view class="submit" :class="{ ready: canSubmit }" role="button" tabindex="0" data-testid="bank-bind-continue" :aria-disabled="!canSubmit" @click="submitChange" @keydown.enter.prevent="submitChange" @keydown.space.prevent="submitChange">
-          <text>{{ state.busy ? t.bankWithdrawal.loading : state.phase === 'uncertain' ? c.retryOriginal : c.confirmChange }}</text>
-        </view>
         <text class="hint footnote">{{ c.changeEffectiveNote }}</text>
       </template>
 
       <!-- First binding, or change step 1: the new account. -->
       <template v-else-if="screen === 'first' || screen === 'details'">
-        <view v-if="screen === 'details'" class="steps" aria-hidden="true"><text class="step step--on">1 {{ c.stepNew }}</text><text class="step">2 {{ c.stepVerify }}</text></view>
-        <view v-if="screen === 'details'" class="section-head"><text class="section-title">{{ c.newAccountTitle }}</text><text class="hint" data-testid="bank-account-routed-notice">{{ c.accountRoutedNotice }}</text></view>
+        <!-- Change step 1 (P-52): step track, a live preview card of the new account, then the two fields in wells. -->
+        <view v-if="screen === 'details'" class="steps2" :aria-label="`1 / 2 ${c.stepNew}`"><view class="steps2__on"><text class="steps2__i">1</text><text>{{ c.stepNew }}</text></view><view class="steps2__ln" aria-hidden="true" /><view class="steps2__off" aria-hidden="true" /></view>
+        <view v-if="screen === 'details'" class="bcard bcard--preview" aria-hidden="true">
+          <text class="bcard__lb">{{ c.newAccount }}</text>
+          <text class="bcard__no">{{ groupedAccount || "—" }}</text>
+          <text class="bcard__ho">{{ state.holder.trim().toUpperCase() || "—" }}</text>
+        </view>
+        <text v-if="screen === 'details'" class="vh" data-testid="bank-account-routed-notice">{{ c.accountRoutedNotice }}</text>
         <view v-else class="first-head">
           <view class="first-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18" /><path d="M5 10v8" /><path d="M9.5 10v8" /><path d="M14.5 10v8" /><path d="M19 10v8" /><path d="M3 21h18" /><path d="m12 3 9 5H3z" /></svg></view>
           <text class="first-title">{{ c.firstTitle }}</text>
@@ -91,6 +91,7 @@
           <view class="field-row">
             <text class="field-label">{{ c.accountLabel }}</text>
             <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.accountPlaceholder" placeholder-style="color: var(--v5-ink-4)" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
+            <text class="hint field-hint">{{ c.accountHint }}</text>
           </view>
           <view class="field-row">
             <text class="field-label">{{ c.holderLabel }}</text>
@@ -98,15 +99,10 @@
           </view>
         </view>
         <view class="hint-stack">
-          <text class="hint">{{ c.accountHint }}</text>
           <text v-if="screen === 'first'" class="hint">{{ c.firstNoSms }}</text>
         </view>
         </view>
-        <view v-if="screen === 'details'" class="submit" :class="{ ready: canGoNext }" role="button" tabindex="0" data-testid="bank-change-next" :aria-disabled="!canGoNext" @click="goVerify" @keydown.enter.prevent="goVerify" @keydown.space.prevent="goVerify"><text>{{ canGoNext ? c.next : t.cards.formSubmitDisabled }}</text></view>
-        <view v-else class="submit" :class="{ ready: canSubmit }" role="button" tabindex="0" data-testid="bank-bind-continue" :aria-disabled="!canSubmit" @click="submitBinding" @keydown.enter.prevent="submitBinding" @keydown.space.prevent="submitBinding">
-          <text>{{ state.busy ? t.bankWithdrawal.loading : state.phase === 'uncertain' ? c.retryOriginal : canSubmit ? c.continue : t.cards.formSubmitDisabled }}</text>
-        </view>
-        <view class="footnote-row"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg><text>{{ copy.bankFooter }}</text></view>
+        <view class="footnote-row"><text>{{ copy.bankFooter }}</text></view>
       </template>
     </view>
 
@@ -210,6 +206,23 @@ function submitChange() {
   savedAfterChange.value = true;
   void form.submit(state.phase !== "uncertain");
 }
+// Grouped preview of the new account number on the change card ("0123 4567 8899").
+const groupedAccount = computed(() => state.account.replace(/\s+/g, "").replace(/(.{4})(?=.)/g, "$1 "));
+function dots(masked: string): string { return masked.replace(/^[*•]+/, "•••• "); }
+// Each screen's main action, rendered by the page in its fixed bottom bar (DS-30); same test ids as before.
+type BindingAction = { testid: string; label: string; enabled: boolean; run: () => void };
+const primaryAction = computed<BindingAction | null>(() => {
+  const loading = t.value.bankWithdrawal.loading;
+  if (screen.value === "overview" && state.config?.beneficiary) {
+    if (changeLocked.value) return { testid: "bank-change", label: c.value.locked, enabled: false, run: () => {} };
+    return directBankBindingAvailable(state.config) ? { testid: "bank-change", label: c.value.changeAccount, enabled: true, run: startChange } : null;
+  }
+  if (screen.value === "details") return { testid: "bank-change-next", label: canGoNext.value ? c.value.next : t.value.cards.formSubmitDisabled, enabled: canGoNext.value, run: goVerify };
+  if (screen.value === "verify") return { testid: "bank-bind-continue", label: state.busy ? loading : state.phase === "uncertain" ? c.value.retryOriginal : c.value.confirmChange, enabled: canSubmit.value, run: submitChange };
+  if (screen.value === "first") return { testid: "bank-bind-continue", label: state.busy ? loading : state.phase === "uncertain" ? c.value.retryOriginal : canSubmit.value ? c.value.continue : t.value.cards.formSubmitDisabled, enabled: canSubmit.value, run: submitBinding };
+  return null;
+});
+defineExpose({ primaryAction });
 function cancelReview() { review.value = null; focusTestId("bank-bind-continue"); }
 useDialogA11y(computed(() => review.value !== null), ".review-sheet-root", cancelReview);
 function confirmBinding() {
@@ -305,6 +318,8 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .footnote { padding: 0 4px; }
 .footnote-row { display: flex; gap: 8px; padding: 0 4px; color: var(--v5-ink-3); font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .footnote-row svg { flex: none; margin-top: 2px; }
+.field-hint { margin-top: -2px; padding: 0 4px; }
+.field-block + .footnote-row { margin-top: -8px; }
 /* Saved */
 .binding-done { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 48px; text-align: center; }
 .done-notes { display: flex; flex-direction: column; padding: 0 16px; }
@@ -320,4 +335,48 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .sheet-head { display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 0; }
 .sheet-actions { display: flex; flex-direction: column; gap: 8px; }
 [aria-disabled="true"] { cursor: default; }
+/* P-52 bank account: physical bank card, numbered rules, change step track + live preview, fields as wells. */
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.binding-body { padding-top: 3px; }
+.bcard { position: relative; display: flex; flex-direction: column; height: 208px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: color-mix(in srgb, white 96%, transparent);
+  background: linear-gradient(150deg, #2B2E35, #17191D 55%, #0F1013); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 8px 12px -10px rgba(255,255,255,.35), 0 16px 36px rgba(0,0,0,.40); }
+.bcard::before { content: ""; position: absolute; right: -70px; top: -90px; width: 300px; height: 300px; border-radius: 50%; background: repeating-radial-gradient(circle, rgba(255,255,255,.055) 0 1px, transparent 1px 9px); pointer-events: none; }
+.bcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.16) 50%, transparent 65%); transform: translateX(-110%); animation: bcard-sweep 1200ms 480ms cubic-bezier(.4,0,.2,1) both; pointer-events: none; }
+@keyframes bcard-sweep { to { transform: translateX(110%); } }
+.bcard--preview { height: 160px; padding: 18px 20px; justify-content: flex-start; }
+.bcard--preview .bcard__no { margin-top: auto; font-size: 24px; line-height: 30px; }
+.bcard--preview .bcard__ho { font-family: var(--font-metric); }
+.bcard--preview::before { right: -70px; top: -90px; width: 280px; height: 280px; }
+.bcard--preview::after { inset: 0; transform: none; animation: none; border-radius: inherit; padding: 1.5px; background: conic-gradient(from 120deg, transparent 0 50%, color-mix(in srgb, var(--v5-brand) 80%, transparent) 72%, transparent 94%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
+.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); }
+.bcard__nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
+.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success); font: 500 12px/16px var(--font-v5); }
+.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning); }
+.bcard__bot { position: relative; display: flex; flex-direction: column; margin-top: auto; }
+.bcard__lb { position: relative; display: block; padding-top: 2px; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-v5); }
+.bcard__no { position: relative; display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; }
+.bcard__eff { display: block; margin-top: 6px; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-metric); }
+.bcard__ho { position: relative; display: block; margin-top: 6px; color: color-mix(in srgb, white 72%, transparent); font: 500 13px/18px var(--font-v5); letter-spacing: .06em; }
+.sec-title { display: block; margin: 16px 4px -4px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
+.rules-card { padding: 4px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.rule-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; }
+.rule-item + .rule-item { border-top: 1px solid var(--v5-border); }
+.rule-num { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-top: -1px; border-radius: 50%; background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/1 var(--font-metric); }
+.rule-text { color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
+.steps2 { display: flex; align-items: center; gap: 10px; margin: -4px 4px 0; }
+.steps2__on { display: inline-flex; align-items: center; gap: 8px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); }
+.steps2__i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-brand); color: var(--v5-on-brand); font: 600 11px/1 var(--font-metric); }
+.steps2__ln { flex: 1; height: 2px; border-radius: 2px; background: var(--v5-surface-3); }
+.steps2__off { width: 10px; height: 10px; border-radius: 50%; background: var(--v5-ink-4); }
+/* Change/first form: label above, input in a recessed well (the .field height contract stays 44px inside). */
+.field-block .group { border: 0; background: transparent; overflow: visible; }
+.field-block .field-row { flex-direction: column; align-items: stretch; gap: 8px; min-height: 0; padding: 0; margin-top: 16px; border-bottom: 0; }
+.field-block .field-row:first-child { margin-top: 0; }
+.field-block .field-label { min-width: 0; max-width: none; padding: 3px 4px 0; font: 400 12px/16px var(--font-v5); }
+.field-block .field-row > .field { display: flex; align-items: center; min-height: 52px; height: 52px; padding: 0 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); font: 500 16px/24px var(--font-v5); }
+[data-theme="light"] .field-block .field-row > .field { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.field-block .field-row > .field.mono { font-family: var(--font-metric); letter-spacing: .04em; }
+@media (prefers-reduced-motion: reduce) { .bcard::after { animation: none; opacity: 0; } }
 </style>

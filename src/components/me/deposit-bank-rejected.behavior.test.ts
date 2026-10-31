@@ -39,6 +39,8 @@ const exposed = ast.statements.flatMap((statement) => {
 const script = ts.transpileModule(setupSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText + `;return { ${exposed.join(", ")} };`;
+// defineExpose is a compiler macro; this harness runs the raw setup, so it is a no-op here.
+const runnable = `const defineExpose = () => {};\n${script}`;
 const render = new Function("Vue", compile(descriptor.template!.content, {
   mode: "function", prefixIdentifiers: true, isCustomElement: tag => ["view", "text"].includes(tag),
 }).code)(Vue) as Vue.RenderFunction;
@@ -175,6 +177,8 @@ function pane(providerStatus: DepositIntent["providerStatus"] = "rejected", tran
   const modules: Record<string, unknown> = {
     "@/lib/amount-display": { formatAmount },
     "@/lib/finance-amount-display": { formatFinanceAmount },
+    "@/lib/display-date": { formatDisplayDateTime: (value: number) => new Date(value).toISOString() },
+    "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     vue: { ...Vue, onMounted: (callback: () => void) => mounted.push(callback),
       onUnmounted: (callback: () => void) => unmounted.push(callback) },
     "@/components/me/fx-rate-line.vue": {}, "@/i18n/use-t": { useT: () => Vue.ref(translations) },
@@ -193,7 +197,7 @@ function pane(providerStatus: DepositIntent["providerStatus"] = "rejected", tran
     "@/lib/hosted-payment": { findResumablePaymentIntent, openHostedPaymentPage: open },
   };
   const scope = Vue.effectScope();
-  const state = scope.run(() => new Function("require", "exports", script)(
+  const state = scope.run(() => new Function("require", "exports", runnable)(
     (name: string) => {
       if (!(name in modules)) throw new Error(`Unexpected bank pane dependency: ${name}`);
       return modules[name];
@@ -202,8 +206,14 @@ function pane(providerStatus: DepositIntent["providerStatus"] = "rejected", tran
   mounted.forEach(callback => callback());
   const dispose = () => { unmounted.forEach(callback => callback()); scope.stop(); };
   cleanups.push(dispose);
+  // The create action lives in wallet-topup's fixed bar; mirror its wiring (shown while formCtaVisible,
+  // disabled unless ctaEnabled, click -> createOrder()) next to the real pane template.
+  type Action = { className: string; label: string; enabled: boolean; run: () => void };
+  const button = (action: Action | null) => action ? Vue.h("view", { class: action.className, style: {}, "aria-disabled": !action.enabled, onClick: () => action.run() }, action.label) : null;
+  const bar = () => [button((state.secondaryAction as Vue.Ref<Action | null>).value), button((state.primaryAction as Vue.Ref<Action | null>).value)];
   const definition = () => ({
-    components: { FxRateLine: { render: () => null } }, setup: () => ({ fmt, fmtVnd, formatAmount, ...state }), render,
+    components: { FxRateLine: { render: () => null } }, setup: () => ({ fmt, fmtVnd, formatAmount, ...state }),
+    render(this: unknown, ...args: unknown[]) { return Vue.h(Vue.Fragment, [(render as (...input: unknown[]) => Vue.VNode).apply(this, args), ...bar()]); },
   });
   return { state, dep, fx, app, auth, navTo, open, toast, html: () => renderToString(Vue.createSSRApp(definition())),
     mount: () => {
@@ -497,7 +507,7 @@ test.each([zh, en, vietnamese])("a resumed rejected order offers explicit retry,
   expect(html).toContain(messages.bankPane.regenCta);
   expect(html).toContain(messages.bankPane.newTopupCta);
   expect(html).not.toContain(messages.bankPane.hostedPendingNote);
-  expect(html).not.toContain(fmt(messages.bankPane.countdown, { time: "06:00" }));
+  expect(html.replace(/<[^>]+>/g, "")).not.toContain(fmt(messages.bankPane.countdown, { time: "06:00" }));
   expect(html).toContain("nx-bank-regen-cta");
   expect(html).toContain("nx-bank-new-topup-cta");
   expect(html).not.toMatch(/nx-bank-(?:create|hosted-continue|cancel)-cta/);
@@ -513,7 +523,8 @@ test.each(["pending", "submit_unknown", "not_submitted", undefined] as const)("%
   view.dep.intents[0].providerStatus = status;
   const html = await view.html();
   expect(html).toContain(zh.bankPane.hostedPendingNote);
-  expect(html).toContain(fmt(zh.bankPane.countdown, { time: "06:00" }));
+  // The ring caption sets the time in its own run; compare the visible text.
+  expect(html.replace(/<[^>]+>/g, "")).toContain(fmt(zh.bankPane.countdown, { time: "06:00" }));
   expect(html).not.toContain(zh.bankPane.hostedRejectedNote);
   expect(html).not.toContain("nx-bank-regen-cta");
   expect(html).not.toContain("nx-bank-new-topup-cta");
@@ -555,7 +566,7 @@ test("the rejected-order new top-up entry preserves the order and creates a diff
   expect(view.state.createError.value).toBe("");
   expect(errorBanner(mounted.root)).toBeUndefined();
   expect(view.dep.intents).toEqual([original]);
-  const amountInput = action(mounted.root, "tabular-nums")!;
+  const amountInput = action(mounted.root, "nx-bank-amt")!;
   expect(amountInput.kind).toBe("input");
   (amountInput.props.onInput as (event: unknown) => void)({ detail: { value: "26" } });
   view.dep.intents = [{ ...original }, { ...original, intentId: "VQR-older", status: "expired" }];

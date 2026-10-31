@@ -31,9 +31,18 @@
     :aria-label="topConfirm.title"
     @click="ui.resolveConfirm(topConfirm.id, false)"
   >
-    <view class="nx-glass-sheet nx-modal nx-dialog-pop-in" @click.stop>
+    <view class="nx-glass-sheet nx-modal nx-dialog-pop-in" :class="{ 'nx-modal--detail': topConfirm.rows?.length }" @click.stop>
+      <view v-if="topConfirm.rows?.length && topConfirm.glyph" class="nx-modal__glyph" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg></view>
       <text class="nx-modal__title">{{ topConfirm.title }}</text>
       <text v-if="topConfirm.message" class="nx-modal__msg">{{ topConfirm.message }}</text>
+      <!-- Detail layout (e.g. withdrawal): a recessed list of what will happen, the last row the amount received. -->
+      <view v-if="topConfirm.rows?.length" class="nx-modal__rows">
+        <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount }">
+          <text class="nx-modal__k">{{ row.label }}</text>
+          <text v-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text></text>
+          <text v-else class="nx-modal__v">{{ row.value }}</text>
+        </view>
+      </view>
       <view class="nx-modal__actions">
         <view
           v-if="!topConfirm.hideCancel"
@@ -92,6 +101,11 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 const ui = useUI();
 const t = useT();
 // Last enqueued confirm renders on top (LIFO), matching the original.
+// "$999.00" → ["$", "999", ".00"] so the currency sign and cents can sit in ink-3 (amount anatomy).
+function amountAnatomy(value: string): [string, string, string] {
+  const match = /^(\$?)(.*?)(\.\d+)?$/.exec(value);
+  return match ? [match[1], match[2], match[3] ?? ""] : ["", value, ""];
+}
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
 const route = ref(readRoute());
 let routeTimer: ReturnType<typeof setInterval> | undefined;
@@ -258,6 +272,23 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 .nx-btn--primary { background: var(--v5-brand); }
 .nx-btn--danger { background: var(--v5-danger); }
 .nx-btn--ghost { background: var(--v5-surface-2); }
+/* Detail confirm (P-45): centred badge + title, recessed rows, full-width confirm over a quiet text cancel. */
+.nx-modal--detail { max-width: 344px; padding: 24px 20px 12px; gap: 0; text-align: center; background: color-mix(in srgb, var(--v5-surface) 50%, var(--v5-surface-2)); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+[data-theme="light"] .nx-modal--detail { background: var(--v5-surface); }
+.nx-modal__cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
+.nx-modal__dec { color: var(--v5-ink-3); }
+.nx-modal__glyph { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; background: var(--v5-brand-soft); color: var(--v5-brand); }
+.nx-modal--detail .nx-modal__title { margin-top: 16px; font: 600 20px/28px var(--font-v5); }
+.nx-modal--detail .nx-modal__msg { margin-top: 8px; }
+.nx-modal__rows { margin-top: 16px; padding: 4px 14px; border-radius: 16px; text-align: left; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .nx-modal__rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.nx-modal__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
+.nx-modal__row + .nx-modal__row { border-top: 1px solid var(--v5-border); }
+.nx-modal__k { flex: none; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.nx-modal__v { min-width: 0; overflow-wrap: anywhere; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
+.nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
+.nx-modal--detail .nx-modal__actions { flex-direction: column-reverse; align-items: stretch; gap: 4px; margin-top: 20px; }
+.nx-modal--detail .nx-btn--ghost { flex: none; min-height: 44px; background: transparent; }
 .nx-btn__label {
   min-width: 0;
   font-size: var(--ui-type-button);

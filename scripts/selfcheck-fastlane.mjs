@@ -1152,7 +1152,9 @@ function functionBody(src, opener) {
         && pgCode.includes("limit: String(dailyFacts.value.limitCount),")
         // 🔴 说不说使用量 ⟺ 服务端是否配置了计数闸；未配置时不显示这一行，
         // 不能把 0 伪装成每日额度(2026-10-29 起也不再显示「未设置上限」这类后台配置状态)。
-        && pgCode.includes('<text v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="block">{{ dailyUsageText }}</text>')
+        // 2026-11-01 P-45 改版:警告框撤掉,这句移进额度圆点行;门挂在行容器上,文案是行内唯一一处。
+        && /<view v-if="dailyFactsDisplayable && limitFacts\.dailyLimitConfigured" class="wd-quota mx-4">[\s\S]{0,400}?<text>\{\{ dailyUsageText \}\}<\/text>/.test(pgCode)
+        && pgCode.split("{{ dailyUsageText }}").length === 2
         && !pgCode.includes("dailyWithdrawalCountNotSet"));
     check("🔴 提现页:显示 / 提交前复检均走服务端事实或冻结快照",
       (() => {

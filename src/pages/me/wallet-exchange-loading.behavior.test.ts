@@ -88,7 +88,8 @@ async function mount(direction = "nex2usdt") {
   });
   const swap = vi.fn(), confirm = vi.fn(), navTo = vi.fn();
   const toast = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-  const chassis = Vue.defineComponent({ setup: (_props, { slots }) => () => Vue.h("chassis", slots.default?.()) });
+  // Mirrors AppChassis: page content plus the fixed bottom-bar slot.
+  const chassis = Vue.defineComponent({ setup: (_props, { slots }) => () => Vue.h("chassis", [slots.default?.(), slots.pageFixed?.({ top: 0 })]) });
   const empty = Vue.defineComponent({ props: ["title"], setup: props => () => Vue.h("empty", props.title) });
   const header = Vue.defineComponent({ props: ["title"], setup: props => () => Vue.h("header", props.title) });
   const accountKey = "user:exchange-loading-fixture";

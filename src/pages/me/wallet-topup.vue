@@ -21,16 +21,36 @@
         </view>
       </view>
 
-      <GlassSegments :label="t.wallet.chooseMethod" v-model="seg" :options="segmentOptions" style="margin: 0 16px 16px"  />
+      <!-- While a bank order is open (paying, credited, expired…) the channel switch steps aside, as on the board. -->
+      <GlassSegments v-if="!bankOrderOpen" :label="t.wallet.chooseMethod" v-model="seg" :options="segmentOptions" style="margin: 15px 16px 0">
+        <template #option="{ option }">
+          <view class="topup-seg">
+            <svg v-if="option.value === 'bank'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg>
+            <svg v-else-if="option.value === 'crypto'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 8h8M12 8v9M8.5 11.5c2 .8 5 .8 7 0" /></svg>
+            <text class="topup-seg__label">{{ option.label }}</text>
+          </view>
+        </template>
+      </GlassSegments>
+      <view v-if="!bankOrderOpen" style="height: 4px" />
 
       <DepositUsdtPane v-if="seg === 'crypto'" />
-      <DepositBankPane v-else-if="seg === 'bank'" />
+      <DepositBankPane v-else-if="seg === 'bank'" ref="bankPane" />
       <TopupCardForm v-else @change-channel="seg = 'crypto'" />
-      <view v-if="orderFunded" style="height: 120px" />
+      <view v-if="orderFunded || bankAction" style="height: 120px" />
     </view>
-    <!-- Once the order is covered, the way back is the page's main action, in the thumb zone (DS-30). -->
+    <!-- The page's main action sits in the thumb zone (DS-30): back to the order once it is covered, otherwise the bank pane's create action. -->
     <template #pageFixed>
       <view v-if="orderFunded" class="topup-sticky"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
+      <view v-else-if="bankAction" class="topup-sticky">
+        <NxButton v-if="bankSecondary" :class="['topup-sticky__btn', bankSecondary.className]" variant="secondary" :label="bankSecondary.label" @click="bankSecondary.run()" />
+        <NxButton :class="['topup-sticky__btn', bankAction.className]" variant="primary" :label="bankAction.label" :disabled="!bankAction.enabled" @click="bankAction.run()">
+          <view class="topup-sticky__label">
+            <view v-if="bankAction.busy" class="topup-sticky__spin" />
+            <text>{{ bankAction.label }}</text>
+            <svg v-if="bankAction.external" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+          </view>
+        </NxButton>
+      </view>
     </template>
   </AppChassis>
 </template>
@@ -56,7 +76,7 @@ import { useDeposits } from "@/store/deposits";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
-const SEGMENTS: { id: Seg }[] = [{ id: "crypto" }, { id: "bank" }, { id: "card" }];
+const SEGMENTS: { id: Seg }[] = [{ id: "bank" }, { id: "crypto" }, { id: "card" }];
 const segments = remoteApiEnabled ? SEGMENTS.filter((item) => item.id !== "card") : SEGMENTS;
 const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
 onLoad((query) => {
@@ -108,6 +128,11 @@ function moveSeg(index: number, delta: number): void {
 const t = useT();
 const locale = useLocaleStore();
 const dep = useDeposits();
+// The bank pane owns the create flow; the page only renders its action in the fixed bottom bar.
+const bankPane = ref<InstanceType<typeof DepositBankPane> | null>(null);
+const bankAction = computed(() => seg.value === "bank" ? bankPane.value?.primaryAction ?? null : null);
+const bankSecondary = computed(() => seg.value === "bank" ? bankPane.value?.secondaryAction ?? null : null);
+const bankOrderOpen = computed(() => seg.value === "bank" && !!bankPane.value && bankPane.value.paneView !== "form");
 
 // ── styles ──
 // Segmented pill tabs — wallet-bills / SegmentedControl idiom.
@@ -153,5 +178,12 @@ const segmentOptions = computed(() => segments.map(({ id }) => ({
 .topup-order__b { font-weight: 500; color: var(--v5-ink); }
 .topup-order__cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-2); color: var(--v5-warning); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .topup-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
-.topup-sticky__btn { display: flex; flex: 1; }
+.topup-sticky { gap: 12px; }
+.topup-sticky__btn { display: flex; flex: 1 1 0; }
+.topup-sticky__label { display: inline-flex; align-items: center; gap: 8px; }
+.topup-sticky__spin { width: 16px; height: 16px; flex: none; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: spin 1s linear infinite; }
+.topup-seg { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+.topup-seg > svg { flex: none; }
+.topup-seg__label { font: var(--ui-type-segment-weight) var(--ui-type-segment)/var(--ui-type-segment-lh) var(--font-v5); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .topup-sticky__spin { animation-duration: 2s; } }
 </style>

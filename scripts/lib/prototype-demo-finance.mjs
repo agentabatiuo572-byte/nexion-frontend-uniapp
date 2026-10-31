@@ -15,7 +15,14 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/payout-addresses") return { ...proof, addresses: empty ? [] : [{ ...proof, network: "USDT-BEP20", address: `0x${"1".repeat(40)}`, status: "ACTIVE", effectiveAt: new Date(now - 86400000).toISOString(), createdAt: new Date(now - 8 * 86400000).toISOString(), nextChangeAllowedAt: iso, changePending: false }], serverNowEpochMs: now, changeCooldownDays: 7, effectiveDelayHours: 24, inFlightWithdrawalBlocked: true };
   if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { enabled: true, paymentMode: "manual", dailyCapacityKnown: true, minDepositUsdt: 50, maxDepositUsdt: 5000, todayRemainingDepositUsdt: 5000, todayRemainingVnd: 125000000, toleranceVnd: 1000, graceMinutes: 10, version: 1, feeVnd: 0, feeUsdt: .123456 } };
   if (p === "/api/app/payments/fx-quote") return { ...proof, source: "nx_finance_fx_quote_config", baseRateVndPerUsdt: 25000, buySpreadPct: 0, quoteRateVndPerUsdt: 25000, lockWindowMinutes: 15, version: 1, asOf: iso };
-  if (p === "/api/app/deposits/vietqr/intents") return { items: [] };
+  if (p === "/api/app/deposits/vietqr/intents") {
+    // Prototype-only hosted bank order: paying (link created) or credited. The link is never followed in previews.
+    const created = now - 28 * 1000, paying = state.topupState === "paying", credited = state.topupState === "credited";
+    if (!paying && !credited) return { items: [] };
+    return { items: [{ intentNo: "VQR-DEMO-P44", usdtAmount: 500, fxRate: 25000, vndAmount: 12500000, status: credited ? "credited" : "awaiting_payment",
+      expiresAt: new Date(created + 15 * 60000).toISOString(), createdAt: new Date(created).toISOString(), creditedUsdt: credited ? 500 : 0, feeVnd: 0, feeUsdt: 0, version: credited ? 3 : 1,
+      paymentMode: "hosted", providerStatus: "created", ...(paying ? { paymentUrl: "https://api.hdpayadmin.com/pay/demo-preview-only" } : { matchedAt: new Date(now - 60000).toISOString() }) }] };
+  }
   if (p === "/api/app/deposits/vietqr/receipts") return { items: empty ? [] : [{ receiptNo: "DEMO-BANK-RECEIPT", intentNo: "VQR-DEMO123456", viewType: "credit", status: "credited", payableVnd: 1250000, receivedVnd: 1250000, lockedFxRate: 25000, creditedUsdt: 50.123456, createdAt: iso }], nextOffset: null };
   if (p === "/api/deposits/address") return { enabled: true, creditEnabled: true, network: "BEP20", address: `0x${"1".repeat(40)}`, feeUsdt: .123456, minDepositUsdt: 50, confirmations: 15 };
   if (p === "/api/deposits") return empty ? [] : [{ depositId: "CR-77", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdt: 50.123456, creditedUsdt: 50, confirmations: 15, status: "CREDITED", createdAt: now }];

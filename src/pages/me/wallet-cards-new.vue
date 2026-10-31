@@ -13,7 +13,7 @@
 -->
 <template>
   <AppChassis active="me">
-    <BankAccountBinding v-if="!cardBindingAvailable" class="bank-binding-layout" :active="bankFormVisible" :return-to="returnTo" />
+    <BankAccountBinding v-if="!cardBindingAvailable" ref="binding" class="bank-binding-layout" :active="bankFormVisible" :return-to="returnTo" />
     <view v-else style="color: var(--v5-ink)">
       <SubPageHeader :back="cardBindingAvailable ? '/pages/me/wallet-cards' : '/pages/me/me'" :title="t.cards.newTitle" />
       <CardSimulationBadge />
@@ -85,6 +85,14 @@
         <text class="block" :style="disclaimerStyle">{{ cardBindingAvailable ? t.cards.formDisclaimer : t.cards.bindingEntryDisclaimer }}</text>
       </view>
     </view>
+    <!-- The binding flow's main action (change / next / confirm) in the fixed bottom bar (DS-30). -->
+    <template #pageFixed>
+      <view v-if="!cardBindingAvailable && binding?.primaryAction" class="bind-bar">
+        <view class="bind-bar__btn" :class="{ 'bind-bar__btn--on': binding.primaryAction.enabled }" role="button" :tabindex="binding.primaryAction.enabled ? 0 : -1" :data-testid="binding.primaryAction.testid" :aria-disabled="!binding.primaryAction.enabled" @click="binding.primaryAction.enabled && binding.primaryAction.run()" @keydown.enter.prevent="binding.primaryAction.enabled && binding.primaryAction.run()" @keydown.space.prevent="binding.primaryAction.enabled && binding.primaryAction.run()">
+          <text>{{ binding.primaryAction.label }}</text>
+        </view>
+      </view>
+    </template>
   </AppChassis>
 </template>
 
@@ -110,6 +118,8 @@ import { paymentMethodApi, remoteApiEnabled, developmentPaymentEnabled } from "@
 import { useApp } from "@/store/app";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 
+// The binding component exposes its main action; the page shows it in the fixed bottom bar.
+const binding = ref<InstanceType<typeof BankAccountBinding> | null>(null);
 const t = useT();
 const cardsStore = useCards();
 const app = useApp();
@@ -346,4 +356,13 @@ const disclaimerStyle: CSSProperties = { marginTop: "12px", padding: "0 4px", fo
 
 <style scoped>
 /* Separate the bound account, fields and conditions without changing their gates. */
+
+/* P-52: binding flow main action in the fixed bottom bar. */
+.bind-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.bind-bar__btn { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
+.bind-bar__btn--on { opacity: 1; cursor: pointer; }
+.bind-bar__btn--on:active { transform: scale(.98); }
+.bind-bar__btn:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.bank-binding-layout { padding-bottom: 96px; }
+@media (prefers-reduced-motion: reduce) { .bind-bar__btn--on:active { transform: none; } }
 </style>

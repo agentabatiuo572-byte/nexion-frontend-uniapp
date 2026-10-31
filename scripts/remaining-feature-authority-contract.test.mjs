@@ -332,7 +332,7 @@ test("remote top-up exposes server-backed USDT and VietQR without card", () => {
   const deposits = read("src/store/deposits.ts");
   assert.match(topup, /const segments = remoteApiEnabled \? SEGMENTS\.filter\(\(item\) => item\.id !== "card"\)/);
   assert.match(topup, /<DepositUsdtPane v-if="seg === 'crypto'" \/>/);
-  assert.match(topup, /<DepositBankPane v-else-if="seg === 'bank'" \/>/);
+  assert.match(topup, /<DepositBankPane v-else-if="seg === 'bank'"(?: ref="bankPane")? \/>/);
   assert.doesNotMatch(topup, /v-if="remoteApiEnabled"[\s\S]{0,200}railsClosedTitle/);
   assert.match(deposits, /paymentApi\.createVietQrIntent\(/);
   assert.match(deposits, /paymentApi\.listVietQrIntents\(/);
