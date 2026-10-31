@@ -17,6 +17,9 @@ const zh = {
   cannotPay: '暂时无法支付', query: '重新查询', retry: '重试', queryFailed: '暂时无法查询，请重试。',
   checking: '正在查询…', cancelOrder: '取消订单', cancelFailed: '订单暂未取消，请重试。',
   expiredPending: '支付期限已过，正在更新订单状态。', viewDetails: '查看详情', closed: '订单已结束，不能继续支付。',
+  rejectCapacity: '设备位已满，请先在设备仓库处理设备后再支付。', rejectUnavailable: '该商品暂停销售，本单暂时无法支付。',
+  rejectQuota: '本月购买名额已满，本单暂时无法支付。', rejectRequirements: '暂未满足该商品的购买条件。',
+  rejectPaused: '支付服务维护中，请稍后再试。',
 };
 type CheckoutFlowCopy = typeof zh;
 const en: CheckoutFlowCopy = {
@@ -36,6 +39,9 @@ const en: CheckoutFlowCopy = {
   cannotPay: 'Payment unavailable', query: 'Check again', retry: 'Try again', queryFailed: 'The check could not be completed. Please try again.',
   checking: 'Checking…', cancelOrder: 'Cancel order', cancelFailed: 'The order has not been cancelled. Please try again.',
   expiredPending: 'The payment deadline has passed. Updating the order status.', viewDetails: 'View details', closed: 'This order has ended and can no longer be paid.',
+  rejectCapacity: 'Your device slots are full. Free a slot in device inventory, then pay.', rejectUnavailable: 'This product is not on sale right now, so this order cannot be paid.',
+  rejectQuota: 'This month\'s purchase quota is used up, so this order cannot be paid.', rejectRequirements: 'You do not meet the purchase requirements for this product yet.',
+  rejectPaused: 'Payments are under maintenance. Please try again later.',
 };
 const vi: CheckoutFlowCopy = {
   paymentMethod: 'Phương thức thanh toán', paymentTotal: 'Tổng tiền thanh toán', wallet: 'Ví', walletBalance: 'Số dư USDT',
@@ -54,6 +60,9 @@ const vi: CheckoutFlowCopy = {
   cannotPay: 'Chưa thể thanh toán', query: 'Kiểm tra lại', retry: 'Thử lại', queryFailed: 'Chưa thể kiểm tra. Vui lòng thử lại.',
   checking: 'Đang kiểm tra…', cancelOrder: 'Hủy đơn hàng', cancelFailed: 'Đơn hàng chưa bị hủy. Vui lòng thử lại.',
   expiredPending: 'Đã quá hạn thanh toán. Đang cập nhật trạng thái đơn hàng.', viewDetails: 'Xem chi tiết', closed: 'Đơn hàng đã kết thúc và không thể thanh toán tiếp.',
+  rejectCapacity: 'Đã hết vị trí thiết bị. Hãy xử lý thiết bị trong kho rồi thanh toán.', rejectUnavailable: 'Sản phẩm đang tạm ngừng bán nên chưa thể thanh toán đơn này.',
+  rejectQuota: 'Đã hết lượt mua trong tháng nên chưa thể thanh toán đơn này.', rejectRequirements: 'Bạn chưa đáp ứng điều kiện mua sản phẩm này.',
+  rejectPaused: 'Hệ thống thanh toán đang bảo trì. Vui lòng thử lại sau.',
 };
 
 export function checkoutFlowCopy(locale: LocaleCode): CheckoutFlowCopy {
