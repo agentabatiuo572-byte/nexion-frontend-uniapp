@@ -175,7 +175,9 @@
         </template>
         <NxButton v-else-if="canBuyAgain" variant="brand" :label="t.promotion.buyAgain" @click="goStore" />
       </view>
-      <NxNoticeDialog class="pending-order-notice" :open="!!paymentNotice" :title="paymentNotice === 'query' ? pendingCopy.queryFailed : pendingCopy.cannotPay" :body="paymentNoticeReason"
+      <NxNoticeDialog :open="cancelBlocked" icon="clock" :title="t.orders.cancelBlockedTitle" :body="t.orders.cancelBlockedBody"
+        :primary="t.orders.paymentInProgressContinue" :secondary="t.orders.cancelBlockedOk" @primary="cancelBlocked = false; requestPendingPayment()" @secondary="cancelBlocked = false" />
+      <NxNoticeDialog class="pending-order-notice" :open="!!paymentNotice" :title="paymentNotice === 'query' ? pendingCopy.queryFailed : pendingCopy.cannotPay" :body="paymentNoticeReason === pendingCopy.queryFailed ? '' : paymentNoticeReason"
         :icon="paymentNotice === 'query' ? 'alert' : 'info'" :primary="paymentNotice === 'query' ? pendingCopy.retry : orderAction?.kind === 'cancel' ? recoveryCopy.retryCancel : orderAction || orderCommandUnavailable ? recoveryCopy.query : liveOrder?.status === 'placed' ? pendingCopy.cancelOrder : pendingCopy.viewDetails"
         :secondary="t.store.coCancel" :busy="pendingPaymentChecking || cancellingOrder || orderCommandQuerying" @primary="runPaymentNoticeAction" @secondary="paymentNotice = ''">
         <text v-if="noticeCancelFailed" class="pending-notice-error" role="alert">{{ pendingCopy.cancelFailed }}</text>
@@ -479,6 +481,8 @@ const paymentSheetAmount = ref<number|string>(0);
 const paymentSheetError = ref('');
 const pendingPaymentChecking = ref(false);
 const paymentNotice = ref<''|'query'|'blocked'>('');
+// Cancelling while an external payment is underway is refused; say so instead of sending the cancel.
+const cancelBlocked = ref(false);
 const paymentNoticeReason = ref('');
 const noticeCancelFailed = ref(false);
 const paymentResultOrder = ref<Order|null>(null);
@@ -730,6 +734,7 @@ function dt(ts: number): string {
 }
 
 async function handleCancel() {
+  if (externalPayment.value) { cancelBlocked.value = true; return; }
   if (!cancellable.value) return;
   const scope = captureDetailScope();
   const cancelAttempt = ++cancelAttemptSequence;
