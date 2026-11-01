@@ -49,7 +49,7 @@ function page() {
     clear();
   };
   disposals.push(dispose);
-  return { state, refreshRemote, hooks, ready, dispose };
+  return { state, refreshRemote, hooks, ready, dispose, refreshCatalog: deps.refreshProductCatalog };
 }
 
 describe("visible orders survive catalog revision invalidation", () => {
@@ -115,4 +115,12 @@ describe("visible orders survive catalog revision invalidation", () => {
     await settled();
     expect(p.refreshRemote).toHaveBeenCalledTimes(2);
   });
+});
+
+it("defers the catalog image read until a cold restored session is bound", async () => {
+  const p = page(); p.ready.value = false; await settled();
+  p.hooks.show.forEach(show => show()); await settled();
+  expect(p.refreshCatalog).not.toHaveBeenCalled();
+  p.ready.value = true; await settled();
+  expect(p.refreshCatalog).toHaveBeenCalledTimes(1);
 });

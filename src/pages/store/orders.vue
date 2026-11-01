@@ -227,7 +227,7 @@ useManualScrollLoadMore(scrollAnchor, {
 });
 onShow(() => {
   ordersPageActive = true;
-  void refreshProductCatalog();
+  if (remoteSessionReady.value) void refreshProductCatalog();
   preserveOrdersOriginInH5();
   void refreshOrders();
 });
@@ -248,7 +248,7 @@ watch(() => app.accountBindingEpoch, () => {
 // onShow can land before the cookie restore binds the account. The deferred
 // read starts here instead, so the page never settles on an account-state error.
 watch(remoteSessionReady, (ready, wasReady) => {
-  if (ready && !wasReady && ordersPageActive) void refreshOrders();
+  if (ready && !wasReady && ordersPageActive) { void refreshProductCatalog(); void refreshOrders(); }
 });
 
 // A later catalog response clears the shared orders without rebinding the account.
