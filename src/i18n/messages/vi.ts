@@ -191,6 +191,7 @@ export const vi: Messages = {
     languageFallback: "Hướng dẫn này chưa có bản bằng ngôn ngữ bạn đã chọn. Bên dưới là nội dung đã xuất bản bằng ngôn ngữ có sẵn.",
     unavailableTitle: "Nội dung tạm thời không khả dụng",
     unavailableBody: "Không thể tải hướng dẫn đã xuất bản. Vui lòng thử lại.",
+    contents: "Đọc theo chủ đề",
   },
   tabs: {
     home: "Trang chủ",
@@ -2216,7 +2217,6 @@ rankBenefits: "Xem quyền lợi cấp bậc",
     releaseDetailsUnavailable: "Chưa tải được thông tin mở khóa. Vui lòng làm mới sau.",
     releaseAttestationInfo: "Được mở khóa sau khi thiết bị trực tuyến đủ tổng cộng {hours} giờ.",
     sheetOk: "Đã hiểu",
-    heldBucketsLine: "${p} đang xác nhận và ${l} chờ mở khóa hiện chưa thể rút",
     withdrawableLabel: "Có thể rút",
     heldReviewChip: "Đang xác nhận",
     heldLockedChip: "Chờ mở khóa",
@@ -2276,7 +2276,6 @@ rankBenefits: "Xem quyền lợi cấp bậc",
 
     minWithdrawNote: "Rút tối thiểu: ${n}.",
 
-    minWithdrawNoteOffset: "Bạn có thể chọn dùng UVT để bù phí.",
     withdrawalStatusSubtitle: "Trạng thái rút tiền",
     noActiveWithdrawal: "Không có lệnh rút nào đang xử lý.",
     withdrawalNotFound: "Không tìm thấy hồ sơ rút tiền.",

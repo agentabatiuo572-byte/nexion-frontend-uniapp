@@ -9,6 +9,10 @@
           <text>{{ t.ui.retry }}</text>
         </view>
       </view>
+      <!-- A page may render the accepted publication itself (scoped slot); loading, fallback and
+           failure stay here so every guide keeps the same acceptance and refresh boundary. -->
+      <slot v-if="$slots.default" :blocks="content.blocks" />
+      <template v-else>
       <HowHero :label="heroLabel(content.contentKey)" :title="content.blocks[0]?.title ?? heroLabel(content.contentKey)" :sub="content.blocks[0]?.body ?? ''" accent="purple" />
       <view v-if="content.blocks[0]?.items?.length" class="mx-4" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px">
         <view v-for="(item, itemIndex) in content.blocks[0].items" :key="itemIndex" style="display: flex; gap: 8px">
@@ -25,6 +29,7 @@
           </view>
         </HowSection>
         <HowCalloutBox v-else class="mx-4" :title="block.title" :body="block.body" :tone="neutral ? 'neutral' : 'purple'" />
+      </template>
       </template>
     </view>
     <view v-if="error" class="mx-4" style="padding: 28px 0;" role="alert" aria-live="polite">

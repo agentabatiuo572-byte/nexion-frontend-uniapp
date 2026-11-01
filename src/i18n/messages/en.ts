@@ -190,6 +190,7 @@ export const en = {
     languageFallback: "This explanation is not available in your selected language. The available published language is shown below.",
     unavailableTitle: "Content is temporarily unavailable",
     unavailableBody: "The published explanation could not be loaded. Please retry.",
+    contents: "Read by topic",
   },
   tabs: {
     home: "Home",
@@ -2254,7 +2255,6 @@ rankBenefits: "View rank benefits",
     releaseDetailsUnavailable: "Release details couldn't load. Please refresh later.",
     releaseAttestationInfo: "Released after your device has been online for {hours} hours in total.",
     sheetOk: "Got it",
-    heldBucketsLine: "${p} confirming and ${l} pending release are not withdrawable yet",
     withdrawableLabel: "Withdrawable",
     heldReviewChip: "Confirming",
     heldLockedChip: "Pending release",
@@ -2314,7 +2314,6 @@ rankBenefits: "View rank benefits",
 
     minWithdrawNote: "Minimum withdrawal: ${n}.",
 
-    minWithdrawNoteOffset: "The fee can optionally be covered with UVT.",
     withdrawalStatusSubtitle: "Withdrawal Status",
     noActiveWithdrawal: "No active withdrawal.",
     withdrawalNotFound: "Withdrawal record not found.",

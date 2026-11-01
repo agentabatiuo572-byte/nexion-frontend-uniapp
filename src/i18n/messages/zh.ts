@@ -191,6 +191,7 @@ export const zh: Messages = {
     languageFallback: "此说明暂未提供所选语言，以下显示已发布的可用语言文本。",
     unavailableTitle: "说明暂时无法加载",
     unavailableBody: "未能获取已发布的说明，请重试。",
+    contents: "按主题阅读",
   },
   tabs: {
     home: "首页",
@@ -2230,7 +2231,6 @@ rankBenefits: "查看等级权益",
     releaseDetailsUnavailable: "释放信息暂时无法加载，请稍后刷新。",
     releaseAttestationInfo: "设备累计在线 {hours} 小时后释放。",
     sheetOk: "知道了",
-    heldBucketsLine: "另有确认中 ${p}、待释放 ${l}，暂不可提",
     withdrawableLabel: "可提现",
     heldReviewChip: "确认中",
     heldLockedChip: "待释放",
@@ -2290,7 +2290,6 @@ rankBenefits: "查看等级权益",
 
     minWithdrawNote: "最低提现:${n}。",
 
-    minWithdrawNoteOffset: "手续费可选择用 UVT 抵扣。",
     withdrawalStatusSubtitle: "提现状态",
     noActiveWithdrawal: "暂无进行中的提现。",
     withdrawalNotFound: "未找到提现记录。",
