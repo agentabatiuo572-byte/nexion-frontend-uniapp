@@ -18,9 +18,17 @@ export function auxiliaryDemo(url,locale,state,request) {
     const totals={amountUSDT:empty?0:3.5,amountNEX:empty?0:11.71875,count:events.length},zero={amountUSDT:0,amountNEX:0,count:0};
     return {...proof,serverCanonical:true,period:url.searchParams.get('period')||'month',page:Number(url.searchParams.get('page')||1),pageSize:Number(url.searchParams.get('pageSize')||20),totalRows:events.length,events,split:{purchase:kind==='direct_purchase'?totals:zero,deviceEarning:kind==='direct_device_earning'?totals:zero},generatedAt:iso,snapshotAt:url.searchParams.get('snapshotAt')||iso};
   }
+  // The prototype models the v1 assignment protocol only; a 404 lets the App fall back to it.
+  if(p==='/api/tasks/v2/assignments')throw Object.assign(new Error('NOT_FOUND'),{status:404});
   if(p==='/api/tasks/assignments') {
     const task=(id,status,taskClass)=>({...proof,serverCanonical:true,taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:text('图像生成','Image generation','Tạo hình ảnh'),taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:2.34,requiredSeconds:600,startedAt:new Date(now-(status==='RUNNING'?300000:4200000)).toISOString(),completableAt:new Date(now+(status==='RUNNING'?300000:-3600000)).toISOString(),completedAt:status==='COMPLETED'?new Date(now-3600000).toISOString():null,receiptNo:status==='COMPLETED'?'DEMO-RECEIPT-1':null,proofNonce:null,proofExpiresAt:null});
     return {...proof,serverCanonical:true,serverNow:iso,devices:empty?[]:[{deviceId:41,instanceNo:'REVIEW-S1',deviceType:'GPU',lockUntil:null,currentTask:task(4,'RUNNING','IG'),recentTasks:[task(1,'COMPLETED','IG')]}]};
+  }
+  // P-62 Task Center: one posted settlement batch so the "Settlement batch" entry can be previewed.
+  if(p==='/api/tasks/v2/settlements'||p==='/api/tasks/v2/settlements/DEMO-BATCH-1') {
+    const batch={batchNo:'DEMO-BATCH-1',asset:'USDT',amount:'2.340000',taskCount:1,status:'POSTED',windowStart:now-7200000,windowEnd:now-3600000,postedAt:now-3000000};
+    if(p.endsWith('/DEMO-BATCH-1'))return {...proof,serverCanonical:true,...batch,items:[{taskNo:'DEMO-TASK-1',receiptNo:'DEMO-RECEIPT-1',deviceId:41,taskType:'IG',amount:'2.340000',completedAt:now-3600000}]};
+    return {...proof,serverCanonical:true,records:empty?[]:[batch],nextCursor:null};
   }
   if(p==='/api/app/support/faqs/page') {
     const questions=[
