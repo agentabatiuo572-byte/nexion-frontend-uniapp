@@ -192,7 +192,7 @@ export const useBills = defineStore("bills", () => {
     let pager = ledgers.get(key);
     if (!pager) {
       const stableFilters = { ...filters };
-      pager = createWalletLedgerPager((page, cursor) => walletBillsApi.list(page, 50, { ...stableFilters, cursor }), productionBill);
+      pager = createWalletLedgerPager((page, cursor) => walletBillsApi.list(page, 20, { ...stableFilters, cursor }), productionBill);
       ledgers.set(key, pager);
     }
     return pager;

@@ -3108,6 +3108,8 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 
 ### 9.7 账单 `/me/wallet/bills`
 
+2026-11-01 分页规则：H5 Lite 当前账单页的全部 / 收入 / 支出列表及共用账单分页的 USDT / UVT 奖励分类记录，首次只向服务端查询 20 条；用户向下滚动至列表底部附近才携带原筛选和游标查询下一页 20 条并追加，不预取或循环拉完整个列表。切换筛选从第一页重新读取，禁止混入旧组合。分页中合并重复触发；失败保留已加载记录并允许同游标重试，游标耗尽停止查询。没有可用滚动事件的平台保留“加载更多”入口。按单号定位仍沿用独立查找流程。
+
 按日期 grouping 流水:
 - type / amount / symbol / status / memo / ref
 - 6 type:swap / topup / withdraw / earning / commission / refund

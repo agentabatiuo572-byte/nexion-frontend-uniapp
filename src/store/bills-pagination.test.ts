@@ -7,7 +7,7 @@ const remote = vi.hoisted(() => ({ fundsServerEnabled: true, walletBillsApi: { l
 vi.mock("@/api/runtime", () => remote);
 const { useBills, isRewardBill } = await import("./bills");
 const row = (id: string) => ({ id, bizNo: id, bizType: "QUEST_REWARD", asset: "NEX", direction: "IN", amount: 2, balanceAfter: 9, status: "SUCCESS", remark: id, createdAt: 1000 });
-const page = (ids: string[], nextCursor: string | null = null, current = 1) => ({ source: "server", sourceEnvironment: "PRODUCTION", bills: ids.map(row), page: current, pageSize: 50, total: 1101, nextPage: nextCursor ? current + 1 : null, nextCursor });
+const page = (ids: string[], nextCursor: string | null = null, current = 1) => ({ source: "server", sourceEnvironment: "PRODUCTION", bills: ids.map(row), page: current, pageSize: 20, total: 1101, nextPage: nextCursor ? current + 1 : null, nextCursor });
 const summary = (amount = 2202) => ({ source: "server", sourceEnvironment: "PRODUCTION", asOf: 2000, timeZone: "Asia/Shanghai", rewardsUsdt: 0, rewardsNex: amount, latestRewardAt: 1000, todayNexEarn: 800, pendingNex: 120, monthBillCount: 1101, recentNexBills: [row("recent")] });
 function deferred<T>() { let resolve!: (v: T) => void; let reject!: (e: Error) => void; const promise = new Promise<T>((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; }
 beforeEach(() => { setActivePinia(createPinia()); remote.walletBillsApi.list.mockReset(); remote.walletBillsApi.summary.mockReset().mockResolvedValue(summary()); });
@@ -29,10 +29,27 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
     expect(remote.walletBillsApi.list).not.toHaveBeenCalled();
     await store.refreshServerLedger();
     expect(remote.walletBillsApi.list).toHaveBeenCalledTimes(1);
-    expect(remote.walletBillsApi.list).toHaveBeenCalledWith(1, 50, { cursor: "start" });
+    expect(remote.walletBillsApi.list).toHaveBeenCalledWith(1, 20, { cursor: "start" });
     expect(store.bills.map(b => b.id)).toEqual(["1"]);
     expect(store.summary?.rewardsNex).toBe(2202);
     expect(store.summary?.recentNexBills[0].type).toBe("achievement");
+  });
+  it.each(["USDT", "NEX"] as const)("loads %s filters in batches of 20 only on demand", async asset => {
+    for (const filters of [{ asset }, { asset, direction: "IN" as const }, { asset, direction: "OUT" as const }, { asset, category: "REWARD" as const }]) {
+      remote.walletBillsApi.list.mockReset().mockImplementation(async (n: number) =>
+        page(Array.from({ length: 20 }, (_, i) => `${n}-${i}`), `cursor-${n}`, n));
+      const pager = useBills().getLedger(filters);
+      await pager.refresh();
+      await Promise.resolve();
+      expect(remote.walletBillsApi.list).toHaveBeenCalledTimes(1);
+      expect(remote.walletBillsApi.list).toHaveBeenLastCalledWith(1, 20, { ...filters, cursor: "start" });
+      expect(pager.rows).toHaveLength(20);
+      await pager.loadMore();
+      await Promise.resolve();
+      expect(remote.walletBillsApi.list).toHaveBeenCalledTimes(2);
+      expect(remote.walletBillsApi.list).toHaveBeenLastCalledWith(2, 20, { ...filters, cursor: "cursor-1" });
+      expect(pager.rows).toHaveLength(40);
+    }
   });
   it("coalesces first-page, next-page and summary reads, but does not cache settled reads", async () => {
     const first = deferred<ReturnType<typeof page>>(); const next = deferred<ReturnType<typeof page>>(); const sum = deferred<ReturnType<typeof summary>>();
@@ -60,12 +77,12 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
     remote.walletBillsApi.list.mockResolvedValue(page(["r"])); const store = useBills();
     const p = store.getLedger({ category: "REWARD", asset: "NEX" });
     expect(p).toBe(store.getLedger({ asset: "NEX", category: "REWARD" }));
-    await p.refresh(); expect(remote.walletBillsApi.list).toHaveBeenCalledWith(1, 50, { asset: "NEX", category: "REWARD", cursor: "start" });
+    await p.refresh(); expect(remote.walletBillsApi.list).toHaveBeenCalledWith(1, 20, { asset: "NEX", category: "REWARD", cursor: "start" });
     expect(store.getLedger().rows).toEqual([]);
   });
   it("uses the controlled projection for a trial purchase and never exposes its internal remark", async () => {
     remote.walletBillsApi.list.mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 1, nextPage: null, nextCursor: null,
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 20, total: 1, nextPage: null, nextCursor: null,
       bills: [{ ...row("trial-charge"), bizNo: "TRIAL-42:CHARGE", bizType: "TRIAL_CHARGE", direction: "OUT", amount: 1249,
         remark: "H2 internal conversion settlement", category: "purchase", presentationCode: "trialCharge" }],
     });
@@ -89,8 +106,8 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
       symbol: "USDT", amount: 1299, balanceAfter: 1299, status: "posted" });
     expect(isRewardBill(pager.rows[0])).toBe(false);
     expect(isRewardBill(pager.rows[1])).toBe(true);
-    expect(remote.walletBillsApi.list.mock.calls[0]).toEqual([1, 50, { direction: "IN", cursor: "start" }]);
-    expect(remote.walletBillsApi.list.mock.calls[1]).toEqual([2, 50, { direction: "IN", cursor: " c1 " }]);
+    expect(remote.walletBillsApi.list.mock.calls[0]).toEqual([1, 20, { direction: "IN", cursor: "start" }]);
+    expect(remote.walletBillsApi.list.mock.calls[1]).toEqual([2, 20, { direction: "IN", cursor: " c1 " }]);
     expect(new URL(request.mock.calls[1][0].path, "http://local").searchParams.get("cursor")).toBe(" c1 ");
   });
   it.each([
@@ -150,7 +167,7 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
   });
   it("uses the legacy bizType allowlist without exposing internal remarks or DEV task identifiers", async () => {
     remote.walletBillsApi.list.mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 3, nextPage: null, nextCursor: null,
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 20, total: 3, nextPage: null, nextCursor: null,
       bills: [
         { ...row("compute"), bizNo: "DEV-TASK-77", bizType: "COMPUTE_TASK_REWARD", remark: "development server-authoritative compute task reward" },
         { ...row("unknown"), bizNo: "INTERNAL-ONLY-9", bizType: "FUTURE_UNMAPPED", remark: "D5 internal ledger note" },
@@ -197,7 +214,7 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
       ["WITHDRAW_FEE_OFFSET_REFUND", `D2-NEX-REFUND-${withdrawalNo}`, "withdrawFeeOffsetRefund"],
     ] as const;
     remote.walletBillsApi.list.mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: components.length, nextPage: null, nextCursor: null,
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 20, total: components.length, nextPage: null, nextCursor: null,
       bills: components.map(([bizType, bizNo], index) => ({ ...row(`withdraw-${index}`), bizType, bizNo, remark: `D${index + 2} internal withdrawal accounting note` })),
     });
 
@@ -210,7 +227,7 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
   });
   it("keeps future withdrawal legs generic unless the server supplies a recognized presentation code", async () => {
     remote.walletBillsApi.list.mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 2, nextPage: null, nextCursor: null,
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 20, total: 2, nextPage: null, nextCursor: null,
       bills: [
         { ...row("withdraw-unknown"), bizType: "WITHDRAW_FUTURE_COMPONENT", category: "withdraw", direction: "OUT", presentationCode: undefined },
         { ...row("withdraw-server-code"), bizType: "WITHDRAW_FUTURE_COMPONENT", category: "withdraw", direction: "OUT", presentationCode: "withdrawNetworkFee" },
@@ -236,7 +253,7 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
       ["WITHDRAW_FEE_OFFSET_REFUND", `D2-NEX-REFUND-${withdrawalNo}`, "withdrawFeeOffsetRefund"],
     ] as const;
     remote.walletBillsApi.list.mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: components.length, nextPage: null, nextCursor: null,
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 20, total: components.length, nextPage: null, nextCursor: null,
       bills: components.map(([bizType, bizNo], index) => ({ ...row(`legacy-withdraw-${index}`), bizType, bizNo, category: "withdraw", presentationCode: "withdraw" })),
     });
 
@@ -248,7 +265,7 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
   });
   it("does not turn a malformed withdrawal component key into a tracking link", async () => {
     remote.walletBillsApi.list.mockResolvedValue({
-      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 50, total: 1, nextPage: null, nextCursor: null,
+      source: "server", sourceEnvironment: "PRODUCTION", page: 1, pageSize: 20, total: 1, nextPage: null, nextCursor: null,
       bills: [{ ...row("withdraw-malformed"), bizType: "WITHDRAW_PAYOUT_REFUND", bizNo: "D5-PRIVATE-LEDGER:PAYOUT:USDT:REFUND", remark: "provider internal return" }],
     });
 
@@ -280,10 +297,10 @@ describe("wallet ledger demand pagination and authoritative summaries", () => {
     await expect(store.refreshSummary()).rejects.toThrow("summary offline"); expect(store.summary).toBeNull(); expect(store.summaryStatus).toBe("error");
   });
   it("can scroll beyond the former 1000-row cap and stops when the server has no cursor", async () => {
-    remote.walletBillsApi.list.mockImplementation(async (n: number) => page(Array.from({length:50}, (_,i) => `${n}-${i}`), n < 22 ? `c${n}` : null, n));
-    const p = useBills().getLedger(); await p.refresh(); expect(p.rows).toHaveLength(50);
-    for (let i = 0; i < 24; i++) await p.loadMore();
-    expect(p.rows).toHaveLength(1100); expect(remote.walletBillsApi.list).toHaveBeenCalledTimes(22);
+    remote.walletBillsApi.list.mockImplementation(async (n: number) => page(Array.from({length:20}, (_,i) => `${n}-${i}`), n < 56 ? `c${n}` : null, n));
+    const p = useBills().getLedger(); await p.refresh(); expect(p.rows).toHaveLength(20);
+    for (let i = 0; i < 60; i++) await p.loadMore();
+    expect(p.rows).toHaveLength(1120); expect(remote.walletBillsApi.list).toHaveBeenCalledTimes(56);
   });
   it("fails closed for a repeated or missing next cursor without draining pages", async () => {
     const p = useBills().getLedger();

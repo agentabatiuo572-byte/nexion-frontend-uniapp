@@ -176,7 +176,7 @@ export function parseWalletBillsSummary(value: unknown): WalletBillsSummary {
 
 export function createWalletBillsApi(client: ApiClient) {
   return {
-    list: async (page = 1, pageSize = 50, options: WalletBillFilters & { cursor?: string } = {}): Promise<WalletBillsSnapshot> => parseWalletBillsSnapshot(await client.request({
+    list: async (page = 1, pageSize = 20, options: WalletBillFilters & { cursor?: string } = {}): Promise<WalletBillsSnapshot> => parseWalletBillsSnapshot(await client.request({
       method: "GET",
       path: `/api/app/wallet/bills?page=${Math.max(1, Math.trunc(page))}&pageSize=${Math.max(1, Math.min(100, Math.trunc(pageSize)))}`
         + (["asset", "direction", "category", "cursor"] as const).filter(key => options[key] !== undefined)

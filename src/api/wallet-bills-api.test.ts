@@ -100,6 +100,13 @@ describe("wallet summary and paginated API contract", () => {
   it.each([{monthBillCount:1.5},{latestRewardAt:"invalid"},{timeZone:""},{asOf:"invalid"},{recentNexBills:null},{sourceEnvironment:"SANDBOX"}])("fails closed for malformed metadata %s", fields => {
     expect(() => parseWalletBillsSummary({...summary(),...fields})).toThrow("WALLET_BILLS_RESPONSE_INVALID");
   });
+  it("defaults to 20 rows without fetching later pages", async () => {
+    const request = vi.fn().mockResolvedValue({ ...snapshot(), pageSize: 20 });
+    const api = createWalletBillsApi({ request } as unknown as ApiClient);
+    await api.list();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0][0].path).toBe("/api/app/wallet/bills?page=1&pageSize=20");
+  });
   it("encodes cursor and server filters; summary is a separate endpoint", async () => {
     const request = vi.fn().mockResolvedValueOnce({source:"server",sourceEnvironment:"PRODUCTION",bills:[],page:2,pageSize:50,total:0,nextPage:null,nextCursor:null}).mockResolvedValueOnce(summary());
     const api = createWalletBillsApi({request} as unknown as ApiClient);
