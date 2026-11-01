@@ -74,4 +74,3 @@ export function attachManualScrollLoadMore(anchor: unknown, options: ManualScrol
   for (const [name, listener] of listeners) host.addEventListener(name, listener, { passive: true });
   return () => { intentUntil = 0; for (const [name, listener] of listeners) host.removeEventListener(name, listener); };
 }
-
