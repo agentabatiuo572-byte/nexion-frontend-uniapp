@@ -135,9 +135,9 @@
       </view>
       <template v-if="stage">
         <view v-if="stageOffline" class="earn-stage__offline-art" aria-hidden="true"><DeviceArt class="earn-stage__offline-image" :device="device" /><view class="earn-stage__floor" /></view>
-        <JobGauge v-else :progress="gaugeProgress" :idle="gaugeIdle" :live="gaugeProgress != null && jobRunning" :label="`${t.earn.currentTask} ${task ? task.model : ''}`"><DeviceArt :device="device" /></JobGauge>
+        <JobGauge v-else :progress="gaugeProgress" :idle="gaugeIdle" :live="gaugeProgress != null && jobRunning" :label="task ? visibility.mask(task.type) : t.earn.currentTask"><DeviceArt :device="device" /></JobGauge>
         <view v-if="stageJob === 'task' && task" class="earn-stage__job">
-          <view class="earn-stage__job-name"><view v-if="!visibility.hidden" class="earn-stage__eq" :class="{ 'earn-stage__eq--running': jobRunning }" aria-hidden="true"><view /><view /><view /></view><text class="earn-stage__job-title">{{ t.earn.currentTask }} · {{ visibility.mask(task.model) }}</text></view>
+          <view class="earn-stage__job-name"><view v-if="!visibility.hidden" class="earn-stage__eq" :class="{ 'earn-stage__eq--running': jobRunning }" aria-hidden="true"><view /><view /><view /></view><text class="earn-stage__job-title">{{ visibility.mask(task.type) }}</text></view>
           <text class="earn-stage__pct">{{ visibility.hidden ? '••••' : progressPct == null ? '—' : progressPct }}<text v-if="!visibility.hidden && progressPct != null" class="earn-stage__pct-unit">%</text></text>
           <text v-if="task.status === 'PAUSED'" class="earn-stage__note earn-stage__note--warn">{{ t.earn.phoneTaskPaused }}</text>
           <text v-else-if="awaitingExecutionResultConfirmation" class="earn-stage__note">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>

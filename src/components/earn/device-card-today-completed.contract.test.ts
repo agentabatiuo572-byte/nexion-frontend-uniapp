@@ -192,6 +192,9 @@ async function setup(name: string) {
   const blank = { render: () => null };
   const chassis = Vue.defineComponent({ setup: (_p, ctx) => () => Vue.h('view', ctx.slots.default?.()) });
   const deps: Record<string, unknown> = {
+    '@/composables/use-loops-in-view': { useLoopsInView: () => ({ elRef: Vue.ref(null), running: Vue.ref(false) }) },
+    '@/components/device-art.vue': { __esModule: true, default: blank },
+    '@/components/earn/job-gauge.vue': { __esModule: true, default: blank },
     '@/lib/device-control-platform': { canControlDevice },
     '@/store/data-visibility': { useDataVisibility: () => ({ hidden: false, mask: String }) },
     '@/lib/amount-display': { formatAmount },
