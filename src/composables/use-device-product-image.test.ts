@@ -1,3 +1,5 @@
+import { deviceTaskRecovering } from "@/lib/task-progress";
+import { computeV2Copy } from "@/i18n/compute-v2";
 import * as Vue from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import { compile } from "@vue/compiler-dom";
@@ -49,7 +51,7 @@ function mount(raw: string, device: Device) {
     "@/store/data-visibility": { useDataVisibility: () => ({ hidden: false, mask: String }) },
     "@/components/ui/nx-button.vue": {}, "@/composables/use-tab-page-lifecycle": { useVisibleInterval() {} },
     "@/lib/server-deadline-clock": { advanceMonotonicHighWater: (value: number) => value, projectServerNow: (value: number) => value, readMonotonicNowMs: () => 0 },
-    "@/lib/task-progress": { taskProgressPercent: () => null } };
+    "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, "@/lib/task-progress": { deviceTaskRecovering, taskProgressPercent: () => null } };
   const exports: Record<string, any> = {};
   new Function("require", "exports", code)((id: string) => modules[id], exports);
   const props = Vue.reactive({ device, online: true, active: true, runtimeConfirmed: true, showAction: false });

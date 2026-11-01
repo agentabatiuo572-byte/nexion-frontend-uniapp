@@ -42,6 +42,8 @@ export interface CanonicalTaskDeviceState {
   lockUntil: number | null;
   currentTask: CanonicalTaskAssignment | null;
   recentTasks: CanonicalTaskAssignment[];
+  recoveryPending?: boolean;
+  recoveryReason?: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" | null;
 }
 
 export interface CanonicalTaskAssignments {
@@ -250,6 +252,9 @@ function device(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTas
   const deviceId = integer(source.deviceId, 1);
   if (currentTask && currentTask.deviceId !== deviceId) return invalid();
   if (recentTasks.some((entry) => entry.deviceId !== deviceId || !(version === 2 ? ["COMPLETED", "FAILED", "CANCELLED"] : ["COMPLETED"]).includes(entry.status))) return invalid();
+  if (version === 2 && ((source.recoveryPending !== undefined && typeof source.recoveryPending !== "boolean")
+    || (source.recoveryReason != null && source.recoveryReason !== "LEGACY_COMPLETE_OUTCOME_UNKNOWN")
+    || (source.recoveryReason != null && source.recoveryPending !== true))) return invalid();
   return {
     deviceId,
     instanceNo: text(source.instanceNo),
@@ -257,6 +262,8 @@ function device(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTas
     lockUntil: timestamp(source.lockUntil, true),
     currentTask,
     recentTasks,
+    ...(version === 2 ? { recoveryPending: source.recoveryPending === true,
+      recoveryReason: source.recoveryReason == null ? null : "LEGACY_COMPLETE_OUTCOME_UNKNOWN" as const } : {}),
   };
 }
 

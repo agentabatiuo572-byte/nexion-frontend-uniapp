@@ -1,3 +1,4 @@
+import { computeV2Copy } from "@/i18n/compute-v2";
 vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
 import * as progress from "@/lib/task-progress";
 import * as deadline from "@/lib/server-deadline-clock";
@@ -94,7 +95,7 @@ function fixture(copy = zh) {
     '@/composables/use-tab-page-lifecycle': { onShow() {}, onHide() {}, useVisibleInterval() {} },
     '@/composables/use-intro-motion': { useIntroMotion: () => Vue.ref(false) },
     '@/lib/device-slot-policy': {}, '@/lib/account-scope': {}, '@/lib/day-one-page-observation': {},
-    '@/lib/task-progress': progress, '@/lib/server-deadline-clock': deadline, '@/lib/task-result-confirmation': confirmation,
+    "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, '@/lib/task-progress': progress, '@/lib/server-deadline-clock': deadline, '@/lib/task-result-confirmation': confirmation,
     '@/lib/device-copy': { deviceName: () => 'Device' }, '@/lib/hashpower': { deviceOnlineState: () => 'online' },
   };
   dependencies['@/components/ui/data-visibility-toggle.vue'] = { __esModule: true, default: component(toggleRaw, dependencies) };
@@ -186,7 +187,7 @@ it.each([zh, en, vietnamese])('shows the actual Home queue task and progress bef
   expect(text(root)).toContain('50%');
   expect(byClass(root, 'hf-device-task__fill').props.style.width).toBe('50%');
   device.taskServerNow += 60_000; await Vue.nextTick();
-  expect(text(root)).toContain('100%'); expect(text(root)).toContain(copy.earn.taskAwaitingExecutionResultConfirmation);
+  expect(text(root)).toContain('99%'); expect(text(root)).not.toContain('100%'); expect(text(root)).toContain(copy.earn.taskAwaitingExecutionResultConfirmation);
   task.status = 'PAUSED'; task.pausedAt = snapshotNow; await Vue.nextTick();
   expect(text(root)).toContain('50%');
   device.taskServerNow += 30_000; await Vue.nextTick(); expect(text(root)).toContain('50%');
@@ -209,5 +210,13 @@ it('keeps an unread task state distinct from a confirmed empty queue', () => {
   const f = fixture();
   const root = f.mount(deviceRowRaw, { device: { id: 'unknown', todayEarnings: 0, currentTask: null }, runtimeConfirmed: true, tasksConfirmed: false });
   expect(text(root)).toContain(zh.earn.runtimeUnknown); expect(text(root)).not.toContain(zh.earn.noCurrentTask);
+  expect(all(root).some(node => node.props.role === 'progressbar')).toBe(false);
+});
+
+it('shows recovery after the old lease expires without a current task or a fake progress bar', () => {
+  const f = fixture(en);
+  const root = f.mount(deviceRowRaw, { device: { id: 'legacy-expired', todayEarnings: 0, currentTask: null, recoveryPending: true }, runtimeConfirmed: true, tasksConfirmed: true });
+  expect(text(root)).toContain(computeV2Copy.en.statuses.RECOVERING);
+  expect(text(root)).not.toContain(en.earn.noCurrentTask);
   expect(all(root).some(node => node.props.role === 'progressbar')).toBe(false);
 });

@@ -261,7 +261,7 @@
       <text v-if="taskHistoryReady" class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 4px">{{ t.earn.phoneWaitingHint }}</text>
     </view>
 
-    <view v-if="phoneFactsReady && !task && device.kind !== 'phone'" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
+    <view v-if="phoneFactsReady && !task && device.kind !== 'phone'" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ recovering ? computeCopy.statuses.RECOVERING : taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
 
     <!-- Current task (non-reconnecting) -->
     <view v-if="task && !reconnecting" style="padding: 0 20px 16px">
@@ -443,7 +443,8 @@ import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
-import { taskProgressPercent } from "@/lib/task-progress";
+import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import TaskV2Status from "@/components/earn/task-v2-status.vue";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
@@ -518,6 +519,8 @@ const KIND_ICON_PATHS: Record<DeviceKind, string> = {
 const kindIconPath = computed(() => KIND_ICON_PATHS[props.device.kind] ?? KIND_ICON_PATHS.phone);
 
 const task = computed(() => phoneFactsReady.value ? props.device.currentTask : null);
+const computeCopy = useComputeV2Copy();
+const recovering = computed(() => deviceTaskRecovering(props.device));
 // Task progress advances from the server snapshot plus a monotonic receive clock.
 // Browser wall-clock changes therefore cannot fast-forward or rewind task earnings.
 const liveTaskNow = computed(() => {
@@ -546,9 +549,9 @@ const awaitingExecutionResultConfirmation = computed(() => {
 
 const onlineState = computed(() => deviceOnlineState(props.device, now.value,
   !remoteApiEnabled || app.remoteFleetStatus !== "error"));
-const statusLabel = computed(() => onlineState.value === "unknown" ? t.value.earn.runtimeUnknown
+const statusLabel = computed(() => recovering.value ? computeCopy.value.statuses.RECOVERING : onlineState.value === "unknown" ? t.value.earn.runtimeUnknown
   : onlineState.value === "online" ? t.value.earn.online : "");
-const statusOnline = computed(() => onlineState.value === "online");
+const statusOnline = computed(() => !recovering.value && onlineState.value === "online");
 const statusColor = computed(() => statusOnline.value ? "var(--v5-brand)" : "var(--v5-ink-3)");
 
 const elapsedRemaining = computed(() => {

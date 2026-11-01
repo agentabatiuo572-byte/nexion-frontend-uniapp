@@ -27,7 +27,7 @@
       <text v-if="device.currentTask.status === 'PAUSED' || device.interruptedAt != null" class="hf-device-task__note">{{ device.interruptedAt != null ? t.earn.reconnecting : t.earn.phoneTaskPaused }}</text>
       <text v-else-if="awaitingExecutionResultConfirmation" class="hf-device-task__note">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
     </view>
-    <view v-else class="hf-device-task hf-device-task--empty"><text>{{ !taskFactsReady ? t.earn.runtimeUnknown : t.earn.noCurrentTask }}</text></view>
+    <view v-else class="hf-device-task hf-device-task--empty"><text>{{ recovering ? computeCopy.statuses.RECOVERING : !taskFactsReady ? t.earn.runtimeUnknown : t.earn.noCurrentTask }}</text></view>
   </view>
 </template>
 
@@ -39,7 +39,8 @@ import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { computed, ref, type CSSProperties } from "vue";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
-import { taskProgressPercent } from "@/lib/task-progress";
+import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
 import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
@@ -51,12 +52,14 @@ const visibility = useDataVisibility();
 const props = defineProps<{ device: Device; divider?: boolean; runtimeConfirmed: boolean; tasksConfirmed?: boolean }>();
 const t = useT();
 const copy = useAuditUiCopy();
+const computeCopy = useComputeV2Copy();
+const recovering = computed(() => deviceTaskRecovering(props.device));
 // Stored device name is English + persisted → resolve from `kind` at render.
 const displayName = computed(() => deviceName(t.value, props.device));
 
 const onlineState = computed(() => deviceOnlineState(props.device, Date.now(), props.runtimeConfirmed));
-const isOnline = computed(() => onlineState.value === "online");
-const statusText = computed(() => onlineState.value === "unknown" ? t.value.earn.runtimeUnknown : isOnline.value ? t.value.earn.online : "");
+const isOnline = computed(() => !recovering.value && onlineState.value === "online");
+const statusText = computed(() => recovering.value ? computeCopy.value.statuses.RECOVERING : onlineState.value === "unknown" ? t.value.earn.runtimeUnknown : isOnline.value ? t.value.earn.online : "");
 const now = ref(Date.now());
 const monotonicNow = ref(readMonotonicNowMs());
 useVisibleInterval(() => {

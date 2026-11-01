@@ -29,6 +29,25 @@ describe("Compute V2 read contract", () => {
     await expect(api(request).state(true)).resolves.toMatchObject({ devices: [] });
     expect(request.mock.calls.map(([value]) => value.path)).toEqual(["/api/tasks/v2/assignments", "/api/tasks/assignments"]);
   });
+  it("preserves the server's legacy recovery projection and hides its elapsed progress", async () => {
+    const request = vi.fn().mockResolvedValue({ ...projection, devices: [{ ...projection.devices[0], currentTask: {
+      ...assignment, taskNo: "CT-OLD", status: "RECOVERING", startedAt: 1000, completableAt: null,
+    } }] });
+    const state = await api(request).state(true);
+    const current = state.devices[0].currentTask!;
+    expect(current).toMatchObject({ taskNo: "CT-OLD", status: "RECOVERING", settlementStatus: "NONE", completableAt: null, receiptNo: null });
+    expect(taskProgressPercent({ startedAt: current.startedAt, status: current.status, totalSec: current.requiredSeconds } as any, 100000)).toBeNull();
+    expect(awaitsExecutionResultConfirmation(current, 100000)).toBe(false);
+  });
+  it("accepts additive device recovery after lease expiry and defaults older responses safely", async () => {
+    const device = { ...projection.devices[0], currentTask: null, recoveryPending: true, recoveryReason: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" };
+    const state = await api(vi.fn().mockResolvedValue({ ...projection, devices: [device] })).state(true);
+    expect(state.devices[0]).toMatchObject({ currentTask: null, recoveryPending: true, recoveryReason: "LEGACY_COMPLETE_OUTCOME_UNKNOWN", recentTasks: [] });
+    expect((await api(vi.fn().mockResolvedValue(projection)).state(true)).devices[0]).toMatchObject({ recoveryPending: false, recoveryReason: null });
+    for (const patch of [{ recoveryPending: "true" }, { recoveryReason: "UNKNOWN_REASON" }, { recoveryPending: false }]) {
+      await expect(api(vi.fn().mockResolvedValue({ ...projection, devices: [{ ...device, ...patch }] })).state(true)).rejects.toMatchObject({ kind: "protocol" });
+    }
+  });
   it.each([new ApiError({ kind: "auth", status: 401, message: "AUTH" }), new ApiError({ kind: "network", message: "NETWORK" }), new ApiError({ kind: "http", status: 503, message: "DOWN" }), new ApiError({ kind: "protocol", message: "INVALID" })])("does not hide failure with legacy data: %s", async failure => {
     const request = vi.fn().mockRejectedValue(failure);
     await expect(api(request).state(true)).rejects.toBe(failure);
