@@ -55,7 +55,7 @@ self.onmessage = async ({ data }) => {
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.proxy = false;
       ort.env.wasm.wasmPaths = base;
-      const bytes = await readBytes(`${base}model.onnx`);
+      const bytes = await readBytes(data.modelUrl);
       if (sha256(bytes) !== MODEL_SHA) throw new Error("PHONE_MODEL_DIGEST_INVALID");
       session = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"], executionMode: "sequential" });
       self.postMessage({ id, state: "READY", modelSha256: MODEL_SHA, modelRevision: MODEL_REVISION, runtimeKey: RUNTIME_KEY });

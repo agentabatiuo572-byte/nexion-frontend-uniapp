@@ -12,8 +12,9 @@ interface Journal {
   task?: PhoneComputeTask; result?: PhoneComputeResult; sent?: boolean; workerExited?: boolean; exitReason?: PhoneExitReason;
 }
 export const phoneComputeRuntime = reactive({
-  status: "unsupported" as "unsupported" | "paused" | "loading" | "ready" | "waiting" | "running" | "verifying" | "recovering" | "error",
+  status: "unsupported" as "unsupported" | "paused" | "downloading" | "loading" | "ready" | "waiting" | "running" | "verifying" | "recovering" | "error",
   error: "", modelName: model.modelName, lastDurationMs: null as number | null,
+  downloadPercent: 0, downloadedBytes: 0, modelSource: "" as "" | "download" | "cache",
 });
 export const phoneComputeCommand = shallowRef<Record<string, unknown> | null>(null);
 const api = createPhoneComputeApi(apiClient);
@@ -22,6 +23,45 @@ let commandId = 0, runId = 0, owner = "", journal: Journal | null = null;
 let executionDeadline = 0;
 let timer: ReturnType<typeof setInterval> | undefined, heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 let stopWaiters: (() => void)[] = [];
+const modelCacheKey = `uvel-phone-model-v1:${model.modelRevision}:${model.modelSha256}`;
+let modelPath = "";
+
+async function cachedModelPath(): Promise<string> {
+  const saved: unknown = uni.getStorageSync(modelCacheKey);
+  if (typeof saved === "string" && saved.startsWith("_doc/uniapp_save/")) {
+    const size = await new Promise<number>(resolve => uni.getSavedFileInfo({
+      filePath: saved, success: file => resolve(file.size), fail: () => resolve(0),
+    }));
+    if (size === model.modelSizeBytes) {
+      phoneComputeRuntime.modelSource = "cache";
+      phoneComputeRuntime.downloadPercent = 100;
+      return saved;
+    }
+    uni.removeStorageSync(modelCacheKey);
+    if (size) await new Promise<void>((resolve, reject) => uni.removeSavedFile({ filePath: saved, success: () => resolve(), fail: reject }));
+  }
+  phoneComputeRuntime.status = "downloading";
+  phoneComputeRuntime.modelSource = "download";
+  phoneComputeRuntime.downloadPercent = 0;
+  phoneComputeRuntime.downloadedBytes = 0;
+  const downloaded = await new Promise<UniApp.DownloadSuccessData>((resolve, reject) => {
+    const task = uni.downloadFile({ url: model.modelUrl, timeout: 300_000, success: resolve,
+      fail: () => reject(new Error("PHONE_MODEL_DOWNLOAD_FAILED")) });
+    task.onProgressUpdate(progress => {
+      phoneComputeRuntime.downloadedBytes = progress.totalBytesWritten;
+      phoneComputeRuntime.downloadPercent = Math.min(100, Math.floor(progress.totalBytesWritten / model.modelSizeBytes * 100));
+    });
+  });
+  if (downloaded.statusCode !== 200) throw new Error(`PHONE_MODEL_DOWNLOAD_HTTP_${downloaded.statusCode}`);
+  const size = await new Promise<number>((resolve, reject) => uni.getFileInfo({ filePath: downloaded.tempFilePath,
+    success: file => resolve(file.size), fail: reject }));
+  if (size !== model.modelSizeBytes) throw new Error("PHONE_MODEL_DOWNLOAD_SIZE_INVALID");
+  const path = await new Promise<string>((resolve, reject) => uni.saveFile({ tempFilePath: downloaded.tempFilePath,
+    success: file => resolve(file.savedFilePath), fail: reject }));
+  uni.setStorageSync(modelCacheKey, path);
+  phoneComputeRuntime.downloadPercent = 100;
+  return path;
+}
 
 function key(account = owner) { return `uvel-phone-em-v1:${account}:${getDeviceId()}`; }
 function save() { if (journal) uni.setStorageSync(key(journal.accountKey), journal); }
@@ -124,6 +164,11 @@ export function receiveNativePhoneCompute(value: unknown) {
   } else if (event.state === "ERROR") {
     phoneComputeRuntime.error = typeof event.error === "string" ? event.error : "PHONE_ENGINE_FAILED";
     phoneComputeRuntime.status = "error";
+    if (event.error === "PHONE_MODEL_DIGEST_INVALID" && modelPath) {
+      uni.removeStorageSync(modelCacheKey);
+      uni.removeSavedFile({ filePath: modelPath, fail: () => { phoneComputeRuntime.error = "PHONE_MODEL_CACHE_REMOVE_FAILED"; } });
+      modelPath = "";
+    }
     if (journal?.task && !journal.result) { journal.phase = "ABORTED"; journal.exitReason = "WORKER_ERROR"; save(); }
     stop("WORKER_ERROR");
   }
@@ -189,7 +234,11 @@ async function drive() {
     }
     if (!ready) {
       if (!loading && phoneComputeRuntime.status !== "error" && exited) {
-        loading = true; exited = false; phoneComputeRuntime.status = "loading"; command("init");
+        loading = true;
+        modelPath = await cachedModelPath();
+        if (!current() || !foreground) { loading = false; return; }
+        exited = false; phoneComputeRuntime.status = "loading";
+        command("init", { modelUrl: plus.io.convertLocalFileSystemURL(modelPath) });
       }
       return;
     }
@@ -207,6 +256,7 @@ async function drive() {
     runId = command("run", { task });
   } catch (error) {
     phoneComputeRuntime.error = error instanceof Error ? error.message : "PHONE_COMPUTE_UNAVAILABLE";
-    if (phoneComputeRuntime.status !== "error") phoneComputeRuntime.status = journal?.task ? "recovering" : "waiting";
+    if (loading || ["downloading", "loading"].includes(phoneComputeRuntime.status)) { loading = false; phoneComputeRuntime.status = "error"; }
+    else if (phoneComputeRuntime.status !== "error") phoneComputeRuntime.status = journal?.task ? "recovering" : "waiting";
   } finally { driving = false; }
 }

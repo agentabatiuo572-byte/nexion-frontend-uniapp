@@ -4,8 +4,10 @@
     <text v-if="!nativePhone" class="block">{{ copy.web }}</text>
     <template v-else>
       <text class="block">{{ copy.engine }} · {{ copy.states[runtime.status] }}</text>
+      <text v-if="runtime.status === 'downloading'" class="block">{{ copy.download }} · {{ runtime.downloadPercent }}% · 90.4 MB</text>
+      <text v-else-if="runtime.modelSource === 'cache' && runtime.status !== 'error'" class="block">{{ copy.cached }}</text>
       <template v-if="runtime.status === 'error'">
-        <text class="block">{{ copy.engineFailure }}</text>
+        <text class="block">{{ runtime.modelSource === 'download' ? copy.downloadFailure : copy.engineFailure }}</text>
         <view class="phone-compute-status__retry" role="button" tabindex="0" @click.stop="retryEngine" @keydown.enter.stop.prevent="retryEngine" @keydown.space.stop.prevent="retryEngine">{{ copy.retryEngine }}</view>
       </template>
     </template>

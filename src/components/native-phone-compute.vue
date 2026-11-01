@@ -39,7 +39,7 @@ export default {
           this.worker = new Worker(`${base}phone-embedding-worker.js`);
           this.worker.onmessage = event => owner.callMethod("receivePhoneCompute", event.data);
           this.worker.onerror = event => owner.callMethod("receivePhoneCompute", { id: command.id, state: "ERROR", error: event.message || "PHONE_WORKER_LOAD_FAILED" });
-          this.worker.postMessage({ id: command.id, action: "init", assetsBase: base });
+          this.worker.postMessage({ id: command.id, action: "init", assetsBase: base, modelUrl: new URL(command.modelUrl, document.baseURI).href });
         } else if (command.action === "run") {
           if (!this.worker) throw new Error("PHONE_WORKER_MISSING");
           this.worker.postMessage(command);
