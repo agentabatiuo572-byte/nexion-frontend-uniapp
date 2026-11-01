@@ -9,7 +9,7 @@
   <AppChassis active="home">
     <view class="lp" :class="'lp--' + (kind ?? 'pending')" data-testid="promotion-landing">
       <SubPageHeader plain design back="/pages/events/events" :title="navTitle" :action-label="activity && !stateView ? t.promotion.homeRulesLink : undefined" :action="activity && !stateView ? openTerms : undefined">
-        <template #actionIcon><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z" /><path d="M14 3.5V8h4M9.5 12h5M9.5 15.5h5" /></svg></template>
+        <template #actionIcon><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z" /><path d="M14 3.5V8h4M9.5 12h5M9.5 15.5h5" /></svg></template>
       </SubPageHeader>
 
       <!-- First read: keep the page structure; a failure says so in place, with no reward shown. -->
@@ -502,15 +502,9 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 
 <style src="../../components/promotion/promotion.css"></style>
 <style scoped>
-/* Theme strengths from the P-58 boards: tag fills, ambient light and the device slab. */
-.lp { --lp-ok: 16%; --lp-amber: 14%; --lp-nex: 16%; --lp-glow: 12%; --lp-sky: 16%; --lp-teal: 16%; --lp-slab: 5%; --lp-floor: 6%; position: relative; overflow-x: clip; color: var(--v5-ink); }
-:global([data-theme="light"]) .lp { --lp-ok: 10%; --lp-amber: 12%; --lp-nex: 10%; --lp-glow: 10%; --lp-sky: 14%; --lp-teal: 16%; --lp-slab: 62%; --lp-floor: 10%; }
-.lp :deep(.nx-tag--success) { background: color-mix(in srgb, var(--v5-success-ink) var(--lp-ok), transparent); }
-.lp :deep(.nx-tag--warning) { background: color-mix(in srgb, var(--v5-warning) var(--lp-amber), transparent); }
-.lp :deep(.nx-tag--uvt) { background: color-mix(in srgb, var(--v5-nex) var(--lp-nex), transparent); }
-/* Board header: 40px glass controls 16px in and 14px down; the 44px hit area stays. */
-.lp :deep(.spv) { padding: 12px 8px 4px; margin-bottom: 6px; }
-.lp :deep(.spv-glass) { width: 40px; height: 40px; }
+/* Theme strengths from the P-58 boards: ambient light, the device slab and the stage floor. */
+.lp { --lp-glow: 12%; --lp-sky: 16%; --lp-teal: 16%; --lp-slab: 5%; --lp-floor: 6%; position: relative; overflow-x: clip; color: var(--v5-ink); }
+:global([data-theme="light"]) .lp { --lp-glow: 10%; --lp-sky: 14%; --lp-teal: 16%; --lp-slab: 62%; --lp-floor: 10%; }
 .lp-body { position: relative; padding: 0 16px; }
 .lp-fill { position: absolute; inset: 0; }
 .lp-card { background: var(--v5-surface); border-radius: var(--ui-radius-surface); box-shadow: var(--v5-glass-shadow); }
@@ -530,7 +524,7 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 .lp-link::before { content: ''; position: absolute; inset: -13px -8px; }
 .lp-link--block { display: flex; width: fit-content; margin-top: 14px; }
 .lp-link:focus-visible, .lp-product:focus-visible, .lp-cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-.lp-amount { font-family: var(--font-amount); font-weight: 500; letter-spacing: -.03em; color: var(--v5-ink); }
+.lp-amount { font-family: var(--font-amount); font-weight: 500; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--v5-ink); }
 .lp-unit { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-strong { color: var(--v5-ink); font-weight: var(--ui-type-list-title-weight); }
 .lp-keep { white-space: nowrap; }
@@ -542,7 +536,7 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 .lp-skel--title { width: 200px; max-width: 60%; height: 26px; margin-top: 16px; border-radius: 8px; }
 .lp-skel-card { display: flex; flex-direction: column; justify-content: center; min-height: 184px; margin-top: 20px; padding: 0 20px; box-sizing: border-box; border-radius: 24px; background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .lp-skel-card__label { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
-.lp-skel-card__value { margin-top: 6px; font: 500 40px/44px var(--font-amount); color: var(--v5-ink-4); }
+.lp-skel-card__value { margin-top: 6px; font: 500 40px/44px var(--font-amount); font-variant-numeric: tabular-nums; color: var(--v5-ink-4); }
 .lp-recovery { margin-top: 16px; }
 .lp-recovery__title { display: block; font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
 .lp-recovery__note { display: block; margin-top: 2px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
@@ -607,7 +601,7 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 .lp-rule__value { display: block; margin-top: 4px; font: var(--ui-type-list-title-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
 
 /* Reward coins: UVT purple stays a flat identifier (01.1.2); the glyph is white in both themes, as on the wallet coins. */
-.lp-coin { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; color: white; font: 500 22px/1 var(--font-amount); box-shadow: inset 0 2px 4px color-mix(in srgb, white 35%, transparent), inset 0 -3px 6px color-mix(in srgb, black 18%, transparent); }
+.lp-coin { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; color: white; font: 500 22px/1 var(--font-amount); font-variant-numeric: tabular-nums; box-shadow: inset 0 2px 4px color-mix(in srgb, white 35%, transparent), inset 0 -3px 6px color-mix(in srgb, black 18%, transparent); }
 .lp-coin--small { width: 40px; height: 40px; font-size: 17px; }
 .lp-coin--uvt { background: var(--v5-nex); }
 .lp-coin--usdt { background: var(--v5-warning); }
@@ -627,7 +621,7 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 .lp-rights__flag { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 14px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); }
 .lp-rights__flag:nth-child(n+3) { padding-top: 0; }
 .lp-flag-mark { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-3); }
-.lp-flag-mark--yes { background: color-mix(in srgb, var(--v5-success-ink) var(--lp-ok), transparent); color: var(--v5-success-ink); }
+.lp-flag-mark--yes { background: var(--v5-success-soft); color: var(--v5-success-ink); }
 
 /* First-purchase ticket */
 .lp-ticket { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 108px; min-height: 184px; margin-top: 20px; border-radius: 24px; background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); overflow: hidden; }
@@ -667,8 +661,8 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 .lp-product__tag { margin-top: 8px; }
 .lp-product__chevron { flex: none; color: var(--v5-ink-4); }
 .lp-price { display: flex; align-items: baseline; gap: 2px; margin-top: 8px; }
-.lp-price__currency { font: 500 12px/16px var(--font-amount); color: var(--v5-ink-3); }
-.lp-price__value { font: 500 20px/24px var(--font-amount); letter-spacing: -.01em; color: var(--v5-ink); }
+.lp-price__currency { font: 500 12px/16px var(--font-amount); font-variant-numeric: tabular-nums; color: var(--v5-ink-3); }
+.lp-price__value { font: 500 20px/24px var(--font-amount); letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: var(--v5-ink); }
 
 /* Repurchase slab: the shared frosted material with the board's fill, rim and light shadow only. */
 .lp-slab-wrap { position: relative; margin-top: 20px; }
