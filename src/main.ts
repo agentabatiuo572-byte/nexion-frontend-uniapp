@@ -2,6 +2,7 @@
 import "core-js/modules/web.url";
 import "core-js/modules/web.url-search-params";
 import { createSSRApp, watch } from "vue";
+import { vVizInview } from "@/lib/viz-inview";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 // #ifdef APP-PLUS
@@ -58,6 +59,8 @@ export function createApp() {
 
   const pinia = createPinia();
   app.use(pinia);
+  // Data-visual entrances below the fold wait until seen (DS-29); registered once so pages stay import-free.
+  app.directive("viz-inview", vVizInview);
   // #ifdef H5
   if (typeof window !== "undefined") {
     const initialRoute = window.location.hash.replace(/^#/, "") || window.location.pathname;

@@ -107,7 +107,7 @@
       <text class="block truncate font-mono-tabular" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">#{{ visibility.mask(task.id) }}</text>
       <view class="flex items-center gap-3" style="margin-top: 10px">
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
-          <view v-if="!visibility.hidden && progressPct != null" class="nx-device-task-progress h-full" :style="progressBarStyle" />
+          <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress h-full nx-viz-grow" :style="progressBarStyle" />
         </view>
         <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-2)">{{ progressLabel }}</text>
       </view>
@@ -277,7 +277,7 @@
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
       <view class="mt-3 flex items-center gap-3">
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
-          <view v-if="!visibility.hidden && progressPct != null" class="nx-device-task-progress h-full" :style="progressBarStyle" />
+          <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress h-full nx-viz-grow" :style="progressBarStyle" />
         </view>
         <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressLabel }}</text>
       </view>

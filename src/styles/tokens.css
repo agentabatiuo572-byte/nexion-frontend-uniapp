@@ -578,6 +578,8 @@ body {
 .nx-viz-light { animation: nx-viz-light 320ms cubic-bezier(.2, .8, .2, 1) both; }
 .nx-viz-press { transition: transform 120ms cubic-bezier(.2, .8, .2, 1); }
 .nx-viz-press:active { transform: scale(.98); }
+/* v-viz-inview (src/lib/viz-inview.ts): an entrance below the fold waits at its first keyframe until seen. */
+[data-viz-wait] { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) {
   .nx-viz-pop, .nx-viz-rise, .nx-viz-grow, .nx-viz-sweep, .nx-viz-light { animation: none; }
   .nx-viz-press:active { transform: none; }

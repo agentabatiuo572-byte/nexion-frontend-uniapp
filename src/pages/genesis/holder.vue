@@ -120,7 +120,7 @@
             <GenesisArtwork context="holding" class="gh-hero-art" />
             <text class="block" :style="heroLabelStyle">{{ t.genesisHolder.post.emissionLabel }}</text>
             <view class="flex items-center" style="gap: var(--v5-space-4); margin-top: 12px">
-              <view class="shrink-0 grid place-items-center" :style="ringStyle">
+              <view class="shrink-0 grid place-items-center nx-viz-sweep" :style="ringStyle">
                 <view class="grid place-items-center" :style="ringInnerStyle">
                   <text class="tabular-nums" :style="ringPctStyle">{{ pctText }}%</text>
                   <text :style="ringLabelStyle">{{ t.genesisHolder.post.released }}</text>
@@ -594,8 +594,10 @@ const ringStyle = computed<CSSProperties>(() => ({
   width: "92px",
   height: "92px",
   borderRadius: "50%",
-  background: `conic-gradient(var(--v5-brand) ${typeof pctText.value === "number" ? pctText.value : 0}%, color-mix(in srgb, var(--v5-surface-2) 70%, transparent) 0)`,
-}));
+  // Sweeps from 0 through the registered --nx-viz-ring (nx-viz-sweep, DS-29).
+  "--nx-viz-ring": typeof pctText.value === "number" ? pctText.value : 0,
+  background: "conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%), color-mix(in srgb, var(--v5-surface-2) 70%, transparent) 0)",
+}) as CSSProperties);
 const ringInnerStyle: CSSProperties = {
   width: "70px",
   height: "70px",
