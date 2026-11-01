@@ -326,6 +326,7 @@ async function refreshOrderWallet(): Promise<boolean> {
 }
 async function refreshOrder() {
   if (!remoteApiEnabled || !id.value.trim() || !remoteOrderBoundAccount.value) return;
+  void revalidateProductCatalog();
   if (remoteOrderRefreshing.value && activeRemoteOrderScope
     && isCurrentDetailScope(activeRemoteOrderScope)) return;
   const scope = captureDetailScope();
@@ -361,7 +362,6 @@ async function refreshOrder() {
   }
 }
 onShow(() => {
-  void revalidateProductCatalog();
   if (detailVisible) return;
   detailMounted = true;
   detailVisible = true;
