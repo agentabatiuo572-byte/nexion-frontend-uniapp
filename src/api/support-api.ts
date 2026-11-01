@@ -92,7 +92,7 @@ function parseConversationMessage(value: unknown): ConvMessage {
   const kind = v?.kind == null ? "TEXT" : text(v.kind)?.toUpperCase();
   const body = kind !== "TEXT" && v?.content == null ? "" : text(v?.content, true);
   const attachmentId = kind === "IMAGE" ? text(v?.attachmentId) : null;
-  if (!v || id === null || ts === null || body === null || !sender || !["TEXT", "IMAGE", "SKU", "LINK"].includes(kind ?? "") || (kind === "TEXT" && !body) || (kind === "IMAGE" && !attachmentId) || (receipt !== null && receipt !== "sent" && receipt !== "read") || (sender === "system" && receipt !== null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
+  if (!v || id === null || ts === null || body === null || !sender || !["TEXT", "IMAGE", "SKU", "LINK", "AGENT_SWITCH"].includes(kind ?? "") || (kind === "AGENT_SWITCH" && sender !== "system") || (kind === "TEXT" && !body) || (kind === "IMAGE" && !attachmentId) || (receipt !== null && receipt !== "sent" && receipt !== "read") || (sender === "system" && receipt !== null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
   const message: ConvMessage = { id: String(id), sender, text: body, ts, kind: kind as ConvMessage["kind"], attachmentId: attachmentId ?? undefined, authorName: text(v.senderName) ?? undefined, status: sender === "system" ? undefined : status };
   if (sender === 'user' && typeof v.clientMessageId === 'string' && v.clientMessageId.length > 0 && v.clientMessageId.length <= 256)
     message.clientMessageId = v.clientMessageId;

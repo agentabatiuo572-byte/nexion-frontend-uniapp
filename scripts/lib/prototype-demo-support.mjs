@@ -204,6 +204,27 @@ export function supportDemo(url,locale,state,request) {
       const agent={senderType:'agent',senderName:text('演示客服','Demo support','Hỗ trợ mẫu')};
       detail.messages=samples.map((row,index)=>({id:nextMessageId(),...(row.senderType?{}:agent),createdAt:new Date(Date.now()-(samples.length-index)*60000).toISOString(),...row}));
       Object.assign(detail.conversation,{unreadCount:1,lastMessage:detail.messages.at(-1).content,lastMessageAt:detail.messages.at(-1).createdAt,lastPublicMessageId:detail.messages.at(-1).id});
+    } else if(scenario==='agent-switch') {
+      // B15: the server writes AGENT_SWITCH in the same transaction as the new agent's first message.
+      // It carries only the new agent's display name (or none) and never moves the list preview or unread count.
+      const demo=text('演示客服','Demo support','Hỗ trợ mẫu'),next=text('林悦','Lin Yue','Lin Yue');
+      const samples=[
+        ['agent',demo,text('你好，请问需要什么帮助？','Hello, how can I help?','Xin chào, bạn cần hỗ trợ gì?'),'read'],
+        ['user',null,text('我的设备今天收益没有更新。','My device earnings did not update today.','Thu nhập thiết bị hôm nay chưa cập nhật.'),'read'],
+        ['switch',next,null],
+        ['agent',next,text('你好，我来继续跟进这个问题。','Hi, I will follow up on this for you.','Xin chào, tôi sẽ tiếp tục hỗ trợ vấn đề này.'),'read'],
+        ['user',null,text('好的，谢谢。','Great, thanks.','Vâng, cảm ơn.'),'read'],
+        ['switch',null,''],
+        ['agent',demo,text('已核对完成，收益已恢复更新。','Checked. Your earnings are updating again.','Đã kiểm tra xong, thu nhập đã cập nhật trở lại.'),'sent'],
+      ];
+      detail.messages=samples.map(([type,senderName,content,receiptStatus],index)=>{
+        // A switch row shares the timestamp of the agent message committed with it.
+        const createdAt=new Date(Date.now()-(samples.length-index-(type==='switch'?1:0))*60000).toISOString();
+        if(type==='switch')return {id:nextMessageId(),senderType:'system',kind:'AGENT_SWITCH',...(senderName?{senderName}:{}),content,createdAt};
+        return {id:nextMessageId(),senderType:type,content,createdAt,receiptStatus,...(senderName?{senderName}:{})};
+      });
+      const last=detail.messages.at(-1);
+      Object.assign(detail.conversation,{unreadCount:1,lastMessage:last.content,lastMessageAt:last.createdAt,lastPublicMessageId:last.id});
     } else detail.conversation.unreadCount=scenario==='long-count'?1298:scenario==='read'?0:1;
     detail.conversation.version++;
     state.supportScenario=scenario;
