@@ -258,7 +258,8 @@ export const useOrders = defineStore("orders", () => {
     };
   }
 
-  async function refreshRemote(): Promise<void> {    if (!remoteApiEnabled) return;
+  async function refreshRemote(): Promise<void> {
+    if (!remoteApiEnabled) return;
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
     const requestGeneration = ++refreshGeneration;
@@ -268,7 +269,7 @@ export const useOrders = defineStore("orders", () => {
       && requestGeneration === refreshGeneration
       && isCurrentRuntimeRevision(requestRunScope);
     try {
-      const canonical = await orderApi.list(null, 50);
+      const canonical = await orderApi.list(null, 20);
       if (!isCurrent()) return;
       orders.value = canonical.orders.map(fromCanonical);
       nextCursor.value = canonical.nextCursor ?? null;
@@ -290,7 +291,7 @@ export const useOrders = defineStore("orders", () => {
       && isCurrentRuntimeRevision(requestRunScope);
     loadingMore.value = true;
     try {
-      const canonical = await orderApi.list(cursor, 50);
+      const canonical = await orderApi.list(cursor, 20);
       if (!isCurrent()) return;
       if (canonical.nextCursor === cursor) {
         nextCursor.value = null;

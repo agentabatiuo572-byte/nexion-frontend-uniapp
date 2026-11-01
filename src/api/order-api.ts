@@ -470,7 +470,7 @@ export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
 
 export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod"): OrderApi {
   return {
-    async list(beforeOrderNo = null, pageSize = 50): Promise<CanonicalOrderList> {
+    async list(beforeOrderNo = null, pageSize = 20): Promise<CanonicalOrderList> {
       const cursor = beforeOrderNo?.trim() || null;
       if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) return invalid();
       const query = cursor

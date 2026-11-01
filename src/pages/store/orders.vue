@@ -42,8 +42,9 @@
           @click.stop="goOrder(o)"
         >
           <view class="flex items-start" style="gap: 12px">
-            <view class="grid place-items-center shrink-0" :style="iconBoxStyle(o.status)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="badge(o.status).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in badge(o.status).icon" :key="di" :d="d" /></svg>
+            <view class="order-product-thumb shrink-0" aria-hidden="true">
+              <image v-if="orderImage(o)" class="order-product-image nx-home-art-float" :src="orderImage(o)" mode="aspectFit" />
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="badge(o.status).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in badge(o.status).icon" :key="di" :d="d" /></svg>
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center justify-between" style="gap: 8px">
@@ -60,6 +61,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 8px"><path d="m9 18 6-6-6-6" /></svg>
           </view>
         </view>
+      </view>
+      <view v-if="orderPanels.mainPresentation === 'list'" class="orders-pagination mx-4">
+        <view ref="scrollAnchor" style="height: 1px" />
         <view
           v-if="remoteApiEnabled && orders.nextCursor"
           class="grid place-items-center active:opacity-80"
@@ -100,6 +104,8 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
+import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
+import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
 import {
   createRemoteOrdersRefresh,
   isInitialOrderReadLoading,
@@ -196,17 +202,28 @@ async function loadMoreOrders() {
   if (orders.loadingMore || !orders.nextCursor) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
   const requestedRefresh = refreshEpoch;
+  const current = () => ordersPageActive && requestedRefresh === refreshEpoch && remoteCommerceRequestCurrent(request, {
+    accountKey: app.accountKey,
+    epoch: app.accountBindingEpoch,
+  });
   try {
     await orders.loadMoreRemote();
+    if (!current()) return;
+    commerceOrdersUnavailable.value = false;
+    remoteOrderAvailability.value = genesisOrdersUnavailable.value ? "partial" : "ready";
   } catch {
-    if (!ordersPageActive || requestedRefresh !== refreshEpoch || !remoteCommerceRequestCurrent(request, {
-      accountKey: app.accountKey,
-      epoch: app.accountBindingEpoch,
-    })) return;
+    if (!current()) return;
     commerceOrdersUnavailable.value = true;
     remoteOrderAvailability.value = "partial";
   }
 }
+const scrollAnchor = ref<unknown>(null);
+useManualScrollLoadMore(scrollAnchor, {
+  enabled: () => remoteApiEnabled && remoteSessionReady.value && ordersPageActive && !commerceOrdersUnavailable.value,
+  hasMore: () => Boolean(orders.nextCursor),
+  loading: () => remoteOrdersRefreshing.value || orders.loadingMore,
+  loadMore: loadMoreOrders,
+});
 onShow(() => {
   ordersPageActive = true;
   preserveOrdersOriginInH5();
@@ -315,6 +332,10 @@ function badge(status: OrderStatus): Badge {
   }
 }
 
+function orderImage(order: OrderListItem): string | undefined {
+  return order.kind === "genesis" ? GENESIS_MEDIA.showcase : getOrderProductMedia(order.productId, order.lineItems)?.src;
+}
+
 function dateText(ts: number): string {
   return Number.isFinite(ts) && Number.isFinite(new Date(ts).getTime())
     ? formatTrialDate(ts)
@@ -393,3 +414,8 @@ function statusChipStyle(status: OrderStatus): CSSProperties {
   };
 }
 </script>
+
+<style scoped>
+.order-product-thumb { position: relative; width: 72px; height: 72px; border-radius: 16px; display: grid; place-items: center; background: var(--v5-surface-2); overflow: hidden; }
+.order-product-image { width: 62px; height: 62px; }
+</style>
