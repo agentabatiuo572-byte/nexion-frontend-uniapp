@@ -17,7 +17,7 @@
       </view>
 
       <view class="tcs-device">
-        <view class="tcs-device-art" aria-hidden="true" />
+        <CatalogMachineImage class="tcs-device-art" :sku="trialView.productId.value" :image-url="getProductMedia(trialView.productId.value)?.src" scope-key="trial-claim" />
         <view class="tcs-device-meta"><text class="tcs-device-caption">{{ copy.productLabel }}</text><text class="tcs-device-name">{{ trialView.deviceName.value ?? '-' }}</text><text class="tcs-device-duration">{{ durationText }}</text></view>
       </view>
 
@@ -49,6 +49,8 @@
   </view>
 </template>
 <script setup lang="ts">
+import CatalogMachineImage from "@/components/catalog-machine-image.vue";
+import { getProductMedia } from "@/lib/product-media";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { navTo } from "@/lib/route";
@@ -194,7 +196,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-close { position:absolute;right:16px;top:16px;z-index:1;width:44px;height:44px;border-radius:999px;background:var(--v5-surface-2);display:grid;place-items:center;flex-shrink:0; }
 .tcs-close:active { background:var(--v5-surface-3); }
 .tcs-device { display:flex;align-items:center;gap:12px;padding:8px 0 12px;border-bottom:1px solid var(--v5-border); }
-.tcs-device-art { width:200px;height:200px;flex:none;background:url('/static/img/home-glass-20260928/s1.webp') center/contain no-repeat; }
+.tcs-device-art { width:200px;height:200px;flex:none; }
 .tcs-device-meta { min-width:0;display:flex;flex-direction:column;gap:5px; }
 .tcs-device-caption { font:400 11px/1.5 var(--font-v5);color:var(--v5-ink-3); }
 .tcs-device-name { font:600 19px/1.3 var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }

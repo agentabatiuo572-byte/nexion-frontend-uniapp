@@ -49,8 +49,8 @@
         >
           <view class="order-card__row">
             <view class="order-card__thumb" aria-hidden="true">
-              <image v-if="orderImage(o)" class="order-card__image nx-home-art-float" :src="orderImage(o)" mode="aspectFit" />
-              <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in badge(o.status).icon" :key="di" :d="d" /></svg>
+              <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="orderImage(o)" :scope-key="o.id" />
+              <image v-else class="order-card__image nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
             </view>
             <view class="order-card__info">
               <view class="order-card__top">
@@ -106,6 +106,8 @@ import { commerceOrderTitle } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { commerceAmount as formatAmount } from "@/lib/commerce-review";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { revalidateProductCatalog } from "@/store/product-catalog";
+import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import GlassSegments from "@/components/glass-segments.vue";
@@ -266,6 +268,7 @@ const scrollPager = useManualScrollLoadMore(scrollAnchor, {
 });
 onShow(() => {
   ordersPageActive = true;
+  void revalidateProductCatalog();
   preserveOrdersOriginInH5();
   void refreshOrders();
 });
@@ -377,7 +380,7 @@ function badge(status: OrderStatus): Badge {
       return { label: t.value.orders.statusChargeback, tone: "danger", icon: ["M12 2v12m0 4v4m-7-5 3 3m11-3-3 3"] };
   }
 }
-// Bundled machine art for the ordered SKU; a bundle shows its first line.
+// Use the same approved SKU main image as the storefront. A bundle shows its first line.
 function orderImage(order: OrderListItem): string | undefined {
   if (order.kind === "genesis") return GENESIS_MEDIA.showcase;
   return getOrderProductMedia(order.productId, order.lineItems)?.src;

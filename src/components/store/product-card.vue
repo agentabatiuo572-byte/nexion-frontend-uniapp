@@ -507,7 +507,6 @@ const gateMetaStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
 };
 
-import { getProductMedia } from "@/lib/product-media";
 </script>
 <style scoped>
 .product-card { transition: transform 180ms ease; }

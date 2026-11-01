@@ -40,12 +40,12 @@ function page(locale: keyof typeof dictionaries = 'en', product = '', intent = '
   const app = Vue.reactive({ accountKey: 'user:A', accountBindingEpoch: 1 });
   const catalogState = Vue.reactive({ status: 'ready', serverCanonical: true });
   const presentation = Vue.ref({ products: snapshot().tiers.map((tier, i) => ({ id: tier.productId, name: `Catalog product ${i + 1}`,
-    price: 1299 + i * 1000, dailyEarnNEX: 80.125, dailyEarn: 1.5, productType: 'DEVICE', gpu: 'GPU', vram: 'VRAM' })) });
+    price: 1299 + i * 1000, dailyEarnNEX: 80.125, dailyEarn: 1.5, productType: 'DEVICE', gpu: 'GPU', vram: 'VRAM', imageUrl: `https://catalog.example/${tier.productId}.webp` })) });
   // UniApp image is native; preserve its attributes in the in-memory host.
   const adapted = source.replace(/<image\b/g, '<view data-native-image="true"');
   const p = mountEntry(adapted, {
     '@/composables/use-scroll-grow-progress': { useScrollGrowProgress: () => ({ elRef: Vue.ref(null), inView: inviteRingInView }), VIZ_RING_TRANSITION },
-    '@/lib/amount-display': { formatAmount }, '@/lib/finance-amount-display': { formatFinanceAmount }, '@/lib/product-media': { getProductMedia },
+    '@/lib/amount-display': { formatAmount }, '@/lib/finance-amount-display': { formatFinanceAmount }, '@/lib/product-media': { getProductMedia: (id: string) => ({ src: `https://catalog.example/${id}.webp` }) },
     '@/lib/route': { navTo, takeNavigationQuery: () => '' },
     '@dcloudio/uni-app': { onLoad: (fn: (q: object) => void) => load.push(fn), onShow: (fn: () => void) => show.push(fn), onHide: (fn: () => void) => hide.push(fn), onUnload: vi.fn() },
     '@/components/app-chassis.vue': slot, '@/components/sub-page-header.vue': { default: Vue.defineComponent({ props: ['back'], setup: props => () => Vue.h('view', { 'data-back': props.back }) }) },
@@ -97,7 +97,7 @@ it.each(['zh', 'en', 'vi'] as const)('keeps %s focused product identity, stock a
   expect(p.tiers()[0].props['data-facts']).toMatchObject({ productId: 'stellarrack-p1', name: 'Catalog product 2', price: 2299,
     monthlyStock: 60, soldThisMonth: 42, available: true, conditions: [{ current: 12800, required: 20000, kind: 'volume' }] });
   expect(text(p.root)).not.toContain('Catalog product 1');
-  expect(all(p.root).find(n => n.props['data-native-image'])!.props.src).toBe(getProductMedia('stellarrack-p1')!.src);
+  expect(all(p.root).find(n => n.props['data-native-image'])!.props.src).toBe("https://catalog.example/stellarrack-p1.webp");
   expect(all(p.root).find(n => n.props['data-back'])!.props['data-back']).toBe('/pages/store/detail?id=stellarrack-p1');
   all(p.root).find(n => n.props['aria-label'] === dictionaries[locale].rank.conditionsLabel)!.props.onClick(); expect(p.navTo).toHaveBeenLastCalledWith('/pages/team/rank');
   all(p.root).find(n => n.props['aria-label'] === dictionaries[locale].quota.inviteFriendsTitle)!.props.onClick(); expect(p.navTo).toHaveBeenLastCalledWith('/pages/team/team?intent=share');
@@ -156,7 +156,7 @@ it('retains the real tier layout while masking stock and qualification and disab
     './quota-condition-bar.vue': { default: Vue.defineComponent({ props: ['met', 'valueText'], setup: props => () => Vue.h('view', { 'data-met': props.met }, props.valueText) }) },
     '@/components/ui/nx-button.vue': { default: Vue.defineComponent({ props: ['label', 'disabled', 'busy'], emits: ['click'], setup: (props, { emit }) => () => Vue.h('view', { 'data-action-disabled': props.disabled, onClick: () => { if (!props.disabled) emit('click'); } }, props.label) }) },
     '@/i18n/use-t': { useT: () => Vue.ref(en) }, '@/i18n/format': { fmt }, '@/lib/brand-copy': { nexGridBrandText },
-    '@/lib/product-media': { getProductMedia }, '@/composables/use-scroll-grow-progress': { useScrollGrowProgress: () => ({ elRef: Vue.ref(null), inView: Vue.ref(true) }), VIZ_RING_TRANSITION: 'none' },
+    '@/lib/product-media': { getProductMedia: (id: string) => ({ src: `https://catalog.example/${id}.webp` }) }, '@/composables/use-scroll-grow-progress': { useScrollGrowProgress: () => ({ elRef: Vue.ref(null), inView: Vue.ref(true) }), VIZ_RING_TRANSITION: 'none' },
   }, { pending: true, onNavigate: navigate, tier: { ...snapshot().tiers[0], name: 'Existing product', unlockKind: 'all',
     conditions: [{ kind: 'invites', label: 'Rank', current: 5, required: 1 }], perks: [] } });
   stop.push(p.unmount);
@@ -179,7 +179,7 @@ it.each(['all', 'either'] as const)('unlocks %s tiers with no minimums while ret
     '@/lib/finance-amount-display': { formatFinanceAmount }, '@/i18n/compute-points': { formatComputePoints },
     '@/store/locale': { useLocaleStore: () => ({ code: 'en' }) }, '@/i18n/network-reaudit': { networkReauditCopy },
     './quota-condition-bar.vue': slot, '@/components/ui/nx-button.vue': button,
-    '@/i18n/use-t': { useT: () => Vue.ref(en) }, '@/i18n/format': { fmt }, '@/lib/product-media': { getProductMedia },
+    '@/i18n/use-t': { useT: () => Vue.ref(en) }, '@/i18n/format': { fmt }, '@/lib/product-media': { getProductMedia: (id: string) => ({ src: `https://catalog.example/${id}.webp` }) },
     '@/composables/use-scroll-grow-progress': { useScrollGrowProgress: () => ({ elRef: Vue.ref(null), inView: stockInView }), VIZ_RING_TRANSITION },
   }, { tier, onNavigate: navigate });
   stop.push(p.unmount);

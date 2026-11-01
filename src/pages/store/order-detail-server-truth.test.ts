@@ -1,7 +1,7 @@
 import { commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
 import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
-import { getProductMedia } from "@/lib/product-media";
+import { getOrderProductMedia } from "@/lib/product-media";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { compile } from "@vue/compiler-dom";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -26,6 +26,7 @@ import { fmt } from "@/i18n/format";
 import { trialPurchaseCopy } from "@/i18n/trial-purchase";
 import { trialLifecycleCopy } from "@/i18n/trial-lifecycle";
 
+vi.mock("@/store/product-catalog", () => ({ productCatalogState: { status: "ready" }, productCatalogPresentation: { value: null }, isProductCatalogDisplayCurrent: () => false, revalidateProductCatalog: vi.fn() }));
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
   productCatalogApi: { catalog: vi.fn() },
@@ -94,7 +95,8 @@ async function detail(dataCenter: string | null, copy = en, status: CanonicalOrd
     if (id === "@/lib/commerce-review") return {commerceOrderTitle,commerceCopy};
     if (id === "@/lib/checkout-flow-copy") return {checkoutFlowCopy};
     if (id === "@/lib/order-payment-rejection") return {orderPaymentRejection};
-    if (id === "@/lib/product-media") return {getProductMedia};
+    if (id === "@/store/product-catalog") return { revalidateProductCatalog: vi.fn() };
+    if (id === "@/lib/product-media") return {getOrderProductMedia};
     if (id === "@/composables/use-dialog-a11y") return {useDialogA11y:()=>{}};
     if (id === "@/lib/authorized-payment") return { executePaymentWithPassword: vi.fn(async (_context: unknown, command: (authorization: PaymentPasswordAuthorization) => Promise<unknown>, current: () => boolean) =>
       current() ? command({ paymentPassword: "039417", credentialVersion: 1, attemptNo: "fixture-attempt" }) : null) };
