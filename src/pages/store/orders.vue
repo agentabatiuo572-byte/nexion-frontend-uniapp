@@ -49,7 +49,7 @@
         >
           <view class="order-card__row">
             <view class="order-card__thumb" aria-hidden="true">
-              <image v-if="orderImage(o)" class="order-card__image" :src="orderImage(o)" mode="aspectFit" />
+              <image v-if="orderImage(o)" class="order-card__image nx-home-art-float" :src="orderImage(o)" mode="aspectFit" />
               <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in badge(o.status).icon" :key="di" :d="d" /></svg>
             </view>
             <view class="order-card__info">
@@ -76,6 +76,9 @@
             </view>
           </view>
         </view>
+      </view>
+      <view v-if="orderPanels.mainPresentation === 'list'" class="orders-pagination mx-4">
+        <view ref="scrollAnchor" style="height: 1px" />
         <view
           v-if="remoteApiEnabled && orders.nextCursor"
           class="grid place-items-center active:opacity-80"
@@ -109,7 +112,7 @@ import GlassSegments from "@/components/glass-segments.vue";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxButton from "@/components/ui/nx-button.vue";
-import { GENESIS_MEDIA, getProductMedia } from "@/lib/product-media";
+import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";
 import { useOrders, type Order, type OrderStatus } from "@/store/orders";
@@ -124,6 +127,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
+import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
 import {
   createRemoteOrdersRefresh,
   isInitialOrderReadLoading,
@@ -238,17 +242,28 @@ async function loadMoreOrders() {
   if (orders.loadingMore || !orders.nextCursor) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
   const requestedRefresh = refreshEpoch;
+  const current = () => ordersPageActive && requestedRefresh === refreshEpoch && remoteCommerceRequestCurrent(request, {
+    accountKey: app.accountKey,
+    epoch: app.accountBindingEpoch,
+  });
   try {
     await orders.loadMoreRemote();
+    if (!current()) return;
+    commerceOrdersUnavailable.value = false;
+    remoteOrderAvailability.value = genesisOrdersUnavailable.value ? "partial" : "ready";
   } catch {
-    if (!ordersPageActive || requestedRefresh !== refreshEpoch || !remoteCommerceRequestCurrent(request, {
-      accountKey: app.accountKey,
-      epoch: app.accountBindingEpoch,
-    })) return;
+    if (!current()) return;
     commerceOrdersUnavailable.value = true;
     remoteOrderAvailability.value = "partial";
   }
 }
+const scrollAnchor = ref<unknown>(null);
+useManualScrollLoadMore(scrollAnchor, {
+  enabled: () => remoteApiEnabled && remoteSessionReady.value && ordersPageActive && !commerceOrdersUnavailable.value,
+  hasMore: () => Boolean(orders.nextCursor),
+  loading: () => remoteOrdersRefreshing.value || orders.loadingMore,
+  loadMore: loadMoreOrders,
+});
 onShow(() => {
   ordersPageActive = true;
   preserveOrdersOriginInH5();
@@ -365,7 +380,7 @@ function badge(status: OrderStatus): Badge {
 // Bundled machine art for the ordered SKU; a bundle shows its first line.
 function orderImage(order: OrderListItem): string | undefined {
   if (order.kind === "genesis") return GENESIS_MEDIA.showcase;
-  return (getProductMedia(order.productId) ?? getProductMedia(order.lineItems?.[0]?.sku))?.src;
+  return getOrderProductMedia(order.productId, order.lineItems)?.src;
 }
 
 function dateText(ts: number): string {
