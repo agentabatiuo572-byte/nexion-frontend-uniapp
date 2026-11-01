@@ -10,7 +10,7 @@ export interface ConvMessage {
   status?: "sent" | "read";
   text: string;
   ts: number;
-  kind?: "TEXT" | "IMAGE" | "SKU" | "LINK";
+  kind?: "TEXT" | "IMAGE" | "SKU" | "LINK" | "AGENT_SWITCH";
   attachmentId?: string;
   skuId?: string;
   skuName?: string;
