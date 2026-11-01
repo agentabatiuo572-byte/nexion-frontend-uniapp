@@ -445,7 +445,7 @@
         </view>
         <text v-else-if="!taskHistoryReady" class="earn-stage__recent-note" role="status" aria-live="polite">{{ t.taskHistory.loading }}</text>
         <view v-else-if="deviceTodayCompleted.length" class="earn-stage__chips">
-          <view v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" class="earn-stage__chip" data-phone-today-task="true"><text>{{ done.model }}</text><text class="earn-stage__chip-amount">{{ visibility.mask(formatUsd(done.reward, 'detail', true)) }}</text></view>
+          <view v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" class="earn-stage__chip" data-phone-today-task="true"><text>{{ done.type }}</text><text class="earn-stage__chip-amount">{{ visibility.mask(formatUsd(done.reward, 'detail', true)) }}</text></view>
         </view>
         <text v-else class="earn-stage__recent-note">{{ t.home.ledgerEmpty }}</text>
       </view>
