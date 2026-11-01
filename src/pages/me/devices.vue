@@ -71,14 +71,13 @@
               <view v-else class="device-bay-slot device-bay-slot--loading" aria-hidden="true" />
             </view>
           </view>
-          <view v-if="inventoryEmpty" class="device-hero__empty">
-            <text class="device-hero__empty-title">{{ t.empty.devicesTitle }}</text>
-            <text class="device-hero__empty-desc">{{ t.empty.devicesDesc }}</text>
-          </view>
         </view>
       </view>
 
       <view v-if="inventoryReady" class="mx-4">
+        <!-- 空库存:《06》no-owned-asset 插画 + 引导(只在库存读完后出现,加载中不冒充空态)。
+             「去商店」主按钮常驻底部固定栏,这里不再给第二个同义 CTA。 -->
+        <EmptyState v-if="inventoryEmpty" kind="no-owned-asset" compact :title="t.empty.devicesTitle" :desc="t.empty.devicesDesc" />
         <!-- Trial and activated devices share one list; the count describes rows, not capacity. -->
         <view v-if="activeDevices.length > 0 || trialPresentation.active.value" class="device-inventory-section" data-inventory-section="devices">
           <view class="device-inventory-section__head">
@@ -432,9 +431,6 @@ function goStore() {
 .device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--v5-ink-3); }
 .device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .device-bay-slot--loading { background: linear-gradient(100deg, color-mix(in srgb, var(--v5-ink) 4%, transparent) 30%, color-mix(in srgb, var(--v5-ink) 10%, transparent) 50%, color-mix(in srgb, var(--v5-ink) 4%, transparent) 70%); background-size: 300% 100%; animation: device-shimmer 1.6s linear infinite; }
-.device-hero__empty { margin-top: 16px; text-align: center; }
-.device-hero__empty-title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
-.device-hero__empty-desc { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .device-inventory-section { margin-top: var(--ui-space-section-gap, 32px); min-width: 0; }
 .device-inventory-section__head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; margin-bottom: 12px; }
 .device-inventory-section__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
