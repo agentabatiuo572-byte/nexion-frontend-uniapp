@@ -77,7 +77,7 @@ function mount(name: "connect" | "estimator", api: any, query: Record<string, st
   initPreContext(h5 ? "h5" : "app-plus");
   const compiled = preJs(preHtml(readFileSync(new URL(`./${name}.vue`, import.meta.url), "utf8"), `${name}.vue`), `${name}.vue`);
   const source = compiled.split('<script setup lang="ts">')[1].split("</script>")[0];
-  const fields = name === "connect" ? "phase, canonical, activationBusy, titleText, subText, isRecal, failureTitle, failureDetail, retryCalibration, activate, leaveConnect, deferPhoneActivation, iosPending, iosSteps, contactSupport" : "detected, loadFailed, deferred, deferFailed, calibration, failureDetail, retryCalibration, goConnect, leaveEstimator, deferPhoneActivation";
+  const fields = name === "connect" ? "phase, canonical, activationBusy, titleText, subText, isRecal, failureTitle, failureDetail, retryCalibration, activate, leaveConnect, deferPhoneActivation, iosPending, iosSteps, contactSupport, supportRequired" : "detected, loadFailed, deferred, deferFailed, calibration, failureDetail, retryCalibration, goConnect, leaveEstimator, deferPhoneActivation";
   const code = ts.transpileModule(`${source}\nexport const page = { ${fields}, phoneActivationGuidance };`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
@@ -99,7 +99,9 @@ describe("real onboarding page workers", () => {
         .mockResolvedValue({ ...record, revision: 4, activationStatus: "ACTIVE" }) };
     const { page, requireCryptoUuid } = mount("connect", api); await settle();
     requireCryptoUuid.mockReturnValueOnce("command-one").mockReturnValueOnce("command-two");
-    await page.activate(); await page.activate();
+    await page.activate();
+    expect(page.supportRequired.value).toBe(false);
+    page.retryCalibration(); await settle();
     expect(api.activationEligibility).toHaveBeenCalledTimes(failed ? 2 : 1);
     expect(api.activate.mock.calls[1][2]).toBe(`phone-activation:active:command-${failed ? "two" : "one"}`);
     expect(api.activate.mock.calls[1][3]).toEqual({ expectedBindingVersion: null,
@@ -109,9 +111,36 @@ describe("real onboarding page workers", () => {
     const api = { result: vi.fn().mockResolvedValue(record), calibrate: vi.fn(), activate: vi.fn(),
       activationEligibility: vi.fn().mockResolvedValue({ binding: { installationId: "old-phone", bindingVersion: 7 },
         policyVersion: 3, canActivate: false, blockedReasons: ["PHONE_REPLACEMENT_DISABLED"] }) };
-    const { page, uiConfirm } = mount("connect", api); await settle(); await page.activate();
+    const { page, uiConfirm, navTo } = mount("connect", api); await settle(); await page.activate();
     expect(api.activate).not.toHaveBeenCalled(); expect(uiConfirm).not.toHaveBeenCalled();
     expect(page.phase.value).toBe("error"); expect(page.activationBusy.value).toBe(false);
+    expect(page.failureDetail.value).toBe(zh.onboarding.phoneReplacementDisabled);
+    expect(page.supportRequired.value).toBe(true);
+    page.retryCalibration(); await settle();
+    expect(navTo).toHaveBeenCalledWith("/pages/support/messages");
+    expect(api.activationEligibility).toHaveBeenCalledOnce();
+    expect(api.activate).not.toHaveBeenCalled(); expect(api.calibrate).not.toHaveBeenCalled();
+  });
+  it("keeps real replacement cooldown distinct and rechecks eligibility on a later retry", async () => {
+    const api = { result: vi.fn().mockResolvedValue(record), calibrate: vi.fn(), activate: vi.fn(),
+      activationEligibility: vi.fn().mockResolvedValue({ binding: { installationId: "old-phone", bindingVersion: 7 },
+        policyVersion: 3, canActivate: false, blockedReasons: ["PHONE_REPLACEMENT_COOLDOWN"] }) };
+    const { page, navTo } = mount("connect", api); await settle(); await page.activate();
+    expect(page.failureDetail.value).toBe(zh.onboarding.phoneReplacementCooldown);
+    expect(page.supportRequired.value).toBe(false);
+    page.retryCalibration(); await settle();
+    expect(api.activationEligibility).toHaveBeenCalledTimes(2);
+    expect(api.activate).not.toHaveBeenCalled(); expect(navTo).not.toHaveBeenCalled();
+  });
+  it("does not retain another account's support-only policy rejection", async () => {
+    const api = { result: vi.fn().mockResolvedValue(record), calibrate: vi.fn(), activate: vi.fn(),
+      activationEligibility: vi.fn().mockResolvedValue({ binding: { installationId: "old-phone", bindingVersion: 7 },
+        policyVersion: 3, canActivate: false, blockedReasons: ["PHONE_REPLACEMENT_DISABLED"] }) };
+    const { page, auth } = mount("connect", api); await settle(); await page.activate();
+    expect(page.supportRequired.value).toBe(true);
+    auth.accountId = "user:43"; await settle();
+    expect(page.supportRequired.value).toBe(false);
+    expect(page.failureDetail.value).not.toBe(zh.onboarding.phoneReplacementDisabled);
   });
   it("asks for consent after the server identifies a same-installation hardware replacement", async () => {
     const api = { result: vi.fn().mockResolvedValue(record), calibrate: vi.fn(),
@@ -301,18 +330,19 @@ describe("real onboarding page workers", () => {
     expect(page.isRecal.value).toBe(false);
     expect(api.calibrate).not.toHaveBeenCalled();
   });
-  it("checks the server on native login before allowing a denied replacement to calibrate", async () => {
-    const api = { phoneLogin: vi.fn().mockResolvedValueOnce("PHONE_REPLACEMENT_DISABLED").mockResolvedValue("REPLACEMENT_REQUIRED"),
+  it("routes a policy-denied native login to support without retrying or calibrating", async () => {
+    const api = { phoneLogin: vi.fn().mockResolvedValue("PHONE_REPLACEMENT_DISABLED"),
       result: vi.fn().mockResolvedValue(record), calibrate: vi.fn().mockResolvedValue(record), activate: vi.fn() };
-    const { page } = mount("connect",api,{mode:"login"}); await settle();
+    const { page, navTo } = mount("connect",api,{mode:"login"}); await settle();
     expect(page.phase.value).toBe("error"); expect(api.result).not.toHaveBeenCalled();
     expect(page.titleText.value).toBe(zh.onboarding.phoneBindingReadUnavailableTitle);
     expect(page.isRecal.value).toBe(false);
     await page.activate(); expect(api.activate).not.toHaveBeenCalled();
     page.retryCalibration(); await settle();
-    expect(page.phase.value).toBe("intro"); expect(api.calibrate).not.toHaveBeenCalled();
-    expect(page.isRecal.value).toBe(true);
-    page.phase.value="calibrating"; await settle(); expect(api.calibrate).toHaveBeenCalledOnce();
+    expect(page.phase.value).toBe("error"); expect(api.calibrate).not.toHaveBeenCalled();
+    expect(page.isRecal.value).toBe(false);
+    expect(api.phoneLogin).toHaveBeenCalledOnce();
+    expect(navTo).toHaveBeenCalledWith("/pages/support/messages");
   });
   it("retains unknown hardware and recalibrates on explicit retry without allowing activation", async () => {
     const pending = { ...record, calibrationAvailable: false, calibrationStatus: "PENDING_VERIFICATION",

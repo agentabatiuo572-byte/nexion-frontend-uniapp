@@ -130,7 +130,7 @@
       </view>
       <view v-else-if="phase === 'error'" class="cn-error-actions">
         <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
-          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : t.onboarding.activationRetry }}</text>
+          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : supportRequired ? t.onboarding.iosContactSupport : t.onboarding.activationRetry }}</text>
         </view>
         <view v-if="failedAction !== 'defer'" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
           <text class="cn-go__t cn-go__t--secondary" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : t.onboarding.activationDefer }}</text>
@@ -246,6 +246,7 @@ watch(authenticatedAccountKey, (next, previous) => {
   calibrationFlow.reset();
   activationIntent = null;
   canonical.value = null;
+  failureCode.value = "";
   if (phase.value !== "intro") phase.value = "error";
   failedAction.value = "calibration";
 });
@@ -267,6 +268,7 @@ const iosSteps = computed(() => [t.value.onboarding.iosStepIdentify, t.value.onb
 function contactSupport() {
   if (!activationBusy.value) navTo("/pages/support/messages");
 }
+const supportRequired = computed(() => failureCode.value === "PHONE_REPLACEMENT_DISABLED");
 const failureDetail = computed(() => iosPending.value
   ? t.value.onboarding.phoneCalibrationPendingIosBody
   : canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
@@ -383,6 +385,10 @@ watch(phase, (p) => {
 
 function retryCalibration() {
   if (!nativePhoneAvailable || activationBusy.value) return;
+  if (supportRequired.value) {
+    contactSupport();
+    return;
+  }
   if (failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED") {
     calibrationFlow.reset();
     resumeDeferred.value = true;
