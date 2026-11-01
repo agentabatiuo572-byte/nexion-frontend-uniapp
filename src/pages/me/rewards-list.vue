@@ -16,7 +16,7 @@
   cursor pagination; the mock slices the local ledger). Wrapped in <AppChassis>.
 -->
 <template>
-  <AppChassis active="me">
+  <AppChassis active="me" :scroll-load-key="`${cat}:${app.accountBindingEpoch}`" @scroll-load-more="scrollPager.loadMoreManually()">
     <view style="color: var(--v5-ink); padding-bottom: 24px">
       <SubPageHeader back="/pages/me/rewards" :title="pageTitle" />
 
@@ -268,7 +268,7 @@ watch(remoteSessionReady, (ready, wasReady) => {
   void refreshRecords();
   if (cat.value === "voucher") retryVouchers();
 });
-useManualScrollLoadMore(scrollAnchor, {
+const scrollPager = useManualScrollLoadMore(scrollAnchor, {
   enabled: () => fundsServerEnabled && (cat.value === "usdt" || cat.value === "uvt") && !activePager.value.error,
   hasMore: () => activePager.value.hasMore,
   loading: () => activePager.value.loadingMore || activePager.value.status === "loading",

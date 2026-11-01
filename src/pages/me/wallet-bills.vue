@@ -7,7 +7,7 @@
   page). Wrapped in <AppChassis active="me">.
 -->
 <template>
-  <AppChassis active="me">
+  <AppChassis active="me" :scroll-load-key="`${asset}:${tab}:${app.accountBindingEpoch}`" @scroll-load-more="scrollPager.loadMoreManually()">
     <view class="bills-page">
       <SubPageHeader :back="ledgerBizNo ? '/pages/me/rewards-list?cat=promotion' : '/pages/me/me'" :title="t.bills.title" />
 
@@ -254,7 +254,7 @@ watch([remoteSessionReady, () => app.accountBindingEpoch], ([ready, epoch], [was
   lookupGeneration++; locatingReceipt.value = false;
   if (ready && (!wasReady || epoch !== previousEpoch)) void refreshLedger();
 });
-useManualScrollLoadMore(scrollAnchor, {
+const scrollPager = useManualScrollLoadMore(scrollAnchor, {
   enabled: () => fundsServerEnabled && !ledgerBizNo.value && !activePager.value.error,
   hasMore: () => activePager.value.hasMore,
   loading: () => activePager.value.loadingMore || activePager.value.status === "loading",
