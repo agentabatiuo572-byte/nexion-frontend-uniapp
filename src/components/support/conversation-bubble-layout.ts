@@ -3,7 +3,7 @@ import type { ThreadMsg } from './thread-types';
 /** Resolve a flat RGBA paint before compositing; never a gradient within a bubble. */
 function bubbleRgb(position: number, light: boolean): number[] {
   const t = Number.isFinite(position) ? Math.max(0, Math.min(1, position)) : 0.5;
-  const top = light ? [130, 59, 191] : [95, 123, 12];
+  const top = light ? [16, 92, 206] : [95, 123, 12];
   const bottom = light ? [12.5, 66.75, 218.5] : [22, 88, 66];
   return top.map((value, index) => Math.round(value + (bottom[index] - value) * t));
 }

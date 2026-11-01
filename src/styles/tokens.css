@@ -1087,12 +1087,12 @@ uni-input .uni-input-placeholder {
 :root:not([data-theme="light"]) .nx-design-glass, [data-theme="dark"] .nx-design-glass { --ui-glass-rgb:255,255,255; }
 .nx-design-glass > .nx-liquid-glass { backdrop-filter:blur(16px) saturate(170%);-webkit-backdrop-filter:blur(16px) saturate(170%); }
 .nx-design-glass > .nx-liquid-glass > .nx-liquid-tint { background:linear-gradient(180deg,rgba(var(--ui-glass-rgb),.16),rgba(var(--ui-glass-rgb),.05) 46%,rgba(var(--ui-glass-rgb),.03));box-shadow:var(--ui-control-shadow,0 8px 24px rgba(0,0,0,.5)); }
-/* Small light-theme navigation controls need only a short grounding shadow.
+/* Small light-theme navigation controls use the general light shadow (design system 01 §1.4).
    Keep the optical layers and the bottom navigation's material independent. */
 [data-theme="light"] .nx-header .nx-design-glass,
 [data-theme="light"] .spv .nx-design-glass,
 [data-theme="light"] .message-nav .nx-design-glass {
-  --ui-control-shadow: 0 2px 6px rgba(23,31,45,.12);
+  --ui-control-shadow: var(--v5-glass-shadow);
 }
 /* The renderer supplies the optical map. Keep it aligned with the outer rim
    and attenuated, so a small pill never gains a second white contour. */
