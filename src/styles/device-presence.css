@@ -5,7 +5,8 @@
 .device-inventory-row__dot,
 .device-hero__dot,
 .device-bay__led,
-.trial-device-row__status--online::before {
+.trial-device-row__status--online::before,
+.home-benefits__online {
   animation: device-online-breathe 2.4s ease-in-out infinite;
   transform-origin: center;
 }
@@ -20,5 +21,6 @@
 .device-inventory-row__dot,
 .device-hero__dot,
 .device-bay__led,
-.trial-device-row__status--online::before { animation: none; }
+.trial-device-row__status--online::before,
+.home-benefits__online { animation: none; }
 }
