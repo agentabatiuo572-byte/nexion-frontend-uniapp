@@ -628,7 +628,6 @@ export const en = {
     doMathVs: "vs {base}",
     doMathSeeCta: "See the math",
     doMathStage: "Est. daily earnings",
-    doMathYour: "vs your {base}",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "Earnings ledger",
     earningsLedgerViewAll: "View all",

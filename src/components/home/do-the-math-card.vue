@@ -6,22 +6,20 @@
   a brand arc jumps from the base to the target with the multiplier at its apex.
 -->
 <template>
-  <view v-if="calculator" data-home-section="do-the-math">
-    <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.doMathTitle }}</text>
-    </view>
-
-    <view ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': (observable && !inView) || !pageVisible, 'dc-card--masked': visibility.hidden }">
+  <NxSection :title="t.home.doMathTitle" data-home-section="do-the-math">
+    <view v-if="calculator" ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': (observable && !inView) || !pageVisible, 'dc-card--masked': visibility.hidden }">
       <view class="dc-stage">
         <svg class="dc-arc" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path :d="arcPath" /></svg>
         <text class="dc-stage__label">{{ t.home.doMathStage }}</text>
         <view class="dc-multiplier" :aria-label="visibility.hidden ? '••' : `${calculator.multiplier}×`"><text>{{ visibility.hidden ? '••' : calculator.multiplier }}</text><text v-if="!visibility.hidden" class="dc-multiplier__sign">×</text></view>
         <view class="dc-col dc-col--base">
           <image v-if="baseArt.imageSrc.value" class="dc-device" :src="baseArt.imageSrc.value" mode="aspectFit" @error="baseArt.imageError" />
+          <view v-else class="dc-device dc-device--placeholder" aria-hidden="true"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg></view>
           <view class="dc-pillar" :style="{ height: `${pillarHeights.base}px` }" />
         </view>
         <view class="dc-col dc-col--target">
           <image v-if="targetArt.imageSrc.value" class="dc-device" :src="targetArt.imageSrc.value" mode="aspectFit" @error="targetArt.imageError" />
+          <view v-else class="dc-device dc-device--placeholder" aria-hidden="true"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg></view>
           <view class="dc-pillar" :style="{ height: `${pillarHeights.target}px` }"><view v-if="!visibility.hidden" class="dc-pillar__sweep" /></view>
         </view>
         <view class="dc-stage__floor" />
@@ -31,20 +29,15 @@
         <view class="dc-legend--target"><text class="dc-legend__name">{{ calculator.target.name }}</text><text class="dc-legend__rate">{{ formatAmount(calculator.target.dailyUsdt) }}<text class="dc-legend__unit">/d</text></text></view>
       </view>
       <view class="dc-foot">
-        <text class="dc-foot__caption">{{ fmt(t.home.doMathYour, { base: baseShort }) }}</text>
+        <text class="dc-foot__caption">{{ fmt(t.home.doMathVs, { base: baseShort }) }}</text>
         <NxButton class="dc-foot__action" variant="brand" size="small" :label="`${t.home.doMathSeeCta} →`" @click="goStore" />
       </view>
     </view>
-  </view>
-  <view v-else data-home-section="do-the-math">
-    <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.doMathTitle }}</text>
-    </view>
-    <view class="dc-status">
+    <view v-else class="dc-status">
       <text>{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : app.homeTruthStatus === 'error' ? t.uiChrome.unavailable : t.home.doMathUnavailable }}</text>
       <view v-if="app.homeTruthStatus === 'error'" class="dc-status__retry" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()">{{ t.ui.retry }}</view>
     </view>
-  </view>
+  </NxSection>
 </template>
 
 <script setup lang="ts">
@@ -60,6 +53,7 @@ import { useDeviceProductImage } from "@/composables/use-device-product-image";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxSection from "@/components/ui/nx-section.vue";
 
 const visibility = useDataVisibility();
 const t = useT();
@@ -112,6 +106,8 @@ function goStore() {
 .dc-col--target { left:calc(75% - 50px); }
 .dc-device { position:relative; z-index:1; display:block; width:88px; height:88px; margin-bottom:-14px; animation:dc-device-drop 700ms 450ms cubic-bezier(.2,.9,.3,1.3) both; }
 .dc-col--target .dc-device { animation-delay:600ms; }
+/* Same neutral placeholder as the catalogue uses for a SKU without an approved image. */
+.dc-device--placeholder { display:grid; place-items:center; color:var(--v5-ink-3); }
 .dc-pillar { position:relative; width:64px; border-radius:12px 12px 3px 3px; overflow:hidden; transform-origin:50% 100%; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); animation:dc-pillar-rise 1100ms cubic-bezier(.16,1,.3,1) both; }
 .dc-col--target .dc-pillar { animation-delay:120ms; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-tech-cyan) 72%,transparent),color-mix(in srgb,var(--v5-aura-sky) 20%,transparent)); box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 14px 30px -10px color-mix(in srgb,var(--v5-tech-cyan) 60%,transparent); }
 .dc-card--masked .dc-col--target .dc-pillar { background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); box-shadow:none; }

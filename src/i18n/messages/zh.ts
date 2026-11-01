@@ -613,7 +613,6 @@ export const zh: Messages = {
     doMathVs: "对比 {base}",
     doMathSeeCta: "查看测算",
     doMathStage: "预估日收益",
-    doMathYour: "对比你的 {base}",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "收益流水",
     earningsLedgerViewAll: "查看全部",
