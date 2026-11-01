@@ -15,7 +15,6 @@
       <OnGridSection />
       <HomeNetworkSnapshot />
       <DoTheMathCard />
-      <EarningsLedgerCard />
       <MarketBoardCard />
       <TrustChipWall />
     </view>
@@ -36,7 +35,6 @@ import HomeNetworkSnapshot from '@/components/home/network-snapshot.vue';
 import LiveFeedCard from '@/components/home/live-feed-card.vue';
 import OnGridSection from '@/components/home/on-grid-section.vue';
 import DoTheMathCard from '@/components/home/do-the-math-card.vue';
-import EarningsLedgerCard from '@/components/home/earnings-ledger-card.vue';
 import MarketBoardCard from '@/components/home/market-board-card.vue';
 import TrustChipWall from '@/components/home/trust-chip-wall.vue';
 import { useT } from '@/i18n/use-t';
