@@ -163,6 +163,16 @@ it("preserves the actual refusal from automatic recovery without discarding the 
   expect(page.authApi.pendingLogin()).toBe(true); expect(page.replayAvailable.value).toBe(true);
 });
 
+it("keeps verification actionable when automatic recovery returns a challenge", async () => {
+  const page = recoveryPage(vi.fn().mockRejectedValueOnce(networkError()).mockResolvedValueOnce({
+    tokenType: "challenge", accessToken: null, refreshToken: null, user: testUser, challengeNo: "original-mfa",
+  }));
+  await page.signInWithPassword(); await settleRecovery();
+  expect(page.request).toHaveBeenCalledTimes(2); expect(page.finishSignIn).not.toHaveBeenCalled();
+  expect(page.loginRecoveryPending.value).toBe(true); expect(page.replayAvailable.value).toBe(true);
+  page.retryPassword.value = "re-entered"; expect(page.canRetryOriginal.value).toBe(true);
+});
+
 it("leaves actionable inputs after a failed read, and retries only the frozen original attempt", async () => {
   const page = recoveryPage(vi.fn().mockRejectedValueOnce(networkError()).mockRejectedValueOnce(networkError())
     .mockRejectedValueOnce(networkError()).mockResolvedValueOnce(session));

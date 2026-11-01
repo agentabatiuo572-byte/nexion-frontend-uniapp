@@ -316,7 +316,6 @@ async function recoverLoginResult() {
       return;
     }
     syncLoginRecovery();
-    replayAvailable.value = false;
     if (result.kind === "authenticated") finishSignIn({ accountId: authenticatedAccountId(result.user),
       onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (cause) {
