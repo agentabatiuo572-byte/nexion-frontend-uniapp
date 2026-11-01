@@ -52,6 +52,10 @@ const zh = {
   loadError: '活动信息暂未读取', loadErrorNote: '网络不稳定，稍后再试。', retry: '重试',
   cardBuy: '买 {name}', cardGet: '送 {reward}', cardFirstEyebrow: '首单得',
   cardFirstNote: '第一笔购机订单付款后发放', cardRepurchaseNote: '已有设备，再添一台 {name}',
+  // Order discounts reduce the order total at checkout; nothing is issued to My rewards.
+  subtitleFirstDiscount: '完成第一笔购机订单，结算时直接立减', subtitleRepurchaseDiscount: '已有设备再添一台指定机型，结算时直接立减',
+  step3Discount: '结算直接抵扣', step3DiscountNote: '下单金额直接减少', cardFirstNoteDiscount: '第一笔购机订单结算时直接抵扣',
+  addLineDiscount: '再添 {n} 台 {name}：{reward}', emptyLineDiscount: '完成第一笔购机后，再添一台可享 {reward}',
 };
 type LandingCopy = typeof zh;
 const en: LandingCopy = {
@@ -105,6 +109,9 @@ const en: LandingCopy = {
   loadError: "Offer details didn't load", loadErrorNote: 'The connection is unstable. Try again shortly.', retry: 'Retry',
   cardBuy: 'Buy {name}', cardGet: 'Get {reward}', cardFirstEyebrow: 'First order',
   cardFirstNote: 'Paid out after your first device order', cardRepurchaseNote: 'Own a device? Add a {name}',
+  subtitleFirstDiscount: 'Complete your first device order and save at checkout', subtitleRepurchaseDiscount: 'Already own a device? Add a listed model and save at checkout',
+  step3Discount: 'Saved at checkout', step3DiscountNote: 'Taken off the order total', cardFirstNoteDiscount: 'Taken off your first device order at checkout',
+  addLineDiscount: 'Add {n} {name}: {reward}', emptyLineDiscount: 'After your first device purchase, add one more: {reward}',
 };
 const vi: LandingCopy = {
   navGift: 'Quà mua máy', navFirst: 'Quà đơn đầu', navRepurchase: 'Mua thêm', navPending: 'Ưu đãi',
@@ -157,6 +164,9 @@ const vi: LandingCopy = {
   loadError: 'Chưa tải được thông tin ưu đãi', loadErrorNote: 'Kết nối không ổn định, hãy thử lại sau.', retry: 'Thử lại',
   cardBuy: 'Mua {name}', cardGet: 'Tặng {reward}', cardFirstEyebrow: 'Đơn đầu nhận',
   cardFirstNote: 'Nhận sau khi thanh toán đơn mua máy đầu tiên', cardRepurchaseNote: 'Đã có máy? Mua thêm {name}',
+  subtitleFirstDiscount: 'Hoàn tất đơn mua máy đầu tiên, được giảm ngay khi thanh toán', subtitleRepurchaseDiscount: 'Đã có thiết bị? Mua thêm mẫu áp dụng, được giảm ngay khi thanh toán',
+  step3Discount: 'Giảm khi thanh toán', step3DiscountNote: 'Trừ thẳng vào tổng đơn', cardFirstNoteDiscount: 'Trừ vào đơn mua máy đầu tiên khi thanh toán',
+  addLineDiscount: 'Mua thêm {n} {name}: {reward}', emptyLineDiscount: 'Sau đơn mua máy đầu tiên, mua thêm một máy: {reward}',
 };
 export const promotionLandingCopy = { zh, en, vi };
 export function landingCopy(language: string): LandingCopy {

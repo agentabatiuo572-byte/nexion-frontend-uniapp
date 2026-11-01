@@ -51,24 +51,24 @@
            terms link keeps opening the existing sheet. -->
       <view v-for="card in landingCards(activity)" :key="card.kind" class="entry-card entry-press" :class="'entry-card--'+card.kind" :style="{ animationDelay: (index*0.06+0.06)+'s' }" role="link" tabindex="0" :aria-label="localized(activity.title,locale.code)" @click="navTo(promotionLandingHref(activity.activityId))" @keydown.enter.prevent="navTo(promotionLandingHref(activity.activityId))">
         <template v-if="card.kind==='gift'">
-          <view class="entry-card__copy"><text class="entry-card__buy">{{ fmt(landing.cardBuy,{name:card.buyName}) }}</text><text class="entry-card__get">{{ landing.cardGet.split('{reward}')[0] }}<text class="entry-card__keep">{{ card.rewardText }}</text>{{ landing.cardGet.split('{reward}')[1] }}</text></view>
+          <view class="entry-card__copy"><text class="entry-card__buy">{{ fmt(landing.cardBuy,{name:card.buyName}) }}</text><text class="entry-card__get">{{ card.discount ? '' : landing.cardGet.split('{reward}')[0] }}<text class="entry-card__keep">{{ card.rewardText }}</text>{{ card.discount ? '' : landing.cardGet.split('{reward}')[1] }}</text></view>
           <view class="entry-card__main"><CatalogMachineImage class="entry-card__fill" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-main'" :refresh-key="catalogRefreshKey" /></view>
           <view v-if="card.giftSku" class="entry-card__gift entry-pop"><CatalogMachineImage class="entry-card__fill" :sku="card.giftSku" :image-url="card.giftImage" :scope-key="activity.activityId+':card-gift'" :refresh-key="catalogRefreshKey" /></view>
           <view class="entry-card__days"><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
         </template>
         <view v-else-if="card.kind==='first'" class="entry-card__stub">
-          <text class="entry-card__eyebrow">{{ landing.cardFirstEyebrow }}</text>
+          <text class="entry-card__eyebrow">{{ card.discount ? t.promotion.orderDiscount : landing.cardFirstEyebrow }}</text>
           <text class="entry-card__amount" :class="{ 'entry-card__amount--long': card.parts.amount.length>4 }">{{ card.parts.amount }}</text>
           <text class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text>
         </view>
         <view v-else class="entry-card__well">
           <view class="entry-card__slot"><CatalogMachineImage class="entry-card__fill" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-slot'" :refresh-key="catalogRefreshKey" /><view class="entry-card__plus entry-pop" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view></view>
-          <view class="entry-card__bonus"><text class="entry-card__bonus-amount">+{{ card.parts.asset==='DEVICE' ? card.rewardText : card.parts.amount }}</text><text v-if="card.parts.asset!=='DEVICE'" class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text></view>
+          <view class="entry-card__bonus"><text class="entry-card__bonus-amount">{{ card.discount ? '−' : '+' }}{{ card.parts.asset==='DEVICE' ? card.rewardText : card.parts.amount }}</text><text v-if="card.parts.asset!=='DEVICE'" class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text></view>
         </view>
         <template v-if="card.kind==='first'"><view class="entry-card__tear" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--top" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--bottom" aria-hidden="true" /></template>
         <view v-if="card.kind!=='gift'" class="entry-card__body">
           <view class="entry-card__head"><text class="entry-card__title">{{ localized(activity.title,locale.code) }}</text><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
-          <text class="entry-card__note">{{ card.kind==='first' ? landing.cardFirstNote : fmt(landing.cardRepurchaseNote,{name:card.buyName}) }}</text>
+          <text class="entry-card__note">{{ card.kind==='first' ? (card.discount ? landing.cardFirstNoteDiscount : landing.cardFirstNote) : fmt(landing.cardRepurchaseNote,{name:card.buyName}) }}</text>
           <view class="entry-card__link" role="button" tabindex="0" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }} ›</text></view>
         </view>
         <view v-else class="entry-card__link entry-card__link--corner" role="button" tabindex="0" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }} ›</text></view>
@@ -165,7 +165,7 @@ function landingCards(activity:PublicPromotion){
   if(!kind||!rule)return [];
   void app.accountKey;void app.accountBindingEpoch;
   const reward=rule.buyerReward,parts=rewardParts(activity,reward),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
-  return [{kind,parts,rewardText:rewardPartsText(parts),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
+  return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:rewardPartsText(parts,t.value.promotion),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
 }
 async function load(reset:boolean,preserveImages=false){
   if(!visible)return;
@@ -214,6 +214,10 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 <style src="./promotion.css"></style>
 <style scoped>
 .promotion-entry { display: flex; flex-direction: column; gap: var(--ui-space-inset); }
+.promotion-entry:not(.promotion-entry-home) { gap: var(--ui-space-card-gap); }
+.entry-navigation { margin-top: calc(var(--ui-space-section-gap) - var(--ui-space-card-gap)); }
+.entry-navigation .promotion-title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
+.entry-navigation .promotion-link { margin: -10px 0; gap: 4px; font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3); }
 .promotion-entry-home { gap: 0; }
 .entry-list, .entry-track { display: contents; }
 .entry-list--home { display: block; overflow: hidden; border-radius: 24px; }
@@ -314,16 +318,19 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card--gift { height: 184px; }
 .entry-card__copy { position: absolute; left: 18px; top: 20px; width: min(176px, 52%); }
 /* Purchase line stays body/500 and the gift line profile/600 in brand (04.2, 10.2). */
-.entry-card__buy { display: block; font: 500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.entry-card__buy { display: block; font: 500 var(--ui-type-body)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
 .entry-card__get { display: block; margin-top: 4px; font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); color: var(--v5-brand); overflow-wrap: anywhere; }
 .entry-card__keep { white-space: nowrap; }
+.entry-card { --entry-amber: 14%; }
+:global([data-theme="light"]) .entry-card { --entry-amber: 12%; }
+.entry-card :deep(.nx-tag--warning) { background: color-mix(in srgb, var(--v5-warning) var(--entry-amber), transparent); }
 .entry-card__days { position: absolute; right: 14px; top: 14px; z-index: 1; }
 .entry-card__main { position: absolute; right: 70px; top: 44px; width: 118px; height: 118px; }
 .entry-card__gift { position: absolute; right: 12px; top: 90px; width: 78px; height: 78px; }
 .entry-card--first { display: grid; grid-template-columns: 112px minmax(0,1fr); min-height: 132px; }
 .entry-card__stub { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 6px; background: var(--v5-surface-2); text-align: center; min-width: 0; }
 .entry-card__eyebrow { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.entry-card__amount { margin-top: 2px; font: 500 36px/40px var(--font-amount); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--v5-ink); }
+.entry-card__amount { margin-top: 2px; font: 500 36px/40px var(--font-amount); letter-spacing: -.03em; color: var(--v5-ink); }
 .entry-card__amount--long { font-size: 26px; line-height: 32px; }
 .entry-card__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
 .entry-card__unit--uvt { color: var(--v5-nex-ink); }
@@ -340,9 +347,9 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__well { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 104px; padding: 10px 0; border-radius: 16px; background: var(--v5-surface-2); }
 .entry-card__slot { position: relative; width: 64px; height: 64px; box-sizing: border-box; border: 1.5px dashed var(--v5-aura-sky); border-radius: 16px; }
 .entry-card__slot > .entry-card__fill { inset: 4px; }
-.entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: var(--v5-bg); }
+.entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: white; }
 .entry-card__bonus { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 3px; padding: 0 6px; }
-.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: anywhere; }
+.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; color: var(--v5-ink); overflow-wrap: anywhere; }
 .entry-pop { animation: entry-card-pop .45s cubic-bezier(.2,.8,.2,1) .5s backwards; }
 .entry-press { transition: transform 120ms ease-out; }
 .entry-press:active { transform: scale(.97); }

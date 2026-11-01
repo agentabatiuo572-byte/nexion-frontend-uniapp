@@ -24,7 +24,7 @@ const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? 
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-export const demoDefaults = {paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
@@ -45,7 +45,10 @@ export const demoOptions = {
   streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
   promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],
-  fleetState:[['normal','默认设备'],['inventory','含仓库未激活设备'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
+  sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
+  promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
+  promotionRewardType:[['reward','首购 / 复购发 UVT'],['discount','首购 / 复购为订单立减']],
+  fleetState:[['normal','默认设备'],['none','暂无设备'],['inventory','含仓库未激活设备'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['erc20-off','ERC20 未开通'],['low-balance','钱包余额不足（820.64 USDT）']],
 };
 const skuDefinitions = [
@@ -354,8 +357,14 @@ export function demoFixture(url,locale,state,request) {
         reward.disclosure.refundTerms={zh:'整单退款时，赠品随订单一并撤销。',en:'If the whole order is refunded, the gift is withdrawn with it.',vi:'Khi hoàn tiền toàn bộ đơn hàng, quà tặng sẽ bị thu hồi cùng đơn.'};
         reward.disclosure.deviceRights={activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:365,taskEnabled:true,countsAsDeviceHolding:true,countsForRank:false,transferable:false,exchangeable:false,revocationMode:'REVOKE_IF_UNUSED'};
       }
-      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward={rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
+      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&[1,4].includes(i)?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(i*10),disclosure:d}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
       if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
+      // Boundary scenarios flip on the clock, one minute after the switch.
+      const edge=(state.promotionTimingAt||now)+60000;
+      if(state.promotionTiming==='starting'){item.startsAt=new Date(edge).toISOString();item.state=now<edge?'SCHEDULED':'ACTIVE';}
+      else if(state.promotionTiming==='ending'){item.endsAt=new Date(edge).toISOString();item.state=now<edge?'ACTIVE':'ENDED';}
+      // Like PromotionPublicService, an offer that is not running is never eligible.
+      if(item.state!=='ACTIVE')item.eligibility='INELIGIBLE';
       if(state.machineImageState==='banner'&&item.state==='ACTIVE')item.bannerImageUrl=`/api/promotions/${item.activityId}/banner/${item.version}`;
       return item;
     });
@@ -469,6 +478,7 @@ export function demoFixture(url,locale,state,request) {
         data.devices.push(clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),clone(46,'CLOUD-SHARE','Cloud Share',0.6,19.9,{todayEarningsUsdt:.2}));
         data.devices.push(clone(47,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       }
+      if(state.fleetState==='none')data.devices=[];
       if(state.fleetState==='reserved'){const trialSlots=['active','final-day','grace'].includes(state.trialState)?1:0;data.slotsUsed=data.devices.filter(d=>d.activatedAt!==null).length+trialSlots+1;data.reservedSlotCount=1;data.trialSlotCount=trialSlots;}
     }
     return data;
