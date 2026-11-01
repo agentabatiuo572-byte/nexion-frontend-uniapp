@@ -10,12 +10,15 @@ import { useTrialPresentation } from "./use-trial-presentation";
 export type FleetSlot =
   | { kind: "trial"; online: boolean }
   | { kind: "device"; device: Device; online: boolean }
+  /** Occupied per the authoritative slot count but not yet classified (e.g. the trial read is still pending). */
+  | { kind: "pending" }
   | { kind: "reserved" }
   | { kind: "empty" };
 
 /**
  * Slot order shared by the Home "My devices" ring, avatars and reel and the Earn ring:
- * trial → Online devices → other occupied devices → slots being provisioned → empty slots.
+ * trial → Online devices → other occupied devices → occupied but unclassified → slots being provisioned → empty.
+ * Once the count is confirmed the drawn breakdown follows the authoritative slot usage.
  */
 export function useFleetSlots() {
   const app = useApp();
@@ -38,8 +41,16 @@ export function useFleetSlots() {
     ];
   });
   const slots = computed<FleetSlot[]>(() => {
+    const known = occupied.value.length;
+    let reserved = app.remoteSlotUsage?.reservedSlotCount ?? 0;
+    let pending = 0;
+    if (countReady.value) {
+      reserved = Math.min(reserved, Math.max(0, slotsUsed.value - known));
+      pending = Math.max(0, slotsUsed.value - known - reserved);
+    }
     const list: FleetSlot[] = [...occupied.value,
-      ...Array.from({ length: app.remoteSlotUsage?.reservedSlotCount ?? 0 }, (): FleetSlot => ({ kind: "reserved" }))];
+      ...Array.from({ length: pending }, (): FleetSlot => ({ kind: "pending" })),
+      ...Array.from({ length: reserved }, (): FleetSlot => ({ kind: "reserved" }))];
     while (list.length < app.slotCap) list.push({ kind: "empty" });
     return list.slice(0, app.slotCap);
   });

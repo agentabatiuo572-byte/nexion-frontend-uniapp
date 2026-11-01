@@ -32,15 +32,16 @@
           <view class="earn-hero__amount">
             <text v-if="!visibility.hidden" class="earn-hero__currency">{{ totalPrefix || '$' }}</text>
             <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(totalInt) }}</text>
-            <text v-else class="earn-hero__int">{{ totalInt }}<text v-if="totalKnown" class="earn-hero__dec">.{{ totalCents }}</text></text>
+            <text v-else class="earn-hero__int">{{ totalInt }}</text>
+            <text v-if="totalKnown && !visibility.hidden" class="earn-hero__dec">.{{ totalCents }}</text>
           </view>
           <!-- 只有**确实请求失败**时才说不可用并给重试;零值已在上面显示为 0(#128)。 -->
-          <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="earn-hero__recovery nx-inline-recovery" role="status" aria-live="polite">
-            <view class="nx-inline-recovery__copy">
+          <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="earn-hero__recovery" role="status" aria-live="polite">
+            <view class="earn-hero__recovery-copy">
               <text class="earn-hero__recovery-title">{{ t.earn.summaryUnavailableTitle }}</text>
               <text class="earn-hero__recovery-body">{{ t.earn.summaryUnavailableBody }}</text>
             </view>
-            <view class="earn-hero__retry nx-inline-recovery__action" role="button" tabindex="0" @click="retrySummary" @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"><text>{{ t.ui.retry }}</text></view>
+            <view class="earn-hero__retry" role="button" tabindex="0" @click="retrySummary" @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"><text>{{ t.ui.retry }}</text></view>
           </view>
           <text v-else class="earn-hero__nex">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}<text class="earn-hero__nex-unit">UVT</text></text>
         </view>
@@ -298,16 +299,19 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 .earn-hero__label { display: flex; align-items: center; gap: 2px; min-width: 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
 .earn-hero__eye { margin: -12px 0; color: var(--v5-ink-3); }
 .earn-scope { color: var(--v5-ink-2); font: 400 12px/16px var(--font-v5); text-align: right; max-width: 50%; }
-.earn-hero__amount { position: relative; display: flex; align-items: baseline; gap: 4px; margin-top: 10px; font-family: var(--font-amount); font-weight: 600; letter-spacing: -.024em; line-height: 1; color: var(--v5-ink); }
+.earn-hero__amount { position: relative; display: flex; align-items: baseline; gap: 4px; margin-top: 10px; font-family: var(--font-amount); font-weight: 600; letter-spacing: -.024em; line-height: 1; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .earn-hero__currency { font-size: 20px; font-weight: 500; color: var(--v5-ink-3); }
 .earn-hero__int { font-size: 52px; }
 .earn-hero__dec { font-size: 34px; color: var(--v5-ink-3); }
 .earn-hero__nex { position: relative; display: block; margin-top: 10px; font: 600 15px/20px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; }
 .earn-hero__nex-unit { margin-left: 3px; font: 500 12px/16px var(--font-v5); letter-spacing: .04em; }
-.earn-hero__recovery { position: relative; margin-top: 10px; }
+.earn-hero__recovery { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.earn-hero__recovery-copy { min-width: 0; }
 .earn-hero__recovery-title { display: block; font: 500 12px/18px var(--font-v5); color: var(--v5-danger); }
 .earn-hero__recovery-body { display: block; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
-.earn-hero__retry { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+/* Board spacing (2px); an invisible extension keeps the 44px touch target without taking layout width. */
+.earn-hero__retry { position: relative; flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+.earn-hero__retry::after { content: ""; position: absolute; inset: 0 -8px; }
 .earn-tile--half { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 116px; padding: 14px 14px 12px; }
 .earn-tile--link { cursor: pointer; }
 .earn-tile--link:active { opacity: .85; }
@@ -337,10 +341,13 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 @media (prefers-reduced-motion:reduce) { .earn-capacity-info :deep(.earn-capacity-info__rocket),.earn-capacity-info :deep(.earn-capacity-info__flame),.earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:none; }.earn-capacity-info :deep(.earn-capacity-info__exhaust) { opacity:0; } }
 .earn-capacity-info:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; border-radius:12px; }
 .earn-more-ways :deep(.nx-section__title) { font-size: 20px; line-height: 1.25; }
+/* The section heading box adds its own room above the title; 22px matches the board's gap. */
+.earn-page > .earn-more-ways { margin-top: 22px; }
 /* Short period names stay on one line (vi "Hôm nay" broke at 320). */
 .earn-range :deep(.nx-glass-option__label) { white-space: nowrap; overflow-wrap: normal; }
 @media (max-width: 374px) {
   .earn-fleet-head, .earn-block { margin-top: 24px; }
+  .earn-page > .earn-more-ways { margin-top: 14px; }
   .earn-hero__int { font-size: 46px; }
 }
 </style>

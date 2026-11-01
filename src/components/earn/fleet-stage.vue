@@ -1,12 +1,12 @@
 <!-- Earn fleet (P-62): device switcher chips over one device stage; empty, first-load and read-failure states take the stage's place. -->
 <template>
   <view class="fleet-stage">
-    <view v-if="app.remoteFleetStatus === 'error'" class="fleet-stage__banner nx-inline-recovery" role="status">
-      <view class="nx-inline-recovery__copy">
+    <view v-if="app.remoteFleetStatus === 'error'" class="fleet-stage__banner" role="status">
+      <view class="fleet-stage__banner-copy">
         <text class="fleet-stage__banner-title">{{ t.coreReview.fleetReadFailed }}</text>
         <text class="fleet-stage__banner-body">{{ t.coreReview.fleetReadRetry }}</text>
       </view>
-      <view class="fleet-stage__retry nx-inline-recovery__action" role="button" tabindex="0" @click="retryFleet"><text>{{ t.ui.retry }}</text></view>
+      <view class="fleet-stage__retry" role="button" tabindex="0" @click="retryFleet"><text>{{ t.ui.retry }}</text></view>
     </view>
     <template v-else-if="!fleetReady">
       <view class="fleet-stage__chips" aria-hidden="true"><view v-for="n in 3" :key="n" class="fleet-stage__chip fleet-stage__chip--placeholder" /></view>
@@ -43,7 +43,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
+import { onShow } from "@/composables/use-tab-page-lifecycle";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -84,10 +85,22 @@ const items = computed<StageItem[]>(() => [
     online: !deviceTaskRecovering(device) && deviceOnlineState(device, Date.now(), fleetReady.value) === "online",
   })),
 ]);
-// Default: the first device with a job in progress, otherwise the first item. Not remembered across visits.
+// One concrete selection per visit: the first device with a job in progress, otherwise the first item. It is
+// committed once the fleet and its task snapshot are known, kept while that item exists (so a task refresh never
+// swaps the stage and unmounts an open menu or sheet), replaced only when it disappears, and reset on a new visit
+// or account change. Before it is committed the stage shows that default provisionally.
+const tasksSettled = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready" || app.remoteAssignmentStatus === "error"
+  || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
+const defaultKey = () => (items.value.find((item) => item.device?.currentTask != null) ?? items.value[0])?.key ?? null;
 const selectedKey = ref<string | null>(null);
-const selected = computed(() => items.value.find((item) => item.key === selectedKey.value)
-  ?? items.value.find((item) => item.device?.currentTask != null) ?? items.value[0] ?? null);
+function commitSelection() {
+  if (selectedKey.value !== null && items.value.some((item) => item.key === selectedKey.value)) return;
+  selectedKey.value = fleetReady.value && tasksSettled.value ? defaultKey() : null;
+}
+watch([items, fleetReady, tasksSettled], commitSelection, { immediate: true });
+onShow(() => { selectedKey.value = null; commitSelection(); });
+watch(() => [app.accountKey, app.accountBindingEpoch], () => { selectedKey.value = null; commitSelection(); });
+const selected = computed(() => items.value.find((item) => item.key === (selectedKey.value ?? defaultKey())) ?? null);
 
 // The chosen chip scrolls fully into view; arrow keys also move focus with it (roving tabindex).
 function select(key: string, focus = false) {
@@ -110,10 +123,12 @@ function retryFleet() { invalidatePassiveTabRead("remote-fleet"); void app.refre
 
 <style scoped>
 .fleet-stage { color: var(--v5-ink); }
-.fleet-stage__banner { margin: 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--v5-danger-soft); color: var(--v5-danger); }
+.fleet-stage__banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--v5-danger-soft); color: var(--v5-danger); }
+.fleet-stage__banner-copy { min-width: 0; }
 .fleet-stage__banner-title { display: block; font: 600 13px/18px var(--font-v5); }
 .fleet-stage__banner-body { display: block; margin-top: 2px; font: 400 12px/18px var(--font-v5); }
-.fleet-stage__retry { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+.fleet-stage__retry { position: relative; flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+.fleet-stage__retry::after { content: ""; position: absolute; inset: 0 -8px; }
 
 .fleet-stage__chips { display: flex; gap: 8px; padding: 0 16px 2px; overflow-x: auto; scrollbar-width: none; }
 .fleet-stage__chips::-webkit-scrollbar { display: none; }
@@ -139,7 +154,7 @@ function retryFleet() { invalidatePassiveTabRead("remote-fleet"); void app.refre
 .fleet-stage__skeleton-stats > view { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .fleet-stage__skeleton-stats > view + view { border-left: 1px solid var(--v5-border); }
 
-.fleet-stage__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 200px; margin: 12px 16px 0; box-sizing: border-box; border-radius: 24px; border: 1.5px dashed var(--v5-border-strong); text-align: center; cursor: pointer; }
+.fleet-stage__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 200px; margin: 12px 16px 0; box-sizing: content-box; border-radius: 24px; border: 1.5px dashed var(--v5-border-strong); text-align: center; cursor: pointer; }
 .fleet-stage__empty:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .fleet-stage__empty:active { opacity: .85; }
 .fleet-stage__plus { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; color: var(--v5-ink-3); }

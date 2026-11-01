@@ -12,6 +12,8 @@
   animation: device-online-breathe 2.4s ease-in-out infinite;
   transform-origin: center;
 }
+/* Owners of off-screen or hidden content add nx-loops-paused (useLoopsInView). */
+.nx-loops-paused .nx-online-dot { animation-play-state: paused; }
 @keyframes device-online-breathe {
   0%, 100% { opacity: .58; transform: scale(.86); }
   50% { opacity: 1; transform: scale(1); }

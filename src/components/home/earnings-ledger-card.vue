@@ -52,7 +52,7 @@ function goAll() {
 .earnings-ledger__all:focus-visible, .earnings-ledger__retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .earnings-ledger__card { padding: 2px 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .earnings-ledger__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-.earnings-ledger__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; }
+.earnings-ledger__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; box-sizing: content-box; }
 .earnings-ledger__row + .earnings-ledger__row { border-top: 1px solid var(--v5-border); }
 .earnings-ledger__identity { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px/20px var(--font-v5); color: var(--v5-ink); }
 .earnings-ledger__identity :deep(*) { white-space: nowrap; }

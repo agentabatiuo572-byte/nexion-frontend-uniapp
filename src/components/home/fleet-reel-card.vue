@@ -18,7 +18,7 @@ import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { navTo } from "@/lib/route";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { deviceName } from "@/lib/device-copy";
-import { deviceTaskRecovering } from "@/lib/task-progress";
+import { deviceTaskRecovering, deviceTaskRunning } from "@/lib/task-progress";
 import type { Device } from "@/store/types";
 import DeviceArt from "@/components/device-art.vue";
 
@@ -32,7 +32,17 @@ const statusText = computed(() => deviceTaskRecovering(props.device) ? computeCo
   : deviceOnlineState(props.device, Date.now(), props.runtimeConfirmed) === "unknown" ? t.value.earn.runtimeUnknown
     : props.online ? t.value.earn.online : t.value.home.deviceOffline);
 const todayText = computed(() => visibility.mask(props.runtimeConfirmed ? (props.device.todayEarnings > 0 ? "+" : "") + fmtMoney(props.device.todayEarnings) : "—"));
-const jobText = computed(() => !props.online || !props.tasksConfirmed ? "—" : props.device.currentTask ? t.value.home.jobRunning : t.value.home.jobIdle);
+// "Running" follows the task status; a paused, queued, interrupted or recovering job says so instead.
+const jobText = computed(() => {
+  const task = props.device.currentTask;
+  if (deviceTaskRecovering(props.device)) return computeCopy.value.statuses.RECOVERING;
+  if (!props.online || !props.tasksConfirmed) return "—";
+  if (!task) return t.value.home.jobIdle;
+  if (deviceTaskRunning(props.device)) return t.value.home.jobRunning;
+  if (props.device.interruptedAt != null) return t.value.earn.reconnecting;
+  if (task.status === "PAUSED") return t.value.earn.phoneTaskPaused;
+  return task.status ? computeCopy.value.statuses[task.status] : t.value.home.jobRunning;
+});
 const label = computed(() => `${t.value.earn.deviceDetailTitle}: ${displayName.value} · ${statusText.value} · ${t.value.home.todayShort} ${todayText.value} · ${t.value.home.jobLabel} ${jobText.value}`);
 
 function go() {
