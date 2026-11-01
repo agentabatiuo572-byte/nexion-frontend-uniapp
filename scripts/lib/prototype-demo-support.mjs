@@ -187,6 +187,23 @@ export function supportDemo(url,locale,state,request) {
       ];
       detail.messages=samples.map(([senderType,content],index)=>({id:nextMessageId(),senderType,content,createdAt:new Date(Date.now()-(samples.length-index)*60000).toISOString(),...(senderType==='agent'?author:{receiptStatus:'read'})}));
       Object.assign(detail.conversation,{unreadCount:1,lastMessage:detail.messages.at(-1).content,lastMessageAt:detail.messages.at(-1).createdAt,lastPublicMessageId:detail.messages.at(-1).id});
+    } else if(scenario==='recommendations') {
+      // Console-sent SKU/LINK messages: product and page links, a custom text
+      // without the product name, and one recommendation that is no longer available.
+      const product=text('推荐商品：','Recommended: ','Gợi ý sản phẩm: '),view=text('查看：','View: ','Xem: ');
+      const samples=[
+        {content:text('根据你的预算，给你推荐下面的设备和入口。','Based on your budget, here are a device and a few pages to look at.','Dựa trên ngân sách của bạn, đây là thiết bị và vài trang nên xem.')},
+        {kind:'SKU',content:product+'UVELRack P1',skuId:'stellarrack-p1',skuName:'UVELRack P1',targetAvailability:'AVAILABLE'},
+        {kind:'SKU',content:text('入门首选，回本更快','A good first device that pays back sooner','Lựa chọn khởi đầu, hoàn vốn nhanh hơn'),skuId:'stellarbox-s1',skuName:'UVELBox S1',targetAvailability:'AVAILABLE'},
+        {kind:'LINK',content:view+text('首页','Home','Trang chủ'),linkTarget:{type:'HOME',params:{}},targetAvailability:'AVAILABLE'},
+        {kind:'LINK',content:view+text('钱包','Wallet','Ví'),linkTarget:{type:'WALLET',params:{}},targetAvailability:'AVAILABLE'},
+        {kind:'LINK',content:view+text('在线客服','Live support','Hỗ trợ trực tuyến'),linkTarget:{type:'SUPPORT',params:{}},targetAvailability:'AVAILABLE'},
+        {kind:'SKU',content:product+'UVELBox Pro',skuId:'stellarbox-pro',skuName:'UVELBox Pro',targetAvailability:'UNAVAILABLE'},
+        {senderType:'user',content:text('好的，我看看。','Thanks, I will take a look.','Cảm ơn, tôi sẽ xem.'),receiptStatus:'read'},
+      ];
+      const agent={senderType:'agent',senderName:text('演示客服','Demo support','Hỗ trợ mẫu')};
+      detail.messages=samples.map((row,index)=>({id:nextMessageId(),...(row.senderType?{}:agent),createdAt:new Date(Date.now()-(samples.length-index)*60000).toISOString(),...row}));
+      Object.assign(detail.conversation,{unreadCount:1,lastMessage:detail.messages.at(-1).content,lastMessageAt:detail.messages.at(-1).createdAt,lastPublicMessageId:detail.messages.at(-1).id});
     } else detail.conversation.unreadCount=scenario==='long-count'?1298:scenario==='read'?0:1;
     detail.conversation.version++;
     state.supportScenario=scenario;
