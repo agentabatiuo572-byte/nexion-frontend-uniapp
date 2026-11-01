@@ -50,6 +50,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.ambassadorState)for(const key of ['ambassadorSubmission','ambassadorCommands'])delete state[key];
         if(update.eventState)for(const key of ['eventStatuses','reminders','spun','spinHistory','raffleEntries'])delete state[key];
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
+        if(update.promotionTiming)state.promotionTimingAt=Date.now();
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
         if(update.trialState||update.benefitState){if(state.trialOrderNo)state.createdOrders=(state.createdOrders||[]).filter(order=>order.orderNo!==state.trialOrderNo);for(const key of ['trialRow','trialCommands','trialStartFailed','trialOrderNo'])delete state[key];}
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
@@ -75,6 +76,8 @@ const server=http.createServer(async(req,res)=>{
         if(response.drop){res.destroy();return;}
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
       }
+      // The signed-out switch refuses the refresh, so the App boots with no session at all.
+      if(url.pathname==='/auth/users/refresh'&&state.sessionState==='signed-out')return sendJson(res,{code:401,message:'AUTH_REQUIRED',data:null},401);
       if(url.pathname==='/auth/users/refresh')return sendJson(res,{code:0,message:'OK',data:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:{userId:900001,countryCode:'+86',phone:'13800000000',nickname:'Alex',onboardingComplete:true}}});
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
       const realtimeTicket=req.method==='POST'&&url.pathname==='/api/app/support/realtime-ticket';
