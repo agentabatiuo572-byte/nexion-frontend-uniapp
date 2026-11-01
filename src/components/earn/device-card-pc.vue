@@ -105,6 +105,7 @@
       <text class="block" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
       <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.model) }} · {{ workloadLabel(task.category) }}</text>
       <text class="block truncate font-mono-tabular" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">#{{ visibility.mask(task.id) }}</text>
+      <TaskV2Status :task="task" />
       <view class="flex items-center gap-3" style="margin-top: 10px">
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
           <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress h-full nx-viz-grow" :style="progressBarStyle" />
@@ -281,7 +282,8 @@
         </view>
         <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressLabel }}</text>
       </view>
-      <view v-if="task.status !== 'PAUSED'" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
+      <TaskV2Status :task="task" />
+      <view v-if="task.status !== 'PAUSED' && task.protocolVersion !== 2" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
         <text v-if="awaitingExecutionResultConfirmation">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
         <text v-else>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
         <text style="color: var(--v5-success-ink)">{{ t.earn.reward }} {{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}</text>
@@ -442,6 +444,7 @@ import type { Device, DeviceKind, TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
 import { taskProgressPercent } from "@/lib/task-progress";
+import TaskV2Status from "@/components/earn/task-v2-status.vue";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import type { LockedTeaser } from "@/mock/tasks";
@@ -550,7 +553,7 @@ const statusColor = computed(() => statusOnline.value ? "var(--v5-brand)" : "var
 
 const elapsedRemaining = computed(() => {
   const tk = task.value;
-  if (!tk) return fmt(t.value.coreReview.minutesSeconds, { minutes: 0, seconds: 0 });
+  if (!tk || tk.startedAt === null) return fmt(t.value.coreReview.minutesSeconds, { minutes: 0, seconds: 0 });
   const elapsed = Math.floor((liveTaskNow.value - tk.startedAt) / 1000 - (tk.pausedSeconds ?? 0));
   const remaining = Math.max(0, tk.totalSec - elapsed);
   const min = Math.floor(remaining / 60);

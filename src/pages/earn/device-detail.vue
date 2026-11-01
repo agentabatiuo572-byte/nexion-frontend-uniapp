@@ -62,7 +62,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -108,7 +108,9 @@ onLoad((options) => {
   loaded.value = true;
   preserveDeviceDetailQueryInH5();
 });
-onShow(() => { preserveDeviceDetailQueryInH5(); void retryFleet(); });
+onShow(() => { app.setTaskReadPageVisible("device-detail", true); preserveDeviceDetailQueryInH5(); void retryFleet(); });
+onHide(() => app.setTaskReadPageVisible("device-detail", false));
+onUnload(() => app.setTaskReadPageVisible("device-detail", false));
 watch(() => app.accountBindingEpoch, () => { if (loaded.value) void retryFleet(); });
 
 function focusStatistics() {

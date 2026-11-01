@@ -2,7 +2,7 @@ import type { CurrentTask } from "@/store/types";
 
 /** Display estimate only: reaching 100% never completes or settles a task. */
 export function taskProgressPercent(task: CurrentTask | null | undefined, now: number, interruptedAt?: number | null): number | null {
-  if (!task) return null;
+  if (!task || task.startedAt === null || ["QUEUED", "RECOVERING", "FAILED", "CANCELLED"].includes(task.status ?? "")) return null;
   const progressNow = task.status === "PAUSED" ? task.pausedAt : interruptedAt ?? now;
   if (progressNow == null) return null;
   const elapsedSeconds = (progressNow - task.startedAt) / 1000 - (task.pausedSeconds ?? 0);

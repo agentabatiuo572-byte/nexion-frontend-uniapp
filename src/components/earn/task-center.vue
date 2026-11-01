@@ -106,7 +106,7 @@
       >
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
         <text class="earn-history-description" :title="`${task.model} · ${workloadLabel(task.category)}`" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-2); margin: 0 4px">·</text><text style="color: var(--v5-ink-2)">{{ workloadLabel(task.category) }}</text></text>
-        <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5); color: var(--v5-success-ink)">{{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}</text>
+        <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5)" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}<text v-if="task.settlementStatus" class="block">{{ computeCopy.statuses[task.settlementStatus] }}</text></text>
         <text class="earn-history-time" style="font-size: 12px; color: var(--v5-ink-3)">{{ completedTime(task.completedAt) }}</text>
         <view v-if="canOpenTaskReceipt(task)" class="earn-history-document shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" :title="task.receiptNo ?? task.id" @click.stop="openTaskReceipt(task)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>
@@ -114,6 +114,12 @@
         <view v-else class="earn-history-document shrink-0" style="width: 22px; height: 22px" />
       </view>
     </view>
+    <view v-if="selectedTask" style="padding:12px;background:var(--v5-surface-2);border-radius:12px" data-compute-task-detail="true">
+      <view class="flex items-center justify-between"><text>{{ computeCopy.details }} #{{ visibility.mask(selectedTask.id) }}</text><view role="button" tabindex="0" @click="selectedTask = null" @keydown.enter.stop.prevent="selectedTask = null" @keydown.space.stop.prevent="selectedTask = null"><text>{{ computeCopy.close }}</text></view></view>
+      <TaskV2Status :task="selectedTask" />
+      <view v-if="selectedTask.receiptNo && selectedTask.settlementStatus === 'POSTED'" role="button" tabindex="0" @click="openTaskReceipt(selectedTask, true)" @keydown.enter.stop.prevent="openTaskReceipt(selectedTask, true)" @keydown.space.stop.prevent="openTaskReceipt(selectedTask, true)"><text>{{ computeCopy.receipt }} #{{ visibility.mask(selectedTask.receiptNo) }}</text></view>
+    </view>
+    <ComputeSettlements />
     <ReceiptModal :receipt="openReceipt" @close="openReceipt = null" />
   </view>
 </template>
@@ -137,12 +143,17 @@ import { useReceipts } from "@/store/receipts";
 import type { Receipt } from "@/mock/receipt";
 import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
+import TaskV2Status from "@/components/earn/task-v2-status.vue";
+import ComputeSettlements from "@/components/earn/compute-settlements.vue";
 
 import { toast } from "@/store/ui";
 
 const visibility = useDataVisibility();
 const app = useApp();
 const t = useT();
+const computeCopy = useComputeV2Copy();
+const selectedTask = ref<CompletedTask | null>(null);
 const receipts = remoteApiEnabled ? null : useReceipts();
 const openReceipt = ref<Receipt | CanonicalComputeReceipt | null>(null);
 let receiptRequestEpoch = 0;
@@ -178,10 +189,14 @@ function receiptFor(id: string): Receipt | undefined {
 }
 
 function canOpenTaskReceipt(task: CompletedTask): boolean {
-  return remoteApiEnabled ? !!task.receiptNo : !!receiptFor(task.id);
+  return remoteApiEnabled ? task.protocolVersion === 2 || !!task.receiptNo : !!receiptFor(task.id);
 }
 
-async function openTaskReceipt(task: CompletedTask): Promise<void> {
+async function openTaskReceipt(task: CompletedTask, receiptOnly = false): Promise<void> {
+  if (remoteApiEnabled && task.protocolVersion === 2 && !receiptOnly) {
+    if (receiptPageVisible) selectedTask.value = task;
+    return;
+  }
   if (!remoteApiEnabled) {
     openReceipt.value = receiptFor(task.id) ?? null;
     return;
@@ -198,7 +213,11 @@ async function openTaskReceipt(task: CompletedTask): Promise<void> {
     && expectedBindingEpoch === app.accountBindingEpoch;
   try {
     const detail = await taskAssignmentApi.receipt(task.receiptNo);
-    if (isCurrent()) openReceipt.value = detail;
+    if (task.protocolVersion === 2 && (detail.taskNo !== task.id || detail.receiptNo !== task.receiptNo)) {
+      throw new Error("TASK_RECEIPT_IDENTITY_MISMATCH");
+    }
+    if (isCurrent()) openReceipt.value = task.protocolVersion === 2 && task.settledAt != null
+      ? { ...detail, settledAt: task.settledAt } : detail;
   } catch {
     if (isCurrent()) {
       toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
@@ -209,6 +228,7 @@ async function openTaskReceipt(task: CompletedTask): Promise<void> {
 watch(() => app.accountBindingEpoch, () => {
   receiptRequestEpoch += 1;
   openReceipt.value = null;
+  selectedTask.value = null;
 });
 
 onUnmounted(() => {
@@ -230,6 +250,9 @@ const allRecent = computed(() =>
     .sort((a, b) => b.completedAt - a.completedAt)
     .slice(0, 20),
 );
+watch(allRecent, (tasks) => {
+  if (selectedTask.value) selectedTask.value = tasks.find((task) => task.id === selectedTask.value?.id) ?? selectedTask.value;
+});
 
 // Cloud Share has no user-owned physical VRAM, but the server routes its
 // rented pool as an 8 GB equivalent for task eligibility and claim execution.
