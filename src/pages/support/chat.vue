@@ -930,8 +930,10 @@ const threadMessages = computed<ThreadMsg[]>(() => {
     id: m.id,
     side: m.sender === "user" ? "right" : "left",
     tone: m.sender === "user" ? "user" : m.sender === "system" ? "system" : "agent",
-    text: m.sender === "system" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE"
-      ? localizedIdleClose(m.text, t.value.conversations) ?? m.text : m.text,
+    text: m.kind === "AGENT_SWITCH"
+      ? m.authorName ? fmt(t.value.conversations.agentSwitchedTo, { name: m.authorName }) : t.value.conversations.agentSwitched
+      : m.sender === "system" && c.lastMessageKind === "IDLE_TIMEOUT_CLOSE"
+        ? localizedIdleClose(m.text, t.value.conversations) ?? m.text : m.text,
     imageSrc: m.attachmentId ? imageSources.value[m.attachmentId] : undefined,
     imageAttachmentId: m.attachmentId,
     imageLoading: !!m.attachmentId && !imageSources.value[m.attachmentId] && !imageFailures.value[m.attachmentId],
