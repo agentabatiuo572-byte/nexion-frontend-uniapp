@@ -1001,7 +1001,7 @@ export default chassisView;
 /* APP's view thread supplies this state when the logic thread has no DOM. */
 .nx-chassis[data-scrolling="true"] :deep(.nx-support-bubble) { opacity: 0; pointer-events: none; }
 .nx-chassis[data-scrolling="true"] :deep(.nx-support-motion),
-.nx-chassis[data-scrolling="true"] :deep(.nx-support-halo) { animation-play-state: paused; }
+.nx-chassis[data-scrolling="true"] :deep(.nx-support-beat) { animation-play-state: paused; }
 </style>
 
 <style scoped>

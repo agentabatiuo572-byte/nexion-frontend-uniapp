@@ -3,14 +3,18 @@
 
   The chassis mounts one shortcut on home/earn/team, above its navigation pill.
   Human support stays available with or without unread replies; the badge counts
-  unread advisor / support replies only. Route gating lives in the chassis; its
+  unread advisor / support replies only, and only then does the button glow and
+  beat (amber, the unread colour shared with the header message badge). Route gating lives in the chassis; its
   measured navigation height includes the safe area.
 -->
 <template>
-    <view class="nx-support-bubble" :class="{ 'nx-support-bubble--dimmed': dimmed, 'nx-support-bubble--light': theme.resolved === 'light' }" role="button" :tabindex="dimmed ? -1 : 0" :aria-hidden="dimmed || undefined" :aria-label="t.coreReview.supportHelp" @click="open" @keydown.enter.prevent="!dimmed && open()" @keydown.space.prevent="!dimmed && open()">
-      <view class="nx-support-btn nx-support-motion">
-        <SupportAvatar :size="36" :pulse="showUnreadBadge && !dimmed" :appearance="theme.resolved" class="nx-support-avatar" />
-        <view v-if="showUnreadBadge" :key="totalUnread" class="nx-support-badge"><text class="nx-support-badge-t">{{ unreadLabel }}</text></view>
+    <view class="nx-support-bubble" :class="{ 'nx-support-bubble--dimmed': dimmed, 'nx-support-bubble--light': theme.resolved === 'light', 'nx-support-bubble--unread': showUnreadBadge }" role="button" :tabindex="dimmed ? -1 : 0" :aria-hidden="dimmed || undefined" :aria-label="t.coreReview.supportHelp" @click="open" @keydown.enter.prevent="!dimmed && open()" @keydown.space.prevent="!dimmed && open()">
+      <view class="nx-support-motion">
+        <view v-if="showUnreadBadge" class="nx-support-beat" aria-hidden="true" />
+        <view class="nx-support-btn">
+          <SupportAvatar :size="36" :appearance="theme.resolved" class="nx-support-avatar" />
+          <view v-if="showUnreadBadge" :key="totalUnread" class="nx-support-badge"><text class="nx-support-badge-t">{{ unreadLabel }}</text></view>
+        </view>
       </view>
     </view>
 </template>
@@ -67,10 +71,34 @@ onMounted(() => {
   border-radius: 999px;
 }
 .nx-support-bubble--dimmed { opacity: 0; pointer-events: none; }
-.nx-support-bubble--dimmed .nx-support-motion { animation-play-state: paused; }
+.nx-support-bubble--dimmed .nx-support-motion,
+.nx-support-bubble--dimmed .nx-support-beat { animation-play-state: paused; }
 .nx-support-bubble--light .nx-support-btn {
   background: linear-gradient(155deg, #fff, #eef2e5);
   box-shadow: 0 3px 12px rgba(42, 53, 24, .14), inset 0 0 0 1px #dde4d3;
+}
+/* Unread: a steady amber glow on the button plus an outward ring every 2s. */
+.nx-support-bubble--unread .nx-support-btn {
+  box-shadow: 0 0 24px color-mix(in srgb, var(--ui-unread-badge) 30%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--ui-unread-badge) 50%, transparent);
+}
+.nx-support-bubble--light.nx-support-bubble--unread .nx-support-btn {
+  box-shadow: 0 3px 12px rgba(42, 53, 24, .14), 0 0 20px rgba(245, 170, 30, .45), inset 0 0 0 1px color-mix(in srgb, var(--v5-warning) 45%, transparent);
+}
+.nx-support-bubble--light { --nx-support-beat-from: .6; }
+/* The ring scales and fades (transform + opacity only) behind the button. */
+.nx-support-beat {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 999px;
+  background: var(--ui-unread-badge);
+  opacity: 0;
+  pointer-events: none;
+  animation: nx-support-beat 2s cubic-bezier(.2, .6, .35, 1) infinite;
+}
+@keyframes nx-support-beat {
+  0% { transform: scale(1); opacity: var(--nx-support-beat-from, .45); }
+  70%, 100% { transform: scale(1.58); opacity: 0; }
 }
 /* Press belongs to the outer hit target; idle float belongs to the inner visual. */
 .nx-support-bubble:active {
@@ -78,6 +106,7 @@ onMounted(() => {
 }
 .nx-support-btn {
   position: relative;
+  z-index: 1;
   flex-shrink: 0;
   width: 48px;
   height: 48px;
@@ -87,7 +116,7 @@ onMounted(() => {
   background: var(--v5-surface);
 }
 /* Float the avatar and badge together while keeping the outer hit target stationary. */
-.nx-support-motion { position: relative; z-index: 1; animation: nx-support-float 3.4s ease-in-out infinite; }
+.nx-support-motion { position: relative; z-index: 1; width: 48px; height: 48px; animation: nx-support-float 3.4s ease-in-out infinite; }
 @keyframes nx-support-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .nx-support-badge {
   position: absolute;
@@ -117,6 +146,6 @@ onMounted(() => {
 @media (prefers-reduced-motion: reduce) {
   .nx-support-bubble { transition: none; }
   .nx-support-bubble:active { transform: none; }
-  .nx-support-motion, .nx-support-badge { animation: none; }
+  .nx-support-motion, .nx-support-badge, .nx-support-beat { animation: none; }
 }
 </style>
