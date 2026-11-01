@@ -4,6 +4,7 @@
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/*.test-support.ts",
-    "src/test/**"
+    "src/test/**",
+    "src/pages/me/prototype-visual-reference.ts"
   ]
 }

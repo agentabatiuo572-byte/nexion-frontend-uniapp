@@ -133,6 +133,7 @@
         <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ phoneActivationGuidance.body }}</text>
         <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
       </view>
+      <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" />
       <template v-if="stage">
         <view v-if="stageOffline" class="earn-stage__offline-art" aria-hidden="true"><DeviceArt class="earn-stage__offline-image" :device="device" /><view class="earn-stage__floor" /></view>
         <JobGauge v-else :progress="gaugeProgress" :idle="gaugeIdle" :live="gaugeProgress != null && jobRunning" :label="task ? visibility.mask(task.type) : t.earn.currentTask"><DeviceArt :device="device" /></JobGauge>
@@ -273,7 +274,7 @@
     </view>
 
     <!-- Phone: waiting placeholder -->
-    <view v-else-if="phoneFactsReady && !task && device.kind === 'phone' && !device.pausedReason" style="padding: 0 20px 16px">
+    <view v-else-if="!remoteApiEnabled && phoneFactsReady && !task && device.kind === 'phone' && !device.pausedReason" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
       <view class="flex items-center gap-2" style="font-size: var(--ui-type-list-subtitle); color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">
         <svg v-if="taskHistoryReady" class="nx-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -480,6 +481,7 @@ import { deviceTaskRecovering, deviceTaskRunning, taskProgressPercent } from "@/
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import TaskV2Status from "@/components/earn/task-v2-status.vue";
+import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import type { LockedTeaser } from "@/mock/tasks";
