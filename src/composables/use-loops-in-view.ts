@@ -15,7 +15,8 @@ function usePageVisible(): Ref<boolean> {
     return visible;
   }
   const instance = getCurrentInstance();
-  const page = (instance as (ComponentInternalInstance & { $pageInstance?: ComponentInternalInstance }) | null)?.$pageInstance ?? instance;
+  // H5 exposes the page as $pageInstance; the App runtime keeps it at instance.root.
+  const page = (instance as (ComponentInternalInstance & { $pageInstance?: ComponentInternalInstance }) | null)?.$pageInstance ?? instance?.root ?? instance;
   if (!page) return ref(true);
   let visible = pageVisibility.get(page);
   if (!visible) {
