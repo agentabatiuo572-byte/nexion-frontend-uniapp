@@ -321,16 +321,13 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__buy { display: block; font: 500 var(--ui-type-body)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
 .entry-card__get { display: block; margin-top: 4px; font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); color: var(--v5-brand); overflow-wrap: anywhere; }
 .entry-card__keep { white-space: nowrap; }
-.entry-card { --entry-amber: 14%; }
-:global([data-theme="light"]) .entry-card { --entry-amber: 12%; }
-.entry-card :deep(.nx-tag--warning) { background: color-mix(in srgb, var(--v5-warning) var(--entry-amber), transparent); }
 .entry-card__days { position: absolute; right: 14px; top: 14px; z-index: 1; }
 .entry-card__main { position: absolute; right: 70px; top: 44px; width: 118px; height: 118px; }
 .entry-card__gift { position: absolute; right: 12px; top: 90px; width: 78px; height: 78px; }
 .entry-card--first { display: grid; grid-template-columns: 112px minmax(0,1fr); min-height: 132px; }
 .entry-card__stub { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 6px; background: var(--v5-surface-2); text-align: center; min-width: 0; }
 .entry-card__eyebrow { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.entry-card__amount { margin-top: 2px; font: 500 36px/40px var(--font-amount); letter-spacing: -.03em; color: var(--v5-ink); }
+.entry-card__amount { margin-top: 2px; font: 500 36px/40px var(--font-amount); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--v5-ink); }
 .entry-card__amount--long { font-size: 26px; line-height: 32px; }
 .entry-card__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
 .entry-card__unit--uvt { color: var(--v5-nex-ink); }
@@ -349,7 +346,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__slot > .entry-card__fill { inset: 4px; }
 .entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: white; }
 .entry-card__bonus { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 3px; padding: 0 6px; }
-.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; color: var(--v5-ink); overflow-wrap: anywhere; }
+.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: anywhere; }
 .entry-pop { animation: entry-card-pop .45s cubic-bezier(.2,.8,.2,1) .5s backwards; }
 .entry-press { transition: transform 120ms ease-out; }
 .entry-press:active { transform: scale(.97); }
