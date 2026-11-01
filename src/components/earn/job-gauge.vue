@@ -21,8 +21,10 @@
       <path class="job-gauge__track" d="M20 140 A110 110 0 0 1 240 140" fill="none" stroke-width="6" stroke-linecap="round" :stroke-dasharray="idle ? '2 9' : undefined" />
       <template v-if="progress != null">
         <path class="job-gauge__arc" d="M20 140 A110 110 0 0 1 240 140" fill="none" :stroke="`url(#${gradientId})`" stroke-width="6" stroke-linecap="round" />
-        <!-- Comet: a 24×6 tangential segment at the arc start, rotated about the centre (130,140) to the head angle. -->
-        <g v-if="live" class="job-gauge__comet"><rect x="17" y="140" width="6" height="24" rx="3" :fill="`url(#${gradientId}-comet)`" /></g>
+        <!-- Comet: a short piece of the same r=110 circle just behind the arc start (12.5°, about 24px; it ends 3px short
+             so the round cap lands on the start), rotated about the centre (130,140) to the head angle. Being part of the
+             circle, it stays on the ring at every angle; a straight tangent bar would bulge off the curve. -->
+        <g v-if="live" class="job-gauge__comet"><path d="M22.61 163.81 A110 110 0 0 1 20.04 142.99" fill="none" :stroke="`url(#${gradientId}-comet)`" stroke-width="6" stroke-linecap="round" /></g>
         <g class="job-gauge__head">
           <circle cx="20" cy="140" r="4" :fill="color" />
           <circle v-if="live" class="job-gauge__ring" cx="20" cy="140" r="5.25" fill="none" :stroke="color" stroke-width="1.5" />
