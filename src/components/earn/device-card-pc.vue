@@ -15,7 +15,7 @@
   pointer events). Movement, touchcancel and unmount cancel the pending hold.
 -->
 <template>
-  <view class="nx-device-card select-none" :style="rowStyle" :data-device-id="device.id" :data-online="statusOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
+  <view class="nx-device-card select-none" :class="{ 'earn-stage': stage, 'earn-stage--online': stage && statusOnline && !stageOffline }" :style="rowStyle" :role="stage ? 'tabpanel' : undefined" :aria-label="stage ? displayName : undefined" :data-device-id="device.id" :data-online="statusOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
     <!-- Long-press quick menu (full-viewport bottom sheet).
          🔴 z 790 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 200 低于里程碑
          庆祝(780),菜单开着时庆祝盖在上面并吞掉「以旧换新 / 统计」的点击。 -->
@@ -60,6 +60,15 @@
       <DeviceDeactivateSheet :device="deactivation.sheetDevice.value" @wait="deactivation.onSheetWait" @force="deactivation.onSheetForce" @dismiss="deactivation.sheetDevice.value = null" />
     </view>
 
+    <view v-if="stage" class="earn-stage__top">
+      <view class="earn-stage__id">
+        <text class="earn-stage__name" role="heading" aria-level="3">{{ displayName }}</text>
+        <view class="earn-stage__status"><view class="earn-stage__dot" :class="{ 'nx-online-dot': statusOnline }" /><text>{{ statusLabel || t.home.deviceOffline }}</text></view>
+      </view>
+      <view v-if="phoneFactsReady || degradable" class="earn-stage__more nx-frosted-button" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="`${t.home.fleetManage} · ${displayName}`" @click.stop="openMenu" @keydown.enter.stop.prevent="openMenu" @keydown.space.stop.prevent="openMenu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+      </view>
+    </view>
     <view v-if="detailPage" class="device-management-heading">
       <view><text class="block device-section-title">{{ t.coreReview.management }}</text><text class="block" :class="{ 'device-status-online': statusOnline }" style="font-size:12px;margin-top:4px" :style="{ color: statusColor }">{{ statusLabel }}</text></view>
       <NxButton v-if="phoneFactsReady || degradable" size="small" :label="t.home.fleetManage" @click="openMenu" />
@@ -67,7 +76,7 @@
     <view v-else-if="showManage && (phoneFactsReady || degradable)" class="flex justify-end" style="padding:8px 16px"><NxButton size="small" :label="t.home.fleetManage" @click="openMenu" /></view>
     <!-- Collapsed row header (always visible; tap toggles detail) -->
     <view
-      v-if="!detailPage"
+      v-if="!detailPage && !stage"
       class="nx-device-card__header active:opacity-70 transition-opacity"
       role="button"
       tabindex="0"
@@ -101,7 +110,7 @@
       </view>
     </view>
 
-    <view v-if="!expanded && task" class="nx-device-current-task" style="padding: 0 20px 16px">
+    <view v-if="!stage && !expanded && task" class="nx-device-current-task" style="padding: 0 20px 16px">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
       <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.type) }}</text>
       <TaskV2Status :task="task" />
@@ -115,17 +124,30 @@
       <text v-else-if="awaitingExecutionResultConfirmation" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
     </view>
 
-    <view v-if="!expanded && phoneFactsReady && !task" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
+    <view v-if="!stage && !expanded && phoneFactsReady && !task" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
 
     <!-- Detail body (expanded; accordion) -->
-    <view v-if="expanded" class="nx-device-card__details">
+    <view v-if="expanded || stage" class="nx-device-card__details" :class="{ 'earn-stage__body': stage }">
       <view v-if="!phoneFactsReady" class="mx-5 mb-4 rounded-xl" style="padding: 12px; background: var(--v5-brand-soft)" role="status">
         <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ phoneActivationGuidance.title }}</text>
         <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ phoneActivationGuidance.body }}</text>
         <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }} →</text></view>
       </view>
+      <template v-if="stage">
+        <view v-if="stageOffline" class="earn-stage__offline-art" aria-hidden="true"><DeviceArt class="earn-stage__offline-image" :device="device" /><view class="earn-stage__floor" /></view>
+        <JobGauge v-else :progress="gaugeProgress" :idle="gaugeIdle" :live="gaugeProgress != null && jobRunning" :label="`${t.earn.currentTask} ${task ? task.model : ''}`"><DeviceArt :device="device" /></JobGauge>
+        <view v-if="stageJob === 'task' && task" class="earn-stage__job">
+          <view class="earn-stage__job-name"><view v-if="!visibility.hidden" class="earn-stage__eq" :class="{ 'earn-stage__eq--running': jobRunning }" aria-hidden="true"><view /><view /><view /></view><text class="earn-stage__job-title">{{ t.earn.currentTask }} · {{ visibility.mask(task.model) }}</text></view>
+          <text class="earn-stage__pct">{{ visibility.hidden ? '••••' : progressPct == null ? '—' : progressPct }}<text v-if="!visibility.hidden && progressPct != null" class="earn-stage__pct-unit">%</text></text>
+          <text v-if="task.status === 'PAUSED'" class="earn-stage__note earn-stage__note--warn">{{ t.earn.phoneTaskPaused }}</text>
+          <text v-else-if="awaitingExecutionResultConfirmation" class="earn-stage__note">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
+          <TaskV2Status :task="task" />
+        </view>
+        <view v-else-if="stageJob === 'idle'" class="earn-stage__job"><view class="earn-stage__idle"><view v-if="taskHistoryReady" class="earn-stage__wait" aria-hidden="true" /><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view></view>
+        <view v-else-if="stageJob === 'status'" class="earn-stage__job"><view class="earn-stage__idle"><text>{{ statusLabel }}</text></view></view>
+      </template>
       <!-- device identity: gpu · location + lifecycle chip -->
-      <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
+      <view v-if="!stage" class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
         <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayGpu }}<text v-if="displayLocation"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ displayLocation }}</text></text>
         <view v-if="phoneFactsReady && degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer"  @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text>{{ subsidyText }}</text>
@@ -144,7 +166,7 @@
       </view>
 
       <!-- FEAT-DEV01: task-capacity readout(补贴期内隐藏百分比只显 badge;tap → W-CAP1 说明弹层) -->
-      <view v-if="phoneFactsReady && degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer"  @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
+      <view v-if="!stage && phoneFactsReady && degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer"  @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
         <text class="min-w-0 truncate" :style="capacityRowStyle">{{ capacityRowText }}</text>
         <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
       </view>
@@ -260,10 +282,10 @@
       <text v-if="taskHistoryReady" class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 4px">{{ t.earn.phoneWaitingHint }}</text>
     </view>
 
-    <view v-if="phoneFactsReady && !task && device.kind !== 'phone'" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ recovering ? computeCopy.statuses.RECOVERING : taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
+    <view v-if="!stage && phoneFactsReady && !task && device.kind !== 'phone'" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ recovering ? computeCopy.statuses.RECOVERING : taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
 
     <!-- Current task (non-reconnecting) -->
-    <view v-if="task && !reconnecting" style="padding: 0 20px 16px">
+    <view v-if="!stage && task && !reconnecting" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
       <text class="block" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ visibility.mask(task.type) }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
@@ -284,7 +306,7 @@
 
     <!-- Every device has its own canonical task stream. Keep the active task above;
          this list only mirrors settled task previews returned for this device. -->
-    <view v-if="phoneFactsReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
+    <view v-if="!stage && phoneFactsReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
       <view class="flex items-center justify-between" :style="{ marginBottom: taskHistoryReady && !deviceTodayCompleted.length ? '0' : '8px' }">
         <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ visibility.mask(deviceTodayCompleted.length) }})</template></text>
         <view
@@ -397,7 +419,7 @@
     </view>
 
     <!-- Earnings — today only (est-this-hour removed per accordion redesign) -->
-    <view v-if="phoneFactsReady && !detailPage" style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
+    <view v-if="!stage && phoneFactsReady && !detailPage" style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
         <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
@@ -409,6 +431,26 @@
         </view>
       </view>
     </view>
+    <template v-if="stage">
+      <view class="earn-stage__stats">
+        <view class="earn-stage__stat"><text class="earn-stage__label">{{ t.earn.todayEarnings }}</text><text class="earn-stage__value earn-stage__value--ok">{{ visibility.mask(phoneFactsReady ? formatUsd(device.todayEarnings, 'overview', true) : '—') }}</text></view>
+        <view class="earn-stage__stat"><text class="earn-stage__label">{{ t.earn.todayUvt }}</text><text class="earn-stage__value earn-stage__value--nex">{{ visibility.mask(phoneFactsReady ? `+${formatAmount(device.todayEarningsNEX)}` : '—') }}</text></view>
+        <view class="earn-stage__stat" :class="{ 'nx-device-explainer': capacityTappable }" :role="capacityTappable ? 'button' : undefined" :tabindex="capacityTappable ? 0 : undefined" :aria-label="capacityTappable ? `${t.earn.jobCapacity} ${visibility.mask(stageCapacityText)} · ${t.earn.capExplainS1Title}` : undefined" @click.stop="capacityTappable && openExplainer()" @keydown.enter.stop.prevent="capacityTappable && openExplainer()" @keydown.space.stop.prevent="capacityTappable && openExplainer()"><text class="earn-stage__label">{{ t.earn.jobCapacity }}</text><text class="earn-stage__value" :class="{ 'earn-stage__value--text': inSubsidy && phoneFactsReady }">{{ visibility.mask(stageCapacityText) }}</text></view>
+      </view>
+      <view v-if="phoneFactsReady" class="earn-stage__recent" data-device-today-completed="true">
+        <view class="earn-stage__recent-head"><text>{{ t.earn.todayRecentCompleted }}</text><view class="earn-stage__link" role="link" tabindex="0" @click.stop="goTaskHistory" @keydown.enter.stop.prevent="goTaskHistory"><text>{{ t.taskHistory.viewAllAccountReceipts }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view></view>
+        <view v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" class="earn-stage__recent-note" role="status" aria-live="polite">
+          <text class="block" style="color: var(--v5-danger)">{{ t.wallet.assignmentsUnavailableTitle }}</text>
+          <text class="block">{{ t.wallet.assignmentsUnavailableBody }}</text>
+        </view>
+        <text v-else-if="!taskHistoryReady" class="earn-stage__recent-note" role="status" aria-live="polite">{{ t.taskHistory.loading }}</text>
+        <view v-else-if="deviceTodayCompleted.length" class="earn-stage__chips">
+          <view v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" class="earn-stage__chip" data-phone-today-task="true"><text>{{ done.model }}</text><text class="earn-stage__chip-amount">{{ visibility.mask(formatUsd(done.reward, 'detail', true)) }}</text></view>
+        </view>
+        <text v-else class="earn-stage__recent-note">{{ t.home.ledgerEmpty }}</text>
+      </view>
+      <view class="earn-stage__foot"><view class="earn-stage__link" role="link" tabindex="0" @click.stop="goDeviceDetail" @keydown.enter.stop.prevent="goDeviceDetail"><text>{{ t.earn.deviceDetailTitle }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view></view>
+    </template>
     </view>
   </view>
 </template>
@@ -454,7 +496,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { localClockTime, todayCompletedTasks } from "@/lib/today-completed-tasks";
 
 const visibility = useDataVisibility();
-const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolean; showManage?: boolean; detailPage?: boolean }>();
+const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolean; showManage?: boolean; detailPage?: boolean; stage?: boolean }>();
 const emit = defineEmits<{ toggle: []; statistics: [] }>();
 const app = useApp();
 const session = useSession();
@@ -538,6 +580,19 @@ const statusLabel = computed(() => recovering.value ? computeCopy.value.statuses
   : onlineState.value === "online" ? t.value.earn.online : "");
 const statusOnline = computed(() => !recovering.value && onlineState.value === "online");
 const statusColor = computed(() => statusOnline.value ? "var(--v5-brand)" : "var(--v5-ink-3)");
+// Earn stage (P-62): which job row the stage shows. Phones without a task keep their own blocks below.
+const stageOffline = computed(() => !recovering.value && onlineState.value === "offline");
+const stageJob = computed<"task" | "idle" | "status" | "none">(() => {
+  if (stageOffline.value) return "none";
+  if (recovering.value || onlineState.value === "unknown") return "status";
+  if (task.value && !reconnecting.value) return "task";
+  if (phoneFactsReady.value && !task.value && props.device.kind !== "phone") return "idle";
+  return "none";
+});
+const jobRunning = computed(() => stageJob.value === "task" && task.value?.status !== "PAUSED" && !awaitingExecutionResultConfirmation.value);
+// Hidden statistics keep only the track; no ratio is revealed.
+const gaugeProgress = computed(() => stageJob.value === "task" && statusOnline.value && !visibility.hidden ? progressPct.value : null);
+const gaugeIdle = computed(() => statusOnline.value && phoneFactsReady.value && !task.value && taskHistoryReady.value && !props.device.pausedReason);
 
 const elapsedRemaining = computed(() => {
   const tk = task.value;
@@ -725,6 +780,10 @@ const subsidyChipStyle: CSSProperties = {
   color: "var(--v5-brand-deep)",
 };
 const capacityPct = computed(() => (lifecycle.value ? Math.round(lifecycle.value.efficiency * 100) : 100));
+// The stage's capacity cell keeps the subsidy rule: a new device shows its subsidy period instead of a percentage.
+const stageCapacityText = computed(() => !phoneFactsReady.value ? "—" : inSubsidy.value ? subsidyText.value
+  : !degradable.value || lifecycle.value ? `${capacityPct.value}%` : "—");
+const capacityTappable = computed(() => phoneFactsReady.value && degradable.value);
 const capacityFloored = computed(() => !!lifecycle.value && lifecycle.value.efficiency <= CAPACITY_FLOOR + 1e-9);
 // 展示派生:今日接单 ≈ 当前日产 ÷ 可接任务均价(单源 tasks.ts,确定性、不落库)。
 const tasksToday = computed(() => {
@@ -819,7 +878,7 @@ watch(menuOpen, async (open) => {
   if (!root) return;
   const target = open
     ? root.querySelector<HTMLElement>(".nx-device-quick-menu [tabindex='0']")
-    : root.querySelector<HTMLElement>(props.detailPage ? ".device-management-heading [role='button']" : ".nx-device-card__header");
+    : root.querySelector<HTMLElement>(props.detailPage ? ".device-management-heading [role='button']" : props.stage ? ".earn-stage__more" : ".nx-device-card__header");
   target?.focus();
 });
 function onPressStart() {
@@ -864,6 +923,9 @@ function goTradeinMenu() {
 }
 function goDevices() {
   navTo("/pages/me/devices");
+}
+function goDeviceDetail() {
+  navTo(`/pages/earn/device-detail?id=${encodeURIComponent(props.device.id)}`);
 }
 
 // ── styles ──
@@ -926,6 +988,8 @@ const unlockCtaLabelStyle: CSSProperties = {
 };
 
 import DeviceSlot from "@/components/home/device-slot.vue";
+import DeviceArt from "@/components/device-art.vue";
+import JobGauge from "@/components/earn/job-gauge.vue";
 </script>
 
 <style scoped>
@@ -994,4 +1058,57 @@ import DeviceSlot from "@/components/home/device-slot.vue";
 .nx-spin {
   animation: spin 1s linear infinite;
 }
+/* Earn device stage (P-62). Shared device blocks keep their 20px inline padding, so the stage pads only its own rows. */
+.earn-stage { position: relative; overflow: hidden; padding: 16px 0 6px; border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); animation: earn-stage-in 280ms ease-out backwards; }
+[data-theme="light"] .earn-stage { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+.earn-stage--online::before { content: ""; position: absolute; left: 50%; top: 70px; width: 260px; height: 190px; margin-left: -130px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 13%, transparent), transparent); pointer-events: none; }
+.earn-stage__body { position: relative; animation: none; }
+.earn-stage__top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 18px; }
+.earn-stage__id { min-width: 0; }
+.earn-stage__name { display: block; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.earn-stage__status { display: flex; align-items: center; gap: 6px; margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
+.earn-stage__dot.nx-online-dot { background: var(--v5-success); }
+.earn-stage__more { position: relative; flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--v5-ink); cursor: pointer; }
+.earn-stage__more::after { content: ""; position: absolute; inset: -4px; }
+.earn-stage__more:focus-visible, .earn-stage__link:focus-visible, .earn-stage__stat[role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.earn-stage__offline-art { position: relative; width: 150px; height: 108px; margin: 18px auto 0; }
+.earn-stage__offline-image { position: absolute; inset: 0; width: 100%; height: 100%; filter: grayscale(.75); opacity: .55; }
+.earn-stage__floor { position: absolute; left: 20%; right: 20%; bottom: -4px; height: 10px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-bg) 65%, transparent), transparent); }
+[data-theme="light"] .earn-stage__floor { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 20%, transparent), transparent); }
+.earn-stage__job { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 10px 18px 0; text-align: center; }
+.earn-stage__job-name { display: flex; align-items: center; justify-content: center; gap: 6px; max-width: 100%; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
+.earn-stage__job-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.earn-stage__eq { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 10px; height: 10px; flex: none; }
+.earn-stage__eq > view { width: 2.2px; height: 10px; border-radius: 1px; background: var(--v5-brand); transform-origin: bottom; transform: scaleY(.55); }
+.earn-stage__eq--running > view { animation: earn-stage-eq .9s ease-in-out infinite; }
+.earn-stage__eq--running > view:nth-child(2) { animation-delay: -.3s; }
+.earn-stage__eq--running > view:nth-child(3) { animation-delay: -.6s; }
+.earn-stage__pct { font: 500 30px/34px var(--font-metric); color: var(--v5-ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.earn-stage__pct-unit { font: 500 16px/20px var(--font-metric); color: var(--v5-ink-3); letter-spacing: 0; }
+.earn-stage__note { display: block; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__note--warn { color: var(--v5-warning-ink); }
+.earn-stage__idle { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 34px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__wait { width: 14px; height: 14px; flex: none; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed var(--v5-ink-3); }
+.earn-stage__stats { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 16px 18px 0; padding: 12px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
+.earn-stage__stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; padding: 0 4px; text-align: center; }
+.earn-stage__stat + .earn-stage__stat { border-left: 1px solid var(--v5-border); }
+.earn-stage__stat[role="button"] { cursor: pointer; min-height: 44px; }
+.earn-stage__label { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__value { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.earn-stage__value--ok { color: var(--v5-success-ink); }
+.earn-stage__value--nex { color: var(--v5-nex-ink); }
+.earn-stage__value--text { font: 500 12px/16px var(--font-v5); white-space: normal; overflow-wrap: anywhere; }
+.earn-stage__recent { position: relative; margin: 6px 18px 0; }
+.earn-stage__recent-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); cursor: pointer; text-align: right; }
+.earn-stage__recent-note { display: block; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.earn-stage__chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; max-width: 100%; box-sizing: border-box; padding: 0 10px; border-radius: 999px; background: var(--v5-surface-2); font: 400 12px/16px var(--font-v5); color: var(--v5-ink-2); white-space: nowrap; }
+[data-theme="light"] .earn-stage__chip { background: var(--v5-bg); }
+.earn-stage__chip-amount { font: 500 12px/16px var(--font-metric); color: var(--v5-success-ink); font-variant-numeric: tabular-nums; }
+.earn-stage__foot { position: relative; display: flex; justify-content: flex-end; margin: 4px 18px 0; }
+@keyframes earn-stage-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes earn-stage-eq { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .earn-stage, .earn-stage__eq--running > view { animation: none; } }
 </style>

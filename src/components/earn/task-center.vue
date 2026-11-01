@@ -10,15 +10,22 @@
   Java receipt-detail endpoint; prototype mode keeps its local receipt lookup.
 -->
 <template>
-  <view class="nx-earn-task-center nx-glass-card mx-4 p-4">
-    <view class="flex items-center justify-between mb-2.5 px-0">
-      <text style="font-family: var(--font-v5); font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.earn.taskCenter }}</text>
-      <view class="flex items-center gap-1" style="font-size: 12px; color: var(--v5-ink-3)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
-        <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">{{ activeJobsText }}</text>
+  <view class="nx-earn-task-center">
+    <view class="earn-tc__head">
+      <text class="earn-tc__title" role="heading" aria-level="2">{{ t.earn.taskCenter }}</text>
+      <view class="earn-tc__pulse">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
+        <text class="earn-tc__count">{{ activeJobsText }}</text>
         <text>{{ t.earn.jobsLive }}</text>
       </view>
     </view>
+    <view class="earn-tc__card">
+    <view class="earn-tc__row" role="button" tabindex="0" :aria-expanded="historyOpen ? 'true' : 'false'" @click="historyOpen = !historyOpen" @keydown.enter.stop.prevent="historyOpen = !historyOpen" @keydown.space.stop.prevent="historyOpen = !historyOpen">
+      <view class="earn-tc__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg></view>
+      <view class="earn-tc__copy"><text class="earn-tc__row-title">{{ t.earn.taskHistoryTitle }}</text><text class="earn-tc__row-sub">{{ historyHintText }}</text></view>
+      <view class="earn-tc__arrow" :class="{ 'earn-tc__arrow--open': historyOpen }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
+    </view>
+    <view v-if="historyOpen" class="earn-tc__panel">
 
     <!-- Upgrade Unlocks -->
     <view v-if="lockedTeasers.length > 0">
@@ -62,7 +69,6 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
       </view>
-      <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ historyHintText }}</text>
     </view>
     <view
       v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'"
@@ -119,7 +125,15 @@
       <TaskV2Status :task="selectedTask" />
       <view v-if="selectedTask.receiptNo && selectedTask.settlementStatus === 'POSTED'" role="button" tabindex="0" @click="openTaskReceipt(selectedTask, true)" @keydown.enter.stop.prevent="openTaskReceipt(selectedTask, true)" @keydown.space.stop.prevent="openTaskReceipt(selectedTask, true)"><text>{{ computeCopy.receipt }} #{{ visibility.mask(selectedTask.receiptNo) }}</text></view>
     </view>
-    <ComputeSettlements />
+    </view>
+    <view v-show="settlementsAvailable" class="earn-tc__row" role="button" tabindex="0" :aria-expanded="settlementsOpen ? 'true' : 'false'" @click="settlementsOpen = !settlementsOpen" @keydown.enter.stop.prevent="settlementsOpen = !settlementsOpen" @keydown.space.stop.prevent="settlementsOpen = !settlementsOpen">
+      <view class="earn-tc__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M3 9h18M8 14h4" /></svg></view>
+      <view class="earn-tc__copy"><text class="earn-tc__row-title">{{ computeCopy.batch }}</text><text class="earn-tc__row-sub">{{ t.earn.settlementBatchesHint }}</text></view>
+      <view class="earn-tc__arrow" :class="{ 'earn-tc__arrow--open': settlementsOpen }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
+    </view>
+    <!-- Kept mounted so it reads on page show; the row appears only when the server offers settlement batches. -->
+    <view v-show="settlementsAvailable && settlementsOpen" class="earn-tc__panel"><ComputeSettlements @availability="settlementsAvailable = $event" /></view>
+    </view>
     <ReceiptModal :receipt="openReceipt" @close="openReceipt = null" />
   </view>
 </template>
@@ -152,6 +166,9 @@ const app = useApp();
 const t = useT();
 const computeCopy = useComputeV2Copy();
 const selectedTask = ref<CompletedTask | null>(null);
+const historyOpen = ref(false);
+const settlementsOpen = ref(false);
+const settlementsAvailable = ref(false);
 const receipts = remoteApiEnabled ? null : useReceipts();
 const openReceipt = ref<Receipt | CanonicalComputeReceipt | null>(null);
 let receiptRequestEpoch = 0;
@@ -299,7 +316,27 @@ function completedTime(ts: number): string {
 </script>
 
 <style scoped>
-.nx-earn-task-center { background: var(--v5-surface); }
+.nx-earn-task-center { margin: 0 16px; color: var(--v5-ink); }
+.earn-tc__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; min-height: 44px; margin: 0 2px 8px; }
+.earn-tc__title { font: 600 17px/24px var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
+.earn-tc__pulse { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+.earn-tc__pulse > svg { flex: none; color: var(--v5-tech-cyan); }
+.earn-tc__count { font: 500 12px/16px var(--font-metric); color: var(--v5-tech-cyan-ink); font-variant-numeric: tabular-nums; }
+.earn-tc__card { padding: 2px 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); font-size: 12px; }
+[data-theme="light"] .earn-tc__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+.earn-tc__row { display: flex; align-items: center; gap: 12px; min-height: 60px; cursor: pointer; }
+.earn-tc__card > .earn-tc__row ~ .earn-tc__row, .earn-tc__panel + .earn-tc__row { border-top: 1px solid var(--v5-border); }
+.earn-tc__row:active { opacity: .8; }
+.earn-tc__row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }
+.earn-tc__icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 12px; background: var(--v5-surface-2); color: var(--v5-tech-cyan); }
+[data-theme="light"] .earn-tc__icon { background: var(--v5-bg); }
+.earn-tc__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.earn-tc__row-title { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); }
+.earn-tc__row-sub { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-tc__arrow { display: grid; place-items: center; flex: none; color: var(--v5-ink-4); transition: transform .2s ease; }
+.earn-tc__arrow--open { transform: rotate(90deg); }
+.earn-tc__panel { padding-bottom: 4px; }
+@media (prefers-reduced-motion: reduce) { .earn-tc__arrow { transition: none; } }
 .earn-history-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 76px 22px; align-items: center; gap: 6px; }
 .earn-history-description { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-history-description :deep(*) { white-space: nowrap; }
