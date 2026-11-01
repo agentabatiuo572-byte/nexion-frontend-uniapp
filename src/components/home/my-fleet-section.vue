@@ -1,6 +1,6 @@
 <!-- Home "My devices" (P-62 design B): slot ring, a collapsed dock of device avatars, and an expandable reel without job progress. -->
 <template>
-  <view class="hf-section" data-home-section="fleet">
+  <view ref="loopRef" class="hf-section" :class="{ 'nx-loops-paused': !loops.running.value }" data-home-section="fleet">
     <view class="hf-head">
       <view class="hf-title"><text class="hf-title__text" role="heading" aria-level="2">{{ t.home.myDevicesTitle }}</text><SlotRing /></view>
       <NxButton class="hf-manage" :label="t.home.fleetManage" variant="link" size="medium" @click="goManage"><text>{{ t.home.fleetManage }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></NxButton>
@@ -14,7 +14,7 @@
       <view class="hf-avatars" aria-hidden="true"><view v-for="n in app.slotCap" :key="n" class="hf-av hf-av--loading" /></view>
       <text class="hf-dock__sub">{{ copy.fleetLoading }}</text>
     </view>
-    <view v-else-if="!fleet.occupied.value.length" class="hf-dock hf-dock--action" role="button" tabindex="0" :aria-label="`${t.earn.addDevice}, ${freeSlotsText}`" @click="addDevice">
+    <view v-else-if="!fleet.occupied.value.length && !fleet.slots.value.some((slot) => slot.kind === 'pending')" class="hf-dock hf-dock--action" role="button" tabindex="0" :aria-label="`${t.earn.addDevice}, ${freeSlotsText}`" @click="addDevice">
       <view class="hf-avatars" aria-hidden="true"><view v-for="(slot, i) in fleet.slots.value" :key="i" class="hf-av" :class="slot.kind === 'reserved' ? 'hf-av--reserved' : 'hf-av--empty'" :style="{ '--i': i }"><view v-if="slot.kind === 'reserved'" class="hf-spin" /><svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view></view>
       <view class="hf-summary"><text class="hf-summary__title">{{ t.earn.addDevice }}</text><text class="hf-dock__sub">{{ freeSlotsText }}</text></view>
       <view class="hf-chev hf-chev--brand nx-frosted-button" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
@@ -26,7 +26,7 @@
             <DeviceArt v-if="slot.kind === 'device'" class="hf-av__art" :device="slot.device" />
             <DeviceArt v-else-if="slot.kind === 'trial'" class="hf-av__art" :src="trialArt" />
             <view v-else-if="slot.kind === 'reserved'" class="hf-spin" />
-            <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            <svg v-else-if="slot.kind === 'empty'" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
             <view v-if="slot.kind === 'device' || slot.kind === 'trial'" class="hf-av__led" :class="{ 'nx-online-dot': slot.online }" />
           </view>
         </view>
@@ -78,6 +78,8 @@ import { invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { useFreeTrial } from "@/store/free-trial";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useFleetSlots, type FleetSlot } from "@/composables/use-fleet-slots";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
+import { deviceTaskRunning } from "@/lib/task-progress";
 import NxButton from "@/components/ui/nx-button.vue";
 import SlotRing from "@/components/slot-ring.vue";
 import DeviceArt from "@/components/device-art.vue";
@@ -90,6 +92,9 @@ const trialCopy = useTrialFleetCopy();
 const app = useApp();
 const trial = useFreeTrial();
 const fleet = useFleetSlots();
+// Online dots and the provisioning spinner loop only while this section is on screen and Home is shown.
+const loops = useLoopsInView(".hf-section");
+const loopRef = loops.elRef;
 
 // Every visit to Home starts collapsed; the open state is not remembered.
 const expanded = ref(false);
@@ -99,10 +104,10 @@ const tasksReady = computed(() => !remoteApiEnabled || app.remoteAssignmentStatu
   || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
 const unavailable = computed(() => app.remoteFleetStatus === "error" || trial.authorityStatus === "error");
 const freeSlotsText = computed(() => fmt(t.value.myDevices.emptySlots, { n: fleet.freeSlots.value }));
-const onlineText = computed(() => fmt(t.value.myDevices.activatedLabel, { n: fleet.occupied.value.filter((slot) => slot.kind !== "reserved" && slot.kind !== "empty" && slot.online).length }));
-// Job state is only stated once the task snapshot is confirmed.
+const onlineText = computed(() => fmt(t.value.myDevices.activatedLabel, { n: fleet.occupied.value.filter((slot) => (slot.kind === "trial" || slot.kind === "device") && slot.online).length }));
+// Job state is only stated once the task snapshot is confirmed; paused, queued, interrupted or recovering jobs are not running.
 const jobsText = computed(() => tasksReady.value && fleet.fleetReady.value
-  ? fmt(copy.value.jobs, { n: fleet.devices.value.filter((device) => device.currentTask != null).length }) : "—");
+  ? fmt(copy.value.jobs, { n: fleet.devices.value.filter(deviceTaskRunning).length }) : "—");
 const dockLabel = computed(() => `${expanded.value ? t.value.home.collapseMyDevices : t.value.home.expandMyDevices}: ${onlineText.value}, ${jobsText.value}`);
 
 const trialArt = computed(() => getProductMedia(fleet.trial.productId.value)?.src ?? null);
@@ -116,6 +121,7 @@ function slotKey(slot: FleetSlot, index: number) {
   return slot.kind === "device" ? `device:${slot.device.id}` : slot.kind === "trial" ? "trial:current" : `${slot.kind}:${index}`;
 }
 function avatarClass(slot: FleetSlot) {
+  if (slot.kind === "pending") return "hf-av--pending";
   if (slot.kind === "reserved") return "hf-av--reserved";
   if (slot.kind === "empty") return "hf-av--empty";
   return slot.online ? "" : "hf-av--off";
@@ -160,6 +166,9 @@ function retry() {
 .hf-av--reserved { background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface)); }
 .hf-av--reserved::before { border-color: color-mix(in srgb, var(--v5-brand) 60%, transparent); }
 .hf-av--loading { background: var(--v5-surface-2); box-shadow: 0 0 0 2.5px var(--v5-surface); animation: none; }
+/* Occupied but not yet classified: a neutral disc, never an empty slot. */
+.hf-av--pending { background: var(--v5-surface-2); }
+.nx-loops-paused .hf-spin { animation-play-state: paused; }
 .hf-spin { width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); border-top-color: var(--v5-brand); animation: hf-spin 1s linear infinite; }
 
 .hf-summary { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -169,6 +178,8 @@ function retry() {
 
 .hf-reel { display: flex; gap: 10px; margin: 12px -16px 0; padding: 0 16px 2px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; scrollbar-width: none; }
 .hf-reel::-webkit-scrollbar { display: none; }
+/* Light cards cast a shadow; extra bottom room keeps it unclipped without moving the link below. */
+[data-theme="light"] .hf-reel { padding-bottom: 10px; margin-bottom: -8px; }
 .hf-reel__item { flex: none; scroll-snap-align: start; animation: hf-slide 420ms cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
 .hf-card { position: relative; display: flex; flex-direction: column; width: 164px; min-height: 220px; height: 100%; box-sizing: border-box; padding: 12px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; cursor: pointer; }
 [data-theme="light"] .hf-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }

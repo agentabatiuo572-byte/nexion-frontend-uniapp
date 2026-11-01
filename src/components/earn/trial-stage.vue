@@ -1,6 +1,6 @@
 <!-- Earn stage for the free-trial device: amber credit gauge, time left, estimate and the existing cancel / buy-early flows. -->
 <template>
-  <view class="trial-stage" :class="{ 'trial-stage--online': online }" role="tabpanel" :aria-label="`${name} · ${copy.imageBadge}`" data-device-key="trial:current">
+  <view ref="loopRef" class="trial-stage" :class="{ 'trial-stage--online': online && !visibility.hidden, 'nx-loops-paused': !loops.running.value }" role="tabpanel" :aria-label="`${name} · ${copy.imageBadge}`" data-device-key="trial:current">
     <view class="trial-stage__top">
       <view class="trial-stage__name-row"><text class="trial-stage__name" role="heading" aria-level="3">{{ name }}</text><NxTag tone="brand">{{ copy.imageBadge }}</NxTag></view>
       <view class="trial-stage__status"><view class="trial-stage__dot" :class="{ 'nx-online-dot': online }" /><text>{{ statusText }}</text></view>
@@ -44,6 +44,7 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 import NxTag from "@/components/ui/nx-tag.vue";
 import DeviceArt from "@/components/device-art.vue";
 import JobGauge from "./job-gauge.vue";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const visibility = useDataVisibility();
 const presentation = useTrialPresentation();
@@ -52,6 +53,9 @@ const t = useT();
 const app = useApp();
 const trial = useFreeTrial();
 const cancelBusy = ref(false);
+// The online dot breathes only while the stage is on screen and the page is shown.
+const loops = useLoopsInView(".trial-stage");
+const loopRef = loops.elRef;
 
 const name = computed(() => presentation.deviceName.value || "—");
 const art = computed(() => getProductMedia(presentation.productId.value)?.src ?? null);
@@ -97,7 +101,7 @@ async function cancelTrial() {
 .trial-stage--online::before { content: ""; position: absolute; left: 50%; top: 70px; width: 260px; height: 190px; margin-left: -130px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 13%, transparent), transparent); pointer-events: none; }
 .trial-stage__top { position: relative; }
 .trial-stage__name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.trial-stage__name { font: 600 20px/28px var(--font-v5); letter-spacing: -.01em; }
+.trial-stage__name { font: 600 20px/28px var(--font-v5); }
 .trial-stage__status { display: flex; align-items: center; gap: 6px; margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .trial-stage__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .trial-stage__dot.nx-online-dot { background: var(--v5-success); }

@@ -26,7 +26,8 @@
             <text class="earn-market__unit">{{ workloadCopy(w).unit }}</text>
             <text class="earn-market__price">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
             <text class="earn-market__delta" :style="{ color: arrowColor(w) }">{{ w.delta === null ? "—" : `${arrow(w)} ${Math.abs(w.delta).toFixed(1)}%` }}</text>
-            <svg v-if="w.spark.length > 1" class="earn-market-spark" width="100" height="24" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="sparkPoints(w.spark)" fill="none" :stroke="arrowColor(w)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" /></svg>
+            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} ↑{{ w.flagshipDelta.toFixed(1) }}%</text>
+            <view v-if="w.spark.length > 1" class="earn-market__spark"><svg data-native-svg class="earn-market-spark" width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="sparkPoints(w.spark)" fill="none" :stroke="arrowColor(w)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" /></svg></view>
           </view>
         </view>
       </view>
@@ -47,7 +48,7 @@
         >
           <text class="earn-ranking-row__no">#{{ d.rank }}</text>
           <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.kind ? getProductMedia(d.kind)?.src ?? null : null" />
-          <text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text>
+          <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text><text v-if="d.bestFor" class="earn-ranking-row__best">{{ d.bestFor }}</text></view>
           <view class="earn-ranking-value">
             <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
             <view class="earn-ranking-value__track" aria-hidden="true"><view v-viz-inview class="earn-ranking-value__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
@@ -165,7 +166,8 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); }
 .earn-market__card { padding: 14px 14px 6px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .earn-market__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-.earn-market__caption { display: block; font: 500 11px/14px var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
+/* The board's caption line box sits 4.5px lower than its 14px line height. */
+.earn-market__caption { display: block; padding-top: 4.5px; font: 500 11px/14px var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
 .earn-market__caption--plain { letter-spacing: 0; text-transform: none; }
 .earn-market__status { display: block; padding: 10px 0; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-market__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
@@ -175,7 +177,11 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__unit { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-market__price { margin-top: 8px; font: 500 15px/20px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-market__delta { font: 500 11px/14px var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.earn-market-spark { display: block; width: 100%; height: 22px; margin-top: 6px; overflow: visible; }
+.earn-market__flagship { margin-top: 2px; font: 500 11px/14px var(--font-v5); color: var(--v5-warning-ink); overflow-wrap: anywhere; }
+/* Sparklines sit on the tile floor so a taller tile (flagship line) keeps them aligned. The App draws the SVG
+   through NxNativeSvg (v-html), so the SVG's own style reaches it through :deep() on this real wrapper. */
+.earn-market__spark { height: 22px; margin-top: auto; padding-top: 6px; line-height: 0; }
+.earn-market__spark :deep(.earn-market-spark) { display: block; width: 100%; height: 100%; overflow: visible; }
 .earn-market__rank { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border); }
 .earn-ranking-row { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) 96px; align-items: center; gap: 8px; min-height: 44px; }
 .earn-ranking-row--link { cursor: pointer; }
@@ -183,7 +189,9 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-row--link:focus-visible, .earn-market__retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .earn-ranking-row__no { font: 500 12px/16px var(--font-metric); color: var(--v5-ink-3); }
 .earn-ranking-row__art { width: 28px; height: 24px; }
+.earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
 .earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-ranking-row__best { min-width: 0; font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-ranking-value__track { position: relative; width: 96px; height: 3px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }

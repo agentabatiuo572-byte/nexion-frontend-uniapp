@@ -14,7 +14,7 @@
     <view class="earn-tc__head">
       <text class="earn-tc__title" role="heading" aria-level="2">{{ t.earn.taskCenter }}</text>
       <view class="earn-tc__pulse">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--v5-tech-cyan)"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
         <text class="earn-tc__count">{{ activeJobsText }}</text>
         <text>{{ t.earn.jobsLive }}</text>
       </view>
@@ -320,11 +320,10 @@ function completedTime(ts: number): string {
 .earn-tc__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; min-height: 44px; margin: 0 2px 8px; }
 .earn-tc__title { font: 600 17px/24px var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
 .earn-tc__pulse { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
-.earn-tc__pulse > svg { flex: none; color: var(--v5-tech-cyan); }
 .earn-tc__count { font: 500 12px/16px var(--font-metric); color: var(--v5-tech-cyan-ink); font-variant-numeric: tabular-nums; }
 .earn-tc__card { padding: 2px 16px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); font-size: 12px; }
 [data-theme="light"] .earn-tc__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-.earn-tc__row { display: flex; align-items: center; gap: 12px; min-height: 60px; cursor: pointer; }
+.earn-tc__row { display: flex; align-items: center; gap: 12px; min-height: 60px; box-sizing: content-box; cursor: pointer; }
 .earn-tc__card > .earn-tc__row ~ .earn-tc__row, .earn-tc__panel + .earn-tc__row { border-top: 1px solid var(--v5-border); }
 .earn-tc__row:active { opacity: .8; }
 .earn-tc__row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 12px; }

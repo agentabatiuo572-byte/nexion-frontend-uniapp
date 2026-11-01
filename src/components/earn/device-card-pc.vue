@@ -15,7 +15,7 @@
   pointer events). Movement, touchcancel and unmount cancel the pending hold.
 -->
 <template>
-  <view class="nx-device-card select-none" :class="{ 'earn-stage': stage, 'earn-stage--online': stage && statusOnline && !stageOffline }" :style="rowStyle" :role="stage ? 'tabpanel' : undefined" :aria-label="stage ? displayName : undefined" :data-device-id="device.id" :data-online="statusOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
+  <view ref="loopRef" class="nx-device-card select-none" :class="{ 'earn-stage': stage, 'earn-stage--online': stage && statusOnline && !stageOffline && !visibility.hidden, 'nx-loops-paused': stage && !loops.running.value }" :style="rowStyle" :role="stage ? 'tabpanel' : undefined" :aria-label="stage ? displayName : undefined" :data-device-id="device.id" :data-online="statusOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
     <!-- Long-press quick menu (full-viewport bottom sheet).
          🔴 z 790 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 200 低于里程碑
          庆祝(780),菜单开着时庆祝盖在上面并吞掉「以旧换新 / 统计」的点击。 -->
@@ -433,9 +433,9 @@
     </view>
     <template v-if="stage">
       <view class="earn-stage__stats">
-        <view class="earn-stage__stat"><text class="earn-stage__label">{{ t.earn.todayEarnings }}</text><text class="earn-stage__value earn-stage__value--ok">{{ visibility.mask(phoneFactsReady ? formatUsd(device.todayEarnings, 'overview', true) : '—') }}</text></view>
-        <view class="earn-stage__stat"><text class="earn-stage__label">{{ t.earn.todayUvt }}</text><text class="earn-stage__value earn-stage__value--nex">{{ visibility.mask(phoneFactsReady ? `+${formatAmount(device.todayEarningsNEX)}` : '—') }}</text></view>
-        <view class="earn-stage__stat" :class="{ 'nx-device-explainer': capacityTappable }" :role="capacityTappable ? 'button' : undefined" :tabindex="capacityTappable ? 0 : undefined" :aria-label="capacityTappable ? `${t.earn.jobCapacity} ${visibility.mask(stageCapacityText)} · ${t.earn.capExplainS1Title}` : undefined" @click.stop="capacityTappable && openExplainer()" @keydown.enter.stop.prevent="capacityTappable && openExplainer()" @keydown.space.stop.prevent="capacityTappable && openExplainer()"><text class="earn-stage__label">{{ t.earn.jobCapacity }}</text><text class="earn-stage__value" :class="{ 'earn-stage__value--text': inSubsidy && phoneFactsReady }">{{ visibility.mask(stageCapacityText) }}</text></view>
+        <view class="earn-stage__stat"><text class="earn-stage__label">{{ t.earn.todayEarnings }}</text><text class="earn-stage__value" :class="{ 'earn-stage__value--ok': !visibility.hidden }">{{ visibility.mask(phoneFactsReady ? formatUsd(device.todayEarnings, 'overview', true) : '—') }}</text></view>
+        <view class="earn-stage__stat"><text class="earn-stage__label">{{ t.earn.todayUvt }}</text><text class="earn-stage__value" :class="{ 'earn-stage__value--nex': !visibility.hidden }">{{ visibility.mask(phoneFactsReady ? `+${formatAmount(device.todayEarningsNEX)}` : '—') }}</text></view>
+        <view class="earn-stage__stat" :role="capacityTappable ? 'button' : undefined" :tabindex="capacityTappable ? 0 : undefined" :aria-label="capacityTappable ? `${t.earn.jobCapacity} ${visibility.mask(stageCapacityText)} · ${t.earn.capExplainS1Title}` : undefined" @click.stop="capacityTappable && openExplainer()" @keydown.enter.stop.prevent="capacityTappable && openExplainer()" @keydown.space.stop.prevent="capacityTappable && openExplainer()"><text class="earn-stage__label">{{ t.earn.jobCapacity }}</text><text class="earn-stage__value" :class="{ 'earn-stage__value--text': inSubsidy && phoneFactsReady }">{{ visibility.mask(stageCapacityText) }}</text></view>
       </view>
       <view v-if="phoneFactsReady" class="earn-stage__recent" data-device-today-completed="true">
         <view class="earn-stage__recent-head"><text>{{ t.earn.todayRecentCompleted }}</text><view class="earn-stage__link" role="link" tabindex="0" @click.stop="goTaskHistory" @keydown.enter.stop.prevent="goTaskHistory"><text>{{ t.taskHistory.viewAllAccountReceipts }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view></view>
@@ -476,7 +476,8 @@ import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind } from "@/store/types";
 import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
-import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
+import { deviceTaskRecovering, deviceTaskRunning, taskProgressPercent } from "@/lib/task-progress";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import TaskV2Status from "@/components/earn/task-v2-status.vue";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
@@ -589,7 +590,10 @@ const stageJob = computed<"task" | "idle" | "status" | "none">(() => {
   if (phoneFactsReady.value && !task.value && props.device.kind !== "phone") return "idle";
   return "none";
 });
-const jobRunning = computed(() => stageJob.value === "task" && task.value?.status !== "PAUSED" && !awaitingExecutionResultConfirmation.value);
+// Loops and the equalizer only move while the job really runs (not paused, queued, interrupted, recovering or awaiting its result).
+const jobRunning = computed(() => stageJob.value === "task" && deviceTaskRunning(props.device) && !awaitingExecutionResultConfirmation.value);
+const loops = useLoopsInView(".nx-device-card");
+const loopRef = loops.elRef;
 // Hidden statistics keep only the track; no ratio is revealed.
 const gaugeProgress = computed(() => stageJob.value === "task" && statusOnline.value && !visibility.hidden ? progressPct.value : null);
 const gaugeIdle = computed(() => statusOnline.value && phoneFactsReady.value && !task.value && taskHistoryReady.value && !props.device.pausedReason);
@@ -1065,7 +1069,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__body { position: relative; animation: none; }
 .earn-stage__top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 18px; }
 .earn-stage__id { min-width: 0; }
-.earn-stage__name { display: block; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.earn-stage__name { display: block; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
 .earn-stage__status { display: flex; align-items: center; gap: 6px; margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .earn-stage__dot.nx-online-dot { background: var(--v5-success); }
@@ -1082,6 +1086,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__eq { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 10px; height: 10px; flex: none; }
 .earn-stage__eq > view { width: 2.2px; height: 10px; border-radius: 1px; background: var(--v5-brand); transform-origin: bottom; transform: scaleY(.55); }
 .earn-stage__eq--running > view { animation: earn-stage-eq .9s ease-in-out infinite; }
+.nx-loops-paused .earn-stage__eq--running > view { animation-play-state: paused; }
 .earn-stage__eq--running > view:nth-child(2) { animation-delay: -.3s; }
 .earn-stage__eq--running > view:nth-child(3) { animation-delay: -.6s; }
 .earn-stage__pct { font: 500 30px/34px var(--font-metric); color: var(--v5-ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
@@ -1093,7 +1098,9 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__stats { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 16px 18px 0; padding: 12px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
 .earn-stage__stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; padding: 0 4px; text-align: center; }
 .earn-stage__stat + .earn-stage__stat { border-left: 1px solid var(--v5-border); }
-.earn-stage__stat[role="button"] { cursor: pointer; min-height: 44px; }
+/* The capacity cell keeps a 44px touch target without adding row height. */
+.earn-stage__stat[role="button"] { position: relative; cursor: pointer; }
+.earn-stage__stat[role="button"]::after { content: ""; position: absolute; inset: -2px 0; }
 .earn-stage__label { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__value { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-stage__value--ok { color: var(--v5-success-ink); }
