@@ -263,15 +263,15 @@ const plainAmount = (parts: RewardParts) => parts.asset === 'DISCOUNT' ? `${part
 const rulePartsOf = () => activity.value && rule.value ? rewardParts(activity.value, rule.value.buyerReward) : null;
 function shortStart(value: string): string {
   const date = new Date(Date.parse(value)), time = formatDisplayTime(value, false, 0), two = (part: number) => String(part).padStart(2, '0');
-  if (locale.code === 'zh') return `${two(date.getUTCMonth() + 1)}/${two(date.getUTCDate())} ${time}`;
-  if (locale.code === 'vi') return `${two(date.getUTCDate())}/${two(date.getUTCMonth() + 1)} ${time}`;
-  return `${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date)} ${time}`;
+  if (locale.code === 'zh') return `${two(date.getUTCMonth() + 1)}/${two(date.getUTCDate())} ${time} UTC`;
+  if (locale.code === 'vi') return `${two(date.getUTCDate())}/${two(date.getUTCMonth() + 1)} ${time} UTC`;
+  return `${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date)} ${time} UTC`;
 }
 
 const navTitle = computed(() => kind.value === 'gift' ? c.value.navGift : kind.value === 'first' ? c.value.navFirst : kind.value === 'repurchase' ? c.value.navRepurchase : c.value.navPending);
 const subtitle = computed(() => {
   const parts = rulePartsOf(), discount = parts?.asset === 'DISCOUNT';
-  if (kind.value === 'gift') return c.value.subtitleGift;
+  if (kind.value === 'gift') return discount ? c.value.subtitleGiftDiscount : parts && parts.asset !== 'DEVICE' ? fmt(c.value.subtitleGiftReward, { unit: parts.unit }) : c.value.subtitleGift;
   if (kind.value === 'first') return discount ? c.value.subtitleFirstDiscount : fmt(c.value.subtitleFirst, { unit: parts?.unit ?? '' });
   return discount ? c.value.subtitleRepurchaseDiscount : fmt(c.value.subtitleRepurchase, { unit: parts?.unit ?? '' });
 });
@@ -504,7 +504,7 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 <style scoped>
 /* Theme strengths from the P-58 boards: ambient light, the device slab and the stage floor. */
 .lp { --lp-glow: 12%; --lp-sky: 16%; --lp-teal: 16%; --lp-slab: 5%; --lp-floor: 6%; position: relative; overflow-x: clip; color: var(--v5-ink); }
-:global([data-theme="light"]) .lp { --lp-glow: 10%; --lp-sky: 14%; --lp-teal: 16%; --lp-slab: 62%; --lp-floor: 10%; }
+:global([data-theme="light"] .lp) { --lp-glow: 10%; --lp-sky: 14%; --lp-teal: 16%; --lp-slab: 62%; --lp-floor: 10%; }
 .lp-body { position: relative; padding: 0 16px; }
 .lp-fill { position: absolute; inset: 0; }
 .lp-card { background: var(--v5-surface); border-radius: var(--ui-radius-surface); box-shadow: var(--v5-glass-shadow); }
@@ -579,6 +579,7 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 .lp-stage__label { position: absolute; bottom: 0; display: flex; flex-direction: column; gap: 2px; max-width: 48%; }
 .lp-stage__label--buy { left: 18px; }
 .lp-stage__label--get { right: 14px; align-items: flex-end; text-align: right; }
+.lp-stage--signin .lp-stage__label { gap: 0; }
 .lp-stage__buy { font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .lp-stage__get { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-brand); }
 
@@ -686,7 +687,10 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 .lp-target__tag { position: absolute; right: -10px; top: -12px; display: flex; border-radius: 999px; background: color-mix(in srgb, var(--v5-surface) 90%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--v5-surface) 90%, transparent); }
 .lp-slab__solo { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .lp-slab__solo:first-child { margin-top: 0; }
-.lp-slab__solo--muted .lp-target__art { border-color: var(--v5-border-strong); opacity: .7; }
+.lp-slab__solo--muted .lp-target { flex: 0 1 88px; min-width: 0; }
+.lp-slab__solo--muted .lp-target__art { width: 100%; border-color: var(--v5-border-strong); opacity: .7; }
+.lp-slab__solo--muted .lp-target__image { max-width: 100%; }
+.lp-slab__solo--muted .lp-slab__text { flex: 0 1 auto; }
 .lp-slab__solo--muted .lp-target__image { filter: grayscale(.6); }
 .lp-slab__text { flex: 1; min-width: 0; font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; }
 .lp-slab__foot { display: block; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--v5-border); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
@@ -694,14 +698,14 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 /* Bottom action bar (DS-30), with the board's page-tinted gradient: the last line sits about 30px above it. */
 .lp-bar-space { height: calc(80px + env(safe-area-inset-bottom)); }
 .lp-bar { --lp-bar-top: 55%; --lp-bar-bottom: 90%; position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--v5-bg) var(--lp-bar-top), transparent), color-mix(in srgb, var(--v5-bg) var(--lp-bar-bottom), transparent)); border-top: 1px solid var(--v5-border); backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); animation: lp-bar .45s cubic-bezier(.2,.8,.2,1) .2s backwards; }
-:global([data-theme="light"]) .lp-bar { --lp-bar-top: 72%; --lp-bar-bottom: 96%; }
+:global([data-theme="light"] .lp-bar) { --lp-bar-top: 72%; --lp-bar-bottom: 96%; }
 .lp-bar__info { flex: 1; min-width: 0; }
 .lp-bar__hint { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-bar .lp-price { margin-top: 2px; }
 .lp-price--bar .lp-price__currency { font-size: 13px; line-height: 18px; }
 .lp-bar .lp-price__value { font-size: 24px; line-height: 28px; letter-spacing: -.02em; }
 .lp-bar__reward { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin-top: 2px; }
-.lp-bar__unit { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lp-bar__unit { font: var(--ui-type-chip-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 /* Approved offer action (03.1): L size, button role type; primary is a solid brand fill, neutral the 7% glass, both with the shared rim. */
 .lp-cta.promotion-action { flex: none; min-width: min(172px, 50%); height: 48px; min-height: 48px; padding: 0 20px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; }
 .lp-cta--primary.promotion-action { background: var(--v5-brand); }

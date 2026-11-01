@@ -62,7 +62,7 @@
           <text class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text>
         </view>
         <view v-else class="entry-card__well">
-          <view class="entry-card__slot"><CatalogMachineImage class="entry-card__fill" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-slot'" :refresh-key="catalogRefreshKey" /><view class="entry-card__plus entry-pop" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view></view>
+          <view class="entry-card__slot"><CatalogMachineImage class="entry-card__slot-image" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-slot'" :refresh-key="catalogRefreshKey" /><text class="entry-card__plus entry-pop" aria-hidden="true">+</text></view>
           <view class="entry-card__bonus"><text class="entry-card__bonus-amount">{{ card.discount ? '−' : '+' }}{{ card.parts.asset==='DEVICE' ? card.rewardText : card.parts.amount }}</text><text v-if="card.parts.asset!=='DEVICE'" class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text></view>
         </view>
         <template v-if="card.kind==='first'"><view class="entry-card__tear" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--top" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--bottom" aria-hidden="true" /></template>
@@ -342,9 +342,9 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card--repurchase { display: flex; gap: 14px; min-height: 132px; box-sizing: border-box; padding: 10px; }
 .entry-card--repurchase .entry-card__body { flex: 1; padding: 6px 4px 6px 0; }
 .entry-card__well { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 104px; padding: 10px 0; border-radius: 16px; background: var(--v5-surface-2); }
-.entry-card__slot { position: relative; width: 64px; height: 64px; box-sizing: border-box; border: 1.5px dashed var(--v5-aura-sky); border-radius: 16px; }
-.entry-card__slot > .entry-card__fill { inset: 4px; }
-.entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: white; }
+.entry-card__slot { position: relative; display: grid; place-items: center; width: 64px; height: 64px; box-sizing: border-box; border: 1.5px dashed var(--v5-aura-sky); border-radius: 16px; }
+.entry-card__slot-image { width: 54px; height: 54px; }
+.entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: white; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); }
 .entry-card__bonus { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 3px; padding: 0 6px; }
 .entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: anywhere; }
 .entry-pop { animation: entry-card-pop .45s cubic-bezier(.2,.8,.2,1) .5s backwards; }
