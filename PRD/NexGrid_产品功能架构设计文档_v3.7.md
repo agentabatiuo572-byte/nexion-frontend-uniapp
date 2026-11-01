@@ -168,6 +168,7 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 - **滚动位置记忆**:chassis 记录各页滚动容器位置;从二级页 `navigateBack` 回上层时恢复到跳转前的滚动位置,前进进入新页则落到顶部
 - overscroll-behavior contain
 - **默认主题 dark**(产品默认 dark mode 体验)。SSR 阶段 `<html data-theme="dark">` 直出,zustand `useTheme.mode` 初值同步为 `"dark"`,避免首屏闪光;旧用户在 localStorage `nexgrid-theme-v1` 中 persist 过 `"light"` 仍保留其个性选择,新用户 / 清缓存进来即落到 dark
+- 原生页面采用应用已解析的深浅主题，保留卡片与玻璃控件的底色、边缘高光、阴影及图片原色，系统自动深色不得再次改色。
 - **Chassis 顶部留白**:tab 路由首屏 hero 紧贴 brand row;sub-route(`SetPageHeader` 模式页)在此基础上再下移,避免第一张 IOSList 撞 header 底沿
 
 ### 3.2 底部 5-Tab 主导航
@@ -990,6 +991,8 @@ flowchart TD
 ### 5.3 每日签到
 
 收益区之后保留签到：连续天数、今天的已发布奖励、7 天进度与签到按钮。奖励数量、签到日及完成状态由现有签到接口返回；不硬写第 7 天奖励。用户点击才签到，等待结果期间禁重复提交，成功按读回状态更新；已签到仍可查看签到详情。账号切换、离开页面后不应用旧结果。
+
+签到卡在深浅主题均保留完整的圆角软边及顶部、侧面高光，与收益区底光形成分层。
 
 ### 5.4 我的福利
 
