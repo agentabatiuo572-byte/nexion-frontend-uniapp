@@ -347,6 +347,12 @@ function showChangeLocked(field: "nickname" | "avatar") {
   toast.info(title, at ? hint.replace("{date}", formatTrialDeadline(at)) : undefined);
 }
 
+function showAvatarRejected(reason: "type" | "size") {
+  const copy = t.value.profile;
+  if (reason === "type") toast.info(copy.avatarTypeInvalidTitle, copy.avatarTypeInvalidHint);
+  else toast.info(copy.avatarSizeInvalidTitle, copy.avatarSizeInvalidHint);
+}
+
 async function loadProfileCandidates() {
   const pageScope = profilePageFence.capture("nickname-candidates");
   const accountScope = captureAccountScope();
@@ -517,6 +523,16 @@ async function handleRegen() {
       const filePath = chosen.tempFilePaths[0];
       if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
       if (!filePath) return;
+      // Same rule as the server (≤ 2 MB; PNG / JPEG / WebP by file signature), checked before upload so the user sees why.
+      const picked = Array.isArray(chosen.tempFiles) ? chosen.tempFiles[0] : chosen.tempFiles;
+      if (picked.size > 2 * 1024 * 1024) { showAvatarRejected("size"); return; }
+      // #ifdef H5
+      // H5 uploads the original file; the native compressed pick is re-encoded and left to the server check.
+      const head = Array.from(new Uint8Array(await (picked as File).slice(0, 12).arrayBuffer()), b => b.toString(16).padStart(2, "0")).join("");
+      if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
+      if (!head.startsWith("89504e470d0a1a0a") && !head.startsWith("ffd8ff")
+          && !(head.startsWith("52494646") && head.slice(16, 24) === "57454250")) { showAvatarRejected("type"); return; }
+      // #endif
       avatarUploading.value = true;
       const key = `app-profile:avatar:${requireCryptoUuid()}`;
       const before = avatarRevision.value;
@@ -539,9 +555,14 @@ async function handleRegen() {
       }
     } catch (cause) {
       if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
-      if (asApiError(cause).message === "USER_AVATAR_CHANGE_TOO_SOON") {
+      const code = asApiError(cause).message;
+      if (code === "USER_AVATAR_CHANGE_TOO_SOON") {
         await loadRemoteProfile();
         if (isCurrentProfileRequest(pageScope, scope, accountKey)) showChangeLocked("avatar");
+        return;
+      }
+      if (code === "USER_AVATAR_TYPE_INVALID" || code === "USER_AVATAR_SIZE_INVALID") {
+        showAvatarRejected(code === "USER_AVATAR_TYPE_INVALID" ? "type" : "size");
         return;
       }
       toast.error(t.value.profile.serverMutationFailed);
