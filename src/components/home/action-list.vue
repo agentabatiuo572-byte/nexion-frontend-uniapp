@@ -46,10 +46,8 @@ const rows = computed<HomeActionRow[]>(() => {
   if (config.isEnabled('homeNewcomerTasksEnabled') && task) list.push({ key:'quest', title:copy.value.newcomer, href:'/pages/missions/missions', progress:{ done:task.done, total:task.total }, progressLabel:task.total ? fmt(copy.value.questProgress,{done:task.done!,total:task.total}) : detailCopy.value.viewTasks, subtitle:detailCopy.value.viewTasks, reward:task.reward ? formatAmount(task.reward).replace(/\.00$/, '') : undefined, rewardLabel:task.claimable ? detailCopy.value.claimReward : detailCopy.value.completeReward, remaining:task.remainingHours !== null ? fmt(detailCopy.value.hours,{n:task.remainingHours}) : task.remainingMinutes !== null ? fmt(detailCopy.value.minutes,{n:task.remainingMinutes}) : undefined });
   const unpaid = ordersReady.value ? orders.orders.filter(order => order.status === 'placed' || order.status === 'payment_failed') : [];
   if (unpaid.length) list.push({ key:'orders', title:copy.value.unpaid, subtitle:fmt(copy.value.orders,{n:visibility.mask(unpaid.length)}), tone:'attention', href:'/pages/store/orders?from=me&status=pending' });
-  if (voucher.claimedUnused.length) list.push({ key:'voucher', title:copy.value.vouchers, subtitle:fmt(copy.value.voucherCount,{n:visibility.mask(voucher.claimedUnused.length)}), tone:'attention', href:'/pages/me/rewards-list?cat=voucher' });
-  if (trial.status === 'active' || trial.status === 'grace') list.push({ key:'trial', title:copy.value.trialActive, href:'/pages/me/trial' });
   if (securityNeedsAction.value) list.push({ key:'security', title:copy.value.security, subtitle:copy.value.securityHint, href:'/pages/me/security' });
-  const priority = ['phone', 'orders', 'quest', 'voucher', 'trial', 'security'];
+  const priority = ['phone', 'orders', 'quest', 'security'];
   return list.sort((a, b) => priority.indexOf(a.key) - priority.indexOf(b.key));
 });
 const shown = computed(() => expanded.value ? rows.value : rows.value.slice(0,3));
