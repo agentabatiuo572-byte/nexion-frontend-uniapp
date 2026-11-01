@@ -132,7 +132,7 @@ function holdPanelHeight() {
 }
 onUnmounted(() => clearTimeout(releaseTimer));
 function revealNext() {
-  const next = heldEntries.value.at(-1);
+  const next = heldEntries.value[heldEntries.value.length - 1];
   if (next === undefined) return;
   if (motionAllowed.value && shownEntries.value.length >= revealCap) holdPanelHeight();
   heldEntries.value = heldEntries.value.slice(0, -1);

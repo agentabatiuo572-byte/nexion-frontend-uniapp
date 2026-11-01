@@ -438,10 +438,9 @@ export const useApp = defineStore("app", () => {
   const remoteFleetHasSnapshot = ref(!remoteApiEnabled);
   /**
    * The fleet's own "today" total, which the backend defines as zero-safe
-   * (COALESCE per device → the exact sum the device cards render). The Home
-   * overview collapses a zero-receipt window to `null` — "no value" — so the
-   * Earn hero has no way to say "confirmed $0.00" from that projection alone.
-   * Keeping this here lets the summary agree with the device cards below it.
+   * (COALESCE per device → the exact sum the device cards render). Keep the
+   * Earn summary tied to these device totals independently of the separately
+   * read Home overview and its availability.
    */
   const remoteRealizedToday = ref<{ usdt: number; nex: number } | null>(null);
   const remoteWithdrawalListStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
