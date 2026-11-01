@@ -8,6 +8,7 @@ import * as dates from "@/lib/display-date";
 import { taskRelativeTime } from "@/lib/task-relative-time";
 import { formatUsd } from "@/lib/usd-display";
 import { workloadLabel } from "@/lib/workload-label";
+import { computeV2Copy } from "@/i18n/compute-v2";
 import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
@@ -18,7 +19,7 @@ const script = ts.transpileModule(compileScript(parse(source).descriptor, { id: 
 }).content, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 function history(completedAt: unknown) {
   const locale = Vue.reactive({ code: "zh" as keyof typeof dictionaries });
-  const task = { id: "historical-task", receiptNo: "canonical-receipt", model: "Cloud 503", category: "IG", reward: 0.123456, completedAt };
+  const task = { id: "historical-task", receiptNo: "canonical-receipt", type: "PC frozen name", model: "Cloud 503", category: "IG", reward: 0.123456, completedAt };
   const app = { accountKey: "fixture", accountBindingEpoch: 1, visibleDevices: [{ recentTasks: [task], kind: "cloud-share", vramTotal: 0 }],
     homeTruth: { onGrid: { activeJobs: 0 } }, remoteAssignmentStatus: "ready", remoteAssignmentHasSnapshot: true };
   const interval = vi.fn(), receipt = vi.fn();
@@ -29,6 +30,9 @@ function history(completedAt: unknown) {
     "@/store/app": { useApp: () => app }, "@/store/receipts": { useReceipts: vi.fn() }, "@/store/ui": { toast: { error: vi.fn() } },
     "@/store/earn-config": { prepareEarnConfig: vi.fn(), useEarnConfig: () => ({ lockedTeasers: () => [], refreshRoute: async () => undefined }) },
     "@/api/runtime": { remoteApiEnabled: true, taskAssignmentApi: { receipt } }, "@/components/me/receipt-modal.vue": { default: { render: () => null } } };
+  imports["@/i18n/compute-v2"] = { useComputeV2Copy: () => Vue.computed(() => computeV2Copy[locale.code]) };
+  imports["@/components/earn/task-v2-status.vue"] = { default: { render: () => null } };
+  imports["@/components/earn/compute-settlements.vue"] = { default: { render: () => null } };
   const exports = {} as { default: Vue.Component };
   new Function("require", "exports", script)((id: string) => imports[id], exports);
   return { locale, app, task, interval, receipt, html: () => renderToString(Vue.createSSRApp(exports.default)) };
@@ -41,8 +45,8 @@ it.each([
   const screen = history(Date.parse("2025-12-31T16:05:06Z")), before = JSON.stringify(screen.task);
   for (const [index, language] of ["zh", "en", "vi"].entries()) {
     screen.locale.code = language as keyof typeof dictionaries; const html = await screen.html();
-    expect(html).toContain(expected[index]); expect(html).toContain("+$0.1235"); expect(html).toContain("Cloud 503");
-    expect(html).toContain(en.market.workloads.IG.label);
+    expect(html).toContain(expected[index]); expect(html).toContain("+$0.1235"); expect(html).toContain("PC frozen name");
+    expect(html).not.toContain("Cloud 503");
     expect(html).toContain('data-task-id="historical-task"'); expect(html).toContain('title="canonical-receipt"');
     expect(html).toContain('d="M4 2v20l2-1');
   }

@@ -103,8 +103,7 @@
 
     <view v-if="!expanded && task" class="nx-device-current-task" style="padding: 0 20px 16px">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
-      <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.model) }} · {{ workloadLabel(task.category) }}</text>
-      <text class="block truncate font-mono-tabular" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">#{{ visibility.mask(task.id) }}</text>
+      <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.type) }}</text>
       <TaskV2Status :task="task" />
       <view class="flex items-center gap-3" style="margin-top: 10px">
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
@@ -233,7 +232,7 @@
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.35">{{ reconnectHoldText }}</text>
           </view>
         </view>
-        <text v-if="device.currentTask" class="block truncate tabular-nums" style="margin-top: 8px; padding-left: 42px; font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5)">#{{ visibility.mask(device.currentTask.id) }} · {{ visibility.mask(device.currentTask.model) }}</text>
+        <text v-if="device.currentTask" class="block truncate" style="margin-top: 8px; padding-left: 42px; font-size: 12px; color: var(--v5-ink-4)">{{ visibility.mask(device.currentTask.type) }}</text>
       </view>
     </view>
 
@@ -266,14 +265,7 @@
     <!-- Current task (non-reconnecting) -->
     <view v-if="task && !reconnecting" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
-      <text class="block" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ visibility.mask(task.model) }}<text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ workloadLabel(task.category) }}</text>
-      <view class="mt-0.5 flex items-center gap-1.5 flex-wrap" style="font-size: 12px; color: var(--v5-ink-3)">
-        <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">#{{ visibility.mask(task.id) }}</text>
-        <text style="color: var(--v5-ink-4)">·</text>
-        <text style="color: color-mix(in srgb, var(--v5-ink) 80%, transparent)">{{ visibility.mask(task.client) }}</text>
-        <text style="color: var(--v5-ink-4)">·</text>
-        <text>{{ visibility.mask(task.location) }}</text>
-      </view>
+      <text class="block" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ visibility.mask(task.type) }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
       <view class="mt-3 flex items-center gap-3">
@@ -320,7 +312,7 @@
           data-phone-today-task="true"
           style="min-height: 28px; font-size: 12px"
         >
-          <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
+          <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.type }}</text>
           <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">{{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}</text>
           <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ localClockTime(task.completedAt) }}</text>
         </view>
@@ -359,7 +351,7 @@
         <view v-for="(it, i) in phoneTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
           <view class="flex items-center gap-1.5 min-w-0 flex-1">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            <view class="min-w-0"><text class="block truncate">{{ it.model }} · {{ workloadLabel(it.category) }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
+            <view class="min-w-0"><text class="block truncate">{{ it.type }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
             <!-- spec-sentinel-ok: workload VRAM requirement from lockedTeasers, not a catalog Product field -->
@@ -392,7 +384,7 @@
         <view v-for="(it, i) in hwTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
           <view class="flex items-center gap-1.5 min-w-0 flex-1">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            <view class="min-w-0"><text class="block truncate">{{ it.model }} · {{ workloadLabel(it.category) }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
+            <view class="min-w-0"><text class="block truncate">{{ it.type }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
             <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5)">{{ it.minVRAM }} GB</text>
@@ -440,8 +432,7 @@ import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
-import type { Device, DeviceKind, TaskCategory } from "@/store/types";
-import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
+import type { Device, DeviceKind } from "@/store/types";
 import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
 import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
@@ -473,12 +464,6 @@ const statisticsCopy = useDeviceStatisticsCapabilityCopy();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 prepareEarnConfig();
 const earnConfig = useEarnConfig();
-
-// Model names are proper nouns (untranslated); the workload half is copy.
-// Resolved from `category` at render — the baked `task.type` string is English.
-function workloadLabel(category: TaskCategory): string {
-  return resolveWorkloadLabel(t.value, category);
-}
 
 // Device identity is resolved from `kind` too — the stored name/gpu/location
 // are English and persist per account. See lib/device-copy.ts.

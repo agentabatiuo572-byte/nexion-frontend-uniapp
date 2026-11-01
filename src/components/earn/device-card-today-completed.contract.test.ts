@@ -280,7 +280,7 @@ it('ordinary page show retry recovers error into parser-confirmed per-device his
   assignment = () => Promise.resolve(taskState(true)); await s.show(); const o = s.observe('retry ready');
   expect(o.assignmentStatus).toBe('ready'); expect(o.assignmentHasSnapshot).toBe(true);
   expect(o.recentCount).toBe(1); expect(o.taskHistoryText).toContain('(1)');
-  expect(o.taskHistoryText).toContain('Synthetic model'); expect(o.taskHistoryText).not.toContain('暂无已完成作业。');
+  expect(o.taskHistoryText).toContain('Synthetic task'); expect(o.taskHistoryText).not.toContain('Synthetic model'); expect(o.taskHistoryText).not.toContain('暂无已完成作业。');
 });
 it.each(['account-switch', 'same-account-rebind'])('late task read cannot restore prior history after %s', async boundary => {
   const late = deferred<unknown>(); assignment = () => late.promise;
@@ -289,7 +289,7 @@ it.each(['account-switch', 'same-account-rebind'])('late task read cannot restor
   s.app.bindAccount(boundary === 'account-switch' ? 'user:7002' : 'user:7001');
   await flush(); late.resolve(taskState(true)); await flush(); const o = s.observe('old resolved');
   expect(o.assignmentHasSnapshot).toBe(false); expect(o.deviceCount).toBe(0);
-  expect(o.taskHistoryText).not.toContain('Synthetic model'); expect(o.uiToasts).toEqual([]);
+  expect(o.taskHistoryText).not.toContain('Synthetic task'); expect(o.uiToasts).toEqual([]);
 });
 it('unmounted detail does not render late read data or produce global feedback', async () => {
   const late = deferred<unknown>(); assignment = () => late.promise;
@@ -327,7 +327,7 @@ it('loading preserves confirmed history, error discloses failure, and ready empt
   expect(s.app.remoteAssignmentStatus).toBe('loading');
   expect(s.app.remoteAssignmentHasSnapshot).toBe(true);
   expect(historyText()).toContain('(1)');
-  expect(historyText()).toContain('Synthetic model');
+  expect(historyText()).toContain('Synthetic task');
   pending.reject(new Error('SYNTHETIC_TASK_READ_UNAVAILABLE'));
   await expect(read).resolves.toBe(true); await flush();
   expect(s.app.remoteAssignmentStatus).toBe('error');

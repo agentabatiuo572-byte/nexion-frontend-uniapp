@@ -3,7 +3,6 @@ import { formatAmount } from "@/lib/amount-display";
 import { earnConfigApi, remoteApiEnabled } from "@/api/runtime";
 import type { EarnPhoneTiers, EarnTaskPricing, EarnTaskRoute, TaskClass } from "@/api/earn-config-api";
 import { applyCanonicalPhoneTierYields } from "@/mock/phone-tiers";
-import { TASK_CATEGORY_LABEL } from "@/store/types";
 import type { LockedTeaser } from "@/mock/tasks";
 import { avgEligibleReward as mockAvgEligibleReward, getLockedTeasers as getMockLockedTeasers } from "@/mock/tasks";
 
@@ -98,7 +97,7 @@ function lockedTeasers(maxVram: number, count = 3): LockedTeaser[] {
     .slice(0, count)
     .map((row) => ({
       category: row.taskClass as TaskClass,
-      type: TASK_CATEGORY_LABEL[row.taskClass],
+      type: row.taskName,
       model: row.models[0] || row.taskName,
       minVRAM: row.minVRAM,
       rewardHint: `$${formatAmount(row.minReward)}-$${formatAmount(row.maxReward)}`,

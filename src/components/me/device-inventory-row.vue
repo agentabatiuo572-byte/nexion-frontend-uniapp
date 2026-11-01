@@ -20,7 +20,7 @@
     <view v-if="active && device.currentTask" class="device-inventory-row__task">
       <view class="device-inventory-row__task-row">
         <view v-if="taskRunning" class="device-inventory-row__eq" aria-hidden="true"><view /><view /><view /></view>
-        <text class="device-inventory-row__task-name"><text class="device-inventory-row__label">{{ t.earn.currentTask }}</text>{{ visibility.mask(device.currentTask.model) }}</text>
+        <text class="device-inventory-row__task-name"><text class="device-inventory-row__label">{{ t.earn.currentTask }}</text>{{ visibility.mask(device.currentTask.type) }}</text>
         <text class="device-inventory-row__pct font-mono-tabular">{{ visibility.mask(progressPct == null ? '—' : `${progressPct}%`) }}</text>
       </view>
       <view class="device-inventory-row__bar" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">

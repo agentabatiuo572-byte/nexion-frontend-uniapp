@@ -12,10 +12,12 @@ describe("locked task teasers", () => {
     expect(deviceCard).toContain("earnConfig.lockedTeasers(props.device.vramTotal, 3)");
     expect(taskCenter).toContain("earnConfig.lockedTeasers(maxVram.value, 3)");
     for (const source of [deviceCard, taskCenter]) {
-      expect(source).toContain("workloadLabel(");
       expect(source).toContain("minVRAM");
       expect(source).toContain("unlockTier");
     }
+    expect(deviceCard).toContain("{{ it.type }}");
+    expect(taskCenter).toContain("{{ teaser.type }}");
+    expect(earnConfig).toContain("type: row.taskName");
   });
 
   it("does not turn category throughput into a personal daily gain", () => {
