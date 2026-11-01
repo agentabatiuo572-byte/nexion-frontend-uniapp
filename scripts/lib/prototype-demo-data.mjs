@@ -170,6 +170,17 @@ export function demoFixture(url,locale,state,request) {
     if(empty){delete config.publicStats.registeredUsersBase;config.publicStats.networkPulse=null;}
     return withDemoShareChannels(config,state);
   }
+  // Every new account gets the newcomer gift, so the register subtitle shows it even without a code.
+  if(pathname==='/api/config/referral-rewards')return {...base(),welcomeGift:{lockMode:'risk_bucket',usdtAmount:5,nexAmount:20}};
+  // Invite preview: one friend code (with a V rank) and one support-advisor code (no V rank); any other code is not found.
+  const referralPreview=pathname.match(/^\/api\/public\/referrals\/([^/]+)\/preview$/);
+  if(referralPreview){
+    const code=decodeURIComponent(referralPreview[1]);
+    const gift={status:'POSTED',usdtAmount:5,nexAmount:20};
+    if(code==='NX8K2M4Q')return {code,kind:'USER',sourceEnvironment:'PRODUCTION',sponsor:{displayName:'M•••',vRank:'V3'},gift};
+    if(code==='CS7K4MPQ')return {code,kind:'ADVISOR',sourceEnvironment:'PRODUCTION',sponsor:{displayName:'L•••',vRank:null},gift};
+    const error=new Error('REFERRAL_PREVIEW_NOT_FOUND');error.status=404;throw error;
+  }
   const learning=learningDemo(url,locale,state,request);if(learning!==undefined)return learning;
   const account=accountDemo(url,locale,state,request);if(account!==undefined)return account;
   const bank=bankDemo(url,state,request);if(bank!==undefined)return bank;
