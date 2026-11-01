@@ -108,7 +108,8 @@ onUnmounted(() => { if (countFrame) cancelAnimationFrame(countFrame); });
 const amountParts = computed(() => formatGroupedAmount(counting.value ?? remoteToday.value ?? display.value).split("."));
 const intPart = computed(() => amountParts.value[0]);
 const cents = computed(() => amountParts.value[1]);
-const longAmount = computed(() => intPart.value.replace(/\D/g, "").length >= 4);
+// The masked amount keeps the 64px size so it does not reveal the magnitude.
+const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\D/g, "").length >= 4);
 </script>
 
 <style scoped>

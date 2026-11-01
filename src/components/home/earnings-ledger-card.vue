@@ -14,7 +14,7 @@
 
     <view v-for="r in rows" :key="r.id" data-home-ledger-row="true" class="earnings-ledger-card__row">
       <text class="earnings-ledger-card__identity" :title="`${r.model} · ${r.who}`">{{ r.model }}<text class="earnings-ledger-card__client"> · {{ r.who }}</text></text>
-      <text class="earnings-ledger-card__amount">{{ visibility.mask(r.amt) }}</text>
+      <text class="earnings-ledger-card__amount" :class="{ 'earnings-ledger-card__amount--masked': visibility.hidden }">{{ visibility.mask(r.amt) }}</text>
     </view>
     <view v-if="remoteApiEnabled && rows.length === 0" class="earnings-ledger-card__row">
       <text class="earnings-ledger-card__status">{{ ledgerStatusText }}</text>
@@ -75,11 +75,13 @@ function goAll() {
 .earnings-ledger-card__title { min-width:0; font:600 16px/22px var(--font-v5); color:var(--v5-ink); }
 .earnings-ledger-card__stale { font-size:12px; color:var(--v5-warning); }
 .earnings-ledger-card__all { flex-shrink:0; display:inline-flex; align-items:center; min-height:44px; padding-left:12px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
-.earnings-ledger-card__row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; min-height:44px; border-top:1px solid var(--v5-border); }
+/* 44px of content plus the 1px top border (border-box). */
+.earnings-ledger-card__row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; min-height:45px; border-top:1px solid var(--v5-border); }
 .earnings-ledger-card__identity { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:500 14px/20px var(--font-v5); color:var(--v5-ink); }
 .earnings-ledger-card__identity :deep(*) { white-space:nowrap; }
 .earnings-ledger-card__client { font-weight:400; color:var(--v5-ink-3); }
 .earnings-ledger-card__amount { font:500 13px/18px var(--font-jet-mono); color:var(--v5-success-ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.earnings-ledger-card__amount--masked { color:var(--v5-ink-3); }
 .earnings-ledger-card__status { min-width:0; font:400 14px/20px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
 .earnings-ledger-card__retry { display:inline-flex; align-items:center; min-height:44px; padding-left:12px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
 </style>

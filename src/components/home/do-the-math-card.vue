@@ -7,7 +7,7 @@
 -->
 <template>
   <NxSection :title="t.home.doMathTitle" data-home-section="do-the-math">
-    <view v-if="calculator" ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': (observable && !inView) || !pageVisible, 'dc-card--masked': visibility.hidden }">
+    <view v-if="calculator" ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': !seen || !pageVisible, 'dc-card--masked': visibility.hidden }">
       <view class="dc-stage">
         <svg class="dc-arc" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path :d="arcPath" /></svg>
         <text class="dc-stage__label">{{ t.home.doMathStage }}</text>
@@ -29,7 +29,7 @@
         <view class="dc-legend--target"><text class="dc-legend__name">{{ calculator.target.name }}</text><text class="dc-legend__rate">{{ formatAmount(calculator.target.dailyUsdt) }}<text class="dc-legend__unit">/d</text></text></view>
       </view>
       <view class="dc-foot">
-        <text class="dc-foot__caption">{{ fmt(t.home.doMathVs, { base: baseShort }) }}</text>
+        <text class="dc-foot__caption">{{ fmt(generalBase ? t.home.doMathVs : t.home.doMathYour, { base: baseShort }) }}</text>
         <NxButton class="dc-foot__action" variant="brand" size="small" :label="`${t.home.doMathSeeCta} →`" @click="goStore" />
       </view>
     </view>
@@ -44,7 +44,7 @@
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
-import { computed, ref, watch } from "vue";
+import { computed, getCurrentInstance, onUnmounted, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
@@ -66,6 +66,8 @@ const calculator = computed(() => {
 const baseShort = computed(() => calculator.value
   ? deviceNameInline(t.value, calculator.value.base.kind, calculator.value.base.name)
   : "");
+// Phone and GPU bases are already named "your phone" / "your computer GPU"; only SKUs take "vs your {base}".
+const generalBase = computed(() => calculator.value?.base.kind === "phone" || calculator.value?.base.kind === "pc-gpu");
 // The projection names the base device by kind only; the target is an exact catalog product.
 const baseArt = useDeviceProductImage(() => ({ kind: calculator.value?.base.kind ?? "cloud-share", productCode: calculator.value?.base.kind ?? "", capacitySource: "server" }));
 const targetArt = useDeviceProductImage(() => ({ kind: calculator.value?.target.kind ?? "cloud-share", productCode: calculator.value?.target.productNo ?? "", capacitySource: "server" }));
@@ -73,16 +75,30 @@ const targetArt = useDeviceProductImage(() => ({ kind: calculator.value?.target.
 // Hidden statistics use one neutral placeholder height so the ratio does not leak.
 const pillarHeights = computed(() => visibility.hidden || !calculator.value
   ? { base: 56, target: 56 }
-  : { base: Math.max(18, 100 * calculator.value.base.dailyUsdt / calculator.value.target.dailyUsdt), target: 100 });
+  : { base: Math.max(4, 100 * calculator.value.base.dailyUsdt / calculator.value.target.dailyUsdt), target: 100 });
 // The arc starts beside the base device (its top sits 112 - pillar px into the 208px stage).
 const arcPath = computed(() => `M 36 ${((124 - pillarHeights.value.base) / 208 * 100).toFixed(1)} Q 46 2 60 28 M 60 28 l -0.5 -4.3 M 60 28 l -2.6 -1.5`);
 
 // DS-29 entrance plays once the stage is first seen; the target sweep pauses off-screen and while the page is hidden.
-// The card mounts after the overview read, so an unresolved ref must not count as seen; without an observer it plays on mount.
+// The card mounts after the overview read, so an unresolved ref must not count as seen. H5 uses the DOM observer;
+// the App logic layer has none, so it observes the card through uni.createIntersectionObserver on this instance.
 const { elRef: cardRef, inView } = useScrollGrowProgress({ threshold: 0.25, fallbackInView: false });
-const observable = typeof IntersectionObserver !== "undefined";
+const domObserver = typeof IntersectionObserver !== "undefined";
+const nativeInView = ref(false);
+let nativeObserver: UniNamespace.IntersectionObserver | null = null;
+const instance = getCurrentInstance();
+if (!domObserver) watch(cardRef, (card) => {
+  nativeObserver?.disconnect();
+  nativeObserver = null;
+  nativeInView.value = false;
+  if (!card || !instance) return;
+  nativeObserver = uni.createIntersectionObserver(instance.proxy, { thresholds: [0.25] }).relativeToViewport();
+  nativeObserver.observe(".dc-card", (result) => { nativeInView.value = result.intersectionRatio >= 0.25; });
+}, { flush: "post" });
+onUnmounted(() => { nativeObserver?.disconnect(); nativeObserver = null; });
+const seen = computed(() => domObserver ? inView.value : nativeInView.value);
 const entered = ref(false);
-watch([inView, cardRef], ([seen, card]) => { entered.value = !!card && (entered.value || seen || !observable); }, { immediate: true });
+watch([seen, cardRef], ([visible, card]) => { entered.value = !!card && (entered.value || visible); }, { immediate: true });
 const pageVisible = ref(true);
 onShow(() => { pageVisible.value = true; });
 onHide(() => { pageVisible.value = false; });

@@ -6,7 +6,7 @@
     <view class="daily-check-in-row__top">
       <view class="daily-check-in-row__copy" role="link" tabindex="0" :aria-label="copy.viewDaily" @click="openDaily">
         <text class="daily-check-in-row__title">{{ ready ? fmt(copy.streak, { n: faucet.signInStreak }) : copy.daily }}</text>
-        <text v-if="subtitle" class="daily-check-in-row__meta" :class="{ 'daily-check-in-row__meta--warning': faucet.remoteReadState === 'error' }">{{ subtitle.lead }}<text v-if="subtitle.reward" class="daily-check-in-row__gift-hint">{{ subtitle.reward }}</text></text>
+        <text v-if="subtitle" class="daily-check-in-row__meta" :class="{ 'daily-check-in-row__meta--warning': faucet.remoteReadState === 'error' }">{{ subtitle.lead }}<text v-if="subtitle.reward" class="daily-check-in-row__gift-hint">{{ subtitle.reward }}</text>{{ subtitle.tail }}</text>
       </view>
       <NxButton class="daily-check-in-row__action" :class="{ 'daily-check-in-row__action--checked': canCheckIn && checked }" :variant="!canCheckIn ? 'secondary' : checked ? 'link' : 'brand'" :label="checkInLabel" size="small" :busy="submitting" @click="checkIn">
         <template v-if="canCheckIn && checked">
@@ -16,8 +16,8 @@
         <text v-else>{{ checkInLabel }}</text>
       </NxButton>
     </view>
-    <view v-if="ready" class="daily-check-in-row__days" :style="{ gridTemplateColumns: dayColumns }">
-      <view class="daily-check-in-row__rail" aria-hidden="true" :style="rail.track"><view class="daily-check-in-row__rail-fill" :style="{ width: rail.fill }" /></view>
+    <view v-if="ready" class="daily-check-in-row__days">
+      <view class="daily-check-in-row__rail" aria-hidden="true"><view class="daily-check-in-row__rail-fill" :style="{ width: railFill }" /></view>
       <view v-for="day in days" :key="day.n" class="daily-check-in-row__node" :aria-label="fmt(copy.day,{n:day.n}) + (day.today ? ' · ' + copy.today : '') + (day.done ? ' · ' + copy.checkedIn : '') + (day.gift ? ' · ' + giftText(day.gift) : '')">
         <view class="daily-check-in-row__dot" aria-hidden="true">
           <view v-if="day.done" class="daily-check-in-row__done" :class="{ 'daily-check-in-row__done--filling': filledToday && day.today }"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m5 12 5 5 9-10"/></svg></view>
@@ -29,7 +29,7 @@
       </view>
     </view>
     <view v-else class="daily-check-in-row__days" :aria-busy="faucet.remoteReadState === 'idle' || faucet.remoteReadState === 'loading' ? 'true' : 'false'" :aria-label="copy.viewDaily">
-      <view class="daily-check-in-row__rail" aria-hidden="true" :style="rail.track" />
+      <view class="daily-check-in-row__rail" aria-hidden="true" />
       <view v-for="n in 7" :key="n" class="daily-check-in-row__node" aria-hidden="true"><view class="daily-check-in-row__dot"><view class="daily-check-in-row__placeholder" /></view><text class="daily-check-in-row__label" /></view>
     </view>
   </view>
@@ -44,14 +44,12 @@ import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { useT } from '@/i18n/use-t';
-import { useLocaleStore } from '@/store/locale';
 import { toast } from '@/store/ui';
 import { dailyCheckInSuccessCopy } from '@/pages/daily/daily-success-copy';
 import { dailyBaseReward, dailyMilestoneRewardText, dailyRewardLabels } from '@/pages/daily/daily-reward-view';
 import type { CanonicalDailyMilestone } from '@/api/points-api';
 import NxButton from '@/components/ui/nx-button.vue';
 const faucet = useNexFaucet(), app = useApp(), copy = useAuditUiCopy(), t = useT();
-const locale = useLocaleStore();
 const submitting = ref(false);
 const rewardFeedback = ref<{ title: string; body: string } | null>(null);
 // The today node fills once after a confirmed check-in; it resets when the page is left.
@@ -69,31 +67,26 @@ const days = computed(() => {
   return Array.from({ length: 7 }, (_, i) => ({ n: start + i + 1, done: start + i + 1 <= streak, today: start + i + 1 === current, gift: faucet.remoteMilestones?.find(m=>m.milestoneDay===start+i+1&&m.status!=='CLAIMED') }));
 });
 function giftText(gift:CanonicalDailyMilestone){return dailyMilestoneRewardText(gift,dailyRewardLabels(t.value.daily.milestones));}
-// The rail already shows today's reward, so the subtitle names the next milestone in this week.
-const subtitle = computed<{ lead: string; reward: string } | null>(() => {
-  if (faucet.remoteReadState === 'error') return { lead: t.value.daily.checkInUnconfirmed, reward: '' };
-  if (!ready.value) return { lead: copy.value.viewDaily, reward: '' };
+function milestoneReward(gift:CanonicalDailyMilestone){return gift.rewardType.trim().toUpperCase() === 'UVT' ? `+${gift.rewardAmount} ${t.value.daily.milestones.rewardNex}` : giftText(gift);}
+// A reached milestone whose reward is still unclaimed comes first (with the daily "Claim" word);
+// otherwise the rail already shows today's reward, so the subtitle names the next milestone in this week.
+const subtitle = computed<{ lead: string; reward: string; tail: string } | null>(() => {
+  if (faucet.remoteReadState === 'error') return { lead: t.value.daily.checkInUnconfirmed, reward: '', tail: '' };
+  if (!ready.value) return { lead: copy.value.viewDaily, reward: '', tail: '' };
+  const claimable = faucet.remoteMilestones.filter(m => m.status === 'CLAIMABLE').sort((a, b) => a.milestoneDay - b.milestoneDay)[0];
+  if (claimable) return { lead: fmt(t.value.daily.milestones.dayLabel, { n: claimable.milestoneDay }) + ' ', reward: milestoneReward(claimable), tail: ' · ' + t.value.daily.milestones.claim };
   const next = days.value.find(day => day.gift && !day.done);
   if (next?.gift) return {
     lead: (next.today ? copy.value.today : fmt(t.value.daily.milestones.dayLabel, { n: next.gift.milestoneDay })) + ' ',
-    reward: next.gift.rewardType.trim().toUpperCase() === 'UVT' ? `+${next.gift.rewardAmount} ${t.value.daily.milestones.rewardNex}` : giftText(next.gift),
+    reward: milestoneReward(next.gift), tail: '',
   };
-  return !checked.value && baseReward.value === null ? { lead: copy.value.viewDaily, reward: '' } : null;
+  return !checked.value && baseReward.value === null ? { lead: copy.value.viewDaily, reward: '', tail: '' } : null;
 });
-// Keep the complete Vietnamese day label on one line without shrinking all
-// seven labels. The other dates share the remaining space in the same row.
-const dayWeights = computed(() => days.value.map(day => ready.value && day.today && locale.code === 'vi' ? 1.5 : 1));
-const dayColumns = computed(() => dayWeights.value.map(weight => weight > 1 ? 'minmax(52px,1.5fr)' : 'minmax(0,1fr)').join(' '));
-// The rail runs between the first and last node centres and fills up to the last checked day.
-const rail = computed(() => {
-  const total = dayWeights.value.reduce((sum, weight) => sum + weight, 0);
-  let offset = 0;
-  const centres = dayWeights.value.map(weight => { const centre = (offset + weight / 2) / total * 100; offset += weight; return centre; });
-  const first = centres[0], last = centres[6], done = ready.value ? days.value.filter(day => day.done).length : 0;
-  return {
-    track: { left: `${first}%`, right: `${100 - last}%` },
-    fill: done ? `${(centres[done - 1] - first) / (last - first) * 100}%` : '0%',
-  };
+// Seven equal columns; the rail runs between the first and last node centres (7.14% in from each side)
+// and fills up to the last checked day.
+const railFill = computed(() => {
+  const done = ready.value ? days.value.filter(day => day.done).length : 0;
+  return `${done ? (done - 1) / 6 * 100 : 0}%`;
 });
 function refresh() { if (visible && remoteApiEnabled) void faucet.ensureRemote(10_000); }
 function openDaily() {
@@ -155,13 +148,13 @@ async function checkIn() {
 .daily-check-in-row :deep(.daily-check-in-row__action) { flex:none; margin-block:-6px; }
 .daily-check-in-row :deep(.daily-check-in-row__action .nx-button__surface) { min-height:32px; height:32px; padding:0 14px; }
 .daily-check-in-row :deep(.daily-check-in-row__action.nx-button--brand .nx-button__surface) { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 18%,transparent); }
-.daily-check-in-row :deep(.daily-check-in-row__action--checked .nx-button__surface) { padding:0 4px; }
+.daily-check-in-row :deep(.daily-check-in-row__action--checked .nx-button__surface) { padding:0; }
 .daily-check-in-row :deep(.daily-check-in-row__action--checked .nx-button__content) { gap:4px; }
 .daily-check-in-row :deep(.daily-check-in-row__action--checked .nx-native-svg) { width:14px; height:14px; }
 .daily-check-in-row :deep(.daily-check-in-row__action--checked .nx-native-svg svg) { display:block; width:100%; height:100%; }
 /* Seven-node rail: checked days fill in brand up to the last one; today carries the real base reward. */
 .daily-check-in-row__days { position:relative; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); margin-top:10px; }
-.daily-check-in-row__rail { position:absolute; top:11px; height:2px; border-radius:2px; background:var(--v5-surface-3); }
+.daily-check-in-row__rail { position:absolute; left:7.14%; right:7.14%; top:11px; height:2px; border-radius:2px; background:var(--v5-surface-3); }
 .daily-check-in-row__rail-fill { height:100%; border-radius:inherit; background:var(--v5-brand); transform-origin:left center; transition:width 900ms cubic-bezier(.16,1,.3,1); animation:check-in-rail-grow 900ms 200ms cubic-bezier(.16,1,.3,1) both; }
 .daily-check-in-row__node { position:relative; z-index:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px; }
 .daily-check-in-row__dot { width:24px; height:24px; display:grid; place-items:center; }
@@ -170,11 +163,11 @@ async function checkIn() {
 .daily-check-in-row__today { position:relative; box-sizing:border-box; width:24px; height:24px; border-radius:50%; display:grid; place-items:center; border:2px solid var(--v5-brand); background:var(--v5-surface); color:var(--v5-brand); font:500 10px/12px var(--font-v5); white-space:nowrap; }
 .daily-check-in-row__gift { position:relative; box-sizing:border-box; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
 .daily-check-in-row__gift--today { width:26px; height:26px; border:2px solid var(--v5-warning); }
-.daily-check-in-row__today::after, .daily-check-in-row__gift--today::after { content:""; position:absolute; inset:-2px; border-radius:50%; border:2px solid currentColor; animation:check-in-ping 2.4s ease-out infinite; }
-.daily-check-in-row__gift--today::after { border-color:var(--v5-warning); }
+.daily-check-in-row__today::after { content:""; position:absolute; inset:-2px; border-radius:50%; border:2px solid currentColor; animation:check-in-ping 2.4s ease-out infinite; }
 .daily-check-in-row__future { width:6px; height:6px; border-radius:50%; background:var(--v5-ink-4); }
 .daily-check-in-row__placeholder { width:6px; height:6px; border-radius:50%; background:var(--v5-surface-3); }
-.daily-check-in-row__label { height:14px; font:500 10.5px/14px var(--font-v5); color:var(--v5-brand); white-space:nowrap; }
+/* Labels stay on one line and may overflow their equal column (Vietnamese "Hôm nay"). */
+.daily-check-in-row__label { height:14px; font:500 10.5px/14px var(--font-v5); color:var(--v5-brand); white-space:nowrap; overflow:visible; }
 .daily-check-in-row__label--gift { color:var(--v5-warning-ink); }
 .daily-check-in-row__dot :deep(.nx-native-svg) { width:11px; height:11px; }
 .daily-check-in-row__gift :deep(.nx-native-svg) { width:12px; height:12px; }
@@ -188,6 +181,6 @@ async function checkIn() {
 @media (prefers-reduced-motion:reduce) {
   .daily-check-in-row__rail-fill { transition:none; animation:none; }
   .daily-check-in-row__done--filling { animation:none; }
-  .daily-check-in-row__today::after, .daily-check-in-row__gift--today::after { animation:none; opacity:0; }
+  .daily-check-in-row__today::after { animation:none; opacity:0; }
 }
 </style>
