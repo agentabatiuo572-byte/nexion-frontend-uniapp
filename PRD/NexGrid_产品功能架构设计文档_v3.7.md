@@ -1,5 +1,7 @@
 # UVEL · 产品需求文档(PRD)
 
+> **2026-11-02 登录与手机初始化分离**：普通 App 登录及冷启动会话恢复不检查手机绑定来决定页面，不自动进入连接、校准或激活页；未激活手机算力也正常进入首页。自动初始化引导仅由新账号注册成功流程发起，已有账号可在设备管理主动校准或激活。此规则覆盖下文历史的新设备登录自动校准描述。
+
 > **2026-11-01付款截止与确认宽限**：[统一截止、确认中与异常结果](UVEL_付款截止与确认宽限_20261101.md)。确认宽限不延长付款；到期收起收款入口，继续原意图查询，服务端确认终态后才展示取消。
 
 > **2026-10-31现行统一支付**：[统一支付与钱包支付密码](UVEL_统一支付与钱包支付密码_20261031.md)。仅钱包需要PIN；HDPAY/BSC直付免PIN。费用、整数充值及最低额、异步收款和恢复按此增量执行。
@@ -268,7 +270,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /register/success                注册成功页(礼包确认 + 引导下载 APP,仅 H5,§4.1.1)
 /onboarding/intro                启动语
 /onboarding/estimator            收益估算
-/onboarding/connect              算力校准 + 接单规则告知(新设备登录复用此页 ?mode=recalibrate 重新校准)
+/onboarding/connect              注册引导或用户主动手机管理的算力校准 + 接单规则告知，普通登录不自动进入
 /onboarding/terms                服务条款(从 intro 脚注 / register 注册脚注进入)
 /session/kicked                  登录失效阻断屏(退出 / 指定会话下线 / 被吊销 → 在途任务回退 + 重新登录)
 ```
@@ -323,7 +325,7 @@ TabBar:active tab 显示背景 chip 高亮。
 | 礼包确认卡 | 金额同源 `rewards.welcomeGift`;两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);所有新账号都显示,新人礼包不需要邀请人(2026-11-01) |
 | H5 装 APP 权益 3 行 | 仅浏览器 H5 显示:在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度;App 不渲染此提醒区 |
 | H5 官网下载引导 | 提示可通过 NexGrid 官网下载 APP;读取 `share.appDownload.officialUrl` 作为唯一链接。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
-| 继续出口 | H5「继续网页版」→ 首页，始终可用；下载 APP 后使用同一账号登录，在 APP 完成手机校准与激活 |
+| 继续出口 | H5「继续网页版」→ 首页，始终可用；下载 APP 后使用同一账号登录正常进入首页，需要手机算力时由设备管理主动校准、激活 |
 
 **规则**:礼包状态由注册流程的风险评估结果带入(`?gift=posted|pending|none`),本页只读展示、不发生任何入账;`officialUrl` 仅接受 HTTPS,优先在新窗口打开,弹窗被拦时改为当前页跳转;返回键视同「继续」,不可返回注册流。App 正常注册直接进入 onboarding;即使直接访问本页,也不显示 H5 安装权益与官网下载提醒。
 
@@ -753,7 +755,7 @@ verify 业务错误:`otp_invalid`(附剩余次数)/ `otp_expired` / `otp_attempt
 
 ### 4.7 Onboarding 流程
 
-注册 / 登录完成后进入 Onboarding,3 步骤揭示价值主张并完成手机算力激活。
+仅新账号注册成功后自动进入 Onboarding，3 步骤揭示价值主张并引导手机算力初始化；普通登录正常进入首页，不以手机激活作为前置条件。已有账号需要手机算力时从设备管理主动进入。
 
 #### 4.7.1 Step 1 — `/onboarding/intro` 启动页
 
@@ -813,7 +815,7 @@ CTA "激活手机算力 →" 在服务端确认绑定成功后路由到 `/`(Home
 |---|---|---|---|
 | `/api/onboarding/phone-installation/challenge` | POST | 历史 `{deviceId}` | 已退役（superseded，2026-10-03）；返回 410，零业务副作用，不生成挑战 |
 | `/api/onboarding/phone-installation/verify` | POST | 历史 `{deviceId,certificates,signature}` | 已退役（superseded，2026-10-03）；返回 410，零业务副作用，不验证或发放资格 |
-| `/api/onboarding/phone-installation/login` | POST | `{deviceId}` | 普通认证请求检查当前账号的执行安装及换机资格；异机先停止旧手机任务 |
+| `/api/onboarding/phone-installation/login` | POST | `{deviceId}` | 保留的显式手机绑定核验端点，兼容 `connect?mode=login`；普通登录/会话恢复不自动调用，标准主动校准/激活仍走对应校准 API |
 | `/api/onboarding/calibrate` | POST | `{deviceId,signals,expectedRevision}` + `Idempotency-Key` | 服务端按观测值确定性派生并保存 score/tier/yield baseline |
 | `/api/onboarding/calibrate/result?deviceId=` | GET | — | 回读该账号、设备与环境下的服务端校准事实 |
 | `/api/onboarding/calibrate/activate` | POST | `{deviceId,expectedRevision}` + `Idempotency-Key` | 原子绑定 canonical 手机设备并发布 `ACTIVE` |
@@ -863,22 +865,22 @@ Persist 字段 `userSet: boolean`:false 时允许 auto-detect 覆盖;一旦用�
 
 i18n namespace `terms`(en/zh 镜像);无后端,纯客户端展示页。真后台对接时条款正文应可由 `GET /admin/legal/terms?locale=&jurisdiction=` 下发,对标 §11.4a risk-disclosure 的「监管改条款当天可改」能力。
 
-#### 4.7.6 登录态路由守卫(Auth / Onboarding Guard)
+#### 4.7.6 登录态路由守卫(Auth Guard)
 
-会话态由 `useAuth`(persist key `nexgrid-auth-v1`)的两个标志决定:`isAuthenticated`(是否已登录)与 `onboardingComplete`(是否完成 onboarding)。守卫负责拦截「未登录」或「已登录但未走完 onboarding」的用户访问受保护页,把他们送回正确的漏斗起点。
+受保护页的访问依据真实认证、有效会话和账号绑定状态。`useAuth` 的 `onboardingComplete` 仅表示手机初始化状态，不参与登录态路由守卫；已登录但未校准或未激活手机算力的账号也可正常进入首页与其他业务页。
 
 **守卫规则**:每次路由变化(以及应用回到前台时)校验当前页面:
 
 | 条件 | 处置 |
 |---|---|
 | 当前页在白名单内 | 放行(漏斗自身页面不自我重定向,避免循环) |
-| `isAuthenticated === false` | 重定向至 `/onboarding/intro`(回到注册漏斗起点) |
-| `isAuthenticated === true` 且 `onboardingComplete === false` | 重定向至 `/onboarding/estimator`(回到 onboarding 收益估算步骤) |
-| 已登录且已完成 onboarding | 放行 |
+| 无有效登录态或服务端会话已失效 | 进入既有登录/会话恢复流程，不进入手机校准 |
+| 有效登录态，手机未初始化、未校准或未激活 | 放行；普通登录进入首页或合法业务返回目标 |
+| 新账号注册成功 | 由注册入口明确启动注册后引导，不由通用守卫推断 |
 
-**白名单**(不受守卫拦截的无壳页):onboarding 全流程(`/onboarding/*`)、登录(`/login`)、注册(`/register`)、推荐落地(`/ref/*`)、交易/凭证详情(`/tx/*`)。这些页面是漏斗本身或公开入口,守卫对其放行,使漏斗永不自我重定向。
+**公开页**：沿当前公开路由白名单开放登录、注册、介绍、条款/隐私/风险披露及指定推荐、交易凭证入口。手机连接/校准不是因此全部公开；其主动设备操作仍需认证与设备校验。公开页不自我重定向。
 
-**默认登录态**:全新安装(无 persist 记录)默认视为「已登录 + 已完成 onboarding」的用户,应用直接打开到 Home,守卫在正常使用中处于休眠态。仅当用户主动 `signOut()` 后,守卫才被激活,任何受保护页都会把用户送回 onboarding 漏斗。历史 persist 用户(无 `onboardingComplete` 字段)视为已完成 onboarding(向后兼容)。
+**默认登录态**：正式 App 全新安装没有服务端有效会话时不伪造已登录状态；已有会话按既有安全存储和服务端恢复规则处理。恢复成功不检查手机绑定来决定路由，也不以历史 `onboardingComplete` 字段缺失或为 false 强制初始化。
 
 ```mermaid
 sequenceDiagram
@@ -888,25 +890,23 @@ sequenceDiagram
     participant Page as 目标页
 
     Route->>Guard: 读取当前路由
-    alt 路由在白名单 (onboarding/login/register/ref/tx)
+    alt 当前路由是已声明公开页
         Guard-->>Page: 放行
     else 受保护页
-        Guard->>Auth: 读 isAuthenticated / onboardingComplete
-        alt 未登录
-            Guard->>Page: reLaunch → /onboarding/intro
-        else 已登录但未完成 onboarding
-            Guard->>Page: reLaunch → /onboarding/estimator
-        else 已登录且已完成
+        Guard->>Auth: 读取认证、会话及当前账号绑定
+        alt 未登录或会话失效
+            Guard->>Page: 登录 / 会话恢复流程
+        else 具有有效登录态
             Guard-->>Page: 放行
         end
     end
 ```
 
-**真后台对接**:把本地 `useAuth` 替换为真实会话(`GET /api/auth/session` 提供 `isAuthenticated` / `onboardingComplete`),守卫判定逻辑完全不变。`signUp` / `signIn` → `POST /api/auth/{register,login}` 返回 token + canonical user;`completeOnboarding` → `POST /api/onboarding/complete`。
+**服务端事实**：登录和恢复沿现有认证 API、会话与账号隔离实现执行，`onboardingComplete` 只作为信息保留；不增加手机初始化前置条件或新的认证接口。手机激活与换绑由用户主动设备操作或新账号注册引导负责。
 
 ### 4.7 多载体会话、会话下线与新设备校准
 
-**目的**:SPEC-4 后,同一账号允许签名 App / H5 / 白 App 接管态等多载体会话并存,算力设备在线状态与业务登录会话解耦。包含三项强相关能力:① 多载体 session registry;② 会话被主动退出、指定下线或风控停用时在途任务中断回退;③ 新物理设备登录触发算力重新校准。
+**目的**:SPEC-4 后,同一账号允许签名 App / H5 / 白 App 接管态等多载体会话并存,算力设备在线状态与业务登录会话解耦。包含三项能力:① 多载体 session registry;② 会话被主动退出、指定下线或风控停用时在途任务中断回退;③ 用户在设备管理主动发起手机校准。普通登录不因新物理设备、未校准或未激活而插入手机初始化流程。
 
 **设备身份**:每个安装持有稳定的 `deviceId`(`lib/device-id.ts`,首次用 `uni.getSystemInfo` + uuid 生成并持久化 `nexgrid-device-id-v1`)+ 友好 `deviceName`(如「iPhone · iOS」)。deviceId 是「是否同一台物理设备」的判据。
 
@@ -917,7 +917,7 @@ sequenceDiagram
 
 **失效处置(任务中断回退)**:当前会话失效 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[已退出 / 会话已停用]+ 任务已回退提示 +「重新登录」)。重新登录新增当前载体会话 → 守卫恢复挖矿(`resumeMining`)。
 
-**新设备校准**:登录时比对本机 deviceId 与该账号上次校准设备(`nexgrid-calibrated-device-v1`)。**不同且账号曾校准过** → `requiresRecalibration` → 登录后跳转算力重新校准仪式(`/onboarding/connect?mode=recalibrate`,复用 §6.10 校准流程,文案「检测到新设备,正在重新校准算力」)。完成后记录本机为该账号校准设备、重置连续在线稳定加成、回首页。首次注册的首次校准走标准 onboarding,不触发此分支。
+**按需手机校准（2026-11-02）**：密码、验证码和第三方普通登录正常进入首页；已有合法业务返回目标继续沿用现有安全返回规则。登录与冷启动恢复不调用手机登录核验来自动跳转，不因 `onboardingComplete=false`、`requiresRecalibration`、未绑定、需换绑或手机状态不可用而进入手机连接/校准页，也不据此停止原手机任务或修改校准记录。自动初始化引导仅由新账号注册成功流程发起；已有账号仍可在设备管理主动发起 `/onboarding/connect?mode=recalibrate`，其安装绑定、校准、换绑和显式激活规则沿用 §6.10。
 
 **会话状态机**:
 
@@ -1255,9 +1255,9 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 H5 首次注册完成后进入下载引导；旧校准入口直接跳转下载页，不采集、登记或激活手机算力，不发放手机登记奖励。普通注册礼按其独立规则执行。H5 登录显示网页版无法运行手机任务的提示。
 
-APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手机登录核验。服务端返回 BOUND 时直接进入首页，不重新校准；明确返回 NEEDS_CALIBRATION 或 REPLACEMENT_REQUIRED 时才引导相应流程，未知或失败显示可重试错误，不称已校准或已换机。不同安装登录先停止原手机未完成任务，再判断 E6 的 allowReplacement 和 minReplacementIntervalDays；不允许或处于冷却期时明确提示，已购设备不受影响。允许时重新采集并校准，显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。
+APP 普通登录及冷启动会话恢复直接进入首页或既有合法返回目标，不自动读取手机登录核验来决定路由，不要求手机已校准或已激活。新账号在 App 注册成功后仍由注册流程进入 estimator → connect；H5 注册仍进入注册成功与下载引导页。已有账号需要手机算力时从设备管理主动进入校准/激活，届时核验当前安装绑定与 E6 的 allowReplacement、minReplacementIntervalDays；明确不允许或处于冷却期时提示，未知或失败允许重试，不称已校准或已换机。显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。购机、置换、提现等其他业务门禁不因本次导航修改而变化。
 
-账号只允许当前执行安装领取或提交手机任务。PHONE/MOBILE 任务领取与完成以普通业务头 X-Phone-Installation-Id 与当前账号绑定匹配；心跳使用既有请求体 calibrationDeviceId 与绑定匹配，不重复添加安装头。非手机任务不受此头约束，正式 App 当前无任务领取/完成 API 入口，本次不新增。原绑定手机重新登录可恢复执行权，但只解除换机引起的暂停，保留运营或风控暂停，并等待新心跳。H5 不采集或上报原生手机运行状态；H5 登录本身不踢掉仍在线的原 APP，原 APP 离线后按服务端心跳有效期停止手机任务，不进行离线托管补收益。已购设备沿用各自运行和结算规则。
+账号只允许当前执行安装领取或提交手机任务。PHONE/MOBILE 任务领取与完成以普通业务头 X-Phone-Installation-Id 与当前账号绑定匹配；心跳使用既有请求体 calibrationDeviceId 与绑定匹配，不重复添加安装头。非手机任务不受此头约束，正式 App 当前无任务领取/完成 API 入口，本次不新增。原绑定手机执行恢复由用户主动设备操作与既有服务端规则负责；普通账号登录不自动触发手机状态变更。设备恢复只解除换机引起的暂停，保留运营或风控暂停，并等待新心跳。H5 不采集或上报原生手机运行状态；H5 登录本身不踢掉仍在线的原 APP，原 APP 离线后按服务端心跳有效期停止手机任务，不进行离线托管补收益。已购设备沿用各自运行和结算规则。
 
 2026-10-03 起采用最小业务校验：不再使用 AndroidKeyStore、挑战/签名/证书、包签名校验或证明资格有效期，不新增安全开关或资格 TTL。安装标识仅用于账号与当前手机绑定的业务匹配，不证明硬件真实性。保留服务端规则匹配、canonical 结果、幂等/revision、换机资格、任务状态与收益结算校验；手机心跳超时继续沿用现有运行规则。
 
@@ -1846,7 +1846,7 @@ flowchart LR
   R -->|领取 CTA 自动带码| G[注册 ?ref 锁定<br/>§4.1]
   R -.中途离开.-> P[pendingRefCode 暂存] -.此后任意入口注册.-> G
   G -->|bind first-wins + 礼包分桶 §4.3.2/4.3.5| S[注册成功页 · 仅 H5<br/>§4.1.1]
-  S -->|下载 APP 后登录| O[APP onboarding]
+  S -->|下载 APP 后登录| O[APP 首页 · 可主动管理手机算力]
   S -->|继续网页版| H[H5 首页]
 ```
 
