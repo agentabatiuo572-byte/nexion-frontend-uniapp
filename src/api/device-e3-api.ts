@@ -601,9 +601,9 @@ function capacityQuote(value: unknown): CanonicalCapacityReplaceQuote {
   if (parsed.payableUsdt !== parsed.targetPriceUsdt
       || parsed.sufficientFunds !== (parsed.walletBalanceUsdt >= parsed.payableUsdt)
       || (parsed.sourceDeviceId === null) !== (parsed.sourceDeviceName === null)) return invalid();
-  const belowCap = parsed.activeDevices < parsed.maxActiveDevices;
-  if (belowCap) {
-    if (decision !== "CAPACITY_AVAILABLE" || parsed.sourceDeviceId !== null) return invalid();
+  // Trial and unfulfilled-order reservations can fill slots below the active-device cap.
+  if (decision === "CAPACITY_AVAILABLE") {
+    if (parsed.activeDevices >= parsed.maxActiveDevices || parsed.sourceDeviceId !== null) return invalid();
   } else if (decision === "REPLACE_REQUIRED") {
     if (parsed.sourceDeviceId === null || parsed.sourceDeviceName === null) return invalid();
   } else if (decision === "NO_ACTIVE_DEVICE") {

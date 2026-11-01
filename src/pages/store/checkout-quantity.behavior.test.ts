@@ -24,7 +24,7 @@ function screen(overrides:Record<string,unknown>={}) {
     trialCheckoutSource:false,trialConversionMode:ref(false),trialQuoteUnavailable:ref(false),appliedTradeinView:ref(null),reAddingTradein:ref(false),
     remoteTradeinRecoveryRequired:ref(false),activeSession:ref(null),resumeSessionId:null,orderId:ref(null),
     remoteOrderFailure:ref(null),receiptWriteFailure:ref(null),pendingCheckoutCreate:ref(null),createdCheckoutOrder:ref(null),captureCheckoutRoute:()=>scope,
-    remoteApiEnabled:true,checkoutWalletReadable:ref(true),checkoutCapacityRequired:ref(false),
+    remoteApiEnabled:true,checkoutWalletReadable:ref(true),checkoutCapacityRequired:ref(false),checkoutOnboardingRequired:ref(false),
     isCurrentCheckoutRoute:()=>current,resumeServerOrder:vi.fn().mockResolvedValue(false),
     readAccountRow:vi.fn(),REMOTE_CHECKOUT_COMMANDS_KEY:'commands',toast:{warn:vi.fn()},t:ref(zh),
     navReplace:vi.fn().mockResolvedValue(true),promotionCheckoutHref,

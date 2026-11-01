@@ -140,10 +140,11 @@
             </view>
             <text v-if="trialZeroDue" class="checkout-note">{{ t.store.coTrialZeroNote }}</text>
             <view v-if="tradeinPlacementText" class="checkout-note"><text>{{ tradeinPlacementText }}</text></view>
-            <view v-if="checkoutCapacityRequired && !hasTradein && !remoteCapacityGate.canConfirm(false)" class="checkout-note checkout-note--warning" role="status" data-testid="checkout-capacity-notice">
+            <view v-if="(checkoutOnboardingRequired && !freeTrial.hasPendingConversion()) || (checkoutCapacityRequired && !hasTradein && !remoteCapacityGate.canConfirm(false))" class="checkout-note checkout-note--warning" role="status" data-testid="checkout-capacity-notice">
               <text>{{ checkoutCapacityMessage }}</text>
               <view class="checkout-capacity-actions">
-                <NxButton variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
+                <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
+                <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
                 <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
                 <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
               </view>
@@ -997,10 +998,14 @@ const KNOWN_KINDS: DeviceKind[] = [
 let interceptFired = false;
 let checkoutCapacityRead: Promise<boolean | undefined> | null = null;
 const remoteCapacityGate = reactive(new RemoteCapacityGate());
+const checkoutOnboardingRequired = ref(false);
+let checkoutSetupReturn = false;
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   interceptFired = false;
   tradeinAvailable.value = false;
   remoteCapacityGate.reset();
+  checkoutOnboardingRequired.value = false;
+  checkoutSetupReturn = false;
   checkoutCapacityRead = null;
   checkoutWalletRefreshSequence += 1;
   checkoutWalletRefreshing.value = false;
@@ -1052,6 +1057,7 @@ async function fireTradeinIntercept(interactive = false): Promise<boolean | unde
   const kind = p.id as DeviceKind;
   if (tradein.appliedTradein?.targetKind === kind) return;
   if (remoteApiEnabled) {
+    if (checkoutOnboardingRequired.value) return;
     const requestScope = captureCheckoutRoute();
     // Capacity is the mandatory server safety gate; trade-in eligibility is an
     // optional enhancement. A transient eligibility failure must not reject an
@@ -1104,9 +1110,12 @@ async function fireTradeinIntercept(interactive = false): Promise<boolean | unde
         return true;
       }
       return false;
-    }).catch((): undefined => {
+    }).catch((error): undefined => {
       if (!isCurrentCheckoutRoute(requestScope)) return;
-      toast.warn(t.value.store.coCapacityUnavailable);
+      const failure = asApiError(error);
+      checkoutOnboardingRequired.value = failure.kind === "http" && failure.status === 428
+        && failure.code === 428 && failure.message === "USER_ONBOARDING_REQUIRED";
+      toast.warn(checkoutOnboardingRequired.value ? t.value.store.coSetupRequired : t.value.store.coCapacityUnavailable);
     });
     return checkoutCapacityRead;
   }
@@ -1129,9 +1138,20 @@ async function fireTradeinIntercept(interactive = false): Promise<boolean | unde
   return false;
 }
 async function retryCheckoutCapacity() {
+  if (checkoutOnboardingRequired.value) { toast.warn(t.value.store.coSetupRequired); return; }
   if (remoteCapacityGate.pending) { await checkoutCapacityRead; return; }
   interceptFired = false;
   await fireTradeinIntercept();
+}
+function openCheckoutSetup() {
+  if (!checkoutOnboardingRequired.value || freeTrial.hasPendingConversion() || !isCurrentCheckoutRoute(captureCheckoutRoute())) return;
+  checkoutSetupReturn = true;
+  // #ifdef H5
+  navTo("/pages/register/success?setup=1");
+  // #endif
+  // #ifndef H5
+  navTo("/pages/onboarding/estimator");
+  // #endif
 }
 const checkoutBackHref = computed(() => promotionRoute.value
   ? promotionStoreHref(promotionRoute.value.activityId,promotionRoute.value)
@@ -1249,6 +1269,7 @@ const checkoutCapacityRequired = computed(() => remoteApiEnabled && !trialConver
   && !freeTrial.hasPendingConversion() && product.value?.productType !== "SHARE"
   && KNOWN_KINDS.includes(productId.value as DeviceKind));
 const checkoutCapacityMessage = computed(() => remoteCapacityGate.pending || !quantityReady.value ? t.value.store.coCapacityChecking
+  : checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : remoteCapacityGate.decision === "REPLACE_REQUIRED" ? slotsFullText.value
   : remoteCapacityGate.decision === "NO_ACTIVE_DEVICE" ? t.value.tradein.errNoActiveDevice
   : t.value.store.coCapacityUnavailable);
@@ -1302,6 +1323,10 @@ async function submitReview() {
     if (!ready || !isCurrentCheckoutRoute(scope)) return;
   }
   if (trialQuoteUnavailable.value || quantitySwitching.value || (remoteApiEnabled && !checkoutWalletReadable.value)) return;
+  if (checkoutOnboardingRequired.value && !freeTrial.hasPendingConversion() && !createdCheckoutOrder.value && !pendingCheckoutCreate.value) {
+    toast.warn(t.value.store.coSetupRequired);
+    return;
+  }
   // One tap joins the in-flight authority read (or retries its failed read),
   // then continues only for this same checkout. No second tap or timed delay.
   if (step.value === 'select-payment' && !createdCheckoutOrder.value && !pendingCheckoutCreate.value
@@ -1324,6 +1349,11 @@ function goConfirm() {
   if (purchaseUnavailable.value) {
     toast.warn(t.value.store.specUnavailable);
     navTo("/store");
+    return;
+  }
+  if (checkoutOnboardingRequired.value && !freeTrial.hasPendingConversion() && !createdCheckoutOrder.value && !pendingCheckoutCreate.value) {
+    toast.warn(t.value.store.coSetupRequired);
+    step.value = "select-payment";
     return;
   }
   if (step.value === "pay-instructions" || step.value === "confirm") {
@@ -1444,6 +1474,12 @@ async function onConfirmPay() {
   if (remoteApiEnabled) {
     const recovering = createdCheckoutOrder.value ? false : await resumeServerOrder(recoveryScope);
     if (recovering || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
+    if (checkoutOnboardingRequired.value && !freeTrial.hasPendingConversion()) {
+      confirming = false;
+      step.value = "select-payment";
+      toast.warn(t.value.store.coSetupRequired);
+      return;
+    }
     // Background polls retain the reviewed page; only a fresh authority read can authorize payment.
     const trialReady = await freeTrial.refreshRemote();
     if (!trialReady || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
@@ -2320,7 +2356,10 @@ function reassertTradeinContext() {
 onShow(() => {
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
-  if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) void resumeServerOrder();
+  if (checkoutSetupReturn) {
+    checkoutSetupReturn = false;
+    if (checkoutRouteInitialized) void initializeCheckout(beginCheckoutRoute());
+  } else if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) void resumeServerOrder();
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
@@ -2347,6 +2386,7 @@ onHide(() => {
   invalidateCheckoutRoute();
   interceptFired = false;
   remoteCapacityGate.reset();
+  checkoutOnboardingRequired.value = false;
   checkoutCapacityRead = null;
   if (dialogsOpen > 0) useUI().clearConfirmsBy(dialogOwner);
   // 页面被别的页压住(前向导航)时,让浮动条在上面那页露出这张发票;回来 onShow 再收起。

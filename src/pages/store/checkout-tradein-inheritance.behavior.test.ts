@@ -415,6 +415,7 @@ it.each(["a", "b"])("cookie bootstrap reads only bound account %s's recovery aft
   const deps = { ...refreshed, resumeServerOrder, initializeCheckout: resumeServerOrder, beginCheckoutRoute: () => refreshed.scope, interceptFired: false, tradeinAvailable: ref(false),
     keepCheckoutTarget: ref(null), keepCheckoutReadError: ref(false),
     remoteCapacityGate: { reset: vi.fn() }, checkoutWalletRefreshSequence: 0, checkoutWalletRefreshing: ref(false),
+    checkoutOnboardingRequired: ref(false), checkoutSetupReturn: false,
     quantityReady: ref(false), clearRemotePurchaseEligibility: vi.fn(), remoteOrderFailure: ref(null),
     receiptWriteFailure: ref(null), receiptRetrying: ref(false), restoreReceiptRecovery: vi.fn(),
     remoteOrderCommandKey: { clear: vi.fn() }, activeSession: ref(null), dialogsOpen: 0,

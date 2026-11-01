@@ -26,7 +26,7 @@ test("a late checkout eligibility or capacity response cannot open account B's s
   const guarded = intercept.indexOf("if (!isCurrentCheckoutRoute(requestScope)) return;");
   assert.ok(guarded >= 0 && guarded < intercept.indexOf("tradein.showChoice"));
   assert.ok(guarded >= 0 && guarded < intercept.indexOf("tradein.showCanonicalReplace"));
-  assert.match(intercept, /catch\(\(\): undefined => \{\s*if \(!isCurrentCheckoutRoute\(requestScope\)\) return;/);
+  assert.match(intercept, /catch\(\(error\): undefined => \{\s*if \(!isCurrentCheckoutRoute\(requestScope\)\) return;/);
   assert.match(checkout, /function checkoutRouteIdentity\(\) \{\s*const account = captureAccountScope\(\);\s*return \{ accountKey: account.accountKey, accountEpoch: account.epoch, productNo: productId.value \};/);
   assert.match(checkout, /function captureCheckoutRoute\(\): CheckoutRouteScope \{\s*return checkoutRouteFence.capture\(checkoutRouteIdentity\(\)\);/);
   assert.match(checkout, /function isCurrentCheckoutRoute\(scope: CheckoutRouteScope\): boolean \{\s*return pageAlive\s*&& pageVisible\s*&& checkoutRouteFence.isCurrent\(scope, checkoutRouteIdentity\(\)\);/);
