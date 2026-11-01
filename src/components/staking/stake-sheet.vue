@@ -296,9 +296,6 @@ async function submit() {
     let lease: RemoteIntentLease | null = null;
     try {
       lease = intentLease(pool.tierKey, submittedAmount);
-      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) {
-        return;
-      }
       await staking.openRemote(pool.tierKey, submittedAmount, lease.key);
       remoteGate.complete(lease, true);
       if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) return;

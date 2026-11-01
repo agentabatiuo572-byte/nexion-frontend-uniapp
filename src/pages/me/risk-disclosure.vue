@@ -1,6 +1,6 @@
 <!--
   Platform risk disclosure (ported from Nexion-prototype/app/(main)/me/risk-disclosure/page.tsx).
-  Required reading before first withdrawal / staking lock. The accept button gates
+  Opened from the sign-up terms, checkout policy links and the trust centre. The accept button gates
   on (a) scroll-to-bottom (uni-app scrolltolower plus a P-019-safe sentinel)
   and (b) an explicit checkbox tick.
   Acceptance persists via the risk-disclosure

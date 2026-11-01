@@ -360,7 +360,7 @@ const LEDGER = {
   "/api/repurchase/orders/:param/claim": "TBD-NAME: 同上(领取)",
   "/api/repurchase/orders/:param/early-withdraw": "TBD-NAME: 同上(提前赎回)",
   "/api/legal/risk-disclosure/acknowledgment": "TBD-NAME: 风险披露确认回写;PRD §9.11d.1 只定义了读端点",
-  "/api/legal/risk-disclosure/gates/:param/check": "TBD-NAME: BACKEND AppRiskDisclosureController 已实现;高敏动作前的披露闸校验(risk-disclosure-api.checkGate;提现与质押在用户确认之后、建单之前各调一次,幂等键复用为 operationId);PRD §9.11d.1 定义了读端点、§11.4a 定义了披露页与服务端权威确认态,该闸路径待同步",
+  "/api/legal/risk-disclosure/gates/:param/check": "TBD-NAME: BACKEND AppRiskDisclosureController 已实现;高敏动作前的披露闸校验(risk-disclosure-api.checkGate;2026-11-01 起 App 提现与质押不再调用,后端停用门槛见 uvel-docs 后端待办 B12);PRD §9.11d.1 定义了读端点、§11.4a 定义了披露页与服务端权威确认态,该闸路径待同步",
   "/api/withdrawals/attempts/:param/abandon": "当前文档: PC 管理端开发落地规格 §3 API D2; PRD v2 当前状态合同（提现未知结果核验与放弃 COMPLETE）",
   // 🔴 /api/stakes/* 与已登记的 /api/staking/* 是**同一批业务的两个路径名**,谁是真的没定论。
   //    交接书 U-2 已就此问后端。在他们回话之前,两边都按代码真实引用登记 —— 台账反映实情,
