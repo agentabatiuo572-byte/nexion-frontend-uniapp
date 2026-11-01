@@ -31,7 +31,7 @@
         <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying ? 'true' : 'false'" class="earnings-retry" @click="retryEarnings" @keydown.enter.prevent="retryEarnings" @keydown.space.prevent="retryEarnings"><text>{{ t.ui.retry }}</text></view>
       </template>
       <template v-else>
-        <text class="earnings-feedback__key">{{ t.home.techTodaysEarnings }}</text>
+        <text class="earnings-feedback__key">{{ t.home.techVsYesterdaySamePeriod }}</text>
         <text class="earnings-feedback__value" :class="deltaTone">{{ deltaText }}</text>
       </template>
     </view>

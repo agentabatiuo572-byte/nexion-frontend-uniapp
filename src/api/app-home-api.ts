@@ -61,7 +61,7 @@ export interface AppHomeOverview {
   earnings: {
     today: AppHomePeriod;
     todayVsYesterdayPct: number | null;
-    /** Today minus yesterday's same-period earnings; null until the backend sends it. */
+    /** Today's settled USDT minus yesterday's same-period amount; null when either amount is unknown. */
     todayVsYesterdayUsdt: number | null;
     week: AppHomePeriod;
     month: AppHomePeriod;

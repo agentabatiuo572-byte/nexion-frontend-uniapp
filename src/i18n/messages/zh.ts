@@ -708,6 +708,7 @@ export const zh: Messages = {
     // Hero (top of Home)
     // TechMoneyCard (hero money — source hardcoded these; keyed for bilingual parity)
     techTodaysEarnings: "今日收益",
+    techVsYesterdaySamePeriod: "较昨日同期",
     techEarningsCurrency: "USDT",
     techSettlementSnapshot: "结算概览",
     techVsYesterday: "↑ 较昨日 +5.2% · 已结算 142 单",

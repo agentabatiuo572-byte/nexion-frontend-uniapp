@@ -721,6 +721,7 @@ export const vi: Messages = {
     // Hero (top of Home)
     // TechMoneyCard (hero money — source hardcoded these; keyed for bilingual parity)
     techTodaysEarnings: "Thu nhập hôm nay",
+    techVsYesterdaySamePeriod: "So với cùng giờ hôm qua",
     techEarningsCurrency: "USDT",
     techSettlementSnapshot: "Tổng quan thu nhập",
     techVsYesterday: "↑ +5.2% so với hôm qua · đã hoàn tất 142 tác vụ",
