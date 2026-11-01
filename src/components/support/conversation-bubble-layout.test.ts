@@ -51,7 +51,7 @@ describe('bubble colour position in the visible viewport', () => {
       'rgba(95, 123, 12, 0.84)', 'rgba(59, 106, 39, 0.84)', 'rgba(22, 88, 66, 0.84)',
     ]);
     expect([0, 0.5, 1].map(position => bubbleFill(position, true))).toEqual([
-      'rgba(130, 59, 191, 0.9)', 'rgba(71, 63, 205, 0.9)', 'rgba(13, 67, 219, 0.9)',
+      'rgba(16, 92, 206, 0.9)', 'rgba(14, 79, 212, 0.9)', 'rgba(13, 67, 219, 0.9)',
     ]);
     expect(bubbleFill(NaN, true)).toBe(bubbleFill(0.5, true));
     expect(bubbleFill(-1, false)).toBe(bubbleFill(0, false));

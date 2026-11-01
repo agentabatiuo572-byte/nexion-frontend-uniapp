@@ -361,7 +361,7 @@ watch(filter, value => {
 .message-center .message-nav .message-icon-button { color:var(--v5-ink); }
 .message-nav .message-icon-button > svg { position:relative; z-index:1; }
 .message-nav :deep(.nx-liquid-glass) { background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-ink) 7%,transparent); box-shadow:var(--ui-glass-edge-shadow); backdrop-filter:blur(12px) saturate(125%); }
-:global([data-theme="light"] .message-center .message-nav .nx-liquid-glass) { background-color:color-mix(in srgb,var(--v5-surface) 78%,transparent); box-shadow:0 2px 6px color-mix(in srgb,var(--v5-ink) 12%,transparent),var(--ui-glass-edge-shadow); }
+:global([data-theme="light"] .message-center .message-nav .nx-liquid-glass) { background-color:color-mix(in srgb,var(--v5-surface) 78%,transparent); box-shadow:var(--v5-glass-shadow),var(--ui-glass-edge-shadow); }
 .message-center .message-heading { padding:0 4px; }
 .message-center .message-heading-row { min-height:44px; gap:10px; }
 .message-center .message-title { font-size:24px; line-height:32px; }

@@ -1023,7 +1023,7 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 }
 :global([data-theme="light"] .nx-conv-thread) {
   --nx-chat-incoming: rgba(255, 255, 255, .76);
-  --nx-chat-out-top: rgba(130, 59, 191, .9);
+  --nx-chat-out-top: rgba(16, 92, 206, .9);
   --nx-chat-out-bottom: color-mix(in srgb, color-mix(in srgb, var(--v5-brand) 75%, var(--v5-brand-deep)) 90%, transparent);
   --nx-chat-out-ink: #FFFFFF;
   --nx-chat-out-meta: #EEF2FF;

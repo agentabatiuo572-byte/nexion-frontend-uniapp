@@ -153,7 +153,10 @@ export default viewImplementation;
 .nx-glass-segments--vertical .nx-glass-option { flex: 0 0 auto; }
 .nx-glass-segments--navigation { --nx-tab-icon-scale: 1.09; height: var(--nx-tabbar-height, 56px); padding: 5px; gap: 2px; box-sizing: border-box; background: transparent; border-radius: 34px; }
 .nx-glass-segments--navigation .nx-glass-option { gap: 0; padding: 4px 2px; border-radius: 28px; }
-.nx-glass-segments--navigation .nx-flat-indicator { border-radius:999px; }
+/* Design system 03 §3.1: dark bottom navigation selects with a deeper black well than the main switch,
+   so the active tab reads clearly; light keeps the flat brand-soft capsule. */
+.nx-glass-segments--navigation .nx-flat-indicator { border-radius:999px; background: rgba(0,0,0,.7); box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
+[data-theme="light"] .nx-glass-segments--navigation .nx-flat-indicator { background: var(--v5-brand-soft); box-shadow: none; }
 @media (forced-colors: active) { .nx-flat-indicator { outline:1px solid Highlight;outline-offset:-1px; } }
 .nx-glass-segments--navigation :deep(.nx-tab__icon) { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex-shrink: 0; line-height: 0; filter: drop-shadow(0 1px 1px var(--v5-tabbar-ink-halo)); transition: transform 160ms cubic-bezier(.2,.8,.2,1); transform-origin: center; }
 .nx-glass-segments--navigation .nx-glass-option--selected :deep(.nx-tab__icon) { transform: translateY(-1px); }

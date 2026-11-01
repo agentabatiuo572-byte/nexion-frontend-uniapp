@@ -1,5 +1,5 @@
 /* Bundled application fonts. Unmodified files and licenses: src/static/fonts/.
-   Inter is the UI family for Latin, Vietnamese and figures (uvel-docs design-system DS-25);
+   Inter is the UI family for Latin and Vietnamese (uvel-docs design-system 01 §1.2);
    CJK text falls through to the system fonts in --font-v5. Each subset is one variable file
    (weight 400–600, optical size), selected by unicode-range so only the needed files load. */
 /* vietnamese */
