@@ -14,12 +14,12 @@
       <NxButton class="entry-cta" size="medium" :label="t.promotion.allProducts" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text><text aria-hidden="true">→</text></NxButton>
     </view>
     <view class="entry-list" :class="{ 'entry-list--home': mode==='home' }"><view class="entry-track" :style="mode==='home' ? { transform: `translateX(-${activeIndex * 100}%)` } : undefined">
-    <view v-for="(activity, index) in items" :key="activity.activityId" :inert="mode==='home' && index!==activeIndex ? true : undefined" :aria-hidden="mode==='home' && index!==activeIndex ? 'true' : undefined" :class="[mode==='home'?'entry-advert':'entry-event', 'entry-kind-'+activityKind(activity), { 'entry-advert--banner': mode==='home' && bannerReady(activity) }]" :data-color-scheme="theme.resolved" :data-activity-id="activity.activityId" :data-activity-kind="activityKind(activity)">
-      <view v-if="mode==='home'" class="entry-advert-target" role="button" :tabindex="active && index===activeIndex ? 0 : -1" :aria-hidden="!active || index!==activeIndex" :aria-label="localized(activity.title,locale.code)+' · '+t.promotion.browse" @click="active && navTo(promotionStoreHref(activity.activityId))" @keydown.enter.prevent="active && navTo(promotionStoreHref(activity.activityId))" @keydown.space.prevent="active && navTo(promotionStoreHref(activity.activityId))" />
+    <view v-for="(activity, index) in items" :key="activity.activityId" :inert="mode==='home' && index!==activeIndex ? true : undefined" :aria-hidden="mode==='home' && index!==activeIndex ? 'true' : undefined" :class="[mode==='home'?'entry-advert':eventLanding(activity)?'entry-landing':'entry-event', 'entry-kind-'+activityKind(activity), { 'entry-advert--banner': mode==='home' && bannerReady(activity) }]" :data-color-scheme="theme.resolved" :data-activity-id="activity.activityId" :data-activity-kind="activityKind(activity)">
+      <view v-if="mode==='home'" class="entry-advert-target" role="button" :tabindex="active && index===activeIndex ? 0 : -1" :aria-hidden="!active || index!==activeIndex" :aria-label="localized(activity.title,locale.code)+' · '+t.promotion.browse" @click="active && navTo(offerHref(activity))" @keydown.enter.prevent="active && navTo(offerHref(activity))" @keydown.space.prevent="active && navTo(offerHref(activity))" />
       <CatalogMachineImage v-if="mode==='home'&&bannerUrl(activity)" :key="bannerKey(activity)" v-show="bannerReady(activity)" class="entry-artwork" v-bind="bannerImageProps(activity)" />
       <view v-if="mode==='home'&&!bannerReady(activity)&&promoSlots(activity).length" class="entry-product-art" aria-hidden="true"><CatalogMachineImage v-for="slot in promoSlots(activity)" :key="slot.role" :sku="slot.sku" :image-url="slot.imageUrl" :scope-key="activity.activityId+':'+slot.role" :refresh-key="catalogRefreshKey" :class="slot.role==='purchase' ? 'entry-main-image' : 'entry-gift-image'" /></view>
       <text v-if="mode==='home'" class="entry-remaining">{{ homeRemaining(activity) }}</text>
-      <view v-if="mode==='events'&&activityKind(activity)!=='plain'" class="entry-event-art"><TeamArt :kind="activityArt(activity)" :size="activityKind(activity)==='spark'?88:144" /></view>
+      <view v-if="mode==='events'&&!eventLanding(activity)&&activityKind(activity)!=='plain'" class="entry-event-art"><TeamArt :kind="activityArt(activity)" :size="activityKind(activity)==='spark'?88:144" /></view>
       <view v-if="mode==='home'" class="entry-copy">
         <template v-if="!bannerReady(activity)">
         <text class="entry-label">{{ activityKind(activity)==='gift' ? t.promotion.giftBadge : t.promotion.activityBadge }}</text>
@@ -28,7 +28,7 @@
         </template>
         <text class="entry-home-deadline" role="button" tabindex="0" :aria-label="t.promotion.homeRulesLink" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity">{{ t.promotion.homeRulesLink }} ›</text>
       </view>
-      <view v-if="mode==='events'" class="entry-event-copy">
+      <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-copy">
         <text class="entry-eyebrow">{{ t.promotion.activityBadge }}</text>
         <text class="entry-title">{{ localized(activity.title,locale.code) }}</text>
         <view v-if="activity.rewardRules.length" class="entry-benefits">
@@ -40,12 +40,38 @@
         </view>
         <text v-if="activity.eligibilityMessage" class="promotion-copy entry-eligibility">{{ localized(activity.eligibilityMessage,locale.code) }}</text>
       </view>
-      <view v-if="mode==='events'" class="entry-event-footer">
+      <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-footer">
         <text class="entry-deadline">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
         <view class="entry-event-actions">
           <view class="promotion-link" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
           <NxButton class="entry-cta" size="medium" :label="t.promotion.browse" @click="navTo(promotionStoreHref(activity.activityId))"><text>{{ t.promotion.browse }}</text><text aria-hidden="true">→</text></NxButton>
         </view>
+      </view>
+      <!-- Purchase gift, first purchase and repurchase open their own landing page; the
+           terms link keeps opening the existing sheet. -->
+      <view v-for="card in landingCards(activity)" :key="card.kind" class="entry-card entry-press" :class="'entry-card--'+card.kind" :style="{ animationDelay: (index*0.06+0.06)+'s' }" role="link" tabindex="0" :aria-label="localized(activity.title,locale.code)" @click="navTo(promotionLandingHref(activity.activityId))" @keydown.enter.prevent="navTo(promotionLandingHref(activity.activityId))">
+        <template v-if="card.kind==='gift'">
+          <view class="entry-card__copy"><text class="entry-card__buy">{{ fmt(landing.cardBuy,{name:card.buyName}) }}</text><text class="entry-card__get">{{ landing.cardGet.split('{reward}')[0] }}<text class="entry-card__keep">{{ card.rewardText }}</text>{{ landing.cardGet.split('{reward}')[1] }}</text></view>
+          <view class="entry-card__main"><CatalogMachineImage class="entry-card__fill" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-main'" :refresh-key="catalogRefreshKey" /></view>
+          <view v-if="card.giftSku" class="entry-card__gift entry-pop"><CatalogMachineImage class="entry-card__fill" :sku="card.giftSku" :image-url="card.giftImage" :scope-key="activity.activityId+':card-gift'" :refresh-key="catalogRefreshKey" /></view>
+          <view class="entry-card__days"><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
+        </template>
+        <view v-else-if="card.kind==='first'" class="entry-card__stub">
+          <text class="entry-card__eyebrow">{{ landing.cardFirstEyebrow }}</text>
+          <text class="entry-card__amount" :class="{ 'entry-card__amount--long': card.parts.amount.length>4 }">{{ card.parts.amount }}</text>
+          <text class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text>
+        </view>
+        <view v-else class="entry-card__well">
+          <view class="entry-card__slot"><CatalogMachineImage class="entry-card__fill" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-slot'" :refresh-key="catalogRefreshKey" /><view class="entry-card__plus entry-pop" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view></view>
+          <view class="entry-card__bonus"><text class="entry-card__bonus-amount">+{{ card.parts.asset==='DEVICE' ? card.rewardText : card.parts.amount }}</text><text v-if="card.parts.asset!=='DEVICE'" class="entry-card__unit" :class="{ 'entry-card__unit--uvt': card.parts.asset==='UVT' }">{{ card.parts.unit }}</text></view>
+        </view>
+        <template v-if="card.kind==='first'"><view class="entry-card__tear" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--top" aria-hidden="true" /><view class="entry-card__notch entry-card__notch--bottom" aria-hidden="true" /></template>
+        <view v-if="card.kind!=='gift'" class="entry-card__body">
+          <view class="entry-card__head"><text class="entry-card__title">{{ localized(activity.title,locale.code) }}</text><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
+          <text class="entry-card__note">{{ card.kind==='first' ? landing.cardFirstNote : fmt(landing.cardRepurchaseNote,{name:card.buyName}) }}</text>
+          <view class="entry-card__link" role="button" tabindex="0" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }} ›</text></view>
+        </view>
+        <view v-else class="entry-card__link entry-card__link--corner" role="button" tabindex="0" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }} ›</text></view>
       </view>
     </view>
     </view></view>
@@ -72,13 +98,17 @@ import { navTo } from '@/lib/route';
 import { localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { createPromotionReadFence,isPromotionActive,promotionDisclosures,promotionStoreHref } from '@/lib/promotion-entry';
 import NxButton from '@/components/ui/nx-button.vue';
+import NxTag from '@/components/ui/nx-tag.vue';
 import TeamArt from '@/components/team/team-art.vue';
 import PromotionTerms from './promotion-terms.vue';
 import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { promotionMachineSlots } from '@/components/catalog-machine-image';
 import { readHomePromotions } from '@/store/home-promotions';
+import { landingCopy } from '@/i18n/promotion-landing';
+import { landingKind,landingProductImage,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
 const props=withDefaults(defineProps<{mode?:'home'|'events';activities?:PublicPromotion[];active?:boolean}>(),{mode:'home',active:true});
 const app=useApp(),locale=useLocaleStore(),theme=useTheme(),t=useT();
+const landing=computed(()=>landingCopy(locale.code));
 const items=ref<PublicPromotion[]>([]),status=ref<'idle'|'loading'|'ready'|'error'>('idle');
 const listRead=ref(false);
 const cursor=ref<string|null>(null),hasMore=ref(false),activeIndex=ref(0),termsActivity=ref<PublicPromotion|null>(null);
@@ -113,29 +143,30 @@ function bannerImageProps(activity:PublicPromotion){
 }
 function clear(resetBanners=true){items.value=[];listRead.value=false;cursor.value=null;hasMore.value=false;activeIndex.value=0;termsActivity.value=null;if(resetBanners){imageRefresh.value++;loadedBanners.value.clear();}}
 function publicName(id:string){void productCatalogState.status;return sessionVault.read()?getProduct(id)?.name??id:id;}
-function rewardSummaries(activity:PublicPromotion){return activity.rewardRules.map(rule=>{
-  const rewards=[rule.buyerReward,rule.inviterReward].filter((reward):reward is NonNullable<typeof reward>=>!!reward);
-  return { id:rule.ruleId, text: publicName(rule.productNo)+' · '+t.value.promotion.rulePer+' '+rule.minBuyQty+' · '+(rule.repeatMode==='PER_GROUP'?t.value.promotion.perGroup:t.value.promotion.oncePerOrder)+'\n'+rewards.map(reward=>(reward.beneficiaryRole==='BUYER'?t.value.promotion.buyer:t.value.promotion.inviter)+' · '+rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName)).join(' / ')+'\n'+[rule.maxGroups.mode==='LIMITED'?fmt(t.value.promotion.orderRewardLimit,{n:rule.maxGroups.value}):'',rule.maxGroupsPerPerson.mode==='LIMITED'?fmt(t.value.promotion.personRewardLimit,{n:rule.maxGroupsPerPerson.value}):''].filter(Boolean).join(' · ') };
-});}
 function homeRewardSummary(activity:PublicPromotion) {
   const reward=activity.rewardRules[0]?.buyerReward;
   if(!reward)return '';
   return localized(reward.disclosure.benefitDescription,locale.code)
     || rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName || (reward.type==='DEVICE'?publicName(reward.giftProductNo):null));
 }
-function homeRemaining(activity:PublicPromotion) {
-  // Use the published clock, refreshed with each offer read, rather than the device timezone.
-  const remaining=Date.parse(activity.endsAt)-Date.parse(activity.serverTime);
-  if(!Number.isFinite(remaining)||remaining<=0)return t.value.promotion.ended;
-  return remaining<86400000?t.value.promotion.endsToday:fmt(t.value.promotion.daysRemaining,{n:Math.ceil(remaining/86400000)});
-}
+function homeRemaining(activity:PublicPromotion){return promotionRemaining(activity,t.value.promotion);}
 function cycleOffer(delta:number){if(items.value.length)activeIndex.value=(activeIndex.value+delta+items.value.length)%items.value.length;}
 // Home offers rotate on their own; any change of offer (auto or tapped) restarts the countdown.
 let autoplayTimer:ReturnType<typeof setInterval>|null=null;
 function stopAutoplay(){if(autoplayTimer!==null){clearInterval(autoplayTimer);autoplayTimer=null;}}
 function startAutoplay(){stopAutoplay();if(props.mode==='home'&&props.active&&visible&&items.value.length>1&&!termsActivity.value)autoplayTimer=setInterval(()=>cycleOffer(1),5000);}
-const termsRules=computed(()=>termsActivity.value?rewardSummaries(termsActivity.value):[]);
-const termsText=computed(()=>termsActivity.value?[localized(termsActivity.value.terms,locale.code),t.value.promotion.deadline+' · '+displayDeadline(termsActivity.value.endsAt,locale.code)].join('\n\n'):'');
+const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,publicName):[]);
+const termsText=computed(()=>termsActivity.value?promotionTermsText(termsActivity.value,t.value.promotion,locale.code):'');
+// Purchase gift, first purchase and repurchase have a landing page; other offers keep the store filter.
+function offerHref(activity:PublicPromotion){return landingKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
+function eventLanding(activity:PublicPromotion){return props.mode==='events'?landingKind(activity):null;}
+function landingCards(activity:PublicPromotion){
+  const kind=eventLanding(activity),rule=activity.rewardRules[0];
+  if(!kind||!rule)return [];
+  void app.accountKey;void app.accountBindingEpoch;
+  const reward=rule.buyerReward,parts=rewardParts(activity,reward),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
+  return [{kind,parts,rewardText:rewardPartsText(parts),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
+}
 async function load(reset:boolean,preserveImages=false){
   if(!visible)return;
   if(!reset&&(status.value==='loading'||!hasMore.value)) return;
@@ -272,5 +303,63 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
   .entry-event { padding: var(--ui-space-inset); grid-template-columns: minmax(0,1fr) 104px; }
   .entry-title { font-size: 20px; }
   .entry-kind-coupon .entry-event-art { margin: -16px -16px -16px 0; }
+}
+/* Landing cards (P-58): plain surfaces, no play-type label, remaining days top right. */
+.entry-landing { display: block; }
+.entry-card { position: relative; display: block; overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); color: var(--v5-ink); cursor: pointer; animation: entry-card-rise .5s cubic-bezier(.2,.8,.2,1) backwards; }
+.entry-card:focus-visible, .entry-card__link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -3px; }
+.entry-card__fill { position: absolute; inset: 0; }
+.entry-card__link { display: inline-flex; align-items: flex-end; align-self: flex-start; box-sizing: border-box; min-height: 44px; margin: auto 0 -13px; padding: 12px 0 13px; font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+.entry-card__link--corner { position: absolute; left: 8px; bottom: 3px; z-index: 1; margin: 0; padding: 13px 10px; }
+.entry-card--gift { height: 184px; }
+.entry-card__copy { position: absolute; left: 18px; top: 20px; width: min(176px, 52%); }
+/* Purchase line stays body/500 and the gift line profile/600 in brand (04.2, 10.2). */
+.entry-card__buy { display: block; font: 500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.entry-card__get { display: block; margin-top: 4px; font: 600 var(--ui-type-profile)/var(--ui-type-profile-lh) var(--font-v5); color: var(--v5-brand); overflow-wrap: anywhere; }
+.entry-card__keep { white-space: nowrap; }
+.entry-card__days { position: absolute; right: 14px; top: 14px; z-index: 1; }
+.entry-card__main { position: absolute; right: 70px; top: 44px; width: 118px; height: 118px; }
+.entry-card__gift { position: absolute; right: 12px; top: 90px; width: 78px; height: 78px; }
+.entry-card--first { display: grid; grid-template-columns: 112px minmax(0,1fr); min-height: 132px; }
+.entry-card__stub { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 6px; background: var(--v5-surface-2); text-align: center; min-width: 0; }
+.entry-card__eyebrow { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.entry-card__amount { margin-top: 2px; font: 500 36px/40px var(--font-amount); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--v5-ink); }
+.entry-card__amount--long { font-size: 26px; line-height: 32px; }
+.entry-card__unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.entry-card__unit--uvt { color: var(--v5-nex-ink); }
+.entry-card__tear { position: absolute; left: 111px; top: 12px; bottom: 12px; border-left: 1.5px dashed var(--v5-border-strong); }
+.entry-card__notch { position: absolute; left: 103px; width: 18px; height: 18px; border-radius: 50%; background: var(--v5-bg); }
+.entry-card__notch--top { top: -9px; }
+.entry-card__notch--bottom { bottom: -9px; }
+.entry-card__body { display: flex; flex-direction: column; min-width: 0; padding: 16px 14px 16px 18px; }
+.entry-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.entry-card__title { min-width: 0; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.entry-card__note { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
+.entry-card--repurchase { display: flex; gap: 14px; min-height: 132px; box-sizing: border-box; padding: 10px; }
+.entry-card--repurchase .entry-card__body { flex: 1; padding: 6px 4px 6px 0; }
+.entry-card__well { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 104px; padding: 10px 0; border-radius: 16px; background: var(--v5-surface-2); }
+.entry-card__slot { position: relative; width: 64px; height: 64px; box-sizing: border-box; border: 1.5px dashed var(--v5-aura-sky); border-radius: 16px; }
+.entry-card__slot > .entry-card__fill { inset: 4px; }
+.entry-card__plus { position: absolute; right: -8px; top: -8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; background: var(--v5-aura-sky); color: var(--v5-bg); }
+.entry-card__bonus { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 3px; padding: 0 6px; }
+.entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: anywhere; }
+.entry-pop { animation: entry-card-pop .45s cubic-bezier(.2,.8,.2,1) .5s backwards; }
+.entry-press { transition: transform 120ms ease-out; }
+.entry-press:active { transform: scale(.97); }
+@keyframes entry-card-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes entry-card-pop { 0% { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@media (max-width:374px) {
+  .entry-card__copy { width: 56%; }
+  .entry-card__main { right: 56px; width: 100px; height: 100px; top: 52px; }
+  .entry-card__gift { width: 68px; height: 68px; top: 98px; }
+  .entry-card--first { grid-template-columns: 96px minmax(0,1fr); }
+  .entry-card__tear { left: 95px; }
+  .entry-card__notch { left: 87px; }
+  .entry-card__well { width: 92px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entry-card, .entry-pop { animation: none; }
+  .entry-press { transition: none; }
+  .entry-press:active { transform: none; }
 }
 </style>
