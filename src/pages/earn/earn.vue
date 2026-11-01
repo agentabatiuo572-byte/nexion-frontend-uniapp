@@ -61,7 +61,7 @@
       <view class="earn-fleet-head">
         <text class="earn-fleet-head__title" role="heading" aria-level="2">{{ t.home.myFleet }}</text>
         <SlotRing />
-        <view class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.taskPoolLineTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
+        <LoopScope class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.taskPoolLineTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
           <svg class="earn-capacity-info__glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <g class="earn-capacity-info__rocket">
               <path d="M8 14 5 17v3l4-2m7-4 3 3v3l-4-2" />
@@ -71,7 +71,7 @@
               <path class="earn-capacity-info__exhaust" d="M8 21v1m8-1v1" stroke-width="1.2" />
             </g>
           </svg>
-        </view>
+        </LoopScope>
       </view>
       <FleetStage />
 
@@ -117,6 +117,7 @@ import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.v
 
 import FleetStage from "@/components/earn/fleet-stage.vue";
 import SlotRing from "@/components/slot-ring.vue";
+import LoopScope from "@/components/loop-scope.vue";
 import { useEarningsLedger } from "@/composables/use-earnings-ledger";
 import MarketBoard from "@/components/earn/market-board.vue";
 import TaskCenter from "@/components/earn/task-center.vue";
@@ -301,8 +302,9 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 .earn-scope { color: var(--v5-ink-2); font: 400 12px/16px var(--font-v5); text-align: right; max-width: 50%; }
 .earn-hero__amount { position: relative; display: flex; align-items: baseline; gap: 4px; margin-top: 10px; font-family: var(--font-amount); font-weight: 600; letter-spacing: -.024em; line-height: 1; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .earn-hero__currency { font-size: 20px; font-weight: 500; color: var(--v5-ink-3); }
-.earn-hero__int { font-size: 52px; }
-.earn-hero__dec { font-size: 34px; color: var(--v5-ink-3); }
+/* -0.024em is set on each part so it scales with that part's size (em letter-spacing inherits as a fixed length). */
+.earn-hero__int { font-size: 52px; letter-spacing: -.024em; }
+.earn-hero__dec { font-size: 34px; color: var(--v5-ink-3); letter-spacing: -.024em; }
 .earn-hero__nex { position: relative; display: block; margin-top: 10px; font: 600 15px/20px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; }
 .earn-hero__nex-unit { margin-left: 3px; font: 500 12px/16px var(--font-v5); letter-spacing: .04em; }
 .earn-hero__recovery { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
@@ -335,6 +337,7 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 .earn-capacity-info :deep(.earn-capacity-info__rocket) { animation:earn-rocket-hop 1.6s ease-in-out infinite; }
 .earn-capacity-info :deep(.earn-capacity-info__flame) { transform-origin:12px 18.5px; animation:earn-rocket-flame .72s ease-in-out infinite; }
 .earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:earn-rocket-exhaust .9s ease-out infinite; }
+.earn-capacity-info.nx-loops-paused :deep(.earn-capacity-info__rocket), .earn-capacity-info.nx-loops-paused :deep(.earn-capacity-info__flame), .earn-capacity-info.nx-loops-paused :deep(.earn-capacity-info__exhaust) { animation-play-state: paused; }
 @keyframes earn-rocket-hop { 0%,100% { transform:translateY(1px); } 50% { transform:translateY(-1.5px); } }
 @keyframes earn-rocket-flame { 0%,100% { transform:scaleY(.6); opacity:.55; } 50% { transform:scaleY(1.15); opacity:1; } }
 @keyframes earn-rocket-exhaust { 0% { transform:translateY(0); opacity:0; } 25% { opacity:.65; } 100% { transform:translateY(2.5px); opacity:0; } }

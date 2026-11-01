@@ -151,7 +151,7 @@ function retryFleet() { invalidatePassiveTabRead("remote-fleet"); void app.refre
 .fleet-stage__bar { display: block; border-radius: 8px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .fleet-stage__loading { display: block; margin-top: 12px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); text-align: center; }
 .fleet-stage__skeleton-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
-.fleet-stage__skeleton-stats > view { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.fleet-stage__skeleton-stats > view { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .fleet-stage__skeleton-stats > view + view { border-left: 1px solid var(--v5-border); }
 
 .fleet-stage__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 200px; margin: 12px 16px 0; box-sizing: content-box; border-radius: 24px; border: 1.5px dashed var(--v5-border-strong); text-align: center; cursor: pointer; }
