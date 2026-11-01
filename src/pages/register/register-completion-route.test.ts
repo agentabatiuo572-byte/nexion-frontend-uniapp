@@ -38,12 +38,48 @@ const unacknowledged = {
   version: "v6", acknowledged: false, acknowledgedAt: null,
 };
 
-describe("registration proceeds directly without a legal gate", () => {
+describe("login and registration completion stay separate", () => {
   beforeEach(() => {
     vi.resetModules();
     state.current.mockReset();
     state.nav.mockReset();
     vi.stubGlobal("uni", { showLoading: vi.fn(), hideLoading: vi.fn() });
+  });
+
+  it.each([
+    [false, false, "NEEDS_CALIBRATION"],
+    [false, true, "REPLACEMENT_REQUIRED"],
+    [true, true, "BOUND"],
+    [false, false, new Error("phone state unavailable")],
+    [false, false, "pending"],
+  ])("native login enters Home without phone initialization (complete=%s, recalibrate=%s, status=%s)", async (onboardingComplete, requiresRecalibration, phoneStatus) => {
+    const gate = await import("@/lib/legal-terms-gate-runtime");
+    const phoneLogin = phoneStatus instanceof Error ? vi.fn().mockRejectedValue(phoneStatus)
+      : phoneStatus === "pending" ? vi.fn(() => new Promise(() => {})) : vi.fn().mockResolvedValue(phoneStatus);
+    const app = { bindAccount: vi.fn(), projectServerIdentity: vi.fn(), refreshHomeTruth: vi.fn(), setRemoteTaskForeground: vi.fn() };
+    const refreshFleet = vi.fn();
+    const refreshEarnings = vi.fn().mockResolvedValue(undefined);
+    const signIn = compile(functionSource(completionSource, ["completeSignIn"]), {
+      useAuth: () => ({ signIn: vi.fn(() => true), onboardingComplete }), useApp: () => app,
+      useSession: () => ({ sessionId: "session", claim: () => ({ requiresRecalibration }), markCalibrated: vi.fn() }),
+      remoteApiEnabled: true, authApi: {}, completedSignIns: new Map(), IDEMPOTENCY_TTL_MS: 600_000,
+      rebindAccountScopedStores: vi.fn(), readAccountSessionRecords: () => [{ sessionId: "session" }],
+      useProfile: () => ({ projectServerIdentity: vi.fn() }), hydrateCurrentProfileLocale: vi.fn(),
+      afterLegalTermsAcknowledged: gate.afterLegalTermsAcknowledged,
+      sessionVault: { read: () => ({ user: { userId: 7 } }) },
+      hasNativePhoneRuntime: () => true, getDeviceId: () => "native-login-fixture",
+      captureAccountScope: () => ({}), isCurrentAccountScope: () => true,
+      onboardingCalibrationApi: { phoneLogin }, refreshRemoteFleetAfterCatalog: refreshFleet,
+      refreshEarningsReleaseStatus: refreshEarnings, resolvePostSignInRoute, navReset: state.nav,
+    }, "completeSignIn");
+
+    expect(signIn({ identity: "user:7", serverProfile: { userId: 7 }, onboardingComplete })).toEqual({ ok: true });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(phoneLogin).not.toHaveBeenCalled();
+    expect(state.nav.mock.calls).toEqual([["/pages/index/index"]]);
+    expect(app.refreshHomeTruth).toHaveBeenCalledOnce();
+    expect(refreshFleet).toHaveBeenCalledWith("user:7");
+    expect(refreshEarnings).toHaveBeenCalledWith("user:7");
   });
 
   it.each([
