@@ -68,6 +68,13 @@ describe("order list provenance", () => {
     await expect(api({...envelope,orders:[{...order(),[field]:"1.000000"}]},"prod").list())
       .rejects.toMatchObject({message:"ORDER_RESPONSE_INVALID"});
   });
+  it("defaults to a single page of twenty", async () => {
+    const request = vi.fn().mockResolvedValue({ source: "server", sourceEnvironment: "PRODUCTION", runId: null,
+      serverCanonical: true, nextCursor: "ORD-next", orders: [order()] });
+    await createOrderApi({ request } as unknown as ApiClient, "prod").list();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ path: "/api/orders?pageSize=20" }));
+  });
   it("requests a bounded cursor page and exposes the next cursor", async () => {
     const request = vi.fn().mockResolvedValue({
       source: "server", sourceEnvironment: "PRODUCTION", runId: null,

@@ -96,6 +96,19 @@ beforeEach(() => {
 afterEach(()=>vi.unstubAllGlobals());
 
 describe("orders remote account and commerce run scope", () => {
+  it("reads only twenty orders until the next page is requested", async () => {
+    const page = (batch: number, cursor: string | null) => ({ ...list("A"), nextCursor: cursor,
+      orders: Array.from({ length: 20 }, (_, i) => ({ ...canonical("A"), orderNo: `ORD-${batch}-${i}` })) });
+    remote.orderApi.list.mockResolvedValueOnce(page(1, "ORD-1-19")).mockResolvedValueOnce(page(2, null));
+    const store = useOrders(); store.bindAccount("A");
+    await store.refreshRemote(); await Promise.resolve();
+    expect(store.orders).toHaveLength(20); expect(remote.orderApi.list).toHaveBeenCalledTimes(1);
+    expect(remote.orderApi.list).toHaveBeenLastCalledWith(null, 20);
+    await store.loadMoreRemote();
+    expect(store.orders).toHaveLength(40); expect(remote.orderApi.list).toHaveBeenLastCalledWith("ORD-1-19", 20);
+    await store.loadMoreRemote(); expect(remote.orderApi.list).toHaveBeenCalledTimes(2);
+  });
+
   it('an unresolved payment prevents cancellation at the shared store boundary',async()=>{
     const store=useOrders();store.bindAccount('A');beginOrderAction('A','pay','ORD-A',100);
     expect(await store.cancelOrderRemote('ORD-A')).toBe(false);expect(remote.orderApi.cancel).not.toHaveBeenCalled();
@@ -184,8 +197,8 @@ describe("orders remote account and commerce run scope", () => {
     await store.refreshRemote();
     await store.loadMoreRemote();
 
-    expect(remote.orderApi.list).toHaveBeenNthCalledWith(1, null, 50);
-    expect(remote.orderApi.list).toHaveBeenNthCalledWith(2, "ORD-new", 50);
+    expect(remote.orderApi.list).toHaveBeenNthCalledWith(1, null, 20);
+    expect(remote.orderApi.list).toHaveBeenNthCalledWith(2, "ORD-new", 20);
     expect(store.orders.map((order) => order.id)).toEqual(["ORD-new", "ORD-old"]);
     expect(store.nextCursor).toBeNull();
   });
@@ -236,7 +249,7 @@ describe("orders remote account and commerce run scope", () => {
     const found = await store.ensureRemoteOrder("ORD-target");
 
     expect(found?.id).toBe("ORD-target");
-    expect(remote.orderApi.list).toHaveBeenNthCalledWith(2, "ORD-new", 50);
+    expect(remote.orderApi.list).toHaveBeenNthCalledWith(2, "ORD-new", 20);
   });
 
   it("accepts the canonical same-account readback after cancellation", async () => {
