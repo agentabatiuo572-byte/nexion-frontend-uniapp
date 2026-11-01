@@ -989,7 +989,7 @@ body {
 @keyframes nx-home-art-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .nx-home-arrow { display: grid; place-items: center; border-radius: var(--v5-radius-full); background: var(--v5-surface-2); color: var(--v5-ink-2); box-shadow:var(--ui-glass-edge-shadow); }
 /* Shared capsule material: soft rim and broad inner refraction, like the wallet edge. */
-.nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow, .nx-conv-bubble {
+.nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow {
   --ui-button-rim: rgba(255,255,255,.10);
   --ui-button-highlight: rgba(255,255,255,.24);
   --ui-button-bottom: rgba(0,0,0,.28);
@@ -1004,7 +1004,7 @@ body {
   backdrop-filter: blur(12px) saturate(125%);
   -webkit-backdrop-filter: blur(12px) saturate(125%);
 }
-[data-theme="light"] .nx-frosted-button, [data-theme="light"] .promotion-action, [data-theme="light"] .reward-cta, [data-theme="light"] .nx-liquid-glass, [data-theme="light"] .nx-home-arrow, [data-theme="light"] .nx-conv-bubble {
+[data-theme="light"] .nx-frosted-button, [data-theme="light"] .promotion-action, [data-theme="light"] .reward-cta, [data-theme="light"] .nx-liquid-glass, [data-theme="light"] .nx-home-arrow {
   --ui-button-rim: rgba(73,94,125,.12);
   --ui-button-highlight: rgba(255,255,255,.85);
   --ui-button-bottom: rgba(87,115,155,.18);
