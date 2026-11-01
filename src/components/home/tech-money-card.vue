@@ -40,12 +40,13 @@
 
 <script setup lang="ts">
 import { formatGroupedAmount } from "@/lib/amount-display";
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
+import { useCountUp } from "@/composables/use-count-up";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useDataVisibility } from "@/store/data-visibility";
 import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
@@ -87,25 +88,9 @@ const deltaTone = computed(() => visibility.hidden || vsYesterday.value === null
 // Mock-only streaming number. Remote mode shows the exact server snapshot; the only motion is a
 // one-time entrance count from 0 to that snapshot (07 首页收益入场), skipped for reduced motion.
 const display = useTicker(() => remoteToday.value ?? Math.max(todayTotal.value, 0.06), 0.0009, 1100, !remoteApiEnabled);
-const counting = ref<number | null>(null);
-let countFrame = 0;
-let counted = false;
-watch(remoteToday, (value) => {
-  if (counted || value === null) return;
-  counted = true;
-  if (visibility.hidden || typeof requestAnimationFrame === "undefined" || typeof window === "undefined"
-    || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-  const start = Date.now();
-  const step = () => {
-    const progress = Math.min(1, (Date.now() - start) / 900);
-    counting.value = progress < 1 ? value * (1 - Math.pow(1 - progress, 3)) : null;
-    if (progress < 1) countFrame = requestAnimationFrame(step);
-  };
-  countFrame = requestAnimationFrame(step);
-}, { immediate: true });
-onUnmounted(() => { if (countFrame) cancelAnimationFrame(countFrame); });
+const shownToday = useCountUp(remoteToday);
 
-const amountParts = computed(() => formatGroupedAmount(counting.value ?? remoteToday.value ?? display.value).split("."));
+const amountParts = computed(() => formatGroupedAmount(shownToday.value ?? display.value).split("."));
 const intPart = computed(() => amountParts.value[0]);
 const cents = computed(() => amountParts.value[1]);
 // The masked amount keeps the 64px size so it does not reveal the magnitude.

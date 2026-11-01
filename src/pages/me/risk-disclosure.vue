@@ -107,7 +107,7 @@
           <text v-else>{{ readingSecondsRemaining > 0 ? fmt(w.minimumReadingWait, { n: readingSecondsRemaining }) : w.acceptCta }}</text>
         </view>
         <text v-if="risk.error && disclosure && !accepted" class="block text-center" :style="hintTextStyle" role="alert">{{ w.acknowledgmentError }}</text>
-        <text class="block text-center" :style="disclaimerStyle">{{ disclaimerText }}</text>
+        <text class="block text-center" :style="disclaimerStyle">{{ w.disclaimer }}</text>
       </view>
     </view>
     </scroll-view>
@@ -139,9 +139,6 @@ const locale = useLocaleStore();
 const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
-// BUG 180: 「我的」 tab name comes from the locale dictionary, not from a copy
-// string that hardcoded "Me" into the zh/vi body. One template, three locales.
-const disclaimerText = computed(() => fmt(w.value.disclaimer, { tab: t.value.tabs.me }));
 const disclosure = computed(() => risk.current);
 // BUG #60: an unprovisioned/ambiguous region mapping is a configuration fact, not a
 // transient failure. Telling the user to retry (and offering the retry CTA) hides the
