@@ -474,13 +474,15 @@ function handleQuickItem(item: QuickItem) {
   navTo(item.href);
 }
 
-// Same route as the support hub's live chat; the guard keeps a double tap from pushing twice.
+// Same route as the support hub's live chat; the guard keeps a double tap from pushing twice, and a
+// route that resolves after the user has left Me does not navigate.
 const openingChat = ref(false);
 async function openSupportChat() {
   if (openingChat.value) return;
   openingChat.value = true;
   try {
-    navTo(await advisorChatRoute(conversations));
+    const route = await advisorChatRoute(conversations);
+    if (remoteMeActive) await navTo(route);
   } finally {
     openingChat.value = false;
   }
