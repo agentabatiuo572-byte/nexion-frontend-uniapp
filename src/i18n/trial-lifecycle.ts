@@ -77,3 +77,9 @@ export function formatTrialRemaining(ms: number, longPattern = trialLifecycleCop
   return [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
     .map(value => String(value).padStart(2, '0')).join(':');
 }
+
+/** Compact countdown on the Home trial card and the Earn trial stage, e.g. "1d 23h:12". */
+export function formatTrialCountdown(ms: number): string {
+  const minutes = Math.max(0, Math.ceil(ms / 60000));
+  return `${Math.floor(minutes / 1440)}d ${Math.floor(minutes % 1440 / 60)}h:${String(minutes % 60).padStart(2, '0')}`;
+}
