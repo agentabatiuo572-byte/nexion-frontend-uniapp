@@ -806,9 +806,12 @@ const trialCreditText = computed(() => {
   const nex = `${formatGroupedAmount(quote.rewardNEX)} UVT`;
   return quote.remainderUSD > 0 ? `${formatGroupedAmount(quote.remainderUSD)} USDT · ${nex}` : nex;
 });
-const promoRowLabel = computed(() => fmt(t.value.store.coRowTrialDiscount, {
-  pct: (trialCfg.value.discountRate * 100).toFixed(0), cap: String(Number(trialCfg.value.discountCapUSD)),
-}));
+// An empty trial discount cap means no cap: drop the "up to" clause instead of printing "0".
+const promoRowLabel = computed(() => {
+  const pct = (trialCfg.value.discountRate * 100).toFixed(0);
+  const cap = trialCfg.value.discountCapUSD;
+  return cap === null ? fmt(t.value.store.coRowTrialDiscountNoCap, { pct }) : fmt(t.value.store.coRowTrialDiscount, { pct, cap: String(cap) });
+});
 
 // ─── Voucher redemption ──────────────────────────────────────────────────
 // Best claimed-unused voucher applicable to this SKU at its base price. The
