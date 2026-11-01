@@ -7,7 +7,7 @@
       <text class="block learning-title" style="margin-top:var(--v5-space-2);font-size:15px;font-weight:600">{{ featuredCourse.title }}</text>
       <text class="block learning-meta">{{ courseMeta }}</text>
       <view v-if="featuredCourse.progress > 0" class="learning-progress" role="progressbar" :aria-label="copy.progress.replace('{progress}', String(featuredCourse.progress))" :aria-valuenow="featuredCourse.progress" :aria-valuemin="0" :aria-valuemax="100">
-        <view class="learning-progress-fill" :style="{ width: `${featuredCourse.progress}%` }" />
+        <view v-viz-inview class="learning-progress-fill nx-viz-grow" :style="{ width: `${featuredCourse.progress}%` }" />
       </view>
       <view class="learning-footer">
         <text v-if="featuredCourse.progress > 0" class="learning-progress-label">{{ copy.progress.replace('{progress}', String(featuredCourse.progress)) }}</text>

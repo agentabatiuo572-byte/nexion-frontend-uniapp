@@ -13,7 +13,7 @@
     <view v-if="variant !== 'home' && isExpanded" :id="`trial-device-details-${variant}`" class="trial-device-row__body">
       <text v-if="presentation.status.value === 'grace'" class="trial-device-row__state">{{ copy.grace }}</text>
       <view class="trial-device-row__credit-block"><view class="trial-device-row__credit"><text>{{ copy.availableCredit }}</text><text v-if="variant === 'inventory'" class="trial-device-row__amount font-mono-tabular">{{ offsetParts[0] }}<text class="trial-device-row__dec">{{ offsetParts[1] }}</text></text><text v-else class="trial-device-row__amount font-mono-tabular">{{ money(presentation.offsetUSD.value) }}</text></view>
-      <view v-if="!hidePersonalData" class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
+      <view v-if="!hidePersonalData" class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view v-viz-inview :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
       <view v-if="!presentation.presentationReady.value" class="trial-device-row__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view v-if="!presentation.presentationReady.value" class="trial-device-row__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
@@ -139,7 +139,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__credit { margin-top:0; }
 .trial-device-row--inventory .trial-device-row__amount { font-family:var(--font-amount); font-size:22px; line-height:28px; font-weight:500; letter-spacing:-.02em; }
 .trial-device-row--inventory .trial-device-row__progress { height:6px; }
-.trial-device-row--inventory .trial-device-row__progress > view { animation:nx-viz-grow 1400ms cubic-bezier(.16,1,.3,1) both; }
+.trial-device-row__progress > view { animation:nx-viz-grow 1400ms cubic-bezier(.16,1,.3,1) both; }
 .trial-device-row--inventory .trial-device-row__actions { margin-top:12px; }
 .trial-device-row__actions > .trial-device-row__cancel--inline { margin:0 auto 0 0; border-top:0; min-height:44px; padding:0; color:var(--v5-ink-3); font:500 13px/18px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__main { gap:12px; }
@@ -178,5 +178,5 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
   .trial-device-row--inventory .trial-device-row__time { font-size:11px; line-height:1.2; }
   .trial-device-row--inventory .trial-device-row__remaining { font-size:12px; line-height:1.2; }
 }
-@media (prefers-reduced-motion:reduce) { .trial-device-row__chevron svg { transition:none; } }
+@media (prefers-reduced-motion:reduce) { .trial-device-row__chevron svg { transition:none; } .trial-device-row__progress > view { animation:none; } }
 </style>

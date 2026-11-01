@@ -27,7 +27,7 @@
       </view>
       <view v-if="detail.event.kind !== 'regional' && detail.targetValue > 0" class="event-section event-section--plain">
         <view class="event-row"><text class="event-heading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
-        <view class="event-progress" role="progressbar" :aria-label="copy.progress" :aria-valuenow="Math.min(detail.progressValue, detail.targetValue)" :aria-valuemin="0" :aria-valuemax="detail.targetValue"><view :style="{ width: `${Math.min(100, detail.progressValue / detail.targetValue * 100)}%` }" /></view>
+        <view class="event-progress" role="progressbar" :aria-label="copy.progress" :aria-valuenow="Math.min(detail.progressValue, detail.targetValue)" :aria-valuemin="0" :aria-valuemax="detail.targetValue"><view v-viz-inview class="nx-viz-grow" :style="{ width: `${Math.min(100, detail.progressValue / detail.targetValue * 100)}%` }" /></view>
       </view>
       <view v-if="detail.myRewardAmount != null" class="nx-glass-card event-section">
         <view class="event-row"><text class="event-heading">{{ copy.myReward }}</text><text>{{ formatUsd(detail.myRewardAmount, 'detail') }}</text></view>

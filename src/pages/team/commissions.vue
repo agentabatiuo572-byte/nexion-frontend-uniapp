@@ -364,7 +364,11 @@ const filterOptions = computed(() => [
 .reward-income-summary > view + view > text:last-child { color: var(--v5-warning); }
 .reward-income-summary > view:first-child > text:last-child { font-family: var(--font-metric); }
 .reward-income-lifetime__amounts > text + text::before { content: "· "; }
-.commission-split { display: flex; gap: 3px; height: 8px; margin-top: 14px; }
+/* Data-visual entrance (DS-29): the split reveals left to right once its data arrives. Its segments are
+   flex shares, so the bar is uncovered rather than grown from width 0. */
+.commission-split { display: flex; gap: 3px; height: 8px; margin-top: 14px; animation: commission-split-grow 1400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes commission-split-grow { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .commission-split { animation: none; } }
 .commission-split > view { min-width: 4px; border-radius: 999px; background: var(--v5-brand); }
 .commission-split > view + view { background: var(--v5-warning); }
 .reward-income-summary { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-top: 14px; }

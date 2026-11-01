@@ -83,7 +83,7 @@
 
       <!-- Trial-cycle progress -->
       <view class="mt-3 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
-        <view class="h-full rounded-full" :style="{ width: progressPct + '%', background: tint }" />
+        <view v-viz-inview class="h-full rounded-full nx-viz-grow" :style="{ width: progressPct + '%', background: tint }" />
       </view>
 
       <!-- Bottom row — early-buy savings (left) + de-emphasized buy pill (right) -->

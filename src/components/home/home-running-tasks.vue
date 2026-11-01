@@ -13,7 +13,7 @@
       <text class="nx-feed-est font-mono-tabular">{{ t.home.feedEstimated }} {{ visibility.mask(formatUsd(row.reward, 'detail', true)) }}</text>
     </view>
     <view class="nx-feed-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden ? undefined : row.pct" aria-valuemin="0" aria-valuemax="100">
-      <view v-if="!visibility.hidden" class="nx-feed-progress__fill" :style="{ width: `${row.pct}%` }" />
+      <view v-if="!visibility.hidden" v-viz-inview class="nx-feed-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
     </view>
   </view>
 </template>

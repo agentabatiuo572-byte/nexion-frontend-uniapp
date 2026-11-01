@@ -2,7 +2,7 @@
   <view class="home-action-row" :data-action-key="row.key" :role="row.action ? undefined : 'link'" :tabindex="row.action ? undefined : 0"
     @click="!row.action && emit('open')" @keydown.enter.prevent="activateRow">
     <view v-if="row.progress" class="home-action-ring" :aria-label="visibility.hidden ? row.title + ' · ' + visibility.mask('') : row.progressLabel">
-      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--v5-surface-3)" stroke-width="3"/><circle v-if="!visibility.hidden && row.progress.total" cx="18" cy="18" r="14" fill="none" stroke="var(--v5-brand)" stroke-width="3" stroke-linecap="round" :stroke-dasharray="`${row.progress.done! / row.progress.total * 87.965} 87.965`" transform="rotate(-90 18 18)"/></svg>
+      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--v5-surface-3)" stroke-width="3"/><circle v-if="!visibility.hidden && row.progress.total" v-viz-inview cx="18" cy="18" r="14" fill="none" class="home-action-ring__arc" stroke="var(--v5-brand)" stroke-width="3" stroke-linecap="round" :stroke-dasharray="`${row.progress.done! / row.progress.total * 87.965} 87.965`" transform="rotate(-90 18 18)"/></svg>
       <text class="home-action-ring__count" aria-hidden="true">{{ visibility.mask(row.progress.total ? `${row.progress.done}/${row.progress.total}` : '–') }}</text>
     </view>
     <view v-else class="home-action-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><template v-if="row.key==='phone'"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></template><template v-else-if="row.key==='security'"><path d="m12 3 8 4v5c0 5-8 9-8 9s-8-4-8-9V7z"/><path d="m8 12 3 3 5-6"/></template><template v-else><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4m8-4v4M8 12h8M8 16h4"/></template></svg></view>
@@ -38,6 +38,10 @@ function activateRow(event: KeyboardEvent) { if (!props.row.action && !event.rep
 .home-action-row:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-3px;border-radius:var(--ui-radius-icon); }
 .home-action-icon,.home-action-ring { width:36px;height:36px;flex:none;position:relative;display:grid;place-items:center; }
 .home-action-icon { border-radius:var(--ui-radius-icon);background:var(--v5-surface-2);color:var(--v5-ink-2); }
+/* Data-visual entrance (DS-29): the arc draws from zero once the row scrolls into view (v-viz-inview). */
+.home-action-ring__arc { animation: home-action-ring-draw 1400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes home-action-ring-draw { from { stroke-dasharray: 0 87.965; } }
+@media (prefers-reduced-motion: reduce) { .home-action-ring__arc { animation: none; } }
 .home-action-ring__count { position:absolute;inset:0;display:grid;place-items:center;font:600 9.5px/1 var(--font-v5);font-variant-numeric:tabular-nums;color:var(--v5-ink); }
 .home-action-copy { flex:1;min-width:0; }
 .home-action-title { display:block;font-size:var(--ui-text-body);font-weight:500;line-height:20px;color:var(--v5-ink);overflow-wrap:anywhere; }
