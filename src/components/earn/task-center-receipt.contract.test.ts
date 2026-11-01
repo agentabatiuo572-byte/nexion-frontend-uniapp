@@ -1,5 +1,6 @@
 import { dayOnePageObservationFixture } from "@/lib/day-one-page-observation.test-support";
 import { useCountUp } from "@/composables/use-count-up";
+import { useEarningsLedger } from "@/composables/use-earnings-ledger";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -128,6 +129,7 @@ async function setup() {
     if(id==='vue')return Vue;
     if(id==='@/composables/use-tab-page-lifecycle')return tabLifecycle;
     if(id==='@/composables/use-count-up')return{useCountUp};
+    if(id==='@/composables/use-earnings-ledger')return{useEarningsLedger};
     if(id==='@dcloudio/uni-app')return{onShow:(f:Function)=>shows.push(f),onHide:(f:Function)=>hides.push(f)};
     if(id==='@/store/app')return{useApp:()=>app};
     if(id==='@/store/ui')return{toast};
@@ -155,12 +157,14 @@ async function setup() {
   const renderer=Vue.createRenderer<any,any>({
     insert:(child,p,anchor)=>{child.parent=p;p.children??=[]; const at=anchor?p.children.indexOf(anchor):-1;if(at<0)p.children.push(child);else p.children.splice(at,0,child);},
     remove:n=>{if(n.parent)n.parent.children=n.parent.children.filter((x:any)=>x!==n);},
-    createElement:tag=>({tag,props:{},children:[]}),createText:text=>({text,children:[]}),createComment:text=>({comment:text,children:[]}),setText:(n,text)=>{n.text=text;},setElementText:(n,text)=>{n.text=text;},parentNode:n=>n.parent??null,nextSibling:()=>null,patchProp:(n,k,_o,v)=>{n.props[k]=v;},
+    createElement:tag=>({tag,props:{},children:[],style:{}}),createText:text=>({text,children:[]}),createComment:text=>({comment:text,children:[]}),setText:(n,text)=>{n.text=text;},setElementText:(n,text)=>{n.text=text;},parentNode:n=>n.parent??null,nextSibling:()=>null,patchProp:(n,k,_o,v)=>{n.props[k]=v;},
   });
   let taskState:any; const child={...task,setup:(p:any,c:any)=>{taskState=task.setup(p,c);return taskState;}};
   const content={...parent,render:()=>Vue.h(child)};
   const root:any={children:[]}; const mounted=renderer.createApp({setup(){Vue.provide(tabLifecycle.TAB_LIFECYCLE,lifecycle);return()=>Vue.h(content);}}); mounted.mount(root);
   let active=true; const stop=()=>{if(active){active=false;mounted.unmount();}}; stopped.push(stop); await flush();
+  const toggleHistory=(n:any):any=>String(n.props?.class??'').split(' ').includes('earn-tc__row')?n:(n.children??[]).map(toggleHistory).find(Boolean);
+  toggleHistory(root).props.onClick(); await flush();
   const find=(tag:string):any=>{const walk=(n:any):any=>n.tag===tag?n:(n.children??[]).map(walk).find(Boolean);return walk(root);};
   return {app,ui,task:taskState,root,stop,find,hide:()=>hides.forEach(f=>f()),show:()=>shows.forEach(f=>f()),rebind:(key:string)=>app.bindAccount(key)};
 }

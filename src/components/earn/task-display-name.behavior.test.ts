@@ -21,7 +21,8 @@ const surfaces = [
   ["Home device", block(home, hasClass("hf-device-task"))],
   ["Home activity", parse(feed).descriptor.template!.content],
   ["Earn collapsed", block(card, hasClass("nx-device-current-task"))],
-  ["Earn expanded / device detail", block(card, when("task && !reconnecting"))],
+  ["Earn expanded / device detail", block(card, when("!stage && task && !reconnecting"))],
+  ["P62 Earn stage", block(card, node => node.tag === "template" && when("stage")(node))],
   ["phone reconnect", block(card, when("reconnecting && device.kind === 'phone'"))],
   ["device inventory", block(inventory, hasClass("device-inventory-row__task"))],
   ["deactivation preview", block(deactivate, nameText)],
@@ -45,14 +46,17 @@ describe("ordinary task names use the configured name only", () => {
     for (const name of ["PC 短文本嵌入", "PC 长文索引"]) {
       const task = { id: "CV2-INTERNAL-TASK", type: name, model: "TEST_BGE_M3_V1", client: "INTERNAL_EXECUTOR",
         location: "INTERNAL_LOCATION", category: "EM", status: "RUNNING", reward: 0.00001, protocolVersion: 2 };
-      const output = text(render(template, { task, device: { currentTask: task, kind: "phone" },
+      const tree = render(template, { task, device: { currentTask: task, kind: "phone" },
         rows: [{ name, status: "RUNNING", reward: task.reward, pct: 35 }], visibility: { hidden: false, mask: String },
         t: zh, computeCopy: { statuses: { RUNNING: "RUNNING" } }, expanded: false, reconnecting: _name === "phone reconnect",
-        active: true, taskRunning: true, sectionLabelStyle: {}, progressPct: 35, progressLabel: "35%",
+        active: true, taskRunning: true, stage: _name === "P62 Earn stage", stageJob: "task", stageOffline: false, jobRunning: true,
+        sectionLabelStyle: {}, progressPct: 35, progressLabel: "35%",
         progressBarStyle: {}, awaitingExecutionResultConfirmation: false, reconnectHoldText: "hold",
-        formatUsd: () => "$0.000010", formatAmount: String }));
+        formatUsd: () => "$0.000010", formatAmount: String });
+      const output = text(tree);
       expect(output).toContain(name);
       for (const hidden of [task.model, task.client, task.location, task.id]) expect(output).not.toContain(hidden);
+      if (_name === "P62 Earn stage") expect(tree.children.find((node: any) => node.props?.label)?.props.label).toBe(name);
     }
   });
 
