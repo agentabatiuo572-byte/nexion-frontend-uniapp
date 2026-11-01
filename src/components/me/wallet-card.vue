@@ -334,11 +334,11 @@ const usdtFitStyle = computed<CSSProperties>(() => ({
 .nx-wallet--compact .nx-wallet-valuation > text { min-width: 0; overflow-wrap: anywhere; }
 @media (min-width: 375px) { .nx-wallet-total { font-weight: 550; } }
 
-/* UI-OPT-046: visible color flow under a soft, thick glass edge, amber + teal (design system 01 §1.1.2).
+/* UI-OPT-046: visible color flow under a soft, thick glass edge, purple + teal (the one purple exception, design system 01 §1.1.2).
    Only the decorative layer moves; amounts and controls stay still. */
 .nx-wallet--compact > .nx-wallet-summary {
-  --wallet-glow-base: linear-gradient(135deg, rgba(30,28,24,.9), rgba(13,27,34,.94));
-  --wallet-glow-amber: rgba(255,203,77,.54);
+  --wallet-glow-base: linear-gradient(135deg, rgba(28,27,43,.9), rgba(13,27,34,.94));
+  --wallet-glow-violet: rgba(137,103,248,.54);
   --wallet-glow-teal: rgba(45,212,191,.36);
   --wallet-glow-accent: rgba(157,214,103,.10);
   --wallet-glow-rim: rgba(176,196,215,.14);
@@ -373,7 +373,7 @@ const usdtFitStyle = computed<CSSProperties>(() => ({
   width: 61%;
   height: 84%;
   border-radius: 32% 68% 55% 45% / 64% 36% 64% 36%;
-  background: var(--wallet-glow-amber);
+  background: var(--wallet-glow-violet);
   opacity: .65;
   filter: blur(42px);
   animation: wallet-color-morph 28s ease-in-out infinite, wallet-edge-pressure 24s ease-in-out infinite;
@@ -407,7 +407,7 @@ const usdtFitStyle = computed<CSSProperties>(() => ({
 .nx-wallet--compact .nx-wallet-particle { animation: none !important; }
 :global([data-theme="light"] .nx-wallet--compact > .nx-wallet-summary) {
   --wallet-glow-base: linear-gradient(135deg, rgba(250,252,255,.86), rgba(242,248,255,.88));
-  --wallet-glow-amber: rgba(198,131,22,.27);
+  --wallet-glow-violet: rgba(157,130,244,.27);
   --wallet-glow-teal: rgba(12,196,214,.225);
   --wallet-glow-accent: rgba(87,210,220,.14);
   --wallet-glow-rim: rgba(103,135,185,.10);
