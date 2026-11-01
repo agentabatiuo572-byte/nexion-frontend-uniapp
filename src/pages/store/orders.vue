@@ -8,7 +8,7 @@
   user, so a "track your shipment" line doesn't apply — see 更新日志 2026-07-08).
 -->
 <template>
-  <AppChassis active="store">
+  <AppChassis active="store" :scroll-load-key="`${statusFilter}:${app.accountBindingEpoch}`" @scroll-load-more="scrollPager.loadMoreManually()">
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
@@ -258,7 +258,7 @@ async function loadMoreOrders() {
   }
 }
 const scrollAnchor = ref<unknown>(null);
-useManualScrollLoadMore(scrollAnchor, {
+const scrollPager = useManualScrollLoadMore(scrollAnchor, {
   enabled: () => remoteApiEnabled && remoteSessionReady.value && ordersPageActive && !commerceOrdersUnavailable.value,
   hasMore: () => Boolean(orders.nextCursor),
   loading: () => remoteOrdersRefreshing.value || orders.loadingMore,

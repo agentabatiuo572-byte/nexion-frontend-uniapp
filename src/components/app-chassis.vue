@@ -209,7 +209,10 @@ import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, o
 
 // Uni forwards query parameters such as product `id` through the page root.
 // Bind fallthrough attrs explicitly so they cannot replace the view adapter's ID.
-defineOptions({ inheritAttrs: false });
+defineOptions({ inheritAttrs: false, methods: {
+  // App-Plus callMethod resolves vm.proxy, which does not expose script-setup bindings.
+  onNativeScrollLoadMore(this: { $: { exposed: { receiveNativeScrollLoadMore(key: string): void } | null } }, key: string) { this.$.exposed?.receiveNativeScrollLoadMore(key); },
+} });
 const props = withDefaults(defineProps<{
   active?: "home" | "earn" | "store" | "team" | "me";
   logicalRoute?: string;
@@ -217,8 +220,10 @@ const props = withDefaults(defineProps<{
   tabHost?: boolean;
   hostVisible?: boolean;
   navCapsule?: boolean;
+  scrollLoadKey?: string;
 }>(), { hostVisible: true });
 
+const emit = defineEmits<{ (event: "scroll-load-more"): void }>();
 const t = useT();
 // The App build has no document in the logic layer; the shell root carries the language for :lang() rules.
 const contentLang = computed(() => useLocaleStore().code);
@@ -688,16 +693,25 @@ import GlassSegments from "@/components/glass-segments.vue";
 
 const chassisHostId = `nx-chassis-host-${getCurrentInstance()!.uid}`;
 const pageVisible = ref(true);
+const scrollVisit = ref(0);
+watch(() => props.scrollLoadKey, () => { scrollVisit.value++; }, { flush: "sync" });
 const tabRevision = ref(0);
 watch(() => props.tabLocationKey, () => { tabRevision.value += 1; }, { flush: "sync" });
-onShow(() => { pageVisible.value = true; });
-onHide(() => { pageVisible.value = false; });
+onShow(() => { scrollVisit.value++; pageVisible.value = true; });
+onHide(() => { scrollVisit.value++; pageVisible.value = false; });
 let scrollDiagnostics = false;
+let nativeScrollBridge = false;
 // #ifdef APP-PLUS
 scrollDiagnostics = import.meta.env.VITE_UVEL_SCROLL_DEBUG === "true";
+nativeScrollBridge = true;
 // #endif
-const chromeConfiguration = computed(() => ({ hostId: chassisHostId, tabKey: props.tabHost ? props.tabLocationKey : undefined, tabRevision: props.tabHost ? tabRevision.value : undefined, visible: pageVisible.value && props.hostVisible, debug: scrollDiagnostics }));
-declare const chromeView: { update(value: { hostId: string; tabKey?: string; tabRevision?: number; visible?: boolean; debug?: boolean }): void };
+const chromeConfiguration = computed(() => ({ hostId: chassisHostId, tabKey: props.tabHost ? props.tabLocationKey : undefined, tabRevision: props.tabHost ? tabRevision.value : undefined, visible: pageVisible.value && props.hostVisible, debug: scrollDiagnostics, scrollKey: nativeScrollBridge && props.scrollLoadKey !== undefined ? `${scrollVisit.value}:${props.scrollLoadKey}` : undefined }));
+// renderjs owns the real WebView scroller; only this visible list may consume its receipt.
+function receiveNativeScrollLoadMore(key: string) {
+  if (nativeScrollBridge && pageVisible.value && props.hostVisible && key === chromeConfiguration.value.scrollKey) emit("scroll-load-more");
+}
+defineExpose({ receiveNativeScrollLoadMore });
+declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void };
 const navigationOptions = computed(() => tabs.value.map(tab => ({ ...tab, value: tab.key })));
 const navigationFrom = consumeGlassNavigation(activeTab.value);
 let navigationPending = false;

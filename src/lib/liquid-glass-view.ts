@@ -1,3 +1,4 @@
+import { attachManualScrollLoadMore } from "./manual-scroll-load-more";
 import { mountLiquidGlass, type GlassConfiguration } from "./liquid-glass-renderer";
 import { glassSpring, glassLogoHidden } from "./liquid-glass-core";
 
@@ -271,11 +272,15 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   };
 }
 
-export function mountChassis(root: HTMLElement, initial: { tabKey?: string; tabRevision?: number; visible?: boolean; debug?: boolean } = {}) {
+export interface ChassisConfiguration { hostId?: string; tabKey?: string; tabRevision?: number; visible?: boolean; debug?: boolean; scrollKey?: string }
+
+export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = {}, notifyScrollBottom?: (key: string) => void) {
   const scroll = root.querySelector<HTMLElement>(".nx-content")!;
   let tabKey = initial.tabKey;
   let tabRevision = initial.tabRevision;
   let visible = initial.visible ?? true;
+  let scrollKey = initial.scrollKey;
+  let detachPagination = () => {};
   let pageTop = scroll.scrollTop;
   let pendingTop: number | null = null;
   let restoreFrame = 0;
@@ -383,11 +388,23 @@ export function mountChassis(root: HTMLElement, initial: { tabKey?: string; tabR
   onScroll();
   const documentVisibility = () => { if (document.visibilityState === "visible" && visible) restore(); };
   if (typeof document !== "undefined") document.addEventListener?.("visibilitychange", documentVisibility);
-  return { update(value: { tabKey?: string; tabRevision?: number; visible?: boolean; debug?: boolean } = {}) {
+  const bindPagination = () => {
+    detachPagination();
+    const key = scrollKey;
+    if (!key || !notifyScrollBottom) return;
+    detachPagination = attachManualScrollLoadMore({ closest: () => scroll }, {
+      enabled: () => viewReady() && pendingTop === null,
+      hasMore: () => true, loading: () => false,
+      loadMore: async () => { notifyScrollBottom(key); },
+    });
+  };
+  bindPagination();
+  return { update(value: ChassisConfiguration = {}) {
     // A delayed logic-thread receipt must not reinstate an older navigation.
     if (value.tabRevision !== undefined && tabRevision !== undefined && value.tabRevision < tabRevision) return;
     const shown = (value.visible ?? true) && !visible;
     visible = value.visible ?? true;
+    if (value.scrollKey !== scrollKey) { scrollKey = value.scrollKey; bindPagination(); }
     if (value.tabKey !== tabKey || value.tabRevision !== tabRevision || shown) {
       tabKey = value.tabKey;
       tabRevision = value.tabRevision;
@@ -395,14 +412,15 @@ export function mountChassis(root: HTMLElement, initial: { tabKey?: string; tabR
     }
     trace(visible ? "show-update" : "hide-update");
     onScroll();
-  }, destroy() { clearTimeout(idle); if (restoreFrame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(restoreFrame); tabPositions.clear(); scroll.removeEventListener("scroll", markScroll); for (const event of cancelEvents) scroll.removeEventListener(event, cancelRestore); scroll.removeEventListener("uvel-scroll-to-top", requestTop); root.removeEventListener?.("keydown", keyScroll); observer?.disconnect(); resize?.disconnect(); if (typeof document !== "undefined") document.removeEventListener?.("visibilitychange", documentVisibility); } };
+  }, destroy() { detachPagination(); clearTimeout(idle); if (restoreFrame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(restoreFrame); tabPositions.clear(); scroll.removeEventListener("scroll", markScroll); for (const event of cancelEvents) scroll.removeEventListener(event, cancelRestore); scroll.removeEventListener("uvel-scroll-to-top", requestTop); root.removeEventListener?.("keydown", keyScroll); observer?.disconnect(); resize?.disconnect(); if (typeof document !== "undefined") document.removeEventListener?.("visibilitychange", documentVisibility); } };
 }
 
 // App renderjs mounts a separate empty Vue instance: its $el is a comment.
 // Explicit host IDs work on both App's view thread and H5's renderjs mixin.
-function viewAdapter<T extends { hostId?: string }>(mount: (host: HTMLElement, value: T) => { update(value: T): void; destroy(): void }) {
+type ViewInstance = { $ownerInstance?: { callMethod(name: string, value: unknown): void } };
+function viewAdapter<T extends { hostId?: string }>(mount: (host: HTMLElement, value: T, instance: ViewInstance) => { update(value: T): void; destroy(): void }) {
   const states = new WeakMap<object, { value: T; frame: number; controller?: ReturnType<typeof mount> }>();
-  function schedule(instance: object) {
+  function schedule(instance: ViewInstance) {
     const state = states.get(instance);
     if (!state || state.frame) return;
     state.frame = requestAnimationFrame(() => {
@@ -411,7 +429,7 @@ function viewAdapter<T extends { hostId?: string }>(mount: (host: HTMLElement, v
       const host = state.value.hostId ? document.getElementById(state.value.hostId) : null;
       if (!host) return;
       if (state.controller) state.controller.update(state.value);
-      else state.controller = mount(host, state.value);
+      else state.controller = mount(host, state.value, instance);
     });
   }
   return {
@@ -429,4 +447,5 @@ function viewAdapter<T extends { hostId?: string }>(mount: (host: HTMLElement, v
 }
 export default viewAdapter<GlassConfiguration>(mountLiquidGlass);
 export const segmentsView = viewAdapter<SegmentsConfiguration>(mountSegments);
-export const chassisView = viewAdapter<{ hostId: string; tabKey?: string; tabRevision?: number; visible?: boolean; debug?: boolean }>(mountChassis);
+export const chassisView = viewAdapter<ChassisConfiguration>((host, value, instance) =>
+  mountChassis(host, value, key => instance.$ownerInstance?.callMethod("onNativeScrollLoadMore", key)));
