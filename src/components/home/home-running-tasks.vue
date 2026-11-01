@@ -5,8 +5,8 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.22-8.56" /></svg>
     </view>
     <view class="nx-feed-copy">
-      <text class="nx-feed-title">{{ visibility.mask(row.model) }}</text>
-      <text class="nx-feed-sub">{{ visibility.mask(row.client) }} · {{ row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text>
+      <text class="nx-feed-title">{{ visibility.mask(row.name) }}</text>
+      <text class="nx-feed-sub">{{ row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text>
     </view>
     <view class="nx-feed-figure">
       <text class="nx-feed-pct font-mono-tabular">{{ visibility.mask(row.pct == null ? '—' : `${row.pct}%`) }}</text>
@@ -51,7 +51,7 @@ const rows = computed(() => !tasksReady.value ? [] : app.visibleDevices.flatMap(
   const taskNow = device.taskServerNow != null && device.taskServerNowReceivedAt != null
     ? projectServerNow(device.taskServerNow, device.taskServerNowReceivedAt, monotonicNow.value) : now.value;
   const pct = taskProgressPercent(task, taskNow, device.interruptedAt);
-  return task.protocolVersion !== 2 && (pct === null || pct >= 100) ? [] : [{ id: `${device.id}:${task.id}`, model: task.model, client: task.client, reward: task.reward, pct, status: task.protocolVersion === 2 ? task.status : undefined }];
+  return task.protocolVersion !== 2 && (pct === null || pct >= 100) ? [] : [{ id: `${device.id}:${task.id}`, name: task.type, reward: task.reward, pct, status: task.protocolVersion === 2 ? task.status : undefined }];
 }).slice(0, props.limit));
 watch(() => rows.value.length, count => emit("count", count), { immediate: true });
 </script>

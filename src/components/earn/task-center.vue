@@ -40,7 +40,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="categoryIconPath(teaser.category)" /></svg>
           </view>
           <view class="flex-1 min-w-0">
-            <text class="block truncate" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink-2)">{{ teaser.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(teaser.category) }}</text></text>
+            <text class="block truncate" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink-2)">{{ teaser.type }}</text>
             <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ t.earn.requires }} <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-tech-cyan-ink)">{{ teaser.minVRAM }}GB VRAM</text><template v-if="!remoteApiEnabled"> · {{ teaser.unlockTier }}</template></text>
           </view>
           <view class="text-right shrink-0">
@@ -105,7 +105,7 @@
         @keydown.enter.stop.prevent="openTaskReceipt(task)" @keydown.space.stop.prevent="openTaskReceipt(task)"
       >
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-        <text class="earn-history-description" :title="`${task.model} · ${workloadLabel(task.category)}`" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-2); margin: 0 4px">·</text><text style="color: var(--v5-ink-2)">{{ workloadLabel(task.category) }}</text></text>
+        <text class="earn-history-description" :title="task.type" style="color: var(--v5-ink-2)">{{ task.type }}</text>
         <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5)" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}<text v-if="task.settlementStatus" class="block">{{ computeCopy.statuses[task.settlementStatus] }}</text></text>
         <text class="earn-history-time" style="font-size: 12px; color: var(--v5-ink-3)">{{ completedTime(task.completedAt) }}</text>
         <view v-if="canOpenTaskReceipt(task)" class="earn-history-document shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" :title="task.receiptNo ?? task.id" @click.stop="openTaskReceipt(task)">
@@ -134,10 +134,8 @@ import { formatDisplayDateTime } from "@/lib/display-date";
 import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
-import { en } from "@/i18n/messages/en";
 import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
 import type { TaskCategory, CompletedTask } from "@/store/types";
-import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { useReceipts } from "@/store/receipts";
 import type { Receipt } from "@/mock/receipt";
@@ -236,12 +234,6 @@ onUnmounted(() => {
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
 });
-
-// Model names are proper nouns (untranslated); the workload half is copy.
-// Resolved from `category` at render — the baked `task.type` string is English.
-function workloadLabel(category: TaskCategory): string {
-  return resolveWorkloadLabel(en, category);
-}
 
 // History list: completed tasks across all devices, most-recent first (last 20).
 const allRecent = computed(() =>

@@ -27,7 +27,7 @@
       <view v-if="task" :style="taskCardStyle">
         <view class="flex items-center justify-between" style="gap: 8px">
           <view class="min-w-0 flex-1">
-            <text class="block truncate" :style="taskModelStyle">{{ task.model }}</text>
+            <text class="block truncate" :style="taskModelStyle">{{ task.type }}</text>
             <text class="block truncate" :style="taskRewardStyle">{{ taskRewardLine }}</text>
           </view>
           <view class="text-right shrink-0">

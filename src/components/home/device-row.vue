@@ -16,8 +16,7 @@
     </view>
     </view>
     <view v-if="device.currentTask" class="hf-device-task">
-      <text class="hf-device-task__title">{{ t.earn.currentTask }} · {{ visibility.mask(device.currentTask.model) }}</text>
-      <text class="hf-device-task__id font-mono-tabular">#{{ visibility.mask(device.currentTask.id) }}</text>
+      <text class="hf-device-task__title">{{ visibility.mask(device.currentTask.type) }}</text>
       <view class="hf-device-task__progress">
         <view class="hf-device-task__track" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
           <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="hf-device-task__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
