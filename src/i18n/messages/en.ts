@@ -723,6 +723,7 @@ export const en = {
     // Hero (top of Home)
     // TechMoneyCard (hero money — source hardcoded these; keyed for bilingual parity)
     techTodaysEarnings: "Today's earnings",
+    techVsYesterdaySamePeriod: "vs same time yesterday",
     techEarningsCurrency: "USDT",
     techSettlementSnapshot: "Settlement snapshot",
     techVsYesterday: "↑ +5.2% vs yesterday · 142 jobs settled",
