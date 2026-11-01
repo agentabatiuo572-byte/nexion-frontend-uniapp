@@ -30,7 +30,7 @@ function usePageVisible(): Ref<boolean> {
 }
 
 /**
- * Continuous decorative loops (online dots, job equalizer, provisioning spinner, gauge comet, rocket) run only while
+ * Continuous decorative loops (online dots, job equalizer, provisioning spinner, gauge ripple, rocket) run only while
  * their element is on screen and the page is shown. Bind `elRef` to the owning element and add a paused class when
  * `running` is false. H5 observes the DOM node (clipping by scroll containers counts as off-screen); the App logic
  * layer has no IntersectionObserver, so it observes `selector` on this instance through uni.createIntersectionObserver.
