@@ -3971,6 +3971,7 @@ timeHoursAgo: "{n}h ago",
     reduceQty: "Reduce quantity and try again",
     howItWorksEntry: "Genesis guide",
     faq: {
+      title: 'Frequently asked questions',
       q1: "What do holders get?",
       a1: "A UVT allocation, released in stages after UVT is listed, under the published schedule.",
       q2: "Can I transfer it?",
@@ -4884,6 +4885,7 @@ timeHoursAgo: "{n}h ago",
   },
 
   marketplace: {
+    royaltyLabel: 'Transfer fee',
     pageTitle: "Resale market",
     internalMarketLine: "In-app resale · External trading not available",
     floor: "Lowest ask",

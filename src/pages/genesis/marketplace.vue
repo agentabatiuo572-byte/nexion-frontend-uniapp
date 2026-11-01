@@ -13,12 +13,12 @@
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/genesis/genesis" />
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: var(--ui-space-inline)">
+      <view class="px-4 marketplace-page" style="display: flex; flex-direction: column; gap: var(--ui-space-inline)">
         <!-- Collection hero — de-carded: sits on the page floor. -->
-        <view :style="heroStyle">
+        <view class="marketplace-hero" :style="heroStyle">
           <view class="flex items-start" style="gap: var(--ui-space-inline)">
             <view class="grid place-items-center shrink-0" :style="avatarStyle">
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z" /><path d="M4 21h16" /></svg>
             </view>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="collTitleStyle">UVEL Genesis Node</text>
@@ -47,7 +47,7 @@
           </view>
 
           <!-- The canonical comparison may be unavailable; never invent a direction. -->
-          <view class="flex items-center" :style="floorDeltaStyle">
+          <view v-if="secondaryBlock === null" class="flex items-center" :style="floorDeltaStyle">
             <text class="flex items-center" style="gap: 6px; font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-3)">
               <svg v-if="floorDelta.state === 'up'" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
               <svg v-else-if="floorDelta.state === 'down'" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6" /><path d="m22 17-8.5-8.5-5 5L2 7" /></svg>
@@ -58,23 +58,16 @@
               <text> {{ t.marketplace.past7d }}</text>
             </text>
           </view>
+<view v-if="secondaryBlock !== null" class="marketplace-closed" role="status"><view class="marketplace-lock" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></view><view><text class="marketplace-closed-title">{{ secondaryBlockText }}</text><text class="marketplace-closed-sub">{{ secondaryBlockSub }}</text></view></view>
         </view>
 
         <!-- 市场关闭说明(FEAT-GEN10 ⑥:二级市场一并锁闭**并说明**)。
              只说状态与影响,不做倒计时、不催 —— 关闭态禁紧迫感元素。 -->
-        <view v-if="secondaryBlock !== null" class="flex items-start" :style="closedNoticeStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-          <view style="flex: 1; margin-left: 8px">
-            <text class="block" :style="closedNoticeTitleStyle">{{ secondaryBlockText }}</text>
-            <text class="block" :style="closedNoticeSubStyle">{{ secondaryBlockSub }}</text>
-            <view class="nx-market-info" role="button" tabindex="0" @click="goGenesis" @keydown.enter.prevent="goGenesis" @keydown.space.prevent="goGenesis">
-              <text>{{ consumerCopy.learn }}</text>
-            </view>
-          </view>
-        </view>
 
+
+        <view class="marketplace-info"><view class="marketplace-info-row"><text class="marketplace-fee-label">{{ t.marketplace.royaltyLabel }}</text><text class="marketplace-fee" :aria-label="marketplaceRoyaltyText">{{ presentGenesisRoyalty(genesis.remoteRoyaltyPct) ?? '—' }}</text><view v-if="marketReadNeedsRetry" class="nx-market-retry" role="button" :tabindex="marketplaceRead.busy ? -1 : 0" :aria-label="t.marketplace.retry" :aria-busy="marketplaceRead.busy" :aria-disabled="marketplaceRead.busy" @click="retryMarketplaceFacts()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></view></view><view class="marketplace-info-row marketplace-info-learn" role="button" tabindex="0" @click="goGenesis"><text class="flex-1">{{ consumerCopy.learn }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></view></view>
         <!-- Tabs -->
-        <GlassSegments v-model="tab" :options="marketTabOptions" />
+        <GlassSegments v-model="tab" :options="marketTabOptions" :label="t.marketplace.pageTitle" class="marketplace-tabs" />
 
         <!-- LISTINGS TAB -->
         <template v-if="tab === 'listings'">
@@ -92,9 +85,9 @@
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
                   <text>{{ t.marketplace.sortLabel }}</text>
                 </text>
-                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" role="radio" :aria-checked="sortKey === 'floor'" :tabindex="sortKey === 'floor' ? 0 : -1" @click="selectSort('floor')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('floor')" @keydown.space.prevent="selectSort('floor')"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
-                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" role="radio" :aria-checked="sortKey === 'recent'" :tabindex="sortKey === 'recent' ? 0 : -1" @click="selectSort('recent')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('recent')" @keydown.space.prevent="selectSort('recent')"><text>{{ t.marketplace.sortRecent }}</text></view>
-                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" role="radio" :aria-checked="sortKey === 'lastSale'" :tabindex="sortKey === 'lastSale' ? 0 : -1" @click="selectSort('lastSale')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)" @keydown.enter.prevent="selectSort('lastSale')" @keydown.space.prevent="selectSort('lastSale')"><text>{{ t.marketplace.sortLastSale }}</text></view>
+                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" role="radio" :aria-checked="sortKey === 'floor'" :tabindex="sortKey === 'floor' ? 0 : -1" @click="selectSort('floor')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
+                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" role="radio" :aria-checked="sortKey === 'recent'" :tabindex="sortKey === 'recent' ? 0 : -1" @click="selectSort('recent')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)"><text>{{ t.marketplace.sortRecent }}</text></view>
+                <view class="nx-marketplace-sort active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" role="radio" :aria-checked="sortKey === 'lastSale'" :tabindex="sortKey === 'lastSale' ? 0 : -1" @click="selectSort('lastSale')"    @keydown.left.prevent="cycleSort(-1)" @keydown.right.prevent="cycleSort(1)"><text>{{ t.marketplace.sortLastSale }}</text></view>
               </view>
             </scroll-view>
 
@@ -106,15 +99,7 @@
                对空列表排序点了没有可观测变化,属规范里的 dead control。
                关闭态不给「从一级预订」CTA:一级与二级同读 marketOpenState,那时跳过去是死路,
                而关闭原因顶部已有说明条讲清,这里不复述。 -->
-          <EmptyState
-            v-else
-            kind="empty-list"
-            :title="t.empty.genesisListingsTitle"
-            :desc="primaryAvailable ? t.empty.genesisListingsDesc : consumerCopy.empty"
-            :cta-label="secondaryBlock === null ? primaryEntryLabel : undefined"
-            emphasis
-            @cta="goGenesis"
-          />
+          <view v-else class="marketplace-listings-empty"><view class="marketplace-empty-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m20.6 13.4-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></view><text class="marketplace-empty-title">{{ t.empty.genesisListingsTitle }}</text><text class="marketplace-empty-desc">{{ primaryAvailable ? t.empty.genesisListingsDesc : consumerCopy.empty }}</text><NxButton v-if="secondaryBlock === null" variant="brand" size="medium" @click="goGenesis">{{ primaryEntryLabel }}</NxButton></view>
         </template>
 
         <!-- ACTIVITY TAB(真实成交 + 虚拟成交混排,FEAT-GEN10)-->
@@ -141,13 +126,13 @@
           <view v-if="!accountDisplayReady" class="text-center" :style="emptyCardStyle">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><path d="M12 9v4" /><path d="M12 17h.01" /><circle cx="12" cy="12" r="10" /></svg>
             <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ genesis.remoteAccountReadState === 'loading' ? t.marketplace.accountLoading : t.marketplace.accountUnavailable }}</text>
-            <text v-if="genesis.remoteAccountReadState !== 'loading'" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.375">{{ t.marketplace.accountUnavailableHint }}</text>
+            <text v-if="genesis.remoteAccountReadState !== 'loading'" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: var(--v5-space-1); line-height: 1.375">{{ t.marketplace.accountUnavailableHint }}</text>
           </view>
           <view v-else-if="ownedCount === 0" class="text-center" :style="emptyCardStyle">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>
             <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ t.marketplace.noTokensTitle }}</text>
-            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.375">{{ primaryAvailable ? t.marketplace.noTokensSub : consumerCopy.empty }}</text>
-            <view class="inline-block active:scale-95" :style="reserveBtnStyle" role="button" tabindex="0" @click="goGenesis" @keydown.enter.prevent="goGenesis" @keydown.space.prevent="goGenesis">
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: var(--v5-space-1); line-height: 1.375">{{ primaryAvailable ? t.marketplace.noTokensSub : consumerCopy.empty }}</text>
+            <view class="inline-block active:scale-95" :style="reserveBtnStyle" role="button" tabindex="0" @click="goGenesis">
               <text>{{ primaryEntryLabel }}</text>
             </view>
           </view>
@@ -156,11 +141,6 @@
           </view>
         </template>
 
-        <text class="block px-2" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ marketplaceRoyaltyText }}</text>
-        <view v-if="marketReadNeedsRetry" class="nx-market-retry" role="button" :tabindex="marketplaceRead.busy ? -1 : 0" :aria-busy="marketplaceRead.busy" :aria-disabled="marketplaceRead.busy"
-          @click="retryMarketplaceFacts()" @keydown.enter.prevent="retryMarketplaceFacts()" @keydown.space.prevent="retryMarketplaceFacts()">
-          <text class="nx-market-read-retry-label">{{ t.marketplace.retry }}</text>
-        </view>
       </view>
     </view>
 
@@ -180,6 +160,7 @@ import ListingCard, { type Listing } from "@/components/genesis/listing-card.vue
 import ActivityRow, { type ActivityEvent } from "@/components/genesis/activity-row.vue";
 import MyTokenCard from "@/components/genesis/my-token-card.vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -528,7 +509,7 @@ const heroStyle: CSSProperties = {
 const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
-  borderRadius: "16px",
+  borderRadius: "var(--v5-radius-m)",
   background: "var(--v5-surface-2)",
   color: "var(--v5-genesis-gold-on-dark)",
 };
@@ -536,7 +517,6 @@ const collTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "20px",
   fontWeight: 600,
-  letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };
 const marketScopeLineStyle: CSSProperties = {
@@ -549,7 +529,7 @@ const marketScopeLineStyle: CSSProperties = {
 const statGridStyle: CSSProperties = {
   // 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 14+14。
   marginTop: "28px",
-  gap: "8px",
+  gap: "var(--v5-space-2)",
 };
 const statLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -568,7 +548,7 @@ function statValStyle(tint?: string): CSSProperties {
   };
 }
 const floorDeltaStyle: CSSProperties = {
-  marginTop: "12px",
+  marginTop: "var(--v5-space-3)",
   paddingTop: "12px",
   borderTop: "1px solid var(--v5-border)",
 };
@@ -578,30 +558,7 @@ const floorDeltaValueStyle = computed<CSSProperties>(() => ({
       : "var(--v5-ink-3)",
   fontWeight: 600,
 }));
-// 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
-// 市场关闭说明条(FEAT-GEN10)。soft bg tint + **零 border**(带 bg 的容器不加边框,
-// 卡片嵌套铁律);用 warning 语义色而非 error —— 这是运营节奏,不是故障。
-const closedNoticeStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-  color: "var(--v5-warning-ink)",
-  borderRadius: "14px",
-  padding: "var(--ui-space-inline) 14px",
-};
-const closedNoticeTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-list-subtitle)", // 档内值(value-ladder 合法集 {56,44,36,34,26,20,15,13,12};13.5 会被哨兵判红)
-  fontWeight: 550,
-  textWrap: "pretty",
-};
-const closedNoticeSubStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  marginTop: "2px",
-  lineHeight: 1.5,
-  textWrap: "pretty",
-};
-const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "12px", background: "var(--v5-surface)" };
+const tabsStyle: CSSProperties = { gap: "var(--v5-space-1)", padding: "var(--v5-space-1)", borderRadius: "var(--ui-radius-icon)", background: "var(--v5-surface)" };
 function tabPillStyle(active: boolean): CSSProperties {
   return {
     // 《07》tap≥44:原 40px(同页 sortPill 已补,这条是同类)
@@ -624,7 +581,7 @@ const sortLabelStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
-  marginRight: "4px",
+  marginRight: "var(--v5-space-1)",
   flexShrink: 0,
 };
 function sortPillStyle(active: boolean): CSSProperties {
@@ -632,7 +589,7 @@ function sortPillStyle(active: boolean): CSSProperties {
     flexShrink: 0,
     height: "32px",
     padding: "0 12px",
-    borderRadius: "999px",
+    borderRadius: "var(--v5-radius-full)",
     fontSize: "12px",
     fontWeight: 500,
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -650,16 +607,16 @@ function sortPillStyle(active: boolean): CSSProperties {
 const listCardStyle: CSSProperties = { paddingBlock: "4px" };
 // Empty state — dashed outline, no fill (whitelist empty-state idiom).
 const emptyCardStyle: CSSProperties = {
-  borderRadius: "16px",
+  borderRadius: "var(--v5-radius-m)",
   border: "1px dashed var(--v5-border-strong)",
-  padding: "32px",
+  padding: "var(--v5-space-8)",
 };
 const reserveBtnStyle: CSSProperties = {
-  marginTop: "12px",
+  marginTop: "var(--v5-space-3)",
   padding: "0 20px",
   height: "48px",
   lineHeight: "48px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-brand-2)",
   color: "var(--v5-on-brand-2)",
   fontWeight: 600,
@@ -695,4 +652,42 @@ const sortOptions = computed(() => [
   width: 100%;
   white-space: nowrap;
 }
+</style>
+
+<style scoped>
+.marketplace-page { padding-top:3px; }
+.marketplace-hero { position:relative; padding:18px 16px 16px!important; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
+.marketplace-hero::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 160deg,transparent 0 40%,color-mix(in srgb,var(--v5-genesis-gold) 80%,transparent) 66%,transparent 92%); mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); mask-composite:exclude; pointer-events:none; }
+.marketplace-hero > .flex { align-items:center; gap:14px!important; }
+.marketplace-hero > .flex > view:first-child { width:52px!important; height:52px!important; border-radius:var(--v5-radius-m)!important; background:color-mix(in srgb,var(--v5-genesis-gold) 16%,transparent)!important; color:var(--v5-genesis-gold)!important; }
+.marketplace-hero > .flex > view:nth-child(2) > text:first-child { font-size:16px!important; line-height:22px; }
+.marketplace-hero > .flex > view:nth-child(2) > text:nth-child(2) { font:400 12px/16px var(--font-v5)!important; letter-spacing:0!important; margin-top:2px!important; }
+.marketplace-hero > .grid { margin-top:14px!important; padding:var(--v5-space-3); gap:0!important; border-radius:var(--v5-radius-m); background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent), inset 0 0 0 1px var(--v5-border); }
+.marketplace-hero > .grid > view { padding:0 4px; min-width:0; }
+.marketplace-hero > .grid > view + view { padding-left:10px; border-left:1px solid var(--v5-border); }
+.marketplace-hero > .grid > view > text:first-child { display:block; font:500 11px/14px var(--font-metric)!important; letter-spacing:.02em!important; color:var(--v5-ink-3)!important; }
+.marketplace-hero > .grid > view > text:nth-child(2) { margin-top:6px!important; font:500 16px/20px var(--font-metric)!important; color:var(--v5-ink)!important; }
+.marketplace-closed { display:flex; align-items:center; gap:var(--v5-space-2); margin-top:var(--v5-space-4); padding-top:14px; border-top:1px solid var(--v5-border); }
+.marketplace-lock { display:grid; place-items:center; flex:none; width:28px; height:28px; border-radius:50%; background:var(--v5-surface-3); color:var(--v5-ink-2); }
+.marketplace-closed-title { display:block; color:var(--v5-ink); font-size:15px; line-height:20px; font-weight:500; }
+.marketplace-closed-sub { display:inline; color:var(--v5-ink-3); font-size:12px; line-height:16px; }
+.marketplace-info { border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
+.marketplace-info-row { display:flex; align-items:center; gap:var(--v5-space-3); min-height:56px; padding:6px 16px; box-sizing:border-box; font-size:15px; line-height:20px; }
+.marketplace-info-learn { padding-right:8px; }
+.marketplace-info-learn > svg { margin-right:12px; }
+.marketplace-info-row + .marketplace-info-row { border-top:1px solid var(--v5-border); }
+.marketplace-fee-label { flex:1; color:var(--v5-ink-3); font-size:12px; line-height:16px; }
+.marketplace-fee { font:500 14px/20px var(--font-metric); }
+.marketplace-info .nx-market-retry { display:grid; place-items:center; flex:none; width:44px; height:44px; padding:0; margin:0 -8px 0 0; align-self:center; min-height:44px; color:var(--v5-ink-3); }
+.marketplace-tabs { margin-top:var(--v5-space-2); height:40px; padding:var(--v5-space-1); gap:var(--v5-space-1); }
+.marketplace-tabs :deep(.nx-glass-option) { min-height:32px; height:32px; }
+.marketplace-listings-empty { padding:var(--v5-space-4) 24px 0!important; background:transparent!important; }
+.marketplace-listings-empty :deep(.nx-empty-icon) { width:56px; height:56px; border-radius:18px; background:var(--v5-surface-2); }
+</style>
+
+<style scoped>
+.marketplace-listings-empty { display:flex; flex-direction:column; align-items:center; text-align:center; padding:var(--v5-space-4) 24px 0; }
+.marketplace-empty-icon { display:grid; place-items:center; width:56px; height:56px; border-radius:18px; background:var(--v5-surface-2); color:var(--v5-ink-3); }
+.marketplace-empty-title { margin-top:var(--v5-space-3); font-size:15px; line-height:22px; font-weight:500; }
+.marketplace-empty-desc { margin-top:var(--v5-space-1); color:var(--v5-ink-3); font-size:13px; line-height:20px; }
 </style>

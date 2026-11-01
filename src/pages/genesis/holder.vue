@@ -15,29 +15,27 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- ══ Empty state (no seats) ══ -->
         <template v-if="!hasNodes">
-          <view class="active:scale-[0.98]" :style="ctaCardStyle" role="button" tabindex="0" :aria-label="consumerCopy.learn" @click="goGenesis" @keydown.enter.prevent="goGenesis" @keydown.space.prevent="goGenesis">
+          <view class="gh-empty-card active:scale-[0.98]" :style="ctaCardStyle" role="button" tabindex="0" :aria-label="consumerCopy.learn" @click="goGenesis">
             <view class="flex items-center" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="ctaIconStyle">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z" /><path d="M4 21h16" /></svg>
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="ctaTitleStyle">{{ remoteApiEnabled && genesis.remoteAccountReadState !== "ready" ? t.holderFacts.unconfirmed : t.genesisHolder.notHolderTitle }}</text>
                 <text class="block" :style="ctaBodyStyle">{{ notHolderBodyText }}</text>
-                <text class="gh-empty-link">{{ consumerCopy.learn }}</text>
+                <text class="gh-empty-link">{{ consumerCopy.learn }} →</text>
               </view>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
-          <view class="gh-empty-trust" role="button" tabindex="0" @click="goTrust" @keydown.enter.prevent="goTrust" @keydown.space.prevent="goTrust">
-            <text>{{ consumerCopy.trust }}</text>
-          </view>
-          <view v-if="remoteApiEnabled" :style="serverFactsEmptyStyle">
+
+          <view v-if="remoteApiEnabled" class="gh-empty-facts" :style="serverFactsEmptyStyle">
             <text class="block" :style="cardTitleStyle">{{ t.holderFacts.title }}</text>
             <text class="block" :style="serverFactStyle">{{ holderFactText }}</text>
             <view class="grid grid-cols-2" style="gap: 10px; margin-top: 8px">
               <view>
                 <text class="block" :style="cellLabelStyle">{{ t.holderFacts.allocation }}</text>
-                <text class="block tabular-nums" :style="cellValStyle('var(--v5-ink)')">{{ allocText }}</text>
+                <text class="block tabular-nums" :style="cellValStyle('var(--v5-ink)')">{{ allocText === '-' ? '—' : allocText }}</text>
               </view>
               <view>
                 <text class="block" :style="cellLabelStyle">{{ t.holderFacts.priority }}</text>
@@ -45,6 +43,9 @@
               </view>
             </view>
           </view>
+          <view class="gh-empty-disclosure"><text>{{ t.genesisHolder.disclosureNote }}</text><view class="gh-empty-trust" role="button" tabindex="0" @click="goTrust">
+            <text>{{ consumerCopy.trust }} ›</text>
+          </view></view>
         </template>
 
         <!-- ══ Holder · 上所前 ══ -->
@@ -118,7 +119,7 @@
           <view class="gh-hero gh-surface" :style="heroCardStyle">
             <GenesisArtwork context="holding" class="gh-hero-art" />
             <text class="block" :style="heroLabelStyle">{{ t.genesisHolder.post.emissionLabel }}</text>
-            <view class="flex items-center" style="gap: 16px; margin-top: 12px">
+            <view class="flex items-center" style="gap: var(--v5-space-4); margin-top: 12px">
               <view class="shrink-0 grid place-items-center" :style="ringStyle">
                 <view class="grid place-items-center" :style="ringInnerStyle">
                   <text class="tabular-nums" :style="ringPctStyle">{{ pctText }}%</text>
@@ -155,7 +156,7 @@
                 <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 12px">{{ f.label }}</text>
                 <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
               </view>
-              <view v-if="genesis.emissionPage.cursor" class="active:opacity-70" role="button" tabindex="0" :aria-disabled="genesis.emissionPage.busy ? 'true' : 'false'" :aria-busy="genesis.emissionPage.busy ? 'true' : 'false'" style="padding:12px;text-align:center;color:var(--v5-brand)" @click="!genesis.emissionPage.busy && genesis.loadMoreEmissions()">
+              <view v-if="genesis.emissionPage.cursor" class="active:opacity-70" role="button" tabindex="0" :aria-disabled="genesis.emissionPage.busy ? 'true' : 'false'" :aria-busy="genesis.emissionPage.busy ? 'true' : 'false'" style="padding:var(--v5-space-3);text-align:center;color:var(--v5-brand)" @click="!genesis.emissionPage.busy && genesis.loadMoreEmissions()">
                 <text>{{ genesis.emissionPage.error ? t.orders.retry : t.orders.loadMore }}</text>
               </view>
             </view>
@@ -225,7 +226,7 @@
           </view>
         </template>
 
-        <text class="block text-center" :style="noteStyle">{{ t.genesisHolder.disclosureNote }}</text>
+        <text v-if="hasNodes" class="block text-center" :style="noteStyle">{{ t.genesisHolder.disclosureNote }}</text>
         <text v-if="hasNodes && !dividendsOpen" class="block text-center active:opacity-70" :style="howLinkStyle" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
       </view>
     </view>
@@ -439,14 +440,14 @@ const heroCardStyle: CSSProperties = {
 };
 const vipCardStyle: CSSProperties = {
   padding: "22px",
-  borderRadius: "24px",
+  borderRadius: "var(--v5-radius-xl)",
   background: "radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 24%, transparent), transparent 48%), linear-gradient(135deg, var(--v5-surface), var(--v5-surface-2))",
   boxShadow: "0 14px 36px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 12%, transparent)",
 };
 const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
-  borderRadius: "16px",
+  borderRadius: "var(--v5-radius-m)",
   background: "linear-gradient(135deg, var(--v5-genesis-gold-on-dark) 0%, #E2C97C 100%)",
   boxShadow: "0 4px 12px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 25%, transparent)",
 };
@@ -471,14 +472,14 @@ const heroNodesStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const allocLineStyle: CSSProperties = {
-  marginTop: "12px",
+  marginTop: "var(--v5-space-3)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const heroStatGridStyle: CSSProperties = {
   // 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 10+14。
-  marginTop: "24px",
+  marginTop: "var(--v5-space-6)",
   gap: "14px",
 };
 const cellLabelStyle: CSSProperties = {
@@ -499,13 +500,13 @@ function cellValStyle(tint: string): CSSProperties {
   };
 }
 const discStyle: CSSProperties = {
-  marginTop: "12px",
+  marginTop: "var(--v5-space-3)",
   fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.5,
 };
 const serverFactStyle: CSSProperties = {
-  marginTop: "8px",
+  marginTop: "var(--v5-space-2)",
   fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.45,
@@ -527,7 +528,7 @@ const cardTitleStyle: CSSProperties = {
 };
 // listing progress
 const progTrackStyle: CSSProperties = {
-  marginTop: "12px",
+  marginTop: "var(--v5-space-3)",
   height: "8px",
   borderRadius: "99px",
   background: "color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
@@ -540,7 +541,7 @@ const progFillStyle = computed<CSSProperties>(() => ({
   background: "linear-gradient(90deg, var(--v5-brand-2), var(--v5-brand))",
 }));
 const progMetaStyle: CSSProperties = {
-  marginTop: "8px",
+  marginTop: "var(--v5-space-2)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
@@ -558,7 +559,7 @@ const poolChipStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 500,
   padding: "2px 8px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
 };
@@ -584,7 +585,7 @@ const rankPtsStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const pointsNoteStyle: CSSProperties = {
-  marginTop: "8px",
+  marginTop: "var(--v5-space-2)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
@@ -640,7 +641,7 @@ const lockValStyle: CSSProperties = {
 // feed — de-carded: header on the floor + hairline row group
 const feedHeadStyle: CSSProperties = { padding: "0 2px 8px", gap: "6px" };
 const feedListStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
-const feedDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "999px", background: "var(--v5-brand)" };
+const feedDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "var(--v5-radius-full)", background: "var(--v5-brand)" };
 const feedLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
@@ -664,11 +665,11 @@ const feedAmtStyle: CSSProperties = {
   color: "var(--v5-brand)",
 };
 // cta / preview (empty state)
-const ctaCardStyle: CSSProperties = { padding: "16px", borderRadius: "16px", background: "var(--v5-brand-2-soft)" };
+const ctaCardStyle: CSSProperties = { padding: "var(--v5-space-4)", borderRadius: "var(--v5-radius-m)", background: "var(--v5-brand-2-soft)" };
 const ctaIconStyle: CSSProperties = {
   width: "44px",
   height: "44px",
-  borderRadius: "12px",
+  borderRadius: "var(--ui-radius-icon)",
   background: "var(--v5-brand-2)",
   boxShadow: "var(--v5-spotlight-brand-2)",
   color: "var(--v5-on-brand-2)",
@@ -695,14 +696,14 @@ const holdingListStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)
 function holdingRowStyle(i: number): CSSProperties {
   return {
     padding: "14px 0",
-    gap: "12px",
+    gap: "var(--v5-space-3)",
     borderBottom: i < holdings.value.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }
 const holdingArtStyle: CSSProperties = {
   width: "48px",
   height: "48px",
-  borderRadius: "12px",
+  borderRadius: "var(--ui-radius-icon)",
   background: "radial-gradient(60% 60% at 30% 30%, rgba(114,80,200,0.40), rgba(114,80,200,0.10) 80%)",
 };
 const holdingIdStyle: CSSProperties = {
@@ -714,7 +715,7 @@ const holdingIdStyle: CSSProperties = {
 const holdingLinkStyle: CSSProperties = {
   width: "44px",
   height: "44px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
   color: "var(--v5-ink-3)",
 };
@@ -722,7 +723,7 @@ const holdingLinkStyle: CSSProperties = {
 const perksWrapStyle: CSSProperties = { padding: "0 2px" };
 const perkListStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" };
 const perksLabelStyle: CSSProperties = {
-  marginBottom: "12px",
+  marginBottom: "var(--v5-space-3)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   fontWeight: 500,
@@ -732,7 +733,7 @@ const perksLabelStyle: CSSProperties = {
 function perkRowStyle(i: number): CSSProperties {
   return {
     gridTemplateColumns: "36px 1fr",
-    gap: "12px",
+    gap: "var(--v5-space-3)",
     padding: "10px 0",
     borderBottom: i < perkKeys.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
@@ -754,9 +755,9 @@ const perkBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)
 // actions
 // Quick-action tiles — filled surface-2, no border (single visual difference).
 const actionTileStyle: CSSProperties = {
-  borderRadius: "16px",
+  borderRadius: "var(--v5-radius-m)",
   background: "var(--v5-surface-2)",
-  padding: "12px",
+  padding: "var(--v5-space-3)",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
@@ -776,7 +777,7 @@ const actionLabelStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, col
 const boostStyle: CSSProperties = {
   marginTop: "2px",
   height: "48px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -807,73 +808,95 @@ const noteStyle: CSSProperties = {
 :global(html[data-theme="dark"] .gh-chassis--owned) { background-image: url("/static/img/genesis/obsidian-dark.webp") !important; }
 .gh-chassis--owned :deep(.nx-top-chrome) { background: transparent; }
 .gh-page { padding-bottom: 32px; color: var(--v5-ink); font-family: var(--font-v5); }
-.gh-content { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
-.gh-surface { background: color-mix(in srgb, var(--v5-surface) 96%, transparent); border-radius: var(--v5-radius-xl); padding: 16px; }
+.gh-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-4); }
+.gh-surface { background: color-mix(in srgb, var(--v5-surface) 96%, transparent); border-radius: var(--v5-radius-xl); padding: var(--v5-space-4); }
 /* Aggregate holding artwork carries no fixed serial; account content stays live. */
-.gh-hero { --gh-logo-width: 128px; position: relative; padding: 12px 20px 16px; border-radius: 18px; background: var(--v5-surface); }
-.gh-hero-art { margin-bottom: 12px; border-radius: 12px; }
+.gh-hero { --gh-logo-width: 128px; position: relative; padding: var(--v5-space-3) 20px 16px; border-radius: 18px; background: var(--v5-surface); }
+.gh-hero-art { margin-bottom: var(--v5-space-3); border-radius:var(--ui-radius-icon); }
 .gh-identity, .gh-summary, .gh-stats, .gh-emissions { position: relative; z-index: 1; }
-.gh-identity { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 12px; }
+.gh-identity { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 44px; margin-bottom: var(--v5-space-3); }
 .gh-identity :deep(.uvel-brand) { width: var(--gh-logo-width); height: 44px; }
-.gh-identity :deep(.genesis-holder-badge) { max-width: calc(100% - var(--gh-logo-width) - 12px); gap: 8px; padding: 5px 12px; min-height: 36px; border: 1px solid color-mix(in srgb, var(--v5-genesis-gold) 80%, transparent); font-size: 13px; font-weight: 600; line-height: 1.3; background: color-mix(in srgb, var(--v5-genesis-gold) 5%, transparent); }
+.gh-identity :deep(.genesis-holder-badge) { max-width: calc(100% - var(--gh-logo-width) - 12px); gap: var(--v5-space-2); padding: 5px 12px; min-height: 36px; border: 1px solid color-mix(in srgb, var(--v5-genesis-gold) 80%, transparent); font-size: 13px; font-weight: 600; line-height: 1.3; background: color-mix(in srgb, var(--v5-genesis-gold) 5%, transparent); }
 .gh-identity :deep(.genesis-holder-badge svg) { width: 24px; height: 24px; }
-.gh-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+.gh-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--v5-space-8); align-items: center; }
 .gh-allocation, .gh-stats > view:last-child { position: relative; }
 .gh-allocation { transform: translateY(-4px); }
 .gh-allocation::before, .gh-stats > view:last-child::before { content: ""; position: absolute; inset-inline-start: -23px; top: 4px; bottom: 4px; width: 1px; background: linear-gradient(transparent, var(--v5-border-strong), transparent); }
 .gh-label { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.5; color: var(--v5-ink-3); overflow-wrap: anywhere; }
-.gh-count { display: flex; align-items: baseline; gap: 8px; font-size: var(--v5-type-hero); line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gh-count { display: flex; align-items: baseline; gap: var(--v5-space-2); font-size: var(--v5-type-hero); line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
 .gh-unit { font-size: var(--v5-type-h3); }
 .gh-value { display: block; font-size: var(--v5-type-h3); line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .gh-brand { color: var(--v5-brand); }
 .gh-hero .gh-value { line-height: 1.2; }
-.gh-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--v5-border); }
-@media (max-width: 374px) { .gh-hero { --gh-logo-width: 104px; padding-inline: 16px; } .gh-identity :deep(.genesis-holder-badge) { gap: 6px; padding-inline: 8px; font-size: 12px; } .gh-identity :deep(.genesis-holder-badge svg) { width: 20px; height: 20px; } .gh-summary { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } .gh-summary, .gh-stats { column-gap: 16px; } .gh-allocation::before, .gh-stats > view:last-child::before { inset-inline-start: -12px; } }
-.gh-disclosure { display: flex; align-items: center; gap: 12px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
+.gh-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--v5-space-8); margin-top: var(--v5-space-3); padding-top: 8px; border-top: 1px solid var(--v5-border); }
+@media (max-width: 374px) { .gh-hero { --gh-logo-width: 104px; padding-inline: 16px; } .gh-identity :deep(.genesis-holder-badge) { gap: 6px; padding-inline: 8px; font-size: 12px; } .gh-identity :deep(.genesis-holder-badge svg) { width: 20px; height: 20px; } .gh-summary { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } .gh-summary, .gh-stats { column-gap: var(--v5-space-4); } .gh-allocation::before, .gh-stats > view:last-child::before { inset-inline-start: -12px; } }
+.gh-disclosure { display: flex; align-items: center; gap: var(--v5-space-3); color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
 .gh-disclosure svg { flex-shrink: 0; }
-.gh-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: var(--ui-type-section); font-weight: 600; line-height: 1.5; }
+.gh-heading { display: flex; align-items: center; gap: var(--v5-space-3); margin-bottom: var(--v5-space-3); font-size: var(--ui-type-section); font-weight: 600; line-height: 1.5; }
 .gh-heading::after { content: ""; width: 40px; height: 1px; flex-shrink: 0; background: linear-gradient(90deg, var(--v5-genesis-gold), transparent); }
 .gh-title { display: block; font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight); line-height: 1.5; }
 .gh-link { color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); }
 .gh-how { display: flex; align-items: center; justify-content: center; align-self: center; min-height: 44px; padding: 0 12px; text-align: center; }
-.gh-section-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
-.gh-chip { padding: 4px 8px; border-radius: var(--v5-radius-full); color: var(--v5-brand); background: var(--v5-brand-soft); font-size: var(--v5-type-caption); }
-.gh-rank { display: flex; gap: 12px; align-items: center; padding: 8px; font-size: var(--ui-type-list-subtitle); }
+.gh-section-row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); flex-wrap: wrap; margin-bottom: var(--v5-space-2); }
+.gh-chip { padding: var(--v5-space-1) 8px; border-radius: var(--v5-radius-full); color: var(--v5-brand); background: var(--v5-brand-soft); font-size: var(--v5-type-caption); }
+.gh-rank { display: flex; gap: var(--v5-space-3); align-items: center; padding: var(--v5-space-2); font-size: var(--ui-type-list-subtitle); }
 .gh-rank--me { background: var(--v5-brand-soft); border-radius: var(--v5-radius-s); }
 .gh-rank-who { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.gh-note { display: block; font-size: var(--v5-type-caption); line-height: 1.5; color: var(--v5-ink-3); margin-top: 4px; overflow-wrap: anywhere; }
+.gh-note { display: block; font-size: var(--v5-type-caption); line-height: 1.5; color: var(--v5-ink-3); margin-top: var(--v5-space-1); overflow-wrap: anywhere; }
 .gh-holding-list { padding-top: 4px; padding-bottom: 4px; }
-.gh-holding { display: flex; align-items: center; gap: 12px; padding: 16px 0; }
+.gh-holding { display: flex; align-items: center; gap: var(--v5-space-3); padding: var(--v5-space-4) 0; }
 .gh-holding + .gh-holding { border-top: 1px solid var(--v5-border); }
 .gh-holding-icon { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--v5-radius-s); color: var(--v5-genesis-gold); background: color-mix(in srgb, var(--v5-genesis-gold) 12%, transparent); }
 .gh-holding-body { flex: 1; min-width: 0; }
 .gh-id { font-family: var(--font-jet-mono); font-size: var(--v5-type-caption); font-weight: 500; overflow-wrap: anywhere; }
-.gh-amount { display: block; margin-top: 4px; font-size: var(--v5-type-caption); line-height: 1.5; overflow-wrap: anywhere; }
+.gh-amount { display: block; margin-top: var(--v5-space-1); font-size: var(--v5-type-caption); line-height: 1.5; overflow-wrap: anywhere; }
 .gh-icon-button { display: grid; place-items: center; width: 44px; min-height: 44px; border-radius: var(--v5-radius-full); flex-shrink: 0; color: var(--v5-ink-3); background: var(--v5-surface-2); }
-.gh-perk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 20px; padding: 20px; }
+.gh-perk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--v5-space-6); row-gap: var(--v5-space-5); padding: var(--v5-space-5); }
 .gh-perk { min-width: 0; }
 .gh-perk:nth-child(n + 3) { padding-top: 20px; border-top: 1px solid var(--v5-border); }
 .gh-perk-icon { display: flex; color: var(--v5-genesis-gold); margin-bottom: 10px; }
 .gh-perk-label { display: block; font-size: 13px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 .gh-perk-body { display: block; margin-top: 5px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: anywhere; }
 .gh-body { display: block; font-size: var(--v5-type-body-s); font-weight: 500; line-height: 1.5; }
-.gh-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-.gh-action { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; min-height: 52px; border-radius: var(--v5-radius-full); background: var(--v5-surface); font-size: var(--v5-type-body-s); font-weight: 500; text-align: center; }
+.gh-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--v5-space-2); }
+.gh-action { display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); padding: var(--v5-space-3); min-height: 52px; border-radius: var(--v5-radius-full); background: var(--v5-surface); font-size: var(--v5-type-body-s); font-weight: 500; text-align: center; }
 .gh-action svg { flex-shrink: 0; }
-.gh-boost { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px 20px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font-size: var(--v5-type-button); line-height: 1.5; font-weight: 600; text-align: center; }
+.gh-boost { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: var(--v5-space-3) 20px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font-size: var(--v5-type-button); line-height: 1.5; font-weight: 600; text-align: center; }
 .gh-content [role="button"] { cursor: pointer; }
 .gh-content [role="button"]:active { opacity: 0.8; }
 .gh-content [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-.gh-empty { display: flex; flex-direction: column; gap: 12px; color: var(--v5-ink); }
+.gh-empty { display: flex; flex-direction: column; gap: var(--v5-space-3); color: var(--v5-ink); }
 .gh-empty > svg { color: var(--v5-genesis-gold); }
 .gh-muted { color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
-.gh-emissions { margin-top: 16px; }
-.gh-emission-row { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+.gh-emissions { margin-top: var(--v5-space-4); }
+.gh-emission-row { display: flex; align-items: center; gap: var(--v5-space-4); margin-top: var(--v5-space-3); }
 .gh-emission-values { min-width: 0; flex: 1; }
-.gh-emission-values > .gh-label:not(:first-child) { margin-top: 12px; }
-.gh-ring { width: 96px; height: 96px; padding: 8px; border-radius: 50%; flex-shrink: 0; }
+.gh-emission-values > .gh-label:not(:first-child) { margin-top: var(--v5-space-3); }
+.gh-ring { width: 96px; height: 96px; padding: var(--v5-space-2); border-radius: 50%; flex-shrink: 0; }
 .gh-ring-inner { width: 100%; height: 100%; border-radius: 50%; background: var(--v5-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .gh-ring-inner .gh-label { font-size: var(--v5-type-caption); }
-.gh-ledger-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; font-size: var(--v5-type-caption); line-height: 1.5; overflow-wrap: anywhere; }
+.gh-ledger-row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); padding-top: 12px; font-size: var(--v5-type-caption); line-height: 1.5; overflow-wrap: anywhere; }
 .gh-ledger-row > text { min-width: 0; }
+</style>
+
+<style scoped>
+.gh-empty-card { margin-top:3px; padding:28px 20px 24px!important; border-radius:var(--ui-radius-surface)!important; border:1.5px dashed var(--v5-border-strong); background:color-mix(in srgb,var(--v5-ink) 3%,transparent)!important; text-align:center; }
+.gh-empty-card > view { flex-direction:column; gap:0!important; }
+.gh-empty-card > view > view:first-child { width:64px!important; height:64px!important; border-radius:var(--v5-radius-l)!important; background:color-mix(in srgb,var(--v5-genesis-gold) 16%,transparent)!important; color:var(--v5-genesis-gold)!important; box-shadow:none!important; }
+.gh-empty-card > view > view:first-child svg { width:30px; height:30px; }
+.gh-empty-card > view > view:nth-child(2) { margin-top:14px; }
+.gh-empty-card > view > view:nth-child(2) > text:first-child { font:600 16px/22px var(--font-v5)!important; }
+.gh-empty-card > view > view:nth-child(2) > text:nth-child(2) { margin-top:var(--v5-space-1)!important; font:400 13px/20px var(--font-v5)!important; }
+.gh-empty-card > view > svg { display:none; }
+.gh-empty-card .gh-empty-link { display:block; margin-top:14px; color:var(--v5-genesis-gold); font:500 13px/18px var(--font-v5); }
+.gh-empty-facts { padding:var(--v5-space-4)!important; border:0!important; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
+.gh-empty-facts > text:first-child { font:500 15px/22px var(--font-v5)!important; color:var(--v5-ink)!important; letter-spacing:0!important; }
+.gh-empty-facts > text:nth-child(2) { margin-top:var(--v5-space-1)!important; font:400 13px/20px var(--font-v5)!important; color:var(--v5-ink-3)!important; }
+.gh-empty-facts > view { margin-top:14px!important; padding:14px 16px; border-radius:14px; gap:0!important; background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent), inset 0 0 0 1px var(--v5-border); }
+.gh-empty-facts > view > view + view { border-left:1px solid var(--v5-border); padding-left:16px; }
+.gh-empty-facts > view > view > text:first-child { display:inline; font:400 12px/16px var(--font-v5)!important; color:var(--v5-ink-3)!important; }
+.gh-empty-facts > view > view > text:nth-child(2) { margin-top:4px!important; font:500 20px/26px var(--font-metric)!important; color:var(--v5-ink)!important; }
+.gh-empty-facts > view > view + view > text:nth-child(2) { font:500 15px/26px var(--font-v5)!important; color:var(--v5-ink-2)!important; }
+.gh-empty-disclosure { margin:var(--v5-space-2) 12px 0; text-align:center; color:var(--v5-ink-3); font-size:12px; line-height:18px; }
+.gh-empty-disclosure .gh-empty-trust { margin-top:-3px; min-height:44px; display:flex; justify-content:center; align-items:center; color:var(--v5-ink-3); font-size:13px; font-weight:500; }
 </style>

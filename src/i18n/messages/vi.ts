@@ -3889,6 +3889,7 @@ timeHoursAgo: "{n} giờ",
     reduceQty: "Giảm số lượng rồi thử lại",
     howItWorksEntry: "Hướng dẫn Genesis",
     faq: {
+      title: 'Câu hỏi thường gặp',
       q1: "Người nắm giữ nhận được gì?",
       a1: "Một hạn mức UVT, được phát hành theo từng đợt sau khi UVT niêm yết, theo lịch nền tảng công bố.",
       q2: "Có thể chuyển nhượng không?",
@@ -4787,6 +4788,7 @@ timeHoursAgo: "{n} giờ",
   },
 
   marketplace: {
+    royaltyLabel: 'Phí chuyển nhượng',
     pageTitle: "Chợ chuyển nhượng",
     internalMarketLine: "Chuyển nhượng trong UVEL · Chưa hỗ trợ giao dịch bên ngoài",
     floor: "Lowest ask",

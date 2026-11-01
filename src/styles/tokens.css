@@ -1283,3 +1283,9 @@ uni-input .uni-input-placeholder {
     --ui-type-nav-title: 16px; --ui-type-nav-title-lh: 22px;
   }
 }
+
+/* The message family owns this category hue; expose its existing role to page-local layouts. */
+.message-center { --ui-notification-device-ink: var(--message-device-ink); }
+/* Provider artwork keeps its approved brand hue independently of the page theme. */
+.security-providers { --ui-telegram-brand: rgb(42,171,238); }
+.security-page { --ui-switch-thumb: rgb(255,255,255); }

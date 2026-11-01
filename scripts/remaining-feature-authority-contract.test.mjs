@@ -120,15 +120,21 @@ test("password change sends only the values validated before awaiting a prior re
 
 test("password buttons expose busy disabled state to keyboard and assistive input", () => {
   const page = read("src/pages/me/security.vue");
+  // 2026-11-01 redesign delegates password-button keyboard and disabled semantics to NxButton.
   for (const handler of ["cancelPwd", "submitPasswordChange"]) {
     const button = page.split("\n").find((line) => line.includes(`@click="${handler}"`));
     assert.ok(button);
-    assert.match(button, /:aria-disabled="securityBusy"/);
-    assert.match(button, /:tabindex="securityBusy \? -1 : 0"/);
-    assert.match(button, /securityBusy \? 'opacity-50'/);
-    assert.ok(button.includes(`@keydown.enter.prevent="${handler}"`));
-    assert.ok(button.includes(`@keydown.space.prevent="${handler}"`));
+    assert.match(button, /^\s*<NxButton\b/);
+    assert.match(button, /:(?:disabled|busy)="securityBusy"/);
   }
+  const component = read("src/components/ui/nx-button.vue");
+  assert.ok(component.includes('role="button"'));
+  assert.ok(component.includes(':tabindex="disabled || busy ? -1 : 0"'));
+  assert.ok(component.includes(':aria-disabled="disabled || busy"'));
+  assert.ok(component.includes("'nx-button--disabled': disabled || busy"));
+  assert.match(component, /\.nx-button--disabled\s*\{[^}]*opacity:\s*\.5\b/);
+  assert.ok(component.includes('@keydown.enter.prevent="activate"'));
+  assert.ok(component.includes('@keydown.space.prevent="activate"'));
 });
 
 test("idle password cancel clears fields without sending a command", () => {

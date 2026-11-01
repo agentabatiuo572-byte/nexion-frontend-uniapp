@@ -86,7 +86,7 @@ it.each([en, zh, vietnamese])("renders actual holder allocations from parser-con
   for (const owned of [0, 2]) {
     genesis.myOwned = owned;
     await genesis.syncRemote();
-    let page = await show(); expect(page.allocation).toBe("-");
+    let page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-");
     if (owned === 0) {
       expect(page.html).not.toContain(copy.genesisHolder.previewModeBanner);
       expect(page.html).not.toContain(copy.genesis.ctaSoldOut);
@@ -96,7 +96,7 @@ it.each([en, zh, vietnamese])("renders actual holder allocations from parser-con
     expect(page.html).toContain(copy.holderFacts.allocationUnavailable);
     expect(page.html).not.toContain(copy.holderFacts.unavailable);
     payload.qualificationReasonCodes = ["HOLDINGS_CONFIRMED"]; await genesis.syncRemote();
-    page = await show(); expect(page.allocation).toBe("-");
+    page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-");
     expect(page.html).toContain(copy.holderFacts.reasons.HOLDINGS_CONFIRMED);
     expect(page.html).toContain(copy.holderFacts.allocationUnavailable);
     payload.reservedAllocation = 0; await genesis.syncRemote();
@@ -108,17 +108,17 @@ it.each([en, zh, vietnamese])("renders actual holder allocations from parser-con
     expect(genesis.remoteEligibility?.reservedAllocation).toBe(1.234567);
     for (const status of ["CONFIG_UNAVAILABLE", "NOT_EFFECTIVE", "NOT_ELIGIBLE"]) {
       payload.status = status; payload.reservedAllocation = null; await genesis.syncRemote();
-      page = await show(); expect(page.allocation).toBe("-");
+      page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-");
       expect(page.html).not.toContain(copy.holderFacts.allocationUnavailable);
       const reason = status === "CONFIG_UNAVAILABLE" ? copy.holderFacts.unpublished
         : status === "NOT_EFFECTIVE" ? copy.holderFacts.notEffective : copy.holderFacts.notEligible;
       expect(page.html).toContain(reason);
     }
     payload.status = "READY"; payload.asOf = new Date(Date.now() - 16 * 60_000).toISOString();
-    await genesis.syncRemote(); page = await show(); expect(page.allocation).toBe("-"); expect(page.html).toContain(copy.holderFacts.stale);
+    await genesis.syncRemote(); page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-"); expect(page.html).toContain(copy.holderFacts.stale);
     expect(page.html).not.toContain(copy.holderFacts.allocationUnavailable);
     payload.asOf = at; payload.reservedAllocation = null; payload.qualificationReasonCodes = [];
-    genesis.remoteEligibility = null; expect((await show()).allocation).toBe("-");
+    genesis.remoteEligibility = null; expect((await show()).allocation).toBe(owned === 0 ? "—" : "-");
     shows.at(-1)!(); await Promise.resolve(); await Promise.resolve();
     expect(genesis.remoteEligibility).toMatchObject({ reservedAllocation: null });
   }
