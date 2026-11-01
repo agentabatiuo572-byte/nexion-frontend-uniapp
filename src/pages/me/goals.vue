@@ -11,54 +11,52 @@
 -->
 <template>
   <AppChassis active="me">
-    <view class="pb-6" style="color: var(--v5-ink)">
+    <view class="growth-goals" :class="{ 'growth-goals--featured': !!featuredGoal }" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.goals.navTitle" />
 
-      <!-- Hero -->
-      <view class="mx-4" :style="heroStyle">
-        <view class="flex items-center" style="gap: 8px; margin-bottom: 6px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
-          <text :style="heroLabelStyle">{{ t.goals.heroLabel }}</text>
-        </view>
-        <text class="block" :style="heroTitleStyle">{{ t.goals.heroTitle }}</text>
+      <view v-if="featuredGoal" class="goal-hero mx-4">
+        <view class="goal-hero__heading"><text>{{ fmt(t.growthUi.goalTerm, {days: Math.max(1, Math.round((featuredGoal.deadlineMs - featuredGoal.createdAt) / ONE_DAY_MS)), amount:formatAmount(featuredGoal.targetUSDT)}) }}</text><text class="goal-hero__term">{{ deadlineLine(featuredGoal.deadlineMs) }}</text></view>
+        <GrowthProgress ring :size="176" :radius="45.4545" :stroke="7" :value="goalPct(featuredGoal.targetUSDT)" :label="`${formatAmount(lifeTimeEarnings)} / ${formatAmount(featuredGoal.targetUSDT)}`">
+          <text class="goal-hero__amount"><text class="amount-cur">$</text>{{ formatAmount(lifeTimeEarnings).split('.')[0] }}<text class="amount-dec">{{ '.' + formatAmount(lifeTimeEarnings).split('.')[1] }}</text></text><text class="goal-hero__of">/ ${{ formatAmount(featuredGoal.targetUSDT) }}</text><text class="goal-hero__pct">{{ goalPct(featuredGoal.targetUSDT).toFixed(0) }}%</text>
+        </GrowthProgress>
+      </view>
+      <view class="goal-intro mx-4" :style="heroStyle">
+        <text class="block" :style="heroTitleStyle">{{ t.growthUi.goalHeading }}</text>
         <text v-if="editorDisplayReady" class="block" :style="heroSubStyle">{{ heroSubLine }}</text>
       </view>
 
       <view v-if="remoteApiEnabled && !editorDisplayReady" class="mx-4" :style="emptyStateStyle" role="status" :aria-busy="goalsStore.status !== 'error'">
         <text>{{ goalsStore.status === 'error' ? t.goals.serverUnavailable : t.goals.loading }}</text>
-        <view v-if="goalsStore.status === 'error'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals" @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals"><text :style="[recCtaLabelStyle, { font: '600 13px/20px var(--font-v5)' }]">{{ t.ui.retry }}</text></view>
+        <view v-if="goalsStore.status === 'error'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"><text :style="[recCtaLabelStyle, { font: '600 13px/20px var(--font-v5)' }]">{{ t.ui.retry }}</text></view>
       </view>
 
       <!-- Setter — de-carded: labels + L1-filled input sit on the page floor -->
-      <view class="mx-4" :style="setterWrapStyle">
-        <text class="block" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
-        <view class="flex items-center" :style="inputBoxStyle">
+      <view class="mx-4 goal-builder" :style="setterWrapStyle">
+        <text class="block goal-target-label" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
+        <view class="flex items-center goal-input-row" :style="inputBoxStyle">
           <text :style="dollarStyle">$</text>
-          <input class="flex-1" :style="targetInputStyle" type="digit" :value="editorDisplayReady ? String(target) : ''" placeholder="—" :disabled="editorBlocked" :aria-label="t.goals.targetLabel" @input="onTarget" />
+          <input class="flex-1" :style="targetInputStyle" type="text" inputmode="decimal" :value="editorDisplayReady ? formatAmount(target).replace(/\.00$/, '') : ''" placeholder="—" :disabled="editorBlocked" :aria-label="t.goals.targetLabel" @input="onTarget" />
         </view>
-        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px" role="radiogroup" :aria-label="t.goals.targetPresetsLabel">
+        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px" role="radiogroup" :aria-label="t.goals.targetPresetsLabel">
           <view
             v-for="(p, pi) in PRESET_TARGETS"
             :key="p"
-            class="nx-goal-target-preset flex items-center justify-center active:opacity-70"
+            :class="{ 'nx-frosted-button': editorDisplayReady && target === p }" class="nx-goal-target-preset flex items-center justify-center active:opacity-70"
             :style="presetTargetStyle(p)"
             role="radio"
             :aria-disabled="editorBlocked"
             :tabindex="target === p || (pi === 0 && !PRESET_TARGETS.includes(target)) ? 0 : -1"
             :aria-checked="editorDisplayReady && target === p ? 'true' : 'false'"
             :aria-label="fmt(t.goals.targetPresetOption, { amount: formatAmount(p) })"
-            @click="selectTarget(p)"
-
-
-
-            @keydown.enter.prevent="selectTarget(p)" @keydown.space.prevent="selectTarget(p)" @keydown.left.prevent="moveTarget(pi, -1)" @keydown.right.prevent="moveTarget(pi, 1)"
+            @click="selectTarget(p)" @keydown.left.prevent="moveTarget(pi, -1)" @keydown.right.prevent="moveTarget(pi, 1)"
           >
-            <text :style="presetTargetLabelStyle(p)">${{ p >= 1000 ? `${formatAmount(p / 1000)}K` : formatAmount(p) }}</text>
+            <text :style="presetTargetLabelStyle(p)">${{ p >= 1000 ? `${formatAmount(p / 1000)}K` : String(p) }}</text>
           </view>
         </view>
 
         <text class="block" :style="[fieldLabelStyle, { marginTop: '18px' }]">{{ t.goals.deadlineLabel }}</text>
-        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px" role="radiogroup" :aria-label="t.goals.deadlineLabel">
+        <view class="grid goal-deadlines nx-frosted-button" :style="{gridTemplateColumns: `repeat(${editorDisplayReady && savedCustomDeadline !== null ? 5 : 4}, minmax(0, 1fr))`, gap: '3px'}" role="radiogroup" :aria-label="t.goals.deadlineLabel">
+          <view v-if="editorDisplayReady && savedCustomDeadline !== null" class="nx-goal-deadline-preset nx-goal-current-deadline flex items-center justify-center" :style="presetDeadlineStyle(savedCustomDeadline)" role="radio" :tabindex="days === savedCustomDeadline ? 0 : -1" :aria-checked="days === savedCustomDeadline" :aria-disabled="editorBlocked" :aria-label="fmt(t.goals.deadlinePresetOption, {days:String(savedCustomDeadline)})" @click="selectDays(savedCustomDeadline)" @keydown.left.prevent="moveDays(-1, -1)" @keydown.right.prevent="moveDays(-1, 1)"><text :style="presetDeadlineLabelStyle(savedCustomDeadline)">{{ fmt(t.goals.deadlinePresetLabel, {days:String(savedCustomDeadline)}) }}</text></view>
           <view
             v-for="(d, di) in PRESET_DEADLINES_DAYS"
             :key="d"
@@ -66,14 +64,10 @@
             :style="presetDeadlineStyle(d)"
             role="radio"
             :aria-disabled="editorBlocked"
-            :tabindex="days === d || (di === 0 && !PRESET_DEADLINES_DAYS.includes(days)) ? 0 : -1"
+            :tabindex="days === d || (!editorDisplayReady && di === 0) ? 0 : -1"
             :aria-checked="editorDisplayReady && days === d ? 'true' : 'false'"
             :aria-label="fmt(t.goals.deadlinePresetOption, { days: String(d) })"
-            @click="selectDays(d)"
-
-
-
-            @keydown.enter.prevent="selectDays(d)" @keydown.space.prevent="selectDays(d)" @keydown.left.prevent="moveDays(di, -1)" @keydown.right.prevent="moveDays(di, 1)"
+            @click="selectDays(d)" @keydown.left.prevent="moveDays(di, -1)" @keydown.right.prevent="moveDays(di, 1)"
           >
             <text :style="presetDeadlineLabelStyle(d)">{{ fmt(t.goals.deadlinePresetLabel, { days: String(d) }) }}</text>
           </view>
@@ -84,7 +78,7 @@
       <view v-if="recommendationWarmDisplay" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recPathStyle">{{ recommendationWarmDisplay }}</text>
-        <view class="inline-flex items-center" :style="recCtaStyle" aria-hidden="true"><text :style="recCtaLabelStyle">{{ t.goals.shopCta }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view>
+        <view class="inline-flex items-center" :style="recCtaStyle" aria-hidden="true"><text :style="recCtaLabelStyle">{{ t.goals.shopCta }} →</text></view>
       </view>
       <view v-else-if="editorHasSnapshot && target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'loading'" class="nx-glass-card mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
@@ -93,25 +87,17 @@
       <view v-else-if="editorHasSnapshot && target > 0 && remoteApiEnabled && goalsStore.recommendationStatus === 'error'" class="mx-4" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
         <text class="block" :style="recReasonStyle">{{ goalsStore.recommendationError === 'GOAL_NO_ELIGIBLE_PRODUCT' ? t.goals.noEligibleProduct : t.goals.serverUnavailable }}</text>
-        <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals"  @keydown.enter.prevent="retryGoals" @keydown.space.prevent="retryGoals">
+        <view v-if="goalsStore.recommendationError !== 'GOAL_NO_ELIGIBLE_PRODUCT'" class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryGoals">
           <text :style="[recCtaLabelStyle, { font: '600 13px/20px var(--font-v5)' }]">{{ t.ui.retry }}</text>
         </view>
       </view>
-      <view v-else-if="target > 0 && (!remoteApiEnabled || (!editorBlocked && goalsStore.recommendationStatus === 'ready' && goalsStore.recommendation?.purchaseRequired === true && goalsStore.recommendation.targetUsdt === target))" class="mx-4" :style="recCardStyle">
+      <view v-else-if="target > 0 && (!remoteApiEnabled || (!editorBlocked && goalsStore.recommendationStatus === 'ready' && goalsStore.recommendation?.purchaseRequired === true && goalsStore.recommendation.targetUsdt === target))" class="mx-4 goal-recommendation" :style="recCardStyle">
         <text class="block" :style="recHeaderStyle">{{ t.goals.recHeader }}</text>
-        <text class="block" :style="recPathStyle">{{ recPathLine }}</text>
+        <text v-if="remoteApiEnabled && goalsStore.recommendation" class="goal-daily">{{ fmt(t.goals.dailyNeeded, {amount: formatGoalDailyRate(goalsStore.recommendation.requiredDaily)}) }}</text>
+        <text v-else class="block" :style="recPathStyle">{{ recPathLine }}</text>
         <text v-if="recommendation.reason" class="block" :style="recReasonStyle">{{ recommendation.reason }}</text>
-        <view class="inline-flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.goals.shopCta" @click="goStore"  @keydown.enter.prevent="goStore" @keydown.space.prevent="goStore">
-          <text :style="recCtaLabelStyle">{{ t.goals.shopCta }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
-      </view>
-
-      <!-- Save -->
-      <view style="padding: 0 16px; margin-top: 12px">
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="[saveBtnStyle, savePending ? saveBtnPendingStyle : {}]" role="button" :tabindex="saveBlocked ? -1 : 0" :aria-label="t.goals.saveCta" :aria-disabled="saveBlocked" @click="onSave"  @keydown.enter.prevent="onSave" @keydown.space.prevent="onSave">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
-          <text :style="saveLabelStyle" style="pointer-events: none">{{ t.goals.saveCta }}</text>
+        <view class="goal-device-well flex items-center active:opacity-80" :style="recCtaStyle" role="button" tabindex="0" :aria-label="t.goals.shopCta" @click="goStore">
+          <view class="goal-device-copy"><text class="goal-device-label">{{ t.growthUi.recommendedDevice }}</text><text class="goal-device-name">{{ recommendation.tier }}</text></view><text :style="recCtaLabelStyle">{{ t.goals.shopCta }} →</text>
         </view>
       </view>
 
@@ -119,27 +105,20 @@
       <view v-if="goals.length > 0">
         <text class="block" :style="sectionLabelStyle">{{ t.goals.activeGoals }}</text>
         <view :style="goalGroupStyle">
-          <view v-for="(g, gi) in goals" :key="g.id" :style="goalRowStyle(gi === goals.length - 1)">
-            <view class="flex items-center justify-between">
-              <text class="font-mono-tabular" :style="goalTargetStyle">${{ formatAmount(g.targetUSDT) }}</text>
-              <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: formatAmount(g.targetUSDT) })" @click="remove(g.id)"  @keydown.enter.prevent="remove(g.id)" @keydown.space.prevent="remove(g.id)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-              </view>
+          <view v-for="(g, gi) in goals" :key="g.id" class="goal-list-row" :style="goalRowStyle(gi === goals.length - 1)">
+            <view class="goal-list-row__body">
+              <view class="goal-list-row__heading"><text :style="goalTargetStyle">${{ formatAmount(g.targetUSDT) }}</text><text v-if="!g.achieved" :style="goalDeadlineStyle">{{ deadlineLine(g.deadlineMs) }}</text><text v-else class="goal-achieved">{{ t.goals.achievedBadge }}</text></view>
+              <GoalProgressBar :pct="goalPct(g.targetUSDT)" />
+              <view class="flex items-center justify-between" style="margin-top:6px"><text :style="goalFootMutedStyle">${{ formatAmount(lifeTimeEarnings) }} / ${{ formatAmount(g.targetUSDT) }}</text><text :style="goalFootPctStyle">{{ goalPct(g.targetUSDT).toFixed(0) }}%</text></view>
             </view>
-            <text class="block" :style="goalDeadlineStyle">{{ deadlineLine(g.deadlineMs) }}</text>
-            <GoalProgressBar :pct="goalPct(g.targetUSDT)" />
-            <view class="flex items-center justify-between font-mono-tabular" style="margin-top: 4px">
-              <text :style="goalFootMutedStyle">${{ formatAmount(lifeTimeEarnings) }} / ${{ formatAmount(g.targetUSDT) }}</text>
-              <text :style="goalFootPctStyle">{{ goalPct(g.targetUSDT).toFixed(0) }}%</text>
-            </view>
-            <view v-if="g.achieved" class="inline-flex items-center" :style="achievedBadgeStyle">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
-              <text :style="achievedLabelStyle">{{ t.goals.achievedBadge }}</text>
-            </view>
+            <view class="goal-delete nx-frosted-button grid place-items-center" role="button" tabindex="0" :aria-label="fmt(t.goals.removeGoalLabel, { amount: formatAmount(g.targetUSDT) })" @click="remove(g.id)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg></view>
           </view>
         </view>
       </view>
     </view>
+    <template #pageFixed>
+      <view class="goal-sticky"><NxButton variant="primary" size="large" :label="t.goals.saveCta" :disabled="saveBlocked" :busy="savePending" @click="onSave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg><text>{{ t.goals.saveCta }}</text></NxButton></view>
+    </template>
   </AppChassis>
 </template>
 
@@ -150,6 +129,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch, type CSSPropert
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import GrowthProgress from "@/components/ui/growth-progress.vue";
 import GoalProgressBar from "@/components/me/goal-progress-bar.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -169,10 +150,12 @@ const ui = useUI();
 
 const lifeTimeEarnings = computed(() => remoteApiEnabled ? goalsStore.lifetimeEarningsUsdt : app.earnings.total);
 const goals = computed(() => !remoteApiEnabled || editorDisplayReady.value ? goalsStore.goals : []);
+const featuredGoal = computed(() => goals.value.find(goal => !goal.achieved) ?? goals.value[0]);
 const target = ref(1000);
 const days = ref(90);
 const savePending = ref(false);
 const restoredGoal = ref<{ id: string; targetUSDT: number; days: number } | null>(null);
+const savedCustomDeadline = computed(() => restoredGoal.value && !PRESET_DEADLINES_DAYS.includes(restoredGoal.value.days) ? restoredGoal.value.days : null);
 const editorDisplayReady = ref(!remoteApiEnabled);
 let editorEnvironmentInvalidated = false;
 watch(() => apiRuntimeConfig?.environment, () => { editorEnvironmentInvalidated = true; editorDisplayReady.value = false; editorReadEpoch += 1; }, { flush: 'sync' });
@@ -241,7 +224,7 @@ function detailVal(e: Event): string {
 }
 function onTarget(e: Event) {
   if (editorBlocked.value) return;
-  target.value = Math.max(0, parseFloat(detailVal(e)) || 0);
+  target.value = Math.max(0, parseFloat(detailVal(e).replace(/,/g, "")) || 0);
 }
 function selectTarget(value: number) {
   if (!editorBlocked.value) target.value = value;
@@ -269,7 +252,11 @@ function movePreset(selector: string, list: number[], index: number, delta: numb
   });
 }
 function moveTarget(index: number, delta: number): void { movePreset(".nx-goal-target-preset", PRESET_TARGETS, index, delta, selectTarget); }
-function moveDays(index: number, delta: number): void { movePreset(".nx-goal-deadline-preset", PRESET_DEADLINES_DAYS, index, delta, selectDays); }
+function moveDays(index: number, delta: number): void {
+  const custom = savedCustomDeadline.value;
+  const list = custom === null ? PRESET_DEADLINES_DAYS : [custom, ...PRESET_DEADLINES_DAYS];
+  movePreset(".nx-goal-deadline-preset", list, index + (custom === null ? 0 : 1), delta, selectDays);
+}
 
 watch(() => goalsStore.accountEpoch, () => {
   editorReadEpoch += 1;
@@ -450,48 +437,26 @@ function goStore() {
 
 // ── styles ──
 function presetTargetStyle(p: number): CSSProperties {
-  return {
-    height: "44px",
-    borderRadius: "8px",
-    // 未选中原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),预设块直接坐在页面底上 → 改 L1
-    background: editorDisplayReady.value && target.value === p ? "var(--v5-brand)" : "var(--v5-surface)",
-  };
+  const selected = editorDisplayReady.value && target.value === p;
+  return {height: '36px', borderRadius: '999px', background: selected ? undefined : 'color-mix(in srgb, var(--v5-ink) 6%, transparent)',
+    '--ui-button-fill': 'color-mix(in srgb, var(--v5-brand) 14%, transparent)', '--ui-button-ink': 'var(--v5-brand)'} as CSSProperties;
 }
 function presetTargetLabelStyle(p: number): CSSProperties {
-  return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "12px",
-    color: editorDisplayReady.value && target.value === p ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
-  };
+  return {font: '500 13px/18px var(--font-metric)', color: editorDisplayReady.value && target.value === p ? 'var(--v5-brand)' : 'var(--v5-ink-2)'};
 }
 function presetDeadlineStyle(d: number): CSSProperties {
-  return {
-    height: "44px",
-    minWidth: 0,
-    padding: "0 4px",
-    boxSizing: "border-box",
-    borderRadius: "8px",
-    // 同上:与目标预设同容器同尺寸,未选中态一并改 L1
-    background: editorDisplayReady.value && days.value === d ? "var(--v5-brand)" : "var(--v5-surface)",
-  };
+  return {height: '32px', minWidth: 0, padding: '0 4px', boxSizing: 'border-box', borderRadius: '999px',
+    background: editorDisplayReady.value && days.value === d ? 'var(--ui-growth-selection)' : 'transparent'};
 }
 function presetDeadlineLabelStyle(d: number): CSSProperties {
-  return {
-    fontFamily: "var(--font-v5)",
-    fontSize: "12px",
-    lineHeight: "18px",
-    whiteSpace: "nowrap",
-    textAlign: "center",
-    fontVariantNumeric: "tabular-nums",
-    fontWeight: editorDisplayReady.value && days.value === d ? 600 : 400,
-    color: editorDisplayReady.value && days.value === d ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
-  };
+  return {font: '500 14px/20px var(--font-v5)', whiteSpace: 'nowrap', textAlign: 'center',
+    color: editorDisplayReady.value && days.value === d ? 'var(--v5-brand)' : 'var(--v5-ink-3)'};
 }
 
 // De-carded: hero intro sits on the page floor — surface/border + the warning
 // radial dropped (a page-floor aura per owner call: deleted, not re-tuned).
-// 2px inset (mx-4 + this) aligns with the labels + groups below at 18px.
-const heroStyle: CSSProperties = { padding: "0 2px" };
+// The 4px inset aligns the intro with the board's 20px section text.
+const heroStyle: CSSProperties = { padding: "0 4px" };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
@@ -501,10 +466,10 @@ const heroLabelStyle: CSSProperties = {
 };
 const heroTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "20px",
+  fontSize: "17px",
   fontWeight: 600,
   color: "var(--v5-ink)",
-  lineHeight: 1.25,
+  lineHeight: "24px",
   textWrap: "balance",
   wordBreak: "normal",
 };
@@ -517,7 +482,7 @@ const heroSubStyle: CSSProperties = {
 };
 // Setter — de-carded floor block; the $ input box sits on the page floor at L1
 // surface (de-card white-list: input = filled box, no border).
-const setterWrapStyle: CSSProperties = { marginTop: "18px", padding: "0 2px" };
+const setterWrapStyle: CSSProperties = { marginTop: "12px", padding: "16px", borderRadius: "var(--ui-radius-surface)", background: "var(--v5-surface)" };
 const fieldLabelStyle: CSSProperties = {
   marginBottom: "8px",
   fontFamily: "var(--font-v5)",
@@ -526,37 +491,43 @@ const fieldLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const inputBoxStyle: CSSProperties = {
-  gap: "8px",
-  height: "52px",
-  padding: "0 14px",
-  borderRadius: "12px",
+  gap: "2px",
+  height: "44px",
+  fontSize: "32px",
+  alignItems: "baseline",
+  padding: "0",
+  borderRadius: "var(--v5-radius-s)",
   // 输入框直接坐在页面底上,surface-3 对页面底亮色 ΔE 2.7 不可辨(内凹读不出来)→ 改 L1 surface。
   background: "var(--v5-surface)",
 };
 const dollarStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "20px",
-  color: "var(--v5-brand)",
+  fontFamily: "var(--font-amount)",
+  fontSize: ".55em",
+  fontWeight: 500,
+  color: "var(--v5-ink-3)",
 };
 const targetInputStyle: CSSProperties = {
   height: "40px",
   background: "transparent",
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
+  fontFamily: "var(--font-amount)",
+  fontSize: "32px",
+  fontWeight: 500,
+  fontVariantNumeric: "tabular-nums",
+  letterSpacing: "-.02em",
   color: "var(--v5-ink)",
 };
-const recCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+const recCardStyle: CSSProperties = {
   marginTop: "12px",
-  borderRadius: "var(--nx-glass-radius)",
+  borderRadius: "var(--ui-radius-surface)",
   padding: "16px",
-  background: "var(--nx-glass-fill)",
+  background: "var(--v5-surface)",
 };
 const recHeaderStyle: CSSProperties = {
   marginBottom: "6px",
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
-  letterSpacing: "0.14em",
+  lineHeight: "16px",
+  letterSpacing: "normal",
   color: "var(--v5-brand)",
 };
 const recPathStyle: CSSProperties = {
@@ -581,14 +552,15 @@ const recCtaStyle: CSSProperties = {
 };
 const recCtaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  fontWeight: 600,
+  fontSize: "13px",
+  lineHeight: "18px",
+  fontWeight: 500,
   color: "var(--v5-brand)",
 };
 const saveBtnStyle: CSSProperties = {
   gap: "6px",
   height: "48px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
 };
@@ -600,7 +572,7 @@ const saveLabelStyle: CSSProperties = {
   color: "inherit",
 };
 const sectionLabelStyle: CSSProperties = {
-  margin: "22px 18px 12px",
+  margin: "32px 20px 12px",
   fontFamily: "var(--font-v5)",
   fontSize: "var(--ui-type-section)",
   fontWeight: 600,
@@ -611,8 +583,9 @@ const sectionLabelStyle: CSSProperties = {
 // container border-top opens the group, each row carries its own divider.
 const goalGroupStyle: CSSProperties = {
   margin: "0 16px",
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
+  padding: "0",
+  borderRadius: "var(--ui-radius-surface)",
+  background: "var(--v5-surface)",
 };
 function goalRowStyle(isLast: boolean): CSSProperties {
   return {
@@ -623,14 +596,14 @@ function goalRowStyle(isLast: boolean): CSSProperties {
 const goalTargetStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "15px",
-  fontWeight: 600,
+  fontWeight: 500,
   color: "var(--v5-ink)",
 };
 const goalRemoveStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
+  width: "36px",
+  height: "36px",
   flexShrink: 0,
-  borderRadius: "6px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-surface-2)",
 };
 const goalDeadlineStyle: CSSProperties = {
@@ -640,14 +613,14 @@ const goalDeadlineStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const goalFootMutedStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-metric)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const goalFootPctStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-metric)",
   fontSize: "12px",
-  color: "var(--v5-brand)",
+  color: "var(--v5-ink-3)",
 };
 const achievedBadgeStyle: CSSProperties = {
   marginTop: "8px",
@@ -657,7 +630,7 @@ const achievedBadgeStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
 };
 const achievedLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-metric)",
   fontSize: "12px",
   color: "var(--v5-brand)",
 };
@@ -667,3 +640,41 @@ const emptyStateStyle: CSSProperties = {
 
 
 </script>
+
+<style scoped>
+.growth-goals { --ui-growth-selection: color-mix(in srgb,var(--v5-bg) 50%,transparent); padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+:global([data-theme="light"]) .growth-goals { --ui-growth-selection: color-mix(in srgb,var(--v5-ink) 7%,transparent); }
+.goal-hero { position: relative; padding: 18px 16px 20px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+.goal-hero__heading { display: flex; justify-content: space-between; gap: var(--v5-space-2); align-items: center; font: 500 15px/22px var(--font-v5); }
+.goal-hero__term { flex: none; color: var(--v5-brand); background: var(--v5-brand-soft); padding: var(--v5-space-1) 8px; border-radius: var(--v5-radius-full); font: 500 12px/16px var(--font-v5); }
+.goal-hero :deep(.growth-progress) { margin: var(--v5-space-3) auto 0; }
+.goal-hero__amount { font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; }.goal-hero__of { font: 500 13px/18px var(--font-metric); color: var(--v5-ink-3); }.goal-hero__pct { margin-top: var(--v5-space-1); color: var(--v5-brand); font: 500 15px/20px var(--font-metric); }
+.goal-intro { margin-top: var(--v5-space-8); }.goal-deadlines { padding: var(--v5-space-1); border-radius: var(--v5-radius-full); position: relative; }
+.nx-goal-target-preset, .nx-goal-deadline-preset { position: relative; cursor: pointer; }.nx-goal-target-preset::after, .nx-goal-deadline-preset::after { content:''; position:absolute; inset:-6px 0; }
+.nx-goal-target-preset:focus-visible, .nx-goal-deadline-preset:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.goal-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg,color-mix(in srgb,var(--ui-ticket-top) 70%,transparent),color-mix(in srgb,var(--ui-ticket-bottom) 94%,transparent)); border-top: 1px solid var(--v5-border); backdrop-filter: blur(18px) saturate(160%); }.goal-sticky > * { flex: 1; }
+.goal-daily { display:block; margin-top:6px; font:500 24px/30px var(--font-metric); letter-spacing:-.01em; }.goal-device-name { flex:1; font:500 15px/22px var(--font-v5); color:var(--v5-ink); }
+.goal-device-name {margin-right:12px;}.goal-builder ~ view [aria-label] .goal-device-name {font-weight:500;}
+
+/* Approved growth board geometry and material. */
+ .amount-cur { font-size:.55em; color:var(--v5-ink-3); margin-right:2px; letter-spacing:0; }.amount-dec { color:var(--v5-ink-3); }
+.goal-hero { overflow:hidden; }.goal-hero::after { content:''; position:absolute; left:50%; top:150px; width:260px; height:80px; margin-left:-130px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-brand) 22%,transparent),transparent); pointer-events:none; }
+.goal-hero :deep(.growth-progress) { position:relative; z-index:1; }
+.goal-device-well { box-sizing:border-box; width:100%; min-height:66px !important; gap:12px !important; padding:10px 12px; border-radius:14px; background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent),inset 0 0 0 1px var(--v5-border); }
+.goal-device-copy { flex:1; min-width:0; }.goal-device-label { display:block; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.goal-device-name { display:block; margin:0; font:500 15px/22px var(--font-v5); }
+.goal-list-row { display:flex; align-items:center; gap:12px; box-sizing:border-box; min-height:86px; padding:14px 16px !important; }
+.goal-list-row__body { flex:1; min-width:0; }.goal-list-row__heading { display:flex; align-items:center; gap:8px; min-height:22px; }.goal-list-row__heading > text { margin-top:0 !important; }.goal-achieved { padding:4px 8px; border-radius:var(--v5-radius-full); background:var(--v5-success-soft); color:var(--v5-success-ink); font:500 12px/16px var(--font-v5); }
+.goal-delete { flex:none; width:36px; height:36px; border-radius:50%; color:var(--v5-ink-3); }.goal-sticky :deep(.nx-button--disabled) { opacity:1; }.goal-sticky { padding-bottom:30px; }
+
+.growth-goals--featured :deep(.spv) { margin-bottom:0; padding-bottom:13px; }
+.goal-hero {margin-top:8px;}.goal-recommendation {min-height:167.5px;box-sizing:border-box;}
+
+.goal-hero__amount { font-variant-numeric:tabular-nums; }
+
+.goal-hero :deep(.growth-progress__center) { transform:none; }
+.goal-target-label { margin-bottom:var(--v5-space-1)!important; }
+.goal-builder { padding-top:20px!important; }
+.goal-device-well { margin-top:14px!important; }
+.goal-recommendation { padding-top:20px!important; }
+
+</style>

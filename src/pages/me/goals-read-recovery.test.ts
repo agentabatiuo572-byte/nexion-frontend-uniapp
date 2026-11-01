@@ -1,3 +1,4 @@
+import { growthButton, growthProgress } from "@/lib/entry-review.test-support";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 // @ts-expect-error Node is used only by the test runner.
 import { readFileSync } from "node:fs";
@@ -15,7 +16,7 @@ import { fmt } from "@/i18n/format";
 const source = readFileSync(new URL("./goals.vue", import.meta.url), "utf8");
 const template = parse(source, { filename: "goals.vue" }).descriptor.template!.content;
 const render = new Function("formatAmount", "Vue", compile(template, { mode: "function", prefixIdentifiers: true }).code)(formatAmount, Vue);
-const wrapper = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("main", slots.default?.()) });
+const wrapper = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("main", [...(slots.default?.() ?? []), ...(slots.pageFixed?.() ?? [])]) });
 const progress = Vue.defineComponent({ setup: () => () => Vue.h("i") });
 
 function goal(id = "goal-1") {
@@ -37,11 +38,11 @@ async function show(
 ) {
   const app = Vue.createSSRApp({
     render,
-    setup: () => ({ formatAmount,
+    setup: () => ({ formatAmount: formatGroupedAmount, formatGoalDailyRate: formatAmount,
       remoteApiEnabled: true,
-      t: { goals: {
+      t: { growthUi: en.growthUi, goals: {
         navTitle: "Goals", heroLabel: "Goal", heroTitle: "Plan", heroSubtitle: "Current {current}", targetLabel: "Target",
-        deadlineLabel: "Deadline", recHeader: "Recommendation", loading: "Loading", serverUnavailable: "Read unavailable",
+        deadlineLabel: "Deadline", recHeader: "Recommendation", dailyNeeded: "About ${amount} per day", loading: "Loading", serverUnavailable: "Read unavailable",
         noEligibleProduct: "No eligible product", recPath: "", recReasonServer: "", shopCta: "Shop", saveCta: "Save",
         activeGoals: "Active goals", deadlineRow: "{n} days", achievedBadge: "Achieved", minTargetWarn: "", savedToast: "",
         targetPresetsLabel: "Quick target amounts", targetPresetOption: "Target {amount} USDT",
@@ -52,7 +53,7 @@ async function show(
         template.replace(/\{(\w+)\}/g, (_m, key: string) => params[key] ?? ""),
       target: 1000, days: 90, savePending: false, editorBlocked: status !== "ready", saveBlocked: status !== "ready",
       recommendationWarmDisplay: "", editorHasSnapshot: status === "ready", editorDisplayReady: status === "ready",
-      PRESET_TARGETS: [500], PRESET_DEADLINES_DAYS: [30],
+      PRESET_TARGETS: [500], PRESET_DEADLINES_DAYS: [30], savedCustomDeadline: null,
       goalsStore: { status, error: status === "error" ? "temporary" : "", goals, lifetimeEarningsUsdt: 25,
         recommendationStatus: recommendationState.status, recommendationError: recommendationState.error,
         recommendation: recommendationState.recommendation },
@@ -66,7 +67,7 @@ async function show(
       deadlineLine: () => "90 days", goalPct: () => 5,
     }),
   });
-  app.component("AppChassis", wrapper); app.component("SubPageHeader", wrapper); app.component("GoalProgressBar", progress);
+  app.component("AppChassis", wrapper); app.component("SubPageHeader", wrapper); app.component("GoalProgressBar", progress); app.component("NxButton", growthButton); app.component("GrowthProgress", growthProgress);
   return renderToString(app);
 }
 
@@ -76,6 +77,7 @@ describe("earning-goal read recovery", () => {
       recommendationStatus: "idle", recommendation: null, recommendationError: null,
       ensure: vi.fn(async () => { goalsStore.readSuccessRevision++; }), refreshRecommendation: vi.fn(async () => {}) });
     const modules: Record<string, unknown> = {
+      "@/components/ui/nx-button.vue": {default: growthButton}, "@/components/ui/growth-progress.vue": {default: growthProgress},
       "@/lib/amount-display": { formatAmount, formatGroupedAmount },
       vue: { ...Vue, onMounted() {}, onUnmounted() {} },
       "@dcloudio/uni-app": { onShow() {}, onHide() {} },
@@ -95,7 +97,7 @@ describe("earning-goal read recovery", () => {
     const page = scope.run(() => exports.default.setup({}, { expose() {} }))!;
     const showActual = () => {
       const actual = Vue.createSSRApp({ render, setup: () => ({ ...page }) });
-      actual.component("AppChassis", wrapper); actual.component("SubPageHeader", wrapper); actual.component("GoalProgressBar", progress);
+      actual.component("AppChassis", wrapper); actual.component("SubPageHeader", wrapper); actual.component("GoalProgressBar", progress); actual.component("NxButton", growthButton); actual.component("GrowthProgress", growthProgress);
       return renderToString(actual).then(html => html.replaceAll("&#39;", "'"));
     };
     const hero = (current: string) => fmt(copy.goals.heroSubtitle, { current });
@@ -140,7 +142,7 @@ describe("earning-goal read recovery", () => {
     });
     expect(html).not.toContain("$100.00");
     expect(html).toContain("Loading");
-    expect(html).not.toContain('value="1000"');
+    expect(html).not.toContain('value="1,000"');
     expect(html).not.toContain('aria-checked="true"');
     expect(html).not.toContain("Shop");
   });
@@ -153,7 +155,7 @@ describe("earning-goal read recovery", () => {
     expect(html).not.toContain("$100.00");
     expect(html).toContain("Read unavailable");
     expect(html).toContain("Retry");
-    expect(html).not.toContain('value="1000"');
+    expect(html).not.toContain('value="1,000"');
     expect(html).not.toContain("Shop");
   });
 
@@ -170,7 +172,7 @@ describe("earning-goal read recovery", () => {
       status: "ready", error: null,
       recommendation: { purchaseRequired: true, targetUsdt: 1000, days: 90, requiredDaily: 1000 / 90 },
     });
-    expect(html).toContain('value="1000"');
+    expect(html).toContain('value="1,000"');
     expect(html).toContain("Shop");
   });
 

@@ -49,7 +49,7 @@ it("offers one recovery action, then saves and reads back 500/90 days and delete
   expect(text(page.root)).toContain("75%");
   const saved = page.control(zh.goals.saveCta)!;
   expect(saved.props["aria-disabled"]).toBe(true);
-  expect(saved.props.style).toMatchObject({ background: "var(--v5-brand)" });
+  expect(Vue.normalizeClass(saved.props.class)).toContain("nx-button--primary");
   await saved.props.onClick(); expect(goalsStore.setGoal).toHaveBeenCalledOnce();
   failing = true; await actions.refreshRemoteGoals(true); await flush();
   singleFailure(); expect(text(page.root)).not.toContain("75%");

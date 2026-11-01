@@ -10,7 +10,7 @@ describe("weekly Tier-2 list presentation", () => {
   });
 
   it("keeps the canonical task name when completed and separates completion from claiming", () => {
-    expect(source).toMatch(/v-else-if="isCompleted\(q\)"[\s\S]*titleOf\(q\)[\s\S]*w\.rewardReady[\s\S]*claimTextFor\(q\)/);
+    expect(source).toMatch(/v-else-if="isCompleted\(q\)"[\s\S]*titleOf\(q\)[\s\S]*t\.growthUi\.weekReady[\s\S]*claimTextFor\(q\)/);
   });
 
   it("labels claimed rows and counts completion rather than only claimed rewards", () => {

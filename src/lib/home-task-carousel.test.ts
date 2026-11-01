@@ -235,7 +235,7 @@ describe("home task carousel", () => {
     expect(weeklyQuestHeroSource).toContain(':disabled="questTargetClosed || periodExpired || wq.loading"');
     expect(weeklyQuestHeroSource).toContain('<svg v-if="!questTargetClosed"');
     // 停用态不得再用「可点的主操作」配色:CTA 是玻璃次按钮,禁用态由 NxButton 统一置灰。
-    expect(weeklyQuestHeroSource).toMatch(/<NxButton\s+v-if="!completed"\s+variant="secondary"/);
+    expect(weeklyQuestHeroSource).toMatch(/<NxButton\s+v-if="!completed"\s+variant="brand"/);
   });
 
   it("keeps mock-only weekly values out of the formal UniApp component", () => {

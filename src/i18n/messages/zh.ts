@@ -1133,6 +1133,17 @@ trustReserve: "暂无可核验的储备资料。",
   },
 
 
+  growthUi: {
+    goalHeading: "设个目标，看推荐路径",
+    goalTerm: "{days} 天内 ${amount}",
+    recommendedDevice: "建议设备",
+    achievementCompleted: "已完成 {n}%",
+    streakPrefix: "当前连续签到",
+    streakSuffix: "天",
+    milestoneDay: "第 {n} 天",
+    weekReady: "奖励已准备好，可领取。",
+  },
+
   goals: {
     navTitle: "收益目标",
     heroLabel: "目标追踪",
@@ -1141,6 +1152,7 @@ trustReserve: "暂无可核验的储备资料。",
     targetLabel: "目标金额",
     deadlineLabel: "期限",
     recHeader: "推荐路径",
+    dailyNeeded: "日均约 ${amount}",
     recPath: "目标：{days} 天内 ${target}，日均约 ${perDay}。建议设备：{tier}。",
     recCloudShare: "每日目标较低，Cloud Share 门槛最低。",
     recS1: "一台 S1 的预估日收益可覆盖目标。",

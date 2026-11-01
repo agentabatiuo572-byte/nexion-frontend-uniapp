@@ -1148,6 +1148,17 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
   },
 
 
+  growthUi: {
+    goalHeading: "Đặt mục tiêu, xem lộ trình gợi ý",
+    goalTerm: "${amount} trong {days} ngày",
+    recommendedDevice: "Thiết bị gợi ý",
+    achievementCompleted: "Đã hoàn thành {n}%",
+    streakPrefix: "Chuỗi điểm danh hiện tại",
+    streakSuffix: "ngày",
+    milestoneDay: "Ngày {n}",
+    weekReady: "Phần thưởng đã sẵn sàng, hãy nhận ngay.",
+  },
+
   goals: {
     navTitle: "Mục tiêu thu nhập",
     heroLabel: "THEO DÕI MỤC TIÊU",
@@ -1156,6 +1167,7 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
     targetLabel: "Số tiền mục tiêu",
     deadlineLabel: "Hạn chót",
     recHeader: "Lộ trình gợi ý",
+    dailyNeeded: "Khoảng ${amount}/ngày",
     recPath: "Mục tiêu: ${target} trong {days} ngày, trung bình khoảng ${perDay}/ngày. Thiết bị đề xuất: {tier}.",
     recCloudShare: "Mục tiêu mỗi ngày thấp; Cloud Share có mức giá thấp nhất.",
     recS1: "Thu nhập ước tính mỗi ngày của một S1 đủ cho mục tiêu này.",

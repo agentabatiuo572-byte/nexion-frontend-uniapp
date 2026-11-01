@@ -1,3 +1,4 @@
+import { growthButton } from "@/lib/entry-review.test-support";
 import * as displayDate from "@/lib/display-date";
 import * as brandCopy from "@/lib/brand-copy";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
@@ -61,6 +62,7 @@ async function mount(localeCode: "zh" | "en" | "vi", rows: Bill[], vouchers?: Vo
   const navTo = vi.fn();
   const shown: Array<() => void> = [], chassis = Vue.defineComponent({ setup: (_props, { slots }) => () => Vue.h("main", slots.default?.()) });
   const modules: Record<string, unknown> = {
+    "@/components/ui/nx-button.vue": {default: growthButton},
     "@/lib/brand-copy": brandCopy,
     "@/lib/amount-display": { formatAmount, formatGroupedAmount },
     "@/lib/usd-display": { formatUsd },
@@ -109,8 +111,9 @@ describe("mounted reward detail precision", () => {
       }));
       const before = JSON.stringify(rows), page = await mount(locale, rows);
       const visibleSymbol = symbol === 'UVT' ? 'UVT' : symbol;
-      expect(page.amounts()).toEqual([`+1,000,000,000,000.00 ${visibleSymbol}`, `−1,000,000,000,000.00 ${visibleSymbol}`,
-        `+<${symbol === 'USDT' ? '0.0001' : '0.01'} ${visibleSymbol}`, `+1.00 ${visibleSymbol}`, `0.00 ${visibleSymbol}`]);
+      expect(page.amounts()).toEqual([`+1,000,000,000,000.00`, `−1,000,000,000,000.00`,
+        `+<${symbol === 'USDT' ? '0.0001' : '0.01'}`, `+1.00`, `0.00`]);
+      expect(nodes(page.root).filter(entry => entry.props.class === "block tabular-nums").every(entry => String(entry.props["aria-label"]).endsWith(visibleSymbol))).toBe(true);
       expect(JSON.stringify(rows)).toBe(before);
     }
   });
@@ -118,8 +121,8 @@ describe("mounted reward detail precision", () => {
   it.each(["zh", "en", "vi"] as const)("keeps six non-zero decimals, symbols, compact NEX and signs in %s", async locale => {
     const rows = [fixture(0.045005), fixture(0.000001), fixture(1234.045005), fixture(-0.045005)];
     const before = JSON.stringify(rows), page = await mount(locale, rows);
-    expect(page.amounts()).toEqual(["+0.045 USDT", "+<0.0001 USDT", "+1,234.045 USDT", "−0.045 USDT"]);
-    const nexPage = await mount(locale, [fixture(146, "UVT")]); expect(nexPage.amounts()).toEqual(["+146.00 UVT"]);
+    expect(page.amounts()).toEqual(["+0.045", "+<0.0001", "+1,234.045", "−0.045"]);
+    const nexPage = await mount(locale, [fixture(146, "UVT")]); expect(nexPage.amounts()).toEqual(["+146.00"]);
     expect(JSON.stringify(rows)).toBe(before);
   });
 
@@ -127,16 +130,16 @@ describe("mounted reward detail precision", () => {
     vi.stubGlobal("Intl", undefined);
     const nativeFormat = vi.spyOn(Number.prototype, "toLocaleString").mockImplementation(() => { throw new Error("NATIVE_LOCALE_FORMAT_UNAVAILABLE"); });
     const page = await mount(locale, [fixture(0.045005), fixture(0.000001), fixture(-1234.045005)]);
-    expect(page.amounts()).toEqual(["+0.045 USDT", "+<0.0001 USDT", "−1,234.045 USDT"]);
-    const nexPage = await mount(locale, [fixture(146, "UVT")]); expect(nexPage.amounts()).toEqual(["+146.00 UVT"]);
+    expect(page.amounts()).toEqual(["+0.045", "+<0.0001", "−1,234.045"]);
+    const nexPage = await mount(locale, [fixture(146, "UVT")]); expect(nexPage.amounts()).toEqual(["+146.00"]);
     expect(nativeFormat).not.toHaveBeenCalled();
   });
 
   it("reacts to the locale picker without rereading or changing the authoritative amount", async () => {
     const rows = [fixture(1234.045005)], page = await mount("en", rows), before = JSON.stringify(rows);
-    expect(page.amounts()).toEqual(["+1,234.045 USDT"]);
-    page.locale.setLocale("vi"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1,234.045 USDT"]);
-    page.locale.setLocale("zh"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1,234.045 USDT"]);
+    expect(page.amounts()).toEqual(["+1,234.045"]);
+    page.locale.setLocale("vi"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1,234.045"]);
+    page.locale.setLocale("zh"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1,234.045"]);
     expect(page.pager.refresh).toHaveBeenCalledOnce(); expect(page.pager.loadMore).not.toHaveBeenCalled();
     expect(JSON.stringify(rows)).toBe(before);
   });
@@ -144,7 +147,7 @@ describe("mounted reward detail precision", () => {
 it("distinguishes debit, credit and zero without mutating ledger precision", async () => {
  const rows = ["-1299.000001", "1299.000001", "-0.000000"].map(amountExact => ({ ...fixture(Number(amountExact)), amountExact }));
  const before = JSON.stringify(rows), page = await mount("zh", rows);
- expect(page.amounts()).toEqual(["−1,299.00 USDT", "+1,299.00 USDT", "0.00 USDT"]);
+ expect(page.amounts()).toEqual(["−1,299.00", "+1,299.00", "0.00"]);
  expect(page.styles().map(style => style.color)).toEqual(["var(--v5-brand-2-ink)", "var(--v5-brand)", "var(--v5-ink-2)"]);
  expect(JSON.stringify(rows)).toBe(before);
 });
@@ -165,7 +168,7 @@ it.each(["zh", "en", "vi"] as const)("keeps complete voucher expiry text and ori
   expect(expiry.every(entry => (entry.props.style as Record<string, string>).overflowWrap === "anywhere")).toBe(true);
   const actions = nodes(page.root).filter(entry => entry.props.role === "button" && entry.props["aria-label"] === dicts[language].rewards.useCta);
   expect(actions).toHaveLength(3);
-  expect(actions.every(entry => (entry.props.style as Record<string, string>).minHeight === "44px")).toBe(true);
+  expect(actions.every(entry => Vue.normalizeClass(entry.props.class).includes("nx-button--small"))).toBe(true);
   (actions[0].props.onClick as () => void)(); expect(page.navTo).toHaveBeenLastCalledWith("/store/detail?id=cloud-fixture");
   (actions[1].props.onClick as () => void)(); expect(page.navTo).toHaveBeenLastCalledWith("/store");
   expect(textOf(page.root)).toContain(original.name); expect(JSON.stringify(vouchers)).toBe(before);

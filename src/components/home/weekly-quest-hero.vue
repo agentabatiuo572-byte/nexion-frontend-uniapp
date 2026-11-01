@@ -1,19 +1,19 @@
 <!-- Weekly Tier 1 is rendered and claimed only from the authenticated server projection. -->
 <template>
-  <view v-if="visible" class="mt-3">
+  <view v-if="visible" class="weekly-hero">
     <view class="nx-glass-card relative overflow-hidden" :style="cardStyle">
       <!-- top edge accent line — warning amber sweep -->
-      <view aria-hidden :style="accentLineStyle" />
+
       <!-- soft top-right radial wash -->
-      <view aria-hidden :style="washStyle" />
+
 
       <view class="relative">
         <!-- mono 11/500 label — warning accent -->
         <view class="inline-flex items-center weekly-label" :style="labelStyle">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
           <text>{{ w.heroLabel }}</text>
           <text v-if="quest" :style="categoryStyle">{{ categoryText }}</text>
-          <text v-if="quest" :style="periodStyle">{{ periodText }}</text>
+
         </view>
 
         <!-- Card title h-md 18 / 600 ink -->
@@ -23,7 +23,7 @@
         <text v-if="quest && wq.error && wq.claimErrorQuestCode === quest.questCode" class="block" role="status" :style="claimErrorStyle">{{ claimErrorText }}</text>
 
         <view class="mt-3 flex items-center justify-between weekly-actions" style="gap: 10px">
-          <view class="flex items-baseline weekly-reward" style="gap: 4px">
+          <view class="flex items-baseline weekly-reward" style="gap: var(--v5-space-1)">
             <!-- Page H1 24 / 600 warning amber + tabular -->
             <text class="tabular-nums" :style="rewardStyle">+{{ rewardDisplay }}</text>
             <text :style="nexUnitStyle">UVT</text>
@@ -33,7 +33,8 @@
           <!-- 导航用玻璃次按钮；目标暂停时禁用并说明状态，已完成仍走真实领取分支。 -->
           <NxButton
             v-if="!completed"
-            variant="secondary"
+            variant="brand"
+            class="weekly-nav-cta"
             size="medium"
             :style="{ minHeight: '44px', opacity: wq.loading && wq.snapshot && !questTargetClosed && !periodExpired ? 1 : undefined }"
             :label="questTargetClosed ? w.targetClosed : ctaText"
@@ -42,21 +43,11 @@
             @click="onCta"
           >
             <text>{{ questTargetClosed ? w.targetClosed : ctaText }}</text>
-            <svg v-if="!questTargetClosed" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+            <svg v-if="!questTargetClosed" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 2px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
           </NxButton>
-          <view
-            v-else
-            class="inline-flex items-center shrink-0 active:opacity-85"
-            role="button" tabindex="0"
-            :style="claimStyle"
-            @click="onClaim"
-            @keydown.enter.prevent="onClaim"
-            @keydown.space.prevent="onClaim"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
-            <text>{{ claimText }}</text>
-          </view>
+          <NxButton v-else variant="brand" size="medium" :label="claimText" @click="onClaim" />
         </view>
+        <view class="weekly-period"><text>{{ t.missions.weekHeading }}</text><text><template v-for="(part, i) in periodText.split(/(\d+)/)" :key="i"><text :class="{'weekly-period-number': /^\d+$/.test(part)}">{{ part }}</text></template></text></view>
       </view>
     </view>
   </view>
@@ -222,19 +213,22 @@ const washStyle: CSSProperties = {
   pointerEvents: "none",
 };
 const labelStyle: CSSProperties = {
-  gap: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  gap: "8px",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand)",
   letterSpacing: "0.06em",
 };
 const categoryStyle: CSSProperties = {
-  marginLeft: "4px",
-  padding: "2px 6px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-soft)",
-  color: "var(--v5-ink-3)",
+  marginLeft: "0",
+  display: "inline-flex",
+  alignItems: "center",
+  height: "24px",
+  padding: "0 8px",
+  borderRadius: "var(--v5-radius-full)",
+  background: "var(--v5-surface-3)",
+  color: "var(--v5-ink-2)",
   letterSpacing: "normal",
 };
 const periodStyle: CSSProperties = {
@@ -250,25 +244,26 @@ const titleStyle: CSSProperties = {
   fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
-  lineHeight: 1.3,
+  lineHeight: "28px",
 };
 const bodyStyle: CSSProperties = {
-  marginTop: "6px",
-  fontSize: "var(--ui-type-list-subtitle)",
+  marginTop: "4px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
-  lineHeight: 1.5,
+  lineHeight: "20px",
 };
 const rewardStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "26px",
+  fontFamily: "var(--font-amount)",
+  fontWeight: 500,
+  fontSize: "32px",
   letterSpacing: "-0.018em",
   color: "var(--v5-nex)",
-  lineHeight: 1,
+  lineHeight: "38px",
 };
 const nexUnitStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-nex)",
   marginLeft: "2px",
 };
@@ -292,7 +287,7 @@ const claimStyle: CSSProperties = {
   gap: "6px",
   height: "44px",
   padding: "0 16px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "linear-gradient(90deg, var(--v5-brand), var(--v5-success))",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
@@ -304,8 +299,23 @@ const claimStyle: CSSProperties = {
 
 
 </script>
+
 <style scoped>
 .weekly-label,.weekly-actions,.weekly-reward { flex-wrap: wrap; }
 .weekly-actions > view,.weekly-actions > :deep(.nx-button) { max-width:100%; box-sizing:border-box; }
 @media(max-width:350px) { .weekly-actions { align-items:flex-start; }.weekly-reward { flex-basis:100%; } }
+.weekly-hero > view { padding: 18px 16px !important; background: var(--v5-surface) !important; border-radius: var(--ui-radius-surface); box-shadow: none !important; }
+.weekly-label { font: 400 12px/16px var(--font-v5) !important; }.weekly-reward { font-family: var(--font-amount); }
+
+/* Approved growth board geometry and material. */
+ .weekly-label { gap:8px !important; font-weight:500 !important; letter-spacing:normal !important; }.weekly-period { display:flex; justify-content:space-between; margin-top:44px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.weekly-hero :deep(.nx-button--brand > .nx-button__surface) { --ui-button-ink:var(--v5-ink) !important; }.weekly-hero > view { box-shadow:var(--v5-glass-shadow) !important; }
+
+.weekly-actions {align-items:flex-end;margin-top:14px;}.weekly-hero > view {padding-bottom:16px !important;}
+
+.weekly-actions { margin-top:10px; }
+.weekly-reward { transform:none; }
+.weekly-nav-cta { top:2px; }
+.weekly-period-number { font:600 12px/16px var(--font-metric); color:var(--v5-ink); }
+
 </style>
