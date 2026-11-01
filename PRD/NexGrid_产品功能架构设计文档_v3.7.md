@@ -302,6 +302,8 @@ TabBar:active tab 显示背景 chip 高亮。
 - 链接来源码(`?ref` / pendingRefCode)通过格式预检(`NEXGRID-XXXX`,大小写不敏感,统一大写)后**锁定置灰展示——不可修改、不可清除**,框内锁形图示 + 「邀请码来自邀请链接 · 不可修改」提示;注册前换码的唯一途径是打开新的邀请链接。
 - 缺失 / 非法码视同无码,输入框保持可手输;登录页 `?ref` 同一预检,非法码不入绑定链。
 
+**2026-11-01 规则更新**：[客服邀请码与新人奖励](UVEL_客服邀请码与新人奖励_20261101.md)。邀请码框同时接受好友邀请码（`NX` 开头）和专属客服邀请码（`CS` 开头），页面样式不变，码的格式以该文为准；客服码注册没有邀请人，注册即绑定该客服。手输的码在发送验证码前校验，无效时在框下提示。
+
 注册页底部含合规脚注「创建账号即表示同意服务条款和隐私政策」,其中「服务条款」下划线可点,进入 §4.7.5 服务条款页;「隐私政策」当前为占位文本(无独立页)。
 
 #### 4.1.1 注册成功页 `/register/success`(浏览器 H5)
@@ -311,7 +313,7 @@ TabBar:active tab 显示背景 chip 高亮。
 | 元素 | 内容 |
 |---|---|
 | 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 NexGrid,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
-| 礼包确认卡 | 金额同源 `rewards.welcomeGift`;两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);未带码注册整卡隐藏 |
+| 礼包确认卡 | 金额同源 `rewards.welcomeGift`;两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);所有新账号都显示,新人礼包不需要邀请人(2026-11-01) |
 | H5 装 APP 权益 3 行 | 仅浏览器 H5 显示:在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度;App 不渲染此提醒区 |
 | H5 官网下载引导 | 提示可通过 NexGrid 官网下载 APP;读取 `share.appDownload.officialUrl` 作为唯一链接。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
 | 继续出口 | H5「继续网页版」→ 首页，始终可用；下载 APP 后使用同一账号登录，在 APP 完成手机校准与激活 |
@@ -371,6 +373,8 @@ TabBar:active tab 显示背景 chip 高亮。
 所有 sign-in endpoint 必须支持 `Idempotency-Key` header(详见 §9.11e),client guard 仅为体验层防御。
 
 ### 4.3 推荐邀请系统
+
+**2026-11-01 规则更新**：[客服邀请码与新人奖励](UVEL_客服邀请码与新人奖励_20261101.md)。新人礼包对每个新账号发放一次，不需要邀请人；邀请人奖励仍只给有邀请人的注册。专属客服邀请码注册没有邀请人，不建立本节的邀请关系和团队，注册即绑定该客服。
 
 #### 4.3.1 推荐链接落地页 `/ref/[code]`
 
@@ -5512,7 +5516,7 @@ progressPct = avg(checks);
 | `KYC_LIFETIME_THRESHOLD_USD` | 100 | 累计兑换触发 KYC 线 |
 | `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台 H8 可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
 | `rewards.welcomeGift.lockMode` | `risk_bucket` | 礼包发放模式:`risk_bucket`=按账户风险桶发放 / `direct`=直入可提(活动期开闸)|
-| `rewards.inviterReward.nexAmount` | 200 | 邀请人奖励:邀请人每成功邀请一名新用户自身获得的 NEX(平台配置,后台 H8 可调);与新人礼 `welcomeGift` 相互独立——礼包给被邀请人、此项给邀请人 |
+| `rewards.inviterReward.nexAmount` | 200 | 邀请人奖励:邀请人每成功邀请一名新用户自身获得的 NEX(平台配置,后台 H8 可调);与新人礼 `welcomeGift` 相互独立——礼包给每个新账号(不需要邀请人)、此项只给邀请人 |
 | `share.baseUrl` | 空 | 分享短链前缀(生产如 `https://nexgrid.ai/ref/`,配套服务端 302 至落地页);空 = 回退当前站点地址直连落地页(开发 / 演示扫码可达);平台配置,后台可调 |
 | `share.channels[]` | Zalo / Telegram / WhatsApp / Messenger / 短信 / X / 复制 / 海报 / 系统分享 | 渠道面板清单与顺序(运营可调,越南盘默认 Zalo 首位);每项含 intent 类型(web 直开 / scheme 复制降级 / 本地动作)与 intent URL 模板 |
 | `share.appDownload.officialUrl` | 空 | 浏览器 H5 注册成功页的 NexGrid 官网 APP 下载地址(§4.1.1);仅接受 HTTPS,空值或非法地址显示不可点击占位,App 不消费;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
