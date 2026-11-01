@@ -109,7 +109,12 @@ export interface PhoneActivationEligibility {
   grantId?: string;
 }
 
+export type PhoneActivationReceipt = { status: "PENDING" }
+  | { status: "FAILED"; reason: string }
+  | { status: "SUCCEEDED"; result: OnboardingCalibration };
+
 export interface OnboardingCalibrationApi {
+  activationReceipt(idempotencyKey: string): Promise<PhoneActivationReceipt | null>;
   activationEligibility(): Promise<PhoneActivationEligibility>;
   activationFailed(idempotencyKey: string): Promise<boolean>;
   phoneLogin(deviceId: string): Promise<string>;
@@ -289,6 +294,22 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
         blockedReasons: response.blockedReasons as string[],
         ...(grant ? { grantId: text(grant.grantId) } : {}),
       };
+    },
+    async activationReceipt(idempotencyKey) {
+      const response = await client.request({ method: "GET", path: `/api/onboarding/phone-installation/replacement-operations/by-key?commandType=PHONE_ACTIVATE&idempotencyKey=${encodeURIComponent(key(idempotencyKey))}` });
+      if (response === null) return null;
+      const receipt = record(response);
+      if (receipt.commandType !== "PHONE_ACTIVATE") return invalid();
+      if (receipt.status === "PENDING") return { status: "PENDING" };
+      if (receipt.status === "FAILED") {
+        const reason = text(record(receipt.originalResult).conflictType);
+        if (!/^[A-Z][A-Z0-9_]{0,95}$/.test(reason)) return invalid();
+        return { status: "FAILED", reason };
+      }
+      if (receipt.status !== "SUCCEEDED") return invalid();
+      const result = parseOnboardingCalibration(receipt.originalResult, environment);
+      if (!result.calibrationAvailable || result.activationStatus !== "ACTIVE") return invalid();
+      return { status: "SUCCEEDED", result };
     },
     async activationFailed(idempotencyKey) {
       const response = await client.request({ method: "GET", path: `/api/onboarding/phone-installation/replacement-operations/by-key?commandType=PHONE_ACTIVATE&idempotencyKey=${encodeURIComponent(key(idempotencyKey))}` });

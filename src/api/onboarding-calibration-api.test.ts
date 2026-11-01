@@ -53,6 +53,23 @@ describe("onboarding calibration API", () => {
     expect(await api.activationFailed("phone-key:1")).toBe(true);
     expect(request.mock.lastCall?.[0].path).toContain("idempotencyKey=phone-key%3A1");
   });
+  it("reads the original activation status and reason without inferring from missing or malformed receipts", async () => {
+    const request = vi.fn(); const api = createOnboardingCalibrationApi({ request } as never);
+    request.mockResolvedValue(null); expect(await api.activationReceipt("phone-key:1")).toBeNull();
+    request.mockResolvedValue({ commandType: "PHONE_ACTIVATE", status: "PENDING" });
+    expect(await api.activationReceipt("phone-key:1")).toEqual({ status: "PENDING" });
+    request.mockResolvedValue({ commandType: "PHONE_ACTIVATE", status: "FAILED", originalResult: { conflictType: "CAPACITY_REPLACEMENT_REQUIRED" } });
+    expect(await api.activationReceipt("phone-key:1")).toEqual({ status: "FAILED", reason: "CAPACITY_REPLACEMENT_REQUIRED" });
+    request.mockResolvedValue({ commandType: "PHONE_ACTIVATE", status: "SUCCEEDED", originalResult: { ...android, activationStatus: "ACTIVE" } });
+    expect(await api.activationReceipt("phone-key:1")).toMatchObject({ status: "SUCCEEDED", result: { activationStatus: "ACTIVE", userId: 9 } });
+    for (const invalid of [{}, { commandType: "OTHER", status: "FAILED" }, { commandType: "PHONE_ACTIVATE", status: "PROCESSING" },
+      { commandType: "PHONE_ACTIVATE", status: "FAILED", originalResult: {} },
+      { commandType: "PHONE_ACTIVATE", status: "FAILED", originalResult: { conflictType: "<raw server content>" } },
+      { commandType: "PHONE_ACTIVATE", status: "SUCCEEDED", originalResult: android }]) {
+      request.mockResolvedValue(invalid);
+      await expect(api.activationReceipt("phone-key:1")).rejects.toThrow("ONBOARDING_CALIBRATION_RESPONSE_INVALID");
+    }
+  });
   afterEach(() => advanceRuntimeRevision(null));
 
   it("reads binding existence without an installation login or inferred fallback", async () => {

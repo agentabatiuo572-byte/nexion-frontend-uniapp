@@ -95,8 +95,8 @@
             <text class="cn-policy__cap-t">{{ failureTitle }}</text>
           </view>
           <text class="cn-policy__t">{{ failureDetail }}</text>
-          <text v-if="failedAction !== 'defer'" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationDeferredHint }}</text>
-          <text class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationRewardGate }}</text>
+          <text v-if="canDefer" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationDeferredHint }}</text>
+          <text v-if="activationOutcome !== 'active'" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationRewardGate }}</text>
         </view>
       </view>
     </view>
@@ -112,7 +112,7 @@
           <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : activateText }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
-        <view v-if="iosPhone" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+        <view v-if="iosPhone && canDefer" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
           <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.iosActivateLater }}</text>
         </view>
       </view>
@@ -124,15 +124,18 @@
           <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.iosContactSupport }}</text>
         </view>
         <!-- Onboarding must still be able to continue without a phone. -->
-        <view v-if="failedAction !== 'defer'" class="cn-link active:opacity-60" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+        <view v-if="canDefer" class="cn-link active:opacity-60" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
           <text class="cn-link__t">{{ t.onboarding.activationDefer }}</text>
         </view>
       </view>
       <view v-else-if="phase === 'error'" class="cn-error-actions">
         <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
-          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : supportRequired ? t.onboarding.iosContactSupport : t.onboarding.activationRetry }}</text>
+          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : failureActionText }}</text>
         </view>
-        <view v-if="failedAction !== 'defer'" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+        <view v-if="failureFeedback?.action === 'devices' && canDefer" class="cn-link active:opacity-60" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
+          <text class="cn-link__t">{{ t.onboarding.activationRetry }}</text>
+        </view>
+        <view v-if="canDefer" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
           <text class="cn-go__t cn-go__t--secondary" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : t.onboarding.activationDefer }}</text>
         </view>
       </view>
@@ -189,6 +192,8 @@ import { confirm as uiConfirm, useUI } from "@/store/ui";
 import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { ApiError } from "@/api/errors";
+import { phoneActivationFeedback, confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
 import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
 import { isCurrentOnboardingCalibrationScope, type OnboardingCalibrationScope } from "@/lib/onboarding-calibration-scope";
 
@@ -209,6 +214,9 @@ const shownScore = ref(0);
 let scoreTimer: ReturnType<typeof setInterval> | null = null;
 const failedAction = ref<FailedAction>("calibration");
 const failureCode = ref("");
+const activationOutcome = ref<"idle" | "preflight-unconfirmed" | "unconfirmed" | "active">("idle");
+const canDefer = computed(() => failedAction.value !== "defer" && activationOutcome.value !== "unconfirmed" && activationOutcome.value !== "active"
+  && canonical.value?.activationStatus !== "ACTIVE");
 
 // Every runtime mode receives final facts from the authenticated server. The
 // onboarding path intentionally has no local capability fallback, so mock,
@@ -245,6 +253,7 @@ watch(authenticatedAccountKey, (next, previous) => {
   useUI().clearConfirmsBy(confirmOwner);
   calibrationFlow.reset();
   activationIntent = null;
+  activationOutcome.value = "idle";
   canonical.value = null;
   failureCode.value = "";
   if (phase.value !== "intro") phase.value = "error";
@@ -268,24 +277,33 @@ const iosSteps = computed(() => [t.value.onboarding.iosStepIdentify, t.value.onb
 function contactSupport() {
   if (!activationBusy.value) navTo("/pages/support/messages");
 }
-const supportRequired = computed(() => failureCode.value === "PHONE_REPLACEMENT_DISABLED");
-const failureDetail = computed(() => iosPending.value
-  ? t.value.onboarding.phoneCalibrationPendingIosBody
-  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
-  ? t.value.onboarding.phoneCalibrationPendingBody
-  : failureCode.value === "PHONE_REPLACEMENT_DISABLED" ? t.value.onboarding.phoneReplacementDisabled
-  : failureCode.value === "PHONE_REPLACEMENT_COOLDOWN" ? t.value.onboarding.phoneReplacementCooldown
-  : failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED" ? t.value.onboarding.phoneCalibrationRulesChanged
+const failureFeedback = computed(() => phoneActivationFeedback(failureCode.value));
+const supportRequired = computed(() => activationOutcome.value === "idle" && failureFeedback.value?.action === "support");
+const failureActionText = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSyncAction
+  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationCheckResult
+  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.activationRetry
+  : failureFeedback.value?.action === "devices" ? t.value.onboarding.phoneActivationManageDevices
+  : failureFeedback.value?.action === "login" ? t.value.onboarding.phoneActivationLoginAction
+  : failureFeedback.value?.action === "terms" ? t.value.onboarding.phoneActivationTermsAction
+  : failureFeedback.value?.action === "recalibrate" ? t.value.onboarding.iosRecalibrate
+  : supportRequired.value ? t.value.onboarding.iosContactSupport : t.value.onboarding.activationRetry);
+const failureDetail = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSync
+  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationUnconfirmed
+  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.phoneActivationEligibilityUnavailable
+  : failureFeedback.value ? t.value.onboarding[failureFeedback.value.detail]
+  : iosPending.value ? t.value.onboarding.phoneCalibrationPendingIosBody
+  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION" ? t.value.onboarding.phoneCalibrationPendingBody
   : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableBody
   : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailed
   : failedAction.value === "calibration" ? t.value.onboarding.calibrationRetry
-  : t.value.onboarding.activationBindRetry);
-const failureTitle = computed(() => iosPending.value ? t.value.onboarding.phoneCalibrationPendingIosTitle
-  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
-  ? t.value.onboarding.phoneCalibrationPendingTitle
+  : t.value.onboarding.phoneActivationRejected);
+const failureTitle = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSyncTitle
+  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationUnconfirmedTitle
+  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.phoneActivationEligibilityUnavailableTitle
+  : iosPending.value ? t.value.onboarding.phoneCalibrationPendingIosTitle
+  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION" ? t.value.onboarding.phoneCalibrationPendingTitle
   : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableTitle
-  : failedAction.value === "calibration"
-  ? t.value.onboarding.calibrationFailedTitle
+  : failedAction.value === "calibration" ? t.value.onboarding.calibrationFailedTitle
   : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailedTitle
   : t.value.onboarding.activationFailedTitle);
 
@@ -306,11 +324,12 @@ const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationA
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const iosPhone = nativePhonePlatform() === "ios";
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
-let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string; versions?: PhoneActivationVersions } | null = null;
+let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string; versions?: PhoneActivationVersions; submitted?: boolean } | null = null;
 const activationBusy = ref(false);
 
 async function startCalibration() {
-  if (!nativePhoneAvailable) return;
+  if (!nativePhoneAvailable || activationOutcome.value === "unconfirmed" || activationOutcome.value === "active") return;
+  activationOutcome.value = "idle";
   failureCode.value = "";
   canonical.value = null;
   activationIntent = null;
@@ -385,11 +404,23 @@ watch(phase, (p) => {
 
 function retryCalibration() {
   if (!nativePhoneAvailable || activationBusy.value) return;
+  if (activationOutcome.value !== "idle") {
+    void activate();
+    return;
+  }
+  if (failureFeedback.value?.action === "devices") { navTo("/pages/me/devices"); return; }
+  if (failureFeedback.value?.action === "login") {
+    auth.signOut();
+    void navReset("/pages/login/login");
+    return;
+  }
+  if (failureFeedback.value?.action === "terms") { navTo("/pages/onboarding/terms"); return; }
   if (supportRequired.value) {
     contactSupport();
     return;
   }
-  if (failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED") {
+  if (failureFeedback.value?.action === "recalibrate") {
+    activationIntent = null;
     calibrationFlow.reset();
     resumeDeferred.value = true;
     phase.value = "calibrating";
@@ -434,67 +465,117 @@ function completeOnboardingLocally(): boolean {
   return false;
 }
 
+/** Reconcile the original operation before any new eligibility check or write. */
+async function readActivationOutcome(idempotencyKey: string, deviceId: string, scope: RequestScope) {
+  let rejection = "";
+  let pending = false;
+  try {
+    const receipt = await onboardingCalibrationApi.activationReceipt(idempotencyKey);
+    if (!scopeIsCurrent(scope)) return { rejection, pending, result: null };
+    if (receipt?.status === "SUCCEEDED" && acceptCurrentCanonical(scope, receipt.result)) {
+      return { rejection, pending, result: receipt.result };
+    }
+    if (receipt?.status === "FAILED") rejection = receipt.reason;
+    pending = receipt?.status === "PENDING";
+  } catch { /* An unavailable receipt does not settle the original operation. */ }
+  if (!scopeIsCurrent(scope)) return { rejection, pending, result: null };
+  try {
+    const readback = await onboardingCalibrationApi.result(deviceId);
+    if (acceptCurrentCanonical(scope, readback) && readback.calibrationAvailable && readback.activationStatus === "ACTIVE") {
+      return { rejection, pending, result: readback };
+    }
+  } catch { /* Keep the original rejection or uncertainty, never this secondary read error. */ }
+  return { rejection, pending, result: null };
+}
+
 async function activate() {
   if (!nativePhoneAvailable || !mounted || !canonical.value?.calibrationAvailable
       || canonical.value.calibrationStatus !== "MATCHED" || activationBusy.value) return;
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   const before = canonical.value;
-  // Apply the server-confirmed baseline to the live phone device + record this
-  // device as the account's calibrated device (so future logins on it skip
-  // recalibration, while a different device triggers it).
   try {
-    const command = activationCommand("ACTIVE", before.revision);
-    const app = useApp();
-    if (!command.versions) {
-      const eligibility = await onboardingCalibrationApi.activationEligibility();
-      if (!scopeIsCurrent(requestScope)) return;
-      if (!eligibility.canActivate) throw new Error(eligibility.blockedReasons[0] || "PHONE_ACTIVATION_UNAVAILABLE");
-      const replacing = eligibility.binding !== null && (eligibility.binding.installationId !== before.deviceId
-        || failureCode.value === "PHONE_REPLACEMENT_CONFIRMATION_REQUIRED");
-      if (replacing) {
-        const confirmed = await uiConfirm({ title: t.value.onboarding.replacementConfirmTitle,
-          message: t.value.onboarding.replacementConfirmBody, confirmLabel: t.value.onboarding.replacementConfirmAction,
-          owner: confirmOwner });
-        if (!scopeIsCurrent(requestScope) || !confirmed) return;
-      }
-      command.versions = {
-        expectedBindingVersion: eligibility.binding?.bindingVersion ?? null,
-        expectedPolicyVersion: eligibility.policyVersion,
-        replacementConfirmed: replacing,
-        ...(eligibility.grantId ? { exceptionGrantId: eligibility.grantId } : {}),
-      };
-    }
-    let activated: OnboardingCalibration;
-    try {
-      activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey, command.versions);
-    } catch (cause) {
-      if (!scopeIsCurrent(requestScope)) return;
-      // Only a persisted FAILED receipt settles the command. Unknown/network
-      // outcomes retain both the key and the exact version/consent snapshot.
-      try {
-        const failed = await onboardingCalibrationApi.activationFailed(command.idempotencyKey);
+    let activated: OnboardingCalibration | null = before.activationStatus === "ACTIVE" ? before : null;
+    if (!activated) {
+      if (activationOutcome.value === "idle") activationOutcome.value = "preflight-unconfirmed";
+      const command = activationCommand("ACTIVE", before.revision);
+      if (command.submitted) {
+        const outcome = await readActivationOutcome(command.idempotencyKey, before.deviceId, requestScope);
         if (!scopeIsCurrent(requestScope)) return;
-        if (failed && activationIntent === command) activationIntent = null;
-      } catch { /* Keep the original command when its receipt is unavailable. */ }
-      if (!scopeIsCurrent(requestScope)) return;
-      const readback = await onboardingCalibrationApi.result(before.deviceId);
-      if (!acceptCurrentCanonical(requestScope, readback)) return;
-      canonical.value = readback;
-      if (!readback.calibrationAvailable || readback.activationStatus !== "ACTIVE") throw cause;
-      activated = readback;
+        activated = outcome.result;
+        if (!activated && outcome.rejection) {
+          activationIntent = null;
+          activationOutcome.value = "idle";
+          throw new Error(outcome.rejection);
+        }
+        if (!activated && outcome.pending) throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
+      }
+      if (!activated) {
+        if (!command.versions) {
+          let eligibility;
+          try { eligibility = await onboardingCalibrationApi.activationEligibility(); }
+          catch (cause) {
+            if (scopeIsCurrent(requestScope) && confirmedPhoneActivationRejection(cause)) activationOutcome.value = "idle";
+            throw cause;
+          }
+          if (!scopeIsCurrent(requestScope)) return;
+          if (!eligibility.canActivate) {
+            activationOutcome.value = "idle";
+            throw new Error(eligibility.blockedReasons[0] || "PHONE_ACTIVATION_UNAVAILABLE");
+          }
+          const replacing = eligibility.binding !== null && (eligibility.binding.installationId !== before.deviceId
+            || failureCode.value === "PHONE_REPLACEMENT_CONFIRMATION_REQUIRED");
+          if (replacing) {
+            const confirmed = await uiConfirm({ title: t.value.onboarding.replacementConfirmTitle,
+              message: t.value.onboarding.replacementConfirmBody, confirmLabel: t.value.onboarding.replacementConfirmAction,
+              owner: confirmOwner });
+            if (!scopeIsCurrent(requestScope)) return;
+            if (!confirmed) { activationOutcome.value = "idle"; return; }
+          }
+          command.versions = {
+            expectedBindingVersion: eligibility.binding?.bindingVersion ?? null,
+            expectedPolicyVersion: eligibility.policyVersion,
+            replacementConfirmed: replacing,
+            ...(eligibility.grantId ? { exceptionGrantId: eligibility.grantId } : {}),
+          };
+        }
+        command.submitted = true;
+        activationOutcome.value = "unconfirmed";
+        try {
+          activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey, command.versions);
+          if (!scopeIsCurrent(requestScope)) return;
+          if (!acceptCurrentCanonical(requestScope, activated)) {
+            throw new ApiError({ kind: "protocol", message: "ONBOARDING_CALIBRATION_SCOPE_INVALID" });
+          }
+          if (!activated.calibrationAvailable || activated.activationStatus !== "ACTIVE") {
+            throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
+          }
+        } catch (cause) {
+          if (!scopeIsCurrent(requestScope)) return;
+          const outcome = await readActivationOutcome(command.idempotencyKey, before.deviceId, requestScope);
+          if (!scopeIsCurrent(requestScope)) return;
+          activated = outcome.result;
+          if (!activated) {
+            if (outcome.rejection || confirmedPhoneActivationRejection(cause)) {
+              activationIntent = null;
+              activationOutcome.value = "idle";
+              if (outcome.rejection && outcome.rejection !== "PHONE_ACTIVATION_FAILED") throw new Error(outcome.rejection);
+            }
+            throw cause;
+          }
+        }
+      }
     }
-    if (!acceptCurrentCanonical(requestScope, activated)) return;
-    if (!activated.calibrationAvailable || activated.activationStatus !== "ACTIVE") throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
-    if (!useSession().markCalibrated(auth.email || auth.accountId || "default")
-        || !completeOnboardingLocally()) {
+    if (!activated || !acceptCurrentCanonical(requestScope, activated)) return;
+    // Server success survives local persistence errors; retry synchronizes this result without another POST.
+    canonical.value = activated;
+    activationOutcome.value = "active";
+    activationIntent = null;
+    if (!useSession().markCalibrated(auth.email || auth.accountId || "default") || !completeOnboardingLocally()) {
       throw new Error("PHONE_ACTIVATION_LOCAL_COMMIT_FAILED");
     }
-    canonical.value = activated;
+    const app = useApp();
     app.acceptPhoneActivation();
-    // Activation is already committed by the canonical endpoint. A secondary
-    // fleet refresh must not turn that success into a false activation error;
-    // App-level resilience owns refresh failure and the next page can retry it.
     void app.refreshRemoteFleet();
     if (isRecal.value) app.resumeMining();
     navReset({ url: "/pages/index/index", fail: () => {} });
@@ -510,15 +591,17 @@ async function activate() {
 }
 
 async function deferPhoneActivation() {
-  if (!nativePhoneAvailable || !mounted || activationBusy.value) return;
+  if (!nativePhoneAvailable || !mounted || activationBusy.value
+      || activationOutcome.value === "unconfirmed" || activationOutcome.value === "active") return;
+  if (canonical.value?.activationStatus === "ACTIVE") { void navReset("/pages/index/index"); return; }
+  activationOutcome.value = "idle";
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   try {
     if (isLogin.value) {
       // Login can mean replacing an existing phone. "NEEDS_CALIBRATION" alone
       // cannot distinguish that from an account which has never bound one.
-      if (loginCheckNeeded.value || isRecal.value || canonical.value?.userDeviceId
-          || canonical.value?.activationStatus === "ACTIVE") {
+      if (loginCheckNeeded.value || isRecal.value || canonical.value?.userDeviceId) {
         void navReset({ url: "/pages/index/index", fail: () => {} });
         return;
       }
