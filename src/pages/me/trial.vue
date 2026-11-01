@@ -364,7 +364,8 @@ const deadlineText = computed(() => {
   if (at === null) return "";
   return fmt(isGrace.value ? detail.value.keptUntil : purchase.value.heroTermUntil, { time: formatTrialDeadline(at, dateLocale()) });
 });
-const earnedShown = useCountUp(() => (isActiveCycle.value && !authorityScreenUnavailable.value ? shadowUSD.value : null));
+// Both counts follow the live source: a tick or quote re-read during the 900 ms entrance must not cut it short.
+const earnedShown = useCountUp(() => (isActiveCycle.value && !authorityScreenUnavailable.value ? shadowUSD.value : null), { follow: true });
 const earnedParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(earnedShown.value ?? 0)));
 
 // ── Quote ticket ──
@@ -373,7 +374,7 @@ const discountTotal = computed(() => {
   return quote ? cents(quote.promoDiscountUSD + quote.earlyDiscountUSD + quote.offsetUSD) : 0;
 });
 const totalShown = useCountUp(() => (purchaseQuote.value && !authorityScreenUnavailable.value
-  ? cents(discountTotal.value + purchaseQuote.value.remainderUSD) : null));
+  ? cents(discountTotal.value + purchaseQuote.value.remainderUSD) : null), { follow: true });
 const totalParts = computed(() => amountParts(totalShown.value ?? 0));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
 const deviceName = computed(() => trialProduct.value?.name ?? cfg.value.trialProductName);
@@ -545,9 +546,9 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-earned { display:flex;flex-direction:column;align-items:center;margin-top:24px;padding:0 16px;text-align:center; }
 .trial-earned__label { color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .trial-earned__amount { display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:4px; }
-.trial-earned__value { font:600 44px/50px var(--font-amount);letter-spacing:-0.024em;white-space:nowrap; }
+.trial-earned__value { font:600 44px/50px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.024em;white-space:nowrap; }
 .trial-earned__unit { color:var(--v5-ink-3);font:500 15px/20px var(--font-v5); }
-.trial-earned__uvt { margin-top:4px;color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);white-space:nowrap; }
+.trial-earned__uvt { margin-top:4px;color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-earned__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-dim { color:var(--v5-ink-3); }
 .trial-unit-small { font-size:12px;line-height:16px; }
@@ -562,26 +563,26 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-ticket__estimate { font-size:12px;line-height:16px; }
 .trial-total { margin-top:16px;padding:14px 16px;border-radius:16px;background:var(--v5-surface-2); }
 :global([data-theme="light"] .trial-total) { background:var(--v5-bg); }
-.trial-total__breakdown { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-wrap:pretty; }
+.trial-total__breakdown { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
 .trial-total__line { display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;margin-top:6px; }
 .trial-total__label { font:500 13px/18px var(--font-v5); }
-.trial-total__value { color:var(--v5-brand);font:600 32px/38px var(--font-amount);letter-spacing:-0.02em;white-space:nowrap; }
+.trial-total__value { color:var(--v5-brand);font:600 32px/38px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.02em;white-space:nowrap; }
 .trial-total__dec { opacity:.72; }
 .trial-total__unit { color:var(--v5-ink-3);font-weight:500; }
-.trial-total__uvt { color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);white-space:nowrap; }
+.trial-total__uvt { color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-rows { display:flex;flex-direction:column;gap:10px;margin-top:16px; }
-.trial-row { display:flex;align-items:center;justify-content:space-between;gap:12px;font:400 13px/18px var(--font-v5); }
-.trial-row__label { flex:1;min-width:0;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);text-wrap:pretty; }
+.trial-row { display:flex;align-items:center;justify-content:space-between;gap:12px;font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums; }
+.trial-row__label { flex:1;min-width:0;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
 .trial-row .trial-row__label { display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;row-gap:2px; }
 .trial-row__value { flex:none;white-space:nowrap; }
 .trial-ticket .trial-limit-tag { height:20px;padding:0 6px; }
 .trial-sum { display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--v5-border); }
 .trial-sum__row { display:flex;align-items:baseline;justify-content:space-between;gap:12px; }
 .trial-sum__label { font:500 13px/18px var(--font-v5); }
-.trial-sum__discount { flex:none;font:500 15px/20px var(--font-v5);white-space:nowrap; }
+.trial-sum__discount { flex:none;font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-sum__price { flex:none;display:inline-flex;align-items:baseline;gap:8px;white-space:nowrap; }
-.trial-sum__strike { color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);text-decoration:line-through; }
-.trial-sum__amount { font:600 24px/30px var(--font-amount);letter-spacing:-0.02em; }
+.trial-sum__strike { color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums;text-decoration:line-through; }
+.trial-sum__amount { font:600 24px/30px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.02em; }
 .trial-sum__currency { color:var(--v5-ink-3);font-size:14px; }
 .trial-perf { position:relative;height:20px; }
 .trial-perf__notch { position:absolute;top:0;width:20px;height:20px;border-radius:50%;background:var(--v5-bg); }
@@ -592,7 +593,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-credit__label { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-credit__row { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:6px; }
 .trial-credit__name { flex:1;min-width:0;color:var(--v5-ink-3);font:400 12px/16px var(--font-v5); }
-.trial-credit__value { flex:none;font:500 15px/20px var(--font-v5);white-space:nowrap; }
+.trial-credit__value { flex:none;font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-credit__sep { color:var(--v5-ink-4); }
 .trial-credit__uvt { color:var(--v5-nex-ink); }
 .trial-legacy-row { margin-top:10px; }
@@ -625,8 +626,8 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-bar__main { display:flex;width:100%; }
 .trial-bar__side { flex:1 1 0;min-width:fit-content; }
 .trial-bar__wide { flex:2 1 0;min-width:fit-content; }
-.trial-bar :deep(.nx-button__content) { white-space:nowrap; }
-.trial-bar--pair :deep(.nx-button__surface) { padding-inline:12px; }
+.trial-bar :deep(.nx-button__content) { white-space:nowrap;font-variant-numeric:tabular-nums; }
+.trial-bar--pair :deep(.nx-button__surface) { padding-inline:15px; }
 
 /* ── Motion (DS-29): blocks rise once, the ring draws once, the bar slides up once ── */
 .trial-rise { animation:trial-rise .52s cubic-bezier(.16,1,.3,1) both; }
