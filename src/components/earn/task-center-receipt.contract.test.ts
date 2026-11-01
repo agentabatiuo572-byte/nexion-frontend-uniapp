@@ -60,6 +60,7 @@ import * as Vue from 'vue';
 import { formatAmount } from '@/lib/amount-display';
 import { formatUsdOverviewParts } from '@/lib/usd-display';
 import { remainderUiCopy } from '@/i18n/remainder-ui';
+import { computeV2Copy } from '@/i18n/compute-v2';
 import { auditUiCopy } from '@/i18n/audit-ui';
 import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
@@ -119,6 +120,7 @@ async function setup() {
     if(id==='@/lib/amount-display')return{formatAmount};
     if(id==='@/lib/usd-display')return{formatUsdOverviewParts};
     if(id==='@/i18n/remainder-ui')return{useRemainderUiCopy:()=>Vue.ref(remainderUiCopy.zh)};
+    if(id==='@/i18n/compute-v2')return{useComputeV2Copy:()=>Vue.ref(computeV2Copy.zh)};
     if(id==='@/i18n/audit-ui')return{useAuditUiCopy:()=>Vue.ref(auditUiCopy.zh)};
     if(id==='@/store/config')return{useConfig:()=>({configStatus:'ready',isEnabled:()=>false})};
     if(id==='@/lib/native-phone-runtime')return{hasNativeAndroidPhoneRuntime: ()=>true, hasNativePhoneRuntime: ()=>true, nativePhonePlatform: () => null};
@@ -172,6 +174,16 @@ describe('actual Earn/TaskCenter mounted handlers with production App/UI stores'
   });
   it('current success opens only the selected receipt',async()=>{
     const s=await setup();remote.taskAssignmentApi.receipt.mockResolvedValue(receipt);await s.task.openTaskReceipt(row);await flush();expect(s.find('probe-modal').props.receipt).toEqual(receipt);expect(s.ui.toasts).toHaveLength(0);
+  });
+  it('a V2 receipt keeps the canonical posting time separate from completion',async()=>{
+    const s=await setup();remote.taskAssignmentApi.receipt.mockResolvedValue({...receipt,taskNo:row.id,settledAt:1000});
+    await s.task.openTaskReceipt({...row,protocolVersion:2,settlementStatus:'POSTED',settledAt:65000},true);await flush();
+    expect(s.find('probe-modal').props.receipt.settledAt).toBe(65000);
+  });
+  it.each(['taskNo','receiptNo'])('a V2 receipt rejects a mismatching %s before using its posting time',async field=>{
+    const s=await setup();remote.taskAssignmentApi.receipt.mockResolvedValue({...receipt,taskNo:row.id,[field]:'other',settledAt:1000});
+    await s.task.openTaskReceipt({...row,protocolVersion:2,settlementStatus:'POSTED',settledAt:65000},true);await flush();
+    expect(s.find('probe-modal').props.receipt).toBeNull();expect(s.ui.toasts).toHaveLength(1);
   });
   it.each(['account','same-account-rebind','unmount'])('late rejection remains fenced after %s',async boundary=>{
     const s=await setup();const r=deferred<any>();remote.taskAssignmentApi.receipt.mockReturnValue(r.promise);const pending=s.task.openTaskReceipt(row);

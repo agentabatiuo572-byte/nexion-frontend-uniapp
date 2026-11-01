@@ -41,10 +41,17 @@ export interface CurrentTask {
   client: string;      // e.g. "Mosaic Studios"
   location: string;    // e.g. "Berlin, DE"
   totalSec: number;
-  startedAt: number;   // epoch ms
+  startedAt: number | null;   // epoch ms; queued v2 tasks have not started
   reward: number;      // USDT
   /** Server status is present only for the remote authority projection. */
-  status?: "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
+  status?: import("@/api/task-assignment-api").CanonicalTaskAssignment["status"];
+  protocolVersion?: 2;
+  queuedAt?: number | null;
+  actualDurationSec?: number | null;
+  settlementStatus?: import("@/api/task-assignment-api").CanonicalTaskAssignment["settlementStatus"];
+  settlementBatchNo?: string | null;
+  settledAt?: number | null;
+  configVersion?: string;
   /** Server-issued estimated completion time; it never certifies settlement. */
   completableAt?: number | null;
   /** Server pause boundary and elapsed time from completed pause intervals. */

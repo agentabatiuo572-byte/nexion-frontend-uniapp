@@ -6,14 +6,14 @@
     </view>
     <view class="nx-feed-copy">
       <text class="nx-feed-title">{{ visibility.mask(row.model) }}</text>
-      <text class="nx-feed-sub">{{ visibility.mask(row.client) }} · {{ t.home.feedRunning }}</text>
+      <text class="nx-feed-sub">{{ visibility.mask(row.client) }} · {{ row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text>
     </view>
     <view class="nx-feed-figure">
-      <text class="nx-feed-pct font-mono-tabular">{{ visibility.mask(`${row.pct}%`) }}</text>
+      <text class="nx-feed-pct font-mono-tabular">{{ visibility.mask(row.pct == null ? '—' : `${row.pct}%`) }}</text>
       <text class="nx-feed-est font-mono-tabular">{{ t.home.feedEstimated }} {{ visibility.mask(formatUsd(row.reward, 'detail', true)) }}</text>
     </view>
-    <view class="nx-feed-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden ? undefined : row.pct" aria-valuemin="0" aria-valuemax="100">
-      <view v-if="!visibility.hidden" v-viz-inview class="nx-feed-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
+    <view class="nx-feed-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || row.pct == null ? undefined : row.pct" aria-valuemin="0" aria-valuemax="100">
+      <view v-if="!visibility.hidden && row.pct != null" v-viz-inview class="nx-feed-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
     </view>
   </view>
 </template>
@@ -28,12 +28,14 @@ import { formatUsd } from "@/lib/usd-display";
 import { taskProgressPercent } from "@/lib/task-progress";
 import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 
 const props = defineProps<{ limit: number }>();
 const emit = defineEmits<{ (event: "count", count: number): void }>();
 const t = useT();
 const app = useApp();
 const visibility = useDataVisibility();
+const computeCopy = useComputeV2Copy();
 const now = ref(Date.now());
 const monotonicNow = ref(readMonotonicNowMs());
 useVisibleInterval(() => {
@@ -49,7 +51,7 @@ const rows = computed(() => !tasksReady.value ? [] : app.visibleDevices.flatMap(
   const taskNow = device.taskServerNow != null && device.taskServerNowReceivedAt != null
     ? projectServerNow(device.taskServerNow, device.taskServerNowReceivedAt, monotonicNow.value) : now.value;
   const pct = taskProgressPercent(task, taskNow, device.interruptedAt);
-  return pct === null || pct >= 100 ? [] : [{ id: `${device.id}:${task.id}`, model: task.model, client: task.client, reward: task.reward, pct }];
+  return task.protocolVersion !== 2 && (pct === null || pct >= 100) ? [] : [{ id: `${device.id}:${task.id}`, model: task.model, client: task.client, reward: task.reward, pct, status: task.protocolVersion === 2 ? task.status : undefined }];
 }).slice(0, props.limit));
 watch(() => rows.value.length, count => emit("count", count), { immediate: true });
 </script>

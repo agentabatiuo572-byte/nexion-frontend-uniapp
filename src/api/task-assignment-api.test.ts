@@ -205,8 +205,8 @@ describe("task assignment server receipt projection", () => {
     const devApi = createTaskAssignmentApi({ request } as unknown as ApiClient, "dev");
     const prodApi = createTaskAssignmentApi({ request } as unknown as ApiClient, "prod");
 
-    expect(Object.keys(devApi).sort()).toEqual(["receipt", "receipts", "reportPhoneRuntime", "state"]);
-    expect(Object.keys(prodApi).sort()).toEqual(["receipt", "receipts", "reportPhoneRuntime", "state"]);
+    expect(Object.keys(devApi).sort()).toEqual(["receipt", "receipts", "reportPhoneRuntime", "settlement", "settlements", "state"]);
+    expect(Object.keys(prodApi).sort()).toEqual(["receipt", "receipts", "reportPhoneRuntime", "settlement", "settlements", "state"]);
     expect(request).not.toHaveBeenCalled();
   });
 

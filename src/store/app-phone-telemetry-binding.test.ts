@@ -101,7 +101,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-it.each(["home", "earn"] as const)("reads a six-second task during a visible %s visit without accelerating phone writes", async page => {
+it.each(["home", "earn", "device-detail"] as const)("reads task state every three seconds during a visible %s visit without accelerating phone writes", async page => {
   let now = 1_000_000;
   vi.spyOn(Date, "now").mockImplementation(() => now);
   const app = useApp(); app.bindAccount("user:1001");
@@ -111,26 +111,26 @@ it.each(["home", "earn"] as const)("reads a six-second task during a visible %s 
   const homeReads = remote.appHomeApi.fetch.mock.calls.length;
   app.setTaskReadPageVisible(page, true);
   await app.refreshVisibleTaskAssignments();
-  now += 2_000;
+  now += 3_000;
   const shortTask = phoneAssignments("RUNNING");
   shortTask.devices[0].currentTask!.requiredSeconds = 6;
   remote.taskAssignmentApi.state.mockResolvedValue(shortTask);
-  app.tick(2_000);
+  app.tick(3_000);
   await vi.waitFor(() => expect(app.devices[0]?.currentTask?.id).toBe("CTA-811"));
   expect(app.devices[0]?.currentTask?.id).toBe("CTA-811");
   expect(app.remoteAssignmentStatus).toBe("ready");
-  now += 2_000;
+  now += 3_000;
   await app.refreshVisibleTaskAssignments();
-  now += 2_000;
+  now += 3_000;
   remote.taskAssignmentApi.state.mockResolvedValue(assignments);
-  app.tick(2_000);
+  app.tick(3_000);
   await vi.waitFor(() => expect(app.devices[0]?.currentTask).toBeNull());
   expect(app.devices[0]?.currentTask).toBeNull();
   expect(remote.taskAssignmentApi.reportPhoneRuntime).toHaveBeenCalledTimes(1);
   expect(remote.deviceE3Api.fleet).toHaveBeenCalledTimes(fleetReads);
   expect(remote.appHomeApi.fetch).toHaveBeenCalledTimes(homeReads);
   app.setTaskReadPageVisible(page, false);
-  now += 2_000;
+  now += 3_000;
   const reads = remote.taskAssignmentApi.state.mock.calls.length;
   await app.refreshVisibleTaskAssignments();
   expect(remote.taskAssignmentApi.state).toHaveBeenCalledTimes(reads);
@@ -155,10 +155,11 @@ it.each(["account-switch", "same-account-rebind", "background"])("rejects a visi
   await vi.waitFor(() => expect(remote.taskAssignmentApi.state).toHaveBeenCalledOnce());
   if (boundary === "background") app.setRemoteTaskForeground(false);
   else app.bindAccount(boundary === "account-switch" ? "user:1002" : "user:1001");
-  finish(phoneAssignments("RUNNING"));
+  finish({ ...phoneAssignments("RUNNING"), protocolVersion: 2, pendingEarned: [{ asset: "USDT", amount: "0.123456", taskCount: 1 }] });
   await vi.waitFor(() => expect(app.remoteAssignmentStatus).toBe("idle"));
   expect(app.remoteAssignmentHasSnapshot).toBe(false);
   expect(app.devices).toEqual([]);
+  expect(app.remotePendingEarned).toBeNull();
 });
 
 it("coalesces fast task reads while waiting for the existing phone POST", async () => {

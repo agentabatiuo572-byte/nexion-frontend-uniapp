@@ -93,12 +93,12 @@ const descLine = computed(() =>
 const progressPct = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return Math.round(Math.min(100, ((nowMs.value - tk.startedAt) / 1000 / tk.totalSec) * 100));
+  return tk.startedAt === null || tk.status === "QUEUED" ? 0 : Math.round(Math.min(100, ((nowMs.value - tk.startedAt) / 1000 / tk.totalSec) * 100));
 });
 const etaSec = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return Math.max(0, Math.round(tk.totalSec - (nowMs.value - tk.startedAt) / 1000));
+  return tk.startedAt === null || tk.status === "QUEUED" ? tk.totalSec : Math.max(0, Math.round(tk.totalSec - (nowMs.value - tk.startedAt) / 1000));
 });
 const etaLabel = computed(() =>
   etaSec.value >= 60 ? `~${Math.ceil(etaSec.value / 60)}m` : `~${etaSec.value}s`,
