@@ -107,7 +107,7 @@ function harness() {
     t: ref(en), toast: { warn: vi.fn(), error: vi.fn() }, orderId: ref(null), navReplace: vi.fn(), navTo: vi.fn(),
     confirm: vi.fn().mockResolvedValue(true), dialogOwner: "fixture-dialog", fmt: (copy: string) => copy,
     submitRemoteOrder: vi.fn(),
-    checkoutCapacityRequired: ref(false),
+    checkoutCapacityRequired: ref(false), checkoutOnboardingRequired: ref(false),
   };
   const pay = new Function("formatAmount", ...Object.keys(deps),
     `let confirming = false, trialQuote, quotedTotal, voucherQuote, quotedTradeIn, dialogsOpen = 0;\n${topup}\n${handler}\nreturn onConfirmPay;`,
@@ -122,7 +122,7 @@ describe("real trial checkout refusal and recovery feedback", () => {
     let finish!: (ready:boolean)=>void,current=true;
     const deps={captureCheckoutRoute:()=>({epoch:1}),isCurrentCheckoutRoute:()=>current,trialQuoteUnavailable:ref(true),
       trialQuoteScreenUnavailable:ref(false),freeTrial:{refreshRemote:vi.fn(()=>new Promise<boolean>(done=>{finish=done;}))},
-      quantitySwitching:ref(false),remoteApiEnabled:true,checkoutWalletReadable:ref(true),step:ref("confirm"),
+      quantitySwitching:ref(false),remoteApiEnabled:true,checkoutWalletReadable:ref(true),checkoutOnboardingRequired:ref(false),step:ref("confirm"),
       goConfirm:vi.fn(),nextTick:async()=>{},requestConfirmPay:vi.fn()};
     const tap=new Function(...Object.keys(deps),code+"return submitReview;")(...Object.values(deps));
     const pending=tap(); deps.trialQuoteUnavailable.value=false; current=outcome!=="stale";
@@ -135,7 +135,7 @@ describe("real trial checkout refusal and recovery feedback", () => {
     let current=true; const step=ref("select-payment");
     const deps={createdCheckoutOrder:ref(null),pendingCheckoutCreate:ref(null),checkoutCapacityRequired:ref(false),captureCheckoutRoute:()=>({epoch:1}),isCurrentCheckoutRoute:()=>current,trialQuoteUnavailable:ref(false),
       trialQuoteScreenUnavailable:ref(false),freeTrial:{refreshRemote:vi.fn()},quantitySwitching:ref(false),remoteApiEnabled:true,
-      checkoutWalletReadable:ref(true),step,goConfirm:()=>{step.value="confirm";},nextTick:async()=>{current=false;},requestConfirmPay:vi.fn()};
+      checkoutWalletReadable:ref(true),checkoutOnboardingRequired:ref(false),step,goConfirm:()=>{step.value="confirm";},nextTick:async()=>{current=false;},requestConfirmPay:vi.fn()};
     const tap=new Function(...Object.keys(deps),code+"return submitReview;")(...Object.values(deps));
     await tap(); expect(deps.requestConfirmPay).not.toHaveBeenCalled();
   });

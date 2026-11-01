@@ -189,6 +189,27 @@ test("E20 accepts the complete server decision matrix and preserves source seman
   assert.equal(replacement.sourceDeviceId, 11);
 });
 
+test("E20 preserves server capacity refusals when trial or order reservations fill the remaining slots", async () => {
+  for (const activeDevices of [4, 5]) {
+    for (const decision of ["REPLACE_REQUIRED", "NO_ACTIVE_DEVICE"]) {
+      const payload = {
+        ...validCapacityQuote,
+        activeDevices,
+        decision,
+        ...(decision === "NO_ACTIVE_DEVICE" ? { sourceDeviceId: null, sourceDeviceName: null } : {}),
+      };
+      const gate = new RemoteCapacityGate();
+      const quote = await gate.resolve(
+        () => apiReturning(payload).capacityQuote("stellarbox-pro-v2"),
+        () => {},
+      );
+      assert.equal(quote.decision, decision);
+      assert.equal(quote.activeDevices, activeDevices);
+      assert.equal(gate.canConfirm(false), false);
+    }
+  }
+});
+
 test("E20 rejects a source id without its authoritative display name", async () => {
   await assert.rejects(
     apiReturning({ ...validCapacityQuote, sourceDeviceName: null }).capacityQuote("stellarbox-pro-v2"),

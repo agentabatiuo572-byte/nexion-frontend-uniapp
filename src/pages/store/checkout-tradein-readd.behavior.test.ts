@@ -3,6 +3,7 @@ import { ref } from "vue";
 import ts from "typescript";
 import source from "./checkout.vue?raw";
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
+import { asApiError } from "@/api/errors";
 import { CheckoutRouteFence } from "@/lib/checkout-route-fence";
 
 const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
@@ -39,7 +40,7 @@ function scenario() {
     capacityQuote: vi.fn(async () => ({ decision: "CAPACITY_AVAILABLE" })),
   };
   const deps = {
-    ref, tradein, deviceE3Api, remoteApiEnabled: true, tradeinAvailable: ref(false),
+    ref, asApiError, tradein, deviceE3Api, remoteApiEnabled: true, tradeinAvailable: ref(false), checkoutOnboardingRequired: ref(false),
     remoteTradeinRecoveryRequired: ref(false), removedTradein: ref(true),
     toast: { warn: vi.fn() }, t: ref({ tradein: { errPleaseRetry: "Please retry", errNoActiveDevice: "No active device" }, store: { coCapacityUnavailable: "Unable to check activation slots" } }),
     trialConversionMode: ref(false), productId: ref(identity.productNo),

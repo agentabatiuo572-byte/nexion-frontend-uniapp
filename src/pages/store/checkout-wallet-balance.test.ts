@@ -35,9 +35,9 @@ describe("checkout wallet balance hint", () => {
   it("does not enter purchase confirmation until a wallet snapshot is readable", async () => {
     const readable=ref(false),confirm=vi.fn(),step=ref('confirm');
     const submit=new Function('quantitySwitching','remoteApiEnabled','checkoutWalletReadable','step','goConfirm','nextTick','requestConfirmPay',
-      'captureCheckoutRoute','trialQuoteUnavailable','trialQuoteScreenUnavailable',
+      'captureCheckoutRoute','trialQuoteUnavailable','trialQuoteScreenUnavailable','checkoutOnboardingRequired',
       extract('async function submitReview()', 'function selectPayment')+'\nreturn submitReview;')
-      (ref(false),true,readable,step,()=>{},async()=>{},confirm,()=>({}),ref(false),ref(false));
+      (ref(false),true,readable,step,()=>{},async()=>{},confirm,()=>({}),ref(false),ref(false),ref(false));
     await submit();expect(confirm).not.toHaveBeenCalled();
     readable.value=true;await submit();expect(confirm).toHaveBeenCalledOnce();
   });

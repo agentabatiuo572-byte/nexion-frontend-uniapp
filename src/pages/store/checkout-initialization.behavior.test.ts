@@ -21,6 +21,7 @@ function page(){
     resumeSessionId:null,trialCheckoutSource:false,trialQuoteAt:()=>({applied:false}),mockServerNow:()=>0,isProductAvailable:()=>true,phase:ref('P1'),
     refreshPurchaseEligibility:vi.fn().mockResolvedValue('eligible'),resumePendingSession:vi.fn(),fireTradeinIntercept:vi.fn().mockResolvedValue(false),
     quantityReady:ref(false),interceptFired:false,tradeinAvailable:ref(false),remoteCapacityGate:{reset:vi.fn()},checkoutCapacityRead:null,
+    checkoutOnboardingRequired:ref(false),checkoutSetupReturn:false,
     checkoutWalletRefreshSequence:0,checkoutWalletRefreshing:ref(false),clearRemotePurchaseEligibility:vi.fn(),
     confirming:false,orderId:ref(null),createdCheckoutOrder:ref(null),pendingCheckoutCreate:ref(null),paymentBlocked:ref(''),
     settledResultReplay:ref(false),checkoutLeaveError:ref(''),checkoutLeaving:ref(false),closePaymentSheet:vi.fn(),remoteOrderFailure:ref(null),
