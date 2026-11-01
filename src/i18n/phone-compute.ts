@@ -6,7 +6,8 @@ const copy = {
     title: "手机本机计算", loading: "正在核对派单条件…", unavailable: "派单条件读取失败，请重试。", retry: "重试",
     ready: "可以接收适配的本机任务。", missing: "未找到这部手机的派单条件。", web: "网页版仅查看状态，不能在本机执行手机任务。",
     engine: "本机计算状态", retryEngine: "重试准备", engineFailure: "本机计算暂不可用，请重试。",
-    states: { unsupported: "此平台暂不支持本机计算", paused: "已暂停", loading: "正在准备本机模型…", ready: "本机模型已就绪", waiting: "任务服务暂不可用，等待重连", running: "正在本机计算", verifying: "计算结束，等待服务端校验", recovering: "正在恢复任务状态", error: "本机计算暂不可用" },
+    download: "首次下载模型，完成后保存在本机", cached: "已复用本机模型缓存，无需重复下载。", downloadFailure: "模型准备失败，请检查网络和存储空间后重试。",
+    states: { unsupported: "此平台暂不支持本机计算", paused: "已暂停", downloading: "正在下载本机模型…", loading: "正在准备本机模型…", ready: "本机模型已就绪", waiting: "任务服务暂不可用，等待重连", running: "正在本机计算", verifying: "计算结束，等待服务端校验", recovering: "正在恢复任务状态", error: "本机计算暂不可用" },
     blockers: {
       PHONE_DEVICE_INACTIVE: "手机尚未激活，或已停止接单。", PHONE_BINDING_REQUIRED: "尚未绑定手机安装实例。",
       PHONE_CALIBRATION_REQUIRED: "需要完成手机校准并激活。", PHONE_EXECUTION_SESSION_REQUIRED: "请在已绑定手机的 App 中登录并保持前台运行。",
@@ -19,7 +20,8 @@ const copy = {
     title: "On-phone compute", loading: "Checking task eligibility…", unavailable: "Unable to read task eligibility. Please retry.", retry: "Retry",
     ready: "Ready for compatible on-phone tasks.", missing: "Task eligibility for this phone was not found.", web: "The web app can display status but cannot execute on-phone tasks.",
     engine: "Local compute status", retryEngine: "Retry setup", engineFailure: "Local compute is unavailable. Please retry.",
-    states: { unsupported: "Local compute is not supported on this platform", paused: "Paused", loading: "Preparing the local model…", ready: "Local model ready", waiting: "Task service unavailable; reconnecting", running: "Computing on this phone", verifying: "Computed; awaiting server verification", recovering: "Recovering task state", error: "Local compute unavailable" },
+    download: "Initial model download; saved on this phone", cached: "Using the saved local model; no download needed.", downloadFailure: "Model setup failed. Check the network and free storage, then retry.",
+    states: { unsupported: "Local compute is not supported on this platform", paused: "Paused", downloading: "Downloading the local model…", loading: "Preparing the local model…", ready: "Local model ready", waiting: "Task service unavailable; reconnecting", running: "Computing on this phone", verifying: "Computed; awaiting server verification", recovering: "Recovering task state", error: "Local compute unavailable" },
     blockers: {
       PHONE_DEVICE_INACTIVE: "The phone is not active or has stopped accepting tasks.", PHONE_BINDING_REQUIRED: "A phone installation must be bound first.",
       PHONE_CALIBRATION_REQUIRED: "Complete phone calibration and activation.", PHONE_EXECUTION_SESSION_REQUIRED: "Sign in to the App on the bound phone and keep it in the foreground.",
@@ -32,7 +34,8 @@ const copy = {
     title: "Tính toán trên điện thoại", loading: "Đang kiểm tra điều kiện nhận việc…", unavailable: "Không thể đọc điều kiện nhận việc. Hãy thử lại.", retry: "Thử lại",
     ready: "Sẵn sàng nhận tác vụ phù hợp trên điện thoại.", missing: "Không tìm thấy điều kiện nhận việc của điện thoại này.", web: "Bản web chỉ hiển thị trạng thái, không thể chạy tác vụ trên điện thoại.",
     engine: "Trạng thái tính toán cục bộ", retryEngine: "Chuẩn bị lại", engineFailure: "Chưa thể tính toán cục bộ. Hãy thử lại.",
-    states: { unsupported: "Nền tảng này chưa hỗ trợ tính toán cục bộ", paused: "Tạm dừng", loading: "Đang chuẩn bị mô hình cục bộ…", ready: "Mô hình cục bộ đã sẵn sàng", waiting: "Dịch vụ tác vụ chưa khả dụng; đang kết nối lại", running: "Đang tính toán trên điện thoại này", verifying: "Đã tính xong; chờ máy chủ xác minh", recovering: "Đang khôi phục trạng thái tác vụ", error: "Chưa thể tính toán cục bộ" },
+    download: "Tải mô hình lần đầu; lưu trên điện thoại", cached: "Đang dùng mô hình đã lưu; không cần tải lại.", downloadFailure: "Không thể chuẩn bị mô hình. Kiểm tra mạng và dung lượng rồi thử lại.",
+    states: { unsupported: "Nền tảng này chưa hỗ trợ tính toán cục bộ", paused: "Tạm dừng", downloading: "Đang tải mô hình cục bộ…", loading: "Đang chuẩn bị mô hình cục bộ…", ready: "Mô hình cục bộ đã sẵn sàng", waiting: "Dịch vụ tác vụ chưa khả dụng; đang kết nối lại", running: "Đang tính toán trên điện thoại này", verifying: "Đã tính xong; chờ máy chủ xác minh", recovering: "Đang khôi phục trạng thái tác vụ", error: "Chưa thể tính toán cục bộ" },
     blockers: {
       PHONE_DEVICE_INACTIVE: "Điện thoại chưa kích hoạt hoặc đã ngừng nhận việc.", PHONE_BINDING_REQUIRED: "Cần liên kết bản cài đặt trên điện thoại.",
       PHONE_CALIBRATION_REQUIRED: "Hoàn tất hiệu chuẩn và kích hoạt điện thoại.", PHONE_EXECUTION_SESSION_REQUIRED: "Đăng nhập App trên điện thoại đã liên kết và giữ App ở phía trước.",
