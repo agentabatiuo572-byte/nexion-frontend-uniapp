@@ -1293,3 +1293,6 @@ uni-input .uni-input-placeholder {
 /* Provider artwork keeps its approved brand hue independently of the page theme. */
 .security-providers { --ui-telegram-brand: rgb(42,171,238); }
 .security-page { --ui-switch-thumb: rgb(255,255,255); }
+
+/* Keep authored image colors when Android WebView automatically darkens small images. */
+uni-image { color-scheme: only light; }

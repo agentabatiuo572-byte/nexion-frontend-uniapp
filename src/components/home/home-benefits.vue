@@ -138,7 +138,7 @@ const trialPending = computed(() => status.value === 'active' || status.value ==
 const trialOfferEnabled = computed(() => canRestart.value || capacityFull.value || canClaim.value);
 const trialName = computed(() => trialView.deviceName.value ?? t.value.trial.heroDeviceName);
 const trialDays = computed(() => trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
-const trialArt = computed(() => getProductMedia(trialView.productId.value)?.src ?? '/static/img/home-glass-20260928/s1.webp');
+const trialArt = computed(() => getProductMedia(trialView.productId.value)?.src);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
 // Same capped estimate the trial page and checkout quote (BUG 78).
 const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);

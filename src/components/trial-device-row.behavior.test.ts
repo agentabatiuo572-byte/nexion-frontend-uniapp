@@ -43,7 +43,7 @@ function mount(variant: "home" | "earn" | "inventory" = "earn", locale: keyof ty
     "@/i18n/trial-fleet": { useTrialFleetCopy: () => Vue.ref(trialFleetCopy[locale]) },
     "@/i18n/use-t": { useT: () => Vue.ref(messages[locale]) },
     "@/i18n/trial-lifecycle": { formatTrialRemaining },
-    "@/lib/amount-display": { formatAmount }, "@/lib/route": { navTo }, "@/lib/product-media": { getProductMedia },
+    "@/lib/amount-display": { formatAmount }, "@/lib/route": { navTo }, "@/lib/product-media": { getProductMedia: (id: string) => id === "stellarbox-s1" ? ({ src: `https://catalog.example/${id}.webp` }) : null },
   };
   const exports: Record<string, any> = {};
   new Function("require", "exports", code)((id: string) => {
@@ -61,7 +61,7 @@ it("renders a collapsed trial row with the actual model image, trial image badge
   expect(tree.filter(node => typeof node.children === "string").map(node => node.children)).toEqual(expect.arrayContaining([
     "Server Trial B", "Online", "2d 0h",
   ]));
-  expect(screen.byClass("trial-device-row__image")!.props!.src).toBe(getProductMedia("stellarbox-s1")!.src);
+  expect(screen.byClass("trial-device-row__image")!.props!.src).toBe("https://catalog.example/stellarbox-s1.webp");
   expect(screen.byClass("trial-device-row__heading")!.props).toMatchObject({ role: "button", tabindex: "0", "aria-expanded": false });
   expect(screen.byClass("trial-device-row__heading")!.props!["aria-label"]).toBe("Trial details: Server Trial B · Online · Remaining 2d 0h");
   expect(screen.byClass("trial-device-row__body")).toBeUndefined();

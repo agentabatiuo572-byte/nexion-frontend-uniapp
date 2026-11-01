@@ -44,6 +44,7 @@ async function mount(platform: "H5" | "APP", messages = zh) {
   const trial = Vue.reactive({ status: 'none', authorityStatus: 'ready', start });
   const config = { trialDays: 3, shadowDailyUSD: 20, trialOffsetCapUSD: 50, trialProductName: 'UVELBox S1' };
   const projection = {
+    productId: Vue.ref("stellarbox-s1"),
     config: Vue.computed(() => trial.authorityStatus === 'error' ? null : config),
     deviceName: Vue.ref('UVELBox S1'), remainingMs: Vue.ref<number | null>(72 * 3600_000),
     estimatedOffsetUSD: Vue.computed(() => trial.authorityStatus === 'error' ? null : computeTrialOffset(config as never, config.trialDays * config.shadowDailyUSD).offsetUSD),
@@ -52,6 +53,7 @@ async function mount(platform: "H5" | "APP", messages = zh) {
   const dialogA11y = vi.fn();
   const navTo = vi.fn(), toast = { info: vi.fn(), success: vi.fn() };
   const modules: Record<string, unknown> = {
+    "@/components/catalog-machine-image.vue": { default: {} }, "@/lib/product-media": { getProductMedia: () => null },
     "@/lib/amount-display": { formatAmount },
     vue: Vue, "@/lib/route": { navTo }, "@/store/app": { useApp: () => appState },
     "@/store/trial-claim-sheet": { useTrialClaimSheet: () => sheet },

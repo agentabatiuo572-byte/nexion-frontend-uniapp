@@ -42,7 +42,7 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getProductMedia(resultOrder.productId)?.src" :amount="resultOrder.total" :error="paymentResultState === 'error' ? t.orders.refreshFailed : ''" @devices="goDevices" @retry="refreshOrder">
+        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="resultOrder.total" :error="paymentResultState === 'error' ? t.orders.refreshFailed : ''" @devices="goDevices" @retry="refreshOrder">
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -74,10 +74,8 @@
               </view>
             </view>
             <view class="order-hero__art" aria-hidden="true">
-              <image v-if="heroImage" class="order-hero__image" :src="heroImage" mode="aspectFit" />
-              <view v-else class="order-hero__icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" :stroke="statusColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in statusIcon" :key="di" :d="d" /></svg>
-              </view>
+              <CatalogMachineImage class="order-hero__image nx-home-art-float" :sku="order.lineItems?.[0]?.sku ?? order.productId" :image-url="heroImage" :scope-key="order.id" />
+
             </view>
           </view>
 
@@ -205,7 +203,9 @@ import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue
 import CheckoutResult from "@/components/checkout/CheckoutResult.vue";
 import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
-import { getProductMedia } from "@/lib/product-media";
+import { getOrderProductMedia } from "@/lib/product-media";
+import { revalidateProductCatalog } from "@/store/product-catalog";
+import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { useT } from "@/i18n/use-t";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { fmt } from "@/i18n/format";
@@ -361,6 +361,7 @@ async function refreshOrder() {
   }
 }
 onShow(() => {
+  void revalidateProductCatalog();
   if (detailVisible) return;
   detailMounted = true;
   detailVisible = true;
@@ -630,7 +631,7 @@ const statusTone = computed(() => (order.value ? STATUS_TONES[order.value.status
 const purchasePaymentState = usePurchasePayment().state;
 const externalPayment = computed(() => { purchasePaymentState.revision; return order.value?.status === 'placed' && !!pendingOrderPayment(app.accountKey, id.value); });
 const heroImage = computed(() => order.value
-  ? (getProductMedia(order.value.productId) ?? getProductMedia(order.value.lineItems?.[0]?.sku))?.src
+  ? getOrderProductMedia(order.value.productId, order.value.lineItems)?.src
   : undefined);
 
 // lucide outline paths per status (Clock / CheckCircle2 / Server / Cpu / XCircle)
