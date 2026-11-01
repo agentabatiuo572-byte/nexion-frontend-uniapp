@@ -778,9 +778,10 @@ function humanMessageRecommendation(message: ConvMessage): Partial<ThreadMsg> {
   const copy = t.value.conversations.recommendation;
   const skuName = message.skuName;
   const body = message.text;
-  const text = message.kind === "SKU"
-    ? message.skuName === message.text ? skuName ?? message.text : [body, skuName].filter(Boolean).join("\n")
-    : message.text;
+  // The console pre-fills "推荐商品：<name>"; only add the name when the agent's text leaves it out.
+  const text = message.kind === "SKU" && skuName && !body.includes(skuName)
+    ? [body, skuName].filter(Boolean).join("\n")
+    : body;
   if (message.targetAvailability !== "AVAILABLE") return { text: [text,
     message.targetAvailability === "UNAVAILABLE" ? copy.unavailable : copy.unknown].filter(Boolean).join("\n") };
   if (message.kind === "SKU" && message.skuId) return { text, ctaLabel: copy.product, ctaHref: `/pages/store/detail?id=${encodeURIComponent(message.skuId)}` };

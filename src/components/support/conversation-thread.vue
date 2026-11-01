@@ -36,7 +36,7 @@
         <view v-else :id="messageRowId(m.id)" class="nx-conv-bubble-row" :class="m.side === 'right' ? 'nx-conv-right' : 'nx-conv-left'" v-bind="entranceBindings(m)">
           <image v-if="m.authorAvatarSrc" class="nx-conv-author-avatar" :src="m.authorAvatarSrc" mode="aspectFill" :aria-label="m.meta" />
           <view class="nx-conv-bubble-line" :class="m.side === 'right' ? 'nx-conv-bubble-line--right' : ''">
-          <view class="nx-conv-bubble" :class="{ 'nx-conv-bubble--retry': canRetryStatus(m) }" :style="bubbleStyle(m)">
+          <view class="nx-conv-bubble" :class="{ 'nx-conv-bubble--retry': canRetryStatus(m), 'nx-conv-bubble--cta': m.ctaLabel && m.ctaHref }" :style="bubbleStyle(m)">
             <view class="nx-conv-bubble-body">
               <view v-if="m.imageSrc" class="nx-conv-image-open" role="button" tabindex="0" :aria-label="imageLabels?.view"
                 @click="openPreview(m.imageSrc)" @keydown.enter.prevent="openPreview(m.imageSrc)" @keydown.space.prevent="openPreview(m.imageSrc)">
@@ -55,9 +55,9 @@
                 <text v-if="line.length === 0" class="nx-conv-seg">{{ " " }}</text>
               </view>
             </view>
-	            <view v-if="m.ctaLabel && m.ctaHref" class="nx-conv-cta-row family-control" role="link" tabindex="0" :aria-label="m.ctaLabel" @click="onCta(m)" @keydown.enter.prevent="onKeyboardActivate($event, () => onCta(m))"><LiquidGlass rendering="frosted" :radius="22" />
+	            <view v-if="m.ctaLabel && m.ctaHref" class="nx-conv-cta-row" role="link" tabindex="0" :aria-label="m.ctaLabel" @click="onCta(m)" @keydown.enter.prevent="onKeyboardActivate($event, () => onCta(m))">
               <text class="nx-conv-cta-t">{{ m.ctaLabel }}</text>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
             </view>
             <view v-if="messageTimes[m.id]?.clock || (m.side === 'right' && receiptState(m))" class="nx-conv-bubble-meta" :class="{ 'nx-conv-bubble-meta--retry': canRetryStatus(m) }">
               <text v-if="messageTimes[m.id]?.clock" class="nx-conv-message-time" :title="messageTimes[m.id]?.full" :aria-label="[m.meta, messageTimes[m.id]?.full].filter(Boolean).join(' · ')">{{ messageTimes[m.id]?.clock }}</text>
@@ -1019,7 +1019,6 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   --nx-chat-out-bottom: rgba(22, 88, 66, .84);
   --nx-chat-out-ink: #F7FBEF;
   --nx-chat-out-meta: #DCE8C2;
-  --nx-chat-stroke: rgba(255, 255, 255, .09);
 }
 :global([data-theme="light"] .nx-conv-thread) {
   --nx-chat-incoming: rgba(255, 255, 255, .76);
@@ -1027,7 +1026,6 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   --nx-chat-out-bottom: color-mix(in srgb, color-mix(in srgb, var(--v5-brand) 75%, var(--v5-brand-deep)) 90%, transparent);
   --nx-chat-out-ink: #FFFFFF;
   --nx-chat-out-meta: #EEF2FF;
-  --nx-chat-stroke: rgba(255, 255, 255, .24);
 }
 .nx-conv-list {
   flex: 1;
@@ -1107,7 +1105,10 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   min-width: 0;
   padding: 6px 10px 5px;
   border-radius: 17px;
-  border: 1px solid var(--nx-chat-stroke);
+  /* Soft inner rim shared with the glass controls; the transparent border keeps
+     the box size and still draws a system outline in forced-colors mode. */
+  border: 1px solid transparent;
+  box-shadow: var(--ui-glass-edge-shadow);
   background-color: var(--nx-bubble-fill);
   background-image: none;
   color: var(--v5-ink);
@@ -1146,13 +1147,21 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 .nx-conv-seg--b {
   font-weight: 600;
 }
+/* The link takes its own last line, so the time floats to its right like a
+   plain text message; the vertical padding keeps a 44px hit area without
+   making that line taller. */
+.nx-conv-bubble--cta .nx-conv-line:last-child::after { content: '\A'; white-space: pre; }
 .nx-conv-cta-row {
-  display: flex;
-  justify-content: flex-end;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 0 14px 10px;
+  padding: 12px 0;
+  margin: -12px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+.nx-conv-cta-row:active { opacity: .65; }
+.nx-conv-cta-row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -8px; border-radius: 8px; }
 .nx-conv-cta-t {
   color: var(--v5-brand);
   font-family: var(--font-v5);
@@ -1389,9 +1398,8 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
 @keyframes nx-conv-send-tap { 0% { transform: scale(1); } 35% { transform: scale(.9); } 100% { transform: scale(1); } }
 .message-family .nx-conv-send, .message-family .nx-conv-attach-trigger { width: 44px; padding: 0; flex-shrink: 0; }
 .message-family .nx-conv-receipt[role="button"]:focus-visible { outline-offset: -3px; border-radius: 8px; }
-.message-family .nx-conv-cta-row { margin: 0 12px 10px; padding: 0 16px; }
 .message-family .nx-conv-queue-action, .message-family .nx-conv-chip { padding-inline: 16px; }
-.nx-conv-thread .nx-conv-cta-row, .nx-conv-thread .nx-conv-chip { --v5-liquid-shadow: inset 0 1px 0 var(--v5-border); }
+.nx-conv-thread .nx-conv-chip { --v5-liquid-shadow: inset 0 1px 0 var(--v5-border); }
 .nx-conv-queue-actions { flex-wrap: wrap; }
 .nx-conv-attachment-actions { gap: 8px; margin-top: 8px; }
 .nx-conv-image-caption { overflow-wrap: anywhere; }
