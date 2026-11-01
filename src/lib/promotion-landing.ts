@@ -34,14 +34,17 @@ export function landingProductName(activity: PublicPromotion, sku: string): stri
   return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? sku;
 }
 
-export type RewardParts = { amount: string; unit: string; asset: 'UVT' | 'USDT' | 'DEVICE' };
+// An order discount lowers the order total at checkout; it is never credited as a USDT reward.
+export type RewardParts = { amount: string; unit: string; asset: 'UVT' | 'USDT' | 'DEVICE' | 'DISCOUNT' };
 export function rewardParts(activity: PublicPromotion, reward: PublicRewardSpec): RewardParts {
   if (reward.type === 'DEVICE') return { amount: String(reward.quantity), unit: reward.disclosure.deviceName ?? landingProductName(activity, reward.giftProductNo), asset: 'DEVICE' };
   // Whole amounts drop the ".00"; any other fraction stays as published.
-  return { amount: rewardAmount(reward).replace(/\.00$/, ''), unit: reward.type === 'UVT' ? 'UVT' : 'USDT', asset: reward.type === 'UVT' ? 'UVT' : 'USDT' };
+  const amount = rewardAmount(reward).replace(/\.00$/, '');
+  return reward.type === 'UVT' ? { amount, unit: 'UVT', asset: 'UVT' } : { amount, unit: 'USDT', asset: reward.type === 'DISCOUNT_USDT' ? 'DISCOUNT' : 'USDT' };
 }
-export function rewardPartsText(parts: RewardParts): string {
-  return parts.asset === 'DEVICE' ? `${parts.unit} × ${parts.amount}` : `${parts.amount} ${parts.unit}`;
+export function rewardPartsText(parts: RewardParts, copy: Pick<Messages['promotion'], 'orderDiscount'>): string {
+  if (parts.asset === 'DEVICE') return `${parts.unit} × ${parts.amount}`;
+  return parts.asset === 'DISCOUNT' ? `${copy.orderDiscount} · ${parts.amount} ${parts.unit}` : `${parts.amount} ${parts.unit}`;
 }
 
 /** Remaining days use the published clock of the same read, never the device date. */

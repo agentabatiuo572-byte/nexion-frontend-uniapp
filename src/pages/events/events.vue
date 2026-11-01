@@ -22,8 +22,8 @@
       <SubPageHeader v-if="!embedded" back="/pages/index/index" />
 
       <view class="px-4 space-y-3">
-        <GlassSegments :label="t.promotion.events" v-model="eventSource" :options="sourceOptions" />
-        <view class="nx-glass-card" style="padding:14px;border-radius:var(--nx-glass-radius)" role="link" tabindex="0" @click="navTo('/pages/events/genesis-raffle')" @keydown.enter.prevent="navTo('/pages/events/genesis-raffle')"><text class="block" style="font-size:14px;font-weight:600;color:var(--v5-brand)">{{ raffleCopy.title }} ›</text><text class="block" style="margin-top:4px;font-size:12px;color:var(--v5-ink-3)">{{ raffleCopy.intro }}</text></view>
+        <GlassSegments class="events-source" :label="t.promotion.events" v-model="eventSource" :options="sourceOptions" />
+        <view class="events-raffle" role="link" tabindex="0" @click="navTo('/pages/events/genesis-raffle')" @keydown.enter.prevent="navTo('/pages/events/genesis-raffle')"><text class="events-raffle__title">{{ raffleCopy.title }} ›</text><text class="events-raffle__intro">{{ raffleCopy.intro }}</text></view>
         <PromotionEntry v-if="eventSource==='promotions'" mode="events" />
         <view v-else-if="!signedIn" class="promotion-flat"><view class="promotion-action" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent('/pages/events/events'))"><text>{{ t.promotion.signIn }}</text></view></view>
         <template v-else>
@@ -439,3 +439,16 @@ const emptyStyle: CSSProperties = {
 import GlassSegments from "@/components/glass-segments.vue";
 const tabOptions = computed(() => TABS.map(value => ({ value, label: t.value.events.tabs[value] })));
 </script>
+
+<style scoped>
+/* Events page per the P-58 Main board: 40px glass header controls, a 7% glass track and a plain raffle card. */
+:deep(.spv) { padding: 12px 8px 4px; margin-bottom: 4px; }
+:deep(.spv-glass) { width: 40px; height: 40px; }
+.events-source.nx-glass-segments { gap: 0; }
+.events-source :deep(.nx-glass-track) { --v5-liquid-tint: color-mix(in srgb, var(--v5-ink) 7%, transparent); --v5-liquid-shadow: none; }
+.events-source :deep(.nx-glass-track .nx-liquid-specular) { display: none; }
+.events-raffle { display: block; padding: 14px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.events-raffle:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.events-raffle__title { display: block; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-brand); }
+.events-raffle__intro { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+</style>
