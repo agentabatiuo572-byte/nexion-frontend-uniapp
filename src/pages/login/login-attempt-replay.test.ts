@@ -163,14 +163,31 @@ it("preserves the actual refusal from automatic recovery without discarding the 
   expect(page.authApi.pendingLogin()).toBe(true); expect(page.replayAvailable.value).toBe(true);
 });
 
-it("keeps verification actionable when automatic recovery returns a challenge", async () => {
-  const page = recoveryPage(vi.fn().mockRejectedValueOnce(networkError()).mockResolvedValueOnce({
-    tokenType: "challenge", accessToken: null, refreshToken: null, user: testUser, challengeNo: "original-mfa",
-  }));
+it("treats an unexpected recovery challenge as unknown, then completes the real original-key MFA flow", async () => {
+  const challenge = { tokenType: "challenge", accessToken: null, refreshToken: null, user: testUser, challengeNo: "original-mfa" };
+  const page = recoveryPage(vi.fn().mockRejectedValueOnce(networkError()).mockResolvedValueOnce(challenge)
+    .mockRejectedValueOnce(new ApiError({ kind: "auth", status: 401, message: "LOGIN_ATTEMPT_RECOVERY_INVALID" }))
+    .mockResolvedValueOnce(challenge).mockResolvedValueOnce(session));
   await page.signInWithPassword(); await settleRecovery();
   expect(page.request).toHaveBeenCalledTimes(2); expect(page.finishSignIn).not.toHaveBeenCalled();
   expect(page.loginRecoveryPending.value).toBe(true); expect(page.replayAvailable.value).toBe(true);
+  expect(page.authApi.pendingLogin()).toBe(true);
+  expect(page.retryContext.value).toMatchObject({ context: { countryCode: "+86", phone: "13800000001" } });
+  expect((page.retryContext.value as { context: { challengeNo?: string } })?.context.challengeNo).toBeUndefined();
+  expect(() => page.authApi.cancelLoginChallenge()).toThrow("LOGIN_RESULT_UNKNOWN");
   page.retryPassword.value = "re-entered"; expect(page.canRetryOriginal.value).toBe(true);
+  await page.retryOriginalLogin(); await settleRecovery();
+  expect(page.authApi.pendingLogin()).toBe(false);
+  expect(page.retryContext.value).toMatchObject({ authMethod: "PASSWORD", context: { challengeNo: "original-mfa" }, pending: false });
+  page.retryPassword.value = "re-entered"; expect(page.canRetryOriginal.value).toBe(false);
+  page.retryCode.value = "123456"; expect(page.canRetryOriginal.value).toBe(true);
+  await page.retryOriginalLogin(); await settleRecovery();
+  expect(page.request).toHaveBeenCalledTimes(5);
+  const original = page.request.mock.calls[0][0];
+  expect(page.request.mock.calls[3][0]).toMatchObject({ path: "/auth/users/login", headers: original.headers });
+  expect(page.request.mock.calls[4][0]).toMatchObject({ path: "/auth/users/login/2fa", headers: original.headers,
+    body: { countryCode: "+86", phone: "13800000001", challengeNo: "original-mfa", code: "123456", password: "re-entered" } });
+  expect(page.finishSignIn).toHaveBeenCalledOnce(); expect(page.authApi.pendingLoginContext()).toBeNull();
 });
 
 it("leaves actionable inputs after a failed read, and retries only the frozen original attempt", async () => {
