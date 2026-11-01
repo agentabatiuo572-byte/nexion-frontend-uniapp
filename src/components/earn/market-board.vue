@@ -26,7 +26,7 @@
             <text class="earn-market__unit">{{ workloadCopy(w).unit }}</text>
             <text class="earn-market__price">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
             <text class="earn-market__delta" :style="{ color: arrowColor(w) }">{{ w.delta === null ? "—" : `${arrow(w)} ${Math.abs(w.delta).toFixed(1)}%` }}</text>
-            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} ↑{{ w.flagshipDelta.toFixed(1) }}%</text>
+            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} <text class="earn-market__flagship-delta">{{ signedDelta(w.flagshipDelta) }}</text></text>
             <view v-if="w.spark.length > 1" class="earn-market__spark"><svg data-native-svg class="earn-market-spark" width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="sparkPoints(w.spark)" fill="none" :stroke="arrowColor(w)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" /></svg></view>
           </view>
         </view>
@@ -135,6 +135,11 @@ function arrow(w: WorkloadPrice): string {
 function arrowColor(w: WorkloadPrice): string {
   return w.delta !== null && w.delta > 0.05 ? "var(--v5-success-ink)" : w.delta !== null && w.delta < -0.05 ? "var(--v5-danger)" : "var(--v5-ink-4)";
 }
+// Same thresholds as the workload delta: ↑ rising, ↓ falling, no arrow when flat.
+function signedDelta(delta: number): string {
+  const sign = delta > 0.05 ? "↑" : delta < -0.05 ? "↓" : "";
+  return `${sign}${Math.abs(delta).toFixed(1)}%`;
+}
 // Bars scale to the best tier; a non-zero tier always keeps a visible sliver.
 const rankMax = computed(() => Math.max(0, ...deviceRankings.value.map((row) => row.dailyEarn ?? 0)));
 function rankShare(row: DeviceRanking): number {
@@ -178,9 +183,10 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-market__price { margin-top: 8px; font: 500 15px/20px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-market__delta { font: 500 11px/14px var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-market__flagship { margin-top: 2px; font: 500 11px/14px var(--font-v5); color: var(--v5-warning-ink); overflow-wrap: anywhere; }
+.earn-market__flagship-delta { font: 500 11px/14px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Sparklines sit on the tile floor so a taller tile (flagship line) keeps them aligned. The App draws the SVG
    through NxNativeSvg (v-html), so the SVG's own style reaches it through :deep() on this real wrapper. */
-.earn-market__spark { height: 22px; margin-top: auto; padding-top: 6px; line-height: 0; }
+.earn-market__spark { height: 22px; margin-top: auto; padding-top: 6px; box-sizing: content-box; line-height: 0; }
 .earn-market__spark :deep(.earn-market-spark) { display: block; width: 100%; height: 100%; overflow: visible; }
 .earn-market__rank { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border); }
 .earn-ranking-row { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) 96px; align-items: center; gap: 8px; min-height: 44px; }

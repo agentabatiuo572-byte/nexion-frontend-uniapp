@@ -41,14 +41,22 @@ export function useFleetSlots() {
     ];
   });
   const slots = computed<FleetSlot[]>(() => {
-    const known = occupied.value.length;
+    let classified = occupied.value;
     let reserved = app.remoteSlotUsage?.reservedSlotCount ?? 0;
     let pending = 0;
     if (countReady.value) {
-      reserved = Math.min(reserved, Math.max(0, slotsUsed.value - known));
-      pending = Math.max(0, slotsUsed.value - known - reserved);
+      // The authoritative count wins in both directions. Fewer used slots than classified items means a stale
+      // snapshot: the separately read trial goes first (devices arrive with the count itself), then the tail.
+      const used = slotsUsed.value;
+      if (classified.length > used) {
+        const trialFirst = classified.findIndex((slot) => slot.kind === "trial");
+        if (trialFirst >= 0) classified = classified.filter((_, index) => index !== trialFirst);
+        classified = classified.slice(0, used);
+      }
+      reserved = Math.min(reserved, Math.max(0, used - classified.length));
+      pending = Math.max(0, used - classified.length - reserved);
     }
-    const list: FleetSlot[] = [...occupied.value,
+    const list: FleetSlot[] = [...classified,
       ...Array.from({ length: pending }, (): FleetSlot => ({ kind: "pending" })),
       ...Array.from({ length: reserved }, (): FleetSlot => ({ kind: "reserved" }))];
     while (list.length < app.slotCap) list.push({ kind: "empty" });

@@ -34,7 +34,7 @@
         <view class="hf-chev nx-frosted-button" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="expanded ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'" /></svg></view>
       </view>
       <view v-if="expanded" class="hf-reel">
-        <view v-for="(slot, i) in fleet.occupied.value" :key="slotKey(slot, i)" class="hf-reel__item" :style="{ '--i': i }">
+        <LoopScope v-for="(slot, i) in fleet.occupied.value" :key="slotKey(slot, i)" class="hf-reel__item" :style="{ '--i': i }">
           <FleetReelCard v-if="slot.kind === 'device'" :device="slot.device" :online="slot.online" :runtime-confirmed="fleet.fleetReady.value" :tasks-confirmed="tasksReady" />
           <view v-else class="hf-card hf-card--trial" :class="{ 'hf-card--online': slot.kind === 'trial' && slot.online }" role="button" tabindex="0" :aria-label="trialLabel" @click="goTrial">
             <view class="hf-card__status"><view class="hf-card__dot" :class="{ 'nx-online-dot': fleet.trialOnline.value }" /><text>{{ trialStatusText }}</text></view>
@@ -44,7 +44,7 @@
             <view class="hf-card__kv"><text class="hf-card__key">{{ t.home.trialLeftShort }}</text><text class="hf-card__mono">{{ trialRemaining }}</text></view>
             <view class="hf-card__kv"><text class="hf-card__key">{{ t.home.trialCreditShort }}</text><text class="hf-card__mono">{{ trialCredit }}</text></view>
           </view>
-        </view>
+        </LoopScope>
         <view v-if="fleet.countReady.value && fleet.freeSlots.value > 0" class="hf-reel__item" :style="{ '--i': fleet.occupied.value.length }">
           <view class="hf-card hf-card--add" role="button" tabindex="0" :aria-label="`${t.earn.addDevice}, ${freeSlotsText}`" @click="addDevice">
             <view class="hf-card__plus nx-frosted-button" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view>
@@ -83,6 +83,7 @@ import { deviceTaskRunning } from "@/lib/task-progress";
 import NxButton from "@/components/ui/nx-button.vue";
 import SlotRing from "@/components/slot-ring.vue";
 import DeviceArt from "@/components/device-art.vue";
+import LoopScope from "@/components/loop-scope.vue";
 import FleetReelCard from "./fleet-reel-card.vue";
 
 const visibility = useDataVisibility();
