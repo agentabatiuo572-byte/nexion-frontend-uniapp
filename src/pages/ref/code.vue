@@ -34,14 +34,14 @@
               <text :style="sponsorNameStyle">{{ sponsor?.name }} </text>
               <text :style="sponsorTagStyle">· {{ t.ref.invitedYou }}</text>
             </view>
-            <view class="flex items-center" style="gap: 6px; margin-top: 4px; flex-wrap: wrap">
-              <text :style="vRankChipStyle">V{{ sponsor?.vRank }}</text>
+            <view v-if="sponsor?.vRank" class="flex items-center" style="gap: 6px; margin-top: 4px; flex-wrap: wrap">
+              <text :style="vRankChipStyle">V{{ sponsor.vRank }}</text>
             </view>
           </view>
         </view>
       </view>
 
-      <!-- Gift hero: remote promotion is rendered only after the server preview succeeds. -->
+      <!-- Gift hero: every new account gets the newcomer gift, so it follows the gated reward config with or without a code. -->
       <view v-if="rewardEnabled" class="nx-glass-card text-center relative overflow-hidden" :style="giftCardStyle">
         <text class="block" :style="giftLabelStyle">{{ t.ref.welcomeGift }}</text>
         <view class="flex items-baseline justify-center" style="gap: 6px; margin-top: 8px">
@@ -52,7 +52,7 @@
       </view>
 
       <!-- What you get -->
-      <view v-if="!remoteApiEnabled || remotePreview" class="nx-glass-card" :style="perksCardStyle">
+      <view class="nx-glass-card" :style="perksCardStyle">
         <view v-for="(p, i) in perks" :key="p.key" class="flex items-center" :style="perkRowStyle(i !== perks.length - 1)">
           <view class="grid place-items-center shrink-0" :style="perkIconBoxStyle(p.tint)">
             <view v-html="p.icon" />
@@ -172,17 +172,11 @@ const joinersText = computed(() => {
 });
 const auth = useAuth();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();
-const rewardEnabled = computed(() => remoteApiEnabled
-  ? !!remotePreview.value && remotePreview.value.gift.status !== "DISABLED"
-  : cfg.config.rewards.enabled);
+const rewardEnabled = computed(() => cfg.config.rewards.enabled);
 const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
-// 礼包金额单源派生自服务端预览或已过 H8 闸门的 platform config。
-const giftUsdt = computed(() => remoteApiEnabled
-  ? (rewardEnabled.value ? remotePreview.value?.gift.usdtAmount ?? 0 : 0)
-  : localGift.value.usdtAmount);
-const giftNex = computed(() => remoteApiEnabled
-  ? (rewardEnabled.value ? remotePreview.value?.gift.nexAmount ?? 0 : 0)
-  : localGift.value.nexAmount);
+// 新人礼包不再需要邀请人：金额单源派生自已过 H8 闸门的 platform config（远程模式已合并 /api/config/referral-rewards）。
+const giftUsdt = computed(() => localGift.value.usdtAmount);
+const giftNex = computed(() => localGift.value.nexAmount);
 const referralCta = computed(() => referralCtaMode(remoteApiEnabled, remotePreviewState.value));
 const referralAttribution = computed(() => resolveReferralAttributionCode(
   remoteApiEnabled,
@@ -240,7 +234,7 @@ const codeUpper = computed(() => code.value.toUpperCase());
 const sponsor = computed(() => {
   if (remoteApiEnabled) {
     const value = remotePreview.value?.sponsor;
-    return value ? { name: value.displayName, vRank: value.vRank.replace(/^V/i, "") } : null;
+    return value ? { name: value.displayName, vRank: value.vRank?.replace(/^V/i, "") ?? null } : null;
   }
   return code.value ? pickSponsor(code.value) : null;
 });

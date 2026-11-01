@@ -22,7 +22,7 @@
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.displayName }}</text> {{ t.ref.invitedYou }}</text>
           <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} UVT</text>
         </view>
-        <text class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
+        <text v-if="sponsorPreview.vRank" class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
       </view>
 
       <!-- Step dots -->
@@ -92,7 +92,8 @@
               </view>
               <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
             </view>
-            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" confirm-type="done" @input="onInvite" @confirm="onCta" />
+            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
+            <text v-if="inviteInvalid" id="register-invite-error" class="rg-invite__err" role="alert">{{ t.register.inviteInvalid }}</text>
           </view>
         </view>
 
@@ -184,7 +185,7 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { apiClient, apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
 import type { OAuthProvider, RegistrationRequest } from "@/api/auth-api";
-import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
+import { createPublicSponsorPreviewApi } from "@/api/public-sponsor-preview-api";
 import { registerMockAuthCredential } from "@/api/mock-auth-api";
 import { registerAndLogin, requiresOriginalRegistrationRecovery } from "@/auth/registration-auto-login";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
@@ -218,18 +219,14 @@ const bills = useBills();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();
 const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
-// 礼包金额单源派生自 platform config(禁本地常量镜像)。
-const remotePreview = ref<PublicSponsorPreview | null>(null);
+// 礼包金额单源派生自 platform config(禁本地常量镜像)；远程模式已合并 /api/config/referral-rewards。
+// 新人礼包不再需要邀请人，无邀请码时同样读取。
 const localGift = computed(() => visibleReferralGift(cfg.config.rewards));
-// H8 闸门或邀请预览未确认金额时，注册页不承诺新人奖励。
+// H8 闸门关闭或未配置金额时，注册页不承诺新人奖励。
 const rewardGateEnabled = computed(() => cfg.config.rewards.enabled);
 const newcomerSubtitle = computed(() => newcomerSubtitleKind(rewardGateEnabled.value, giftUsdt.value, giftNex.value));
-const giftUsdt = computed(() => remoteApiEnabled
-  ? remotePreview.value?.gift.usdtAmount ?? 0
-  : localGift.value.usdtAmount);
-const giftNex = computed(() => remoteApiEnabled
-  ? remotePreview.value?.gift.nexAmount ?? 0
-  : localGift.value.nexAmount);
+const giftUsdt = computed(() => localGift.value.usdtAmount);
+const giftNex = computed(() => localGift.value.nexAmount);
 const giftLabel = computed(() => [
   giftUsdt.value > 0 ? `${formatAmount(giftUsdt.value)} USDT` : "",
   giftNex.value > 0 ? `${formatAmount(giftNex.value)} UVT` : "",
@@ -253,6 +250,9 @@ const phone = ref("");
 const code = ref<string[]>(["", "", "", "", "", ""]);
 const focusIdx = ref(0);
 const invite = ref("");
+// The server refused the typed or linked code; shown under the invite field until the user edits it.
+const inviteInvalid = ref(false);
+const checkingInvite = ref(false);
 const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
@@ -284,7 +284,7 @@ let sponsorPreviewLoadVersion = 0;
 // [FEAT-SHARE4] 链接来源码(?ref > pendingRefCode)合法即锁定;非法/缺失视同
 // 无码,回到可手输。锁定后无任何解锁入口(防截断归因/换码自荐)。
 const lockedRef = ref<string | null>(null);
-type SponsorPreview = { displayName: string; vRank: string };
+type SponsorPreview = { displayName: string; vRank: string | null };
 const sponsorPreview = ref<SponsorPreview | null>(null);
 
 onLoad(async (options) => {
@@ -292,7 +292,6 @@ onLoad(async (options) => {
   privacyHref.value = privacyPolicyHref("/pages/register/register", raw);
   if (remoteApiEnabled) {
     const previewLoadVersion = ++sponsorPreviewLoadVersion;
-    remotePreview.value = null;
     lockedRef.value = null;
     sponsorPreview.value = null;
     const norm = normalizeRegistrationSponsorCode(raw, true);
@@ -300,12 +299,10 @@ onLoad(async (options) => {
     try {
       const preview = await publicSponsorPreviewApi.preview(norm);
       if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
-      remotePreview.value = preview;
       lockedRef.value = preview.code;
       sponsorPreview.value = preview.sponsor;
     } catch {
       if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
-      remotePreview.value = null;
       lockedRef.value = null;
       sponsorPreview.value = null;
     }
@@ -339,7 +336,7 @@ const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
-const busy = computed(() => verifying.value || completing.value);
+const busy = computed(() => verifying.value || completing.value || checkingInvite.value);
 const originalRegistrationRecoveryRequired = computed(() => requiresOriginalRegistrationRecovery(authApi,
   { countryCode: country.value, phone: phoneClean.value }));
 const ctaEnabled = computed(() => !registrationNeedsLogin.value && !originalRegistrationRecoveryRequired.value
@@ -451,7 +448,7 @@ function onPhone(e: Event) {
   otpRequestId.value = null;
   verifiedToken.value = null;
 }
-function onInvite(e: Event) { invite.value = inputVal(e); error.value = null; registrationRisk.value = null; }
+function onInvite(e: Event) { invite.value = inputVal(e); inviteInvalid.value = false; error.value = null; registrationRisk.value = null; }
 function onCode(i: number, e: Event) {
   const digits = inputVal(e).replace(/\D/g, "");
   const next = [...code.value];
@@ -494,6 +491,29 @@ function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = t.value.register.errorInvalidPhone; return; }
   void requestCode();
+}
+// Lite keeps the invite field on the OTP step, so a typed code is checked before
+// password setup: the server consumes the OTP before it rejects the code. A link code
+// was already previewed when it was locked. Only an explicit not-found/invalid
+// answer blocks; a failed check is no verdict, and registration still validates the code.
+async function manualInviteAccepted(): Promise<boolean> {
+  const typed = invite.value;
+  if (!remoteApiEnabled || lockedRef.value || !typed.trim()) return true;
+  const sponsorCode = normalizeRegistrationSponsorCode(typed, true);
+  if (!sponsorCode) { inviteInvalid.value = true; return false; }
+  checkingInvite.value = true;
+  try {
+    await publicSponsorPreviewApi.preview(sponsorCode);
+  } catch (cause) {
+    if (cause instanceof ApiError && ["REFERRAL_PREVIEW_INVALID", "REFERRAL_PREVIEW_NOT_FOUND"].includes(cause.message)) {
+      if (mounted && invite.value === typed) inviteInvalid.value = true;
+      return false;
+    }
+  } finally {
+    checkingInvite.value = false;
+  }
+  // The user edited the code while it was being checked; let them submit again.
+  return mounted && invite.value === typed;
 }
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
 async function requestCode(captchaTicket?: string) {
@@ -599,8 +619,9 @@ function recoverRejectedRegistration(cause: unknown): boolean {
   if (!(cause instanceof ApiError) || cause.kind !== "http") return false;
   const invalidOtp = cause.status === 422 && cause.message === "USER_REGISTRATION_OTP_INVALID";
   const signupLimited = cause.status === 409 && cause.message === "USER_REGISTRATION_K1_IP_LIMIT";
-  if (!invalidOtp && !signupLimited) return false;
-  // Both refusals leave no new account; the challenge cannot be reused.
+  const sponsorRejected = cause.message === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || cause.message === "USER_REGISTRATION_SPONSOR_INVALID";
+  if (!invalidOtp && !signupLimited && !sponsorRejected) return false;
+  // These refusals leave no new account; the challenge cannot be reused.
   // A user-requested resend must still pass the normal CAPTCHA and rate limits.
   invalidateOtpFlow();
   otpRequestId.value = null;
@@ -610,13 +631,24 @@ function recoverRejectedRegistration(cause: unknown): boolean {
   if (resendTimer) clearInterval(resendTimer);
   resendTimer = undefined;
   resendLeft.value = 0;
-  step.value = invalidOtp ? 2 : 1;
+  // The invite field and resend live on step 2 in Lite.
+  step.value = invalidOtp || sponsorRejected ? 2 : 1;
+  if (sponsorRejected) {
+    // A link code can stop working after it was locked; reopen the field so the user can fix or clear it.
+    if (lockedRef.value) {
+      invite.value = lockedRef.value;
+      lockedRef.value = null;
+      sponsorPreview.value = null;
+    }
+    inviteInvalid.value = true;
+    return true;
+  }
   error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired : t.value.register.errorSignupLimited;
   return true;
 }
 
 async function verifyCode() {
-  if (verifying.value) return;
+  if (verifying.value || checkingInvite.value) return;
   error.value = null;
   if (!remoteApiEnabled && verifiedToken.value) {
     verifying.value = true;
@@ -629,6 +661,7 @@ async function verifyCode() {
   if (remoteApiEnabled) {
     const requestId = otpRequestId.value;
     if (!requestId) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+    if (!(await manualInviteAccepted())) return;
     const phoneAtVerify = fullPhone.value;
     const codeAtVerify = codeStr.value;
     const flowVersion = otpFlowVersion;
@@ -1046,6 +1079,7 @@ onUnmounted(() => cleanup());
 .rg-locked { display: flex; align-items: center; gap: 8px; background: #0A0A0A; border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; opacity: 0.9; }
 .rg-locked__code { flex: 1; font-size: 15px; color: var(--text-muted); font-family: var(--font-jet-mono), ui-monospace, monospace; letter-spacing: 0.04em; }
 .rg-locked__tag { display: block; margin-top: 8px; padding: 0 4px; font-size: 12px; color: var(--v5-brand); }
+.rg-invite__err { display: block; margin-top: 8px; padding: 0 4px; font-size: 12px; color: var(--v5-brand-2); }
 .rg-step3 { display: flex; flex-direction: column; gap: 12px; }
 /* 《03》§3 零 border:填充容器不描边(2026-08-15 zero-border 门抓获存量);错误态改 soft tint 表达。 */
 .rg-field { background: var(--v5-surface); border-radius: 16px; height: 56px; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
