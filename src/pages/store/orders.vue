@@ -105,6 +105,7 @@ import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
+import { refreshProductCatalog } from "@/store/product-catalog";
 import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
 import {
   createRemoteOrdersRefresh,
@@ -226,6 +227,7 @@ useManualScrollLoadMore(scrollAnchor, {
 });
 onShow(() => {
   ordersPageActive = true;
+  void refreshProductCatalog();
   preserveOrdersOriginInH5();
   void refreshOrders();
 });

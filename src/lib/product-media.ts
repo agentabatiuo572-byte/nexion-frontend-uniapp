@@ -1,26 +1,19 @@
-/** Bundled artwork only. This does not replace the server's product or holding identity. */
+import { getProduct } from "@/mock/products";
+import { productCatalogState } from "@/store/product-catalog";
+
 const ROOT = "/static/img/products/uvel-v3";
 
-export const PRODUCT_MEDIA = {
-  "stellarbox-s1": { src: `${ROOT}/stellarbox-s1.png`, tierCode: "S1" },
-  "stellarbox-pro": { src: `${ROOT}/stellarbox-pro.png`, tierCode: "Pro" },
-  "stellarbox-pro-v2": { src: `${ROOT}/stellarbox-pro-v2.png`, tierCode: "Pro v2" },
-  "stellarrack-p1": { src: `${ROOT}/stellarrack-p1.png`, tierCode: "Rack P1" },
-  "stellarrack-p2": { src: `${ROOT}/stellarrack-p2.png`, tierCode: "Rack P2" },
-  "cloud-share": { src: `${ROOT}/cloud-share.png`, tierCode: "Cloud Share" },
-} as const;
-
-export type ProductMediaId = keyof typeof PRODUCT_MEDIA;
-
+/** SKU images come only from the same approved catalog used by the storefront. */
 export function getProductMedia(id: string | null | undefined) {
-  return id && Object.prototype.hasOwnProperty.call(PRODUCT_MEDIA, id)
-    ? PRODUCT_MEDIA[id as ProductMediaId]
-    : null;
+  if (!id) return null;
+  const product = productCatalogState.status === "ready" ? getProduct(id) ?? getProduct(id.toLowerCase()) : undefined;
+  const current = product;
+  return current?.imageUrl ? { src: current.imageUrl, tierCode: current.tier } : null;
 }
 
 /** Historical trade-in snapshots can append a quantity to the SKU. Artwork only; never rewrite order identity. */
 export function getOrderProductMedia(productNo: string, lineItems?: readonly { sku: string }[]) {
-  return getProductMedia(lineItems?.[0]?.sku) ?? getProductMedia(productNo.replace(/×[1-9]\d*$/, ""));
+  return getProductMedia(lineItems?.[0]?.sku ?? productNo.replace(/×[1-9]\d*$/, ""));
 }
 
 // Genesis is an independent entitlement, never a seventh device SKU.

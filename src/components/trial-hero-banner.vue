@@ -5,7 +5,7 @@
     @click="onClick"  @keydown.enter.prevent="onClick" @keydown.space.prevent="onClick">
     <view class="nx-home-glass-panel" aria-hidden="true" />
     <view class="trial-aura" aria-hidden="true" />
-    <view class="trial-art nx-home-art-float" aria-hidden="true"><view class="nx-home-art" /></view>
+    <view class="trial-art nx-home-art-float" aria-hidden="true"><image v-if="trialImage" class="nx-home-art" :src="trialImage" mode="aspectFit" /></view>
     <view class="trial-meta">
       <text class="trial-badge">{{ t.trial.heroBadge }}</text>
       <text class="trial-title">{{ t.trial.heroDeviceName }}</text>
@@ -29,9 +29,10 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { getProductMedia } from "@/lib/product-media";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { useFreeTrial } from "@/store/free-trial";
-import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
+import { useTrialConfig, computeTrialOffset, resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -52,6 +53,7 @@ watch(inView, (v) => {
 const eligibility = computed(() => trial.eligibility());
 const canClaim = computed(() => trial.status === "none"
   && (eligibility.value.ok || trial.confirmedOfferState() === "claimable"));
+const trialImage = computed(() => getProductMedia(resolveTrialCheckoutProductId(trialCfg.config?.trialProductId))?.src);
 const productUnavailable = computed(() => eligibility.value.reason === "product-unavailable");
 const visible = computed(() => trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0
@@ -182,7 +184,7 @@ function retryEligibility() {
 .trial-cta text { white-space: normal; overflow-wrap: anywhere; }
 .trial-cta svg { flex: none; }
 .trial-art { position: absolute; width: 43%; aspect-ratio: 1; right: 0; top: 50%; margin-top: -21.5%; pointer-events: none; }
-.trial-art .nx-home-art { width: 100%; height: 100%; background-image: url('/static/img/home-glass-20260928/s1.webp'); }
+.trial-art .nx-home-art { width: 100%; height: 100%; background-image: none; }
 .trial-aura { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(ellipse at 83% 54%, color-mix(in srgb, var(--v5-brand) 12%, transparent), transparent 65%); }
 @media (max-width: 350px) {
   .nx-trial-hero { padding: 18px; }
