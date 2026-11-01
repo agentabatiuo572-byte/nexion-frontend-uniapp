@@ -85,7 +85,7 @@ export interface AuthApi {
   pendingLogin(): boolean;
   pendingLoginContext(): { authMethod: string; context: Record<string, string | null>; pending: boolean } | null;
   cancelLoginChallenge(): void;
-  recoverLogin(): Promise<LoginResult>;
+  recoverLogin(): Promise<Extract<LoginResult, { kind: "authenticated" }>>;
   retryLogin(credentials: { password?: string; code?: string; captchaTicket?: string }): Promise<LoginResult>;
   login(request: PasswordLoginRequest): Promise<LoginResult>;
   sendLoginOtp(request: RegistrationOtpRequest): Promise<LoginOtpResult>;
@@ -448,7 +448,10 @@ export function createAuthApi(
       // A missing/in-progress result never authorizes a fresh attempt.
       if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
       const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
-      if (result.kind === "authenticated") attempts.complete(attempt);
+      // Recovery only reads issued sessions. A challenge here cannot prove the
+      // original login was unissued, so preserve the unresolved attempt.
+      if (result.kind !== "authenticated") throw new ApiError({ kind: "protocol", message: "LOGIN_RECOVERY_RESPONSE_INVALID" });
+      attempts.complete(attempt);
       return result;
     },
     async completeProviderLogin(request, expectedRevision) {
