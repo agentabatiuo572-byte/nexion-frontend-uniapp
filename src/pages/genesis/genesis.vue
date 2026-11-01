@@ -3,7 +3,8 @@
   <AppChassis active="me">
     <SubPageHeader back="/pages/me/me" />
     <view class="genesis-page">
-      <image class="genesis-main-art" src="/static/img/genesis/obsidian-dark.webp" mode="aspectFill" :aria-label="t.genesis.heroTitle" />
+      <!-- 主视觉 = 透明底创世卡片图(环绕光圈 + 底座后方的地面光影),深浅主题各一张,由 CSS 按 data-theme 切换,只加载当前主题那张。 -->
+      <view class="genesis-main-art" role="img" :aria-label="t.genesis.heroTitle" />
       <view class="genesis-seat genesis-edge">
         <view class="flex items-center justify-between" style="gap:8px">
           <view class="genesis-crown-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z"/></svg><text>{{ t.genesis.heroCrown }}</text></view>
@@ -338,9 +339,9 @@ function goMarketplace() {
 
 <style scoped>
 .genesis-page { padding:3px 16px 120px; color:var(--v5-ink); --genesis-soft:color-mix(in srgb,var(--v5-genesis-gold) 16%,transparent); }
-.genesis-main-art { display:block; width:100%; height:300px; aspect-ratio:auto; border-radius:var(--v5-radius-xl); background:var(--v5-bg); }
-.genesis-main-art :deep(.genesis-artwork__image) { object-fit:cover; }
-.genesis-seat { position:relative; margin:-36px 12px 0; padding:18px 18px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
+.genesis-main-art { display:block; width:calc(100% + 32px); margin:0 -16px; aspect-ratio:1366 / 1254; background:url("/static/img/genesis/genesis-card-dark.webp") center / contain no-repeat; }
+[data-theme="light"] .genesis-main-art { background-image:url("/static/img/genesis/genesis-card-light.webp"); }
+.genesis-seat { position:relative; margin:-24px 12px 0; padding:18px 18px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
 .genesis-edge::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 160deg,transparent 0 40%,color-mix(in srgb,var(--v5-genesis-gold) 85%,transparent) 66%,transparent 92%); mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); mask-composite:exclude; pointer-events:none; }
 .genesis-crown-chip { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:var(--v5-radius-full); background:var(--genesis-soft); color:var(--v5-genesis-gold); font-size:12px; line-height:16px; font-weight:500; }
 .genesis-how { display:flex; align-items:center; min-height:44px; margin-block:-10px; font-size:13px; line-height:18px; font-weight:500; color:var(--v5-genesis-gold); }
