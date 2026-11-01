@@ -43,8 +43,9 @@ import { useLocaleStore } from "@/store/locale";
 import { ApiError } from "@/api/errors";
 import { listenForNativeOAuthReturn, validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth-browser-return";
 
-const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null }>(), {
-  intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null,
+// beforeStart lets the host page veto a start (e.g. an invalid typed invite code) before the provider opens.
+const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null }>(), {
+  intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null, beforeStart: null,
 });
 const t = useT();
 const emit = defineEmits<{ (event: "busy", busy: boolean): void }>();
@@ -112,6 +113,7 @@ function cancelFromUser() {
 function errorMessage(cause: unknown): string {
   const error = cause instanceof ApiError ? cause.message : "";
   if (error === "OAUTH_ACCOUNT_LINK_REQUIRED") return t.value.thirdParty.linkRequired;
+  if (error === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || error === "USER_REGISTRATION_SPONSOR_INVALID") return t.value.register.inviteInvalid;
   if (error?.startsWith("USER_REGISTRATION_SPONSOR_")) return t.value.register.sponsorEnvironmentMismatch;
   if (error === "OAUTH_LINK_PASSWORD_INVALID") return t.value.thirdParty.passwordInvalid;
   if (error === "OAUTH_IDENTITY_ALREADY_LINKED" || error === "OAUTH_PROVIDER_ALREADY_LINKED")
@@ -135,6 +137,8 @@ async function start(name: string) {
   if (!popup) { message.value = t.value.thirdParty.popupBlocked; submitting.value = false; emit("busy", false); return; }
   // #endif
   try {
+    // The popup above is only a blank reservation; a veto closes it before any provider page loads.
+    if (props.beforeStart && !(await props.beforeStart())) { cancel(); return; }
     const next = await api.start(provider, props.intent, props.sponsorCode);
     if (disposed || current !== generation || !sameSession()) { cancel(); return; }
     flow.value = next; expiresAt = Date.now() + next.expiresInSec * 1000;

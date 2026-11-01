@@ -3,8 +3,10 @@ import { ApiError } from "./errors";
 
 export type PublicSponsorPreview = {
   code: string;
+  // USER is a friend's code; ADVISOR is a support advisor's code, which has no V rank.
+  kind: "USER" | "ADVISOR";
   sourceEnvironment: "PRODUCTION";
-  sponsor: { displayName: string; vRank: string };
+  sponsor: { displayName: string; vRank: string | null };
   gift: { status: "DISABLED" | "PENDING_REVIEW" | "POSTED"; usdtAmount: number; nexAmount: number };
 };
 
@@ -32,22 +34,27 @@ export function parsePublicSponsorPreview(value: unknown): PublicSponsorPreview 
   const sponsor = object(row?.sponsor);
   const gift = object(row?.gift);
   const code = text(row?.code);
+  // Backends before the advisor-code release omit `kind`; those previews are friend codes.
+  const kind = row && "kind" in row ? row.kind : "USER";
   const sourceEnvironment = text(row?.sourceEnvironment)?.toUpperCase();
   const displayName = text(sponsor?.displayName);
   const vRank = text(sponsor?.vRank);
+  const vRankOk = vRank !== null || (kind === "ADVISOR" && sponsor?.vRank === null);
   const status = text(gift?.status)?.toUpperCase();
   const usdtAmount = amount(gift?.usdtAmount);
   const nexAmount = amount(gift?.nexAmount);
-  if (!row || !sponsor || !gift || !exactKeys(row, ["code", "sourceEnvironment", "sponsor", "gift"])
+  if (!row || !sponsor || !gift
+      || !exactKeys(row, ["code", "sourceEnvironment", "sponsor", "gift", ...("kind" in row ? ["kind"] : [])])
+      || (kind !== "USER" && kind !== "ADVISOR")
       || !exactKeys(sponsor, ["displayName", "vRank"])
       || !exactKeys(gift, ["status", "usdtAmount", "nexAmount"])
       || !code || !REMOTE_REFERRAL_CODE_RE.test(code)
       || sourceEnvironment !== "PRODUCTION"
-      || !displayName || !vRank
+      || !displayName || !vRankOk
       || (status !== "DISABLED" && status !== "PENDING_REVIEW" && status !== "POSTED")
       || (status === "DISABLED" && (usdtAmount !== 0 || nexAmount !== 0))
       || usdtAmount === null || nexAmount === null) return invalid();
-  return { code, sourceEnvironment, sponsor: { displayName, vRank },
+  return { code, kind, sourceEnvironment, sponsor: { displayName, vRank },
     gift: { status, usdtAmount, nexAmount } };
 }
 
