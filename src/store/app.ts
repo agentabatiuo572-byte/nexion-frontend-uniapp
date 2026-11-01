@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import type { Device, CurrentTask, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
+import { TASK_CATEGORY_LABEL } from "./types";
 import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned, installCanonicalLifecycleConfig } from "./device-lifecycle";
@@ -763,7 +764,8 @@ export const useApp = defineStore("app", () => {
     return {
       id: task.taskNo,
       category: task.taskClass,
-      type: task.taskName,
+      // Job names show in English in every language (the server's taskName is one admin-set string, not localized).
+      type: TASK_CATEGORY_LABEL[task.taskClass],
       model: task.model,
       client: task.client,
       location,
