@@ -236,7 +236,7 @@ function retryEligibility() {
 .hb-half__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
 .hb-half__foot { display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;min-height:52px;padding:4px 10px 4px 14px; }
 .hb-perf { position:relative;margin:0 14px;border-top:1px dashed var(--v5-border-strong); }
-.hb-perf::before,.hb-perf::after { content:"";position:absolute;top:-9px;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--v5-border); }
+.hb-perf::before,.hb-perf::after { content:"";position:absolute;top:-9px;box-sizing:content-box;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--v5-border); }
 .hb-perf::before { left:-23px; }
 .hb-perf::after { right:-23px; }
 .hb-rule { height:1px;margin:0 14px;background:var(--v5-border); }
@@ -247,7 +247,7 @@ function retryEligibility() {
 .hb-wv__txt { flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:12px 8px 12px 4px; }
 .hb-wv__amount { font-size:32px;line-height:38px; }
 .hb-vperf { position:relative;align-self:stretch;margin:14px 0;border-left:1px dashed var(--v5-border-strong); }
-.hb-vperf::before,.hb-vperf::after { content:"";position:absolute;left:-9px;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--v5-border); }
+.hb-vperf::before,.hb-vperf::after { content:"";position:absolute;left:-9px;box-sizing:content-box;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--v5-border); }
 .hb-vperf::before { top:-23px; }
 .hb-vperf::after { bottom:-23px; }
 .hb-wv__stub { flex:none;display:flex;align-items:center;justify-content:center;width:92px; }
@@ -290,6 +290,8 @@ function retryEligibility() {
   .hb-half__top { height:66px;padding:6px 0 0 4px; }
   .hb-half__art { width:72px;height:72px; }
   .hb-half__main,.hb-half__foot { padding-left:12px; }
+  .hb-half__foot { gap:4px;padding-right:8px; }
+  .hb-half__foot .hb-pill { padding-inline:11px; }
   .hb-half__amount,.hb-wv__amount { font-size:28px;line-height:34px; }
   .hb-wv__art { width:64px;height:64px;margin-left:4px; }
   .hb-wv__stub { width:80px; }
