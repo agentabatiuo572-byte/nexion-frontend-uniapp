@@ -68,6 +68,7 @@ const server=http.createServer(async(req,res)=>{
     }
     const trustPage=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(whitepaper|incorporation|msb|ein)\/pages\/([1-9][0-9]?)$/);
     if(trustPage&&process.env.DEMO_TRUST_DOCUMENTS_DIR){res.setHeader('Content-Type','image/jpeg');return res.end(await readFile(path.join(process.env.DEMO_TRUST_DOCUMENTS_DIR,'pages',trustPage[1],`${trustPage[2]}.jpg`)));}
+    if(url.pathname==='/api/app/support/advisor/avatar/1'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(import.meta.dirname,'fixtures/demo-advisor-photo.webp')));}
     if(url.pathname==='/api/app/support/attachments/demo-image/content'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(root,'static/img/home-glass-20260928/s1.webp')));}
     if(/^\/(api|auth)\//.test(url.pathname)) {
       if(checkoutFlow?.handles(url.pathname)){

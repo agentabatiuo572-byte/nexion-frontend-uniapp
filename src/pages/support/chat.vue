@@ -29,7 +29,8 @@
 
       <view class="cp-identity">
         <LiquidGlass rendering="frosted" :radius="26" />
-        <SupportAvatar :size="40" :appearance="theme.resolved" class="cp-avatar" aria-hidden="true" />
+        <image v-if="headerPhoto" class="cp-avatar cp-avatar-photo" :src="headerPhoto" mode="aspectFill" aria-hidden="true" />
+        <SupportAvatar v-else :size="40" :appearance="theme.resolved" class="cp-avatar" aria-hidden="true" />
         <view class="cp-meta">
           <text class="cp-name">{{ headerName }}</text>
           <view v-if="headerRole" class="cp-role" :class="{ 'cp-role--online': headerRole === t.conversations.online }">
@@ -732,6 +733,21 @@ const headerRole = computed(() => {
 });
 // Never show a live dot until a human conversation has an assigned, current
 // websocket presence. Unknown, reconnecting, and offline stay visually neutral.
+// The current owner's newest verified message decides the header portrait: the
+// author photo it carries once loaded, otherwise the brand advisor portrait.
+// A transferred session keeps the old owner's rows, so it falls back too.
+const headerPhoto = computed(() => {
+  const owner = conv.value?.ownerAgentId;
+  const messages = conv.value?.messages ?? [];
+  if (!owner || advisorApplies.value || isTransferredSession.value) return undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message.sender !== "agent" || message.authorConfidence !== "VERIFIED" || String(message.senderId) !== owner) continue;
+    const key = avatarImageKey(message);
+    return key ? imageSources.value[key] : undefined;
+  }
+  return undefined;
+});
 const dotStyle = computed<CSSProperties>(() =>
   humanPresence.value.mutedDot
     ? { background: "var(--v5-ink-4)", animation: "none" }
@@ -1150,6 +1166,8 @@ const theme = useTheme();
   max-width: 100%;
 }
 .cp-avatar { position: relative; }
+.cp-avatar-photo { display: block; flex-shrink: 0; width: 40px; height: 40px; border-radius: 999px; box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .12), 0 4px 10px rgba(0, 0, 0, .35); }
+:global([data-theme="light"] .cp-avatar-photo) { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--v5-ink) 8%, transparent), 0 4px 10px rgba(0, 0, 0, .12); }
 .cp-meta {
   min-width: 0;
   position: relative; text-align: left;
