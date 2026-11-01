@@ -10,6 +10,14 @@ describe("wallet summary and paginated API contract", () => {
     amount: "1299", balanceAfter: "1299", status: "SUCCESS", remark: "internal operator/reason/key",
     createdAt: "2026-10-07T04:46:45Z", category: "refund", presentationCode: "orderRefund", publicReference: orderNo, ...fields,
   });
+  it.each(["UVT", "NEX"])("reads %s wire assets through the existing H5 token model", asset => {
+    const wire = refund({ asset, amount: "0.000001", balanceAfter: "1.000001" });
+    expect(parseWalletBillsSnapshot({ ...snapshot(), total: 1, bills: [wire] }).bills[0])
+      .toMatchObject({ asset: "NEX", amount: 0.000001, amountExact: "0.000001" });
+    expect(parseWalletBillsSummary({ ...summary(), recentNexBills: [wire] }).recentNexBills[0].asset).toBe("NEX");
+    expect(() => parseWalletBillsSnapshot({ ...snapshot(), total: 1, bills: [refund({ asset: "BTC" })] }))
+      .toThrow("WALLET_BILLS_RESPONSE_INVALID");
+  });
   it.each([" ", "\n", "\r\n"])("preserves raw order refund reference whitespace %j for strict consumer validation", whitespace => {
     for (const leading of [true, false]) {
       const bizNo = leading ? `${whitespace}E4-REFUND-${orderNo}` : `E4-REFUND-${orderNo}${whitespace}`;

@@ -91,7 +91,8 @@ function bill(value: unknown): WalletBillRow {
   const id = text(row?.id);
   const bizNo = text(row?.bizNo);
   const bizType = text(row?.bizType);
-  const asset = text(row?.asset)?.toUpperCase();
+  const wireAsset = text(row?.asset)?.toUpperCase();
+  const asset = wireAsset === "UVT" ? "NEX" : wireAsset;
   const direction = text(row?.direction)?.toUpperCase();
   const amount = money(row?.amount);
   const balanceAfter = money(row?.balanceAfter);
