@@ -573,7 +573,7 @@ sandboxSponsorEnvironmentMismatch: "该邀请码不可用,请核对后重试",
     doMathDaily: "每日",
     doMathPayback: "回本",
     doMathVs: "对比 {base}",
-    doMathSeeCta: "查看测算",
+    doMathSeeCta: "去升级",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "收益流水",
     earningsLedgerViewAll: "查看全部",

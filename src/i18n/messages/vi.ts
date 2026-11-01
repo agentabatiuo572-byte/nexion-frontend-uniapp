@@ -586,7 +586,7 @@ sandboxSponsorEnvironmentMismatch: "Mã mời này không dùng được. Kiểm
     doMathDaily: "mỗi ngày",
     doMathPayback: "hoàn vốn",
     doMathVs: "so với {base}",
-    doMathSeeCta: "Xem cách tính",
+    doMathSeeCta: "Nâng cấp",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "Sổ thu nhập",
     earningsLedgerViewAll: "Xem tất cả",
