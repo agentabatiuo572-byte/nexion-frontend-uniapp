@@ -624,10 +624,9 @@ function scroller(): HTMLElement | undefined {
 function onThreadScroll(event: { detail: { scrollTop: number; scrollHeight?: number } }) {
   if (stopPreviewPreparation) { nativePreviewReading = null; clearPreviewRowHeights(); }
   pendingTailGeneration = undefined;
-  // Mirror the native position so a later prepend can reapply the same target.
+  // Observe gestures without turning delayed App scroll events back into scroll commands.
   if (pendingPosition) pendingPosition.top += event.detail.scrollTop - lastScrollTop;
   lastScrollTop = event.detail.scrollTop;
-  scrollTop.value = lastScrollTop;
   const node = scroller();
   if (node) followingTail = node.scrollHeight - node.clientHeight - node.scrollTop <= 24;
   else if (event.detail.scrollHeight !== undefined && measuredViewportHeight > 0)
@@ -750,8 +749,15 @@ function preservePosition(previousInset: number, firstId?: string) {
     Math.max(0, adjustment.expiresAt - Date.now()));
   const apply = (delta: number) => {
     if (!current() || !Number.isFinite(delta)) return;
-    settlePosition(true);
     const nextTop = preservedConversationTop(adjustment.top, delta), target = scroller();
+    // Native props only react to a changed value. Rearm a repeated restoration
+    // at the observed position only when issuing that command, never on gestures.
+    if (!target && scrollTop.value === nextTop && lastScrollTop !== nextTop) {
+      scrollTop.value = lastScrollTop;
+      void nextTick(() => apply(delta));
+      return;
+    }
+    settlePosition(true);
     if (target) target.scrollTop = nextTop;
     scrollTop.value = nextTop; lastScrollTop = nextTop;
     scheduleBubblePositions();
