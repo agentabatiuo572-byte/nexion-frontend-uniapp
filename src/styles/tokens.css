@@ -588,13 +588,6 @@ body {
   .nx-viz-motion, .nx-viz-motion * { transition: none !important; }
 }
 
-/* Support avatar halo pulse — outward brand ring. Used by <support-avatar pulse>. */
-@keyframes v5-support-halo {
-  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--v5-brand) 60%, transparent); }
-  70%  { box-shadow: 0 0 0 10px color-mix(in oklab, var(--v5-brand) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--v5-brand) 0%, transparent); }
-}
-
 /* CardStagger entrance — fade + slide-up, replayed via animation-delay per
    nth-child (replaces framer-motion staggerChildren). Honors reduced-motion. */
 @keyframes nx-card-stagger-in {

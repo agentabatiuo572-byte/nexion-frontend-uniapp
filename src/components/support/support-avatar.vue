@@ -1,45 +1,31 @@
 <!--
-  SupportAvatar — the cartoon portrait on the floating support shortcut.
-
-  `size` + `pulse` (+ caller class via attr inherit). The brand-tinted ring is a
-  static boxShadow on the image; the pulse halo is a CSS ring
-  (@keyframes v5-support-halo) around the avatar.
+  SupportAvatar — the cartoon advisor portrait, shared by the floating support
+  shortcut and the chat header. Dark and light themes use their own asset.
+  The unread heartbeat lives on the shortcut button, not on the portrait.
 -->
 <template>
-  <view class="relative inline-block shrink-0" :style="{ width: size + 'px', height: size + 'px' }">
-    <image
-      class="block rounded-full"
-      :src="appearance === 'light' ? '/static/img/marketing/support-avatar-light-20261026.webp' : '/static/img/marketing/support-avatar.png'"
-      mode="aspectFill"
-      :style="{
-        width: size + 'px',
-        height: size + 'px',
-        borderRadius: '9999px',
-        boxShadow:
-          '0 0 0 1.5px color-mix(in oklab, var(--v5-brand) 35%, transparent), 0 4px 10px rgba(0,0,0,0.35)',
-      }"
-    />
-    <view
-      v-if="pulse"
-      class="absolute inset-0 rounded-full pointer-events-none nx-support-halo"
-      :style="{
-        boxShadow: '0 0 0 0 color-mix(in oklab, var(--v5-brand) 60%, transparent)',
-      }"
-    />
-  </view>
+  <image
+    class="nx-support-portrait"
+    :class="{ 'nx-support-portrait--light': appearance === 'light' }"
+    :src="appearance === 'light' ? '/static/img/marketing/support-advisor-light-20261102.webp' : '/static/img/marketing/support-advisor-dark-20261102.webp'"
+    mode="aspectFill"
+    :style="{ width: size + 'px', height: size + 'px' }"
+  />
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{ size?: number; pulse?: boolean; appearance?: 'light' | 'dark' }>(), {
+withDefaults(defineProps<{ size?: number; appearance?: 'light' | 'dark' }>(), {
   size: 36,
-  pulse: false,
   appearance: 'dark',
 });
-
-
 </script>
 
 <style scoped>
-.nx-support-halo { animation: v5-support-halo 1.8s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .nx-support-halo { animation: none; } }
+.nx-support-portrait {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .12), 0 4px 10px rgba(0, 0, 0, .35);
+}
+.nx-support-portrait--light { box-shadow: 0 0 0 1.5px rgba(19, 20, 26, .08), 0 4px 10px rgba(0, 0, 0, .12); }
 </style>

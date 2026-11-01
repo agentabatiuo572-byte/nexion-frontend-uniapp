@@ -28,7 +28,8 @@
       </view>
 
       <view class="cp-identity">
-        <LiquidGlass rendering="frosted" :radius="24" />
+        <LiquidGlass rendering="frosted" :radius="26" />
+        <SupportAvatar :size="40" :appearance="theme.resolved" class="cp-avatar" aria-hidden="true" />
         <view class="cp-meta">
           <text class="cp-name">{{ headerName }}</text>
           <view v-if="headerRole" class="cp-role" :class="{ 'cp-role--online': headerRole === t.conversations.online }">
@@ -1081,6 +1082,9 @@ const historyContentKey = computed(() => JSON.stringify([remoteApiEnabled, advis
 onUnmounted(() => { topOverlayMeasureEpoch++; topOverlayObserver?.disconnect(); });
 
 import LiquidGlass from "@/components/liquid-glass.vue";
+import SupportAvatar from "@/components/support/support-avatar.vue";
+import { useTheme } from "@/store/theme";
+const theme = useTheme();
 </script>
 
 <style scoped>
@@ -1137,17 +1141,18 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 }
 .cp-head-spacer { width: 44px; height: 44px; pointer-events: none; }
 .cp-identity {
-  position: relative; min-height: 44px; padding: 5px 18px; border-radius: 24px; box-sizing: border-box;
+  position: relative; min-height: 44px; padding: 5px 18px 5px 5px; border-radius: 26px; box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   justify-self: center;
   min-width: 0;
   max-width: 100%;
 }
+.cp-avatar { position: relative; }
 .cp-meta {
   min-width: 0;
-  position: relative; text-align: center;
+  position: relative; text-align: left;
 }
 .cp-name {
   display: block;
@@ -1162,7 +1167,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 .cp-role {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
   margin-top: 2px;
 }
