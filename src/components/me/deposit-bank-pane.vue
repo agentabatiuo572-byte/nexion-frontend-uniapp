@@ -1077,18 +1077,18 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-stage { position: relative; margin: 4px -2px 0; }
 .nx-bank-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
 .nx-bank-stage__aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
-.nx-bank-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-brand) 22%, transparent); }
+.nx-bank-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
 .nx-bank-stage__aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent); }
 /* The glass carries its own copy of the aura so the colour reads through it as on the board.
    No backdrop-filter: it only took effect while the page-enter animation composited the page,
    so the slab rendered brighter for ~300ms and then dimmed. The tint below is the brighter look. */
 .nx-bank-slab { position: relative; padding: 23px 20px 20px; border-radius: 24px;
-  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 28%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 28%, transparent), transparent 70%), rgba(255,255,255,.13);
+  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 22%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent), transparent 70%), rgba(255,255,255,.13);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
 }
-[data-theme="light"] .nx-bank-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
+[data-theme="light"] .nx-bank-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
 [data-theme="light"] .nx-bank-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
-[data-theme="light"] .nx-bank-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
+[data-theme="light"] .nx-bank-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
   box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
 .nx-bank-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .nx-bank-amtrow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
@@ -1119,7 +1119,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 /* Order/credited stages open right under the header (switch and rate line hidden); 15px clears its collapsing 12px margin as on the board. */
 .nx-step-in > .nx-bank-stage:first-child { margin-top: 15px; }
 .nx-bank-pay { padding: 28px 20px 22px; text-align: center; }
-.nx-bank-slab.nx-bank-pay { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 6%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent), transparent 70%), rgba(255,255,255,.045); }
+.nx-bank-slab.nx-bank-pay { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 6%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent), transparent 70%), rgba(255,255,255,.045); }
 [data-theme="light"] .nx-bank-slab.nx-bank-pay { background: rgba(255,255,255,.58); }
 .nx-bank-ring { position: relative; width: 148px; height: 148px; margin: 0 auto; }
 .nx-bank-ring > svg { position: absolute; inset: 0; transform: rotate(-90deg); }

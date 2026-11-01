@@ -598,7 +598,7 @@ const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus
 .team-bento__card--gold { --accent: var(--v5-warning); }
 .team-bento__card--brand { --accent: var(--v5-brand); }
 .team-bento__card--cyan { --accent: var(--ui-device-ink); }
-.team-bento__card--violet { --accent: var(--v5-nex); }
+.team-bento__card--violet { --accent: var(--v5-nex); background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-warning) 12%, transparent), transparent 60%), var(--v5-surface); }
 .team-bento__card:focus-visible, .team-tool:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .team-bento__head { display: flex; align-items: center; justify-content: space-between; }
 .team-bento__icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }

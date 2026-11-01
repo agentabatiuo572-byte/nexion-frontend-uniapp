@@ -308,7 +308,7 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-gift { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 18px; color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 18%,transparent); }
 @keyframes reward-enter { from { transform: translateY(12px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .reward-tile { animation: none; } }
-.reward-tile--usdt { background: radial-gradient(ellipse at 15% 20%,color-mix(in srgb,var(--v5-brand) 10%,transparent),transparent 65%),radial-gradient(ellipse at 90% 80%,color-mix(in srgb,var(--v5-tech-cyan) 10%,transparent),transparent 65%),color-mix(in srgb,var(--v5-surface) 78%,transparent); backdrop-filter:blur(16px) saturate(140%); }
+.reward-tile--usdt { background: radial-gradient(ellipse at 15% 20%,color-mix(in srgb,var(--v5-warning) 12%,transparent),transparent 65%),radial-gradient(ellipse at 90% 80%,color-mix(in srgb,var(--v5-brand-2) 12%,transparent),transparent 65%),color-mix(in srgb,var(--v5-surface) 78%,transparent); backdrop-filter:blur(16px) saturate(140%); }
 
 /* Approved growth board geometry and material. */
  .amount-cur { font-size:.55em; color:var(--v5-ink-3); margin-right:2px; letter-spacing:0; }.amount-dec { color:var(--v5-ink-3); }
@@ -316,10 +316,10 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-tile--usdt { isolation:isolate; background:color-mix(in srgb,var(--v5-ink) 4.5%,transparent); box-shadow:var(--ui-glass-edge-shadow); padding:18px; }
 .reward-tile--usdt::before,.reward-tile--usdt::after { content:''; position:absolute; width:180px; height:140px; border-radius:50%; filter:blur(42px); pointer-events:none; z-index:-1; }
 .reward-tile--usdt::before { left:-4px; top:0px; background:color-mix(in srgb,var(--v5-brand) 40%,transparent); }
-.reward-tile--usdt::after { right:-8px; bottom:12px; background:color-mix(in srgb,var(--v5-tech-cyan) 45%,transparent); }
+.reward-tile--usdt::after { right:-8px; bottom:12px; background:color-mix(in srgb,var(--v5-brand-2) 45%,transparent); }
 .reward-tile--usdt .reward-arrow { box-shadow:var(--ui-glass-edge-shadow); background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-ink) 7%,transparent); }
 .reward-tile--uvt { box-shadow:var(--v5-glass-shadow); }
-.reward-tile--uvt::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 210deg,transparent 0 45%,color-mix(in srgb,var(--v5-nex) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
+.reward-tile--uvt::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 210deg,transparent 0 45%,color-mix(in srgb,var(--v5-warning) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
 .reward-tile--voucher .reward-tile__amount { font-family:var(--font-amount); }
 .reward-tile--promotion .reward-arrow { color:var(--v5-ink-4); }.reward-tile--promotion .reward-arrow svg { width:16px; height:16px; }
 .reward-tile--usdt .reward-tile__amount { margin-top:6px; }.reward-tile--usdt .reward-tile__desc { margin-top:4px; }
@@ -327,7 +327,7 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 
 :global([data-theme="light"] .reward-tile--usdt) {background:color-mix(in srgb,var(--v5-surface) 58%,transparent);box-shadow:var(--ui-glass-edge-shadow),var(--v5-glass-shadow);}
 :global([data-theme="light"] .reward-tile--usdt::before) {background:color-mix(in srgb,var(--v5-brand) 14%,transparent);}
-:global([data-theme="light"] .reward-tile--usdt::after) {background:color-mix(in srgb,var(--v5-tech-cyan) 16%,transparent);}
+:global([data-theme="light"] .reward-tile--usdt::after) {background:color-mix(in srgb,var(--v5-brand-2) 16%,transparent);}
 .reward-tile--uvt .reward-tile__amount,.reward-tile--uvt .reward-tile__unit {color:var(--v5-nex-ink);}
 
 .reward-tile__amount { font-variant-numeric:tabular-nums; }

@@ -333,7 +333,7 @@ function historyRowStyle(isLast: boolean): CSSProperties {
 
 <style scoped>
 .pool-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
-.pool-hero { position: relative; padding: var(--v5-space-5); border-radius: 28px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-nex) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.pool-hero { position: relative; padding: var(--v5-space-5); border-radius: 28px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-warning) 10%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .pool-label { color: var(--v5-ink); font-size: 13px; line-height: 18px; font-weight: 600; }
 .pool-hero .reward-amount { display: block; margin: var(--v5-space-1) 0 6px; font-size: 32px; line-height: 40px; font-weight: 550; letter-spacing: -.03em; overflow-wrap: anywhere; }
 .pool-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }

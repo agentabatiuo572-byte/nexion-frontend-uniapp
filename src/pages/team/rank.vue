@@ -357,7 +357,7 @@ const upcomingPeerNotice = computed(() => prog.value.next && prog.value.next.pee
 .rank-ladder-row[data-status="done"] .rank-row-sub { color:var(--v5-ink-3); }
 .rank-perk-value { font:600 22px/26px var(--font-metric);color:var(--v5-brand); }
 .rank-perk + .rank-perk .rank-perk-value { color:var(--v5-nex); }
-.rank-reward-item { padding:14px;border-radius:16px;background:radial-gradient(120% 120% at 100% 0%,color-mix(in srgb,var(--v5-nex) 16%,transparent),transparent 60%),color-mix(in srgb,var(--v5-ink) 3%,transparent); }
+.rank-reward-item { padding:14px;border-radius:16px;background:radial-gradient(120% 120% at 100% 0%,color-mix(in srgb,var(--v5-warning) 14%,transparent),transparent 60%),color-mix(in srgb,var(--v5-ink) 3%,transparent); }
 .rank-reward-summary { justify-content:space-between; }
 .rank-reward-title { font:600 13px/18px var(--font-v5);color:var(--v5-ink); }
 .rank-reward-amount { font:600 16px/20px var(--font-metric);color:var(--v5-nex); }
