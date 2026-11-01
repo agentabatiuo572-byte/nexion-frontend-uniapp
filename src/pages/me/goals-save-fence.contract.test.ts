@@ -117,6 +117,17 @@ describe("native goal save without Array.at", () => {
     } finally { scope.stop(); }
   });
 
+  it("parses a grouped editor amount and saves the unchanged numeric target", async () => {
+    const { context, page, scope } = await legacyNativePage();
+    try {
+      page.onTarget({ detail: { value: "5,000.25" } });
+      expect(page.target.value).toBe(5000.25);
+      await page.onSave();
+      expect(context.goalsStore.saves).toHaveLength(1);
+      expect(context.goalsStore.saves[0].targetUSDT).toBe(5000.25);
+    } finally { scope.stop(); }
+  });
+
   it("preserves a failed save intent for retry and then confirms success without duplicating the goal", async () => {
     const { context, page, scope } = await legacyNativePage();
     try {

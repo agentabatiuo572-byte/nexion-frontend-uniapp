@@ -1,19 +1,20 @@
 <template>
-  <AppChassis active="me">
+  <AppChassis class="growth-course-chassis" active="me">
     <view class="learning-course">
       <view v-if="displayCourse && displayCompleted && !error" class="course-result-header">
-        <view class="course-result-header__close nx-design-glass" role="button" tabindex="0" :aria-label="auditCopy.close" @click="navBack(courseBack)" @keydown.enter.prevent="navBack(courseBack)" @keydown.space.prevent="navBack(courseBack)">
+        <view class="course-result-header__close nx-design-glass" role="button" tabindex="0" :aria-label="auditCopy.close" @click="navBack(courseBack)">
           <LiquidGlass :radius="22" tone="navigation" />
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
         </view>
         <text class="course-result-header__title">{{ displayCourse.title }}</text>
       </view>
       <SubPageHeader v-else design :back="courseBack" :title="displayCourse?.title" />
+      <GrowthProgress v-if="displayCourse && !displayCompleted && !error" class="course-read-progress" :value="displayCourse.progress" :label="displayCourse.title" />
       <view v-if="loading && !displayCourse" class="course-state" role="status"><text>{{ t.learning.courseLoading }}</text></view>
       <view v-else-if="error" class="course-state" role="alert" aria-live="assertive">
         <text class="block" style="text-wrap: pretty">{{ errorText }}</text>
-        <text v-if="error === 'courseIdMissing'" class="block active:opacity-70" style="margin-top: 12px; color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses" @keydown.enter.prevent="onKeyboardActivate($event, backToCourses)" @keydown.space.prevent="onKeyboardActivate($event, backToCourses)">{{ t.learning.centerTitle }}</text>
-        <text v-else class="block active:opacity-70" style="margin-top: 12px; min-height: 44px; font: 600 13px/20px var(--font-v5); color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.ui.retry" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ t.ui.retry }}</text>
+        <text v-if="error === 'courseIdMissing'" class="block active:opacity-70" style="margin-top: var(--v5-space-3); color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses">{{ t.learning.centerTitle }}</text>
+        <text v-else class="block active:opacity-70" style="margin-top: var(--v5-space-3); min-height: 44px; font: 600 13px/20px var(--font-v5); color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.ui.retry" @click="load">{{ t.ui.retry }}</text>
       </view>
       <view v-else-if="displayCourse && displayCompleted" class="course-completed">
         <view class="course-result" role="status" aria-live="polite">
@@ -40,40 +41,44 @@
       </view>
       <view v-else-if="displayCourse" class="course-lesson">
         <text class="block" style="font-size: var(--ui-type-page-title); line-height: var(--ui-type-page-title-lh); font-weight: 600">{{ displayCourse.title }}</text>
-        <view class="course-read-progress" role="progressbar" :aria-valuenow="displayCompleted ? 100 : displayCourse.progress" aria-valuemin="0" aria-valuemax="100"><view :style="{width:(displayCompleted ? 100 : displayCourse.progress)+'%'}" /></view>
-        <text class="block" style="margin-top: 10px; color: var(--v5-ink-2); text-wrap: pretty">{{ displayCourse.body }}</text>
-        <text class="block" style="margin-top: 8px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle)">{{ versionLine }}</text>
-        <text v-if="startState === 'pending' && !warmCourseRead" class="block" style="margin-top: 8px; color: var(--v5-ink-3); text-wrap: pretty" role="status" aria-live="polite">{{ t.learning.courseStartConfirming }}</text>
-        <view v-else-if="startState === 'unconfirmed'" style="margin-top: 8px">
+        <view class="course-lesson__meta"><text>{{ courseDurationText(displayCourse.duration, t.learning.durationMinutes) }} · {{ t.privacy.version }} {{ displayCourse.version }}</text><text class="course-lesson__reward">{{ completionCopy.reward }} {{ formatAmount(displayCourse.rewardNex) }} UVT</text></view>
+        <view class="course-lesson__body"><text v-for="(paragraph, index) in displayCourse.body.split(/\n+/)" :key="index" class="course-lesson__paragraph">{{ paragraph }}</text></view>
+        <text v-if="startState === 'pending' && !warmCourseRead" class="block" style="margin-top: var(--v5-space-2); color: var(--v5-ink-3); text-wrap: pretty" role="status" aria-live="polite">{{ t.learning.courseStartConfirming }}</text>
+        <view v-else-if="startState === 'unconfirmed'" style="margin-top: var(--v5-space-2)">
           <text class="block" style="color: var(--v5-ink-3); text-wrap: pretty" role="alert" aria-live="assertive">{{ startFailureText }}</text>
-          <NxButton data-testid="learning-start-recovery" style="margin-top: 8px" variant="secondary" :label="startRecoveryLabel" @click="recoverStart" />
+          <NxButton data-testid="learning-start-recovery" style="margin-top: var(--v5-space-2)" variant="secondary" :label="startRecoveryLabel" @click="recoverStart" />
         </view>
 
-        <view v-for="(question, index) in displayCourse.questions" :key="question.questionId" style="margin-top: 16px">
+        <view v-for="(question, index) in displayCourse.questions" :key="question.questionId" style="margin-top: var(--v5-space-4)">
           <text>{{ question.question }}</text>
           <!-- 每题只能选一个答案(选第二个会把第一个取消),是单选不是多选。
                原先 role="button" + aria-pressed 被浏览器当成 toggle button,读屏按复选框朗读,
                而且没有题目级分组名 —— 用户既以为能多选,也听不出这几个选项属于哪道题。
                改用 radiogroup(组名 = 题干)+ radio + aria-checked。 -->
           <view role="radiogroup" :aria-label="question.question" :data-course-question-index="index">
-            <view v-for="(option, optionIndex) in question.options" :key="option" :class="interactionLocked ? '' : 'active:opacity-70'" style="margin-top: 8px" role="radio" :tabindex="quizOptionTabIndex(answers[index], optionIndex, question.options.length, interactionLocked || loading)" :aria-label="option" :aria-checked="answers[index] === optionIndex ? 'true' : 'false'" :aria-disabled="interactionLocked ? 'true' : 'false'" @click="selectAnswer(index, optionIndex)" @keydown.enter.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.space.prevent="onKeyboardActivate($event, () => selectAnswer(index, optionIndex))" @keydown.up.prevent="moveAnswer(index, optionIndex, -1)" @keydown.down.prevent="moveAnswer(index, optionIndex, 1)">
+            <view v-for="(option, optionIndex) in question.options" :key="option" :class="[interactionLocked ? '' : 'active:opacity-70', {'nx-frosted-button': answers[index] === optionIndex}]" style="margin-top: var(--v5-space-2)" role="radio" :tabindex="quizOptionTabIndex(answers[index], optionIndex, question.options.length, interactionLocked || loading)" :aria-label="option" :aria-checked="answers[index] === optionIndex ? 'true' : 'false'" :aria-disabled="interactionLocked ? 'true' : 'false'" @click="selectAnswer(index, optionIndex)" @keydown.up.prevent="moveAnswer(index, optionIndex, -1)" @keydown.down.prevent="moveAnswer(index, optionIndex, 1)">
               <view class="course-radio" :class="{selected: answers[index] === optionIndex}" aria-hidden="true" /><text>{{ option }}</text>
             </view>
           </view>
         </view>
 
-        <NxButton class="course-submit" v-if="!displayResultDetails || displayResultDetails.passed" style="margin-top:20px" variant="primary" :disabled="!canSubmit" :label="displayCourse.questions.length ? t.learning.submitQuiz : t.learning.completeCourse" @click="finish" />
         <text v-if="displayCourse.questions.length && !pendingAttempt && !allAnswered && !displayCompleted" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.learning.answerAllFirst }}</text>
-        <text v-if="pendingAttempt" class="block active:opacity-70" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty" role="button" tabindex="0" :aria-label="pendingStatusText" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)">{{ pendingStatusText }}</text>
+        <text v-if="pendingAttempt" class="block active:opacity-70" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty" role="button" tabindex="0" :aria-label="pendingStatusText" @click="load">{{ pendingStatusText }}</text>
         <view v-if="displayResultDetails" data-testid="learning-result-details" class="course-quiz-result" role="status"><text class="course-quiz-result__title">{{ displayResultDetails.passed ? t.learning.resultPassed : t.learning.resultFailed }}</text><text class="course-quiz-result__score">{{ scoreLine }}</text><text class="course-quiz-result__meta">{{ attemptsLine }} · {{ rewardStatusLine }}</text>
           <NxButton v-if="!displayResultDetails.passed && !interactionLocked" class="course-quiz-result__retry" variant="primary" :label="retryQuizLabel" @click="restartQuiz" />
         </view>
       </view>
     </view>
+    <template #pageFixed>
+      <view v-if="displayCourse && !displayCompleted && !error && (!displayResultDetails || displayResultDetails.passed)" class="course-sticky">
+        <NxButton class="course-submit" variant="primary" size="large" :disabled="!canSubmit" :label="displayCourse.questions.length ? t.learning.submitQuiz : t.learning.completeCourse" @click="finish" />
+      </view>
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
+import GrowthProgress from "@/components/ui/growth-progress.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { selectRecommendedCourse } from "@/lib/learning-recommendation";
@@ -601,7 +606,7 @@ onUnmounted(resetNextCourses);
 .course-submit.nx-button--disabled { opacity: 1; }
 .learning-course { --learning-reward: var(--v5-nex); padding-bottom: var(--v5-space-6); color: var(--v5-ink); font-family: var(--font-v5); }
 .learning-course :deep(.spv--design) { grid-template-columns: 56px minmax(0, 1fr) 56px; margin: 0; }
-.course-state, .course-lesson { padding: 20px 16px 0; }
+.course-state, .course-lesson { padding: var(--v5-space-5) 16px 0; }
 .course-result-header { display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; align-items: center; box-sizing: border-box; height: 56px; padding: 0 6px; }
 .course-result-header__close { position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-left: 6px; border-radius: 50%; color: var(--v5-ink-2); cursor: pointer; }
 .course-result-header__close > svg { position: relative; z-index: 1; }
@@ -621,19 +626,42 @@ onUnmounted(resetNextCourses);
 .course-next__meta { margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); overflow-wrap: anywhere; }
 .course-next__reward { color: var(--learning-reward); font-variant-numeric: tabular-nums; }
 .learning-course .course-next__cta { display: flex; box-sizing: border-box; width: 100%; min-height: 48px; margin-top: var(--v5-space-4); padding: 0; font-size: var(--ui-type-button); font-weight: 600; }
-.course-quiz-result { display:flex;flex-direction:column;gap:8px;margin-top:20px;padding-top:20px;border-top:1px solid var(--v5-border); }
+.course-quiz-result { display:flex;flex-direction:column;gap:var(--v5-space-2);margin-top:var(--v5-space-5);padding-top:20px;border-top:1px solid var(--v5-border); }
 .course-quiz-result__title { font:600 18px/25px var(--font-v5);color:var(--v5-ink); }
 .course-quiz-result__score { font:600 28px/36px var(--font-metric);font-variant-numeric:tabular-nums; }
 .course-quiz-result__meta { font:400 var(--ui-type-list-subtitle)/20px var(--font-v5);color:var(--v5-ink-2); }
-.course-quiz-result__retry { width:100%;margin-top:8px; }
-.course-next-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px; text-align: center; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); }
+.course-quiz-result__retry { width:100%;margin-top:var(--v5-space-2); }
+.course-next-state { display: flex; flex-direction: column; align-items: center; gap: var(--v5-space-2); padding: 18px; text-align: center; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); }
 .learning-course .course-result__back { display: flex; box-sizing: border-box; width: 100%; min-height: 44px; margin-top: var(--v5-space-2); padding: var(--v5-space-2) var(--v5-space-3); font-size: 14px; font-weight: 400; color: var(--v5-ink-2); }
-.course-next-state.nx-inline-recovery { display: grid; align-items: center; gap: 12px; text-align: start; }
-[role="radio"] { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 12px; border: 1px solid var(--v5-border); border-radius: 14px; font: 400 14px/1.5 var(--font-v5); }
+.course-next-state.nx-inline-recovery { display: grid; align-items: center; gap: var(--v5-space-3); text-align: start; }
+[role="radio"] { display: flex; align-items: center; gap: var(--v5-space-3); min-height: 48px; padding: var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: 14px; font: 400 14px/1.5 var(--font-v5); }
 [role="radio"][aria-checked="true"] { border-color: var(--v5-brand); background: color-mix(in srgb,var(--v5-brand) 6%,transparent); }
 .course-radio { width: 18px; height: 18px; border: 1px solid var(--v5-ink-3); border-radius: 50%; flex: none; }
 .course-radio.selected { border: 5px solid var(--v5-brand); }
-.course-read-progress { height: 4px; background: var(--v5-surface-3); margin-top:16px;border-radius:4px;overflow:hidden; }.course-read-progress > view { height:100%;background:var(--v5-brand); }
+.course-read-progress { height: 4px; background: var(--v5-surface-3); margin-top:var(--v5-space-4);border-radius:4px;overflow:hidden; }.course-read-progress > view { height:100%;background:var(--v5-brand); }
 /* Lesson text is running copy: long-form role (14px floor on small screens). */
 .learning-course .course-lesson { font-size: var(--ui-type-long-form); line-height: var(--ui-type-long-form-lh); }
+.learning-course { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }.course-read-progress { margin: 0 16px; height: 3px; }
+.course-lesson { padding: var(--v5-space-6) 20px 0; }.course-lesson > text:first-child { font: 600 24px/32px var(--font-v5) !important; }
+.course-lesson__meta { display:flex; align-items:center; flex-wrap:wrap; gap:var(--v5-space-2); margin-top:10px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.course-lesson__reward { padding: var(--v5-space-1) 8px; border-radius: var(--v5-radius-full); color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 18%,transparent); }
+.course-lesson__body { display:block; white-space:pre-line; margin-top:var(--v5-space-5); font:400 15px/24px var(--font-v5); color:var(--v5-ink-2); }
+.course-sticky { position:absolute; left:0; right:0; bottom:0; z-index:36; display:flex; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); background:linear-gradient(180deg,color-mix(in srgb,var(--ui-ticket-top) 70%,transparent),color-mix(in srgb,var(--ui-ticket-bottom) 94%,transparent)); border-top:1px solid var(--v5-border); backdrop-filter:blur(18px) saturate(160%); }.course-sticky > * { flex:1; }
+.course-lesson [role="radio"] { position:relative; padding:var(--v5-space-3); border-radius:14px; background:color-mix(in srgb,var(--v5-ink) 6%,transparent); }.course-lesson [role="radio"][aria-checked="true"] { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent); color:var(--v5-brand); }
+
+/* Approved growth board geometry and material. */
+ .growth-course-chassis { width:100%; max-width:100vw; min-width:0; }
+.learning-course, .course-lesson, .course-lesson__meta, .course-lesson__body { box-sizing:border-box; width:100%; max-width:100%; min-width:0; }
+.learning-course { padding-top:0; overflow-wrap:anywhere; }
+.learning-course :deep(.spv), .learning-course :deep(.spv-titlewrap) { min-width:0; max-width:100%; }
+.course-lesson__body, .course-lesson__body :deep(span) { white-space:pre-wrap; overflow-wrap:anywhere; word-break:normal; }
+.course-read-progress { width:calc(100% - 32px); max-width:calc(100% - 32px); box-sizing:border-box; }
+.course-sticky { position:fixed; inset:auto 0 0; box-sizing:border-box; width:100%; max-width:100vw; min-width:0; padding:12px 16px 30px; }
+.course-sticky .course-submit { width:100%; min-width:0; }
+
+
+.course-read-progress { margin-top:7px; }
+.course-lesson__paragraph { display:block; }
+.course-lesson__paragraph + .course-lesson__paragraph { margin-top:14px; }
+
 </style>

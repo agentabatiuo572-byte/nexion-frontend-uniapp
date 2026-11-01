@@ -1,3 +1,4 @@
+import { growthButton } from "@/lib/entry-review.test-support";
 import * as displayDate from "@/lib/display-date";
 import * as brandCopy from "@/lib/brand-copy";
 import { formatAmount } from "@/lib/amount-display";
@@ -77,6 +78,7 @@ async function mount(localeCode: Locale, rows: Bill[] = [], page: keyof typeof c
   const account = Vue.reactive({ accountKey: "user:7", accountBindingEpoch: 1 });
   const shown: Array<() => void> = [], navTo = vi.fn();
   const modules: Record<string, unknown> = {
+    "@/components/ui/nx-button.vue": {default: growthButton},
     "@/lib/brand-copy": brandCopy,
     "@/lib/amount-display": { formatAmount },
     "@/lib/usd-display": { formatUsd },
@@ -185,23 +187,23 @@ describe("mounted reward state presentation", () => {
 
   it("keeps totals during a same-account refresh but clears all cached counts on account rebinding", async () => {
     const screen = await mount("en", [], "summary");
-    const totals = () => nodes(screen.root).filter(entry => entry.props.class === "font-mono-tabular").map(textOf);
+    const totals = () => nodes(screen.root).filter(entry => entry.props.class === "reward-value").map(textOf);
     screen.voucher.claimedUnused = [{ id: "old-1" }, { id: "old-2" }]; await Vue.nextTick();
-    expect(totals()).toEqual(["2", "$147.72", "251.50"]);
+    expect(totals()).toEqual(["$147.72", "251.50", "2"]);
     screen.voucher.remoteStatus = "loading"; screen.voucher.claimedUnused = [];
     screen.bills.summaryStatus = "loading"; screen.bills.summary = null; await Vue.nextTick();
-    expect(totals()).toEqual(["2", "$147.72", "251.50"]);
+    expect(totals()).toEqual(["$147.72", "251.50", "2"]);
     screen.account.accountBindingEpoch++; screen.account.accountKey = "user:8"; await Vue.nextTick();
-    expect(totals()).toEqual(["-", "-", "-"]);
+    expect(totals()).toEqual(["—", "—", "—"]);
     screen.voucher.remoteStatus = "ready"; screen.bills.summary = { rewardsUsdt: 5, rewardsNex: 6 };
     screen.bills.summaryStatus = "ready"; await Vue.nextTick();
-    expect(totals()).toEqual(["0", "$5.00", "6.00"]);
+    expect(totals()).toEqual(["$5.00", "6.00", "0"]);
   });
 
   it.each(locales)("keeps uncached failed reads unknown until retry restores values, including fixture zeros in %s", async locale => {
     const screen = await mount(locale, [], "summary", undefined, true), t = dicts[locale];
-    const totals = () => nodes(screen.root).filter(entry => entry.props.class === "font-mono-tabular").map(textOf);
-    expect(totals()).toEqual(["-", "-", "-"]);
+    const totals = () => nodes(screen.root).filter(entry => entry.props.class === "reward-value").map(textOf);
+    expect(totals()).toEqual(["—", "—", "—"]);
     expect(screen.text()).toContain(t.walletV3.submitReasonServiceUnavailable);
     expect(screen.text()).not.toContain(t.rewards.emptyHint);
     const retry = nodes(screen.root).find(entry => entry.props.role === "button" && textOf(entry) === t.store.catalogRetry)!;
@@ -213,21 +215,21 @@ describe("mounted reward state presentation", () => {
     const pending = (retry.props.onClick as () => Promise<void>)(); await Vue.nextTick();
     expect(screen.voucher.refreshRemote).toHaveBeenCalledTimes(2);
     expect(screen.bills.refreshSummary).toHaveBeenCalledTimes(2);
-    expect(totals()).toEqual(["-", "-", "-"]);
+    expect(totals()).toEqual(["—", "—", "—"]);
     expect(screen.text()).not.toContain(t.rewards.emptyHint);
     screen.voucher.claimedUnused = [{ id: "recovered-1" }, { id: "recovered-2" }]; screen.voucher.remoteStatus = "ready";
     screen.bills.summary = { rewardsUsdt: 12.5, rewardsNex: 340 }; screen.bills.summaryStatus = "ready";
     finishRead(); await pending; await Vue.nextTick();
-    expect(totals()).toEqual(["2", "$12.50", "340.00"]);
+    expect(totals()).toEqual(["$12.50", "340.00", "2"]);
     expect(screen.text()).not.toContain(t.walletV3.submitReasonServiceUnavailable);
     expect(screen.text()).not.toContain(t.store.catalogRetry);
     screen.voucher.remoteStatus = "error"; screen.voucher.claimedUnused = [];
     screen.bills.summaryStatus = "error"; screen.bills.summary = null; await Vue.nextTick();
-    expect(totals()).toEqual(["2", "$12.50", "340.00"]);
+    expect(totals()).toEqual(["$12.50", "340.00", "2"]);
     expect(screen.text()).toContain(t.walletV3.submitReasonServiceUnavailable);
     screen.voucher.remoteStatus = "ready"; screen.bills.summary = { rewardsUsdt: 0, rewardsNex: 0 };
     screen.bills.summaryStatus = "ready"; await Vue.nextTick();
-    expect(totals()).toEqual(["0", "$0.00", "0.00"]);
+    expect(totals()).toEqual(["$0.00", "0.00", "0"]);
     expect(screen.text()).toContain(t.rewards.emptyHint);
     expect(screen.text()).not.toContain(t.walletV3.submitReasonServiceUnavailable);
   });
@@ -235,9 +237,9 @@ describe("mounted reward state presentation", () => {
   it.each(locales)("adds the activity category without mixing gifts into currency totals in %s", async locale => {
     const summary = await mount(locale, [], "summary"), t = dicts[locale];
     const cards = nodes(summary.root).filter(entry => entry.props.role === "button" && entry.props["aria-label"]);
-    expect(cards.map(card => card.props["aria-label"])).toEqual([t.rewards.catVouchers, t.rewards.catUsdt, t.rewards.catNex, t.promotion.rewardCategory]);
+    expect(cards.map(card => card.props["aria-label"])).toEqual([t.rewards.catUsdt, t.rewards.catNex, t.rewards.catVouchers, t.promotion.rewardCategory]);
     const promotion = cards[3]; expect(textOf(promotion)).toContain(t.promotion.rewardCategoryDesc);
-    expect(nodes(promotion).some(entry => entry.props.class === "font-mono-tabular")).toBe(false);
+    expect(nodes(promotion).some(entry => entry.props.class === "reward-value")).toBe(false);
     (promotion.props.onClick as () => void)(); expect(summary.navTo).toHaveBeenCalledWith("/me/rewards/list?cat=promotion");
     const list = await mount(locale, [], "list", "promotion");
     expect(nodes(list.root).find(entry => entry.tag === "header")?.text).toBe(t.promotion.rewardCategory);
@@ -255,7 +257,7 @@ describe("mounted reward state presentation", () => {
       expect(page.text()).not.toContain(t.bills.memo.refer);
       expect(page.text()).toContain(`${t.rewards.typeRefer} · F2-NETWORK-NEX-376`);
     }
-    expect(page.text()).toContain("+99.50 UVT");
+    expect(page.text()).toContain("+99.50");
     expect(JSON.stringify(rows)).toBe(before);
     expect(page.pager.refresh).toHaveBeenCalledOnce(); expect(page.pager.loadMore).not.toHaveBeenCalled();
   });
@@ -273,7 +275,7 @@ describe("mounted reward state presentation", () => {
     const rows: Bill[] = [{ ...fixture("pending", "achievement"), amount: 0.045005, memoKey: "learningReward", ref: "intro-uvel@v1" }];
     const before = JSON.stringify(rows), page = await mount(locale, rows), t = dicts[locale];
     expect(page.text()).toContain(`${t.bills.memo.learningReward} · UVEL intro`);
-    expect(page.text()).toContain("+0.05 UVT");
+    expect(page.text()).toContain("+0.05");
     expect(nodes(page.root).find(entry => entry.tag === "header")?.props.back).toBe("/pages/me/rewards");
     const link = nodes(page.root).find(entry => entry.props.role === "link")!;
     (link.props.onClick as () => void)();
@@ -295,7 +297,7 @@ describe("mounted reward state presentation", () => {
     expect(page.text()).toContain(en.bills.statusPosted); expect(page.text()).toContain(en.bills.memo.refer);
     page.locale.setLocale("vi"); await Vue.nextTick();
     expect(page.text()).toContain(vietnamese.bills.statusPosted); expect(page.text()).toContain(vietnamese.bills.memo.refer);
-    expect(page.text()).toContain("+99.50 UVT"); expect(rows[0].amount).toBe(99.5);
+    expect(page.text()).toContain("+99.50"); expect(rows[0].amount).toBe(99.5);
     expect(page.pager.refresh).toHaveBeenCalledOnce();
   });
 });

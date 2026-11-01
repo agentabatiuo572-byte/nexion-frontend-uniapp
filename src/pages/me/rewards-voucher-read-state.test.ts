@@ -118,7 +118,7 @@ describe('Rewards voucher list remote read states', () => {
       `${l1Block}\nreturn { voucherReady, availableCount, expiredCount, allZero, cats };`,
     )(formatAmount, computed, voucher, true, true, bills, () => false, t, (template: string, args: { n: number }) => template.replace('{n}', String(args.n)), ref, watch);
 
-    expect(result.cats.value[0].big).toBe('-');
+    expect(result.cats.value[0].big).toBe('—');
     expect(result.allZero.value).toBe(false);
     voucher.remoteStatus = 'ready';
     expect(result.cats.value[0].big).toBe('0');

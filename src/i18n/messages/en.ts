@@ -1150,6 +1150,17 @@ trustReserve: "No verifiable reserve information available.",
   },
 
 
+  growthUi: {
+    goalHeading: "Set a goal, see the recommended path",
+    goalTerm: "${amount} in {days} days",
+    recommendedDevice: "Suggested device",
+    achievementCompleted: "Completed {n}%",
+    streakPrefix: "Current streak",
+    streakSuffix: "days",
+    milestoneDay: "Day {n}",
+    weekReady: "Your reward is ready, claim it now.",
+  },
+
   goals: {
     navTitle: "Earning goals",
     heroLabel: "TARGET TRACKER",
@@ -1158,6 +1169,7 @@ trustReserve: "No verifiable reserve information available.",
     targetLabel: "Target amount",
     deadlineLabel: "Deadline",
     recHeader: "Recommended path",
+    dailyNeeded: "About ${amount} per day",
     recPath: "Target: ${target} in {days} days, approximately ${perDay} per day. Recommended device: {tier}.",
     recCloudShare: "Your daily target is low; Cloud Share has the lowest entry price.",
     recS1: "One S1's estimated daily earnings cover this target.",

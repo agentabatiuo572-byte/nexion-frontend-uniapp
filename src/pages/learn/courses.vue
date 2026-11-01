@@ -12,12 +12,13 @@
         <view class="course-list__heading"><text class="course-list__title">{{ pageCopy.allCourses }}</text><text class="course-list__count">—</text></view>
       </view>
       <view v-if="overview && !error">
-        <view class="learning-summary">
+        <view class="learning-summary learning-summary--known">
+          <GrowthProgress ring :size="64" :stroke="9" :value="overviewProgress" :label="progressLine"><text>{{ overview.completedCourses }}/{{ overview.totalCourses }}</text></GrowthProgress>
           <view class="learning-summary__line">
             <text class="learning-summary__progress">{{ progressLine }}</text>
             <view class="learning-summary__earned"><text>{{ pageCopy.earned }}</text><text class="learning-reward">{{ formatAmount(overview.earnedNex) }} UVT</text></view>
           </view>
-          <view class="learning-summary__bar" role="progressbar" :aria-label="progressLine" :aria-valuenow="overviewProgress" aria-valuemin="0" aria-valuemax="100"><view :style="{ width: overviewProgress + '%' }" /></view>
+
         </view>
 
         <EmptyState v-if="overview.courses.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
@@ -26,12 +27,12 @@
             <view class="course-feature__glow" aria-hidden="true" />
             <text class="course-feature__label">{{ featuredCourse.progress > 0 ? recommendationCopy.resume : t.learning.featuredLabel }}</text>
             <text class="course-feature__name">{{ featuredCourse.title }}</text>
-            <view class="course-feature__meta"><text>{{ courseMetaLead(featuredCourse) }} · {{ pageCopy.reward }} </text><text class="learning-reward">{{ formatAmount(featuredCourse.rewardNex) }} UVT</text></view>
+            <view class="course-feature__meta"><text>{{ courseMetaLead(featuredCourse) }} · {{ pageCopy.reward }}</text><text class="learning-reward" style="margin-left:3px">{{ formatAmount(featuredCourse.rewardNex) }} UVT</text></view>
             <view class="course-feature__progress">
-              <view class="course-progress" role="progressbar" :aria-label="featuredCourse.title" :aria-valuenow="featuredCourse.progress" aria-valuemin="0" aria-valuemax="100"><view :style="{ width: featuredCourse.progress + '%' }" /></view>
-              <text class="course-progress__label">{{ fmt(auditCopy.progress, { n: featuredCourse.progress }) }}</text>
+              <GrowthProgress class="course-progress" :value="featuredCourse.progress" :label="featuredCourse.title" />
             </view>
-            <NxButton class="course-feature__cta" variant="primary" :label="featuredCourse.progress > 0 ? recommendationCopy.resume : recommendationCopy.start" @click="open(featuredCourse.id)" />
+            <view class="course-feature__actions"><text class="course-progress__label">{{ fmt(auditCopy.progress, { n: featuredCourse.progress }) }}</text>
+            <NxButton class="course-feature__cta" variant="brand" size="medium" :label="featuredCourse.progress > 0 ? recommendationCopy.resume : recommendationCopy.start" @click="open(featuredCourse.id)" /></view>
           </view>
         </view>
         <view v-else-if="overview.courses.length" class="course-completed"><text>{{ auditCopy.allCoursesDone }}</text><text>{{ fmt(auditCopy.earned, { n: formatAmount(overview.earnedNex) }) }}</text></view>
@@ -39,11 +40,10 @@
         <view v-if="overview.courses.length" class="learning-section">
           <view class="course-list__heading"><text class="course-list__title">{{ pageCopy.allCourses }}</text><text class="course-list__count">{{ fmt(pageCopy.courseCount, { n: overview.totalCourses }) }}</text></view>
           <view class="course-list">
-            <view v-for="(course, index) in overview.courses" :key="course.id" class="course-row" :class="{ 'course-row--recommended': course.id === featuredCourse?.id }" role="button" tabindex="0" :aria-label="course.title + ' · ' + courseMeta(course) + ' · ' + courseStatus(course)" @click="open(course.id)" @keydown.enter.prevent="open(course.id)" @keydown.space.prevent="open(course.id)">
+            <view v-for="(course, index) in overview.courses" :key="course.id" class="course-row" :class="{ 'course-row--recommended': course.id === featuredCourse?.id }" role="button" tabindex="0" :aria-label="course.title + ' · ' + courseMeta(course) + ' · ' + courseStatus(course)" @click="open(course.id)">
               <view v-if="course.completed" class="course-status course-status--done" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10" /></svg></view>
-              <svg v-else-if="course.progress > 0" class="course-status course-status--progress" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="var(--ui-course-track)" stroke-width="3" /><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" :stroke-dasharray="`${course.progress * 81.6814 / 100} 81.6814`" transform="rotate(-90 16 16)" /></svg>
-              <view v-else class="course-status course-status--todo" aria-hidden="true"><text>{{ index + 1 }}</text></view>
-              <view class="course-row__body"><text class="course-row__title">{{ course.title }}</text><view class="course-row__meta"><text>{{ courseMeta(course) }}</text><text v-if="!course.completed && course.progress > 0" class="course-row__progress-copy"> · {{ fmt(auditCopy.progress,{n:course.progress}) }}</text></view></view>
+              <GrowthProgress v-else ring :size="36" :stroke="9" :value="course.progress" :label="courseStatus(course)"><text class="course-number" :class="{'course-number--active': course.progress > 0}">{{ index + 1 }}</text></GrowthProgress>
+              <view class="course-row__body"><text class="course-row__title">{{ course.title }}</text><view class="course-row__meta"><text>{{ courseMetaLead(course) }} · {{ pageCopy.reward }}</text><text class="learning-reward" style="margin-left:3px">{{ formatAmount(course.rewardNex) }} UVT</text><text v-if="!course.completed && course.progress > 0" class="course-row__progress-copy"> · {{ fmt(auditCopy.progress,{n:course.progress}) }}</text></view></view>
               <text v-if="course.completed" class="course-row__done">{{ auditCopy.completed }}</text>
               <text v-else-if="course.id === featuredCourse?.id" class="course-row__tag">{{ pageCopy.recommended }}</text>
               <svg v-else class="course-row__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
@@ -61,6 +61,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
+import GrowthProgress from "@/components/ui/growth-progress.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -180,9 +181,9 @@ onUnmounted(stopRuntimeRefresh);
 <style scoped>
 .learning-center {--ui-course-track:color-mix(in srgb,var(--v5-ink) 16%,var(--v5-bg)); --learning-reward: var(--v5-nex); padding-bottom: var(--v5-space-6); color: var(--v5-ink); font-family: var(--font-v5); }
 .learning-center :deep(.spv--design) { grid-template-columns: 56px minmax(0, 1fr) 56px; margin: 0; }
-.learning-state { padding: 20px 18px; color: var(--v5-ink-3); text-wrap: pretty; }
+.learning-state { padding: var(--v5-space-5) 18px; color: var(--v5-ink-3); text-wrap: pretty; }
 .learning-retry { margin-top: var(--v5-space-3); }
-.learning-summary { padding: 20px 18px 0; }
+.learning-summary { padding: var(--v5-space-5) 18px 0; }
 .learning-summary__line { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
 .learning-summary__progress { font-size: var(--v5-type-h3); font-weight: 600; line-height: 29px; font-variant-numeric: tabular-nums; }
 .learning-summary__earned { display: flex; gap: 3px; align-items: baseline; font-size: 12.5px; color: var(--v5-ink-3); }
@@ -202,12 +203,12 @@ onUnmounted(stopRuntimeRefresh);
 .course-progress__label { flex: none; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
 .learning-center .course-feature__cta { display: flex; box-sizing: border-box; width: 100%; min-height: 44px; margin-top: var(--v5-space-4); padding: 0; font-size: var(--ui-type-button); font-weight: 600; }
 .course-feature__cta :deep(.nx-button__surface) { min-height:44px; box-shadow:0 8px 22px color-mix(in srgb,var(--v5-brand) 28%,transparent),inset 0 1px 0 var(--v5-liquid-highlight); }
-.course-completed { display: flex; flex-direction: column; gap: 8px; padding: 24px 18px 0; color: var(--v5-brand); }
+.course-completed { display: flex; flex-direction: column; gap: var(--v5-space-2); padding: var(--v5-space-6) 18px 0; color: var(--v5-brand); }
 .course-list__heading { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 2px; }
 .course-list__title { font-size: var(--ui-type-section); font-weight: 600; letter-spacing: -.012em; }
 .course-list__count { font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink-3); }
 .course-list { overflow: hidden; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
-.course-row { display: flex; align-items: center; gap: 12px; box-sizing: border-box; min-height: 64px; padding: 10px 16px; border-bottom: 1px solid var(--v5-border); cursor: pointer; }
+.course-row { display: flex; align-items: center; gap: var(--v5-space-3); box-sizing: border-box; min-height: 64px; padding: 10px 16px; border-bottom: 1px solid var(--v5-border); cursor: pointer; }
 .course-row:last-child { border-bottom: 0; }
 .course-row--recommended { background: color-mix(in srgb, var(--v5-brand) 6%, transparent); }
 .course-row:active { opacity: .7; }
@@ -222,6 +223,30 @@ onUnmounted(stopRuntimeRefresh);
 .course-row__done { flex: none; max-width: 25%; font-size: 12.5px; line-height: 18px; color: var(--v5-brand); }
 .course-row__tag { display: inline-flex; flex: none; align-items: center; min-height: 22px; max-width: 25%; box-sizing: border-box; padding: 0 var(--v5-space-2); border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand); font-size: var(--v5-type-caption); font-weight: 500; line-height: 18px; }
 .course-row__chevron { flex: none; color: var(--v5-ink-4); }
-</style>
+.course-number {font:500 12px/16px var(--font-metric);color:var(--v5-ink-3);}.course-number--active {color:var(--v5-brand);}.course-row__progress-copy {white-space:nowrap;}
+.learning-summary { padding: var(--v5-space-1) 20px 0; }.learning-summary--known { display: flex; align-items: center; gap: var(--v5-space-4); }.learning-summary__line { display: block; }
+.learning-summary__progress { font: 600 20px/28px var(--font-v5); }.learning-summary__earned { margin-top: var(--v5-space-1); font: 400 12px/16px var(--font-v5); }
+.learning-summary :deep(.growth-progress__center) { font: 500 14px/18px var(--font-metric); }.learning-reward { font-family: var(--font-metric); }
+.learning-section { padding-top: 20px; }.course-feature { padding: 18px 16px 16px; border: none; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 1px 0 var(--v5-brand); }
+.course-feature__glow { display: none; }.course-feature__label { font: 400 12px/16px var(--font-v5); color: var(--v5-brand); }.course-feature__name { margin-top: var(--v5-space-1); max-width: none; font: 600 18px/24px var(--font-v5); }
+.course-feature__meta { margin-top: var(--v5-space-1); font: 400 12px/16px var(--font-v5); }.course-feature__progress { display: block; margin-top: var(--v5-space-3); }.course-progress { height: 6px; }.course-progress__label { display: block; margin-top: 14px; padding-right: 46%; font: 400 12px/16px var(--font-v5); }
+.learning-center .course-feature__cta { width: auto; display: flex; margin: -30px 0 0 auto; max-width: 52%; font-weight: 500; }.course-feature__cta :deep(.nx-button__surface) { box-shadow: var(--ui-glass-edge-shadow); }
+.course-list__heading { justify-content: space-between; margin: 0 4px 12px; min-height: 24px; }.course-list { border: none; border-radius: var(--ui-radius-surface); }.course-row { min-height: 68px; }.course-status { width: 36px; height: 36px; font-family: var(--font-metric); }.course-row__meta { font: 400 12px/16px var(--font-v5); transform:translateY(1.5px); }
 
-<style scoped>.course-row__progress-copy {white-space:nowrap;}:global(:root:not([data-theme="light"]) .learning-center) {--ui-course-track:#2A2A2A;}</style>
+/* Approved growth board geometry and material. */
+ .learning-summary { padding-top:11px; }.learning-section + .learning-section { padding-top:32px; }
+.course-feature { padding-top:22px; display:flex; flex-direction:column; box-sizing:border-box; min-height:197.5px; overflow:visible; box-shadow:var(--v5-glass-shadow); }
+.course-feature::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 120deg,transparent 0 50%,color-mix(in srgb,var(--v5-brand) 80%,transparent) 72%,transparent 94%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
+.course-feature__actions { box-sizing:border-box; padding:0 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:64px; margin-top:auto; }.course-feature__actions .course-progress__label { padding:0; margin:0; }
+.learning-center .course-feature__cta { margin:0; flex:none; width:92px; max-width:none; }
+.course-feature__cta :deep(.nx-button__surface) { padding-inline:16px; --ui-button-ink:var(--v5-ink) !important; }
+.learning-reward { font-family:var(--font-v5); }.learning-summary__earned .learning-reward { font-family:var(--font-metric); }
+
+
+.learning-center .course-feature__cta { min-height:40px; padding:0; position:relative; }
+.course-feature__cta :deep(.nx-button__surface) { min-height:40px; }
+.course-feature__cta::after { content:""; position:absolute; inset:-2px 0; }
+.course-row__tag { min-height:24px; }
+.course-list__heading { margin-inline:2px; }
+
+</style>

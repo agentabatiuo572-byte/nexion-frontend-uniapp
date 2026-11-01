@@ -16,10 +16,10 @@
 <template>
   <AppChassis active="home">
     <view class="missions-content">
-      <SubPageHeader back="/pages/index/index" />
-      <view class="mx-4"><GlassSegments :label="t.missions.heroTitle" v-model="activePanel" :options="panels" /></view>
-      <view v-if="activePanel === 'today'" class="mx-4 space-y-4" style="margin-top:20px"><DailyCheckInRow /><DayOneQuestCard v-model:expanded="dayOneExpanded" /><FeaturedLearningCard /></view>
-      <view v-else-if="activePanel === 'week'" style="margin-top:20px"><view class="mx-4"><WeeklyQuestHero /></view><WeeklyQuestList /></view>
+      <SubPageHeader back="/pages/index/index" :title="t.headerTitles.missions" />
+      <view class="mx-4 missions-segments"><GlassSegments selection="flat" :label="t.missions.heroTitle" v-model="activePanel" :options="panels" /></view>
+      <view v-if="activePanel === 'today'" class="mx-4 missions-today"><DailyCheckInRow /><DayOneQuestCard mission-layout v-model:expanded="dayOneExpanded" /><FeaturedLearningCard mission-layout /></view>
+      <view v-else-if="activePanel === 'week'" class="missions-week"><view class="mx-4"><WeeklyQuestHero /></view><WeeklyQuestList /></view>
       <EventsContent v-else-if="activePanel === 'events'" embedded />
       <AchievementsContent v-else embedded />
     </view>
@@ -196,7 +196,7 @@ const heroStyle: CSSProperties = {
 const heroChipStyle: CSSProperties = {
   gap: "6px",
   padding: "3px 9px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-success-soft)",
   color: "var(--v5-success)",
   fontSize: "12px",
@@ -259,7 +259,7 @@ const badgeStyle: CSSProperties = {
   minWidth: "18px",
   height: "18px",
   padding: "0 5px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-warning)",
   color: "var(--v5-on-brand)",
   fontSize: "12px",
@@ -276,6 +276,13 @@ const badgeStyle: CSSProperties = {
   outline: 2px solid var(--v5-brand);
   outline-offset: 2px;
 }
+.missions-content { padding-bottom:24px; }
+.missions-content { padding-bottom: 24px; color: var(--v5-ink); }
+.missions-segments { margin-top: 14px; }
+.missions-today { display: flex; flex-direction: column; gap: var(--v5-space-3); margin-top: var(--v5-space-3); }
+.missions-today > *, .missions-week > * { animation: growth-enter 480ms cubic-bezier(.16,1,.3,1) both; }
+.missions-today > :nth-child(2) { animation-delay: 70ms; }.missions-today > :nth-child(3) { animation-delay: 140ms; }
+.missions-week { margin-top: var(--v5-space-3); }
+@keyframes growth-enter { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .missions-today > *, .missions-week > * { animation: none; } }
 </style>
-
-<style scoped>.missions-content { padding-bottom:24px; }</style>

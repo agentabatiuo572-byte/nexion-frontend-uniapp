@@ -72,7 +72,8 @@ it('unknown target and deadline have no visual selection until the current actua
  await p.actions.onSave();expect(remote.goalsApi.create).not.toHaveBeenCalled();
  initial.resolve(facts(1000));await p.store.ensure();await flush();
  expect(p.actions.editorDisplayReady.value).toBe(true);
- expect(radios().filter(n=>n.props.style?.background==='var(--v5-brand)')).toHaveLength(2);
+ expect(radios().filter(n=>Vue.normalizeClass(n.props.class).includes('nx-frosted-button'))).toHaveLength(1);
+ expect(radios().filter(n=>n.props.style?.background==='var(--ui-growth-selection)')).toHaveLength(1);
  expect(radios().filter(n=>n.props['aria-checked']==='true')).toHaveLength(2);p.page.unmount();
 });
 it.each([false,true])('onShow before a same-account store bind recovers even without an app epoch notification, nonempty=%s',async nonempty=>{
