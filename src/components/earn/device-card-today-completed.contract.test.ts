@@ -1,3 +1,4 @@
+import { computeV2Copy } from "@/i18n/compute-v2";
 import * as progress from "@/lib/task-progress";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@dcloudio/uni-app", () => ({ onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn(), onUnload: vi.fn() }));
@@ -199,7 +200,8 @@ async function setup(name: string) {
     vue: Vue, '@/store/app': { useApp: () => app }, '@/store/session': { useSession },
     '@/store/config': { useConfig }, '@/lib/native-phone-runtime': native,
     '@/lib/phone-activation-guidance': guidance, '@/store/device-types': deviceTypes,
-    '@/lib/workload-label': workload, '@/lib/task-result-confirmation': confirmation, '@/lib/task-progress': progress,
+    '@/components/earn/task-v2-status.vue': { __esModule: true, default: blank },
+    '@/lib/workload-label': workload, '@/lib/task-result-confirmation': confirmation, "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, '@/lib/task-progress': progress,
     '@/lib/device-copy': deviceCopy, '@/store/device-lifecycle': lifecycle,
     '@/store/interrupt': interrupt, '@/lib/hashpower': hashpower, '@/lib/device-capability': capability,
     '@/lib/today-completed-tasks': completions, '@/lib/device-detail-navigation': navigation,
@@ -207,7 +209,7 @@ async function setup(name: string) {
     '@/i18n/format': { fmt }, '@/i18n/use-t': { useT: () => Vue.ref(taskHistoryCopy) }, '@/api/runtime': remote,
     '@/lib/route': { navTo: vi.fn(), navBack: vi.fn(), takeNavigationQuery: () => '' },
     '@/store/earn-config': { prepareEarnConfig: () => {}, useEarnConfig: () => ({ lockedTeasers: () => [], averageEligibleReward: () => 0 }) },
-    '@dcloudio/uni-app': { onLoad: (f: Function) => loads.push(f), onShow: (f: Function) => shows.push(f) },
+    '@dcloudio/uni-app': { onLoad: (f: Function) => loads.push(f), onShow: (f: Function) => shows.push(f), onHide: vi.fn(), onUnload: vi.fn() },
     '@/components/app-chassis.vue': { __esModule: true, default: chassis },
     '@/components/empty-state.vue': { __esModule: true, default: blank },
     '@/components/sub-page-header.vue': { __esModule: true, default: blank },

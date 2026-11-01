@@ -797,6 +797,8 @@ export const useApp = defineStore("app", () => {
           taskServerNow: state.serverNow,
           taskServerNowReceivedAt: taskSnapshotReceivedAt,
           currentTask: null,
+          recoveryPending: false,
+          recoveryReason: null,
           recentTasks: [],
           taskLockUntil: null,
         };
@@ -807,6 +809,8 @@ export const useApp = defineStore("app", () => {
         taskServerNowReceivedAt: taskSnapshotReceivedAt,
         taskLockUntil: authority.lockUntil,
         currentTask: authority.currentTask ? remoteTask(authority.currentTask, device.location ?? "") : null,
+        recoveryPending: authority.recoveryPending === true,
+        recoveryReason: authority.recoveryReason ?? null,
         recentTasks: authority.recentTasks.filter((entry) => entry.status === "COMPLETED").map((entry) => ({
           ...remoteTask(entry, device.location ?? ""),
           completedAt: entry.completedAt ?? entry.completableAt ?? state.serverNow,

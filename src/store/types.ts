@@ -136,6 +136,9 @@ export interface Device {
   gpuPower: number; // W
   vramUsed: number; // GB
   currentTask: CurrentTask | null;
+  /** Read-only unresolved legacy completion, including after its task lease expires. */
+  recoveryPending?: boolean;
+  recoveryReason?: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" | null;
   recentTasks: CompletedTask[]; // last 10
   /** Server-authoritative post-completion task lock. Remote clients only display this value. */
   taskLockUntil?: number | null;

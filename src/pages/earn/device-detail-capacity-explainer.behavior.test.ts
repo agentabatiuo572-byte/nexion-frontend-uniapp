@@ -1,3 +1,4 @@
+import { computeV2Copy } from "@/i18n/compute-v2";
 vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
 import * as progress from "@/lib/task-progress";
 import * as Vue from "vue";
@@ -107,7 +108,7 @@ async function mount(copy: Messages, device = serverDevice()) {
   const onShow: Array<() => void> = [];
   const app = Vue.reactive({ accountKey: request.accountKey, accountBindingEpoch: request.epoch,
     visibleDevices: [device], remoteFleetStatus: "ready", remotePhoneBindingInvalid: false,
-    setPhoneRuntime, refreshRemoteFleet, captureRemoteAccountRequest: vi.fn(() => ({ ...request })) });
+    setPhoneRuntime, refreshRemoteFleet, setTaskReadPageVisible: vi.fn(), captureRemoteAccountRequest: vi.fn(() => ({ ...request })) });
   const passthrough = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("view", slots.default?.()) });
   const blank = Vue.defineComponent({ setup: () => () => Vue.h("view") });
   const sfc = (value: Component) => ({ __esModule: true, default: value });
@@ -117,7 +118,7 @@ async function mount(copy: Messages, device = serverDevice()) {
     "@/lib/usd-display": { formatUsd },
     "@/i18n/device-statistics-capability": { useDeviceStatisticsCapabilityCopy: () => Vue.ref(deviceStatisticsCapabilityCopy[copy === zh ? "zh" : copy === vietnamese ? "vi" : "en"]) },
     vue: Vue, "@dcloudio/uni-app": { onLoad: (callback: (query: object) => void) => callback({ id: device.id }),
-      onShow: (callback: () => void) => onShow.push(callback) },
+      onShow: (callback: () => void) => onShow.push(callback), onHide: vi.fn(), onUnload: vi.fn(), onBackPress: vi.fn() },
     "@/components/app-chassis.vue": sfc(passthrough), "@/components/empty-state.vue": sfc(blank),
     "@/components/sub-page-header.vue": sfc(blank), "@/components/home/device-slot.vue": sfc(blank),
     "@/components/liquid-glass.vue": sfc(blank), "@/components/ui/nx-tag.vue": sfc(blank),
@@ -134,7 +135,8 @@ async function mount(copy: Messages, device = serverDevice()) {
     "@/composables/use-capacity-explainer": { useCapacityExplainer },
     "@/composables/use-dialog-a11y": { useDialogA11y }, "@/lib/server-deadline-clock": deadline,
     "@/lib/phone-activation-guidance": phoneGuidance, "@/store/device-types": deviceTypes,
-    "@/lib/workload-label": workload, "@/lib/task-result-confirmation": confirmation, "@/lib/task-progress": progress,
+    "@/components/earn/task-v2-status.vue": sfc(blank),
+    "@/lib/workload-label": workload, "@/lib/task-result-confirmation": confirmation, "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, "@/lib/task-progress": progress,
     "@/lib/device-copy": deviceCopy, "@/store/device-lifecycle": lifecycle, "@/store/interrupt": interrupt,
     "@/lib/hashpower": hashpower, "@/lib/device-capability": capability,
     "@/lib/today-completed-tasks": completions, "@/lib/device-detail-navigation": detailNavigation,

@@ -8,7 +8,7 @@
       </view>
       <view class="device-inventory-row__identity">
         <text class="device-inventory-row__name">{{ deviceName(t, device) }}</text>
-        <view v-if="active && onlineState === 'online'" class="device-inventory-row__state device-inventory-row__state--active"><view class="device-inventory-row__dot" aria-hidden="true" /><text>{{ t.earn.online }}</text></view>
+        <view v-if="active && !recovering && onlineState === 'online'" class="device-inventory-row__state device-inventory-row__state--active"><view class="device-inventory-row__dot" aria-hidden="true" /><text>{{ t.earn.online }}</text></view>
         <text v-if="statusText" class="device-inventory-row__status">{{ statusText }}</text>
       </view>
       <view v-if="active" class="device-inventory-row__today-box">
@@ -29,7 +29,7 @@
     </view>
     <view v-else-if="active" class="device-inventory-row__task device-inventory-row__task--idle">
       <view class="device-inventory-row__wait" aria-hidden="true" />
-      <text>{{ runtimeConfirmed ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text>
+      <text>{{ recovering ? computeCopy.statuses.RECOVERING : runtimeConfirmed ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text>
     </view>
 
     <view v-if="device.pendingDeactivate" class="device-inventory-row__pending">
@@ -76,9 +76,12 @@ import { deviceOnlineState } from "@/lib/hashpower";
 import { useDeviceProductImage } from "@/composables/use-device-product-image";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
-import { taskProgressPercent } from "@/lib/task-progress";
+import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 
 const t = useT();
+const computeCopy = useComputeV2Copy();
+const recovering = computed(() => deviceTaskRecovering(props.device));
 const visibility = useDataVisibility();
 const props = withDefaults(
   defineProps<{
@@ -109,6 +112,7 @@ const todayText = computed(() => visibility.mask(props.runtimeConfirmed ? `+${fm
 const { imageSrc, imageError } = useDeviceProductImage(() => props.device);
 const onlineState = computed(() => deviceOnlineState(props.device, Date.now(), props.runtimeConfirmed));
 const statusText = computed(() => {
+  if (recovering.value) return computeCopy.value.statuses.RECOVERING;
   if (props.device.activationUnconfirmed) return t.value.earn.runtimeUnknown;
   if (onlineState.value === "unknown") return t.value.earn.runtimeUnknown;
   return "";
@@ -125,7 +129,7 @@ const liveTaskNow = computed(() => props.device.taskServerNow != null && props.d
   ? projectServerNow(props.device.taskServerNow, props.device.taskServerNowReceivedAt, monotonicNow.value) : now.value);
 const progressPct = computed(() => props.runtimeConfirmed
   ? taskProgressPercent(props.device.currentTask, liveTaskNow.value, props.device.interruptedAt) : null);
-const taskRunning = computed(() => onlineState.value === "online" && props.device.currentTask?.status !== "PAUSED" && props.device.interruptedAt == null);
+const taskRunning = computed(() => !recovering.value && onlineState.value === "online" && props.device.currentTask?.status !== "PAUSED" && props.device.interruptedAt == null);
 const actionDisabled = computed(() => props.disabled || props.actionDisabled);
 const actionLabel = computed(() =>
   props.active ? props.deactivateLabel : props.disabled ? props.disabledLabel ?? props.slotsFullLabel : props.activateLabel,

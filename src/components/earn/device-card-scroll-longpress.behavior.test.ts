@@ -1,3 +1,4 @@
+import { computeV2Copy } from "@/i18n/compute-v2";
 import * as progress from "@/lib/task-progress";
 vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
 import * as Vue from "vue";
@@ -57,6 +58,15 @@ const now = 1_800_000_000_000;
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); useCapacityExplainer().close(); });
 afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); useCapacityExplainer().close(); vi.useRealTimers(); });
 
+test.each([false, true])("shows expired-task recovery in Earn and detail (detail=%s) without a task or progress", async detail => {
+  const device = { ...cloudDevice(), currentTask: null, recoveryPending: true };
+  const card = await mount(en, device, true, true, true, detail);
+  expect(text(card.root)).toContain(computeV2Copy.en.statuses.RECOVERING);
+  expect(text(card.root)).not.toContain(en.earn.noCurrentTask);
+  expect(find(card.root, "nx-device-task-progress")).toBeUndefined();
+  expect(all(card.root).some(node => node.props.role === "progressbar")).toBe(false);
+});
+
 function cloudDevice(): Device {
   return { id: "render-cloud", rowVersion: 1, kind: "cloud-share", name: "Cloud Share", gpu: "RTX 4090",
     vramTotal: 96, basePower: 1200, baseRate: 100, baseRateNEX: 50, purchasedAt: now - 172_800_000,
@@ -94,7 +104,8 @@ async function mount(copy: Messages = zh, device = cloudDevice(), expanded = fal
     "@/lib/route": { navTo }, "@/composables/use-capacity-explainer": { useCapacityExplainer },
     "@/lib/server-deadline-clock": deadline, "@/lib/phone-activation-guidance": phoneGuidance,
     "@/store/device-types": deviceTypes, "@/lib/workload-label": workload,
-    "@/lib/task-result-confirmation": confirmation, "@/lib/task-progress": progress, "@/lib/device-copy": deviceCopy,
+    "@/components/earn/task-v2-status.vue": { __esModule: true, default: Vue.defineComponent({ setup: () => () => null }) },
+    "@/lib/task-result-confirmation": confirmation, "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, "@/lib/task-progress": progress, "@/lib/device-copy": deviceCopy,
     "@/store/device-lifecycle": lifecycle, "@/store/interrupt": interrupt,
     "@/lib/hashpower": hashpower, "@/lib/device-capability": capability,
     "@/lib/today-completed-tasks": completions, "@/i18n/format": { fmt },
@@ -406,7 +417,8 @@ test.each([en, zh, vietnamese])("collapsed queue exposes each actual task and fr
   expect(text(summary())).toContain("50%");
   expect(find(card.root, "nx-device-task-progress")!.props.style.width).toBe("50%");
   await vi.advanceTimersByTimeAsync(61_000);
-  expect(text(summary())).toContain("100%");
+  expect(text(summary())).toContain("99%");
+  expect(text(summary())).not.toContain("100%");
   expect(text(summary())).toContain(copy.earn.taskAwaitingExecutionResultConfirmation);
   expect(JSON.stringify(device)).toBe(before);
   device.currentTask!.status = "PAUSED"; device.currentTask!.pausedAt = now; await Vue.nextTick();

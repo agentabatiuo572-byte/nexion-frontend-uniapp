@@ -1,3 +1,5 @@
+import { deviceTaskRecovering } from "@/lib/task-progress";
+import { computeV2Copy } from "@/i18n/compute-v2";
 vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
 import * as Vue from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -41,7 +43,7 @@ function mount(locale: keyof typeof messages = "en") {
     "@/i18n/format": { fmtMoney }, "@/store/data-visibility": { useDataVisibility: () => visibility },
     "@/components/ui/nx-button.vue": { name: "NxButton" }, "@/composables/use-tab-page-lifecycle": { useVisibleInterval() {} },
     "@/lib/server-deadline-clock": { advanceMonotonicHighWater: (value: number) => value, projectServerNow: (value: number) => value, readMonotonicNowMs: () => 0 },
-    "@/lib/task-progress": { taskProgressPercent: () => 50 },
+    "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, "@/lib/task-progress": { deviceTaskRecovering, taskProgressPercent: () => 50 },
     "@/composables/use-device-product-image": { useDeviceProductImage: (device: () => Device) => ({ imageSrc: Vue.computed(() => `https://catalog.example/${device().productCode}`), imageError() {} }) } };
   const exports: Record<string, any> = {};
   new Function("require", "exports", code)((id: string) => {
@@ -52,6 +54,17 @@ function mount(locale: keyof typeof messages = "en") {
   const byClass = (className: string) => nodes(node()).find(item => item.props?.class?.split(" ").includes(className));
   return { props, device, emit, node, byClass, t, visibility };
 }
+
+it("shows a read-only recovery fact after lease expiry instead of idle or running animation", () => {
+  const screen = mount("en");
+  screen.device.currentTask = null;
+  screen.device.recoveryPending = true;
+  const content = nodes(screen.node()).flatMap(node => typeof node.children === "string" ? [node.children] : []).join("");
+  expect(content).toContain(computeV2Copy.en.statuses.RECOVERING);
+  expect(content).not.toContain(en.earn.noCurrentTask);
+  expect(screen.byClass("device-inventory-row__state--active")).toBeUndefined();
+  expect(screen.byClass("device-inventory-row__eq")).toBeUndefined();
+});
 
 it.each(["zh", "en", "vi"] as const)("shows the %s purchased card open with its job, earnings and actions", locale => {
   const screen = mount(locale);
