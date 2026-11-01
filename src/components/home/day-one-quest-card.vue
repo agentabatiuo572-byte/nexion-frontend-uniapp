@@ -533,7 +533,7 @@ const toggleStyle: CSSProperties = {
 
 /* Approved growth board geometry and material. */
  .newcomer-task--mission { position:relative; padding:25px 16px 5px !important; box-shadow:var(--v5-glass-shadow) !important; overflow:visible; }
-.newcomer-task--mission::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 200deg,transparent 0 45%,color-mix(in srgb,var(--v5-nex) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
+.newcomer-task--mission::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 200deg,transparent 0 45%,color-mix(in srgb,var(--v5-warning) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
 .newcomer-task--mission .newcomer-task__reward { margin-top:17px; }
 .newcomer-task--mission .newcomer-task__count { background:var(--v5-surface-3); color:var(--v5-ink-2); font:500 12px/16px var(--font-v5); }
 .newcomer-task--mission .newcomer-task__unit { font:500 12px/16px var(--font-v5) !important; color:var(--v5-nex-ink) !important; margin-left:6px !important; }

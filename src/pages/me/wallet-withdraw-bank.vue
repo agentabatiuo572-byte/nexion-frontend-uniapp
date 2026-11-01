@@ -446,15 +446,15 @@ onUnload(() => { alive = false; visible = false; stopTimer(); stopRuntime(); rev
 .stage { position: relative; margin-top: 12px; }
 .aura { position: absolute; inset: -8px -6px; pointer-events: none; }
 .aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
-.aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-brand) 22%, transparent); }
-.aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent); }
-[data-theme="light"] .aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
-[data-theme="light"] .aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
+.aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
+.aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-brand-2) 26%, transparent); }
+[data-theme="light"] .aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
+[data-theme="light"] .aura > view:last-child { background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
 .slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl);
-  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 15%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent), transparent 70%), rgba(255,255,255,.085);
+  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 15%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-brand-2) 16%, transparent), transparent 70%), rgba(255,255,255,.085);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
   backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); }
-[data-theme="light"] .slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
+[data-theme="light"] .slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-brand-2) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
   box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
 .slab__head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }

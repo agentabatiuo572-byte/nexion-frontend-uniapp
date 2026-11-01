@@ -401,15 +401,15 @@ function goStore() {
 .device-stage { position: relative; margin-top: 15px; }
 .device-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
 .device-stage__aura > view { position: absolute; width: 190px; height: 150px; border-radius: 50%; filter: blur(42px); }
-.device-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-brand) 26%, transparent); }
-.device-stage__aura > view:last-child { right: -14px; bottom: 20px; background: color-mix(in srgb, var(--v5-tech-cyan) 30%, transparent); }
-[data-theme="light"] .device-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
-[data-theme="light"] .device-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 18%, transparent); }
+.device-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent); }
+.device-stage__aura > view:last-child { right: -14px; bottom: 20px; background: color-mix(in srgb, var(--v5-aura-sky) 28%, transparent); }
+[data-theme="light"] .device-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
+[data-theme="light"] .device-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-aura-sky) 18%, transparent); }
 /* Liquid-glass soft edge: tinted fill carrying a copy of the stage aura, soft inner rim; bays sit in it
    as recessed wells. No backdrop-filter: it only applied while the page-enter animation composited the
    page, so the hero flashed brighter, then dimmed. The tint is the brighter look. */
 .device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl);
-  background: radial-gradient(220px 170px at 12% 60px, color-mix(in srgb, var(--v5-brand) 28%, transparent), transparent 70%), radial-gradient(220px 170px at 88% calc(100% - 70px), color-mix(in srgb, var(--v5-tech-cyan) 28%, transparent), transparent 70%), rgba(255,255,255,.055);
+  background: radial-gradient(220px 170px at 12% 60px, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent), transparent 70%), radial-gradient(220px 170px at 88% calc(100% - 70px), color-mix(in srgb, var(--v5-aura-sky) 26%, transparent), transparent 70%), rgba(255,255,255,.055);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35); }
 [data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); background: rgba(255,255,255,.58);
   box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
