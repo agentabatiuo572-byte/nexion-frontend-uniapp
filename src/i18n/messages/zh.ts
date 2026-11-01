@@ -611,7 +611,7 @@ export const zh: Messages = {
     doMathHeadline: "{target} 预估日收益是 {base} 的 {mult}。",
     doMathDaily: "每日",
     doMathVs: "对比 {base}",
-    doMathSeeCta: "查看测算",
+    doMathSeeCta: "去升级",
     doMathStage: "预估日收益",
     doMathYour: "对比你的 {base}",
     // EarningsLedgerCard (ZONE 5)
