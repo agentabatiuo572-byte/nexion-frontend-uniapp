@@ -72,7 +72,8 @@ const copy = useTrialLifecycleCopy();
 
 const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '-');
 const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
-const estimateNote = computed(() => trialView.config.value ? fmt(copy.value.estimateNote, {
+// An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
+const estimateNote = computed(() => trialView.config.value ? fmt(trialView.config.value.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote, {
   rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
   cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
 }) : freeTrial.authorityStatus === 'error' ? copy.value.unavailable : copy.value.loading);
