@@ -12,7 +12,7 @@ import ts from 'typescript';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useDataVisibility } from '@/store/data-visibility';
 import { createPassiveTabReadFixture } from '@/lib/passive-tab-read.test-support';
-import { formatAmount } from '@/lib/amount-display';
+import { formatAmount, formatGroupedAmount } from '@/lib/amount-display';
 import { formatUsd, formatUsdOverviewParts } from '@/lib/usd-display';
 import { fmt, fmtMoney } from '@/i18n/format';
 import { homeEarningsSubtitle } from './home-real-copy';
@@ -83,7 +83,7 @@ function fixture(copy = zh) {
     '@/store/commission': { useCommission: () => ({ todayUSDT: () => 0 }) },
     '@/store/staking': { useStaking: () => ({ todayAccruedUSDT: () => 0 }) },
     '@/composables/use-ticker': { useTicker: () => Vue.ref(0) }, './home-real-copy': { homeEarningsSubtitle },
-    '@/lib/amount-display': { formatAmount }, '@/lib/usd-display': { formatUsd, formatUsdOverviewParts },
+    '@/lib/amount-display': { formatAmount, formatGroupedAmount }, '@/lib/usd-display': { formatUsd, formatUsdOverviewParts },
     './home-live-feed': { formatHomeFeedTime, buildCanonicalHomeFeed }, '@/lib/route': { navTo },
     '@/i18n/remainder-ui': { useRemainderUiCopy: () => Vue.ref({ earnWays: {} }) },
     '@/i18n/audit-ui': { useAuditUiCopy: () => Vue.ref({ deviceRevenue: 'Revenue', revenueScope: 'Devices' }) },
@@ -120,7 +120,7 @@ it.each([zh, en, vietnamese])('links both title toggles, masks period totals/cou
   expect(text(home)).toContain('125.67');
   expect(text(earn)).toContain(fmt(copy.earn.jobsCount, { n: '321' }));
   expect(text(ledger)).toContain('+$0.0003');
-  const ledgerDate = text(all(ledger).find(n => n.props['data-home-ledger-time'])!);
+  expect(all(ledger).some(n => n.props['data-home-ledger-time'])).toBe(false);
   invoke(byClass(home, 'data-visibility-toggle').props.onClick); await Vue.nextTick();
   expect(f.visibility.hidden).toBe(true);
   for (const root of [home, earn, ledger, feed]) {
@@ -129,9 +129,9 @@ it.each([zh, en, vietnamese])('links both title toggles, masks period totals/cou
     expect(text(root)).not.toContain('+$0.0003');
   }
   expect(text(earn)).toContain(fmt(copy.earn.jobsCount, { n: '••••' }));
-  expect(text(home)).toContain(fmt(copy.home.techSettledJobs, { arrow: '', delta: '••••', count: '••••' }).trim());
+  expect(text(home)).not.toContain('321');
   expect(text(home)).not.toContain('12.3%');
-  expect(text(all(ledger).find(n => n.props['data-home-ledger-time'])!)).toBe(ledgerDate);
+  expect(all(ledger).some(n => n.props['data-home-ledger-time'])).toBe(false);
   expect(byClass(earn, 'data-visibility-toggle').props['aria-pressed']).toBe('true');
   invoke(all(earn).find(n => n.props['data-select-week'])!.props.onClick); await Vue.nextTick();
   expect(text(earn)).not.toContain('654');
