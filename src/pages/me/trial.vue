@@ -67,9 +67,9 @@
               <text class="trial-total__breakdown">{{ totalBreakdown }}</text>
               <view class="trial-total__line">
                 <text class="trial-total__label">{{ detail.totalLabel }}</text>
-                <text class="trial-total__value">{{ totalParts[0] }}<text class="trial-total__dec">.{{ totalParts[1] }}</text></text>
+                <text class="trial-total__value">{{ totalParts[0] }}<text v-if="totalParts[1]" class="trial-total__dec">.{{ totalParts[1] }}</text></text>
                 <text class="trial-unit-small trial-total__unit">USDT</text>
-                <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ formatGroupedAmount(purchaseQuote.rewardNEX) }}<text class="trial-unit-small"> UVT</text></text>
+                <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small"> UVT</text></text>
               </view>
             </view>
 
@@ -77,10 +77,10 @@
               <view class="trial-row"><text class="trial-row__label">{{ detail.unitPrice }}</text><text class="trial-row__value">{{ usd(purchaseQuote.priceUSD) }}</text></view>
               <view v-if="purchaseQuote.promoDiscountUSD > 0" class="trial-row"><view class="trial-row__label">{{ promoLabel }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">−{{ usd(purchaseQuote.promoDiscountUSD) }}</text></view>
               <view v-if="earlyQuote && earlyQuote.earlyDiscountUSD > 0" class="trial-row"><text class="trial-row__label">{{ detail.earlyRow }}</text><text class="trial-row__value">−{{ usd(earlyQuote.earlyDiscountUSD) }}</text></view>
-              <view v-if="purchaseQuote.offsetUSD > 0" class="trial-row"><view class="trial-row__label">{{ fmt(detail.offsetRow, { amount: formatGroupedAmount(purchaseQuote.offsetUSD) }) }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">−{{ usd(purchaseQuote.offsetUSD) }}</text></view>
+              <view v-if="purchaseQuote.offsetUSD > 0" class="trial-row"><view class="trial-row__label">{{ fmt(detail.offsetRow, { amount: visibility.mask(formatGroupedAmount(purchaseQuote.offsetUSD)) }) }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">{{ visibility.mask(`−${usd(purchaseQuote.offsetUSD)}`) }}</text></view>
             </view>
             <view class="trial-sum">
-              <view class="trial-sum__row"><text class="trial-sum__label">{{ detail.discountTotal }}</text><text class="trial-sum__discount">−{{ usd(discountTotal) }}</text></view>
+              <view class="trial-sum__row"><text class="trial-sum__label">{{ detail.discountTotal }}</text><text class="trial-sum__discount">{{ visibility.mask(`−${usd(discountTotal)}`) }}</text></view>
               <view class="trial-sum__row">
                 <text class="trial-row__label">{{ detail.finalPrice }}</text>
                 <view class="trial-sum__price">
@@ -97,7 +97,7 @@
               <text class="trial-credit__label">{{ purchase.creditGroup }}</text>
               <view class="trial-credit__row">
                 <text class="trial-credit__name">{{ detail.creditRow }}</text>
-                <text class="trial-credit__value" data-testid="trial-credit-after"><template v-if="purchaseQuote.remainderUSD > 0">{{ formatGroupedAmount(purchaseQuote.remainderUSD) }}<text class="trial-unit-small trial-dim"> USDT</text></template><text v-if="purchaseQuote.remainderUSD > 0 && purchaseQuote.rewardNEX > 0" class="trial-credit__sep"> · </text><text v-if="purchaseQuote.rewardNEX > 0" class="trial-credit__uvt">{{ formatGroupedAmount(purchaseQuote.rewardNEX) }}<text class="trial-unit-small"> UVT</text></text></text>
+                <text class="trial-credit__value" data-testid="trial-credit-after"><template v-if="purchaseQuote.remainderUSD > 0">{{ visibility.mask(formatGroupedAmount(purchaseQuote.remainderUSD)) }}<text class="trial-unit-small trial-dim"> USDT</text></template><text v-if="purchaseQuote.remainderUSD > 0 && purchaseQuote.rewardNEX > 0" class="trial-credit__sep"> · </text><text v-if="purchaseQuote.rewardNEX > 0" class="trial-credit__uvt">{{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small"> UVT</text></text></text>
               </view>
             </view>
           </template>
@@ -106,7 +106,7 @@
         <view v-else class="trial-ticket trial-ticket__body trial-rise trial-rise--3" data-testid="trial-credit-summary">
           <view class="trial-sum__row">
             <text class="trial-row__label">{{ lifecycle.availableOffsetLabel }}</text>
-            <text class="trial-sum__discount">{{ usd(trialOffset.offsetUSD) }}</text>
+            <text class="trial-sum__discount">{{ visibility.mask(usd(trialOffset.offsetUSD)) }}</text>
           </view>
           <view class="trial-row trial-legacy-row"><text class="trial-row__label">{{ lifecycle.estimateTotalLabel }}</text><text class="trial-row__value">≈ {{ usd(estimatedOffsetUSD) }}</text></view>
           <text class="trial-legacy-note">{{ lifecycle.earlyPurchaseNote }}</text>
@@ -180,8 +180,12 @@
         </view>
       </view>
 
-      <!-- Lets the last block scroll clear of the bottom bar. -->
-      <view v-if="!authorityScreenUnavailable" :style="{ height: barNote ? '98px' : '72px' }" />
+      <!-- Reserves the bottom bar's height so the last row scrolls clear of it: the bar's own note and
+           retry rows, invisible, wrap exactly as in the bar; the button, padding and safe area are fixed. -->
+      <view v-if="!authorityScreenUnavailable" class="trial-bar-space" aria-hidden="true">
+        <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
+        <view v-if="barRetry" class="trial-bar__retry trial-bar-space__retry" />
+      </view>
     </view>
 
     <!-- Every state's main action sits in the thumb zone (DS-30). -->
@@ -189,7 +193,7 @@
       <view v-if="!authorityScreenUnavailable" class="trial-bar" :class="{ 'trial-bar--pair': conversionRefunded }">
         <template v-if="isActiveCycle || (status === 'ended' && !claimVisible)">
           <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
-          <view v-if="productCatalogState.status === 'error'" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
+          <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
           <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialProductUnavailable && !trialCatalogLoading" :busy="trialCatalogLoading" @click="goCheckout">
             <svg v-if="isActiveCycle" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
             <text>{{ trialBuyCtaText }}</text>
@@ -375,7 +379,7 @@ const discountTotal = computed(() => {
 });
 const totalShown = useCountUp(() => (purchaseQuote.value && !authorityScreenUnavailable.value
   ? cents(discountTotal.value + purchaseQuote.value.remainderUSD) : null), { follow: true });
-const totalParts = computed(() => amountParts(totalShown.value ?? 0));
+const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalShown.value ?? 0)));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
 const deviceName = computed(() => trialProduct.value?.name ?? cfg.value.trialProductName);
 const buyTitle = computed(() => {
@@ -383,12 +387,13 @@ const buyTitle = computed(() => {
   return isGrace.value ? detail.value.graceTitle : purchase.value.accruedTitle;
 });
 // What arrives after purchase: USDT when there is some, otherwise the UVT (amounts never split across lines).
+// Both figures carry the trial earnings, so the data-visibility mask hides them like the hero.
 const totalBreakdown = computed(() => {
   const quote = purchaseQuote.value;
   if (!quote) return "";
-  const discount = usd(discountTotal.value);
-  const credit = quote.remainderUSD > 0 ? `${formatGroupedAmount(quote.remainderUSD)} USDT`
-    : quote.rewardNEX > 0 ? `${formatGroupedAmount(quote.rewardNEX)} UVT` : "";
+  const discount = visibility.mask(usd(discountTotal.value));
+  const credit = quote.remainderUSD > 0 ? `${visibility.mask(formatGroupedAmount(quote.remainderUSD))} USDT`
+    : quote.rewardNEX > 0 ? `${visibility.mask(formatGroupedAmount(quote.rewardNEX))} UVT` : "";
   return credit ? fmt(detail.value.totalBreakdown, { discount, credit }) : fmt(detail.value.totalDiscountOnly, { discount });
 });
 const promoLabel = computed(() => {
@@ -403,7 +408,7 @@ const w = computed(() => t.value.trial);
 const idleBody = computed(() => freeTrial.authorityStatus === "mock" || freeTrial.authorityServerState !== null
   ? fmt(w.value.idleBody, { n: String(cfg.value.trialDays) })
   : "");
-const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: formatAmount(trialOffset.value.remainderUSD) }));
+const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: visibility.mask(formatAmount(trialOffset.value.remainderUSD)) }));
 const trialBuyCtaText = computed(() => {
   if (productCatalogState.status === "error") return t.value.store.catalogErrorTitle;
   if (trialCatalogLoading.value) return w.value.buyCtaPlain;
@@ -434,6 +439,7 @@ const ineligibleReasonText = computed(() => {
   if (r === "capacity-full") return lifecycle.value.capacityFull;
   return w.value.eligReasonClosed;
 });
+const barRetry = computed(() => (isActiveCycle.value || status.value === "ended") && !claimVisible.value && productCatalogState.status === "error");
 // The one line above the bottom button that says why it is disabled.
 const barNote = computed(() => {
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
@@ -623,6 +629,9 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-bar--pair { flex-direction:row;flex-wrap:wrap;gap:12px; }
 .trial-bar__note { margin:0 0 10px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;text-wrap:pretty; }
 .trial-bar__retry { display:flex;justify-content:center;margin:-6px 0 4px; }
+/* In-flow twin of the bar: 12 top + 48 button + 30 bottom (+ safe area) + a 20px gap, less the 40px the chassis already pads. */
+.trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 16px calc(70px + env(safe-area-inset-bottom)); }
+.trial-bar-space__retry { height:44px; }
 .trial-bar__main { display:flex;width:100%; }
 .trial-bar__side { flex:1 1 0;min-width:fit-content; }
 .trial-bar__wide { flex:2 1 0;min-width:fit-content; }
