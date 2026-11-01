@@ -475,8 +475,8 @@ export const en = {
   register: {
     registrationSignInRequired: "Your account was created. Sign in to continue.",
     title: "Create account",
-    subtitleHighlight: "Invitation welcome reward: {reward}",
-    subtitleRest: ". A valid invite and reward eligibility are required; credit follows settlement records.",
+    subtitleHighlight: "Welcome reward: {reward}",
+    subtitleRest: ". Reward eligibility is required; credit follows settlement records.",
     subtitleRewardDisabled: "Connect a device to get started.",
     phonePlaceholder: "Mobile number",
     passwordPlaceholder: "Create password (8–64 chars)",
@@ -520,6 +520,7 @@ export const en = {
     registrationOutcomeUnknown: "The account may have been created, but sign-in is unconfirmed. Check the registration result before registering again.",
     registrationSignedIn: "Account created · signed in automatically",
     sponsorEnvironmentMismatch: "This invitation code is unavailable. Check the code and try again.",
+    inviteInvalid: "Invalid invite code. Please check it and try again.",
     setPasswordTitle: "Set your password",
     setPasswordHint: "Use 8–64 characters with letters and numbers.",
     confirmPasswordPlaceholder: "Confirm password",

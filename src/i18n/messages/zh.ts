@@ -459,8 +459,8 @@ export const zh: Messages = {
   register: {
     registrationSignInRequired: "账号已创建，请登录后继续。",
     title: "创建账号",
-    subtitleHighlight: "邀请新人礼：{reward}",
-    subtitleRest: "。须有有效邀请并满足奖励条件；实际到账以结算记录为准。",
+    subtitleHighlight: "新人礼包：{reward}",
+    subtitleRest: "。须满足奖励条件；实际到账以结算记录为准。",
     subtitleRewardDisabled: "连接设备后即可开始使用。",
     phonePlaceholder: "手机号码",
     passwordPlaceholder: "设置密码(8–64 位)",
@@ -504,6 +504,7 @@ export const zh: Messages = {
     registrationOutcomeUnknown: "账号可能已创建，登录结果尚未确认。请查询注册结果，确认前不要重复注册。",
     registrationSignedIn: "注册成功，已自动登录",
     sponsorEnvironmentMismatch: "该邀请码不可用,请核对后重试",
+    inviteInvalid: "邀请码无效，请检查后重新输入",
     setPasswordTitle: "设置登录密码",
     setPasswordHint: "密码需 8–64 位,且包含字母和数字。",
     confirmPasswordPlaceholder: "再次输入密码",
