@@ -1610,10 +1610,11 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent); }
 [data-theme="light"] .wd-aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
 [data-theme="light"] .wd-aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
+/* No backdrop-filter (same as the top-up slab): it only applied while the page-enter animation
+   composited the page, so the slab flashed brighter, then dimmed. The tint is the brighter look. */
 .wd-slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl);
-  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 15%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent), transparent 70%), rgba(255,255,255,.085);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
-  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); }
+  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 28%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 28%, transparent), transparent 70%), rgba(255,255,255,.13);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35); }
 [data-theme="light"] .wd-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
   box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
 .wd-slab__head { display: flex; align-items: center; justify-content: space-between; }

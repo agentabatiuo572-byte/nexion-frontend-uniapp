@@ -1079,11 +1079,13 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-stage__aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
 .nx-bank-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-brand) 22%, transparent); }
 .nx-bank-stage__aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent); }
-/* The glass carries a faint copy of the aura so the colour reads through it as on the board. */
+/* The glass carries its own copy of the aura so the colour reads through it as on the board.
+   No backdrop-filter: it only took effect while the page-enter animation composited the page,
+   so the slab rendered brighter for ~300ms and then dimmed. The tint below is the brighter look. */
 .nx-bank-slab { position: relative; padding: 23px 20px 20px; border-radius: 24px;
-  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 15%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent), transparent 70%), rgba(255,255,255,.085);
+  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 28%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 28%, transparent), transparent 70%), rgba(255,255,255,.13);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
-  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); }
+}
 [data-theme="light"] .nx-bank-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
 [data-theme="light"] .nx-bank-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
 [data-theme="light"] .nx-bank-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-brand) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
