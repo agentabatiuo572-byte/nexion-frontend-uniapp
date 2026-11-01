@@ -8,10 +8,10 @@
       </view>
     </view>
     <view class="team-ledger__amount tabular-nums"><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__currency">{{ monthUSDTParts.prefix }}</text><text>{{ visibility.mask(intPart) }}</text><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__fraction">.{{ fracPart }}</text></view>
-    <text class="team-ledger__nex tabular-nums">{{ visibility.mask(hasAmounts ? '+' + formatAmount(monthNEX) : '—') }} UVT</text>
+    <text class="team-ledger__nex tabular-nums">{{ visibility.mask(hasAmounts ? '+' + formatAmount(shownMonthNEX) : '—') }} UVT</text>
     <view class="team-ledger__settlement" :aria-label="copy.settlementScope">
-      <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot" aria-hidden="true" /><text>{{ t.teamV3.settled }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(unlockedUSDT) : '—') }}</text></view>
-      <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot team-ledger__dot--cooling" aria-hidden="true" /><text>{{ t.teamV3.coolingDown }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(coolingUSDT) : '—') }}</text></view>
+      <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot" aria-hidden="true" /><text>{{ t.teamV3.settled }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(shownUnlockedUSDT) : '—') }}</text></view>
+      <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot team-ledger__dot--cooling" aria-hidden="true" /><text>{{ t.teamV3.coolingDown }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(shownCoolingUSDT) : '—') }}</text></view>
     </view>
     <view class="team-ledger__control">
       <!-- Lifetime composition stays open; data-state says whether its figures are current. -->
@@ -50,6 +50,7 @@ import { teamRedesignCopy } from '@/i18n/team-redesign';
 import { useDataVisibility } from '@/store/data-visibility';
 import DataVisibilityToggle from '@/components/ui/data-visibility-toggle.vue';
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, vizStagger } from '@/composables/use-scroll-grow-progress';
+import { useCountUp } from '@/composables/use-count-up';
 
 const props = withDefaults(defineProps<{
   available?: boolean;
@@ -77,7 +78,12 @@ function retry() {
   if (props.failed) emit('retry');
 }
 
-const monthUSDTParts = computed(() => hasAmounts.value ? formatUsdOverviewParts(props.monthUSDT) : null);
+// The month figures count up once when they first become readable; the lifetime composition stays static.
+const shownMonthUSDT = useCountUp(() => hasAmounts.value ? props.monthUSDT : null);
+const shownMonthNEX = useCountUp(() => hasAmounts.value ? props.monthNEX : null);
+const shownUnlockedUSDT = useCountUp(() => hasAmounts.value ? props.unlockedUSDT : null);
+const shownCoolingUSDT = useCountUp(() => hasAmounts.value ? props.coolingUSDT : null);
+const monthUSDTParts = computed(() => hasAmounts.value ? formatUsdOverviewParts(shownMonthUSDT.value) : null);
 const intPart = computed(() => monthUSDTParts.value?.integer ?? '—');
 const fracPart = computed(() => monthUSDTParts.value?.fraction ?? '');
 const splitTotal = computed(() => hasAmounts.value ? Math.max(0, props.directUSDT + props.extendedUSDT) : 0);

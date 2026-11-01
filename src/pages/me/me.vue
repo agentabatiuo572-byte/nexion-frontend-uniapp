@@ -97,6 +97,7 @@ import { usePaymentPassword } from "@/store/payment-password";
 import { captureAccountScope, isCurrentAccountScope, rebindAccountScopedStores } from "@/lib/account-scope";
 import { useNotifications } from "@/store/notifications";
 import { useConversations } from "@/store/conversations";
+import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useGenesis } from "@/store/genesis";
 import { useConfig } from "@/store/config";
@@ -330,12 +331,11 @@ const quickSections = computed<QuickSection[]>(() => [
     title: t.value.me.secHelp,
     items: [
       { key: "messages", label: t.value.notifs.drawerTitle, href: "/me/notifications", icon: "messages", badge: formatUnreadBadge(messageUnread.value) || undefined, tone: "purple" },
-      // This opens the support hub; availability is not inferred from a local badge.
+      // This opens the advisor chat directly (handleQuickItem); availability is not inferred from a local badge.
       { key: "support", label: t.value.me.supportHubRow, href: "/me/support", icon: "chat", meta: t.value.me.supportHubMeta, tone: "success" },
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
       { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
       { key: "learning", label: t.value.me.learningRow, href: "/learn/courses", icon: "book", tone: "brand" },
-      { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
       { key: "developer", label: t.value.me.developer, href: "/developer", icon: "code", tone: "muted" },
     ],
   },
@@ -470,7 +470,20 @@ function handleQuickItem(item: QuickItem) {
     themePickerOpen.value = true;
     return;
   }
+  if (item.key === "support") { void openSupportChat(); return; }
   navTo(item.href);
+}
+
+// Same route as the support hub's live chat; the guard keeps a double tap from pushing twice.
+const openingChat = ref(false);
+async function openSupportChat() {
+  if (openingChat.value) return;
+  openingChat.value = true;
+  try {
+    navTo(await advisorChatRoute(conversations));
+  } finally {
+    openingChat.value = false;
+  }
 }
 
 function toneColor(tone: QuickTone = "muted"): string {

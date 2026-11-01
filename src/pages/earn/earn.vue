@@ -139,6 +139,7 @@ import { useConfig } from "@/store/config";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { navTo } from "@/lib/route";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
+import { useCountUp } from "@/composables/use-count-up";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 
@@ -307,13 +308,16 @@ const mockTotal = computed(() => {
   return range.value === "Today" ? e.today : range.value === "Week" ? e.thisWeek : range.value === "Month" ? e.thisMonth : e.total;
 });
 const total = computed(() => remoteApiEnabled ? serverPeriodValue.value?.usdt ?? null : mockTotal.value);
-const totalParts = computed(() => formatUsdOverviewParts(total.value));
+// Only the first figure counts up; a later period switch shows its value directly.
+const shownTotal = useCountUp(total);
+const totalParts = computed(() => formatUsdOverviewParts(shownTotal.value));
 const totalKnown = computed(() => totalParts.value !== null);
 const totalPrefix = computed(() => totalParts.value?.prefix ?? "");
 const totalInt = computed(() => totalParts.value?.integer ?? "—");
 const totalCents = computed(() => totalParts.value?.fraction ?? "");
 const nexTotal = computed(() => remoteApiEnabled ? serverPeriodValue.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
-const nexFmt = computed(() => nexTotal.value === null ? "—" : formatAmount(nexTotal.value));
+const shownNex = useCountUp(nexTotal);
+const nexFmt = computed(() => shownNex.value === null ? "—" : formatAmount(shownNex.value));
 const jobsCount = computed(() => {
   if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
   return serverPeriodValue.value?.jobCount ?? null;
