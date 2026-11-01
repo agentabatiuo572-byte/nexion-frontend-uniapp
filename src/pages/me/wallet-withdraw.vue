@@ -329,7 +329,6 @@ import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } f
 import { mockServerNow } from "@/store/server-time";
 import { evaluateWithdrawal, requestWithdrawalEligibility, type WithdrawalEligibility } from "@/store/withdrawal-eligibility";
 import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
-import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { confirm as uiConfirm, toast } from "@/store/ui";
@@ -354,7 +353,6 @@ const t = useT();
 const app = useApp();
 const auth = useAuth();
 const payout = usePayoutAddress();
-const risk = useRiskDisclosure();
 const phase = useProductPhase();
 const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
@@ -1170,11 +1168,6 @@ async function handleSubmit() {
     network.value = pending.network;
     offsetWithNex.value = pending.offset;
   }
-  if (!risk.accepted) {
-    // Source pushes to the risk-disclosure page (not yet ported) and returns.
-    navTo("/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw");
-    return;
-  }
   // 🔴 **一份提交快照收全族**(2026-08-04 R2 三条 P1 同一个根:跨 await 的状态漂移)。
   //
   // 参与这次提交的每一个输入 —— 账号 / 网络 / 收款地址 / 金额 / 可提上限 / 抵扣开关 / 报价 ——
@@ -1256,22 +1249,7 @@ async function handleSubmit() {
     clearSubmitFreeze();
     return;
   }
-  // The page gate is a visible product boundary, while the withdrawal service
-  // keeps the final server-side gate as defense in depth. Reuse the frozen
-  // withdrawal idempotency key as operationId so retries remain one audited
-  // business flow and an account rebind cannot authorize the old attempt.
   submitting.value = true;
-  try {
-    await risk.checkGate("withdraw", snap.idempotencyKey);
-  } catch (cause) {
-    clearSubmitFreeze();
-    if (cause instanceof ApiError && cause.message === "RISK_DISCLOSURE_ACK_REQUIRED") {
-      navTo("/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw");
-    } else {
-      toast.error(t.value.riskDisclosure.gateUnavailable);
-    }
-    return;
-  }
   // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
   // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
   // 🔴 重放**不进**前置评估:它是给「新的一笔」用的前置过滤(判当前额度/风控放不放行),

@@ -106,7 +106,6 @@
 <script setup lang="ts">
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
-import { navTo } from "@/lib/route";
 import { ref, computed, watch, onBeforeUnmount, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -119,8 +118,6 @@ import { StakingOpenRejectedError } from "@/api/staking-open-rejection";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { useRiskDisclosure } from "@/store/risk-disclosure";
-import { ApiError } from "@/api/errors";
 import { canOpenStakingPool, resolveStakingPool } from "@/lib/staking-canonical";
 import { formatCommandAmount, normalizeCommandAmount } from "@/lib/command-amount";
 
@@ -133,7 +130,6 @@ const emit = defineEmits<{ "update:open": [boolean] }>();
 const t = useT();
 const app = useApp();
 const staking = useStaking();
-const risk = useRiskDisclosure();
 
 const amount = ref(0);
 const remotePending = ref(false);
@@ -300,7 +296,6 @@ async function submit() {
     let lease: RemoteIntentLease | null = null;
     try {
       lease = intentLease(pool.tierKey, submittedAmount);
-      await risk.checkGate("staking", lease.key);
       if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) {
         return;
       }
@@ -315,10 +310,6 @@ async function submit() {
       if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch) return;
       restorePendingOpen();
       if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) return;
-      if (cause instanceof ApiError && cause.message === "RISK_DISCLOSURE_ACK_REQUIRED") {
-        navTo("/pages/me/risk-disclosure?return=/pages/staking/staking");
-        return;
-      }
       if (cause instanceof StakingOpenRejectedError) {
         const title = cause.reason === "insufficient" ? t.value.stakingV3.toast.insufficient
           : cause.reason === "minimum" ? t.value.stakingV3.toast.minAmount
