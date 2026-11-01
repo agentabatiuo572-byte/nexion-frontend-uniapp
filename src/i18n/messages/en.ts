@@ -630,7 +630,7 @@ sandboxSponsorEnvironmentMismatch: "This invitation code can't be used. Check it
     doMathDaily: "daily",
     doMathPayback: "payback",
     doMathVs: "vs {base}",
-    doMathSeeCta: "See the math",
+    doMathSeeCta: "Upgrade",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "Earnings ledger",
     earningsLedgerViewAll: "View all",
