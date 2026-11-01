@@ -1,11 +1,16 @@
 <!--
   Exchange · How it works — explainer (ported from
-  Nexion-prototype/app/(main)/me/wallet/exchange/how-it-works/page.tsx). Reuses
-  shared how-* components; purple accent. Wrapped in <AppChassis active="me">.
+  Nexion-prototype/app/(main)/me/wallet/exchange/how-it-works/page.tsx). The published
+  document renders through ExchangeGuide (approved fund board ExchangeHow); loading,
+  fallback and failure stay in HowPublishedContent. Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
-    <HowPublishedContent v-if="remoteApiEnabled && exchangeAvailable === true" content-key="wallet-exchange-how" back="/pages/me/wallet-exchange" />
+    <HowPublishedContent v-if="remoteApiEnabled && exchangeAvailable === true" content-key="wallet-exchange-how" back="/pages/me/wallet-exchange">
+      <template #default="{ blocks }">
+        <ExchangeGuide v-bind="publishedGuide(blocks)" :back-label="w.ctaBack" :directory-label="t.howPublished.contents" @back="goBack" />
+      </template>
+    </HowPublishedContent>
     <view v-else-if="remoteApiEnabled" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/wallet-exchange" />
       <view class="mx-4" role="status" aria-live="polite" style="padding: 24px 2px; color: var(--v5-ink-2)">
@@ -17,34 +22,7 @@
     </view>
     <view v-if="!remoteApiEnabled" style="padding-bottom: 32px">
       <SubPageHeader back="/pages/me/wallet-exchange" />
-
-      <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="purple" />
-
-      <HowSection :title="w.s2Title" accent="purple">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg>
-        </template>
-        <view style="display: flex; flex-direction: column; gap: 14px">
-          <HowStepRow :n="1" :title="w.s2Step1Title" :body="w.s2Step1Body" accent="purple" />
-          <HowStepRow :n="2" :title="w.s2Step2Title" :body="w.s2Step2Body" accent="purple" />
-          <HowStepRow :n="3" :title="w.s2Step3Title" :body="w.s2Step3Body" accent="purple" />
-        </view>
-      </HowSection>
-
-      <HowSection :title="w.s3Title">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" /></svg>
-        </template>
-        <text class="block" :style="paraStyle">{{ w.s3Intro }}</text>
-        <CalloutBox :title="w.s3HintTitle" :body="w.s3HintBody" tone="amber" />
-      </HowSection>
-
-      <view class="mx-4" style="margin-top: 24px">
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" @click="goBack">
-          <text>{{ w.ctaBack }}</text>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
-      </view>
+      <ExchangeGuide v-bind="localGuide" :back-label="w.ctaBack" :directory-label="t.howPublished.contents" @back="goBack" />
     </view>
   </AppChassis>
 </template>
@@ -52,15 +30,13 @@
 <script setup lang="ts">
 import { onShow } from "@dcloudio/uni-app";
 import { navBack } from "@/lib/route";
-import { computed, onUnmounted, ref, type CSSProperties } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import HowPublishedContent from "@/components/how/how-published-content.vue";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
+import type { HowContentBlock } from "@/api/how-content-api";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import HowHero from "@/components/how/how-hero.vue";
-import HowSection from "@/components/how/how-section.vue";
-import HowStepRow from "@/components/how/how-step-row.vue";
-import CalloutBox from "@/components/how/how-callout-box.vue";
+import ExchangeGuide from "@/components/me/exchange-guide.vue";
 import { useT } from "@/i18n/use-t";
 
 const t = useT();
@@ -90,19 +66,36 @@ function goBack() {
   navBack("/pages/me/wallet-exchange");
 }
 
-const paraStyle: CSSProperties = { fontSize: "var(--ui-type-long-form)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-long-form-lh)" }; // how-page scale: body 13.5/1.65 ink-2
-const ctaStyle: CSSProperties = {
-  gap: "6px",
-  height: "50px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-  boxShadow: "var(--v5-spotlight-brand)",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "var(--ui-type-button)",
-  letterSpacing: "-0.005em",
-};
+// A plain-text section reads as one numbered point: its first sentence leads, the rest explains.
+function splitLead(text: string): { title: string; body?: string } {
+  const m = /^(.+?(?:[。！？]|[.!?](?=\s)))\s*(\S[\s\S]*)$/.exec(text.trim());
+  return m ? { title: m[1], body: m[2] } : { title: text.trim() };
+}
 
+// Published document → guide: the first block is the overview, callouts stay callouts, list
+// items become numbered rows (the block body leads them in), plain text becomes one row.
+function publishedGuide(blocks: HowContentBlock[]) {
+  const [intro, ...rest] = blocks;
+  return {
+    intro: { title: intro?.title ?? w.value.heroLabel, lines: intro ? [intro.body, ...(intro.items ?? [])].filter(Boolean) : [] },
+    parts: rest.map(block => block.kind === "callout"
+      ? { kind: "callout" as const, id: block.id, title: block.title, body: block.body }
+      : block.items?.length
+        ? { kind: "section" as const, id: block.id, title: block.title, lead: block.body || undefined, rows: block.items.map(title => ({ title })) }
+        : { kind: "section" as const, id: block.id, title: block.title, rows: block.body ? [splitLead(block.body)] : [] }),
+  };
+}
 
+const localGuide = computed(() => ({
+  intro: { title: w.value.heroLabel, lines: [w.value.heroTitle, w.value.heroSub] },
+  parts: [
+    { kind: "section" as const, id: "steps", title: w.value.s2Title, rows: [
+      { title: w.value.s2Step1Title, body: w.value.s2Step1Body },
+      { title: w.value.s2Step2Title, body: w.value.s2Step2Body },
+      { title: w.value.s2Step3Title, body: w.value.s2Step3Body },
+    ] },
+    { kind: "section" as const, id: "daily-limit", title: w.value.s3Title, rows: [splitLead(w.value.s3Intro)] },
+    { kind: "callout" as const, id: "note", title: w.value.s3HintTitle, body: w.value.s3HintBody },
+  ],
+}));
 </script>
