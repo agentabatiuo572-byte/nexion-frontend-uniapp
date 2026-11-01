@@ -72,10 +72,11 @@
   </NxSection>
 </template>
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch, type Ref } from "vue";
+import { computed, onUnmounted, ref, watch, watchEffect, type Ref } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { useApp } from "@/store/app";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -119,7 +120,16 @@ const status = computed(() => trialView.status.value);
 const hasLifecycle = computed(() => status.value !== null && status.value !== 'none');
 const eligibility = computed(() => trial.eligibility());
 const capacityFull = computed(() => eligibility.value.reason === 'capacity-full');
-const canRestart = computed(() => status.value === 'ended' && eligibility.value.ok);
+// eligibility() fails closed while a background read is in flight, so keep the last
+// CONFIRMED restart answer (reset on rebind). The claim sheet re-verifies before starting.
+const app = useApp(), confirmedRestart = ref(false);
+let restartBinding = '';
+watchEffect(() => {
+  const binding = `${app.accountKey}:${app.accountBindingEpoch}`;
+  if (binding !== restartBinding) { restartBinding = binding; confirmedRestart.value = false; }
+  if (!remoteApiEnabled || trial.authorityStatus === 'ready') confirmedRestart.value = status.value === 'ended' && eligibility.value.ok;
+});
+const canRestart = computed(() => status.value === 'ended' && confirmedRestart.value);
 const canClaim = computed(() => trial.status === "none" && trial.authorityStatus !== 'error'
   && (eligibility.value.ok || trial.confirmedOfferState() === "claimable"));
 const trialOffer = computed(() => canRestart.value || (!hasLifecycle.value && trial.status === "none"
