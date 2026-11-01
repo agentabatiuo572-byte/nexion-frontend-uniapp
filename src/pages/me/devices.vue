@@ -405,10 +405,12 @@ function goStore() {
 .device-stage__aura > view:last-child { right: -14px; bottom: 20px; background: color-mix(in srgb, var(--v5-tech-cyan) 30%, transparent); }
 [data-theme="light"] .device-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
 [data-theme="light"] .device-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 18%, transparent); }
-/* Liquid-glass soft edge: frosted fill, soft inner rim; bays sit in it as recessed wells. */
-.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl); background: rgba(255,255,255,.045);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
-  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); }
+/* Liquid-glass soft edge: tinted fill carrying a copy of the stage aura, soft inner rim; bays sit in it
+   as recessed wells. No backdrop-filter: it only applied while the page-enter animation composited the
+   page, so the hero flashed brighter, then dimmed. The tint is the brighter look. */
+.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl);
+  background: radial-gradient(220px 170px at 12% 60px, color-mix(in srgb, var(--v5-brand) 28%, transparent), transparent 70%), radial-gradient(220px 170px at 88% calc(100% - 70px), color-mix(in srgb, var(--v5-tech-cyan) 28%, transparent), transparent 70%), rgba(255,255,255,.055);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35); }
 [data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); background: rgba(255,255,255,.58);
   box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
 .device-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -428,7 +430,11 @@ function goStore() {
 .device-bay-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 112px; box-sizing: border-box; border-radius: var(--v5-radius-m); }
 .device-bay-slot--empty { border: 1.5px dashed var(--v5-border-strong); cursor: pointer; }
 .device-bay-slot--empty:active { transform: scale(.97); }
-.device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--v5-ink-3); }
+.device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--v5-ink-3);
+  backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* Over the stage aura the shared frosted blur only applied during the page-enter animation (bright, then
+   dim); a fixed, slightly denser fill keeps the brighter look without the flash. */
+[data-theme="dark"] .device-bay-slot__plus { --ui-button-fill: color-mix(in srgb, var(--v5-ink) 14%, transparent); }
 .device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .device-bay-slot--loading { background: linear-gradient(100deg, color-mix(in srgb, var(--v5-ink) 4%, transparent) 30%, color-mix(in srgb, var(--v5-ink) 10%, transparent) 50%, color-mix(in srgb, var(--v5-ink) 4%, transparent) 70%); background-size: 300% 100%; animation: device-shimmer 1.6s linear infinite; }
 .device-inventory-section { margin-top: var(--ui-space-section-gap, 32px); min-width: 0; }
