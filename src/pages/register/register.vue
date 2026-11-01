@@ -74,7 +74,7 @@
               </view>
               <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
             </view>
-            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
+            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :disabled="verifying" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
             <text v-if="inviteInvalid" id="register-invite-error" class="rg-invite__err" role="alert">{{ t.register.inviteInvalid }}</text>
           </view>
           <!-- 包 zm T3:仅开发构建,Java dev 后端网络级失联时亮工程横幅(生产构建整段剔除)
@@ -146,7 +146,7 @@
       <text v-if="!ctaEnabled && !busy && (phoneTouched || submitAttempted)" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
-      <ThirdPartyAuth v-if="remoteApiEnabled && step === 1" :disabled="busy || authApi.pendingLogin()" :sponsor-code="lockedRef || invite" :before-start="manualInviteAccepted" @busy="oauthBusy = $event" />
+      <ThirdPartyAuth v-if="remoteApiEnabled && step === 1" :disabled="busy || authApi.pendingLogin()" :sponsor-code="lockedRef || invite" :before-start="manualInviteAccepted" :sponsor-rejected="rejectSponsorCode" @busy="oauthBusy = $event" />
       <view v-if="step === 1 && !remoteApiEnabled" class="rg-oauth">
         <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
         <AuthProviderGrid :busy="busy" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
@@ -498,7 +498,10 @@ function onCta() {
 async function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = t.value.register.errorInvalidPhone; return; }
+  const flowVersion = otpFlowVersion;
   if (!(await manualInviteAccepted())) return;
+  // The phone or country changed while the code was being checked; the user sends again.
+  if (flowVersion !== otpFlowVersion || step.value !== 1 || !phoneOk.value) return;
   void requestCode();
 }
 // A typed code is checked before an OTP is sent or a third-party sign-up starts,
@@ -523,6 +526,16 @@ async function manualInviteAccepted(): Promise<boolean> {
   }
   // The user edited the code while it was being checked; let them submit again.
   return mounted && invite.value === typed;
+}
+// The server refused the code at submit or third-party sign-up. A link code can stop
+// working after it was locked; reopen the field with it so the user can fix or clear it.
+function rejectSponsorCode() {
+  if (lockedRef.value) {
+    invite.value = lockedRef.value;
+    lockedRef.value = null;
+    sponsorPreview.value = null;
+  }
+  inviteInvalid.value = true;
 }
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
 async function requestCode(captchaTicket?: string) {
@@ -642,13 +655,7 @@ function recoverRejectedRegistration(cause: unknown): boolean {
   resendLeft.value = 0;
   step.value = invalidOtp ? 2 : 1;
   if (sponsorRejected) {
-    // A link code can stop working after it was locked; reopen the field so the user can fix or clear it.
-    if (lockedRef.value) {
-      invite.value = lockedRef.value;
-      lockedRef.value = null;
-      sponsorPreview.value = null;
-    }
-    inviteInvalid.value = true;
+    rejectSponsorCode();
     return true;
   }
   error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired : t.value.register.errorSignupLimited;

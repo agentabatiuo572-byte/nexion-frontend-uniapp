@@ -272,7 +272,9 @@ const ALL_PERKS: { key: PerkKey; icon: string; tint: string }[] = [
   { key: "always", icon: ZAP_SVG, tint: "var(--v5-warning)" },
   { key: "sponsor", icon: USERS_SVG, tint: "var(--v5-tech-cyan)" },
 ];
-const perks = computed(() => ALL_PERKS.filter((perk) => rewardEnabled.value || perk.key !== "gift"));
+// The inviter perk is a promise about a friend inviter, so it needs a confirmed friend code.
+const perks = computed(() => ALL_PERKS.filter((perk) => (rewardEnabled.value || perk.key !== "gift")
+  && (perk.key !== "sponsor" || remotePreview.value?.kind === "USER")));
 function perkLabel(k: PerkKey): string {
   const s = t.value.ref.perks[k];
   return k === "gift" ? fmt(s, { usd: formatAmount(giftUsdt.value), nex: formatAmount(giftNex.value) }) : s;

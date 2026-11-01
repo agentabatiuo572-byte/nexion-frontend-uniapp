@@ -44,8 +44,9 @@ import { ApiError } from "@/api/errors";
 import { listenForNativeOAuthReturn, validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth-browser-return";
 
 // beforeStart lets the host page veto a start (e.g. an invalid typed invite code) before the provider opens.
-const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null }>(), {
-  intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null, beforeStart: null,
+// sponsorRejected hands a refused invite code back to the host page that owns the invite field.
+const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: (() => void) | null }>(), {
+  intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null, beforeStart: null, sponsorRejected: null,
 });
 const t = useT();
 const emit = defineEmits<{ (event: "busy", busy: boolean): void }>();
@@ -122,6 +123,16 @@ function errorMessage(cause: unknown): string {
   if (error === "USER_PASSWORD_RESET_REQUIRED") return t.value.thirdParty.passwordReset;
   return t.value.thirdParty.failed;
 }
+// A refused invite code ends this flow: retrying would send the same code. The host
+// page reopens its invite field with the prompt; without a host handler it shows here.
+function sponsorRefused(cause: unknown): boolean {
+  if (!(cause instanceof ApiError)
+      || !["USER_REGISTRATION_SPONSOR_NOT_FOUND", "USER_REGISTRATION_SPONSOR_INVALID"].includes(cause.message)) return false;
+  cancel();
+  if (props.sponsorRejected) props.sponsorRejected();
+  else message.value = t.value.register.inviteInvalid;
+  return true;
+}
 async function start(name: string) {
   if (flow.value || submitting.value || props.disabled || disposed) return;
   if (props.intent === "LOGIN" && authApi.pendingLogin()) { message.value = t.value.login.unknownAttempt; return; }
@@ -151,7 +162,7 @@ async function start(name: string) {
     });
     // #endif
     void poll(current);
-  } catch (cause) { cancel(); message.value = errorMessage(cause); }
+  } catch (cause) { if (!sponsorRefused(cause)) { cancel(); message.value = errorMessage(cause); } }
   finally { submitting.value = false; }
 }
 async function poll(current: number) {
@@ -238,7 +249,7 @@ async function complete(captchaTicket?: string) {
         // ambiguous completion, including recovery after this flow has expired.
         cancel(); message.value = t.value.login.unknownAttempt;
       } else if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") showCaptcha.value = true;
-      else message.value = errorMessage(cause);
+      else if (!sponsorRefused(cause)) message.value = errorMessage(cause);
     }
   } finally { submitting.value = false; password.value = ""; }
 }
