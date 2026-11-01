@@ -181,7 +181,10 @@ function retry() {
 .hf-reel::-webkit-scrollbar { display: none; }
 /* Light cards cast a shadow; extra bottom room keeps it unclipped without moving the link below. */
 [data-theme="light"] .hf-reel { padding-bottom: 10px; margin-bottom: -8px; }
-.hf-reel__item { flex: none; scroll-snap-align: start; animation: hf-slide 420ms cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.hf-reel__item { flex: none; scroll-snap-align: start; }
+/* The slide-in runs on the card, not on the snap item: moving the snap item makes the mandatory snap re-align
+   to its shifted box, so the reel overshoots the left edge and springs back when the animation ends. */
+.hf-reel__item > * { animation: hf-slide 420ms cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
 .hf-card { position: relative; display: flex; flex-direction: column; width: 164px; min-height: 220px; height: 100%; box-sizing: border-box; padding: 12px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; cursor: pointer; }
 [data-theme="light"] .hf-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .hf-card:active { opacity: .85; }
@@ -215,6 +218,6 @@ function retry() {
   .hf-av__art { left: 2px; top: 3px; width: 28px; height: 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hf-av, .hf-reel__item, .hf-spin { animation: none; }
+  .hf-av, .hf-reel__item > *, .hf-spin { animation: none; }
 }
 </style>
