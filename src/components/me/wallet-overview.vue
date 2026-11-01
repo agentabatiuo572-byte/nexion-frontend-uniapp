@@ -7,11 +7,11 @@
       <view class="wallet-earnings">
         <view class="wallet-metric wallet-metric--today" data-wallet-metric="today">
           <text class="wallet-metric-label">{{ t.wallet.todayLabel }}</text>
-          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(todayEarningsText, 22, true)">{{ visibility.mask(shownToday === null ? "—" : `+$${formatAmount(shownToday)}`) }}</text>
+          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(todayEarningsText, 22, true)">{{ todayEarningsText }}</text>
         </view>
         <view class="wallet-metric" data-wallet-metric="all-time">
           <text class="wallet-metric-label">{{ t.wallet.allTimeEarnings }}</text>
-          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(allTimeEarned === null ? '-' : `$${formatAmount(allTimeEarned)}`), 22, true)">{{ visibility.mask(shownAllTime === null ? '-' : `$${formatAmount(shownAllTime)}`) }}</text>
+          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(allTimeEarned === null ? '-' : `$${formatAmount(allTimeEarned)}`), 22, true)">{{ visibility.mask(allTimeEarned === null ? '-' : `$${formatAmount(allTimeEarned)}`) }}</text>
           <view class="wallet-metric-sub wallet-metric-breakdown" role="group" tabindex="0" :aria-label="allTimeSublabel">
             <view class="wallet-metric-breakdown__item" aria-hidden="true">
               <svg class="wallet-metric-breakdown__icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3M10 10h4v4h-4z" /></svg>
@@ -25,12 +25,12 @@
         </view>
         <view class="wallet-metric" data-wallet-metric="reviewing" role="button" tabindex="0" @click="showPendingSheet" @keydown.enter.prevent="showPendingSheet" @keydown.space.prevent="showPendingSheet">
           <text class="wallet-metric-label">{{ t.wallet.reviewingEarnings }}</text>
-          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(bucketsReadable ? `$${formatAmount(pendingReview)}` : '—'), 22, true)">{{ visibility.mask(bucketsReadable ? `$${formatAmount(shownPending)}` : "—") }}</text>
+          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(bucketsReadable ? `$${formatAmount(pendingReview)}` : '—'), 22, true)">{{ visibility.mask(bucketsReadable ? `$${formatAmount(pendingReview)}` : "—") }}</text>
           <text class="wallet-metric-sub wallet-metric-sub--release">{{ t.wallet.reviewingEarningsSub }}</text>
         </view>
         <view class="wallet-metric" data-wallet-metric="locked" role="button" tabindex="0" @click="showLockedSheet" @keydown.enter.prevent="showLockedSheet" @keydown.space.prevent="showLockedSheet">
           <text class="wallet-metric-label">{{ t.wallet.lockedRewards }}</text>
-          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(bucketsReadable ? `$${formatAmount(lockedRewards)}` : '—'), 22, true)">{{ visibility.mask(bucketsReadable ? `$${formatAmount(shownLocked)}` : "—") }}</text>
+          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(bucketsReadable ? `$${formatAmount(lockedRewards)}` : '—'), 22, true)">{{ visibility.mask(bucketsReadable ? `$${formatAmount(lockedRewards)}` : "—") }}</text>
           <text class="wallet-metric-sub wallet-metric-sub--release">{{ t.wallet.lockedRewardsSub }}</text>
         </view>
       </view>
@@ -85,7 +85,6 @@ import { useConfig } from "@/store/config";
 import { confirm as uiConfirm } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
 import { resolveWalletTodayEarnings } from "@/lib/wallet-today-earnings";
-import { useCountUp } from "@/composables/use-count-up";
 
 const props = withDefaults(defineProps<{ section?: 'all' | 'summary' | 'recovery' }>(), { section: 'all' });
 const t = useT();
@@ -186,11 +185,6 @@ const teamLifetimeUSD = computed(() => !remoteApiEnabled ? commission.totalUSDTL
       ? commission.eventsLifetimeDisplayUSDT ?? (commission.eventsStatus === "loading" ? commission.eventsEvidence?.aggregate.totalUSDT : null) ?? null : null);
 const allTimeEarned = computed(() => miningLifetimeUSD.value === null || teamLifetimeUSD.value === null
   ? null : miningLifetimeUSD.value + teamLifetimeUSD.value);
-// The four headline figures count up once; their fit size keeps the final text. The breakdown stays static.
-const shownToday = useCountUp(todayEarnings);
-const shownAllTime = useCountUp(allTimeEarned);
-const shownPending = useCountUp(() => bucketsReadable.value ? pendingReview.value : null);
-const shownLocked = useCountUp(() => bucketsReadable.value ? lockedRewards.value : null);
 const hasReadRecovery = computed(() => configSyncFailed.value || fundsAuthorityUnavailable.value || releaseAuthorityUnavailable.value
   || earningsRecoveryVisible.value
   || (remoteApiEnabled && app.remoteWithdrawalListStatus === "error"));

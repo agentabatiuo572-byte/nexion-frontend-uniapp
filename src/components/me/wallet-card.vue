@@ -20,7 +20,7 @@
       </view>
       <view class="nx-wallet-nex" role="link" tabindex="0" @click="goNex" @keydown.enter.prevent="goNex" :aria-label="t.uiChrome.nexBalance + ': ' + nexLabel + ' UVT'">
         <view class="nx-wallet-coin" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" /></svg></view>
-        <view class="nx-wallet-token-value"><text class="tabular-nums nx-wallet-token-amount">{{ shownNexLabel }}</text><text class="nx-wallet-token-unit"> UVT</text></view>
+        <view class="nx-wallet-token-value"><text class="tabular-nums nx-wallet-token-amount">{{ nexLabel }}</text><text class="nx-wallet-token-unit"> UVT</text></view>
         <svg class="nx-wallet-nex-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
       </view>
     <view class="nx-wallet-details">
@@ -124,8 +124,6 @@ const pendingLine = computed(() => {
 
 const nex = computed(() => app.user.nexBalance);
 const nexLabel = computed(() => visibility.mask(fundsReadable.value ? formatAmount(nex.value) : "—"));
-const shownNex = useCountUp(() => fundsReadable.value ? nex.value : null);
-const shownNexLabel = computed(() => visibility.mask(fundsReadable.value ? formatAmount(shownNex.value) : "—"));
 const marketReady = computed(() => market.isMockMode || market.remoteReady);
 const nexChangeLabel = computed(() => {
   if (!marketReady.value || !market.change24hAvailable) return "—";
