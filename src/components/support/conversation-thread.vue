@@ -1105,10 +1105,9 @@ function onKeyboardActivate(event: KeyboardEvent, action: () => void) {
   min-width: 0;
   padding: 6px 10px 5px;
   border-radius: 17px;
-  /* Soft inner rim shared with the glass controls; the transparent border keeps
-     the box size and still draws a system outline in forced-colors mode. */
+  /* Flat fill only, no visible edge; the transparent border keeps the box size
+     and still draws a system outline in forced-colors mode. */
   border: 1px solid transparent;
-  box-shadow: var(--ui-glass-edge-shadow);
   background-color: var(--nx-bubble-fill);
   background-image: none;
   color: var(--v5-ink);
