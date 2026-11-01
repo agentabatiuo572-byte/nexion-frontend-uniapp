@@ -134,7 +134,10 @@ export const apiClient = createRuntimeApiClient({
 // Authentication is server-backed in both dev and prod; Java active profile
 // selects the development challenge or production provider flow.
 export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface,
-  beforeSessionEnd: revokeNativePush,
+  beforeSessionEnd: async context => {
+    await (await import("@/services/phone-compute")).pauseNativePhoneCompute("APP_PAUSED");
+    await revokeNativePush(context);
+  },
   sessionEndCancelled: resumeNativePush,
   installationId: () => clientSurface === "APP" ? getDeviceId() : "",
   executionSupported: () => clientSurface === "APP" && hasNativePhoneRuntime(),

@@ -27,10 +27,11 @@
         <view v-if="!visibility.hidden && progressPct != null" class="device-inventory-row__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
       </view>
     </view>
-    <view v-else-if="active" class="device-inventory-row__task device-inventory-row__task--idle">
+    <view v-else-if="active && (!remoteApiEnabled || device.kind !== 'phone')" class="device-inventory-row__task device-inventory-row__task--idle">
       <view class="device-inventory-row__wait" aria-hidden="true" />
       <text>{{ recovering ? computeCopy.statuses.RECOVERING : runtimeConfirmed ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text>
     </view>
+    <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" style="margin:12px 0 0" />
 
     <view v-if="device.pendingDeactivate" class="device-inventory-row__pending">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
@@ -78,6 +79,8 @@ import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
+import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const computeCopy = useComputeV2Copy();

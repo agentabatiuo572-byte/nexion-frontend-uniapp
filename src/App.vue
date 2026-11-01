@@ -3,6 +3,7 @@ import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
 import { installNativePush, refreshNativePush, flushNativePushClick } from "@/services/native-push";
+import { setNativePhoneComputeForeground } from "@/services/phone-compute";
 import { navReset } from "@/lib/route";
 import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
@@ -1281,6 +1282,7 @@ onLaunch(() => {
   scheduleAccountSessionBootstrap();
 });
 onShow(() => {
+  setNativePhoneComputeForeground(true);
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");
@@ -1313,6 +1315,7 @@ onShow(() => {
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
+  setNativePhoneComputeForeground(false);
   if (remoteApiEnabled) useApp().setRemoteTaskForeground(false);
   detachSessionWatch();
   stopBusinessLoops();
