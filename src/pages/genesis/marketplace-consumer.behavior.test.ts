@@ -58,7 +58,8 @@ it("offers information and a working read retry on every closed-market tab, incl
       expect(navTo).toHaveBeenLastCalledWith("/pages/genesis/genesis");
       if (owned && tab === "mine") expect(page.nodes("test-holding")).toHaveLength(1);
       cfg.refresh.mockClear(); genesis.syncRemote.mockClear(); report.mockClear();
-      page.control(zh.marketplace.retry)!.props.onClick(); await flush();
+      expect(page.nodes("nx-market-retry")[0]!.props['aria-label']).toBe(zh.marketplace.retry);
+      page.nodes("nx-market-retry")[0]!.props.onClick(); await flush();
       expect(cfg.refresh).toHaveBeenCalledOnce(); expect(genesis.syncRemote).toHaveBeenCalledOnce();
       expect(report).not.toHaveBeenCalled(); expect(genesis.acquireSecondary).not.toHaveBeenCalled();
     }
@@ -78,7 +79,7 @@ it("keeps failed reads distinct from empty lists and only offers reservation whe
   genesis.remoteAccountReadState = "ready"; genesis.remotePublicReadState = "ready"; genesis.remoteRoyaltyPct = 0;
   gate.secondaryBlock.value = null; gate.blockText.value = null; gate.block.value = "soldOut"; await flush();
   expect(page.control(zh.marketplace.reservePrimary)).toBeUndefined();
-  expect(page.control(zh.marketplace.retry)).toBeUndefined();
+  expect(page.nodes("nx-market-retry")[0]).toBeUndefined();
   gate.block.value = null; await flush();
   expect(page.control(zh.marketplace.reservePrimary)).toBeDefined();
   page.unmount();
@@ -88,7 +89,7 @@ it("keeps confirmed empty tabs silent while warm reads cannot manufacture a new 
   const p=setup(); await flush();
   let finish!:(value:boolean)=>void;
   p.genesis.syncRemote.mockImplementationOnce(()=>{p.genesis.remotePublicReadState="loading";p.genesis.remoteAccountReadState="loading";return new Promise(r=>{finish=r;});});
-  p.page.control(zh.marketplace.retry)!.props.onClick();await flush();
+  p.page.nodes("nx-market-retry")[0]!.props.onClick();await flush();
   for(const tab of ["listings","activity","mine"]){
     all(p.page.root).find(n=>n.props.tab===tab)!.props.onClick();await flush();
     expect(text(p.page.root)).not.toContain(zh.marketplace.marketLoading);

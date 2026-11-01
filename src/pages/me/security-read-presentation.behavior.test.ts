@@ -8,7 +8,7 @@ import {createP318AccountPageFence} from './p3-18-account-page-fence';
 function setup() {
   const app=Vue.reactive({accountKey:'A',accountBindingEpoch:1});
   const fence=createP318AccountPageFence(()=>app.accountKey,()=>app.accountBindingEpoch);
-  const names=['securityBusy','remoteSecurityLoading','sessionPageLoading','remoteSecurity','securityPresentation','phonePolicy','phoneEditing','phoneNext','phonePassword','phoneOldCode','phoneNewCode','phoneChallenge','phoneError','deletionStatus','editingPwd','current','next','confirmPwd','twoFactorPassword','twoFactorPasswordError','twoFactorPasswordFocus','twoFactorCode','twoFactorChallengeNo','twoFactorPhoneMasked','twoFactorTarget','deletionPassword','deletionCommandKey','err'];
+  const names=['twoFactorSheetOpen','deletionSheetOpen','securityBusy','remoteSecurityLoading','sessionPageLoading','remoteSecurity','securityPresentation','phonePolicy','phoneEditing','phoneNext','phonePassword','phoneOldCode','phoneNewCode','phoneChallenge','phoneError','deletionStatus','editingPwd','current','next','confirmPwd','twoFactorPassword','twoFactorPasswordError','twoFactorPasswordFocus','twoFactorCode','twoFactorChallengeNo','twoFactorPhoneMasked','twoFactorTarget','deletionPassword','deletionCommandKey','err'];
   const refs=Object.fromEntries(names.map(name=>[name,Vue.ref(null)])) as Record<string,Vue.Ref<any>>;
   const api={securityOverview:vi.fn(),accountDeletionStatus:vi.fn(async()=>({status:'NONE'})),revokeSession:vi.fn(),revokeOtherSessions:vi.fn()};
   const uiConfirm=vi.fn(async()=>true),ui={clearConfirmsBy:vi.fn()};
@@ -40,8 +40,10 @@ it('retains warm metadata while live authority is cleared and cannot revoke unti
 it.each([401,403])('clears metadata and every private form after ordinary %s, with no stale recovery',async status=>{
  const p=setup();p.api.securityOverview.mockResolvedValue(snapshot);await p.actions.loadRemoteSecurity();
  for(const name of ['current','next','confirmPwd','phonePassword','phoneOldCode','phoneNewCode','twoFactorPassword','twoFactorCode','twoFactorChallengeNo','deletionPassword','deletionCommandKey'])p.refs[name].value='private';
+ p.refs.twoFactorSheetOpen.value=true;p.refs.deletionSheetOpen.value=true;
  p.api.securityOverview.mockRejectedValueOnce(new ApiError({kind:'http',status,code:status,message:'FORBIDDEN'}));
  expect(await p.actions.loadRemoteSecurity()).toBe(false);expect(p.refs.securityPresentation.value).toBeNull();
+ expect(p.refs.twoFactorSheetOpen.value).toBe(false);expect(p.refs.deletionSheetOpen.value).toBe(false);
  for(const name of ['current','next','confirmPwd','phonePassword','phoneOldCode','phoneNewCode','twoFactorPassword','twoFactorCode','twoFactorChallengeNo','deletionPassword','deletionCommandKey'])expect(p.refs[name].value).toBe('');
  p.api.securityOverview.mockResolvedValue({...snapshot,twoFactorEnabled:false,sessions:[]});await p.actions.loadRemoteSecurity();
  expect(p.refs.securityPresentation.value.sessions).toEqual([]);expect(p.refs.twoFactorPassword.value).toBe('');

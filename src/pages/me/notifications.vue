@@ -3,9 +3,9 @@
     <template #pageFixed="{ top }">
     <view class="message-center message-page" :style="{ top: top + 'px' }">
       <view class="message-nav">
-        <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.profile.back" @click="navBack('/pages/me/me')"><LiquidGlass :radius="22" tone="navigation" /><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg></view>
-        <view v-if="summaryRecovery.visible" class="message-summary-recovery" role="alert"><text v-if="!headerState.title" class="message-recovery-title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text><view class="message-button" role="button" :tabindex="summaryRecovery.busy ? -1 : 0" :aria-disabled="summaryRecovery.busy" :aria-label="summaryRecovery.label + ' · ' + t.ui.retry" @click="retrySummary" @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"><text>{{ summaryRecovery.label }} · {{ t.ui.retry }}</text></view></view>
-        <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.notifs.preferences" @click="navTo('/pages/me/preferences')"><LiquidGlass :radius="22" tone="navigation" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></view>
+        <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.profile.back" @click="navBack('/pages/me/me')"><LiquidGlass :radius="22" tone="navigation" rendering="frosted" /><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg></view>
+        <view v-if="summaryRecovery.visible" class="message-summary-recovery" role="alert"><text v-if="!headerState.title" class="message-recovery-title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text><view class="message-button" role="button" :tabindex="summaryRecovery.busy ? -1 : 0" :aria-disabled="summaryRecovery.busy" :aria-label="summaryRecovery.label + ' · ' + t.ui.retry" @click="retrySummary"><text>{{ summaryRecovery.label }} · {{ t.ui.retry }}</text></view></view>
+        <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.notifs.preferences" @click="navTo('/pages/me/preferences')"><LiquidGlass :radius="22" tone="navigation" rendering="frosted" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></view>
       </view>
       <view v-if="!summaryRecovery.visible" class="message-compact" :class="{ 'message-compact--visible': !headerState.title }" :aria-hidden="headerState.title"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
       <view class="message-collapse" :class="{ 'message-collapse--hidden': !headerState.title }" :style="collapseStyle('title')" :aria-hidden="!headerState.title" :inert="!headerState.title ? true : undefined" @focusin="headerFocused = true" @focusout="headerFocused = false">
@@ -13,7 +13,7 @@
           <view class="message-heading-row">
             <text class="message-title" :class="{ 'message-title--hidden': !headerState.title }" :aria-hidden="!headerState.title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text>
             <view class="message-subtitle" role="status"><view v-if="center.totalUnread" class="message-status-dot" aria-hidden="true" /><text>{{ unreadLabel }}</text></view>
-            <view v-if="section === 'notifications' && notifs.unread > 0" class="message-button message-mark-all" role="button" :tabindex="headerState.title && !markingAll && !clearingRead ? 0 : -1" :aria-disabled="markingAll || clearingRead" :aria-label="t.notifs.markAll" @click="markAll" @keydown.enter.prevent="markAll" @keydown.space.prevent="markAll"><text>{{ actionCopy.markAllShort }}</text></view>
+            <view v-if="section === 'notifications' && notifs.unread > 0" class="message-button message-mark-all" role="button" :tabindex="headerState.title && !markingAll && !clearingRead ? 0 : -1" :aria-disabled="markingAll || clearingRead" :aria-label="t.notifs.markAll" @click="markAll"><text>{{ actionCopy.markAllShort }}</text></view>
           </view>
         </view>
       </view>
@@ -25,28 +25,28 @@
       <GlassSegments v-if="section !== 'service'" :label="t.notifs.filterGroupLabel" semantics="radio" v-model="filter" :options="filterOptions" layout="scroll" class="message-filters">
         <template #option="{ option }"><text class="message-option-label">{{ option.label }}</text><view v-if="option.hasUnread && option.value !== 'all'" class="message-category-dot" aria-hidden="true" /></template>
       </GlassSegments>
-      <scroll-view :key="section" scroll-y class="message-scroll" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
+      <scroll-view :key="section" scroll-y class="message-scroll" :class="{ 'message-scroll--notifications': section === 'notifications' }" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
       <ServiceMessageList v-if="section === 'service'" />
       <view v-else class="notification-feed" :aria-busy="notifs.loading">
         <view v-if="!notifs.loading && !notifs.error && notifs.nextCursor && filtered.length === 0" role="status" class="message-state"><text>{{ t.notifs.moreToCheck }}</text></view>
         <EmptyState v-if="!notifs.loading && !notifs.error && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
-        <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1 }">
+        <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
           <text v-if="index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts)" class="notification-date" role="heading" aria-level="2">{{ dateHeading(n.ts) }}</text>
           <view class="notification-row" role="button" tabindex="0" :aria-label="platformDisplayText(n.title)" :aria-expanded="directNotice(n) ? undefined : expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
             <view class="notification-icon" :data-category="notificationCategory(n)" aria-hidden="true" v-html="kindIcon(n)" />
-            <view class="notification-content"><view class="notification-top"><view class="notification-heading"><text class="notification-title">{{ platformDisplayText(n.title) }}</text><text v-if="n.priority === 'critical' || n.priority === 'high'" class="notification-important">{{ t.notifs.important }}</text></view><view class="notification-meta"><text class="notification-time">{{ timeAgo(n.ts) }}</text><view v-if="!n.readAt" class="message-status-dot" aria-hidden="true" /></view></view><text v-if="n.body && expandedId !== n.id" class="notification-preview">{{ platformDisplayText(n.body) }}</text></view>
-            <svg v-if="n.ctaHref" class="notification-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            <view class="notification-content"><view class="notification-top"><view class="notification-heading"><text class="notification-title">{{ platformDisplayText(n.title) }}</text><text v-if="n.priority === 'critical' || n.priority === 'high'" class="notification-important">{{ t.notifs.important }}</text></view></view><text v-if="n.body && expandedId !== n.id" class="notification-preview">{{ platformDisplayText(n.body) }}</text></view>
+<view class="notification-meta"><text class="notification-time">{{ timeAgo(n.ts) }}</text><view v-if="!n.readAt" class="message-status-dot" aria-hidden="true" /></view>
           </view>
           <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ platformDisplayText(n.body) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="16" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
         </view>
-        <view v-if="notifs.error" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()" @keydown.enter.prevent="notifs.retryRemote()" @keydown.space.prevent="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
+        <view v-if="notifs.error" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
         <view v-if="notifs.loading && !filtered.length" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
         <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loadingMore ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
       </view>
       <view class="message-scroll-compensation" :style="{ height: headerCompensation + 'px' }" aria-hidden="true" />
       </scroll-view>
       <view v-if="section === 'notifications'" class="notification-management">
-        <view class="message-button" role="button" :tabindex="clearingRead || markingAll || notifs.loading ? -1 : 0" :aria-disabled="clearingRead || markingAll || notifs.loading" @click="confirmClearRead" @keydown.enter.prevent="confirmClearRead" @keydown.space.prevent="confirmClearRead"><LiquidGlass :radius="22" /><text>{{ actionCopy.clearRead }}</text></view>
+        <NxButton variant="secondary" size="medium" :disabled="clearingRead || markingAll || notifs.loading" @click="confirmClearRead">{{ actionCopy.clearRead }}</NxButton>
       </view>
     </view>
     </template>
@@ -59,6 +59,7 @@ import { platformDisplayText } from "@/lib/brand-copy";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onShow, onHide, onLoad, onResize } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ServiceMessageList from "@/components/support/service-message-list.vue";
@@ -158,11 +159,11 @@ const visibleFilterIds = computed(() => filterIds);
 const expandedId = ref<string | null>(null);
 const categoryKeys = { finance: "categoryFinance", device: "categoryDevice", team: "kindTeam", rewards: "categoryRewards", system: "kindSystem" } as const;
 const categoryIcons: Record<NotificationCategory, string> = {
-  finance: '<path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2"/><path d="M3 6v12a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-3"/>',
+  finance: '<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7"/><path d="M16 14h.01"/>',
   device: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
   team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
-  rewards: '<path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
-  system: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  rewards: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  system: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
 };
 function kindIcon(n: Notification) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${categoryIcons[notificationCategory(n)]}</svg>`; }
 function countOf(id: Filter) { return id === "all" ? notifs.items.length : notifs.items.filter(n => notificationCategory(n) === id).length; }
@@ -352,22 +353,58 @@ watch(filter, value => {
 
 <style src="@/styles/message-center.css"></style>
 <style scoped>
-.message-recovery-title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-.message-nav .message-summary-recovery { flex: 1; min-width: 0; margin: 0 8px; }
-.message-nav .message-summary-recovery .message-button { font: 600 13px/20px var(--font-v5); text-align: center; }
-.notification-management { display: flex; flex-shrink: 0; justify-content: flex-end; padding: 8px 0; }
-/* One glass rail, one flat moving selection; shared spring/drag behavior stays active. */
-.message-center .message-primary { height: 50px; box-sizing: border-box; padding: 3px; gap: 4px; border: 0; background: transparent; box-shadow: none; }
-.message-center .message-primary :deep(.nx-glass-backdrop) { --v5-liquid-shadow: 0 0 0 transparent; }
-.message-center .message-filters :deep(.nx-glass-indicator) { --v5-liquid-selected: transparent; --v5-liquid-selection-shadow: 0 0 0 transparent; }
+.message-recovery-title { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.message-nav .message-summary-recovery { flex:1; min-width:0; margin:0 8px; }
+.message-nav .message-summary-recovery .message-button { font:600 13px/20px var(--font-v5); text-align:center; }
+.message-page { bottom:0!important; }
+.message-center .message-nav { position:relative; z-index:41; height:70px; margin:-7px -4px 0; }
+.message-center .message-nav .message-icon-button { color:var(--v5-ink); }
+.message-nav .message-icon-button > svg { position:relative; z-index:1; }
+.message-nav :deep(.nx-liquid-glass) { background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-ink) 7%,transparent); box-shadow:var(--ui-glass-edge-shadow); backdrop-filter:blur(12px) saturate(125%); }
+:global([data-theme="light"] .message-center .message-nav .nx-liquid-glass) { background-color:color-mix(in srgb,var(--v5-surface) 78%,transparent); box-shadow:0 2px 6px color-mix(in srgb,var(--v5-ink) 12%,transparent),var(--ui-glass-edge-shadow); }
+.message-center .message-heading { padding:0 4px; }
+.message-center .message-heading-row { min-height:44px; gap:10px; }
+.message-center .message-title { font-size:24px; line-height:32px; }
+.message-center .message-subtitle { font-size:13px; line-height:18px; color:var(--v5-ink-3); gap:6px; }
+.message-center .message-mark-all { font-size:13px; min-height:44px; padding-inline:0; font-weight:500; color:var(--v5-brand); }
+.message-center .message-primary-inner { padding-top:12px; }
+.message-center .message-primary { height:40px; box-sizing:border-box; padding:var(--v5-space-1); gap:var(--v5-space-1); }
+.message-center .message-primary :deep(.nx-glass-track) { --v5-liquid-shadow:none; }
+.message-center .message-primary :deep(.nx-glass-option) { min-height:32px; height:32px; padding:0 10px; gap:6px; font-size:14px; line-height:20px; font-weight:500; }
+.message-primary .message-status-dot { width:5px; height:5px; }
+.message-filters :deep(.nx-liquid-glass--selection) { background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-brand) 14%,transparent); box-shadow:var(--ui-glass-edge-shadow); backdrop-filter:blur(12px) saturate(125%); }
+.message-filters :deep(.nx-liquid-glass--selection .nx-liquid-tint) { background:none; box-shadow:none; }
+.message-filters :deep(.nx-liquid-glass--selection .nx-liquid-rim) { box-shadow:none; }
+.message-filters :deep(.nx-liquid-glass--selection .nx-liquid-specular) { background:none; }
 .message-option-label, .message-category-dot { position: relative; z-index: 1; }
-.message-center .message-primary :deep(.nx-glass-option) { min-height: 44px; height: 44px; padding: 0 10px; gap: 6px; border: 1px solid transparent; border-radius: 999px; color: var(--v5-ink-2); font-size: var(--ui-type-list-title); line-height: 20px; font-weight: 500; }
-.message-center .message-primary :deep(.nx-glass-option--selected) { color: var(--v5-brand); font-weight: 600; }
-.message-center .message-filters { align-self: flex-start; width: fit-content; max-width: 100%; box-sizing: border-box; height: 44px; min-height: 44px; margin-block: 7px -5px; padding: 0; gap: 6px; border-radius: 0; background: transparent; }
-.message-center .message-filters :deep(.nx-glass-option) { min-height: 44px; height: 44px; padding: 0 9px; gap: 4px; border: 0; border-radius: 999px; color: var(--v5-ink-3); font-size: 13.5px; line-height: normal; font-weight: 500; }
-.message-center .message-filters :deep(.nx-glass-option--selected) { color: var(--v5-ink); font-weight: 600; background: transparent; }
-.message-category-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); flex-shrink: 0; align-self: center; }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .message-center .message-primary :deep(.nx-glass-backdrop), .message-center .message-filters :deep(.nx-glass-indicator) { background: var(--v5-surface); }
-}
+.message-center .message-filters { align-self:flex-start; width:fit-content; max-width:100%; box-sizing:border-box; height:44px; min-height:44px; margin:6px 0 -6px; padding:6px 0; gap:var(--v5-space-1); border-radius:0; background:transparent; }
+.message-center .message-filters :deep(.nx-glass-option) { min-height:32px; height:32px; padding:0 12px; gap:var(--v5-space-1); border:0; border-radius:var(--v5-radius-full); font-size:13px; line-height:18px; font-weight:500; }
+.message-center .message-filters :deep(.nx-glass-option:not(.nx-glass-option--selected)) { color:var(--v5-ink-3); }
+.message-category-dot { width:5px; height:5px; border-radius:50%; background:var(--v5-brand); flex-shrink:0; align-self:center; }
+.message-center .message-scroll--notifications { width:calc(100% + 32px); margin-inline:-16px; }
+.message-center .notification-feed { padding:0 16px 100px; }
+.message-center .notification-item { border:0; }
+.message-center .notification-date { margin:var(--v5-space-5) 4px 8px; font-size:12px; line-height:16px; font-weight:400; }
+.message-center .notification-row { padding:14px 16px; background:var(--v5-surface); }
+.message-center .notification-item--group-first .notification-row { border-top-left-radius:22px; border-top-right-radius:22px; }
+.message-center .notification-item--group-last .notification-row { border-bottom-left-radius:22px; border-bottom-right-radius:22px; }
+.message-center .notification-item:not(.notification-item--group-first) .notification-row { border-top:1px solid var(--v5-border); }
+.message-center .notification-icon { --notice-color:var(--v5-nex); display:flex; align-items:center; justify-content:center; width:40px; height:40px; margin:0; border-radius:var(--ui-radius-icon); background:color-mix(in srgb,var(--notice-color) 16%,transparent); color:var(--notice-color); }
+.message-center .notification-icon :deep(svg) { width:20px; height:20px; }
+.message-center .notification-icon[data-category="finance"] { --notice-color:var(--v5-success-ink); }
+.message-center .notification-icon[data-category="device"] { --notice-color:var(--ui-notification-device-ink); }
+.message-center .notification-icon[data-category="team"] { --notice-color:var(--v5-brand-2-ink); }
+.message-center .notification-icon[data-category="system"] { --notice-color:var(--v5-nex-ink); }
+.message-center .notification-icon[data-category="rewards"] { --notice-color:var(--v5-warning-ink); }
+.message-center .notification-heading { gap:var(--v5-space-2); }
+.message-center .notification-title { font-size:14px; line-height:20px; }
+.message-center .notification-preview { margin-top:2px; font-size:12.5px; line-height:18px; }
+.message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
+.message-center .notification-time { font-size:12px; line-height:16px; }
+.message-center .notification-meta .message-status-dot { width:8px; height:8px; }
+.message-center .notification-important { height:24px; background:var(--v5-warning-soft); font-size:12px; line-height:16px; padding:0 var(--v5-space-2); border-radius:var(--v5-radius-full); }
+.message-center .notification-detail { padding:0 16px 14px 68px; background:var(--v5-surface); }
+.notification-management { position:absolute; right:16px; bottom:38px; padding:0; }
+:global([data-theme="dark"] .message-center .notification-important) { background:color-mix(in srgb,var(--v5-warning) 16%,transparent); }
+:global([data-theme="light"] .message-center .notification-row) { box-shadow:var(--v5-glass-shadow); }
 </style>

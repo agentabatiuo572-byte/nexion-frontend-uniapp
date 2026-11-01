@@ -3,7 +3,7 @@
     <text class="oauth-title">{{ intent === "LINK" ? t.thirdParty.linkTitle : t.thirdParty.signInTitle }}</text>
     <text v-if="intent === 'LINK' && !providers.length" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
     <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || disabled" :preserve-appearance="disabled && !flow && !submitting" @select="start" />
-    <view v-if="flow" class="oauth-panel" aria-live="polite">
+    <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
       <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
       <input v-if="verified && intent === 'LINK'" v-model="password" password :maxlength="128"
@@ -21,7 +21,7 @@
         :aria-disabled="submitting" @click="cancelFromUser" @keydown.enter.prevent="cancelFromUser" @keydown.space.prevent="cancelFromUser">
         <text>{{ t.ui.cancel }}</text>
       </view>
-    </view>
+    </component>
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
     <ServerCaptchaSlider v-if="showCaptcha" scene="LOGIN" phone="" @success="captchaComplete" @close="showCaptcha = false" />
   </view>
@@ -29,6 +29,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
@@ -42,7 +43,7 @@ import { useLocaleStore } from "@/store/locale";
 import { ApiError } from "@/api/errors";
 import { listenForNativeOAuthReturn, validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth-browser-return";
 
-const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null }>(), {
+const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null }>(), {
   intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null,
 });
 const t = useT();
@@ -259,15 +260,19 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.third-party-auth { margin: 20px 0; color: var(--v5-ink); }
-.oauth-title { display: block; font-size: var(--ui-type-subheading); font-weight: var(--ui-type-subheading-weight); margin-bottom: 12px; }
+.third-party-auth { margin: var(--v5-space-5) 0; color: var(--v5-ink); }
+.oauth-title { display: block; font-size: var(--ui-type-subheading); font-weight: var(--ui-type-subheading-weight); margin-bottom: var(--v5-space-3); }
 .oauth-copy { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.6; color: var(--v5-ink-2); margin: 10px 0; overflow-wrap: anywhere; }
-.oauth-panel { padding: 14px; margin-top: 12px; border-radius: 16px; background: var(--v5-surface); }
-.oauth-identity { display: block; overflow-wrap: anywhere; font-weight: 600; margin: 12px 0; }
-.oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px; border-radius: 10px; color: var(--v5-ink); background: var(--v5-surface-2); margin: 12px 0; }
-.oauth-button { min-height: 44px; display: flex; align-items: center; justify-content: center; margin-top: 10px; border-radius: 12px; background: var(--v5-brand); color: white; font-size: var(--ui-type-button); }
+.oauth-panel { padding: 14px; margin-top: var(--v5-space-3); border-radius:var(--v5-radius-m); background: var(--v5-surface); }
+.oauth-identity { display: block; overflow-wrap: anywhere; font-weight: 600; margin: var(--v5-space-3) 0; }
+.oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px; border-radius: 10px; color: var(--v5-ink); background: var(--v5-surface-2); margin: var(--v5-space-3) 0; }
+.oauth-button { min-height: 44px; display: flex; align-items: center; justify-content: center; margin-top: 10px; border-radius:var(--ui-radius-icon); background: var(--v5-brand); color: white; font-size: var(--ui-type-button); }
 .oauth-button:active { opacity: 0.8; }
 .oauth-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .oauth-button[aria-disabled="true"] { opacity: 0.5; }
 .oauth-secondary { background: var(--v5-surface-2); color: var(--v5-ink); }
+</style>
+
+<style scoped>
+.oauth-panel-sheet :deep(.nx-sheet) { min-height:50vh; }
 </style>

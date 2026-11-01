@@ -3903,6 +3903,7 @@ timeHoursAgo: "{n}小时前",
     reduceQty: "减少数量后重试",
     howItWorksEntry: "创世说明",
     faq: {
+      title: '常见问题',
       q1: "持有能获得什么？",
       a1: "UVT 预留额度，在 UVT 上线交易后按平台公布的安排分期释放。",
       q2: "可以转让吗？",
@@ -4797,6 +4798,7 @@ timeHoursAgo: "{n}小时前",
   },
 
   marketplace: {
+    royaltyLabel: '手续费',
     pageTitle: "转让市场",
     internalMarketLine: "UVEL 站内转让 · 暂不支持站外交易",
     floor: "Lowest ask",

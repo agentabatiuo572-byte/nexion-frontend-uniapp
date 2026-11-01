@@ -150,14 +150,14 @@ describe("message page header content contract", () => {
     expect(source).not.toContain('message-secondary-actions');
     const management = all.find(node => hasClass(node, 'notification-management'))!;
     expect(management.loc.source).toContain('@click="confirmClearRead"');
-    expect(management.loc.source).toContain('LiquidGlass');
+    expect(management.loc.source).toContain('<NxButton variant="secondary" size="medium"');
     expect(elements(heading.children)).not.toContain(management);
     const scroll = all.find(node => node.tag === 'scroll-view')!;
     const fixedPage = all.find(node => hasClass(node, 'message-page'))!;
     expect(elements(scroll.children)).not.toContain(management);
     expect(fixedPage.children.indexOf(management)).toBeGreaterThan(fixedPage.children.indexOf(scroll));
     expect(management.loc.source).toContain(`v-if="section === 'notifications'"`);
-    expect(descriptor.styles[1].content).toMatch(/\.notification-management\s*\{[^}]*flex-shrink:\s*0/);
+    expect(descriptor.styles[1].content).toMatch(/\.notification-management\s*\{[^}]*position:\s*absolute/);
     expect(pageStyles).toContain('bottom: calc(env(safe-area-inset-bottom) + 34px)');
     expect(nav.loc.source).toContain("navTo('/pages/me/preferences')");
     expect(settingsSource).not.toContain('confirmClearRead');
@@ -231,7 +231,11 @@ describe("message page header content contract", () => {
     const nodes = (node: Vue.VNode): Vue.VNode[] => [node, ...(Array.isArray(node.children) ? node.children.filter(Vue.isVNode).flatMap(nodes) : [])];
     const retry = () => nodes(render(context, [])).find(node => node.props?.['aria-label'] === '更新失败 · ' + zh.ui.retry)!;
     retry().props!.onClick();
-    for (const handler of retry().props!.onKeydown) handler({ key: 'Enter', preventDefault() {} });
+    // Exercise the same shared semantic keyboard adapter used by App.vue.
+    const activationSource = readFileSync(new URL('../../lib/a11y-activate.ts', import.meta.url), 'utf8');
+    const activationCode = ts.transpileModule(activationSource.slice(activationSource.indexOf('const ACTIVATION_KEYS'), activationSource.indexOf('let installed')), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+    const activate = new Function(activationCode + '; return onKeydown;')();
+    activate({ key: 'Enter', preventDefault() {}, target: { tagName: 'UNI-VIEW', getAttribute: (key: string) => retry().props![key], click: () => retry().props!.onClick() } });
     expect(calls).toBe(2);
     center.loading = true;
     expect(retry().props!.tabindex).toBe(-1); expect(retry().props!['aria-disabled']).toBe(true);
@@ -282,8 +286,9 @@ describe("message page header content contract", () => {
     expect(attribute(primary, 'surface')).toMatchObject({ value: { content: 'glass' } });
     expect(attribute(primary, 'selection')).toMatchObject({ value: { content: 'flat' } });
     expect(scoped).not.toContain('.nx-glass-option--selected::before');
-    const indicator = scoped.match(/\.message-filters :deep\(\.nx-glass-indicator\)\s*\{([^}]+)\}/)![1];
-    expect(indicator).not.toMatch(/display:\s*none|visibility:\s*hidden|transform:/);
+    // Selection material and movement are owned by the approved shared segments.
+    expect(scoped).not.toContain(':deep(.nx-glass-indicator)');
+    expect(scoped).not.toContain(':deep(.nx-glass-option--selected)');
     expect(scoped).toMatch(/\.message-option-label, \.message-category-dot\s*\{[^}]*z-index:\s*1/);
   });
 
@@ -291,11 +296,11 @@ describe("message page header content contract", () => {
     const scoped = descriptor.styles.find(style => style.scoped)!.content;
     const category = scoped.match(/\.message-filters :deep\(\.nx-glass-option\)\s*\{([^}]+)\}/)![1];
     const date = pageStyles.match(/\.notification-date\s*\{([^}]+)\}/)![1];
-    expect(category).toContain('line-height: normal');
+    expect(category).toContain('line-height:18px');
     expect(date).toContain('line-height: var(--ui-type-message-meta-lh)');
     expect(date).toContain('font-size: var(--ui-type-message-meta)');
     for (const rule of [category, date]) expect(rule).not.toMatch(/transform|translate|top:/);
-    expect(category).toContain('height: 44px'); expect(date).toContain('margin: 18px 2px 2px');
+    expect(category).toContain('height:32px'); expect(scoped).toMatch(/\.notification-date\s*\{[^}]*margin:var\(--v5-space-5\) 4px 8px/);
     expect(source + pageStyles + settingsSource).not.toMatch(/#(?:0F131B|171B24|232938|121722|0D1017)\b/i);
   });
 });

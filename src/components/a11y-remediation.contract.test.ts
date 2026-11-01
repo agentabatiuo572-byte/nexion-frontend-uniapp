@@ -69,12 +69,18 @@ describe("accessibility remediation contracts", () => {
     expect(language).toContain('@keydown.space.prevent="goAccount"');
 
     const security = read("../pages/me/security.vue");
-    expect(security).toContain('@keydown.space.prevent="editingPwd = !editingPwd"');
-    expect(security).toContain('@keydown.enter.prevent="submitPasswordChange"');
-    expect(security).toContain('@keydown.space.prevent="handleRevoke(s)"');
-    expect(security).toContain('@keydown.enter.prevent="handleRevokeAll"');
-    expect(security).toContain('@keydown.space.prevent="handleDeleteAccount"');
-    expect(security).toContain('@keydown.enter.prevent="handleCancelAccountDeletion"');
+    // Semantic role + tabindex is the shared keyboard activation contract.
+    for (const action of ['editingPwd = !editingPwd', 'openDeletionSheet', 'handleRevoke(s)', 'handleRevokeAll', 'handleCancelAccountDeletion']) {
+      const clickAt = security.indexOf('@click="' + action + '"');
+      expect(clickAt).toBeGreaterThan(-1);
+      const target = security.slice(security.lastIndexOf('<view', clickAt), clickAt);
+      expect(target).toContain('role="button"');
+      expect(target).toMatch(/:?tabindex=/);
+    }
+    expect(security).toContain('<NxSheet :open="editingPwd"');
+    expect(security).toContain('@click="submitPasswordChange"');
+    expect(security).toContain('@click="handleDeleteAccount"');
+    expect(security).not.toMatch(/@keydown\.(enter|space)/);
   });
 
   it("uses the shared semantic activation contract on wallet, team, download, learning and developer actions", () => {
