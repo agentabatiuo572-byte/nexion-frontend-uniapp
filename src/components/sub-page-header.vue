@@ -29,7 +29,14 @@
       <text v-if="displayTitle" class="spv-title">{{ displayTitle }}</text>
       <text v-if="subtitle" class="spv-sub">{{ subtitle }}</text>
     </view>
-    <view v-if="actionLabel && action" class="spv-action" role="button" tabindex="0" :aria-label="actionLabel" @click="action" @keydown.enter.prevent="onKeyboardActivate($event, action)" @keydown.space.prevent="onKeyboardActivate($event, action)">
+    <!-- An icon action keeps the round glass control; its label is the accessible name. -->
+    <view v-if="actionLabel && action && $slots.actionIcon" class="spv-side spv-bell" role="button" tabindex="0" :aria-label="actionLabel" @click="action" @keydown.enter.prevent="onKeyboardActivate($event, action)" @keydown.space.prevent="onKeyboardActivate($event, action)">
+      <view class="spv-glass nx-design-glass">
+        <LiquidGlass :radius="22" tone="navigation" :blur="8" />
+        <slot name="actionIcon" />
+      </view>
+    </view>
+    <view v-else-if="actionLabel && action" class="spv-action" role="button" tabindex="0" :aria-label="actionLabel" @click="action" @keydown.enter.prevent="onKeyboardActivate($event, action)" @keydown.space.prevent="onKeyboardActivate($event, action)">
       <view v-if="!design" class="spv-action-surface"><LiquidGlass :radius="18" :blur="8" /></view>
       <text>{{ actionLabel }}</text>
     </view>
@@ -162,7 +169,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
 .spv-side:active .spv-glass { transform: scale(.92); }
-.spv-glass > svg { position: relative; z-index: 1; }
+.spv-glass > svg, :slotted(svg) { position: relative; z-index: 1; }
 .spv-back { margin-left: 6px; }
 .spv-bell { justify-self: end; margin-right: 6px; }
 .spv--plain { border-radius: 0; }
