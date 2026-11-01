@@ -6,6 +6,7 @@
 .device-hero__dot,
 .device-bay__led,
 .trial-device-row__status--online::before,
+.trial-detail__online,
 .home-benefits__online {
   animation: device-online-breathe 2.4s ease-in-out infinite;
   transform-origin: center;
@@ -22,5 +23,6 @@
 .device-hero__dot,
 .device-bay__led,
 .trial-device-row__status--online::before,
+.trial-detail__online,
 .home-benefits__online { animation: none; }
 }

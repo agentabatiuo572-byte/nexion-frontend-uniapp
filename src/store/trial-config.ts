@@ -15,11 +15,12 @@ export interface TrialConfig {
   graceDays: number;
   /** Active-purchase discount rate (applies during trial + grace) */
   discountRate: number;
-  /** Active-purchase discount hard cap, USD */
-  discountCapUSD: number;
+  /** Active-purchase discount hard cap, USD; null = the operator left it empty (no cap). */
+  discountCapUSD: number | null;
   /** Trial-earnings offset cap, USD (offsets device price at purchase; remainder
-   *  credited to balance AFTER purchase; before purchase only offsets). 后台可调。 */
-  trialOffsetCapUSD: number;
+   *  credited to balance AFTER purchase; before purchase only offsets). 后台可调；
+   *  null = left empty (no cap, the default since 2026-11-01). */
+  trialOffsetCapUSD: number | null;
   /** Trial product id selected by the authoritative product policy. */
   trialProductId: TrialProductId;
   /** Server-owned E1 display name for the selected product. */
@@ -145,6 +146,8 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       if (!Number.isInteger(value) || value > max) throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
       return value;
     };
+    // An empty cap is the operator's "no cap", not zero.
+    const cap = (key: string) => (String(raw[key] ?? "").trim() === "" ? null : number(key));
     const bool = (key: string) => {
       return parseTrialBooleanConfig(raw[key]);
     };
@@ -158,8 +161,8 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       trialDays: integer("trialDays", 1),
       graceDays: integer("graceDays"),
       discountRate: discountRate > 1 ? discountRate / 100 : discountRate,
-      discountCapUSD: number("discountCapUSD"),
-      trialOffsetCapUSD: number("trialOffsetCapUSD"),
+      discountCapUSD: cap("discountCapUSD"),
+      trialOffsetCapUSD: cap("trialOffsetCapUSD"),
       trialProductId,
       trialProductName,
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
@@ -189,7 +192,7 @@ export function computeDiscountedPrice(config: TrialConfig): {
   total: number;
 } {
   const subtotal = config.trialPriceUSD;
-  const discount = Math.min(subtotal * config.discountRate, config.discountCapUSD);
+  const discount = Math.min(subtotal * config.discountRate, config.discountCapUSD ?? Infinity);
   return { subtotal, discount: +discount.toFixed(2), total: +(subtotal - discount).toFixed(2) };
 }
 
@@ -204,7 +207,7 @@ export function computeTrialOffset(
   shadowUSD: number,
 ): { offsetUSD: number; remainderUSD: number } {
   const earnings = Math.max(0, shadowUSD);
-  const offsetUSD = +Math.min(earnings, config.trialOffsetCapUSD).toFixed(2);
+  const offsetUSD = +Math.min(earnings, config.trialOffsetCapUSD ?? Infinity).toFixed(2);
   const remainderUSD = +(earnings - offsetUSD).toFixed(2);
   return { offsetUSD, remainderUSD };
 }
