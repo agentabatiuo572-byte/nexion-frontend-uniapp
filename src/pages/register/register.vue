@@ -92,7 +92,7 @@
               </view>
               <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
             </view>
-            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
+            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :disabled="verifying" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
             <text v-if="inviteInvalid" id="register-invite-error" class="rg-invite__err" role="alert">{{ t.register.inviteInvalid }}</text>
           </view>
         </view>
@@ -661,7 +661,10 @@ async function verifyCode() {
   if (remoteApiEnabled) {
     const requestId = otpRequestId.value;
     if (!requestId) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+    const checkVersion = otpFlowVersion;
     if (!(await manualInviteAccepted())) return;
+    // The user changed the number or a new code was sent while the invite code was being checked.
+    if (checkVersion !== otpFlowVersion || step.value !== 2 || otpRequestId.value !== requestId) return;
     const phoneAtVerify = fullPhone.value;
     const codeAtVerify = codeStr.value;
     const flowVersion = otpFlowVersion;
