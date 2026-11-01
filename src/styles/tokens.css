@@ -992,3 +992,6 @@ html {
 uni-input {
   min-height: 44px;
 }
+
+/* Keep authored image colors when Android WebView automatically darkens small images. */
+uni-image { color-scheme: only light; }

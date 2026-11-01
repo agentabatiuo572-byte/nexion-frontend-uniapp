@@ -498,7 +498,6 @@ const gateMetaStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
 };
 
-import { getProductMedia } from "@/lib/product-media";
 </script>
 <style scoped>
 .promotion-buy { --v5-liquid-tint:transparent; }

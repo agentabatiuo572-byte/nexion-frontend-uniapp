@@ -24,7 +24,7 @@ function page() {
   const refreshRemote = vi.fn(async () => { rows.value = [{ id: "original-order" }]; });
   const hooks: Record<string, Array<() => void>> = { show: [], hide: [], dispose: [] };
   const deps = {
-    useManualScrollLoadMore: vi.fn(),
+    useManualScrollLoadMore: vi.fn(), refreshProductCatalog: vi.fn(),
     computed, ref, watch, captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, createRemoteOrdersRefresh,
     isInitialOrderReadLoading, orderListPanels, remoteCommerceRequestCurrent,
     app: reactive({ accountKey: "user:607", accountBindingEpoch: 1 }),

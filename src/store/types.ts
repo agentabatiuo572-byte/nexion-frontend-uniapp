@@ -73,6 +73,7 @@ export interface Device {
   /** E3 capacity projection source. Remote rows are display-only server facts;
    * mock rows intentionally omit this marker and keep the local simulation. */
   capacitySource?: "server" | "mock";
+  productCode?: string;
   capacityPct?: number | null;
   capacityAgeMonths?: number | null;
   capacitySubsidized?: boolean | null;
