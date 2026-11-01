@@ -60,6 +60,15 @@ describe("ordinary task names use the configured name only", () => {
     }
   });
 
+  it("P62 recent completion chips use the product task name and hide model identifiers", () => {
+    const done = { id: "CV2-INTERNAL-TASK", receiptNo: "CTR-AUDIT-RECEIPT", type: "Embedding", model: "TEST_BGE_M3_V1", reward: 0.000025 };
+    const output = text(render(block(card, hasClass("earn-stage__chip")), {
+      deviceTodayCompleted: [done], visibility: { mask: String }, formatUsd: () => "<$0.0001",
+    }));
+    expect(output).toBe("Embedding<$0.0001");
+    for (const hidden of [done.model, done.id, done.receiptNo]) expect(output).not.toContain(hidden);
+  });
+
   it("keeps the task number in the explicit audit detail", () => {
     const output = text(render(block(history, when("selectedTask")), {
       selectedTask: { id: "CV2-AUDIT-TASK", settlementStatus: "NONE" }, visibility: { mask: String },
