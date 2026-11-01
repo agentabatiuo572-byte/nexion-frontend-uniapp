@@ -27,5 +27,5 @@ withDefaults(defineProps<{ size?: number; appearance?: 'light' | 'dark' }>(), {
   border-radius: 999px;
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .12), 0 4px 10px rgba(0, 0, 0, .35);
 }
-.nx-support-portrait--light { box-shadow: 0 0 0 1.5px rgba(19, 20, 26, .08), 0 4px 10px rgba(0, 0, 0, .12); }
+.nx-support-portrait--light { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--v5-ink) 8%, transparent), 0 4px 10px rgba(0, 0, 0, .12); }
 </style>

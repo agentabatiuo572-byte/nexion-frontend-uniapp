@@ -177,6 +177,16 @@ export function supportDemo(url,locale,state,request) {
       const content=text('已收到你的消息，我会继续跟进。','I have received your message and will follow up.','Tôi đã nhận được tin nhắn và sẽ tiếp tục hỗ trợ.');
       detail.messages.push({id,senderType:'agent',senderName:text('演示客服','Demo support','Hỗ trợ mẫu'),content,createdAt:now,receiptStatus:'sent'});
       Object.assign(detail.conversation,{unreadCount:detail.conversation.unreadCount+1,lastMessage:content,lastMessageAt:now,lastPublicMessageId:id});
+    } else if(scenario==='author-photo') {
+      // Verified messages from owner 1 carry its avatar reference; the photo is served by the preview server.
+      const author={senderId:1,authorConfidence:'VERIFIED',senderAvatar:{assetId:'5b0f3c2e-8d4a-4c71-9e26-0a7d3f19b4c8',version:1},senderName:text('演示客服','Demo support','Hỗ trợ mẫu')};
+      const samples=[
+        ['agent',text('你好，我是你的专属客服，有问题随时找我。','Hi, I am your dedicated advisor. Reach out any time.','Xin chào, tôi là cố vấn riêng của bạn. Cứ liên hệ khi cần nhé.')],
+        ['user',text('好的，谢谢。','Great, thanks.','Vâng, cảm ơn.')],
+        ['agent',text('设备有任何异常，我会第一时间通知你。','I will let you know right away if anything changes on your device.','Nếu thiết bị có gì bất thường, tôi sẽ báo bạn ngay.')],
+      ];
+      detail.messages=samples.map(([senderType,content],index)=>({id:nextMessageId(),senderType,content,createdAt:new Date(Date.now()-(samples.length-index)*60000).toISOString(),...(senderType==='agent'?author:{receiptStatus:'read'})}));
+      Object.assign(detail.conversation,{unreadCount:1,lastMessage:detail.messages.at(-1).content,lastMessageAt:detail.messages.at(-1).createdAt,lastPublicMessageId:detail.messages.at(-1).id});
     } else detail.conversation.unreadCount=scenario==='long-count'?1298:scenario==='read'?0:1;
     detail.conversation.version++;
     state.supportScenario=scenario;
