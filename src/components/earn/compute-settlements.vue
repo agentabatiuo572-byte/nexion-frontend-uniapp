@@ -1,5 +1,5 @@
 <template>
-  <view v-if="remoteApiEnabled && (app.remoteComputeProtocolVersion === 2 || historyAvailable)" class="compute-settlements" data-compute-settlements="true">
+  <view v-if="available" class="compute-settlements" data-compute-settlements="true">
     <view v-if="app.remoteComputeProtocolVersion === 2">
     <text class="block" style="font-weight:600">{{ copy.pending }}</text>
     <template v-if="assignmentsReady && app.remotePendingEarned">
@@ -49,6 +49,10 @@ const nextCursor = ref<string | null>(null);
 const detail = ref<ComputeSettlementDetail | null>(null);
 const loading = ref(false), error = ref(false), detailLoading = ref(false), detailError = ref(false);
 const historyAvailable = ref(false);
+// Settlement batches exist only when the server offers them; the Task Center shows its entry row on this signal.
+const available = computed(() => remoteApiEnabled && (app.remoteComputeProtocolVersion === 2 || historyAvailable.value));
+const emit = defineEmits<{ (event: "availability", available: boolean): void }>();
+watch(available, (value) => emit("availability", value), { immediate: true });
 const assignmentsReady = computed(() => app.remoteAssignmentStatus === "ready" || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
 let visible = false, pageEpoch = 0, listEpoch = 0, detailEpoch = 0;
 const date = (value: number) => visibility.mask(formatDisplayDateTime(value, dateLocale()));

@@ -16,95 +16,68 @@
 -->
 <template>
   <AppChassis active="earn">
-    <CardStagger class="pt-6 pb-4 space-y-6" style="color: var(--v5-ink)">
-      <view v-if="app.remoteFleetStatus === 'error'" class="nx-inline-recovery mx-4 rounded-xl" style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
-        <view class="nx-inline-recovery__copy">
-          <text class="block" style="font-size: 13px; font-weight: 600">{{ t.coreReview.fleetReadFailed }}</text>
-          <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.coreReview.fleetReadRetry }}</text>
-        </view>
-        <!-- 文案必须裹 <text>:uni 下 <view> 里的裸 {{ }} 在 App 端不保证渲染。
-             顺带补 role/tabindex —— 这是个真控件(重试),本仓禁原生 button,
-             键盘语义由 lib/a11y-activate.ts 平台层按 role+tabindex 自动补上。 -->
-        <view
-          class="nx-inline-recovery__action active:opacity-70"
-          style="color: var(--v5-brand)"
-          role="button" tabindex="0"
-          @click="retryFleet"
-        >
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
-      <!-- ===== HERO: pill tabs ===== -->
+    <CardStagger class="pt-6 pb-4 earn-page" style="color: var(--v5-ink)">
+      <!-- ===== Period switch ===== -->
       <view class="mx-4">
         <GlassSegments class="earn-range" :label="t.earn.rangeGroupLabel" semantics="radio" v-model="range" :options="rangeOptions"  />
       </view>
 
-      <!-- ===== HERO: total earned card ===== -->
-      <view class="mx-4">
-        <view class="relative overflow-hidden" :style="totalCardStyle">
-          <view class="relative" style="z-index: 1">
-            <view class="flex justify-between items-center gap-2">
-              <view class="flex items-center gap-1 min-w-0"><text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text><DataVisibilityToggle /></view>
-              <text class="earn-scope">{{ auditCopy.revenueScope }}</text>
-            </view>
-
-            <view class="mt-2.5 flex items-baseline gap-1" style="font-family: var(--font-amount); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)">
-              <text v-if="totalKnown && !visibility.hidden" style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">{{ totalPrefix }}</text>
-              <text v-if="visibility.hidden" class="tabular-nums" style="font-size: 56px">{{ visibility.mask(totalInt) }}</text>
-              <text v-else class="tabular-nums" style="font-size: 56px">{{ totalInt }}<text v-if="totalKnown" style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
-            </view>
-            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-nex); font-weight: 600">{{ visibility.mask(`+${nexFmt}`) }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">UVT</text></text>
-            <!-- 只有**确实请求失败**时才说不可用并给重试;零值已在上面显示为 0(#128)。 -->
-            <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="nx-inline-recovery mt-2" role="status" aria-live="polite">
-              <view class="nx-inline-recovery__copy">
-                  <text class="block" style="font-size: 12px; font-weight: 600; color: var(--v5-danger)">{{ t.earn.summaryUnavailableTitle }}</text>
-                  <text class="block" style="font-size: 12px; margin-top: 2px; color: var(--v5-ink-3)">{{ t.earn.summaryUnavailableBody }}</text>
-              </view>
-              <view
-                class="nx-inline-recovery__action active:opacity-70"
-                  style="color: var(--v5-brand)"
-                role="button" tabindex="0"
-                @click="retrySummary"
-
-                @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"
-              >
-                <text>{{ t.ui.retry }}</text>
-              </view>
-            </view>
+      <!-- ===== Bento: device earnings, completed jobs, latest settlement ===== -->
+      <view class="earn-bento">
+        <view class="earn-tile earn-tile--hero" role="group" :aria-label="auditCopy.deviceRevenue">
+          <view class="earn-hero__row">
+            <view class="earn-hero__label"><text>{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text><DataVisibilityToggle class="earn-hero__eye" /></view>
+            <text class="earn-scope">{{ auditCopy.revenueScope }}</text>
           </view>
+          <view class="earn-hero__amount">
+            <text v-if="!visibility.hidden" class="earn-hero__currency">{{ totalPrefix || '$' }}</text>
+            <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(totalInt) }}</text>
+            <text v-else class="earn-hero__int">{{ totalInt }}<text v-if="totalKnown" class="earn-hero__dec">.{{ totalCents }}</text></text>
+          </view>
+          <!-- 只有**确实请求失败**时才说不可用并给重试;零值已在上面显示为 0(#128)。 -->
+          <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="earn-hero__recovery nx-inline-recovery" role="status" aria-live="polite">
+            <view class="nx-inline-recovery__copy">
+              <text class="earn-hero__recovery-title">{{ t.earn.summaryUnavailableTitle }}</text>
+              <text class="earn-hero__recovery-body">{{ t.earn.summaryUnavailableBody }}</text>
+            </view>
+            <view class="earn-hero__retry nx-inline-recovery__action" role="button" tabindex="0" @click="retrySummary" @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"><text>{{ t.ui.retry }}</text></view>
+          </view>
+          <text v-else class="earn-hero__nex">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}<text class="earn-hero__nex-unit">UVT</text></text>
+        </view>
+        <view class="earn-tile earn-tile--half" role="group" :aria-label="t.earn.completedJobs">
+          <view class="earn-half__label"><view class="earn-half__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg></view><text>{{ t.earn.completedJobs }}</text></view>
+          <text class="earn-half__count">{{ visibility.mask(jobsCount === null ? '—' : jobsCount.toLocaleString()) }}<text v-if="jobsCount !== null && !visibility.hidden && t.earn.completedJobsUnit" class="earn-half__unit">{{ t.earn.completedJobsUnit }}</text></text>
+        </view>
+        <view class="earn-tile earn-tile--half earn-tile--link" role="link" tabindex="0" :aria-label="latestLabel" @click="goLedger" @keydown.enter.stop.prevent="goLedger">
+          <text class="earn-half__label">{{ t.earn.latestSettlement }}</text>
+          <view v-if="latest" class="earn-half__latest"><text class="earn-half__amount">{{ visibility.mask(latest.amt) }}</text><text class="earn-half__who">{{ latest.model }} · {{ latest.who }}</text></view>
+          <view v-else-if="!remoteApiEnabled || app.homeTruthStatus === 'idle' || (app.homeTruthStatus === 'loading' && !app.homeTruth)" class="earn-half__placeholder" aria-hidden="true" />
+          <view v-else class="earn-half__latest"><text class="earn-half__amount earn-half__amount--none">—</text><text class="earn-half__who">{{ ledgerStatusText }}</text></view>
         </view>
       </view>
 
-      <!-- My devices header and selected-period completed jobs. -->
-      <view class="mx-4 mt-2 mb-1 px-1">
-        <view class="flex items-center justify-between gap-2">
-          <view class="flex items-center min-w-0">
-            <text style="font-family: var(--font-v5); font-size: var(--ui-type-section); font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }}</text>
-            <view class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.taskPoolLineTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
-              <svg class="earn-capacity-info__glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <g class="earn-capacity-info__rocket">
-                  <path d="M8 14 5 17v3l4-2m7-4 3 3v3l-4-2" />
-                  <path d="M12 2c-3.3 2.7-4.7 7.5-3.5 13.5L10 18h4l1.5-2.5C16.7 9.5 15.3 4.7 12 2Z" fill="currentColor" fill-opacity=".12" />
-                  <circle cx="12" cy="9" r="2" />
-                  <path class="earn-capacity-info__flame" d="M10.2 18.5c-.7 1.5.2 3 1.8 4 1.6-1 2.5-2.5 1.8-4" fill="currentColor" stroke="none" />
-                  <path class="earn-capacity-info__exhaust" d="M8 21v1m8-1v1" stroke-width="1.2" />
-                </g>
-              </svg>
-            </view>
-          </view>
-          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2)">{{ visibility.mask(fleetCountText) }}</text>
+      <!-- ===== My compute fleet: slot ring, capacity explainer, device switcher + stage ===== -->
+      <view class="earn-fleet-head">
+        <text class="earn-fleet-head__title" role="heading" aria-level="2">{{ t.home.myFleet }}</text>
+        <SlotRing />
+        <view class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.taskPoolLineTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
+          <svg class="earn-capacity-info__glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <g class="earn-capacity-info__rocket">
+              <path d="M8 14 5 17v3l4-2m7-4 3 3v3l-4-2" />
+              <path d="M12 2c-3.3 2.7-4.7 7.5-3.5 13.5L10 18h4l1.5-2.5C16.7 9.5 15.3 4.7 12 2Z" fill="currentColor" fill-opacity=".12" />
+              <circle cx="12" cy="9" r="2" />
+              <path class="earn-capacity-info__flame" d="M10.2 18.5c-.7 1.5.2 3 1.8 4 1.6-1 2.5-2.5 1.8-4" fill="currentColor" stroke="none" />
+              <path class="earn-capacity-info__exhaust" d="M8 21v1m8-1v1" stroke-width="1.2" />
+            </g>
+          </svg>
         </view>
-        <text class="block" style="font-size: 12px; line-height: 18px; color: var(--v5-ink-3)">{{ jobsText }}</text>
       </view>
-      <!-- Device pool — one card, accordion rows (one detail open at a time) -->
-      <EmptySlotsHint v-if="fleetReady" :trial-expanded="expandedId === 'trial:current'" @toggle-trial="toggleDevice('trial:current')">
-        <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0 || trialPresentation.active.value" @toggle="toggleDevice(d.id)" />
-      </EmptySlotsHint>
+      <FleetStage />
 
-      <EarningsLedgerCard class="mx-4" />
-      <MarketBoard />
-      <TaskCenter />
-      <NxSection class="mx-4 earn-more-ways" :title="auditCopy.moreWays">
+      <EarningsLedgerCard class="mx-4 earn-block" />
+      <MarketBoard class="earn-block" />
+      <TaskCenter class="earn-block" />
+      <NxSection class="mx-4 earn-block earn-more-ways" :title="auditCopy.moreWays">
         <!-- #ifdef H5 -->
         <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
           artwork="phone" :action="remainderCopy.downloadApp" @click="goPhoneDownload" />
@@ -123,10 +96,10 @@
 </template>
 
 <script setup lang="ts">
-import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
+import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsdOverviewParts } from "@/lib/usd-display";
-import { onUnmounted, computed, nextTick, ref, watch, type CSSProperties } from "vue";
+import { onUnmounted, computed, nextTick, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -138,21 +111,19 @@ import { useRemainderUiCopy } from "@/i18n/remainder-ui";
 import { useConfig } from "@/store/config";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { navTo } from "@/lib/route";
-import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useCountUp } from "@/composables/use-count-up";
-import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 
-import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
+import FleetStage from "@/components/earn/fleet-stage.vue";
+import SlotRing from "@/components/slot-ring.vue";
+import { useEarningsLedger } from "@/composables/use-earnings-ledger";
 import MarketBoard from "@/components/earn/market-board.vue";
 import TaskCenter from "@/components/earn/task-center.vue";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useFreeTrial } from "@/store/free-trial";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
-import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
 import { useDataVisibility } from "@/store/data-visibility";
@@ -232,7 +203,6 @@ watch([() => app.homeTruthStatus, () => app.remoteFleetStatus, () => app.homeTru
   void observeDayOneEarnPage();
 });
 
-function retryFleet() { invalidatePassiveTabRead('remote-fleet'); void app.refreshRemoteFleet().catch(() => undefined); }
 /** Retry the summary read itself (Home overview), not just the fleet. */
 function retrySummary() { void app.refreshHomeTruth().catch(() => undefined); }
 function rangeLabel(r: Range): string { return r === "Today" ? t.value.earn.rangeToday : r === "Week" ? t.value.earn.rangeWeek : r === "Month" ? t.value.earn.rangeMonth : t.value.earn.rangeAll; }
@@ -252,26 +222,6 @@ const capacityExplainer = useCapacityExplainer();
 function openExplainer() {
   capacityExplainer.open();
 }
-
-// Accordion: only one device detail open at a time (null = all collapsed).
-const expandedId = ref<string | null>(null);
-function toggleDevice(id: string) {
-  expandedId.value = expandedId.value === id ? null : id;
-}
-
-// Earn shows ACTIVE fleet only (inventory lives in /me/devices).
-const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const trialPresentation = useTrialPresentation();
-// A background refresh remains authoritative only for fresh mutations. For
-// read-only presentation, keep the bound account's last confirmed fleet visible
-// until the next response resolves; a first read and every error stay unknown.
-const fleetReady = computed(() => !remoteApiEnabled
-  || app.remoteFleetStatus === "ready"
-  || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
-const fleetCountText = computed(() => fleetReady.value && (app.remoteSlotsUsed != null || trialPresentation.reservedSlots.value !== null) ? fmt(t.value.home.fleetOfMax, {
-  n: app.remoteSlotsUsed ?? (app.activeSlotCount + (trialPresentation.reservedSlots.value ?? 0)),
-  max: app.slotCap,
-}) : "— / —");
 
 // ── HERO total earned ──
 const serverPeriod = computed(() => {
@@ -322,70 +272,60 @@ const jobsCount = computed(() => {
   if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
   return serverPeriodValue.value?.jobCount ?? null;
 });
-const jobsText = computed(() => jobsCount.value === null ? visibility.mask("—") : fmt(t.value.earn.jobsCount, { n: visibility.mask(jobsCount.value.toLocaleString()) }));
 
-// drifting hero dots
-const HERO_DOTS = [
-  { left: "12%", delay: 0, color: "var(--v5-tech-cyan-ink)" },
-  { left: "32%", delay: 1.6, color: "var(--v5-brand)" },
-  { left: "54%", delay: 3.2, color: "var(--v5-brand-2-ink)" },
-  { left: "72%", delay: 4.8, color: "var(--v5-tech-cyan-ink)" },
-  { left: "88%", delay: 6.4, color: "var(--v5-brand)" },
-];
-
-// ── styles ──
-function pillStyle(r: Range): CSSProperties {
-  const on = range.value === r;
-  return {
-    // 《07》tap≥44(原 32);《03》§2 圆角上阶梯 9→12;透明 border 无视觉作用,删。
-    height: "44px",
-    background: on ? "var(--v5-brand-soft)" : "transparent",
-    borderRadius: "12px",
-  };
-}
-function pillLabelStyle(r: Range): CSSProperties {
-  const on = range.value === r;
-  return {
-    color: on ? "var(--v5-brand)" : "var(--v5-ink-3)",
-    fontFamily: "var(--font-v5)",
-    fontWeight: on ? 600 : 500,
-    fontSize: "var(--ui-type-list-subtitle)",
-  };
-}
-const totalCardStyle: CSSProperties = {
-  padding: "0 0 10px",
-};
-function heroDotStyle(d: { left: string; delay: number; color: string }): CSSProperties {
-  return {
-    position: "absolute",
-    bottom: "-6px",
-    left: d.left,
-    width: "4px",
-    height: "4px",
-    borderRadius: "50%",
-    background: d.color,
-    opacity: 0,
-    animation: "v5-dot-drift 8s linear infinite",
-    animationDelay: `${d.delay}s`,
-  };
-}
-const usdtTagStyle: CSSProperties = {
-  fontSize: "12px",
-  padding: "2px 7px",
-  borderRadius: "4px",
-  background: "var(--v5-brand-soft)",
-  color: "var(--v5-brand)",
-  fontWeight: 500,
-  letterSpacing: "0.04em",
-  whiteSpace: "nowrap",
-};
+// Latest settlement = the first row of the ledger below (same source); the tile opens the same "View all" page.
+const { rows: ledgerRows, statusText: ledgerStatusText } = useEarningsLedger();
+const latest = computed(() => ledgerRows.value[0] ?? null);
+const latestLabel = computed(() => latest.value
+  ? `${t.value.earn.latestSettlement} ${visibility.mask(latest.value.amt)}, ${latest.value.model} · ${latest.value.who}, ${t.value.home.earningsLedgerViewAll}`
+  : `${t.value.earn.latestSettlement}, ${t.value.home.earningsLedgerViewAll}`);
+function goLedger() { navTo("/pages/me/wallet-bills"); }
 
 import GlassSegments from "@/components/glass-segments.vue";
 const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLabel(value) })));
 </script>
 
 <style scoped>
-.earn-capacity-info { width:44px; height:44px; flex:none; display:grid; place-items:center; color:var(--v5-brand); background:transparent; cursor:pointer; }
+.earn-page > .earn-bento { margin-top: 16px; }
+.earn-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 16px; }
+.earn-tile { position: relative; min-width: 0; box-sizing: border-box; overflow: hidden; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .earn-tile { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+/* The only ambient glow on Earn: a soft amber light in the big tile's corner. */
+.earn-tile--hero { grid-column: 1 / -1; padding: 16px 18px 18px; border-radius: 24px; }
+.earn-tile--hero::before { content: ""; position: absolute; right: -60px; top: -70px; width: 240px; height: 200px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-warning) 26%, transparent), transparent); pointer-events: none; }
+[data-theme="light"] .earn-tile--hero::before { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-warning) 16%, transparent), transparent); }
+.earn-hero__row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.earn-hero__label { display: flex; align-items: center; gap: 2px; min-width: 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
+.earn-hero__eye { margin: -12px 0; color: var(--v5-ink-3); }
+.earn-scope { color: var(--v5-ink-2); font: 400 12px/16px var(--font-v5); text-align: right; max-width: 50%; }
+.earn-hero__amount { position: relative; display: flex; align-items: baseline; gap: 4px; margin-top: 10px; font-family: var(--font-amount); font-weight: 600; letter-spacing: -.024em; line-height: 1; color: var(--v5-ink); }
+.earn-hero__currency { font-size: 20px; font-weight: 500; color: var(--v5-ink-3); }
+.earn-hero__int { font-size: 52px; }
+.earn-hero__dec { font-size: 34px; color: var(--v5-ink-3); }
+.earn-hero__nex { position: relative; display: block; margin-top: 10px; font: 600 15px/20px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; }
+.earn-hero__nex-unit { margin-left: 3px; font: 500 12px/16px var(--font-v5); letter-spacing: .04em; }
+.earn-hero__recovery { position: relative; margin-top: 10px; }
+.earn-hero__recovery-title { display: block; font: 500 12px/18px var(--font-v5); color: var(--v5-danger); }
+.earn-hero__recovery-body { display: block; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-hero__retry { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+.earn-tile--half { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 116px; padding: 14px 14px 12px; }
+.earn-tile--link { cursor: pointer; }
+.earn-tile--link:active { opacity: .85; }
+.earn-tile--link:focus-visible, .earn-hero__retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.earn-half__label { display: flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-half__icon { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 7px; background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); color: var(--v5-tech-cyan); }
+.earn-half__count { font: 500 30px/34px var(--font-metric); color: var(--v5-ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.earn-half__unit { margin-left: 4px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); letter-spacing: 0; }
+.earn-half__latest { min-width: 0; }
+.earn-half__amount { display: block; font: 500 19px/24px var(--font-metric); color: var(--v5-success-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.earn-half__amount--none { color: var(--v5-ink-3); }
+.earn-half__who { display: block; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-half__placeholder { width: 80%; height: 14px; border-radius: 8px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+
+.earn-fleet-head { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 32px 18px 8px; }
+.earn-fleet-head__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
+.earn-block { margin-top: 32px; }
+.earn-capacity-info { width:44px; height:44px; margin-left:-8px; flex:none; display:grid; place-items:center; color:var(--v5-brand); background:transparent; cursor:pointer; }
 /* App renders small SVGs through NxNativeSvg/v-html, so inner nodes need deep selectors. */
 .earn-capacity-info :deep(.earn-capacity-info__glyph) { display:block; overflow:visible; }
 .earn-capacity-info :deep(.earn-capacity-info__rocket) { animation:earn-rocket-hop 1.6s ease-in-out infinite; }
@@ -396,8 +336,11 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 @keyframes earn-rocket-exhaust { 0% { transform:translateY(0); opacity:0; } 25% { opacity:.65; } 100% { transform:translateY(2.5px); opacity:0; } }
 @media (prefers-reduced-motion:reduce) { .earn-capacity-info :deep(.earn-capacity-info__rocket),.earn-capacity-info :deep(.earn-capacity-info__flame),.earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:none; }.earn-capacity-info :deep(.earn-capacity-info__exhaust) { opacity:0; } }
 .earn-capacity-info:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; border-radius:12px; }
-.earn-scope { color: var(--v5-ink-2); font: 400 12px/1.4 var(--font-v5); text-align: right; max-width: 50%; }
 .earn-more-ways :deep(.nx-section__title) { font-size: 20px; line-height: 1.25; }
 /* Short period names stay on one line (vi "Hôm nay" broke at 320). */
 .earn-range :deep(.nx-glass-option__label) { white-space: nowrap; overflow-wrap: normal; }
+@media (max-width: 374px) {
+  .earn-fleet-head, .earn-block { margin-top: 24px; }
+  .earn-hero__int { font-size: 46px; }
+}
 </style>
