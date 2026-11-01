@@ -625,6 +625,8 @@ export const vi: Messages = {
     doMathDaily: "mỗi ngày",
     doMathVs: "so với {base}",
     doMathSeeCta: "Xem cách tính",
+    doMathStage: "Thu nhập ngày dự kiến",
+    doMathYour: "so với {base} của bạn",
     // EarningsLedgerCard (ZONE 5)
     earningsLedgerTitle: "Sổ thu nhập",
     earningsLedgerViewAll: "Xem tất cả",
