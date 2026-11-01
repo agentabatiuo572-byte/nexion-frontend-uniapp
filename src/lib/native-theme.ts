@@ -16,7 +16,8 @@ export function syncNativeTheme(theme: ResolvedTheme): void {
     // Status-bar support must not prevent page CSS synchronization.
   }
   if (typeof getCurrentPages !== "function") return;
-  const script = `document.documentElement.setAttribute("data-theme", "${theme}")`;
+  // Keep browser color adjustment aligned with the app theme when a page resumes.
+  const script = `document.documentElement.setAttribute("data-theme", "${theme}");document.documentElement.style.colorScheme = "only ${theme}"`;
   for (const page of getCurrentPages() as AppPage[]) {
     try {
       page.$getAppWebview?.().evalJS(script);

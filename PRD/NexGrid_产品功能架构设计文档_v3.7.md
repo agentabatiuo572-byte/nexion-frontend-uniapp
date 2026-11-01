@@ -168,7 +168,8 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 - **滚动位置记忆**:chassis 记录各页滚动容器位置;从二级页 `navigateBack` 回上层时恢复到跳转前的滚动位置,前进进入新页则落到顶部
 - overscroll-behavior contain
 - **默认主题 dark**(产品默认 dark mode 体验)。SSR 阶段 `<html data-theme="dark">` 直出,zustand `useTheme.mode` 初值同步为 `"dark"`,避免首屏闪光;旧用户在 localStorage `nexgrid-theme-v1` 中 persist 过 `"light"` 仍保留其个性选择,新用户 / 清缓存进来即落到 dark
-- 原生页面采用应用已解析的深浅主题，保留卡片与玻璃控件的底色、边缘高光、阴影及图片原色，系统自动深色不得再次改色。
+- 原生页面采用应用已解析的深浅主题；首次显示、返回页面和切换主题时，同步页面主题标记与浏览器配色声明，保留卡片与玻璃控件的原底色、透明度、边缘高光、阴影及图片原色规则，系统自动深色不得再次改色。
+- 第三方收银台为独立网页，不继承应用主题样式，其外观需单独验收。
 - **Chassis 顶部留白**:tab 路由首屏 hero 紧贴 brand row;sub-route(`SetPageHeader` 模式页)在此基础上再下移,避免第一张 IOSList 撞 header 底沿
 
 ### 3.2 底部 5-Tab 主导航
