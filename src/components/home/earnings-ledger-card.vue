@@ -1,34 +1,24 @@
 <!--
   EarningsLedgerCard — ZONE 5 recent micro-earnings ledger (ported from
-  mission-control.tsx EarningsLedgerCard). Header (Earnings ledger · N of total)
-  + 5 rows (model · client · amount · age). Remote rows come from the Home
-  canonical projection; only the local demo uses mock rows.
+  mission-control.tsx EarningsLedgerCard). One card: header (Earnings ledger ·
+  View all) + 5 rows of "model · client" and the settled amount, no time column
+  (design system 04.6). Remote rows come from the Home canonical projection;
+  only the local demo uses mock rows.
 -->
 <template>
   <view class="earnings-ledger-card" data-home-section="earnings-ledger" :data-ledger-mode="app.homeTruth?.earningsLedgerMode ?? 'UNAVAILABLE'">
-    <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.earningsLedgerTitle }}<text v-if="app.homeTruthStatus === 'error' && app.homeTruth" style="font-size: 12px; color: var(--v5-warning)"> · {{ t.home.networkStale }}</text></text>
-      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" role="link" tabindex="0" data-home-action="earnings-ledger-all" @click="goAll" @keydown.enter.stop.prevent="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
+    <view class="earnings-ledger-card__head">
+      <text class="earnings-ledger-card__title">{{ t.home.earningsLedgerTitle }}<text v-if="app.homeTruthStatus === 'error' && app.homeTruth" class="earnings-ledger-card__stale"> · {{ t.home.networkStale }}</text></text>
+      <text class="earnings-ledger-card__all active:opacity-70" role="link" tabindex="0" data-home-action="earnings-ledger-all" @click="goAll" @keydown.enter.stop.prevent="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
     </view>
 
-    <view style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
-      <view
-        v-for="(r, i) in rows"
-        :key="r.id"
-        data-home-ledger-row="true"
-        class="grid items-center gap-x-2"
-        :style="{ gridTemplateColumns: 'minmax(0, 1fr) auto minmax(64px, 26%)', minHeight: '40px', padding: '6px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
-      >
-        <view class="earnings-ledger-identity min-w-0" :title="`${r.model} · ${r.who}`">
-          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink)">{{ r.model }}<text style="color: var(--v5-ink-3)"> · {{ r.who }}</text></text>
-        </view>
-        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ visibility.mask(r.amt) }}</text>
-        <text data-home-ledger-time="true" class="font-mono-tabular text-right" style="min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 16px; font-size: 12px; color: var(--v5-ink-2)">{{ r.t }}</text>
-      </view>
-      <view v-if="remoteApiEnabled && rows.length === 0" class="nx-inline-recovery px-2 py-3">
-        <text class="nx-inline-recovery__copy" style="font-size: 12px; color: var(--v5-ink-3)">{{ ledgerStatusText }}</text>
-        <text v-if="app.homeTruthStatus === 'error'" class="nx-inline-recovery__action active:opacity-70" role="button" tabindex="0" data-home-action="earnings-ledger-retry" style="padding: 0 12px; color: var(--v5-brand)" @click="retryHome" @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
-      </view>
+    <view v-for="r in rows" :key="r.id" data-home-ledger-row="true" class="earnings-ledger-card__row">
+      <text class="earnings-ledger-card__identity" :title="`${r.model} · ${r.who}`">{{ r.model }}<text class="earnings-ledger-card__client"> · {{ r.who }}</text></text>
+      <text class="earnings-ledger-card__amount">{{ visibility.mask(r.amt) }}</text>
+    </view>
+    <view v-if="remoteApiEnabled && rows.length === 0" class="earnings-ledger-card__row">
+      <text class="earnings-ledger-card__status">{{ ledgerStatusText }}</text>
+      <text v-if="app.homeTruthStatus === 'error'" class="earnings-ledger-card__retry active:opacity-70" role="button" tabindex="0" data-home-action="earnings-ledger-retry" @click="retryHome" @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
     </view>
   </view>
 </template>
@@ -37,27 +27,21 @@
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
-import { useLocaleStore } from "@/store/locale";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
-import { formatConversationTime } from "@/components/support/conversation-time";
 import { parseServerTimestamp } from "@/api/server-time";
-import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 
 const visibility = useDataVisibility();
 const t = useT();
 const app = useApp();
-const locale = useLocaleStore();
-const clockNow = ref(Date.now());
-useVisibleInterval(() => { clockNow.value = Date.now(); }, 60_000);
 const ROWS = [
-  { id: 1, who: "Pocket Studios", model: "SDXL Turbo", amt: formatUsd(0.00032, "detail", true), t: "2s" },
-  { id: 2, who: "Echo Earbuds", model: "Whisper tiny", amt: formatUsd(0.00005, "detail", true), t: "14s" },
-  { id: 3, who: "Helix Labs", model: "Llama 3.2 3B", amt: formatUsd(0.00021, "detail", true), t: "38s" },
-  { id: 4, who: "Mosaic Studios", model: "Flux Schnell", amt: formatUsd(0.00048, "detail", true), t: "52s" },
-  { id: 5, who: "Vector Foundry", model: "MobileBERT", amt: formatUsd(0.00009, "detail", true), t: "1m" },
+  { id: 1, who: "Pocket Studios", model: "SDXL Turbo", amt: formatUsd(0.00032, "detail", true) },
+  { id: 2, who: "Echo Earbuds", model: "Whisper tiny", amt: formatUsd(0.00005, "detail", true) },
+  { id: 3, who: "Helix Labs", model: "Llama 3.2 3B", amt: formatUsd(0.00021, "detail", true) },
+  { id: 4, who: "Mosaic Studios", model: "Flux Schnell", amt: formatUsd(0.00048, "detail", true) },
+  { id: 5, who: "Vector Foundry", model: "MobileBERT", amt: formatUsd(0.00009, "detail", true) },
 ];
 
 const remoteRows = computed(() => (app.homeTruth?.earningsLedger ?? [])
@@ -69,10 +53,6 @@ const remoteRows = computed(() => (app.homeTruth?.earningsLedger ?? [])
     who: entry.client,
     model: entry.model,
     amt: formatUsd(entry.rewardUsdt, "detail", !entry.synthetic),
-    t: formatConversationTime(parseServerTimestamp(entry.completedAt) ?? undefined, {
-      locale: locale.code === "zh" || locale.code === "vi" ? locale.code : "en",
-      now: clockNow.value,
-    })?.group ?? "—",
   })));
 const rows = computed(() => remoteApiEnabled ? remoteRows.value : ROWS);
 const ledgerStatusText = computed(() => {
@@ -90,6 +70,16 @@ function goAll() {
 }
 </script>
 <style scoped>
-.earnings-ledger-card { padding: 4px 16px 6px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
-.earnings-ledger-identity :deep(*) { white-space: nowrap; }
+.earnings-ledger-card { margin-top:12px; padding:4px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); border:1px solid var(--v5-border); box-shadow:var(--v5-glass-shadow); }
+.earnings-ledger-card__head { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; }
+.earnings-ledger-card__title { min-width:0; font:600 16px/22px var(--font-v5); color:var(--v5-ink); }
+.earnings-ledger-card__stale { font-size:12px; color:var(--v5-warning); }
+.earnings-ledger-card__all { flex-shrink:0; display:inline-flex; align-items:center; min-height:44px; padding-left:12px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
+.earnings-ledger-card__row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; min-height:44px; border-top:1px solid var(--v5-border); }
+.earnings-ledger-card__identity { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:500 14px/20px var(--font-v5); color:var(--v5-ink); }
+.earnings-ledger-card__identity :deep(*) { white-space:nowrap; }
+.earnings-ledger-card__client { font-weight:400; color:var(--v5-ink-3); }
+.earnings-ledger-card__amount { font:500 13px/18px var(--font-jet-mono); color:var(--v5-success-ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.earnings-ledger-card__status { min-width:0; font:400 14px/20px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
+.earnings-ledger-card__retry { display:inline-flex; align-items:center; min-height:44px; padding-left:12px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
 </style>

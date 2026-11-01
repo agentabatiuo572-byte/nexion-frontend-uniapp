@@ -1,9 +1,9 @@
 <!--
-  DoTheMathCard — ZONE 5 server-authoritative upgrade ROI math. The Java Home
-  projection selects the user's highest-yield active device and the next
-  purchasable E1 catalog product. Headline segments preserve the 5174 layout
-  so word order works in any locale), two rate bars, a 3-stat grid, and a CTA.
-  Hidden at top tier (multiplier 0). Uses the shared plain card background.
+  DoTheMathCard — server-authoritative upgrade comparison (design system 04.1 设备对比, P-57).
+  The Java Home projection selects the user's highest-yield active device and the next
+  purchasable E1 catalog product. "Upgrade stage": both devices stand on pillars whose
+  heights are their real estimated daily earnings (target 100px, base in proportion, min 18px);
+  a brand arc jumps from the base to the target with the multiplier at its apex.
 -->
 <template>
   <view v-if="calculator" data-home-section="do-the-math">
@@ -11,57 +11,38 @@
       <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.doMathTitle }}</text>
     </view>
 
-    <view class="nx-glass-card relative overflow-hidden" style="background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); border-radius: var(--nx-glass-radius); padding: 16px">
-      <view class="relative">
-        <view style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-ink); letter-spacing: -0.018em; line-height: 1.35">
-          <text v-for="(s, i) in headlineSegs" :key="i" :style="s.color ? { color: s.color } : {}">{{ s.text }}</text>
+    <view ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': (observable && !inView) || !pageVisible, 'dc-card--masked': visibility.hidden }">
+      <view class="dc-stage">
+        <svg class="dc-arc" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path :d="arcPath" /></svg>
+        <text class="dc-stage__label">{{ t.home.doMathStage }}</text>
+        <view class="dc-multiplier" :aria-label="visibility.hidden ? '••' : `${calculator.multiplier}×`"><text>{{ visibility.hidden ? '••' : calculator.multiplier }}</text><text v-if="!visibility.hidden" class="dc-multiplier__sign">×</text></view>
+        <view class="dc-col dc-col--base">
+          <image v-if="baseArt.imageSrc.value" class="dc-device" :src="baseArt.imageSrc.value" mode="aspectFit" @error="baseArt.imageError" />
+          <view class="dc-pillar" :style="{ height: `${pillarHeights.base}px` }" />
         </view>
-
-        <view class="mt-4 flex flex-col gap-2.5">
-          <!-- base rate bar -->
-          <view>
-            <view class="flex justify-between items-baseline font-mono-tabular mb-1" style="font-size: 12px; color: var(--v5-ink-3)">
-              <text style="color: var(--v5-ink-3)">{{ baseShort }}</text>
-              <text class="tabular-nums" style="color: var(--v5-ink); font-weight: 500">{{ visibility.mask(baseRate) }}</text>
-            </view>
-            <view class="rounded-full overflow-hidden" style="height: 3px; background: var(--v5-surface-3)">
-              <view v-if="!visibility.hidden" class="h-full rounded-full" :style="{ width: baseWidthPct + '%', background: 'var(--v5-ink-4)', opacity: 0.72 }" />
-            </view>
-          </view>
-          <!-- target rate bar -->
-          <view>
-            <view class="flex justify-between items-baseline font-mono-tabular mb-1" style="font-size: 12px; color: var(--v5-ink-3)">
-              <text style="color: var(--v5-brand)">{{ targetLabel }}</text>
-              <text class="tabular-nums" style="color: var(--v5-ink); font-weight: 500">{{ targetRate }}</text>
-            </view>
-            <view class="rounded-full overflow-hidden" style="height: 3px; background: var(--v5-surface-3)">
-              <view class="h-full rounded-full" style="width: 100%; background: linear-gradient(90deg, var(--v5-brand), var(--v5-success)); opacity: 0.72" />
-            </view>
-          </view>
+        <view class="dc-col dc-col--target">
+          <image v-if="targetArt.imageSrc.value" class="dc-device" :src="targetArt.imageSrc.value" mode="aspectFit" @error="targetArt.imageError" />
+          <view class="dc-pillar" :style="{ height: `${pillarHeights.target}px` }"><view v-if="!visibility.hidden" class="dc-pillar__sweep" /></view>
         </view>
-
-        <!-- 去线(主人 2026-08-17 全站令):mt-7 = 原 mt-4 + pt-3 的总间距 -->
-        <view class="mt-7 grid grid-cols-2">
-          <!-- 每列拉满行高 + 标签贴顶数值贴底:第三列标签("对比 <机型>")会折成两行,
-               不这么做的话它的数值被推低 15px,三列数字读起来是歪的(去掉分隔虚线后更明显) -->
-          <view v-for="s in stats" :key="s.k" style="display: flex; flex-direction: column; justify-content: space-between">
-            <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ s.k }}</text>
-            <text class="block tabular-nums" :style="{ marginTop: '3px', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '20px', color: s.tone, letterSpacing: '-0.014em' }">{{ s.v }}</text>
-          </view>
-        </view>
-
-        <view class="mt-3.5 w-full flex items-center justify-center gap-1.5 active:opacity-80 transition-opacity"   style="padding: 12px 16px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 15px; line-height: 20px; letter-spacing: -0.005em" role="link" tabindex="0" @click="goStore" @keydown.enter.stop.prevent="goStore">
-          <text style="color: var(--v5-brand)">{{ t.home.doMathSeeCta }}</text>
-          <text class="font-mono-tabular" style="opacity: 0.8; font-size: 12px; color: var(--v5-brand)">→</text>
-        </view>
+        <view class="dc-stage__floor" />
+      </view>
+      <view class="dc-legend">
+        <view><text class="dc-legend__name">{{ baseShort }}</text><text class="dc-legend__rate">{{ visibility.mask(formatAmount(calculator.base.dailyUsdt)) }}<text class="dc-legend__unit">/d</text></text></view>
+        <view class="dc-legend--target"><text class="dc-legend__name">{{ calculator.target.name }}</text><text class="dc-legend__rate">{{ formatAmount(calculator.target.dailyUsdt) }}<text class="dc-legend__unit">/d</text></text></view>
+      </view>
+      <view class="dc-foot">
+        <text class="dc-foot__caption">{{ fmt(t.home.doMathYour, { base: baseShort }) }}</text>
+        <NxButton class="dc-foot__action" variant="brand" size="small" :label="`${t.home.doMathSeeCta} →`" @click="goStore" />
       </view>
     </view>
   </view>
   <view v-else data-home-section="do-the-math">
-    <text class="block" style="font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight); color: var(--v5-ink)">{{ t.home.doMathTitle }}</text>
-    <view class="flex items-center justify-between" style="gap: 12px; min-height: 64px; font-size: 13px; color: var(--v5-ink-2)">
+    <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
+      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.doMathTitle }}</text>
+    </view>
+    <view class="dc-status">
       <text>{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : app.homeTruthStatus === 'error' ? t.uiChrome.unavailable : t.home.doMathUnavailable }}</text>
-      <view v-if="app.homeTruthStatus === 'error'" class="shrink-0 inline-flex items-center" style="min-height: 44px; color: var(--v5-brand)" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()">{{ t.ui.retry }}</view>
+      <view v-if="app.homeTruthStatus === 'error'" class="dc-status__retry" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()">{{ t.ui.retry }}</view>
     </view>
   </view>
 </template>
@@ -70,11 +51,15 @@
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { deviceNameInline } from "@/lib/device-copy";
+import { useDeviceProductImage } from "@/composables/use-device-product-image";
+import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
+import NxButton from "@/components/ui/nx-button.vue";
 
 const visibility = useDataVisibility();
 const t = useT();
@@ -87,46 +72,83 @@ const calculator = computed(() => {
 const baseShort = computed(() => calculator.value
   ? deviceNameInline(t.value, calculator.value.base.kind, calculator.value.base.name)
   : "");
-const targetLabel = computed(() => (calculator.value?.target.name ?? ""));
-const baseWidthPct = computed(() => calculator.value
-  ? Math.max(0.4, (calculator.value.base.dailyUsdt / calculator.value.target.dailyUsdt) * 100)
-  : 0.4);
-const baseRate = computed(() => calculator.value ? `${formatAmount(calculator.value.base.dailyUsdt)} /d` : "—");
-const targetRate = computed(() => calculator.value ? `${formatAmount(calculator.value.target.dailyUsdt)} /d` : "—");
+// The projection names the base device by kind only; the target is an exact catalog product.
+const baseArt = useDeviceProductImage(() => ({ kind: calculator.value?.base.kind ?? "cloud-share", productCode: calculator.value?.base.kind ?? "", capacitySource: "server" }));
+const targetArt = useDeviceProductImage(() => ({ kind: calculator.value?.target.kind ?? "cloud-share", productCode: calculator.value?.target.productNo ?? "", capacitySource: "server" }));
 
-// Render the headline by splitting the i18n template around {target}/{mult}/{base}
-// placeholders → colored segments. Works regardless of per-locale word order.
-const headlineSegs = computed(() => {
-  const tpl = t.value.home.doMathHeadline;
-  const vars: Record<string, { text: string; color: string }> = {
-    target: { text: targetLabel.value, color: "var(--v5-ink)" },
-    mult: { text: visibility.mask(`${calculator.value?.multiplier ?? 0}×`), color: "var(--v5-success-ink)" },
-    base: { text: baseShort.value, color: "var(--v5-brand-2-ink)" },
-  };
-  const segs: { text: string; color?: string }[] = [];
-  const re = /\{(\w+)\}/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(tpl)) !== null) {
-    if (m.index > last) segs.push({ text: tpl.slice(last, m.index) });
-    const v = vars[m[1]];
-    segs.push(v ? { text: v.text, color: v.color } : { text: m[0] });
-    last = m.index + m[0].length;
-  }
-  if (last < tpl.length) segs.push({ text: tpl.slice(last) });
-  return segs;
-});
+// Hidden statistics use one neutral placeholder height so the ratio does not leak.
+const pillarHeights = computed(() => visibility.hidden || !calculator.value
+  ? { base: 56, target: 56 }
+  : { base: Math.max(18, 100 * calculator.value.base.dailyUsdt / calculator.value.target.dailyUsdt), target: 100 });
+// The arc starts beside the base device (its top sits 112 - pillar px into the 208px stage).
+const arcPath = computed(() => `M 36 ${((124 - pillarHeights.value.base) / 208 * 100).toFixed(1)} Q 46 2 60 28 M 60 28 l -0.5 -4.3 M 60 28 l -2.6 -1.5`);
 
-const stats = computed(() => calculator.value ? [
-  { k: t.value.home.doMathDaily, v: formatAmount(calculator.value.target.dailyUsdt), tone: "var(--v5-ink)" },
-  { k: fmt(t.value.home.doMathVs, { base: baseShort.value }), v: visibility.mask(`${calculator.value.multiplier}×`), tone: "var(--v5-success)" },
-] : []);
+// DS-29 entrance plays once the stage is first seen; the target sweep pauses off-screen and while the page is hidden.
+// The card mounts after the overview read, so an unresolved ref must not count as seen; without an observer it plays on mount.
+const { elRef: cardRef, inView } = useScrollGrowProgress({ threshold: 0.25, fallbackInView: false });
+const observable = typeof IntersectionObserver !== "undefined";
+const entered = ref(false);
+watch([inView, cardRef], ([seen, card]) => { entered.value = !!card && (entered.value || seen || !observable); }, { immediate: true });
+const pageVisible = ref(true);
+onShow(() => { pageVisible.value = true; });
+onHide(() => { pageVisible.value = false; });
 
 function goStore() {
   const productNo = calculator.value?.target.productNo;
   if (!productNo) return;
   navTo(`/pages/store/detail?id=${encodeURIComponent(productNo)}`);
 }
-
-
 </script>
+
+<style scoped>
+.dc-card { position:relative; isolation:isolate; box-sizing:border-box; padding:12px 12px 8px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); border:1px solid var(--v5-border); box-shadow:var(--v5-glass-shadow); overflow:hidden; }
+/* Recessed stage with a faint cyan glow behind the target. */
+.dc-stage { --dc-well:inset 0 2px 10px rgba(0,0,0,.55); position:relative; height:208px; border-radius:16px; overflow:hidden; background:radial-gradient(55% 65% at 75% 92%,color-mix(in srgb,var(--v5-tech-cyan) 18%,transparent),transparent 72%),var(--v5-surface-2); box-shadow:var(--dc-well); }
+:global([data-theme="light"] .dc-stage) { --dc-well:inset 0 1px 4px rgba(20,16,8,.08); }
+.dc-stage__label { position:absolute; left:12px; top:10px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.dc-stage__floor { position:absolute; left:12px; right:12px; bottom:22px; height:1px; background:var(--v5-border-strong); }
+.dc-col { position:absolute; bottom:22px; width:100px; display:flex; flex-direction:column; align-items:center; }
+.dc-col--base { left:calc(25% - 50px); }
+.dc-col--target { left:calc(75% - 50px); }
+.dc-device { position:relative; z-index:1; display:block; width:88px; height:88px; margin-bottom:-14px; animation:dc-device-drop 700ms 450ms cubic-bezier(.2,.9,.3,1.3) both; }
+.dc-col--target .dc-device { animation-delay:600ms; }
+.dc-pillar { position:relative; width:64px; border-radius:12px 12px 3px 3px; overflow:hidden; transform-origin:50% 100%; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); animation:dc-pillar-rise 1100ms cubic-bezier(.16,1,.3,1) both; }
+.dc-col--target .dc-pillar { animation-delay:120ms; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-tech-cyan) 72%,transparent),color-mix(in srgb,var(--v5-aura-sky) 20%,transparent)); box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 14px 30px -10px color-mix(in srgb,var(--v5-tech-cyan) 60%,transparent); }
+.dc-card--masked .dc-col--target .dc-pillar { background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); box-shadow:none; }
+.dc-pillar__sweep { position:absolute; top:-10%; bottom:-10%; left:-70%; width:45%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); transform:skewX(-18deg); animation:dc-sweep 6.8s 1.8s ease-in-out infinite; }
+/* The arc is drawn by a left-to-right reveal: dashes cannot follow pathLength under a non-scaling stroke
+   (they are laid out in screen space), and the arc runs left to right from 36% to 60%. */
+.dc-arc { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; animation:dc-arc-draw 750ms 900ms cubic-bezier(.4,0,.2,1) both; }
+.dc-arc path { fill:none; stroke:var(--v5-brand); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.dc-multiplier { position:absolute; left:50%; top:10px; padding:0 8px; border-radius:12px; background:var(--v5-surface-2); font:500 36px/40px var(--font-jet-mono); letter-spacing:-.04em; color:var(--v5-brand); font-variant-numeric:tabular-nums; white-space:nowrap; transform:translateX(-50%); animation:dc-multiplier-pop 560ms 1250ms cubic-bezier(.2,.9,.3,1.35) both; }
+.dc-multiplier__sign { font-size:22px; margin-left:1px; }
+.dc-legend { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:10px; text-align:center; animation:dc-fade-up 500ms 1000ms ease-out both; }
+.dc-legend__name { display:block; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.dc-legend__rate { display:block; margin-top:2px; font:500 15px/20px var(--font-jet-mono); color:var(--v5-ink); font-variant-numeric:tabular-nums; }
+.dc-legend__unit { font-size:12px; color:var(--v5-ink-3); margin-left:2px; }
+.dc-legend--target .dc-legend__name { color:var(--v5-ink); }
+.dc-legend--target .dc-legend__rate { color:var(--v5-brand); }
+.dc-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px; padding-left:4px; }
+.dc-foot__caption { min-width:0; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.dc-card :deep(.dc-foot__action) { flex:none; }
+.dc-card :deep(.dc-foot__action .nx-button__surface) { min-height:32px; height:32px; padding:0 14px; }
+/* The entrance waits at its first frame until the stage is seen (same contract as v-viz-inview). */
+.dc-card:not(.dc-card--entered) .dc-device, .dc-card:not(.dc-card--entered) .dc-pillar, .dc-card:not(.dc-card--entered) .dc-arc,
+.dc-card:not(.dc-card--entered) .dc-multiplier, .dc-card:not(.dc-card--entered) .dc-legend, .dc-card--paused .dc-pillar__sweep { animation-play-state:paused; }
+.dc-status { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:64px; font:400 13px/18px var(--font-v5); color:var(--v5-ink-2); }
+.dc-status__retry { flex-shrink:0; display:inline-flex; align-items:center; min-height:44px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
+@keyframes dc-pillar-rise { from { transform:scaleY(0); } }
+@keyframes dc-device-drop { from { opacity:0; transform:translateY(-20px); } }
+@keyframes dc-arc-draw { from { clip-path:inset(0 64% 0 0); } to { clip-path:inset(0 39% 0 0); } }
+@keyframes dc-multiplier-pop { from { opacity:0; transform:translateX(-50%) scale(.55); } }
+@keyframes dc-fade-up { from { opacity:0; transform:translateY(6px); } }
+@keyframes dc-sweep { 0% { left:-70%; } 15%,100% { left:130%; } }
+@media (max-width:339px) {
+  .dc-device { width:74px; height:74px; margin-bottom:-12px; }
+  .dc-pillar { width:54px; }
+  .dc-multiplier { font-size:30px; line-height:34px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .dc-device, .dc-pillar, .dc-arc, .dc-multiplier, .dc-legend, .dc-pillar__sweep { animation:none; }
+}
+</style>

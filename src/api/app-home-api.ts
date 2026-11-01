@@ -61,6 +61,8 @@ export interface AppHomeOverview {
   earnings: {
     today: AppHomePeriod;
     todayVsYesterdayPct: number | null;
+    /** Today minus yesterday's same-period earnings; null until the backend sends it. */
+    todayVsYesterdayUsdt: number | null;
     week: AppHomePeriod;
     month: AppHomePeriod;
     all: AppHomePeriod;
@@ -194,12 +196,14 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
   const todayVsYesterdayPct = e?.todayVsYesterdayPct === null
     ? null
     : finiteNumber(e?.todayVsYesterdayPct);
+  const todayVsYesterdayUsdt = e?.todayVsYesterdayUsdt == null ? null : finiteNumber(e.todayVsYesterdayUsdt);
   if (!generatedAt || !production
       || accountScope !== APP_HOME_ACCOUNT_SCOPE
       || row.serverCanonical !== true || !e || !market || !onboarding || !grid
       || ledgerMode !== "SETTLED"
       || !isRow(e.today) || !isRow(e.week) || !isRow(e.month) || !isRow(e.all)
       || (e.todayVsYesterdayPct !== null && todayVsYesterdayPct === null)
+      || (e.todayVsYesterdayUsdt != null && todayVsYesterdayUsdt === null)
       || !Array.isArray(row.earningsLedger) || row.earningsLedger.length > 20
       || !Array.isArray(market.workloads) || !Array.isArray(market.deviceRankings) || !Array.isArray(grid.clients)) return invalid();
   const promoRow = row.weeklyPromo;
@@ -235,7 +239,7 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
     sourceEnvironment: row.sourceEnvironment as AppHomeOverview["sourceEnvironment"],
     runId: row.runId as string, generatedAt, accountScope,
     earnings: {
-      today: period(e.today), todayVsYesterdayPct,
+      today: period(e.today), todayVsYesterdayPct, todayVsYesterdayUsdt,
       week: period(e.week), month: period(e.month), all: period(e.all),
     },
     earningsLedgerMode: ledgerMode as AppHomeOverview["earningsLedgerMode"], earningsLedger,
