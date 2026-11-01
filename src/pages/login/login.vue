@@ -3,7 +3,7 @@
     <view class="lg-wrap" :inert="showCountries || undefined" :aria-hidden="showCountries">
       <!-- Top bar -->
       <view class="lg-top">
-        <view v-if="step > 1 || mode === 'reset'" class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.back" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">
+        <view v-if="!loginRecoveryPending && (step > 1 || mode === 'reset')" class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.back" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
         <view v-else class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.close" @click="close" @keydown.enter.prevent="close" @keydown.space.prevent="close">
@@ -16,26 +16,12 @@
       </view>
 
       <!-- Step indicator (otp: 2, reset: 3) -->
-      <view v-if="mode !== 'password'" class="lg-dots">
+      <view v-if="!loginRecoveryPending && mode !== 'password'" class="lg-dots">
         <view v-for="n in (mode === 'reset' ? 3 : 2)" :key="n" class="lg-dot" :class="n === step ? 'lg-dot--active' : (n < step ? 'lg-dot--done' : '')" />
       </view>
 
       <!-- Title -->
       <text class="lg-title">{{ titleText }}</text>
-      <!-- #ifdef APP-PLUS -->
-      <view class="lg-recovery-notice"><text>{{ t.login.takeoverNotice }}</text></view>
-      <!-- #endif -->
-      <view v-if="loginRecoveryPending" class="lg-recovery-notice lg-recovery" data-testid="login-recovery" role="status">
-        <text class="lg-recovery-notice__t">{{ replayAvailable ? t.login.retryOriginalHint : loginResultUnknown ? t.login.unknownAttempt : t.login.verificationPending }}</text>
-        <view v-if="loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="recoverLoginResult" @keydown.enter.prevent="recoverLoginResult" @keydown.space.prevent="recoverLoginResult"><text>{{ t.login.recoverAttempt }}</text></view>
-        <view v-if="replayAvailable" class="lg-col">
-          <text class="lg-recovery__account">{{ retryContext?.context.countryCode }} {{ retryContext?.context.phone }}</text>
-          <input class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
-          <input class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
-          <view class="lg-cta lg-recovery__action" :class="canRetryOriginal ? 'lg-cta--on' : ''" role="button" :tabindex="canRetryOriginal ? 0 : -1" :aria-disabled="!canRetryOriginal" @click="retryOriginalLogin()" @keydown.enter.prevent="retryOriginalLogin()" @keydown.space.prevent="retryOriginalLogin()"><text class="lg-cta__t" :class="canRetryOriginal ? 'lg-cta__t--on' : ''">{{ t.login.retryOriginal }}</text></view>
-        </view>
-        <view v-if="!loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="cancelLoginVerification" @keydown.enter.prevent="cancelLoginVerification" @keydown.space.prevent="cancelLoginVerification"><text>{{ t.ui.cancel }}</text></view>
-      </view>
       <view v-if="modeLabel" class="lg-mode-badge" data-testid="auth-runtime-label">
         <text class="lg-mode-badge__t">{{ modeLabel }}</text>
       </view>
@@ -47,11 +33,22 @@
         <text class="lg-recovery-notice__t">{{ t.session.secureBrowserUnsupported }}</text>
       </view>
       <!-- #endif -->
-      <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>
-      <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
-      <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
+      <template v-if="!loginRecoveryPending">
+        <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>
+        <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
+        <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
+      </template>
 
       <!-- Body -->
+      <view v-if="loginRecoveryPending" class="lg-body lg-col" data-testid="login-recovery">
+        <text class="lg-sub" role="status" aria-live="polite">{{ loading ? t.login.signingIn : loginResultUnknown ? t.login.unknownAttempt : t.login.verificationPending }}</text>
+        <text v-if="retryContext?.context.phone" class="lg-phone lg-recovery__account">{{ retryContext?.context.countryCode }} {{ retryContext?.context.phone }}</text>
+        <text v-if="retryNeedsPassword || retryNeedsCode" class="lg-sub">{{ t.login.retryOriginalHint }}</text>
+        <input class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
+        <input class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
+        <view class="lg-cta lg-recovery__action" :class="canRetryOriginal || loading ? 'lg-cta--on' : ''" role="button" :tabindex="canRetryOriginal ? 0 : -1" :aria-disabled="!canRetryOriginal" data-system-chrome-primary @click="retryOriginalLogin()" @keydown.enter.prevent="retryOriginalLogin()" @keydown.space.prevent="retryOriginalLogin()"><text class="lg-cta__t" :class="canRetryOriginal || loading ? 'lg-cta__t--on' : ''">{{ loading ? t.login.signingIn : t.login.retryOriginal }}</text></view>
+        <view v-if="!loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="cancelLoginVerification" @keydown.enter.prevent="cancelLoginVerification" @keydown.space.prevent="cancelLoginVerification"><text>{{ t.ui.cancel }}</text></view>
+      </view>
       <view v-if="!loginRecoveryPending" class="lg-body">
         <!-- Step 1: phone (+ password for password mode) -->
         <view v-if="step === 1" class="lg-col">
@@ -159,7 +156,7 @@ import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
 // #endif
 import { navReset, takeNavigationQuery } from "@/lib/route";
-import { ref, computed, nextTick, onUnmounted } from "vue";
+import { ref, computed, nextTick, watch, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
@@ -254,15 +251,18 @@ const retryCode = ref("");
 const retryNeedsPassword = computed(() => ["PASSWORD", "TWO_FACTOR", "REGISTRATION"].includes(retryContext.value?.authMethod ?? ""));
 const retryNeedsCode = computed(() => ["OTP", "TWO_FACTOR", "REGISTRATION"].includes(retryContext.value?.authMethod ?? "")
   || !!retryContext.value?.context.challengeNo);
-const canRetryOriginal = computed(() => !loading.value && replayAvailable.value
+const canRetryOriginal = computed(() => !loading.value && (!retryContext.value || (replayAvailable.value
   && (!retryNeedsPassword.value || !!retryPassword.value)
-  && (!retryNeedsCode.value || /^\d{6}$/.test(retryCode.value)));
+  && (!retryNeedsCode.value || /^\d{6}$/.test(retryCode.value)))));
 function syncLoginRecovery() {
   retryContext.value = authApi.pendingLoginContext();
   loginResultUnknown.value = authApi.pendingLogin();
   loginRecoveryPending.value = loginResultUnknown.value || !!retryContext.value;
-  if (!loginResultUnknown.value) replayAvailable.value = !!retryContext.value;
+  replayAvailable.value = !!retryContext.value;
 }
+// One read when an unresolved attempt first reaches this page. Further reads
+// belong to an explicit retry; a failed read must never start a polling loop.
+watch(loginResultUnknown, (pending) => { if (pending) void recoverLoginResult(); }, { flush: "post" });
 function cancelLoginVerification() {
   if (loading.value || authApi.pendingLogin()) return;
   authApi.cancelLoginChallenge();
@@ -272,14 +272,23 @@ function cancelLoginVerification() {
   syncLoginRecovery();
 }
 async function retryOriginalLogin(captchaTicket?: string) {
-  if (loading.value || !replayAvailable.value || !retryContext.value) return;
+  if (loading.value) return;
+  if (!retryContext.value) { await recoverLoginResult(); return; }
+  if (!replayAvailable.value) return;
   if ((retryNeedsPassword.value && !retryPassword.value) || (retryNeedsCode.value && !/^\d{6}$/.test(retryCode.value))) return;
+  const flowVersion = otpFlowVersion;
   error.value = null;
-  loading.value = true;
   try {
+    // A normal Retry first consumes any session already issued by this attempt.
+    // CAPTCHA is a continuation of that same click, with its original proof.
+    if (authApi.pendingLogin() && typeof captchaTicket !== "string") {
+      await recoverLoginResult();
+      if (!mounted || flowVersion !== otpFlowVersion || !authApi.pendingLogin()) return;
+    }
+    loading.value = true;
     const result = await authApi.retryLogin({ password: retryPassword.value || undefined, code: retryCode.value || undefined,
       ...(typeof captchaTicket === "string" ? { captchaTicket } : {}) });
-    if (!mounted) {
+    if (!mounted || flowVersion !== otpFlowVersion) {
       if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
@@ -288,20 +297,21 @@ async function retryOriginalLogin(captchaTicket?: string) {
       replayAvailable.value = true; retryCode.value = "";
     } else finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete,
       serverProfile: result.user, serverSessionRevision: result.vaultRevision });
-  } catch (cause) { if (mounted) {
+  } catch (cause) { if (mounted && flowVersion === otpFlowVersion) {
     syncLoginRecovery();
     if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") { captchaPurpose.value = "replay"; showCaptcha.value = true; }
     else error.value = remoteLoginError(cause);
   } }
-  finally { if (!showCaptcha.value || captchaPurpose.value !== "replay") { retryPassword.value = ""; retryCode.value = ""; } if (mounted) loading.value = false; }
+  finally { if (!showCaptcha.value || captchaPurpose.value !== "replay") { retryPassword.value = ""; retryCode.value = ""; } if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 async function recoverLoginResult() {
   if (loading.value || !authApi.pendingLogin()) return;
+  const flowVersion = otpFlowVersion;
   error.value = null;
   loading.value = true;
   try {
     const result = await authApi.recoverLogin();
-    if (!mounted) {
+    if (!mounted || flowVersion !== otpFlowVersion) {
       if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
@@ -310,10 +320,10 @@ async function recoverLoginResult() {
     if (result.kind === "authenticated") finishSignIn({ accountId: authenticatedAccountId(result.user),
       onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (cause) {
-    if (!mounted) return;
+    if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
-    error.value = cause instanceof Error && cause.message === "APP_REPLACED" ? t.value.login.sessionReplaced : t.value.login.unknownAttempt;
-  } finally { if (mounted) loading.value = false; }
+    error.value = cause instanceof Error && cause.message === "APP_REPLACED" ? t.value.login.sessionReplaced : remoteLoginError(cause);
+  } finally { if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 const returnParam = ref<string | null>(null);
 const refOnLogin = ref<string | null>(null);
@@ -375,6 +385,7 @@ const newPwdOk = computed(() => isResetPasswordOk(newPassword.value, { phone: ph
 const pwdMatch = computed(() => newPassword.value === confirmPwd.value && newPwdOk.value);
 
 const titleText = computed(() => {
+  if (loginRecoveryPending.value) return t.value.login.title;
   if (step.value === 3) return t.value.login.newPasswordTitle;
   if (step.value === 2) return t.value.login.codeStepTitle;
   if (mode.value === "reset") return t.value.login.resetTitle;
@@ -1040,10 +1051,9 @@ onUnmounted(() => cleanup());
 .lg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
 .lg-mode-badge__t { font-size: 12px; font-weight: 600; color: var(--v5-warning); }
 .lg-recovery-notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 12%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 34%, transparent); }
-.lg-recovery { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
-.lg-recovery__account { font-size: 15px; color: var(--v5-ink); }
+.lg-recovery__account { box-sizing: border-box; padding: 0 16px; font-size: var(--ui-type-input); color: var(--v5-ink); }
 .lg-recovery__input { box-sizing: border-box; height: 56px; padding: 0 16px; border-radius: 16px; background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); }
-.lg-recovery .lg-recovery__action { margin-top: 4px; }
+.lg-recovery__action { margin-top: 12px; }
 .lg-recovery__secondary { min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: var(--ui-type-body); color: var(--v5-brand); }
 .lg-recovery__secondary[aria-disabled="true"] { opacity: .5; }
 .lg-recovery-notice__t { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.5; color: var(--v5-ink-2); }
