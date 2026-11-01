@@ -1,4 +1,5 @@
 import { dayOnePageObservationFixture } from "@/lib/day-one-page-observation.test-support";
+import { useCountUp } from "@/composables/use-count-up";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -126,6 +127,7 @@ async function setup() {
     if(id==='@/lib/native-phone-runtime')return{hasNativeAndroidPhoneRuntime: ()=>true, hasNativePhoneRuntime: ()=>true, nativePhonePlatform: () => null};
     if(id==='vue')return Vue;
     if(id==='@/composables/use-tab-page-lifecycle')return tabLifecycle;
+    if(id==='@/composables/use-count-up')return{useCountUp};
     if(id==='@dcloudio/uni-app')return{onShow:(f:Function)=>shows.push(f),onHide:(f:Function)=>hides.push(f)};
     if(id==='@/store/app')return{useApp:()=>app};
     if(id==='@/store/ui')return{toast};
