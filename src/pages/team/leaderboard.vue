@@ -189,7 +189,8 @@ async function loadRemote(page = 1, append = false) {
         || snapshot.pageSize !== PAGE_SIZE || snapshot.rows[0]?.rank !== expectedFirstRank) {
         throw new Error("TEAM_LEADERBOARD_PAGE_SEQUENCE_INVALID");
       }
-      const lastPoints = previous.rows.map(row => row.computePoints).filter(value => value !== null).at(-1);
+      const previousPoints = previous.rows.map(row => row.computePoints).filter(value => value !== null);
+      const lastPoints = previousPoints[previousPoints.length - 1];
       const firstPoints = snapshot.rows.find(row => row.computePoints !== null)?.computePoints;
       if (snapshot.rankingMetric === "COMPUTE_POINTS" && lastPoints != null && firstPoints != null && firstPoints > lastPoints) {
         throw new Error("TEAM_LEADERBOARD_PAGE_SEQUENCE_INVALID");
