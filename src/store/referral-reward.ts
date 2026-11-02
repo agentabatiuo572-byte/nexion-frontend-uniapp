@@ -6,9 +6,13 @@ import { apiRuntimeConfig, referralRewardApi, remoteApiEnabled } from "@/api/run
 import type { ReferralRewardSnapshot } from "@/api/referral-reward-api";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 
 export const useReferralReward = defineStore("referralReward", () => {
   const snapshot = ref<ReferralRewardSnapshot | null>(null);
+  const referralCode = ref("");
+  let savedReferralCode = "";
+  const codeCacheKey = `nexgrid-referral-code:${apiRuntimeConfig.environment}:${apiRuntimeConfig.baseUrl}-accounts-v1`;
   const loading = ref(false);
   const error = ref<string | null>(null);
   const accountScope = createRemoteAccountEpoch();
@@ -56,6 +60,9 @@ export const useReferralReward = defineStore("referralReward", () => {
       const next = await referralRewardApi.snapshot(limit);
       if (generation !== refreshGeneration || !accountScope.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return false;
       snapshot.value = next;
+      referralCode.value = request.accountKey === "default" ? "" : next.referralCode;
+      if (request.accountKey !== "default" && savedReferralCode !== next.referralCode
+          && writeAccountRow(codeCacheKey, request.accountKey, { code: next.referralCode })) savedReferralCode = next.referralCode;
       error.value = null; retryAt = 0; rateLimited.value = false; transientFailure.value = false;
       return true;
     } catch (cause) {
@@ -79,6 +86,8 @@ export const useReferralReward = defineStore("referralReward", () => {
     invalidatePassiveTabRead("referral-reward");
     environmentInvalidated = true; refreshGeneration += 1; inFlight = null; retryAt = 0;
     snapshot.value = null; error.value = null; loading.value = false; rateLimited.value = false; transientFailure.value = false;
+    referralCode.value = "";
+    savedReferralCode = "";
   }, { flush: "sync" });
 
   function invalidateReadOwner(): void {
@@ -91,11 +100,15 @@ export const useReferralReward = defineStore("referralReward", () => {
 
   function bindAccount(accountKey: string) {
     accountScope.bind(accountKey);
+    const cached = remoteApiEnabled && accountKey !== "default" && !environmentInvalidated
+      ? readAccountRow<{ code: string }>(codeCacheKey, accountKey) : null;
+    referralCode.value = typeof cached?.code === "string" ? cached.code.trim() : "";
+    savedReferralCode = referralCode.value;
     refreshGeneration += 1;
     inFlight = null; retryAt = 0; rateLimited.value = false; transientFailure.value = false;
     snapshot.value = null;
     error.value = null;
     void refresh();
   }
-  return { snapshot, loading, error, rateLimited, transientFailure, refresh, ensure, invalidateReadOwner, bindAccount };
+  return { snapshot, referralCode, loading, error, rateLimited, transientFailure, refresh, ensure, invalidateReadOwner, bindAccount };
 });

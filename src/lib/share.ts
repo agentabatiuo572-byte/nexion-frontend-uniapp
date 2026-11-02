@@ -39,10 +39,10 @@ const SHARE_EVENT_CHANNELS = new Set<ShareEventChannel>([
   "copy", "poster", "system", "code", "link",
 ]);
 
-// 单源分享链接:服务端模式只能取 H8 当前用户投影中的邀请码；该投影缺失时
-// 返回空串而不是回退到浏览器 demo 身份。mock 模式仍保持原有本地演示行为。
+// 邀请码由服务端首次确认后按账号和API服务持久缓存；奖励刷新不清空它。
+// 未取得该账号的真实邀请码时返回空串，不回退到演示身份。
 export function currentShareReferralCode(): string {
-  if (remoteApiEnabled) return useReferralReward().snapshot?.referralCode?.trim() ?? "";
+  if (remoteApiEnabled) return useReferralReward().referralCode;
   return useApp().user.referralCode.trim();
 }
 

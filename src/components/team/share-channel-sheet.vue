@@ -68,7 +68,7 @@ const cfg = useConfig();
 const rewardPresentation = ref<{ amount: number; enabled: boolean } | null>(null);
 const channelsHaveRead = ref(false);
 const environmentInvalidated = ref(false);
-watch(() => apiRuntimeConfig?.environment, () => { environmentInvalidated.value = true; rewardPresentation.value = null; channelsHaveRead.value = false; codePresentation.value = ''; statusPresentation.value = ''; invalidateActions(); }, { flush: 'sync' });
+watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => { environmentInvalidated.value = true; rewardPresentation.value = null; channelsHaveRead.value = false; codePresentation.value = ''; statusPresentation.value = ''; invalidateActions(); }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, locale.code], () => { rewardPresentation.value = null; channelsHaveRead.value = false; }, { flush: 'sync' });
 watch([() => rewards.snapshot, () => rewards.loading, () => rewards.error], () => {
   if (rewards.error) { rewardPresentation.value = null; return; }
@@ -144,7 +144,7 @@ watch(() => props.open, (open) => {
   if (!open) { invalidateActions(); return; }
   actionsOpen = true;
   void cfg.ensureLoaded();
-  if (remoteApiEnabled && !rewards.snapshot?.referralCode && !rewards.loading) void rewards.refresh();
+  if (remoteApiEnabled && !rewards.referralCode && !rewards.loading) void rewards.refresh();
 }, { immediate: true });
 
 async function retry() {
@@ -154,7 +154,7 @@ async function retry() {
   try {
     await Promise.all([
       cfg.load(),
-      remoteApiEnabled && (!rewards.snapshot?.referralCode || !!rewards.error) ? rewards.refresh() : Promise.resolve(),
+      remoteApiEnabled && (!rewards.referralCode || !!rewards.error) ? rewards.refresh() : Promise.resolve(),
     ]);
   } finally {
     if (operation === actionEpoch) retrying.value = false;
