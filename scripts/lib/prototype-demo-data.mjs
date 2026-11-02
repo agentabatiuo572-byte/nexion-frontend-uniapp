@@ -415,8 +415,8 @@ export function demoFixture(url,locale,state,request) {
     const data=base();data.walletUsdt=empty?0:state.paymentState==='low-balance'?820.64:state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
     if(state.checkoutState==='replace')data.slotCap=2;
     data.devices=empty?[]:data.devices.concat({...data.devices[0],id:42,instanceNo:'DEMO-CLOUD',name:'Cloud Share',productCode:'CLOUD-SHARE',deviceType:'CLOUD',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}).map(device=>({...device,runtimeStatus:'ONLINE'}));
-    if(!empty&&state.scopeState==='mixed') data.devices.push({...data.devices[0],id:43,instanceNo:'DEMO-PHONE',name:'Phone',deviceType:'PHONE',productCode:'PHONE',dailyUsdt:0.1,dailyNex:0,todayEarningsUsdt:0,todayEarningsNex:0,actualPaidUsdt:0});
     if(!empty&&state.machineImageState==='alternate')Object.assign(data.devices.at(-1),{instanceNo:'DEMO-RACK',name:'UVELRack P1',productCode:'STELLARRACK-P1',dailyUsdt:45,dailyNex:30,actualPaidUsdt:12999});
+    if(!empty&&state.scopeState==='mixed'&&state.fleetState!=='phone-history') data.devices.push({...data.devices[0],id:43,instanceNo:'DEMO-PHONE',name:'Phone',deviceType:'PHONE',productCode:'PHONE',dailyUsdt:0.1,dailyNex:0,todayEarningsUsdt:0,todayEarningsNex:0,actualPaidUsdt:0});
     if(!empty)for(const order of state.createdOrders||[])if(['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
       const product=products.find(p=>p.id===line.sku),instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
       state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);

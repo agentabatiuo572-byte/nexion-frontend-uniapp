@@ -9,12 +9,12 @@ export function computeDemo(url, locale, state, request) {
   const text = (zh, en, vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
   const names = [text('图像生成周期', 'Image generation cycle', 'Chu kỳ tạo ảnh'), text('Cloud Share 收益周期', 'Cloud Share reward cycle', 'Chu kỳ thu nhập Cloud Share')];
   const anchor=state.computeAnchor??=now;
-  const devices = state.fleetState==='phone-history'?[41,42,43,44]:[41,42];
+  const devices = state.fleetState==='phone-history'?[41,42,43,44]:state.scopeState==='mixed'?[41,42,43]:[41,42];
   const deviceType=id=>({41:'BOX',42:'CLOUD',43:'PHONE',44:'MOBILE'})[id];
   const deviceName=id=>({41:'UVELBox S1',42:'Cloud Share',43:'Demo PHONE',44:'Demo MOBILE'})[id];
   const instance=id=>id===41?'REVIEW-S1':id===42?'DEMO-CLOUD':`DEMO-${deviceType(id)}`;
   const amount=id=>id===41?'0.023456':id===42?'0.000032':id===43?'0.100000':'0.200000';
-  const total=devices.length===4?'0.323488':'0.023488';
+  const total=devices.length===4?'0.323488':devices.length===3?'0.123488':'0.023488';
   const task = (deviceId, status, history = false) => {
     const cloud = deviceId === 42, index = cloud ? 1 : 0;
     const start = history ? anchor - 600000 : now - 30000;
