@@ -2,7 +2,7 @@
 import { fixture } from './design-review-fixture.mjs';
 const day=86400000,proof={sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
-export function trialDemo(url,locale,state,request){
+export function trialDemo(url,locale,state,request,capacityFull){
   if(!url.pathname.startsWith('/api/trial/'))return undefined;
   const now=Date.now(),mode=state.trialState||'follow';
   const data=structuredClone(fixture(new URL('/api/trial/state',url.origin),locale,{offers:true},request));
@@ -11,6 +11,9 @@ export function trialDemo(url,locale,state,request){
   // FEAT-TRIAL05 mirror of the Java quote: inside the original term the full claimed term is
   // settled and a fixed discount comes off what is left to pay; 0 switches the rule off.
   cfg.earlyPurchaseDiscountUSD??=String(state.trialEarlyDiscount??'10');
+  // P-59 / backend B13-B14: the trial discount caps at $50 and trial earnings offset without a cap (empty = none).
+  cfg.discountCapUSD='50';cfg.trialOffsetCapUSD='';
+  const cap=value=>String(value??'').trim()===''?Infinity:Number(value);
   const round=value=>Number(Number(value).toFixed(2));
   const scenario=mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
   if(!state.trialRow){
@@ -23,11 +26,13 @@ export function trialDemo(url,locale,state,request){
     if(row.state==='GRACE'&&now>=row.startedAt+duration+grace)row.state='FAILED';
     const claimed=row.state!=='ELIGIBLE',live=['ACTIVE','GRACE'].includes(row.state);
     const elapsed=Math.min(duration,Math.max(0,now-row.startedAt))/day;
-    const shadow=claimed?Number((elapsed*Number(cfg.shadowDailyUSD)).toFixed(2)):0,offset=live?Math.min(shadow,Number(cfg.trialOffsetCapUSD)):0;
-    const canStart=!claimed||(mode==='eligible-again'&&row.state==='FAILED');
+    const shadow=claimed?Number((elapsed*Number(cfg.shadowDailyUSD)).toFixed(2)):0,offset=live?Math.min(shadow,cap(cfg.trialOffsetCapUSD)):0;
+    const eligible=!claimed||(mode==='eligible-again'&&row.state==='FAILED');
+    const full=capacityFull||mode==='capacity-full';
+    const canStart=eligible&&!full;
     const quote=live?quoteFor(shadow,claimed?Number((elapsed*Number(cfg.shadowDailyNEX)).toFixed(2)):0,row.state==='ACTIVE'&&now<row.startedAt+duration):undefined;
     const conversion=row.state==='REDEEMED'?conversionFacts():null;
-    return {...data,state:row.state,canStart,eligibilityReason:!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
+    return {...data,state:row.state,canStart,eligibilityReason:eligible&&full?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?'DEMO-TRIAL':null,version:row.version||1,serverNowEpochMs:now,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,graceEndsAtEpochMs:claimed?row.startedAt+duration+grace:null,
       finishedAtEpochMs:['FAILED','CANCELLED','REDEEMED'].includes(row.state)?row.finishedAt||row.startedAt+duration+grace:null,
@@ -38,7 +43,9 @@ export function trialDemo(url,locale,state,request){
       const discount=Number(cfg.earlyPurchaseDiscountUSD);
       const early=inTerm&&discount>0,price=Number(cfg.trialPriceUSD);
       const settledUsdt=early?round(Number(cfg.trialDays)*Number(cfg.shadowDailyUSD)):shadow,rewardNex=early?round(Number(cfg.trialDays)*Number(cfg.shadowDailyNEX)):nex;
-      const offsetUsdt=Math.min(settledUsdt,Number(cfg.trialOffsetCapUSD)),promo=round(Math.min(price*Number(cfg.discountRate),Number(cfg.discountCapUSD)));
+      // The credit is what has accrued so far (all of it in grace), never more than is left to pay after the trial
+      // discount; the not-yet-accrued part of an early full-term settlement arrives after purchase with all the UVT.
+      const promo=round(Math.min(price*Number(cfg.discountRate),cap(cfg.discountCapUSD))),offsetUsdt=round(Math.min(shadow,cap(cfg.trialOffsetCapUSD),Math.max(0,price-promo)));
       const base=round(Math.max(0,price-Math.min(price,promo+offsetUsdt))),earlyDiscountUsdt=early?Math.min(discount,base):0;
       return {settlementPolicy:early?'FULL_TERM_ON_CONVERSION':'ACCRUED_ON_CONVERSION',quoteVersion:early?'FULL_TERM_ON_CONVERSION:demo'+row.startedAt:'ACCRUED_ON_CONVERSION',
         earlyPurchase:early,priceUsdt:price,accruedUsdt:shadow,accruedNex:nex,settledUsdt,rewardNex,earlyRewardUsdt:round(settledUsdt-shadow),earlyRewardNex:round(rewardNex-nex),
@@ -71,7 +78,7 @@ export function trialDemo(url,locale,state,request){
   const remember=value=>{if(key){state.trialCommands??={};state.trialCommands[key]=structuredClone(value);}return value;};
   if(url.pathname==='/api/trial/start'){
     if(mode==='claim-error'&&!state.trialStartFailed){state.trialStartFailed=true;refuse('TRIAL_SERVICE_UNAVAILABLE');}
-    if(mode==='capacity-full')refuse('TRIAL_CAPACITY_FULL');
+    if(snapshot().eligibilityReason==='capacity-full')refuse('TRIAL_CAPACITY_FULL');
     if(snapshot().canStart)Object.assign(row,{state:'ACTIVE',startedAt:now,version:(row.version||1)+1});
     return remember(snapshot());
   }
@@ -86,6 +93,7 @@ export function trialDemo(url,locale,state,request){
     if(body.productNo!==cfg.trialProductId)refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');
     if(body.expectedAmountUsdt!==null&&body.expectedAmountUsdt<amount)refuse('TRIAL_AMOUNT_MISMATCH');
     if(body.quoteVersion&&body.quoteVersion!==quote.quoteVersion)refuse('TRIAL_QUOTE_CHANGED');
+    state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
     if((state.walletBalance??52800.64)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
     const orderNo='TRC-DEMO'+now;
     state.walletBalance=(state.walletBalance??52800.64)-amount+quote.remainderUsdt;
@@ -97,6 +105,6 @@ export function trialDemo(url,locale,state,request){
       earlyRewardUsdt:quote.earlyRewardUsdt,earlyRewardNex:quote.earlyRewardNex,earlyDiscountUsdt:quote.earlyDiscountUsdt,source,provenance:{...proof,source}});
   }
   if(['/api/trial/state','/api/trial/eligibility'].includes(url.pathname)){
-    const result=snapshot();if(mode==='capacity-full'&&row.state==='ELIGIBLE')Object.assign(result,{canStart:false,eligibilityReason:'capacity-full'});return result;
+    return snapshot();
   }
 }
