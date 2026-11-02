@@ -195,7 +195,7 @@ async function complete(captchaTicket?: string) {
       challengeNo.value = result.challengeNo; deliveryHint.value = result.deliveryHint; code.value = ""; return;
     }
     const registrationDestination = result.registrationReceipt
-      ? "/pages/register/success"
+      ? "/pages/index/index"
       : props.returnTo;
     const completed = completeSignIn({
       identity: `user:${result.user.userId}`, returnTo: registrationDestination,
@@ -208,7 +208,7 @@ async function complete(captchaTicket?: string) {
     if (result.registrationReceipt) {
       stageRemoteRegistrationReceipt(result.registrationReceipt, `user:${result.user.userId}`);
       toast.success(t.value.register.registrationSignedIn);
-      navReset({ url: "/pages/register/success", fail: () => navReset({ url: "/pages/index/index", fail: () => {} }) });
+      navReset({ url: "/pages/index/index", fail: () => {} });
     }
     cancel();
   } catch (cause) {
