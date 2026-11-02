@@ -4836,8 +4836,8 @@ timeHoursAgo: "{n} giờ",
     powerUps: {
       label: "Tăng lực chuỗi",
       streakStat: "Chuỗi {n} ngày",
-      threshold: "{n}d",
-      daysToUnlock: "Còn {n} ngày nữa để mở",
+      threshold: "{n} ngày",
+      daysToUnlock: "Mở sau {n} ngày",
       locked: "Đang khóa",
       // BUG 195: nghiệp vụ mà hạng mục này trỏ tới đang tạm dừng.
       suspended: "Tạm dừng",

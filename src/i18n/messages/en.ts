@@ -4933,7 +4933,7 @@ timeHoursAgo: "{n}h ago",
     powerUps: {
       label: "Streak power-ups",
       streakStat: "{n}-day streak",
-      threshold: "{n}d",
+      threshold: "{n} days",
       daysToUnlock: "{n} more days to unlock",
       locked: "Locked",
       // BUG 195: the target business is suspended, so this tier must not promise an activatable perk.

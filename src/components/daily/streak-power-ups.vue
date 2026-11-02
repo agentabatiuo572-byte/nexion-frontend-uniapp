@@ -67,6 +67,7 @@ import { computed, ref, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
+import { useConfig } from "@/store/config";
 import { useDailyPowerUp, type StreakPowerUpId } from "@/store/daily-powerup";
 import { toast } from "@/store/ui";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -97,6 +98,7 @@ const locale = useLocaleStore();
 // `w` also feeds powerUpNameText, which looks names up by key → type as a string record.
 const w = computed(() => t.value.daily.powerUps as unknown as Record<string, string>);
 const faucet = useNexFaucet();
+const config = useConfig();
 const powerUp = useDailyPowerUp();
 const claimBusy = ref(false);
 // The page supplies scoped display availability; it never authorizes a claim.
@@ -120,7 +122,7 @@ const powerUps = computed<PowerUp[]>(() => (remoteApiEnabled
       // 服务端的可用性判定是权威:它读的是各域自己的读模型,比客户端本地推断更准。
       serverBusinessAvailable: item.businessAvailable,
     }))
-  : localPowerUps.value));
+  : localPowerUps.value).filter((item) => config.isEnabled("stakingVisible") || item.id !== "staking_boost"));
 
 const streak = computed(() => faucet.signInStreak);
 
@@ -243,7 +245,8 @@ function isOpenSlot(p: PowerUp): boolean {
 </script>
 
 <style scoped>
-.spu { display: block; }
+.spu { --spu-dash: color-mix(in srgb, var(--v5-ink) 16%, transparent); display: block; }
+[data-theme="light"] .spu { --spu-dash: var(--v5-border-strong); }
 .spu-sh { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin: 0 18px 12px; }
 .spu-sh__h { min-width: 0; font: 600 17px/24px var(--font-v5); color: var(--v5-ink); }
 .spu-meta { flex: none; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
@@ -252,7 +255,7 @@ function isOpenSlot(p: PowerUp): boolean {
 .spu-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 136px; padding: 14px; box-sizing: border-box; border-radius: 20px; animation: spu-rise 460ms cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--i) * 60ms + 200ms); }
 .spu-card--s { background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .spu-card--s { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-.spu-card--l { border: 1.5px dashed var(--v5-border-strong); }
+.spu-card--l { border: 1.5px dashed var(--spu-dash); }
 .spu-r { display: flex; align-items: center; justify-content: space-between; }
 .spu-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: color-mix(in srgb, var(--t) 16%, transparent); color: var(--t); }
 .spu-card--l .spu-ic { background: color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink-4); }
@@ -262,15 +265,17 @@ function isOpenSlot(p: PowerUp): boolean {
 .spu-ds { margin-top: -6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .spu-bt { margin-top: auto; display: flex; align-items: center; gap: 4px; font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .spu-bt svg { flex: none; }
-.spu-bt--lock { font-weight: 400; }
+.spu-bt--lock { align-items: flex-start; font-weight: 400; }
+/* A wrapped line keeps its icon on the first line. */
+.spu-bt--lock svg { margin-top: 2px; }
 .spu-bt--ok { color: var(--v5-success-ink); }
 .spu-bt--w { color: var(--v5-warning-ink); }
 /* 34px glass pill inside a 44px hit area. */
 .spu-act-hit { display: flex; align-items: center; min-height: 44px; margin: -5px 0; cursor: pointer; }
 .spu-act { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); display: inline-flex; align-items: center; justify-content: center; gap: 2px; height: 34px; padding: 0 14px; border-radius: 999px; font: 500 13px/18px var(--font-v5); white-space: nowrap; }
 .spu-act-hit:active .spu-act { opacity: .85; }
-.spu-pf { display: flex; align-items: center; gap: 6px; margin: 12px 18px 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); }
-.spu-pf svg { flex: none; color: var(--v5-warning-ink); }
+.spu-pf { display: flex; align-items: flex-start; gap: 6px; margin: 12px 18px 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); }
+.spu-pf svg { flex: none; margin-top: 2px; color: var(--v5-warning-ink); }
 .spu-pf--n { font-weight: 400; color: var(--v5-ink-2); }
 .spu-pf--a, .spu-pf--a svg { color: var(--v5-success-ink); }
 .spu-note { display: block; margin: 4px 18px 0; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }

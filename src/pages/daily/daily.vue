@@ -26,7 +26,7 @@
 
       <!-- Streak energy ring -->
       <view class="dly-hero" :class="{ 'dly-hero--glow': dailyFactsVisible }" :role="dailyFactsVisible ? undefined : 'status'" :aria-label="t.daily.activeStreak">
-        <LoopScope class="dly-rw">
+        <view ref="ringRef" class="dly-rw" :class="{ 'nx-loops-paused': !ringLoops.running.value }">
           <svg v-if="!dailyFactsVisible" class="dly-ring" width="248" height="248" viewBox="0 0 248 248" aria-hidden="true"><circle class="dly-ring__ph" cx="124" cy="124" r="104" /></svg>
           <svg v-else class="dly-ring" width="248" height="248" viewBox="0 0 248 248" role="img" :aria-label="ringLabel">
             <circle v-for="s in ringSegments" :key="`t${s.i}`" class="dly-ring__tr" cx="124" cy="124" r="104" :stroke-dasharray="s.dash" :stroke-linecap="ringCap" :transform="`rotate(${s.rotate} 124 124)`" />
@@ -38,7 +38,7 @@
             <view class="dly-spk" style="left: -4px; top: 186px; width: 4px; height: 4px; background: var(--v5-brand-2); opacity: .6" />
             <view class="dly-spk" style="right: -20px; top: 52px; width: 4px; height: 4px; background: var(--v5-brand-2); opacity: .6" />
             <view class="dly-spk" style="right: -12px; top: 170px; width: 7px; height: 7px; background: var(--v5-warning); opacity: .5" />
-            <view v-if="ring.next !== null" class="dly-gift" aria-hidden="true">
+            <view v-if="ring.next !== null" class="dly-gift" :class="{ 'dly-gift--reached': ring.reached }" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
             </view>
           </template>
@@ -51,11 +51,11 @@
             <view class="dly-burst__ring" />
             <view v-for="r in 8" :key="r" class="dly-burst__ray" :style="{ transform: `rotate(${(r - 1) * 45}deg)` }" />
           </view>
-          <view v-if="successFx" :key="`f${successFx.key}`" class="dly-fly" role="status">
+          <view v-if="successFx && successFx.atRing" :key="`f${successFx.key}`" class="dly-fly" role="status">
             <text>+{{ successFx.amount }}</text><text class="dly-fly__u">UVT</text><text v-if="successFx.multiplier > 1" class="dly-fly__u">{{ successFx.multiplier }}×</text>
             <text class="dly-sr">{{ successFx.summary }}</text>
           </view>
-        </LoopScope>
+        </view>
         <template v-if="!dailyFactsVisible">
           <text v-if="!remoteRefreshError && faucet.remoteReadState !== 'error'" class="dly-next dly-next--mut">{{ t.daily.loading }}</text>
         </template>
@@ -84,9 +84,9 @@
         </view>
       </view>
 
-      <!-- Milestone rewards -->
-      <view class="dly-sec">
-        <view class="dly-sh">
+      <!-- Milestone rewards (while loading: placeholder tickets right under the ring, no title) -->
+      <view class="dly-sec" :class="{ 'dly-sec--sk': !dailyFactsVisible }">
+        <view v-if="dailyFactsVisible" class="dly-sh">
           <text class="dly-sh__h">{{ t.daily.milestones.label }}</text>
           <text v-if="dailyFactsVisible && claimableCount > 0" class="dly-pill">{{ fmt(t.daily.milestones.claimableCount, { n: claimableCount }) }}</text>
         </view>
@@ -223,6 +223,11 @@
     <!-- Check-in sits in the thumb zone (DS-30). -->
     <template #pageFixed>
       <view class="dly-bar">
+        <!-- The ring is scrolled away: the same reward rises above the bar instead. -->
+        <view v-if="successFx && !successFx.atRing" :key="`bf${successFx.key}`" class="dly-fly dly-fly--bar" role="status">
+          <view class="dly-fly__pill"><text>+{{ successFx.amount }}</text><text class="dly-fly__u">UVT</text><text v-if="successFx.multiplier > 1" class="dly-fly__u">{{ successFx.multiplier }}×</text></view>
+          <text class="dly-sr">{{ successFx.summary }}</text>
+        </view>
         <view v-if="dailyFactsVisible && lastSignedToday" class="dly-done nx-frosted-button" role="status">
           <view class="dly-done__ok"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></view>
           <text class="dly-done__t">{{ t.daily.checkedInShort }}</text>
@@ -255,7 +260,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
-import LoopScope from "@/components/loop-scope.vue";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StreakPowerUps from "@/components/daily/streak-power-ups.vue";
 import { useT } from "@/i18n/use-t";
@@ -438,9 +443,11 @@ onShow(() => { pageActive = true; readDailyPage(); });
 onUnmounted(() => { pageActive = false; dailyRefreshRequest += 1; unsubscribeDailyRuntime(); });
 
 // Per-second tick for the countdown.
+// It stops while the page is hidden and resumes on show; the countdown is recomputed from the clock.
 const tick = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
+function startTick() {
+  if (timer) return;
   timer = setInterval(() => {
     tick.value += 1;
     if (remoteApiEnabled && faucet.remoteNextResetAt > 0
@@ -448,6 +455,17 @@ onMounted(() => {
       void refreshDaily();
     }
   }, 1000);
+}
+onHide(() => {
+  if (timer) clearInterval(timer);
+  timer = null;
+});
+onShow(() => {
+  tick.value += 1;
+  startTick();
+});
+onMounted(() => {
+  startTick();
   // 🔴 这里曾挂过一个 reconcileFaucetBills()「签到/里程碑发币没落盘就补发」——**已撤销**。
   // 实景走查当场证伪:判据是「有领取状态、无对应账单行 ⇒ 补发」,它分不清
   //   ① 从没发过(该补)与 ② 发过了但账单行丢了(不该补)。
@@ -749,7 +767,10 @@ const returned = ref(false);
 
 const RING_R = 104;
 const RING_C = 2 * Math.PI * RING_R;
-const ring = computed(() => dailyStreakRing(streak.value, milestones.value.map(m => m.day)));
+// The ring and its breathing run only while on screen; a success off screen floats above the bar.
+const ringLoops = useLoopsInView(".dly-rw");
+const ringRef = ringLoops.elRef;
+const ring = computed(() => dailyStreakRing(streak.value, milestones.value.map(m => m.day), lastSignedToday.value));
 const ringSegments = computed(() => {
   const step = 360 / ring.value.segments;
   // Rounded caps blur together on dense stages; past 14 segments they become flat ticks.
@@ -765,11 +786,12 @@ const ringSegments = computed(() => {
 const ringCap = computed(() => ring.value.segments <= 14 ? "round" : "butt");
 const ringTodayIndex = computed(() => !lastSignedToday.value && ring.value.next !== null ? ring.value.done : null);
 const ringBreathing = computed(() => ringTodayIndex.value !== null && checkInStateConfirmed.value);
+// Amber → coral across the signed segments; a lone segment signed today is already the coral end.
 function ringDoneStroke(i: number): string {
-  const mix = ring.value.done > 1 ? Math.round((i / (ring.value.done - 1)) * 100) : 0;
+  const mix = ring.value.done > 1 ? Math.round((i / (ring.value.done - 1)) * 100) : lastSignedToday.value ? 100 : 0;
   return `color-mix(in srgb, var(--v5-brand-2) ${mix}%, var(--v5-warning))`;
 }
-const ringLabel = computed(() => ring.value.next === null
+const ringLabel = computed(() => ring.value.next === null || ring.value.reached
   ? fmt(t.value.daily.ringLabelAll, { n: streak.value })
   : fmt(t.value.daily.ringLabel, { n: streak.value, day: ring.value.next, left: ring.value.next - streak.value }));
 // The burst sits on today's freshly filled segment, or on the gift when a milestone day empties the stage.
@@ -820,7 +842,7 @@ const balanceParts = computed(() => {
 
 // Check-in success: today's segment fills, the count steps up and the actual
 // reward floats for 1900ms. Leaving the page or switching account cancels it.
-const successFx = ref<{ key: number; amount: string; multiplier: number; summary: string } | null>(null);
+const successFx = ref<{ key: number; amount: string; multiplier: number; summary: string; atRing: boolean } | null>(null);
 const countingStreak = ref<number | null>(null);
 const displayStreak = computed(() => countingStreak.value ?? streak.value);
 let successTimer: ReturnType<typeof setTimeout> | null = null;
@@ -835,7 +857,7 @@ function clearCheckInSuccess() {
 }
 function playCheckInSuccess(from: number, gained: number, multiplier: number, summary: string) {
   clearCheckInSuccess();
-  successFx.value = { key: Date.now(), amount: formatAmount(gained), multiplier, summary };
+  successFx.value = { key: Date.now(), amount: formatAmount(gained), multiplier, summary, atRing: ringLoops.running.value };
   successTimer = setTimeout(clearCheckInSuccess, 1900);
   const to = streak.value;
   const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -856,11 +878,12 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 
 <style scoped>
 /* Design: uvel-docs P-65 boards (Main / DailyLight / DailySigned / DailyStates). One aura only — behind the ring. */
-.dly { --dly-glow: 30%; --dly-glow2: 14%; --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 50%, transparent); padding-bottom: calc(84px + env(safe-area-inset-bottom)); font-family: var(--font-v5); color: var(--v5-ink); }
-[data-theme="light"] .dly { --dly-glow: 20%; --dly-glow2: 9%; --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-ink) 10%, transparent); }
+.dly { --dly-glow: 30%; --dly-glow2: 14%; --dly-dash: color-mix(in srgb, var(--v5-ink) 16%, transparent); --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 50%, transparent); padding-bottom: calc(84px + env(safe-area-inset-bottom)); font-family: var(--font-v5); color: var(--v5-ink); }
+[data-theme="light"] .dly { --dly-glow: 20%; --dly-glow2: 9%; --dly-dash: var(--v5-border-strong); --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-ink) 10%, transparent); }
 .dly-card { position: relative; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .dly-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .dly-sec { display: block; margin-top: var(--ui-space-section-gap); }
+.dly-sec--sk { margin-top: 20px; }
 .dly-sh { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin: 0 18px 12px; }
 .dly-sh__h { min-width: 0; font: 600 17px/24px var(--font-v5); color: var(--v5-ink); }
 .dly-meta { flex: none; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
@@ -882,11 +905,12 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-ring__ph { stroke: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
 .dly-ring__tr { stroke: color-mix(in srgb, var(--v5-ink) 9%, transparent); }
 .dly-ring__dn { animation: dly-lit 380ms ease-out both; animation-delay: calc(var(--i) * 80ms + 260ms); }
-.dly-ring__dn--new { stroke: var(--v5-brand-2); animation-delay: 0ms; }
+.dly-ring__dn--new { animation-delay: 0ms; }
 .dly-ring__td { stroke: var(--v5-brand); }
 .dly-ring__td--breathe { opacity: .35; animation: dly-breathe 2.4s ease-in-out 900ms infinite; }
 .nx-loops-paused .dly-ring__td--breathe { animation-play-state: paused; }
 .dly-spk { position: absolute; border-radius: 50%; pointer-events: none; }
+.dly-gift.dly-gift--reached { background: var(--v5-warning); box-shadow: 0 0 0 4px var(--v5-bg); color: var(--v5-bg); }
 .dly-gift { position: absolute; left: 104px; top: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--v5-warning) 18%, var(--v5-bg)); box-shadow: 0 0 0 4px var(--v5-bg), inset 0 0 0 1.5px color-mix(in srgb, var(--v5-warning) 70%, transparent); color: var(--v5-warning-ink); }
 .dly-ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .dly-num { margin-top: 2px; font: 500 76px/76px var(--font-metric); letter-spacing: -.05em; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
@@ -905,8 +929,11 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-burst { position: absolute; width: 0; height: 0; pointer-events: none; animation: dly-burst 600ms cubic-bezier(.2, .8, .2, 1) both; }
 .dly-burst__ring { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%; box-shadow: 0 0 0 2px color-mix(in srgb, var(--v5-warning) 60%, transparent); }
 .dly-burst__ray { position: absolute; left: -1.5px; top: -24px; width: 3px; height: 9px; border-radius: 2px; background: var(--v5-warning); transform-origin: 1.5px 24px; }
-.dly-burst__ray:nth-child(odd) { top: -22px; height: 6px; background: var(--v5-brand-2); transform-origin: 1.5px 22px; }
+.dly-burst__ray:nth-child(even) { top: -22px; height: 6px; background: var(--v5-brand-2); transform-origin: 1.5px 22px; }
 .dly-fly { position: absolute; left: -30px; right: -30px; top: -6px; font: 500 22px/28px var(--font-metric); letter-spacing: -.01em; color: var(--v5-brand); animation: dly-fly 1900ms linear both; pointer-events: none; }
+.dly-fly--bar { left: 0; right: 0; top: auto; bottom: 100%; margin-bottom: 12px; display: flex; justify-content: center; animation-name: dly-fly-bar; }
+/* Over scrolled content the reward needs its own ground to stay readable. */
+.dly-fly__pill { display: inline-flex; align-items: baseline; padding: 4px 16px; border-radius: 999px; background: color-mix(in srgb, var(--v5-bg) 82%, transparent); box-shadow: inset 0 0 0 1px var(--v5-sticky-bar-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .dly-fly__u { margin-left: 4px; font: 500 13px/18px var(--font-v5); letter-spacing: 0; }
 
 /* Milestone tickets */
@@ -931,10 +958,10 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-tk__v { font: 600 26px/30px var(--font-amount); letter-spacing: -.02em; color: var(--v5-ink); white-space: nowrap; }
 .dly-tk__v--t { padding-top: 6px; font: 500 15px/20px var(--font-v5); letter-spacing: 0; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .dly-tk__u + .dly-tk__v--t { padding-top: 0; }
-.dly-tk__pf { margin: 0 12px; border-top: 1.5px dashed var(--v5-border-strong); }
+.dly-tk__pf { margin: 0 12px; border-top: 1.5px dashed var(--dly-dash); }
 .dly-tk__sb { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 10px; }
-.dly-tk__st { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); text-align: center; }
-.dly-tk__st svg { flex: none; }
+.dly-tk__st { display: flex; align-items: flex-start; justify-content: center; gap: 4px; min-height: 44px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); text-align: center; }
+.dly-tk__st svg { flex: none; margin-top: 2px; }
 .dly-tk__nxt { font-weight: 500; color: var(--v5-warning-ink); }
 .dly-claim { display: flex; align-items: center; justify-content: center; width: 100%; height: 44px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 14px/20px var(--font-v5); cursor: pointer; }
 .dly-tk--can { border: 1.5px solid transparent; background: linear-gradient(var(--v5-surface), var(--v5-surface)) padding-box, linear-gradient(155deg, var(--v5-warning), var(--v5-brand-2) 55%, color-mix(in srgb, var(--v5-brand-2) 10%, transparent)) border-box; box-shadow: none; }
@@ -945,7 +972,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-tk__sheen { position: absolute; inset: 0; overflow: hidden; border-radius: 16px; pointer-events: none; }
 .dly-tk__sheen > view { position: absolute; top: 0; bottom: 0; left: 0; width: 46px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .16), transparent); transform: translateX(-120%) skewX(-18deg); animation: dly-sheen 1100ms ease-out 1000ms 1 both; }
 .dly-tk--got .dly-tk__u, .dly-tk--got .dly-tk__v { color: var(--v5-ink-3); }
-.dly-tk--sk { background: transparent; box-shadow: none; border: 1.5px dashed var(--v5-border-strong); }
+.dly-tk--sk { background: transparent; box-shadow: none; border: 1.5px dashed var(--dly-dash); }
 .dly-tk--sk::before, .dly-tk--sk::after { display: none; }
 .dly-bone { display: block; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
 
@@ -981,7 +1008,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-pl--1 { height: 60px; background: color-mix(in srgb, var(--v5-warning) 20%, transparent); box-shadow: inset 0 2px 0 var(--v5-warning); color: var(--v5-warning-ink); }
 .dly-pl--2 { height: 44px; }
 .dly-pl--3 { height: 32px; }
-.dly-lr { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 10px; }
+.dly-lr { display: flex; align-items: center; gap: 10px; box-sizing: content-box; min-height: 52px; padding: 0 10px; }
 .dly-lr + .dly-lr { border-top: 1px solid var(--v5-border); }
 .dly-lr__rk { width: 20px; font: 500 13px/18px var(--font-metric); color: var(--v5-ink-3); }
 .dly-lr__n { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
@@ -1004,7 +1031,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-w2 > view + view { padding-left: 14px; border-left: 1px solid var(--v5-border); }
 .dly-w2__b { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); }
 .dly-wn { display: block; padding-bottom: 12px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
-.dly-wlk { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; margin: 0 -16px; padding: 0 16px; border-top: 1px solid var(--v5-border); font: 500 13px/18px var(--font-v5); color: var(--v5-ink); cursor: pointer; }
+.dly-wlk { display: flex; align-items: center; justify-content: space-between; gap: 10px; box-sizing: content-box; min-height: 48px; margin: 0 -16px; padding: 0 16px; border-top: 1px solid var(--v5-border); font: 500 13px/18px var(--font-v5); color: var(--v5-ink); cursor: pointer; }
 .dly-wlk__l { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dly-wlk__l svg { flex: none; color: var(--v5-warning-ink); }
 .dly-wlk > svg { flex: none; color: var(--v5-ink-3); }
@@ -1012,7 +1039,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 /* Recent */
 .dly-hs { margin: 0 18px; }
 .dly-hs__msg { display: block; padding: 12px 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
-.dly-hr { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; }
+.dly-hr { display: flex; align-items: center; justify-content: space-between; gap: 12px; box-sizing: content-box; min-height: 60px; }
 .dly-hr + .dly-hr { border-top: 1px solid var(--v5-border); }
 .dly-hr__w { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dly-hr__t { font: 500 15px/20px var(--font-v5); color: var(--v5-ink); }
@@ -1051,6 +1078,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 @keyframes dly-burst { 0% { opacity: 0; transform: scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.2); } }
 /* 07 签到成功奖励: rise from the ring centre, hold above the ring, keep rising out. */
 @keyframes dly-fly { 0% { opacity: 0; transform: translateY(118px); } 28% { opacity: 1; transform: none; } 66% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-28px); } }
+@keyframes dly-fly-bar { 0% { opacity: 0; transform: translateY(40px); } 28% { opacity: 1; transform: none; } 66% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-28px); } }
 @keyframes dly-fly-fade { 0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1058,6 +1086,6 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
   .dly-ring__td--breathe { opacity: 1; animation: none; }
   .dly-tk__sheen, .dly-cta__sheen { display: none; }
   /* The reward stays readable for the full 1900ms, fading in place (overrides the global reduce catch-all). */
-  .dly .dly-fly { animation: dly-fly-fade 1900ms linear both !important; animation-delay: 0s !important; }
+  .dly .dly-fly, .dly-bar .dly-fly { animation: dly-fly-fade 1900ms linear both !important; animation-delay: 0s !important; }
 }
 </style>
