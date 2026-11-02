@@ -2001,10 +2001,16 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
       && current.discountUsdt === reviewedQuote.discountUsdt;
   };
   const expectedActive = recovery.tradeinQuote.targetDeviceStatus === "ACTIVE";
+  const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
+  const markCommandSubmitted = () => {
+    if (!authorizationIsCurrent()) throw new Error('CHECKOUT_ACCOUNT_CHANGED');
+    recovery = { ...recovery, tradeinCommandSubmitted: true };
+    rememberCheckoutOrder(submissionScope.accountKey, recovery);
+    return key;
+  };
   let recoveredResult = recovery.tradeinResult;
   if (!newSubmission && !recoveredResult) {
     if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
-    const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
     const result = await readPaymentCommand(apiClient, 'trade-in', key);
     if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
     if (result.status === 'REJECTED') return null;
@@ -2017,40 +2023,29 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
           remoteTradeinRecoveryRequired.value = true;
           if (recoveredResult) return recoveredResult;
           let submitted: CanonicalTradeinResult | null = null;
-          let externalCommandStarted = false;
-          try {
-            const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
-            if (!submitted) {
-              const paid = await executeSelectedPurchase({amount:recovery.tradeinQuote.payableUsdt,currency:'USDT',summary:product.value?.name??t.value.store.coConfirmPurchase},
-                async authorization=>{
-                  if (!authorizationIsCurrent()) return null;
-                  return deviceE3Api.submit(recovery.tradeinQuote.sourceDeviceId,recovery.productNo,key,recovery.tradeinQuote,authorization);
-                },authorizationIsCurrent,
-                {kind:'TRADE_IN',payload:{sourceDeviceId:reviewedQuote.sourceDeviceId,expectedSourceVersion:reviewedQuote.sourceRowVersion,targetProductNo:recovery.productNo,expectedPayableUsdt:reviewedQuote.payableUsdt,expectedDiscountUsdt:reviewedQuote.discountUsdt},
-                  commandKey:()=>{externalCommandStarted=true;return key;},parseReceipt:parseCanonicalTradeinResult});
-              if (!paid) {
-                // Closing the UI does not cancel an external collection. Keep its
-                // frozen quote and lock until the original command has a final result.
-                const original = externalCommandStarted ? await readPaymentCommand(apiClient, 'trade-in', key) : null;
-                if (!scopeIsCurrent()) throw new Error('CHECKOUT_ACCOUNT_CHANGED');
-                if (original?.status === 'SUCCEEDED') submitted = parseCanonicalTradeinResult(original.receipt);
-                else {
-                  if ((!externalCommandStarted && newSubmission) || original?.status === 'REJECTED') {
-                    finishCheckoutTradein(submissionScope.accountKey, recovery);
-                    remoteTradeinRecoveryRequired.value = false;
-                  }
-                  throw new Error(externalCommandStarted && original?.status !== 'REJECTED' ? 'PAYMENT_RESULT_UNRESOLVED' : 'PAYMENT_CANCELLED');
-                }
-              } else submitted = paid;
+          const paid = await executeSelectedPurchase({amount:recovery.tradeinQuote.payableUsdt,currency:'USDT',summary:product.value?.name??t.value.store.coConfirmPurchase},
+            async authorization=>{
+              if (!authorizationIsCurrent()) return null;
+              return deviceE3Api.submit(recovery.tradeinQuote.sourceDeviceId,recovery.productNo,markCommandSubmitted(),recovery.tradeinQuote,authorization);
+            },authorizationIsCurrent,
+            {kind:'TRADE_IN',payload:{sourceDeviceId:reviewedQuote.sourceDeviceId,expectedSourceVersion:reviewedQuote.sourceRowVersion,targetProductNo:recovery.productNo,expectedPayableUsdt:reviewedQuote.payableUsdt,expectedDiscountUsdt:reviewedQuote.discountUsdt},
+              commandKey:markCommandSubmitted,parseReceipt:parseCanonicalTradeinResult});
+          if (!paid) {
+            // A reload must not turn an unsubmitted choice into a permanent lock.
+            // Missing submission history remains unknown, even when the key is unseen.
+            const original = await readPaymentCommand(apiClient, 'trade-in', key);
+            if (!scopeIsCurrent()) throw new Error('CHECKOUT_ACCOUNT_CHANGED');
+            if (original.status === 'SUCCEEDED') submitted = parseCanonicalTradeinResult(original.receipt);
+            else {
+              if (original.status === 'REJECTED' || (recovery.tradeinCommandSubmitted === false
+                  && original.status === 'NOT_SEEN' && original.canResumeSameKey)) {
+                finishCheckoutTradein(submissionScope.accountKey, recovery);
+                remoteTradeinRecoveryRequired.value = false;
+                throw new Error('PAYMENT_CANCELLED');
+              }
+              throw new Error('PAYMENT_RESULT_UNRESOLVED');
             }
-          } catch (cause) {
-            if (newSubmission && !externalCommandStarted && scopeIsCurrent() && isSettledRejection(cause)
-                && asApiError(cause).message !== "IDEMPOTENCY_RESULT_UNKNOWN") {
-              finishCheckoutTradein(submissionScope.accountKey, recovery);
-              remoteTradeinRecoveryRequired.value = false;
-            }
-            throw cause;
-          }
+          } else submitted = paid;
           if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           recovery = { ...recovery, orderNo: submitted.orderNo, tradeinResult: submitted };
           rememberCheckoutOrder(submissionScope.accountKey, recovery);
@@ -2148,8 +2143,15 @@ async function resumePendingRemoteTradein(scope: CheckoutRouteScope, navigate = 
         remoteTradeinRecoveryError.value = true;
       }
     }
-  } catch {
-    if (isCurrentCheckoutRoute(scope)) remoteTradeinRecoveryError.value = true;
+  } catch (error) {
+    if (isCurrentCheckoutRoute(scope)) {
+      if (error instanceof Error && error.message === 'PAYMENT_CANCELLED') {
+        remoteTradeinRecoveryRequired.value = false;
+        remoteTradeinRecoveryError.value = false;
+        step.value = 'select-payment';
+        await retryCheckoutCapacity();
+      } else remoteTradeinRecoveryError.value = true;
+    }
   } finally {
     if (isCurrentCheckoutRoute(scope)) remoteTradeinRecoveryBusy.value = false;
   }
@@ -2247,7 +2249,7 @@ async function submitRemoteOrder(): Promise<void> {
     }
     if (tradeinContext) {
       const recovery: CheckoutTradeinRecovery = { productNo: p.id, orderNo: "", intent: remoteOrderIntent(),
-        commandKey: remoteOrderKey(), tradeinQuote: { ...tradeinContext.canonicalQuote! } };
+        commandKey: remoteOrderKey(), tradeinQuote: { ...tradeinContext.canonicalQuote! }, tradeinCommandSubmitted: false };
       rememberCheckoutOrder(submissionScope.accountKey, recovery);
       remoteTradeinRecoveryRequired.value = true;
       await completeRemoteTradein(recovery, submissionScope, true);
