@@ -15,6 +15,8 @@ import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remot
 
 export type StreakPowerUpId =
   | "royalty_boost"
+  | "streak_badge"
+  | "checkin_boost"
   | "nex_boost"
   | "staking_boost"
   | "genesis_whitelist";
