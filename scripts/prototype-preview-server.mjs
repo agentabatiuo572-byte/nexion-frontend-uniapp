@@ -17,7 +17,7 @@ if(process.env.DEMO_STATE_FILE)Object.assign(state,JSON.parse(await readFile(pro
 const authDemo=createAuthDemo(state);
 let locale='zh';
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
-// Let trial conversion reach the existing wallet authorization UI in the default preview.
+// Keep trial wallet authorization available when the full checkout fixture is disabled.
 const trialPin=createPaymentPinFlowFixture();
 Object.assign(trialPin.state,{loggedIn:true,password:'246802',version:1});
 const fixtureFor=(url,request)=>demoFixture(url,locale,state,request);

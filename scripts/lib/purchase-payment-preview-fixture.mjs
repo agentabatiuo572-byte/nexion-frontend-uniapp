@@ -14,7 +14,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const quotes = new Map(), intents = new Map();
   let sequence = 0;
   const handles = path => path.startsWith(base);
-  const commandKinds = {ORDER_PAY:'order-pay',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
+  const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   const ordersOf = (url, request) => demoFixture(new URL('/api/orders', url.origin), locale(), state, {...request, method: () => 'GET'}).orders;
   function settle(orderNo, status, intent) {
     if (!orderNo) return;
@@ -61,13 +61,29 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       {paymentMethod: 'CREGIS_USDT_ERC20', configured: state.paymentState !== 'erc20-off'}]}};
     if (path === `${base}-quotes` && method === 'POST') {
       const body = request.postDataJSON(), order = ordersOf(url, request).find(row => row.orderNo === body.payload?.orderNo);
-      if (!commandKinds[body.kind] || (body.kind === 'ORDER_PAY' ? !order : !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
+      if (!commandKinds[body.kind] || (body.kind === 'ORDER_PAY' ? !order : body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
       if (body.paymentMethod === 'CREGIS_USDT_ERC20' && state.paymentState === 'erc20-off') return {status: 503, message: 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED', data: null};
       const bank = body.paymentMethod === 'HDPAY_BANK', erc20 = body.paymentMethod === 'CREGIS_USDT_ERC20';
-      const amount = order?.amountUsdt ?? body.payload.expectedPayableUsdt;
-      const subtotal = cents(amount), channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
+      const trial = body.kind === 'TRIAL_CONVERT'
+        ? demoFixture(new URL('/api/trial/state',url.origin),locale(),state,{...request,method:()=> 'GET'}) : null;
+      if (trial) {
+        const expected = body.payload.expectedAmountUsdt;
+        if (typeof expected !== 'number' || !Number.isFinite(expected) || expected < 0 || expected > 1000000
+          || !/^\d+(?:\.\d{1,2})?$/.test(String(expected))) return {status:409,message:'TRIAL_AMOUNT_INVALID',data:null};
+        if (!['ACTIVE','GRACE'].includes(trial.state) || !trial.quote || body.payload.productNo !== trial.config.trialProductId)
+          return {status:409,message:'TRIAL_NOT_CONVERTIBLE',data:null};
+        if (body.payload.quoteVersion !== trial.quote.quoteVersion) return {status:409,message:'TRIAL_QUOTE_CHANGED',data:null};
+      }
+      const amount = trial ? trial.quote.amountUsdt : order?.amountUsdt ?? body.payload.expectedPayableUsdt;
+      // Trial business amounts retain six decimals; the external principal confirms HALF_UP cents.
+      const micros = BigInt(Number(amount).toFixed(6).replace('.', ''));
+      const subtotal = trial ? Number((micros + 5000n) / 10000n) : cents(amount);
+      if (trial && subtotal > cents(body.payload.expectedAmountUsdt)) return {status:409,message:'TRIAL_AMOUNT_MISMATCH',data:null};
+      const adjustment = Number(BigInt(subtotal) * 10000n - micros) / 1000000;
+      const channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
+      if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};
       const quote = {paymentQuoteId: `PPQ-PREVIEW-${++sequence}`, kind: body.kind, paymentMethod: body.paymentMethod, network: bank ? 'VND_BANK' : erc20 ? 'ERC20' : 'BSC',
-        businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: '0.000000', subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
+        businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: adjustment.toFixed(6), subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
         networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion: 3, expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
         fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null};
       quotes.set(quote.paymentQuoteId, {quote, orderNo: order?.orderNo, expiresAt: order?.expiresAt});

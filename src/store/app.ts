@@ -977,7 +977,6 @@ export const useApp = defineStore("app", () => {
           usdtBalance: fleet.walletUsdt,
           earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
         };
-        remoteSlotUsage.value = fleet.slotsUsed === undefined ? null : { slotsUsed: fleet.slotsUsed, reservedSlotCount: fleet.reservedSlotCount, trialSlotCount: fleet.trialSlotCount };
         remoteFleetHasSnapshot.value = true;
         remoteRealizedToday.value = { usdt: fleet.realizedTodayUsdt, nex: fleet.realizedTodayNex };
         remoteWalletReceiptHasSnapshot.value = false;
