@@ -293,9 +293,9 @@ TabBar:active tab 显示背景 chip 高亮。
 | 3 | 密码 + 确认密码 | 两次一致 + 符合 §4.6.1 强度要求 | 提交 → 注册成功 |
 
 **注册成功后行为**:
-1. 服务端创建账号并返回会话与注册回执；H5 使用 cookie refresh，会话投影到当前账号
+1. 服务端创建账号并返回会话；手机号注册返回注册回执，第三方回执限制见下文待后端支持项。H5 使用 cookie refresh，会话投影到当前账号
 2. H5 不创建、校准或激活手机设备；安装 APP 后可按其流程处理
-3. H5 端跳转 `/register/success`(注册成功页,§4.1.1);App 壳内注册直接跳转 `/onboarding/estimator`(L0 → L1)
+3. 手机注册以及带注册回执的第三方注册在 H5 端跳转 `/register/success`(注册成功页,§4.1.1);App 壳内注册直接跳转 `/onboarding/estimator`(L0 → L1)
 4. 服务端在专属客服会话里发一条注册欢迎语，回到首页时人工服务浮标显示未读（§11.8.4「注册欢迎语」，依赖后端 B16）
 
 **邀请码携带与锁定**(绑定规则详见 §4.3)：
@@ -304,11 +304,13 @@ TabBar:active tab 显示背景 chip 高亮。
 - 发码前预检结束时若手机号、国家码或步骤改变，放弃该次操作；发码及验证码校验期间不可修改邀请码。保留 Lite `bbfc7242`、`8fa987d9` 的好友/客服归因及礼包规则。
 - 手机注册或第三方注册收到 `USER_REGISTRATION_SPONSOR_NOT_FOUND/INVALID` 时解除锁定、保留码、清除卡片并在框下提示无效；第三方结束本轮授权并回到首步，手机注册回到验证码步以便重发。已知 App BUG-030 仍保留：旧码请求被拒时，可能把用户已编辑的当前码标为无效。
 
-**第三方注册（2026-11-03）**：登录与注册首步展示服务端配置可用的 Google、Apple、Telegram。点击时同步打开空白 popup，邀请码预检通过后才调用 `/auth/users/oauth/provider/start` 并导航授权窗口；popup 被拦截时提示允许弹窗后重试。只接受同一窗口、授权地址来源及当前 flow 的 `postMessage` 回执，查询 status 后由用户确认，调用 complete。已有身份登录；新身份由服务端注册，允许无手机号会话，注册回执进入 Lite 成功页，再由“继续网页版”进入首页。生产授权交接仅 HTTPS；同源 HTTP loopback 可用于本地联调。无需 APP 深链或原生授权桥。
+**第三方注册（2026-11-03）**：登录与注册首步展示服务端配置可用的 Google、Apple、Telegram。点击时同步打开空白 popup，邀请码预检通过后才调用 `/auth/users/oauth/provider/start` 并导航授权窗口；popup 被拦截时提示允许弹窗后重试。只接受同一窗口、授权地址来源及当前 flow 的 `postMessage` 回执，查询 status 后由用户确认，调用 complete。已有身份登录；新身份由服务端注册，允许无手机号会话；收到注册回执才进入 Lite 成功页，再由“继续网页版”进入首页。生产授权交接仅 HTTPS；同源 HTTP loopback 可用于本地联调。无需 APP 深链或原生授权桥。
+
+**待后端支持**：第三方携带客服/顾问码（`CS...`）注册尚未完成联调支持，当前 `AppUserRegistrationService` 只按 `nx_user.referral_code` 查找邀请人，不能把顾问码作为好友码成功绑定。第三方新账号不带邀请码时，当前后端不返回 `registrationReceipt`；Lite 无法区分新注册与已有账号登录，因此会跳过注册成功页和注册语言提交，按登录路径进入首页。两项都必须由后端补齐，前端不根据手机号缺失、授权入口或昵称猜测注册身份，也不补造回执。预览同样模拟这两项现状。
 
 发码收到 `USER_CAPTCHA_REQUIRED` 或 `USER_CAPTCHA_TICKET_INVALID` 时打开服务端滑块；验证成功后携带 ticket 重发，前端不生成 ticket。IP / 浏览器注册上限使用 §4.3.5 的三语提示。
 
-新人礼读取公开奖励配置和注册回执；没有邀请人或使用客服码也可获得新人礼。详见 [客服邀请码与新人奖励](UVEL_客服邀请码与新人奖励_20261101.md)。注册页服务条款和隐私政策均可打开对应正文页。
+新人礼规则为没有邀请人或使用客服码也可获得新人礼；展示读取公开奖励配置和真实注册回执，第三方顾问码与无码回执的待办见上段。详见 [客服邀请码与新人奖励](UVEL_客服邀请码与新人奖励_20261101.md)。注册页服务条款和隐私政策均可打开对应正文页。
 
 #### 4.1.1 注册成功页 `/register/success`(浏览器 H5)
 
@@ -317,16 +319,16 @@ TabBar:active tab 显示背景 chip 高亮。
 | 元素 | 内容 |
 |---|---|
 | 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 NexGrid,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
-| 礼包确认卡 | 远程模式金额与状态读取注册回执，未提供金额时不显示默认到账数；本地 mock 才使用 `rewards.welcomeGift`。两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);所有新账号都显示,新人礼包不需要邀请人(2026-11-01) |
-| H5 装 APP 权益 3 行 | 仅浏览器 H5 显示:在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度;App 不渲染此提醒区 |
-| H5 官网下载引导 | 提示可通过 NexGrid 官网下载 APP;读取 `share.appDownload.officialUrl` 作为唯一链接。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
-| 继续出口 | H5「继续网页版」→ 首页，始终可用；下载 APP 后使用同一账号登录，在 APP 完成手机校准与激活 |
+| 礼包确认卡 | 远程模式金额与状态读取注册回执，未提供金额时不显示默认到账数；本地 mock 才使用 `rewards.welcomeGift`。`POSTED` 显示已入账，其余可展示回执显示「确认中 · 稍后自动入账」及说明；`UNAVAILABLE`、缺失回执或金额时隐藏礼包卡；有可展示注册回执并进入本页时显示；第三方无码注册当前缺少回执，待后端补齐(2026-11-03) |
+| H5 装 APP 权益 3 行 | 仅浏览器 H5 显示:随时查看礼包与收益进度 / 设备状态和收益到账实时提醒 / 更稳的连接与算力调度;App 不渲染此提醒区 |
+| H5 官网下载引导 | 提示可通过 NexGrid 官网下载 APP;统一官网入口读取 `share.appDownload.officialUrl`；iOS / Android 安装包分别读取 `iosUrl` / `androidUrl`。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
+| 继续出口 | H5 提供「稍后在手机 App 激活，继续网页版」及浏览出口 → 首页；下载 APP 后使用同一账号登录，在 APP 完成手机校准与激活 |
 
 **规则**:远程模式礼包状态和金额读取服务端注册回执，缺失时不冒充已入账；本页只读展示、不发生任何入账;`officialUrl` 仅接受 HTTPS,优先在新窗口打开,弹窗被拦时改为当前页跳转;返回键视同「继续」,不可返回注册流。App 正常注册直接进入 onboarding;即使直接访问本页,也不显示 H5 安装权益与官网下载提醒。
 
 ### 4.2 登录流程
 
-双模式登录:默认密码登录(`password`),可切换至验证码登录(`otp`)。返回用户主要走 password 路径以加快再访;丢失密码或更换设备的用户走 OTP 路径。两种模式共用相同的手机号识别。Google / Apple / Telegram 沿用 §4.1 的浏览器授权流程，账号不存在时可携带邀请码注册；已有账号不由浏览器重新绑定邀请关系。授权结果未知时保留原登录尝试、安装 ID 与 recovery proof，通过原尝试查询或重试恢复；查询到非会话响应不视为登录成功。
+双模式登录:默认密码登录(`password`),可切换至验证码登录(`otp`)。返回用户主要走 password 路径以加快再访;丢失密码或更换设备的用户走 OTP 路径。两种模式共用相同的手机号识别。Google / Apple / Telegram 沿用 §4.1 的浏览器授权流程，账号不存在时可携带邀请码注册；已有账号不由浏览器重新绑定邀请关系。授权结果未知时保留原登录尝试、安装 ID 与 recovery proof，通过原尝试查询或重试恢复；查询到非会话响应不视为登录成功。H5 恢复时必须使用尝试中冻结的安装 ID（包括历史空值或 localStorage 清除前的 ID），不因当前浏览器 ID 改变而改写；只有新尝试使用当前 ID。若 OAuth complete 未送达，原尝试恢复无结果且重放返回 `OAUTH_FLOW_EXPIRED`，再次用原 proof 查询；只有后端明确返回 `LOGIN_ATTEMPT_RECOVERY_INVALID` 才清除尝试，提示重新授权或手机号登录。已签发会话仍用原 proof 恢复，查询暂不可用时保留 pending。
 
 #### 4.2.1 密码登录(默认)
 
@@ -340,10 +342,10 @@ TabBar:active tab 显示背景 chip 高亮。
 
 | 步骤 | 字段 | 校验规则 | 交互 |
 |---|---|---|---|
-| 1 | 国家码 + 手机号、选填邀请码 | 按国家码校验号码；手输邀请码先读公开预览 | 选区号 + 输手机 + "Send code"；也可使用 Google / Apple / Telegram |
+| 1 | 国家码 + 手机号 | 按国家码校验号码 | 选区号 + 输手机 + "Send code"；也可使用 Google / Apple / Telegram |
 | 2 | 6 位 OTP | 仅数字 | 满 6 位**自动确认**(无需手动点击)→ 登录成功跳 `/` |
 
-底部"改用密码登录"链接切换回 password 模式。
+底部"改用密码登录"链接切换回 password 模式。登录页没有手输邀请码字段或预检步骤；只保留导航传入的 `ref`，第三方授权携带该码，需要手动编辑时进入注册页。
 
 #### 4.2.3 忘记密码 reset 流程
 
@@ -426,7 +428,7 @@ TabBar:active tab 显示背景 chip 高亮。
 
 新人礼与服务端确认的有效手机任务收益按账户实时风险评估分入**收益三桶**。H5 不登记、执行或结算手机任务，不产生离线托管收益；手机任务执行与停止遵循 §6.11，普通注册礼包保持独立规则，既有合法入账不因端切换而追回。
 
-**H5 注册风控标识（后端 B19，2026-11-03）**：复用 `nexgrid-device-id-v1`，首次用密码学随机数生成浏览器安装 ID，存入 localStorage，后续请求及刷新复用，格式 `[A-Za-z0-9._:-]{1,128}`。登录（含 OTP / 二次验证）、注册、注册/登录/重置密码发码及 OAuth start/complete 均发送 `X-NexGrid-Installation-Id`、`X-NexGrid-Client-Surface: H5`、`X-NexGrid-Execution-Supported: false`；OAuth status 同样携带标识。安装 ID 用于浏览器归因，不证明物理设备身份，不授予手机执行能力。
+**H5 注册风控标识（后端 B19，2026-11-03）**：复用 `nexgrid-device-id-v1`，首次用密码学随机数生成浏览器安装 ID，存入 localStorage，后续新请求及刷新复用（既存登录尝试按 §4.2 保留其冻结 ID），格式 `[A-Za-z0-9._:-]{1,128}`。登录（含 OTP / 二次验证）、注册、注册/登录/重置密码发码及 OAuth start/complete 均发送 `X-NexGrid-Installation-Id`、`X-NexGrid-Client-Surface: H5`、`X-NexGrid-Execution-Supported: false`；OAuth status 同样携带标识。安装 ID 用于浏览器归因，不证明物理设备身份，不授予手机执行能力。
 
 后端当前 `AppLoginContext.validate` 接受 H5 空 ID 或上述合法 ID，并拒绝 H5 executionSupported=true；cookie refresh 模式仍由 `AppSessionSurface.from` 判为 H5。`POST /register/otp/send` 目前只读取客户端 IP；前端已携带 B19 所需标识，实际设备限额执行仍待后端 B19，不声称请求头本身完成防滥用。
 
@@ -504,88 +506,28 @@ i18n keys 在 `kycExpress.*` namespace,~40 keys。复用 `app/components/how-it-
 
 ### 4.5 安全管理 `/me/security`
 
-页面包含 5 个功能项:
+页面沿用 Lite 的安全设置布局：
 
 | 项 | 功能 | 详见 |
 |---|---|---|
-| 密码修改 | 当前密码 + 新密码 + 确认,inline 表单展开 | §4.6.4 |
-| 2FA(双因子) | TOTP + 8 个 recovery codes | §4.5.1 |
-| Active Sessions | 显示当前 + 历史登录设备,可逐个 revoke | §4.5.2 |
-| Revoke All Other Sessions | 一键登出所有其他设备 | §4.5.2 |
-| Delete Account | 红色 destructive,二次确认;确认后即登出 + 清除本地会话 + 跳转 `/login`(真后台:`DELETE /api/account` 服务端清除用户记录)| — |
+| 绑定手机号 | 无手机号账号显示引导，短信验证后绑定 | 下文 |
+| 密码修改 | 当前密码 + 新密码 + 确认，inline 表单展开 | §4.6.4 |
+| 2FA(双因子) | 当前密码 + 账号手机号短信验证码，启用或关闭 | §4.5.1 |
+| Active Sessions | 当前会话和其他会话，可逐个撤销 | §4.5.2 |
+| Revoke All Other Sessions | 一键登出所有其他会话 | §4.5.2 |
+| Delete Account | 当前密码和确认后提交注销申请，展示后端状态；未完成的申请可按服务端状态取消，不立即删除账号 | `/api/app/security/account-deletion` |
+
+**账号首次绑定手机号（2026-11-03）**：第三方注册可创建无手机号账号。安全页显示“绑定手机号”；银行卡绑定发码、提现地址重绑发码、2FA 变更发码前共用 `requireAccountPhone`，无手机号时提示并进入 `/pages/me/phone-binding`，不先向短信接口发送无效号码。
+
+绑定页按当前语言选择国家码，验证号码后调用 `POST /api/app/security/phone/challenge`；需要 CAPTCHA 时先完成 REGISTER 场景滑块，再携 ticket 发码。输入六位短信验证码调用 `POST /api/app/security/phone`，收到 `PHONE_BOUND` 后通过会话恢复读取服务端号码，确认成功并提供返回安全页入口。手机号已占用、验证码无效/过期、发送或提交失败均有中英越提示；提交回包丢失时通过会话恢复确认是否已绑定。绑定后返回原操作可再次发码。
+
+这是账号手机号绑定，不登记或激活手机计算设备。移植 App `b2d74d2b` 及该页后续交互/文案样式修正；`ec6cc13e` 是更换已有登录手机号的独立功能，不是首次绑定修复的依赖，本次未移植。
 
 #### 4.5.1 双因子认证(2FA)
 
-**算法**
+当前实现使用短信二次验证。安全页启用或关闭 2FA 需要已绑定手机号及当前密码；关闭前额外确认。`POST /api/app/security/two-factor/challenge` 携带目标 enabled 与 currentPassword，返回 challengeNo、有效期和脱敏号码；输入六位短信码后 `PUT /api/app/security/two-factor` 提交 enabled、currentPassword、challengeNo、code，成功后重读安全状态。
 
-采用 **TOTP**(Time-based One-Time Password,RFC 6238),兼容 Google Authenticator / Authy / 1Password / Microsoft Authenticator。
-
-- 6 位 code,30 秒时间窗
-- HMAC-SHA1 + 16 byte (128-bit) random secret per user
-- 容差:接受 ±1 个 30s 窗口,防 client 时钟漂移
-
-**启用流程**
-
-`/me/security` 点击 "Enable 2FA":
-
-1. Confirm dialog 解释 2FA 用途 + 备份提示
-2. server `POST /api/auth/2fa/enroll` → 返 `{secret, qrcodeUrl, recoveryCodes[]}`(base32 secret + otpauth URI + 8 个 recovery codes)
-3. client 渲染 QR + 可显式查看 secret + 强制显示 recoveryCodes + 提供 download(纯文本 / PDF)
-4. 用户在 authenticator 扫码后输 6 位 TOTP → `POST /api/auth/2fa/confirm` → server 验证 → 启用成功 + toast `2FA 已启用 — 请备份恢复码`
-
-未在 confirm 步骤完成验证前,2FA enrollment 不计入 user state(server 端 pending,5 分钟超时清理)。
-
-**登录时校验**
-
-任一 sign-in 路径(password / OTP / reset)server 验证一次因子成功后,若 user has 2FA enabled:
-
-- 不立即签发 session token,改返 `{step: "2fa_required", challengeId}`
-- client 跳 `/login/2fa?challengeId=...` 显示 6 位 TOTP 输入框 + "使用恢复码" 切换链接
-- 用户输 TOTP code 或 recovery code → `POST /api/auth/2fa/verify {challengeId, code, type: "totp" | "recovery"}` → server 验证 → 签发 session token + 跳 `/`
-
-2FA challenge 5 分钟过期,过期后必须重头登录。
-
-**关闭流程**
-
-`/me/security` toggle off:
-
-1. Confirm dialog(danger)警告关闭后账户更易被入侵
-2. Step-up auth:必须输 current password 二次验证
-3. `POST /api/auth/2fa/disable {currentPassword}` → server 验证 → 关闭 + revoke 所有 recoveryCodes
-4. Toast `2FA 已关闭`
-
-**Recovery codes**
-
-| 维度 | 规则 |
-|---|---|
-| 数量 | 8 个一次性 codes,启用时一次性生成 |
-| 长度 / 格式 | 10 位字母+数字,中间连字符(如 `xk9p3-mv2nr`)|
-| 存储 | server-side hashed(同密码 argon2id),client 不存 |
-| 显示 | 仅启用 / regenerate 时显示一次,用户必须 download / 抄录 |
-| 使用 | 每个 code 一次性,使用即失效 |
-| Regenerate | `/me/security` → "Regenerate codes" → 二次确认 + currentPassword → server 失效旧 codes + 生成 8 个新 |
-| 失效场景 | (1) 单 code 使用 (2) 全部 regenerate (3) 2FA 关闭(全失效)|
-
-**失去 device + recovery codes 路径**
-
-用户既丢 authenticator 又没保存 recovery codes:
-
-- 走客服工单(`/me/help → contact support`)+ KYC 二次验证
-- server 人工 disable 2FA + audit log,审核通过后用户重新走 enroll
-
-不提供"忘记 2FA" 自助路径(防社工攻击)。
-
-**真后台对接**
-
-| Endpoint | Method | Payload | 用途 |
-|---|---|---|---|
-| `/api/auth/2fa/enroll` | POST | — | 启动 enrollment,返 secret + QR + recoveryCodes |
-| `/api/auth/2fa/confirm` | POST | `{code}` | 用户首次 TOTP 验证 → 启用 |
-| `/api/auth/2fa/disable` | POST | `{currentPassword}` | 关闭 2FA + revoke recovery codes |
-| `/api/auth/2fa/verify` | POST | `{challengeId, code, type}` | 登录二因子 challenge |
-| `/api/auth/2fa/regenerate-codes` | POST | `{currentPassword}` | 重生 recovery codes |
-
-TOTP / recovery 连续输错走 §4.6.2 锁定计数器(5 次 / 15 分钟 → 锁定登录)。
+密码或第三方登录由后端返回 `USER_TWO_FACTOR_VERIFICATION_REQUIRED` 时，保留原登录尝试和 challengeNo，输入短信码继续 `/auth/users/login/2fa` 或第三方 complete。会话只在服务端确认验证成功后接受。当前 Lite 不提供 TOTP 二维码、密钥或恢复码。
 
 #### 4.5.2 Session 管理
 
