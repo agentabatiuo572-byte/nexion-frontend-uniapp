@@ -1,4 +1,5 @@
 import { isLiteProduct } from "@/lib/lite-scope";
+import { getProduct } from "@/mock/products";
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
@@ -125,7 +126,8 @@ export const useGoals = defineStore("goals", () => {
     try {
       const nextRecommendation = await goalsApi.recommendation(targetUSDT, deadlineMs);
       if (expectedScopeEpoch !== scopeEpoch || expectedRecommendationEpoch !== recommendationEpoch) return;
-      if (nextRecommendation.purchaseRequired && !isLiteProduct({ id: nextRecommendation.productNo ?? "", name: nextRecommendation.productName ?? "" })) {
+      if (nextRecommendation.purchaseRequired && !isLiteProduct(getProduct(nextRecommendation.productNo ?? "")
+        ?? { id: nextRecommendation.productNo ?? "", name: nextRecommendation.productName ?? "" })) {
         recommendationError.value = "GOAL_NO_ELIGIBLE_PRODUCT";
         recommendationStatus.value = "error";
         return;
