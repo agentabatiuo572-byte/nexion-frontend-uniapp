@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { isLiteQuest, isPhoneProductName } from "@/lib/lite-scope";
+import { isLiteProduct, isLiteQuest } from "@/lib/lite-scope";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -111,14 +111,18 @@ onMounted(() => {
 
 const { block: genesisBlock } = useGenesisSaleGate();
 const targetAvailability = useQuestTargetAvailability();
+const litePromoBanner = computed(() => {
+  const promo = wq.snapshot?.promoBanner;
+  return promo && isLiteProduct({ id: promo.targetDevice, productType: promo.productType }) ? promo : null;
+});
 const weeklySource = computed(() => selectHomeWeeklySource(
   [...wq.tier1Quests, ...wq.tier2Quests].filter((q) =>
     isLiteQuest(q) && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(q.actionRoute))),
-  wq.snapshot?.promoBanner && !isPhoneProductName(wq.snapshot.promoBanner.targetDevice) ? wq.snapshot.promoBanner : null,
+  litePromoBanner.value,
 ));
 const weeklyCard = computed(() => presentHomeWeeklyCard(
   weeklySource.value,
-  wq.snapshot?.promoBanner && !isPhoneProductName(wq.snapshot.promoBanner.targetDevice) ? wq.snapshot.promoBanner : null,
+  litePromoBanner.value,
   wq.multiplier,
   now.value * 1000,
   weeklySource.value?.kind === "quest"

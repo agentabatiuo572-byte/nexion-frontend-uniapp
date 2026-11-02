@@ -127,7 +127,7 @@ export const useGoals = defineStore("goals", () => {
       const nextRecommendation = await goalsApi.recommendation(targetUSDT, deadlineMs);
       if (expectedScopeEpoch !== scopeEpoch || expectedRecommendationEpoch !== recommendationEpoch) return;
       if (nextRecommendation.purchaseRequired && !isLiteProduct(getProduct(nextRecommendation.productNo ?? "")
-        ?? { id: nextRecommendation.productNo ?? "", name: nextRecommendation.productName ?? "" })) {
+        ?? { id: nextRecommendation.productNo ?? "" })) {
         recommendationError.value = "GOAL_NO_ELIGIBLE_PRODUCT";
         recommendationStatus.value = "error";
         return;
