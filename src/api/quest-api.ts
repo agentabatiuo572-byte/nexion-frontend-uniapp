@@ -146,7 +146,8 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
   const countdownDays = number(row.countdownDays, 0, 365);
   const countdownHours = number(row.countdownHours, 0, 23);
   const targetDevice = text(row.targetDevice);
-  const productType = text(row.productType)?.toUpperCase();
+  const rawProductType = text(row.productType)?.toUpperCase();
+  const productType = rawProductType === "SERVER" ? "DEVICE" : rawProductType;
   if ((productType !== undefined && productType !== "DEVICE" && productType !== "SHARE")
       || (row.productType != null && productType === undefined)) {
     return invalid("QUEST_PROMO_RESPONSE_INVALID");
