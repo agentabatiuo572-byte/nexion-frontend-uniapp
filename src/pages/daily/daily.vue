@@ -908,6 +908,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-ring__dn--new { animation-delay: 0ms; }
 .dly-ring__td { stroke: var(--v5-brand); }
 .dly-ring__td--breathe { opacity: .35; animation: dly-breathe 2.4s ease-in-out 900ms infinite; }
+/* Light theme: blue thinned to .35 over the beige track reads as lavender, so the low point stays at .6. */
+[data-theme="light"] .dly-ring__td--breathe { opacity: .6; animation-name: dly-breathe-light; }
 .nx-loops-paused .dly-ring__td--breathe { animation-play-state: paused; }
 .dly-spk { position: absolute; border-radius: 50%; pointer-events: none; }
 .dly-gift.dly-gift--reached { background: var(--v5-warning); box-shadow: 0 0 0 4px var(--v5-bg); color: var(--v5-bg); }
@@ -1081,6 +1083,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 @keyframes dly-slidein { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes dly-lit { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dly-breathe { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes dly-breathe-light { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
 @keyframes dly-barup { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes dly-sheen { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(420%) skewX(-18deg); } }
 @keyframes dly-spin { to { transform: rotate(360deg); } }
@@ -1092,7 +1095,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 
 @media (prefers-reduced-motion: reduce) {
   .dly-hero, .dly-ring__dn, .dly-rail__item > .dly-tk, .dly-tk__sheen > view, .dly-cta__sheen, .dly-bar, .dly-burst { animation: none; }
-  .dly-ring__td--breathe { opacity: 1; animation: none; }
+  .dly-ring__td--breathe, [data-theme="light"] .dly-ring__td--breathe { opacity: 1; animation: none; }
   .dly-tk__sheen, .dly-cta__sheen { display: none; }
   /* The reward stays readable for the full 1900ms, fading in place (overrides the global reduce catch-all). */
   .dly .dly-fly, .dly-bar .dly-fly { animation: dly-fly-fade 1900ms linear both !important; animation-delay: 0s !important; }
