@@ -14,8 +14,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const quotes = new Map(), intents = new Map();
   let sequence = 0;
   const handles = path => path.startsWith(base);
+  const commandKinds = {ORDER_PAY:'order-pay',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   const ordersOf = (url, request) => demoFixture(new URL('/api/orders', url.origin), locale(), state, {...request, method: () => 'GET'}).orders;
   function settle(orderNo, status, intent) {
+    if (!orderNo) return;
     state.orderStatuses ||= {};
     state.orderStatuses[orderNo] = status;
     const order = state.createdOrders?.find(row => row.orderNo === orderNo);
@@ -26,13 +28,16 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent) {
     const age = Date.now() - intent.createdAt, scenario = state.paymentState ?? 'delivered', bank = intent.paymentMethod === 'HDPAY_BANK';
-    if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status) || scenario === 'waiting' || scenario === 'urgent') return intent;
+    if (!['AWAITING_PAYMENT', 'FUNDS_CONFIRMED'].includes(intent.status) || ['waiting', 'urgent', 'read-error'].includes(scenario)) return intent;
     if (age < ARRIVE_AFTER) return intent;
     if (scenario === 'expired') { settle(intent.orderNo, 'expired', intent); return Object.assign(intent, {status: 'EXPIRED', reason: 'PAYMENT_TIMEOUT'}); }
     if (scenario === 'bank-failed' && bank) return Object.assign(intent, {status: 'EXPIRED', reason: 'PAYMENT_FAILED'});
     if (scenario === 'mismatch') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_AMOUNT_MISMATCH'});
     if (age < DELIVER_AFTER) return Object.assign(intent, {status: 'FUNDS_CONFIRMED'});
     if (scenario === 'delivery-failed') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
+    // Non-order fixtures cover open, unknown and rejected commands. Their
+    // business delivery/fleet mutation is not simulated here.
+    if (intent.kind !== 'ORDER_PAY') throw Object.assign(new Error('PURCHASE_PAYMENT_DELIVERY_NOT_MODELED'), {status:503});
     settle(intent.orderNo, 'activated', intent);
     const order = state.createdOrders?.find(row => row.orderNo === intent.orderNo);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
@@ -42,11 +47,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }
   const view = intent => { const {createdAt, orderNo, ...row} = advance(intent); return row; };
-  function paymentCommand(key) {
-    const intent = [...intents.values()].find(row => row.commandKey === key);
+  function paymentCommand(kind, key) {
+    const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
     if (!intent) return null;
+    if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
     advance(intent);
-    return {kind:'order-pay',commandKey:key,status:intent.status==='DELIVERED'?'SUCCEEDED':intent.status==='EXPIRED'?'REJECTED':'PROCESSING',canResumeSameKey:false,...(intent.receipt?{receipt:intent.receipt}:{})};
+    return {kind,commandKey:key,status:intent.status==='DELIVERED'?'SUCCEEDED':intent.status==='EXPIRED'?'REJECTED':'PROCESSING',canResumeSameKey:false,...(intent.receipt?{receipt:intent.receipt}:{})};
   }
   function handle(url, request) {
     const path = url.pathname, method = request.method();
@@ -55,15 +61,16 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       {paymentMethod: 'CREGIS_USDT_ERC20', configured: state.paymentState !== 'erc20-off'}]}};
     if (path === `${base}-quotes` && method === 'POST') {
       const body = request.postDataJSON(), order = ordersOf(url, request).find(row => row.orderNo === body.payload?.orderNo);
-      if (body.kind !== 'ORDER_PAY' || !order) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
+      if (!commandKinds[body.kind] || (body.kind === 'ORDER_PAY' ? !order : !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
       if (body.paymentMethod === 'CREGIS_USDT_ERC20' && state.paymentState === 'erc20-off') return {status: 503, message: 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED', data: null};
       const bank = body.paymentMethod === 'HDPAY_BANK', erc20 = body.paymentMethod === 'CREGIS_USDT_ERC20';
-      const subtotal = cents(order.amountUsdt), channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
-      const quote = {paymentQuoteId: `PPQ-PREVIEW-${++sequence}`, kind: 'ORDER_PAY', paymentMethod: body.paymentMethod, network: bank ? 'VND_BANK' : erc20 ? 'ERC20' : 'BSC',
-        businessAmountUsdt: Number(order.amountUsdt).toFixed(6), roundingAdjustmentUsdt: '0.000000', subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
+      const amount = order?.amountUsdt ?? body.payload.expectedPayableUsdt;
+      const subtotal = cents(amount), channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
+      const quote = {paymentQuoteId: `PPQ-PREVIEW-${++sequence}`, kind: body.kind, paymentMethod: body.paymentMethod, network: bank ? 'VND_BANK' : erc20 ? 'ERC20' : 'BSC',
+        businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: '0.000000', subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
         networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion: 3, expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
         fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null};
-      quotes.set(quote.paymentQuoteId, {quote, orderNo: order.orderNo, expiresAt: order.expiresAt});
+      quotes.set(quote.paymentQuoteId, {quote, orderNo: order?.orderNo, expiresAt: order?.expiresAt});
       return {status: 200, message: 'OK', data: quote};
     }
     if (path === `${base}-intents` && method === 'POST') {

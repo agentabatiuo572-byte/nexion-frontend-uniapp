@@ -32,8 +32,8 @@
         <text>{{ t.store.coRecoverOriginalOrder }}</text><NxButton :label="t.store.catalogRetry" :busy="checkoutLeaving" @click="recoverCheckoutCreation" />
       </view>
       <view v-else-if="keepCheckoutTarget" class="text-center" role="status" style="padding:var(--v5-space-5)">
-        <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : t.tradein.keepRecoveryPending }}</text>
-        <NxButton :label="t.tradein.keepRecoveryAction" @click="recoverKeepBeforePurchase([keepCheckoutTarget])" />
+        <text class="block">{{ keepCheckoutReadError ? t.tradein.keepRecoveryReadError : purchaseRecoveryCopy(locale.code).original }}</text>
+        <NxButton :label="t.tradein.keepRecoveryAction" @click="recoverCapacityBeforePurchase([keepCheckoutTarget])" />
       </view>
       <view v-else-if="remoteTradeinRecoveryError" class="text-center" role="status" style="padding:var(--v5-space-5)">
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);margin-bottom:var(--v5-space-3)">{{ t.tradein.recoveryPending }}</text>
@@ -335,7 +335,7 @@ import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
-import { readPendingKeepCommand } from '@/lib/keep-command-recovery';
+import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
 import { takeNavigationQuery } from '@/lib/route';
 import { promotionCheckoutHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
@@ -617,11 +617,11 @@ function purchaseEligibilityFailureCopy(): string {
     : t.value.store.gateBlockedToast;
 }
 
-function recoverKeepBeforePurchase(targets: string[]): boolean {
+function recoverCapacityBeforePurchase(targets: string[]): boolean {
   keepCheckoutTarget.value = null; keepCheckoutReadError.value = false;
   if (!remoteApiEnabled) return false;
   for (const target of targets) {
-    try { if (!readPendingKeepCommand(app.accountKey, target)) continue; }
+    try { if (!readCapacityPending(app.accountKey, target)) continue; }
     catch { keepCheckoutReadError.value = true; }
     keepCheckoutTarget.value = target;
     productId.value = target;
@@ -2017,6 +2017,7 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
           remoteTradeinRecoveryRequired.value = true;
           if (recoveredResult) return recoveredResult;
           let submitted: CanonicalTradeinResult | null = null;
+          let externalCommandStarted = false;
           try {
             const key = recovery.commandKey.replace("h7-order:", "e3-tradein:");
             if (!submitted) {
@@ -2026,18 +2027,24 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
                   return deviceE3Api.submit(recovery.tradeinQuote.sourceDeviceId,recovery.productNo,key,recovery.tradeinQuote,authorization);
                 },authorizationIsCurrent,
                 {kind:'TRADE_IN',payload:{sourceDeviceId:reviewedQuote.sourceDeviceId,expectedSourceVersion:reviewedQuote.sourceRowVersion,targetProductNo:recovery.productNo,expectedPayableUsdt:reviewedQuote.payableUsdt,expectedDiscountUsdt:reviewedQuote.discountUsdt},
-                  commandKey:()=>recovery.commandKey.replace('h7-order:','e3-tradein:'),parseReceipt:parseCanonicalTradeinResult});
+                  commandKey:()=>{externalCommandStarted=true;return key;},parseReceipt:parseCanonicalTradeinResult});
               if (!paid) {
-                if (newSubmission) {
-                  finishCheckoutTradein(submissionScope.accountKey, recovery);
-                  remoteTradeinRecoveryRequired.value = false;
+                // Closing the UI does not cancel an external collection. Keep its
+                // frozen quote and lock until the original command has a final result.
+                const original = externalCommandStarted ? await readPaymentCommand(apiClient, 'trade-in', key) : null;
+                if (!scopeIsCurrent()) throw new Error('CHECKOUT_ACCOUNT_CHANGED');
+                if (original?.status === 'SUCCEEDED') submitted = parseCanonicalTradeinResult(original.receipt);
+                else {
+                  if ((!externalCommandStarted && newSubmission) || original?.status === 'REJECTED') {
+                    finishCheckoutTradein(submissionScope.accountKey, recovery);
+                    remoteTradeinRecoveryRequired.value = false;
+                  }
+                  throw new Error(externalCommandStarted && original?.status !== 'REJECTED' ? 'PAYMENT_RESULT_UNRESOLVED' : 'PAYMENT_CANCELLED');
                 }
-                throw new Error('PAYMENT_CANCELLED');
-              }
-              submitted = paid;
+              } else submitted = paid;
             }
           } catch (cause) {
-            if (newSubmission && scopeIsCurrent() && isSettledRejection(cause)
+            if (newSubmission && !externalCommandStarted && scopeIsCurrent() && isSettledRejection(cause)
                 && asApiError(cause).message !== "IDEMPOTENCY_RESULT_UNKNOWN") {
               finishCheckoutTradein(submissionScope.accountKey, recovery);
               remoteTradeinRecoveryRequired.value = false;
@@ -2163,7 +2170,7 @@ function resumeServerOrder(routeScope = captureCheckoutRoute()): Promise<boolean
     isCurrent: () => isCurrentCheckoutRoute(routeScope),
     isCurrentAccount: () => isCurrentAccountScope({ accountKey: routeScope.accountKey, epoch: routeScope.accountEpoch }),
     navigate: (url) => isCurrentCheckoutRoute(routeScope) ? navReplace(url) : Promise.resolve(false),
-  })).then(recovered => recovered || (isCurrentCheckoutRoute(routeScope) && recoverKeepBeforePurchase([routeScope.productNo])))
+  })).then(recovered => recovered || (isCurrentCheckoutRoute(routeScope) && recoverCapacityBeforePurchase([routeScope.productNo])))
     .finally(() => { if (serverOrderRecovery?.key === key) serverOrderRecovery = null; });
   serverOrderRecovery = { key, promise };
   return promise;
@@ -2193,7 +2200,8 @@ async function submitRemoteOrder(): Promise<void> {
   const scopeIsCurrent = () => isCurrentCheckoutRoute(submissionScope);
   const reviewedTotal = netPrice.value + cardFee.value;
   const reviewedTrialVersion = trialView.value.quoteVersion;
-  if (await resumePendingRemoteTradein(submissionScope)) { confirming = false; return; }
+  if (await resumePendingRemoteTradein(submissionScope)
+      || (!hasOriginalCheckout.value && recoverCapacityBeforePurchase([submissionScope.productNo]))) { confirming = false; return; }
   const walletReceiptScope = app.captureRemoteAccountRequest();
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
@@ -2396,7 +2404,7 @@ async function submitRemoteOrder(): Promise<void> {
     } else if (["ORDER_MONTHLY_QUOTA_PAUSED", "ORDER_MONTHLY_QUOTA_EXHAUSTED"].includes(apiError.message)) {
       toast.warn(t.value.quota.stockUnavailable);
     } else {
-      toast.warn(t.value.tradein.errPurchaseFailed);
+      toast.warn(remoteTradeinRecoveryRequired.value ? purchaseRecoveryCopy(locale.code).paymentPending : t.value.tradein.errPurchaseFailed);
     }
     // No local order, balance debit, or voucher redemption mirror in remote mode.
     step.value = "confirm";
