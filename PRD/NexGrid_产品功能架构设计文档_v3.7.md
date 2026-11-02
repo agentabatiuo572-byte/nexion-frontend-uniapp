@@ -1624,66 +1624,35 @@ Price box 之后的紧迫感 strip(Sprint A-1 / B.1)。**目的**:让产品页�
 
 ### 7.3 结账流程 `/store/checkout`
 
-7 步状态机:`select-payment → confirm → pay-instructions → awaiting → confirmed → activating → live`
+2026-11-03：H5 Lite 定向同步 App `origin/test` 的购买付款行为，保留 Lite 页面骨架、导航及手机不售卖限制。普通购买、组合购买、活动结算、试用转正、升级置换与容量购买共用支付协调器；订单详情可继续原付款。
 
-#### 7.3.1 步骤定义
+#### 7.3.1 确认与支付方式
 
-| Step | 内容 | 推进触发 |
-|---|---|---|
-| select-payment | 4 支付方式选择(USDT TRC20 / BEP20 / ERC20 / Card)| `Continue` |
-| confirm | Review order:产品 / 数量 / 支付方式 / 物流 / 费用拆解 / 总额 | `Pay now`(链上)或 `Continue to payment`(Card)|
-| pay-instructions | 链上 → QR + 地址 + 倒计时;Card → saved-cards selector + CVV(§7.3.3)| 链上 12s auto-detect 模拟确认 / Card 提交 |
-| awaiting | 等待网络/支付方确认(2.4s mock)| 自动 |
-| confirmed | 支付成功庆祝(首单特殊分支,§7.3.4)| 1.2s 自动进 activating |
-| activating | 设备激活时序图 | 全部步完成 |
-| live | 跳 `/store/orders/[id]` |  |
+商品确认显示美元金额；服务端负责库存、购买资格、优惠与容量的最终校验。新组合购买进入共用商品明细结算，旧组合命令继续按原身份恢复。已创建订单、未知创建命令、试用转正及 KEEP/置换恢复先处理原结果，不能因余额、券或库存变化重新创建。
 
-#### 7.3.2 Confirm step 费用拆解
+正数应付可选钱包、银行卡或 USDT（BEP20 / ERC20）。外付渠道与网络按 `/api/app/purchase-payment-policy` 配置显示；未配置的选项隐藏。配置读取失败时沿用 App 的报价核验流程，明确的“未配置”报价拒绝会移除该选项。零应付权益仍走钱包确认与 PIN，不创建零金额外付单。
 
-按支付方式动态展示:
+只有钱包付款要求六位支付密码；首次设置需两次输入，再输入本笔支付 PIN，设置成功本身不授权扣款。PIN 拒绝保留原订单；取消时查询原付款结果，服务端明确未执行后才取消原单。找回、锁定、账号切换及离页清理沿用支付密码生命周期。外付不读取或提交 PIN。
 
-| 支付方式 | 显示行 | Total 计算 |
-|---|---|---|
-| Card | Subtotal + Card processing fee (3.5%) + Total | `price × 1.035` |
-| 链上(USDT 三网络)| Network fee: Free + Total | `price` |
+#### 7.3.2 报价、费用与倒计时
 
-结算页点击付款先展示购买确认弹窗，明确应付金额和 USDT 币种；取消、关闭或离页不触发付款。确认后执行原支付流程，不要求支付密码或手机验证码；支付成功以实际支付结果为准。活动结算页付款采用相同确认规则。确认期间金额变化、订单过期或账户变化时不得继续旧确认；余额不足、失败重试及结果未知回查沿用原流程。
+- 外付本金、渠道费用、网络确认费与总额来自服务端，未知费用不得按免费处理。ERC20 网络费由用户承担并计入总额，外部钱包另收 ETH Gas；BEP20 外部钱包另收 BNB Gas。
+- 银行卡确认、等待与结果金额显示 `$`；银行卡实际支付页之外不显示 VND 金额或锁定汇率。原 intent 的 VND/FX 快照仍保留用于协议核验。
+- 方法页显示原订单剩余时间；钱包不足显示差额并可去充值。充值携带原单、金额与截止时间，余额足够后返回原单续付。
+- 报价到期前 30 秒自动刷新，失败按 3/6/12 秒递增重试（上限 30 秒）。已建 intent 通常每 5 秒读取，失败按 5/10/20/30 秒退避；后台暂停，回到前台立即查原单。
+- 可付款截止取订单、intent、服务端 deadline 与银行 expirationTime 的最早时间。确认宽限只允许等待确认，不延长转账时间；`paymentAllowed=false` 时关闭付款入口与地址。
 
-#### 7.3.3 pay-instructions 分支
+#### 7.3.3 外部付款与原单恢复
 
-**链上分支(USDT TRC20 / BEP20 / ERC20)**:
-- 140×140 QR 二维码 + 真实网络格式钱包地址
-- 30 分钟支付倒计时
-- 12s auto-detect 模拟链上确认
+USDT 页绑定所选网络，显示应付总额、二维码、地址、复制操作、倒计时与等待状态；到账后显示资金已收到，再读取交付结果。银行卡先确认美元总额及付款提醒，H5 在 UVEL 页头下用受信任 URL 的 iframe 嵌入支付页，不使用原生 webview。
 
-**Card 分支**(走 saved-cards 复用流程,见 §9.10):
-- 顶部:已绑卡列表(从 `useCards.cards` 读),tap 选中 → brand-2 高亮 + Check 标
-- "添加新卡"入口:跳 `/me/wallet/cards/new?returnTo={当前 checkout url}`,绑定完自动跳回
-- 选中后:输入 CVV(只 3-4 位数字)
-- 空态(无任何绑卡):卡片提示"还没有绑定的银行卡 / 绑定一次,以后结算只输 CVV 即可" + 主 CTA "绑定银行卡" 跳 `/me/wallet/cards/new?returnTo=...`
-- 费用拆解:商品总价 / 卡处理费 (3.5%) / 实付总额
-- 提交按钮:`支付 ${总额}`(选中卡 + CVV 4 位时启用);否则 disabled 显示 `输入 CVV` / `选择银行卡` / `填写完整信息`
+付款前、剩余时间不足、离开、超时、银行失败、人工核对、迟到款与交付异常使用居中提示。服务端判定 EXPIRED / MANUAL_REVIEW 后不再显示可付款地址或银行入口。已交付后收到额外款项，保留交付事实与人工核对提示，不自动补钱包或退款。
 
-**关键安全约束**:**完整 PAN / CVV 永不持久化**。saved-cards store 只存 brand / last4 / expiry / holder + 一个 mock tokenId(对标 PSP token 化模式)。
+原 kind/key/quote/intent 及网络按账号保存；刷新或离开后查询原 intent，不改网络、不重新报价建单。创建响应丢失时按原键查询；只在明确未见且原协议允许时同键继续。报价变化等明确拒绝也先查原键，查询失败继续保留身份。
 
-**支付成功后**:
-- 自动创建订单(`useApp.orders`)
-- 跳 `/store/orders/[id]` 显示进度
+#### 7.3.4 购买成功与激活
 
-#### 7.3.4 confirmed step 首单庆祝分支(Sprint A-1 / E.1)
-
-
-`confirmed` step UI 根据 `wasEmptyBeforeRef.current`(组件挂载时 snapshot `useOrders.orders.length === 0`)分两个分支渲染:
-
-- **非首单**:Check icon + `Payment Confirmed` + 副字 `Funds received · Initializing your device…`
-- **首单**:
-  - `<Confetti originRef={medalRef}>` 全屏彩带(detail § 14.3.1.1)
-  - 🏅 medal spring 入场
-  - 大字 `🎉 Your first NexGridBox is on its way`
-  - 副字 `We'll provision your slot in the data center within minutes.`
-  - Sparkles icon + `Achievement unlocked · First Hardware Owner · +200 NEX`
-
-**为什么用 ref snapshot 而不是订阅 store**:`createOrder` 立即把 `orders.length` 从 0 推到 1,如果直接订阅,触发庆祝判定时已经为 1,逻辑断。`useRef(orders.length === 0)` 在挂载瞬间 snapshot,保留"组件挂载前用户是否已有订单"的真值,贯穿整个 checkout 生命周期。
+支付回执与原业务身份、金额匹配后先显示购买成功，再显示激活或入库结果。动效只展示服务端事实，不触发扣款或模拟激活。普通、订单详情及活动结果卡优先显示 `paidTotalUsdt`（含渠道和网络费用），未提供时回退原业务金额；银行结果显示美元。平台奖励币显示 UVT，试用奖励按服务端回执展示，不再固定承诺首单奖励。
 
 ### 7.4 订单管理 `/store/orders`
 
@@ -1693,38 +1662,13 @@ Price box 之后的紧迫感 strip(Sprint A-1 / B.1)。**目的**:让产品页�
 
 订单 4 阶段直通车:`placed → paid → provisioning → activated`(平台为机房托管模式,无实物物流环节)。
 
-**结算与驻留态**:结账即时结算 —— `createOrder` 创建订单时同时记入 `placed`(已下单)与 `paid`(已付款)两条时间线事件,订单初始驻留态为 `paid`。`placed` 仅是时间线上的瞬时事件,正常流程不停留于该状态(无独立"待付款"驻留态)。
+**结算与驻留态**：服务端创建订单后可停留 `placed` 待付款，付款与创建为独立动作。付款、交付与激活均读取服务端规范状态，前端不以定时器宣布成功。`inventory` 表示已购买并入库，尚未激活。
 
-**自动履约推进(全局)**:订单付款后无需用户干预即可自动履约。平台对所有在途订单(`paid` / `provisioning`)以固定节奏(每 6 秒一拍)逐段推进:`paid → provisioning`(分配机位)→ `provisioning → activated`(设备上线)。订单进入 `activated` 的同一更新内,平台**自动生成并激活一台对应商品的设备**(`addDevice(productId)` + `activateDevice`,受 §12.x `MAX_DEVICES=6` 活跃槽位上限约束),并写入 `deviceId` / `activatedAt` / 时间线 `Device live · joined NexGrid network`,从而把购买动作与 Earn 模块的设备机队接起来。用户停留在某订单详情页(`/store/[id]`)时,该订单以更快的节奏(每 3 秒一拍)单独推进,使进度条实时可见。
+**待付款与恢复**：列表待付款行显示服务端到期时间对应的剩余分钟和「继续付款」；点击直接打开详情的原单支付。详情显示倒计时，所有状态的主操作固定在底部；未到达的进度节点只显示点。正在外付的原单继续查询其 intent，不能改走一笔新钱包支付。
 
-```mermaid
-stateDiagram-v2
-    [*] --> placed : createOrder 写入时间线
-    placed --> paid : 结账即结算(初始驻留态)
-    paid --> provisioning : 自动推进 · "分配机位"
-    provisioning --> activated : 自动推进 · 生成并激活设备
-    placed --> cancelled : cancelOrder(仅 placed 可取消)
-    activated --> [*]
-    cancelled --> [*]
+**取消与关闭原因**：只有服务端允许的未付款订单可以取消；付款处理中取消受阻时显示原因并提供继续付款。取消、过期、支付失败、交付失败及拒付按 `closeReasonCode` 显示关闭原因，保留订单号和支持入口。付款成功后的退款与人工处理不由前端自行决定。
 
-    note right of activated
-        进入 activated 同步:
-        addDevice(productId) + activateDevice
-        + 写 deviceId / activatedAt / 时间线
-    end note
-```
-
-> 当前各阶段推进由客户端模拟节奏驱动(`SimulationProvider` ORDER_TICK 6s + 详情页 3s);真后台对接时改由服务端履约事件推送(SSE `GET /api/orders/:id`),客户端只反映 canonical 状态、不自行推断推进。设备记录由服务端在订单上线时创建并回传 `deviceId`。真平台所需的 `payment_failed / expired / refunded / chargeback / provisioning_failed` 终态在 mock 阶段暂统一塌缩为 `cancelled`,对接时补全(见 §9.11f)。
-
-**取消规则**:订单**仅在付款前(`placed` 态)可由用户自助取消**。一旦进入 `paid`(结账后的初始驻留态)及之后的 `provisioning` / `activated`,订单即为**最终态,不可自助取消** —— 机房已产生机位调度与资金结算承诺,付款后的撤销改走退款 / 支持流程。`cancelOrder(id)` 对任何非 `placed` 状态为 no-op,该不变量由服务端权威强制、client 仅反映(`GET /api/orders/:id` 返回规范状态)。因当前结账即结算、订单不停留在 `placed`,订单详情页实际不出现自助"取消订单"入口。
-
-**订单详情页 `/store/[id]`**:
-- **Order summary** 板块顶部展示 **Order ID**(完整订单号)+ Quantity / Unit price / Discount / Subtotal / Total
-- **Deployment timeline**(原"物流进度"已统一更名)— 4 阶段时间线 + 状态描述 + 进度条
-- **Deployment #**(原"运单号")+ **Datacenter**(原"承运商",显示 SG / FRA / VA 机房 ID)+ 数据中心 API 模拟说明
-- 到 `activated` 阶段自动 `addDevice(productId)` 添加设备到 fleet
-
-**文案规则**:平台不涉及实体物流(机房托管 = 数据中心一键开通),所有 "shipping / tracking / courier" 文案统一改为 "deployment / activation / datacenter"。例外:排行榜 Podium 实物奖品(Genesis Node / NexGridBox 等,见 §8.11.5)保留 shipping 语义。
+**订单详情**：保留完整订单号复制、数量、结构化商品明细、折扣、业务总额、时间线与退款字段。成功结果使用含费用的实付总额（如服务端已提供），查看设备从 Lite 的设备页进入，返回仍遵循 Lite 导航。更多支付行为见 §7.3 与 `docs/PRD/payment-17-18-lite.md`。
 
 ### 7.5 升级置换(Trade-in)— 随时下架 + 产出阶梯抵扣
 
@@ -2602,136 +2546,42 @@ iOS Settings 风分组列表:
 
 ### 9.2 充值 `/me/wallet/topup`
 
-#### 9.2.1 三条充值通道
+#### 9.2.1 通道与可见性
 
-| 通道 | 手续费 | 最低额 | 单笔上限 | 到账方式 |
-|---|---|---|---|---|
-| USDT 链上 · TRC20 | 1 USDT | $10 | — | 链上确认数达标自动入账 |
-| USDT 链上 · BEP20 | 1 USDT | $10 | — | 同上 |
-| USDT 链上 · ERC20 | 5 USDT | $10 | — | 同上 |
-| 银行转账 · VietQR | 0 | $10 等值 | $5,000 | 回单匹配自动入账 |
-| 国际卡 · Visa/Mastercard | 3.5%(另收) | $30 | $5,000 | 收单授权成功即入账 |
+正式 H5 Lite 提供银行卡与 USDT（BEP20 / ERC20）充值，费率、最低额、确认数和限额均读取服务端。旧国际卡 token 表单和 TRC20 本地模拟不作为正式充值入口。
 
-通道费率、最低额、单笔上限、启停位均由后台按通道下发,前端不写死;拉取失败禁回退默认值,
-该通道置为不可用而非按旧值放行。BTC / Ethereum 充值通道已下线。
+银行通道配置关闭且当前账号的历史单已读取、没有待付款或核对中订单时，隐藏银行分段。已有银行订单仍可打开并查看原支付快照；配置重新打开后页面重新读取并恢复分段。USDT 仅读取选中网络的地址；接口明确未配置/关闭该网络时隐藏并切换到可用网络，不为预判可用性提前分配地址。返回页面或重试时重新探测已隐藏网络。
 
-#### 9.2.2 统一入金账
+#### 9.2.2 金额与原单
 
-三条通道共用同一份入金记录与状态机,后台对账看到的是同一份数据,不存在只走余额、
-不留入金单的通道。
+新建充值本金必须是正整数，最低额和每日额度依服务端配置，费用与实际到账额分别显示。历史小数单保留原身份、金额及 hosted 快照；重建回到空白整数输入，不把历史金额自动改成新单。账号改变后清理旧账号展示与待执行操作。
 
-```mermaid
-stateDiagram-v2
-    [*] --> detected: 链上侦测到转账
-    detected --> confirming: 金额 ≥ 最低额
-    detected --> dust_hold: 金额 < 最低额
-    confirming --> credited: 确认数达标,入账 + 写账单
-    dust_hold --> credited: 后台人工核销
-    dust_hold --> returned: 后台登记退回
-    [*] --> credited: 银行回单匹配 / 卡授权成功(同步入账,不经确认推进)
-    credited --> [*]
-    returned --> [*]
-```
+#### 9.2.3 USDT 充值
 
-**计费方向按通道分两类**(两类都满足「入账额 = 实收额 − 手续费」,账本口径统一):
+用户按选中网络使用服务端分配的专属地址，二维码和警示绑定 BEP20 或 ERC20；只发送相应网络的 USDT。手续费、最低充值额及确认数来自地址响应，记录按服务端到账状态显示；余额和账单不由前端推算入账。充值未到账可联系支持。
 
-- 链上:从到账额里扣,入账额 = 转入额 − 通道费。
-- 国际卡:费另收在用户卡上,入账额 = 用户输入额、实扣 = 入账额 + 费;入金记录的实收额记实扣额。
-- 银行转账:0 费,按下单时锁定的牌价折算。
+已知沿用 App BUG-058：网络选项上的费用都读取当前选中网络的费用，未选中选项可能显示错误费用；实际提交及付款总额仍以选中网络服务端数据为准。本批不独立修复。
 
-**幂等键按通道**:链上 = 交易哈希 · 银行 = 付款单号 · 国际卡 = 收单方授权号。
-同键重复回报一律 no-op,不重复入账;账单按同一键去重兜底。
+#### 9.2.4 银行卡充值
 
-**副作用顺序**:先落入金单并持久化,过了才动余额与账单 —— 「失败」必须等于「什么都没发生」,
-否则失败态既扣了钱又允许重试,会重复入账且对账查不到。
+银行页继续使用现有服务端配置、原单恢复及 hosted 打开行为。银行充值的锁定 VND/FX 属于充值单快照；购买支付确认中的美元规则见 §7.3，不改变历史充值对账金额。生成、等待、已到账、过期或核对中状态以服务端为准，返回与重新打开不新建订单。
 
-**状态权威**:状态一律由服务端裁定,客户端只提交意图、只读结果,不本地推进状态。
+已知沿用 App BUG-060：`channel=bank` 深链在银行分段已隐藏时仍可能选中银行；本批保留 App 行为。
 
-#### 9.2.3 USDT 链上充值
+#### 9.2.5 从购买补足余额
 
-- 每用户 × 每网络一个专属充值地址,服务端派发、长期恒定不轮换,转入即可归属到人。
-- 所需确认数按网络配置(TRC20 20 · BEP20 15 · ERC20 12,后台可调),达标即自动入账。
-- 页面常驻错网络警示:仅通过所选网络转入,错网络 / 错资产转账无法找回。
-- 提供「如何获取 USDT」新手指引与「充值未到账」工单入口。
+从付款方式页携带原订单进入充值，显示待补差额和原单倒计时。确认余额足够后提供「返回付款」，打开原订单详情并继续支付。充值到账本身不自动执行订单扣款。
 
-**异常路径**:
+#### 9.2.6 接口与状态权威
 
-| 场景 | 处理 |
+| 接口 | 用途 |
 |---|---|
-| 转入额低于最低额 | 入金单挂起,不自动入账;后台人工核销或登记退回 |
-| 转入额不足以覆盖通道费 | 只能退回,不可核销入账 |
-| 错网络转入 | 侦测不到,不生成入金单;走工单人工核实 |
-| 确认停滞超 30 分钟 | 提示网络拥堵,不自动置失败;走满仍正常入账 |
+| `GET /api/app/payments/config`、`GET /api/app/payments/fx-quote` | 银行启停、费用、额度和牌价 |
+| `GET /api/deposits/address?network=BEP20或ERC20` | 当前账号选中网络地址及政策 |
+| `GET /api/deposits` | 链上到账与确认记录 |
+| `/api/app/deposits/vietqr/intents`、`/api/app/deposits/vietqr/receipts` | 银行原单及到账记录 |
 
-#### 9.2.4 VietQR 银行转账
-
-面向越南本地用户的主力法币通道:按当前牌价下单,转越南盾,按锁定牌价折成 USDT 入账,平台 0 手续费。
-
-- **下单锁价**:生成付款单时锁定牌价、应付越南盾金额与倒计时;窗口内平台调价不影响已生成的单。
-- **附言码**:每单铸一个在途唯一的附言码,用户转账时填入,作为回单归属的主匹配依据。
-- **精确零头**:应付金额精确到盾、不凑整千,零头本身作为第二重匹配线索。
-- **收款账户池**:从可用账户池轮询派发;单账户可停用 / 熔断并移出轮换,池内无可用账户时该通道置灰。
-
-**付款单状态机**:
-
-```mermaid
-stateDiagram-v2
-    [*] --> awaiting_payment: 生成付款单(锁价窗开始)
-    awaiting_payment --> credited: 附言命中 + 金额在容差内
-    awaiting_payment --> mismatch_review: 金额差超容差
-    awaiting_payment --> expired: 锁价窗到点未付
-    awaiting_payment --> cancelled: 用户主动取消
-    mismatch_review --> credited: 后台按实收核销
-    mismatch_review --> return_pending: 后台登记退回
-    expired --> credited: 迟到转账,后台按锁定价补入账
-    credited --> [*]
-    cancelled --> [*]
-    return_pending --> [*]
-```
-
-**三类进人工挂账**(钱已到银行、只是认不到人,记入负债科目「待核实入金」,不计入用户可提余额):
-无附言码或附言残缺且金额撞不上任何在途单;实收与应付差异超容差(默认 ±1,000₫);
-锁价窗过期后才到账且超出宽限。挂账各行折算金额之和恒等于该科目余额。
-
-#### 9.2.5 国际卡充值
-
-辅助通道。提交卡信息后由收单方完成 3DS 授权,授权成功即直落已入账,不经确认推进。
-
-- 限额门双层:界面提交前拦 + 服务端入账前拦,绕过界面直接调用同样拒绝。
-- 限额提示常驻展示,越界即给出禁用原因,不得复用收单方拒付文案 —— 真实原因是超限,
-  提示发卡行拒绝会误导用户去联系银行。
-- 卡号 / CVV 不落平台后端,由收单方直连采集;平台只接收授权结果与授权号。
-- 同卡短时间内重试次数与锁卡时长由后台配置。
-
-#### 9.2.6 汇率牌价
-
-越南盾牌价由后台单一配置派生,前端只做展示与换算,不缓存、不写死:
-
-- 牌价 = 基准价 ×(1 + 买入点差),取整到十位;点差合法区间 0 ~ 3%,越界后台拒绝写入。
-- 牌价不可用(缺字段 / 非法值 / 点差越界)时禁止下单,不猜价、不回退默认值。
-- 换算全程整数域运算(点差转基点、金额转分),避免小数进位在半分边界上偏一档。
-
-#### 9.2.7 充值记录
-
-- 三通道的入金记录同列「最近入金」,按通道分流展示标题与跳转:链上轨可进链上交易详情,
-  法币轨无链上哈希,进账单流水。
-- 入金记录与账单、收据三处使用同一单号口径,互相可反查。
-
-#### 9.2.8 充值后台接口契约
-
-(server endpoint TBD,候选命名,真后台对接时正式确认。入账状态一律 server 权威,客户端无写入口。)
-
-| Endpoint | Method | Payload | 用途 |
-|---|---|---|---|
-| `/api/config/deposit-channels` | `GET` | — | 下发三通道的费率 / 最低额 / 单笔上限 / 确认数 / 启停位。**拉取失败禁回退写死值**,按通道维护处理 |
-| `/api/config/bank-accounts` | `GET` | — | 下发收款账户池(启停 / 日限 / 熔断 / 轮换),银行轨专属 |
-| `/api/deposits/address` | `GET` | `?network=` | 取当前用户在该网络的专属充值地址(server 派发,同账号同网络恒定、不轮换)|
-| `/api/deposits` | `GET` | `?cursor=` | 入金记录列表(三通道合流,server 权威状态)|
-| `/api/deposits/bank-intents` | `POST` | `{ amountUsdt }` | 生成银行付款单:锁定牌价 + 派发收款账户 + 铸造附言码,返回锁价窗到期时间 |
-| `/api/deposits/bank-intents/:id/cancel` | `POST` | — | 用户取消在途付款单(仅待付款态可调,终态拒绝)|
-| `/api/deposits/card` | `POST` | `{ token, amountUsdt, holder, billing }` —— **token 来自收单方 SDK** | 卡通道充值下单;授权结果由收单方回调 server,server 在同一事务内入账 + 记账 + 写账单 |
-
-链上到账与银行回单均为**服务端事件驱动**(链上侦测服务 / 银行回单推送),客户端只轮询拉取状态收敛,没有任何推进状态的入口。
+所有资金状态和余额由后端确定；预览场景仅存在于 `scripts/`，不接真实支付机构或链上资金。
 
 ### 9.3 提现 `/me/wallet/withdraw`
 
@@ -3591,11 +3441,11 @@ interface TrialConfig {
 
 ### 9.11f 状态机失败/退款路径(server canonical)
 
-当前 Order / Withdrawal / Staking position 状态机均**缺少失败 / 退款 / 异常状态**。真后台必须扩展:
+订单已接入服务端失败、过期、退款与拒付状态，关闭原因按服务端字段展示（见 §7.4）。其他模块原有扩展清单保留如下：
 
 | State machine | 当前状态 | 缺失状态 | 备注 |
 |---|---|---|---|
-| Order | placed / paid / provisioning / activated / cancelled | `payment_failed` / `expired` / `refunded` / `chargeback` / `provisioning_failed` | `cancelled` 当前 collapses 所有失败为一类 |
+| Order | placed / paid / provisioning / activated / inventory / cancelled / payment_failed / expired / refunded / chargeback / provisioning_failed | 本批已接入以上状态 | 关闭原因取 `closeReasonCode`；退款字段与交付结果分别展示，不把所有失败归为 cancelled |
 | Withdrawal | submitted / review-passed / processing / sent / confirmed | `review-rejected` / `address-invalid` / `tx-failed` / `tx-orphaned` / `refunded` / `frozen` | 全部 server canonical,client 仅订阅 |
 | Staking position | claimed: bool + earlyExit: bool | 改为 status union: `pending_lock` / `active` / `mature_unclaimed` / `early_withdrawn` / `claimed` / `slashed` / `refunded` |  |
 | Free trial | idle / active / grace / extended / redeemed / failed / cancelled | ✓ 已完整 | 7-state, MVP-A 已实现 |
