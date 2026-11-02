@@ -7,10 +7,10 @@
   flow. Orders, PIN authorization, external intents and delivery remain server
   authoritative. The local prototype stepper is retained for offline mode.
 
-  Batch C trade-in intercept (ported): on first mount, for purchasable DEVICE
-  products only, open the trade-in Choice sheet if the user owns a tradeable
-  device, else the slot-full Replace sheet when active slots are capped, else
-  fall through to the normal payment flow. Cross-store composition (eligibility
+  Remote checkout reads trade-in eligibility and capacity on entry, then exposes
+  the matching choice or replacement action. Explicit selection opens its sheet;
+  an existing purchase command is recovered before offering a new purchase.
+  Cross-store composition (eligibility
   reads app/v-rank/network) lives here at the page layer via the
   useDeviceEligibility composable (stores never import each other, P-031/032).
   Wrapped in <AppChassis active="store">; the back + "Checkout" title live in the
@@ -100,15 +100,15 @@
             <!-- FEAT-TRIAL02: conversion credit chips (promo + accrued credit) -->
             <view v-if="promoDiscount > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ promoRowLabel }} −{{ formatGroupedAmount(promoDiscountText) }} USDT</text>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ promoRowLabel }} −{{ promoDiscountText }} USDT</text>
             </view>
             <view v-if="trialOffsetView.offsetUSD > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 7v5l3.5 2" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ t.store.coRowTrialOffset }} −{{ formatGroupedAmount(trialOffsetText) }} USDT</text>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ t.store.coRowTrialOffset }} −{{ trialOffsetText }} USDT</text>
             </view>
             <view v-if="trialOffsetView.earlyDiscountUSD > 0" class="flex items-center" style="gap: 5px; margin-top: 6px" data-testid="checkout-trial-early-discount">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ earlyCopy.earlyDiscountLabel }} −{{ formatGroupedAmount(trialEarlyDiscountText) }} USDT</text>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ earlyCopy.earlyDiscountLabel }} −{{ trialEarlyDiscountText }} USDT</text>
             </view>
             <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
             <view v-if="hasVoucher" class="flex items-center" style="gap: 5px; margin-top: 6px">
@@ -176,16 +176,16 @@
             <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
             <!-- Subtotal revealed when any deduction applies (to anchor the
                  discount rows) or when a card fee applies. -->
-            <CheckoutRow v-if="hasVoucher || isCard || hasTradein || trialConversionMode" :label="t.store.coRowSubtotal" :value="trialConversionMode ? `${formatGroupedAmount(priceText)} USDT` : `$${priceText}`" />
-            <CheckoutRow v-if="promoDiscount > 0" :label="promoRowLabel" :value="`−${formatGroupedAmount(promoDiscountText)} USDT`" />
-            <CheckoutRow v-if="trialOffsetView.offsetUSD > 0" :label="t.store.coRowTrialOffset" :value="`−${formatGroupedAmount(trialOffsetText)} USDT`" />
-            <CheckoutRow v-if="trialOffsetView.earlyDiscountUSD > 0" :label="earlyCopy.earlyDiscountLabel" :value="`−${formatGroupedAmount(trialEarlyDiscountText)} USDT`" />
+            <CheckoutRow v-if="hasVoucher || isCard || hasTradein || trialConversionMode" :label="t.store.coRowSubtotal" :value="trialConversionMode ? `${priceText} USDT` : `$${priceText}`" />
+            <CheckoutRow v-if="promoDiscount > 0" :label="promoRowLabel" :value="`−${promoDiscountText} USDT`" />
+            <CheckoutRow v-if="trialOffsetView.offsetUSD > 0" :label="t.store.coRowTrialOffset" :value="`−${trialOffsetText} USDT`" />
+            <CheckoutRow v-if="trialOffsetView.earlyDiscountUSD > 0" :label="earlyCopy.earlyDiscountLabel" :value="`−${trialEarlyDiscountText} USDT`" />
             <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
             <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="`−$${tradeinCreditText}`" />
             <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="`$${cardFeeText}`" />
             <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
-            <CheckoutRow :label="t.store.coRowTotal" :value="trialConversionMode ? `${formatGroupedAmount(confirmTotalText)} USDT` : `$${confirmTotalText}`" big />
+            <CheckoutRow :label="t.store.coRowTotal" :value="trialConversionMode ? `${confirmTotalText} USDT` : `$${confirmTotalText}`" big />
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
               <text>{{ earlyCopy.afterPurchaseLabel }}</text>
               <text class="checkout-trial-credit-value">{{ trialCreditText }}</text>
@@ -193,6 +193,21 @@
             <text v-if="trialConversionMode" class="block" style="font-size: var(--ui-type-meta, 12px); color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ purchaseCopy.refundClause }}</text>
             <!-- 异常4: $0 due keeps the explicit confirm; surplus never refunds -->
             <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
+          </view>
+          <view v-if="remoteApiEnabled && !hasOriginalCheckout && (hasTradein || removedTradein || tradeinAvailable)" class="checkout-tradein">
+            <view class="checkout-tradein-copy"><text>{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-product-meta">{{ tradeinChipText }}</text></view>
+            <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
+            <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" @click="reAddTradein" />
+          </view>
+          <text v-if="tradeinPlacementText" class="checkout-product-meta">{{ tradeinPlacementText }}</text>
+          <view v-if="!hasOriginalCheckout && ((checkoutOnboardingRequired && !freeTrial.hasPendingConversion()) || (checkoutCapacityRequired && !hasTradein && !remoteCapacityGate.canConfirm(false)))" class="checkout-capacity-notice" role="status">
+            <text>{{ checkoutCapacityMessage }}</text>
+            <view class="checkout-capacity-actions">
+              <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
+              <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
+              <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
+              <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
+            </view>
           </view>
           <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" v-if="!remoteApiEnabled" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="requestConfirmPay">
             <text @click.stop="requestConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
@@ -281,7 +296,7 @@
       </template>
     </view>
     <CheckoutLegal v-if="!checkoutResultVisible" @navigate="openCheckoutLegal" />
-    <view v-if="!checkoutResultVisible" style="height:120px" />
+    <view v-if="!checkoutResultVisible" class="checkout-bottom-space" />
     <NxSheet :open="purchasePolicyOpen" :title="policyCopy.entry" @close="purchasePolicyOpen=false">
       <view class="checkout-policy-body">
         <view v-if="policyHasDevice" class="checkout-policy-section"><text class="checkout-policy-title">{{ policyCopy.deviceScope }}{{ t.store.faq.refund.q }}</text><text>{{ t.store.faq.refund.a }}</text></view>
@@ -620,7 +635,7 @@ onLoad(async (options) => {
   const pendingQuery=new URLSearchParams(takeNavigationQuery('/pages/store/checkout').replace(/^\?/,''));
   const navigationQuery:Record<string,string>={};pendingQuery.forEach((value,key)=>{navigationQuery[key]=value;});
   const o = { ...navigationQuery, ...(options || {}) } as Record<string, string>;
-  if (o.items !== undefined || o.activityId || o.voucherId || o.promotion==='1') {
+  if (o.orderNo || o.items !== undefined || o.activityId || o.voucherId || o.promotion==='1') {
     try {
       const items:PromotionItem[]=o.items ? JSON.parse(o.items.trim().startsWith('%')?decodeURIComponent(o.items):o.items) : o.product ? [{productNo:o.product,quantity:Number(o.quantity??1)}] : [];
       if(!o.orderNo)validatePromotionItems(items);
@@ -2304,7 +2319,9 @@ async function submitRemoteOrder(): Promise<void> {
           throw error;
         }
       },
-      paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},commandKey:()=>{const action=beginOrderAction(submissionScope.accountKey,'pay',created.orderNo,created.amountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
+      paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},orderNo:created.orderNo,deadlineAt:persisted.expiresAt,image:p.imageUrl,
+        reorder:()=>void navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`),
+        commandKey:()=>{const action=beginOrderAction(submissionScope.accountKey,'pay',created.orderNo,created.amountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
     if (!paid) { step.value='confirm'; return; }
     if (!scopeIsCurrent()) return;
     if (paid.orderNo !== created.orderNo) {
@@ -2861,7 +2878,7 @@ onUnload(() => cleanup());
 onUnmounted(() => cleanup());
 
 // ─── styles ───
-useSetPageHeader(() => ({ title: t.value.headerTitles.storeCheckout, backHref: checkoutBackHref.value }));
+useSetPageHeader(() => ({ title: t.value.headerTitles.storeCheckout, backHref: checkoutBackHref.value, onBack: requestCheckoutBack }));
 
 const notFoundBtnStyle: CSSProperties = {
   minHeight: "44px",
@@ -3031,6 +3048,23 @@ const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-r
 </script>
 
 <style scoped>
+.checkout-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: center; gap: 16px; box-sizing: border-box; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); border-top: 1px solid var(--v5-border); background: var(--v5-surface); }
+.checkout-sticky-copy { flex: 1; min-width: 0; }
+.checkout-sticky :deep(.nx-button) { flex: 0 1 50%; min-width: 0; }
+.checkout-total { font-size: 24px; line-height: 30px; }
+.checkout-product-meta { display: block; margin-top: 4px; color: var(--v5-ink-3); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.checkout-bottom-space { height: calc(148px + env(safe-area-inset-bottom)); }
+.nx-chassis :deep(.purchase-payment-resume) { bottom: calc(148px + env(safe-area-inset-bottom)); }
+.nx-chassis:has(.purchase-payment-resume) .checkout-bottom-space { height: calc(324px + env(safe-area-inset-bottom)); }
+.checkout-tradein { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border); font-size: 13px; }
+.checkout-tradein-copy { flex: 1; min-width: 0; }
+.checkout-capacity-notice { display: grid; gap: 8px; margin-top: 16px; padding: 12px; border-radius: var(--v5-radius-m); background: var(--v5-warning-soft); color: var(--v5-warning); font-size: 13px; line-height: 20px; }
+.checkout-capacity-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 360px) {
+  .checkout-sticky { flex-wrap: wrap; gap: 8px; }
+  .checkout-sticky-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-basis: 100%; }
+  .checkout-sticky :deep(.nx-button) { flex-basis: 100%; }
+}
 .checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-2); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle, 13px); font-weight:600; color:var(--v5-ink-2); }
 .checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .nx-step-in {

@@ -273,6 +273,7 @@ const cashierUrl = computed(() => timing.value.canPay && s.intent?.paymentUrl ? 
 const qrImage = computed(() => { if (!s.intent?.address || !ready.value) return ''; const qr = qrcode(0, 'M'); qr.addData(s.intent.address); qr.make(); return qr.createDataURL(6, 1); });
 
 const now = ref(Date.now());
+watch(() => active.value && s.open, open => { if (open) now.value = Date.now(); }, { flush: 'sync' });
 useVisibleInterval(() => { if (active.value && s.open) now.value = Date.now(); }, 1000);
 const deadlineLeft = computed(() => s.deadlineAt === null ? null : Math.max(0, s.deadlineAt - now.value));
 const quoteLeft = computed(() => s.quote ? Math.max(0, Date.parse(s.quote.expiresAt) - now.value) : null);
@@ -296,9 +297,13 @@ const notice = computed<Notice | null>(() => {
       : { icon: 'shield', tone: 'brand', title: c.remindUsdtTitle, body: fill(s.method === 'CREGIS_USDT_ERC20' ? c.remindErc20 : c.remindBep20, { amt: s.quote ? amount(s.quote.totalUsdt) : '—' }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss };
     case 'timeShort': return { icon: 'clock', tone: 'warning', title: c.timeShortTitle, body: fill(c.timeShort, { n: Math.max(1, Math.ceil((deadlineLeft.value ?? 0) / 60000)) }), primary: c.useWallet, secondary: c.continueAnyway, onPrimary: () => { dismiss(); payment.back(); }, onSecondary: () => payment.notify('reminder') };
     case 'timeout': return order
-      ? { icon: 'clock', tone: 'neutral', title: c.timeoutTitle, body: c.timeout, primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }
+      ? s.coldResume
+        ? { icon: 'clock', tone: 'neutral', title: c.timeoutTitle, body: c.timeout, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
+        : { icon: 'clock', tone: 'neutral', title: c.timeoutTitle, body: c.timeout, primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }
       : { icon: 'clock', tone: 'neutral', title: c.timeoutOtherTitle, body: c.timeoutOther, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
-    case 'bankFailed': return { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: c.retryPay, secondary: c.switchMethod, onPrimary: () => payment.restart('bank'), onSecondary: () => payment.restart('methods') };
+    case 'bankFailed': return s.coldResume
+      ? { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: order ? c.continuePay : c.ok, secondary: order ? c.viewOrder : c.close, onPrimary: order ? () => payment.restart('methods') : payment.close, onSecondary: order ? payment.openOrder : payment.close }
+      : { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: c.retryPay, secondary: c.switchMethod, onPrimary: () => payment.restart('bank'), onSecondary: () => payment.restart('methods') };
     case 'review': return { icon: 'info', tone: 'warning', title: c.reviewTitle, body: s.intent?.reason === 'PAYMENT_AMOUNT_MISMATCH' ? c.reviewMismatch : c.reviewOther, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };

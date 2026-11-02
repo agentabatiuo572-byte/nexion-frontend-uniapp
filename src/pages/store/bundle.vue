@@ -623,7 +623,9 @@ async function onCheckout() {
                 clearOrderAction(accountKey,created.orderNo,action.key);
               throw error;
             }
-          },paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},commandKey:()=>{const action=beginOrderAction(accountKey,'pay',created.orderNo,command.expectedAmountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
+          },paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},orderNo:created.orderNo,deadlineAt:persisted.expiresAt,
+            reorder:()=>void navTo('/pages/store/bundle'),
+            commandKey:()=>{const action=beginOrderAction(accountKey,'pay',created.orderNo,command.expectedAmountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
         if (!paid) return;
         if (!scopeIsCurrent()) return;
         if (paid.orderNo !== created.orderNo) throw new Error("BUNDLE_WALLET_PAYMENT_RECEIPT_INVALID");
