@@ -79,8 +79,11 @@
 </template>
 
 <script setup lang="ts">
-import { navTo } from "@/lib/route";
+import { isStakingVisibilityRoute, navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
+import { useConfig } from "@/store/config";
+import { useLocaleStore } from "@/store/locale";
+import { powerUpEffectText, powerUpNameText } from "@/lib/power-up-copy";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
@@ -107,6 +110,8 @@ interface PowerUp {
 }
 
 const t = useT();
+const config = useConfig();
+const locale = useLocaleStore();
 // `w` indexes dynamic `${key}_label/_desc` props → type as a string record.
 const w = computed(() => t.value.daily.powerUps as unknown as Record<string, string>);
 const faucet = useNexFaucet();
@@ -119,17 +124,19 @@ const POWERUPS: PowerUp[] = [
   { id: "genesis_whitelist", threshold: 60, tint: "var(--v5-ink)", key: "genesis_whitelist", href: "/pages/genesis/genesis" },
 ];
 
-const powerUps = computed<PowerUp[]>(() => remoteApiEnabled
+const powerUps = computed<PowerUp[]>(() => (remoteApiEnabled
   ? faucet.remotePowerUps.map((item) => ({
       id: item.powerUpCode.toLowerCase() as StreakPowerUpId,
       threshold: item.unlockStreakDays,
       tint: "var(--v5-success)", key: item.powerUpCode.toLowerCase() as PowerUp["key"], href: item.targetPath,
-      labelText: item.name, descText: `${item.effectType}: ${item.effectValue}`,
+      labelText: powerUpNameText(item.powerUpCode, item.effectType, item.name, w.value),
+      descText: powerUpEffectText(item.effectType, item.effectValue, locale.code),
       status: item.status,
       // 服务端的可用性判定是权威:它读的是各域自己的读模型,比客户端本地推断更准。
       serverBusinessAvailable: item.businessAvailable,
     }))
-  : POWERUPS);
+  : POWERUPS).filter((item) => config.isEnabled("stakingVisible")
+    || (item.id !== "staking_boost" && !isStakingVisibilityRoute(item.href))));
 
 const streak = computed(() => faucet.signInStreak);
 

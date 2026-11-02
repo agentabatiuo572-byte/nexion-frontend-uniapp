@@ -1,3 +1,5 @@
+import { useConfig } from "@/store/config";
+import { isLiteNativeRoute } from "@/lib/lite-scope";
 // Map a prototype-style LOGICAL path (the web routes baked into nova /
 // notification CTA data, e.g. "/team/commissions", "/genesis",
 // "/me/wallet/exchange", "/store") to the actual uni-app route, then navigate.
@@ -17,6 +19,12 @@ import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { toast } from "@/store/ui";
 import { getT } from "@/i18n/use-t";
 import { requestCheckoutLeave, hasCheckoutLeaveGuard, clearCheckoutLeaveForReset } from "@/lib/promotion-leave-guard";
+
+export function isStakingVisibilityRoute(href: string): boolean {
+  const path = href.split(/[?#]/)[0];
+  return path.startsWith("/pages/staking/") || path === "/wallet/staking"
+    || path === "/pages/me/wallet-repurchase" || path === "/pages/me/wallet-repurchase-how";
+}
 
 const TAB_ROOT: Record<string, string> = {
   "/": "/pages/index/index",
@@ -90,6 +98,7 @@ function forceNavigation(target: string | ForcedNavigationOptions, replace: bool
     return Promise.resolve(false);
   }
   const { url } = toUniRoute(options.url.trim());
+  if (isLiteNativeRoute(url) || (isStakingVisibilityRoute(url) && !useConfig().isEnabled("stakingVisible"))) return Promise.resolve(false);
   return new Promise((resolve) => {
     let settled = false;
     const invoke = (callback: Function | undefined, result: unknown) => {
@@ -250,6 +259,7 @@ function performNavTo(href: string): Promise<boolean> {
     return Promise.resolve(false);
   }
   const { url, tab } = toUniRoute(href);
+  if (isLiteNativeRoute(url) || (isStakingVisibilityRoute(url) && !useConfig().isEnabled("stakingVisible"))) return Promise.resolve(false);
   const question = url.indexOf("?");
   pendingNavigationQuery = question < 0 ? null : { path: url.slice(0, question), query: url.slice(question) };
   const queryForThisNavigation = pendingNavigationQuery;

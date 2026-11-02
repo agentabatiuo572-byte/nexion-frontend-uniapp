@@ -1,3 +1,4 @@
+import { isLiteNativeRoute } from "./lite-scope";
 import type { CanonicalQuest } from "@/api/quest-api";
 import type { LocaleCode } from "@/i18n";
 import type { Messages } from "@/i18n/messages/en";
@@ -25,6 +26,7 @@ const APP_QUEST_ROUTES = new Set([
 
 export function normalizeQuestActionRoute(value: string): string {
   const route = value.trim();
+  if (isLiteNativeRoute(route)) return route;
   if (!/^\/pages\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*(?:\?[A-Za-z0-9._~%=&-]+)?$/.test(route)
       || !APP_QUEST_ROUTES.has(route)) {
     throw new Error("QUEST_ACTION_ROUTE_INVALID");

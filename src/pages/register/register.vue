@@ -943,25 +943,10 @@ function completeActivatedRegistration(accountId: string, restorePreviousAccount
   launchRegistrationSuccess();
 }
 function registrationCompletionDestination(): string {
-  // #ifdef H5
-  return "/pages/register/success";
-  // #endif
-  // #ifndef H5
-  return "/pages/onboarding/estimator";
-  // #endif
+  return "/pages/index/index";
 }
 function launchRegistrationSuccess() {
-  // [FEAT-SHARE5] H5 注册完成 → 成功页(礼包确认 + 引导下载 APP);
-  // APP 壳内注册装 APP 引导无意义,直进 onboarding(异常2)。
-  // #ifdef H5
-  navReset({
-    url: registrationCompletionDestination(),
-    fail: () => navReset({ url: "/pages/onboarding/estimator", fail: () => {} }),
-  });
-  // #endif
-  // #ifndef H5
   navReset({ url: registrationCompletionDestination(), fail: () => {} });
-  // #endif
 }
 function prospectiveIdentity() {
   return `${country.value}${phoneClean.value}@demo.nexgrid.ai`;

@@ -255,7 +255,6 @@ const USERS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" s
 type PerkKey = "gift" | "day1" | "always" | "sponsor";
 const ALL_PERKS: { key: PerkKey; icon: string; tint: string }[] = [
   { key: "gift", icon: GIFT_SVG, tint: "var(--v5-brand)" },
-  { key: "day1", icon: SPARK_SVG, tint: "var(--v5-tech-cyan)" },
   { key: "always", icon: ZAP_SVG, tint: "var(--v5-warning)" },
   { key: "sponsor", icon: USERS_SVG, tint: "var(--v5-tech-cyan)" },
 ];

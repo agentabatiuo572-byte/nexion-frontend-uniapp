@@ -134,9 +134,6 @@
         @busy="thirdPartyBusy = $event; syncLoginRecovery()" />
 
       <!-- Footer -->
-      <!-- #ifdef APP-PLUS -->
-      <InviteScanEntry v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" :disabled="loading" />
-      <!-- #endif -->
       <view class="lg-footer">
         <text v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister">{{ t.login.signUp }}</text></text>
       </view>
@@ -152,9 +149,6 @@
 
 <script setup lang="ts">
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
-// #ifdef APP-PLUS
-import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
-// #endif
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, nextTick, watch, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
@@ -537,10 +531,7 @@ function finishSignIn(
 ) {
   signInTimer = undefined;
   if (!mounted || (context && !isCurrentOtpFlow(context))) return;
-  let registrationDestination = "/pages/register/success";
-  // #ifndef H5
-  registrationDestination = "/pages/onboarding/estimator";
-  // #endif
+  const registrationDestination = "/pages/index/index";
   const result = completeSignIn({
     identity: session.accountId,
     returnTo: session.recoveredRegistration ? registrationDestination : returnParam.value,

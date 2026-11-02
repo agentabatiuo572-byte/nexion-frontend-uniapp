@@ -14,9 +14,6 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 24px">
         <!-- Invite hero -->
         <InviteEarnCard ref="inviteCard" />
-        <!-- #ifdef APP-PLUS -->
-        <InviteScanEntry />
-        <!-- #endif -->
         <ReferralProgress @share="inviteCard?.openShare()" />
 
         <TeamSummaryCard
@@ -208,9 +205,6 @@ import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import InviteEarnCard from "@/components/team/invite-earn-card.vue";
-// #ifdef APP-PLUS
-import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
-// #endif
 import TeamLedgerCard from "@/components/team/team-ledger-card.vue";
 import NetworkOrbBackdrop from "@/components/team/network-orb-backdrop.vue";
 import { useT } from "@/i18n/use-t";

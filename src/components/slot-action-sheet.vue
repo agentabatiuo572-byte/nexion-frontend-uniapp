@@ -130,11 +130,7 @@ async function onActivate(d: Device) {
     toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
     return;
   }
-  if (d.kind === "phone") {
-    sheet.hide();
-    navTo("/pages/onboarding/connect?mode=recalibrate");
-    return;
-  }
+  if (d.kind === "phone") return;
   if (occupiesDeviceSlot(d.kind) && slotsUsed.value >= app.slotCap) {
     toast.warn(fmt(t.value.slotSheet.toastSlotsFull, { max: app.slotCap }));
     return;

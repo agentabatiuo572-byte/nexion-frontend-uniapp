@@ -16,13 +16,12 @@ export interface DayOneObservationRequest extends DayOneObservationIdentity,
 }
 export function observationRejectionReason(error: unknown): DayOneObservationReason {
   if (error instanceof ApiError && error.kind === "http" && error.status === 428 && error.code === 428) {
-    if (error.message === "USER_ONBOARDING_REQUIRED") return "onboarding";
     if (error.message === "LEGAL_TERMS_ACK_REQUIRED") return "terms";
   }
   return "unconfirmed";
 }
 export function observationRecoveryRoute(reason: DayOneObservationReason, web: boolean, taskRoute: string): string {
-  if (reason === "onboarding") return web ? "/pages/register/success?setup=1" : "/pages/onboarding/estimator";
+  if (reason === "onboarding") return "/pages/index/index";
   if (reason === "terms") return buildLegalTermsRoute(taskRoute);
   return taskRoute;
 }

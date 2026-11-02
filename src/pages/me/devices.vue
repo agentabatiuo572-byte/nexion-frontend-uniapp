@@ -61,23 +61,6 @@
         </view>
 
 
-        <!-- #ifdef APP-PLUS -->
-        <view v-if="phoneNeedsActivation" :style="phoneActivationCardStyle">
-          <view class="flex items-start" style="gap: 12px">
-            <view class="grid place-items-center shrink-0" :style="phoneActivationIconStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" /><path d="M12 18h.01" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="phoneActivationTitleStyle">{{ phoneActivationGuidance.title }}</text>
-              <text class="block" :style="phoneActivationBodyStyle">{{ phoneActivationGuidance.body }}</text>
-              <text class="block" :style="phoneActivationRewardStyle">{{ t.myDevices.phoneActivationRewardGate }}</text>
-            </view>
-          </view>
-          <view v-if="nativePhoneAvailable" class="flex items-center justify-center active:scale-[0.98]" :style="phoneActivationCtaStyle" role="button" tabindex="0" @click="goPhoneActivation"  @keydown.enter.prevent="goPhoneActivation" @keydown.space.prevent="goPhoneActivation">
-            <text :style="phoneActivationCtaLabelStyle">{{ t.myDevices.phoneActivationCta }}</text>
-          </view>
-        </view>
-        <!-- #endif -->
         <!-- Trial device — UVELBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
         <view v-if="trialActive" class="nx-glass-card overflow-hidden" :style="trialCardStyle">
@@ -226,9 +209,6 @@ import { deviceName } from "@/lib/device-copy";
 import { trialCardLabels } from "@/lib/trial-card-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { useSession } from "@/store/session";
-import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
-import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { canControlDevice } from "@/lib/device-control-platform";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTradeinSheet } from "@/store/tradein-sheet";
@@ -250,9 +230,6 @@ import { isActivatableInventoryDevice, occupiesDeviceSlot, requiresActivationCon
 
 const t = useT();
 const app = useApp();
-const session = useSession();
-const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
-const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 const trial = useFreeTrial();
 const deferredCommandInFlight = ref<Set<string>>(new Set());
 
@@ -291,12 +268,6 @@ const unconfirmedDevices = computed(() => app.visibleDevices.filter((d) => d.kin
 const inventoryEmpty = computed(() => activeDevices.value.length === 0
   && inactiveDevices.value.length === 0
   && unconfirmedDevices.value.length === 0);
-const phoneNeedsActivation = computed(() => {
-  const phones = app.visibleDevices.filter((device) => device.kind === "phone");
-  if (phones.some(requiresActivationConfirmation)) return true;
-  return !phones.some((device) => device.activatedAt !== null)
-    || app.remotePhoneBindingInvalid || !session.isCurrentDeviceCalibrated(app.accountKey);
-});
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = computed(() => (trialActive.value ? 1 : 0));
@@ -407,10 +378,7 @@ async function handleActivate(d: Device) {
     toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
     return;
   }
-  if (d.kind === "phone") {
-    goPhoneActivation();
-    return;
-  }
+  if (d.kind === "phone") return;
   if (occupiesDeviceSlot(d.kind) && slotsFull.value) {
     toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: app.slotCap }));
     return;
@@ -465,10 +433,6 @@ function onSheetWait() {
   sheetDevice.value = null;
 }
 
-function goPhoneActivation() {
-  if (!nativePhoneAvailable) return;
-  navTo("/pages/onboarding/connect?mode=recalibrate");
-}
 
 async function runRemoteDeferredCommand(d: Device): Promise<boolean> {
   if (!canControlDevice(d)) return false;
@@ -761,51 +725,6 @@ const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
   fontWeight: 500,
-  color: "var(--v5-on-brand)",
-};
-const phoneActivationCardStyle: CSSProperties = {
-  marginTop: "12px",
-  borderRadius: "16px",
-  border: "1px solid color-mix(in oklab, var(--v5-brand) 35%, var(--v5-border))",
-  background: "color-mix(in oklab, var(--v5-brand) 8%, var(--v5-surface))",
-  padding: "14px",
-};
-const phoneActivationIconStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  borderRadius: "12px",
-  background: "color-mix(in oklab, var(--v5-brand) 13%, var(--v5-surface))",
-};
-const phoneActivationTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const phoneActivationBodyStyle: CSSProperties = {
-  marginTop: "4px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  lineHeight: 1.5,
-  color: "var(--v5-ink-3)",
-};
-const phoneActivationRewardStyle: CSSProperties = {
-  marginTop: "6px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  lineHeight: 1.5,
-  color: "var(--v5-warning)",
-};
-const phoneActivationCtaStyle: CSSProperties = {
-  marginTop: "12px",
-  minHeight: "44px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-};
-const phoneActivationCtaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
 

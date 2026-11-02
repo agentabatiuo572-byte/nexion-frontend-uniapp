@@ -24,16 +24,6 @@
         <view class="phone-policy-action nx-home-pill" role="button" tabindex="0" @click="goAppDownload" @keydown.enter.prevent="goAppDownload" @keydown.space.prevent="goAppDownload"><text>{{ t.phonePolicy.download }}</text></view>
       </view>
       <!-- #endif -->
-      <!-- #ifdef APP-PLUS -->
-      <view v-if="phoneNeedsBinding" class="phone-policy-notice nx-home-glass-item" role="status">
-        <view class="nx-home-glass-panel" aria-hidden="true" />
-        <view class="phone-policy-icon" aria-hidden="true">
-          <svg width="24" height="32" viewBox="0 0 24 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4" y="2" width="16" height="28" rx="4" /><path d="M10 5h4m-4 22h4" /></svg>
-        </view>
-        <text class="phone-policy-copy">{{ t.myDevices.phoneActivationBody }}</text>
-        <view class="phone-policy-action nx-home-pill" role="button" tabindex="0" data-home-action="phone-binding" @click="goPhoneBinding"  @keydown.enter.prevent="goPhoneBinding" @keydown.space.prevent="goPhoneBinding"><text>{{ t.myDevices.phoneActivationCta }}</text></view>
-      </view>
-      <!-- #endif -->
 
       <view
         v-if="visibleTaskCards.length || homePromotionStatus === 'loading' || homePromotionStatus === 'error'"
@@ -126,7 +116,6 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
-import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { useGenesisConfig } from "@/store/genesis-config";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -163,7 +152,6 @@ import { useApp } from "@/store/app";
 // #ifdef H5
 import { useAuth } from "@/store/auth";
 // #endif
-import { useSession } from "@/store/session";
 import { navTo } from "@/lib/route";
 import { deriveHomeTaskCards, createHomeNewcomerContentResizer, HOME_TASK_CARD_COLLAPSED_HEIGHT, shouldMeasureHomeNewcomerContent, type HomeTaskCardId } from "@/lib/home-task-carousel";
 
@@ -181,10 +169,6 @@ const app = useApp();
 const auth = useAuth();
 function goAppDownload() { navTo("/pages/register/success?download=1"); }
 // #endif
-const session = useSession();
-const phoneNeedsBinding = computed(() => remoteApiEnabled && hasNativeAndroidPhoneRuntime() && app.accountKey !== "default"
-  && (app.remotePhoneBindingInvalid || !session.isCurrentDeviceCalibrated(app.accountKey)));
-function goPhoneBinding() { if (hasNativeAndroidPhoneRuntime()) navTo("/pages/onboarding/connect?mode=recalibrate"); }
 // 🔴 首页承载 QuickActionRow(创世快捷入口,受闸文案),必须跟着重读配置(独立验收 P1:
 //   此前只有 3 个创世页接了 onShow,首页与商城页漏接 —— 用户停在首页,运营切关闭,
 //   首页仍在催「仅剩 N 席」)。

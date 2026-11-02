@@ -73,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+import { isLiteQuest, isPhoneProductName } from "@/lib/lite-scope";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -80,9 +81,10 @@ import { useLocaleStore } from "@/store/locale";
 import { useContentCopy } from "@/store/content-copy";
 import { refreshCanonicalOrders } from "@/store/order-canonical";
 import { useWeeklyQuest } from "@/store/weekly-quest";
+import { useConfig } from "@/store/config";
 import { presentHomeWeeklyCard, selectHomeWeeklySource } from "@/lib/home-task-carousel";
 import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
-import { navTo } from "@/lib/route";
+import { isStakingVisibilityRoute, navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
@@ -98,6 +100,7 @@ const t = useT();
 const locale = useLocaleStore();
 const managedCopy = useContentCopy();
 const wq = useWeeklyQuest();
+const stakingDisplay = useConfig();
 const now = useNow();
 
 onMounted(() => {
@@ -109,12 +112,13 @@ onMounted(() => {
 const { block: genesisBlock } = useGenesisSaleGate();
 const targetAvailability = useQuestTargetAvailability();
 const weeklySource = computed(() => selectHomeWeeklySource(
-  [...wq.tier1Quests, ...wq.tier2Quests],
-  wq.snapshot?.promoBanner ?? null,
+  [...wq.tier1Quests, ...wq.tier2Quests].filter((q) =>
+    isLiteQuest(q) && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(q.actionRoute))),
+  wq.snapshot?.promoBanner && !isPhoneProductName(wq.snapshot.promoBanner.targetDevice) ? wq.snapshot.promoBanner : null,
 ));
 const weeklyCard = computed(() => presentHomeWeeklyCard(
   weeklySource.value,
-  wq.snapshot?.promoBanner ?? null,
+  wq.snapshot?.promoBanner && !isPhoneProductName(wq.snapshot.promoBanner.targetDevice) ? wq.snapshot.promoBanner : null,
   wq.multiplier,
   now.value * 1000,
   weeklySource.value?.kind === "quest"
