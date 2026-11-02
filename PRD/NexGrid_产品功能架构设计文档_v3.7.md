@@ -293,9 +293,9 @@ TabBar:active tab 显示背景 chip 高亮。
 | 3 | 密码 + 确认密码 | 两次一致 + 符合 §4.6.1 强度要求 | 提交 → 注册成功 |
 
 **注册成功后行为**:
-1. 服务端创建账号并返回会话；手机号注册返回注册回执，第三方回执限制见下文待后端支持项。H5 使用 cookie refresh，会话投影到当前账号
-2. H5 不创建、校准或激活手机设备；安装 APP 后可按其流程处理
-3. 手机注册以及带注册回执的第三方注册在 H5 端跳转 `/register/success`(注册成功页,§4.1.1);App 壳内注册直接跳转 `/onboarding/estimator`(L0 → L1)
+1. 服务端注册并签发会话，前端只投影当前账号与注册回执，不在浏览器创建业务用户。
+2. Lite 不创建、校准或激活手机设备，也不要求用户确认“稍后激活”。后端 `4d9a0f08` 已解除普通业务与手机初始化的绑定，无需自动提交初始 web deferral。
+3. H5 Lite 注册成功及注册结果恢复后直接进入首页；普通登录沿用有效返回地址，排除注册、登录和手机 onboarding 路由。下载页仍可从首页通用 App 下载横幅进入（§4.1.1）。App 的原生校准链路不属于 Lite。
 4. 服务端在专属客服会话里发一条注册欢迎语，回到首页时人工服务浮标显示未读（§11.8.4「注册欢迎语」，依赖后端 B16）
 
 **邀请码携带与锁定**(绑定规则详见 §4.3)：
@@ -304,27 +304,27 @@ TabBar:active tab 显示背景 chip 高亮。
 - 发码前预检结束时若手机号、国家码或步骤改变，放弃该次操作；发码及验证码校验期间不可修改邀请码。保留 Lite `bbfc7242`、`8fa987d9` 的好友/客服归因及礼包规则。
 - 手机注册或第三方注册收到 `USER_REGISTRATION_SPONSOR_NOT_FOUND/INVALID` 时解除锁定、保留码、清除卡片并在框下提示无效；第三方结束本轮授权并回到首步，手机注册回到验证码步以便重发。已知 App BUG-030 仍保留：旧码请求被拒时，可能把用户已编辑的当前码标为无效。
 
-**第三方注册（2026-11-03）**：登录与注册首步展示服务端配置可用的 Google、Apple、Telegram。点击时同步打开空白 popup，邀请码预检通过后才调用 `/auth/users/oauth/provider/start` 并导航授权窗口；popup 被拦截时提示允许弹窗后重试。只接受同一窗口、授权地址来源及当前 flow 的 `postMessage` 回执，查询 status 后由用户确认，调用 complete。已有身份登录；新身份由服务端注册，允许无手机号会话；收到注册回执才进入 Lite 成功页，再由“继续网页版”进入首页。生产授权交接仅 HTTPS；同源 HTTP loopback 可用于本地联调。无需 APP 深链或原生授权桥。
+**第三方注册（2026-11-03）**：登录与注册首步展示服务端配置可用的 Google、Apple、Telegram。点击时同步打开空白 popup，邀请码预检通过后才调用 `/auth/users/oauth/provider/start` 并导航授权窗口；popup 被拦截时提示允许弹窗后重试。只接受同一窗口、授权地址来源及当前 flow 的 `postMessage` 回执，查询 status 后由用户确认，调用 complete。已有身份登录；新身份由服务端注册，允许无手机号会话；有注册回执时保存回执并初始化注册语言，完成后进入首页，不增加手机步骤。生产授权交接仅 HTTPS；同源 HTTP loopback 可用于本地联调。无需 APP 深链或原生授权桥。
 
-**待后端支持**：第三方携带客服/顾问码（`CS...`）注册尚未完成联调支持，当前 `AppUserRegistrationService` 只按 `nx_user.referral_code` 查找邀请人，不能把顾问码作为好友码成功绑定。注册回执仍待后端 B9 item 5 补齐：第三方新账号不带邀请码的首次响应没有 `registrationReceipt`；更广泛地，任何注册响应丢失后通过登录尝试恢复取得会话时（手机或第三方注册、有无邀请码均包括），`AppUserAuthService.loginReceipt()` 也不返回注册回执。手机号注册恢复后，前端仍按保存的注册尝试进入成功页并提交注册语言，只是没有回执时不显示礼包卡；第三方注册恢复后无法识别为新注册，会跳过成功页和注册语言提交；第三方无码首次响应同样按登录处理。两项都必须由后端补齐，前端不根据手机号缺失、授权入口或昵称猜测注册身份，也不补造回执。预览的会话恢复响应也不补造注册回执。
+**待后端支持**：第三方携带客服/顾问码（`CS...`）注册尚未完成联调支持，当前 `AppUserRegistrationService` 只按 `nx_user.referral_code` 查找邀请人，不能把顾问码作为好友码成功绑定。注册回执仍待后端 B9 item 5 补齐：第三方新账号不带邀请码的首次响应没有 `registrationReceipt`；更广泛地，任何注册响应丢失后通过登录尝试恢复取得会话时（手机或第三方注册、有无邀请码均包括），`AppUserAuthService.loginReceipt()` 也不返回注册回执。手机号注册恢复后，前端仍按保存的注册尝试提交注册语言并进入首页，只是没有回执时不显示礼包卡；第三方注册恢复后无法识别为新注册，不提交注册语言；第三方无码首次响应同样按登录处理，进入安全返回地址或首页。两项都必须由后端补齐，前端不根据手机号缺失、授权入口或昵称猜测注册身份，也不补造回执。预览的会话恢复响应也不补造注册回执。
 
 发码收到 `USER_CAPTCHA_REQUIRED` 或 `USER_CAPTCHA_TICKET_INVALID` 时打开服务端滑块；验证成功后携带 ticket 重发，前端不生成 ticket。IP / 浏览器注册上限使用 §4.3.5 的三语提示。
 
 新人礼规则为没有邀请人或使用客服码也可获得新人礼；展示读取公开奖励配置和真实注册回执，第三方顾问码与注册回执（含丢失响应后的恢复回执）的待办见上段。详见 [客服邀请码与新人奖励](UVEL_客服邀请码与新人奖励_20261101.md)。注册页服务条款和隐私政策均可打开对应正文页。
 
-#### 4.1.1 注册成功页 `/register/success`(浏览器 H5)
+#### 4.1.1 注册成功 / App 下载页 `/register/success`(浏览器 H5)
 
-**目的**:确认新人礼到账状态,并在浏览器 H5 提供 NexGrid 官网 APP 下载入口。App 壳内注册不经过本页,直接进入 onboarding。
+Lite 注册完成直接进入首页。本页保留成功回执展示能力与独立下载入口；首页通用 App 下载横幅进入 `?download=1`，不显示注册礼包，也不要求手机激活、校准或 deferral。旧 `setup=1` 不再产生初始化步骤。
 
 | 元素 | 内容 |
 |---|---|
-| 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 NexGrid,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
-| 礼包确认卡 | 远程模式金额与状态读取注册回执，未提供金额时不显示默认到账数；本地 mock 才使用 `rewards.welcomeGift`。`POSTED` 显示已入账，其余可展示回执显示「确认中 · 稍后自动入账」及说明；`UNAVAILABLE`、缺失回执或金额时隐藏礼包卡；有可展示注册回执并进入本页时显示；第三方无码首次响应及任何注册的尝试恢复响应当前缺少回执，待后端 B9 item 5 补齐(2026-11-03) |
-| H5 装 APP 权益 3 行 | 仅浏览器 H5 显示:随时查看礼包与收益进度 / 设备状态和收益到账实时提醒 / 更稳的连接与算力调度;App 不渲染此提醒区 |
-| H5 官网下载引导 | 提示可通过 NexGrid 官网下载 APP;统一官网入口读取 `share.appDownload.officialUrl`；iOS / Android 安装包分别读取 `iosUrl` / `androidUrl`。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
-| 继续出口 | H5 提供「稍后在手机 App 激活，继续网页版」及浏览出口 → 首页；下载 APP 后使用同一账号登录，在 APP 完成手机校准与激活 |
+| 标题与副行 | 成功模式显示注册结果；下载模式显示 App 下载说明 |
+| 礼包确认卡 | 只读账号绑定的注册回执，区分已入账 / 待处理；`UNAVAILABLE`、缺失回执或金额时隐藏，不从 URL 或公开奖励配置制造到账事实。第三方无码首次响应与所有注册尝试恢复响应的回执缺失依赖 B9 item 5，见 §4.1 |
+| App 说明 | 查看礼包与收益进度、设备状态提醒、管理账户与设备；不推广手机算力 |
+| 下载链接 | 分别读取 `share.appDownload.iosUrl`、`androidUrl`、`officialUrl`；有效 HTTPS 地址可在当前页打开，缺失或无效时显示不可用占位并允许重读配置 |
+| 继续出口 | 「继续网页版」及返回动作进入首页，不返回注册或手机 onboarding |
 
-**规则**:远程模式礼包状态和金额读取服务端注册回执，缺失时不冒充已入账；本页只读展示、不发生任何入账;`officialUrl` 仅接受 HTTPS,优先在新窗口打开,弹窗被拦时改为当前页跳转;返回键视同「继续」,不可返回注册流。App 正常注册直接进入 onboarding;即使直接访问本页,也不显示 H5 安装权益与官网下载提醒。
+后端依据：`auth/application/AppUserAuthService.java` 只投影 `onboardingComplete`；`user/mapper/UserOpsMapper.java#isOnboardingComplete` 查询校准状态。后端 `4d9a0f08` 删除 `shared/security/UserBusinessWriteGateFilter.java` 并在 `SecurityConfig.java` 移除其安装；`onboarding/application/PhoneInstallationService.java#requireDefer` 的 `initialOnly` 约束只约束主动调用 deferral 的 H5 请求，并非账户业务前置条件。Lite 因此不调用 `confirmInitialWebPhoneDeferral`，不改写已有手机状态。
 
 ### 4.2 登录流程
 
@@ -1078,7 +1078,9 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 
 **Timer 起算**:基于 `useQuest.startedAt`,QuestHero mount 时 `ensureStarted()` set `Date.now()`,persist 锁定。新老 mock 用户首次访问 Home 都会触发一次完整 3 phase 体验。
 
-#### 5.15.3 6 任务清单
+#### 5.15.3 任务清单
+
+**Lite 当前规则（2026-11-03）**：正式模式读取服务器首次进入时冻结的任务组，不按下表在客户端重建任务或逐项发奖。显示时隐藏手机连接、校准、激活及购买任务；`stakingVisible=false` 时同时隐藏质押 / 复投任务。首页、任务页和周任务转换横幅一致过滤；服务端组数量与领取判定保持原样。下表仅为本地演示的旧默认清单，不代表线上发布条件。
 - 进度行:`{done} of {total} tasks` / 右侧累计 `+N NEX`(已完成任务的 rewardNex 之和)
 - progress bar(by completed/total)
 - 6 任务 row(纵向,固定顺序按 funnel 难度):
@@ -1421,7 +1423,9 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 ### 6.11 APP 与 H5 的手机执行资格
 
-H5 首次注册完成后进入下载引导；旧校准入口直接跳转下载页，不采集、登记或激活手机算力，不发放手机登记奖励。普通注册礼按其独立规则执行。H5 登录显示网页版无法运行手机任务的提示。
+H5 Lite 是唯一网页产品线。注册成功直接进入首页；登录、注册恢复、试用、充值及任务恢复均不进入 `/onboarding/connect` 或 `/onboarding/estimator`，两页不注册进 Lite 路由；旧 `entry-surfaces/index|signed|h5|white` 三端走查页也从 Lite 路由移除，不再通过旧链接展示手机算力或原生入口。首页保留通用 App 下载横幅，下载页保留 iOS / Android / 官网链接。
+
+Lite 不展示手机设备、激活 / 校准卡、手机收益方式、重新校准动作或扫码邀请入口；首页、Earn、设备仓库、详情和搜索只展示可在网页管理的设备。隐藏手机仍保留在服务器设备账本中并占用原槽位，不以可见卡片数重算容量。服务端任务以明确手机动作路由、任务码或中英越文标题识别并隐藏；商品及目标推荐以明确手机 SKU / 名称识别。首日任务的原始组条件、数量和奖励不改写，若服务器组仍要求隐藏任务，应由服务器调整发布。无法识别的运营自由文案需后台清理，不猜测不透明标识。公开法律文本及手机号身份、验证码功能保留。
 
 APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手机登录核验。服务端返回 BOUND 时直接进入首页，不重新校准；明确返回 NEEDS_CALIBRATION 或 REPLACEMENT_REQUIRED 时才引导相应流程，未知或失败显示可重试错误，不称已校准或已换机。不同安装登录先停止原手机未完成任务，再判断 E6 的 allowReplacement 和 minReplacementIntervalDays；不允许或处于冷却期时明确提示，已购设备不受影响。允许时重新采集并校准，显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。
 
@@ -1437,7 +1441,7 @@ APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手
 
 ### 7.1 商品列表 `/store`
 
-6 种产品卡片,固定 SKU 算力/价格阶梯;升级动力由 §6.8 任务产能递减 + §7.5 升级置换驱动(**代际概念已取消**,无代际字段/无固定升级映射):
+商品卡片由服务端当前目录提供，数量、SKU、价格及产能以目录为准；Lite 过滤明确可识别的手机商品，并在搜索、商品详情与下单入口共用过滤后的目录；升级动力由 §6.8 任务产能递减 + §7.5 升级置换驱动(**代际概念已取消**,无代际字段/无固定升级映射):
 
 | 产品 | 状态 | 价格 | 日产 USDT | 日产 NEX | 倍数 vs Phone |
 |---|---|---|---|---|---|
@@ -2884,9 +2888,9 @@ future = amount × (1 + APY × days / 365)
 
 **i18n**:`walletV3.stakeAlt.{label/headline/tierLabel/cta/disclaimer}`(en + zh 镜像)。
 
-#### 9.3.4a Risk disclosure gate(Sprint A-1 / A.3)
+#### 9.3.4a 提现确认与风险说明（2026-11-03）
 
-`handleSubmit` 前置守卫:`useRiskDisclosure().accepted === false` 时,跳 `/me/risk-disclosure?return=/me/wallet/withdraw`,接受后通过 query 自动回原页。Staking lock 同理(同一 store)。详见 §11.X。
+移植 App `95641b63`：提现直接进入现有金额 / 地址 / 费用确认，不读取 `risk.accepted`，确认后不调用风险披露 `checkGate`，不跳转风险说明页。冻结提交快照、账号 / epoch 守卫、幂等键、提现资格复核及服务端失败处理保持原样。风险说明仍可作为独立法律文本阅读（§11.4a）。
 
 #### 9.3.5 Compliance hold banner(Sprint 3,phase 派发)
 
@@ -3010,7 +3014,11 @@ i18n keys 在 `exchangeHowItWorks.*` namespace ~35 keys。
 
 i18n keys 在 `repurchaseHowItWorks.*` namespace ~40 keys。
 
-### 9.6 Staking 4 档质押(USDT 锁仓)`/staking`
+### 9.6 Staking 质押(USDT 锁仓)`/staking`
+
+**Lite 可见性**：采用 App `45f60a23` / `d4cae8b9` 及后续修正的 `featureFlags.stakingVisible`。服务端字段缺省视为开启，未取得配置前不显示。关闭时隐藏首页快捷入口、提现替代卡、签到质押增益、首日 / 周任务与转换横幅、搜索、活动、Genesis 增益入口、钱包复投入口；拒绝 `/pages/staking/*` 及复投页导航。直接打开这些页面也重读开关并回首页，页面在前台期间每 15 秒重读，关闭已有弹层。Lite 既有 Earn 模板没有 App 的收益方式卡，不新增手机或质押卡。
+
+正式模式的期限、参考年奖励率、最低金额及提前退出规则由服务端 G1 方案提供；下表仅为旧本地演示示例，不覆盖服务器配置。
 
 质押与复投(§9.5)均为 **USDT 锁仓**产品;NEX 不可质押(NEX 仅两大功能:兑换 USDT 与抵扣提现手续费,见 §9.3 / §9.4)。用 NEX 余额需先在兑换页换成 USDT 再质押。
 
@@ -3024,7 +3032,7 @@ i18n keys 在 `repurchaseHowItWorks.*` namespace ~40 keys。
 #### 9.6.1 UI
 
 - Hero:Total locked + Accrued + Active count + Matured count
-- 4 个 plan 卡片(每个:期限 + APY 大字 + 描述 + 罚款警告 + Stake CTA)
+- 当前服务器发布的方案卡片（期限、参考年奖励率、描述、提前退出规则及质押入口）
 - Positions 列表:
   - 期限 + APY chip + 本金
   - 实时累积利息(每 4s tick)+ 剩余天数 + 进度条
@@ -3042,7 +3050,7 @@ i18n keys 在 `repurchaseHowItWorks.*` namespace ~40 keys。
 
 #### 9.6.2a 开仓确认与写入
 
-Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收益和最小质押额。确认后写入 active position 与 wallet bill;用户端展示值必须与后台 G1 参数源一致。
+Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则、预计收益和最低金额。确认后提交服务器开仓指令并读取仓位与账单；用户端展示值必须与后台 G1 参数源一致。App `95641b63` 的行为移植到 Lite：不再调用风险披露 `checkGate`，也不因 `RISK_DISCLOSURE_ACK_REQUIRED` 跳页；保留指令租约、账号 / epoch / 弹层守卫和错误映射。
 
 #### 9.6.3 玩法说明页 `/staking/how-it-works`
 
@@ -3128,44 +3136,17 @@ Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.
 9. "Your NEX unlocks up to $X USDT withdrawal" 卡 → 跳提现(NEX 用于抵扣提现手续费,见 §9.3.2)
 10. Recent 10 条 NEX 发放历史(`mounted` guard,避免 SSR/CSR 时间戳 hydration mismatch)
 
-#### 9.8.6 Streak Power-Ups(Long-tail Task System 强化)
+#### 9.8.6 Streak Power-Ups（连续签到增益）
 
-4 个 conversion-tied unlock,基于 `signInStreak` 与阈值比较自动解锁。激活后写入 `useDailyPowerUp` persist,激活同时 unlock 一枚成就 badge,引导用户跳目标路由继续转化动作。
+正式模式读取服务端发布的增益名称、解锁天数、状态及目标路由，激活由服务端确认；本地演示才使用旧的 7 / 14 / 30 / 60 天默认档。Lite 保留现有每日页布局，不移植 App P-65 改版。
 
-| Streak 阈值 | 增益名称 | i18n key | 转化路径 | Badge | Icon |
-|---|---|---|---|---|---|
-| **7 天** | Royalty Boost +5% this week | `royalty_boost` | `/team/unilevel/how-it-works` | `streak_royalty` | Zap |
-| **14 天** | NEX yield boost unlocked | `nex_boost` | `/daily` | `streak_nex` | Zap |
-| **30 天** | +2% APY on next stake | `staking_boost` | `/staking` | `streak_staker` | ShieldCheck |
-| **60 天** | Genesis whitelist priority | `genesis_whitelist` | `/genesis` | `streak_founder` | Gem |
-
-每行 ≥ 56px Apple HIG tap target,三态:
-
-| 态 | Icon | Right CTA |
-|---|---|---|
-| Locked(`streak < threshold`) | Lock icon | `Locked` label |
-| Unlocked + 未激活 | icon | 实心 button `Activate →` → `claim(id)` + `unlockAchievement(badgeId)` + 跳 `href` + toast |
-| 已激活 | Check icon | `Activated` label |
-
-**Dynamic footer banner**(inline 卡片,三态切换):
-
-1. 存在 unlocked + 未激活 perk:banner `«{name}» is ready — tap Activate on the right`
-2. 无 unlocked perk + 有 locked perk:banner `{days} more days to unlock «{name}»` — 直接驱动签到动机
-3. 全部已激活:banner `All {n} perks activated · keep streaking to retain them`
-
-设计目的:即使所有 perk 都锁定,用户也能看到"还差 X 天到第一个 reward"的紧迫感,而不是 4 个并列 Lock icon 的视觉死局。
-
-**实现细节**:
-- `lib/mock/streak-powerups.ts` 4 个 `StreakPowerUp` 定义(id / threshold / icon / tint / href / badgeId)
-- `lib/store/daily-powerup.ts` `useDailyPowerUp` zustand persist `nexgrid-daily-powerup-v1`(`claimed: StreakPowerUpId[]` + `claimedAt: Record<id, ms>`)
-- `app/components/daily/streak-power-ups.tsx` mounted-guarded(`claimed` 来自 persist,需 hydrate 后才读)
-- 严守 [feedback_no_meta_in_product]:UI 文案绝不出现 "phase boost" / "exit theater" / 任何元层面术语,只用真实平台话术(Royalty Boost / NEX yield boost / APY boost / Whitelist priority)
+BUG-062：移植 `src/lib/power-up-copy.ts`（App `493d67b5`、`fc6726cf` 及 `a276ac10` 文案修正）。已知默认 ROUTE_BADGE 名称在 zh / en / vi 下本地化；运营自定义名称保留原文。`CHECKIN_MULTIPLIER=1.5` 显示“签到奖励 × 1.5，断签后失效” / “Check-in reward × 1.5, ends if your streak breaks” / “Thưởng điểm danh × 1.5, mất khi đứt chuỗi”。未知效果、空值或无效数值不显示效果描述，绝不拼接原始服务端代码。`stakingVisible=false` 时隐藏质押增益，包括指向 `/wallet/staking` 的 `STAKING_APY` 发布项；其他增益的解锁与激活行为保持原样。
 
 #### 9.8.7 SSR/CSR 安全
 
 - 历史时间戳列表 + 已签到倒计时 chip 都依赖 `Date.now()` / persisted store,需 `mounted` flag 守卫,避免 hydration mismatch
 - Lucky multiplier 仅在 signIn 事件 handler 内 roll,不在 render 时调 Math.random()
-- Streak Power-Ups 已激活态来自 `useDailyPowerUp` persist,同样 mounted-guarded(SSR 默认未激活,client hydrate 后才显示真实状态)
+- 正式模式 Streak Power-Ups 的已激活态来自服务端快照；本地演示才读取账号隔离的持久化状态。
 
 ### 9.9 NEX 资产详情页 `/me/wallet/nex`
 
@@ -4144,37 +4125,11 @@ sequenceDiagram
 
 24 个成就分类(First / Earnings / Social / Loyalty / Hardware),每解锁触发弹窗 + 可领取 USDT/NEX 奖励。
 
-### 11.4a 风险提示书 `/me/risk-disclosure`(Sprint A-1 / A.3)
+### 11.4a 风险提示书 `/me/risk-disclosure`
 
-合规剧场关键件 — 真实加密交易所 ToS 风格强制阅读 + 双 gate 确认(scroll-to-bottom + checkbox)。首次提现 / 首次 staking 锁仓前拦截;常驻入口在个人中心「帮助与支持」分组。
+风险说明保留为可公开阅读的法律文本，服务条款页的交叉链接保留；Lite 搜索不再收录此路由。提现与质押不再把阅读或确认作为前置步骤（App `95641b63`，§9.3.4a / §9.6.2a）。
 
-**Store**:`lib/store/risk-disclosure.ts` — `useRiskDisclosure` zustand persist(`nexgrid-risk-disclosure-v1`),`{ accepted, acceptedAt, accept, reset }`。
-
-**页面结构**:
-1. iOS nav back + 标题 `Platform risk disclosure`
-2. **Hero**(AlertTriangle):`REQUIRED READING` 标签 + `Read this before staking, locking, or withdrawing.` + 副文
-3. **7 章节**(每章 mono 编号 01-07 + 标题 + body):
-   - 01 收益预估只是预测,不是承诺(±15% 周波动)
-   - 02 任务产能节奏(月 1-3 −4% / 4-8 −6% / 9-12 −23.7% / floor 22%)
-   - 03 NEX 代币市场风险(±20% 日 / 非 FDIC 保险)
-   - 04 提现窗口 + 合规审查(30d / 45d enhanced / 无 NEX 抵扣时按惩罚费率收手续费)
-   - 05 Staking 锁仓不可撤销(提前赎回扣全息 + 5-15% 本金)
-   - 06 网络经济 + 推荐人激励(平台利润支付 / 反垃圾推广)
-   - 07 托管 / KYC / 监管管辖(FinCEN MSB / MiCA / Chainalysis / PwC 季度审计)
-4. **Bottom sentinel + IntersectionObserver**(`rootMargin -24px`)— 工作在 iOS chassis 内部 scroll 容器
-5. **未滚到底 banner**:`ArrowDown` + `Please scroll through all sections before acknowledging`
-6. **Acknowledge section**:
-   - Checkbox(scrolledToBottom 才能勾)+ `I have read the 7 sections above and understand...` 完整 acknowledgement label
-   - Accept CTA(全宽):双 gate 满足才 enable;已接受时变 `Acknowledged` + ShieldCheck 不可点
-7. **Footer disclaimer**:`Acknowledgment is logged with timestamp. Re-reading available anytime via Me → Risk disclosure.`
-
-**双 gate**:`canAccept = scrolledToBottom && checked && !accepted`。
-
-**i18n**:`riskDisclosure.*` namespace ~25 keys(en + zh 镜像)。
-
-**集成点**(`useRiskDisclosure().accepted === false` 时拦截):
-- `/me/wallet/withdraw` handleSubmit 前置守卫(§9.3.4a)
-- 后续 Sprint:`/staking` lock CTA 同理
+页面内容按当前账号地区和语言读取服务器发布版本，确认状态也由服务器管理；加载失败、地区未配置或账号切换不产生本地“已确认”事实。页面自身的阅读完成与勾选规则保留，只影响本页确认，不影响普通业务入口。zh / en / vi 均使用 `riskDisclosure.*` 文案；移除已无调用方的 `search.routes.risk` 和 `riskDisclosure.gateUnavailable`。
 
 ### 11.5 推理收据 `/me/receipts` + `/me/proof`
 
@@ -4188,41 +4143,14 @@ sequenceDiagram
 
 #### 11.5.2 Proof of Contribution 分享卡 `/me/proof`
 
-社交分享中心 — 真实平台都做(对标 Coinbase shareable card / Robinhood Wrapped),目的是**把用户的 lifetime 收益 / streak / 网络规模做成可一键社交分享的视觉证明**,驱动 referral 转化。
+分享中心提供 Earnings / Streak / Network 三种卡片，分别显示累计收益、最长连续签到和团队规模。卡片保留品牌、用户名、加入日期、V 等级、活跃天数、非手机在线设备数、网络分位与成就摘要；无权威数据时显示占位，不推算成绩。推荐区展示邀请码、完整链接与按该链接生成的真实二维码。
 
-**3 个卡片主题 Tab**:
-- **Earnings** — hero `TOTAL EARNED $XXX.XX` 大字 + 14 点 sparkline
-- **Streak** — hero `LONGEST STREAK 🔥 N d` 大字
-- **Network** — hero `TEAM REACH 👥 N` 大字
+**Lite 分享触点**：
+- 顶部「复制分享内容」直接复制当前卡片文案，提示粘贴到所选应用或网站，不调用原生 `uni.share`。
+- X / Telegram / WhatsApp / Instagram 按钮复制分享文案；Copy link 只复制推荐链接；Save PNG 生成 1080 × 1350 海报并通过浏览器下载。
+- 二维码是可导出的邀请内容；Lite 不提供相机扫码入口。
 
-**共享区域(所有 variant)**:
-- 顶部 brand 行(NexGrid logo + `PROOF OF CONTRIBUTION` label)
-- 用户名 + Member since + **VBadge** 组件露出当前 V 级
-- 3 mini stats:Active days / Devices / Top X% of network(基于 lifetime 收益分位)
-- **Achievements chips 横滑**:V{N} {title} / {n}d streak / {n} devices / {n}d active(动态生成)
-- **Referral 区**:大字 `NEXGRID-XXXX` 推荐码 + 完整 URL(点击复制)+ QR 占位图案(从 referralCode 哈希)
-
-**分享触点**:
-- 顶部 `Quick share` CTA → 调起 `navigator.share()` 原生 sheet(无原生支持时回退到 clipboard.writeText + toast)
-- 下方 **6 个目的地 grid**:X/Twitter / Telegram / WhatsApp / Instagram / Copy link / Save PNG
-- 每目的地 icon + label,点击复制对应 shareText 到剪贴板
-
-**Share Text 模板**(根据 variant 切换):
-- Earnings:`💸 Earned $X on NexGrid in N days. Join my network: {refUrl}`
-- Streak:`🔥 N-day streak on NexGrid. Daily check-ins drip passive NEX. Join me: {refUrl}`
-- Network:`🌐 My NexGrid network is N strong across 7 layers. Compound earnings from each. Join: {refUrl}`
-
-**数据源**:
-- earnings / activeDays / devices / referralCode / displayName / joinedAt → `useApp` + `useProfile`
-- 当前 V 级 → `useVRank.myRank` + `V_RANKS[myRank].title`
-- streak / longestStreak → `useNexFaucet`
-- totalMembers → `useNetwork`
-
-**SSR/CSR 安全**:
-- VBadge / streak chip / longestStreak 数字依赖 persisted store,需 `mounted` flag 守卫
-- QR 占位图案在 useMemo 内基于 referralCode 哈希生成(纯函数,SSR 安全)
-
-i18n keys 在 `proof.*` namespace,~50 keys。
+分享内容以 UVEL / UVT 显示，Network 文案只描述成员数，不再承诺多层收益。正式模式以 `proofApi.snapshot()` 为累计收益、加入日期、活跃天数、连续签到、推荐码、团队人数和网络分位的来源；设备数读取服务器设备列表并排除手机，V 等级读取正式梯度。失败显示重试与占位，账号或运行环境切换后失效旧快照。本地演示才读取对应本地 store。中英越按钮与提示使用 `proof.*` 文案；既有导出分享正文仍为英文。
 
 ### 11.5a 我的奖励 `/me/rewards`
 
