@@ -118,6 +118,7 @@ import ReferralProgress from '@/components/promotion/referral-progress.vue';
 import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@/composables/use-tab-page-lifecycle";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { takeNavigationQuery } from "@/lib/route";
 import AppChassis from "@/components/tab-page-frame.vue";
 import { teamRedesignCopy } from '@/i18n/team-redesign';
@@ -385,6 +386,14 @@ function openReferralNetwork() {
 // unlockMatured at mount + every 60s.
 let unlockTimer: ReturnType<typeof setInterval> | null = null;
 let remotePoolVisible = false;
+let releaseActiveRefresh = () => {};
+async function refreshVisibleTeam() {
+  if (!remotePoolVisible || !remoteApiEnabled) return;
+  await Promise.allSettled([
+    vrank.ensureCanonicalVRank(), commission.ensureCanonicalBinary(), commission.ensureCanonicalEvents(),
+    network.ensureCanonicalNetwork(), referralRewards.ensure(), refreshRemotePool(),
+  ]);
+}
 onMounted(() => {
   if (remoteApiEnabled) return;
   commission.unlockMatured();
@@ -392,6 +401,8 @@ onMounted(() => {
 });
 onShow(() => {
   remotePoolVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleTeam);
   if (!remoteApiEnabled) return;
   void vrank.ensureCanonicalVRank();
   void commission.ensureCanonicalBinary();
@@ -399,7 +410,7 @@ onShow(() => {
   void network.ensureCanonicalNetwork();
   void refreshRemotePool(true);
 });
-onHide(() => { remotePoolVisible = false; remotePoolRequest += 1; });
+onHide(() => { releaseActiveRefresh(); remotePoolVisible = false; remotePoolRequest += 1; });
 async function refreshRemotePool(passive = false) {
   if (!remoteApiEnabled || !remotePoolVisible || displayEnvironmentInvalidated.value) return;
   const request = ++remotePoolRequest;
@@ -436,6 +447,7 @@ const unsubscribeRemotePoolRun = subscribeRuntimeRevision(scope => {
   void refreshRemotePool(true);
 });
 onUnmounted(() => {
+  releaseActiveRefresh();
   if (unlockTimer) clearInterval(unlockTimer);
   unsubscribeRemotePoolRun();
   remotePoolMounted = false;

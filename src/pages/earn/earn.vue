@@ -102,6 +102,8 @@ import { formatAmount } from "@/lib/amount-display";
 import { formatUsdOverviewParts } from "@/lib/usd-display";
 import { onUnmounted, computed, nextTick, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { useEarnConfig } from "@/store/earn-config";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import NxSection from "@/components/ui/nx-section.vue";
@@ -159,26 +161,37 @@ const range = ref<Range>("Today");
 const freeTrial = useFreeTrial();
 let earnPageVisible = false;
 let earnObservationEpoch = 0;
+let releaseActiveRefresh = () => {};
+async function refreshVisibleEarn() {
+  if (!earnPageVisible || !remoteApiEnabled) return;
+  await Promise.allSettled([
+    freeTrial.refreshRemote(), app.ensureRemoteFleet(), app.ensureHomeTruth(), useEarnConfig().ensure(),
+  ]);
+}
 
 // The banner is the first discoverable H2 entry. Do not make a new user wait
 // for the global poll before we know whether the server has made it eligible.
 onShow(() => {
   earnPageVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleEarn);
   app.setTaskReadPageVisible("earn", true);
   if (remoteApiEnabled) {
     void runPassiveTabRead('trial-state', () => freeTrial.refreshRemote());
-    void runPassiveTabRead('remote-fleet', () => app.refreshRemoteFleet(undefined, { coalesce: true })).catch(() => undefined);
+    void app.ensureRemoteFleet().catch(() => undefined);
     void app.ensureHomeTruth().catch(() => undefined);
     void observeDayOneEarnPage();
   }
 });
 
 onHide(() => {
+  releaseActiveRefresh();
   earnPageVisible = false;
   app.setTaskReadPageVisible("earn", false);
   earnObservationEpoch += 1;
 });
 onUnmounted(() => {
+  releaseActiveRefresh();
   earnPageVisible = false;
   app.setTaskReadPageVisible("earn", false);
   earnObservationEpoch += 1;

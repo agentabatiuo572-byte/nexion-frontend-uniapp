@@ -121,9 +121,9 @@ import { PRODUCTS } from "@/mock/products";
 import type { Product } from "@/mock/products";
 import { productCopy, specRow } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
-import { remoteApiEnabled, supportApi } from "@/api/runtime";
+import { remoteApiEnabled } from "@/api/runtime";
 import type { SupportFaq } from "@/domain/support";
-import { readPublishedFaqPages } from "@/lib/published-faq-pages";
+import { readPublishedFaqs } from "@/store/published-content";
 import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { searchStakingRateSummary } from "@/lib/search-staking-rate";
@@ -156,7 +156,7 @@ const publishedFaqs = ref<SupportFaq[]>([]);
 const publishedFaqStatus = ref<SearchRemoteStatus>("idle");
 let publishedFaqReadEpoch = 0;
 
-async function refreshPublishedFaqs(): Promise<void> {
+async function refreshPublishedFaqs(force = false): Promise<void> {
   const readEpoch = ++publishedFaqReadEpoch;
   const accountKey = app.accountKey;
   const accountEpoch = app.accountBindingEpoch;
@@ -166,7 +166,7 @@ async function refreshPublishedFaqs(): Promise<void> {
   publishedFaqs.value = [];
   publishedFaqStatus.value = "loading";
   try {
-    const items = await readPublishedFaqPages(supportApi, language, isCurrent);
+    const items = await readPublishedFaqs(language, isCurrent, force);
     if (!isCurrent()) return;
     publishedFaqs.value = items;
     publishedFaqStatus.value = "ready";
@@ -175,9 +175,8 @@ async function refreshPublishedFaqs(): Promise<void> {
   }
 }
 
-async function refreshSearchSources(force = false): Promise<void> {
+async function refreshSearchSources(force = false, forceFaqs = false): Promise<void> {
   if (!remoteApiEnabled) return;
-  void refreshPublishedFaqs();
   const readEpoch = ++searchSourceReadEpoch;
   const accountKey = app.accountKey;
   const accountEpoch = app.accountBindingEpoch;
@@ -187,8 +186,9 @@ async function refreshSearchSources(force = false): Promise<void> {
   if (readEpoch !== searchSourceReadEpoch
     || accountKey !== app.accountKey
     || accountEpoch !== app.accountBindingEpoch) return;
+  void refreshPublishedFaqs(forceFaqs);
   void network.refreshCanonicalNetwork();
-  void app.refreshRemoteFleet(undefined, { coalesce: !force });
+  void (force ? app.refreshRemoteFleet() : app.ensureRemoteFleet());
   void staking.syncRemote();
 }
 
@@ -202,7 +202,7 @@ bindPageVisibilityRefresh(searchVisibility, {
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale.code], () => refreshSearchSources(true));
 
 function retrySearchSources() {
-  refreshSearchSources(true);
+  refreshSearchSources(true, true);
 }
 
 const devices = computed(() => !remoteApiEnabled

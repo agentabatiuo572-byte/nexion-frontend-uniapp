@@ -68,6 +68,7 @@ import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow, onUnload } from "@/composables/use-tab-page-lifecycle";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import NxSection from "@/components/ui/nx-section.vue";
@@ -115,7 +116,7 @@ import { subscribeRuntimeRevision } from "@/api/order-api";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { settleRemoteMeLoaders } from "@/lib/remote-me-refresh";
 import { revalidateProductCatalog } from "@/store/product-catalog";
-import { refreshEarningsReleaseStatus } from "@/store/earning-release";
+import { ensureEarningsReleaseStatus } from "@/store/earning-release";
 import { compiledResourceVersion, formatResourceVersion, readNativeResourceVersion } from "@/lib/app-version";
 
 const versionFooter = ref("UVEL");
@@ -149,9 +150,8 @@ const locale = useLocaleStore();
 const trial = useFreeTrial();
 const security = useSecurity();
 const paymentPassword = usePaymentPassword();
-const paymentPasswordLoading = ref(true);
-const paymentPasswordSummary = computed(() => paymentPasswordLoading.value ? "…" : !paymentPassword.ui.state ? t.value.paymentPin.unavailable : paymentPassword.ui.state.configured ? t.value.paymentPin.configured + (paymentPassword.locked() ? ` · ${t.value.paymentPin.lockedLabel}` : "") : t.value.paymentPin.notConfigured);
-async function refreshPaymentPassword() { paymentPasswordLoading.value = true; await paymentPassword.refreshStatus(); paymentPasswordLoading.value = false; }
+const paymentPasswordSummary = computed(() => !paymentPassword.display.state ? paymentPassword.display.loading ? "…" : t.value.paymentPin.unavailable : paymentPassword.display.state.configured ? t.value.paymentPin.configured + (paymentPassword.displayLocked() ? ` · ${t.value.paymentPin.lockedLabel}` : "") : t.value.paymentPin.notConfigured);
+async function refreshPaymentPassword() { await paymentPassword.ensureStatus(); }
 const notifications = useNotifications();
 const conversations = useConversations();
 const messageCenter = useMessageDrawer();
@@ -403,11 +403,11 @@ async function refreshRemoteTrial() {
 async function refreshRemoteMe() {
   if (!remoteApiEnabled) return;
   await settleRemoteMeLoaders([
-    ["profile-avatar", () => runPassiveTabRead("profile-avatar", () => profile.refreshAvatar())],
+    ["profile-avatar", () => profile.ensureAvatar()],
     ["home", () => app.ensureHomeTruth()],
     ["commission", () => commission.ensureCanonicalEvents()],
     ["withdrawals", () => runPassiveTabRead('withdrawals', () => app.refreshRemoteWithdrawalList())],
-    ["fleet", async () => { await revalidateProductCatalog(); await runPassiveTabRead('remote-fleet', () => app.refreshRemoteFleet(undefined, { coalesce: true })); await runPassiveTabRead('earning-release', () => refreshEarningsReleaseStatus()); }],
+    ["fleet", async () => { await revalidateProductCatalog(); await app.ensureRemoteFleet(); await ensureEarningsReleaseStatus(); }],
     ["funds", refreshRemoteFunds],
     ["orders", () => refreshRemoteOrders(true)],
     ["security", refreshRemoteSecurity],
@@ -432,12 +432,20 @@ watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (remoteApiEnabled) void refreshRemoteMe();
 });
+let releaseActiveRefresh = () => {};
+async function refreshVisibleMe() {
+  if (!remoteMeActive) return;
+  await Promise.allSettled([refreshPaymentPassword(), refreshRemoteMe()]);
+}
 onShow(() => {
   remoteMeActive = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleMe);
   void refreshPaymentPassword();
   if (remoteApiEnabled) void refreshRemoteMe();
 });
 onHide(() => {
+  releaseActiveRefresh();
   remoteMeActive = false;
   remoteSecurityRequest += 1;
   remoteOrdersRequest += 1;
@@ -454,10 +462,11 @@ const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
     sessionUserId: sessionVault.read()?.user.userId ?? null,
   })) {
     void refreshRemoteOrders(true);
-    void runPassiveTabRead("earning-release", () => refreshEarningsReleaseStatus()).catch(() => undefined);
+    void ensureEarningsReleaseStatus().catch(() => undefined);
   }
 });
 onUnmounted(() => {
+  releaseActiveRefresh();
   remoteMeActive = false;
   remoteSecurityRequest += 1;
   remoteOrdersRequest += 1;
@@ -465,7 +474,6 @@ onUnmounted(() => {
 });
 
 function handleQuickItem(item: QuickItem) {
-  if (item.key === "payment-password" && !paymentPassword.ui.state) { void refreshPaymentPassword(); return; }
   if (item.key === "theme") {
     themePickerOpen.value = true;
     return;

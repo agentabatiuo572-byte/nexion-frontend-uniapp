@@ -1,5 +1,8 @@
-import { reactive } from "vue";
-import { apiClient, sessionVault } from "@/api/runtime";
+import { reactive, watch } from "vue";
+import { apiClient, apiRuntimeConfig, sessionVault } from "@/api/runtime";
+import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { createPaymentPasswordApi, type PaymentPasswordApi, type PaymentPasswordAuthorization, type PaymentPasswordChallenge, type PaymentPasswordProof, type PaymentPasswordReceipt, type PaymentPasswordState } from "@/api/payment-password-api";
 import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
@@ -37,6 +40,9 @@ export function paymentPasswordErrorKey(error: unknown): ErrorKey {
 
 /** Secrets stay in these in-memory fields only. The coordinator never executes a purchase. */
 export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identity: () => string, randomId = requireCryptoUuid, pendingStorage?: PendingStorage) {
+  const display = reactive({ state: null as Pick<PaymentPasswordState, "configured" | "lockedUntil" | "serverTime"> | null, loading: false });
+  let displayReadEpoch = 0;
+  let environmentInvalidated = false;
   const ui = reactive({
     visible: false, stage: "loading" as Stage, context: null as PaymentPasswordContext | null,
     state: null as PaymentPasswordState | null, busy: false, error: "" as ErrorKey,
@@ -77,16 +83,50 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     if (pendingStorage && !pendingStorage.write(null)) return false;
     pending = null; ui.pendingOperation = ""; return true;
   }
-  function setState(state: PaymentPasswordState) { ui.state = state; serverOffset = Date.parse(state.serverTime) - Date.now(); ui.now = Date.now() + serverOffset; }
+  function setState(state: PaymentPasswordState) {
+    ui.state = state; serverOffset = Date.parse(state.serverTime) - Date.now(); ui.now = Date.now() + serverOffset;
+    invalidatePassiveTabRead("payment-password-display");
+    displayReadEpoch++;
+    display.loading = false;
+    display.state = { configured: state.configured, lockedUntil: state.lockedUntil, serverTime: state.serverTime };
+  }
   function cancel() {
     generation++; clearSecrets(); ui.visible = false; ui.busy = false; ui.context = null; ui.error = ""; ui.notice = "";
     resolve?.(null); resolve = null; personalResolve?.(false); personalResolve = null;
   }
-  function accountChanged() { cancel(); pending = null; ui.pendingOperation = ""; ui.state = null; ui.changeError = ""; lastPaymentError = ""; }
+  function accountChanged() {
+    cancel(); pending = null; ui.pendingOperation = ""; ui.state = null; ui.changeError = ""; lastPaymentError = "";
+    invalidatePassiveTabRead("payment-password-display");
+    displayReadEpoch++; display.state = null; display.loading = false;
+  }
+  watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
+    environmentInvalidated = true;
+    accountChanged();
+  }, { flush: "sync" });
+  function ensureStatus(): Promise<boolean> {
+    return runPassiveTabRead("payment-password-display", readDisplayStatus, identity(), () => display.state !== null);
+  }
+  async function readDisplayStatus(): Promise<boolean> {
+    if (!identity() || environmentInvalidated) return false;
+    const account = identity(), epoch = ++displayReadEpoch, runtime = captureRuntimeRevision();
+    const currentRead = () => epoch === displayReadEpoch && account === identity() && isCurrentRuntimeRevision(runtime);
+    display.loading = true;
+    try {
+      const state = await api.status();
+      if (!currentRead()) return false;
+      display.state = { configured: state.configured, lockedUntil: state.lockedUntil, serverTime: state.serverTime };
+      serverOffset = Date.parse(state.serverTime) - Date.now(); ui.now = Date.now() + serverOffset;
+      return true;
+    } catch (cause) {
+      if (currentRead() && !isTransientReadFailure(cause)) display.state = null;
+      return false;
+    } finally { if (epoch === displayReadEpoch && account === identity()) display.loading = false; }
+  }
+  function displayLocked(): boolean { return !!display.state?.lockedUntil && Date.parse(display.state.lockedUntil) > ui.now; }
   async function refreshStatus(): Promise<PaymentPasswordState | null> {
-    const account = identity();
-    try { const result = await api.status(); if (account !== identity()) return null; setState(result); return result; }
-    catch { if (account === identity()) ui.state = null; return null; }
+    const account = identity(), token = generation;
+    try { const result = await api.status(); if (account !== identity() || token !== generation) return null; setState(result); return result; }
+    catch { if (account === identity() && token === generation) ui.state = null; return null; }
   }
   async function load() {
     const token = generation; ui.stage = "loading"; ui.busy = true; ui.error = "";
@@ -243,7 +283,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     lastPaymentError = paymentPasswordErrorKey(error); return true;
   }
   function tick() { ui.now = Date.now() + serverOffset; }
-  return { ui, cancel, accountChanged, refreshStatus, request, setup, recover, resumePending, load, next, restart, confirm, query, authorize, startRecovery, unavailableRecovery, sendChallenge, verify, change, report, locked, tick };
+  return { ui, display, ensureStatus, displayLocked, cancel, accountChanged, refreshStatus, request, setup, recover, resumePending, load, next, restart, confirm, query, authorize, startRecovery, unavailableRecovery, sendChallenge, verify, change, report, locked, tick };
 }
 
 const coordinator = createPaymentPasswordCoordinator(createPaymentPasswordApi(apiClient), () => {

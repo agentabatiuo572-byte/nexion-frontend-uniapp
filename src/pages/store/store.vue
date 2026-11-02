@@ -99,6 +99,7 @@
 
 <script setup lang="ts">
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -179,6 +180,16 @@ let storePageVisible = false;
 let storeObservationEpoch = 0;
 let storeViewReportedScope = "";
 let storeViewAttempt: { scopeKey: string; userId: number; event: ReturnType<typeof createStoreViewEvent>; tries: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
+let releaseActiveRefresh = () => {};
+async function refreshVisibleStore() {
+  if (!storePageVisible) return;
+  if (publicOnly.value) { await refreshPromotion(); return; }
+  await Promise.allSettled([
+    voucher.revalidateRemote(), runPassiveTabRead('genesis-state', () => genesis.syncRemote()),
+    runPassiveTabRead('product-phase', () => refreshServerProductPhase(true)),
+    revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(), refreshPromotion(),
+  ]);
+}
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
 //   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
 //   只有页面级 onShow 能把它翻回来。
@@ -186,6 +197,8 @@ onShow(() => {
   const pending=takeNavigationQuery('/pages/store/store');
   if(pending){const query=new URLSearchParams(pending),values:Record<string,string>={};query.forEach((value,key)=>{values[key]=value;});readPromotionQuery(values);}
   storePageVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleStore);
   if(publicOnly.value)return;
   void runPassiveTabRead('genesis-config', () => genesisCfg.refresh(), undefined, () => genesisCfg.loaded);
   void voucher.revalidateRemote();
@@ -195,10 +208,11 @@ onShow(() => {
   void runPassiveTabRead('genesis-state', () => genesis.syncRemote());
   void runPassiveTabRead('product-phase', () => refreshServerProductPhase(true));
   void revalidateProductCatalog();
-  void runPassiveTabRead('earn-config', () => earnConfig.refresh());
+  void earnConfig.ensure();
   void observeDayOneStorePage();
 });
 onHide(() => {
+  releaseActiveRefresh();
   storePageVisible = false;
   storeObservationEpoch += 1;
   storeViewReportedScope = "";
@@ -211,6 +225,7 @@ onHide(() => {
   focusProductName.value = "";
 });
 onUnmounted(() => {
+  releaseActiveRefresh();
   storePageVisible = false;
   storeObservationEpoch += 1;
   storeViewReportedScope = "";

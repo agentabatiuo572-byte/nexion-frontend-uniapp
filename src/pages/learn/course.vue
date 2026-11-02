@@ -14,7 +14,7 @@
       <view v-else-if="error" class="course-state" role="alert" aria-live="assertive">
         <text class="block" style="text-wrap: pretty">{{ errorText }}</text>
         <text v-if="error === 'courseIdMissing'" class="block active:opacity-70" style="margin-top: var(--v5-space-3); color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses">{{ t.learning.centerTitle }}</text>
-        <text v-else class="block active:opacity-70" style="margin-top: var(--v5-space-3); min-height: 44px; font: 600 13px/20px var(--font-v5); color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.ui.retry" @click="load">{{ t.ui.retry }}</text>
+        <text v-else class="block active:opacity-70" style="margin-top: var(--v5-space-3); min-height: 44px; font: 600 13px/20px var(--font-v5); color: var(--v5-brand)" role="button" tabindex="0" :aria-label="t.ui.retry" @click="retryCourse">{{ t.ui.retry }}</text>
       </view>
       <view v-else-if="displayCourse && displayCompleted" class="course-completed">
         <view class="course-result" role="status" aria-live="polite">
@@ -33,7 +33,7 @@
           <view v-else-if="nextLoading" class="course-next-state" role="status"><text>{{ completionCopy.nextLoading }}</text></view>
           <view v-else-if="nextError" class="course-next-state nx-inline-recovery" role="alert">
             <text class="nx-inline-recovery__copy">{{ completionCopy.nextUnavailable }}</text>
-            <NxButton class="nx-inline-recovery__action" variant="text" :label="t.ui.retry" @click="loadNextCourses" />
+            <NxButton class="nx-inline-recovery__action" variant="text" :label="t.ui.retry" @click="retryNextCourses" />
           </view>
           <view v-else-if="nextOverview" class="course-next-state"><text>{{ auditCopy.allCoursesDone }}</text><text class="course-next__reward">{{ fmt(auditCopy.earned, { n: formatAmount(nextOverview.earnedNex) }) }}</text></view>
           <NxButton class="course-result__back" variant="text" :label="completionCopy.backToCenter" @click="backToCourses" />
@@ -63,7 +63,7 @@
         </view>
 
         <text v-if="displayCourse.questions.length && !pendingAttempt && !allAnswered && !displayCompleted" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.learning.answerAllFirst }}</text>
-        <text v-if="pendingAttempt" class="block active:opacity-70" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty" role="button" tabindex="0" :aria-label="pendingStatusText" @click="load">{{ pendingStatusText }}</text>
+        <text v-if="pendingAttempt" class="block active:opacity-70" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty" role="button" tabindex="0" :aria-label="pendingStatusText" @click="retryCourse">{{ pendingStatusText }}</text>
         <view v-if="displayResultDetails" data-testid="learning-result-details" class="course-quiz-result" role="status"><text class="course-quiz-result__title">{{ displayResultDetails.passed ? t.learning.resultPassed : t.learning.resultFailed }}</text><text class="course-quiz-result__score">{{ scoreLine }}</text><text class="course-quiz-result__meta">{{ attemptsLine }} · {{ rewardStatusLine }}</text>
           <NxButton v-if="!displayResultDetails.passed && !interactionLocked" class="course-quiz-result__retry" variant="primary" :label="retryQuizLabel" @click="restartQuiz" />
         </view>
@@ -86,6 +86,7 @@ import type { LearningOverview } from "@/api/learning-api";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import AppChassis from "@/components/app-chassis.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -97,6 +98,8 @@ import {
   type LearningPendingAttempt,
 } from "@/api/learning-attempt-key";
 import { learningApi } from "@/api/learning-runtime";
+import { invalidateLearningContent, projectStartedLearningCourse, readLearningCourse, readLearningCourses } from "@/store/published-content";
+import { passiveTabReadScope } from "@/lib/passive-tab-read";
 import { remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
 import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import type { LearningCourse, LearningQuizReceiptStatus, LearningResult } from "@/api/learning-api";
@@ -189,6 +192,7 @@ const pendingStatusText = computed(() => pendingReceiptStatus.value === "UNKNOWN
 let accountEpoch = 0;
 let generation = 0;
 let mounted = false;
+let coursePresentationScope = "";
 const fenceReader = createLearningPageFenceReader(
   () => String(app.accountKey),
   () => accountEpoch,
@@ -297,6 +301,7 @@ let courseEnvironmentInvalidated = false;
 watch(() => apiRuntimeConfig?.environment, () => { courseEnvironmentInvalidated = true; generation += 1; coursePresentation.value = null; resetLoadCoalescer(); resetCourseState(); error.value = 'courseUnavailable'; }, { flush: 'sync' });
 async function performLoad() {
   if (courseEnvironmentInvalidated) return;
+  if (coursePresentationScope !== passiveTabReadScope(false)) coursePresentation.value = null;
   generation += 1;
   const scope = fence();
   const requestedCourseId = courseId.value;
@@ -331,17 +336,21 @@ async function performLoad() {
     const loaded = await loadPublishedCourseWithStart({
       courseId: requestedCourseId,
       language: language.value,
-      read: learningApi.course,
-      start: learningApi.start,
+      read: readLearningCourse,
+      start: (...args) => learningApi.start(...args).then(started => {
+        if (current(scope) && started.id === args[0] && started.version === args[2]) projectStartedLearningCourse(started, args[1]);
+        return started;
+      }),
       isCurrent: () => current(scope),
       publish: (published, start, failure) => {
         if (!current(scope)) return;
-        if (failure?.status === 401 || failure?.status === 403) {
+        if (failure?.kind === "auth" || failure?.status === 401 || failure?.status === 403 || failure?.code === 401 || failure?.code === 403) {
           course.value = null; coursePresentation.value = null; startState.value = 'unconfirmed';
           startFailure.value = failure; loading.value = false; error.value = 'courseUnavailable'; return;
         }
         course.value = published;
         coursePresentation.value = published;
+        coursePresentationScope = passiveTabReadScope(false);
         confirmedAttempts.value = published.attempts;
         answers.value = initialQuizAnswers(published);
         startState.value = start;
@@ -358,7 +367,15 @@ async function performLoad() {
     startState.value = loaded.start;
     if (startConfirmed.value) await recoverPendingReceipt(scope, loaded.course);
   } catch (cause) {
-    if (current(scope)) { coursePresentation.value = null; error.value = cause instanceof ApiError && cause.kind === "network" ? "courseOffline" : "courseUnavailable"; }
+    if (current(scope)) {
+      if (cause instanceof ApiError && cause.kind === "network" && coursePresentation.value) {
+        startState.value = "unconfirmed";
+        startFailure.value = { reason: "network", kind: "network" };
+      } else {
+        coursePresentation.value = null;
+        error.value = cause instanceof ApiError && cause.kind === "network" ? "courseOffline" : "courseUnavailable";
+      }
+    }
   } finally {
     if (current(scope)) loading.value = false;
   }
@@ -367,12 +384,13 @@ async function performLoad() {
 let startLoad = createLearningCourseStartLoadCoalescer(performLoad);
 function load(): Promise<void> { return startLoad(); }
 function resetLoadCoalescer() { startLoad = createLearningCourseStartLoadCoalescer(performLoad); }
+function retryCourse() { invalidateLearningContent(); return load(); }
 
 function recoverStart() {
-  if (!mounted || loading.value || startState.value !== "unconfirmed" || !course.value) return;
+  if (!mounted || loading.value || startState.value !== "unconfirmed" || !displayCourse.value) return;
   const reason = startFailure.value?.reason;
   if (reason === "terms") return navTo("/pages/support/messages");
-  if (reason !== "onboarding") return load();
+  if (reason !== "onboarding") return retryCourse();
   let web = false;
   // #ifdef H5
   web = true;
@@ -436,8 +454,8 @@ async function finish() {
   error.value = "";
   try {
     const submitted = submittedCourse.questions.length
-      ? await learningApi.submitQuiz(submittedCourse.id, submittedCourse.version, submittedAnswers, attemptKey)
-      : await learningApi.complete(submittedCourse.id, submittedCourse.version);
+      ? await learningApi.submitQuiz(submittedCourse.id, submittedCourse.version, submittedAnswers, attemptKey).finally(invalidateLearningContent)
+      : await learningApi.complete(submittedCourse.id, submittedCourse.version).finally(invalidateLearningContent);
     if (!acceptResult(scope, submittedCourse, identity, attemptKey, submitted)) throw new Error("LEARNING_RESULT_SCOPE_MISMATCH");
   } catch (cause) {
     if (!current(scope)) return;
@@ -465,7 +483,7 @@ async function finish() {
 
         // ABSENT/FAILED proves there is no committed in-flight result. Replaying
         // the immutable body with the same key cannot create a second attempt.
-        const replay = await learningApi.submitQuiz(submittedCourse.id, submittedCourse.version, submittedAnswers, attemptKey);
+        const replay = await learningApi.submitQuiz(submittedCourse.id, submittedCourse.version, submittedAnswers, attemptKey).finally(invalidateLearningContent);
         if (acceptResult(scope, submittedCourse, identity, attemptKey, replay)) return;
         throw new Error("LEARNING_RESULT_SCOPE_MISMATCH");
       } catch (recoveryCause) {
@@ -526,14 +544,22 @@ onLoad((options) => {
   if (mounted) void load();
 });
 const courseVisibility = createPageVisibilityRefresh(() => { void load(); });
+let releaseActiveRefresh = () => {};
 bindPageVisibilityRefresh(courseVisibility, {
   mounted: (callback) => onMounted(() => { mounted = true; callback(); }),
   shown: (callback) => onShow(() => {
     mounted = true;
+    releaseActiveRefresh();
+    releaseActiveRefresh = registerActivePageRefresh(() => {
+      invalidateLearningContent();
+      resetLoadCoalescer();
+      return load();
+    });
     preserveCourseSourceInH5(courseId.value, courseSource.value);
     callback();
   }),
   hidden: (callback) => onHide(() => {
+    releaseActiveRefresh();
     mounted = false;
     generation += 1;
     resetLoadCoalescer();
@@ -541,11 +567,12 @@ bindPageVisibilityRefresh(courseVisibility, {
     callback();
   }),
 });
-onUnmounted(() => { mounted = false; generation += 1; resetLoadCoalescer(); });
+onUnmounted(() => { releaseActiveRefresh(); mounted = false; generation += 1; resetLoadCoalescer(); });
 watch(() => String(app.accountKey), refreshForScopeChange, { flush: "sync" });
 watch(() => app.accountBindingEpoch, refreshForScopeChange, { flush: "sync" });
 watch(() => language.value, refreshForScopeChange, { flush: "sync" });
 const stopRuntimeRefresh = subscribeRuntimeRevision(() => {
+  coursePresentation.value = null;
   accountEpoch += 1; generation += 1; resetLoadCoalescer(); resetCourseState();
   if (mounted) void load();
 });
@@ -580,14 +607,14 @@ function openNextCourse() {
 }
 let nextRequest = 0;
 function resetNextCourses(keepPresentation = false) { nextRequest++; if (!keepPresentation) nextOverview.value = null; nextLoading.value = false; nextError.value = false; }
-async function loadNextCourses() {
+async function loadNextCourses(force = false) {
   resetNextCourses(true);
   if (!serverCompleted.value || !remoteApiEnabled || !mounted) return;
   const request = nextRequest;
   const scope = fence();
   nextLoading.value = true;
   try {
-    const next = await learningApi.courses(language.value);
+    const next = await readLearningCourses(language.value, force);
     if (request === nextRequest && current(scope) && serverCompleted.value) nextOverview.value = next;
   } catch {
     if (request === nextRequest && current(scope)) { nextOverview.value = null; nextError.value = true; }
@@ -595,6 +622,7 @@ async function loadNextCourses() {
     if (request === nextRequest && current(scope)) nextLoading.value = false;
   }
 }
+function retryNextCourses() { void loadNextCourses(true); }
 watch(() => [serverCompleted.value, courseId.value, app.accountKey, app.accountBindingEpoch, language.value] as const, () => { void loadNextCourses(); });
 watch(() => [courseId.value, app.accountKey, app.accountBindingEpoch, language.value] as const, () => resetNextCourses(), { flush: "sync" });
 watch(() => displayCourse.value, value => { if (!value) resetNextCourses(); }, { flush: "sync" });

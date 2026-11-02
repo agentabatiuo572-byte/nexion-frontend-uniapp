@@ -36,7 +36,7 @@
 
       <!-- FAQ list -->
       <view class="mx-4" :style="faqWrapStyle">
-        <EmptyState v-if="faqLoadError && faqs.length === 0" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="loadFaqs" />
+        <EmptyState v-if="faqLoadError && faqs.length === 0" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="retryFaqs" />
         <EmptyState v-else-if="filtered.length === 0 && faqPageNum > 0 && !faqLoading && !faqLoadError && !canLoadMoreFaqs" :kind="query.trim() || requestedFaqId ? 'no-search-results' : 'empty-list'" :title="query.trim() || requestedFaqId ? t.empty.searchTitle : t.empty.listTitle" :desc="query.trim() || requestedFaqId ? t.empty.searchDesc : t.empty.listDesc" compact />
         <template v-else>
           <view
@@ -94,20 +94,23 @@
 <script setup lang="ts">
 import { platformDisplayText } from "@/lib/brand-copy";
 
-import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { supportApi } from "@/api/runtime";
+import { ApiError } from "@/api/errors";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import type { SupportFaq } from "@/domain/support";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
-import { readPublishedFaqPages } from "@/lib/published-faq-pages";
+import { passiveTabReadScope } from "@/lib/passive-tab-read";
+import { readPublishedFaqPage, readPublishedFaqs } from "@/store/published-content";
 
 const t = useT();
 const w = computed(() => t.value.help);
@@ -131,12 +134,15 @@ const cat = ref<FaqCategory | "all">("all");
 const openId = ref<string | null>(null);
 const faqLoadError = ref(false);
 let faqRequestGeneration = 0;
+let faqDisplayScope = "";
 const canLoadMoreFaqs = computed(() => faqs.value.length < faqTotal.value);
 const requestedFaqLanguage = computed(() => locale.code === "zh" ? "zh-CN" : locale.code === "vi" ? "vi-VN" : "en-US");
 const faqLanguageFallback = computed(() => faqs.value.length > 0
   && faqs.value.some((faq) => faq.language.toLowerCase() !== requestedFaqLanguage.value.toLowerCase()));
 
-async function loadFaqs() {
+async function loadFaqs(force = false) {
+  const displayScope = passiveTabReadScope(false);
+  if (faqDisplayScope !== displayScope) resetFaqProjection();
   const requestGeneration = ++faqRequestGeneration;
   const requestedLanguage = locale.code;
   const requestScope = remoteAccountScope.snapshot();
@@ -145,12 +151,13 @@ async function loadFaqs() {
   try {
     const targetId = requestedFaqId.value;
     const isCurrent = () => requestGeneration === faqRequestGeneration && requestedLanguage === locale.code
-      && remoteAccountScope.isCurrent(requestScope);
-    const allItems = targetId ? await readPublishedFaqPages(supportApi, requestedLanguage, isCurrent) : null;
+      && remoteAccountScope.isCurrent(requestScope) && displayScope === passiveTabReadScope(false);
+    const allItems = targetId ? await readPublishedFaqs(requestedLanguage, isCurrent, force) : null;
     const next = allItems ? { items: allItems, total: allItems.length, pageNum: 1 }
-      : await supportApi.faqPage(requestedLanguage, undefined, "Help Center", 1, FAQ_PAGE_SIZE);
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      : await readPublishedFaqPage(requestedLanguage, 1, FAQ_PAGE_SIZE, force);
+    if (isCurrent()) {
       faqs.value = next.items;
+      faqDisplayScope = displayScope;
       faqPageNum.value = next.pageNum;
       faqTotal.value = next.total;
       if (targetId && requestedFaqId.value === targetId) {
@@ -159,8 +166,13 @@ async function loadFaqs() {
         openId.value = target?.id ?? null;
       }
     }
-  } catch {
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) faqLoadError.value = true;
+  } catch (cause) {
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      if (cause instanceof ApiError && (cause.kind === "auth" || cause.status === 401 || cause.status === 403 || cause.code === 401 || cause.code === 403)) {
+        faqs.value = []; faqPageNum.value = 0; faqTotal.value = 0;
+      }
+      faqLoadError.value = true;
+    }
   } finally {
     if (requestGeneration === faqRequestGeneration && remoteAccountScope.isCurrent(requestScope)) faqLoading.value = false;
   }
@@ -168,21 +180,30 @@ async function loadFaqs() {
 
 async function loadMoreFaqs() {
   if (faqLoading.value || !canLoadMoreFaqs.value) return;
+  if (faqDisplayScope !== passiveTabReadScope(false)) return loadFaqs();
   const requestGeneration = ++faqRequestGeneration;
   const requestedLanguage = locale.code;
   const requestScope = remoteAccountScope.snapshot();
+  const displayScope = faqDisplayScope;
+  const force = faqLoadError.value;
   const nextPage = faqPageNum.value + 1;
   faqLoadError.value = false;
   faqLoading.value = true;
   try {
-    const next = await supportApi.faqPage(requestedLanguage, undefined, "Help Center", nextPage, FAQ_PAGE_SIZE);
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+    const next = await readPublishedFaqPage(requestedLanguage, nextPage, FAQ_PAGE_SIZE, force);
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)
+      && displayScope === passiveTabReadScope(false)) {
       faqs.value = [...new Map([...faqs.value, ...next.items].map(item => [item.id, item])).values()];
       faqPageNum.value = next.pageNum;
       faqTotal.value = next.total;
     }
-  } catch {
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) faqLoadError.value = true;
+  } catch (cause) {
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      if (cause instanceof ApiError && (cause.kind === "auth" || cause.status === 401 || cause.status === 403 || cause.code === 401 || cause.code === 403)) {
+        faqs.value = []; faqPageNum.value = 0; faqTotal.value = 0;
+      }
+      faqLoadError.value = true;
+    }
   } finally {
     if (requestGeneration === faqRequestGeneration && remoteAccountScope.isCurrent(requestScope)) faqLoading.value = false;
   }
@@ -190,10 +211,11 @@ async function loadMoreFaqs() {
 
 function retryFaqs() {
   if (faqLoading.value) return;
-  void loadFaqs();
+  void loadFaqs(true);
 }
 
 function resetFaqProjection() {
+  faqDisplayScope = "";
   faqRequestGeneration += 1;
   faqs.value = [];
   faqPageNum.value = 0;
@@ -203,9 +225,18 @@ function resetFaqProjection() {
   faqLoading.value = false;
 }
 
+let releaseActiveRefresh = () => {};
+let helpVisible = false;
 onShow(() => {
+  helpVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(() => loadFaqs(true));
   void loadFaqs();
 });
+onHide(() => { helpVisible = false; releaseActiveRefresh(); });
+onUnmounted(() => { helpVisible = false; releaseActiveRefresh(); });
+const stopRuntimeRefresh = subscribeRuntimeRevision(() => { resetFaqProjection(); if (helpVisible) void loadFaqs(); });
+onUnmounted(stopRuntimeRefresh);
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;

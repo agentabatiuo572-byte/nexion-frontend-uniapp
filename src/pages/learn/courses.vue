@@ -5,13 +5,13 @@
       <view v-if="loading && !overview" class="learning-state" role="status"><text>{{ t.learning.centerLoading }}</text></view>
       <view v-else-if="error" class="learning-state" role="alert" aria-live="assertive">
         <text class="block">{{ errorText }}</text>
-        <NxButton class="learning-retry nx-retry-action" variant="text" :label="t.ui.retry" @click="load" />
+        <NxButton class="learning-retry nx-retry-action" variant="text" :label="t.ui.retry" @click="retryCourses" />
       </view>
       <view v-if="!overview" class="learning-summary">
         <view class="learning-summary__line"><text class="learning-summary__progress">{{ fmt(pageCopy.progress, {done:'—',total:'—'}) }}</text><view class="learning-summary__earned"><text>{{ pageCopy.earned }}</text><text class="learning-reward">— UVT</text></view></view>
         <view class="course-list__heading"><text class="course-list__title">{{ pageCopy.allCourses }}</text><text class="course-list__count">—</text></view>
       </view>
-      <view v-if="overview && !error">
+      <view v-if="overview">
         <view class="learning-summary learning-summary--known">
           <GrowthProgress ring :size="64" :stroke="9" :value="overviewProgress" :label="progressLine"><text>{{ overview.completedCourses }}/{{ overview.totalCourses }}</text></GrowthProgress>
           <view class="learning-summary__line">
@@ -59,13 +59,16 @@ import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import AppChassis from "@/components/app-chassis.vue";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import GrowthProgress from "@/components/ui/growth-progress.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import { learningApi } from "@/api/learning-runtime";
+import { ApiError } from "@/api/errors";
+import { readLearningCourses } from "@/store/published-content";
+import { passiveTabReadScope } from "@/lib/passive-tab-read";
 import { remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
 import { courseDurationText } from "@/lib/course-duration";
@@ -109,6 +112,7 @@ function courseStatus(course: LearningCourse) { return course.completed ? auditC
 let accountEpoch = 0;
 let generation = 0;
 let mounted = false;
+let overviewScope = "";
 const fenceReader = createLearningPageFenceReader(
   () => String(app.accountKey),
   () => accountEpoch,
@@ -120,8 +124,10 @@ function fence(): LearningPageFence { return fenceReader.capture(); }
 function current(scope: LearningPageFence): boolean { return fenceReader.isCurrent(scope); }
 let environmentInvalidated = false;
 watch(() => apiRuntimeConfig?.environment, () => { environmentInvalidated = true; accountEpoch += 1; generation += 1; overview.value = null; error.value = 'centerUnavailable'; }, { flush: 'sync' });
-async function load() {
+async function load(force = false) {
   if (environmentInvalidated) return;
+  const displayScope = passiveTabReadScope(false);
+  if (overviewScope !== displayScope) overview.value = null;
   generation += 1;
   const scope = fence();
   loading.value = true;
@@ -133,19 +139,24 @@ async function load() {
     return;
   }
   try {
-    const value = await learningApi.courses(language.value);
-    if (current(scope)) overview.value = value;
+    const value = await readLearningCourses(language.value, force);
+    if (current(scope)) { overview.value = value; overviewScope = displayScope; }
   } catch (cause) {
-    if (current(scope)) { overview.value = null; error.value = cause instanceof Error && cause.message.includes("GEO_COUNTRY_UNRESOLVED") ? "centerGeoUnresolved" : "centerUnavailable"; }
+    if (current(scope)) {
+      if (cause instanceof ApiError && (cause.kind === "auth" || cause.status === 401 || cause.status === 403 || cause.code === 401 || cause.code === 403)) overview.value = null;
+      error.value = cause instanceof Error && cause.message.includes("GEO_COUNTRY_UNRESOLVED") ? "centerGeoUnresolved" : "centerUnavailable";
+    }
   } finally {
     if (current(scope)) loading.value = false;
   }
 }
+function retryCourses() { void load(true); }
 function open(id: string) { navTo(`/pages/learn/course?id=${encodeURIComponent(id)}`); }
 const courseVisibility = createPageVisibilityRefresh((reason) => {
   if (reason === "return") generation += 1;
   void load();
 });
+let releaseActiveRefresh = () => {};
 bindPageVisibilityRefresh(courseVisibility, {
   mounted: (callback) => onMounted(() => {
     mounted = true;
@@ -153,15 +164,18 @@ bindPageVisibilityRefresh(courseVisibility, {
   }),
   shown: (callback) => onShow(() => {
     mounted = true;
+    releaseActiveRefresh();
+    releaseActiveRefresh = registerActivePageRefresh(() => load(true));
     callback();
   }),
   hidden: (callback) => onHide(() => {
+    releaseActiveRefresh();
     mounted = false;
     generation += 1;
     callback();
   }),
 });
-onUnmounted(() => { mounted = false; generation += 1; });
+onUnmounted(() => { releaseActiveRefresh(); mounted = false; generation += 1; });
 function refreshForScopeChange() {
   accountEpoch += 1;
   generation += 1;
