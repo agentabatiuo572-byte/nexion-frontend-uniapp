@@ -68,6 +68,7 @@
 import { computed, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
+import { requireAccountPhone } from "@/lib/require-account-phone";
 import { useApp } from "@/store/app";
 import { apiClient } from "@/api/runtime";
 import { createBankWithdrawalApi } from "@/api/bank-withdrawal-api";
@@ -88,7 +89,7 @@ const fieldsDisabled = computed(() => state.busy || state.phase !== "details" ||
 const canSubmit = computed(() => { void now.value; return !state.busy && (state.phase === "uncertain" || form.canContinue()); });
 const canSendOtp = computed(() => { void now.value; return form.canSendOtp(); });
 const resendSeconds = computed(() => Math.max(0, Math.ceil((state.resendAt - now.value) / 1000)));
-function sendOtp() { if (canSendOtp.value) void form.sendOtp(); }
+function sendOtp() { if (canSendOtp.value && requireAccountPhone()) void form.sendOtp(); }
 const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, routingUnverified: c.value.routingUnverified, bind: c.value.bindError, unknown: c.value.unknown, otpSend: c.value.otpSendError, otpInvalid: c.value.otpInvalid, otpRateLimited: c.value.otpRateLimited }[state.error] || c.value.bindError));
 const displayDate = formatBankDateTime;
 function submitBinding() {

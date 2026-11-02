@@ -104,6 +104,7 @@ function errorMessage(cause: unknown): string {
   const error = cause instanceof ApiError ? cause.message : "";
   if (error === "USER_REGISTRATION_K1_IP_LIMIT") return t.value.register.errorSignupLimited;
   if (error === "USER_REGISTRATION_DEVICE_LIMIT") return t.value.register.errorDeviceSignupLimited;
+  if (error === "OAUTH_LOGIN_EXPIRED") return t.value.thirdParty.restartExpired;
   if (error === "OAUTH_ACCOUNT_LINK_REQUIRED") return t.value.thirdParty.linkRequired;
   if (error === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || error === "USER_REGISTRATION_SPONSOR_INVALID") return t.value.register.inviteInvalid;
   if (error?.startsWith("USER_REGISTRATION_SPONSOR_")) return t.value.register.sponsorEnvironmentMismatch;
@@ -216,6 +217,8 @@ async function complete(captchaTicket?: string) {
         // Leave the durable attempt intact. The shared login recovery UI owns
         // ambiguous completion, including recovery after this flow has expired.
         cancel(); message.value = t.value.login.unknownAttempt;
+      } else if (cause instanceof ApiError && cause.message === "OAUTH_LOGIN_EXPIRED") {
+        cancel(); message.value = errorMessage(cause);
       } else if (cause instanceof ApiError && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) showCaptcha.value = true;
       else if (!sponsorRefused(cause)) message.value = errorMessage(cause);
     }

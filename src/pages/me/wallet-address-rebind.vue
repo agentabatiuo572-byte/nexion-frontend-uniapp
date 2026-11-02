@@ -254,6 +254,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
+import { requireAccountPhone } from "@/lib/require-account-phone";
 import { fmt } from "@/i18n/format";
 import { navBack, navTo } from "@/lib/route";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
@@ -406,6 +407,7 @@ function resetOtp() {
 }
 async function sendCode(captchaTicket?: string) {
   if (otpSending.value) return;
+  if (!requireAccountPhone()) return;
   const scope = captureCommandScope();
   if (!commandIsCurrent(scope)) return;
   otpSending.value = true;

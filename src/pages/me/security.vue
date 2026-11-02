@@ -34,6 +34,10 @@
         <text class="block" style="font-size: 13px; line-height: 1.5">{{ t.topupChrome.flowRetired }}</text>
       </view>
 
+      <view v-if="phoneMissing" class="mx-4 nx-glass-card" style="padding: 16px; margin-bottom: 16px" role="status">
+        <text class="block">{{ t.security.phoneBindingRequired }}</text>
+        <view role="button" tabindex="0" style="min-height: 44px; color: var(--v5-brand); display: flex; align-items: center" @click="navTo('/pages/me/phone-binding')" @keydown.enter.prevent="navTo('/pages/me/phone-binding')" @keydown.space.prevent="navTo('/pages/me/phone-binding')">{{ t.security.phoneBindingTitle }} →</view>
+      </view>
       <!-- ───── Password + Two-factor (merged, de-carded group) ───── -->
       <view class="nx-glass-card mx-4" :style="cardStyle">
         <view class="flex items-center active:opacity-90" :style="rowStyle" role="button" tabindex="0" :aria-expanded="editingPwd ? 'true' : 'false'" @click="editingPwd = !editingPwd"  @keydown.enter.prevent="editingPwd = !editingPwd" @keydown.space.prevent="editingPwd = !editingPwd">
@@ -157,6 +161,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { parseServerTimestamp } from "@/api/server-time";
 import { useT } from "@/i18n/use-t";
+import { requireAccountPhone } from "@/lib/require-account-phone";
 import { fmt } from "@/i18n/format";
 import { useSecurity } from "@/store/security";
 import { captureAccountScope, isCurrentAccountScope, rebindAccountScopedStores } from "@/lib/account-scope";
@@ -207,6 +212,7 @@ const securityConfirmOwner = `p3-18-security:${globalThis.crypto?.randomUUID?.()
 let securityPageVisible = true;
 
 const remoteSecurity = ref<SecurityState | null>(null);
+const phoneMissing = ref(remoteApiEnabled && !!sessionVault.read() && !sessionVault.read()!.user.phone);
 const deletionStatus = ref<AccountDeletionStatus>({ status: "NONE" });
 const deletionPending = computed(() => deletionStatus.value.status !== "NONE"
   && (deletionStatus.value.status === "REQUESTED" || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED"));
@@ -323,6 +329,7 @@ function refreshSecurityForCurrentAccount() {
 
 onShow(() => {
   securityPageVisible = true;
+  phoneMissing.value = remoteApiEnabled && !!sessionVault.read() && !sessionVault.read()!.user.phone;
   refreshSecurityForCurrentAccount();
 });
 onHide(() => {
@@ -539,6 +546,7 @@ async function submitPasswordChange() {
 
 async function toggleTwoFactor(value: boolean) {
   if (securityBusy.value) return;
+  if (!requireAccountPhone()) return;
   const pageScope = securityPageFence.capture("two-factor");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
