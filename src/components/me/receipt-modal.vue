@@ -204,8 +204,8 @@ const receiptStatus = computed(() => {
 const summaryAmount = computed(() => {
   const r = props.receipt;
   if (!r) return "";
-  const amount = formatGroupedAmount(isCanonicalComputeReceipt(r) ? r.rewardUsdt : r.netPaid);
-  return (amount.startsWith("-") || amount === "0.00" ? "" : "+") + amount + " USDT";
+  const amount = isCanonicalComputeReceipt(r) ? formatGroupedAmount(r.rewardUsdt, "full") : formatGroupedAmount(r.netPaid);
+  return (amount.startsWith("-") || amount === "0" || amount === "0.00" ? "" : "+") + amount + " USDT";
 });
 
 // ── tap-to-copy (matches prototype RowCopy: copy on tap, transient ✓ icon) ──
@@ -351,8 +351,8 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
-          { k: "reward_usdt", v: `+${formatAmount(r.rewardUsdt)} USDT`, accent: true, strong: true },
-          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex)} UVT`, accent: true }] : []),
+          { k: "reward_usdt", v: `+${formatAmount(r.rewardUsdt, "full")} USDT`, accent: true, strong: true },
+          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex, "full")} UVT`, accent: true }] : []),
         ],
       },
       {

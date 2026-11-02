@@ -66,7 +66,7 @@
                 <text class="block truncate" :style="rowSubStyle">{{ t.receipt.computeTitle }} · {{ r.model }}</text>
               </view>
               <view class="text-right shrink-0" style="margin-left: 8px">
-                <text class="block tabular-nums" :style="remoteAmountStyle">+${{ formatAmount(r.rewardUsdt) }}</text>
+                <text class="block tabular-nums" :style="remoteAmountStyle">+${{ formatAmount(r.rewardUsdt, "full") }}</text>
                 <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
