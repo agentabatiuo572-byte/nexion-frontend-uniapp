@@ -127,7 +127,7 @@ const fieldLabels: Record<string, readonly [string, string, string]> = {
   reward_usdt:["USDT 收益","USDT reward","Thu nhập USDT"],
   reward_nex:["UVT 奖励","UVT reward","Phần thưởng UVT"],
   proof_hash:["证明哈希","Proof hash","Mã băm bằng chứng"],
-  receipt_hash:["凭证哈希","Receipt hash","Mã băm biên nhận"],
+  receipt_hash:["证明哈希","Receipt hash","Mã băm biên nhận"],
   compliance_id:["核验编号","Verification number","Mã xác minh"],
   type:["类型","Type","Loại"],
   program:["核验程序","Verification program","Chương trình xác minh"],
