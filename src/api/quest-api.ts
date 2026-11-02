@@ -29,6 +29,7 @@ export interface CanonicalPromoBanner {
   countdownDays: number;
   countdownHours: number;
   targetDevice: string;
+  productType?: "DEVICE" | "SHARE";
   targetDaily: number | null;
   status: "active" | "paused";
 }
@@ -146,6 +147,10 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
   const countdownHours = number(row.countdownHours, 0, 23);
   const targetDevice = text(row.targetDevice);
   const productType = text(row.productType)?.toUpperCase();
+  if ((productType !== undefined && productType !== "DEVICE" && productType !== "SHARE")
+      || (row.productType != null && productType === undefined)) {
+    return invalid("QUEST_PROMO_RESPONSE_INVALID");
+  }
   const shareTarget = productType === "SHARE"
     || (productType == null && /cloud[\s_-]*share|\u4e91\u5171\u4eab|\u96f2\u5171\u4eab/i.test(targetDevice ?? ""));
   const targetDaily = shareTarget ? null : number(row.targetDaily, 0, 1_000_000);
@@ -163,6 +168,7 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
     countdownDays,
     countdownHours,
     targetDevice,
+    productType,
     targetDaily,
     status,
   };
