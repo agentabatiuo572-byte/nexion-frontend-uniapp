@@ -9,9 +9,15 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
-    <FxRateLine v-if="paymentSessionReady" :key="app.accountBindingEpoch" />
-    <view v-if="createError || readError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
-      <text class="block break-all" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger)">{{ createError || readError }}</text>
+    <FxRateLine v-if="paymentSessionReady" :style="readFailure || paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
+    <view v-if="readFailure" class="nx-bank-read-error" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-2)" role="status">
+      <text>{{ readFailure }}</text>
+      <view class="nx-bank-read-retry" role="button" :tabindex="readRetryBusy ? -1 : 0" :aria-disabled="readRetryBusy" style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)" @click="retryReadData" @keydown.enter.prevent="retryReadData" @keydown.space.prevent="retryReadData">
+        <text>{{ readRetryBusy ? t.help.loadingMore : t.ui.retry }}</text>
+      </view>
+    </view>
+    <view v-if="createError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
+      <text class="block break-all" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger)">{{ createError }}</text>
       <view v-if="createRecovery" class="nx-bank-setup-recovery active-press" role="button" tabindex="0"
         @click="goCreateRecovery" @keydown.enter.prevent="goCreateRecovery" @keydown.space.prevent="goCreateRecovery"
         style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)">
@@ -20,16 +26,9 @@
     </view>
 
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
-    <template v-if="paneView === 'form' && paymentSessionReady">
-      <!-- 收款账户池无可用账户 → 通道维护空状态([FEAT-PAY02] ⑤;segment 侧同步置灰) -->
-      <view v-if="!bankRailAvailable" class="flex flex-col items-center" style="padding: 36px 0 28px">
-        <view class="grid place-items-center" :style="pausedIconStyle">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M10 15V9" /><path d="M14 15V9" /></svg>
-        </view>
-        <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; max-width: 260px">{{ t.bankPane.railPaused }}</text></view>
-      </view>
-
-      <view v-else :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
+    <template v-if="paneView === 'form' && paymentSessionReady && fx.configReady && !fx.syncFailed">
+      <!-- An unconfigured bank channel is not shown: the page hides this segment and moves to USDT. -->
+      <view v-if="bankRailAvailable" :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
         <view v-if="dailyCapacityExhausted" class="flex" :style="warnRowStyle">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
           <view class="flex-1 min-w-0">
@@ -37,80 +36,83 @@
             <text class="block" :style="warnTextStyle" style="margin-top: 2px">{{ fmt(t.bankPane.dailyCapacityExhaustedBody, { remaining: todayRemainingLabel, min: minLabel }) }}</text>
           </view>
         </view>
-        <view class="rounded-2xl" :style="amountBoxStyle">
-          <view><text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.bankPane.amountLabel }}</text></view>
-          <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
-            <input
-              class="flex-1 min-w-0 tabular-nums"
-              :style="amountInputStyle"
-              type="text"
-              inputmode="numeric"
-              :value="amount"
-              placeholder="0.00"
-              :disabled="creating || !fxUsable || dailyCapacityExhausted"
-              :aria-label="t.bankPane.amountLabel"
-              @input="onAmount"
-            />
-            <text class="font-mono-tabular" style="font-size: 15px; color: var(--v5-ink-3)">USDT</text>
+        <!-- Amount on a liquid-glass slab over a soft aura; preset amounts sit under it (selected = brand glass, others flat). -->
+        <view class="nx-bank-stage">
+          <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
+          <view class="nx-bank-slab">
+            <text class="nx-bank-k">{{ t.bankPane.amountLabel }}</text>
+            <view class="nx-bank-amtrow">
+              <input
+                class="nx-bank-amt"
+                :style="{ width: `calc(${Math.max(amount.length, 1)} * (1ch - .02em) + 8px)` }"
+                type="text"
+                inputmode="numeric"
+                :value="amount"
+                placeholder="0"
+                :disabled="creating || !fxUsable || dailyCapacityExhausted"
+                :aria-label="t.bankPane.amountLabel"
+                @input="onAmount"
+              />
+              <text class="nx-bank-unit">USDT</text>
+            </view>
+            <text class="nx-bank-vnd">{{ vndPreview }}</text>
+            <view class="nx-bank-chips">
+              <view
+                v-for="preset in quickAmounts" :key="preset.value"
+                class="nx-bank-chip" :class="{ 'nx-bank-chip--on nx-frosted-button': amount === String(preset.value) }"
+                role="button" :tabindex="preset.enabled ? 0 : -1" :aria-disabled="!preset.enabled" :aria-pressed="amount === String(preset.value)"
+                @click="pickAmount(preset)"
+              ><text>{{ preset.label }}</text></view>
+            </view>
+            <text v-if="amountError" class="nx-bank-err">{{ amountError }}</text>
           </view>
-          <view style="margin-top: 8px">
-            <text class="tabular-nums" style="font-size: 13px; color: var(--v5-ink-2); font-weight: 600; white-space: nowrap">{{ vndPreview }}</text>
-          </view>
-          <view v-if="amountError"><text class="block" :style="errTextStyle">{{ amountError }}</text></view>
         </view>
 
-        <view class="flex items-center justify-between" style="margin-top: 10px; padding: 0 4px; gap: 8px">
-          <view class="min-w-0"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ feeNote }}</text></view>
-          <view v-if="dailyCapacityKnown" class="shrink-0"><text style="font-size: 12px; color: var(--v5-ink-3); white-space: nowrap">{{ todayRemainingLine }}</text></view>
+        <view class="nx-bank-facts">
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factFee }}</text><text class="nx-bank-fact__v">{{ feeFact }}</text><text v-if="fx.configReady && fx.feeUsdt > 0 && fx.feeVnd > 0" class="nx-bank-fact__sub">{{ fmtVnd(fx.feeVnd) }}</text></view>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factTodayRemaining }}</text><text class="nx-bank-fact__v">{{ todayRemainingFact }}</text></view>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factSingleLimit }}</text><text class="nx-bank-fact__v">{{ limitFact }}</text></view>
         </view>
 
-        <view style="margin-top: 6px; padding: 0 4px"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ limitLine }}</text></view>
-
-        <view
-          :class="['nx-bank-create-cta w-full grid place-items-center', ctaEnabled ? 'active:opacity-90' : '']"
-          :style="createBtnStyle"
-          role="button" tabindex="0"
-          :aria-disabled="!ctaEnabled"
-          @click="createOrder()"
-        >
-          <view class="inline-flex items-center" style="gap: 8px">
-            <view v-if="creating" :style="miniSpinnerStyle" />
-            <text>{{ creating ? t.bankPane.creating : t.bankPane.createCta }}</text>
-          </view>
+        <view class="nx-bank-hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>
+          <text>{{ t.bankPane.hostedSecureNote }}</text>
         </view>
       </view>
     </template>
 
     <!-- ── 付款单(awaiting_payment)── -->
     <template v-else-if="paneView === 'order' && intent">
-      <view class="nx-step-in" style="margin-top: 14px">
-        <view v-if="!hostedRejected"><text class="block text-center tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
-        <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-v5); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
-        <view><text class="block text-center" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ creditLineText }}</text></view>
-
+      <view class="nx-step-in" :style="intent.paymentMode === 'hosted' ? undefined : 'margin-top: 14px'">
+        <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
         <template v-if='intent.paymentMode === "hosted"'>
-          <view class="flex flex-col items-center" style="margin-top: 18px; padding: 18px 14px; border-radius: 16px; background: var(--v5-surface-2)">
-            <view class="grid place-items-center" :style="hostedIconStyle">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" /><path d="M3 10h18" /><path d="M7 15h.01" /></svg>
+          <view class="nx-bank-stage">
+            <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
+            <view class="nx-bank-slab nx-bank-pay">
+              <template v-if="!hostedRejected">
+                <view class="nx-bank-ring" role="timer" :aria-label="`${t.bankPane.remainingLabel} ${countdownText}`">
+                  <svg width="148" height="148" viewBox="0 0 148 148" aria-hidden="true">
+                    <circle class="nx-bank-ring__track" cx="74" cy="74" r="68" />
+                    <circle class="nx-bank-ring__value" cx="74" cy="74" r="68" :style="{ strokeDashoffset: `${(427 * (1 - countdownRatio)).toFixed(1)}` }" />
+                  </svg>
+                  <view class="nx-bank-ring__c"><text class="nx-bank-ring__t">{{ countdownText }}</text><text class="nx-bank-k">{{ t.bankPane.remainingLabel }}</text></view>
+                </view>
+                <text class="nx-bank-cd">{{ countdownParts[0] }}<text class="nx-bank-cd__time">{{ countdownText }}</text>{{ countdownParts[1] }}</text>
+              </template>
+              <view v-else class="nx-bank-pay__rejected">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
+                <text>{{ t.bankPane.hostedRejectedNote }}</text>
+              </view>
             </view>
-            <text class="block text-center" style="margin-top: 10px; font-size: 13px; color: var(--v5-ink-2); line-height: 1.55">{{ hostedRejected ? t.bankPane.hostedRejectedNote : hostedCanOpen ? t.bankPane.hostedSecureNote : t.bankPane.hostedPendingNote }}</text>
-            <text v-if="hostedRejected && intent.providerReason" class="block text-center break-all" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-2); line-height: 1.55">{{ fmt(t.bankPane.providerReason, { reason: intent.providerReason }) }}</text>
           </view>
-          <view v-if="hostedCanOpen" class="nx-bank-hosted-continue-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="openHostedOrder(intent)">
-            <text>{{ t.bankPane.hostedContinueCta }}</text>
+          <view class="nx-bank-sum">
+            <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.expectedLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--big">{{ fmtVnd(intent.vndAmount) }}</text></view>
+            <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) }} USDT</text></view>
+            <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.fx.rateLabel }}</text><text class="nx-bank-sum__v">1 USDT ≈ {{ fmtVnd(intent.fxRate) }}</text></view>
           </view>
-          <view
-            v-if="hostedRejected"
-            :class="['nx-bank-regen-cta w-full grid place-items-center', creating || !fxUsable ? '' : 'active:opacity-90']"
-            :style="paidBtnStyle"
-            role="button" tabindex="0"
-            :aria-disabled="creating || !fxUsable"
-            @click="regen"
-          >
-            <view class="inline-flex items-center" style="gap: 8px">
-              <view v-if="creating" :style="miniSpinnerStyle" />
-              <text>{{ creating ? t.bankPane.creating : t.bankPane.regenCta }}</text>
-            </view>
+          <view v-if="!hostedRejected" class="nx-bank-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>
+            <text>{{ hostedCanOpen ? t.bankPane.hostedSecureNote : t.bankPane.hostedPendingNote }}</text>
           </view>
           <view
             v-if="hostedRejected"
@@ -124,6 +126,12 @@
           <view v-if="hostedRejected" class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
             <text :style="ghostTextStyle">{{ t.help.contactSupport }}</text>
           </view>
+        </template>
+
+        <template v-else>
+        <view><text class="block text-center tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
+        <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-amount, var(--font-v5)); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
+        <view><text class="block text-center" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ creditLineText }}</text></view>
         </template>
 
         <template v-if="intent.paymentMode !== 'hosted'">
@@ -164,7 +172,7 @@
         <view class="flex items-center justify-between" :style="memoBoxStyle">
           <view class="flex-1 min-w-0">
             <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.bankPane.memoLabel }}</text>
-            <text class="block font-mono-tabular" :style="memoCodeStyle">{{ intent.memoCode }}</text>
+            <text class="block font-mono-code" :style="memoCodeStyle">{{ intent.memoCode }}</text>
           </view>
           <view class="nx-bank-copy-memo-cta grid place-items-center shrink-0 active:opacity-80" :style="memoCopyBtnStyle" role="button" tabindex="0" @click="copyMemo">
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.bankPane.copyCta }}</text>
@@ -175,13 +183,10 @@
         <view style="margin-top: 14px">
           <view v-for="(s, i) in steps" :key="i" class="flex items-start" style="gap: 10px; padding: 5px 0">
             <view class="grid place-items-center shrink-0" :style="stepNumStyle"><text style="font-size: 12px; font-weight: 600; color: var(--v5-brand)">{{ i + 1 }}</text></view>
-            <view class="flex-1 min-w-0"><text style="font-size: 13px; color: var(--v5-ink-2); line-height: 1.5">{{ s }}</text></view>
+            <view class="flex-1 min-w-0"><text style="font-size: var(--ui-type-list-subtitle, 13px); color: var(--v5-ink-2); line-height: 1.5">{{ s }}</text></view>
           </view>
         </view>
 
-        <view class="nx-bank-paid-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="paidPressed = true">
-          <text>{{ t.bankPane.paidCta }}</text>
-        </view>
         </template>
         <!-- HDPay 无关闭订单/退款接口，provider order 创建后禁止制造本地取消分叉。 -->
         <view v-if="intent.paymentMode !== 'hosted'" class="nx-bank-cancel-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="askCancel">
@@ -206,21 +211,17 @@
 
     <!-- ── 成功(credited)── -->
     <template v-else-if="paneView === 'credited' && intent">
-      <view class="flex flex-col items-center nx-step-in" style="padding: 32px 0 8px">
-        <view class="grid place-items-center" :style="successIconStyle">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-        </view>
-        <view><text class="block text-center" :style="stateTitleStyle">{{ t.bankPane.successTitle }}</text></view>
-        <view>
-          <text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-brand); white-space: nowrap">+{{ formatAmount(creditedUsdt) }} USDT</text>
-        </view>
-        <view><text class="block text-center" :style="stateBodyStyle">{{ fmt(t.bankPane.successLine, { rate: rateText }) }}</text></view>
+      <!-- Credited (P-44): medal with a one-time ring, the credited amount, then a details card; actions sit in the bottom bar. -->
+      <view class="nx-bank-done nx-step-in" role="status">
+        <view class="nx-bank-done__medal"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5" /></svg></view>
+        <text class="nx-bank-done__title">{{ t.bankPane.successTitle }}</text>
+        <text class="nx-bank-done__amt">+{{ formatAmount(creditedUsdt) }}<text class="nx-bank-done__unit">USDT</text></text>
+        <text class="nx-bank-done__line">{{ fmt(t.bankPane.successLine, { rate: fmtVnd(intent.fxRate) }) }}</text>
       </view>
-      <view class="nx-bank-done-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="finishCreditedFlow">
-        <text>{{ t.bankPane.doneCta }}</text>
-      </view>
-      <view class="nx-bank-bills-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goBills">
-        <text :style="ghostTextStyle">{{ t.bankPane.viewBills }}</text>
+      <view class="nx-bank-sum nx-bank-sum--done">
+        <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.methodLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--text">{{ t.bankPane.segBank }}</text></view>
+        <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.expectedLabel }}</text><text class="nx-bank-sum__v">{{ fmtVnd(intent.vndAmount) }}</text></view>
+        <view v-if="creditedAtText" class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditedAtLabel }}</text><text class="nx-bank-sum__v">{{ creditedAtText }}</text></view>
       </view>
     </template>
 
@@ -236,18 +237,6 @@
       <view v-if="intent.receivedVnd" class="flex" :style="warnRowStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
         <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.bankPane.lateNote }}</text></view>
-      </view>
-      <view
-        :class="['nx-bank-regen-cta w-full grid place-items-center', creating ? '' : 'active:opacity-90']"
-        :style="paidBtnStyle"
-        role="button" tabindex="0"
-        :aria-disabled="creating"
-        @click="regen"
-      >
-        <view class="inline-flex items-center" style="gap: 8px">
-          <view v-if="creating" :style="miniSpinnerStyle" />
-          <text>{{ creating ? t.bankPane.creating : t.bankPane.regenCta }}</text>
-        </view>
       </view>
       <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
         <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
@@ -298,7 +287,9 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
+import { formatDisplayDateTime } from "@/lib/display-date";
+import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
 import { useT } from "@/i18n/use-t";
@@ -343,6 +334,20 @@ const autoResumePending = ref(true);
 const openingHosted = ref(false);
 const pageActive = ref(false);
 const readError = ref("");
+const readRetryPending = ref(false);
+const readRetryBusy = computed(() => readRetryPending.value || fx.loading || dep.serverStatus === "loading");
+const readFailure = computed(() => readError.value || (paymentSessionReady.value && fx.syncFailed ? t.value.bankPane.createFxUnavailable : ""));
+async function retryReadData() {
+  if (!pageActive.value || !paymentSessionReady.value || readRetryBusy.value) return;
+  const accountKey = app.accountKey, bindingEpoch = app.accountBindingEpoch;
+  readRetryPending.value = true;
+  try {
+    const results = await Promise.allSettled([fx.load(), dep.refreshRemoteVietQrDeposits()]);
+    if (!pageActive.value || !paymentSessionReady.value || accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch) return;
+    readError.value = dep.serverStatus === "error" || results.some(result => result.status === "rejected")
+      ? t.value.topupChrome.depositOpFailedNote : "";
+  } finally { readRetryPending.value = false; }
+}
 type PaymentReadScope = { accountKey: string; bindingEpoch: number };
 type ExistingPaymentChoice = PaymentReadScope & { intentId: string; usdtAmount: number; expireAt: number; paymentUrl: string };
 let pendingPaymentRead: (PaymentReadScope & { intents: DepositIntent[] }) | null = null;
@@ -454,7 +459,7 @@ watch(
 function recoveryAmount(): string {
   const draft = dep.bankRecoveryDraft;
   return paymentSessionReady.value && dep.currentAccountKey() === app.accountKey
-    && draft?.accountKey === app.accountKey ? draft.amount : "25";
+    && draft?.accountKey === app.accountKey ? draft.amount : "";
 }
 const amount = ref(recoveryAmount());
 watch(() => [app.accountKey, paymentSessionReady.value], () => { amount.value = recoveryAmount(); });
@@ -463,7 +468,7 @@ function onAmount(e: Event) {
   // 保留原输入；非法符号或超精度必须提示，不能静默变成另一笔金额。
   amount.value = (e as unknown as { detail?: { value?: string } }).detail?.value ?? "";
 }
-// Recharge principal is a positive integer; direct purchase payments keep decimal amounts.
+// User-entered top-up principal is a positive integer; purchase quotes and fees keep cents.
 const amountValid = computed(() => /^[1-9]\d*$/.test(amount.value)
   && Number.isSafeInteger(Number(amount.value)));
 const amountNum = computed(() => amountValid.value ? Number(amount.value) : 0);
@@ -485,23 +490,26 @@ const inRange = computed(() =>
 function usdtLabel(value: number): string {
   return `$${formatAmount(value)}`;
 }
-function fmtVnd(value: number): string { return `${formatAmount(value)}₫`; }
+function fmtVnd(value: number): string { return `${formatAmount(value, "VND")} ₫`; }
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
-const limitLine = computed(() => fx.configReady
-  ? fmt(t.value.bankPane.limitNote, { min: minLabel.value, max: maxLabel.value }) : "—");
+// Facts well under the amount: unknown values stay "—", never a fabricated 0.
+const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}–${shortUsdt(maxDeposit.value)}` : "—");
 const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
-const todayRemainingLine = computed(() =>
-  fmt(t.value.bankPane.todayRemainingNote, { remaining: todayRemainingLabel.value }),
-);
-const feeNote = computed(() => {
+const todayRemainingFact = computed(() => dailyCapacityKnown.value ? todayRemainingLabel.value : "—");
+const feeFact = computed(() => {
   if (!fx.configReady) return "—";
-  if (fx.feeUsdt <= 0 && fx.feeVnd <= 0) return t.value.bankPane.feeNote;
-  const usdt = formatAmount(fx.feeUsdt);
-  return fx.feeVnd > 0
-    ? fmt(t.value.bankPane.feeConfiguredVnd, { usdt, vnd: fmtVnd(fx.feeVnd) })
-    : fmt(t.value.bankPane.feeConfigured, { usdt });
+  if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return fmtVnd(fx.feeVnd);
+  return `${formatAmount(Math.max(fx.feeUsdt, 0))} USDT`;
 });
+// Whole-dollar labels for presets and limits ("$1,000"), keeping cents only when present.
+function shortUsdt(value: number): string { return usdtLabel(value).replace(/\.00$/, ""); }
+const quickAmounts = computed(() => [100, 500, 1000, 5000].map(value => ({ value, label: shortUsdt(value),
+  enabled: fxUsable.value && !creating.value && !dailyCapacityExhausted.value && value >= minDeposit.value && value <= maxDeposit.value
+    && (!dailyCapacityKnown.value || value <= todayRemainingDeposit.value) })));
+function pickAmount(preset: { value: number; enabled: boolean }) {
+  if (preset.enabled) amount.value = String(preset.value);
+}
 const amountError = computed(() => {
   if (amount.value === "" || amount.value === "." || dailyCapacityExhausted.value) return "";
   if (!amountValid.value) return t.value.bankPane.amountFormatError;
@@ -522,12 +530,13 @@ const vndPreview = computed(() =>
     ? fmt(t.value.bankPane.approx, { vnd: fmtVnd(vndForUsdt(amountNum.value, fx.quoteRate)) })
     : fmt(t.value.bankPane.approx, { vnd: "—" }),
 );
-const ctaEnabled = computed(() => fxUsable.value && inRange.value && !creating.value);
+const ctaEnabled = computed(() => fxUsable.value && inRange.value && !creating.value && !readError.value);
 
 // ── 生成付款单(mock ~600ms 延迟演加载态:按钮内联 spinner「生成中…」)──
 const creating = ref(false);
 const createError = ref("");
 const createRecovery = ref<"terms" | null>(null);
+const formCtaVisible = computed(() => paneView.value === "form" && paymentSessionReady.value && fx.configReady && !fx.syncFailed && bankRailAvailable.value);
 function goCreateRecovery() {
   if (!paymentSessionReady.value || creating.value || dep.currentAccountKey() !== app.accountKey) return;
   if (createRecovery.value !== "terms") return;
@@ -542,7 +551,7 @@ let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
   if ((presetUsdt === undefined && !amountValid.value) || !Number.isSafeInteger(usdt)
-    || creating.value || !fxUsable.value || usdt < minDeposit.value
+    || creating.value || readError.value || !fxUsable.value || usdt < minDeposit.value
     || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
   createRecovery.value = null;
@@ -570,8 +579,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       return;
     }
     if (!fx.vietQrEnabled) {
-      createError.value = t.value.bankPane.railPaused;
-      toast.error(createError.value);
+      // The page hides the bank segment and moves to USDT; no "unavailable" message.
       creating.value = false;
       return;
     }
@@ -632,7 +640,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       }
       if (cause instanceof ApiError && cause.message === "HDPAY_ORDER_CREATE_REJECTED") {
         approvedBusinessFailureCopy = t.value.bankPane.hostedRejectedNote;
-        if (cause.providerReason) approvedBusinessFailureCopy += `\n${fmt(t.value.bankPane.providerReason, { reason: cause.providerReason })}`;
       }
       // Another payment can consume the last daily capacity after our preflight.
       // The server remains the final authority; translate this settled 422 into
@@ -670,7 +677,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       // 曾仍传 "VIETQR_CREATE_FAILED",lib 改版后它从「极端边界才漏出」变成「每次失败必弹」。
     }, t.value.bankPane.createFailedNote);
 }
-/** 整数金额可显式重建；历史小数单保留原快照并返回整数输入。 */
+/** 整数金额可显式重建；历史小数单保留原快照并返回整数输入，不创建新收款。 */
 function regen() {
   const it = intent.value;
   if (!it) return;
@@ -690,7 +697,7 @@ async function finishCreditedFlow() {
     }
     if (!pageActive.value) return;
   }
-  navBack("/pages/me/wallet");
+  navBack("/pages/me/me");
 }
 function startNewTopup() {
   autoResumePending.value = false;
@@ -721,6 +728,13 @@ const countdownText = computed(() => {
   const left = Math.max(0, Math.floor((it.expireAt - nowTick.value) / 1000));
   return `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
 });
+// Ring share of the lock window still left; the copy keeps the time as its own bold run.
+const countdownRatio = computed(() => {
+  const it = intent.value;
+  const total = it ? it.expireAt - it.createdAt : 0;
+  return it && total > 0 ? Math.min(1, Math.max(0, (it.expireAt - nowTick.value) / total)) : 0;
+});
+const countdownParts = computed(() => { const [head = "", tail = ""] = t.value.bankPane.countdown.split("{time}"); return [head, tail]; });
 const hostedRejected = computed(() => intent.value?.paymentMode === "hosted"
   && intent.value.providerStatus === "rejected");
 const hostedCanOpen = computed(() => intent.value?.paymentMode === "hosted"
@@ -769,6 +783,12 @@ const creditedUsdt = computed(() => {
   return dep.records.find((r) => r.depositId === it.intentId)?.creditedUsdt ?? it.usdtAmount;
 });
 const rateText = computed(() => (intent.value ? intent.value.fxRate.toLocaleString("en-US") : "—"));
+const locale = useLocaleStore();
+// Credited time comes from the credit record; without one the row is left out.
+const creditedAtText = computed(() => {
+  const at = intent.value ? dep.records.find((r) => r.depositId === intent.value!.intentId)?.creditedAt : undefined;
+  return at ? formatDisplayDateTime(at, locale.code) : "";
+});
 const creditLineText = computed(() =>
   intent.value
     ? fmt(t.value.bankPane.creditLine, { usdt: formatAmount(intent.value.usdtAmount), rate: rateText.value })
@@ -870,44 +890,6 @@ const disabledWrapStyle: CSSProperties = {
   opacity: 0.45,
   pointerEvents: "none",
 };
-const amountBoxStyle: CSSProperties = {
-  marginTop: "14px",
-  padding: "14px",
-  background: "var(--v5-surface-2)",
-};
-const amountInputStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-  background: "transparent",
-  border: "none",
-  outline: "none",
-  padding: 0,
-  minWidth: 0,
-};
-const errTextStyle: CSSProperties = {
-  marginTop: "6px",
-  fontSize: "12px",
-  color: "var(--v5-danger)",
-  lineHeight: 1.4,
-};
-function pillBtn(bg: string, color: string): CSSProperties {
-  return {
-    marginTop: "14px",
-    height: "48px",
-    borderRadius: "999px",
-    background: bg,
-    color,
-    fontFamily: "var(--font-v5)",
-    fontSize: "15px",
-    fontWeight: 600,
-  };
-}
-const createBtnStyle = computed<CSSProperties>(() =>
-  ctaEnabled.value ? pillBtn("var(--v5-brand)", "var(--v5-on-brand)") : pillBtn("var(--v5-surface-2)", "var(--v5-ink-4)"),
-);
-const paidBtnStyle: CSSProperties = pillBtn("var(--v5-brand)", "var(--v5-on-brand)");
 const ghostBtnStyle: CSSProperties = {
   marginTop: "6px",
   minHeight: "44px",
@@ -915,17 +897,8 @@ const ghostBtnStyle: CSSProperties = {
   background: "transparent",
 };
 const ghostTextStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle, 13px)",
   color: "var(--v5-ink-3)",
-};
-const miniSpinnerStyle: CSSProperties = {
-  width: "16px",
-  height: "16px",
-  borderRadius: "50%",
-  border: "2px solid color-mix(in srgb, currentColor 30%, transparent)",
-  borderTopColor: "currentColor",
-  animation: "spin 1s linear infinite",
-  flexShrink: 0,
 };
 const qrBoxStyle: CSSProperties = {
   width: "160px",
@@ -954,11 +927,11 @@ const bankRowStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const bankKeyStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle, 13px)",
   color: "var(--v5-ink-3)",
 };
 const bankValStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle, 13px)",
   fontWeight: 500,
   color: "var(--v5-ink)",
   textAlign: "right",
@@ -999,8 +972,8 @@ const stepNumStyle: CSSProperties = {
 const stateTitleStyle: CSSProperties = {
   marginTop: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title, 16px)",
+  fontWeight: "var(--ui-type-card-title-weight, 600)",
   color: "var(--v5-ink)",
 };
 const stateBodyStyle: CSSProperties = {
@@ -1015,12 +988,6 @@ const waitIconStyle: CSSProperties = {
   height: "52px",
   borderRadius: "50%",
   background: "var(--v5-warning-soft)",
-};
-const successIconStyle: CSSProperties = {
-  width: "52px",
-  height: "52px",
-  borderRadius: "50%",
-  background: "var(--v5-success-soft)",
 };
 const expiredIconStyle: CSSProperties = {
   width: "52px",
@@ -1040,18 +1007,27 @@ const warnTextStyle: CSSProperties = {
   color: "var(--v5-warning)",
   lineHeight: 1.45,
 };
-const pausedIconStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "14px",
-  background: "var(--v5-surface-2)",
-};
-const hostedIconStyle: CSSProperties = {
-  width: "52px",
-  height: "52px",
-  borderRadius: "16px",
-  background: "var(--v5-brand-soft)",
-};
+
+// ── Main actions for the page's fixed bottom bar (DS-30): one per stage, plus the credited stage's bills link. ──
+type PaneAction = { className: string; label: string; enabled: boolean; busy: boolean; external: boolean; run: () => void };
+const primaryAction = computed<PaneAction | null>(() => {
+  const it = intent.value, copy = t.value.bankPane;
+  const regenAction = (enabled: boolean): PaneAction => ({ className: "nx-bank-regen-cta", label: creating.value ? copy.creating : copy.regenCta,
+    enabled, busy: creating.value, external: false, run: regen });
+  if (paneView.value === "form") return formCtaVisible.value ? { className: "nx-bank-create-cta", label: creating.value ? copy.creating : copy.createCta,
+    enabled: ctaEnabled.value, busy: creating.value, external: false, run: () => createOrder() } : null;
+  if (paneView.value === "order" && it) {
+    if (it.paymentMode !== "hosted") return { className: "nx-bank-paid-cta", label: copy.paidCta, enabled: true, busy: false, external: false, run: () => { paidPressed.value = true; } };
+    if (hostedCanOpen.value) return { className: "nx-bank-hosted-continue-cta", label: copy.hostedContinueCta, enabled: true, busy: false, external: true, run: () => openHostedOrder(it) };
+    return hostedRejected.value ? regenAction(!creating.value && fxUsable.value) : null;
+  }
+  if (paneView.value === "credited" && it) return { className: "nx-bank-done-cta", label: copy.doneCta, enabled: true, busy: false, external: false, run: () => { void finishCreditedFlow(); } };
+  if (paneView.value === "expired" && it) return regenAction(!creating.value);
+  return null;
+});
+const secondaryAction = computed<PaneAction | null>(() => paneView.value === "credited" && intent.value
+  ? { className: "nx-bank-bills-link", label: t.value.bankPane.viewBills, enabled: true, busy: false, external: false, run: goBills } : null);
+defineExpose({ paneView, primaryAction, secondaryAction });
 </script>
 
 <style scoped>
@@ -1070,4 +1046,83 @@ const hostedIconStyle: CSSProperties = {
     opacity: 0.72;
   }
 }
+</style>
+
+<style scoped>
+/* P-44 top-up form: amount on a liquid-glass slab over a two-tone aura, presets, and a recessed facts well. */
+.nx-bank-stage { position: relative; margin: 4px -2px 0; }
+.nx-bank-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
+.nx-bank-stage__aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
+.nx-bank-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
+.nx-bank-stage__aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent); }
+/* The glass carries its own copy of the aura so the colour reads through it as on the board.
+   No backdrop-filter: it only took effect while the page-enter animation composited the page,
+   so the slab rendered brighter for ~300ms and then dimmed. The tint below is the brighter look. */
+.nx-bank-slab { position: relative; padding: 23px 20px 20px; border-radius: 24px;
+  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 22%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent), transparent 70%), rgba(255,255,255,.13);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
+}
+[data-theme="light"] .nx-bank-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
+[data-theme="light"] .nx-bank-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
+[data-theme="light"] .nx-bank-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
+  box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
+.nx-bank-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.nx-bank-amtrow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
+.nx-bank-amt { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 74px); height: 52px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand);
+  font: 500 44px/52px var(--font-amount, var(--font-v5)); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.nx-bank-unit { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
+.nx-bank-vnd { display: block; margin-top: 2px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+.nx-bank-chip { position: relative; height: 36px; display: grid; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent);
+  color: var(--v5-ink-2); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+.nx-bank-chip::after { content: ""; position: absolute; inset: -4px 0; }
+.nx-bank-chip--on { color: var(--v5-brand); background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-brand) 14%, transparent); }
+.nx-bank-chip[aria-disabled="true"] { opacity: .45; cursor: default; }
+.nx-bank-chip:not([aria-disabled="true"]):active { transform: scale(.97); }
+.nx-bank-chip:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.nx-bank-err { display: block; margin-top: 10px; color: var(--v5-danger); font: 400 12px/18px var(--font-v5); }
+.nx-bank-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 14px 16px; border-radius: 14px;
+  background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .nx-bank-facts { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.nx-bank-fact { min-width: 0; }
+.nx-bank-fact > .nx-bank-k { padding-top: 3px; }
+.nx-bank-fact + .nx-bank-fact { padding-left: 12px; border-left: 1px solid var(--v5-border); }
+.nx-bank-fact__v { display: block; margin-top: 4px; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: 400 11px/16px var(--font-metric); white-space: nowrap; }
+.nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.nx-bank-hint > svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
+/* Hosted payment: countdown ring on the glass slab, order summary card. */
+/* Order/credited stages open right under the header (switch and rate line hidden); 15px clears its collapsing 12px margin as on the board. */
+.nx-step-in > .nx-bank-stage:first-child { margin-top: 15px; }
+.nx-bank-pay { padding: 28px 20px 22px; text-align: center; }
+.nx-bank-slab.nx-bank-pay { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 6%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent), transparent 70%), rgba(255,255,255,.045); }
+[data-theme="light"] .nx-bank-slab.nx-bank-pay { background: rgba(255,255,255,.58); }
+.nx-bank-ring { position: relative; width: 148px; height: 148px; margin: 0 auto; }
+.nx-bank-ring > svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.nx-bank-ring__track { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 9%, transparent); stroke-width: 8; }
+.nx-bank-ring__value { fill: none; stroke: var(--v5-brand); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 427; transition: stroke-dashoffset 1s linear; }
+.nx-bank-ring__c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.nx-bank-ring__t { color: var(--v5-ink); font: 500 32px/38px var(--font-metric); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.nx-bank-cd { display: block; margin-top: 16px; color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
+.nx-bank-cd__time { color: var(--v5-ink); font-family: var(--font-metric); font-weight: 500; font-variant-numeric: tabular-nums; }
+.nx-bank-pay__rejected { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--v5-ink-2); font: 400 var(--ui-type-list-subtitle, 13px)/1.55 var(--font-v5); }
+.nx-bank-sum { margin: 12px -2px 0; border-radius: var(--ui-radius-surface, var(--v5-radius-xl)); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); overflow: hidden; }
+.nx-bank-sum__r { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+.nx-bank-sum__r + .nx-bank-sum__r { border-top: 1px solid var(--v5-border); }
+.nx-bank-sum__v { min-width: 0; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.nx-bank-sum__v--big { font-family: var(--font-amount, var(--font-v5)); font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
+.nx-bank-sum__v--text { font: 500 14px/20px var(--font-v5); }
+/* Credited: medal pops once and rings once; amount in the success ink. */
+.nx-bank-done { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -5px; padding: 28px 20px 8px; text-align: center; }
+.nx-bank-done::before { content: ""; position: absolute; left: 50%; top: 70px; width: 300px; height: 180px; margin-left: -150px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 20%, transparent), transparent); pointer-events: none; }
+.nx-bank-done__medal { position: relative; width: 88px; height: 88px; display: grid; place-items: center; border-radius: 50%; background: var(--v5-success-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-success) 35%, transparent); animation: nx-viz-pop 520ms cubic-bezier(.2,1.4,.4,1) 120ms both; }
+.nx-bank-done__medal::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 2px solid var(--v5-success); opacity: 0; animation: nx-bank-ring-out 900ms 620ms ease-out both; }
+.nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: 600 20px/28px var(--font-v5); }
+.nx-bank-done__amt { position: relative; display: block; margin-top: 10px; color: var(--v5-success-ink); font: 500 36px/44px var(--font-amount, var(--font-v5)); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-done__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 14px/16px var(--font-v5); letter-spacing: 0; }
+.nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.nx-bank-sum--done { margin-top: 24px; }
+.nx-bank-sum--done .nx-bank-sum__v { font: 500 14px/20px var(--font-v5); }
+@keyframes nx-bank-ring-out { 0% { opacity: .55; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.14); } }
+@media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring__value { transition: none; } .nx-bank-done__medal, .nx-bank-done__medal::after { animation: none; } }
 </style>

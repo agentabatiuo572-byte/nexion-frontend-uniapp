@@ -22,6 +22,7 @@
           <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
+
         </view>
       </view>
 
@@ -60,6 +61,16 @@
             </view>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 8px"><path d="m9 18 6-6-6-6" /></svg>
           </view>
+          <view v-if="o.kind === 'commerce' && o.status === 'placed'" class="order-card__pending">
+            <view v-if="pendingCloseMinutes(o)" class="order-card__countdown">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+              <text>{{ fmt(t.orders.pendingCloseIn, { min: pendingCloseMinutes(o)! }) }}</text>
+            </view>
+            <!-- Stops the tap here so the card does not also open the plain detail. -->
+            <view class="order-card__pay" @click.stop>
+              <NxButton variant="brand" size="small" :label="t.orders.pendingContinue" @click="goOrderPayment(o)" />
+            </view>
+          </view>
         </view>
       </view>
       <view v-if="orderPanels.mainPresentation === 'list'" class="orders-pagination mx-4">
@@ -90,6 +101,9 @@ import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
+import { fmt } from "@/i18n/format";
+import { useNow } from "@/composables/use-now";
+import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";
 import { nexGridBrandText } from "@/lib/brand-copy";
@@ -136,6 +150,13 @@ const orderList = computed<OrderListItem[]>(() => [
   ...orders.orders.map((order): CommerceOrderListItem => ({ ...order, kind: "commerce" })),
   ...genesisOrderListItems(genesis.remoteOrders, t.value.me.genesisNode, t.value.orders.quantity),
 ].sort((a, b) => b.placedAt - a.placedAt));
+// Minutes left on an unpaid order's server deadline; null once it lapses or when unknown.
+const nowSeconds = useNow();
+function pendingCloseMinutes(order: OrderListItem): number | null {
+  if (order.kind === "genesis" || order.status !== "placed" || order.expiresAt == null) return null;
+  const left = order.expiresAt - nowSeconds.value * 1000;
+  return left > 0 ? Math.ceil(left / 60000) : null;
+}
 const remoteOrderAvailability = ref<OrderSourceAvailability>("ready");
 const remoteOrdersRefreshing = ref(remoteApiEnabled);
 const remoteOrdersResolved = ref(false);
@@ -351,6 +372,10 @@ function goOrder(order: OrderListItem) {
   navTo(order.kind === "genesis" ? "/pages/genesis/holder" : `/pages/store/order-detail?id=${encodeURIComponent(order.id)}&from=${ordersBackHref.value === "/me" ? "me" : "store"}`);
 }
 
+function goOrderPayment(order: OrderListItem) {
+  navTo(`/pages/store/order-detail?id=${encodeURIComponent(order.id)}&from=${ordersBackHref.value === "/me" ? "me" : "store"}&pay=1`);
+}
+
 const remoteErrorStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "10px 12px",
@@ -420,4 +445,10 @@ function statusChipStyle(status: OrderStatus): CSSProperties {
 <style scoped>
 .order-product-thumb { position: relative; width: 72px; height: 72px; border-radius: 16px; display: grid; place-items: center; background: var(--v5-surface-2); overflow: hidden; }
 .order-product-image { width: 62px; height: 62px; }
+</style>
+
+<style scoped>
+.order-card__pending { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-top: 14px; padding-top: 2px; border-top: 1px solid var(--v5-border); }
+.order-card__countdown { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--v5-warning-ink); font: 400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 16px) var(--font-v5); }
+.order-card__pay { flex: none; margin-left: auto; }
 </style>

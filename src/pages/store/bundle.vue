@@ -200,8 +200,9 @@ import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import PromotionBundle from '@/components/promotion/promotion-bundle.vue';
-import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
+import { promotionCheckoutHref, parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
+import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { nexGridBrandText } from "@/lib/brand-copy";
@@ -222,8 +223,6 @@ import { quoteBundleAmountUsdt } from "@/api/bundle-quote";
 import { restoreBundleCommand, type PendingBundleCommand } from "@/api/bundle-command";
 import type { BundleDiscountSnapshot } from "@/api/bundle-discount-api";
 import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
-import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
-import { paidOrderReceipt } from '@/api/order-api';
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { usePendingCheckout } from "@/store/pending-checkout";
@@ -233,6 +232,10 @@ import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
+import { paidOrderReceipt } from "@/api/order-api";
+import { orderPaymentRejection } from "@/lib/order-payment-rejection";
+import { beginOrderAction, readOrderAction, clearOrderAction, markOrderActionPaid } from "@/lib/order-command-fence";
 
 const t = useT();
 const cart = useCart();
@@ -531,10 +534,28 @@ async function offerBundleWalletTopup(requiredUsdt: number): Promise<void> {
   if (accepted && isCurrentAccountScope(accountScope)) navTo("/pages/me/wallet-topup");
 }
 
+// Existing durable commands stay in their original recovery path. New bundles
+// use the shared items review, legal terms and explicit payment confirmation.
+async function openBundleReview(list:Product[]):Promise<boolean> {
+  if(receiptWriteFailure.value)return true;
+  submitting.value=true;
+  try {
+    const rows=readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY,orders.currentAccountKey(),true);
+    const commands=rows?.commands??{};
+    if(Object.keys(commands).length){
+      if(commands[bundleFingerprint(list)])return false;
+      toast.warn(t.value.bundle.checkoutOutcomeUnknown);void navTo('/pages/store/orders');return true;
+    }
+    await navTo(promotionCheckoutHref(list.map(product=>({productNo:product.id,quantity:1}))));
+  }catch{toast.warn(t.value.bundle.checkoutOutcomeUnknown);}
+  finally{submitting.value=false;}
+  return true;
+}
 async function onCheckout() {
   const list = products.value;
   if (list.length < 2 || submitting.value || walletRefreshing.value) return;
   if (remoteApiEnabled) {
+    if(await openBundleReview(list))return;
     const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();
     const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)
@@ -577,15 +598,39 @@ async function onCheckout() {
         if (!matchesBundleQuote(created, command.productNos, command.expectedAmountUsdt)) {
           throw new ApiError({ kind: "protocol", message: "BUNDLE_QUOTE_RECEIPT_MISMATCH" });
         }
-        const paid = await executeSelectedPurchase({ amount: created.amountUsdt, currency: 'USDT', summary: t.value.bundle.checkoutSuccessTitle },
-          authorization => orderApi.pay(created.orderNo, `wallet-pay:${created.orderNo}`, authorization), scopeIsCurrent,
-          { kind: 'ORDER_PAY', payload: { orderNo: created.orderNo }, commandKey: () => `wallet-pay:${created.orderNo}`, parseReceipt: paidOrderReceipt });
+        if (readOrderAction(accountKey,created.orderNo)) {
+          navTo(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`);
+          return;
+        }
+        const persisted=await orders.ensureRemoteOrder(created.orderNo);
+        if (!scopeIsCurrent()) return;
+        if (!persisted || persisted.total!==created.amountUsdt) throw new Error('BUNDLE_WALLET_PAYMENT_READBACK_MISMATCH');
+        if (persisted.status!=='placed') {
+          navTo(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`);
+          return;
+        }
+        let paymentKey:string|null=null;
+        const paymentCurrent=()=>scopeIsCurrent()&&bundleFingerprint(products.value)===bundleFingerprint(list)
+          &&normalizeBundleExpectedAmountUsdt(total.value)===command.expectedAmountUsdt
+          &&policy.value?.policyVersion===latestPolicy.policyVersion;
+        const paid = await executeSelectedPurchase({amount:command.expectedAmountUsdt,currency:'USDT',summary:list.map(product=>product.name).join(', ')},
+          async authorization=>{
+            if(!paymentCurrent())return null;
+            const action=beginOrderAction(accountKey,'pay',created.orderNo,command.expectedAmountUsdt,'WALLET');paymentKey=action.key;
+            try{return await orderApi.pay(created.orderNo,action.key,authorization);}
+            catch(error){
+              if (/^PAYMENT_PASSWORD_(INCORRECT|LOCKED|VERSION_CONFLICT|NOT_CONFIGURED|REQUIRED)$/.test(asApiError(error).message))
+                clearOrderAction(accountKey,created.orderNo,action.key);
+              throw error;
+            }
+          },paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},commandKey:()=>{const action=beginOrderAction(accountKey,'pay',created.orderNo,command.expectedAmountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
         if (!paid) return;
         if (!scopeIsCurrent()) return;
-        if (paid.orderNo !== created.orderNo
-            || (paid.paymentMethod === "WALLET"
+        if (paid.orderNo !== created.orderNo) throw new Error("BUNDLE_WALLET_PAYMENT_RECEIPT_INVALID");
+        markOrderActionPaid(accountKey,created.orderNo);
+        if (paid.paymentMethod === "WALLET"
               && (paid.walletBalanceAfterUsdt === null
-                || !app.adoptCommerceWallet(paid.walletBalanceAfterUsdt, walletReceiptScope)))) {
+                || !app.adoptCommerceWallet(paid.walletBalanceAfterUsdt, walletReceiptScope))) {
           throw new Error("BUNDLE_WALLET_PAYMENT_RECEIPT_INVALID");
         }
         paymentConfirmed = true;
@@ -598,13 +643,12 @@ async function onCheckout() {
         if (!settled || settled.status !== "activated") {
           throw new Error("BUNDLE_WALLET_PAYMENT_READBACK_MISMATCH");
         }
+        if(paymentKey)clearOrderAction(accountKey,created.orderNo,paymentKey);
         // Order + wallet receipt are already canonical. Fleet projection is
         // best effort and must never cause a second payment submission.
         void app.refreshRemoteFleet(walletReceiptScope);
-        const successBody = t.value.bundle.checkoutSuccessBody;
-        toast.success(t.value.bundle.checkoutSuccessTitle,
-          fmt(successBody, { count: created.itemCount }));
-        navTo("/pages/store/orders");
+        toast.success(t.value.orders.statusActivated);
+        navTo(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`);
       } catch (error) {
         const policyStale = error instanceof ApiError && error.message === "BUNDLE_DISCOUNT_POLICY_STALE";
         const quoteStale = error instanceof ApiError && error.message === "BUNDLE_QUOTE_STALE";
@@ -615,6 +659,14 @@ async function onCheckout() {
           retireBundleKey(list, accountKey, command.key);
         }
         if (!scopeIsCurrent()) return;
+        // A definitive refusal leaves the order unpaid; its detail page reads the
+        // rejected command back and offers cancel or a fresh payment.
+        const rejection = createdOrderNo && !paymentConfirmed ? orderPaymentRejection(error, useLocaleStore().code) : null;
+        if (rejection) {
+          toast.warn(rejection);
+          navTo(`/pages/store/order-detail?id=${encodeURIComponent(createdOrderNo)}`);
+          return;
+        }
         if (paymentConfirmed) {
           toast.warn(t.value.orders.walletPaymentConfirmedRefreshPending);
           if (confirmedOrderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(confirmedOrderNo)}`);

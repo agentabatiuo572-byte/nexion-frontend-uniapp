@@ -66,6 +66,8 @@ export interface CanonicalOrder {
   amountUsdt: number | string;
   promotionQuoteId?: string;
   paymentMethod: string | null;
+  /** What the user actually paid incl. channel and network fees (2-place decimal); absent until the server sends it. */
+  paidTotalUsdt?: string;
   paymentStatus: string;
   orderStatus: string;
   activationStatus: string;
@@ -136,7 +138,8 @@ export interface PaidOrderReceipt {
   activationStatus: "ACTIVATED";
   canonicalStatus: "activated";
   amountUsdt: number;
-  paymentMethod: "WALLET" | "VOUCHER" | "HDPAY_BANK" | "CREGIS_USDT_BSC";
+  paymentMethod: "WALLET" | "VOUCHER" | "HDPAY_BANK" | "CREGIS_USDT_BSC" | "CREGIS_USDT_ERC20";
+  paidTotalUsdt?: string;
   walletBalanceAfterUsdt: number | null;
   idempotent: boolean;
   serverCanonical: true;
@@ -254,6 +257,13 @@ function promotionDecimal(value: unknown): string {
   return value;
 }
 
+/** Optional fee-inclusive paid total: a decimal string with at most two places. */
+function paidTotalUsdt(value: unknown): { paidTotalUsdt?: string } {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "string" || !/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(value)) return invalid();
+  return { paidTotalUsdt: value };
+}
+
 function historyNumber(source: Record<string, unknown>, field: "subtotalUsdt" | "discountUsdt"): number {
   const value=source[field];
   // Promotion overlays encode every total as a decimal string; the settled amount stays exact above.
@@ -302,6 +312,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     amountUsdt: historyAmount(source),
     ...(source.promotionQuoteId ? { promotionQuoteId: nonEmptyString(source.promotionQuoteId) } : {}),
     paymentMethod: nullableString(source.paymentMethod),
+    ...paidTotalUsdt(source.paidTotalUsdt),
     paymentStatus: nonEmptyString(source.paymentStatus),
     orderStatus: nonEmptyString(source.orderStatus),
     activationStatus: nonEmptyString(source.activationStatus),
@@ -433,7 +444,7 @@ function cancelledOrder(value: unknown): CancelledOrder {
 
 export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
   const source = { ...record(value) };
-  if ((source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC') && typeof source.amountUsdt === 'string') {
+  if ((source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC' || source.paymentMethod === 'CREGIS_USDT_ERC20') && typeof source.amountUsdt === 'string') {
     if (!/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(source.amountUsdt)) return invalid();
     source.amountUsdt = Number(source.amountUsdt);
   }
@@ -445,7 +456,7 @@ export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
   if (amountUsdt < 0) return invalid();
   const paymentMethod = source.paymentMethod === "UVEL_WALLET" || source.paymentMethod === "WALLET"
     ? "WALLET" : source.paymentMethod === "VOUCHER" ? "VOUCHER"
-      : source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC' ? source.paymentMethod : invalid();
+      : source.paymentMethod === 'HDPAY_BANK' || source.paymentMethod === 'CREGIS_USDT_BSC' || source.paymentMethod === 'CREGIS_USDT_ERC20' ? source.paymentMethod : invalid();
   if ((paymentMethod === "VOUCHER") !== (amountUsdt === 0)) return invalid();
   const walletBalanceAfterUsdt = paymentMethod === "WALLET"
     ? finiteNumber(source.walletBalanceAfterUsdt)
@@ -459,6 +470,7 @@ export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
     canonicalStatus: "activated",
     amountUsdt,
     paymentMethod,
+    ...paidTotalUsdt(source.paidTotalUsdt),
     walletBalanceAfterUsdt,
     idempotent: typeof source.idempotent === "boolean" ? source.idempotent : invalid(),
     serverCanonical: true,

@@ -84,9 +84,9 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   }
   function accountChanged() { cancel(); pending = null; ui.pendingOperation = ""; ui.state = null; ui.changeError = ""; lastPaymentError = ""; }
   async function refreshStatus(): Promise<PaymentPasswordState | null> {
-    const account = identity();
-    try { const result = await api.status(); if (account !== identity()) return null; setState(result); return result; }
-    catch { if (account === identity()) ui.state = null; return null; }
+    const account = identity(), token = generation;
+    try { const result = await api.status(); if (account !== identity() || token !== generation) return null; setState(result); return result; }
+    catch { if (account === identity() && token === generation) ui.state = null; return null; }
   }
   async function load() {
     const token = generation; ui.stage = "loading"; ui.busy = true; ui.error = "";
