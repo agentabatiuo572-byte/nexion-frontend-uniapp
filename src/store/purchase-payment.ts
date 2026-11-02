@@ -5,14 +5,14 @@ import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind
 import { useApp } from './app';
 import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
 import { clearOrderAction, readOrderAction } from '@/lib/order-command-fence';
-import { navTo } from '@/lib/route';
+import { navTo, navReplace } from '@/lib/route';
 import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
-  orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void };
+  orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
@@ -24,7 +24,7 @@ const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
 const api = createPurchasePaymentApi(apiClient);
-const state = reactive({ open: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
+const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', image: '', deadlineAt: null as number | null,
   policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, notice: '' as PurchaseNotice, cashier: false,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
@@ -88,6 +88,13 @@ function finish(result: PurchaseChoice | null) {
   requestVersion++; stopTimers(); openCashierOnReady = false;
   Object.assign(state, { open: false, loading: false, retrying: false, busy: false, cashier: false, notice: '' });
   const done = resolveChoice; resolveChoice = null; context = null; done?.(result);
+}
+// A checkout owner may defer navigation until its payment operation releases
+// the page leave guard. Cold resumes use ordinary navigation directly.
+function closeAndNavigate(href: string) {
+  const navigate = context?.navigate;
+  finish(null);
+  if (navigate) navigate(href); else void navTo(href);
 }
 /** Reads continue on their own: every 5 s while the payment is open, backing off after failures, paused in the background. */
 function schedule(version: number, accountKey: string, failed: boolean) {
@@ -216,19 +223,28 @@ async function confirm() {
  *  caller-owned key ends the flow so that page starts a new purchase. */
 function restart(step: 'bank' | 'methods') {
   const pending = state.pending;
-  if (!pending || state.busy || !context) return;
-  const orderNo = typeof context.payload.orderNo === 'string' ? context.payload.orderNo : '';
+  // A local countdown or failed read never authorizes replacing an intent.
+  if (!pending || state.busy || state.intent?.status !== 'EXPIRED') return;
+  const orderNo = state.orderNo;
+  if (!context && !orderNo) { finish(null); return; }
   const orderKey = pending.kind === 'ORDER_PAY' && !!orderNo && readOrderAction(state.accountKey, orderNo)?.key === pending.commandKey;
   retire(pending, state.accountKey);
-  if (!orderKey && context.commandKey) { finish(null); return; }
   if (orderKey) clearOrderAction(state.accountKey, orderNo, pending.commandKey, true);
+  // A reloaded dialog has no business callback. Re-read the original order and
+  // its command before it may offer another payment, including promoted orders.
+  if (!context) {
+    finish(null);
+    void navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&pay=1`);
+    return;
+  }
+  if (!orderKey && context.commandKey) { finish(null); return; }
   Object.assign(state, { pending: null, intent: null, quote: null, notice: '', cashier: false });
   if (step === 'bank') void select('HDPAY_BANK', 'bank'); else choose('WALLET');
 }
 function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'orderNo' | 'image' | 'deadlineAt'> & { amount?: number | string }, pending: PendingExternal | null) {
   const accountKey = account();
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
-  Object.assign(state, { open: true, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
+  Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null, policy: null, notice: '', cashier: false,
     quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false });
 }
@@ -268,13 +284,12 @@ export function usePurchasePayment() {
     wake: () => { paused = false; if (state.open && state.pending && !state.busy && !settled(state.intent)) void (state.unavailable ? submitOriginal() : query()); },
     topup: () => {
       const orderNo = state.orderNo, total = Number(state.amount), deadlineAt = state.deadlineAt, summary = state.summary;
-      finish(null);
       const query = orderNo ? `?orderNo=${encodeURIComponent(orderNo)}&amount=${total}&name=${encodeURIComponent(summary)}${deadlineAt ? `&deadline=${deadlineAt}` : ''}` : '';
-      void navTo(`/pages/me/wallet-topup${query}`);
+      closeAndNavigate(`/pages/me/wallet-topup${query}`);
     },
-    openOrder: () => { const orderNo = state.orderNo; finish(null); if (orderNo && !onOrderPage(orderNo)) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
-    support: () => { finish(null); void navTo('/pages/me/support'); },
-    reorder: () => { const again = context?.reorder; finish(null); again?.(); },
+    openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); else finish(null); },
+    support: () => closeAndNavigate('/pages/me/support'),
+    reorder: () => { const again = context?.reorder, orderNo = state.orderNo; finish(null); if (again) again(); else if (orderNo && !onOrderPage(orderNo)) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
     pending: () => { state.revision; try { const records = Object.values(rows().records); state.pendingReadError = false; return records.filter(row => row.lastStatus !== 'EXPIRED' && !(row.lastStatus === 'DELIVERED' && row.validated)); } catch { state.pendingReadError = true; return []; } }, resume,
     records: () => { state.revision; try { return Object.values(rows().records); } catch { return []; } },
     viewOrder: () => { const intent = state.intent, pending = state.pending; if (!intent?.receipt || !pending) return; const orderNo = validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt); finish(null); void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`); },
