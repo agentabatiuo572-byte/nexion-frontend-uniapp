@@ -133,6 +133,10 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/me/phone-binding",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/me/security",
       "style": { "navigationStyle": "custom" }
     },

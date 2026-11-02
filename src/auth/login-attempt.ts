@@ -14,17 +14,19 @@ export interface LoginAttempt {
 }
 
 /** Credentials and OTP never enter this record; the runtime chooses per-surface storage. */
-export function createLoginAttempt(deps: { storage?: KeyValueStorage; installationId: () => string; executionSupported: () => boolean }) {
+export function createLoginAttempt(deps: { clientSurface?: "APP" | "H5"; storage?: KeyValueStorage; installationId: () => string; executionSupported: () => boolean }) {
   let current: LoginAttempt | null = null;
   function read() {
-    if (current && current.installationId !== deps.installationId())
+    // H5 recovery uses the installation frozen in the saved attempt, even an old
+    // empty value. Only a new attempt adopts the current browser installation.
+    if (deps.clientSurface !== "H5" && current && current.installationId !== deps.installationId())
       throw new ApiError({ kind: "configuration", message: "LOGIN_INSTALLATION_CHANGED" });
     if (!current) {
       const saved = deps.storage?.get() as LoginAttempt | null;
       if (saved && /^[A-Za-z0-9_-]{16,80}$/.test(saved.loginAttemptId)
           && /^[A-Za-z0-9_-]{43,128}$/.test(saved.recoveryProof)
           && typeof saved.pending === "boolean") {
-        if (saved.installationId !== deps.installationId())
+        if (deps.clientSurface !== "H5" && saved.installationId !== deps.installationId())
           throw new ApiError({ kind: "configuration", message: "LOGIN_INSTALLATION_CHANGED" });
         current = saved;
       }

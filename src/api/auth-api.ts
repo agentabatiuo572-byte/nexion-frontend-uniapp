@@ -335,13 +335,27 @@ export function createAuthApi(
     "X-NexGrid-Installation-Id": (options.installationId?.() ?? ""),
     "X-NexGrid-Execution-Supported": "false",
   } : sessionIssuanceHeaders;
-  const attempts = createLoginAttempt({ storage: options.attemptStorage,
+  const attempts = createLoginAttempt({ clientSurface: options.clientSurface, storage: options.attemptStorage,
     installationId: options.installationId ?? (() => ""), executionSupported: options.executionSupported ?? (() => false) });
   const contextHeaders = (attempt: LoginAttempt) => ({ ...sessionIssuanceHeaders,
     "X-NexGrid-Installation-Id": attempt.installationId,
     "X-NexGrid-Execution-Supported": String(attempt.executionSupported),
     "X-NexGrid-Login-Attempt-Id": attempt.loginAttemptId,
     "X-NexGrid-Login-Recovery-Key": attempt.recoveryProof });
+  async function recoverAttempt(attempt: LoginAttempt): Promise<LoginResult> {
+    const revision = vault.revision();
+    const data = await client.request<AuthSessionResponse>({ method: "POST",
+      path: `/auth/users/login/attempts/${encodeURIComponent(attempt.loginAttemptId)}/recover`, authenticated: false,
+      headers: contextHeaders(attempt), body: { installationId: attempt.installationId,
+        executionSupported: attempt.executionSupported, recoveryProof: attempt.recoveryProof,
+        authMethod: attempt.authMethod, authReference: attempt.authReference } });
+    // A missing/in-progress result never authorizes a fresh attempt.
+    if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
+    const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
+    if (result.kind !== "authenticated") throw new ApiError({ kind: "protocol", message: "LOGIN_RECOVERY_RESPONSE_INVALID" });
+    attempts.complete(attempt);
+    return result;
+  }
   async function issue(method: string, reference: string, request: Parameters<ApiClient["request"]>[0], oauth = false, replay = false): Promise<LoginResult | OAuthExchangeResult> {
     const body = request.body as Record<string, unknown>;
     const context: Record<string, string | null> = {};
@@ -360,6 +374,18 @@ export function createAuthApi(
       else attempts.complete(attempt);
       return result;
     } catch (cause) {
+      if (method === "OAUTH" && body?.flowId && cause instanceof ApiError
+          && cause.message === "OAUTH_FLOW_EXPIRED") {
+        // An expired flow can still have issued a session. Query the original proof
+        // after the server's expiry reply before allowing any new login attempt.
+        try { return await recoverAttempt(attempt); }
+        catch (recoveryError) {
+          if (!(recoveryError instanceof ApiError) || recoveryError.message !== "LOGIN_ATTEMPT_RECOVERY_INVALID"
+              || (recoveryError.status !== 401 && recoveryError.code !== 401)) throw recoveryError;
+          attempts.complete(attempt);
+          throw new ApiError({ kind: "auth", message: "OAUTH_LOGIN_EXPIRED" });
+        }
+      }
       if (!replay) {
         // A CAPTCHA rejects issuance, but the provider identity/context still belongs
         // to this attempt. Preserve its frozen installation for the challenge retry.
@@ -437,18 +463,7 @@ export function createAuthApi(
     async recoverLogin() {
       const attempt = attempts.read();
       if (!attempt?.pending) throw new ApiError({ kind: "configuration", message: "LOGIN_ATTEMPT_REQUIRED" });
-      const revision = vault.revision();
-      const data = await client.request<AuthSessionResponse>({ method: "POST",
-        path: `/auth/users/login/attempts/${encodeURIComponent(attempt.loginAttemptId)}/recover`, authenticated: false,
-        headers: contextHeaders(attempt), body: { installationId: attempt.installationId,
-          executionSupported: attempt.executionSupported, recoveryProof: attempt.recoveryProof,
-          authMethod: attempt.authMethod, authReference: attempt.authReference } });
-      // A missing/in-progress result never authorizes a fresh attempt.
-      if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
-      const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
-      if (result.kind !== "authenticated") throw new ApiError({ kind: "protocol", message: "LOGIN_RECOVERY_RESPONSE_INVALID" });
-      attempts.complete(attempt);
-      return result;
+      return recoverAttempt(attempt);
     },
     async completeProviderLogin(request, expectedRevision) {
       if (restoreInFlight) await restoreInFlight;
