@@ -212,9 +212,23 @@ function retryEligibility() {
 .hb-card:active:not([aria-disabled="true"]) { transform:scale(.97);transition-duration:100ms; }
 .hb-card[aria-disabled="true"] { cursor:default; }
 .hb-card:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
-.hb-glow-warn::before,.hb-glow-cyan::before { content:"";position:absolute;z-index:-1;left:-70px;top:-80px;width:220px;height:220px;border-radius:50%;pointer-events:none; }
-.hb-glow-warn::before { background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-warning) 17%,transparent),transparent); }
-.hb-glow-cyan::before { background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-tech-cyan) 17%,transparent),transparent); }
+.hb-glow-warn { --hb-glow:color-mix(in srgb,var(--v5-warning) 17%,transparent); }
+.hb-glow-cyan { --hb-glow:color-mix(in srgb,var(--v5-tech-cyan) 17%,transparent); }
+/* Offer cards: liquid-glass soft-edge card, the check-in card's material (04.1 签到); pending cards stay solid.
+   The corner glow is a background layer under the sheen, so the sheen, inner rim and highlight paint over it.
+   The transparent border keeps the layout and the forced-colors outline; the fill stops inside it so the rim is the outer edge. */
+.hb-half,.hb-wv,.hb-wt {
+  --hb-fill:rgba(255,255,255,.045);--hb-rim:rgba(255,255,255,.10);--hb-highlight:rgba(255,255,255,.20);
+  --hb-bottom:rgba(0,0,0,.40);--hb-sheen:rgba(255,255,255,.06);--hb-shadow:0 12px 32px rgba(0,0,0,.35);
+  border-color:transparent;
+  background:linear-gradient(145deg,var(--hb-sheen),transparent 40%,transparent 70%,var(--hb-sheen)),radial-gradient(circle 110px at 40px 30px,var(--hb-glow),transparent),var(--hb-fill);
+  background-clip:padding-box;
+  box-shadow:inset 0 0 0 1px var(--hb-rim),inset 0 7px 10px -7px var(--hb-highlight),inset 3px 0 12px -8px var(--hb-highlight),inset 0 -8px 14px -8px var(--hb-bottom),var(--hb-shadow);
+}
+[data-theme="light"] .hb-half,[data-theme="light"] .hb-wv,[data-theme="light"] .hb-wt {
+  --hb-fill:rgba(255,255,255,.58);--hb-rim:rgba(73,94,125,.12);--hb-highlight:rgba(255,255,255,.95);
+  --hb-bottom:rgba(87,115,155,.16);--hb-sheen:rgba(255,255,255,.30);--hb-shadow:0 2px 8px rgba(20,16,8,.05);
+}
 
 .hb-amount { display:block;font-weight:500;letter-spacing:-.02em;color:var(--v5-brand);white-space:nowrap; }
 .hb-amount__minor { font-size:max(12px,.55em);color:var(--v5-ink-3); }
@@ -236,7 +250,7 @@ function retryEligibility() {
 .hb-half__sub { display:block;margin-top:2px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
 .hb-half__foot { display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;min-height:52px;padding:4px 10px 4px 14px; }
 .hb-perf { position:relative;margin:0 14px;border-top:1px dashed var(--v5-border-strong); }
-.hb-perf::before,.hb-perf::after { content:"";position:absolute;top:-9px;box-sizing:content-box;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--v5-border); }
+.hb-perf::before,.hb-perf::after { content:"";position:absolute;top:-9px;box-sizing:content-box;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--hb-rim); }
 .hb-perf::before { left:-23px; }
 .hb-perf::after { right:-23px; }
 .hb-rule { height:1px;margin:0 14px;background:var(--v5-border); }
@@ -247,7 +261,7 @@ function retryEligibility() {
 .hb-wv__txt { flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:12px 8px 12px 4px; }
 .hb-wv__amount { font-size:32px;line-height:38px; }
 .hb-vperf { position:relative;align-self:stretch;margin:14px 0;border-left:1px dashed var(--v5-border-strong); }
-.hb-vperf::before,.hb-vperf::after { content:"";position:absolute;left:-9px;box-sizing:content-box;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--v5-border); }
+.hb-vperf::before,.hb-vperf::after { content:"";position:absolute;left:-9px;box-sizing:content-box;width:16px;height:16px;border-radius:50%;background:var(--v5-bg);border:1px solid var(--hb-rim); }
 .hb-vperf::before { top:-23px; }
 .hb-vperf::after { bottom:-23px; }
 .hb-wv__stub { flex:none;display:flex;align-items:center;justify-content:center;width:92px; }
