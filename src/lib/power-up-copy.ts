@@ -18,6 +18,6 @@ export function powerUpEffectText(effectType: string, rawValue: string | number,
   const value = Number(rawValue);
   if (!Number.isFinite(value) || value < 0) return '';
   if (effectType !== 'CHECKIN_MULTIPLIER') return '';
-  const copy = locale === 'zh' ? '签到奖励 × {n}' : locale === 'vi' ? 'Thưởng điểm danh × {n}' : 'Check-in reward × {n}';
+  const copy = locale === 'zh' ? '签到奖励 × {n}，断签后失效' : locale === 'vi' ? 'Thưởng điểm danh × {n}, mất khi đứt chuỗi' : 'Check-in reward × {n}, ends if your streak breaks';
   return copy.replace('{n}', String(value));
 }

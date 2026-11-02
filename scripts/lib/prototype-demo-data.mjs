@@ -24,6 +24,7 @@ const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? 
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
+const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
 export const demoDefaults = {paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
@@ -42,7 +43,7 @@ export const demoOptions = {
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
   bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
-  streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
+  streakState:[['normal','连续签到'],['first','首次签到·连续 0 天'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
   promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],
   sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
@@ -437,20 +438,30 @@ export function demoFixture(url,locale,state,request) {
     const data=base();
     if(empty) return data;
     const unlocked=state.taskState==='claimed'||state.taskState==='complete';
+    // Like the design boards: a 12-day streak (13 once checked in today), one saver in hand.
+    const dayOf=t=>new Date(t).toISOString().slice(0,10);
+    if(state.streakState==='normal')data.streak={...data.streak,currentStreak:state.checkedIn?13:12,longestStreak:state.checkedIn?13:12,streakSavers:1,lastCheckInDate:dayOf(state.checkedIn?now:now-day),checkedInToday:!!state.checkedIn};
+    if(state.streakState==='first')data.streak={...data.streak,currentStreak:state.checkedIn?1:0,longestStreak:state.checkedIn?1:0,streakSavers:0,lastCheckInDate:state.checkedIn?dayOf(now):null,checkedInToday:!!state.checkedIn};
     if(state.streakState==='broken'&&!state.saverUsed)data.streak={...data.streak,currentStreak:state.checkedIn?1:0,longestStreak:7,streakSavers:state.checkedIn?0:1,lastCheckInDate:new Date(state.checkedIn?now:now-3*day).toISOString().slice(0,10),checkedInToday:!!state.checkedIn};
     if(state.saverUsed)data.streak={...data.streak,currentStreak:state.checkedIn?8:7,longestStreak:state.checkedIn?8:7,streakSavers:0,lastCheckInDate:new Date(state.checkedIn?now:now-day).toISOString().slice(0,10),checkedInToday:!!state.checkedIn};
-    data.dailyMilestones=[3,7,14,30].map((milestoneDay,i)=>({milestoneId:i+1,milestoneDay,rewardType:'UVT',rewardAmount:(i+1)*20,badgeCode:null,status:state.milestoneClaims?.includes(i+1)?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
+    // Mirrors the backend seeds (nx_growth_checkin_rule / nx_streak_milestone / nx_streak_power_up); day 3 is already claimed in the 12-day scenario.
+    data.rules=[['baseline','1'],['bonus7','5'],['luckyMultiplierMax','2'],['p15','15'],['p2','5'],['broken','48'],['revive','1']].map(([key,value])=>({key,value}));
+    data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:state.milestoneClaims?.includes(i+1)||state.streakState==='normal'&&milestoneDay===3?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
     data.earningMilestones=[10,100,1000].map((amount,i)=>({milestoneId:'demo-earning-'+i,thresholdUsdt:amount,rewardNex:amount,lifetimeEarningsUsdt:128.5,status:i===0||i===1&&state.earningClaimed?'FIRED':i===1?'CLAIMABLE':'LOCKED',achievedAt:i===0||i===1&&state.earningClaimed?iso:null}));
     const names=locale==='zh'?['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星']:locale==='vi'?['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']:['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'];
     data.badgeAchievements=names.map((name,i)=>({achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],rewardPoints:50*(i+1),status:i<2||unlocked?'UNLOCKED':'LOCKED',unlockedAt:i<2||unlocked?iso:null}));
-    data.powerUps=[{powerUpId:1,powerUpCode:'demo-checkin-boost',name:localized(locale,'签到加成','Check-in boost','Thưởng điểm danh'),unlockStreakDays:3,targetPath:'/pages/daily/daily',effectType:'CHECKIN_MULTIPLIER',effectValue:'1.5',status:state.powerUp?'ACTIVATED':'AVAILABLE',businessAvailable:true}];
-    data.topStreakers=[{name:'Maya',countryCode:'SG',streak:28},{name:'Linh',countryCode:'VN',streak:24},{name:'Alex',countryCode:'JP',streak:14}];
+    // Route badges keep the seeded Chinese name (the App localizes them); the check-in boost is the B17 multiplier.
+    data.powerUps=[[1,'ROYALTY_BOOST','团队成长徽章','/team',7,'ROUTE_BADGE','连续签到 7 天可查看团队成长权益',null],[2,'STREAK_BADGE','连续签到徽章','/me/rewards',14,'ROUTE_BADGE','连续签到 14 天解锁专属徽章',null],[3,'CHECKIN_BOOST',localized(locale,'签到加成','Check-in boost','Thưởng điểm danh'),'/daily',30,'CHECKIN_MULTIPLIER','1.5',null],[4,'GENESIS_ALLOWLIST','Genesis 资格入口','/market/genesis',60,'ROUTE_BADGE','连续签到 60 天解锁 Genesis 资格入口',true]]
+      .map(([powerUpId,powerUpCode,name,targetPath,unlockStreakDays,effectType,effectValue,businessAvailable])=>({powerUpId,powerUpCode,name,unlockStreakDays,targetPath,effectType,effectValue,status:state.powerUps?.includes(powerUpId)?'ACTIVATED':data.streak.currentStreak>=unlockStreakDays?'AVAILABLE':'LOCKED',businessAvailable}));
+    data.topStreakers=[{name:'Daniel_K',countryCode:'US',streak:412},{name:'Mei_C',countryCode:'SG',streak:387},{name:'Lukas_F',countryCode:'DE',streak:341},{name:'Carlos_M',countryCode:'BR',streak:298},{name:'Priya_S',countryCode:'IN',streak:256}];
     return data;
   }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
-  if(milestoneClaim){const id=Number(milestoneClaim[1]);state.milestoneClaims||=[];state.milestoneClaims.push(id);return {...authority,milestoneId:id,milestoneDay:[3,7,14,30][id-1],rewardType:'UVT',rewardAmount:id*20,badgeCode:null,spinTickets:0};}
-  if(pathname==='/api/points/power-ups/1/activate'){state.powerUp=true;return {...authority,powerUpId:1,powerUpCode:'demo-checkin-boost',badgeCode:null,status:'ACTIVATED'};}
-  if(pathname==='/api/points/sign-in'&&(state.saverUsed||state.streakState==='broken')){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:5,rewardNex:5,streakBonusNex:0,multiplier:1,streakDays:state.saverUsed?8:1};}
+  if(milestoneClaim){const id=Number(milestoneClaim[1]),[milestoneDay,rewardType,rewardAmount,badgeCode]=demoStreakMilestones[id-1];state.milestoneClaims||=[];state.milestoneClaims.push(id);return {...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};}
+  const powerUpActivate=pathname.match(/^\/api\/points\/power-ups\/([1-4])\/activate$/);
+  if(powerUpActivate){const id=Number(powerUpActivate[1]);state.powerUps||=[];state.powerUps.push(id);return {...authority,powerUpId:id,powerUpCode:['ROYALTY_BOOST','STREAK_BADGE','CHECKIN_BOOST','GENESIS_ALLOWLIST'][id-1],badgeCode:null,status:'ACTIVATED'};}
+  if(pathname==='/api/points/sign-in'&&(state.saverUsed||state.streakState!=='normal')){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:1,rewardNex:1,streakBonusNex:0,multiplier:1,streakDays:state.saverUsed?8:1};}
+  if(pathname==='/api/points/sign-in'){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:1,rewardNex:1,streakBonusNex:0,multiplier:1,streakDays:13};}
   if(pathname==='/api/points/streak-saver/use'){if(state.streakState!=='broken'||state.saverUsed||state.checkedIn)throw new Error('No interrupted streak to restore');state.saverUsed=true;return {...authority,restoredStreak:7,streakSavers:0,effectiveLastCheckInDate:new Date(now-day).toISOString().slice(0,10)};}
   if(pathname==='/api/earnings/milestones/evaluate'){const fired=state.earningClaimed?[]:[{milestoneId:'demo-earning-1',thresholdUsd:100,rewardNex:100,lifetimeEarningsUsd:128.5}];state.earningClaimed=true;return {...authority,fired,count:fired.length};}
   if(pathname==='/api/app/security') return {twoFactorEnabled:true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};

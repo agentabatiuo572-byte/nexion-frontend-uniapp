@@ -2935,100 +2935,86 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 
 ### 9.8 每日签到 `/daily`
 
+> 2026-11-02 改版（P-65）：能量环 + 横滑奖券 + 2×2 增益 + 领奖台榜单，签到主按钮移到底部固定操作栏。下文为现行结构；奖励数额、里程碑与增益一律以后台配置和接口返回为准，文中数字只是当前默认配置。
+
 #### 9.8.1 规则
 
-签到是一个小额 NEX 水龙头(NEX 主产出仍是设备挖矿,见 §13.1)。
+签到是小额 UVT 奖励入口（UVT 主产出仍是设备挖矿，见 §13.1）。规则由后台签到规则表（`nx_growth_checkin_rule`）配置，接口 `/api/points/state` 的 `rules` 下发，页面只读不写死：
 
-- 每日签到 baseline +2 NEX
-- 连续 7 天满额外 +5 NEX bonus
-- **Lucky multiplier**:每次签到 15% 概率触发 1.5×,5% 概率触发 2× 随机奖励倍率(作用于当次 NEX 发放量)
-- 同一天不可重复签到;同一天 0:00 之前不算新一天
-- 中断 streak(>48h 未签)→ 重置为 0,但可消耗 1 张 Streak Saver 恢复至历史最长 streak(上限 30 天)
-- `longestStreak` 字段在签到时同步更新
+- `baseline` 每日基础奖励（默认 1 UVT）；按钮文案「签到 · 基础奖励 {n} UVT」取这个值，取不到时只显示「签到」
+- `bonus7` 连续 7 天额外奖励（默认 5 UVT）
+- **幸运加倍**：服务端随机，`p15` 概率 1.5×、`p2` 概率 2×（默认 15% / 5%），作用于当次 UVT 发放；页面显示的概率取自这两项，取不到时退回一句通用说明
+- `broken` 断签判定小时（默认 48h）；`revive` 默认复活卡张数（默认 1）
+- 同一业务日（服务端 `serverDate`）只能签一次；签到幂等键用服务端业务日
+- **签到加成**（连签增益 CHECKIN_MULTIPLIER，默认 30 天解锁，×1.5）：激活后签到奖励按倍率计，断签即失效，可与活动倍率叠加（后端交接 B17）
 
-#### 9.8.2 30 天里程碑路线图
+#### 9.8.2 连签里程碑奖励
 
-7 阶梯奖励,签到累计满 N 天后,Claim 按钮变亮可手动领取:
+里程碑由后台配置（`nx_streak_milestone`），默认 7 档：
 
-| Day | 奖励 | 类型 |
+| 天 | 奖励 | 类型 |
 |---|---|---|
-| 3   | +5 NEX | nex |
-| 7   | +15 NEX | nex |
-| 14  | +1 USDT | usdt |
-| 21  | +100 NEX | nex |
-| 30  | 🎰 Lucky Spin × 1 | spin |
-| 60  | +10 USDT | usdt |
-| 100 | ⭐ Streak Master Badge(NFT) | badge |
+| 3   | 5 UVT | UVT |
+| 7   | 15 UVT | UVT |
+| 14  | 1 USDT | USDT |
+| 21  | 100 UVT | UVT |
+| 30  | 抽奖次数 ×1 | SPIN |
+| 60  | 10 USDT | USDT |
+| 100 | 徽章「连续签到大师」 | BADGE（STREAK_MASTER） |
 
-每个里程碑 claim 一次后状态变为 `claimed`(Claimed 按钮);未达成显示 Lock icon + "Xd to unlock"。
-里程碑奖励本质上是 sunk-cost 强化:user 累计越久,放弃损失越大。
+- 每档一张奖券（上半：第 N 天、奖励类型图标、单位与金额；中间打孔线和两侧缺口；下半票根）。标题右侧有可领取时显示「{n} 个可领取」。
+- 票根状态：可领取 = 品牌色「领取」按钮，整券琥珀→珊瑚描边；已领 = 「已领」，右上角灰勾，金额变灰；下一档 = 「还需 N 天」（琥珀）；其他未解锁 = 锁 +「还需 N 天」；服务端尚未确认可领（天数已到但未解锁）= 「领取资格待确认」。点未解锁的券提示「保持连签继续解锁」。
+- 进入页面时横滑条自动滚到第一张可领取的券（没有则下一档），保留它左边一张可见。
+- 领取成功提示奖励与「第 N 天里程碑已领取」；抽奖次数奖励发放抽奖券（进入 §11.10.9 幸运转盘）。
 
-Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.10.9 Lucky Spin 转盘(与每日免费转盘同一奖池);claim 后提示"已领到一次幸运转盘机会",可选立即前往转盘。
+#### 9.8.3 断签复活卡（Streak Saver）
 
-#### 9.8.3 断签复活卡(Streak Saver)
+- 卡片显示剩余张数（插画角标 ×N）、「中断连签后可用复活卡恢复」、「N 张复活卡可用」/「暂无可用复活卡」。
+- 只有连签真正断掉（距上次签到超过 48h）且还有复活卡时按钮「使用 1 张」可点；否则按钮半透明，点了提示「断签时才能使用复活卡」。
+- 使用后由服务端恢复连签并扣 1 张，页面显示服务端返回的恢复后天数，提示「连签已恢复」，复活卡回到连签增益之后的位置。
 
-- 用户默认 1 张
-- 仅当 streak 真正断掉(`Date.now() - lastSignedInAt > 48h`)时按钮亮起
-- 消耗 1 张 → `signInStreak` 恢复到 `min(longestStreak, 30)`,`lastSignedInAt` 设置为 "yesterday" 使次日签到可续上
-- Day-30 里程碑可获得 +1 张复活卡(未来扩展)
-- 0 张时按钮 disabled + 副字 `No savers left · earn one at Day-30 milestone`
+#### 9.8.4 签到达人榜
 
-#### 9.8.4 Top Streakers 迷你榜
+- 标题右侧「你的最长：N 天」。前三名在领奖台上（顺序 2-1-3，第一名带皇冠，头像为名字首字母），显示名字、国家代码与连签天数；第 4 名起为列表行。名次柱高度只是装饰。
+- 远程模式数据来自接口 `topStreakers`；不足 3 人时领奖台只放现有人数，0 人显示空态。
 
-5 行社会证明 leaderboard,显示当前全平台最长连签人(Daniel_K 🇺🇸 412 / Mei_C 🇸🇬 387 / Lukas_F 🇩🇪 341 / Carlos_M 🇧🇷 298 / Priya_S 🇮🇳 256),
-右上角显示 `Your best: {longestStreak} days`,驱动用户与榜单对标。
+#### 9.8.5 页面结构（自上而下）
 
-#### 9.8.5 UI(完整页面结构,自上而下)
+页头沿用子页面头（返回 + 标题「每日签到」）。读取失败时页头下方显示琥珀提示条「暂时无法确认账号状态，请重试」+「重新同步」。区块间距 32px（≤374px 为 24px）。
 
-1. **Streak hero** — 大字 streak 数字 + `days` + "Active streak" 标签 + 距下次里程碑 daysToMilestone 文案 + 已签到时显示 `Next claim in HH:MM:SS` 倒计时 chip
-2. **本周 7 天日历**(Mon-Sun grid)— 已完成 / Sun 第 7 天 / 今日高亮 / future
-3. **签到主 CTA** + 副字 `Streak day + 15% chance of 1.5×, 5% chance of 2×` Lucky 提示
-4. **30 天里程碑路线图**(7 行卡片,见 §9.8.2)
-5. **Streak Power-Ups 卡**(Sparkles header)— 4 行 conversion-tied unlock(参 §9.8.6)
-6. **Streak Saver 卡** — Shield icon + 余量 + `Use 1 saver` 按钮(仅断签时可用)
-7. **Top Streakers 榜**(见 §9.8.4)
-8. 3 stats grid:NEX Balance / Lifetime earned / Burned
-9. "Your NEX unlocks up to $X USDT withdrawal" 卡 → 跳提现(NEX 用于抵扣提现手续费,见 §9.3.2)
-10. Recent 10 条 NEX 发放历史(`mounted` guard,避免 SSR/CSR 时间戳 hydration mismatch)
+1. **连签能量环**（主视觉）——环按「当前阶段」分格：里程碑天数升序，上一档（≤ 当前连签的最大里程碑天，没有为 0）到下一档之间每天一格；已签格从琥珀渐变到珊瑚，今天未签那格为品牌色并缓慢呼吸；超过最后一档时画 7 格全亮、不放礼物标记。环顶礼物标记表示下一档奖励；环心为火焰、连签天数、「连续天数」。环下一行：0 天「今日开始你的连续签到」，有下一档「再签到 N 天可领取 {奖励}」（奖励名琥珀色），无下一档「暂无下一档连签奖励」；再下一行「幸运加倍」+ 1.5× / 2× 两个概率胶囊。环背后是整页唯一一团琥珀→珊瑚氛围光。
+2. **断签复活卡**——断签可复活时（见 §9.8.3）整块移到能量环正下方，描边改为珊瑚渐变、按钮可点；否则在连签增益之后。
+3. **连签里程碑奖励**——横滑奖券，见 §9.8.2。
+4. **连签增益**——2×2 卡格，见 §9.8.6。
+5. **签到达人榜**——见 §9.8.4。
+6. **UVT 卡**——余额（UVT，整数大字 + 小数辅助色）；下方两栏「累计 · 已入账奖励」「消耗 · 提现抵扣净额」；口径说明「累计包含全部已入账 UVT 奖励；提现抵扣已扣除退回金额」；余额或汇总读取失败时卡内说明并给重试；卡底整行入口「UVT 可用于抵扣提现网络费」→ 提现方式页（UVT 用于抵扣提现手续费，见 §9.3.2）。
+7. **最近**——UVT 账单最近记录（名称、时间、金额，入账为成功色）；空、读取中、失败重试各有状态。
+8. **底部固定操作栏**（DS-30）——见 §9.8.7。内容底部留白，最后一行能滚到操作栏上方。
 
-#### 9.8.6 Streak Power-Ups(Long-tail Task System 强化)
+远程模式下账号签到事实还没读到（读取中或失败）时，不显示任何连签数、里程碑、增益或榜单：能量环显示空轨道和「—」，读取中时环下显示「正在加载最新签到状态…」，里程碑区显示 3 张虚线占位券，增益和榜单显示「—」。
 
-4 个 conversion-tied unlock,基于 `signInStreak` 与阈值比较自动解锁。激活后写入 `useDailyPowerUp` persist,激活同时 unlock 一枚成就 badge,引导用户跳目标路由继续转化动作。
+#### 9.8.6 连签增益（Streak Power-Ups）
 
-| Streak 阈值 | 增益名称 | i18n key | 转化路径 | Badge | Icon |
-|---|---|---|---|---|---|
-| **7 天** | Royalty Boost +5% this week | `royalty_boost` | `/team/unilevel/how-it-works` | `streak_royalty` | Zap |
-| **14 天** | NEX yield boost unlocked | `nex_boost` | `/daily` | `streak_nex` | Zap |
-| **30 天** | +2% APY on next stake | `staking_boost` | `/staking` | `streak_staker` | ShieldCheck |
-| **60 天** | Genesis whitelist priority | `genesis_whitelist` | `/genesis` | `streak_founder` | Gem |
+增益由后台配置（`nx_streak_power_up`），接口返回状态（LOCKED / AVAILABLE / ACTIVATED）和目标业务可用性。默认：
 
-每行 ≥ 56px Apple HIG tap target,三态:
+| 天 | 增益 | code | 激活后去向 |
+|---|---|---|---|
+| 7  | 团队成长徽章 | ROYALTY_BOOST | 团队页 |
+| 14 | 连续签到徽章 | STREAK_BADGE | 奖励页 |
+| 30 | 签到加成（签到奖励 × 1.5，断签后失效） | CHECKIN_BOOST（CHECKIN_MULTIPLIER） | 留在本页（`/daily` 不在跳转表） |
+| 60 | Genesis 资格入口 | GENESIS_ALLOWLIST | Genesis 页 |
 
-| 态 | Icon | Right CTA |
-|---|---|---|
-| Locked(`streak < threshold`) | Lock icon | `Locked` label |
-| Unlocked + 未激活 | icon | 实心 button `Activate →` → `claim(id)` + `unlockAchievement(badgeId)` + 跳 `href` + toast |
-| 已激活 | Check icon | `Activated` label |
+- 标题右侧「当前 N 天」。两列卡格：图标块 + 门槛「N 天」、名称、有效果说明时一行描述、底部状态。图标按 code：团队（天蓝）、徽章（琥珀）、签到加成（闪电，琥珀）、Genesis（宝石，珊瑚），其他未知 code 用通用图标。
+- 状态：可激活 = 「激活 ›」按钮，激活成功提示「已激活「{name}」」并按去向跳转；已激活 = 成功色勾「已激活」；未解锁 = 虚线空位卡 + 锁「再签 N 天解锁」；目标业务暂停 = 「业务暂停」+ 说明；业务状态无法核实 = 「业务状态待核实」+ 说明。
+- 卡下提示：有可激活时「「{name}」已解锁，可以激活了」；否则「再签 N 天即可解锁「{name}」」；全部激活「全部 N 个增益已激活 · 继续签到保留权益」；再下一行「连签权益以当前可用状态和签到记录为准。」
 
-**Dynamic footer banner**(inline 卡片,三态切换):
+#### 9.8.7 底部操作栏与签到反馈
 
-1. 存在 unlocked + 未激活 perk:banner `«{name}» is ready — tap Activate on the right`
-2. 无 unlocked perk + 有 locked perk:banner `{days} more days to unlock «{name}»` — 直接驱动签到动机
-3. 全部已激活:banner `All {n} perks activated · keep streaking to retain them`
-
-设计目的:即使所有 perk 都锁定,用户也能看到"还差 X 天到第一个 reward"的紧迫感,而不是 4 个并列 Lock icon 的视觉死局。
-
-**实现细节**:
-- `lib/mock/streak-powerups.ts` 4 个 `StreakPowerUp` 定义(id / threshold / icon / tint / href / badgeId)
-- `lib/store/daily-powerup.ts` `useDailyPowerUp` zustand persist `nexgrid-daily-powerup-v1`(`claimed: StreakPowerUpId[]` + `claimedAt: Record<id, ms>`)
-- `app/components/daily/streak-power-ups.tsx` mounted-guarded(`claimed` 来自 persist,需 hydrate 后才读)
-- 严守 [feedback_no_meta_in_product]:UI 文案绝不出现 "phase boost" / "exit theater" / 任何元层面术语,只用真实平台话术(Royalty Boost / NEX yield boost / APY boost / Whitelist priority)
-
-#### 9.8.7 SSR/CSR 安全
-
-- 历史时间戳列表 + 已签到倒计时 chip 都依赖 `Date.now()` / persisted store,需 `mounted` flag 守卫,避免 hydration mismatch
-- Lucky multiplier 仅在 signIn 事件 handler 内 roll,不在 render 时调 Math.random()
-- Streak Power-Ups 已激活态来自 `useDailyPowerUp` persist,同样 mounted-guarded(SSR 默认未激活,client hydrate 后才显示真实状态)
+- 未签到：品牌色主按钮「签到 · 基础奖励 {n} UVT」；提交中显示加载、不可重复提交；读取中保持按钮外观但不提交。
+- 已签到：中性玻璃胶囊「今日已签到」+ 时钟 + 倒计时「HH:MM:SS 后可签」（按服务端下次重置时间每秒走）。
+- 签到状态未确认（读取失败）：中性按钮「签到状态未确认 · 请重新同步」，点击重新读取（不发签到请求）。
+- 签到成功：今天那格补满并迸一次光点，天数从旧值数到新值，实际奖励「+{奖励} UVT」从环心上飘约 1.9 秒（触发幸运加倍时附倍率），不再弹成功提示；离页或切换账号时取消。失败、地区限制与冲突仍用提示条。
+- 动效只用位移和透明度；循环只有今天那格的呼吸和已签到倒计时，离屏或页面隐藏时暂停；系统「减少动态」下全部静止，上飘改为原位淡入淡出并保留 1.9 秒。
 
 ### 9.9 NEX 资产详情页 `/me/wallet/nex`
 
