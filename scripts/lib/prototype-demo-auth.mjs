@@ -7,7 +7,7 @@ export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',regis
 export const authDemoOptions = {
   authState:[['signed-in','已登录'],['signed-out','未登录（验证登录/注册）']],
   oauthState:[['signup','第三方新账号'],['existing','第三方已有账号'],['lost-unissued','complete 丢失且过期：未签发'],['lost-issued','complete 回包丢失且过期：已签发，恢复暂时不可用'],['invite-refused','授权后邀请码被拒'],['device-limit','第三方注册设备上限'],['ip-limit','第三方注册 IP 上限']],
-  savedAttemptState:[['none','无旧尝试'],['legacy-empty','旧空安装 ID：恢复已签发会话'],['storage-cleared','旧浏览器 ID：恢复已签发会话']],
+  savedAttemptState:[['none','无旧尝试'],['legacy-empty','旧空安装 ID：恢复已签发会话'],['storage-cleared','旧浏览器 ID：恢复已签发会话'],['registration','手机号注册恢复（无回执）']],
   phoneBindingState:[['normal','正常绑定（验证码 123456）'],['captcha','绑定发码需滑块'],['used','手机号已被使用']],
   registrationState:[['normal','正常注册'],['captcha','发码需滑块'],['captcha-invalid','发码 ticket 无效后重新验证'],['device-limit','注册设备上限'],['ip-limit','注册 IP 上限']],
 };
@@ -44,6 +44,7 @@ export function createAuthDemo(state) {
       const attempt={loginAttemptId:randomBytes(16).toString('hex'),recoveryProof:randomBytes(32).toString('base64url'),
         installationId:state.savedAttemptState==='legacy-empty'?'':'preview-previous-browser-id',executionSupported:false,
         authMethod:'OTP',authReference:'LOGIN-'+randomBytes(16).toString('hex'),pending:true,context:{countryCode:'+86',phone:'13800000000'}};
+      if(state.savedAttemptState==='registration')Object.assign(attempt,{authMethod:'REGISTRATION',authReference:'+86:13800000000',context:{countryCode:'+86',phone:'13800000000',language:'en'}});
       attempts.set(attempt.loginAttemptId,{...attempt,response:{accessToken:'local-demo-token',refreshToken:null,tokenType:'Bearer',user:existing}});
       return attempt;
     },

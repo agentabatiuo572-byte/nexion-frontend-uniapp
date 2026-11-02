@@ -943,7 +943,7 @@ function completeActivatedRegistration(accountId: string, restorePreviousAccount
   launchRegistrationSuccess();
 }
 function registrationCompletionDestination(): string {
-  return "/pages/index/index";
+  return "/pages/register/success";
 }
 function launchRegistrationSuccess() {
   navReset({ url: registrationCompletionDestination(), fail: () => {} });

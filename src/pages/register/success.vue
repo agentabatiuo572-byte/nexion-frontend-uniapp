@@ -1,7 +1,7 @@
 <!--
-  Lite registration lands on Home. This page retains the account-bound success
-  receipt and the iOS / Android / official-site download links. download=1 is
-  the public App-download entry; neither mode performs phone initialization.
+  Lite registration shows its account-bound receipt and the iOS / Android /
+  official-site download links before continuing to Home. download=1 is the
+  public App-download entry; neither mode performs phone initialization.
 -->
 <template>
   <StandalonePageShell class="rs-root" :reserve-bottom="false">
