@@ -27,15 +27,8 @@
 
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
     <template v-if="paneView === 'form' && paymentSessionReady && fx.configReady && !fx.syncFailed">
-      <!-- 收款账户池无可用账户 → 通道维护空状态([FEAT-PAY02] ⑤;segment 侧同步置灰) -->
-      <view v-if="!bankRailAvailable" class="flex flex-col items-center" style="padding: 36px 0 28px">
-        <view class="grid place-items-center" :style="pausedIconStyle">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M10 15V9" /><path d="M14 15V9" /></svg>
-        </view>
-        <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; max-width: 260px">{{ t.bankPane.railPaused }}</text></view>
-      </view>
-
-      <view v-else :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
+      <!-- An unconfigured bank channel is not shown: the page hides this segment and moves to USDT. -->
+      <view v-if="bankRailAvailable" :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
         <view v-if="dailyCapacityExhausted" class="flex" :style="warnRowStyle">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
           <view class="flex-1 min-w-0">
@@ -593,8 +586,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       return;
     }
     if (!fx.vietQrEnabled) {
-      createError.value = t.value.bankPane.railPaused;
-      toast.error(createError.value);
+      // The page hides the bank segment and moves to USDT; no "unavailable" message.
       creating.value = false;
       return;
     }
@@ -1024,12 +1016,6 @@ const warnTextStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-warning)",
   lineHeight: 1.45,
-};
-const pausedIconStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "14px",
-  background: "var(--v5-surface-2)",
 };
 
 // ── Main actions for the page's fixed bottom bar (DS-30): one per stage, plus the credited stage's bills link. ──

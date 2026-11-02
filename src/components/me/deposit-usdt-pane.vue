@@ -3,19 +3,18 @@
   正式模式支持 BEP20 / ERC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
   → 常驻错网络警示 → 指引/工单入口 → 最近入金
   列表(confirming n/N 实时进度 · credited / dust_hold / returned 态)。
-  4 态:骨架(匹配形状)/ 空列表 / 通道停用置灰 / 断网 inline 重试。
+  4 态:骨架(匹配形状)/ 空列表 / 断网 inline 重试;服务端报告未配置或已关闭的网络不显示。
   数据纯展示:状态 server-canonical(mock 引擎在 deposits store),本组件零写状态。
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
       <!-- ── 网络:上下两行单选(选中 = 品牌描边 + 实心点)── -->
-      <view class="nx-dep-nets" role="radiogroup" :aria-label="t.wallet.networkLabel">
+      <view v-if="visibleNets.length" class="nx-dep-nets" role="radiogroup" :aria-label="t.wallet.networkLabel">
         <view
-          v-for="nw in NETWORKS"
+          v-for="nw in visibleNets"
           :key="nw.id"
-          :class="['nx-dep-net', `nx-dep-net-${nw.label.toLowerCase()}`, { 'nx-dep-net--on': net === nw.id, 'nx-dep-net--off': !isSelectable(nw.id) }]"
+          :class="['nx-dep-net', `nx-dep-net-${nw.label.toLowerCase()}`, { 'nx-dep-net--on': net === nw.id }]"
           role="radio" tabindex="0"
-          :aria-disabled="!isSelectable(nw.id)"
           :aria-checked="net === nw.id"
           @click="pickNet(nw.id)" @keydown.enter.prevent="pickNet(nw.id)" @keydown.space.prevent="pickNet(nw.id)"
         >
@@ -84,14 +83,6 @@
             <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
         </view>
-      </view>
-
-      <!-- ── 全部网络停用 ── -->
-      <view v-else-if="!addressRefreshFailed" class="flex flex-col items-center" style="padding: 36px 0 28px">
-        <view class="grid place-items-center" :style="stateIconBoxStyle">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M10 15V9" /><path d="M14 15V9" /></svg>
-        </view>
-        <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; max-width: 260px">{{ fundsServerEnabled ? CHANNEL_SHORT[net] + " · " : "" }}{{ fundsServerEnabled ? t.topupChrome.channelPaused : t.topupChrome.allNetworksPaused }}</text></view>
       </view>
 
       <!-- ── 可用专属地址警示:地址恒定 + 错网络不可找回(规格 ⑦ 语义)── -->
@@ -229,6 +220,10 @@ const CHANNEL_SHORT: Record<DepositChannel, string> = {
 const CONFIRM_DELAY_NOTE_MS = 30 * 60 * 1000;
 
 const net = ref<ChainDepositChannel>(fundsServerEnabled ? "usdt-bep20" : "usdt-trc20");
+// Networks the server reported as not configured or turned off are not shown.
+// The address read is the only per-network signal, so a network is known only once it has been read.
+const offNets = ref<ChainDepositChannel[]>([]);
+const visibleNets = computed(() => NETWORKS.filter((nw) => fundsServerEnabled ? !offNets.value.includes(nw.id) : dep.chainChannelEnabled[nw.id] === true));
 
 // ── 正式模式从服务端获取地址与记录；失败时只显示重试，不回退到模拟地址。──
 const phase = ref<"loading" | "preparing" | "error" | "ready">("loading");
@@ -286,6 +281,17 @@ function load(background = false) {
             || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
         if (snapshot.enabled && (snapshot.minDepositUsdt == null || !Number.isSafeInteger(Number(snapshot.minDepositUsdt))
             || Number(snapshot.minDepositUsdt) <= 0 || snapshot.feeUsdt == null || snapshot.confirmations == null)) throw new Error('CREGIS_DEPOSIT_POLICY_UNAVAILABLE');
+        const selected = net.value;
+        if (snapshot.enabled || snapshot.reason === "CREGIS_ADDRESS_PREPARING") {
+          if (offNets.value.includes(selected)) offNets.value = offNets.value.filter((id) => id !== selected);
+        } else {
+          offNets.value = [...offNets.value.filter((id) => id !== selected), selected];
+          const next = visibleNets.value[0];
+          if (next) {
+            pickNet(next.id);
+            return;
+          }
+        }
         addressRefreshFailed.value = false;
         serverEnabled.value = snapshot.enabled;
         serverCreditEnabled.value = snapshot.creditEnabled === true;
@@ -362,6 +368,7 @@ watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch],
   serverEnabled.value = false;
   serverCreditEnabled.value = false;
   serverRecords.value = [];
+  offNets.value = [];
   chainHistoryLoaded.value = false;
   chainHistoryFailed.value = false;
   addressRefreshFailed.value = false;
@@ -386,9 +393,6 @@ onUnmounted(() => {
 });
 
 // ── 服务端逐网络确认能力；切换时立即移除旧地址和二维码。──
-function isSelectable(id: ChainDepositChannel): boolean {
-  return fundsServerEnabled ? id === "usdt-bep20" || id === "usdt-erc20" : isEnabled(id);
-}
 function isEnabled(id: ChainDepositChannel): boolean {
   if (fundsServerEnabled) return id === net.value && serverEnabled.value && !!serverAddress.value;
   return dep.chainChannelEnabled[id] === true;
@@ -401,10 +405,6 @@ const activeNet = computed<ChainDepositChannel | null>(() => {
 });
 const activeLabel = computed(() => (activeNet.value ? CHANNEL_SHORT[activeNet.value] : ""));
 function pickNet(id: ChainDepositChannel) {
-  if (!isSelectable(id) || (fundsServerEnabled && id === net.value && !serverEnabled.value)) {
-    toast.info(t.value.topupChrome.channelPaused);
-    return;
-  }
   if (id === net.value) return;
   net.value = id;
   if (fundsServerEnabled) {
@@ -620,7 +620,6 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-net:active { transform: scale(.97); }
 .nx-dep-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
-.nx-dep-net--off { opacity: .45; }
 .nx-dep-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .nx-dep-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
 .nx-dep-net--on .nx-dep-net__name { color: var(--v5-brand); }

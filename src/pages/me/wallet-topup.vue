@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, type CSSProperties, computed } from "vue";
+import { ref, nextTick, type CSSProperties, computed, watch } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { takeNavigationQuery, navTo } from "@/lib/route";
 import NxButton from "@/components/ui/nx-button.vue";
@@ -73,6 +73,7 @@ import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import { useT } from "@/i18n/use-t";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
+import { useFx } from "@/store/fx";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
@@ -128,11 +129,17 @@ function moveSeg(index: number, delta: number): void {
 const t = useT();
 const locale = useLocaleStore();
 const dep = useDeposits();
+const fx = useFx();
+// An unconfigured bank channel is not shown; until its config arrives the segment stays.
+const bankHidden = computed(() => remoteApiEnabled ? fx.configReady && !fx.vietQrEnabled : !dep.bankRailAvailable);
+const visibleSegments = computed(() => bankHidden.value ? segments.filter((item) => item.id !== "bank") : segments);
 // The bank pane owns the create flow; the page only renders its action in the fixed bottom bar.
 const bankPane = ref<InstanceType<typeof DepositBankPane> | null>(null);
 const bankAction = computed(() => seg.value === "bank" ? bankPane.value?.primaryAction ?? null : null);
 const bankSecondary = computed(() => seg.value === "bank" ? bankPane.value?.secondaryAction ?? null : null);
 const bankOrderOpen = computed(() => seg.value === "bank" && !!bankPane.value && bankPane.value.paneView !== "form");
+// An open bank order stays on screen; otherwise a hidden bank channel hands over to USDT.
+watch([bankHidden, bankOrderOpen], ([hidden, open]) => { if (hidden && !open && seg.value === "bank") seg.value = "crypto"; }, { immediate: true });
 
 // ── styles ──
 // Segmented pill tabs — wallet-bills / SegmentedControl idiom.
@@ -149,8 +156,6 @@ function segPillStyle(id: Seg): CSSProperties {
     height: "44px",
     borderRadius: "10px",
     background: seg.value === id ? "var(--v5-brand)" : "transparent",
-    // 收款账户池无可用账户 → 银行转账 chip 置灰([FEAT-PAY02] ⑤;可点进,pane 给维护说明)
-    opacity: id === "bank" && !dep.bankRailAvailable ? 0.45 : 1,
   };
 }
 function segLabelStyle(id: Seg): CSSProperties {
@@ -163,9 +168,8 @@ function segLabelStyle(id: Seg): CSSProperties {
 }
 
 import GlassSegments from "@/components/glass-segments.vue";
-const segmentOptions = computed(() => segments.map(({ id }) => ({
+const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
   value: id, label: segLabel(id), className: `nx-topup-seg-${id}`,
-  dimmed: id === "bank" && !dep.bankRailAvailable,
 })));
 </script>
 <style scoped>
