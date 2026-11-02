@@ -306,7 +306,7 @@ TabBar:active tab 显示背景 chip 高亮。
 
 **第三方注册（2026-11-03）**：登录与注册首步展示服务端配置可用的 Google、Apple、Telegram。点击时同步打开空白 popup，邀请码预检通过后才调用 `/auth/users/oauth/provider/start` 并导航授权窗口；popup 被拦截时提示允许弹窗后重试。只接受同一窗口、授权地址来源及当前 flow 的 `postMessage` 回执，查询 status 后由用户确认，调用 complete。已有身份登录；新身份由服务端注册，允许无手机号会话；收到注册回执才进入 Lite 成功页，再由“继续网页版”进入首页。生产授权交接仅 HTTPS；同源 HTTP loopback 可用于本地联调。无需 APP 深链或原生授权桥。
 
-**待后端支持**：第三方携带客服/顾问码（`CS...`）注册尚未完成联调支持，当前 `AppUserRegistrationService` 只按 `nx_user.referral_code` 查找邀请人，不能把顾问码作为好友码成功绑定。注册回执仍待后端 B9 item 5 补齐：第三方新账号不带邀请码的首次响应没有 `registrationReceipt`；更广泛地，任何注册响应丢失后通过登录尝试恢复取得会话时（手机或第三方注册、有无邀请码均包括），`AppUserAuthService.loginReceipt()` 也不返回注册回执。因此恢复出的会话跳过注册成功页和注册语言提交，第三方无码首次响应同样按登录处理。两项都必须由后端补齐，前端不根据手机号缺失、授权入口或昵称猜测注册身份，也不补造回执。预览的会话恢复响应也不补造注册回执。
+**待后端支持**：第三方携带客服/顾问码（`CS...`）注册尚未完成联调支持，当前 `AppUserRegistrationService` 只按 `nx_user.referral_code` 查找邀请人，不能把顾问码作为好友码成功绑定。注册回执仍待后端 B9 item 5 补齐：第三方新账号不带邀请码的首次响应没有 `registrationReceipt`；更广泛地，任何注册响应丢失后通过登录尝试恢复取得会话时（手机或第三方注册、有无邀请码均包括），`AppUserAuthService.loginReceipt()` 也不返回注册回执。手机号注册恢复后，前端仍按保存的注册尝试进入成功页并提交注册语言，只是没有回执时不显示礼包卡；第三方注册恢复后无法识别为新注册，会跳过成功页和注册语言提交；第三方无码首次响应同样按登录处理。两项都必须由后端补齐，前端不根据手机号缺失、授权入口或昵称猜测注册身份，也不补造回执。预览的会话恢复响应也不补造注册回执。
 
 发码收到 `USER_CAPTCHA_REQUIRED` 或 `USER_CAPTCHA_TICKET_INVALID` 时打开服务端滑块；验证成功后携带 ticket 重发，前端不生成 ticket。IP / 浏览器注册上限使用 §4.3.5 的三语提示。
 
