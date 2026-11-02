@@ -22,7 +22,6 @@
         <view class="mx-4">
           <TrialHeroBanner class="w-full" />
         </view>
-        <TrialGhostSlot class="mx-4" />
       </CardStagger>
     </template>
 
@@ -122,13 +121,13 @@
 </template>
 
 <script setup lang="ts">
+import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { formatAmount } from "@/lib/amount-display";
 import { onUnmounted, computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import TrialHeroBanner from "@/components/trial-hero-banner.vue";
-import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 import MissedIncomeBanner from "@/components/earn/missed-income-banner.vue";
@@ -149,6 +148,7 @@ type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
 
 const app = useApp();
+const trialPresentation = useTrialPresentation();
 const t = useT();
 const range = ref<Range>("Today");
 const freeTrial = useFreeTrial();
@@ -233,8 +233,8 @@ const devices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phon
 const fleetReady = computed(() => !remoteApiEnabled
   || app.remoteFleetStatus === "ready"
   || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
-const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
-  n: app.visibleDevices.filter(isActiveSlotDevice).length,
+const fleetCountText = computed(() => fleetReady.value && (app.remoteSlotsUsed !== null || trialPresentation.reservedSlots.value !== null) ? fmt(t.value.home.fleetOfMax, {
+  n: app.remoteSlotsUsed ?? (app.activeSlotCount + (trialPresentation.reservedSlots.value ?? 0)),
   max: app.slotCap,
 }) : "— / —");
 

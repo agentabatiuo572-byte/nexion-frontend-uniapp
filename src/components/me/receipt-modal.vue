@@ -12,7 +12,7 @@
   prop/emit — no chassis-level overlay host).
 -->
 <template>
-  <view v-if="receipt" class="nx-receipt-modal-root" role="dialog" aria-modal="true" :aria-label="isLegacyVerification ? t.receipt.typeWalletPairing : t.receipt.proofOfCompute">
+  <view v-if="receipt" class="nx-receipt-modal-root" role="dialog" aria-modal="true" :aria-label="isLegacyVerification ? t.receipt.typeWalletPairing : isTaskCycleReceipt ? computeCopy.taskReceipt : t.receipt.proofOfCompute">
     <view class="nx-receipt-scrim" :style="scrimStyle" @click="emit('close')">
     <view class="nx-step-in" :style="sheetStyle" @click.stop>
       <!-- Close -->
@@ -22,11 +22,11 @@
 
       <!-- Header -->
       <view :style="headerStyle">
-        <text class="block" :style="headerKickerStyle">{{ isLegacyVerification ? t.receipt.typeWalletPairing : t.receipt.proofOfCompute }}</text>
+        <text class="block" :style="headerKickerStyle">{{ isLegacyVerification ? t.receipt.typeWalletPairing : isTaskCycleReceipt ? computeCopy.taskReceipt : t.receipt.proofOfCompute }}</text>
         <view class="flex items-center" style="margin-top: 6px; gap: 8px">
           <text class="inline-flex items-center" :style="stampStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="margin-left: 4px">{{ t.receipt.stampVerified }}</text>
+            <text style="margin-left: 4px">{{ isTaskCycleReceipt ? computeCopy.statuses.POSTED : t.receipt.stampVerified }}</text>
           </text>
           <text style="font-size: 12px; color: var(--v5-ink-3)">{{ isLegacyVerification ? t.receipt.statusRecorded : t.receipt.statusSettled }} · {{ fmtDate(receipt.settledAt) }}</text>
         </view>
@@ -77,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -91,6 +92,10 @@ const props = defineProps<{ receipt: Receipt | CanonicalComputeReceipt | null }>
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const t = useT();
+const computeCopy = useComputeV2Copy();
+const isTaskCycleReceipt = computed(() => props.receipt !== null && isCanonicalComputeReceipt(props.receipt) && ["SIMULATED", "RULE_CYCLE"].includes(props.receipt.executionMode ?? ""));
+const isSimulatedReceipt = computed(() => props.receipt !== null && isCanonicalComputeReceipt(props.receipt) && props.receipt.executionMode === "SIMULATED");
+const isSimulatedNexReceipt = computed(() => props.receipt !== null && isCanonicalComputeReceipt(props.receipt) && isSimulatedReceipt.value && props.receipt.rewardUsdt === 0 && props.receipt.rewardNex > 0);
 useDialogA11y(computed(() => props.receipt !== null), ".nx-receipt-modal-root", () => emit("close"));
 // "KY" = 存量验证类回执(机制已删,历史数据保留可查 —— 白名单字段)。
 function isCanonicalComputeReceipt(
@@ -222,14 +227,16 @@ const sections = computed<DescSection[]>(() => {
         rows: [
           { k: "receipt_no", v: r.receiptNo, accent: true },
           { k: "task_no", v: r.taskNo },
-          { k: "task_type", v: workloadLabel(t.value, r.taskClass) },
-          { k: "task_name", v: r.taskName },
-          { k: "model", v: r.model || "—" },
+          { k: "task_type", v: isSimulatedReceipt.value ? r.taskName : workloadLabel(t.value, r.taskClass) },
+          ...(!isSimulatedReceipt.value ? [{ k: "task_name", v: r.taskName }, { k: "model", v: r.model || "—" }] : []),
         ],
       },
       {
         rows: [
-          { k: "client", v: r.client },
+          ...(r.client ? [{ k: "client", v: r.client }] : []),
+          ...(r.executionMode ? [{ k: "execution_mode", v: r.executionMode }] : []),
+          ...(r.proofKind ? [{ k: "proof_kind", v: r.proofKind }] : []),
+          ...(r.modelExecuted != null ? [{ k: "model_executed", v: String(r.modelExecuted) }] : []),
           { k: "status", v: r.earningStatus },
         ],
       },
@@ -251,14 +258,13 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
-          { k: "reward_usdt", v: `+$${formatAmount(r.rewardUsdt)} USDT`, accent: true, strong: true },
-          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex)} UVT`, accent: true }] : []),
+          ...(!isSimulatedNexReceipt.value ? [{ k: "reward_usdt", v: `+${formatAmount(r.rewardUsdt, 6)} USDT`, accent: true, strong: true }] : []),
+          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex, 6)} UVT`, accent: true, strong: isSimulatedNexReceipt.value }] : []),
         ],
       },
       {
         rows: [
-          { k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: shortenHex(r.proofHash, 8, 6) },
-          { k: "source", v: `${r.source}/${r.sourceEnvironment}` },
+          ...(r.proofHash ? [{ k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: shortenHex(r.proofHash, 8, 6) }] : []),
         ],
       },
     ];

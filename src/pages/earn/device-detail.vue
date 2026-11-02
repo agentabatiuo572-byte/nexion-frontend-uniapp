@@ -9,6 +9,7 @@
           :expanded="expanded"
           @toggle="expanded = !expanded"
         />
+        <ComputeSettlements style="padding:16px" />
       </view>
 
       <!-- A valid deep link starts from an empty remote account snapshot. Keep
@@ -57,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import ComputeSettlements from "@/components/earn/compute-settlements.vue";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";

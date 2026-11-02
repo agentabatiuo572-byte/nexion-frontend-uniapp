@@ -1844,7 +1844,7 @@ catalog: {
     // Batch D — /me/devices 改名为"设备仓库"。展示全部设备 + 激活/停用 +
     // 置换 promo banner。区别于上方 MyDevicesEntry 摘要卡片。
     inventoryTitle: "设备仓库",
-    inventorySlotMeter: "{active}/{max} 个槽位已激活",
+    inventorySlotMeter: "{active}/{max} 个槽位已占用",
     inventorySlotsLabel: "算力槽位",
     inventorySectionActive: "已激活",
     inventorySectionInventory: "待激活",

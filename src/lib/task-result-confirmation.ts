@@ -1,4 +1,4 @@
-export type ServerTaskStatus = "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
+export type ServerTaskStatus = import("@/api/task-assignment-api").CanonicalTaskAssignment["status"];
 
 export interface TaskResultConfirmationInput {
   /** Present only for the server-authoritative task projection. */

@@ -13,13 +13,16 @@
       </view>
     </view>
     <view class="hf-grid">
+      <TrialDeviceRow variant="home" style="grid-column:1 / -1" />
       <DeviceRow v-for="d in devices" :key="d.id" :device="d" :runtime-confirmed="fleetReady" />
-      <AddDeviceRow v-if="fleetReady && slotDevices.length < app.slotCap" />
+      <AddDeviceRow v-if="fleetReady && trialPresentation.reservedSlots.value !== null && (app.remoteSlotsUsed ?? (app.activeSlotCount + trialPresentation.reservedSlots.value)) < app.slotCap" />
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import TrialDeviceRow from "@/components/trial-device-row.vue";
+import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { navTo } from "@/lib/route";
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -33,6 +36,7 @@ import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 
 const t = useT();
 const app = useApp();
+const trialPresentation = useTrialPresentation();
 
 const devices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null));
 // Hiding a phone card does not release its server-owned slot.
@@ -43,13 +47,13 @@ const slotDevices = computed(() => app.visibleDevices.filter(isActiveSlotDevice)
 const fleetReady = computed(() => !remoteApiEnabled
   || app.remoteFleetStatus === "ready"
   || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
-const fleetCountText = computed(() => fleetReady.value ? fmt(t.value.home.fleetOfMax, {
-  n: slotDevices.value.length,
+const fleetCountText = computed(() => fleetReady.value && (app.remoteSlotsUsed !== null || trialPresentation.reservedSlots.value !== null) ? fmt(t.value.home.fleetOfMax, {
+  n: app.remoteSlotsUsed ?? (app.activeSlotCount + (trialPresentation.reservedSlots.value ?? 0)),
   max: app.slotCap,
 }) : "— / —");
 
 function goManage() {
-  navTo("/pages/earn/earn");
+  navTo("/pages/me/devices");
 }
 
 

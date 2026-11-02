@@ -24,6 +24,7 @@
       </view>
     </view>
 
+    <HomeRunningTasks :limit="3" />
     <!-- Activity tab -->
     <view v-show="tab === 'activity'" id="home-live-feed-panel-activity" class="font-mono-tabular" style="padding: 0 2px 6px; font-size: 12px" role="tabpanel" aria-labelledby="home-live-feed-tab-activity" :aria-hidden="tab !== 'activity'" :tabindex="tab === 'activity' ? 0 : -1">
       <view
@@ -71,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import HomeRunningTasks from "./home-running-tasks.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, nextTick, ref, type CSSProperties } from "vue";

@@ -1,3 +1,4 @@
+import type { TaskExecutionMetadata } from "@/api/task-assignment-api";
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
 import type { EntrySurface } from "@/lib/entry-surface";
 
@@ -33,7 +34,7 @@ export const TASK_CATEGORY_LABEL: Record<TaskCategory, string> = {
   SP: "Speech",
 };
 
-export interface CurrentTask {
+export interface CurrentTask extends TaskExecutionMetadata {
   id: string;          // e.g. "IG-A78234"  ({category}-A{counter})
   category: TaskCategory;
   type: string;        // human label, e.g. "Image Gen"
@@ -41,12 +42,24 @@ export interface CurrentTask {
   client: string;      // e.g. "Mosaic Studios"
   location: string;    // e.g. "Berlin, DE"
   totalSec: number;
-  startedAt: number;   // epoch ms
+  startedAt: number | null;   // epoch ms; queued v2 tasks have not started
   reward: number;      // USDT
+  rewardAsset?: "USDT" | "UVT";
+  rewardAmount?: string;
   /** Server status is present only for the remote authority projection. */
-  status?: "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
+  status?: import("@/api/task-assignment-api").CanonicalTaskAssignment["status"];
+  protocolVersion?: 2 | 3;
+  queuedAt?: number | null;
+  actualDurationSec?: number | null;
+  settlementStatus?: import("@/api/task-assignment-api").CanonicalTaskAssignment["settlementStatus"];
+  settlementBatchNo?: string | null;
+  settledAt?: number | null;
+  configVersion?: string;
   /** Server-issued estimated completion time; it never certifies settlement. */
   completableAt?: number | null;
+  /** Server pause boundary and elapsed time from completed pause intervals. */
+  pausedAt?: number | null;
+  pausedSeconds?: number;
 }
 
 export interface CompletedTask extends CurrentTask {
@@ -125,6 +138,9 @@ export interface Device {
   gpuPower: number; // W
   vramUsed: number; // GB
   currentTask: CurrentTask | null;
+  recoveryPending?: boolean;
+  recoveryReason?: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" | null;
+  simulationState?: import("@/api/task-assignment-api").SimulationState;
   recentTasks: CompletedTask[]; // last 10
   /** Server-authoritative post-completion task lock. Remote clients only display this value. */
   taskLockUntil?: number | null;
@@ -446,6 +462,8 @@ export interface AppState {
   visibleDevices: Device[];
   slotDevices: Device[];
   activeSlotCount: number;
+  remoteSlotsUsed?: number | null;
+  remoteSlotUsage?: { slotsUsed: number; reservedSlotCount?: number; trialSlotCount?: number } | null;
   earnings: EarningsState;
   global: GlobalStats;
   latestWithdrawal: Withdrawal | null;

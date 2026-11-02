@@ -1905,7 +1905,7 @@ catalog: {
     // promo banner. Distinct from MyDevicesEntry above which is the /me
     // summary card.
     inventoryTitle: "Device inventory",
-    inventorySlotMeter: "{active}/{max} slots active",
+    inventorySlotMeter: "{active}/{max} slots used",
     inventorySlotsLabel: "Compute slots",
     inventorySectionActive: "Active",
     inventorySectionInventory: "Inventory",

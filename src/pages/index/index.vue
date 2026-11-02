@@ -15,7 +15,7 @@
         <GreetingHeader />
         <TechMoneyCard />
       </view>
-      <TrialGhostSlot />
+      <TrialHeroBanner />
       <!-- #ifdef H5 -->
       <view v-if="auth.isAuthenticated" class="phone-policy-notice nx-home-glass-item" role="status" data-testid="home-app-download-banner">
         <view class="nx-home-glass-panel" aria-hidden="true" />
@@ -121,7 +121,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import GreetingHeader from "@/components/home/greeting-header.vue";
 import TechMoneyCard from "@/components/home/tech-money-card.vue";
-import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
+import TrialHeroBanner from "@/components/trial-hero-banner.vue";
 import ConversionBanner from "@/components/home/conversion-banner.vue";
 import PromotionEntry from "@/components/promotion/promotion-entry.vue";
 import PromotionAction from "@/components/promotion/promotion-action.vue";
