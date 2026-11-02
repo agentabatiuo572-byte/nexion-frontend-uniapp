@@ -4,9 +4,10 @@ import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
-export type ExternalPaymentMethod = 'HDPAY_BANK' | 'CREGIS_USDT_BSC';
+export type ExternalPaymentMethod = 'HDPAY_BANK' | 'CREGIS_USDT_BSC' | 'CREGIS_USDT_ERC20';
 export type PurchaseMethod = 'WALLET' | ExternalPaymentMethod;
-type PurchaseFinancialSnapshot = { businessAmountUsdt?: string; roundingAdjustmentUsdt?: string; fxRateVndPerUsdt: string | null; feePolicyVersion: number };
+type PurchaseFinancialSnapshot = { businessAmountUsdt?: string; roundingAdjustmentUsdt?: string; fxRateVndPerUsdt: string | null; feePolicyVersion: number;
+  deadlineAt?: string; confirmationGraceEndsAt?: string };
 export type PurchaseQuote = {
   paymentQuoteId: string; kind: PurchaseKind; paymentMethod: ExternalPaymentMethod; network: string | null;
   subtotalUsdt: string; channelFeeUsdt: string; networkConfirmFeeUsdt: string; totalUsdt: string;
@@ -20,6 +21,7 @@ export type PurchasePaymentIntent = {
   networkConfirmFeeUsdt: string; totalUsdt: string; amountVnd: string | null; paymentUrl: string | null;
   address: string | null; expiresAt: string; reason: string | null; receipt: unknown;
   fulfilmentStatus?: 'DELIVERED';
+  paymentAllowed?: boolean; expirationTime?: string;
 } & PurchaseFinancialSnapshot;
 const invalid = () => new ApiError({ kind: 'protocol', message: 'PURCHASE_PAYMENT_RESPONSE_INVALID' });
 const object = (raw: unknown): Record<string, unknown> => {
@@ -42,10 +44,12 @@ const timestamp = (raw: unknown): string => {
   return value;
 };
 function common(raw: Record<string, unknown>) {
-  if (!purchaseKinds.includes(raw.kind as PurchaseKind) || !['HDPAY_BANK', 'CREGIS_USDT_BSC'].includes(String(raw.paymentMethod))) throw invalid();
+  if (!purchaseKinds.includes(raw.kind as PurchaseKind) || typeof raw.paymentMethod !== 'string'
+    || !['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].includes(raw.paymentMethod)) throw invalid();
   const paymentMethod = raw.paymentMethod as ExternalPaymentMethod;
   const network = raw.network == null ? null : text(raw.network);
   if (paymentMethod === 'CREGIS_USDT_BSC' && !['BSC', 'BEP20', 'USDT-BSC'].includes(network ?? '')) throw invalid();
+  if (paymentMethod === 'CREGIS_USDT_ERC20' && network !== 'ERC20') throw invalid();
   const amountVnd = raw.amountVnd == null ? null : text(raw.amountVnd);
   if (paymentMethod === 'HDPAY_BANK' && (!amountVnd || !/^[1-9]\d*$/.test(amountVnd))) throw invalid();
   const subtotalUsdt = money(raw.subtotalUsdt), channelFeeUsdt = money(raw.channelFeeUsdt), networkConfirmFeeUsdt = money(raw.networkConfirmFeeUsdt), totalUsdt = money(raw.totalUsdt);
@@ -63,10 +67,18 @@ function common(raw: Record<string, unknown>) {
       || micros(businessAmountUsdt) + micros(roundingAdjustmentUsdt) !== micros(subtotalUsdt)
       || (micros(businessAmountUsdt) + 5000n) / 10000n !== cents(subtotalUsdt)) throw invalid();
   }
-  return { kind: raw.kind as PurchaseKind, paymentMethod, network, subtotalUsdt, channelFeeUsdt, networkConfirmFeeUsdt, totalUsdt, amountVnd,
+  const expiresAt = timestamp(raw.expiresAt);
+  const timing: { deadlineAt?: string; confirmationGraceEndsAt?: string } = {};
+  if (raw.deadlineAt !== undefined || raw.confirmationGraceEndsAt !== undefined) {
+    timing.deadlineAt = timestamp(raw.deadlineAt);
+    timing.confirmationGraceEndsAt = timestamp(raw.confirmationGraceEndsAt);
+    if (Date.parse(expiresAt) > Date.parse(timing.deadlineAt)
+      || Date.parse(timing.confirmationGraceEndsAt) - Date.parse(timing.deadlineAt) !== (paymentMethod === 'CREGIS_USDT_BSC' ? 3 : 5) * 60000) throw invalid();
+  }
+  return { kind: raw.kind as PurchaseKind, paymentMethod, network, subtotalUsdt, channelFeeUsdt, networkConfirmFeeUsdt, totalUsdt, amountVnd, ...timing,
     feePolicyVersion: Number(raw.feePolicyVersion), fxRateVndPerUsdt,
     ...(typeof businessAmountUsdt === 'string' && typeof roundingAdjustmentUsdt === 'string' ? { businessAmountUsdt, roundingAdjustmentUsdt } : {}),
-    expiresAt: timestamp(raw.expiresAt), paymentQuoteId: text(raw.paymentQuoteId) };
+    expiresAt, paymentQuoteId: text(raw.paymentQuoteId) };
 }
 export function parsePurchaseQuote(value: unknown): PurchaseQuote {
   return common(object(value));
@@ -76,15 +88,30 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
   if (!purchasePaymentStatuses.includes(raw.status as PurchasePaymentStatus)) throw invalid();
   const paymentUrl = raw.paymentUrl == null ? null : text(raw.paymentUrl), address = raw.address == null ? null : text(raw.address);
   if (paymentUrl && (fields.paymentMethod !== 'HDPAY_BANK' || !validateHostedPaymentUrl(paymentUrl))) throw invalid();
-  if (address && (fields.paymentMethod !== 'CREGIS_USDT_BSC' || !/^0x[0-9a-fA-F]{40}$/.test(address))) throw invalid();
+  if (address && (!['CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].includes(fields.paymentMethod) || !/^0x[0-9a-fA-F]{40}$/.test(address))) throw invalid();
   if ((raw.status === 'DELIVERED' || raw.fulfilmentStatus === 'DELIVERED') && (!raw.receipt || typeof raw.receipt !== 'object')) throw invalid();
+  if (raw.paymentAllowed !== undefined && (typeof raw.paymentAllowed !== 'boolean' || !fields.deadlineAt)) throw invalid();
+  const expirationTime = raw.expirationTime === undefined ? undefined : timestamp(raw.expirationTime);
+  if (expirationTime && fields.paymentMethod !== 'HDPAY_BANK') throw invalid();
   return { ...fields, intentNo: text(raw.intentNo), commandKey: text(raw.commandKey), status: raw.status as PurchasePaymentStatus,
     paymentUrl, address, reason: raw.reason == null || typeof raw.reason === 'string' && !raw.reason.trim() ? null : text(raw.reason), receipt: raw.receipt ?? null,
-    ...(raw.fulfilmentStatus === 'DELIVERED' ? { fulfilmentStatus: 'DELIVERED' as const } : {}) };
+    ...(raw.fulfilmentStatus === 'DELIVERED' ? { fulfilmentStatus: 'DELIVERED' as const } : {}),
+    ...(raw.paymentAllowed !== undefined ? { paymentAllowed: raw.paymentAllowed as boolean } : {}),
+    ...(expirationTime ? { expirationTime } : {}) };
 }
 export function createPurchasePaymentApi(client: ApiClient) {
   const base = '/api/app/purchase-payment';
   return {
+    /** Which external channels operations have configured; unlisted channels count as unavailable. */
+    async policy(): Promise<Partial<Record<ExternalPaymentMethod, boolean>>> {
+      const raw = object(await client.request({ path: `${base}-policy` }));
+      if (!Array.isArray(raw.channels)) throw invalid();
+      return Object.fromEntries(raw.channels.map(value => {
+        const row = object(value);
+        if (typeof row.paymentMethod !== 'string' || typeof row.configured !== 'boolean') throw invalid();
+        return [row.paymentMethod, row.configured];
+      }));
+    },
     async quote(kind: PurchaseKind, paymentMethod: ExternalPaymentMethod, payload: Record<string, unknown>) {
       return parsePurchaseQuote(await client.request({ method: 'POST', path: `${base}-quotes`, body: { kind, paymentMethod, payload } }));
     },

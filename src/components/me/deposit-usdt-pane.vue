@@ -1,20 +1,42 @@
 <!--
   DepositUsdtPane — 充值页「USDT 链上」通道段(PAY-规格 [FEAT-PAY01] ⑤⑥)。
-  正式模式仅 BEP20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
+  正式模式支持 BEP20 / ERC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
   → 常驻错网络警示 → 指引/工单入口 → 最近入金
   列表(confirming n/N 实时进度 · credited / dust_hold / returned 态)。
-  4 态:骨架(匹配形状)/ 空列表 / 通道停用置灰 / 断网 inline 重试。
+  4 态:骨架(匹配形状)/ 空列表 / 断网 inline 重试;服务端报告未配置或已关闭的网络不显示。
   数据纯展示:状态 server-canonical(mock 引擎在 deposits store),本组件零写状态。
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
+      <!-- ── 网络:上下两行单选(选中 = 品牌描边 + 实心点)── -->
+      <view v-if="visibleNets.length" class="nx-dep-nets" role="radiogroup" :aria-label="t.wallet.networkLabel">
+        <view
+          v-for="nw in visibleNets"
+          :key="nw.id"
+          :class="['nx-dep-net', `nx-dep-net-${nw.label.toLowerCase()}`, { 'nx-dep-net--on': net === nw.id }]"
+          role="radio" tabindex="0"
+          :aria-checked="net === nw.id"
+          @click="pickNet(nw.id)" @keydown.enter.prevent="pickNet(nw.id)" @keydown.space.prevent="pickNet(nw.id)"
+        >
+          <view class="nx-dep-net__nm">
+            <text class="nx-dep-net__name">{{ nw.label }}</text>
+            <text v-if="nw.id === 'usdt-trc20'" class="nx-dep-net__sub">{{ t.topupChrome.netRecommended }}</text>
+            <text v-else class="nx-dep-net__sub">{{ fmt(t.topupChrome.netFee, { fee: (addressRefreshFailed || (fundsServerEnabled && !serverEnabled)) ? "—" : formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
+          </view>
+          <view class="nx-dep-net__ck" aria-hidden="true" />
+        </view>
+      </view>
+
+
     <!-- ── 加载骨架(chip 行 / QR 区 / 入口区,匹配真实形状)── -->
     <view v-if="phase === 'loading'">
-      <view class="flex" style="gap: 8px">
-        <view v-for="i in NETWORKS.length" :key="i" class="flex-1 nx-dep-sk" style="height: 56px" />
-      </view>
       <view class="nx-dep-sk" style="height: 300px; margin-top: 16px" />
       <view class="nx-dep-sk" style="height: 96px; margin-top: 16px" />
+    </view>
+
+    <view v-else-if="phase === 'preparing'" class="flex flex-col items-center" style="padding: 40px 0 32px" role="status">
+      <view class="nx-dep-sk" style="width: 56px; height: 56px; border-radius: 50%" />
+      <text style="margin-top: 16px; color: var(--v5-ink-2)">{{ t.topupChrome.addrPreparing }}</text>
     </view>
 
     <!-- ── 地址拉取失败(断网)→ inline 重试 ── -->
@@ -23,131 +45,113 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
       </view>
       <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.addrLoadFailed }}</text></view>
-      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="load()">
-        <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text>
+      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="refresh()">
+        <text style="font: 600 13px/20px var(--font-v5); color: var(--v5-ink)">{{ t.ui.retry }}</text>
       </view>
     </view>
 
     <template v-else>
-      <view v-if="refreshFailed" class="nx-dep-background-error" role="status">
-        <text :style="noteStyle">{{ addressVerified ? t.topupChrome.depositOpFailedNote : t.topupChrome.addressStatusUnverified }}</text>
-        <view class="nx-dep-background-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="load(true)"><text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text></view>
+      <view v-if="addressRefreshFailed" class="nx-dep-background-error" role="status">
+        <text :style="noteStyle">{{ t.topupChrome.addrLoadFailed }}</text>
+        <view class="nx-dep-background-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="refresh(true)"><text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text></view>
       </view>
-      <!-- ── 三网络 chip ── -->
-      <view class="flex" style="gap: 8px">
-        <view
-          v-for="nw in NETWORKS"
-          :key="nw.id"
-          :class="['flex-1 flex flex-col items-center justify-center', isEnabled(nw.id) ? 'active:opacity-85' : '', `nx-dep-net-${nw.label.toLowerCase()}`]"
-          :style="chipStyle(nw.id)"
-          role="button" tabindex="0"
-          :aria-disabled="!isEnabled(nw.id)"
-          @click="pickNet(nw.id)"
-        >
-          <text :style="chipLabelStyle(nw.id)">{{ nw.label }}</text>
-          <text v-if="nw.id === 'usdt-trc20'" :style="chipTagStyle">{{ t.topupChrome.netRecommended }}</text>
-          <text v-else :style="chipSubStyle" style="white-space: nowrap">{{ fmt(t.topupChrome.netFee, { fee: addressVerified ? formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) : "—" }) }}</text>
-        </view>
-      </view>
-
-      <!-- ── 专属地址 + QR(所选网络启用时)── -->
-      <view v-if="activeNet" style="margin-top: 18px">
-        <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ fmt(t.topupChrome.sendVia, { network: activeLabel }) }}</text></view>
-        <view v-if="fundsServerEnabled && !serverCreditEnabled" class="nx-dep-credit-paused-note" :style="warnlineStyle">
-          <text :style="warnTextStyle">{{ t.topupChrome.creditPausedNote }}</text>
-        </view>
-        <view v-if="address && addressVerified" class="nx-dep-qr-box" :style="qrBoxStyle">
-          <image class="nx-dep-qr-image" :src="qrImage" mode="aspectFit" :style="qrImageStyle" aria-hidden="true" />
-        </view>
-        <view v-if="addressVerified"><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text></view>
-        <view v-if="addressVerified" class="nx-dep-amount-note"><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.amountAtSenderNote }}</text></view>
-        <view class="flex items-center rounded-xl" :style="addressRowStyle">
-          <view class="flex-1 min-w-0">
-            <text class="font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); white-space: nowrap">{{ shortAddr }}</text>
+      <!-- ── 专属地址票据:QR 白卡 + 撕线 + 地址井 + 三项事实 ── -->
+      <view v-if="activeNet" class="nx-dep-ticket">
+        <view class="nx-dep-ticket__top">
+          <text class="nx-dep-via">{{ fmt(t.topupChrome.sendVia, { network: activeLabel }) }}</text>
+          <view v-if="fundsServerEnabled && !serverCreditEnabled" class="nx-dep-credit-paused-note" :style="warnlineStyle">
+            <text :style="warnTextStyle">{{ t.topupChrome.creditPausedNote }}</text>
           </view>
-          <view v-if="addressVerified" class="nx-dep-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" :aria-label="copied ? t.topupChrome.addrCopied : t.topupChrome.copyAddress" @click="copyAddr">
-            <svg v-if="copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+          <view v-if="address" class="nx-dep-qr-box">
+            <image class="nx-dep-qr-image" :src="qrImage" mode="aspectFit" aria-hidden="true" />
+          </view>
+          <text class="nx-dep-scan">{{ t.topupChrome.scanOrCopy }}</text>
+        </view>
+        <view class="nx-dep-tear" aria-hidden="true" />
+        <view class="nx-dep-ticket__bot">
+          <view class="nx-dep-addr">
+            <text class="nx-dep-addr__a">{{ shortAddr }}</text>
+            <view :class="['nx-dep-copy-address-cta nx-frosted-button', { 'nx-dep-copy--done': copied }]" role="button" tabindex="0" :aria-label="copied ? t.topupChrome.addrCopied : t.topupChrome.copyAddress" @click="copyAddr">
+              <svg v-if="copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+              <text>{{ t.bankPane.copyCta }}</text>
+            </view>
+          </view>
+          <!-- 费用/最低额/确认数 — 服务端或 deposits-core 常量单源 -->
+          <view class="nx-dep-trio">
+            <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">${{ formatAmount(minDeposit) }}</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ formatAmount(feeUsdt) }} USDT</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
         </view>
-        <!-- 费用/最低额/确认数 — deposits-core 常量单源派生 -->
-        <view class="flex items-center justify-between" style="margin-top: 12px; gap: 8px">
-          <view><text :style="metaCapStyle">{{ t.topupChrome.minDeposit }} <text class="nx-dep-min-value" :style="metaValStyle">{{ addressVerified ? `$${formatAmount(minDeposit)}` : "—" }}</text></text></view>
-          <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text class="nx-dep-fee-value" :style="metaValStyle">{{ addressVerified ? `${formatAmount(feeUsdt)} USDT` : "—" }}</text></text></view>
-          <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text class="nx-dep-confirmations-value" :style="metaValStyle">{{ addressVerified ? confirmations : "—" }}</text></text></view>
-        </view>
-      </view>
-
-      <!-- ── 全部网络停用 ── -->
-      <view v-else class="flex flex-col items-center" style="padding: 36px 0 28px">
-        <view class="grid place-items-center" :style="stateIconBoxStyle">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M10 15V9" /><path d="M14 15V9" /></svg>
-        </view>
-        <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; max-width: 260px">{{ t.topupChrome.allNetworksPaused }}</text></view>
       </view>
 
       <!-- ── 可用专属地址警示:地址恒定 + 错网络不可找回(规格 ⑦ 语义)── -->
-      <view v-if="activeNet && address && addressVerified" class="flex" :style="warnlineStyle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-        <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.topupChrome.depositAddrNote }}</text></view>
+      <view v-if="activeNet && address" class="nx-dep-warnbox">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4M12 17h.01" /></svg>
+        <text>{{ t.topupChrome.depositAddrNote }}</text>
       </view>
+      <view v-if="activeNet" class="nx-dep-amount-note"><text>{{ t.topupChrome.amountAtSenderNote }}</text></view>
 
-      <!-- ── 指引 / 工单入口(透明 hairline 组)── -->
-      <view style="margin-top: 16px">
-        <view class="nx-dep-usdt-guide-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" tabindex="0" @click="goGuide">
-          <text :style="linkTextStyle">{{ t.topupChrome.howToGetUsdt }}</text>
-          <text style="color: var(--v5-ink-4); font-size: 13px">›</text>
+      <!-- ── 指引 / 工单入口 ── -->
+      <view class="nx-dep-rows nx-dep-links">
+        <view class="nx-dep-usdt-guide-link nx-dep-link" role="button" tabindex="0" @click="goGuide">
+          <view class="nx-dep-link__ico nx-dep-link__ico--tech" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg></view>
+          <text class="nx-dep-link__t">{{ t.topupChrome.howToGetUsdt }}</text>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
-        <view class="nx-dep-support-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" tabindex="0" @click="goSupport">
-          <text :style="linkTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
-          <text style="color: var(--v5-ink-4); font-size: 13px">›</text>
+        <view class="nx-dep-support-link nx-dep-link" role="button" tabindex="0" @click="goSupport">
+          <view class="nx-dep-link__ico nx-dep-link__ico--warn" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" /></svg></view>
+          <text class="nx-dep-link__t">{{ t.topupChrome.depositNotArrived }}</text>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
       </view>
 
       <!-- ── 最近入金 ── -->
-      <view style="margin-top: 20px">
-        <view><text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.topupChrome.recentDeposits }}</text></view>
+      <view>
+        <text class="nx-dep-sec">{{ t.topupChrome.recentDeposits }}</text>
 
         <view v-if="bankHistoryStatus === 'idle' || bankHistoryStatus === 'loading'" class="nx-dep-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
         <view v-else-if="bankHistoryStatus === 'error'" style="margin-top: 8px">
           <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
-          <view class="nx-dep-history-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshBankHistory">
-            <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text>
+          <view class="nx-dep-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refreshBankHistory">
+            <text>{{ t.ui.retry }}</text>
           </view>
         </view>
 
-        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || historyLoaded) && !refreshFailed" class="flex flex-col items-center" style="padding: 26px 0 18px">
+        <view v-if="fundsServerEnabled && chainHistoryFailed" style="margin-top: 8px">
+          <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
+          <view class="nx-dep-chain-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refresh()"><text>{{ t.ui.retry }}</text></view>
+        </view>
+        <view v-else-if="fundsServerEnabled && !chainHistoryLoaded" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
+
+        <view v-if="sortedRecords.length === 0 && bankHistoryStatus === 'ready' && (!fundsServerEnabled || (chainHistoryLoaded && !chainHistoryFailed && !addressRefreshFailed))" class="flex flex-col items-center" style="padding: 26px 0 18px">
           <view class="grid place-items-center" :style="stateIconBoxStyle">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
           </view>
           <view><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4)">{{ t.topupChrome.noDepositsYet }}</text></view>
         </view>
 
-        <view v-else-if="sortedRecords.length > 0" style="margin-top: 4px">
+        <view v-else-if="sortedRecords.length > 0" class="nx-dep-rows">
           <view
             v-for="r in sortedRecords"
             :key="r.depositId"
-            class="nx-dep-record-row flex items-start"
-            :class="recordClickable(r) ? 'active:opacity-90' : ''"
-            :style="recordRowStyle"
+            class="nx-dep-record-row"
             :role="recordClickable(r) ? 'button' : undefined"
             :tabindex="recordClickable(r) ? 0 : undefined"
             v-on="recordRowOn(r)"
           >
-            <view class="grid place-items-center shrink-0" :style="depIconStyle">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
+            <view class="nx-dep-record-row__ico" :class="{ 'nx-dep-record-row__ico--ok': r.status === 'credited' }" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7" /></svg>
             </view>
-            <view class="flex-1 min-w-0" style="margin-left: 10px">
-              <view class="flex items-center justify-between" style="gap: 8px">
-                <text :style="rowTitleStyle">{{ rowTitle(r) }}</text>
-                <text class="tabular-nums" :style="rowAmtStyle(r)" style="white-space: nowrap">{{ rowAmount(r) }}</text>
-              </view>
-              <view class="flex items-center justify-between" style="gap: 8px; margin-top: 2px">
-                <text class="truncate font-mono-tabular" :style="rowSubStyle">{{ netShort(r.channel) }} · {{ r.depositId }}</text>
-                <text v-if="stateText(r)" :style="stateTextStyle(r)">{{ stateText(r) }}</text>
-              </view>
+            <view class="nx-dep-record-row__main">
+              <text class="nx-dep-record-row__title">{{ rowTitle(r) }}</text>
+              <text class="nx-dep-record-row__sub">{{ netShort(r.channel) }} · {{ r.depositId }}</text>
               <view v-if="isInFlight(r) && r.requiredConfirmations != null" class="nx-dep-progress" :style="progTrackStyle"><view :style="progFillStyle(r)" /></view>
               <view v-if="noteText(r)"><text class="block" :style="noteStyle">{{ noteText(r) }}</text></view>
+            </view>
+            <view class="nx-dep-record-row__side">
+              <text class="nx-dep-record-row__amt" :style="rowAmtStyle(r)">{{ r.status === "credited" ? "+" : "" }}{{ rowAmount(r) }}</text>
+              <text v-if="stateText(r)" class="nx-dep-record-row__state" :style="stateTextStyle(r)">{{ stateText(r) }}</text>
             </view>
           </view>
         </view>
@@ -159,8 +163,9 @@
 <script setup lang="ts">
 import { formatAmount as formatBaseAmount } from "@/lib/amount-display";
 import { exactDepositAmount } from "@/api/cregis-deposit-api";
-const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 6);
+const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 2);
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import { cregisDepositApi, fundsServerEnabled, sessionVault } from "@/api/runtime";
 import { binarySessionReady } from "@/lib/binary-session-ready";
@@ -198,6 +203,7 @@ const remoteSessionReady = computed(() => {
 // ── 网络 chip(标签为链名专有名词,非文案)──
 const NETWORKS: { id: ChainDepositChannel; label: string }[] = fundsServerEnabled ? [
   { id: "usdt-bep20", label: "BEP20" },
+  { id: "usdt-erc20", label: "ERC20" },
 ] : [
   { id: "usdt-trc20", label: "TRC20" },
   { id: "usdt-bep20", label: "BEP20" },
@@ -213,17 +219,34 @@ const CHANNEL_SHORT: Record<DepositChannel, string> = {
 /** confirming 超过 30 分钟未走满 → 「网络拥堵」提示([FEAT-PAY01] ② 异常3)。 */
 const CONFIRM_DELAY_NOTE_MS = 30 * 60 * 1000;
 
+const net = ref<ChainDepositChannel>(fundsServerEnabled ? "usdt-bep20" : "usdt-trc20");
+// Networks the server reported as not configured or turned off are not shown.
+// The address read is the only per-network signal, so a network is known only once it has been read.
+// The list is forgotten when the page shows again or the user retries, so a network turned back on returns;
+// only the selected network is read (reading allocates an address).
+const offNets = ref<ChainDepositChannel[]>([]);
+const visibleNets = computed(() => NETWORKS.filter((nw) => fundsServerEnabled ? !offNets.value.includes(nw.id) : dep.chainChannelEnabled[nw.id] === true));
+
 // ── 正式模式从服务端获取地址与记录；失败时只显示重试，不回退到模拟地址。──
-const phase = ref<"loading" | "error" | "ready">("loading");
+const phase = ref<"loading" | "preparing" | "error" | "ready">("loading");
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 let loadGeneration = 0;
+let pageVisible = true;
+let requestRunning = false;
+let nextPollAt = 0;
+let pollFailures = 0;
+function pollDelay(state: "preparing" | "ready" | "error", failures = 0): number {
+  if (state === "preparing") return 5_000 + Math.floor(Math.random() * 5_001);
+  if (state === "ready") return 30_000 + Math.floor(Math.random() * 15_001);
+  return Math.min(60_000, 10_000 * 2 ** Math.min(failures, 2)) + Math.floor(Math.random() * 5_001);
+}
 const serverAddress = ref("");
 const serverEnabled = ref(false);
 const serverCreditEnabled = ref(false);
-const addressVerified = ref(!fundsServerEnabled);
-const refreshFailed = ref(false);
-const historyLoaded = ref(false);
+const chainHistoryLoaded = ref(false);
+const chainHistoryFailed = ref(false);
+const addressRefreshFailed = ref(false);
 type PaneDepositRecord = Omit<DepositRecord, "status"> & {
   status: DepositRecord["status"] | "reorg_investigating" | "provider_conflict_hold" | "reorg_reversed";
   reviewHold?: boolean;
@@ -232,45 +255,78 @@ type PaneDepositRecord = Omit<DepositRecord, "status"> & {
 };
 const serverRecords = ref<PaneDepositRecord[]>([]);
 const copied = ref(false);
-const minDeposit = ref<string | number | null>(MIN_DEPOSIT_USDT);
-const feeUsdt = ref<string | number | null>(0);
+const minDeposit = ref<string | number | null>(fundsServerEnabled ? null : MIN_DEPOSIT_USDT);
+const feeUsdt = ref<string | number | null>(fundsServerEnabled ? null : 0);
 const confirmations = ref(CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"]);
+function refresh(background = false): void {
+  offNets.value = [];
+  load(background);
+}
 function refreshBankHistory(): void {
   if (fundsServerEnabled && remoteSessionReady.value && dep.currentAccountKey() === app.accountKey
       && dep.remoteReceiptInitialStatus !== "loading") void dep.refreshRemoteVietQrDeposits();
 }
 function load(background = false) {
-  if (fundsServerEnabled && !remoteSessionReady.value) return;
+  if (fundsServerEnabled && (!remoteSessionReady.value || !pageVisible)) return;
+  if (background && requestRunning) return;
+  const hadSnapshot = background && phase.value === "ready";
   if (!background) phase.value = "loading";
   if (loadTimer) clearTimeout(loadTimer);
   if (fundsServerEnabled) {
     if (!background) refreshBankHistory();
     const generation = ++loadGeneration;
+    requestRunning = true;
+    nextPollAt = Number.POSITIVE_INFINITY;
     const account = app.accountKey;
     const bindingEpoch = app.accountBindingEpoch;
+    const selectedNetwork = net.value === "usdt-erc20" ? "ERC20" : "BEP20";
     void (async () => {
-      let addressReceived = false;
       try {
-        const snapshot = await cregisDepositApi.address();
+        const snapshot = await cregisDepositApi.address(selectedNetwork);
         if (generation !== loadGeneration || account !== app.accountKey
             || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
         if (snapshot.enabled && (snapshot.minDepositUsdt == null || !Number.isSafeInteger(Number(snapshot.minDepositUsdt))
-            || Number(snapshot.minDepositUsdt) < 1)) throw new Error('CREGIS_MINIMUM_INVALID');
-        addressReceived = true;
-        addressVerified.value = true;
+            || Number(snapshot.minDepositUsdt) <= 0 || snapshot.feeUsdt == null || snapshot.confirmations == null)) throw new Error('CREGIS_DEPOSIT_POLICY_UNAVAILABLE');
+        const selected = net.value;
+        if (snapshot.enabled || snapshot.reason === "CREGIS_ADDRESS_PREPARING") {
+          if (offNets.value.includes(selected)) offNets.value = offNets.value.filter((id) => id !== selected);
+        } else {
+          offNets.value = [...offNets.value.filter((id) => id !== selected), selected];
+          const next = visibleNets.value[0];
+          if (next) {
+            pickNet(next.id);
+            return;
+          }
+        }
+        addressRefreshFailed.value = false;
         serverEnabled.value = snapshot.enabled;
         serverCreditEnabled.value = snapshot.creditEnabled === true;
         serverAddress.value = snapshot.enabled ? snapshot.address ?? "" : "";
-        minDeposit.value = snapshot.minDepositUsdt == null ? MIN_DEPOSIT_USDT : exactDepositAmount(snapshot.minDepositUsdt, snapshot.minDepositUsdtExact);
-        feeUsdt.value = snapshot.feeUsdt == null ? 0 : exactDepositAmount(snapshot.feeUsdt, snapshot.feeUsdtExact);
+        minDeposit.value = snapshot.minDepositUsdt == null ? null : exactDepositAmount(snapshot.minDepositUsdt, snapshot.minDepositUsdtExact);
+        feeUsdt.value = snapshot.feeUsdt == null ? null : exactDepositAmount(snapshot.feeUsdt, snapshot.feeUsdtExact);
         confirmations.value = snapshot.confirmations ?? CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"];
-        copied.value = false;
-        phase.value = "ready";
-        const deposits = await cregisDepositApi.list();
+        phase.value = !snapshot.enabled && snapshot.reason === "CREGIS_ADDRESS_PREPARING" ? "preparing" : "ready";
+        if (phase.value === "preparing") {
+          nextPollAt = Date.now() + pollDelay(phase.value);
+          return;
+        }
+        let deposits;
+        try {
+          deposits = await cregisDepositApi.list();
+        } catch {
+          if (generation === loadGeneration && account === app.accountKey
+              && bindingEpoch === app.accountBindingEpoch && remoteSessionReady.value) {
+            chainHistoryFailed.value = true;
+            nextPollAt = Date.now() + pollDelay("error", pollFailures++);
+          }
+          return;
+        }
         if (generation !== loadGeneration || account !== app.accountKey
             || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
+        chainHistoryLoaded.value = true;
+        chainHistoryFailed.value = false;
         serverRecords.value = deposits.map((row) => ({
-          depositId: row.depositId, channel: "usdt-bep20", txHash: row.txHash,
+          depositId: row.depositId, channel: row.network === "ERC20" ? "usdt-erc20" : "usdt-bep20", txHash: row.txHash,
           address: row.address, grossAmountUsdt: row.grossAmountUsdt,
           grossExact: exactDepositAmount(row.grossAmountUsdt, row.grossAmountUsdtExact),
           creditedExact: exactDepositAmount(row.creditedUsdt, row.creditedUsdtExact),
@@ -286,23 +342,22 @@ function load(background = false) {
             : row.status === "CONFIRMING" ? "confirming" : "dust_hold",
           createdAt: row.createdAt, creditedAt: row.creditedAt ?? undefined,
         }));
-        historyLoaded.value = true;
-        phase.value = "ready";
-        refreshFailed.value = false;
+        phase.value = !snapshot.enabled && snapshot.reason === "CREGIS_ADDRESS_PREPARING" ? "preparing" : "ready";
+        pollFailures = 0;
+        nextPollAt = Date.now() + pollDelay(phase.value);
       } catch {
         if (generation === loadGeneration && account === app.accountKey
             && bindingEpoch === app.accountBindingEpoch && remoteSessionReady.value) {
-          if (!addressReceived) { addressVerified.value = false; copied.value = false; }
-          if (background && phase.value === "ready") {
-            refreshFailed.value = true;
-            return;
-          }
-          if (addressReceived) { refreshFailed.value = true; return; }
           serverAddress.value = "";
           serverEnabled.value = false;
           serverCreditEnabled.value = false;
-          phase.value = "error";
+          copied.value = false;
+          addressRefreshFailed.value = hadSnapshot;
+          phase.value = hadSnapshot ? "ready" : "error";
+          nextPollAt = Date.now() + pollDelay("error", pollFailures++);
         }
+      } finally {
+        if (generation === loadGeneration) requestRunning = false;
       }
     })();
     return;
@@ -318,10 +373,11 @@ watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch],
   serverAddress.value = "";
   serverEnabled.value = false;
   serverCreditEnabled.value = false;
-  addressVerified.value = false;
   serverRecords.value = [];
-  historyLoaded.value = false;
-  refreshFailed.value = false;
+  offNets.value = [];
+  chainHistoryLoaded.value = false;
+  chainHistoryFailed.value = false;
+  addressRefreshFailed.value = false;
   copied.value = false;
   phase.value = "loading";
   if (ready) load();
@@ -329,33 +385,39 @@ watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch],
 onMounted(() => {
   if (!fundsServerEnabled) load();
   if (fundsServerEnabled) pollTimer = setInterval(() => {
-    if (phase.value === "ready") load(true);
-  }, 30_000);
+    if (!pageVisible || (typeof document !== "undefined" && document.hidden)) return;
+    if (phase.value !== "loading" && Date.now() >= nextPollAt) load(true);
+  }, 1_000);
 });
+onShow(() => { pageVisible = true; if (fundsServerEnabled) refresh(true); });
+onHide(() => { pageVisible = false; loadGeneration++; requestRunning = false; });
 onUnmounted(() => {
+  pageVisible = false;
   loadGeneration++;
   if (loadTimer) clearTimeout(loadTimer);
   if (pollTimer) clearInterval(pollTimer);
 });
 
-// ── 网络选择(停用 chip 不可选;所选被停用时回落到首个启用网络)──
-const net = ref<ChainDepositChannel>(fundsServerEnabled ? "usdt-bep20" : "usdt-trc20");
+// ── 服务端逐网络确认能力；切换时立即移除旧地址和二维码。──
 function isEnabled(id: ChainDepositChannel): boolean {
-  if (fundsServerEnabled) return id === "usdt-bep20" && serverEnabled.value && !!serverAddress.value;
+  if (fundsServerEnabled) return id === net.value && serverEnabled.value && !!serverAddress.value;
   return dep.chainChannelEnabled[id] === true;
 }
 const activeNet = computed<ChainDepositChannel | null>(() => {
   if (isEnabled(net.value)) return net.value;
+  if (fundsServerEnabled) return null;
   const fallback = NETWORKS.find((n) => isEnabled(n.id));
   return fallback ? fallback.id : null;
 });
 const activeLabel = computed(() => (activeNet.value ? CHANNEL_SHORT[activeNet.value] : ""));
 function pickNet(id: ChainDepositChannel) {
-  if (!isEnabled(id)) {
-    toast.info(t.value.topupChrome.channelPaused);
-    return;
-  }
+  if (id === net.value) return;
   net.value = id;
+  if (fundsServerEnabled) {
+    serverAddress.value = ""; serverEnabled.value = false; serverCreditEnabled.value = false; copied.value = false;
+    minDeposit.value = null; feeUsdt.value = null; addressRefreshFailed.value = false;
+    load();
+  }
 }
 
 // ── 专属地址(同账号同网络恒定;中段省略防溢出,复制取全量)──
@@ -367,7 +429,7 @@ const shortAddr = computed(() => {
 });
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 function copyAddr() {
-  if (!address.value || !addressVerified.value) return;
+  if (!address.value) return;
   uni.setClipboardData({
     data: address.value,
     showToast: false, // 关掉 uni 系统 toast(恒中文「内容已复制」),只留应用内三语 toast
@@ -494,77 +556,6 @@ function goRecord(r: PaneDepositRecord) {
 }
 
 // ── styles ──
-const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
-function chipStyle(id: ChainDepositChannel): CSSProperties {
-  const on = activeNet.value === id;
-  return {
-    minHeight: "56px",
-    borderRadius: "16px",
-    gap: "2px",
-    padding: "8px 6px",
-    background: on ? "var(--v5-brand-soft)" : "var(--v5-surface)",
-    opacity: isEnabled(id) ? 1 : 0.45,
-  };
-}
-function chipLabelStyle(id: ChainDepositChannel): CSSProperties {
-  return {
-    fontSize: "13px",
-    fontWeight: 600,
-    color: activeNet.value === id ? "var(--v5-brand)" : "var(--v5-ink-2)",
-  };
-}
-const chipTagStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "var(--v5-brand)",
-  textAlign: "center",
-  lineHeight: 1.3,
-};
-const chipSubStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-};
-const qrBoxStyle: CSSProperties = {
-  width: "192px",
-  height: "192px",
-  margin: "16px auto 0",
-  borderRadius: "16px",
-  background: "#ffffff",
-  display: "grid",
-  placeItems: "center",
-};
-const qrImageStyle: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  display: "block",
-};
-const addressRowStyle: CSSProperties = {
-  marginTop: "16px",
-  padding: "12px",
-  gap: "8px",
-  background: "var(--v5-surface-2)",
-};
-const copyBtnStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "10px",
-  background: "var(--v5-surface-3)",
-};
-const metaCapStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  whiteSpace: "nowrap",
-};
-const metaValStyle: CSSProperties = {
-  color: "var(--v5-ink-2)",
-  fontWeight: 600,
-};
 const warnlineStyle: CSSProperties = {
   marginTop: "16px",
   padding: "10px 12px",
@@ -577,48 +568,15 @@ const warnTextStyle: CSSProperties = {
   color: "var(--v5-warning)",
   lineHeight: 1.45,
 };
-const linkRowStyle: CSSProperties = {
-  minHeight: "48px",
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
-};
-const linkTextStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "var(--v5-ink-2)",
-};
-const recordRowStyle: CSSProperties = {
-  padding: "12px 0",
-  borderTop: "1px solid var(--v5-border)",
-};
-const depIconStyle: CSSProperties = {
-  width: "38px",
-  height: "38px",
-  borderRadius: "12px",
-  background: "var(--v5-brand-soft)",
-};
-const rowTitleStyle: CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 500,
-  color: "var(--v5-ink)",
-};
 function rowAmtStyle(r: PaneDepositRecord): CSSProperties {
-  return {
-    fontFamily: "var(--font-v5)",
-    fontSize: "13px",
-    fontWeight: 600,
-    color: r.status === "credited" ? "var(--v5-brand)" : "var(--v5-ink)",
-  };
+  return { color: r.status === "credited" ? "var(--v5-success-ink)" : "var(--v5-ink)" };
 }
-const rowSubStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-};
 function stateTextStyle(r: PaneDepositRecord): CSSProperties {
   return {
     fontSize: "12px",
     whiteSpace: isRiskHold(r) ? "normal" : "nowrap",
     textAlign: "right",
-    color: isRiskHold(r) ? "var(--v5-warning)" : r.status === "credited" ? "var(--v5-brand)" : ["returned", "reorg_reversed"].includes(r.status) ? "var(--v5-ink-4)" : "var(--v5-ink-3)",
+    color: isRiskHold(r) ? "var(--v5-warning)" : r.status === "credited" ? "var(--v5-success-ink)" : ["returned", "reorg_reversed"].includes(r.status) ? "var(--v5-ink-4)" : "var(--v5-ink-3)",
   };
 }
 const progTrackStyle: CSSProperties = {
@@ -662,6 +620,65 @@ const retryBtnStyle: CSSProperties = {
 </script>
 
 <style scoped>
+/* P-44 USDT channel: network radio rows, address ticket (white QR plate, tear line, address well), warning box, list cards. */
+.nx-dep-nets { display: flex; flex-direction: column; gap: 8px; margin: 8px -2px 0; }
+.nx-dep-net { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 16px; box-sizing: border-box; border-radius: var(--v5-radius-m); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+.nx-dep-net:active { transform: scale(.97); }
+.nx-dep-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
+.nx-dep-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.nx-dep-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.nx-dep-net--on .nx-dep-net__name { color: var(--v5-brand); }
+.nx-dep-net__sub { min-width: 0; overflow: hidden; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); text-overflow: ellipsis; white-space: nowrap; }
+.nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
+.nx-dep-net--on .nx-dep-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
+.nx-dep-net--on .nx-dep-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
+.nx-dep-ticket { position: relative; margin: 12px -2px 0; border-radius: var(--ui-radius-surface, var(--v5-radius-xl)); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.nx-dep-ticket__top { padding: 20px 20px 18px; text-align: center; }
+.nx-dep-via { display: inline-flex; color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); letter-spacing: .04em; }
+.nx-dep-qr-box { width: 184px; height: 184px; margin: 14px auto 0; padding: 10px; box-sizing: border-box; border-radius: 18px; background: #FFFFFF; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: nx-viz-pop 420ms cubic-bezier(.2,1.4,.4,1) 260ms both; }
+.nx-dep-qr-image { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.nx-dep-scan { display: block; margin-top: 12px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.nx-dep-tear { position: relative; height: 0; margin: 0 18px; border-top: 1.5px dashed var(--v5-border-strong); }
+.nx-dep-tear::before, .nx-dep-tear::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-bg); }
+.nx-dep-tear::before { left: -28px; } .nx-dep-tear::after { right: -28px; }
+.nx-dep-ticket__bot { padding: 16px; }
+.nx-dep-addr { display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .nx-dep-addr { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.nx-dep-addr__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
+.nx-dep-copy-address-cta { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-ink); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.nx-dep-copy-address-cta::after { content: ""; position: absolute; inset: -6px -2px; }
+.nx-dep-copy-address-cta:active { transform: scale(.97); }
+.nx-dep-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; text-align: center; }
+.nx-dep-trio > view + view { border-left: 1px solid var(--v5-border); }
+.nx-dep-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.nx-dep-trio .nx-dep-k { padding-top: 3px; }
+.nx-dep-trio__v { display: block; margin-top: 2px; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; }
+.nx-dep-warnbox { display: flex; align-items: flex-start; gap: 10px; margin: 12px -2px 0; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-warning) 16%, transparent); color: var(--v5-warning-ink); font: 400 13px/20px var(--font-v5); }
+.nx-dep-warnbox > svg { flex: none; margin-top: 3px; }
+.nx-dep-amount-note { margin-top: 10px; padding: 0 2px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.nx-dep-rows { margin: 16px -2px 0; overflow: hidden; border-radius: var(--ui-radius-surface, var(--v5-radius-xl)); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.nx-dep-link { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; color: var(--v5-ink); cursor: pointer; }
+.nx-dep-link__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon, 12px); }
+.nx-dep-link__ico--tech { background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); }
+.nx-dep-link__ico--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
+.nx-dep-link__t { flex: 1; min-width: 0; font: 400 15px/20px var(--font-v5); }
+.nx-dep-link + .nx-dep-link, .nx-dep-record-row + .nx-dep-record-row { border-top: 1px solid var(--v5-border); }
+.nx-dep-link > svg { flex: none; color: var(--v5-ink-4); }
+.nx-dep-link:active { opacity: .7; }
+.nx-dep-sec { display: block; margin: 32px 2px 12px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
+.nx-dep-sec + view > .nx-dep-rows, .nx-dep-sec ~ .nx-dep-rows { margin-top: 0; }
+.nx-dep-record-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; }
+.nx-dep-record-row[role="button"]:active { opacity: .9; }
+.nx-dep-record-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon, 12px); background: var(--v5-surface-3); color: var(--v5-ink-2); }
+.nx-dep-record-row__ico--ok { background: var(--v5-success-soft); color: var(--v5-success-ink); }
+.nx-dep-record-row__main { flex: 1; min-width: 0; }
+.nx-dep-record-row__title { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
+.nx-dep-record-row__sub { display: block; padding-top: 3px; overflow: hidden; color: var(--v5-ink-3); font: 400 12px/16px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
+.nx-dep-record-row__side { flex: none; max-width: 50%; text-align: right; }
+.nx-dep-record-row__amt { display: block; font: 500 16px/20px var(--font-amount, var(--font-v5)); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-dep-record-row__state { display: block; margin-top: 2px; font: 400 12px/16px var(--font-v5); }
+@media (prefers-reduced-motion: reduce) { .nx-dep-net, .nx-dep-copy-address-cta { transition: none; } .nx-dep-net:active, .nx-dep-copy-address-cta:active { transform: none; } .nx-dep-qr-box { animation: none; } }
 /* 骨架 shimmer(匹配形状占位;通用 spinner 禁用) */
 .nx-dep-sk {
   border-radius: 16px;

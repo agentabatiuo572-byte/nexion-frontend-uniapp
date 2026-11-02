@@ -13,8 +13,8 @@ const parts = computed(() => {
 });
 </script>
 <style scoped>
-.checkout-amount { white-space: nowrap; font-family: var(--font-amount); font-weight: 500; font-variant-numeric: tabular-nums; }
+.checkout-amount { white-space: nowrap; font-family: var(--font-amount, var(--font-v5)); font-weight: 500; font-variant-numeric: tabular-nums; }
 .checkout-amount__symbol { margin-right: calc(var(--v5-space-1) / 2); color: var(--v5-ink-3); font-size: .6em; }
 .checkout-amount__fraction { color: var(--v5-ink-3); }
-.checkout-amount__unit { margin-left: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
+.checkout-amount__unit { margin-left: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-note-weight, 400) var(--ui-type-note, 12px)/var(--ui-type-note-lh, 18px) var(--font-v5); }
 </style>

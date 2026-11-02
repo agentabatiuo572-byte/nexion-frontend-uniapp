@@ -612,7 +612,7 @@ function eligibilityNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
 }
 function eligibilityConditionText(condition: PurchaseEligibilityCondition): string {
-  const numberLabel = condition.kind === "teamVolumeUsd" ? formatAmount : eligibilityNumber;
+  const numberLabel = eligibilityNumber;
   const values = {
     current: numberLabel(condition.current),
     required: numberLabel(condition.required),
@@ -622,7 +622,7 @@ function eligibilityConditionText(condition: PurchaseEligibilityCondition): stri
     ? fmt(t.value.store.purchaseEligibilityRank, values)
     : condition.kind === "activeDirect"
       ? fmt(t.value.store.purchaseEligibilityActiveDirect, values)
-      : condition.kind === "teamVolumeUsd"
+      : condition.kind === "teamComputePoints"
         ? fmt(t.value.store.purchaseEligibilityTeamVolume, values)
         : condition.kind === "lifetimeQuota"
           ? fmt(t.value.store.purchaseEligibilityLifetimeQuota, values)

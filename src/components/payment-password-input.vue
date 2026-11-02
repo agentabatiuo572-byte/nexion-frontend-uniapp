@@ -1,7 +1,7 @@
 <template>
   <view class="payment-pin-input" :class="{ 'payment-pin-input--disabled': disabled, 'payment-pin-input--focused': focused }">
     <view class="payment-pin-input__cells" aria-hidden="true">
-      <view v-for="n in 6" :key="n" class="payment-pin-input__cell" :class="{ 'payment-pin-input__cell--active': focused && modelValue.length === n - 1 }">
+      <view v-for="n in 6" :key="n" class="payment-pin-input__cell" :class="{ 'payment-pin-input__cell--active': !disabled && (focused || autoFocus) && modelValue.length === n - 1 }">
         <view v-if="modelValue.length >= n" class="payment-pin-input__dot" />
       </view>
     </view>
@@ -31,11 +31,11 @@ function onInput(event: Event) {
 <style scoped>
 .payment-pin-input { position: relative; width: 100%; min-width: 0; margin: var(--v5-space-3) 0; }
 .payment-pin-input__cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--v5-space-2); }
-.payment-pin-input__cell { height: 52px; display: flex; align-items: center; justify-content: center; background: var(--v5-surface-2); border: 1px solid var(--v5-border); border-radius: var(--v5-radius-s); }
-.payment-pin-input__cell--active { border-color: var(--v5-brand); }
-.payment-pin-input__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--v5-ink); }
-.payment-pin-input__control { position: absolute; inset: 0; width: 100%; height: 52px; opacity: 0; caret-color: transparent; color: transparent; }
+.payment-pin-input__cell { height: 56px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb,var(--v5-ink) 5%,transparent); border: 0; border-radius: 14px; box-shadow: inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent), inset 0 0 0 1px var(--v5-border); }
+.payment-pin-input__cell--active { box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
+.payment-pin-input__cell--active::after { content:""; width:2px; height:22px; border-radius:1px; background:var(--v5-brand); }
+.payment-pin-input__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--v5-ink); }
+.payment-pin-input__control { position: absolute; inset: 0; width: 100%; height: 56px; opacity: 0; caret-color: transparent; color: transparent; }
 .payment-pin-input--disabled { opacity: .55; }
-.payment-pin-input--focused .payment-pin-input__cells { outline: 2px solid var(--v5-brand); outline-offset: 3px; border-radius: var(--v5-radius-s); }
 .payment-pin-input__status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 </style>
