@@ -6,7 +6,7 @@
       <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
     <template v-else>
-      <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:t.tradein.keepRecoveryPending }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
+      <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
       <text v-if="displayQuote||order" class="checkout-review-title">{{ order?.paymentStatus==='PENDING' ? p.pending : p.confirmOrder }}</text>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="recover"><text>{{ p.query }}</text></PromotionAction></view>
       <view v-if="error" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
@@ -141,7 +141,8 @@ import type { PromotionItem } from '@/api/promotion-api';
 import { validatePromotionItems } from '@/api/promotion-api';
 import type { LocalizedText,RewardDisclosure,Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';import { useLocaleStore } from '@/store/locale';import { useApp } from '@/store/app';import { useAuth } from '@/store/auth';
-import { readPendingKeepCommand } from '@/lib/keep-command-recovery';
+import { readCapacityPending } from '@/lib/capacity-command-recovery';
+import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
 import { useTradeinSheet } from '@/store/tradein-sheet';
 import type { DeviceKind } from '@/store/types';
 import { useVoucher } from '@/store/voucher';
@@ -244,7 +245,7 @@ function recoverKeepBeforeNewPurchase(reopen=false):boolean {
   const previous=keepRecoveryTarget.value;
   keepRecoveryTarget.value=null;keepRecoveryReadError.value=false;
   for(const {productNo} of selection.value){
-    try{if(!readPendingKeepCommand(account,productNo))continue;}
+    try{if(!readCapacityPending(account,productNo))continue;}
     catch{keepRecoveryReadError.value=true;}
     keepRecoveryTarget.value=productNo;
     freshQuoteReady.value=false;quoteFresh.value=false;quotePresentation.value=null;
