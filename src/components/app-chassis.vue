@@ -121,6 +121,7 @@
     </view>
 
     <slot name="pageFixed" :top="contentTop + pendingBarInset" />
+    <ReceiptModal v-if="active === 'earn'" :receipt="taskCenterReceipt" @close="taskCenterReceipt = null" />
 
     <!-- Bottom chrome: floating pill TabBar (tab routes) + home indicator (always) -->
     <view class="nx-tabbar-wrap">
@@ -169,6 +170,8 @@ import BrandLockup from "@/components/brand-lockup.vue";
 import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
 // #endif
 import GlobalUi from "@/components/global-ui.vue";
+import ReceiptModal from "@/components/me/receipt-modal.vue";
+import { taskCenterReceiptKey, type OpenTaskReceipt } from "@/store/receipts";
 import { toast } from "@/store/ui";
 import SupportBubble from "@/components/support/support-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
@@ -213,6 +216,9 @@ defineOptions({ inheritAttrs: false, methods: {
   // App-Plus callMethod resolves vm.proxy, which does not expose script-setup bindings.
   onNativeScrollLoadMore(this: { $: { exposed: { receiveNativeScrollLoadMore(key: string): void } | null } }, key: string) { this.$.exposed?.receiveNativeScrollLoadMore(key); },
 } });
+const taskCenterReceipt = ref<OpenTaskReceipt>(null);
+provide(taskCenterReceiptKey, taskCenterReceipt);
+
 const props = withDefaults(defineProps<{
   active?: "home" | "earn" | "store" | "team" | "me";
   logicalRoute?: string;

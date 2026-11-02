@@ -59,7 +59,7 @@
             @keydown.enter.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
             @keydown.space.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
           >
-            <text style="min-width:0;overflow-wrap:anywhere;font-family:var(--font-jet-mono),ui-monospace,monospace;color:var(--v5-ink)">{{ row.v }}</text>
+            <text style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-jet-mono),ui-monospace,monospace;color:var(--v5-ink)">{{ row.v }}</text>
             <text v-if="row.hint" style="color:var(--v5-ink-2);font-size:12px">({{ row.hint }})</text>
             <!-- Check when just-copied, else Copy affordance (mirrors prototype RowCopy) -->
             <svg v-if="copiedField === (row.copyKey ?? row.k)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
@@ -127,6 +127,7 @@ const fieldLabels: Record<string, readonly [string, string, string]> = {
   reward_usdt:["USDT 收益","USDT reward","Thu nhập USDT"],
   reward_nex:["UVT 奖励","UVT reward","Phần thưởng UVT"],
   proof_hash:["证明哈希","Proof hash","Mã băm bằng chứng"],
+  receipt_hash:["凭证哈希","Receipt hash","Mã băm biên nhận"],
   compliance_id:["核验编号","Verification number","Mã xác minh"],
   type:["类型","Type","Loại"],
   program:["核验程序","Verification program","Chương trình xác minh"],
@@ -174,7 +175,7 @@ function fieldLabel(key: string): string {
   return fieldLabels[key]?.[localeIndex[receiptLocale.value]] ?? key;
 }
 const identifierFields = new Set(["receipt_no","task_no","compliance_id","job_id","device_instance","gpu_fingerprint","block"]);
-useDialogA11y(computed(() => props.receipt !== null), ".nx-receipt-modal-root", () => emit("close"));
+useDialogA11y(computed(() => props.receipt !== null), ".nx-receipt-modal-root", () => emit("close"), true);
 // "KY" = 存量验证类回执(机制已删,历史数据保留可查 —— 白名单字段)。
 function isCanonicalComputeReceipt(
   receipt: Receipt | CanonicalComputeReceipt,
@@ -326,10 +327,11 @@ const sections = computed<DescSection[]>(() => {
     return [
       {
         rows: [
-          { k: "receipt_no", v: r.receiptNo, accent: true },
-          { k: "task_no", v: r.taskNo },
-          { k: "task_type", v: isSimulatedReceipt.value ? r.taskName : workloadLabel(t.value, r.taskClass) },
-          ...(!isSimulatedReceipt.value ? [{ k: "task_name", v: r.taskName }, { k: "model", v: r.model || "—" }] : []),
+          { k: "receipt_no", v: r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5), copyValue: r.receiptNo },
+          { k: "task_no", v: shortenHex(r.taskNo, 7, 5), copyValue: r.taskNo },
+          { k: "task_type", v: workloadLabel(t.value, r.taskClass) },
+          { k: "task_name", v: r.taskName },
+          ...(!isSimulatedReceipt.value ? [{ k: "model", v: r.model || "—" }] : []),
         ],
       },
       {
@@ -362,6 +364,7 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
+          ...(r.receiptHash ? [{ k: "receipt_hash", copyValue: r.receiptHash, v: shortenHex(r.receiptHash, 8, 6) }] : []),
           ...(r.proofHash ? [{ k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: shortenHex(r.proofHash, 8, 6) }] : []),
         ],
       },
@@ -574,5 +577,5 @@ function valueStyle(row: DescRow): CSSProperties {
   };
 }
 // Prototype RowCopy: `flex items-center gap-1` (4px) — value + hint + copy icon.
-const copyRowStyle: CSSProperties = { gap: "6px", minHeight: "44px", minWidth: "44px", justifyContent: "flex-end", flexWrap: "wrap" };
+const copyRowStyle: CSSProperties = { gap: "6px", minHeight: "44px", minWidth: 0, justifyContent: "flex-end", flexWrap: "nowrap" };
 </script>

@@ -134,7 +134,6 @@
     <!-- Kept mounted so it reads on page show; the row appears only when the server offers settlement batches. -->
     <view v-if="legacySettlementsEnabled" v-show="settlementsAvailable && settlementsOpen" class="earn-tc__panel"><ComputeSettlements @availability="settlementsAvailable = $event" /></view>
     </view>
-    <ReceiptModal :receipt="openReceipt" @close="openReceipt = null" />
   </view>
 </template>
 
@@ -142,7 +141,7 @@
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatTaskReward } from "@/lib/task-reward-display";
 import { navTo } from "@/lib/route";
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, inject, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { dateLocale } from "@/i18n/format";
@@ -150,11 +149,9 @@ import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
 import type { TaskCategory, CompletedTask } from "@/store/types";
-import ReceiptModal from "@/components/me/receipt-modal.vue";
-import { useReceipts } from "@/store/receipts";
+import { taskCenterReceiptKey, useReceipts } from "@/store/receipts";
 import type { Receipt } from "@/mock/receipt";
 import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
-import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import TaskV2Status from "@/components/earn/task-v2-status.vue";
 import ComputeSettlements from "@/components/earn/compute-settlements.vue";
@@ -170,7 +167,7 @@ const historyOpen = ref(false);
 const settlementsOpen = ref(false);
 const settlementsAvailable = ref(false);
 const receipts = remoteApiEnabled ? null : useReceipts();
-const openReceipt = ref<Receipt | CanonicalComputeReceipt | null>(null);
+const openReceipt = inject(taskCenterReceiptKey)!;
 let receiptRequestEpoch = 0;
 let receiptPageVisible = true;
 let receiptPageEpoch = 0;
@@ -180,6 +177,7 @@ onShow(() => {
 });
 onHide(() => {
   receiptPageVisible = false;
+  openReceipt.value = null;
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
 });
@@ -248,6 +246,7 @@ watch(() => app.accountBindingEpoch, () => {
 
 onUnmounted(() => {
   receiptPageVisible = false;
+  openReceipt.value = null;
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
 });

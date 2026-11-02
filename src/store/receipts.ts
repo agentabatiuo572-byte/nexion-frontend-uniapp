@@ -1,9 +1,13 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, type InjectionKey, type Ref } from "vue";
+import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { remoteApiEnabled } from "@/api/runtime";
+
+export type OpenTaskReceipt = Receipt | CanonicalComputeReceipt | null;
+export const taskCenterReceiptKey: InjectionKey<Ref<OpenTaskReceipt>> = Symbol("task-center-receipt");
 
 // Ported from Nexion-prototype/lib/store/receipts.ts (zustand → Pinia).
 // Proof-of-Compute receipts (design doc §6.9), newest-first, capped + persisted.
