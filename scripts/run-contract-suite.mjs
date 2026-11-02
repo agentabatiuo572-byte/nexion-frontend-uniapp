@@ -33,7 +33,6 @@ const REGISTRY = {
   "lucky-spin-svg.browser.test.mjs": { how: "chain" },
   "prototype-realtime.test.mjs": { how: "chain" },
   "touch-target-countdown.contract.test.mjs": { how: "chain" },
-  "app-h5-sync.test.mjs": { how: "elsewhere", by: "npm run test:app-h5-sync" },
   // ── chain:本执行器跑(原孤儿,z1 接入)──
   "native-svg-icons.test.mjs": { how: "chain" },
   "native-glass-icon-layer.test.mjs": { how: "chain" },
