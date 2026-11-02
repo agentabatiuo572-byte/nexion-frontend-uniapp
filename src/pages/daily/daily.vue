@@ -43,7 +43,7 @@
             </view>
           </template>
           <view class="dly-ctr" aria-hidden="true">
-            <svg v-if="dailyFactsVisible" width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="dly-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color: var(--v5-brand-2)" /><stop offset="1" style="stop-color: var(--v5-warning)" /></linearGradient></defs><path fill="url(#dly-flame)" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+            <svg v-if="dailyFactsVisible" class="dly-flame" :class="{ 'dly-flame--off': successFx && successFx.atRing }" width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="dly-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color: var(--v5-brand-2)" /><stop offset="1" style="stop-color: var(--v5-warning)" /></linearGradient></defs><path fill="url(#dly-flame)" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
             <text class="dly-num" :class="{ 'dly-num--q': !dailyFactsVisible }">{{ dailyFactsVisible ? displayStreak : '—' }}</text>
             <text class="dly-lbl">{{ t.daily.activeStreak }}</text>
           </view>
@@ -930,7 +930,10 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-burst__ring { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%; box-shadow: 0 0 0 2px color-mix(in srgb, var(--v5-warning) 60%, transparent); }
 .dly-burst__ray { position: absolute; left: -1.5px; top: -24px; width: 3px; height: 9px; border-radius: 2px; background: var(--v5-warning); transform-origin: 1.5px 24px; }
 .dly-burst__ray:nth-child(even) { top: -22px; height: 6px; background: var(--v5-brand-2); transform-origin: 1.5px 22px; }
-.dly-fly { position: absolute; left: -30px; right: -30px; top: -6px; font: 500 22px/28px var(--font-metric); letter-spacing: -.01em; color: var(--v5-brand); animation: dly-fly 1900ms linear both; pointer-events: none; }
+/* The reward rests where the flame sits (below the gift), and the flame steps aside meanwhile. */
+.dly-flame { transition: opacity 240ms ease; }
+.dly-flame--off { opacity: 0; }
+.dly-fly { position: absolute; left: -30px; right: -30px; top: 58px; font: 500 22px/28px var(--font-metric); letter-spacing: -.01em; color: var(--v5-brand); animation: dly-fly 1900ms linear both; pointer-events: none; }
 .dly-fly--bar { left: 0; right: 0; top: auto; bottom: 100%; margin-bottom: 12px; display: flex; justify-content: center; animation-name: dly-fly-bar; }
 /* Over scrolled content the reward needs its own ground to stay readable. */
 .dly-fly__pill { display: inline-flex; align-items: baseline; padding: 4px 16px; border-radius: 999px; background: color-mix(in srgb, var(--v5-bg) 82%, transparent); box-shadow: inset 0 0 0 1px var(--v5-sticky-bar-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
@@ -1076,8 +1079,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 @keyframes dly-sheen { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(420%) skewX(-18deg); } }
 @keyframes dly-spin { to { transform: rotate(360deg); } }
 @keyframes dly-burst { 0% { opacity: 0; transform: scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.2); } }
-/* 07 签到成功奖励: rise from the ring centre, hold above the ring, keep rising out. */
-@keyframes dly-fly { 0% { opacity: 0; transform: translateY(118px); } 28% { opacity: 1; transform: none; } 66% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-28px); } }
+/* 07 签到成功奖励: rise from the streak number to the flame spot, hold, then drift 12px up and out (clear of the gift). */
+@keyframes dly-fly { 0% { opacity: 0; transform: translateY(56px); } 28% { opacity: 1; transform: none; } 66% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-12px); } }
 @keyframes dly-fly-bar { 0% { opacity: 0; transform: translateY(40px); } 28% { opacity: 1; transform: none; } 66% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-28px); } }
 @keyframes dly-fly-fade { 0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
 
