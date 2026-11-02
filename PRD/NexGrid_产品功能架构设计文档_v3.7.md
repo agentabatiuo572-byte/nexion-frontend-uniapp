@@ -1058,6 +1058,12 @@ flowchart TD
 
 原生基座首次挂载、返回首页及后续滚入均不依赖较新运行时的数组取尾方法；无待滚入记录时保持现有内容，有记录时沿用原顺序与节奏。
 
+### 5.8b 设备对比
+
+只展示服务端首页投影 `doTheMath` 的有效对比，基准为当前账号最高日收益的活跃真实设备，目标为服务端选定的可购买目录商品；不展示云份额对比，不用 `derivePromoUpgrade`、本地档位或样例兜底。已拥有最高档设备、没有更高档可购商品、购买资格探测失败或没有有效基准设备时，服务端返回空对比。投影为空、尚未读到有效数据或读取失败且无可用对比时，整个区块隐藏，包含标题、加载/错误/暂无设备提示与占位；前后可见模块保持正常 20px 间距。刷新重新读到有效投影后恢复展示。
+
+有效对比沿用设备图、收益柱、倍数和日收益，CTA 按投影的目标 `productNo` 进入商品详情，不由本地档位推断。隐藏统计时遮盖个人收益与倍数，柱高统一，不泄露比例；离开视口或页面隐藏时暂停循环动效。
+
 ### 5.9 状态与验收
 
 320/390px、中/英/越、亮暗主题与减少动画均须检查；长文自然换行，不裁掉金额或关键条件。每日自动奖励提示按账号和 UTC 日限频，不影响实际奖励发放或账本。页面滚动留足底部导航安全区，浮标不挡主要操作。
@@ -4579,7 +4585,7 @@ Events 分两大类:
 - `selectActiveDevices(s)` / `selectInactiveDevices(s)` — 派生过滤
 - `selectActiveCount(s)` — 槽位占用数
 - `selectActivePhone(s)` — 手机激活状态(可能因用户在 `/me/devices` 取消激活而为 undefined)
-- `derivePromoUpgrade(devices)` — pure helper,返回 `{ baseKind, baseName, baseDaily, targetKind, targetName, targetDaily, multiplier, targetPayback }`,推广文本(weekly quest / Home upsell / EmptySlotsHint / DoTheMathCard / MissedIncomeBanner)动态接此 helper。**base(`base*` 字段 = 最高日收益活跃真实设备)+ targetPayback(目标设备按其日收益的回本天数)详见 §13.2a**
+- `derivePromoUpgrade(devices)` — pure helper,返回 `{ baseKind, baseName, baseDaily, targetKind, targetName, targetDaily, multiplier, targetPayback }`,推广文本(weekly quest / Home upsell / EmptySlotsHint / MissedIncomeBanner)动态接此 helper；首页 `DoTheMathCard` 仅消费服务端投影，见 §5.8b。**base(`base*` 字段 = 最高日收益活跃真实设备)+ targetPayback(目标设备按其日收益的回本天数)详见 §13.2a**
 
 **Store actions**:
 - 正式购买流程 — 订单成功由服务端在原支付事务中创建设备并自动激活 Online，返回后刷新权威 fleet；不得调用本地 `addDevice(kind)` 冒充已购或激活。原型本地 action 仅作演示，不作为正式业务依据。
@@ -5190,11 +5196,13 @@ progressPct = avg(checks);
 - `targetPayback = round(DEVICE_PRICE_USDT[targetKind] / targetDaily)`:目标设备按其日收益的回本天数(全无激活的 fallback 用 S1 价 / S1 日收益)
 
 **应用**:
-- Home `ConversionBanner` / `DoTheMathCard`("Activate {targetName} · earn ${targetDaily}/day · payback ~{targetPayback} days · {multiplier}× {baseName}")
+- Home `ConversionBanner`("Activate {targetName} · earn ${targetDaily}/day · payback ~{targetPayback} days · {multiplier}× {baseName}")
 - `EmptySlotsHint` Subtitle("{empty} × {targetName} @ ${targetDaily}/d · {multiplier}× {baseName}")
 - `MissedIncomeBanner`(试用期隐藏):非试用态显示 base 与 target 的日收益差(gap = targetDaily − baseDaily)累计错过收益,ceiling 对比 = {targetName}
-- Home `AddDeviceRow`("Add a NexGridBox")与 `DoTheMathCard` 的 CTA href 均指向 `derivePromoUpgrade().targetKind`(已激活 Pro/Rack 的用户被推向下一档,而非硬锚 S1;无激活设备时 fallback S1)
+- Home `AddDeviceRow`("Add a NexGridBox")的 CTA href 指向 `derivePromoUpgrade().targetKind`(已激活 Pro/Rack 的用户被推向下一档,而非硬锚 S1;无激活设备时 fallback S1)
 - 任何未来推广卡片接同一 helper,不重复实现倍数算法
+
+首页 `DoTheMathCard` 不适用上述本地 helper 与 fallback 规则：以服务端 `doTheMath` 为唯一对比来源，CTA 使用目标 `productNo`，无有效对比整块隐藏（§5.8b）。
 
 **边界**:
 - 全无激活设备 → fallback 锚定 S1 baseline,`multiplier = 0`,UI 隐藏倍数行,只显示 target 设备(eg "Activate NexGridBox S1 · earn $7.00/day · anchor pricing")

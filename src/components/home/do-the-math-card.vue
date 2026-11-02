@@ -6,8 +6,8 @@
   a brand arc jumps from the base to the target with the multiplier at its apex.
 -->
 <template>
-  <NxSection :title="t.home.doMathTitle" data-home-section="do-the-math">
-    <view v-if="calculator" ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': !seen || !pageVisible, 'dc-card--masked': visibility.hidden }">
+  <NxSection v-if="calculator" :title="t.home.doMathTitle" data-home-section="do-the-math">
+    <view ref="cardRef" class="dc-card" :class="{ 'dc-card--entered': entered, 'dc-card--paused': !seen || !pageVisible, 'dc-card--masked': visibility.hidden }">
       <view class="dc-stage">
         <svg class="dc-arc" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path :d="arcPath" /></svg>
         <text class="dc-stage__label">{{ t.home.doMathStage }}</text>
@@ -32,10 +32,6 @@
         <text class="dc-foot__caption">{{ fmt(generalBase ? t.home.doMathVs : t.home.doMathYour, { base: baseShort }) }}</text>
         <NxButton class="dc-foot__action" variant="brand" size="small" :label="`${t.home.doMathSeeCta} →`" @click="goStore" />
       </view>
-    </view>
-    <view v-else class="dc-status">
-      <text>{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : app.homeTruthStatus === 'error' ? t.uiChrome.unavailable : t.home.doMathUnavailable }}</text>
-      <view v-if="app.homeTruthStatus === 'error'" class="dc-status__retry" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()">{{ t.ui.retry }}</view>
     </view>
   </NxSection>
 </template>
@@ -147,8 +143,6 @@ function goStore() {
 /* The entrance waits at its first frame until the stage is seen (same contract as v-viz-inview). */
 .dc-card:not(.dc-card--entered) .dc-device, .dc-card:not(.dc-card--entered) .dc-pillar, .dc-card:not(.dc-card--entered) .dc-arc,
 .dc-card:not(.dc-card--entered) .dc-multiplier, .dc-card:not(.dc-card--entered) .dc-legend, .dc-card--paused .dc-pillar__sweep { animation-play-state:paused; }
-.dc-status { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:64px; font:400 13px/18px var(--font-v5); color:var(--v5-ink-2); }
-.dc-status__retry { flex-shrink:0; display:inline-flex; align-items:center; min-height:44px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
 @keyframes dc-pillar-rise { from { transform:scaleY(0); } }
 @keyframes dc-device-drop { from { opacity:0; transform:translateY(-20px); } }
 @keyframes dc-arc-draw { from { clip-path:inset(0 64% 0 0); } to { clip-path:inset(0 39% 0 0); } }
