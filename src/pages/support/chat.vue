@@ -67,7 +67,7 @@
       <text class="cp-ai-history-t">{{ t.conversations.loadEarlier }}</text>
     </view>
     <view v-if="humanHistoryError || humanHistoryListError" class="cp-ai-history" role="alert"><text>{{ t.conversations.loadError }}</text><view role="button" tabindex="0" @click="retryHumanHistory" @keydown.enter.prevent="retryHumanHistory"><text>{{ t.conversations.retry }}</text></view></view>
-    <view v-if="showUnassignedReceived" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ t.conversations.image.unassignedReceived }}</text></view>
+    <view v-if="unassignedNotice" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ unassignedNotice }}</text></view>
 
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
@@ -744,8 +744,13 @@ const isClosedSession = computed(() =>
 // Account advisor identity belongs to new composition. Existing conversation
 // headers and waiting state use the server's owner for that exact conversation id.
 const advisorApplies = computed(() => !isAi.value && !isClosedSession.value && !cid.value && !!startType.value);
-const showUnassignedReceived = computed(() => !isAi.value && !isClosedSession.value && !!conv.value
-  && isWaitingForAgent(conv.value.agentName) && conv.value.messages.some(message => message.sender === "user"));
+// An unassigned conversation may already hold the registration welcome; keep the
+// leave-a-message hint until the user writes, then confirm receipt instead.
+const unassignedNotice = computed(() => {
+  if (isAi.value || isClosedSession.value || !conv.value?.messages.length || !isWaitingForAgent(conv.value.agentName)) return "";
+  return conv.value.messages.some(message => message.sender === "user")
+    ? t.value.conversations.image.unassignedReceived : t.value.conversations.image.unassignedHint;
+});
 const headerName = computed(() => {
   if (isAi.value) return t.value.nova.name;
   if (advisorApplies.value && convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.image.unassigned;
