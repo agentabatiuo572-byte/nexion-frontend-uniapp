@@ -232,14 +232,15 @@ export function supportDemo(url,locale,state,request) {
       const last=detail.messages.at(-1);
       Object.assign(detail.conversation,{unreadCount:1,lastMessage:last.content,lastMessageAt:last.createdAt,lastPublicMessageId:last.id});
     } else if(scenario==='welcome-unassigned'||scenario==='welcome-assigned') {
-      // Just registered: the welcome is the account's only message. Unassigned
-      // accounts get it with no author (the server projects the owner as 待分配).
-      const advisor=text('演示顾问','Demo advisor','Cố vấn mẫu');
-      const author=scenario==='welcome-assigned'?{senderId:1,authorConfidence:'VERIFIED',senderName:advisor}:{};
-      detail.messages=[{id:nextMessageId(),senderType:'agent',kind:'TEXT',content:welcome,createdAt:now,...author}];
-      Object.assign(detail.conversation,{conversationType:'advisor',status:'OPEN',ownerAgentId:scenario==='welcome-assigned'?'1':null,
-        ownerAgentName:scenario==='welcome-assigned'?advisor:'待分配',unreadCount:1,lastMessage:welcome,lastMessageAt:now,lastPublicMessageId:detail.messages[0].id});
-      state.supportConversations=[detail];
+      // Just registered: the welcome is the account's only message, in a fresh
+      // conversation so no earlier history merges in. Unassigned accounts get it
+      // with no author (the server projects the owner as 待分配).
+      const advisor=text('演示顾问','Demo advisor','Cố vấn mẫu'),assigned=scenario==='welcome-assigned';
+      const id=++state.supportConversationSequence;
+      const message={id:nextMessageId(),senderType:'agent',kind:'TEXT',content:welcome,createdAt:now,...(assigned?{senderId:1,authorConfidence:'VERIFIED',senderName:advisor}:{})};
+      state.supportConversations=[{conversation:{id,conversationNo:'DEMO-SUPPORT-'+id,conversationType:'advisor',status:'OPEN',version:1,
+        ownerAgentId:assigned?'1':null,ownerAgentName:assigned?advisor:'待分配',unreadCount:1,lastMessage:welcome,lastMessageAt:now,lastPublicMessageId:message.id},
+        messages:[message],historyTruncated:false,nextCursor:null}];
     } else detail.conversation.unreadCount=scenario==='long-count'?1298:scenario==='read'?0:1;
     detail.conversation.version++;
     state.supportScenario=scenario;
@@ -255,7 +256,8 @@ export function supportDemo(url,locale,state,request) {
   if(p===root+'/conversations'&&method==='POST') {
     const fingerprint=commandFingerprint('create',undefined,input);
     const existing=replayCommand(state,input.clientMessageId,fingerprint);if(existing)return supportUserView(state,existing);
-    const ownerAgentId=String(state.supportAdvisorId??1),messageId=nextMessageId();
+    // Without an advisor (unassigned welcome) the message continues the waiting, ownerless conversation.
+    const ownerAgentId=scenario==='welcome-unassigned'?null:String(state.supportAdvisorId??1),messageId=nextMessageId();
     let detail=state.supportConversations.filter(row=>row.conversation.ownerAgentId===ownerAgentId)
       .sort((a,b)=>b.conversation.id-a.conversation.id)[0];
     const message={id:messageId,clientMessageId:input.clientMessageId,senderType:'user',content:input.openingText,createdAt:now,receiptStatus:'sent'};
@@ -264,7 +266,7 @@ export function supportDemo(url,locale,state,request) {
       Object.assign(detail.conversation,{status:'OPEN',version:detail.conversation.version+1,lastMessage:input.openingText,lastMessageAt:now,lastPublicMessageId:messageId});
     } else {
       const id=++state.supportConversationSequence;
-      detail={clientMessageId:input.clientMessageId,conversation:{id,conversationNo:'DEMO-SUPPORT-'+id,conversationType:input.conversationType.toLowerCase(),status:'OPEN',version:1,ownerAgentId,ownerAgentName:'Demo support',unreadCount:0,lastMessage:input.openingText,lastMessageAt:now,lastPublicMessageId:messageId},messages:[message],historyTruncated:false,nextCursor:null};
+      detail={clientMessageId:input.clientMessageId,conversation:{id,conversationNo:'DEMO-SUPPORT-'+id,conversationType:input.conversationType.toLowerCase(),status:'OPEN',version:1,ownerAgentId,ownerAgentName:ownerAgentId?'Demo support':'待分配',unreadCount:0,lastMessage:input.openingText,lastMessageAt:now,lastPublicMessageId:messageId},messages:[message],historyTruncated:false,nextCursor:null};
       state.supportConversations.unshift(detail);
     }
     state.supportMessageCommands.push({key:input.clientMessageId,fingerprint,conversationNo:detail.conversation.conversationNo});
