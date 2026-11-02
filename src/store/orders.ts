@@ -66,6 +66,8 @@ export interface Order {
   /** 试用转购购后到账的 USDT / UVT 奖励;fullTerm 订单退款时随退款收回。 */
   trialReward?: { usdt: number; nex: number; reversedOnRefund: boolean };
   total: number | string;   // Promoted history preserves the server's exact decimal string.
+  /** Server-reported amount actually paid incl. channel and network fees. */
+  paidTotal?: string;
   promotionQuoteId?: string;
   paymentMethod: string;    // "usdt-trc20" etc
   status: OrderStatus;
@@ -240,6 +242,7 @@ export const useOrders = defineStore("orders", () => {
       }),
       ...(row.tradeinNo && { tradeInCredit: row.discountUsdt, tradeInDeviceId: String(row.sourceDeviceId) }),
       total: row.amountUsdt,
+      ...(row.paidTotalUsdt !== undefined && { paidTotal: row.paidTotalUsdt }),
       ...(row.promotionQuoteId && { promotionQuoteId: row.promotionQuoteId }),
       paymentMethod: row.paymentMethod ?? "wallet",
       status,

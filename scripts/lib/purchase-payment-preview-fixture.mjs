@@ -20,7 +20,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     state.orderStatuses[orderNo] = status;
     const order = state.createdOrders?.find(row => row.orderNo === orderNo);
     if (!order) return;
-    if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paymentNo: intent.intentNo, paidAt: Date.now(), activatedAt: Date.now()});
+    if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: Date.now(), activatedAt: Date.now()});
     else Object.assign(order, {canonicalStatus: 'expired', paymentStatus: 'EXPIRED', orderStatus: 'EXPIRED', activationStatus: 'WAITING_PAYMENT', closeReasonCode: 'PAYMENT_TIMEOUT'});
   }
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
@@ -36,7 +36,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     settle(intent.orderNo, 'activated', intent);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
       orderNo: intent.orderNo, paymentNo: intent.intentNo, paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', canonicalStatus: 'activated',
-      amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod,
+      amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }
   const view = intent => { const {createdAt, orderNo, ...row} = advance(intent); return row; };

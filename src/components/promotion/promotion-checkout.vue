@@ -2,7 +2,7 @@
   <view class="promotion promotion-main" :class="{'promotion-main--result':order?.paymentStatus==='PAID'}">
     <view v-if="!auth.isAuthenticated" class="promotion-flat"><text class="promotion-title">{{ p.signIn }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ p.signIn }}</text></PromotionAction></view>
     <view v-else-if="loading" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
-    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?getProduct(items[0].productNo)?.imageUrl:undefined" :amount="order.amountUsdt??''" :error="resultError" @devices="viewDevices" @retry="readActivation">
+    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?getProduct(items[0].productNo)?.imageUrl:undefined" :amount="order.paidTotalUsdt??order.amountUsdt??''" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices" @retry="readActivation">
       <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
     <template v-else>
