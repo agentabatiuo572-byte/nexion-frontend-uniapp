@@ -3,7 +3,7 @@ import { useLocaleStore } from "@/store/locale";
 
 export const computeV2Copy = {
   zh: {
-    accountBatchHint: "批次总额按账号统计，Lite 不显示手机任务。",
+    accountBatchHint: "包含账号所有设备的收益。",
     historyHint: "最近 {n} 笔，点击查看任务与结算详情。",
     ruleCycle: "按规则结算，未执行模型",
     stopNow: "立即停止（未完成任务不发收益）", stopDescription: "{name} 有进行中的任务，请选择停用方式。", stopping: "正在停止，任务收益确认后将完成停用。",
@@ -13,7 +13,7 @@ export const computeV2Copy = {
     statuses: { CLAIMED: "已领取", QUEUED: "排队中", RUNNING: "计算中", VERIFYING: "校验中", RECOVERING: "恢复中", PAUSED: "已暂停", COMPLETED: "已完成", FAILED: "执行失败", CANCELLED: "已取消", NONE: "无待结算收益", PENDING: "待结算", POSTED: "已入账", BLOCKED: "结算挂起" },
   },
   en: {
-    accountBatchHint: "Batch totals cover the account. Lite hides phone tasks.",
+    accountBatchHint: "Includes earnings from all account devices.",
     historyHint: "Latest {n} tasks. Select one for task and settlement details.",
     ruleCycle: "Rule-based settlement; no model execution",
     stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
@@ -23,7 +23,7 @@ export const computeV2Copy = {
     statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
   },
   vi: {
-    accountBatchHint: "Tổng lô tính cho cả tài khoản. Lite ẩn tác vụ điện thoại.",
+    accountBatchHint: "Bao gồm thu nhập từ mọi thiết bị trong tài khoản.",
     historyHint: "{n} tác vụ gần nhất. Chọn để xem chi tiết và quyết toán.",
     ruleCycle: "Quyết toán theo quy tắc, không chạy mô hình",
     stopNow: "Dừng ngay (tác vụ chưa xong không nhận thưởng)", stopDescription: "{name} đang có tác vụ. Chọn thời điểm ngừng kích hoạt.", stopping: "Đang dừng. Thiết bị sẽ ngừng kích hoạt sau khi xác nhận thu nhập đã hoàn thành.",

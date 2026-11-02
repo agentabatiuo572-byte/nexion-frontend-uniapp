@@ -111,6 +111,7 @@ export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   rewardNex: number;
   earningStatus: string;
   completedAt: number;
+  settledAt: number | null;
 }
 
 export interface CanonicalComputeReceiptPage {
@@ -310,7 +311,7 @@ function state(value: unknown, mode: ApiEnvironment, requireV2 = false): Canonic
   if ((requireV2 && source.protocolVersion !== 2) || (source.protocolVersion !== undefined && source.protocolVersion !== 2 && source.protocolVersion !== 3)) return invalid();
   if (!Array.isArray(source.devices)) return invalid();
   const version = source.protocolVersion === 3 ? 3 : source.protocolVersion === 2 ? 2 : 1;
-  const devices = source.devices.map((entry) => device(entry, mode, version)).filter(entry => entry.deviceType.toUpperCase() !== "PHONE");
+  const devices = source.devices.map((entry) => device(entry, mode, version)).filter(entry => !["PHONE", "MOBILE"].includes(entry.deviceType.toUpperCase()));
   if (new Set(devices.map((entry) => entry.deviceId)).size !== devices.length) return invalid();
   if (version === 2 && !Array.isArray(source.pendingEarned)) return invalid();
   if (source.pendingEarned != null && !Array.isArray(source.pendingEarned)) return invalid();
@@ -413,6 +414,7 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
     rewardNex: decimal(source.rewardNex),
     earningStatus,
     completedAt: timestamp(source.completedAt) as number,
+    settledAt: timestamp(source.settledAt, true),
     ...executionMetadata(source),
   };
 }
@@ -495,14 +497,10 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
       if (normalizedOffset > 1_000_000 || normalizedLimit > 50) {
         throw new ApiError({ kind: "configuration", message: "TASK_RECEIPT_PAGE_INVALID" });
       }
-      const page = receiptPage(await client.request<unknown>({
+      return receiptPage(await client.request<unknown>({
         path: `/api/tasks/receipts?offset=${normalizedOffset}&limit=${normalizedLimit}`
           + (normalizedCursor === null ? "" : `&cursor=${encodeURIComponent(normalizedCursor)}`),
       }), mode);
-      // The server summary does not include deviceType. Resolve each page's receipts
-      // so Lite can exclude phone work without guessing from a task name or number.
-      const details = await Promise.all(page.items.map(item => this.receipt(item.receiptNo)));
-      return { ...page, items: page.items.filter((_, index) => details[index].deviceType.toUpperCase() !== "PHONE"), total: null };
     },
   };
 }

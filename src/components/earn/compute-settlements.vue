@@ -25,7 +25,7 @@
       <text class="block">{{ copy.statuses[detail.status] }} · {{ visibility.mask(formatAmount(detail.amount, 6)) }} {{ detail.asset === 'NEX' ? 'UVT' : detail.asset }}</text>
       <text class="block">{{ copy.postedAt }} {{ detail.postedAt == null ? copy.unknown : date(detail.postedAt) }}</text>
       <text class="block">{{ copy.accountBatchHint }}</text>
-      <view v-for="item in visibleItems" :key="item.taskNo" class="compute-settlements__row"><text class="block">#{{ visibility.mask(item.taskNo) }} · {{ item.taskType }}</text><text class="block font-mono-tabular">{{ visibility.mask(formatAmount(item.amount, 6)) }} {{ detail.asset === 'NEX' ? 'UVT' : detail.asset }} · {{ date(item.completedAt) }}</text><text v-if="item.receiptNo" class="block">{{ copy.receipt }} #{{ visibility.mask(item.receiptNo) }}</text></view>
+      <view v-for="item in detail.items" :key="item.taskNo" class="compute-settlements__row"><text class="block">#{{ visibility.mask(item.taskNo) }} · {{ item.taskType }}</text><text class="block font-mono-tabular">{{ visibility.mask(formatAmount(item.amount, 6)) }} {{ detail.asset === 'NEX' ? 'UVT' : detail.asset }} · {{ date(item.completedAt) }}</text><text v-if="item.receiptNo" class="block">{{ copy.receipt }} #{{ visibility.mask(item.receiptNo) }}</text></view>
     </view>
   </view>
 </template>
@@ -48,7 +48,6 @@ const visibility = useDataVisibility();
 const batches = ref<ComputeSettlementBatch[]>([]);
 const nextCursor = ref<string | null>(null);
 const detail = ref<ComputeSettlementDetail | null>(null);
-const visibleItems = computed(() => detail.value?.items.filter(item => app.devices.some(device => device.id === String(item.deviceId) && device.kind !== "phone")) ?? []);
 const loading = ref(false), error = ref(false), detailLoading = ref(false), detailError = ref(false);
 const historyAvailable = ref(false);
 const pendingAvailable = computed(() => app.remotePendingEarned?.some(row => row.taskCount > 0) === true);

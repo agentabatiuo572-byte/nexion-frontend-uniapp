@@ -25,7 +25,7 @@ const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-export const demoDefaults = {computeState:"cycles",fleetState:"normal",checkoutState:'ordinary',paymentState:'delivered',topupState:'form',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',stakingOpenState:'readonly',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {trialQuoteState:"default",computeState:"cycles",fleetState:"normal",checkoutState:'ordinary',paymentState:'delivered',topupState:'form',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',stakingOpenState:'readonly',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
   promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU）']],
@@ -36,7 +36,8 @@ export const demoOptions = {
   topupState:[['form','充值输入'],['paying','充值银行单待付款'],['credited','充值已到账']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
   computeState:[['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
-  fleetState:[['normal','硬件 + Cloud Share'],['none','暂无设备'],['inventory','含未激活设备'],['full','已满 6/6'],['reserved','含预留槽位']],
+  fleetState:[['normal','硬件 + Cloud Share'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含未激活设备'],['full','已满 6/6'],['reserved','含预留槽位']],
+  trialQuoteState:[['default','默认报价'],['full-term','整期抵扣 · 应付 910'],['precision','六位报价 · 342.123456'],['repriced','提前优惠变更 · 应付 909'],['capped','抵扣上限 · 余款 10'],['excess-offset','抵扣超过原价']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（重试原消息）'],['timeout','确认超时（15 秒转待确认）']],
@@ -427,6 +428,7 @@ export function demoFixture(url,locale,state,request) {
     // Device warehouse scenarios: an idle purchased device, a full fleet, or a slot held for provisioning.
     if(!empty&&state.fleetState&&state.fleetState!=='normal'){
       const clone=(id,code,name,daily,paid,extra)=>({...data.devices[0],id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
+      if(state.fleetState==='phone-history')for(const [id,type]of [[43,'PHONE'],[44,'MOBILE']])data.devices.push(clone(id,type,`Demo ${type}`,1,0,{deviceType:type}));
       if(state.fleetState==='inventory')data.devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       if(state.fleetState==='full'){
         data.devices.push(clone(48,'STELLARBOX-S1','UVELBox S1',6.2,1299,{}));

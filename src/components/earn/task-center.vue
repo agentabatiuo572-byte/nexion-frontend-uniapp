@@ -113,7 +113,7 @@
       </view>
     </view>
     <view v-if="selectedTask" style="padding:12px;background:var(--v5-surface-2);border-radius:12px" data-compute-task-detail="true">
-      <view class="flex items-center justify-between"><text>{{ computeCopy.details }} #{{ selectedTask.id }}</text><view role="button" tabindex="0" @click="selectedTask = null" @keydown.enter.prevent="selectedTask = null" @keydown.space.prevent="selectedTask = null">{{ computeCopy.close }}</view></view>
+      <view class="flex items-center justify-between"><text>{{ computeCopy.details }} #{{ selectedTask.id }}</text><view role="button" tabindex="0" @click="selectedTaskId = null" @keydown.enter.prevent="selectedTaskId = null" @keydown.space.prevent="selectedTaskId = null">{{ computeCopy.close }}</view></view>
       <TaskV2Status :task="selectedTask" />
       <view v-if="selectedTask.receiptNo && selectedTask.settlementStatus === 'POSTED'" role="button" tabindex="0" style="min-height:44px;display:flex;align-items:center" @click="openTaskReceipt(selectedTask, true)" @keydown.enter.prevent="openTaskReceipt(selectedTask, true)" @keydown.space.prevent="openTaskReceipt(selectedTask, true)">{{ computeCopy.receipt }} #{{ selectedTask.receiptNo }}</view>
     </view>
@@ -148,7 +148,7 @@ import { toast } from "@/store/ui";
 const app = useApp();
 const t = useT();
 const computeCopy = useComputeV2Copy();
-const selectedTask = ref<CompletedTask | null>(null);
+const selectedTaskId = ref<string | null>(null);
 const relativeNow = ref(Date.now());
 let relativeTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => { relativeTimer = setInterval(() => { relativeNow.value = Date.now(); }, 30000); });
@@ -163,7 +163,7 @@ onShow(() => {
 });
 onHide(() => {
   receiptPageVisible = false;
-  selectedTask.value = null;
+  selectedTaskId.value = null;
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
 });
@@ -192,7 +192,7 @@ function canOpenTaskReceipt(task: CompletedTask): boolean {
 }
 
 async function openTaskReceipt(task: CompletedTask, receiptOnly = false): Promise<void> {
-  if (task.protocolVersion && !receiptOnly) { selectedTask.value = task; return; }
+  if (task.protocolVersion && !receiptOnly) { selectedTaskId.value = task.id; return; }
   if (!remoteApiEnabled) {
     openReceipt.value = receiptFor(task.id) ?? null;
     return;
@@ -209,7 +209,11 @@ async function openTaskReceipt(task: CompletedTask, receiptOnly = false): Promis
     && expectedBindingEpoch === app.accountBindingEpoch;
   try {
     const detail = await taskAssignmentApi.receipt(task.receiptNo);
-    if (isCurrent()) openReceipt.value = detail;
+    if (task.protocolVersion === 2 && detail.taskNo !== task.id) {
+      throw new Error("TASK_RECEIPT_IDENTITY_MISMATCH");
+    }
+    if (isCurrent()) openReceipt.value = task.protocolVersion === 2 && task.settledAt != null
+      ? { ...detail, settledAt: task.settledAt } : detail;
   } catch {
     if (isCurrent()) {
       toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
@@ -219,13 +223,13 @@ async function openTaskReceipt(task: CompletedTask, receiptOnly = false): Promis
 
 watch(() => app.accountBindingEpoch, () => {
   receiptRequestEpoch += 1;
-  selectedTask.value = null;
+  selectedTaskId.value = null;
   openReceipt.value = null;
 });
 
 onUnmounted(() => {
   receiptPageVisible = false;
-  selectedTask.value = null;
+  selectedTaskId.value = null;
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
   if (relativeTimer) clearInterval(relativeTimer);
@@ -246,10 +250,12 @@ const allRecent = computed(() =>
     .slice(0, 20),
 );
 
+const selectedTask = computed(() => allRecent.value.find(task => task.id === selectedTaskId.value) ?? null);
+
 // Cloud Share has no user-owned physical VRAM, but the server routes its
 // rented pool as an 8 GB equivalent for task eligibility and claim execution.
 const CLOUD_SHARE_ROUTING_VRAM_GB = 8;
-const maxVram = computed(() => app.visibleDevices.reduce(
+const maxVram = computed(() => app.visibleDevices.filter(device => device.kind !== "phone").reduce(
   (m, d) => Math.max(m, d.kind === "cloud-share" ? CLOUD_SHARE_ROUTING_VRAM_GB : d.vramTotal),
   0,
 ));
