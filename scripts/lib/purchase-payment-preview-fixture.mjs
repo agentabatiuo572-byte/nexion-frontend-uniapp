@@ -34,12 +34,20 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (age < DELIVER_AFTER) return Object.assign(intent, {status: 'FUNDS_CONFIRMED'});
     if (scenario === 'delivery-failed') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
     settle(intent.orderNo, 'activated', intent);
+    const order = state.createdOrders?.find(row => row.orderNo === intent.orderNo);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
+      ...(order?.promotionQuoteId ? order : {}),
       orderNo: intent.orderNo, paymentNo: intent.intentNo, paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', canonicalStatus: 'activated',
       amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }
   const view = intent => { const {createdAt, orderNo, ...row} = advance(intent); return row; };
+  function paymentCommand(key) {
+    const intent = [...intents.values()].find(row => row.commandKey === key);
+    if (!intent) return null;
+    advance(intent);
+    return {kind:'order-pay',commandKey:key,status:intent.status==='DELIVERED'?'SUCCEEDED':intent.status==='EXPIRED'?'REJECTED':'PROCESSING',canResumeSameKey:false,...(intent.receipt?{receipt:intent.receipt}:{})};
+  }
   function handle(url, request) {
     const path = url.pathname, method = request.method();
     if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: [
@@ -85,5 +93,5 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     return {status: 404, message: 'PURCHASE_PAYMENT_NOT_MODELED', data: null};
   }
-  return {handles, handle};
+  return {handles, handle, paymentCommand};
 }
