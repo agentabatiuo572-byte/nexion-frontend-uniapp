@@ -994,6 +994,12 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-svb { display: flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px; font: 500 13px/18px var(--font-v5); white-space: nowrap; }
 .dly-svb--on { --ui-button-fill: color-mix(in srgb, var(--v5-brand-2) 18%, transparent); }
 .dly-svb--off { opacity: .5; }
+/* Narrow screens: the button moves to a second row under the text (illustration 54 + gap 14), so the copy keeps its width. */
+@media (max-width: 359px) {
+  .dly-sv { flex-wrap: wrap; row-gap: 4px; }
+  .dly-svt { flex: 1 1 calc(100% - 68px); }
+  .dly-svb-hit { margin-left: 68px; }
+}
 
 /* Leaderboard podium */
 .dly-lb { margin: 0 16px; padding: 8px; }
