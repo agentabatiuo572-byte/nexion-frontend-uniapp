@@ -1,8 +1,11 @@
 import type { ApiClient } from './api-client';
 import { ApiError } from './errors';
 import { readPaymentCommand } from './payment-command-api';
-import type { PublicPromotion, PublicPromotionPage, Quote, QuoteInput, Reward, RewardPage, ReferralProgress, OrderReceipt, CommandReceipt } from './promotion-contracts';
-export type { PublicPromotion, Quote, Reward, ExpectedReward, PublicRewardSpec, RewardSpec, RewardState, OrderReceipt } from './promotion-contracts';
+import type { PublicPromotion, PublicPromotionPage, Quote, QuoteInput, Reward, RewardPage, ReferralProgress, OrderReceipt as ContractOrderReceipt, CommandReceipt } from './promotion-contracts';
+export type { PublicPromotion, Quote, Reward, ExpectedReward, PublicRewardSpec, RewardSpec, RewardState } from './promotion-contracts';
+// The shared order projection also carries these; the generated promotion OpenAPI types do not list them yet.
+const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USDT_BSC','CREGIS_USDT_ERC20'] as const;
+export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null;paidTotalUsdt?:string|null};
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };
 export type PromotionOperation='createOrder'|'createBundle'|'payOrder'|'cancelOrder';
@@ -67,6 +70,8 @@ export function parsePromotedOrder(value:unknown):OrderReceipt{
     if(!['PENDING','PAID','CANCELLED','EXPIRED','REFUNDED'].includes(string(r.paymentStatus))||!['PENDING_PAYMENT','COMPLETED','CANCELLED','EXPIRED','REFUNDED'].includes(string(r.orderStatus)))return invalid();
   }
   else {string(r.paymentStatus);string(r.orderStatus);}
+  if(r.paymentMethod!==undefined&&r.paymentMethod!==null&&!PAYMENT_METHODS.includes(r.paymentMethod as typeof PAYMENT_METHODS[number]))return invalid();
+  if(r.paidTotalUsdt!==undefined&&r.paidTotalUsdt!==null&&(typeof r.paidTotalUsdt!=='string'||!/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(r.paidTotalUsdt)))return invalid();
   return r as OrderReceipt;
 }
 function page<T>(value:unknown,parse:(value:unknown)=>T):{items:T[];nextCursor:string|null;hasMore:boolean}{const p=object(value);if(typeof p.hasMore!=='boolean'||(p.nextCursor!==null&&typeof p.nextCursor!=='string'))return invalid();return {items:array(p.items).map(parse),nextCursor:p.nextCursor as string|null,hasMore:p.hasMore};}

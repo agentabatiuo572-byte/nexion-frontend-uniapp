@@ -66,6 +66,8 @@ export interface CanonicalOrder {
   amountUsdt: number | string;
   promotionQuoteId?: string;
   paymentMethod: string | null;
+  /** What the user actually paid incl. channel and network fees (2-place decimal); absent until the server sends it. */
+  paidTotalUsdt?: string;
   paymentStatus: string;
   orderStatus: string;
   activationStatus: string;
@@ -137,6 +139,7 @@ export interface PaidOrderReceipt {
   canonicalStatus: "activated";
   amountUsdt: number;
   paymentMethod: "WALLET" | "VOUCHER" | "HDPAY_BANK" | "CREGIS_USDT_BSC" | "CREGIS_USDT_ERC20";
+  paidTotalUsdt?: string;
   walletBalanceAfterUsdt: number | null;
   idempotent: boolean;
   serverCanonical: true;
@@ -254,6 +257,13 @@ function promotionDecimal(value: unknown): string {
   return value;
 }
 
+/** Optional fee-inclusive paid total: a decimal string with at most two places. */
+function paidTotalUsdt(value: unknown): { paidTotalUsdt?: string } {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "string" || !/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(value)) return invalid();
+  return { paidTotalUsdt: value };
+}
+
 function historyNumber(source: Record<string, unknown>, field: "subtotalUsdt" | "discountUsdt"): number {
   const value=source[field];
   // Promotion overlays encode every total as a decimal string; the settled amount stays exact above.
@@ -302,6 +312,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     amountUsdt: historyAmount(source),
     ...(source.promotionQuoteId ? { promotionQuoteId: nonEmptyString(source.promotionQuoteId) } : {}),
     paymentMethod: nullableString(source.paymentMethod),
+    ...paidTotalUsdt(source.paidTotalUsdt),
     paymentStatus: nonEmptyString(source.paymentStatus),
     orderStatus: nonEmptyString(source.orderStatus),
     activationStatus: nonEmptyString(source.activationStatus),
@@ -459,6 +470,7 @@ export function paidOrderReceipt(value: unknown): PaidOrderReceipt {
     canonicalStatus: "activated",
     amountUsdt,
     paymentMethod,
+    ...paidTotalUsdt(source.paidTotalUsdt),
     walletBalanceAfterUsdt,
     idempotent: typeof source.idempotent === "boolean" ? source.idempotent : invalid(),
     serverCanonical: true,

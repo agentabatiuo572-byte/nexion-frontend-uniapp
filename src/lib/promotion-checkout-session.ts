@@ -1,5 +1,5 @@
-import type { OrderReceipt, Quote } from '../api/promotion-contracts';
-import type { PromotionApi, PromotionOperation } from '../api/promotion-api';
+import type { Quote } from '../api/promotion-contracts';
+import type { OrderReceipt, PromotionApi, PromotionOperation } from '../api/promotion-api';
 import { parsePromotedOrder } from '../api/promotion-api';
 
 export interface PromotionPendingCommand { key: string; operation: PromotionOperation; targetId: string; paymentMethod?: 'WALLET' | 'EXTERNAL' }
