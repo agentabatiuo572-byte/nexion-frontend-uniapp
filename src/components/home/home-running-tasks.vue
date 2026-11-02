@@ -6,11 +6,11 @@
     </view>
     <view class="nx-feed-copy">
       <text class="nx-feed-title">{{ visibility.mask(row.name) }}</text>
-      <text class="nx-feed-sub">{{ row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text>
+      <text class="nx-feed-sub">{{ row.confirming ? computeCopy.confirming : row.simulated && row.status === 'RUNNING' ? computeCopy.running : row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text>
     </view>
     <view class="nx-feed-figure">
       <text class="nx-feed-pct font-mono-tabular">{{ visibility.mask(row.pct == null ? '—' : `${row.pct}%`) }}</text>
-      <text class="nx-feed-est font-mono-tabular">{{ t.home.feedEstimated }} {{ visibility.mask(formatUsd(row.reward, 'detail', true)) }}</text>
+      <text class="nx-feed-est font-mono-tabular">{{ t.home.feedEstimated }} {{ visibility.mask(row.rewardText) }}</text>
     </view>
     <view class="nx-feed-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || row.pct == null ? undefined : row.pct" aria-valuemin="0" aria-valuemax="100">
       <view v-if="!visibility.hidden && row.pct != null" v-viz-inview class="nx-feed-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
@@ -24,7 +24,7 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
-import { formatUsd } from "@/lib/usd-display";
+import { formatTaskReward } from "@/lib/task-reward-display";
 import { taskProgressPercent } from "@/lib/task-progress";
 import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
@@ -43,15 +43,20 @@ useVisibleInterval(() => {
   monotonicNow.value = advanceMonotonicHighWater(monotonicNow.value, readMonotonicNowMs());
 }, 1000);
 // Same readiness rule as the home fleet rows: a retained snapshot may show while it refreshes.
-const tasksReady = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
-  || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
+const tasksReady = computed(() => !remoteApiEnabled || app.remoteAssignmentHasSnapshot);
 const rows = computed(() => !tasksReady.value ? [] : app.visibleDevices.flatMap((device) => {
   const task = device.currentTask;
   if (!task || task.status === "PAUSED" || device.interruptedAt != null) return [];
   const taskNow = device.taskServerNow != null && device.taskServerNowReceivedAt != null
     ? projectServerNow(device.taskServerNow, device.taskServerNowReceivedAt, monotonicNow.value) : now.value;
-  const pct = taskProgressPercent(task, taskNow, device.interruptedAt);
-  return task.protocolVersion !== 2 && (pct === null || pct >= 100) ? [] : [{ id: `${device.id}:${task.id}`, name: task.type, reward: task.reward, pct, status: task.protocolVersion === 2 ? task.status : undefined }];
+  const validUntil = device.kind === "phone" ? device.phoneValidUntil : null;
+  const expired = validUntil != null && taskNow >= validUntil && (task.completableAt == null || task.completableAt > validUntil);
+  const pct = taskProgressPercent(task, taskNow, device.interruptedAt, validUntil);
+  const simulated = task.executionMode === "SIMULATED";
+  const confirming = simulated && !expired && task.status === "RUNNING" && task.completableAt != null && taskNow >= task.completableAt;
+  return task.protocolVersion === undefined && (pct === null || pct >= 100) ? []
+    : [{ id: `${device.id}:${task.id}`, name: task.type, rewardText: formatTaskReward(task, true), pct, simulated, confirming,
+      status: expired ? "PAUSED" as const : task.protocolVersion ? task.status : undefined }];
 }).slice(0, props.limit));
 watch(() => rows.value.length, count => emit("count", count), { immediate: true });
 </script>

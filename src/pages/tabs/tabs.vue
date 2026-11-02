@@ -2,18 +2,12 @@
   <AppChassis :key="accountScope" :active="location.tab" :logical-route="location.route" :tab-location-key="location.href" :tab-host="true" :host-visible="visible">
     <NativeTabContent v-for="entry in visited" :key="`${accountScope}:${entry.href}`" :content="components[entry.tab]" :query="entry.query" :location-key="entry.href" :active="entry.href === location.href" :visible="visible && entry.href === location.href" />
   </AppChassis>
-  <!-- #ifdef APP-PLUS -->
-  <NativePhoneCompute />
-  <!-- #endif -->
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, provide, ref, shallowRef, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NativeTabContent from "@/components/native-tab-content.vue";
-// #ifdef APP-PLUS
-import NativePhoneCompute from "@/components/native-phone-compute.vue";
-// #endif
 import Home from "@/pages/index/index.vue";
 import Earn from "@/pages/earn/earn.vue";
 import Store from "@/pages/store/store.vue";

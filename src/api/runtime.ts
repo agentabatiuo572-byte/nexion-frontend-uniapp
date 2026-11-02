@@ -135,7 +135,6 @@ export const apiClient = createRuntimeApiClient({
 // selects the development challenge or production provider flow.
 export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface,
   beforeSessionEnd: async context => {
-    await (await import("@/services/phone-compute")).pauseNativePhoneCompute("APP_PAUSED");
     await revokeNativePush(context);
   },
   sessionEndCancelled: resumeNativePush,

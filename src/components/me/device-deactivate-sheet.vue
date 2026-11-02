@@ -48,7 +48,7 @@
         </view>
         <view class="w-full flex items-center justify-center transition active:bg-[color-mix(in_srgb,var(--v5-brand-2)_25%,transparent)]" :style="forceBtnStyle" role="button" tabindex="0" @click="emit('force')"  @keydown.enter.prevent="emit('force')" @keydown.space.prevent="emit('force')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
-          <text :style="forceLabelStyle">{{ t.deactivateSheet.forceCta }}</text>
+          <text :style="forceLabelStyle">{{ task?.executionMode === 'SIMULATED' ? computeCopy.stopNow : t.deactivateSheet.forceCta }}</text>
         </view>
         <view class="w-full flex items-center justify-center transition active:bg-[var(--v5-surface-3)]" :style="backBtnStyle" role="button" tabindex="0" @click="emit('dismiss')"  @keydown.enter.prevent="emit('dismiss')" @keydown.space.prevent="emit('dismiss')">
           <text :style="backLabelStyle">{{ t.deactivateSheet.backCta }}</text>
@@ -60,10 +60,14 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { formatTaskReward } from "@/lib/task-reward-display";
+import { taskProgressPercent } from "@/lib/task-progress";
+import { projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import type { Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 
@@ -71,15 +75,18 @@ const props = defineProps<{ device: Device | null }>();
 const emit = defineEmits<{ (e: "wait"): void; (e: "force"): void; (e: "dismiss"): void }>();
 
 const t = useT();
+const computeCopy = useComputeV2Copy();
 useDialogA11y(computed(() => props.device !== null), ".nx-device-deactivate-root", () => emit("dismiss"));
 
 // Local epoch-ms clock so the task progress bar / ETA tick once a second while
 // the sheet is open. Component lifecycle (not page) → onMounted/onUnmounted (P-021).
 const nowMs = ref(Date.now());
+const monotonicNow = ref(readMonotonicNowMs());
 let clock: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   clock = setInterval(() => {
     nowMs.value = Date.now();
+    monotonicNow.value = readMonotonicNowMs();
   }, 1000);
 });
 onUnmounted(() => {
@@ -87,18 +94,22 @@ onUnmounted(() => {
 });
 
 const task = computed(() => props.device?.currentTask ?? null);
+const taskNow = computed(() => props.device?.taskServerNow != null && props.device.taskServerNowReceivedAt != null
+  ? projectServerNow(props.device.taskServerNow, props.device.taskServerNowReceivedAt, monotonicNow.value) : nowMs.value);
 const descLine = computed(() =>
-  props.device ? fmt(t.value.deactivateSheet.desc, { name: deviceName(t.value, props.device) }) : "",
+  props.device ? fmt(task.value?.executionMode === "SIMULATED" ? computeCopy.value.stopDescription : t.value.deactivateSheet.desc,
+    { name: deviceName(t.value, props.device) }) : "",
 );
 const progressPct = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return tk.startedAt === null || tk.status === "QUEUED" ? 0 : Math.round(Math.min(100, ((nowMs.value - tk.startedAt) / 1000 / tk.totalSec) * 100));
+  return taskProgressPercent(tk, taskNow.value, props.device?.interruptedAt,
+    props.device?.kind === "phone" ? props.device.phoneValidUntil : null) ?? 0;
 });
 const etaSec = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return tk.startedAt === null || tk.status === "QUEUED" ? tk.totalSec : Math.max(0, Math.round(tk.totalSec - (nowMs.value - tk.startedAt) / 1000));
+  return tk.startedAt === null || tk.status === "QUEUED" ? tk.totalSec : Math.max(0, Math.round(tk.totalSec - (taskNow.value - tk.startedAt) / 1000));
 });
 const etaLabel = computed(() =>
   etaSec.value >= 60 ? `~${Math.ceil(etaSec.value / 60)}m` : `~${etaSec.value}s`,
@@ -107,6 +118,7 @@ const etaLine = computed(() => fmt(t.value.deactivateSheet.etaRemaining, { eta: 
 const taskRewardLine = computed(() => {
   const tk = task.value;
   if (!tk) return "";
+  if (tk.executionMode === "SIMULATED") return formatTaskReward(tk, true);
   return fmt(t.value.deactivateSheet.taskRewardLine, {
     client: tk.client,
     amount: formatAmount(tk.reward),

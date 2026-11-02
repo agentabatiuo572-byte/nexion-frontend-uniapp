@@ -77,7 +77,7 @@ import { deviceOnlineState } from "@/lib/hashpower";
 import { useDeviceProductImage } from "@/composables/use-device-product-image";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
-import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
+import { deviceTaskRecovering, deviceTaskRunning, taskProgressPercent } from "@/lib/task-progress";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -131,8 +131,10 @@ useVisibleInterval(() => {
 const liveTaskNow = computed(() => props.device.taskServerNow != null && props.device.taskServerNowReceivedAt != null
   ? projectServerNow(props.device.taskServerNow, props.device.taskServerNowReceivedAt, monotonicNow.value) : now.value);
 const progressPct = computed(() => props.runtimeConfirmed
-  ? taskProgressPercent(props.device.currentTask, liveTaskNow.value, props.device.interruptedAt) : null);
-const taskRunning = computed(() => !recovering.value && onlineState.value === "online" && props.device.currentTask?.status !== "PAUSED" && props.device.interruptedAt == null);
+  ? taskProgressPercent(props.device.currentTask, liveTaskNow.value, props.device.interruptedAt,
+    props.device.kind === "phone" ? props.device.phoneValidUntil : null) : null);
+const taskRunning = computed(() => onlineState.value === "online" && deviceTaskRunning(props.device)
+  && (props.device.kind !== "phone" || props.device.phoneValidUntil == null || liveTaskNow.value < props.device.phoneValidUntil));
 const actionDisabled = computed(() => props.disabled || props.actionDisabled);
 const actionLabel = computed(() =>
   props.active ? props.deactivateLabel : props.disabled ? props.disabledLabel ?? props.slotsFullLabel : props.activateLabel,

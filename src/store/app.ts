@@ -11,7 +11,7 @@ import { readMonotonicNowMs } from "../lib/server-deadline-clock";
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { phoneRuntimePauseReason } from "@/lib/phone-runtime";
-import { collectNativePhoneRuntime, hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
+import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { getDeviceId } from "@/lib/device-id";
 import { accountTotalHashrate } from "@/lib/account-hashrate";
 import { isActiveSlotDevice } from "@/lib/device-slot-policy";
@@ -56,6 +56,7 @@ import {
   expectedApiEnvironment,
   remoteApiEnabled,
   sessionVault,
+  onboardingCalibrationApi,
   taskAssignmentApi,
   withdrawalApi,
 } from "@/api/runtime";
@@ -85,10 +86,10 @@ const ONE_DAY = ONE_DAY_MS;
 // ── module-level tick state (mirrors original module scope) ──
 const deviceTimers = new Map<string, { vital: number }>();
 const lastTickAggregate = { usd: 0, nex: 0 };
-const REMOTE_TASK_SYNC_MS = 60_000;
+const REMOTE_TASK_SYNC_MS = 300_000;
 const REMOTE_TASK_RETRY_MS = 15_000;
-const TASK_ASSIGNMENT_CACHE_MS = 1_000;
-const VISIBLE_TASK_READ_MS = 3_000;
+const TASK_ASSIGNMENT_CACHE_MS = 60_000;
+const VISIBLE_TASK_READ_MS = 60_000;
 
 function normalRandom(mean: number, std: number, min: number, max: number) {
   let u = 0, v = 0;
@@ -456,16 +457,16 @@ export const useApp = defineStore("app", () => {
   const remoteAssignmentHasSnapshot = ref(!remoteApiEnabled);
   // Pending compute earnings are server facts, never part of spendable balances.
   const remotePendingEarned = ref<import("@/api/task-assignment-api").PendingComputeEarning[] | null>(null);
-  const remoteComputeProtocolVersion = ref<1 | 2>(1);
-  let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments } | null = null;
+  const remoteComputeProtocolVersion = ref<1 | 2 | 3>(1);
+  let nativePhoneBinding: { accountKey: string; epoch: number; deviceId: number } | null = null;
+  let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments; receivedMonotonicAt: number } | null = null;
   let remoteTaskSyncInFlightKey: string | null = null;
   let remoteTaskSyncAfter = 0;
   let visibleTaskReadAfter = 0;
   const taskReadPages = new Set<"home" | "earn" | "device-detail">();
   let remoteTaskForeground = true;
   let remoteTaskForegroundEpoch = 0;
-  // Runtime writes for this installation must reach the server in order. In
-  // particular, a returning foreground sample cannot overtake an old POST.
+  // Keep online confirmations ordered across foreground transitions.
   let remotePhoneRuntimeReportTail: Promise<void> = Promise.resolve();
   function enqueuePhoneRuntimeReport(report: () => Promise<void>): Promise<void> {
     const pending = remotePhoneRuntimeReportTail.then(report);
@@ -480,7 +481,7 @@ export const useApp = defineStore("app", () => {
       visibleTaskReadAfter = 0;
       taskAssignmentSnapshot = null;
       invalidateRemoteFleet();
-      void refreshVisibleTaskAssignments();
+      void syncRemoteTaskAssignments();
     }
   }
   function acceptPhoneActivation(): void {
@@ -488,27 +489,28 @@ export const useApp = defineStore("app", () => {
     remoteTaskForegroundEpoch += 1;
     remoteTaskSyncAfter = 0;
     remotePhoneBindingInvalid.value = false;
+    nativePhoneBinding = null;
+    invalidateRemoteTaskAssignments();
+    void syncRemoteTaskAssignments();
+  }
+  function invalidateRemoteTaskAssignments(): void {
     taskAssignmentReadEpoch += 1;
     taskAssignmentSnapshot = null;
-    void syncRemoteTaskAssignments();
+    taskAssignmentSnapshotInFlight = null;
+    visibleTaskReadAfter = 0;
   }
   async function pauseLocalPhoneRuntimeBeforeSignOut(): Promise<void> {
     setRemoteTaskForeground(false);
-    const request = remoteAccountEpoch.snapshot();
-    try {
-      await enqueuePhoneRuntimeReport(async () => {
-        if (!hasNativePhoneRuntime() || !remoteAccountEpoch.isCurrent(request)) return;
-        await taskAssignmentApi.reportPhoneRuntime(getDeviceId(), null, false, null);
-      });
-    } catch { /* Offline logout falls back to the server's 120-second timeout. */ }
   }
   let taskAssignmentSnapshot: {
     key: string;
     receivedAt: number;
+    receivedMonotonicAt: number;
     state: CanonicalTaskAssignments;
   } | null = null;
   let taskAssignmentSnapshotInFlight: {
     key: string;
+    startedAt: number;
     request: Promise<CanonicalTaskAssignments>;
   } | null = null;
   let taskAssignmentReadEpoch = 0;
@@ -763,8 +765,7 @@ export const useApp = defineStore("app", () => {
     return {
       id: task.taskNo,
       category: task.taskClass,
-      // Job names show in English in every language (the server's taskName is one admin-set string, not localized).
-      type: TASK_CATEGORY_LABEL[task.taskClass],
+      type: task.executionMode === "SIMULATED" ? task.taskName : TASK_CATEGORY_LABEL[task.taskClass],
       model: task.model,
       client: task.client,
       location,
@@ -773,6 +774,8 @@ export const useApp = defineStore("app", () => {
       pausedAt: task.pausedAt,
       pausedSeconds: task.pausedSeconds,
       reward: task.rewardUsdt,
+      rewardAsset: task.rewardAsset,
+      rewardAmount: task.rewardAmount,
       status: task.status,
       completableAt: task.completableAt,
       protocolVersion: task.protocolVersion,
@@ -791,7 +794,8 @@ export const useApp = defineStore("app", () => {
   function applyRemoteAssignments(base: Device[], state: CanonicalTaskAssignments): Device[] {
     remotePendingEarned.value = state.pendingEarned ?? null;
     remoteComputeProtocolVersion.value = state.protocolVersion ?? 1;
-    const taskSnapshotReceivedAt = readMonotonicNowMs();
+    const taskSnapshotReceivedAt = lastConfirmedAssignments?.state === state
+      ? lastConfirmedAssignments.receivedMonotonicAt : readMonotonicNowMs();
     const byDevice = new Map(state.devices.map((entry) => [String(entry.deviceId), entry]));
     return base.map((device) => {
       const authority = byDevice.get(device.id);
@@ -805,6 +809,8 @@ export const useApp = defineStore("app", () => {
           recoveryReason: null,
           recentTasks: [],
           taskLockUntil: null,
+          phoneValidUntil: null,
+          simulationState: undefined,
         };
       }
       return {
@@ -812,6 +818,8 @@ export const useApp = defineStore("app", () => {
         taskServerNow: state.serverNow,
         taskServerNowReceivedAt: taskSnapshotReceivedAt,
         taskLockUntil: authority.lockUntil,
+        phoneValidUntil: authority.phoneValidUntil,
+        simulationState: authority.simulationState,
         currentTask: authority.currentTask ? remoteTask(authority.currentTask, device.location ?? "") : null,
         recoveryPending: authority.recoveryPending === true,
         recoveryReason: authority.recoveryReason ?? null,
@@ -833,40 +841,37 @@ export const useApp = defineStore("app", () => {
         && now < taskAssignmentSnapshot.receivedAt + TASK_ASSIGNMENT_CACHE_MS) {
       return Promise.resolve(taskAssignmentSnapshot.state);
     }
-    if (taskAssignmentSnapshotInFlight?.key === key) return taskAssignmentSnapshotInFlight.request;
+    if (taskAssignmentSnapshotInFlight?.key === key && now < taskAssignmentSnapshotInFlight.startedAt + TASK_ASSIGNMENT_CACHE_MS)
+      return taskAssignmentSnapshotInFlight.request;
     const pending = taskAssignmentApi.state(true).then((state) => {
       if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
       if (foregroundEpoch !== remoteTaskForegroundEpoch) throw new Error("REMOTE_FOREGROUND_CHANGED");
       if (readEpoch !== taskAssignmentReadEpoch) throw new Error("REMOTE_ASSIGNMENT_READ_SUPERSEDED");
-      taskAssignmentSnapshot = { key, receivedAt: Date.now(), state };
+      taskAssignmentSnapshot = { key, receivedAt: Date.now(), receivedMonotonicAt: readMonotonicNowMs(), state };
       return state;
     });
-    taskAssignmentSnapshotInFlight = { key, request: pending };
-    const clearInFlight = () => {
-      if (taskAssignmentSnapshotInFlight?.request === pending) taskAssignmentSnapshotInFlight = null;
-    };
-    void pending.then(clearInFlight, clearInFlight);
+    taskAssignmentSnapshotInFlight = { key, startedAt: now, request: pending };
     return pending;
   }
 
   function setTaskReadPageVisible(page: "home" | "earn" | "device-detail", visible: boolean): void {
     if (visible) {
       taskReadPages.add(page);
-      visibleTaskReadAfter = 0;
       void refreshVisibleTaskAssignments();
     } else taskReadPages.delete(page);
   }
 
   function rememberTaskAssignments(request: RemoteAccountRequest, state: CanonicalTaskAssignments): CanonicalTaskAssignments {
+    if (lastConfirmedAssignments?.state === state) return state;
     if (lastConfirmedAssignments?.request.accountKey === request.accountKey
       && lastConfirmedAssignments.request.epoch === request.epoch
       && lastConfirmedAssignments.state.serverNow > state.serverNow) return lastConfirmedAssignments.state;
-    lastConfirmedAssignments = { request: { ...request }, state };
+    lastConfirmedAssignments = { request: { ...request }, state,
+      receivedMonotonicAt: taskAssignmentSnapshot?.state === state ? taskAssignmentSnapshot.receivedMonotonicAt : readMonotonicNowMs() };
     return state;
   }
 
-  // Short tasks can start and finish between heartbeats. Read their projection
-  // while a queue is visible, without accelerating runtime writes or fleet reads.
+  // All visible task pages share one account read window and in-flight request.
   async function refreshVisibleTaskAssignments(): Promise<void> {
     if (!remoteApiEnabled || !remoteTaskForeground || !taskReadPages.size
       || miningPaused.value || Date.now() < visibleTaskReadAfter) return;
@@ -889,6 +894,10 @@ export const useApp = defineStore("app", () => {
       remoteAssignmentHasSnapshot.value = true;
       remoteAssignmentStatus.value = "ready";
       remoteAssignmentError.value = "";
+      await Promise.allSettled([
+        refreshRemoteFleet(request, { coalesce: true }),
+        refreshHomeTruth(request),
+      ]);
     } catch (cause) {
       if (remoteTaskForeground && foregroundEpoch === remoteTaskForegroundEpoch
         && readEpoch === taskAssignmentReadEpoch && remoteAccountEpoch.isCurrent(request)
@@ -903,92 +912,57 @@ export const useApp = defineStore("app", () => {
     const calledAt = Date.now();
     if (!remoteApiEnabled || !remoteTaskForeground || miningPaused.value || calledAt < remoteTaskSyncAfter) return;
     const request = remoteAccountEpoch.snapshot();
+    const activeSession = sessionVault.read();
+    if (!activeSession || request.accountKey !== `user:${activeSession.user.userId}`) return;
     const foregroundEpoch = remoteTaskForegroundEpoch;
     const syncKey = `${request.accountKey}:${request.epoch}:${foregroundEpoch}`;
     if (remoteTaskSyncInFlightKey === syncKey) return;
     remoteTaskSyncInFlightKey = syncKey;
     remoteTaskSyncAfter = calledAt + REMOTE_TASK_SYNC_MS;
-    let refreshFleetAfterStaleRead = false;
     try {
-      if (remoteTaskForeground && foregroundEpoch === remoteTaskForegroundEpoch && remoteAccountEpoch.isCurrent(request)) {
+      if (hasNativePhoneRuntime() && useSession().isCurrentDeviceCalibrated(request.accountKey)) {
         try {
           await enqueuePhoneRuntimeReport(async () => {
-            // Sample only after any older POST settles. The phone may have
-            // changed battery/network state while waiting for that response.
             if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch
               || !remoteAccountEpoch.isCurrent(request)) return;
-            const signals = await collectNativePhoneRuntime().catch(() => null);
+            if (nativePhoneBinding?.accountKey !== request.accountKey || nativePhoneBinding.epoch !== request.epoch) {
+              const installationId = getDeviceId();
+              const binding = await onboardingCalibrationApi.result(installationId);
+              if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch
+                || !remoteAccountEpoch.isCurrent(request)) return;
+              if (`user:${binding.userId}` !== request.accountKey || binding.deviceId !== installationId)
+                throw new Error("PHONE_BINDING_IDENTITY_MISMATCH");
+              if (binding.activationStatus !== "ACTIVE" || binding.userDeviceId == null) return;
+              nativePhoneBinding = { ...request, deviceId: binding.userDeviceId };
+            }
+            const online = await taskAssignmentApi.confirmPhoneOnline(nativePhoneBinding.deviceId, getDeviceId());
             if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch
               || !remoteAccountEpoch.isCurrent(request)) return;
-            if (!signals) {
-              // A native App can recover a temporarily missing sample.
-              // H5 has no bridge, so its read-only refresh stays at 60s.
-              if (hasNativePhoneRuntime()) {
-                remoteTaskSyncAfter = Math.min(remoteTaskSyncAfter, Date.now() + REMOTE_TASK_RETRY_MS);
-              }
-              return;
+            const receivedAt = readMonotonicNowMs();
+            devices.value = devices.value.map(device => device.id === String(online.deviceId)
+              && (device.taskServerNow == null || device.taskServerNow <= online.serverNow)
+              ? { ...device, taskServerNow: online.serverNow, taskServerNowReceivedAt: receivedAt,
+                phoneValidUntil: online.phoneValidUntil, simulationState: online.simulationState } : device);
+            if (lastConfirmedAssignments && lastConfirmedAssignments.state.serverNow <= online.serverNow) {
+              const state = { ...lastConfirmedAssignments.state, serverNow: online.serverNow,
+                devices: lastConfirmedAssignments.state.devices.map(device => device.deviceId === online.deviceId
+                  ? { ...device, phoneValidUntil: online.phoneValidUntil, simulationState: online.simulationState } : device) };
+              lastConfirmedAssignments = { request: { ...request }, state, receivedMonotonicAt: receivedAt };
+              if (taskAssignmentSnapshot) taskAssignmentSnapshot = { ...taskAssignmentSnapshot, receivedMonotonicAt: receivedAt, state };
             }
-            await taskAssignmentApi.reportPhoneRuntime(getDeviceId(), signals.batteryLevel,
-              signals.networkReachable, signals.isCharging);
-            if (remoteAccountEpoch.isCurrent(request)) {
-              // A concurrent page read may have captured PAUSED before this POST.
-              // Fence its cache and in-flight GET, but let a checkout mutation's
-              // fleet readback finish instead of cancelling that business flow.
-              refreshFleetAfterStaleRead = remoteFleetRefreshCoordinator.hasInFlight();
-              taskAssignmentReadEpoch += 1;
-              taskAssignmentSnapshot = null;
-              taskAssignmentSnapshotInFlight = null;
-              lastConfirmedAssignments = null;
-              if (foregroundEpoch === remoteTaskForegroundEpoch) remotePhoneBindingInvalid.value = false;
-            }
+            remotePhoneBindingInvalid.value = false;
+            if (online.simulationState === "CLOSING") remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
           });
         } catch (cause) {
-          // Retry transport/server failures before the 120-second server lease expires.
-          // A rejected local calibration binding keeps the normal 60-second cadence.
-          if (cause instanceof ApiError && (cause.code === 409 || cause.status === 409)
-            && ["TASK_ASSIGNMENT_PHONE_BINDING_INVALID", "TASK_ASSIGNMENT_DEVICE_NOT_ACTIVE"].includes(cause.message)
-            && foregroundEpoch === remoteTaskForegroundEpoch && remoteAccountEpoch.isCurrent(request)) {
-            remotePhoneBindingInvalid.value = true;
-            useSession().clearCalibrated(request.accountKey);
-          }
-          if (asApiError(cause).retryable && foregroundEpoch === remoteTaskForegroundEpoch) {
-            remoteTaskSyncAfter = Math.min(remoteTaskSyncAfter, Date.now() + REMOTE_TASK_RETRY_MS);
+          if (foregroundEpoch === remoteTaskForegroundEpoch && remoteAccountEpoch.isCurrent(request)) {
+            nativePhoneBinding = null;
+            if (asApiError(cause).retryable) remoteTaskSyncAfter = Date.now() + REMOTE_TASK_RETRY_MS;
           }
         }
       }
-      if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch) return;
-      const [assignmentResult] = await Promise.allSettled([readRemoteTaskAssignments(request)]);
-      // before applying remote task assignments, reject any response from a prior account bind.
       if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch || !remoteAccountEpoch.isCurrent(request)) return;
-      if (assignmentResult.status === "fulfilled") {
-        devices.value = applyRemoteAssignments(devices.value, rememberTaskAssignments(request, assignmentResult.value));
-        remoteAssignmentHasSnapshot.value = true;
-        remoteAssignmentStatus.value = "ready";
-        remoteAssignmentError.value = "";
-      } else {
-        remoteAssignmentStatus.value = "error";
-        remoteAssignmentError.value = assignmentResult.reason instanceof Error
-          ? assignmentResult.reason.message : "TASK_ASSIGNMENT_SYNC_FAILED";
-      }
-      // Dev and production clients are equally read-only. Task creation, completion,
-      // receipts and money mutations are server jobs; the App only refreshes their
-      // task, per-device earnings and Home aggregate projections.
-      await Promise.allSettled([
-        refreshRemoteFleet(request, { coalesce: true }),
-        refreshHomeTruth(request),
-      ]);
-      if (refreshFleetAfterStaleRead && remoteTaskForeground
-        && foregroundEpoch === remoteTaskForegroundEpoch && remoteAccountEpoch.isCurrent(request)) {
-        // The coalesced read began before the runtime POST. After it settles,
-        // fetch current fleet runtime without superseding its mutation caller.
-        await refreshRemoteFleet(request, { coalesce: true });
-      }
-      return;
-    } catch (cause) {
-      if (remoteTaskForeground && foregroundEpoch === remoteTaskForegroundEpoch && remoteAccountEpoch.isCurrent(request)) {
-        remoteAssignmentStatus.value = "error";
-        remoteAssignmentError.value = cause instanceof Error ? cause.message : "TASK_ASSIGNMENT_SYNC_FAILED";
-      }
+      if (!remoteFleetHasSnapshot.value) await refreshRemoteFleet(request, { coalesce: true });
+      await refreshVisibleTaskAssignments();
     } finally {
       if (remoteTaskSyncInFlightKey === syncKey) remoteTaskSyncInFlightKey = null;
     }
@@ -1207,6 +1181,7 @@ export const useApp = defineStore("app", () => {
       remoteWalletReceiptHasSnapshot.value = false;
       remoteAssignmentStatus.value = "idle";
       remotePhoneBindingInvalid.value = false;
+      nativePhoneBinding = null;
       remoteAssignmentError.value = "";
       remoteAssignmentHasSnapshot.value = false;
       remotePendingEarned.value = null;
@@ -2576,7 +2551,7 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError, homeTruthRateLimited, homeTruthTransientFailure,
     remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePendingEarned, remoteComputeProtocolVersion, remotePhoneBindingInvalid,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, refreshVisibleTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, refreshVisibleTaskAssignments, invalidateRemoteTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
     tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining, acceptPhoneActivation,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,

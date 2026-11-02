@@ -6,7 +6,9 @@ import { canControlDevice } from "@/lib/device-control-platform";
 import { useApp } from "@/store/app";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
-import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import { deviceE3Api, remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
+import { getDeviceId } from "@/lib/device-id";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { isSettledRejection } from "@/api/errors";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
@@ -18,6 +20,7 @@ import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-comma
  */
 export function useDeviceDeactivation() {
   const t = useT();
+  const computeCopy = useComputeV2Copy();
   const app = useApp();
   const deferredCommandInFlight = ref<Set<string>>(new Set());
   const sheetDevice = ref<Device | null>(null);
@@ -31,10 +34,15 @@ export function useDeviceDeactivation() {
     return deferredCommandInFlight.value.has(deferredCommandSlot(device, app.accountKey, Number(device.rowVersion)));
   }
 
+  function usesSimulatedStop(device: Device): boolean {
+    return device.currentTask ? device.currentTask.executionMode === "SIMULATED"
+      : app.remoteComputeProtocolVersion === 3 && !device.recoveryPending;
+  }
+
   async function handleDeactivate(d: Device) {
     if (!canControlDevice(d)) return;
     if (remoteApiEnabled && deferredCommandBusy(d)) return;
-    if (remoteApiEnabled && d.pendingDeactivate) {
+    if (remoteApiEnabled && d.pendingDeactivate && !usesSimulatedStop(d)) {
       toast.info(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
       return;
     }
@@ -100,12 +108,15 @@ export function useDeviceDeactivation() {
       const result = await deviceE3Api.deactivateAfterTask(Number(d.id), version, key);
       if (result.status === "ACTIVE") throw new Error("DEVICE_DEFERRED_RESPONSE_INVALID");
       if (!current()) return false;
+      app.invalidateRemoteTaskAssignments();
       if (!await app.refreshRemoteFleet() || !confirmed(result.status)) {
         throw new Error("DEVICE_DEFERRED_DEACTIVATION_NOT_CONFIRMED");
       }
       finish(result.status);
       return true;
     } catch (cause) {
+      if (!current()) return false;
+      app.invalidateRemoteTaskAssignments();
       // A lost response or 409 is retried with the same durable key first. A
       // successful replay proves the command was accepted without a duplicate.
       try {
@@ -156,21 +167,33 @@ export function useDeviceDeactivation() {
       return false;
     }
     const accountKey = app.accountKey;
+    const scope = captureAccountScope();
     const version = Number(d.rowVersion);
     const key = acquireDeviceCommandKey(accountKey, operation, d.id, version);
     const expectedActive = operation === "activate";
     const confirmed = () => {
-      if (accountKey !== app.accountKey) return false;
+      if (!isCurrentAccountScope(scope) || accountKey !== app.accountKey) return false;
       const current = app.devices.find((entry) => entry.id === d.id);
       return Boolean(current) && (current!.activatedAt !== null) === expectedActive;
     };
+    let simulatedClosing = false;
     try {
       if (operation === "activate") {
         await deviceE3Api.activate(Number(d.id), version, app.slotCap, key);
+      } else if (usesSimulatedStop(d)) {
+        const result = await taskAssignmentApi.stopSimulatedTask(Number(d.id), false, d.kind === "phone" ? getDeviceId() : undefined);
+        simulatedClosing = result.simulationState === "CLOSING";
       } else {
         await deviceE3Api.deactivate(Number(d.id), version, key);
       }
+      if (!isCurrentAccountScope(scope) || accountKey !== app.accountKey) return false;
+      app.invalidateRemoteTaskAssignments();
       await app.refreshRemoteFleet();
+      if (simulatedClosing) {
+        finishDeviceCommand(accountKey, operation, d.id, version);
+        if (isCurrentAccountScope(scope)) toast.info(computeCopy.value.stopping);
+        return true;
+      }
       if (!confirmed()) throw new Error(operation === "activate"
         ? "DEVICE_ACTIVATION_NOT_CONFIRMED"
         : "DEVICE_DEACTIVATION_NOT_CONFIRMED");
@@ -181,6 +204,8 @@ export function useDeviceDeactivation() {
       toast.success(message);
       return true;
     } catch (cause) {
+      if (!isCurrentAccountScope(scope) || accountKey !== app.accountKey) return false;
+      app.invalidateRemoteTaskAssignments();
       try {
         await app.refreshRemoteFleet();
         if (confirmed()) {
