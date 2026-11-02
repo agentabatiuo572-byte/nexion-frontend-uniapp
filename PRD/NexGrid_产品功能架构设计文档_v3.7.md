@@ -1423,7 +1423,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 ### 6.11 APP 与 H5 的手机执行资格
 
-H5 Lite 是唯一网页产品线。注册成功直接进入首页；登录、注册恢复、试用、充值及任务恢复均不进入 `/onboarding/connect` 或 `/onboarding/estimator`，两页不注册进 Lite 路由；旧 `entry-surfaces/index|signed|h5|white` 三端走查页也从 Lite 路由移除，不再通过旧链接展示手机算力或原生入口。首页保留通用 App 下载横幅，下载页保留 iOS / Android / 官网链接。
+H5 Lite 是唯一网页产品线。手机号注册和带注册回执的第三方注册进入注册成功页（§4.1.1），由「继续网页版」进入首页，不经过任何手机激活或暂缓步骤；登录、注册恢复、试用、充值及任务恢复均不进入 `/onboarding/connect` 或 `/onboarding/estimator`，两页不注册进 Lite 路由；旧 `entry-surfaces/index|signed|h5|white` 三端走查页也从 Lite 路由移除，不再通过旧链接展示手机算力或原生入口。首页保留通用 App 下载横幅，下载页保留 iOS / Android / 官网链接。
 
 Lite 不展示手机设备、激活 / 校准卡、手机收益方式、重新校准动作或扫码邀请入口；首页、Earn、设备仓库、详情和搜索只展示可在网页管理的设备。隐藏手机仍保留在服务器设备账本中并占用原槽位，不以可见卡片数重算容量。服务端任务以明确手机动作路由、任务码或中英越文标题识别并隐藏；账号手机号任务先按稳定代码（如 `bind_mobile` / `bind_phone` / `verify_phone`）或资料 / 安全页动作路由豁免，不依赖标题翻译判断。商品只按明确身份过滤：结构化 `productType=SHARE` 与已知硬件 SKU 优先保留，包括 Mobile Cloud Share，以及 ID 为 `stellarbox-pro`、名为 Mobile GPU Server 的设备。其余仅在明确 `kind=phone` 或已知手机 SKU ID / code（`phone`、`phone-basic`、`iphone15`，不区分大小写）时隐藏，绝不按显示名称推断手机；目标推荐共用此规则并可读取现有目录类型。当前目录只有 DEVICE / SHARE，没有手机专属 device kind；未知 SKU 保留，后台仍需约束手机发布并补充结构化身份。首页促销在 API 边界先将后端原始 `SERVER` 归一为 `DEVICE`，再校验并保留 `productType`；`SERVER` 不得导致首日 / 周任务快照整体失效。随后选取周任务来源和生成卡片时共用同一份身份过滤结果；`targetDevice` 仅精确匹配已知 SKU，不对自由名称作手机判断。活动 SHARE 无论名称都保留，未下发类型的旧促销仍兼容。首日任务的原始组条件、数量和奖励不改写，若服务器组仍要求隐藏任务，应由服务器调整发布。无法识别的运营自由文案需后台清理，不猜测不透明标识。公开法律文本及手机号身份、验证码功能保留。
 
