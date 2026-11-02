@@ -3,6 +3,7 @@ import { useLocaleStore } from "@/store/locale";
 
 export const computeV2Copy = {
   zh: {
+    completedAt: "完成时间",
     accountBatchHint: "包含账号所有设备的收益。",
     historyHint: "最近 {n} 笔，点击查看任务与结算详情。",
     ruleCycle: "按规则结算，未执行模型",
@@ -13,6 +14,7 @@ export const computeV2Copy = {
     statuses: { CLAIMED: "已领取", QUEUED: "排队中", RUNNING: "计算中", VERIFYING: "校验中", RECOVERING: "恢复中", PAUSED: "已暂停", COMPLETED: "已完成", FAILED: "执行失败", CANCELLED: "已取消", NONE: "无待结算收益", PENDING: "待结算", POSTED: "已入账", BLOCKED: "结算挂起" },
   },
   en: {
+    completedAt: "Completed at",
     accountBatchHint: "Includes earnings from all account devices.",
     historyHint: "Latest {n} tasks. Select one for task and settlement details.",
     ruleCycle: "Rule-based settlement; no model execution",
@@ -23,6 +25,7 @@ export const computeV2Copy = {
     statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
   },
   vi: {
+    completedAt: "Hoàn thành lúc",
     accountBatchHint: "Bao gồm thu nhập từ mọi thiết bị trong tài khoản.",
     historyHint: "{n} tác vụ gần nhất. Chọn để xem chi tiết và quyết toán.",
     ruleCycle: "Quyết toán theo quy tắc, không chạy mô hình",

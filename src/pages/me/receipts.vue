@@ -67,7 +67,7 @@
               </view>
               <view class="text-right shrink-0" style="margin-left: 8px">
                 <text class="block tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 6)} UVT` : `+$${formatAmount(r.rewardUsdt, 6)}` }}</text>
-                <text class="block" :style="rowDateStyle">{{ shortDate(r.settledAt ?? r.completedAt) }}</text>
+                <text class="block" :style="rowDateStyle">{{ computeCopy.completedAt }} · {{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
           </template>
@@ -421,8 +421,7 @@ async function openRemoteComputeReceipt(task: CanonicalComputeReceiptSummary): P
     if (requestEpoch === receiptRequestEpoch
       && receiptsPageFence.isCurrent(requestScope)
       && expectedAccountKey === app.accountKey
-      && expectedBindingEpoch === app.accountBindingEpoch) open.value = task.settledAt == null
-        ? detail : { ...detail, settledAt: task.settledAt };
+      && expectedBindingEpoch === app.accountBindingEpoch) open.value = detail;
   } catch {
     if (requestEpoch === receiptRequestEpoch
       && receiptsPageFence.isCurrent(requestScope)
