@@ -24,8 +24,9 @@ const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-export const demoDefaults = {...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {scopeState:'normal',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
+  scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益']],
   ...authDemoOptions,
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
@@ -39,7 +40,7 @@ export const demoOptions = {
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
-  stakingState:[['enabled','正常开放'],['delisted','功能下架'],['error','质押读取失败（其他正常）']],
+  stakingState:[['enabled','正常开放'],['legacy','未下发开关（默认开放）'],['delisted','功能下架'],['error','质押读取失败（其他正常）']],
   bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
   streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
@@ -118,6 +119,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.featureFlags.stakingVisible=state.stakingState!=='delisted';
+    if(state.stakingState==='legacy')delete config.featureFlags.stakingVisible;
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
     Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0});
@@ -169,6 +171,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/team/binary')return {...authority,source:'server',runId:null,asOfDate:iso.slice(0,10),trackA:empty?0:2800,trackB:empty?0:2400,trackAMembers:empty?0:4,trackBMembers:empty?0:4,autoPlacedMembers:0,matchRate:.1,threshold:1000,dailyCap:5000,periodCap:150000,estimatedAmountUsdt:empty?0:240,settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason:empty?'BOTH_TRACKS_BELOW_THRESHOLD':'',recentMatches:empty?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'unlocked',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
   if(pathname==='/auth/users/oauth/provider/linked')return ['GOOGLE'];
+  if(state.scopeState==='mixed') products.push({...products[0],id:'phone-basic',name:localized(locale,'手机算力设备','Phone compute device','Thiết bị điện thoại'),price:99});
   if(pathname==='/api/store/catalog') return {...authority,source:'nx_product',revision:null,products:empty?[]:products};
   if(pathname==='/api/product/phase') return {phase:'P2',source:'H1_GROWTH_RHYTHM',devOverrideAllowed:false};
   if(pathname==='/api/store/purchase-eligibility') return {...authority,runId:null,productNo:url.searchParams.get('productNo'),eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',policies:[{policy:'E1',eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',mode:'ALL',conditions:state.catalogState==='restricted'?[{kind:'rank',required:3,current:2,gap:1,met:false}]:[]},{policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]}],evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
@@ -293,6 +296,16 @@ export function demoFixture(url,locale,state,request) {
     data.quests.forEach((row,i)=>{row.actionRoute=routes[i];row.category=['identity','explore','explore','explore','identity','social'][i];});
     const weekNames=locale==='zh'?['了解设备收益','完成一门课程','邀请一位好友','查看账户安全']:locale==='vi'?['Tìm hiểu thu nhập','Hoàn thành một bài học','Mời một người bạn','Kiểm tra bảo mật']:['Explore device earnings','Complete one course','Invite a friend','Review account security'];
     if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(now+(state.taskState==='expired'?-1000:5*day)).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
+    if(state.scopeState==='mixed' && data.quests.length) {
+      const sample=data.quests[0];
+      data.quests.push(
+        {...sample,questCode:'connect_phone',name:localized(locale,'连接手机','Connect a phone','Kết nối điện thoại'),actionRoute:'/pages/onboarding/connect'},
+        {...sample,questCode:'activate_phone',name:localized(locale,'激活手机','Activate a phone','Kích hoạt điện thoại'),actionRoute:'/pages/me/devices'},
+        {...sample,questCode:'day_one_staking',name:localized(locale,'了解质押','Explore staking','Tìm hiểu staking'),actionRoute:'/pages/staking/staking'},
+        {...sample,layer:'WEEKLY_T1',instanceKey:'WEEK:demo',questCode:'weekly_buy_phone',name:localized(locale,'购买手机','Buy a phone','Mua điện thoại'),actionRoute:'/pages/store/store'},
+        {...sample,layer:'WEEKLY_T2',instanceKey:'WEEK:demo',questCode:'weekly_staking',name:localized(locale,'每周质押','Weekly staking','Staking hàng tuần'),actionRoute:'/pages/staking/staking'});
+      data.dayOneRequiredTaskCount=data.quests.filter(q=>q.layer==='DAY_ONE').length;
+    }
     data.promoBanner={bannerCode:'demo-weekly',baseReward:300,multiplier:1,countdownDays:5,countdownHours:0,targetDevice:'UVELBox Pro',targetDaily:22.4,status:'active'};
     return data;
   }
@@ -324,6 +337,10 @@ export function demoFixture(url,locale,state,request) {
     const names=locale==='zh'?['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星']:locale==='vi'?['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']:['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'];
     data.badgeAchievements=names.map((name,i)=>({achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],rewardPoints:50*(i+1),status:i<2||unlocked?'UNLOCKED':'LOCKED',unlockedAt:i<2||unlocked?iso:null}));
     data.powerUps=[{powerUpId:1,powerUpCode:'demo-checkin-boost',name:localized(locale,'签到加成','Check-in boost','Thưởng điểm danh'),unlockStreakDays:3,targetPath:'/pages/daily/daily',effectType:'CHECKIN_MULTIPLIER',effectValue:'1.5',status:state.powerUp?'ACTIVATED':'AVAILABLE',businessAvailable:true}];
+    if(state.scopeState==='mixed') data.powerUps.push(
+      {powerUpId:2,powerUpCode:'STAKING_APY',name:'质押活动入口',unlockStreakDays:30,targetPath:'/wallet/staking',effectType:'ROUTE_BADGE',effectValue:'0',status:'LOCKED',businessAvailable:true},
+      {powerUpId:3,powerUpCode:'ROYALTY_BOOST',name:'团队成长徽章',unlockStreakDays:7,targetPath:'/team',effectType:'ROUTE_BADGE',effectValue:'0',status:'AVAILABLE',businessAvailable:true},
+      {powerUpId:4,powerUpCode:'demo-unknown',name:localized(locale,'成长徽章','Growth badge','Huy hiệu phát triển'),unlockStreakDays:60,targetPath:'/team',effectType:'UNKNOWN_RAW_EFFECT',effectValue:'10',status:'AVAILABLE',businessAvailable:true});
     data.topStreakers=[{name:'Maya',countryCode:'SG',streak:28},{name:'Linh',countryCode:'VN',streak:24},{name:'Alex',countryCode:'JP',streak:14}];
     return data;
   }
@@ -342,6 +359,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/devices/earnings') {
     const data=base();data.walletUsdt=empty?0:state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
     data.devices=empty?[]:data.devices.concat({...data.devices[0],id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}).map(device=>({...device,runtimeStatus:'ONLINE'}));
+    if(!empty&&state.scopeState==='mixed') data.devices.push({...data.devices[0],id:43,instanceNo:'DEMO-PHONE',name:'Phone',deviceType:'PHONE',productCode:'PHONE',dailyUsdt:0.1,dailyNex:0,todayEarningsUsdt:0,todayEarningsNex:0,actualPaidUsdt:0});
     if(!empty&&state.machineImageState==='alternate')Object.assign(data.devices.at(-1),{instanceNo:'DEMO-RACK',name:'UVELRack P1',productCode:'STELLARRACK-P1',dailyUsdt:45,dailyNex:30,actualPaidUsdt:12999});
     if(!empty)for(const order of state.createdOrders||[])if(order.canonicalStatus==='activated')for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
       const product=products.find(p=>p.id===line.sku),instanceNo=order.orderNo+'-'+i+'-'+unit;

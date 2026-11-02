@@ -39,6 +39,7 @@ const server=http.createServer(async(req,res)=>{
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
+        if(update.authState)delete state.scopeCalls;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}
@@ -63,6 +64,7 @@ const server=http.createServer(async(req,res)=>{
     const trustPage=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(whitepaper|incorporation|msb|ein)\/pages\/([1-9][0-9]?)$/);
     if(trustPage&&process.env.DEMO_TRUST_DOCUMENTS_DIR){res.setHeader('Content-Type','image/jpeg');return res.end(await readFile(path.join(process.env.DEMO_TRUST_DOCUMENTS_DIR,'pages',trustPage[1],`${trustPage[2]}.jpg`)));}
     if(url.pathname==='/api/app/support/attachments/demo-image/content'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(root,'static/img/home-glass-20260928/s1.webp')));}
+    if(/onboarding|risk-disclosure|auth\/users\/register/.test(url.pathname)){state.scopeCalls??={};const key=req.method+' '+url.pathname;state.scopeCalls[key]=(state.scopeCalls[key]??0)+1;}
     if(authDemo.handles(url.pathname)) {
       let raw='';for await(const chunk of req)raw+=chunk;
       const response=authDemo.handle(url,req.method,req.headers,raw?JSON.parse(raw):{});
