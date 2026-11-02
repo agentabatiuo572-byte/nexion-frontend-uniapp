@@ -15,7 +15,7 @@
   pointer events). Movement, touchcancel and unmount cancel the pending hold.
 -->
 <template>
-  <view class="nx-device-card select-none" :style="rowStyle" :data-device-id="device.id" :data-online="deviceOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
+  <view v-if="liteDeviceVisible" class="nx-device-card select-none" :style="rowStyle" :data-device-id="device.id" :data-online="deviceOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
     <!-- Long-press quick menu (full-viewport bottom sheet).
          🔴 z 790 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 200 低于里程碑
          庆祝(780),菜单开着时庆祝盖在上面并吞掉「以旧换新 / 统计」的点击。 -->
@@ -213,10 +213,11 @@
       <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 4px">{{ t.earn.phoneWaitingHint }}</text>
     </view>
 
+    <text v-if="device.recoveryPending && !task" class="block" style="padding:0 20px 16px;color:var(--v5-warning-ink)">{{ computeCopy.statuses.RECOVERING }}</text>
     <!-- Current task (non-reconnecting) -->
     <view v-if="task && !reconnecting" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
-      <text class="block" style="font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ workloadLabel(task.category) }}</text>
+      <text class="block" style="font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ task.type }}</text>
       <view class="mt-0.5 flex items-center gap-1.5 flex-wrap" style="font-size: 12px; color: var(--v5-ink-3)">
         <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">#{{ task.id }}</text>
         <text style="color: var(--v5-ink-4)">·</text>
@@ -224,18 +225,20 @@
         <text style="color: var(--v5-ink-4)">·</text>
         <text>{{ task.location }}</text>
       </view>
-      <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
-      <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
+      <TaskV2Status :task="task" />
+      <text v-if="task.protocolVersion && awaitingExecutionResultConfirmation" class="block" style="margin-top:4px;font-size:12px;color:var(--v5-ink-3)">{{ computeCopy.confirming }}</text>
+      <text v-if="task.status === 'PAUSED' && !task.protocolVersion" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
+      <text v-if="task.status === 'PAUSED' && !task.protocolVersion" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
       <view v-if="task.status !== 'PAUSED'" class="mt-3 flex items-center gap-3">
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
-          <view class="h-full" :style="progressBarStyle" />
+          <view v-if="progressPct != null" class="h-full" :style="progressBarStyle" />
         </view>
-        <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressPct }}%</text>
+        <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressPct == null ? '—' : `${progressPct}%` }}</text>
       </view>
-      <view v-if="task.status !== 'PAUSED'" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
+      <view v-if="task.status !== 'PAUSED' && !task.protocolVersion" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
         <text v-if="awaitingExecutionResultConfirmation">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
         <text v-else>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
-        <text style="color: var(--v5-warning-ink)">{{ t.earn.reward }} +${{ formatAmount(task.reward) }}</text>
+        <text style="color: var(--v5-warning-ink)">{{ t.earn.reward }} {{ formatTaskReward(task, true) }}</text>
       </view>
     </view>
 
@@ -269,8 +272,8 @@
           data-phone-today-task="true"
           style="min-height: 28px; font-size: 12px"
         >
-          <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
-          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">+${{ formatAmount(task.reward) }}</text>
+          <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.type }}</text>
+          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">{{ formatTaskReward(task, true) }}</text>
           <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ localClockTime(task.completedAt) }}</text>
         </view>
       </view>
@@ -372,6 +375,10 @@
 </template>
 
 <script setup lang="ts">
+import TaskV2Status from "@/components/earn/task-v2-status.vue";
+import { taskProgressPercent, deviceTaskRecovering } from "@/lib/task-progress";
+import { formatTaskReward } from "@/lib/task-reward-display";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { advanceMonotonicHighWater, deadlineRemainingDays, deadlineRemainingMs, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
@@ -403,6 +410,8 @@ const app = useApp();
 const session = useSession();
 const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
 const t = useT();
+const liteDeviceVisible = computed(() => props.device.kind !== "phone");
+const computeCopy = useComputeV2Copy();
 prepareEarnConfig();
 const earnConfig = useEarnConfig();
 
@@ -469,12 +478,7 @@ const taskLockRemainingMinutes = computed(() => {
   return lockUntil > liveTaskNow.value ? Math.max(1, Math.ceil((lockUntil - liveTaskNow.value) / 60000)) : 0;
 });
 const reconnecting = computed(() => phoneLocalReady.value && props.device.kind === "phone" && props.device.interruptedAt != null);
-const elapsedRatio = computed(() => {
-  const tk = task.value;
-  if (!tk) return 0;
-  return Math.min(1, Math.max(0, (liveTaskNow.value - tk.startedAt) / 1000 / tk.totalSec));
-});
-const progressPct = computed(() => Math.round(elapsedRatio.value * 100));
+const progressPct = computed(() => taskProgressPercent(task.value, liveTaskNow.value, props.device.interruptedAt));
 const awaitingExecutionResultConfirmation = computed(() => {
   const tk = task.value;
   return tk !== null && awaitsExecutionResultConfirmation(tk, liveTaskNow.value);
@@ -485,7 +489,11 @@ const idleGated = computed(
 );
 
 const statusLabel = computed(() => {
+  if (deviceTaskRecovering(props.device)) return computeCopy.value.statuses.RECOVERING;
   if (props.device.pendingDeactivate) return t.value.myDevices.inventoryPendingDeactivateChip;
+  if (awaitingExecutionResultConfirmation.value) return computeCopy.value.confirming;
+  if (task.value?.executionMode === "SIMULATED" && task.value.status === "RUNNING") return computeCopy.value.running;
+  if (task.value?.protocolVersion && task.value.status) return computeCopy.value.statuses[task.value.status];
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (task.value?.status === "PAUSED") return t.value.earn.phoneTaskPaused;
   if (idleGated.value) return t.value.earn.idle;
@@ -517,8 +525,8 @@ const statusGlow = computed(() => phoneLocalReady.value && !props.device.pending
 
 const elapsedRemaining = computed(() => {
   const tk = task.value;
-  if (!tk) return "0m 00s";
-  const elapsed = Math.floor((liveTaskNow.value - tk.startedAt) / 1000);
+  if (!tk || tk.startedAt === null) return "—";
+  const elapsed = Math.floor((liveTaskNow.value - tk.startedAt) / 1000 - (tk.pausedSeconds ?? 0));
   const remaining = Math.max(0, tk.totalSec - elapsed);
   const min = Math.floor(remaining / 60);
   const sec = remaining % 60;

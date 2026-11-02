@@ -3,7 +3,13 @@ import { ApiError } from "./errors";
 import { matchesRuntimeProvenance, type ServerSourceEnvironment } from "./runtime-provenance";
 import type { ApiEnvironment } from "./runtime-config";
 
-export interface CanonicalTaskAssignment {
+export interface TaskExecutionMetadata {
+  executionMode?: "MODEL" | "RULE_CYCLE" | "SIMULATED";
+  proofKind?: "MODEL_EXECUTION" | "RULE_SETTLEMENT" | "TASK_RECEIPT";
+  modelExecuted?: boolean;
+}
+
+export interface CanonicalTaskAssignment extends TaskExecutionMetadata {
   taskNo: string;
   deviceId: number;
   taskId: string;
@@ -11,10 +17,21 @@ export interface CanonicalTaskAssignment {
   taskClass: "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
   model: string;
   client: string;
-  status: "CLAIMED" | "RUNNING" | "PAUSED" | "COMPLETED";
+  status: "CLAIMED" | "QUEUED" | "RUNNING" | "VERIFYING" | "RECOVERING" | "PAUSED" | "COMPLETED" | "FAILED" | "CANCELLED";
   rewardUsdt: number;
+  rewardAsset?: "USDT" | "UVT";
+  rewardAmount?: string;
   requiredSeconds: number;
-  startedAt: number;
+  startedAt: number | null;
+  protocolVersion?: 2 | 3;
+  queuedAt?: number | null;
+  actualDurationSec?: number | null;
+  settlementStatus?: SettlementStatus | "NONE";
+  settlementBatchNo?: string | null;
+  settledAt?: number | null;
+  configVersion?: string;
+  pausedAt?: number | null;
+  pausedSeconds?: number;
   completableAt: number | null;
   completedAt: number | null;
   receiptNo: string | null;
@@ -33,18 +50,29 @@ export interface CanonicalTaskDeviceState {
   lockUntil: number | null;
   currentTask: CanonicalTaskAssignment | null;
   recentTasks: CanonicalTaskAssignment[];
+  recoveryPending?: boolean;
+  recoveryReason?: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" | null;
+  simulationState?: SimulationState;
+}
+
+export type SimulationState = "RUNNING" | "EXPIRED" | "STOPPED" | "WAITING_CONFIG" | "CLOSING" | "ERROR";
+export interface CanonicalTaskStop {
+  deviceId: number;
+  simulationState: SimulationState;
 }
 
 export interface CanonicalTaskAssignments {
   serverNow: number;
   devices: CanonicalTaskDeviceState[];
+  protocolVersion?: 2 | 3;
+  pendingEarned?: PendingComputeEarning[];
   source: "server";
   sourceEnvironment: ServerSourceEnvironment;
   runId: string;
   serverCanonical: true;
 }
 
-export interface CanonicalComputeReceipt {
+export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   receiptNo: string;
   taskNo: string;
   deviceId: number;
@@ -61,7 +89,7 @@ export interface CanonicalComputeReceipt {
   rewardUsdt: number;
   rewardNex: number;
   earningStatus: string;
-  proofHash: string;
+  proofHash: string | null;
   startedAt: number;
   completedAt: number;
   settledAt: number;
@@ -72,9 +100,10 @@ export interface CanonicalComputeReceipt {
   serverCanonical: true;
 }
 
-export interface CanonicalComputeReceiptSummary {
+export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   receiptNo: string;
   taskNo: string;
+  taskName?: string;
   taskClass: CanonicalTaskAssignment["taskClass"];
   model: string;
   client: string;
@@ -98,10 +127,29 @@ export interface CanonicalComputeReceiptPage {
 }
 
 export interface TaskAssignmentApi {
-  state(): Promise<CanonicalTaskAssignments>;
-  reportPhoneRuntime(calibrationDeviceId: string, batteryLevel: number | null, networkReachable: boolean, isCharging: boolean | null): Promise<void>;
+  state(preferV2?: boolean): Promise<CanonicalTaskAssignments>;
+  stopSimulatedTask(deviceId: number, afterCurrent: boolean, expectedVersion: number): Promise<CanonicalTaskStop>;
   receipt(receiptNo: string): Promise<CanonicalComputeReceipt>;
   receipts(offset?: number, limit?: number, cursor?: string | null): Promise<CanonicalComputeReceiptPage>;
+  settlements(cursor?: string | null, limit?: number): Promise<ComputeSettlementPage>;
+  settlement(batchNo: string): Promise<ComputeSettlementDetail>;
+}
+
+export type SettlementStatus = "PENDING" | "POSTED" | "BLOCKED";
+export interface PendingComputeEarning { asset: "USDT" | "NEX"; amount: string; taskCount: number }
+export interface ComputeSettlementBatch extends PendingComputeEarning {
+  batchNo: string;
+  status: SettlementStatus;
+  windowStart: number;
+  windowEnd: number;
+  postedAt: number | null;
+}
+export interface ComputeSettlementPage {
+  records: ComputeSettlementBatch[];
+  nextCursor: string | null;
+}
+export interface ComputeSettlementDetail extends ComputeSettlementBatch {
+  items: { taskNo: string; receiptNo: string | null; deviceId: number; taskType: string; amount: string; completedAt: number }[];
 }
 
 function invalid(message = "TASK_ASSIGNMENT_RESPONSE_INVALID"): never {
@@ -167,46 +215,82 @@ function provenance(source: Record<string, unknown>, mode: ApiEnvironment): {
   };
 }
 
-function task(value: unknown, mode: ApiEnvironment): CanonicalTaskAssignment {
+function executionMetadata(source: Record<string, unknown>): TaskExecutionMetadata {
+  const executionMode = source.executionMode ?? undefined;
+  const proofKind = source.proofKind ?? undefined;
+  const modelExecuted = source.modelExecuted ?? undefined;
+  if ((executionMode !== undefined && executionMode !== "MODEL" && executionMode !== "RULE_CYCLE" && executionMode !== "SIMULATED")
+    || (proofKind !== undefined && proofKind !== "MODEL_EXECUTION" && proofKind !== "RULE_SETTLEMENT" && proofKind !== "TASK_RECEIPT")
+    || (modelExecuted !== undefined && typeof modelExecuted !== "boolean")
+    || ((executionMode === "RULE_CYCLE" || proofKind === "RULE_SETTLEMENT")
+      && (executionMode !== "RULE_CYCLE" || proofKind !== "RULE_SETTLEMENT" || modelExecuted !== false))
+    || ((executionMode === "SIMULATED" || proofKind === "TASK_RECEIPT")
+      && (executionMode !== "SIMULATED" || proofKind !== "TASK_RECEIPT" || modelExecuted !== false))) return invalid();
+  return { executionMode, proofKind, modelExecuted };
+}
+
+function task(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTaskAssignment {
   const source = record(value);
+  const taskVersion = version === 3 && source.protocolVersion === 2 ? 2 : version;
   const proof = provenance(source, mode);
   const taskClass = text(source.taskClass).toUpperCase();
   const status = text(source.status).toUpperCase();
-  if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || !/^(CLAIMED|RUNNING|PAUSED|COMPLETED)$/.test(status)) return invalid();
-  const startedAt = timestamp(source.startedAt) as number;
-  const completableAt = timestamp(source.completableAt, status === "PAUSED");
-  if ((status !== "PAUSED" && completableAt === null) || (completableAt !== null && completableAt < startedAt)) return invalid();
+  if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass)
+    || !(taskVersion >= 2 ? /^(CLAIMED|QUEUED|RUNNING|VERIFYING|RECOVERING|PAUSED|COMPLETED|FAILED|CANCELLED)$/ : /^(CLAIMED|RUNNING|PAUSED|COMPLETED)$/).test(status)) return invalid();
+  const startedAt = timestamp(source.startedAt, taskVersion >= 2 && source.executionMode !== "SIMULATED");
+  const completableAt = timestamp(source.completableAt, taskVersion >= 2 || status === "PAUSED");
+  if ((taskVersion < 2 && status !== "PAUSED" && completableAt === null)
+    || (completableAt !== null && startedAt !== null && completableAt < startedAt)) return invalid();
   const completedAt = timestamp(source.completedAt, true);
   if (status === "COMPLETED" && completedAt === null) return invalid();
+  const rewardAsset = source.rewardAsset === "NEX" ? "UVT" : source.rewardAsset;
+  if (source.executionMode === "SIMULATED" && rewardAsset !== "USDT" && rewardAsset !== "UVT") return invalid();
   return {
     taskNo: text(source.taskNo),
     deviceId: integer(source.deviceId, 1),
     taskId: text(source.taskId),
     taskName: text(source.taskName),
     taskClass: taskClass as CanonicalTaskAssignment["taskClass"],
-    model: text(source.model, true),
-    client: text(source.client),
+    model: text(source.executionMode === "SIMULATED" ? source.model ?? "" : source.model, true),
+    client: text(source.executionMode === "SIMULATED" ? source.client ?? "" : source.client, source.executionMode === "SIMULATED"),
     status: status as CanonicalTaskAssignment["status"],
     rewardUsdt: decimal(source.rewardUsdt),
+    ...(source.executionMode === "SIMULATED" ? { rewardAsset: rewardAsset as "USDT" | "UVT", rewardAmount: exactAmount(source.rewardAmount) } : {}),
     requiredSeconds: integer(source.requiredSeconds, 1),
     startedAt,
+    pausedAt: timestamp(source.pausedAt, true),
+    pausedSeconds: source.pausedSeconds == null ? 0 : integer(source.pausedSeconds),
     completableAt,
     completedAt,
     receiptNo: source.receiptNo == null ? null : text(source.receiptNo),
     proofNonce: source.proofNonce == null ? null : text(source.proofNonce),
     proofExpiresAt: timestamp(source.proofExpiresAt, true),
+    ...(taskVersion >= 2 ? {
+      protocolVersion: taskVersion as 2 | 3,
+      queuedAt: timestamp(source.queuedAt, true),
+      actualDurationSec: source.actualDurationSec == null ? null : decimal(source.actualDurationSec),
+      settlementStatus: taskVersion === 3 && source.settlementStatus == null ? undefined
+        : source.settlementStatus === "NONE" ? "NONE" as const : settlementStatus(source.settlementStatus),
+      settlementBatchNo: source.settlementBatchNo == null ? null : text(source.settlementBatchNo),
+      settledAt: timestamp(source.settledAt, true),
+      configVersion: source.configVersion == null ? undefined : text(String(source.configVersion)),
+    } : {}),
+    ...executionMetadata(source),
     ...proof,
   };
 }
 
-function device(value: unknown, mode: ApiEnvironment): CanonicalTaskDeviceState {
+function device(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTaskDeviceState {
   const source = record(value);
   if (!Array.isArray(source.recentTasks)) return invalid();
-  const currentTask = source.currentTask == null ? null : task(source.currentTask, mode);
-  const recentTasks = source.recentTasks.map((entry) => task(entry, mode));
+  const currentTask = source.currentTask == null ? null : task(source.currentTask, mode, version);
+  const recentTasks = source.recentTasks.map((entry) => task(entry, mode, version));
   const deviceId = integer(source.deviceId, 1);
   if (currentTask && currentTask.deviceId !== deviceId) return invalid();
-  if (recentTasks.some((entry) => entry.deviceId !== deviceId || entry.status !== "COMPLETED")) return invalid();
+  if (recentTasks.some((entry) => entry.deviceId !== deviceId || !(version >= 2 ? ["COMPLETED", "FAILED", "CANCELLED"] : ["COMPLETED"]).includes(entry.status))) return invalid();
+  if (version >= 2 && ((source.recoveryPending !== undefined && typeof source.recoveryPending !== "boolean")
+    || (source.recoveryReason != null && source.recoveryReason !== "LEGACY_COMPLETE_OUTCOME_UNKNOWN")
+    || (source.recoveryReason != null && source.recoveryPending !== true))) return invalid();
   return {
     deviceId,
     instanceNo: text(source.instanceNo),
@@ -214,24 +298,69 @@ function device(value: unknown, mode: ApiEnvironment): CanonicalTaskDeviceState 
     lockUntil: timestamp(source.lockUntil, true),
     currentTask,
     recentTasks,
+    ...(version >= 2 ? { recoveryPending: source.recoveryPending === true,
+      recoveryReason: source.recoveryReason == null ? null : "LEGACY_COMPLETE_OUTCOME_UNKNOWN" as const } : {}),
+    simulationState: source.simulationState == null ? undefined : simulationState(source.simulationState),
   };
 }
 
-function state(value: unknown, mode: ApiEnvironment): CanonicalTaskAssignments {
+function state(value: unknown, mode: ApiEnvironment, requireV2 = false): CanonicalTaskAssignments {
   const source = record(value);
   const proof = provenance(source, mode);
+  if ((requireV2 && source.protocolVersion !== 2) || (source.protocolVersion !== undefined && source.protocolVersion !== 2 && source.protocolVersion !== 3)) return invalid();
   if (!Array.isArray(source.devices)) return invalid();
-  const devices = source.devices.map((entry) => device(entry, mode));
+  const version = source.protocolVersion === 3 ? 3 : source.protocolVersion === 2 ? 2 : 1;
+  const devices = source.devices.map((entry) => device(entry, mode, version)).filter(entry => entry.deviceType.toUpperCase() !== "PHONE");
   if (new Set(devices.map((entry) => entry.deviceId)).size !== devices.length) return invalid();
-  return { serverNow: timestamp(source.serverNow) as number, devices, ...proof };
+  if (version === 2 && !Array.isArray(source.pendingEarned)) return invalid();
+  if (source.pendingEarned != null && !Array.isArray(source.pendingEarned)) return invalid();
+  const pendingEarned = Array.isArray(source.pendingEarned) ? source.pendingEarned.map(pendingEarning) : undefined;
+  if (pendingEarned && new Set(pendingEarned.map((row) => row.asset)).size !== pendingEarned.length) return invalid();
+  return { serverNow: timestamp(source.serverNow) as number, devices, ...(version >= 2 ? { protocolVersion: version as 2 | 3, pendingEarned } : {}), ...proof };
+}
+
+function simulationState(value: unknown): SimulationState {
+  if (value !== "RUNNING" && value !== "EXPIRED" && value !== "STOPPED"
+    && value !== "WAITING_CONFIG" && value !== "CLOSING" && value !== "ERROR") return invalid();
+  return value;
+}
+
+function settlementStatus(value: unknown): SettlementStatus {
+  const status = text(value);
+  if (status !== "PENDING" && status !== "POSTED" && status !== "BLOCKED") return invalid();
+  return status;
+}
+
+function exactAmount(value: unknown): string {
+  if (typeof value !== "string" || !/^(?:0|[1-9]\d{0,11})\.\d{6}$/.test(value)) return invalid();
+  return value;
+}
+
+function pendingEarning(value: unknown): PendingComputeEarning {
+  const source = record(value);
+  if (source.asset !== "USDT" && source.asset !== "NEX") return invalid();
+  return { asset: source.asset, amount: exactAmount(source.amount), taskCount: integer(source.taskCount) };
+}
+
+function settlementBatch(value: unknown): ComputeSettlementBatch {
+  const source = record(value);
+  const windowStart = timestamp(source.windowStart) as number;
+  const windowEnd = timestamp(source.windowEnd) as number;
+  if (windowEnd < windowStart) return invalid();
+  const status = settlementStatus(source.status);
+  const postedAt = timestamp(source.postedAt, true);
+  if (status === "POSTED" && postedAt === null) return invalid();
+  return { ...pendingEarning(source), batchNo: text(source.batchNo), status, windowStart, windowEnd, postedAt };
 }
 
 function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt {
   const source = record(value);
   const proof = provenance(source, mode);
   const taskClass = text(source.taskClass).toUpperCase();
-  const proofHash = text(source.proofHash).toLowerCase();
-  if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || !/^[a-f0-9]{64,128}$/.test(proofHash)) {
+  const metadata = executionMetadata(source);
+  const proofHash = metadata.executionMode === "SIMULATED" && source.proofHash == null ? null : text(source.proofHash).toLowerCase();
+  if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || (proofHash !== null && !/^[a-f0-9]{64,128}$/.test(proofHash))
+    || (metadata.executionMode === "SIMULATED" && proofHash !== null)) {
     return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   }
   const startedAt = timestamp(source.startedAt) as number;
@@ -250,16 +379,17 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
     taskId: text(source.taskId),
     taskName: text(source.taskName),
     taskClass: taskClass as CanonicalTaskAssignment["taskClass"],
-    model: text(source.model, true),
-    client: text(source.client),
+    model: text(metadata.executionMode === "SIMULATED" ? source.model ?? "" : source.model, true),
+    client: text(metadata.executionMode === "SIMULATED" ? source.client ?? "" : source.client, metadata.executionMode === "SIMULATED"),
     rewardUsdt: decimal(source.rewardUsdt),
     rewardNex: decimal(source.rewardNex),
     earningStatus: text(source.earningStatus),
     proofHash,
     startedAt,
     completedAt,
-    settledAt: completedAt,
+    settledAt: timestamp(source.settledAt, true) ?? completedAt,
     durationSec,
+    ...metadata,
     ...proof,
   };
 }
@@ -275,13 +405,15 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
   return {
     receiptNo: text(source.receiptNo),
     taskNo: text(source.taskNo),
+    taskName: source.taskName == null ? undefined : text(source.taskName),
     taskClass: taskClass as CanonicalTaskAssignment["taskClass"],
-    model: text(source.model, true),
-    client: text(source.client),
+    model: text(source.executionMode === "SIMULATED" ? source.model ?? "" : source.model, true),
+    client: text(source.executionMode === "SIMULATED" ? source.client ?? "" : source.client, source.executionMode === "SIMULATED"),
     rewardUsdt: decimal(source.rewardUsdt),
     rewardNex: decimal(source.rewardNex),
     earningStatus,
     completedAt: timestamp(source.completedAt) as number,
+    ...executionMetadata(source),
   };
 }
 
@@ -302,24 +434,49 @@ function receiptPage(value: unknown, mode: ApiEnvironment): CanonicalComputeRece
 
 export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment): TaskAssignmentApi {
   return {
-    async state() {
-      return state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
-    },
-    async reportPhoneRuntime(calibrationDeviceId, batteryLevel, networkReachable, isCharging) {
-      const localDeviceId = typeof calibrationDeviceId === "string" ? calibrationDeviceId.trim() : "";
-      const validBattery = batteryLevel === null
-        ? networkReachable === false
-        : Number.isInteger(batteryLevel) && batteryLevel >= 0 && batteryLevel <= 100;
-      if (!/^[A-Za-z0-9._:-]{1,128}$/.test(localDeviceId) || !validBattery
-        || typeof networkReachable !== "boolean"
-        || (isCharging !== null && typeof isCharging !== "boolean")) {
-        throw new ApiError({ kind: "configuration", message: "PHONE_RUNTIME_SIGNALS_INVALID" });
+    async state(preferV2 = false) {
+      const current = state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
+      if (current.protocolVersion === 3) return current;
+      if (preferV2) {
+        try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments" }), mode, true); }
+        catch (cause) {
+          if (!(cause instanceof ApiError) || cause.kind !== "http" || (cause.status !== 404 && cause.status !== 501)) throw cause;
+        }
       }
-      await client.request<unknown>({
-        path: "/api/tasks/phone/runtime",
-        method: "POST",
-        body: { calibrationDeviceId: localDeviceId, batteryLevel, networkReachable, isCharging },
+      return current;
+    },
+    async settlements(cursor = null, limit = 20) {
+      const normalizedLimit = integer(limit, 1);
+      if (normalizedLimit > 50) return invalid();
+      const source = record(await client.request<unknown>({ path: `/api/tasks/v2/settlements?limit=${normalizedLimit}` + (cursor == null ? "" : `&cursor=${encodeURIComponent(text(cursor))}`) }));
+      provenance(source, mode);
+      if (!Array.isArray(source.records)) return invalid();
+      const records = source.records.map(settlementBatch);
+      if (new Set(records.map((row) => row.batchNo)).size !== records.length) return invalid();
+      return { records, nextCursor: source.nextCursor == null ? null : text(source.nextCursor) };
+    },
+    async settlement(batchNo) {
+      const expectedBatch = text(batchNo);
+      const source = record(await client.request<unknown>({ path: `/api/tasks/v2/settlements/${encodeURIComponent(expectedBatch)}` }));
+      provenance(source, mode);
+      const batch = settlementBatch(source);
+      if (batch.batchNo !== expectedBatch || !Array.isArray(source.items)) return invalid();
+      const items = source.items.map((value) => {
+        const row = record(value);
+        return { taskNo: text(row.taskNo), receiptNo: row.receiptNo == null ? null : text(row.receiptNo), deviceId: integer(row.deviceId, 1), taskType: text(row.taskType), amount: exactAmount(row.amount), completedAt: timestamp(row.completedAt) as number };
       });
+      if (items.length !== batch.taskCount || new Set(items.map((row) => row.taskNo)).size !== items.length) return invalid();
+      if (items.length > 200 || items.reduce((sum, row) => sum + BigInt(row.amount.replace(".", "")), BigInt(0)) !== BigInt(batch.amount.replace(".", ""))) return invalid();
+      return { ...batch, items };
+    },
+    async stopSimulatedTask(deviceId, afterCurrent, expectedVersion) {
+      const expectedDeviceId = integer(deviceId, 1);
+      if (typeof afterCurrent !== "boolean") return invalid();
+      const source = record(await client.request<unknown>({
+        path: "/api/tasks/simulated/stop", method: "POST", body: { deviceId: expectedDeviceId, afterCurrent, expectedVersion: integer(expectedVersion) },
+      }));
+      if (integer(source.deviceId, 1) !== expectedDeviceId) return invalid();
+      return { deviceId: expectedDeviceId, simulationState: simulationState(source.simulationState) };
     },
     async receipt(receiptNo) {
       const normalizedReceiptNo = text(receiptNo);
@@ -338,10 +495,14 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
       if (normalizedOffset > 1_000_000 || normalizedLimit > 50) {
         throw new ApiError({ kind: "configuration", message: "TASK_RECEIPT_PAGE_INVALID" });
       }
-      return receiptPage(await client.request<unknown>({
+      const page = receiptPage(await client.request<unknown>({
         path: `/api/tasks/receipts?offset=${normalizedOffset}&limit=${normalizedLimit}`
           + (normalizedCursor === null ? "" : `&cursor=${encodeURIComponent(normalizedCursor)}`),
       }), mode);
+      // The server summary does not include deviceType. Resolve each page's receipts
+      // so Lite can exclude phone work without guessing from a task name or number.
+      const details = await Promise.all(page.items.map(item => this.receipt(item.receiptNo)));
+      return { ...page, items: page.items.filter((_, index) => details[index].deviceType.toUpperCase() !== "PHONE"), total: null };
     },
   };
 }

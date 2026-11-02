@@ -799,7 +799,7 @@ const NO_TRIAL: TrialQuote = { applied: false, promo: 0, offsetUSD: 0, remainder
 /** 单一解析:给定时刻解析一次试用状态机,派生本页全部试用金额(纯函数,零落盘)。 */
 function trialQuoteAt(now: number): TrialQuote {
   const cfg = trialCfg.value;
-  const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
+  const r = remoteApiEnabled ? freeTrial.snapshot() : resolveTrialAt(freeTrial.snapshot(), now, cfg);
   const trialProductId = resolveTrialCheckoutProductId(cfg.trialProductId);
   if ((r.status !== "active" && r.status !== "grace") || !trialProductId || productId.value !== trialProductId) return NO_TRIAL;
   // A server quote carries every amount convert() settles, including the
@@ -816,15 +816,11 @@ function trialQuoteAt(now: number): TrialQuote {
       quoteVersion: serverQuote.quoteVersion,
     };
   }
-  // Remote credit is the same server projection shown by free-trial.liveShadow*.
-  // Only local mode accrues by time; recomputing remote credit would quote a
-  // different discount from the trial page and the conversion authority.
-  const acc = remoteApiEnabled
-    ? { usd: freeTrial.authoritativeShadowUSD, nex: freeTrial.authoritativeShadowNEX }
-    : accruedShadow(r, now, cfg);
-  const split = remoteApiEnabled
-    ? { offsetUSD: freeTrial.authoritativeOffsetUSD ?? 0, remainderUSD: freeTrial.authoritativeRemainderUSD ?? 0 }
-    : computeTrialOffset(cfg, r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
+  if (remoteApiEnabled) return NO_TRIAL;
+  // 影子口径与 free-trial.liveShadow* 同一条规则(active 按冻结窗口累计 /
+  // grace 取边界定格值),但锚在本次解析出的行上,不再各读各的时钟。
+  const acc = accruedShadow(r, now, cfg);
+  const split = computeTrialOffset(cfg, r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
   return {
     applied: true,
     promo: computeDiscountedPrice(cfg).discount,
@@ -847,8 +843,7 @@ const trialEarlyQuoteLapsed = computed(() => {
 });
 const trialQuoteIncomplete = computed(() => trialEarlyQuoteLapsed.value
   || ((freeTrial.status === "active" || freeTrial.status === "grace")
-    && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null
-      || freeTrial.authoritativePriceUSD === null)));
+    && !freeTrial.authoritativeQuote));
 const trialQuoteUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
 // The 4s trial poll marks the authority loading while it re-reads. Keep the last confirmed quote on
 // screen meanwhile instead of swapping the page out (which also threw the scroll back to the top);
@@ -857,7 +852,7 @@ const trialQuoteScreenUnavailable = computed(() => remoteApiEnabled && !hasOrigi
   && !(freeTrial.authorityStatus === "loading" && freeTrial.authorityServerState !== null)) || trialQuoteIncomplete.value));
 const trialConversionMode = computed(() => trialView.value.applied);
 const purchaseSubtotal = computed(() => createdCheckoutOrder.value?.subtotalUsdt ?? pendingCheckoutCreate.value?.subtotal
-  ?? (remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativePriceUSD ?? 0 : product.value?.price ?? 0));
+  ?? (remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote!.priceUSD : product.value?.price ?? 0));
 const promoDiscount = computed(() => trialView.value.promo);
 const trialOffsetView = computed(() => trialView.value);
 const promoDiscountText = computed(() => formatAmount(promoDiscount.value));
@@ -1023,6 +1018,7 @@ async function reAddTradein() {
 const netPrice = computed(() => {
   if (createdCheckoutOrder.value) return createdCheckoutOrder.value.amountUsdt;
   if (pendingCheckoutCreate.value) return pendingCheckoutCreate.value.amount;
+  if (remoteApiEnabled && trialConversionMode.value) return freeTrial.authoritativeQuote!.amountUSD;
   const canonical = remoteApiEnabled ? appliedTradeinView.value?.canonicalQuote ?? null : null;
   if (canonical) return canonical.payableUsdt;
   return Math.max(

@@ -46,10 +46,10 @@
             v-for="d in inactiveDevices"
             :key="d.id"
             class="sas-device"
-            :class="{ 'is-pending': activationInFlight.has(d.id) }"
+            :class="{ 'is-pending': activationInFlight.has(d.id) || slotsFull || !capacityReady }"
             role="button"
-            :tabindex="activationInFlight.has(d.id) ? -1 : 0"
-            :aria-disabled="activationInFlight.has(d.id) ? 'true' : 'false'"
+            :tabindex="activationInFlight.has(d.id) || slotsFull || !capacityReady ? -1 : 0"
+            :aria-disabled="activationInFlight.has(d.id) || slotsFull || !capacityReady ? 'true' : 'false'"
             @click="onActivate(d)"
 
             @keydown.enter.prevent="onActivate(d)" @keydown.space.prevent="onActivate(d)"
@@ -69,6 +69,8 @@
         </view>
       </view>
 
+      <view v-if="!capacityReady" class="sas-unconfirmed" role="status"><text>{{ t.myDevices.inventoryStaleWarning }}</text></view>
+      <view v-else-if="slotsFull" class="sas-unconfirmed" role="status"><text>{{ fmt(t.slotSheet.toastSlotsFull, { max: app.slotCap }) }}</text></view>
       <view v-if="unconfirmedDevices.length > 0" class="sas-unconfirmed" role="status">
         <text>{{ t.myDevices.inventoryActivationUnconfirmed }}</text>
       </view>
@@ -82,6 +84,7 @@ import { navTo } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useApp } from "@/store/app";
+import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -112,7 +115,11 @@ const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableIn
 const unconfirmedDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && requiresActivationConfirmation(d)));
 const activeCount = computed(() => app.activeSlotCount);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const slotsUsed = computed(() => activeCount.value + reservedSlots.value);
+const slotsUsed = computed(() => app.remoteSlotsUsed ?? (activeCount.value + reservedSlots.value));
+const slotsFull = computed(() => slotsUsed.value >= app.slotCap);
+const trialPresentation = useTrialPresentation();
+const capacityReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready"
+  && (app.remoteSlotsUsed !== null || trialPresentation.actionsReady.value && trialPresentation.reservedSlots.value !== null));
 
 const activateRowText = computed(() =>
   fmt(t.value.slotSheet.activateRow, { n: inactiveDevices.value.length }),
@@ -126,6 +133,10 @@ function hide() {
 const activationInFlight = ref(new Set<string>());
 
 async function onActivate(d: Device) {
+  if (!capacityReady.value) {
+    toast.warn(t.value.myDevices.inventoryStaleWarning);
+    return;
+  }
   if (requiresActivationConfirmation(d)) {
     toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
     return;

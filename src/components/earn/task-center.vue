@@ -103,8 +103,8 @@
         @keydown.enter.stop.prevent="openTaskReceipt(task)" @keydown.space.stop.prevent="openTaskReceipt(task)"
       >
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-        <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
-        <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-warning-ink)">+${{ formatAmount(task.reward) }}</text>
+        <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.type }}</text>
+        <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-warning-ink)">{{ formatTaskReward(task, true) }}<text v-if="task.settlementStatus && task.settlementStatus !== 'NONE'" class="block">{{ computeCopy.statuses[task.settlementStatus] }}</text></text>
         <text class="text-right shrink-0" style="font-size: 12px; color: var(--v5-ink-3); width: 48px">{{ shortTime(task.completedAt) }}</text>
         <view v-if="canOpenTaskReceipt(task)" class="shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" :title="task.receiptNo ?? task.id" @click.stop="openTaskReceipt(task)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>
@@ -112,11 +112,21 @@
         <view v-else class="shrink-0" style="width: 22px; height: 22px" />
       </view>
     </view>
+    <view v-if="selectedTask" style="padding:12px;background:var(--v5-surface-2);border-radius:12px" data-compute-task-detail="true">
+      <view class="flex items-center justify-between"><text>{{ computeCopy.details }} #{{ selectedTask.id }}</text><view role="button" tabindex="0" @click="selectedTask = null" @keydown.enter.prevent="selectedTask = null" @keydown.space.prevent="selectedTask = null">{{ computeCopy.close }}</view></view>
+      <TaskV2Status :task="selectedTask" />
+      <view v-if="selectedTask.receiptNo && selectedTask.settlementStatus === 'POSTED'" role="button" tabindex="0" style="min-height:44px;display:flex;align-items:center" @click="openTaskReceipt(selectedTask, true)" @keydown.enter.prevent="openTaskReceipt(selectedTask, true)" @keydown.space.prevent="openTaskReceipt(selectedTask, true)">{{ computeCopy.receipt }} #{{ selectedTask.receiptNo }}</view>
+    </view>
+    <ComputeSettlements />
     <ReceiptModal :receipt="openReceipt" @close="openReceipt = null" />
   </view>
 </template>
 
 <script setup lang="ts">
+import TaskV2Status from "@/components/earn/task-v2-status.vue";
+import ComputeSettlements from "@/components/earn/compute-settlements.vue";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
+import { formatTaskReward } from "@/lib/task-reward-display";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
@@ -137,6 +147,8 @@ import { toast } from "@/store/ui";
 
 const app = useApp();
 const t = useT();
+const computeCopy = useComputeV2Copy();
+const selectedTask = ref<CompletedTask | null>(null);
 const relativeNow = ref(Date.now());
 let relativeTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => { relativeTimer = setInterval(() => { relativeNow.value = Date.now(); }, 30000); });
@@ -151,6 +163,7 @@ onShow(() => {
 });
 onHide(() => {
   receiptPageVisible = false;
+  selectedTask.value = null;
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
 });
@@ -175,10 +188,11 @@ function receiptFor(id: string): Receipt | undefined {
 }
 
 function canOpenTaskReceipt(task: CompletedTask): boolean {
-  return remoteApiEnabled ? !!task.receiptNo : !!receiptFor(task.id);
+  return remoteApiEnabled ? !!task.protocolVersion || !!task.receiptNo : !!receiptFor(task.id);
 }
 
-async function openTaskReceipt(task: CompletedTask): Promise<void> {
+async function openTaskReceipt(task: CompletedTask, receiptOnly = false): Promise<void> {
+  if (task.protocolVersion && !receiptOnly) { selectedTask.value = task; return; }
   if (!remoteApiEnabled) {
     openReceipt.value = receiptFor(task.id) ?? null;
     return;
@@ -205,11 +219,13 @@ async function openTaskReceipt(task: CompletedTask): Promise<void> {
 
 watch(() => app.accountBindingEpoch, () => {
   receiptRequestEpoch += 1;
+  selectedTask.value = null;
   openReceipt.value = null;
 });
 
 onUnmounted(() => {
   receiptPageVisible = false;
+  selectedTask.value = null;
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
   if (relativeTimer) clearInterval(relativeTimer);
@@ -224,6 +240,7 @@ function workloadLabel(category: TaskCategory): string {
 // History list: completed tasks across all devices, most-recent first (last 20).
 const allRecent = computed(() =>
   app.visibleDevices
+    .filter(device => device.kind !== "phone")
     .flatMap((d) => d.recentTasks)
     .sort((a, b) => b.completedAt - a.completedAt)
     .slice(0, 20),
@@ -236,11 +253,11 @@ const maxVram = computed(() => app.visibleDevices.reduce(
   (m, d) => Math.max(m, d.kind === "cloud-share" ? CLOUD_SHARE_ROUTING_VRAM_GB : d.vramTotal),
   0,
 ));
-const lockedTeasers = computed(() => earnConfig.lockedTeasers(maxVram.value, 3));
+const lockedTeasers = computed(() => app.remoteComputeProtocolVersion === 3 ? [] : earnConfig.lockedTeasers(maxVram.value, 3));
 watch(maxVram, (value) => { void earnConfig.refreshRoute(value); }, { immediate: true });
 
 const historyHintText = computed(() =>
-  t.value.taskHistory.historyHint.replace("{n}", String(allRecent.value.length)),
+  computeCopy.value.historyHint.replace("{n}", String(allRecent.value.length)),
 );
 
 // Divider above History only when the Upgrade Unlocks block precedes it.

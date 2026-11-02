@@ -3,10 +3,7 @@
   <view class="earn-fleet-list mx-4">
     <view class="nx-home-glass-panel" aria-hidden="true" />
     <view class="earn-fleet-content">
-      <view v-if="trialSlot" class="earn-trial-reservation">
-        <text>{{ t.trial.slotTag }}</text>
-        <text class="font-mono-tabular">1 / {{ app.slotCap }}</text>
-      </view>
+      <TrialDeviceRow variant="earn" />
       <slot />
       <view class="earn-add-wrap">
         <view class="earn-add-device nx-home-pill" role="button" tabindex="0"
@@ -20,6 +17,7 @@
 </template>
 
 <script setup lang="ts">
+import TrialDeviceRow from "@/components/trial-device-row.vue";
 import { computed, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";

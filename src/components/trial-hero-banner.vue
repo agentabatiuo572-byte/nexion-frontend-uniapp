@@ -1,6 +1,6 @@
 <!-- Trial eligibility and claim flow remain owned by the existing trial stores. -->
 <template>
-  <view v-if="visible" class="nx-trial-hero nx-home-glass-item" role="button" :tabindex="canClaim ? 0 : -1" :aria-disabled="canClaim ? 'false' : 'true'"
+  <view v-if="visible" class="nx-trial-hero nx-home-glass-item" role="button" :tabindex="(hasLifecycle || capacityFull || canClaim) ? 0 : -1" :aria-disabled="(hasLifecycle || capacityFull || canClaim) ? 'false' : 'true'"
     :aria-busy="trial.authorityStatus === 'loading'" :aria-label="t.trial.heroDeviceName + ' · ' + claimCtaText"
     @click="onClick"  @keydown.enter.prevent="onClick" @keydown.space.prevent="onClick">
     <view class="nx-home-glass-panel" aria-hidden="true" />
@@ -8,13 +8,15 @@
     <view class="trial-art nx-home-art-float" aria-hidden="true"><image v-if="trialImage" class="nx-home-art" :src="trialImage" mode="aspectFit" /></view>
     <view class="trial-meta">
       <text class="trial-badge">{{ t.trial.heroBadge }}</text>
-      <text class="trial-title">{{ t.trial.heroDeviceName }}</text>
-      <text class="trial-tagline">{{ taglineText }}</text>
+      <text class="trial-title">{{ trialView.deviceName.value ?? trialCfg.config.trialProductName }}</text>
+      <template v-if="hasLifecycle"><text class="trial-tagline">{{ trialView.status.value === 'active' ? lifecycleCopy.remainingLabel : trialView.status.value === 'grace' ? lifecycleCopy.creditUntilLabel : trialView.status.value === 'converted' ? lifecycleCopy.convertedBody : lifecycleCopy.endedBody }}</text><text v-if="trialView.active.value" class="trial-value font-mono-tabular">{{ trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.longRemaining) }}</text><text v-if="trialView.active.value" class="trial-estimate-label">{{ lifecycleCopy.creditLabel }} · {{ trialView.offsetUSD.value === null ? '—' : `$${formatAmount(trialView.offsetUSD.value)}` }}</text></template>
+      <template v-else><text class="trial-tagline">{{ taglineText }}</text>
       <view class="trial-estimate">
         <text class="trial-estimate-label">{{ earnLabelText }}</text>
         <text class="trial-value font-mono-tabular">${{ est }}</text>
       </view>
       <text class="trial-estimate-label">{{ creditBasisText }}</text>
+      </template>
       <view class="trial-cta nx-home-pill" aria-hidden="true">
         <text>{{ claimCtaText }}</text>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7" /></svg>
@@ -28,6 +30,9 @@
 </template>
 
 <script setup lang="ts">
+import { useTrialPresentation } from "@/composables/use-trial-presentation";
+import { useTrialLifecycleCopy, formatTrialRemaining } from "@/i18n/trial-lifecycle";
+import { navTo } from "@/lib/route";
 import { formatAmount } from "@/lib/amount-display";
 import { getProductMedia } from "@/lib/product-media";
 import { computed, ref, watch, type CSSProperties } from "vue";
@@ -42,6 +47,10 @@ const trial = useFreeTrial();
 const trialCfg = useTrialConfig();
 const claimSheet = useTrialClaimSheet();
 const t = useT();
+const trialView = useTrialPresentation();
+const lifecycleCopy = useTrialLifecycleCopy();
+const hasLifecycle = computed(() => trialView.status.value !== null && trialView.status.value !== "none");
+const capacityFull = computed(() => eligibility.value.reason === "capacity-full");
 
 // Entrance plays once the coupon scrolls into view (not on mount).
 const { elRef, inView } = useScrollGrowProgress({ threshold: 0.25 });
@@ -55,7 +64,7 @@ const canClaim = computed(() => trial.status === "none"
   && (eligibility.value.ok || trial.confirmedOfferState() === "claimable"));
 const trialImage = computed(() => getProductMedia(resolveTrialCheckoutProductId(trialCfg.config?.trialProductId))?.src);
 const productUnavailable = computed(() => eligibility.value.reason === "product-unavailable");
-const visible = computed(() => trial.status === "none"
+const visible = computed(() => hasLifecycle.value || capacityFull.value || trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0
   && trial.showHeroPromo());
 
@@ -78,6 +87,8 @@ const availabilityText = computed(() => productUnavailable.value
 // not swap the label and re-lay-out the ticket while the confirmed offer is
 // still the last thing the server told us. onClick stays gated by canClaim.
 const claimCtaText = computed(() => {
+  if (hasLifecycle.value) return lifecycleCopy.value.viewTrial;
+  if (capacityFull.value) return lifecycleCopy.value.capacityFull;
   switch (trial.confirmedOfferState()) {
     case "claimable": return t.value.trial.heroClaimCta;
     case "error": return t.value.trial.entryUnavailable;
@@ -159,6 +170,8 @@ const shimmerStyle = computed<CSSProperties>(() => ({
 }));
 
 function onClick() {
+  if (hasLifecycle.value) { navTo("/pages/me/trial"); return; }
+  if (capacityFull.value) { navTo("/pages/me/devices"); return; }
   if (!canClaim.value) return;
   claimSheet.show();
 }

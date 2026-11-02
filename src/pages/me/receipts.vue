@@ -63,10 +63,10 @@
             >
               <view class="flex-1 min-w-0">
                 <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
-                <text class="block truncate" :style="rowSubStyle">{{ t.receipt.computeTitle }} · {{ r.model }}</text>
+                <text class="block truncate" :style="rowSubStyle">{{ r.executionMode === 'SIMULATED' || r.executionMode === 'RULE_CYCLE' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}` }}</text>
               </view>
               <view class="text-right shrink-0" style="margin-left: 8px">
-                <text class="block tabular-nums" :style="remoteAmountStyle">+${{ formatAmount(r.rewardUsdt) }}</text>
+                <text class="block tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 6)} UVT` : `+$${formatAmount(r.rewardUsdt, 6)}` }}</text>
                 <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
@@ -172,6 +172,7 @@
 </template>
 
 <script setup lang="ts">
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
@@ -204,6 +205,7 @@ const REMOTE_RECEIPT_KINDS: RemoteReceiptKind[] = ["compute", "deposit"];
 const PAGE_SIZE = 10;
 
 const t = useT();
+const computeCopy = useComputeV2Copy();
 const app = useApp();
 const depositsStore = useDeposits();
 const receiptsPageFence = createReceiptsPageRequestFence(
@@ -248,13 +250,13 @@ const remoteReceiptHasMore = computed(() => remoteReceiptKind.value === "compute
 const showRemoteReceiptInitialError = computed(() => remoteReceiptInitialStatus.value === "error" && remoteReceiptItems.value.length === 0);
 const showRemoteReceiptInlineError = computed(() => remoteReceiptMoreStatus.value === "error" && remoteReceiptItems.value.length > 0);
 const remoteReceiptTitle = computed(() => remoteReceiptKind.value === "compute"
-  ? t.value.receipt.computeTitle
+  ? computeCopy.value.taskReceipt
   : t.value.receipt.depositTitle);
 const remoteReceiptEmptyTitle = computed(() => remoteReceiptKind.value === "compute"
-  ? t.value.receipt.computeEmptyTitle
+  ? computeCopy.value.emptyReceipts
   : t.value.receipt.depositEmptyTitle);
 const remoteReceiptEmptyHint = computed(() => remoteReceiptKind.value === "compute"
-  ? t.value.receipt.computeEmptyHint
+  ? computeCopy.value.receiptsHint
   : t.value.receipt.depositEmptyHint);
 const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
@@ -541,7 +543,7 @@ function tabLabel(c: Tab): string {
 }
 
 function remoteReceiptKindLabel(kind: RemoteReceiptKind): string {
-  return kind === "compute" ? t.value.receipt.computeTab : t.value.receipt.depositTab;
+  return kind === "compute" ? computeCopy.value.taskReceipt : t.value.receipt.depositTab;
 }
 
 async function handleClearAll() {

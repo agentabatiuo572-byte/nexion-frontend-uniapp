@@ -61,28 +61,7 @@
         </view>
 
 
-        <!-- Trial device — UVELBox S1 on free trial (shadow, not a real device).
-             Cancel-trial lives here in device management. -->
-        <view v-if="trialActive" class="nx-glass-card overflow-hidden" :style="trialCardStyle">
-          <view class="flex items-center" style="gap: 12px; padding: 12px 16px">
-            <view class="grid place-items-center shrink-0" :style="trialIconBoxStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <view class="flex flex-wrap items-center" style="gap: 6px">
-                <text class="truncate" :style="trialNameStyle">UVELBox S1</text>
-                <text :style="trialBadgeStyle">{{ trialLabels.badge }}</text>
-              </view>
-              <text class="block" :style="trialSubStyle">{{ trial.status === 'grace' ? t.trial.ghostRibbonGrace : t.trial.deviceRowSub }}</text>
-            </view>
-          </view>
-          <!-- Spec ④: user cancel exists on the active edge only — grace has
-               nothing running to cancel (production already stopped). -->
-          <view v-if="trial.status === 'active'" class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" role="button" tabindex="0" @click="handleCancelTrial"  @keydown.enter.prevent="handleCancelTrial" @keydown.space.prevent="handleCancelTrial">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></svg>
-            <text :style="trialCancelLabelStyle">{{ t.trial.cancelCta }}</text>
-          </view>
-        </view>
+        <TrialDeviceRow variant="inventory" :show-cancel="true" @cancel="handleCancelTrial" />
 
         <!-- Active fleet -->
         <view v-if="activeDevices.length > 0" style="margin-top: 12px">
@@ -101,7 +80,7 @@
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
-              :action-disabled="remoteApiEnabled && !!d.pendingDeactivate"
+              :action-disabled="remoteApiEnabled && !!d.pendingDeactivate && !usesSimulatedStop(d)"
               v-bind="tradeinStrip(d)"
               @toggle="handleDeactivate(d)"
               @tradein="handleTradein(d)"
@@ -124,6 +103,7 @@
               :active="false"
               :show-action="canControlDevice(d)"
               :disabled="slotsFull && occupiesDeviceSlot(d.kind)"
+              :action-disabled="!capacityReady"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
@@ -195,6 +175,9 @@
 </template>
 
 <script setup lang="ts">
+import { useComputeV2Copy } from "@/i18n/compute-v2";
+import TrialDeviceRow from "@/components/trial-device-row.vue";
+import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { formatAmount } from "@/lib/amount-display";
 import { navReset, navTo } from "@/lib/route";
 import { computed, ref, watch, type CSSProperties } from "vue";
@@ -219,7 +202,7 @@ import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase"
 import { useProductPhase } from "@/composables/use-product-phase";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
-import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import { isSettledRejection } from "@/api/errors";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
@@ -229,7 +212,9 @@ import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { isActivatableInventoryDevice, occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 
 const t = useT();
+const computeCopy = useComputeV2Copy();
 const app = useApp();
+const trialPresentation = useTrialPresentation();
 const trial = useFreeTrial();
 const deferredCommandInFlight = ref<Set<string>>(new Set());
 
@@ -249,6 +234,10 @@ function retryInventory() {
   void trial.poll(Date.now());
 }
 
+function usesSimulatedStop(device: Device): boolean {
+  return device.currentTask ? device.currentTask.executionMode === "SIMULATED" : app.remoteComputeProtocolVersion === 3 && !device.recoveryPending;
+}
+
 function deferredCommandSlot(device: Device, accountKey: string, version: number): string {
   return `${accountKey.trim().toLowerCase()}:deactivate-after-task:${device.id}:${version}`;
 }
@@ -260,7 +249,7 @@ function deferredCommandBusy(device: Device): boolean {
 
 // Typed against TrialStatus so a future enum change fails tsc here instead of
 // silently widening to string[] (FEAT-TRIAL02 audit trap).
-const trialActive = computed(() => trial.status === "active" || trial.status === "grace");
+const trialActive = computed(() => trialPresentation.active.value);
 const trialLabels = computed(() => trialCardLabels(trial.status, t.value.trial));
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
@@ -271,8 +260,10 @@ const inventoryEmpty = computed(() => activeDevices.value.length === 0
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = computed(() => (trialActive.value ? 1 : 0));
-const slotsUsed = computed(() => app.activeSlotCount + trialReserved.value);
+const slotsUsed = computed(() => app.remoteSlotsUsed ?? (app.activeSlotCount + trialReserved.value));
 const slotsFull = computed(() => slotsUsed.value >= app.slotCap);
+const capacityReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready"
+  && (app.remoteSlotsUsed !== null || trialPresentation.actionsReady.value && trialPresentation.reservedSlots.value !== null));
 
 const slotMeterLabel = computed(() =>
   fmt(t.value.myDevices.inventorySlotMeter, { active: slotsUsed.value, max: app.slotCap }),
@@ -374,6 +365,10 @@ function handleTradein(d: Device) {
 
 async function handleActivate(d: Device) {
   if (!canControlDevice(d)) return;
+  if (!capacityReady.value) {
+    toast.warn(t.value.myDevices.inventoryStaleWarning);
+    return;
+  }
   if (requiresActivationConfirmation(d)) {
     toast.warn(t.value.myDevices.inventoryActivationUnconfirmed);
     return;
@@ -399,7 +394,7 @@ async function handleActivate(d: Device) {
 async function handleDeactivate(d: Device) {
   if (!canControlDevice(d)) return;
   if (remoteApiEnabled && deferredCommandBusy(d)) return;
-  if (remoteApiEnabled && d.pendingDeactivate) {
+  if (remoteApiEnabled && d.pendingDeactivate && !usesSimulatedStop(d)) {
     toast.info(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
     return;
   }
@@ -466,6 +461,7 @@ async function runRemoteDeferredCommand(d: Device): Promise<boolean> {
     const result = await deviceE3Api.deactivateAfterTask(Number(d.id), version, key);
     if (result.status === "ACTIVE") throw new Error("DEVICE_DEFERRED_RESPONSE_INVALID");
     if (!current()) return false;
+    app.invalidateRemoteTaskAssignments();
     if (!await app.refreshRemoteFleet() || !confirmed(result.status)) {
       throw new Error("DEVICE_DEFERRED_DEACTIVATION_NOT_CONFIRMED");
     }
@@ -524,7 +520,10 @@ async function handleCancelTrial() {
   });
   if (ok) {
     const result = await trial.cancel();
-    if (result?.ok) toast.info(t.value.trial.toastCancelled);
+    if (result?.ok) {
+      toast.info(t.value.trial.toastCancelled);
+      if (remoteApiEnabled) void app.refreshRemoteFleet();
+    }
     else toast.warn(t.value.trial.cancelError);
   }
 }
@@ -544,13 +543,23 @@ async function runRemoteDeviceCommand(d: Device, operation: "activate" | "deacti
     const current = app.devices.find((entry) => entry.id === d.id);
     return Boolean(current) && (current!.activatedAt !== null) === expectedActive;
   };
+  let simulatedClosing = false;
   try {
     if (operation === "activate") {
       await deviceE3Api.activate(Number(d.id), version, app.slotCap, key);
+    } else if (usesSimulatedStop(d)) {
+      const result = await taskAssignmentApi.stopSimulatedTask(Number(d.id), false, version);
+      simulatedClosing = result.simulationState === "CLOSING";
     } else {
       await deviceE3Api.deactivate(Number(d.id), version, key);
     }
+    app.invalidateRemoteTaskAssignments();
     await app.refreshRemoteFleet();
+    if (simulatedClosing) {
+      finishDeviceCommand(accountKey, operation, d.id, version);
+      if (accountKey === app.accountKey) toast.info(computeCopy.value.stopping);
+      return true;
+    }
     if (!confirmed()) throw new Error(operation === "activate"
       ? "DEVICE_ACTIVATION_NOT_CONFIRMED"
       : "DEVICE_DEACTIVATION_NOT_CONFIRMED");

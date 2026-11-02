@@ -1846,7 +1846,7 @@ catalog: {
     activatedLabel: "{n} đã kích hoạt",
     emptySlots: "còn {n} khe trống",
     inventoryTitle: "Kho thiết bị",
-    inventorySlotMeter: "{active}/{max} khe đang chạy",
+    inventorySlotMeter: "Đã dùng {active}/{max} vị trí",
     inventorySlotsLabel: "Khe tính toán",
     inventorySectionActive: "Đang chạy",
     inventorySectionInventory: "Trong kho",
