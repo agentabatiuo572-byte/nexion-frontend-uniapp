@@ -14,7 +14,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || external.handles(path);
   function handle(url, request) {
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
-    const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
+    const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
     if (paymentCommand) {
       const result = external.paymentCommand(paymentCommand[1], decodeURIComponent(paymentCommand[2]));
       if (result) return ok(result);
