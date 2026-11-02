@@ -21,7 +21,7 @@ export function trialDemo(url,locale,state,request,capacityFull){
   // P-59 / backend B13-B14: the trial discount caps at $50 and trial earnings offset without a cap (empty = none).
   cfg.discountCapUSD='50';cfg.trialOffsetCapUSD='';
   const pricing=state.trialQuoteState||'default';
-  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='precision'?'432.123456':pricing==='excess-offset'?'25':'1000',shadowDailyUSD:'10',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':''});
+  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='precision'?'432.123456':pricing==='half-cent'?'432.135':pricing==='precision-repriced'?'432.123457':pricing==='excess-offset'?'25':'1000',shadowDailyUSD:'10',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':''});
   const duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
   const scenario=mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
   if(!state.trialRow){
@@ -107,9 +107,11 @@ export function trialDemo(url,locale,state,request,capacityFull){
     if(!['ACTIVE','GRACE'].includes(row.state))refuse('TRIAL_NOT_CONVERTIBLE');
     const quote=current.quote,amount=quote.amountUsdt;
     if(body.productNo!==cfg.trialProductId)refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');
-    // Accept six decimals here to exercise Lite's exact payment payload. Backend origin/test
-    // still rejects expectedAmountUsdt scale > 2 (TRIAL_AMOUNT_INVALID); that server gap is not simulated.
-    if(body.expectedAmountUsdt==null||body.expectedAmountUsdt<amount)refuse('TRIAL_AMOUNT_MISMATCH');
+    // convert confirms cents, while the quote, debit and receipt retain six decimals.
+    const expected=body.expectedAmountUsdt;
+    if(typeof expected!=='number'||!Number.isFinite(expected)||expected<0||expected>1000000
+      ||!/^\d+(?:\.\d{1,2})?$/.test(String(expected)))refuse('TRIAL_AMOUNT_INVALID');
+    if((units(amount)+5000n)/10000n>units(expected,2))refuse('TRIAL_AMOUNT_MISMATCH');
     if(body.quoteVersion&&body.quoteVersion!==quote.quoteVersion)refuse('TRIAL_QUOTE_CHANGED');
     state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
     if((state.walletBalance??52800.64)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
