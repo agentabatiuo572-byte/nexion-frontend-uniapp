@@ -44,7 +44,7 @@ export interface CurrentTask extends TaskExecutionMetadata {
   totalSec: number;
   startedAt: number | null;   // epoch ms; queued v2 tasks have not started
   reward: number;      // USDT
-  rewardAsset?: "USDT" | "NEX";
+  rewardAsset?: "USDT" | "UVT";
   rewardAmount?: string;
   /** Server status is present only for the remote authority projection. */
   status?: import("@/api/task-assignment-api").CanonicalTaskAssignment["status"];

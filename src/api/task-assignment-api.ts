@@ -19,7 +19,7 @@ export interface CanonicalTaskAssignment extends TaskExecutionMetadata {
   client: string;
   status: "CLAIMED" | "QUEUED" | "RUNNING" | "VERIFYING" | "RECOVERING" | "PAUSED" | "COMPLETED" | "FAILED" | "CANCELLED";
   rewardUsdt: number;
-  rewardAsset?: "USDT" | "NEX";
+  rewardAsset?: "USDT" | "UVT";
   rewardAmount?: string;
   requiredSeconds: number;
   startedAt: number | null;
@@ -247,7 +247,8 @@ function task(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTaskA
     || (completableAt !== null && startedAt !== null && completableAt < startedAt)) return invalid();
   const completedAt = timestamp(source.completedAt, true);
   if (status === "COMPLETED" && completedAt === null) return invalid();
-  if (source.executionMode === "SIMULATED" && source.rewardAsset !== "USDT" && source.rewardAsset !== "NEX") return invalid();
+  const rewardAsset = source.rewardAsset === "NEX" ? "UVT" : source.rewardAsset;
+  if (source.executionMode === "SIMULATED" && rewardAsset !== "USDT" && rewardAsset !== "UVT") return invalid();
   return {
     taskNo: text(source.taskNo),
     deviceId: integer(source.deviceId, 1),
@@ -258,7 +259,7 @@ function task(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTaskA
     client: text(source.executionMode === "SIMULATED" ? source.client ?? "" : source.client, source.executionMode === "SIMULATED"),
     status: status as CanonicalTaskAssignment["status"],
     rewardUsdt: decimal(source.rewardUsdt),
-    ...(source.executionMode === "SIMULATED" ? { rewardAsset: source.rewardAsset as "USDT" | "NEX", rewardAmount: exactAmount(source.rewardAmount) } : {}),
+    ...(source.executionMode === "SIMULATED" ? { rewardAsset: rewardAsset as "USDT" | "UVT", rewardAmount: exactAmount(source.rewardAmount) } : {}),
     requiredSeconds: integer(source.requiredSeconds, 1),
     startedAt,
     pausedAt: timestamp(source.pausedAt, true),
