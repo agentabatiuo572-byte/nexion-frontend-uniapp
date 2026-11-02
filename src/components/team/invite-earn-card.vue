@@ -79,7 +79,7 @@ const rewardReady=computed(()=>!!rewards.snapshot && !rewards.error && !rewards.
 const rewardEnabled=computed(()=>rewards.snapshot?.rewardEnabled===true);
 const nexReward=computed(()=>rewards.snapshot?.inviterRewardNex ?? 0);
 const rewardAmount=computed(()=>formatAmount(nexReward.value).replace(/\.00$/, ''));
-const referralCode=computed(()=>remoteApiEnabled ? !rewards.loading && !rewards.error ? rewards.snapshot?.referralCode ?? '' : '' : app.user.referralCode);
+const referralCode=computed(()=>remoteApiEnabled ? rewards.referralCode : app.user.referralCode);
 const rewardCaption=computed(()=>rewards.error ? 'error' : !rewards.loading && rewards.snapshot && !referralCode.value ? 'unavailable'
   : rewardRead.value==='disabled' ? 'disabled' : 'qualified');
 const needsRetry=computed(()=>!rewards.loading && (!!rewards.error || !referralCode.value));

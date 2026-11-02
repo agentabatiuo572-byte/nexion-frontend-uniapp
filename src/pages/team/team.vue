@@ -557,9 +557,9 @@ onLoad((query) => {
 onShow(() => { invitePageVisible.value = true; });
 onHide(() => { invitePageVisible.value = false; pendingShareIntent.value = false; });
 watch(() => app.accountKey, () => { pendingShareIntent.value = false; });
-watch([pendingShareIntent, invitePageVisible, inviteCard, () => referralRewards.snapshot?.referralCode, () => referralRewards.loading], () => {
-  if (!pendingShareIntent.value || !invitePageVisible.value || !inviteCard.value || referralRewards.loading) return;
-  if (remoteApiEnabled && !referralRewards.snapshot?.referralCode) return;
+watch([pendingShareIntent, invitePageVisible, inviteCard, () => referralRewards.referralCode], () => {
+  if (!pendingShareIntent.value || !invitePageVisible.value || !inviteCard.value) return;
+  if (remoteApiEnabled && !referralRewards.referralCode) return;
   pendingShareIntent.value = false;
   inviteCard.value.openShare();
 }, { flush: 'post' });
