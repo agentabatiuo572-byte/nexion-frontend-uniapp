@@ -45,7 +45,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
       </view>
       <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.addrLoadFailed }}</text></view>
-      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="load()">
+      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="refresh()">
         <text style="font: 600 13px/20px var(--font-v5); color: var(--v5-ink)">{{ t.ui.retry }}</text>
       </view>
     </view>
@@ -53,7 +53,7 @@
     <template v-else>
       <view v-if="addressRefreshFailed" class="nx-dep-background-error" role="status">
         <text :style="noteStyle">{{ t.topupChrome.addrLoadFailed }}</text>
-        <view class="nx-dep-background-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="load(true)"><text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text></view>
+        <view class="nx-dep-background-retry grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="refresh(true)"><text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text></view>
       </view>
       <!-- ── 专属地址票据:QR 白卡 + 撕线 + 地址井 + 三项事实 ── -->
       <view v-if="activeNet" class="nx-dep-ticket">
@@ -120,7 +120,7 @@
 
         <view v-if="fundsServerEnabled && chainHistoryFailed" style="margin-top: 8px">
           <text :style="noteStyle">{{ t.topupChrome.depositOpFailedNote }}</text>
-          <view class="nx-dep-chain-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="load()"><text>{{ t.ui.retry }}</text></view>
+          <view class="nx-dep-chain-history-retry nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-80" role="button" tabindex="0" @click="refresh()"><text>{{ t.ui.retry }}</text></view>
         </view>
         <view v-else-if="fundsServerEnabled && !chainHistoryLoaded" class="nx-dep-chain-history-loading nx-dep-sk" role="status" :aria-label="t.bankWithdrawal.loading" style="height: 56px; margin-top: 8px" />
 
@@ -222,6 +222,8 @@ const CONFIRM_DELAY_NOTE_MS = 30 * 60 * 1000;
 const net = ref<ChainDepositChannel>(fundsServerEnabled ? "usdt-bep20" : "usdt-trc20");
 // Networks the server reported as not configured or turned off are not shown.
 // The address read is the only per-network signal, so a network is known only once it has been read.
+// The list is forgotten when the page shows again or the user retries, so a network turned back on returns;
+// only the selected network is read (reading allocates an address).
 const offNets = ref<ChainDepositChannel[]>([]);
 const visibleNets = computed(() => NETWORKS.filter((nw) => fundsServerEnabled ? !offNets.value.includes(nw.id) : dep.chainChannelEnabled[nw.id] === true));
 
@@ -256,6 +258,10 @@ const copied = ref(false);
 const minDeposit = ref<string | number | null>(fundsServerEnabled ? null : MIN_DEPOSIT_USDT);
 const feeUsdt = ref<string | number | null>(fundsServerEnabled ? null : 0);
 const confirmations = ref(CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"]);
+function refresh(background = false): void {
+  offNets.value = [];
+  load(background);
+}
 function refreshBankHistory(): void {
   if (fundsServerEnabled && remoteSessionReady.value && dep.currentAccountKey() === app.accountKey
       && dep.remoteReceiptInitialStatus !== "loading") void dep.refreshRemoteVietQrDeposits();
@@ -383,7 +389,7 @@ onMounted(() => {
     if (phase.value !== "loading" && Date.now() >= nextPollAt) load(true);
   }, 1_000);
 });
-onShow(() => { pageVisible = true; if (fundsServerEnabled) load(true); });
+onShow(() => { pageVisible = true; if (fundsServerEnabled) refresh(true); });
 onHide(() => { pageVisible = false; loadGeneration++; requestRunning = false; });
 onUnmounted(() => {
   pageVisible = false;

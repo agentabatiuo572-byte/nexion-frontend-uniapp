@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, type CSSProperties, computed, watch } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import { takeNavigationQuery, navTo } from "@/lib/route";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useApp } from "@/store/app";
@@ -71,9 +71,12 @@ import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import { useT } from "@/i18n/use-t";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
 import { useFx } from "@/store/fx";
+import { useAuth } from "@/store/auth";
+import { binarySessionReady } from "@/lib/binary-session-ready";
+import { findResumablePaymentIntent } from "@/lib/hosted-payment";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
@@ -130,8 +133,33 @@ const t = useT();
 const locale = useLocaleStore();
 const dep = useDeposits();
 const fx = useFx();
-// An unconfigured bank channel is not shown; until its config arrives the segment stays.
-const bankHidden = computed(() => remoteApiEnabled ? fx.configReady && !fx.vietQrEnabled : !dep.bankRailAvailable);
+const auth = useAuth();
+const sessionReady = computed(() => {
+  void app.accountBindingEpoch;
+  return binarySessionReady({
+    remote: remoteApiEnabled,
+    authenticated: auth.isAuthenticated,
+    accountId: auth.accountId,
+    appAccountKey: app.accountKey,
+    sessionUserId: sessionVault.read()?.user.userId ?? null,
+  });
+});
+// The page reads the bank channel config itself, so a channel turned back on (or another account) shows again.
+watch([sessionReady, () => app.accountKey, () => app.accountBindingEpoch], ([ready]) => { if (ready) void fx.load(); }, { immediate: true });
+onShow(() => { if (sessionReady.value) void fx.load(); });
+// Only hide the bank channel once this account's bank orders are read and none can be resumed;
+// until then (config or orders still loading) the segment stays.
+// Latched per account binding: later background refreshes briefly report "loading" and must not bring the segment back.
+// Sync flush: a queued refresh can turn "ready" back into "loading" in the same tick.
+const bankOrdersReadFor = ref("");
+const accountBinding = computed(() => `${app.accountKey}:${app.accountBindingEpoch}`);
+watch([() => dep.remoteReceiptInitialStatus, accountBinding], ([status]) => {
+  if (status === "ready" && dep.currentAccountKey() === app.accountKey) bankOrdersReadFor.value = accountBinding.value;
+}, { immediate: true, flush: "sync" });
+const bankOrdersRead = computed(() => bankOrdersReadFor.value === accountBinding.value);
+const bankHidden = computed(() => remoteApiEnabled
+  ? fx.configReady && !fx.vietQrEnabled && bankOrdersRead.value && !findResumablePaymentIntent(dep.intents)
+  : !dep.bankRailAvailable);
 const visibleSegments = computed(() => bankHidden.value ? segments.filter((item) => item.id !== "bank") : segments);
 // The bank pane owns the create flow; the page only renders its action in the fixed bottom bar.
 const bankPane = ref<InstanceType<typeof DepositBankPane> | null>(null);
