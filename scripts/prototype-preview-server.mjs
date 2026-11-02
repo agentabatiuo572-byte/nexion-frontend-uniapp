@@ -40,6 +40,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.authState)delete state.scopeCalls;
+        if(update.stakingOpenState){delete state.stakingAttempts;delete state.stakingStatusReads;}
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}
@@ -72,6 +73,17 @@ const server=http.createServer(async(req,res)=>{
       return sendJson(res,response.body,response.status);
     }
     if(/^\/(api|auth)\//.test(url.pathname)) {
+      // B12 handoff: this rejection precedes command recording and all money writes.
+      if(req.method==='POST'&&url.pathname==='/api/stakes'&&state.stakingOpenState!=='readonly') {
+        let raw='';for await(const chunk of req)raw+=chunk;
+        state.stakingAttempts??=[];state.stakingAttempts.push({key:req.headers['idempotency-key'],...JSON.parse(raw||'{}')});
+        if(state.stakingOpenState==='disclosure')return sendJson(res,{code:409,message:'RISK_DISCLOSURE_ACK_REQUIRED',data:null});
+        return sendJson(res,{code:503,message:'DEMO_STAKING_RESULT_UNKNOWN',data:null},503);
+      }
+      if(req.method==='GET'&&url.pathname==='/api/stakes/open-status'&&state.stakingOpenState!=='readonly') {
+        state.stakingStatusReads=(state.stakingStatusReads||0)+1;
+        return sendJson(res,{code:0,message:'OK',data:{stakingCommandProtocol:1,sourceEnvironment:'PRODUCTION',runId:'',status:'NOT_FOUND'}});
+      }
       if(checkoutFlow?.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
         const response=checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});

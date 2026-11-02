@@ -24,9 +24,9 @@ const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-export const demoDefaults = {scopeState:'normal',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {scopeState:'normal',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',stakingOpenState:'readonly',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
-  scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益']],
+  scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益'],['review','范围复核：SHARE / iPhone15 / 手机号任务']],
   ...authDemoOptions,
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
@@ -34,13 +34,14 @@ export const demoOptions = {
   messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['agent-switch','客服已切换提示（有名字/无名字）'],['read','会话全部已读']],
   machineImageState:[['normal','原活动机型'],['alternate','后台换机型（Pro 赠 S1）'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足']],
-  taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
+  taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全'],['lite-filtered','冻结组：网页已完成 / 手机未完成'],['web-complete','纯网页冻结组：全部完成']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
   raffleState:[['normal','正常开奖'],['small-usdt','微额 USDT 奖励'],['upcoming','1 分钟后开始'],['ending','1 分钟后截止'],['ended','已截止待开奖']],
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
   stakingState:[['enabled','正常开放'],['legacy','未下发开关（默认开放）'],['delisted','功能下架'],['error','质押读取失败（其他正常）']],
+  stakingOpenState:[['readonly','只读预览'],['disclosure','开仓拒绝风险确认（HTTP 200 / code 409）'],['unknown','开仓结果未知 / 状态 NOT_FOUND']],
   bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
   streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
@@ -172,6 +173,9 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
   if(pathname==='/auth/users/oauth/provider/linked')return ['GOOGLE'];
   if(state.scopeState==='mixed') products.push({...products[0],id:'phone-basic',name:localized(locale,'手机算力设备','Phone compute device','Thiết bị điện thoại'),price:99});
+  if(state.scopeState==='review') products.push(
+    {...products.find(p=>p.productType==='SHARE'),id:'mobile-cloud-share',name:'Mobile Cloud Share'},
+    {...products[0],id:'iphone15',name:'iPhone15',price:99});
   if(pathname==='/api/store/catalog') return {...authority,source:'nx_product',revision:null,products:empty?[]:products};
   if(pathname==='/api/product/phase') return {phase:'P2',source:'H1_GROWTH_RHYTHM',devOverrideAllowed:false};
   if(pathname==='/api/store/purchase-eligibility') return {...authority,runId:null,productNo:url.searchParams.get('productNo'),eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',policies:[{policy:'E1',eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',mode:'ALL',conditions:state.catalogState==='restricted'?[{kind:'rank',required:3,current:2,gap:1,met:false}]:[]},{policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]}],evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
@@ -305,6 +309,29 @@ export function demoFixture(url,locale,state,request) {
         {...sample,layer:'WEEKLY_T1',instanceKey:'WEEK:demo',questCode:'weekly_buy_phone',name:localized(locale,'购买手机','Buy a phone','Mua điện thoại'),actionRoute:'/pages/store/store'},
         {...sample,layer:'WEEKLY_T2',instanceKey:'WEEK:demo',questCode:'weekly_staking',name:localized(locale,'每周质押','Weekly staking','Staking hàng tuần'),actionRoute:'/pages/staking/staking'});
       data.dayOneRequiredTaskCount=data.quests.filter(q=>q.layer==='DAY_ONE').length;
+    }
+    if(state.scopeState==='review' && data.quests.length) {
+      const sample=data.quests[0];
+      data.quests.push(...[
+        ['bind_mobile','/pages/me/profile','绑定手机号','Bind mobile number','Liên kết số điện thoại'],
+        ['verify_phone','/pages/me/security','验证手机号','Verify phone number','Xác minh số điện thoại'],
+      ].map(([questCode,actionRoute,zh,en,vi])=>({...sample,questCode,actionRoute,name:localized(locale,zh,en,vi),layer:'WEEKLY_T2',instanceKey:'WEEK:demo',status:'PENDING',category:'identity'})));
+    }
+    if(state.taskState==='lite-filtered') {
+      const sample=data.quests[0];
+      data.quests=[
+        {...sample,questCode:'visit_store',name:localized(locale,'浏览商城','Browse the store','Xem cửa hàng'),actionRoute:'/pages/store/store',status:'COMPLETED'},
+        {...sample,questCode:'connect_phone',name:localized(locale,'连接手机','Connect a phone','Kết nối điện thoại'),actionRoute:'/pages/onboarding/connect',status:'PENDING'},
+      ];
+      data.dayOneRequiredTaskCount=2;data.dayOneSnapshotStatus='SNAPSHOT';
+    }
+    if(state.taskState==='web-complete') {
+      const sample=data.quests[0];
+      data.quests=[
+        {...sample,questCode:'bind_mobile',name:localized(locale,'绑定手机号','Bind mobile number','Liên kết số điện thoại'),actionRoute:'/pages/me/profile',status:'COMPLETED'},
+        {...sample,questCode:'visit_store',name:localized(locale,'浏览商城','Browse the store','Xem cửa hàng'),actionRoute:'/pages/store/store',status:'CLAIMABLE'},
+      ];
+      data.dayOneRequiredTaskCount=2;data.dayOneSnapshotStatus='SNAPSHOT';
     }
     data.promoBanner={bannerCode:'demo-weekly',baseReward:300,multiplier:1,countdownDays:5,countdownHours:0,targetDevice:'UVELBox Pro',targetDaily:22.4,status:'active'};
     return data;

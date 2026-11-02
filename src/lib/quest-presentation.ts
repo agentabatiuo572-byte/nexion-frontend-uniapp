@@ -8,6 +8,7 @@ import { platformDisplayText } from "./brand-copy";
 const APP_QUEST_ROUTES = new Set([
   "/pages/missions/missions",
   "/pages/me/profile",
+  "/pages/me/security",
   "/pages/me/wallet-cards-new",
   "/pages/me/wallet-topup",
   "/pages/me/wallet-exchange",

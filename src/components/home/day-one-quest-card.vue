@@ -31,11 +31,11 @@
       </view>
 
       <view style="margin-top: 10px">
-        <view ref="elRef" style="height: 6px; border-radius: 999px; overflow: hidden; background: var(--v5-surface-2); position: relative">
+        <view v-show="!questUnavailable" ref="elRef" style="height: 6px; border-radius: 999px; overflow: hidden; background: var(--v5-surface-2); position: relative">
           <view :style="barStyle" />
         </view>
         <view style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
-          <text v-if="questUnavailable" style="color: var(--v5-ink-4)">{{ unavailableLabel }}</text>
+          <text v-if="questUnavailable" role="status" style="color: var(--v5-ink-4)">{{ unavailableLabel }}</text>
           <template v-else>
             <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
             <text v-if="remoteApiEnabled" style="color: var(--v5-nex)">{{ claimState.empty ? t.home.dayOneNoActiveTasks : claimState.claimed ? t.home.dayOneRewardClaimed : claimState.unverified ? t.home.dayOneSnapshotUnverified : t.home.dayOneRewardUnclaimed }}</text>
@@ -45,7 +45,7 @@
       </view>
 
       <!-- 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 12+12 -->
-      <view v-if="expanded" style="margin-top: 24px; display: flex; flex-direction: column; gap: 4px">
+      <view v-if="expanded && !questUnavailable" style="margin-top: 24px; display: flex; flex-direction: column; gap: 4px">
         <view
           v-for="task in tasks"
           :key="task.id"
@@ -205,14 +205,15 @@ const fallbackTasks = computed<QuestTask[]>(() => [
   { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", eligible: true },
   { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
 ]);
+const dayOneRows = computed(() => quest.remoteQuests.filter((row) => row.layer === "DAY_ONE"));
 const remoteTasks = computed<QuestTask[]>(() => {
   const palette = [
     { color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
     { color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
     { color: "var(--v5-brand)", onColor: "var(--v5-on-brand)" },
   ];
-  return quest.remoteQuests
-    .filter((row) => row.layer === "DAY_ONE" && isLiteQuest(row)
+  return dayOneRows.value
+    .filter((row) => isLiteQuest(row)
       && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(row.actionRoute)))
     .map((row, index) => ({
       id: row.questCode,
@@ -225,10 +226,12 @@ const remoteTasks = computed<QuestTask[]>(() => {
       ...palette[index % palette.length],
     }));
 });
-const questUnavailable = computed(() => remoteApiEnabled && quest.remoteStatus !== "ready");
+const liteGroupUnavailable = computed(() => remoteApiEnabled && quest.remoteStatus === "ready"
+  && dayOneRows.value.length !== remoteTasks.value.length);
+const questUnavailable = computed(() => remoteApiEnabled && (quest.remoteStatus !== "ready" || liteGroupUnavailable.value));
 const questLoadError = computed(() => remoteApiEnabled && quest.remoteStatus === "error");
-const unavailableLabel = computed(() => questLoadError.value
-  ? t.value.home.dayOneUnavailable : t.value.home.dayOneLoading);
+const unavailableLabel = computed(() => liteGroupUnavailable.value ? t.value.home.dayOneLiteUnavailable
+  : questLoadError.value ? t.value.home.dayOneUnavailable : t.value.home.dayOneLoading);
 const tasks = computed<QuestTask[]>(() => selectHomeQuestRows(
   remoteApiEnabled,
   quest.remoteStatus === "ready",
@@ -268,7 +271,7 @@ function recoverObservation(task: QuestTask, retryOnly = false): void {
 const claimState = computed(() => dayOneClaimState(
   quest.remoteQuests, quest.dayOneRequiredTaskCount, quest.dayOneSnapshotStatus, nowTick.value * 1000,
 ));
-watch(() => [expanded.value, props.active, claimState.value.claimCode, claimState.value.empty, quest.dayOneClaiming,
+watch(() => [expanded.value, props.active, questUnavailable.value, unavailableLabel.value, claimState.value.claimCode, claimState.value.empty, quest.dayOneClaiming,
   quest.dayOneClaimError, tasks.value.length, t.value.home.dayOneClaimReward, t.value.home.dayOneClaimUnconfirmed,
   t.value.home.dayOneNoActiveTasks, t.value.home.dayOneFirstDayReward],
   () => emit("content-resize"), { flush: "post", immediate: true });
@@ -287,11 +290,12 @@ const taskCountText = computed(() => questUnavailable.value
   : fmt(t.value.home.dayOneTaskCount, { n: total.value }));
 const toggleLabel = computed(() => questLoadError.value
   ? t.value.home.dayOneRetryLoad
+  : liteGroupUnavailable.value ? t.value.home.dayOneUnavailable
   : questUnavailable.value ? t.value.home.dayOneLoading
   : expanded.value ? t.value.home.dayOneHideTasks : viewTasksText.value);
 const rewardText = computed(() => {
   if (!remoteApiEnabled) return formatAmount(mockReward);
-  if (quest.remoteStatus !== "ready") return "—";
+  if (questUnavailable.value) return "—";
   return quest.dayOneRewardNex > 0 ? formatAmount(quest.dayOneRewardNex) : "—";
 });
 const dayOneWindow = computed(() => quest.remoteQuests.find((row) => row.layer === "DAY_ONE") ?? null);

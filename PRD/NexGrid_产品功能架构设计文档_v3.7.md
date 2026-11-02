@@ -1080,7 +1080,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 
 #### 5.15.3 任务清单
 
-**Lite 当前规则（2026-11-03）**：正式模式读取服务器首次进入时冻结的任务组，不按下表在客户端重建任务或逐项发奖。显示时隐藏手机连接、校准、激活及购买任务；`stakingVisible=false` 时同时隐藏质押 / 复投任务。首页、任务页和周任务转换横幅一致过滤；服务端组数量与领取判定保持原样。下表仅为本地演示的旧默认清单，不代表线上发布条件。
+**Lite 当前规则（2026-11-03）**：正式模式读取服务器首次进入时冻结的任务组，不按下表在客户端重建任务或逐项发奖。显示时隐藏手机连接、校准、激活及购买任务；`stakingVisible=false` 时同时隐藏质押 / 复投任务。首页、任务页和周任务转换横幅一致过滤；服务端组数量与领取判定保持原样。若冻结组有成员因 Lite 范围或质押开关被过滤，整组显示“包含网页版不可用的任务，暂时无法在此完成或领取”，隐藏完成比例、进度条和领取入口，不把剩余任务展示成 1/1 或 100%。无删减的组仍按服务器原始快照展示和领取。下表仅为本地演示的旧默认清单，不代表线上发布条件。
 - 进度行:`{done} of {total} tasks` / 右侧累计 `+N NEX`(已完成任务的 rewardNex 之和)
 - progress bar(by completed/total)
 - 6 任务 row(纵向,固定顺序按 funnel 难度):
@@ -1425,7 +1425,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 H5 Lite 是唯一网页产品线。注册成功直接进入首页；登录、注册恢复、试用、充值及任务恢复均不进入 `/onboarding/connect` 或 `/onboarding/estimator`，两页不注册进 Lite 路由；旧 `entry-surfaces/index|signed|h5|white` 三端走查页也从 Lite 路由移除，不再通过旧链接展示手机算力或原生入口。首页保留通用 App 下载横幅，下载页保留 iOS / Android / 官网链接。
 
-Lite 不展示手机设备、激活 / 校准卡、手机收益方式、重新校准动作或扫码邀请入口；首页、Earn、设备仓库、详情和搜索只展示可在网页管理的设备。隐藏手机仍保留在服务器设备账本中并占用原槽位，不以可见卡片数重算容量。服务端任务以明确手机动作路由、任务码或中英越文标题识别并隐藏；商品及目标推荐以明确手机 SKU / 名称识别。首日任务的原始组条件、数量和奖励不改写，若服务器组仍要求隐藏任务，应由服务器调整发布。无法识别的运营自由文案需后台清理，不猜测不透明标识。公开法律文本及手机号身份、验证码功能保留。
+Lite 不展示手机设备、激活 / 校准卡、手机收益方式、重新校准动作或扫码邀请入口；首页、Earn、设备仓库、详情和搜索只展示可在网页管理的设备。隐藏手机仍保留在服务器设备账本中并占用原槽位，不以可见卡片数重算容量。服务端任务以明确手机动作路由、任务码或中英越文标题识别并隐藏；账号手机号任务先按稳定代码（如 `bind_mobile` / `bind_phone` / `verify_phone`）或资料 / 安全页动作路由豁免，不依赖标题翻译判断。商品优先采用结构化 `productType`：`SHARE` 始终保留，包括名为 Mobile Cloud Share 的商品；其余商品用明确手机 SKU（含 `iphone15`）及名称识别，目标推荐可读取现有目录类型。当前目录只有 DEVICE / SHARE，没有手机专属 device kind，不能可靠识别完全不透明的设备 SKU；需要后台补充契约后才能按设备类型精确过滤。首日任务的原始组条件、数量和奖励不改写，若服务器组仍要求隐藏任务，应由服务器调整发布。无法识别的运营自由文案需后台清理，不猜测不透明标识。公开法律文本及手机号身份、验证码功能保留。
 
 APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手机登录核验。服务端返回 BOUND 时直接进入首页，不重新校准；明确返回 NEEDS_CALIBRATION 或 REPLACEMENT_REQUIRED 时才引导相应流程，未知或失败显示可重试错误，不称已校准或已换机。不同安装登录先停止原手机未完成任务，再判断 E6 的 allowReplacement 和 minReplacementIntervalDays；不允许或处于冷却期时明确提示，已购设备不受影响。允许时重新采集并校准，显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。
 
@@ -1441,7 +1441,7 @@ APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手
 
 ### 7.1 商品列表 `/store`
 
-商品卡片由服务端当前目录提供，数量、SKU、价格及产能以目录为准；Lite 过滤明确可识别的手机商品，并在搜索、商品详情与下单入口共用过滤后的目录；升级动力由 §6.8 任务产能递减 + §7.5 升级置换驱动(**代际概念已取消**,无代际字段/无固定升级映射):
+商品卡片由服务端当前目录提供，数量、SKU、价格及产能以目录为准；Lite 先保留所有结构化 `productType=SHARE` 商品，再过滤明确手机 SKU / 名称（含 iPhone15）。当前目录尚无手机专属设备种类字段，未标明身份的设备商品仍需后台约束发布。搜索、商品详情与下单入口共用过滤后的目录；升级动力由 §6.8 任务产能递减 + §7.5 升级置换驱动(**代际概念已取消**,无代际字段/无固定升级映射):
 
 | 产品 | 状态 | 价格 | 日产 USDT | 日产 NEX | 倍数 vs Phone |
 |---|---|---|---|---|---|
@@ -2890,7 +2890,7 @@ future = amount × (1 + APY × days / 365)
 
 #### 9.3.4a 提现确认与风险说明（2026-11-03）
 
-移植 App `95641b63`：提现直接进入现有金额 / 地址 / 费用确认，不读取 `risk.accepted`，确认后不调用风险披露 `checkGate`，不跳转风险说明页。冻结提交快照、账号 / epoch 守卫、幂等键、提现资格复核及服务端失败处理保持原样。风险说明仍可作为独立法律文本阅读（§11.4a）。
+移植 App `95641b63`：提现直接进入现有金额 / 地址 / 费用确认，不读取 `risk.accepted`，确认后不调用风险披露 `checkGate`，不跳转风险说明页。冻结提交快照、账号 / epoch 守卫、幂等键、提现资格复核及服务端失败处理保持原样。风险说明仍可作为独立法律文本阅读（§11.4a）。该客户端决策不代表后端已解除门禁：B12 交接落地前，未确认账号的提现仍可能在提交时由 `AppWithdrawalService` 占用余额，之后在 `OpsFinanceService` 的 APPROVE 阶段被 `RISK_DISCLOSURE_ACK_REQUIRED` 拒绝；不能把前端确认框验收等同于提现批准或到账。
 
 #### 9.3.5 Compliance hold banner(Sprint 3,phase 派发)
 
@@ -3050,7 +3050,7 @@ i18n keys 在 `repurchaseHowItWorks.*` namespace ~40 keys。
 
 #### 9.6.2a 开仓确认与写入
 
-Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则、预计收益和最低金额。确认后提交服务器开仓指令并读取仓位与账单；用户端展示值必须与后台 G1 参数源一致。App `95641b63` 的行为移植到 Lite：不再调用风险披露 `checkGate`，也不因 `RISK_DISCLOSURE_ACK_REQUIRED` 跳页；保留指令租约、账号 / epoch / 弹层守卫和错误映射。
+Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则、预计收益和最低金额。确认后提交服务器开仓指令并读取仓位与账单；用户端展示值必须与后台 G1 参数源一致。App `95641b63` 的行为移植到 Lite：不再调用风险披露 `checkGate`，也不因 `RISK_DISCLOSURE_ACK_REQUIRED` 跳页；保留指令租约、账号 / epoch / 弹层守卫和错误映射。B12 前若当前账号拥有的新开仓请求收到准确的 `RISK_DISCLOSURE_ACK_REQUIRED`（code 409，HTTP 409 或成功 HTTP 下的业务拒绝），因 `AppStakingService.open` 在 `executeOnce` 之前返回，按确定未扣款处理并仅退役该请求的准确 intent；提示用户本次未扣款、联系客服后重试，不跳转风险页。普通 `NOT_FOUND`、旧请求恢复、未知错误和其他账号请求均不据此退役；本地退役失败继续核对原请求。
 
 #### 9.6.3 玩法说明页 `/staking/how-it-works`
 
@@ -4129,7 +4129,7 @@ sequenceDiagram
 
 风险说明保留为可公开阅读的法律文本，服务条款页的交叉链接保留；Lite 搜索不再收录此路由。提现与质押不再把阅读或确认作为前置步骤（App `95641b63`，§9.3.4a / §9.6.2a）。
 
-页面内容按当前账号地区和语言读取服务器发布版本，确认状态也由服务器管理；加载失败、地区未配置或账号切换不产生本地“已确认”事实。页面自身的阅读完成与勾选规则保留，只影响本页确认，不影响普通业务入口。zh / en / vi 均使用 `riskDisclosure.*` 文案；移除已无调用方的 `search.routes.risk` 和 `riskDisclosure.gateUnavailable`。
+页面内容按当前账号地区和语言读取服务器发布版本，确认状态也由服务器管理；加载失败、地区未配置或账号切换不产生本地“已确认”事实。页面自身的阅读完成与勾选规则保留。**后端 B12 依赖尚未解除**：客户端不再前置确认，不等于服务端不检查确认状态。当前 `content/application/AppRiskDisclosureService.java#checkUserGate` 对未确认账号返回 code 409；`market/application/AppStakingService.java#open` 在 `executeOnce` 前拒绝开仓；`finance/application/AppWithdrawalService.java` 提交时仍可能先 `reserveFunds`，而 `finance/application/OpsFinanceService.java` 在 APPROVE 阶段调用 `disclosureGateFacade.checkUserGate`，返回 `RISK_DISCLOSURE_ACK_REQUIRED` 后不继续批准。B12 必须解除对应后端门禁并完成真实提交 / 审批链验收，才可声称风险确认不再影响这些业务；Lite 保持与 App 相同的前端产品决策，不恢复确认步骤。zh / en / vi 均使用 `riskDisclosure.*` 文案；移除已无调用方的 `search.routes.risk` 和 `riskDisclosure.gateUnavailable`。
 
 ### 11.5 推理收据 `/me/receipts` + `/me/proof`
 
