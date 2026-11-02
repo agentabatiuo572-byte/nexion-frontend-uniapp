@@ -102,6 +102,7 @@ function retryConfig() {
 }
 function retryDevices() { if (!cfg.loading) void cfg.load(); }
 function retryFleet() { void player.refresh(); }
+defineExpose({ refresh: () => player.refresh() });
 
 const gridClients = computed(() => (app.homeTruth?.onGrid.clients ?? [])
   .map((client) => ({ ...client, color: "var(--v5-brand)" })));

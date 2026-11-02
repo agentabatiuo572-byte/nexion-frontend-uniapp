@@ -7,16 +7,16 @@
       </view>
       <DailyCheckInRow />
       <HomeBenefits />
-      <HomeActionList />
+      <HomeActionList ref="homeActions" />
       <MyFleetSection />
       <PromotionEntry v-if="homePromotions.length" mode="home" :activities="homePromotions" />
       <view v-else-if="!homePromotionRead && (homePromotionStatus === 'idle' || homePromotionStatus === 'loading')" class="home-promotion-skeleton" role="status" aria-busy="true" :aria-label="t.coreReview.loadingOffers"><view /><view /></view>
       <LiveFeedCard />
-      <OnGridSection />
+      <OnGridSection ref="homeGrid" />
       <HomeNetworkSnapshot />
       <DoTheMathCard />
       <MarketBoardCard />
-      <TrustChipWall />
+      <TrustChipWall ref="homeTrust" />
     </view>
   </AppChassis>
 </template>
@@ -45,6 +45,9 @@ import { remoteApiEnabled, sessionVault } from '@/api/runtime';
 import type { PublicPromotion } from '@/api/promotion-contracts';
 import { createPromotionReadFence, isPromotionActive } from '@/lib/promotion-entry';
 import { readHomePromotions } from '@/store/home-promotions';
+import { registerActivePageRefresh } from '@/lib/active-page-refresh';
+import { useNexFaucet } from '@/store/nex-faucet';
+import { useProfile } from '@/store/profile';
 const t = useT(), locale = useLocaleStore(), config = useConfig(), app = useApp();
 const homePromotions = ref<PublicPromotion[]>([]);
 const homePromotionStatus = ref<'idle'|'loading'|'ready'|'error'>('idle');
@@ -52,6 +55,19 @@ const homePromotionRead=ref(false);
 const fence = createPromotionReadFence();
 let visible = true;
 let pendingTicket:number|null=null;
+let releaseActiveRefresh = () => {};
+const homeActions = ref<{ refresh: () => Promise<unknown> } | null>(null);
+const homeGrid = ref<{ refresh: () => Promise<unknown> } | null>(null);
+const homeTrust = ref<{ refresh: () => Promise<unknown> } | null>(null);
+async function refreshVisibleHome() {
+  if (!visible) return;
+  fence.invalidate(); pendingTicket = null;
+  await Promise.allSettled([
+    refresh(), app.ensureHomeTruth(), app.ensureRemoteFleet(),
+    useNexFaucet().ensureRemote(), useProfile().ensureAvatar(),
+    homeActions.value?.refresh(), homeGrid.value?.refresh(), homeTrust.value?.refresh(),
+  ]);
+}
 async function refresh(passive=false) {
   if (!visible) return;
   if(pendingTicket!==null&&fence.current(pendingTicket))return;
@@ -73,9 +89,9 @@ async function refresh(passive=false) {
     }
   } finally {if(pendingTicket===ticket)pendingTicket=null;}
 }
-onShow(() => { visible = true; app.setTaskReadPageVisible("home", true); void refresh(true); });
-onHide(() => { visible = false; app.setTaskReadPageVisible("home", false); });
-onUnmounted(() => { visible = false; app.setTaskReadPageVisible("home", false); fence.invalidate(); });
+onShow(() => { visible = true; releaseActiveRefresh(); releaseActiveRefresh = registerActivePageRefresh(refreshVisibleHome); app.setTaskReadPageVisible("home", true); void refresh(true); });
+onHide(() => { releaseActiveRefresh(); visible = false; app.setTaskReadPageVisible("home", false); });
+onUnmounted(() => { releaseActiveRefresh(); visible = false; app.setTaskReadPageVisible("home", false); fence.invalidate(); });
 onLoad(() => locale.ensureSystemDetected());
 watch(() => [app.accountKey, app.accountBindingEpoch, locale.code], () => { fence.invalidate(); homePromotions.value = []; homePromotionRead.value=false;void refresh(true); },{flush:'sync'});
 </script>

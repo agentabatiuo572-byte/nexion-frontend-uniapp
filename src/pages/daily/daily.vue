@@ -300,7 +300,7 @@ watch([() => bills.summary, () => bills.summaryStatus], () => {
 const summaryForDisplay = computed(() => !summaryEnvironmentInvalidated.value && bills.summaryStatus !== 'error' && summaryReadScope.value === summaryScope.value ? bills.summary : null);
 
 async function refreshBalance(coalesce = true) {
-  if (remoteApiEnabled && remoteSessionReady.value && pageActive) await app.refreshRemoteFleet(undefined, { coalesce }).catch(() => false);
+  if (remoteApiEnabled && remoteSessionReady.value && pageActive) await (coalesce ? app.ensureRemoteFleet() : app.refreshRemoteFleet()).catch(() => false);
 }
 async function refreshLedger(force = false) {
   if (remoteApiEnabled && remoteSessionReady.value && pageActive) await bills.refreshSummary({ force }).catch(() => {});

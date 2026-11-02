@@ -50,7 +50,6 @@ export const useReferralReward = defineStore("referralReward", () => {
     const request: RemoteAccountRequest = accountScope.snapshot();
     const runScope: RuntimeRevisionScope = captureRuntimeRevision();
     const generation = ++refreshGeneration;
-    snapshot.value = null;
     loading.value = true;
     // 🔴 error **不在 await 之前清**。清早了的后果:出错态的「点击重试」是靠 error 渲染的,
     //   用户一点,这一句同步把 error 置空 → 下一次 flush 就把那个按钮从 DOM 上换掉,
@@ -67,9 +66,9 @@ export const useReferralReward = defineStore("referralReward", () => {
       return true;
     } catch (cause) {
       if (generation === refreshGeneration && accountScope.isCurrent(request) && isCurrentRuntimeRevision(runScope)) {
-        snapshot.value = null;
         rateLimited.value = isHttpReadRateLimit(cause);
         transientFailure.value = isTransientReadFailure(cause);
+        if (!transientFailure.value) snapshot.value = null;
         if (isHttpReadRateLimit(cause)) retryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
         error.value = cause instanceof Error ? cause.message : "REFERRAL_REWARD_LOAD_FAILED";
       } else if (generation === refreshGeneration) {

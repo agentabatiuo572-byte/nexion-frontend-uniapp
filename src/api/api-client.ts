@@ -180,6 +180,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   function businessWrite(request: HttpRequest): boolean {
     if (request.method === "GET") return false;
     const path = request.url.slice(baseUrl.length).split("?")[0];
+    // These live POST reads/socket tickets do not change displayed business facts.
+    if (request.method === "POST" && ["/api/app/trade-in/eligibility", "/api/app/trade-in/quote",
+      "/api/app/support/realtime-ticket"].includes(path)) return false;
     // Browsing observations and phone runtime reporting keep their own cadence.
     return !/^\/api\/(?:app\/analytics\/events|tasks\/phone\/runtime|growth\/day-one\/page-observations|store\/products\/[^/]+\/detail-observation|genesis\/secondary-market\/observation|share\/event)(?:$|\/)/.test(path)
       && !path.startsWith("/auth/");

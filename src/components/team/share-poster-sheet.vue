@@ -438,8 +438,8 @@ watch(
 );
 watch(() => props.open, (open) => {
   if (!open || !remoteApiEnabled) return;
-  void app.refreshRemoteFleet(undefined, { coalesce: true });
-  void app.refreshHomeTruth();
+  void app.ensureRemoteFleet();
+  void app.ensureHomeTruth();
 });
 // 当前模板失效时回落到仍可用的首个模板。
 watch(availableTpls, (list) => {

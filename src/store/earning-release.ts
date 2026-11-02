@@ -3,7 +3,7 @@ import type { EarningsReleaseStatus } from "@/api/earnings-release-api";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import type { RiskClusterSummary } from "@/store/risk-cluster";
 import { shallowRef } from "vue";
-import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
+import { invalidateBeforePassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 
 export type LedgerRoute = "pending_review" | "bonus_locked";
 export type ReleaseSource = "attest" | "manual";
@@ -26,6 +26,11 @@ export function bindEarningsReleaseAccount(accountKey: string): void {
   earningsReleaseSnapshot.value = null;
   earningsReleaseHasSnapshot.value = false;
   earningsReleaseStatus.value = "idle";
+}
+
+export function ensureEarningsReleaseStatus(): Promise<EarningsReleaseStatus> {
+  return runPassiveTabRead("earning-release", () => refreshEarningsReleaseStatus(), undefined,
+    () => earningsReleaseStatus.value === "ready" && earningsReleaseHasSnapshot.value);
 }
 
 export async function refreshEarningsReleaseStatus(

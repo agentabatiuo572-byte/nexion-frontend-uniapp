@@ -52,10 +52,10 @@ const rows = computed<HomeActionRow[]>(() => {
 });
 const shown = computed(() => expanded.value ? rows.value : rows.value.slice(0,3));
 async function refresh() {
-  const request = ++generation, scope = passiveTabReadScope();
+  const request = ++generation, scope = passiveTabReadScope(false);
   if (!visible) return;
   if (!remoteApiEnabled || app.accountKey === 'default') { initialPending.value = false; return; }
-  const current = () => visible && request === generation && scope === passiveTabReadScope();
+  const current = () => visible && request === generation && scope === passiveTabReadScope(false);
   await Promise.allSettled([
     runPassiveTabRead('quest', () => quest.refreshRemote(), undefined, () => quest.remoteStatus === 'ready'), runPassiveTabRead('trial-state', () => trial.refreshRemote()), voucher.revalidateRemote(),
     runPassiveTabRead('orders', () => orders.refreshRemote().then(() => true)).then(() => { if(current()) ordersReady.value = true; }).catch(() => { if(current()) ordersReady.value = false; }),
@@ -67,6 +67,7 @@ onMounted(refresh);
 onShow(() => { visible = true; void refresh(); });
 onHide(() => { visible = false; generation++; });
 onUnmounted(() => { visible = false; generation++; });
+defineExpose({ refresh });
 watch(() => [app.accountKey,app.accountBindingEpoch], () => { initialPending.value = remoteApiEnabled; securityNeedsAction.value = false; ordersReady.value = false; expanded.value = false; void refresh(); });
 </script>
 <style scoped>

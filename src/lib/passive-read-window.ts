@@ -1,12 +1,12 @@
 import { ApiError } from "@/api/errors";
 import { createPageReadController, type PageActivationOptions } from "./passive-page-activation";
 
-/** Ephemeral results for one activation and periods of rapid Tab navigation. */
+/** Display results stay fresh briefly; commands and manual reads bypass this window. */
 let writeRevision = 0;
 export const capturePassiveWriteRevision = () => writeRevision;
 export function invalidatePassiveTabReads(): void { writeRevision += 1; }
 
-type Attempt = { resource: string; visit: number; retryUntil: number | null; pending: boolean; cached: boolean; hasCache?: () => boolean; promise: Promise<unknown> };
+type Attempt = { resource: string; visit: number; retryUntil: number | null; receivedAt: number | null; pending: boolean; cached: boolean; hasCache?: () => boolean; promise: Promise<unknown> };
 export function createPassiveReadWindow(now = () => Date.now(), activations = createPageReadController(now)) {
   let activeScope = "", scopeVersion = 0;
   let executing: { scope: string; version: number; key: string; attempt: Attempt; rawClaimed: boolean } | null = null;
@@ -31,12 +31,14 @@ export function createPassiveReadWindow(now = () => Date.now(), activations = cr
     }
   }
   function track<T>(resource: string, promise: Promise<T>, hasCache?: () => boolean): Attempt {
-    const attempt: Attempt = { resource, visit: activations.snapshot().visit, retryUntil: null, pending: true, cached: false, hasCache, promise };
+    const attempt: Attempt = { resource, visit: activations.snapshot().visit, retryUntil: null, receivedAt: null, pending: true, cached: false, hasCache, promise };
     void promise.then(value => {
       attempt.pending = false;
       attempt.cached = value !== false && value !== null && (value !== undefined || !!hasCache) && (!hasCache || hasCache());
+      attempt.receivedAt = now();
     }, cause => {
       attempt.pending = false;
+      attempt.receivedAt = now();
       if (cause instanceof ApiError && cause.kind === "http" && cause.status === 429)
         attempt.retryUntil = now() + (cause.retryAfterMs ?? 30_000);
     });
@@ -51,12 +53,15 @@ export function createPassiveReadWindow(now = () => Date.now(), activations = cr
     attempts.set(key, track(resource, promise, hasCache));
     return promise;
   }
-  function run<T>(scope: string, resource: string, read: () => Promise<T>, query?: unknown, hasCache?: () => boolean): Promise<T> {
+  function run<T>(scope: string, resource: string, read: () => Promise<T>, query?: unknown, hasCache?: () => boolean, maxAgeMs = 5_000): Promise<T> {
     selectScope(scope);
     const key = keyOf(resource, query), previous = attempts.get(key);
     const activation = activations.snapshot();
+    const reusable = previous?.cached && (!previous.hasCache || previous.hasCache());
+    const fresh = reusable && previous.receivedAt !== null && now() - previous.receivedAt < maxAgeMs;
     if (previous && (previous.pending || (previous.retryUntil !== null ? now() < previous.retryUntil
-      : previous.visit === activation.visit || (activation.protected && previous.cached && (!previous.hasCache || previous.hasCache()))))) {
+      : fresh || (maxAgeMs === 5_000 && activation.protected && reusable)
+        || (!previous.cached && previous.visit === activation.visit && previous.receivedAt !== null && now() - previous.receivedAt < 1_000)))) {
       previous.visit = activation.visit;
       return previous.promise as Promise<T>;
     }

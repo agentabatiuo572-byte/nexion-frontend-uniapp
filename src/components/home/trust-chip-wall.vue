@@ -82,6 +82,7 @@ onShow(() => {
   if (status.value === "idle" || status.value === "error") void refresh();
 });
 onHide(() => { pageVisible = false; syncPlayer(); });
+defineExpose({ refresh: () => Promise.allSettled([refresh(), player.refresh()]) });
 
 onMounted(() => {
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", syncPlayer);

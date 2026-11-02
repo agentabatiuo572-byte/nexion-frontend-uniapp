@@ -65,7 +65,7 @@ import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import { ApiError, asApiError } from "@/api/errors";
-import { isHttpReadRateLimit } from "@/lib/remote-read-failure";
+import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import type { UserSession } from "@/api/contracts";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -432,6 +432,14 @@ export const useApp = defineStore("app", () => {
       // The existing API client belongs to its boot environment until reload.
       homeTruthEnvironmentInvalidated = true;
       invalidateHomeTruth();
+      invalidateRemoteFleet();
+      devices.value = [];
+      remoteFleetStatus.value = "idle";
+      remoteFleetHasSnapshot.value = false;
+      remoteRealizedToday.value = null;
+      remoteSlotUsage.value = null;
+      remoteAssignmentHasSnapshot.value = false;
+      remotePendingEarned.value = null;
     }, { flush: "sync" });
   }
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
@@ -986,7 +994,7 @@ export const useApp = defineStore("app", () => {
     const request = remoteAccountEpoch.snapshot();
     if (remoteApiEnabled && !hasHomeSession(request)) { invalidateHomeTruth(); return Promise.resolve(false); }
     if (Date.now() < homeTruthRetryAt) return Promise.resolve(false);
-    return runPassiveTabRead("home-truth", () => refreshHomeTruth(request), [request, homeTruthOwnerEpoch]);
+    return runPassiveTabRead("home-truth", () => refreshHomeTruth(request), [request, homeTruthOwnerEpoch], () => homeTruth.value !== null);
   }
 
   function hasHomeSession(request: RemoteAccountRequest): boolean {
@@ -1057,12 +1065,19 @@ export const useApp = defineStore("app", () => {
     remoteFleetRefreshSequence += 1;
   }
 
+  function ensureRemoteFleet(): Promise<boolean> {
+    const request = remoteAccountEpoch.snapshot();
+    return runPassiveTabRead("remote-fleet", () => refreshRemoteFleet(request, { coalesce: true }), undefined,
+      () => remoteFleetHasSnapshot.value);
+  }
+
   async function refreshRemoteFleet(
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
     options: RemoteFleetRefreshOptions = {},
   ): Promise<boolean> {
     invalidateBeforePassiveTabRead("remote-fleet");
     if (!remoteApiEnabled) return true;
+    if (homeTruthEnvironmentInvalidated) return false;
     const expectedAccountKey = request.accountKey;
     const runScope = captureRuntimeRevision();
     const scope = {
@@ -1076,7 +1091,7 @@ export const useApp = defineStore("app", () => {
     // the HttpOnly refresh cookie. Never turn a Login page lifecycle hook or a
     // default-account rebind into an authenticated request: its late
     // unauthorized callback could otherwise clear a newer restored session.
-    return remoteFleetRefreshCoordinator.refresh(scope, async (lease) => {
+    return rememberPassiveTabRead("remote-fleet", remoteFleetRefreshCoordinator.refresh(scope, async (lease) => {
       let refreshSequence: number | null = null;
       const assignmentReadEpochAtStart = taskAssignmentReadEpoch;
       try {
@@ -1151,10 +1166,18 @@ export const useApp = defineStore("app", () => {
           && refreshSequence === remoteFleetRefreshSequence) {
           remoteFleetStatus.value = "error";
           remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
+          if (!isTransientReadFailure(cause)) {
+            remoteFleetHasSnapshot.value = false;
+            remoteRealizedToday.value = null;
+            remoteSlotUsage.value = null;
+            devices.value = [];
+            remoteAssignmentHasSnapshot.value = false;
+            remotePendingEarned.value = null;
+          }
         }
         return false;
       }
-    }, options);
+    }, options), undefined, undefined, () => remoteFleetHasSnapshot.value);
   }
 
   function bindAccount(rawAccountKey: string, surface: EntrySurface = getEntrySurface()) {
@@ -2551,7 +2574,7 @@ export const useApp = defineStore("app", () => {
     homeTruth, homeTruthStatus, homeTruthError, homeTruthRateLimited, homeTruthTransientFailure,
     remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePendingEarned, remoteComputeProtocolVersion, remotePhoneBindingInvalid,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, refreshVisibleTaskAssignments, invalidateRemoteTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, ensureRemoteFleet, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, refreshVisibleTaskAssignments, invalidateRemoteTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
     tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining, acceptPhoneActivation,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, creditRewardBucket, creditRewardBucketOnce,
