@@ -1,0 +1,75 @@
+import type { ApiClient } from "./api-client";
+import type { AuthApi, OAuthLoginApi } from "./auth-api";
+import { getDeviceId } from "@/lib/device-id";
+import { ApiError } from "./errors";
+
+export type ThirdPartyProvider = "GOOGLE" | "APPLE" | "TELEGRAM";
+export interface OAuthFlow {
+  flowId: string; flowKey: string; authorizationUrl: string; expiresInSec: number;
+  receipt?: string;
+}
+export interface OAuthStatus {
+  status: "PENDING" | "VERIFIED" | "FAILED" | "CONSUMED";
+  provider: ThirdPartyProvider; displayName: string | null;
+}
+const ROOT = "/auth/users/oauth/provider";
+const PROVIDERS = ["GOOGLE", "APPLE", "TELEGRAM"] as const;
+const invalid = () => new ApiError({ kind: "protocol", message: "OAUTH_RESPONSE_INVALID" });
+function providerList(value: unknown): ThirdPartyProvider[] {
+  if (!Array.isArray(value) || value.some(p => !PROVIDERS.includes(p)) || new Set(value).size !== value.length)
+    throw invalid();
+  return value;
+}
+export function validateOAuthFlow(value: unknown): OAuthFlow {
+  const flow = value as OAuthFlow;
+  if (!flow || typeof flow.authorizationUrl !== "string" || !/^OIDC-[a-f0-9]{32}$/.test(flow.flowId) || !/^[A-Za-z0-9_-]{43}$/.test(flow.flowKey)
+      || !Number.isInteger(flow.expiresInSec) || flow.expiresInSec < 1 || flow.expiresInSec > 600) throw invalid();
+  // Only the canonical backend handoff is accepted. Same-origin HTTP loopback
+  // also supports local H5 backend/preview development.
+  const local = typeof window !== "undefined" && window.location.protocol === "http:"
+    && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+    && flow.authorizationUrl.startsWith(`${window.location.origin}/`);
+  const address = /^https:\/\/(?:\[[a-f\d:.]+\]|[a-z\d.-]+)(?::(\d{1,5}))?((?:\/[^\s?#\\]*)?\/auth\/users\/oauth\/provider\/authorize\/[A-Za-z0-9_-]{43})$/i.exec(local ? flow.authorizationUrl.replace(/^http:/, "https:") : flow.authorizationUrl);
+  if (!address || address[1] && (Number(address[1]) < 1 || Number(address[1]) > 65535)) throw invalid();
+  let path: string;
+  try { path = decodeURIComponent(address[2]); } catch { throw invalid(); }
+  if (path.includes("\\") || path.split("/").some(segment => segment === "." || segment === "..")) throw invalid();
+  return flow;
+}
+export function createOAuthProviderApi(client: ApiClient, auth: Pick<AuthApi, "pendingLogin"> & OAuthLoginApi) {
+  const headers = () => ({
+    "X-NexGrid-Installation-Id": getDeviceId(),
+    "X-NexGrid-Client-Surface": "H5",
+    "X-NexGrid-Execution-Supported": "false",
+  });
+  const proof = (flow: OAuthFlow) => ({ flowId: flow.flowId, flowKey: flow.flowKey, receipt: flow.receipt });
+  return {
+    async available() {
+      return providerList(await client.request({ path: `${ROOT}/available`, authenticated: false }));
+    },
+    async start(provider: ThirdPartyProvider, intent: "LOGIN", sponsorCode?: string | null) {
+      if (intent === "LOGIN" && auth.pendingLogin())
+        throw new ApiError({ kind: "configuration", message: "LOGIN_RESULT_UNKNOWN" });
+      return validateOAuthFlow(await client.request({
+        path: `${ROOT}/start`, method: "POST", body: { provider, intent,
+          ...(intent === "LOGIN" && sponsorCode ? { sponsorCode } : {}) }, authenticated: false,
+        headers: headers(),
+      }));
+    },
+    async status(flow: OAuthFlow): Promise<OAuthStatus> {
+      const value = await client.request<OAuthStatus>({
+        path: `${ROOT}/status`, method: "POST", body: proof(flow), authenticated: false, headers: headers(),
+      });
+      if (!value || !PROVIDERS.includes(value.provider)
+          || !["PENDING", "VERIFIED", "FAILED", "CONSUMED"].includes(value.status)
+          || value.status === "VERIFIED" && typeof value.displayName !== "string") throw invalid();
+      return value;
+    },
+    async complete(provider: ThirdPartyProvider, flow: OAuthFlow, expectedRevision: number,
+        challengeNo?: string, code?: string, captchaTicket?: string) {
+      if (!flow.receipt || !/^[A-Za-z0-9_-]{43}$/.test(flow.receipt)) throw invalid();
+      return auth.completeProviderLogin({ provider, ...proof(flow), receipt: flow.receipt,
+        challengeNo, code, captchaTicket }, expectedRevision);
+    },
+  };
+}
