@@ -23,8 +23,8 @@
         </view>
         <text class="font-mono-tabular">{{ visibility.mask(progressPct == null ? '-' : `${progressPct}%`) }}</text>
       </view>
-      <text v-if="device.currentTask.status === 'PAUSED' || device.interruptedAt != null" class="hf-device-task__note">{{ device.interruptedAt != null ? t.earn.reconnecting : t.earn.phoneTaskPaused }}</text>
-      <text v-else-if="awaitingExecutionResultConfirmation" class="hf-device-task__note">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
+      <text v-if="phoneTaskExpired || device.currentTask.status === 'PAUSED' || device.interruptedAt != null" class="hf-device-task__note">{{ device.interruptedAt != null ? t.earn.reconnecting : t.earn.phoneTaskPaused }}</text>
+      <text v-else-if="awaitingExecutionResultConfirmation" class="hf-device-task__note">{{ device.currentTask.executionMode === 'SIMULATED' ? computeCopy.confirming : t.earn.taskAwaitingExecutionResultConfirmation }}</text>
     </view>
     <view v-else class="hf-device-task hf-device-task--empty"><text>{{ recovering ? computeCopy.statuses.RECOVERING : !taskFactsReady ? t.earn.runtimeUnknown : t.earn.noCurrentTask }}</text></view>
   </view>
@@ -68,8 +68,11 @@ useVisibleInterval(() => {
 const liveTaskNow = computed(() => props.device.taskServerNow != null && props.device.taskServerNowReceivedAt != null
   ? projectServerNow(props.device.taskServerNow, props.device.taskServerNowReceivedAt, monotonicNow.value) : now.value);
 const taskFactsReady = computed(() => props.tasksConfirmed ?? props.runtimeConfirmed);
+const phoneTaskExpired = computed(() => props.device.kind === "phone" && props.device.phoneValidUntil != null
+  && liveTaskNow.value >= props.device.phoneValidUntil);
 const progressPct = computed(() => props.runtimeConfirmed && taskFactsReady.value
-  ? taskProgressPercent(props.device.currentTask, liveTaskNow.value, props.device.interruptedAt) : null);
+  ? taskProgressPercent(props.device.currentTask, liveTaskNow.value, props.device.interruptedAt,
+    props.device.kind === "phone" ? props.device.phoneValidUntil : null) : null);
 const awaitingExecutionResultConfirmation = computed(() => props.device.currentTask != null
   && awaitsExecutionResultConfirmation(props.device.currentTask, liveTaskNow.value));
 const rowStyle = computed<CSSProperties>(() => ({

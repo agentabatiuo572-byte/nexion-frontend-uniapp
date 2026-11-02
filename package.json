@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "prepare:phone-compute": "node scripts/prepare-phone-compute-assets.mjs",
     "test:payment-password": "node --test scripts/lib/payment-pin-flow-fixture.test.mjs && vitest run src/api/payment-password-api.test.ts src/api/payment-command-api.test.ts src/store/payment-password.test.ts src/lib/authorized-payment.test.ts",
     "test:payment-password-ui": "node scripts/payment-password-ui.h5.e2e.mjs && node scripts/payment-pin-checkout.h5.e2e.mjs",
     "preview:prototype": "node scripts/prototype-preview-server.mjs",
@@ -103,7 +102,6 @@
     "@lollipopkit/liquid-glass": "0.2.1",
     "core-js": "3.49.0",
     "js-sha256": "1.0.0",
-    "onnxruntime-web": "1.23.2",
     "pinia": "^2.2.8",
     "qrcode-generator": "^1.5.0",
     "simple-liquid-glass": "5.3.0",

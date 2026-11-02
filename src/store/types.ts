@@ -44,9 +44,11 @@ export interface CurrentTask extends TaskExecutionMetadata {
   totalSec: number;
   startedAt: number | null;   // epoch ms; queued v2 tasks have not started
   reward: number;      // USDT
+  rewardAsset?: "USDT" | "NEX";
+  rewardAmount?: string;
   /** Server status is present only for the remote authority projection. */
   status?: import("@/api/task-assignment-api").CanonicalTaskAssignment["status"];
-  protocolVersion?: 2;
+  protocolVersion?: 2 | 3;
   queuedAt?: number | null;
   actualDurationSec?: number | null;
   settlementStatus?: import("@/api/task-assignment-api").CanonicalTaskAssignment["settlementStatus"];
@@ -98,6 +100,8 @@ export interface Device {
   taskServerNow?: number | null;
   /** Monotonic receive anchor paired only with the task-state snapshot clock. */
   taskServerNowReceivedAt?: number | null;
+  phoneValidUntil?: number | null;
+  simulationState?: import("@/api/task-assignment-api").SimulationState;
   /** Monotonic receive anchor used to advance the signed server deadline while the card stays open. */
   capacitySnapshotReceivedAt?: number | null;
   // Lifecycle (Sprint 2): set on device creation; drives the monthly efficiency

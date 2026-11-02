@@ -18,7 +18,7 @@ export function nativePhonePlatform(): NativePhonePlatform | null {
   return null;
 }
 
-/** Phone compute runs in the native Android and iOS Apps. */
+/** Only the Android and iOS Apps may confirm their bound phone online. */
 export function hasNativePhoneRuntime(): boolean {
   return nativePhonePlatform() !== null;
 }

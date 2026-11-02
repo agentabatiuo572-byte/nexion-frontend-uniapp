@@ -3,7 +3,6 @@ import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
 import { installNativePush, refreshNativePush, flushNativePushClick } from "@/services/native-push";
-import { setNativePhoneComputeForeground } from "@/services/phone-compute";
 import { navReset } from "@/lib/route";
 import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
@@ -543,8 +542,7 @@ async function refreshAuthenticatedRemoteFleet(): Promise<boolean> {
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth)) return false;
   if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
-  // A cold-start fleet read must follow the local phone's runtime report, so
-  // a stale PAUSED assignment cannot be projected ahead of its resume POST.
+  // Confirm the bound phone online before the initial account snapshot.
   await useApp().syncRemoteTaskAssignments();
   return true;
 }
@@ -1282,7 +1280,6 @@ onLaunch(() => {
   scheduleAccountSessionBootstrap();
 });
 onShow(() => {
-  setNativePhoneComputeForeground(true);
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");
@@ -1315,7 +1312,6 @@ onShow(() => {
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
-  setNativePhoneComputeForeground(false);
   if (remoteApiEnabled) useApp().setRemoteTaskForeground(false);
   detachSessionWatch();
   stopBusinessLoops();

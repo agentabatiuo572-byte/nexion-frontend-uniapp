@@ -112,7 +112,7 @@
       >
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
         <text class="earn-history-description" :title="task.type" style="color: var(--v5-ink-2)">{{ task.type }}</text>
-        <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5)" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}<text v-if="task.settlementStatus" class="block">{{ computeCopy.statuses[task.settlementStatus] }}</text></text>
+        <text class="earn-history-amount tabular-nums" style="font-family: var(--font-v5)" :style="{ color: task.settlementStatus && task.settlementStatus !== 'POSTED' ? 'var(--v5-warning-ink)' : 'var(--v5-success-ink)' }">{{ visibility.mask(formatTaskReward(task, true)) }}<text v-if="task.settlementStatus" class="block">{{ computeCopy.statuses[task.settlementStatus] }}</text></text>
         <text class="earn-history-time" style="font-size: 12px; color: var(--v5-ink-3)">{{ completedTime(task.completedAt) }}</text>
         <view v-if="canOpenTaskReceipt(task)" class="earn-history-document shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" :title="task.receiptNo ?? task.id" @click.stop="openTaskReceipt(task)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>
@@ -126,13 +126,13 @@
       <view v-if="selectedTask.receiptNo && selectedTask.settlementStatus === 'POSTED'" role="button" tabindex="0" @click="openTaskReceipt(selectedTask, true)" @keydown.enter.stop.prevent="openTaskReceipt(selectedTask, true)" @keydown.space.stop.prevent="openTaskReceipt(selectedTask, true)"><text>{{ computeCopy.receipt }} #{{ visibility.mask(selectedTask.receiptNo) }}</text></view>
     </view>
     </view>
-    <view v-show="settlementsAvailable" class="earn-tc__row" role="button" tabindex="0" :aria-expanded="settlementsOpen ? 'true' : 'false'" @click="settlementsOpen = !settlementsOpen" @keydown.enter.stop.prevent="settlementsOpen = !settlementsOpen" @keydown.space.stop.prevent="settlementsOpen = !settlementsOpen">
+    <view v-if="legacySettlementsEnabled" v-show="settlementsAvailable" class="earn-tc__row" role="button" tabindex="0" :aria-expanded="settlementsOpen ? 'true' : 'false'" @click="settlementsOpen = !settlementsOpen" @keydown.enter.stop.prevent="settlementsOpen = !settlementsOpen" @keydown.space.stop.prevent="settlementsOpen = !settlementsOpen">
       <view class="earn-tc__icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M3 9h18M8 14h4" /></svg></view>
       <view class="earn-tc__copy"><text class="earn-tc__row-title">{{ computeCopy.batch }}</text><text class="earn-tc__row-sub">{{ t.earn.settlementBatchesHint }}</text></view>
       <view class="earn-tc__arrow" :class="{ 'earn-tc__arrow--open': settlementsOpen }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
     </view>
     <!-- Kept mounted so it reads on page show; the row appears only when the server offers settlement batches. -->
-    <view v-show="settlementsAvailable && settlementsOpen" class="earn-tc__panel"><ComputeSettlements @availability="settlementsAvailable = $event" /></view>
+    <view v-if="legacySettlementsEnabled" v-show="settlementsAvailable && settlementsOpen" class="earn-tc__panel"><ComputeSettlements @availability="settlementsAvailable = $event" /></view>
     </view>
     <ReceiptModal :receipt="openReceipt" @close="openReceipt = null" />
   </view>
@@ -140,7 +140,7 @@
 
 <script setup lang="ts">
 import { useDataVisibility } from "@/store/data-visibility";
-import { formatUsd } from "@/lib/usd-display";
+import { formatTaskReward } from "@/lib/task-reward-display";
 import { navTo } from "@/lib/route";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
@@ -259,6 +259,10 @@ const allRecent = computed(() =>
     .sort((a, b) => b.completedAt - a.completedAt)
     .slice(0, 20),
 );
+const legacySettlementsEnabled = computed(() => app.remoteComputeProtocolVersion === 2
+  || app.devices.some(device => device.currentTask?.protocolVersion === 2
+    || device.recentTasks.some(task => task.protocolVersion === 2))
+  || app.remotePendingEarned?.some(row => row.taskCount > 0) === true);
 watch(allRecent, (tasks) => {
   if (selectedTask.value) selectedTask.value = tasks.find((task) => task.id === selectedTask.value?.id) ?? selectedTask.value;
 });
@@ -270,7 +274,7 @@ const maxVram = computed(() => app.visibleDevices.reduce(
   (m, d) => Math.max(m, d.kind === "cloud-share" ? CLOUD_SHARE_ROUTING_VRAM_GB : d.vramTotal),
   0,
 ));
-const lockedTeasers = computed(() => earnConfig.lockedTeasers(maxVram.value, 3));
+const lockedTeasers = computed(() => app.remoteComputeProtocolVersion === 3 ? [] : earnConfig.lockedTeasers(maxVram.value, 3));
 
 const historyHintText = computed(() =>
   t.value.taskHistory.historyHint.replace("{n}", visibility.mask(allRecent.value.length)),
@@ -305,7 +309,7 @@ function goReceipts() {
 }
 
 function retryAssignments() {
-  void app.refreshRemoteFleet().catch(() => undefined);
+  void app.refreshVisibleTaskAssignments();
 }
 
 function completedTime(ts: number): string {

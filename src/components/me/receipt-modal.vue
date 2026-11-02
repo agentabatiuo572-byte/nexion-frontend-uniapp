@@ -12,7 +12,7 @@
   prop/emit — no chassis-level overlay host).
 -->
 <template>
-  <view v-if="receipt" class="nx-receipt-modal-root" role="dialog" aria-modal="true" :aria-label="isLegacyVerification ? t.receipt.typeWalletPairing : t.receipt.proofOfCompute">
+  <view v-if="receipt" class="nx-receipt-modal-root" role="dialog" aria-modal="true" :aria-label="receiptTitle">
     <view class="nx-receipt-scrim" :style="scrimStyle" @click="emit('close')">
     <view class="nx-step-in" :style="sheetStyle" @click.stop>
       <!-- Close -->
@@ -22,11 +22,11 @@
 
       <!-- Header -->
       <view :style="headerStyle">
-        <text class="block" :style="headerKickerStyle">{{ isLegacyVerification ? t.receipt.typeWalletPairing : t.receipt.proofOfCompute }}</text>
+        <text class="block" :style="headerKickerStyle">{{ receiptTitle }}</text>
         <view class="flex items-center flex-wrap" style="margin-top: 8px; gap: 8px">
           <text v-if="isReceiptSettled" class="inline-flex items-center" :style="stampStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="margin-left: 4px">{{ t.receipt.stampVerified }}</text>
+            <text style="margin-left: 4px">{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</text>
           </text>
           <text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ receiptStatus }} · {{ fmtDate(receipt.settledAt) }}</text>
         </view>
@@ -102,9 +102,9 @@ const t = useT();
 const locale = useLocaleStore();
 // 2026-10 review: user-facing labels are localized; identifiers and proof values stay exact.
 const copyByLocale = {
-  zh: { result:"收益金额", copy:"复制", job:"作业与凭证", client:"委托方", device:"执行设备", runtime:"执行时间与用量", rewards:"收益明细", proof:"核验信息", checks:"历史核验记录", pending:"待结算", failed:"结算失败", unknown:"状态待确认", purpose:"钱包归属证明", images:"张图像" },
-  en: { result:"Reward amount", copy:"Copy", job:"Job and receipt", client:"Client", device:"Execution device", runtime:"Runtime and usage", rewards:"Reward breakdown", proof:"Verification details", checks:"Historical verification", pending:"Pending settlement", failed:"Settlement failed", unknown:"Status unconfirmed", purpose:"Wallet ownership proof", images:"images" },
-  vi: { result:"Số tiền thu nhập", copy:"Sao chép", job:"Tác vụ và biên nhận", client:"Khách hàng", device:"Thiết bị thực hiện", runtime:"Thời gian và mức sử dụng", rewards:"Chi tiết thu nhập", proof:"Thông tin xác minh", checks:"Xác minh trước đây", pending:"Chờ quyết toán", failed:"Quyết toán thất bại", unknown:"Chưa xác nhận trạng thái", purpose:"Bằng chứng sở hữu ví", images:"hình ảnh" },
+  zh: { taskReceipt:"任务凭证", posted:"已入账", taskRuntime:"任务时间", taskDevice:"设备信息", result:"收益金额", copy:"复制", job:"作业与凭证", client:"委托方", device:"执行设备", runtime:"执行时间与用量", rewards:"收益明细", proof:"核验信息", checks:"历史核验记录", pending:"待结算", failed:"结算失败", unknown:"状态待确认", purpose:"钱包归属证明", images:"张图像" },
+  en: { taskReceipt:"Task receipt", posted:"Posted", taskRuntime:"Task times", taskDevice:"Device information", result:"Reward amount", copy:"Copy", job:"Job and receipt", client:"Client", device:"Execution device", runtime:"Runtime and usage", rewards:"Reward breakdown", proof:"Verification details", checks:"Historical verification", pending:"Pending settlement", failed:"Settlement failed", unknown:"Status unconfirmed", purpose:"Wallet ownership proof", images:"images" },
+  vi: { taskReceipt:"Biên nhận tác vụ", posted:"Đã ghi có", taskRuntime:"Thời gian tác vụ", taskDevice:"Thông tin thiết bị", result:"Số tiền thu nhập", copy:"Sao chép", job:"Tác vụ và biên nhận", client:"Khách hàng", device:"Thiết bị thực hiện", runtime:"Thời gian và mức sử dụng", rewards:"Chi tiết thu nhập", proof:"Thông tin xác minh", checks:"Xác minh trước đây", pending:"Chờ quyết toán", failed:"Quyết toán thất bại", unknown:"Chưa xác nhận trạng thái", purpose:"Bằng chứng sở hữu ví", images:"hình ảnh" },
 };
 const receiptLocale = computed(() => locale.code === "zh" || locale.code === "vi" ? locale.code : "en");
 const copy = computed(() => copyByLocale[receiptLocale.value]);
@@ -186,6 +186,12 @@ const isLegacyVerification = computed(() => {
   const receipt = props.receipt;
   return receipt ? !isCanonicalComputeReceipt(receipt) && receipt.category === "KY" : false;
 });
+const isSimulatedReceipt = computed(() => props.receipt != null && isCanonicalComputeReceipt(props.receipt)
+  && props.receipt.executionMode === "SIMULATED");
+const isSimulatedNexReceipt = computed(() => props.receipt != null && isCanonicalComputeReceipt(props.receipt)
+  && isSimulatedReceipt.value && props.receipt.rewardUsdt === 0 && props.receipt.rewardNex > 0);
+const receiptTitle = computed(() => isLegacyVerification.value ? t.value.receipt.typeWalletPairing
+  : isSimulatedReceipt.value ? copy.value.taskReceipt : t.value.receipt.proofOfCompute);
 const stampColor = computed(() => (isLegacyVerification.value ? "var(--v5-tech-cyan)" : "var(--v5-brand)"));
 const isReceiptSettled = computed(() => {
   const r = props.receipt;
@@ -204,8 +210,8 @@ const receiptStatus = computed(() => {
 const summaryAmount = computed(() => {
   const r = props.receipt;
   if (!r) return "";
-  const amount = isCanonicalComputeReceipt(r) ? formatGroupedAmount(r.rewardUsdt, "full") : formatGroupedAmount(r.netPaid);
-  return (amount.startsWith("-") || amount === "0" || amount === "0.00" ? "" : "+") + amount + " USDT";
+  const amount = isCanonicalComputeReceipt(r) ? formatGroupedAmount(isSimulatedNexReceipt.value ? r.rewardNex : r.rewardUsdt, "full") : formatGroupedAmount(r.netPaid);
+  return (amount.startsWith("-") || amount === "0" || amount === "0.00" ? "" : "+") + amount + (isSimulatedNexReceipt.value ? " UVT" : " USDT");
 });
 
 // ── tap-to-copy (matches prototype RowCopy: copy on tap, transient ✓ icon) ──
@@ -322,14 +328,13 @@ const sections = computed<DescSection[]>(() => {
         rows: [
           { k: "receipt_no", v: r.receiptNo, accent: true },
           { k: "task_no", v: r.taskNo },
-          { k: "task_type", v: workloadLabel(t.value, r.taskClass) },
-          { k: "task_name", v: r.taskName },
-          { k: "model", v: r.model || "—" },
+          { k: "task_type", v: isSimulatedReceipt.value ? r.taskName : workloadLabel(t.value, r.taskClass) },
+          ...(!isSimulatedReceipt.value ? [{ k: "task_name", v: r.taskName }, { k: "model", v: r.model || "—" }] : []),
         ],
       },
       {
         rows: [
-          { k: "client", v: r.client },
+          ...(r.client ? [{ k: "client", v: r.client }] : []),
           { k: "status", v: receiptStatus.value },
         ],
       },
@@ -351,13 +356,13 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
-          { k: "reward_usdt", v: `+${formatAmount(r.rewardUsdt, "full")} USDT`, accent: true, strong: true },
-          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex, "full")} UVT`, accent: true }] : []),
+          ...(!isSimulatedNexReceipt.value ? [{ k: "reward_usdt", v: `+${formatAmount(r.rewardUsdt, "full")} USDT`, accent: true, strong: true }] : []),
+          ...(r.rewardNex > 0 ? [{ k: "reward_nex", v: `+${formatAmount(r.rewardNex, "full")} UVT`, accent: true, strong: isSimulatedNexReceipt.value }] : []),
         ],
       },
       {
         rows: [
-          { k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: shortenHex(r.proofHash, 8, 6) },
+          ...(r.proofHash ? [{ k: "proof_hash", copyKey: "proof_hash", copyValue: r.proofHash, v: shortenHex(r.proofHash, 8, 6) }] : []),
         ],
       },
     ];
@@ -457,9 +462,9 @@ function sectionHeading(section: DescSection): string {
   const first = section.rows[0]?.k ?? "";
   if (["receipt_no","job_id","compliance_id"].includes(first)) return copy.value.job;
   if (["client","client_addr"].includes(first)) return copy.value.client;
-  if (first === "device") return copy.value.device;
-  if (["started_at","duration"].includes(first)) return copy.value.runtime;
-  if (["reward_nex","deposit","unit_price"].includes(first)) return copy.value.rewards;
+  if (first === "device") return isSimulatedReceipt.value ? copy.value.taskDevice : copy.value.device;
+  if (["started_at","duration"].includes(first)) return isSimulatedReceipt.value ? copy.value.taskRuntime : copy.value.runtime;
+  if (["status","reward_nex","deposit","unit_price"].includes(first)) return copy.value.rewards;
   return copy.value.proof;
 }
 

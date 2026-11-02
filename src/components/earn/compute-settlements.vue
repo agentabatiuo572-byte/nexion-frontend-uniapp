@@ -1,6 +1,6 @@
 <template>
   <view v-if="available" class="compute-settlements" data-compute-settlements="true">
-    <view v-if="app.remoteComputeProtocolVersion === 2">
+    <view v-if="app.remoteComputeProtocolVersion === 2 || pendingAvailable">
     <text class="block" style="font-weight:600">{{ copy.pending }}</text>
     <template v-if="assignmentsReady && app.remotePendingEarned">
       <text v-for="row in app.remotePendingEarned" :key="row.asset" class="block font-mono-tabular">{{ visibility.mask(formatAmount(row.amount)) }} {{ row.asset === 'NEX' ? 'UVT' : row.asset }} · {{ visibility.mask(row.taskCount) }} {{ copy.tasks }}</text>
@@ -49,8 +49,9 @@ const nextCursor = ref<string | null>(null);
 const detail = ref<ComputeSettlementDetail | null>(null);
 const loading = ref(false), error = ref(false), detailLoading = ref(false), detailError = ref(false);
 const historyAvailable = ref(false);
+const pendingAvailable = computed(() => app.remotePendingEarned?.some(row => row.taskCount > 0) === true);
 // Settlement batches exist only when the server offers them; the Task Center shows its entry row on this signal.
-const available = computed(() => remoteApiEnabled && (app.remoteComputeProtocolVersion === 2 || historyAvailable.value));
+const available = computed(() => remoteApiEnabled && (app.remoteComputeProtocolVersion === 2 || pendingAvailable.value || historyAvailable.value));
 const emit = defineEmits<{ (event: "availability", available: boolean): void }>();
 watch(available, (value) => emit("availability", value), { immediate: true });
 const assignmentsReady = computed(() => app.remoteAssignmentStatus === "ready" || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));

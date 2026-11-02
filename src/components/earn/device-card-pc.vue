@@ -113,7 +113,7 @@
     <view v-if="!stage && !expanded && task" class="nx-device-current-task" style="padding: 0 20px 16px">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
       <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.type) }}</text>
-      <TaskV2Status :task="task" />
+      <TaskV2Status :task="task" :paused="phoneTaskExpired" />
       <view class="flex items-center gap-3" style="margin-top: 10px">
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
           <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="nx-device-task-progress h-full nx-viz-grow" :style="progressBarStyle" />
@@ -121,7 +121,7 @@
         <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-2)">{{ progressLabel }}</text>
       </view>
       <text v-if="task.status === 'PAUSED' || reconnecting" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-warning-ink)">{{ reconnecting ? t.earn.reconnecting : t.earn.phoneTaskPaused }}</text>
-      <text v-else-if="awaitingExecutionResultConfirmation" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
+      <text v-else-if="awaitingExecutionResultConfirmation" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ task?.executionMode === 'SIMULATED' ? computeCopy.confirming : t.earn.taskAwaitingExecutionResultConfirmation }}</text>
     </view>
 
     <view v-if="!stage && !expanded && phoneFactsReady && !task" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
@@ -141,8 +141,8 @@
           <view class="earn-stage__job-name"><view v-if="!visibility.hidden" class="earn-stage__eq" :class="{ 'earn-stage__eq--running': jobRunning }" aria-hidden="true"><view /><view /><view /></view><text class="earn-stage__job-title">{{ visibility.mask(task.type) }}</text></view>
           <text class="earn-stage__pct">{{ visibility.hidden ? '••••' : progressPct == null ? '—' : progressPct }}<text v-if="!visibility.hidden && progressPct != null" class="earn-stage__pct-unit">%</text></text>
           <text v-if="task.status === 'PAUSED'" class="earn-stage__note earn-stage__note--warn">{{ t.earn.phoneTaskPaused }}</text>
-          <text v-else-if="awaitingExecutionResultConfirmation" class="earn-stage__note">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
-          <TaskV2Status :task="task" />
+          <text v-else-if="awaitingExecutionResultConfirmation" class="earn-stage__note">{{ task?.executionMode === 'SIMULATED' ? computeCopy.confirming : t.earn.taskAwaitingExecutionResultConfirmation }}</text>
+          <TaskV2Status :task="task" :paused="phoneTaskExpired" />
         </view>
         <view v-else-if="stageJob === 'idle'" class="earn-stage__job"><view class="earn-stage__idle"><view v-if="taskHistoryReady" class="earn-stage__wait" aria-hidden="true" /><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view></view>
         <view v-else-if="stageJob === 'status'" class="earn-stage__job"><view class="earn-stage__idle"><text>{{ statusLabel }}</text></view></view>
@@ -297,11 +297,11 @@
         </view>
         <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressLabel }}</text>
       </view>
-      <TaskV2Status :task="task" />
-      <view v-if="task.status !== 'PAUSED' && task.protocolVersion !== 2" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
-        <text v-if="awaitingExecutionResultConfirmation">{{ t.earn.taskAwaitingExecutionResultConfirmation }}</text>
+      <TaskV2Status :task="task" :paused="phoneTaskExpired" />
+      <view v-if="task.status !== 'PAUSED' && task.protocolVersion !== 2 && task.protocolVersion !== 3" class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
+        <text v-if="awaitingExecutionResultConfirmation">{{ task?.executionMode === 'SIMULATED' ? computeCopy.confirming : t.earn.taskAwaitingExecutionResultConfirmation }}</text>
         <text v-else>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
-        <text style="color: var(--v5-success-ink)">{{ t.earn.reward }} {{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}</text>
+        <text style="color: var(--v5-success-ink)">{{ t.earn.reward }} {{ visibility.mask(formatTaskReward(task, true)) }}</text>
       </view>
     </view>
 
@@ -336,7 +336,7 @@
           style="min-height: 28px; font-size: 12px"
         >
           <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.type }}</text>
-          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">{{ visibility.mask(formatUsd(task.reward, 'detail', true)) }}</text>
+          <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-success-ink)">{{ visibility.mask(formatTaskReward(task, true)) }}</text>
           <text class="tabular-nums text-right shrink-0" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4); width: 38px">{{ localClockTime(task.completedAt) }}</text>
         </view>
       </view>
@@ -446,7 +446,7 @@
         </view>
         <text v-else-if="!taskHistoryReady" class="earn-stage__recent-note" role="status" aria-live="polite">{{ t.taskHistory.loading }}</text>
         <view v-else-if="deviceTodayCompleted.length" class="earn-stage__chips">
-          <view v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" class="earn-stage__chip" data-phone-today-task="true"><text>{{ done.type }}</text><text class="earn-stage__chip-amount">{{ visibility.mask(formatUsd(done.reward, 'detail', true)) }}</text></view>
+          <view v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" class="earn-stage__chip" data-phone-today-task="true"><text>{{ done.type }}</text><text class="earn-stage__chip-amount">{{ visibility.mask(formatTaskReward(done, true)) }}</text></view>
         </view>
         <text v-else class="earn-stage__recent-note">{{ t.home.ledgerEmpty }}</text>
       </view>
@@ -459,6 +459,7 @@
 <script setup lang="ts">
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
+import { formatTaskReward } from "@/lib/task-reward-display";
 import { formatUsd } from "@/lib/usd-display";
 import { useDeviceStatisticsCapabilityCopy } from "@/i18n/device-statistics-capability";
 import { canControlDevice } from "@/lib/device-control-platform";
@@ -570,7 +571,10 @@ const taskLockRemainingMinutes = computed(() => {
   return lockUntil > liveTaskNow.value ? Math.max(1, Math.ceil((lockUntil - liveTaskNow.value) / 60000)) : 0;
 });
 const reconnecting = computed(() => phoneFactsReady.value && props.device.kind === "phone" && props.device.interruptedAt != null);
-const progressPct = computed(() => taskProgressPercent(task.value, liveTaskNow.value, props.device.interruptedAt));
+const phoneTaskExpired = computed(() => props.device.kind === "phone" && props.device.phoneValidUntil != null
+  && liveTaskNow.value >= props.device.phoneValidUntil);
+const progressPct = computed(() => taskProgressPercent(task.value, liveTaskNow.value, props.device.interruptedAt,
+  props.device.kind === "phone" ? props.device.phoneValidUntil : null));
 const progressLabel = computed(() => visibility.mask(progressPct.value == null ? "-" : `${progressPct.value}%`));
 const awaitingExecutionResultConfirmation = computed(() => {
   const tk = task.value;
@@ -593,7 +597,8 @@ const stageJob = computed<"task" | "idle" | "status" | "none">(() => {
   return "none";
 });
 // Loops and the equalizer only move while the job really runs (not paused, queued, interrupted, recovering or awaiting its result).
-const jobRunning = computed(() => stageJob.value === "task" && deviceTaskRunning(props.device) && !awaitingExecutionResultConfirmation.value);
+const jobRunning = computed(() => stageJob.value === "task" && deviceTaskRunning(props.device)
+  && !phoneTaskExpired.value && !awaitingExecutionResultConfirmation.value);
 const loops = useLoopsInView(".nx-device-card");
 const loopRef = loops.elRef;
 // Hidden statistics keep only the track; no ratio is revealed.
@@ -718,7 +723,7 @@ const sparkPoints = computed(() => {
 
 // Locked task examples use the server VRAM gate, not category throughput as income.
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
-const phoneLockedVisible = computed(() => promo.value.baseKind === "phone");
+const phoneLockedVisible = computed(() => app.remoteComputeProtocolVersion !== 3 && promo.value.baseKind === "phone");
 const phoneTeasers = computed<LockedTeaser[]>(() => earnConfig.lockedTeasers(props.device.vramTotal, 3));
 const unlockText = computed(() => t.value.earn.unlockNMoreTasks.replace("{n}", String(phoneTeasers.value.length)));
 function goUnlock() {
