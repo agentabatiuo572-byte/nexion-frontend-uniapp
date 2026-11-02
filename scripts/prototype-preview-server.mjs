@@ -37,7 +37,7 @@ const server=http.createServer(async(req,res)=>{
         const update=JSON.parse(body||'{}');
         if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
-        if(update.reset||update.authState)authDemo.reset();
+        if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
@@ -106,7 +106,9 @@ const server=http.createServer(async(req,res)=>{
     if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);return res.end();}
     if(url.pathname==='/'||(await stat(file).catch(()=>null))?.isDirectory())file=path.join(file,'index.html');
     const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
-    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+seed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
+    const savedAttempt=path.extname(file)==='.html'?authDemo.savedAttempt():null;
+    const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);

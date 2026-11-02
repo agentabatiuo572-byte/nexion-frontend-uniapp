@@ -26,6 +26,7 @@ export function bankDemo(url, state, request) {
     return result;
   };
   const challenge = type => {
+    if(state.authUser&&!state.authUser.phone)fail(type==='address'?'PAYOUT_ADDRESS_PHONE_INVALID':'USER_PHONE_REQUIRED',422);
     const challengeNo = type === 'bank' ? 'PAYOUT-BANK-' + randomBytes(16).toString('hex') : 'PAYOUT-' + randomBytes(12).toString('hex').toUpperCase();
     demo[type + 'Otp'] = { challengeNo, expiresAt: now + 300000 };
     return { ...proof, challengeNo, expiresInSeconds: 300, retryAfterSeconds: 60 };
