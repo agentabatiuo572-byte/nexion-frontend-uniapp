@@ -130,7 +130,7 @@ export function createAuthDemo(state) {
         }
         // Current backend omits registrationReceipt for provider sign-up without
         // a sponsor. Do not make the preview imply this dependency is delivered.
-        return session({...existing,countryCode:'',phone:'',nickname:'Preview identity'},flow.sponsorCode?receipt(flow.sponsorCode):undefined);
+        return session({...existing,countryCode:'',phone:'',nickname:'Preview identity',onboardingComplete:false},flow.sponsorCode?receipt(flow.sponsorCode):undefined);
       }
       if(path==='/api/auth/captcha/challenge') {
         const challengeId='PREVIEW-'+randomBytes(16).toString('hex');challenges.set(challengeId,body.scene);
@@ -158,7 +158,7 @@ export function createAuthDemo(state) {
         if(path==='/auth/users/register') {
           if(state.registrationState==='device-limit')return fail(409,'USER_REGISTRATION_DEVICE_LIMIT');
           if(state.registrationState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
-          return session({...existing,countryCode:body.countryCode,phone:body.phone},receipt(body.sponsorCode));
+          return session({...existing,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode));
         }
         if(path==='/auth/users/login/otp/verify')return session(existing);
         if(path.endsWith('/complete'))return ok({status:'PASSWORD_RESET',revokedSessionCount:0});

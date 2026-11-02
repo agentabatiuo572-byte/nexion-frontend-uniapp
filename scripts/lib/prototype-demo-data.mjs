@@ -27,7 +27,7 @@ const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 export const demoDefaults = {scopeState:'normal',promoState:'normal',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',stakingOpenState:'readonly',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
-  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU）']],
+  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU）']],
   ...authDemoOptions,
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
@@ -339,6 +339,7 @@ export function demoFixture(url,locale,state,request) {
     }
     data.promoBanner={bannerCode:'demo-weekly',baseReward:300,multiplier:1,countdownDays:5,countdownHours:0,targetDevice:'UVELBox Pro',targetDaily:22.4,status:'active'};
     if(state.promoState==='hardware') Object.assign(data.promoBanner,{targetDevice:'Mobile GPU Server',productType:'DEVICE'});
+    if(state.promoState==='server') Object.assign(data.promoBanner,{targetDevice:'Mobile GPU Server',productType:'SERVER'});
     if(state.promoState==='share') Object.assign(data.promoBanner,{targetDevice:'Mobile Cloud Share',productType:'SHARE',targetDaily:null});
     if(state.promoState==='phone') Object.assign(data.promoBanner,{targetDevice:'iphone15',productType:'DEVICE'});
     return data;
