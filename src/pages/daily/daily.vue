@@ -995,7 +995,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-svb--on { --ui-button-fill: color-mix(in srgb, var(--v5-brand-2) 18%, transparent); }
 .dly-svb--off { opacity: .5; }
 /* Narrow screens: the button moves to a second row under the text (illustration 54 + gap 14), so the copy keeps its width. */
-@media (max-width: 359px) {
+@media (max-width: 374px) {
   .dly-sv { flex-wrap: wrap; row-gap: 4px; }
   .dly-svt { flex: 1 1 calc(100% - 68px); }
   .dly-svb-hit { margin-left: 68px; }
