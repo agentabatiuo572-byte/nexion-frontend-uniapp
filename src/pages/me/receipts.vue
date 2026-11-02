@@ -62,7 +62,7 @@
               @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
+                <text class="block truncate" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
                 <text class="block truncate" :style="rowSubStyle">{{ r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}` }}</text>
               </view>
               <view class="text-right shrink-0" style="margin-left: 8px">
@@ -165,8 +165,10 @@
       <view v-if="!remoteReceiptsMode" ref="loadMoreSentinel" style="height: 1px" />
 
 
-      <ReceiptModal :receipt="open" @close="open = null" />
     </view>
+    <template #pageFixed>
+      <ReceiptModal :receipt="open" @close="open = null" />
+    </template>
   </AppChassis>
 </template>
 
@@ -185,6 +187,7 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { workloadLabel } from "@/lib/workload-label";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
+import { shortenHex } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";

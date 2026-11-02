@@ -77,6 +77,7 @@ export interface CanonicalTaskAssignments {
 
 export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   receiptNo: string;
+  displayReceiptNo?: string;
   taskNo: string;
   deviceId: number;
   deviceInstanceNo: string;
@@ -93,6 +94,7 @@ export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   rewardNex: number;
   earningStatus: string;
   proofHash: string | null;
+  receiptHash?: string;
   startedAt: number;
   completedAt: number;
   settledAt: number;
@@ -105,6 +107,7 @@ export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
 
 export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   receiptNo: string;
+  displayReceiptNo?: string;
   taskNo: string;
   taskName?: string;
   taskClass: CanonicalTaskAssignment["taskClass"];
@@ -364,7 +367,9 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
   const taskClass = text(source.taskClass).toUpperCase();
   const metadata = executionMetadata(source);
   const proofHash = metadata.executionMode === "SIMULATED" && source.proofHash == null ? null : text(source.proofHash).toLowerCase();
+  const receiptHash = source.receiptHash == null ? undefined : text(source.receiptHash);
   if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || (proofHash !== null && !/^[a-f0-9]{64,128}$/.test(proofHash))
+    || (receiptHash !== undefined && (metadata.executionMode !== "SIMULATED" || !/^[a-f0-9]{64}$/.test(receiptHash)))
     || (metadata.executionMode === "SIMULATED" && proofHash !== null)) {
     return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   }
@@ -374,6 +379,7 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
   if (completedAt < startedAt) return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   return {
     receiptNo: text(source.receiptNo),
+    displayReceiptNo: source.displayReceiptNo == null ? undefined : text(source.displayReceiptNo),
     taskNo: text(source.taskNo),
     deviceId: integer(source.deviceId, 1),
     deviceInstanceNo: text(source.deviceInstanceNo),
@@ -390,6 +396,7 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
     rewardNex: decimal(source.rewardNex),
     earningStatus: text(source.earningStatus),
     proofHash,
+    receiptHash,
     startedAt,
     completedAt,
     settledAt: timestamp(source.settledAt, true) ?? completedAt,
@@ -409,6 +416,7 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
   }
   return {
     receiptNo: text(source.receiptNo),
+    displayReceiptNo: source.displayReceiptNo == null ? undefined : text(source.displayReceiptNo),
     taskNo: text(source.taskNo),
     taskName: source.taskName == null ? undefined : text(source.taskName),
     taskClass: taskClass as CanonicalTaskAssignment["taskClass"],
