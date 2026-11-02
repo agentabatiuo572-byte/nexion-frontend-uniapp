@@ -106,7 +106,7 @@
         <text class="cp-ai-history-t">{{ t.conversations.loadEarlier }}</text>
       </view>
       <view v-if="humanHistoryError || humanHistoryListError" class="cp-history-error" role="alert"><text>{{ t.conversations.loadError }}</text><view class="cp-history-text-action" role="button" :tabindex="humanHistoryRetryBusy || humanEarlierBusy ? -1 : 0" :aria-disabled="humanHistoryRetryBusy || humanEarlierBusy" :aria-busy="humanHistoryRetryBusy" @click="retryHumanHistory" @keydown.enter.prevent="onKeyboardActivate($event, retryHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, retryHumanHistory)"><text>{{ t.conversations.retry }}</text></view></view>
-      <view v-if="showUnassignedReceived" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ t.conversations.image.unassignedReceived }}</text></view>
+      <view v-if="unassignedNotice" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ unassignedNotice }}</text></view>
       </template>
     </ConversationThread>
 
@@ -681,8 +681,13 @@ const isClosedSession = computed(() => !!conv.value && !isReplyAllowed.value);
 // Account advisor identity belongs to new composition. Existing conversation
 // headers and waiting state use the server's owner for that exact conversation id.
 const advisorApplies = computed(() => !isClosedSession.value && !cid.value && !!startType.value);
-const showUnassignedReceived = computed(() => !isClosedSession.value && !!conv.value
-  && isWaitingForAgent(conv.value.agentName) && conv.value.messages.some(message => message.sender === "user"));
+// An unassigned conversation may already hold the registration welcome; keep the
+// leave-a-message hint until the user writes, then confirm receipt instead.
+const unassignedNotice = computed(() => {
+  if (isClosedSession.value || !conv.value?.messages.length || !isWaitingForAgent(conv.value.agentName)) return "";
+  return conv.value.messages.some(message => message.sender === "user")
+    ? t.value.conversations.image.unassignedReceived : t.value.conversations.image.unassignedHint;
+});
 const headerName = computed(() => {
   if (advisorApplies.value && convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.image.unassigned;
   if (advisorApplies.value && convStore.advisor?.currentAdvisorName) return convStore.advisor.currentAdvisorName;
@@ -1096,7 +1101,7 @@ onMounted(() => {
 watch(() => [headerName.value, headerRole.value, locale.code, statusBarHeight.value], measureTopOverlay);
 const historyContentKey = computed(() => JSON.stringify([remoteApiEnabled, advisorApplies.value,
   convStore.advisorError, convStore.advisorLoading, humanHistoryError.value, humanHistoryListError.value,
-  humanEarlierBusy.value, humanHistoryRetryBusy.value, showUnassignedReceived.value,
+  humanEarlierBusy.value, humanHistoryRetryBusy.value, unassignedNotice.value,
   conv.value?.historyTruncated, conv.value?.historyNextCursor]));
 onUnmounted(() => { topOverlayMeasureEpoch++; topOverlayObserver?.disconnect(); });
 
