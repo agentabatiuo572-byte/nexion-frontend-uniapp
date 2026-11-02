@@ -2,11 +2,11 @@
   Proof — ported from Nexion-prototype/app/(main)/me/proof/page.tsx.
   Proof-of-Contribution share hub: 3 card variants (Earnings / Streak / Network)
   tab-switched → a share card (brand + profile + VBadge + variant hero stat +
-  secondary stats + achievement chips + referral code/QR) → native-share CTA →
+  secondary stats + achievement chips + referral code/QR) → copy-share CTA →
   6 destination buttons → poster tip. Reads app (user/earnings/devices),
   profile (displayName), v-rank (myRank + canonical ladder), network (totalMembers),
-  points (streaks). Reuses team/v-badge.vue. navigator.share → uni.share? +
-  setClipboardData fallback (P-028). Gradient literals → token color-mix.
+  points (streaks). Reuses team/v-badge.vue and the H5 clipboard helper.
+  Gradient literals → token color-mix.
   SetPageHeader → SubPageHeader. SSR mounted-guard dropped. Wrapped in
   <AppChassis active="me">.
 -->
@@ -124,7 +124,7 @@
           </view>
         </view>
 
-        <!-- Quick native share -->
+        <!-- Copy share text for browser users -->
         <view style="margin-top: 12px">
           <view
             class="flex items-center justify-center active:scale-[0.98]"
@@ -132,9 +132,9 @@
             role="button"
             tabindex="0"
             :aria-label="t.proof.shareNative"
-            @click="nativeShare"
+            @click="copyShare"
 
-            @keydown.enter.stop.prevent="nativeShare" @keydown.space.stop.prevent="nativeShare"
+            @keydown.enter.stop.prevent="copyShare" @keydown.space.stop.prevent="copyShare"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
             <text style="margin-left: 8px; pointer-events: none" :style="nativeBtnTextStyle">{{ t.proof.shareNative }}</text>
@@ -349,22 +349,9 @@ const streakChip = computed(() => fmt(t.value.proof.badges.streak, { n: String(l
 const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String(onlineDevices.value ?? "—") }));
 const daysActiveChip = computed(() => fmt(t.value.proof.badges.daysActive, { n: String(activeDays.value ?? "—") }));
 
-// ── share actions (P-028: uni.share? + setClipboardData fallback) ──
-function nativeShare() {
-  const share = (uni as { share?: (o: unknown) => void }).share;
-  if (typeof share === "function") {
-    share({
-      provider: "weixin",
-      type: 0,
-      href: referralLink.value,
-      title: "UVEL · Proof of Contribution",
-      summary: shareText.value,
-      success: () => {},
-      fail: () => copyText(shareText.value, t.value.proof.sharedToast),
-    });
-  } else {
-    copyText(shareText.value, t.value.proof.sharedToast);
-  }
+// ── share actions: copy text/link or export a browser-downloadable poster ──
+function copyShare() {
+  copyText(shareText.value, t.value.proof.sharedToast);
 }
 function copyLink() {
   copyText(referralLink.value, t.value.proof.copiedToast);

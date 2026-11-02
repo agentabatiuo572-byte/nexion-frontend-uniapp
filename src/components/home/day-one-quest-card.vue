@@ -132,8 +132,10 @@
 </template>
 
 <script setup lang="ts">
+import { isLiteQuest } from "@/lib/lite-scope";
+import { useConfig } from "@/store/config";
 import { formatAmount } from "@/lib/amount-display";
-import { navTo } from "@/lib/route";
+import { isStakingVisibilityRoute, navTo } from "@/lib/route";
 import { computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -178,6 +180,7 @@ const expanded = computed({
   set: (value: boolean) => emit("update:expanded", value),
 });
 
+const stakingDisplay = useConfig();
 const t = useT();
 const locale = useLocaleStore();
 const nowTick = useNow();
@@ -209,7 +212,8 @@ const remoteTasks = computed<QuestTask[]>(() => {
     { color: "var(--v5-brand)", onColor: "var(--v5-on-brand)" },
   ];
   return quest.remoteQuests
-    .filter((row) => row.layer === "DAY_ONE")
+    .filter((row) => row.layer === "DAY_ONE" && isLiteQuest(row)
+      && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(row.actionRoute)))
     .map((row, index) => ({
       id: row.questCode,
       order: index + 1,

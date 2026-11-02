@@ -3,14 +3,12 @@ import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { readAccountSessionRecords, useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
-import { rebindAccountScopedStores, captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
-import { authApi, onboardingCalibrationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
-import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
-import { getDeviceId } from "@/lib/device-id";
+import { authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { afterLegalTermsAcknowledged, hasPendingLegalTermsRequirement, scheduleLegalTermsGate } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
@@ -186,18 +184,6 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
       const current = sessionVault.read();
       if (!current || current.user.userId !== expectedUserId) return;
       if (hasPendingLegalTermsRequirement()) return false;
-      if (hasNativeAndroidPhoneRuntime()) {
-        const phoneScope = captureAccountScope();
-        let phoneStatus = "UNAVAILABLE";
-        try { phoneStatus = await onboardingCalibrationApi.phoneLogin(getDeviceId()); } catch { /* The phone screen owns retry; other assets remain available. */ }
-        const latest = sessionVault.read();
-        if (!isCurrentAccountScope(phoneScope) || !latest || latest.user.userId !== expectedUserId) return;
-        if (hasPendingLegalTermsRequirement()) return false;
-        if (phoneStatus === "BOUND") session.markCalibrated(options.identity);
-        if (phoneStatus !== "BOUND" && !options.deferNavigation) {
-          void navReset({ url: "/pages/onboarding/connect?mode=login", fail: () => {} });
-        }
-      }
       // App.onShow is not guaranteed after an H5 reLaunch. Complete the
       // canonical catalogue/fleet bootstrap only after the legal boundary.
       void app.refreshHomeTruth();

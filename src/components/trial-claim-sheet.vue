@@ -126,11 +126,9 @@ const prop3Sub = computed(() => fmt(t.value.trial.sheetProp3Sub, { pct: (cfg.val
 const claiming = ref(false);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
-const claimCtaLabel = computed(() => claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
-  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
+const claimCtaLabel = computed(() => claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : claimError.value ? t.value.trial.claimRetryCta : t.value.trial.sheetClaimCta);
-const claimErrorText = computed(() => claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
-  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
+const claimErrorText = computed(() => claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : claimErrorReason.value === "unknown"
   ? t.value.trial.claimUnknownInline
   : t.value.trial.claimErrorInline);
@@ -155,16 +153,6 @@ function hide() {
 async function onClaim() {
   if (claiming.value || !sheet.open) return;
   if (claimErrorReason.value === "terms-required") { hide(); navTo("/pages/onboarding/terms"); return; }
-  if (claimErrorReason.value === "onboarding-required") {
-    hide();
-    // #ifdef H5
-    navTo("/pages/register/success?setup=1");
-    // #endif
-    // #ifndef H5
-    navTo("/pages/onboarding/estimator");
-    // #endif
-    return;
-  }
   const requestedEpoch = app.accountBindingEpoch;
   claiming.value = true;
   // Remote start first refreshes GET /api/trial/eligibility, then posts the

@@ -15,7 +15,7 @@
       <view v-if="createRecovery" class="nx-bank-setup-recovery active-press" role="button" tabindex="0"
         @click="goCreateRecovery" @keydown.enter.prevent="goCreateRecovery" @keydown.space.prevent="goCreateRecovery"
         style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)">
-        <text>{{ createRecovery === 'terms' ? t.bankPane.termsRecoveryCta : t.bankPane.onboardingRecoveryCta }}</text>
+        <text>{{ t.bankPane.termsRecoveryCta }}</text>
       </view>
     </view>
 
@@ -527,19 +527,12 @@ const ctaEnabled = computed(() => fxUsable.value && inRange.value && !creating.v
 // ── 生成付款单(mock ~600ms 延迟演加载态:按钮内联 spinner「生成中…」)──
 const creating = ref(false);
 const createError = ref("");
-const createRecovery = ref<"onboarding" | "terms" | null>(null);
+const createRecovery = ref<"terms" | null>(null);
 function goCreateRecovery() {
   if (!paymentSessionReady.value || creating.value || dep.currentAccountKey() !== app.accountKey) return;
-  if (createRecovery.value !== "terms" && createRecovery.value !== "onboarding") return;
+  if (createRecovery.value !== "terms") return;
   dep.bankRecoveryDraft = { accountKey: app.accountKey, amount: amount.value };
-  if (createRecovery.value === "terms") { navTo("/pages/onboarding/terms"); return; }
-  // Restore only the input if navigation rebuilds the page; never replay CREATE.
-  // #ifdef H5
-  navTo("/pages/register/success?setup=1");
-  // #endif
-  // #ifndef H5
-  navTo("/pages/onboarding/estimator");
-  // #endif
+  navTo("/pages/onboarding/terms");
 }
 watch(() => app.accountBindingEpoch, () => {
   if (createRecovery.value) createError.value = "";
@@ -632,10 +625,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
         }
       }
       if (cause instanceof ApiError && cause.kind === "http" && cause.status === 428 && cause.code === 428) {
-        if (cause.message === "USER_ONBOARDING_REQUIRED") {
-          approvedBusinessFailureCopy = t.value.bankPane.onboardingRequired;
-          if (stillCurrent()) createRecovery.value = "onboarding";
-        } else if (cause.message === "LEGAL_TERMS_ACK_REQUIRED") {
+        if (cause.message === "LEGAL_TERMS_ACK_REQUIRED") {
           approvedBusinessFailureCopy = t.value.bankPane.termsRequired;
           if (stillCurrent()) createRecovery.value = "terms";
         }

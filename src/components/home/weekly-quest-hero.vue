@@ -66,10 +66,12 @@
 </template>
 
 <script setup lang="ts">
+import { isLiteQuest } from "@/lib/lite-scope";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onMounted, watch, type CSSProperties } from "vue";
 import type { CanonicalQuest } from "@/api/quest-api";
 import { useWeeklyQuest } from "@/store/weekly-quest";
+import { useConfig } from "@/store/config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
@@ -78,13 +80,14 @@ import { useQuestTargetAvailability } from "@/composables/use-quest-target-avail
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
-import { navTo } from "@/lib/route";
+import { isStakingVisibilityRoute, navTo } from "@/lib/route";
 import { useNow } from "@/composables/use-now";
 import { isCurrentQuest } from "@/lib/actionable-quest";
 import { toast } from "@/store/ui";
 import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 
 const t = useT();
+const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
@@ -123,7 +126,9 @@ onMounted(() => {
   void wq.refresh();
 });
 
-const quest = computed<CanonicalQuest | null>(() => wq.tier1Quests.find((q) => isCurrentQuest(q, nowTick.value * 1000)) ?? null);
+const quest = computed<CanonicalQuest | null>(() => wq.tier1Quests.find((q) =>
+  isLiteQuest(q) && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(q.actionRoute))
+  && isCurrentQuest(q, nowTick.value * 1000)) ?? null);
 const mult = computed(() => wq.multiplier);
 const reward = computed(() => (quest.value ? Math.round(quest.value.rewardNex * mult.value) : 0));
 const rewardDisplay = computed(() => formatAmount(reward.value));

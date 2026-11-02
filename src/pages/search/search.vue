@@ -119,6 +119,7 @@ import { useApp } from "@/store/app";
 import { useNetwork } from "@/store/network";
 import { useLocaleStore } from "@/store/locale";
 import { useStaking } from "@/store/staking";
+import { useConfig } from "@/store/config";
 import { PRODUCTS } from "@/mock/products";
 import type { Product } from "@/mock/products";
 import { productCopy, specRow } from "@/lib/product-copy";
@@ -146,6 +147,8 @@ const app = useApp();
 const network = useNetwork();
 const locale = useLocaleStore();
 const staking = useStaking();
+const config = useConfig();
+onShow(() => { void config.load(); });
 
 const q = ref("");
 
@@ -247,7 +250,6 @@ const ROUTES: ReadonlyArray<{ key: RouteKey; href: string }> = [
   { key: "preferences", href: "/pages/me/preferences" },
   { key: "language", href: "/pages/me/language" },
   { key: "help", href: "/pages/me/help" },
-  { key: "risk", href: "/pages/me/risk-disclosure" },
   { key: "trust", href: "/pages/trust/trust" },
   { key: "developer", href: "/pages/developer/developer" },
   { key: "globe", href: "/pages/globe/globe" },
@@ -272,6 +274,7 @@ const results = computed<Hit[]>(() => {
   const routeCopy = t.value.search.routes;
   const faqCopy = t.value.search.faqEntries;
   for (const r of ROUTES) {
+    if (r.key === "staking" && !config.isEnabled("stakingVisible")) continue;
     const c = routeCopy[r.key];
     const sublabel = r.key === "staking"
       ? searchStakingRateSummary({
@@ -317,6 +320,7 @@ const results = computed<Hit[]>(() => {
     }
   }
   for (const f of remoteApiEnabled ? [] : FAQ) {
+    if (f.key === "staking" && !config.isEnabled("stakingVisible")) continue;
     const c = faqCopy[f.key];
     if (c.label.toLowerCase().includes(query) || c.sub.toLowerCase().includes(query)) {
       out.push({ group: "faq", label: c.label, sublabel: c.sub, href: f.href });

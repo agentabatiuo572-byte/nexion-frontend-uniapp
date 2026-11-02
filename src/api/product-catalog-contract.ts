@@ -1,3 +1,4 @@
+import { isLiteProduct } from "@/lib/lite-scope";
 import type { Product, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
 
@@ -236,6 +237,6 @@ export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnap
     sourceEnvironment: "PRODUCTION",
     runId: "",
     revision: source.revision as string | null,
-    products: source.products.map(product),
+    products: source.products.map(product).filter(isLiteProduct),
   };
 }
