@@ -6,12 +6,14 @@ import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoOptions } from './lib/prototype-demo-data.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
+import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
 // An optional local handoff preserves demo conversations across a preview rebuild.
 if(process.env.DEMO_STATE_FILE)Object.assign(state,JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state);
+const authDemo=createAuthDemo(state);
 let locale='zh';
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW==='1'?createCheckoutFlowFixture(state,()=>locale):null;
 const fixtureFor=(url,request)=>demoFixture(url,locale,state,request);
@@ -27,6 +29,7 @@ const server=http.createServer(async(req,res)=>{
     const url=new URL(req.url,'http://127.0.0.1:'+server.address().port);
     res.setHeader('Cache-Control','no-store');
     if(checkoutFlow&&url.pathname==='/__checkout/state')return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,setupWrites:checkoutFlow.pin.state.setupWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
+    if(url.pathname==='/__demo/auth-requests')return sendJson(res,{simulation:true,requests:authDemo.trace});
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
       if(req.method==='POST') {
@@ -34,6 +37,8 @@ const server=http.createServer(async(req,res)=>{
         const update=JSON.parse(body||'{}');
         if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
+        if(update.reset||update.authState)authDemo.reset();
+        if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}
@@ -58,6 +63,12 @@ const server=http.createServer(async(req,res)=>{
     const trustPage=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(whitepaper|incorporation|msb|ein)\/pages\/([1-9][0-9]?)$/);
     if(trustPage&&process.env.DEMO_TRUST_DOCUMENTS_DIR){res.setHeader('Content-Type','image/jpeg');return res.end(await readFile(path.join(process.env.DEMO_TRUST_DOCUMENTS_DIR,'pages',trustPage[1],`${trustPage[2]}.jpg`)));}
     if(url.pathname==='/api/app/support/attachments/demo-image/content'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(root,'static/img/home-glass-20260928/s1.webp')));}
+    if(authDemo.handles(url.pathname)) {
+      let raw='';for await(const chunk of req)raw+=chunk;
+      const response=authDemo.handle(url,req.method,req.headers,raw?JSON.parse(raw):{});
+      if(response.html){res.writeHead(response.status,{'Content-Type':mime['.html']});return res.end(response.html);}
+      return sendJson(res,response.body,response.status);
+    }
     if(/^\/(api|auth)\//.test(url.pathname)) {
       if(checkoutFlow?.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
@@ -95,7 +106,7 @@ const server=http.createServer(async(req,res)=>{
     if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403);return res.end();}
     if(url.pathname==='/'||(await stat(file).catch(()=>null))?.isDirectory())file=path.join(file,'index.html');
     const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
-    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+seed):bytes);
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+seed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
