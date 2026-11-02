@@ -16,7 +16,7 @@
       </view>
       <view v-if="productName || amount !== undefined" class="checkout-result__summary">
         <text v-if="productName" class="checkout-result__product">{{ productName }}</text>
-        <view v-if="amount !== undefined" class="checkout-result__amount"><text>{{ state === 'activated' ? copy.paidAmount : copy.orderAmount }}</text><CheckoutAmount :value="amount" currency="USDT" /></view>
+        <view v-if="amount !== undefined" class="checkout-result__amount"><text>{{ state === 'activated' ? copy.paidAmount : copy.orderAmount }}</text><CheckoutAmount :value="amount" :currency="currency ?? 'USDT'" /></view>
       </view>
       <slot />
     </view>
@@ -37,7 +37,7 @@ import { useLocaleStore } from '@/store/locale';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import NxButton from '@/components/ui/nx-button.vue';
 import CheckoutAmount from './CheckoutAmount.vue';
-const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error'; productName?: string; productImage?: string; amount?: string | number; error?: string }>();
+const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error'; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
 const emit = defineEmits<{ (event: 'devices'): void; (event: 'retry'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));

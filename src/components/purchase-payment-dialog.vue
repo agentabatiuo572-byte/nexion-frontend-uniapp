@@ -69,32 +69,25 @@
               <text v-if="!payment.available(tab.id)" class="pp-soon">{{ copy.soon }}</text>
             </view>
           </view>
-          <view class="pp-fees">
-            <template v-if="rounded">
-              <view class="pp-kv"><text class="pp-kv__k">{{ copy.businessAmount }}</text><text class="pp-kv__v">{{ s.quote?.businessAmountUsdt }}</text></view>
-              <view class="pp-kv"><text class="pp-kv__k">{{ copy.roundingAdjustment }}</text><text class="pp-kv__v">{{ s.quote?.roundingAdjustmentUsdt }}</text></view>
-            </template>
-            <view v-else class="pp-kv"><text class="pp-kv__k">{{ copy.subtotal }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.subtotalUsdt) : '—' }}</text></view>
-            <view class="pp-kv"><text class="pp-kv__k">{{ copy.channelFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.channelFeeUsdt) : '—' }}</text></view>
-            <view class="pp-kv"><text class="pp-kv__k">{{ copy.networkFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.networkConfirmFeeUsdt) : '—' }}</text></view>
-          </view>
         </template>
 
-        <template v-else>
-          <text class="pp-label">{{ copy.payable }}</text>
-          <text class="pp-vnd">{{ vnd(s.quote?.amountVnd ?? null) }}<text class="pp-vnd__u">₫</text></text>
-          <text v-if="s.quote?.fxRateVndPerUsdt" class="pp-fx">{{ copy.fx }} 1 USDT = {{ rate(s.quote.fxRateVndPerUsdt) }} ₫</text>
-          <view class="pp-fees">
-            <view class="pp-kv"><text class="pp-kv__k">{{ copy.subtotal }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.subtotalUsdt) : '—' }}</text></view>
-            <view class="pp-kv"><text class="pp-kv__k">{{ copy.channelFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.channelFeeUsdt) : '—' }}</text></view>
-          </view>
-        </template>
+        <!-- Bank shows the same $ fee list as USDT, without a network fee; the ₫ amount stays on the payment page. -->
+        <view v-if="s.step !== 'methods'" class="pp-fees">
+          <template v-if="rounded">
+            <view class="pp-kv"><text class="pp-kv__k">{{ copy.businessAmount }}</text><text class="pp-kv__v">{{ s.quote?.businessAmountUsdt }}</text></view>
+            <view class="pp-kv"><text class="pp-kv__k">{{ copy.roundingAdjustment }}</text><text class="pp-kv__v">{{ s.quote?.roundingAdjustmentUsdt }}</text></view>
+          </template>
+          <view v-else class="pp-kv"><text class="pp-kv__k">{{ copy.subtotal }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.subtotalUsdt) : '—' }}</text></view>
+          <view class="pp-kv"><text class="pp-kv__k">{{ copy.channelFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.channelFeeUsdt) : '—' }}</text></view>
+          <view v-if="s.step === 'network'" class="pp-kv"><text class="pp-kv__k">{{ copy.networkFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.networkConfirmFeeUsdt) : '—' }}</text></view>
+        </view>
       </view>
 
       <view class="pp-foot">
         <view class="pp-total" :class="{ 'is-ruled': s.step === 'methods' }">
-          <text class="pp-total__k">{{ s.step === 'bank' ? copy.equivalent : copy.total }}</text>
-          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' ? s.amount : s.quote?.totalUsdt ?? null" currency="USDT" />
+          <text class="pp-total__k">{{ copy.total }}</text>
+          <!-- Bank card amounts use $; USDT only on the wallet and USDT paths. -->
+          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" />
         </view>
         <template v-if="s.step !== 'methods'">
           <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
@@ -129,7 +122,7 @@
         <view class="pp-step" role="listitem" aria-hidden="true"><view class="pp-dot" /></view>
       </view>
       <view class="pp-receipt">
-        <view class="pp-kv"><text class="pp-kv__k">{{ copy.paidAmount }}</text><CheckoutAmount class="pp-receipt__amt" :value="s.intent?.totalUsdt ?? null" currency="USDT" /></view>
+        <view class="pp-kv"><text class="pp-kv__k">{{ copy.paidAmount }}</text><CheckoutAmount class="pp-receipt__amt" :value="s.intent?.totalUsdt ?? null" :currency="isBank ? 'USD' : 'USDT'" /></view>
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.paidMethod }}</text><text class="pp-kv__v">{{ methodName }}</text></view>
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.product }}</text><text class="pp-kv__v">{{ s.summary }}</text></view>
         <view v-if="s.orderNo" class="pp-kv"><text class="pp-kv__k">{{ copy.orderNo }}</text><text class="pp-kv__v pp-mono">{{ s.orderNo }}</text></view>
@@ -144,9 +137,8 @@
       <view class="pp-card pp-hero">
         <text class="pp-hero__lab">{{ copy.payable }}</text>
         <view class="pp-hero__row">
-          <text v-if="isBank" class="pp-hero__amt">{{ vnd(fees?.amountVnd ?? null) }}<text class="pp-hero__u">₫</text></text>
-          <CheckoutAmount v-else class="pp-hero__amt" :value="fees?.totalUsdt ?? null" currency="USDT" />
-          <view class="pp-copy nx-frosted-button" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
+          <CheckoutAmount class="pp-hero__amt" :value="fees?.totalUsdt ?? null" :currency="isBank ? 'USD' : 'USDT'" />
+          <view v-if="!isBank" class="pp-copy nx-frosted-button" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
         </view>
@@ -180,10 +172,9 @@
       <view v-if="fees" class="pp-card">
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.subtotal }}</text><text class="pp-kv__v">{{ amount(fees.subtotalUsdt) }}</text></view>
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.channelFee }}</text><text class="pp-kv__v">{{ amount(fees.channelFeeUsdt) }}</text></view>
-        <view v-if="isBank && fees.fxRateVndPerUsdt" class="pp-kv"><text class="pp-kv__k">{{ copy.fx }}</text><text class="pp-kv__v">1 USDT = {{ rate(fees.fxRateVndPerUsdt) }} ₫</text></view>
-        <view v-else-if="!isBank" class="pp-kv"><text class="pp-kv__k">{{ copy.networkFee }}</text><text class="pp-kv__v">{{ amount(fees.networkConfirmFeeUsdt) }}</text></view>
+        <view v-if="!isBank" class="pp-kv"><text class="pp-kv__k">{{ copy.networkFee }}</text><text class="pp-kv__v">{{ amount(fees.networkConfirmFeeUsdt) }}</text></view>
         <view class="pp-div" />
-        <view class="pp-kv"><text class="pp-kv__k">{{ isBank ? copy.equivalent : copy.total }}</text><text class="pp-kv__v">{{ amount(fees.totalUsdt) }} USDT</text></view>
+        <view class="pp-kv"><text class="pp-kv__k">{{ copy.total }}</text><text class="pp-kv__v">{{ isBank ? `$${amount(fees.totalUsdt)}` : `${amount(fees.totalUsdt)} USDT` }}</text></view>
       </view>
 
       <view class="pp-warn">
@@ -301,7 +292,7 @@ const notice = computed<Notice | null>(() => {
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
   switch (s.notice) {
     case 'reminder': return s.method === 'HDPAY_BANK'
-      ? { icon: 'shield', tone: 'brand', title: c.remindBankTitle, body: fill(c.remindBank, { amt: vnd(s.quote?.amountVnd ?? null) }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss }
+      ? { icon: 'shield', tone: 'brand', title: c.remindBankTitle, body: c.remindBank, primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss }
       : { icon: 'shield', tone: 'brand', title: c.remindUsdtTitle, body: fill(s.method === 'CREGIS_USDT_ERC20' ? c.remindErc20 : c.remindBep20, { amt: s.quote ? amount(s.quote.totalUsdt) : '—' }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss };
     case 'timeShort': return { icon: 'clock', tone: 'warning', title: c.timeShortTitle, body: fill(c.timeShort, { n: Math.max(1, Math.ceil((deadlineLeft.value ?? 0) / 60000)) }), primary: c.useWallet, secondary: c.continueAnyway, onPrimary: () => { dismiss(); payment.back(); }, onSecondary: () => payment.notify('reminder') };
     case 'timeout': return order
@@ -318,14 +309,12 @@ const notice = computed<Notice | null>(() => {
 });
 
 function amount(value: string | number) { return formatGroupedAmount(value); }
-function vnd(value: string | null) { return value ? BigInt(value).toLocaleString(locale.code === 'vi' ? 'vi-VN' : 'en-US') : '—'; }
-function rate(value: string) { return Number(value).toLocaleString(locale.code === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 2 }); }
 function clock(ms: number) { const total = Math.ceil(ms / 1000); return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`; }
 function chooseExternal(option: 'HDPAY_BANK' | 'USDT') { if (option === 'HDPAY_BANK' ? payment.available('HDPAY_BANK') : usdtAvailable.value) payment.choose(option); }
 function pickNetwork(method: ExternalPaymentMethod) { if (payment.available(method) && s.method !== method) void payment.select(method); }
 function copyText(data: string, message: string) { uni.setClipboardData({ data, showToast: false, success: () => toast.success(message) }); }
 function copyAddress() { if (s.intent?.address) copyText(s.intent.address, copy.value.copied); }
-function copyAmount() { const value = isBank.value ? fees.value?.amountVnd : fees.value?.totalUsdt; if (value) copyText(value, copy.value.amountCopied); }
+function copyAmount() { const value = fees.value?.totalUsdt; if (value) copyText(value, copy.value.amountCopied); }
 /** Arrow keys move through a radio group; in the network tabs they also choose the network. */
 function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
   const items = Array.from((event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]:not([aria-disabled="true"])'));
@@ -417,9 +406,6 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-kv { display: flex; justify-content: space-between; align-items: center; gap: var(--v5-space-3); min-height: 32px; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .pp-kv__k { color: var(--v5-ink-3); }
 .pp-kv__v { min-width: 0; font-weight: 500; color: var(--v5-ink); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
-.pp-vnd { display: block; margin-top: var(--v5-space-1); font: 500 32px/40px var(--font-amount); letter-spacing: -.02em; color: var(--v5-ink); }
-.pp-vnd__u { margin-left: 6px; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink-3); letter-spacing: 0; }
-.pp-fx { display: block; margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-foot { flex: none; }
 .pp-total { display: flex; align-items: baseline; justify-content: space-between; margin-top: var(--v5-space-4); }
 .pp-total.is-ruled { margin-top: var(--v5-space-5); padding-top: var(--v5-space-4); border-top: 1px solid var(--v5-border); }
@@ -442,7 +428,6 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-hero__lab { display: block; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-hero__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-1); }
 .pp-hero__amt { min-width: 0; font: 500 32px/40px var(--font-amount); letter-spacing: -.02em; white-space: nowrap; color: var(--v5-ink); }
-.pp-hero__u { margin-left: 6px; font: 500 var(--ui-type-description)/18px var(--font-v5); color: var(--v5-ink-3); letter-spacing: 0; }
 .pp-hero .pp-cd { margin-top: 10px; }
 .pp-hero__meta { display: block; margin-top: var(--v5-space-3); padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-copy { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
