@@ -10,7 +10,7 @@
  * runtime reports against the active binding. This ID is a lookup key, not
  * cryptographic proof of a physical device.
  */
-import { mockServerUuid } from "@/store/mock-id";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { reportNativeSessionStage } from "@/api/native-session-storage";
 
 const STORAGE_KEY = "nexgrid-device-id-v1";
@@ -67,7 +67,7 @@ export function getDeviceIdentity(): DeviceIdentity {
   if (runtimeIdentity) return { ...runtimeIdentity };
   try {
     const cached = uni.getStorageSync(STORAGE_KEY) as DeviceIdentity | "";
-    if (cached && typeof cached === "object" && cached.deviceId) {
+    if (cached && typeof cached === "object" && typeof cached.deviceId === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(cached.deviceId)) {
       runtimeIdentity = { deviceId: cached.deviceId, deviceName: cached.deviceName || "Web device" };
       reportNativeSessionStage("INSTALLATION_REUSED");
       return { ...runtimeIdentity };
@@ -78,7 +78,7 @@ export function getDeviceIdentity(): DeviceIdentity {
     // first run / storage unavailable
   }
   const identity: DeviceIdentity = {
-    deviceId: mockServerUuid(),
+    deviceId: requireCryptoUuid(),
     deviceName: deriveDeviceName(readSystemInfo()),
   };
   reportNativeSessionStage("INSTALLATION_CREATED");

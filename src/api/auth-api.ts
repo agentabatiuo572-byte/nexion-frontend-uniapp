@@ -58,6 +58,16 @@ export interface OAuthExchangeRequest {
   displayName?: string;
 }
 
+export interface OAuthProviderLoginRequest {
+  provider: Exclude<OAuthProvider, "PASSKEY">;
+  flowId: string;
+  flowKey: string;
+  receipt: string;
+  challengeNo?: string;
+  code?: string;
+  captchaTicket?: string;
+}
+
 export interface PasswordResetOtpVerifyResult {
   status: "PASSWORD_RESET_OTP_VERIFIED";
 }
@@ -107,6 +117,10 @@ export interface AuthApi {
   logout(): Promise<void>;
 }
 
+export interface OAuthLoginApi {
+  completeProviderLogin(request: OAuthProviderLoginRequest, expectedRevision: number): Promise<LoginResult>;
+}
+
 function loginOtpFromResponse(value: unknown): LoginOtpResult {
   if (!value || typeof value !== "object") {
     throw new ApiError({ kind: "protocol", message: "LOGIN_OTP_RESPONSE_INVALID" });
@@ -143,6 +157,7 @@ function passwordResetOtpFromResponse(value: unknown): PasswordResetOtpResult {
 const SETTLED_REGISTRATION_CONFLICTS = new Set([
   "USER_REGISTRATION_ACCOUNT_EXISTS",
   "USER_REGISTRATION_K1_IP_LIMIT",
+  "USER_REGISTRATION_DEVICE_LIMIT",
   "USER_REGISTRATION_SPONSOR_AMBIGUOUS",
   "USER_REGISTRATION_SPONSOR_STATE_CHANGED",
   "USER_REGISTRATION_SPONSOR_ENVIRONMENT_MISMATCH",
@@ -304,17 +319,22 @@ function oauthDevelopmentChallengeFromResponse(value: unknown): string {
 export function createAuthApi(
   client: ApiClient,
   vault: SessionVault,
-  options: { refreshCredentialMode?: RefreshCredentialMode; clientSurface?: "APP";
+  options: { refreshCredentialMode?: RefreshCredentialMode; clientSurface?: "APP" | "H5";
     installationId?: () => string; executionSupported?: () => boolean; attemptStorage?: KeyValueStorage } = {},
-): AuthApi {
+): AuthApi & OAuthLoginApi {
   const refreshCredentialMode = options.refreshCredentialMode ?? "token";
   let restoreInFlight: Promise<SessionSnapshot | null> | null = null;
   const cookieHeaders = refreshCredentialMode === "cookie"
     ? { "X-Nexion-Refresh-Mode": "cookie" }
     : undefined;
-  const sessionIssuanceHeaders = options.clientSurface === "APP"
-    ? { ...cookieHeaders, "X-NexGrid-Client-Surface": "APP" }
+  const sessionIssuanceHeaders = options.clientSurface
+    ? { ...cookieHeaders, "X-NexGrid-Client-Surface": options.clientSurface }
     : cookieHeaders;
+  const otpHeaders = () => options.clientSurface === "H5" ? {
+    ...sessionIssuanceHeaders,
+    "X-NexGrid-Installation-Id": (options.installationId?.() ?? ""),
+    "X-NexGrid-Execution-Supported": "false",
+  } : sessionIssuanceHeaders;
   const attempts = createLoginAttempt({ storage: options.attemptStorage,
     installationId: options.installationId ?? (() => ""), executionSupported: options.executionSupported ?? (() => false) });
   const contextHeaders = (attempt: LoginAttempt) => ({ ...sessionIssuanceHeaders,
@@ -348,7 +368,7 @@ export function createAuthApi(
           attempts.challenge(attempt);
         else if (method === "OAUTH" && body?.flowId && cause instanceof ApiError
             && cause.message === "OAUTH_ACCOUNT_LINK_REQUIRED") attempts.complete(attempt);
-        else if (method === "REGISTRATION" && isSettledRegistrationConflict(cause)) attempts.complete(attempt);
+        else if ((method === "REGISTRATION" || method === "OAUTH") && isSettledRegistrationConflict(cause)) attempts.complete(attempt);
         else attempts.failed(attempt, cause);
       }
       throw cause;
@@ -400,17 +420,18 @@ export function createAuthApi(
         throw new ApiError({ kind: "configuration", message: "LOGIN_ATTEMPT_REQUIRED" });
       const paths: Record<string, string> = { PASSWORD: "/auth/users/login", OTP: "/auth/users/login/otp/verify",
         TWO_FACTOR: "/auth/users/login/2fa", REGISTRATION: "/auth/users/register", OAUTH: "/auth/users/oauth/exchange" };
+      const providerLogin = attempt.authMethod === "OAUTH" && !!attempt.context.flowId;
       const method = !attempt.pending && attempt.authMethod === "PASSWORD" && attempt.context.challengeNo
         ? "TWO_FACTOR" : attempt.authMethod;
       const reference = method === "TWO_FACTOR" ? attempt.context.challengeNo! : attempt.authReference;
-      const path = paths[method];
+      const path = providerLogin ? "/auth/users/oauth/provider/complete" : paths[method];
       if (!path) throw new ApiError({ kind: "configuration", message: "LOGIN_ATTEMPT_REQUIRED" });
       // Only newly entered secrets may vary. Identity, provider/challenge, and
       // registration choices remain those of the original durable attempt.
       const result = await issue(method, reference, { path, method: "POST", authenticated: false,
         body: { ...attempt.context, password: credentials.password, code: credentials.code, captchaTicket: credentials.captchaTicket },
-        ...(attempt.authMethod === "PASSWORD" ? { acceptedResponses: [{ status: 428, code: 428, message: "USER_TWO_FACTOR_VERIFICATION_REQUIRED" }] } : {}),
-      }, attempt.authMethod === "OAUTH", attempt.pending);
+        ...(attempt.authMethod === "PASSWORD" || providerLogin ? { acceptedResponses: [{ status: 428, code: 428, message: "USER_TWO_FACTOR_VERIFICATION_REQUIRED" }] } : {}),
+      }, attempt.authMethod === "OAUTH" && !providerLogin, attempt.pending);
       return "kind" in result ? result : { kind: "authenticated", user: result.user, vaultRevision: result.vaultRevision };
     },
     async recoverLogin() {
@@ -425,8 +446,18 @@ export function createAuthApi(
       // A missing/in-progress result never authorizes a fresh attempt.
       if (data?.sessionEndedReason) { attempts.complete(attempt); throw new ApiError({ kind: "auth", message: data.sessionEndedReason }); }
       const result = consumeLoginResponse(data, vault, revision, refreshCredentialMode);
-      if (result.kind === "authenticated") attempts.complete(attempt);
+      if (result.kind !== "authenticated") throw new ApiError({ kind: "protocol", message: "LOGIN_RECOVERY_RESPONSE_INVALID" });
+      attempts.complete(attempt);
       return result;
+    },
+    async completeProviderLogin(request, expectedRevision) {
+      if (restoreInFlight) await restoreInFlight;
+      if (vault.revision() !== expectedRevision)
+        throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
+      return issue("OAUTH", `${request.provider}:${request.flowId}`, {
+        path: "/auth/users/oauth/provider/complete", method: "POST", authenticated: false, body: request,
+        acceptedResponses: [{ status: 428, code: 428, message: "USER_TWO_FACTOR_VERIFICATION_REQUIRED" }],
+      }) as Promise<LoginResult>;
     },
     async login(request) {
       // Set-Cookie from a bootstrap restore must settle before a new login.
@@ -452,6 +483,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
+        headers: otpHeaders(),
       }));
     },
     async completeOtpLogin(request) {
@@ -473,6 +505,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
+        headers: otpHeaders(),
       }));
     },
     async verifyPasswordResetOtp(request) {
@@ -516,6 +549,7 @@ export function createAuthApi(
         method: "POST",
         body: request,
         authenticated: false,
+        headers: otpHeaders(),
       });
       return registrationOtpFromResponse(data);
     },

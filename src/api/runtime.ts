@@ -101,7 +101,10 @@ export async function prepareSessionVault(): Promise<void> {
   await nativeSessionStorage.ready();
   sessionVault.hydrate();
 }
-let clientSurface: "APP" | undefined;
+let clientSurface: "APP" | "H5" | undefined;
+// #ifdef H5
+clientSurface = "H5";
+// #endif
 // #ifdef APP-PLUS
 clientSurface = "APP";
 // #endif
@@ -128,7 +131,7 @@ export const apiClient = createRuntimeApiClient({
 // Authentication is server-backed in both dev and prod; Java active profile
 // selects the development challenge or production provider flow.
 export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface,
-  installationId: () => clientSurface === "APP" ? getDeviceId() : "",
+  installationId: getDeviceId,
   executionSupported: () => false,
   attemptStorage: typeof sessionStorage !== "undefined" ? {
     get: () => { const value = sessionStorage.getItem("uvel-login-attempt"); return value ? JSON.parse(value) : null; },

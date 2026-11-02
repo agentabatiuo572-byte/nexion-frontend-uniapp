@@ -129,10 +129,9 @@
       </view>
 
       <!-- OAuth (step 1, not reset) -->
-      <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset' && !remoteApiEnabled" class="lg-oauth">
-        <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
-        <AuthProviderGrid :busy="loading" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
-      </view>
+      <ThirdPartyAuth v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'"
+        :disabled="loading" :return-to="returnParam" :sponsor-code="refOnLogin"
+        @busy="thirdPartyBusy = $event; syncLoginRecovery()" />
 
       <!-- Footer -->
       <!-- #ifdef APP-PLUS -->
@@ -157,21 +156,21 @@ import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
 // #endif
 import { navReset, takeNavigationQuery } from "@/lib/route";
-import { ref, computed, nextTick, onUnmounted } from "vue";
+import { ref, computed, nextTick, watch, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
-import AuthProviderGrid from "@/components/auth-provider-grid.vue";
+import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
 import { authAccountKeyForPhone } from "@/store/auth-account";
-import { normalizeRefCode } from "@/store/sponsorship";
+import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { toast } from "@/store/ui";
 import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
@@ -180,7 +179,6 @@ import type { LocaleCode } from "@/i18n";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
 import { apiRuntimeConfig, authApi, h5RefreshCookieEnabled, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
-import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";
 import type { RegistrationReceipt, UserSession } from "@/api/contracts";
 import { dialCodeForLocale, phoneFormatHint, sanitizePhoneInput, validateNationalPhone } from "@/auth/phone-number";
@@ -242,7 +240,9 @@ const error = ref<string | null>(null);
 const phoneTouched = ref(false);
 const submitAttempted = ref(false);
 const resendLeft = ref(0);
-const loading = ref(false);
+const credentialLoading = ref(false);
+const thirdPartyBusy = ref(false);
+const loading = computed({ get: () => credentialLoading.value || thirdPartyBusy.value, set: value => { credentialLoading.value = value; } });
 const loginRecoveryPending = ref(false);
 const loginResultUnknown = ref(false);
 const replayAvailable = ref(false);
@@ -252,15 +252,18 @@ const retryCode = ref("");
 const retryNeedsPassword = computed(() => ["PASSWORD", "TWO_FACTOR", "REGISTRATION"].includes(retryContext.value?.authMethod ?? ""));
 const retryNeedsCode = computed(() => ["OTP", "TWO_FACTOR", "REGISTRATION"].includes(retryContext.value?.authMethod ?? "")
   || !!retryContext.value?.context.challengeNo);
-const canRetryOriginal = computed(() => !loading.value && replayAvailable.value
+const canRetryOriginal = computed(() => !loading.value && (!retryContext.value || (replayAvailable.value
   && (!retryNeedsPassword.value || !!retryPassword.value)
-  && (!retryNeedsCode.value || /^\d{6}$/.test(retryCode.value)));
+  && (!retryNeedsCode.value || /^\d{6}$/.test(retryCode.value)))));
 function syncLoginRecovery() {
   retryContext.value = authApi.pendingLoginContext();
   loginResultUnknown.value = authApi.pendingLogin();
   loginRecoveryPending.value = loginResultUnknown.value || !!retryContext.value;
-  if (!loginResultUnknown.value) replayAvailable.value = !!retryContext.value;
+  replayAvailable.value = !!retryContext.value;
 }
+// One read when an unresolved attempt first reaches this page. Further reads
+// belong to an explicit retry; a failed read must never start a polling loop.
+watch(loginResultUnknown, (pending) => { if (pending) void recoverLoginResult(); }, { flush: "post" });
 function cancelLoginVerification() {
   if (loading.value || authApi.pendingLogin()) return;
   authApi.cancelLoginChallenge();
@@ -270,15 +273,24 @@ function cancelLoginVerification() {
   syncLoginRecovery();
 }
 async function retryOriginalLogin(captchaTicket?: string) {
-  if (loading.value || !replayAvailable.value || !retryContext.value) return;
+  if (loading.value) return;
+  if (!retryContext.value) { await recoverLoginResult(); return; }
+  if (!replayAvailable.value) return;
   if ((retryNeedsPassword.value && !retryPassword.value) || (retryNeedsCode.value && !/^\d{6}$/.test(retryCode.value))) return;
-  error.value = null;
-  loading.value = true;
+  const flowVersion = otpFlowVersion;
   const originalContext = retryContext.value;
+  error.value = null;
   try {
+    // A normal Retry first consumes any session already issued by this attempt.
+    // CAPTCHA is a continuation of that same click, with its original proof.
+    if (authApi.pendingLogin() && typeof captchaTicket !== "string") {
+      await recoverLoginResult();
+      if (!mounted || flowVersion !== otpFlowVersion || !authApi.pendingLogin()) return;
+    }
+    loading.value = true;
     const result = await authApi.retryLogin({ password: retryPassword.value || undefined, code: retryCode.value || undefined,
       ...(typeof captchaTicket === "string" ? { captchaTicket } : {}) });
-    if (!mounted) {
+    if (!mounted || flowVersion !== otpFlowVersion) {
       if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
@@ -287,37 +299,37 @@ async function retryOriginalLogin(captchaTicket?: string) {
       replayAvailable.value = true; retryCode.value = "";
     } else finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete,
       serverProfile: result.user, serverSessionRevision: result.vaultRevision,
-      recoveredRegistration: originalContext?.authMethod === "REGISTRATION", registrationReceipt: result.registrationReceipt,
-      registrationLanguage: originalContext?.context.language });
-  } catch (cause) { if (mounted) {
+      recoveredRegistration: originalContext?.authMethod === "REGISTRATION" || !!result.registrationReceipt,
+      registrationReceipt: result.registrationReceipt, registrationLanguage: originalContext?.context.language });
+  } catch (cause) { if (mounted && flowVersion === otpFlowVersion) {
     syncLoginRecovery();
     if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") { captchaPurpose.value = "replay"; showCaptcha.value = true; }
     else error.value = remoteLoginError(cause);
   } }
-  finally { if (!showCaptcha.value || captchaPurpose.value !== "replay") { retryPassword.value = ""; retryCode.value = ""; } if (mounted) loading.value = false; }
+  finally { if (!showCaptcha.value || captchaPurpose.value !== "replay") { retryPassword.value = ""; retryCode.value = ""; } if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 async function recoverLoginResult() {
   if (loading.value || !authApi.pendingLogin()) return;
+  const flowVersion = otpFlowVersion;
+  const originalContext = retryContext.value;
   error.value = null;
   loading.value = true;
-  const originalContext = retryContext.value;
   try {
     const result = await authApi.recoverLogin();
-    if (!mounted) {
+    if (!mounted || flowVersion !== otpFlowVersion) {
       if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
     syncLoginRecovery();
-    replayAvailable.value = false;
     if (result.kind === "authenticated") finishSignIn({ accountId: authenticatedAccountId(result.user),
       onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision,
-      recoveredRegistration: originalContext?.authMethod === "REGISTRATION", registrationReceipt: result.registrationReceipt,
-      registrationLanguage: originalContext?.context.language });
+      recoveredRegistration: originalContext?.authMethod === "REGISTRATION" || !!result.registrationReceipt,
+      registrationReceipt: result.registrationReceipt, registrationLanguage: originalContext?.context.language });
   } catch (cause) {
-    if (!mounted) return;
+    if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
-    error.value = cause instanceof Error && cause.message === "APP_REPLACED" ? t.value.login.sessionReplaced : t.value.login.unknownAttempt;
-  } finally { if (mounted) loading.value = false; }
+    error.value = cause instanceof Error && cause.message === "APP_REPLACED" ? t.value.login.sessionReplaced : remoteLoginError(cause);
+  } finally { if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 const returnParam = ref<string | null>(null);
 const refOnLogin = ref<string | null>(null);
@@ -339,15 +351,14 @@ let mounted = true;
 onLoad((options) => {
   syncLoginRecovery();
   const o = (options || {}) as Record<string, string>;
-  const forwarded = new URLSearchParams(takeNavigationQuery("/pages/login/login")).get("return");
-  if (forwarded || o.return) returnParam.value = forwarded || o.return;
+  const forwarded = new URLSearchParams(takeNavigationQuery("/pages/login/login"));
+  if (forwarded.get("return") || o.return) returnParam.value = forwarded.get("return") || o.return;
   serverSessionReloadNotice.value = o.notice === "server-session-reload";
   // #ifdef H5
   browserUnsupportedNotice.value = o.notice === "secure-browser-unsupported";
   // #endif
   // [FEAT-SHARE4] 与注册页同一 client 预检:非法码不入绑定链(服务端权威校验另行)。
-  const normRef = normalizeRefCode(o.ref);
-  if (normRef) refOnLogin.value = normRef;
+  refOnLogin.value = normalizeRegistrationSponsorCode(o.ref ?? forwarded.get("ref"), remoteApiEnabled);
 });
 
 const showCaptcha = ref(false);
@@ -411,64 +422,6 @@ const primaryDisabledReason = computed(() => {
   return "";
 });
 const resendInText = computed(() => (t.value.login.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
-function showOauthUnavailable(provider: string) {
-  toast.info(fmt(t.value.login.oauthUnavailableTitle, { provider }), t.value.login.oauthUnavailableBody);
-}
-
-function oauthProvider(label: string): OAuthProvider | null {
-  return label === "Google" ? "GOOGLE"
-    : label === "Apple" ? "APPLE"
-    : label === "Passkey" ? "PASSKEY"
-    : label === "Telegram" ? "TELEGRAM"
-    : null;
-}
-
-function oauthError(cause: unknown, provider: OAuthProvider): string {
-  const code = cause instanceof ApiError ? cause.message : "";
-  if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
-      ) {
-    return `${fmt(t.value.login.oauthUnavailableTitle, { provider })}: ${t.value.login.oauthUnavailableBody}`;
-  }
-  return remoteLoginError(cause);
-}
-
-async function startOauth(label: string) {
-  const provider = oauthProvider(label);
-  if (!provider || !remoteApiEnabled) {
-    showOauthUnavailable(label);
-    return;
-  }
-  if (loading.value) return;
-  const flowVersion = ++otpFlowVersion;
-  loading.value = true;
-  error.value = null;
-  try {
-    const result = await authApi.oauthExchange({
-      provider,
-      displayName: `${provider} User`,
-    });
-    if (!mounted || flowVersion !== otpFlowVersion) {
-      authApi.discardSessionIfCurrent(result.vaultRevision);
-      return;
-    }
-    const completed = completeSignIn({
-      identity: authenticatedAccountId(result.user),
-      returnTo: returnParam.value,
-      onboardingComplete: result.user.onboardingComplete,
-      serverProfile: result.user,
-      serverSessionRevision: result.vaultRevision,
-    });
-    if (!completed.ok) {
-      loading.value = false;
-      error.value = t.value.authOtp.errorServiceUnavailable;
-    }
-  } catch (cause) {
-    if (!mounted || flowVersion !== otpFlowVersion) return;
-    loading.value = false;
-    error.value = oauthError(cause, provider);
-  }
-}
-
 function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
@@ -1023,7 +976,8 @@ function close() {
 }
 function goRegister() {
   invalidateOtpFlow();
-  navReset({ url: "/pages/register/register", fail: () => {} });
+  const query = refOnLogin.value ? `?ref=${encodeURIComponent(refOnLogin.value)}` : "";
+  navReset({ url: `/pages/register/register${query}`, fail: () => {} });
 }
 
 function cleanup() {

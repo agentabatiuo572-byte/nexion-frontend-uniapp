@@ -81,20 +81,7 @@
             <text v-if="resendLeft > 0" class="rg-resend__count">{{ resendInText }}</text>
             <text v-else class="rg-resend__btn" role="button" tabindex="0" :aria-label="t.register.resend" @click="resend" @keydown.enter.prevent="resend" @keydown.space.prevent="resend">{{ t.register.resend }}</text>
           </view>
-          <view class="rg-invite">
-            <text class="rg-invite__lbl">{{ t.register.inviteLabel }} <text class="rg-invite__opt">{{ lockedRef ? t.register.inviteLockedLabel : t.register.inviteOptional }}</text></text>
-            <!-- [FEAT-SHARE4] 链接来源码锁定置灰:不可修改不可删除(主人 2026-07-08 拍板);
-                 无码自然进入才渲染可手输框。 -->
-            <view v-if="lockedRef">
-              <view class="rg-locked">
-                <text class="rg-locked__code">{{ lockedRef }}</text>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-              </view>
-              <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
-            </view>
-            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :disabled="verifying" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
-            <text v-if="inviteInvalid" id="register-invite-error" class="rg-invite__err" role="alert">{{ t.register.inviteInvalid }}</text>
-          </view>
+
         </view>
 
         <!-- Step 3: password -->
@@ -113,6 +100,20 @@
             </view>
           </view>
         </view>
+          <view v-if="step < 3" class="rg-invite">
+            <text class="rg-invite__lbl">{{ t.register.inviteLabel }} <text class="rg-invite__opt">{{ lockedRef ? t.register.inviteLockedLabel : t.register.inviteOptional }}</text></text>
+            <!-- [FEAT-SHARE4] 链接来源码锁定置灰:不可修改不可删除(主人 2026-07-08 拍板);
+                 无码自然进入才渲染可手输框。 -->
+            <view v-if="lockedRef">
+              <view class="rg-locked">
+                <text class="rg-locked__code">{{ lockedRef }}</text>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              </view>
+              <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
+            </view>
+            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :aria-label="t.register.invitePlaceholder" :value="invite" :disabled="verifying || completing" :aria-invalid="inviteInvalid" :aria-describedby="inviteInvalid ? 'register-invite-error' : undefined" confirm-type="done" @input="onInvite" @confirm="onCta" />
+            <text v-if="inviteInvalid" id="register-invite-error" class="rg-invite__err" role="alert">{{ t.register.inviteInvalid }}</text>
+          </view>
       </view>
 
       <view v-if="reviewNotice" class="rg-review">
@@ -146,10 +147,9 @@
       <text v-if="!ctaEnabled && !busy && (phoneTouched || submitAttempted)" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
-      <view v-if="step === 1 && !remoteApiEnabled" class="rg-oauth">
-        <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
-        <AuthProviderGrid :busy="busy" :development="apiRuntimeConfig.environment === 'dev'" @select="startOauth" />
-      </view>
+      <ThirdPartyAuth v-if="step === 1" :disabled="verifying || completing || checkingInvite"
+        :sponsor-code="currentSponsorCode()" :before-start="manualInviteAccepted"
+        :sponsor-rejected="rejectProviderInvite" @busy="thirdPartyBusy = $event" />
 
       <!-- Footer -->
       <view class="rg-footer">
@@ -170,7 +170,7 @@
 import { formatAmount } from "@/lib/amount-display";
 import { privacyPolicyHref } from "@/lib/privacy-return";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
-import { navReset, navTo } from "@/lib/route";
+import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, nextTick, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -178,13 +178,13 @@ import BrandLockup from "@/components/brand-lockup.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
-import AuthProviderGrid from "@/components/auth-provider-grid.vue";
+import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { apiClient, apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
-import type { OAuthProvider, RegistrationRequest } from "@/api/auth-api";
+import type { RegistrationRequest } from "@/api/auth-api";
 import { createPublicSponsorPreviewApi } from "@/api/public-sponsor-preview-api";
 import { registerMockAuthCredential } from "@/api/mock-auth-api";
 import { registerAndLogin, requiresOriginalRegistrationRecovery } from "@/auth/registration-auto-login";
@@ -288,7 +288,8 @@ type SponsorPreview = { displayName: string; vRank: string | null };
 const sponsorPreview = ref<SponsorPreview | null>(null);
 
 onLoad(async (options) => {
-  const raw = options && (options as Record<string, string>).ref;
+  const forwarded = new URLSearchParams(takeNavigationQuery("/pages/register/register"));
+  const raw = options?.ref ?? forwarded.get("ref") ?? undefined;
   privacyHref.value = privacyPolicyHref("/pages/register/register", raw);
   if (remoteApiEnabled) {
     const previewLoadVersion = ++sponsorPreviewLoadVersion;
@@ -296,6 +297,7 @@ onLoad(async (options) => {
     sponsorPreview.value = null;
     const norm = normalizeRegistrationSponsorCode(raw, true);
     if (!norm) return;
+    invite.value = norm;
     try {
       const preview = await publicSponsorPreviewApi.preview(norm);
       if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
@@ -336,7 +338,8 @@ const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
-const busy = computed(() => verifying.value || completing.value || checkingInvite.value);
+const thirdPartyBusy = ref(false);
+const busy = computed(() => verifying.value || completing.value || checkingInvite.value || thirdPartyBusy.value);
 const originalRegistrationRecoveryRequired = computed(() => requiresOriginalRegistrationRecovery(authApi,
   { countryCode: country.value, phone: phoneClean.value }));
 const ctaEnabled = computed(() => !registrationNeedsLogin.value && !originalRegistrationRecoveryRequired.value
@@ -362,62 +365,6 @@ const ctaDisabledReason = computed(() => {
   return t.value.register.ctaDisabledPassword;
 });
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
-function showOauthUnavailable(provider: string) {
-  toast.info(fmt(t.value.register.oauthUnavailableTitle, { provider }), t.value.register.oauthUnavailableBody);
-}
-
-function oauthProvider(label: string): OAuthProvider | null {
-  return label === "Google" ? "GOOGLE"
-    : label === "Apple" ? "APPLE"
-    : label === "Passkey" ? "PASSKEY"
-    : label === "Telegram" ? "TELEGRAM"
-    : null;
-}
-
-function oauthError(cause: unknown, provider: OAuthProvider): string {
-  const code = cause instanceof Error ? cause.message : "";
-  if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
-      ) {
-    return `${fmt(t.value.register.oauthUnavailableTitle, { provider })}: ${t.value.register.oauthUnavailableBody}`;
-  }
-  return t.value.authOtp.errorServiceUnavailable;
-}
-
-async function startOauth(label: string) {
-  const provider = oauthProvider(label);
-  if (!provider || !remoteApiEnabled) {
-    showOauthUnavailable(label);
-    return;
-  }
-  if (busy.value) return;
-  const flowVersion = ++otpFlowVersion;
-  completing.value = true;
-  error.value = null;
-  try {
-    const result = await authApi.oauthExchange({
-      provider,
-      displayName: `${provider} User`,
-    });
-    if (!mounted || flowVersion !== otpFlowVersion) {
-      authApi.discardSessionIfCurrent(result.vaultRevision);
-      return;
-    }
-    const completed = completeSignIn({
-      identity: `user:${result.user.userId}`,
-      onboardingComplete: result.user.onboardingComplete,
-      serverProfile: result.user,
-      serverSessionRevision: result.vaultRevision,
-    });
-    if (!completed.ok) {
-      completing.value = false;
-      error.value = t.value.authOtp.errorServiceUnavailable;
-    }
-  } catch (cause) {
-    if (!mounted || flowVersion !== otpFlowVersion) return;
-    completing.value = false;
-    error.value = oauthError(cause, provider);
-  }
-}
 const reviewNotice = computed(() => registrationRisk.value !== null && registrationRisk.value.cluster.status !== "clear");
 // 分因提示: 同簇重复账号用「设备已有账号活动」口径;裸号/未绑定用「先审核,绑定后释放」口径。
 const reviewNoticeBody = computed(() => {
@@ -492,8 +439,8 @@ function goSendCode() {
   if (!phoneOk.value) { error.value = t.value.register.errorInvalidPhone; return; }
   void requestCode();
 }
-// Lite keeps the invite field on the OTP step, so a typed code is checked before
-// password setup: the server consumes the OTP before it rejects the code. A link code
+// The shared invite field is checked before sending and again before password
+// setup: the server consumes the OTP before it rejects the code. A link code
 // was already previewed when it was locked. Only an explicit not-found/invalid
 // answer blocks; a failed check is no verdict, and registration still validates the code.
 async function manualInviteAccepted(): Promise<boolean> {
@@ -517,7 +464,11 @@ async function manualInviteAccepted(): Promise<boolean> {
 }
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
 async function requestCode(captchaTicket?: string) {
-  if (verifying.value) return;
+  if (busy.value) return;
+  const checkVersion = otpFlowVersion;
+  const stepAtCheck = step.value;
+  if (!(await manualInviteAccepted())) return;
+  if (checkVersion !== otpFlowVersion || step.value !== stepAtCheck) return;
   devBackendDown.value = false;
   const phoneAtRequest = fullPhone.value;
   const flowVersion = ++otpFlowVersion;
@@ -543,7 +494,10 @@ async function requestCode(captchaTicket?: string) {
       if (cause instanceof Error && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) {
         showCaptcha.value = true;
       } else {
-        error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
+        error.value = cause instanceof ApiError && cause.message === "USER_REGISTRATION_DEVICE_LIMIT"
+          ? t.value.register.errorDeviceSignupLimited
+          : cause instanceof ApiError && cause.message === "USER_REGISTRATION_K1_IP_LIMIT"
+            ? t.value.register.errorSignupLimited : geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
       }
       // 开发构建里区分「产品坏了」与「本地后端没起」——网络级失败时亮工程横幅。
       if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.environment === "dev" && cause instanceof ApiError && cause.kind === "network";
@@ -618,7 +572,7 @@ function registrationErrorText(cause: unknown): string {
 function recoverRejectedRegistration(cause: unknown): boolean {
   if (!(cause instanceof ApiError) || cause.kind !== "http") return false;
   const invalidOtp = cause.status === 422 && cause.message === "USER_REGISTRATION_OTP_INVALID";
-  const signupLimited = cause.status === 409 && cause.message === "USER_REGISTRATION_K1_IP_LIMIT";
+  const signupLimited = cause.status === 409 && ["USER_REGISTRATION_K1_IP_LIMIT", "USER_REGISTRATION_DEVICE_LIMIT"].includes(cause.message);
   const sponsorRejected = cause.message === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || cause.message === "USER_REGISTRATION_SPONSOR_INVALID";
   if (!invalidOtp && !signupLimited && !sponsorRejected) return false;
   // These refusals leave no new account; the challenge cannot be reused.
@@ -634,17 +588,25 @@ function recoverRejectedRegistration(cause: unknown): boolean {
   // The invite field and resend live on step 2 in Lite.
   step.value = invalidOtp || sponsorRejected ? 2 : 1;
   if (sponsorRejected) {
-    // A link code can stop working after it was locked; reopen the field so the user can fix or clear it.
-    if (lockedRef.value) {
-      invite.value = lockedRef.value;
-      lockedRef.value = null;
-      sponsorPreview.value = null;
-    }
-    inviteInvalid.value = true;
+    reopenRefusedInvite();
     return true;
   }
-  error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired : t.value.register.errorSignupLimited;
+  error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired
+    : cause.message === "USER_REGISTRATION_DEVICE_LIMIT" ? t.value.register.errorDeviceSignupLimited : t.value.register.errorSignupLimited;
   return true;
+}
+
+// Shared with provider registration; like App BUG-030 this marks the current field.
+function reopenRefusedInvite() {
+  if (lockedRef.value) invite.value = lockedRef.value;
+  lockedRef.value = null;
+  sponsorPreview.value = null;
+  inviteInvalid.value = true;
+}
+function rejectProviderInvite() {
+  step.value = 1;
+  error.value = null;
+  reopenRefusedInvite();
 }
 
 async function verifyCode() {
@@ -1019,7 +981,10 @@ function back() {
   step.value = (step.value === 3 ? 2 : 1) as Step;
 }
 function close() { navReset({ url: "/pages/onboarding/intro", fail: () => {} }); }
-function goLogin() { navReset({ url: "/pages/login/login", fail: () => {} }); }
+function goLogin() {
+  const code = currentSponsorCode();
+  navReset({ url: `/pages/login/login${code ? `?ref=${encodeURIComponent(code)}` : ""}`, fail: () => {} });
+}
 function recoverOriginalLogin() { if (!completing.value) navTo("/pages/login/login"); }
 function goTerms() { navTo("/pages/onboarding/terms"); }
 const privacyHref = ref(privacyPolicyHref("/pages/register/register"));
@@ -1076,6 +1041,7 @@ onUnmounted(() => cleanup());
 .rg-resend__change { color: var(--v5-ink-3); }
 .rg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
 .rg-resend__btn { color: var(--v5-brand); font-weight: 500; }
+.rg-invite { margin-top: 20px; }
 .rg-invite__lbl { display: block; font-size: 12px; color: var(--v5-ink-3); margin-bottom: 6px; padding: 0 4px; }
 .rg-invite__opt { color: var(--v5-ink-4); }
 /* [FEAT-SHARE4] 链接来源码锁定态:同 rg-field 形制但压暗 + 锁标,无输入交互。 */
