@@ -35,4 +35,3 @@ export function readCapacityPending(accountKey:string,targetProductNo?:string):C
       || capacityIntent(value.operation as 'replace'|'keep',q)!==value.intent) throw new Error('CAPACITY_RECOVERY_INVALID');
   return targetProductNo&&q.targetProductNo!==targetProductNo?null:value as CapacityPending;
 }
-
