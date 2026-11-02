@@ -51,7 +51,7 @@ export function createAuthDemo(state) {
     handles(path){return path.startsWith('/auth/users/')||path.startsWith('/api/auth/captcha/')||['/api/app/security/phone/challenge','/api/app/security/phone','/api/app/security/two-factor/challenge','/api/app/security/two-factor'].includes(path);},
     handle(url,method,headers,body) {
       const path=url.pathname;
-      if(method==='POST'&&!['/auth/users/refresh','/auth/users/logout','/auth/users/session/discard'].includes(path)) {
+      if(method==='POST'&&path!=='/auth/users/refresh') {
         trace.push({path,installationId:headers['x-nexgrid-installation-id']??'',clientSurface:headers['x-nexgrid-client-surface']??'',executionSupported:headers['x-nexgrid-execution-supported']??'',refreshMode:headers['x-nexion-refresh-mode']??'',captchaTicketPresent:!!body.captchaTicket,sponsorCode:body.sponsorCode??null,attemptId:headers['x-nexgrid-login-attempt-id']??null});
       }
       if(path==='/auth/users/refresh')return state.authState==='signed-in'?session(state.authUser??existing):fail(401,'USER_REFRESH_TOKEN_REQUIRED');
