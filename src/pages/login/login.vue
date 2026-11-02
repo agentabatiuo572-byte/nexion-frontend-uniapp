@@ -531,7 +531,7 @@ function finishSignIn(
 ) {
   signInTimer = undefined;
   if (!mounted || (context && !isCurrentOtpFlow(context))) return;
-  const registrationDestination = "/pages/index/index";
+  const registrationDestination = "/pages/register/success";
   const result = completeSignIn({
     identity: session.accountId,
     returnTo: session.recoveredRegistration ? registrationDestination : returnParam.value,
