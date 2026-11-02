@@ -43,17 +43,18 @@
                 <NxButton :label="copy.topup" variant="brand" size="small" @click="payment.topup" />
               </view>
             </view>
-            <view class="pp-opt" :class="{ off: !payment.available('HDPAY_BANK') }" role="radio" :tabindex="s.method === 'HDPAY_BANK' ? 0 : -1" aria-checked="false" :aria-disabled="!payment.available('HDPAY_BANK')" @click="chooseExternal('HDPAY_BANK')" @keydown.enter.prevent="chooseExternal('HDPAY_BANK')">
+            <!-- Unconfigured channels are hidden, never shown as unavailable. -->
+            <view v-if="payment.available('HDPAY_BANK')" class="pp-opt" role="radio" :tabindex="s.method === 'HDPAY_BANK' ? 0 : -1" aria-checked="false" @click="payment.choose('HDPAY_BANK')" @keydown.enter.prevent="payment.choose('HDPAY_BANK')">
               <view class="pp-opt__row">
                 <view class="pp-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg></view>
-                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.bank }}</text><text class="pp-opt__h">{{ payment.available('HDPAY_BANK') ? copy.bankHint : copy.unavailable }}</text></view>
+                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.bank }}</text><text class="pp-opt__h">{{ copy.bankHint }}</text></view>
                 <view class="pp-radio" aria-hidden="true" />
               </view>
             </view>
-            <view class="pp-opt" :class="{ off: !usdtAvailable }" role="radio" :tabindex="s.method !== 'WALLET' && s.method !== 'HDPAY_BANK' ? 0 : -1" aria-checked="false" :aria-disabled="!usdtAvailable" @click="chooseExternal('USDT')" @keydown.enter.prevent="chooseExternal('USDT')">
+            <view v-if="usdtAvailable" class="pp-opt" role="radio" :tabindex="s.method !== 'WALLET' && s.method !== 'HDPAY_BANK' ? 0 : -1" aria-checked="false" @click="payment.choose('USDT')" @keydown.enter.prevent="payment.choose('USDT')">
               <view class="pp-opt__row">
                 <view class="pp-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 8h8" /><path d="M12 8v9" /><path d="M7.5 12c0 1 2 1.6 4.5 1.6s4.5-.6 4.5-1.6" /></svg></view>
-                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.usdt }}</text><text class="pp-opt__h">{{ usdtAvailable ? copy.usdtHint : copy.unavailable }}</text></view>
+                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.usdt }}</text><text class="pp-opt__h">{{ copy.usdtHint }}</text></view>
                 <view class="pp-radio" aria-hidden="true" />
               </view>
             </view>
@@ -63,10 +64,9 @@
         <template v-else-if="s.step === 'network'">
           <text class="pp-label">{{ copy.networkLabel }}</text>
           <view class="pp-tabs" role="radiogroup" :aria-label="copy.networkLabel" @keydown.right.prevent="moveFocus($event, 1, true)" @keydown.down.prevent="moveFocus($event, 1, true)" @keydown.left.prevent="moveFocus($event, -1, true)" @keydown.up.prevent="moveFocus($event, -1, true)">
-            <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id, off: !payment.available(tab.id) }" role="radio" :tabindex="s.method === tab.id ? 0 : -1"
-              :aria-checked="s.method === tab.id" :aria-disabled="!payment.available(tab.id)" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
+            <view v-for="tab in networks" :key="tab.id" class="pp-tab" :class="{ on: s.method === tab.id }" role="radio" :tabindex="s.method === tab.id ? 0 : -1"
+              :aria-checked="s.method === tab.id" @click="pickNetwork(tab.id)" @keydown.enter.prevent="pickNetwork(tab.id)">
               <text class="pp-tab__a">{{ tab.title }}</text><text class="pp-tab__b">{{ tab.chain }}</text>
-              <text v-if="!payment.available(tab.id)" class="pp-soon">{{ copy.soon }}</text>
             </view>
           </view>
         </template>
@@ -259,7 +259,7 @@ const usdtAvailable = computed(() => payment.available('CREGIS_USDT_BSC') || pay
 const networks = computed(() => [
   { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
   { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
-]);
+].filter(tab => payment.available(tab.id)));
 const sheetTitle = computed(() => s.step === 'network' ? copy.value.networkTitle : s.step === 'bank' ? copy.value.bankTitle : copy.value.title);
 const rounded = computed(() => !!s.quote?.roundingAdjustmentUsdt && Number(s.quote.roundingAdjustmentUsdt) !== 0);
 const fees = computed(() => s.intent ?? s.quote);
@@ -310,8 +310,7 @@ const notice = computed<Notice | null>(() => {
 
 function amount(value: string | number) { return formatGroupedAmount(value); }
 function clock(ms: number) { const total = Math.ceil(ms / 1000); return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`; }
-function chooseExternal(option: 'HDPAY_BANK' | 'USDT') { if (option === 'HDPAY_BANK' ? payment.available('HDPAY_BANK') : usdtAvailable.value) payment.choose(option); }
-function pickNetwork(method: ExternalPaymentMethod) { if (payment.available(method) && s.method !== method) void payment.select(method); }
+function pickNetwork(method: ExternalPaymentMethod) { if (s.method !== method) void payment.select(method); }
 function copyText(data: string, message: string) { uni.setClipboardData({ data, showToast: false, success: () => toast.success(message) }); }
 function copyAddress() { if (s.intent?.address) copyText(s.intent.address, copy.value.copied); }
 function copyAmount() { const value = fees.value?.totalUsdt; if (value) copyText(value, copy.value.amountCopied); }
@@ -380,7 +379,6 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-opts { display: grid; gap: 10px; margin-top: var(--v5-space-2); }
 .pp-opt { min-height: 68px; box-sizing: border-box; padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-l); background: var(--v5-surface-2); box-shadow: inset 0 0 0 1px var(--v5-border); display: flex; flex-direction: column; justify-content: center; }
 .pp-opt.on { background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
-.pp-opt.off { opacity: .5; }
 .pp-opt__row { display: flex; align-items: center; gap: var(--v5-space-3); }
 .pp-opt__ic { flex: none; width: 40px; height: 40px; border-radius: var(--v5-radius-s); display: grid; place-items: center; background: var(--v5-surface-3); color: var(--v5-ink-2); }
 .pp-opt.on .pp-opt__ic { background: var(--v5-brand-soft); color: var(--v5-brand); }
@@ -393,13 +391,11 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 /* The 32px pill keeps its 44px hit area without adding visible space. */
 .pp-short :deep(.nx-button) { margin: -6px 0; }
 .pp-short__t { min-width: 0; color: var(--v5-warning); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
-.pp-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: var(--v5-space-2); }
+.pp-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: var(--v5-space-2); }
 .pp-tab { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; box-sizing: border-box; padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .pp-tab.on { background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
 .pp-tab__a { font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .pp-tab__b { font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.pp-tab.off .pp-tab__a, .pp-tab.off .pp-tab__b { color: var(--v5-ink-3); }
-.pp-soon { margin-top: var(--v5-space-1); height: 20px; padding: 0 6px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); color: var(--v5-ink-3); font: 500 11px/20px var(--font-v5); }
 .pp-fees { margin-top: var(--v5-space-5); padding: var(--v5-space-1) var(--v5-space-4); border-radius: var(--v5-radius-l); background: var(--v5-surface-2); }
 .pp-fees .pp-kv { min-height: 36px; }
 .pp-fees .pp-kv + .pp-kv { border-top: 1px solid var(--v5-border); }
