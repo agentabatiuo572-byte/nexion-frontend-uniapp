@@ -28,7 +28,7 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="margin-left: 4px">{{ isTaskCycleReceipt ? computeCopy.statuses.POSTED : t.receipt.stampVerified }}</text>
           </text>
-          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ isLegacyVerification ? t.receipt.statusRecorded : t.receipt.statusSettled }} · {{ fmtDate(receipt.settledAt) }}</text>
+          <text v-if="receiptTime" style="font-size: 12px; color: var(--v5-ink-3)">{{ receiptTime.label }} · {{ fmtDate(receiptTime.at) }}</text>
         </view>
       </view>
 
@@ -107,6 +107,14 @@ function isCanonicalComputeReceipt(
 const isLegacyVerification = computed(() => {
   const receipt = props.receipt;
   return receipt ? !isCanonicalComputeReceipt(receipt) && receipt.category === "KY" : false;
+});
+const receiptTime = computed(() => {
+  const receipt = props.receipt;
+  if (!receipt) return null;
+  if (isCanonicalComputeReceipt(receipt) && receipt.settledAt === null) {
+    return { label: computeCopy.value.completedAt, at: receipt.completedAt };
+  }
+  return { label: isLegacyVerification.value ? t.value.receipt.statusRecorded : t.value.receipt.statusSettled, at: receipt.settledAt! };
 });
 const stampColor = computed(() => (isLegacyVerification.value ? "var(--v5-tech-cyan)" : "var(--v5-brand)"));
 

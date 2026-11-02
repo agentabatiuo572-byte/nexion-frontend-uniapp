@@ -92,7 +92,8 @@ export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   proofHash: string | null;
   startedAt: number;
   completedAt: number;
-  settledAt: number;
+  /** Null when the backend has not supplied an actual posting time. */
+  settledAt: number | null;
   durationSec: number;
   source: "server";
   sourceEnvironment: ServerSourceEnvironment;
@@ -111,7 +112,6 @@ export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   rewardNex: number;
   earningStatus: string;
   completedAt: number;
-  settledAt: number | null;
 }
 
 export interface CanonicalComputeReceiptPage {
@@ -366,6 +366,7 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
   }
   const startedAt = timestamp(source.startedAt) as number;
   const completedAt = timestamp(source.completedAt) as number;
+  const settledAt = timestamp(source.settledAt, true);
   const durationSec = integer(source.durationSec);
   if (completedAt < startedAt) return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   return {
@@ -388,7 +389,9 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
     proofHash,
     startedAt,
     completedAt,
-    settledAt: timestamp(source.settledAt, true) ?? completedAt,
+    // The legacy detail constructor copies completedAt into settledAt. It does
+    // not establish a posting time; Task Center can supply the v2 projection.
+    settledAt: metadata.executionMode !== "SIMULATED" && settledAt === completedAt ? null : settledAt,
     durationSec,
     ...metadata,
     ...proof,
@@ -414,7 +417,6 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
     rewardNex: decimal(source.rewardNex),
     earningStatus,
     completedAt: timestamp(source.completedAt) as number,
-    settledAt: timestamp(source.settledAt, true),
     ...executionMetadata(source),
   };
 }
