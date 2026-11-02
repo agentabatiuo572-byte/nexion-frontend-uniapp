@@ -1,5 +1,6 @@
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
 import type { EntrySurface } from "@/lib/entry-surface";
+import type { TaskExecutionMetadata } from "@/api/task-assignment-api";
 
 export type DeviceKind =
   | "phone"
@@ -33,7 +34,7 @@ export const TASK_CATEGORY_LABEL: Record<TaskCategory, string> = {
   SP: "Speech",
 };
 
-export interface CurrentTask {
+export interface CurrentTask extends TaskExecutionMetadata {
   id: string;          // e.g. "IG-A78234"  ({category}-A{counter})
   category: TaskCategory;
   type: string;        // human label, e.g. "Image Gen"

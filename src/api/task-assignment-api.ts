@@ -3,7 +3,13 @@ import { ApiError } from "./errors";
 import { matchesRuntimeProvenance, type ServerSourceEnvironment } from "./runtime-provenance";
 import type { ApiEnvironment } from "./runtime-config";
 
-export interface CanonicalTaskAssignment {
+export interface TaskExecutionMetadata {
+  executionMode?: "MODEL" | "RULE_CYCLE";
+  proofKind?: "MODEL_EXECUTION" | "RULE_SETTLEMENT";
+  modelExecuted?: boolean;
+}
+
+export interface CanonicalTaskAssignment extends TaskExecutionMetadata {
   taskNo: string;
   deviceId: number;
   taskId: string;
@@ -57,7 +63,7 @@ export interface CanonicalTaskAssignments {
   serverCanonical: true;
 }
 
-export interface CanonicalComputeReceipt {
+export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   receiptNo: string;
   taskNo: string;
   deviceId: number;
@@ -85,7 +91,7 @@ export interface CanonicalComputeReceipt {
   serverCanonical: true;
 }
 
-export interface CanonicalComputeReceiptSummary {
+export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   receiptNo: string;
   taskNo: string;
   taskClass: CanonicalTaskAssignment["taskClass"];
@@ -199,6 +205,18 @@ function provenance(source: Record<string, unknown>, mode: ApiEnvironment): {
   };
 }
 
+function executionMetadata(source: Record<string, unknown>): TaskExecutionMetadata {
+  const executionMode = source.executionMode ?? undefined;
+  const proofKind = source.proofKind ?? undefined;
+  const modelExecuted = source.modelExecuted ?? undefined;
+  if ((executionMode !== undefined && executionMode !== "MODEL" && executionMode !== "RULE_CYCLE")
+    || (proofKind !== undefined && proofKind !== "MODEL_EXECUTION" && proofKind !== "RULE_SETTLEMENT")
+    || (modelExecuted !== undefined && typeof modelExecuted !== "boolean")
+    || ((executionMode === "RULE_CYCLE" || proofKind === "RULE_SETTLEMENT")
+      && (executionMode !== "RULE_CYCLE" || proofKind !== "RULE_SETTLEMENT" || modelExecuted !== false))) return invalid();
+  return { executionMode, proofKind, modelExecuted };
+}
+
 function task(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTaskAssignment {
   const source = record(value);
   const proof = provenance(source, mode);
@@ -240,6 +258,7 @@ function task(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTaskA
       settledAt: timestamp(source.settledAt, true),
       configVersion: source.configVersion == null ? undefined : text(String(source.configVersion)),
     } : {}),
+    ...executionMetadata(source),
     ...proof,
   };
 }
@@ -343,6 +362,7 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
     completedAt,
     settledAt: timestamp(source.settledAt, true) ?? completedAt,
     durationSec,
+    ...executionMetadata(source),
     ...proof,
   };
 }
@@ -365,6 +385,7 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
     rewardNex: decimal(source.rewardNex),
     earningStatus,
     completedAt: timestamp(source.completedAt) as number,
+    ...executionMetadata(source),
   };
 }
 

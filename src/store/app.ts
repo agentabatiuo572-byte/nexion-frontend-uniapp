@@ -782,6 +782,9 @@ export const useApp = defineStore("app", () => {
       settlementBatchNo: task.settlementBatchNo,
       settledAt: task.settledAt,
       configVersion: task.configVersion,
+      executionMode: task.executionMode,
+      proofKind: task.proofKind,
+      modelExecuted: task.modelExecuted,
     };
   }
 
