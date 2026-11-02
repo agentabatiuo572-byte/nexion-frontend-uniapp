@@ -116,6 +116,9 @@ export function supportDemo(url,locale,state,request) {
   if(!p.startsWith(root))return undefined;
   const method=request.method(),input=method==='GET'?{}:request.postDataJSON(),now=new Date().toISOString();
   const text=(zh,en,vi)=>locale==='zh'?zh:locale==='vi'?vi:en;
+  // B16 registration welcome: one copy per language, the same for every new account.
+  const welcome=text('你好，欢迎加入 UVEL！设备、收益或充值提现有任何问题，直接在这里给我们留言，我们会尽快回复你。','Hi, welcome to UVEL! If you have any questions about your devices, earnings, deposits or withdrawals, just message us here and we\'ll get back to you soon.','Xin chào, chào mừng bạn đến với UVEL! Nếu bạn có câu hỏi về thiết bị, thu nhập, nạp hoặc rút tiền, hãy nhắn cho chúng tôi tại đây, chúng tôi sẽ phản hồi sớm nhất.');
+  if(p===root+'/advisor'&&state.messageState==='welcome-unassigned')return {assignmentId:null,currentAdvisorId:null,currentAdvisorName:null,assignmentState:'UNBOUND',availability:'UNBOUND'};
   if(p===root+'/advisor')return {assignmentId:1,currentAdvisorId:state.supportAdvisorId??1,currentAdvisorName:text('演示顾问','Demo advisor','Cố vấn mẫu'),assignmentState:'ASSIGNED',availability:'BUSY'};
   if(p===root+'/conversation-management')return {clearUserHistory:true,
     clearedPeers:(state.supportUserClearMarkers||[]).filter(row=>row.accountId===supportAccountId(state)).map(({accountId,...marker})=>structuredClone(marker))};
@@ -123,10 +126,11 @@ export function supportDemo(url,locale,state,request) {
   if(p===root+'/conversation-categories')return [{type:'advisor',enabled:true},{type:'support',enabled:true},{type:'ai',enabled:false}];
   const scenario=state.messageState||'normal';
   if(state.supportConversations==null) {
-    const content=text('你好，这里是原型演示会话。','Hello, this is a prototype conversation.','Xin chào, đây là hội thoại mẫu.');
+    // The demo account's advisor conversation opens with the registration welcome.
+    const content=welcome;
     // Replacement scenarios start directly at message 1, retaining their existing pages.
     const messages=['history','timeline','receipts'].includes(scenario)?[]:[{id:1,senderType:'agent',senderName:text('演示客服','Demo support','Hỗ trợ mẫu'),content,createdAt:now}];
-    state.supportConversations=[{conversation:{id:1,conversationNo:'DEMO-SUPPORT-1',conversationType:'support',status:'OPEN',version:1,ownerAgentId:'1',ownerAgentName:text('演示客服','Demo support','Hỗ trợ mẫu'),unreadCount:1,lastMessage:content,lastMessageAt:now,lastPublicMessageId:messages.length},messages,historyTruncated:false,nextCursor:null}];
+    state.supportConversations=[{conversation:{id:1,conversationNo:'DEMO-SUPPORT-1',conversationType:'advisor',status:'OPEN',version:1,ownerAgentId:'1',ownerAgentName:text('演示客服','Demo support','Hỗ trợ mẫu'),unreadCount:1,lastMessage:content,lastMessageAt:now,lastPublicMessageId:messages.length},messages,historyTruncated:false,nextCursor:null}];
   }
   // These legacy DEMO rows were all authored for the one demo advisor. Retain
   // their cids/messages and add its identity; never infer identity from a name.
@@ -140,6 +144,8 @@ export function supportDemo(url,locale,state,request) {
   // Every receipt here is an explicit server fixture, never inferred by the UI.
   if(state.supportScenario!==scenario&&state.supportConversations.length) {
     const detail=state.supportConversations[0];
+    // Leaving the unassigned welcome returns the conversation to the demo advisor.
+    if(scenario!=='welcome-unassigned'&&!detail.conversation.ownerAgentId)Object.assign(detail.conversation,{ownerAgentId:'1',ownerAgentName:text('演示客服','Demo support','Hỗ trợ mẫu')});
     state.supportHistory=['history','timeline'].includes(scenario)||scenario==='incoming'&&state.supportHistory;
     if(['history','timeline'].includes(scenario)) {
       detail.messages=Array.from({length:24},(_,index)=>({id:nextMessageId(),senderType:index%2?'user':'agent',content:text('第'+(index+1)+'条历史消息。这里保留设备查询与服务沟通的完整内容，方便检查长正文换行。','History message '+(index+1)+'. The full device and service discussion remains available for checking long text wrapping.','Tin nhắn lịch sử '+(index+1)+'. Nội dung đầy đủ về thiết bị và hỗ trợ được giữ lại để kiểm tra văn bản dài.'),createdAt:new Date(Date.now()-(25-index)*60000).toISOString(),receiptStatus:index%2?'read':'sent'}));
@@ -225,6 +231,15 @@ export function supportDemo(url,locale,state,request) {
       });
       const last=detail.messages.at(-1);
       Object.assign(detail.conversation,{unreadCount:1,lastMessage:last.content,lastMessageAt:last.createdAt,lastPublicMessageId:last.id});
+    } else if(scenario==='welcome-unassigned'||scenario==='welcome-assigned') {
+      // Just registered: the welcome is the account's only message. Unassigned
+      // accounts get it with no author (the server projects the owner as 待分配).
+      const advisor=text('演示顾问','Demo advisor','Cố vấn mẫu');
+      const author=scenario==='welcome-assigned'?{senderId:1,authorConfidence:'VERIFIED',senderName:advisor}:{};
+      detail.messages=[{id:nextMessageId(),senderType:'agent',kind:'TEXT',content:welcome,createdAt:now,...author}];
+      Object.assign(detail.conversation,{conversationType:'advisor',status:'OPEN',ownerAgentId:scenario==='welcome-assigned'?'1':null,
+        ownerAgentName:scenario==='welcome-assigned'?advisor:'待分配',unreadCount:1,lastMessage:welcome,lastMessageAt:now,lastPublicMessageId:detail.messages[0].id});
+      state.supportConversations=[detail];
     } else detail.conversation.unreadCount=scenario==='long-count'?1298:scenario==='read'?0:1;
     detail.conversation.version++;
     state.supportScenario=scenario;
