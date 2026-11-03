@@ -51,6 +51,7 @@ import NxButton from '@/components/ui/nx-button.vue';
 import PromotionTerms from './promotion-terms.vue';
 import NxSheet from '@/components/ui/nx-sheet.vue';
 import { isPromotionActive,promotionDisclosures } from '@/lib/promotion-entry';
+import { litePromotion } from '@/lib/promotion-landing';
 import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { promotionMachineSlots } from '@/components/catalog-machine-image';
 import { getProduct } from '@/mock/products';
@@ -102,7 +103,7 @@ async function loadActivities(reset=false,passive=false){
     listRead.value=true;error.value=false;
     const returnedIds=new Set(page.items.map(p=>p.activityId));
     const previous=reset?[]:activities.value.filter(p=>!returnedIds.has(p.activityId));
-    activities.value=[...new Map([...previous,...page.items.filter(p=>p.template==='DIRECT_REFERRAL'&&isPromotionActive(p))].map(activity=>[activity.activityId,activity])).values()];
+    activities.value=[...new Map([...previous,...page.items.flatMap(p=>p.template==='DIRECT_REFERRAL'&&isPromotionActive(p)?litePromotion(p)??[]:[])].map(activity=>[activity.activityId,activity])).values()];
     cursor=page.nextCursor;hasMore.value=page.hasMore;
     if(expandedActivity.value&&!activities.value.some(p=>p.activityId===expandedActivity.value)&&!hasMore.value)expandedActivity.value=null;
     const ids=new Set(activities.value.map(p=>p.activityId));
