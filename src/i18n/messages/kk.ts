@@ -1081,7 +1081,7 @@ export const kk: Messages = {
     dayOneTaskBindCard: "Карта байланыстыру",
     dayOneTaskVisitEarn: "Табысқа өту",
     dayOneTaskVisitStore: "Дүкенге өту",
-    dayOneTaskSeeRoi: "S1 табысын қарау",
+    dayOneTaskSeeRoi: "S1 болжамды табысын қарау",
     dayOneTaskSetupProfile: "Профильді толтыру",
     dayOneTaskInviteFriend: "Дос шақыру",
     dayOneCatWallet: "әмиян",
@@ -1837,7 +1837,7 @@ export const kk: Messages = {
     purchaseFundsGap: "Әмиянда ${amount} жетпейді. Рәсімдеу алдында толтырыңыз.",
     purchaseConditions: {
       rank: "Команда дәрежесі",
-      activeDirect: "Белсенді шақырылған достар",
+      activeDirect: "Сіз шақырған белсендірілген достар",
       teamComputePoints: "Команда ұпайы",
       lifetimeQuota: "Жалпы квота (қолданылған / барлығы)",
       monthlyQuota: "Айлық квота (қолданылған / барлығы)",
