@@ -127,7 +127,9 @@ export const useConfig = defineStore("config", () => {
   const publicStatsAuthority = ref<PlatformPublicStatsAuthority | null>(null);
   const configStatus = ref<"idle" | "loading" | "ready" | "failed">(remoteApiEnabled ? "idle" : "ready");
   // Interface languages from the last successful platform read; null = not configured, so every
-  // launched language is offered (also while loading and after a failed read).
+  // launched language is offered. Before the first successful read it is null. A failed refresh
+  // keeps the last list, so a switched-off language never reappears because a read failed; a
+  // successful read that omits or invalidates the field, or an API environment change, resets it.
   const interfaceLanguages = ref<readonly string[] | null>(null);
   /** Launched languages the loaded configuration switches on, in registry order; zh/en/vi always. */
   const offeredLocales = computed(() => {
@@ -182,7 +184,6 @@ export const useConfig = defineStore("config", () => {
   function clearRemotePlatformAuthority() {
     if (!remoteApiEnabled) return;
     publicStatsAuthority.value = null;
-    interfaceLanguages.value = null;
     config.value = {
       ...config.value,
       publicStats: { ...unavailableServerConfig.publicStats },
@@ -206,6 +207,7 @@ export const useConfig = defineStore("config", () => {
     invalidatePassiveTabRead("config");
     loading.value = false;
     clearRemotePlatformAuthority();
+    interfaceLanguages.value = null;
     configStatus.value = "failed";
   }
   function currentClient(): boolean {
