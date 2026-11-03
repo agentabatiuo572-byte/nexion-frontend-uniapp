@@ -157,7 +157,7 @@ import { acquireAccountCommandKey,readAccountRow,writeAccountRow } from '@/store
 import { registerCheckoutLeaveGuard } from '@/lib/promotion-leave-guard';
 import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadline-clock';
 import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
-import { promotionCheckoutHref } from '@/lib/promotion-entry';
+import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
@@ -446,7 +446,7 @@ async function confirmPayment(){
     &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&JSON.stringify(order.value?.items)===lines&&order.value?.payBy===payBy
     &&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&!session.unknown;
   paymentConfirming.value=true;paymentSheetOpen.value=false;
-  let rejection='';
+  let rejection='',paymentDestination='';
   try{
     await run(async()=>{
       await executeSelectedPurchase({amount:amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,
@@ -462,9 +462,11 @@ async function confirmPayment(){
             throw cause;
           }
         },
-        paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo},commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}});
+        paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
+          navigate:href=>{paymentDestination=href;},reorder:()=>{paymentDestination=promotionStoreHref(props.activityId,props);},
+          commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}});
     });
-    if(!readCurrent(generation))return;
+    if(!readCurrent(generation)||paymentDestination)return;
     if(order.value?.paymentStatus==='PAID')await readActivation();
     else{
       await refreshWallet();
@@ -475,7 +477,10 @@ async function confirmPayment(){
       const cancel=await confirm({title:flowCopy.value.cannotPay,message:reason||p.value.disabledNote,confirmLabel:p.value.cancelOrder,cancelLabel:p.value.keep,owner:paymentDialogOwner});
       if(cancel&&readCurrent(generation))await cancelOrder();
     }
-  }finally{paymentConfirming.value=false;}
+  }finally{
+    paymentConfirming.value=false;
+    if(paymentDestination&&readCurrent(generation))await navTo(paymentDestination);
+  }
 }
 async function recover():Promise<boolean>{
   let verified=false;

@@ -570,7 +570,7 @@ onLoad(async (options) => {
   const pendingQuery=new URLSearchParams(takeNavigationQuery('/pages/store/checkout').replace(/^\?/,''));
   const navigationQuery:Record<string,string>={};pendingQuery.forEach((value,key)=>{navigationQuery[key]=value;});
   const o = { ...navigationQuery, ...(options || {}) } as Record<string, string>;
-  if (o.items !== undefined || o.activityId || o.voucherId || o.promotion==='1') {
+  if (o.orderNo || o.items !== undefined || o.activityId || o.voucherId || o.promotion==='1') {
     try {
       const items:PromotionItem[]=o.items ? JSON.parse(o.items.trim().startsWith('%')?decodeURIComponent(o.items):o.items) : o.product ? [{productNo:o.product,quantity:Number(o.quantity??1)}] : [];
       if(!o.orderNo)validatePromotionItems(items);
@@ -2254,7 +2254,9 @@ async function submitRemoteOrder(): Promise<void> {
           throw error;
         }
       },
-      paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},commandKey:()=>{const action=beginOrderAction(submissionScope.accountKey,'pay',created.orderNo,created.amountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
+      paymentCurrent,{kind:'ORDER_PAY',payload:{orderNo:created.orderNo},orderNo:created.orderNo,deadlineAt:persisted.expiresAt,image:p.imageUrl,
+        reorder:()=>void navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`),
+        commandKey:()=>{const action=beginOrderAction(submissionScope.accountKey,'pay',created.orderNo,created.amountUsdt,'EXTERNAL');paymentKey=action.key;return action.key;},parseReceipt:paidOrderReceipt});
     if (!paid) { step.value='confirm'; return; }
     if (!scopeIsCurrent()) return;
     if (paid.orderNo !== created.orderNo) {
