@@ -1,28 +1,31 @@
 // Loopback-only task-cycle, v2 and receipt scenarios. Never imported by src.
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
-export function computeDemo(url, locale, state, request) {
+export function computeDemo(url, locale, state, request, fleetDevices) {
   const path = url.pathname;
   if (!path.startsWith('/api/tasks/')) return undefined;
   const now = Date.now(), mode = state.computeState || 'cycles';
   const simulated = mode === 'cycles', version = simulated ? 3 : 2;
-  const empty = state.dataState === 'empty' || state.fleetState === 'none';
   const text = (zh, en, vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
   const names = [text('图像生成周期', 'Image generation cycle', 'Chu kỳ tạo ảnh'), text('Cloud Share 收益周期', 'Cloud Share reward cycle', 'Chu kỳ thu nhập Cloud Share')];
   const anchor=state.computeAnchor??=now;
-  const devices = state.fleetState==='phone-history'?[41,42,43,44]:state.scopeState==='mixed'?[41,42,43]:[41,42];
-  const deviceType=id=>({41:'BOX',42:'CLOUD',43:'PHONE',44:'MOBILE'})[id];
-  const deviceName=id=>({41:'UVELBox S1',42:'Cloud Share',43:'Demo PHONE',44:'Demo MOBILE'})[id];
-  const instance=id=>id===41?'REVIEW-S1':id===42?'DEMO-CLOUD':`DEMO-${deviceType(id)}`;
-  const amount=id=>id===41?'0.023456':id===42?'0.000032':id===43?'0.100000':'0.200000';
-  const total=devices.length===4?'0.323488':devices.length===3?'0.123488':'0.023488';
+  // Tasks run on the fleet the account actually holds, as the fleet read shows it: activated devices with their own
+  // ids, kinds and names (Lite phones by their PHONE/MOBILE identity), plus devices the user stopped, which keep their
+  // history but run nothing. Traded-in and inventory devices have no task, and the empty account has none at all.
+  const fleet = fleetDevices().filter(device => device.activatedAt !== null || state.stoppedDevices?.includes(device.id));
+  const byId = new Map(fleet.map(device => [device.id, device])), devices = fleet.map(device => device.id);
+  const deviceType=id=>byId.get(id).deviceType;
+  const deviceName=id=>byId.get(id).name;
+  const instance=id=>byId.get(id).instanceNo;
+  const amount=id=>({CLOUD:'0.000032',PHONE:'0.100000',MOBILE:'0.200000'})[deviceType(id)]??'0.023456';
+  const total=(devices.reduce((sum,id)=>sum+Math.round(Number(amount(id))*1e6),0)/1e6).toFixed(6);
   const task = (deviceId, status, history = false) => {
-    const cloud = deviceId === 42, index = cloud ? 1 : 0;
+    const cloud = deviceType(deviceId) === 'CLOUD', index = cloud ? 1 : 0;
     const start = history ? anchor - 600000 : now - 30000;
     const execution = simulated ? { executionMode: 'SIMULATED', proofKind: 'TASK_RECEIPT', modelExecuted: false }
       : cloud ? { executionMode: 'RULE_CYCLE', proofKind: 'RULE_SETTLEMENT', modelExecuted: false }
         : { executionMode: 'MODEL', proofKind: 'MODEL_EXECUTION', modelExecuted: true };
     return { ...proof, ...execution, protocolVersion: version, taskNo: `DEMO-TASK-${deviceId}-${history ? 'DONE' : 'LIVE'}`, deviceId,
-      taskId: cloud ? 'cloud-cycle' : 'image-gen', taskName: deviceId>42?`${deviceType(deviceId)} ${text('任务周期','task cycle','chu kỳ tác vụ')}`:names[index], taskClass: 'IG', model: simulated ? '' : cloud ? 'Cloud reward' : 'SDXL', client: 'UVEL', status,
+      taskId: cloud ? 'cloud-cycle' : 'image-gen', taskName: ['PHONE','MOBILE'].includes(deviceType(deviceId))?`${deviceType(deviceId)} ${text('任务周期','task cycle','chu kỳ tác vụ')}`:names[index], taskClass: 'IG', model: simulated ? '' : cloud ? 'Cloud reward' : 'SDXL', client: 'UVEL', status,
       rewardUsdt: cloud && simulated ? 0 : Number(amount(deviceId)), ...(simulated ? { rewardAsset: cloud ? 'UVT' : 'USDT', rewardAmount: cloud ? '0.123456' : amount(deviceId) } : {}),
       requiredSeconds: 60, queuedAt: start - 1000, startedAt: status === 'QUEUED' ? null : start, completableAt: ['QUEUED', 'RECOVERING'].includes(status) ? null : start + 60000,
       completedAt: history ? start + 60000 : null, actualDurationSec: status === 'QUEUED' ? null : history ? 60 : 30,
@@ -34,21 +37,21 @@ export function computeDemo(url, locale, state, request) {
   const status = ({ queued: 'QUEUED', verifying: 'VERIFYING', recovering: 'RECOVERING', failed: 'FAILED', cancelled: 'CANCELLED' })[mode] || 'RUNNING';
   if (path === '/api/tasks/assignments' || path === '/api/tasks/v2/assignments') return { ...proof, protocolVersion: version, serverNow: now,
     pendingEarned: [{ asset: 'USDT', amount: ['pending','blocked'].includes(mode) ? total : '0.000000', taskCount: ['pending','blocked'].includes(mode) ? devices.length : 0 }],
-    devices: empty ? [] : devices.map(deviceId => ({ deviceId, instanceNo: instance(deviceId), deviceType: deviceType(deviceId), lockUntil: null,
+    devices: devices.map(deviceId => ({ deviceId, instanceNo: instance(deviceId), deviceType: deviceType(deviceId), lockUntil: null,
       recoveryPending: mode === 'recovering', recoveryReason: mode === 'recovering' ? 'LEGACY_COMPLETE_OUTCOME_UNKNOWN' : null,
       simulationState: state.stoppedDevices?.includes(deviceId) ? 'STOPPED' : 'RUNNING',
       currentTask: state.stoppedDevices?.includes(deviceId) || mode === 'recovering' ? null : task(deviceId, status), recentTasks: [task(deviceId, 'COMPLETED', true)] })) };
   // App 99cf4991's minute-batch fixture, extended to cover hardware and Cloud Share together.
   const batch = { batchNo: 'DEMO-BATCH-1', asset: 'USDT', amount: total, taskCount: devices.length, status: 'POSTED', windowStart: anchor - 600000, windowEnd: anchor - 540000, postedAt: anchor - 60000 };
-  if (path === '/api/tasks/v2/settlements') return { ...proof, records: empty ? [] : [batch], nextCursor: null };
+  if (path === '/api/tasks/v2/settlements') return { ...proof, records: devices.length ? [batch] : [], nextCursor: null };
   if (path === '/api/tasks/v2/settlements/DEMO-BATCH-1') return { ...proof, ...batch, items: devices.map(deviceId => ({ taskNo: `DEMO-TASK-${deviceId}-DONE`, receiptNo: `DEMO-RECEIPT-${deviceId}`, deviceId, taskType: 'IG', amount: amount(deviceId), completedAt: anchor - 540000 })) };
   const receipts = devices.map(deviceId => {
     const done = task(deviceId, 'COMPLETED', true);
     return { ...done, settledAt: simulated?done.settledAt:done.completedAt, receiptNo: `DEMO-RECEIPT-${deviceId}`, deviceInstanceNo: instance(deviceId), deviceName: deviceName(deviceId), deviceType: deviceType(deviceId), deviceGpu: deviceId === 41 ? '4 × RTX 4090' : '', vramTotalGb: deviceId === 41 ? 96 : null,
-      rewardNex: deviceId === 42 && simulated ? .123456 : 0, earningStatus: 'POSTED', proofHash: simulated ? null : 'a'.repeat(64), durationSec: 60 };
+      rewardNex: deviceType(deviceId) === 'CLOUD' && simulated ? .123456 : 0, earningStatus: 'POSTED', proofHash: simulated ? null : 'a'.repeat(64), durationSec: 60 };
   });
   // Current summary DTO omits posting time; direct simulated receipt details carry it.
-  if (path === '/api/tasks/receipts') return { ...proof, items: empty ? [] : receipts.map(({settledAt,...summary})=>summary), total: empty ? 0 : receipts.length, nextOffset: null, nextCursor: null };
+  if (path === '/api/tasks/receipts') return { ...proof, items: receipts.map(({settledAt,...summary})=>summary), total: receipts.length, nextOffset: null, nextCursor: null };
   if (path.startsWith('/api/tasks/receipts/')) return receipts.find(row => row.receiptNo === decodeURIComponent(path.split('/').pop()));
   if (path === '/api/tasks/simulated/stop' && request.method() === 'POST') {
     const { deviceId, expectedVersion } = request.postDataJSON();

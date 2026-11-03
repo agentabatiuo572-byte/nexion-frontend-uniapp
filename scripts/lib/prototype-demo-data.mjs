@@ -283,7 +283,7 @@ export function demoFixture(url,locale,state,request) {
       windowSales:Math.floor(sold / 3), liveActivity:demoLiveActivity({id:product.id,sold},now) };
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
-  if((state.computeState??'app')!=='app'){const compute=computeDemo(url,locale,state,request);if(compute!==undefined)return compute;}
+  if((state.computeState??'app')!=='app'){const compute=computeDemo(url,locale,state,request,()=>demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'}).devices);if(compute!==undefined)return compute;}
   // USER_ONBOARDING_REQUIRED is the backend's shared write gate (HTTP 428, code 428).
   if(state.setupGateState==='setup-required'&&request.method()==='POST'&&(pathname==='/api/trial/start'||pathname.startsWith('/api/growth/day-one/page-observations/')||/^\/api\/content\/learning\/courses\/[^/]+\/start$/.test(pathname)))throw Object.assign(new Error('USER_ONBOARDING_REQUIRED'),{status:428});
   if(pathname.startsWith('/api/growth/day-one/page-observations/'))return {accepted:true,recorded:true};
