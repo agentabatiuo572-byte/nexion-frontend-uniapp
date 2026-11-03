@@ -15,6 +15,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { parseGlobeDisplay } from "@/lib/globe-simulation";
+import { uiLocale, type UiLocale } from "@/i18n";
 
 export interface PlatformComputeConfigSnapshot {
   featureFlags: {
@@ -44,6 +45,8 @@ export interface PlatformComputeConfigSnapshot {
   };
   rewards: RewardsConfig;
   share: ShareConfig;
+  /** Interface languages the platform switches on; null when the field is missing or invalid (not configured). */
+  interfaceLanguages: UiLocale[] | null;
   updatedAt: string;
   sources: string[];
 }
@@ -402,6 +405,13 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = 
   };
 }
 
+// Optional: a missing or malformed list means "not configured" and never fails the platform read.
+function parseInterfaceLanguages(value: unknown): UiLocale[] | null {
+  if (!Array.isArray(value) || !value.every((code) => typeof code === "string" && uiLocale(code) === code)) return null;
+  const codes = value as UiLocale[];
+  return new Set(codes).size === codes.length && (["zh", "en", "vi"] as const).every((code) => codes.includes(code)) ? codes : null;
+}
+
 function parseNetworkPulse(value: unknown): PlatformConfig["networkPulse"] {
   if (value === null || value === undefined) return null;
   const row = record(value);
@@ -489,6 +499,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
       inviterReward: { nexAmount: 0 },
     },
     share: experience.share,
+    interfaceLanguages: parseInterfaceLanguages(root.interfaceLanguages),
     updatedAt: nonEmptyString(root.updatedAt),
     sources,
   };

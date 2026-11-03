@@ -136,7 +136,7 @@
       <text class="intro-lang-sheet__title">{{ t.language.pageTitle }}</text>
       <scroll-view scroll-y :show-scrollbar="false" class="intro-lang-list">
         <view
-          v-for="l in LOCALES"
+          v-for="l in platformConfig.offeredLocales"
           :key="l.code"
           class="intro-lang-row active:opacity-80"
           role="button"
@@ -170,7 +170,8 @@ import { ref, computed } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
-import { LOCALES, type LocaleCode } from "@/i18n";
+import type { LocaleCode } from "@/i18n";
+import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useIntroMotion } from "@/composables/use-intro-motion";
@@ -178,6 +179,7 @@ import { useIntroMotion } from "@/composables/use-intro-motion";
 const t = useT();
 const motionAllowed = useIntroMotion();
 const locale = useLocaleStore();
+const platformConfig = useConfig();
 const langOpen = ref(false);
 function closeLang() {
   langOpen.value = false;
