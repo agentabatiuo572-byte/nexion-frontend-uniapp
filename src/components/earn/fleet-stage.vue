@@ -80,7 +80,7 @@ type StageItem = { key: string; name: string; online: boolean; device: Device | 
 // The trial comes first, then the active fleet in its existing order.
 const items = computed<StageItem[]>(() => [
   ...(fleet.trial.active.value ? [{ key: "trial:current", name: fleet.trial.deviceName.value || "—", online: fleet.trialOnline.value, device: null }] : []),
-  ...app.visibleDevices.filter((device) => device.activatedAt !== null).map((device) => ({
+  ...app.visibleDevices.filter((device) => device.kind !== "phone" && device.activatedAt !== null).map((device) => ({
     key: device.id, name: deviceName(t.value, device), device,
     online: !deviceTaskRecovering(device) && deviceOnlineState(device, Date.now(), fleetReady.value) === "online",
   })),

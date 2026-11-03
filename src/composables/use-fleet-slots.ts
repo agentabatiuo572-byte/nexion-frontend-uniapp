@@ -30,7 +30,9 @@ export function useFleetSlots() {
   const countReady = computed(() => fleetReady.value && (app.remoteSlotsUsed != null || trial.reservedSlots.value !== null));
   const slotsUsed = computed(() => app.remoteSlotsUsed ?? app.activeSlotCount + (trial.reservedSlots.value ?? 0));
   const trialOnline = computed(() => trial.presentationReady.value && trial.status.value === "active");
-  const devices = computed(() => fleetVisible.value ? app.visibleDevices.filter(isActiveSlotDevice) : []);
+  // Lite hides phones in device views by explicit kind. A hidden phone keeps its server slot: it stays in
+  // slotsUsed and is drawn as an occupied, unclassified ("pending") slot once the count is confirmed.
+  const devices = computed(() => fleetVisible.value ? app.visibleDevices.filter((device) => device.kind !== "phone" && isActiveSlotDevice(device)) : []);
   const occupied = computed<FleetSlot[]>(() => {
     const rows = devices.value.map((device): FleetSlot => ({ kind: "device", device,
       online: !deviceTaskRecovering(device) && deviceOnlineState(device, Date.now(), fleetReady.value) === "online" }));
