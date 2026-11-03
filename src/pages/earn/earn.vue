@@ -78,16 +78,9 @@
       <EarningsLedgerCard class="mx-4 earn-block" />
       <MarketBoard class="earn-block" />
       <TaskCenter class="earn-block" />
-      <NxSection class="mx-4 earn-block earn-more-ways" :title="auditCopy.moreWays">
-        <!-- #ifdef H5 -->
-        <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
-          artwork="phone" :action="remainderCopy.downloadApp" @click="goPhoneDownload" />
-        <!-- #endif -->
-        <!-- #ifndef H5 -->
-        <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
-          artwork="phone" :action="nativePhoneAvailable ? remainderCopy.earnWays.phoneAction : remainderCopy.earnWays.phoneReadOnly" @click="goPhoneCompute" />
-        <!-- #endif -->
-        <EarnWayCard v-if="stakingVisible" eyebrow="UVT" :title="remainderCopy.stakingTitle" :body="remainderCopy.earnWays.stakingBody"
+      <!-- Lite has no phone compute way; staking is the only remaining way, so the section follows its visibility. -->
+      <NxSection v-if="stakingVisible" class="mx-4 earn-block earn-more-ways" :title="auditCopy.moreWays">
+        <EarnWayCard eyebrow="UVT" :title="remainderCopy.stakingTitle" :body="remainderCopy.earnWays.stakingBody"
           artwork="staking" :action="remainderCopy.stakingAction" @click="goStaking" />
       </NxSection>
       <!-- FEAT-DEV01: W-CAP1 任务产能说明弹层(单实例;设备卡/补贴 badge/提示线共用入口) -->
@@ -112,7 +105,6 @@ import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { useRemainderUiCopy } from "@/i18n/remainder-ui";
 import { useConfig } from "@/store/config";
-import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { navTo } from "@/lib/route";
 import { useCountUp } from "@/composables/use-count-up";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
@@ -143,17 +135,6 @@ const auditCopy = useAuditUiCopy();
 const remainderCopy = useRemainderUiCopy();
 const config = useConfig();
 const stakingVisible = computed(() => config.configStatus === "ready" && config.isEnabled("stakingVisible"));
-const nativePhoneAvailable = hasNativePhoneRuntime();
-
-// H5 exposes a download guide, never a phone calibration or execution action.
-// #ifdef H5
-function goPhoneDownload() { navTo("/pages/register/success?download=1"); }
-// #endif
-// #ifndef H5
-function goPhoneCompute() {
-  navTo(nativePhoneAvailable ? "/pages/onboarding/connect?mode=recalibrate" : "/pages/me/devices");
-}
-// #endif
 function goStaking() {
   if (stakingVisible.value) navTo("/pages/staking/staking");
 }
