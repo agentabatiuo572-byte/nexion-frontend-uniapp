@@ -5,7 +5,7 @@ import { readAccountRow, writeAccountRow, releaseAccountCommandKey } from "@/sto
 const KEY = "nexgrid-checkout-server-order-recovery-v1";
 const COMMANDS_KEY = "nexgrid-remote-checkout-commands-v1";
 type Pointer = { productNo: string; orderNo: string; intent: string; commandKey: string;
-  tradeinQuote?: CanonicalTradeinQuote; tradeinResult?: CanonicalTradeinResult };
+  tradeinQuote?: CanonicalTradeinQuote; tradeinResult?: CanonicalTradeinResult; tradeinCommandSubmitted?: boolean };
 export type CheckoutTradeinRecovery = Pointer & { tradeinQuote: CanonicalTradeinQuote };
 type Row = { orders: Record<string, Pointer> };
 const terminal = new Set(["activated", "inventory", "cancelled", "expired", "refunded", "chargeback"]);
@@ -16,7 +16,8 @@ export function rememberCheckoutOrder(accountKey: string, pointer: Pointer): voi
       && row.orders[pointer.productNo].commandKey !== pointer.commandKey) throw new Error("CHECKOUT_RECOVERY_PENDING");
   if (!writeAccountRow(KEY, accountKey, { orders: { ...row?.orders, [pointer.productNo]: pointer } })
       || readAccountRow<Row>(KEY, accountKey)?.orders?.[pointer.productNo]?.orderNo !== pointer.orderNo
-      || readAccountRow<Row>(KEY, accountKey)?.orders?.[pointer.productNo]?.commandKey !== pointer.commandKey) {
+      || readAccountRow<Row>(KEY, accountKey)?.orders?.[pointer.productNo]?.commandKey !== pointer.commandKey
+      || readAccountRow<Row>(KEY, accountKey)?.orders?.[pointer.productNo]?.tradeinCommandSubmitted !== pointer.tradeinCommandSubmitted) {
     throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
   }
 }
@@ -36,6 +37,7 @@ export function readCheckoutTradein(accountKey: string, productNo: string): Chec
   if (!pointer?.tradeinQuote) return null;
   const quote = pointer.tradeinQuote;
   if (pointer.productNo !== productNo || quote.targetProductNo !== productNo
+      || (pointer.tradeinCommandSubmitted !== undefined && typeof pointer.tradeinCommandSubmitted !== 'boolean')
       || !pointer.commandKey || !pointer.intent || !Number.isSafeInteger(quote.sourceRowVersion)
       || quote.sourceRowVersion < 0 || !["ACTIVE", "INACTIVE"].includes(quote.targetDeviceStatus)) {
     throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
