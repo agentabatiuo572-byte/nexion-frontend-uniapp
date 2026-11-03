@@ -632,6 +632,8 @@ export function demoFixture(url,locale,state,request) {
     data.reservedSlotCount=demoOrderSlots(state)+(!empty&&state.fleetState==='reserved'?1:0);
     data.trialSlotCount=trialSlotCount;
     data.slotsUsed=data.devices.filter(device=>device.activatedAt!==null).length+data.reservedSlotCount+trialSlotCount;
+    // replace = a full small fleet: the cap of 2 grows to cover hidden phones or a trial instead of reading 3/2.
+    if(state.checkoutState==='replace')data.slotCap=Math.max(data.slotCap,data.slotsUsed);
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
