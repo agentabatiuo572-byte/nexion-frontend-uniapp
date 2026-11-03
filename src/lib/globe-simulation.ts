@@ -77,20 +77,23 @@ function splitByWeights(total: number, weights: number[]): number[] {
   for (let k = 0, left = total - parts.reduce((acc, part) => acc + part, 0); k < left; k += 1) parts[order[k]] += 1;
   return parts;
 }
-/** `onlineTotal` is the home online-devices figure and `jobsTotal` the Earn task centre's job count; null shows placeholders. */
+/**
+ * Splits the home online-devices figure and the Earn task centre's job count across the centers.
+ * The page shows the totals itself; a null total leaves only that metric's per-center values as placeholders.
+ */
 export function globeSimulation(step: number, config: GlobeDisplayConfig | undefined, onlineTotal: number | null, jobsTotal: number | null) {
-  if (!config || onlineTotal === null || jobsTotal === null) return null;
+  if (!config) return null;
   const tick = Number.isFinite(step) ? Math.max(0, Math.floor(step)) : 0;
   const configured = GLOBE_CENTERS.map(center => config.centers.find(row => row.id === center.id)!);
   const weights = configured.map(row => row.weight);
-  const online = splitByWeights(onlineTotal, weights), jobs = splitByWeights(jobsTotal, weights);
-  const regions = GLOBE_CENTERS.map((center, i) => {
+  const online = onlineTotal === null ? null : splitByWeights(onlineTotal, weights);
+  const jobs = jobsTotal === null ? null : splitByWeights(jobsTotal, weights);
+  return GLOBE_CENTERS.map((center, i) => {
     const seed = (i + 1) * 101;
-    const onlineNodes = online[i], activeJobs = jobs[i];
-    return { ...center, onlineNodes, activeJobs,
-      jobsPerHour: Math.round(activeJobs * (config.throughputMin + (config.throughputMax - config.throughputMin) * drift(seed + 29, tick))),
+    const activeJobs = jobs?.[i] ?? null;
+    return { ...center, onlineNodes: online?.[i] ?? null, activeJobs,
+      jobsPerHour: activeJobs === null ? null : Math.round(activeJobs * (config.throughputMin + (config.throughputMax - config.throughputMin) * drift(seed + 29, tick))),
       avgLatencyMs: Math.round(configured[i].latencyMs + config.latencyJitterMs * drift(seed + 43, tick)),
     };
   });
-  return { regions, nodes: onlineTotal, jobs: jobsTotal };
 }
