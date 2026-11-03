@@ -929,9 +929,9 @@ const faqQStyle: CSSProperties = {
 .detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--v5-type-body-s-lh) var(--font-v5); overflow-wrap: anywhere; }
 .detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--v5-type-h3-lh) var(--font-v5); overflow-wrap: anywhere; }
 .detail-sales-stat:only-child { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
-.detail-compute-points { display: flex; align-items: flex-start; gap: 6px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.detail-compute-points { display: flex; align-items: flex-start; gap: 5px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .detail-compute-points svg { flex: none; margin-top: 2px; }
-.detail-compute-points__value { margin: 0 2px; color: var(--v5-ink-2); font-family: var(--font-metric); font-weight: 500; font-variant-numeric: tabular-nums; }
+.detail-compute-points__value { margin: 0 2px; color: var(--v5-ink-2); font-family: var(--font-metric); font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .share-returns { padding: var(--v5-space-5); }
 .share-returns__title { display: block; font: 600 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
 .share-returns__description { display: block; margin-top: var(--v5-space-1); font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }
