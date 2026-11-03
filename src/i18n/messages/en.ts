@@ -592,7 +592,6 @@ export const en = {
     onGridOnline: "online",
     networkPulseTitle: "Network pulse",
     networkLive: "live",
-    networkPublishedScope: "Published scale estimates · not live connections",
     networkEstimatedDevices: "Estimated online",
     networkGlobalGrid: "Global grid · live",
     networkMembers: "Members",
@@ -789,8 +788,6 @@ export const en = {
     liveFeedEmpty: "No task activity available.",
 
 quickMissionsActive: "5 active",
-sandboxQuoteLedgerTitle: "Sample task quotes",
-sandboxQuoteNoCredit: "Demo data · Not credited to balance",
 trustReserve: "No verifiable reserve information available.",
 },
   earn: {
@@ -3364,9 +3361,6 @@ earningsMilestone: "Earnings milestone ${threshold}",
     loadMore: "Load more",
     retry: "Retry",
 
-sandboxPayCta: "Continue demo payment",
-sandboxPayBusy: "Confirming demo payment…",
-sandboxPayHint: "Demo payments use no real funds. Check the order status after completion.",
 },
   staking: {
     title: "Staking",
@@ -3510,11 +3504,9 @@ sandboxPayHint: "Demo payments use no real funds. Check the order status after c
     centerFrankfurt: "Frankfurt",
     centerNewYork: "New York",
     centerSanJose: "San Jose",
-    simulationHint: "Nodes, tasks and latency are simulated, not live telemetry.",
     superComputeCenter: "Supercomputing center",
     title: "Global Network",
     back: "Back",
-    headline: "UVEL network overview",
     activeNodes: "Active nodes",
     activeJobs: "Jobs in flight",
     jobsPerHour: "Jobs/hr",
@@ -3528,7 +3520,6 @@ sandboxPayHint: "Demo payments use no real funds. Check the order status after c
     regionDevices: "{n} devices",
     regionJobs: "{n} jobs / hour",
     regionLatency: "Avg latency {n}ms",
-    legend: "Dots and pulses are illustrative · see region details for actual load",
     yourNodeBadge: "You",
     regionProjectionLoadingTitle: "Loading regional network",
     regionProjectionLoadingDesc: "Loading active node and task distribution.",
@@ -4461,7 +4452,6 @@ timeHoursAgo: "{n}h ago",
     heroSub: "See eligibility, payout times and reward records.",
     currentRulesTitle: "Current rules",
     currentRules: "Reach V{rank} to take part. Rewards are subject to actual payout.",
-    localRules: "Local preview is for interface demonstration only and is not a payout rule.",
     nextPayout: "Next payout: {time}",
     s1Title: "What is the team incentive pool?",
     s1Para1:
@@ -5701,7 +5691,6 @@ openSeaErrorPool: {
     reasonNewAddressAge: "Security check in progress",
     startFailed: "Something went wrong. Please try again.",
 
-sandboxMockNotice: "Demo mode · No real transfers will be made",
 },
   learning: {
     centerTitle: "Learning center",

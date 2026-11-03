@@ -576,7 +576,6 @@ export const zh: Messages = {
     onGridOnline: "在线",
     networkPulseTitle: "网络脉搏",
     networkLive: "实时",
-    networkPublishedScope: "公开规模估算 · 非实时接入统计",
     networkEstimatedDevices: "预计在线设备",
     networkGlobalGrid: "全球网格 · 实时",
     networkMembers: "注册用户",
@@ -774,8 +773,6 @@ export const zh: Messages = {
     liveFeedEmpty: "暂无任务动态。",
 
 quickMissionsActive: "5 个进行",
-sandboxQuoteLedgerTitle: "任务报价示例",
-sandboxQuoteNoCredit: "演示数据 · 不计入余额",
 trustReserve: "暂无可核验的储备资料。",
 },
   earn: {
@@ -3316,9 +3313,6 @@ earningsMilestone: "收益里程碑 ${threshold}",
     loadMore: "加载更多",
     retry: "重试",
 
-sandboxPayCta: "继续体验支付",
-sandboxPayBusy: "正在确认体验支付…",
-sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状态。",
 },
   staking: {
     title: "质押",
@@ -3459,11 +3453,9 @@ sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状
     centerFrankfurt: "法兰克福",
     centerNewYork: "纽约",
     centerSanJose: "圣何塞",
-    simulationHint: "节点、任务与延迟均为模拟展示，不代表实时运行数据。",
     superComputeCenter: "超级算力中心",
     title: "全球网络",
     back: "返回",
-    headline: "UVEL 网络示意",
     activeNodes: "在线节点",
     activeJobs: "进行中任务",
     jobsPerHour: "任务/小时",
@@ -3477,7 +3469,6 @@ sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状
     regionDevices: "{n} 台设备",
     regionJobs: "{n} 任务/小时",
     regionLatency: "平均延迟 {n}ms",
-    legend: "点阵与脉冲仅作示意 · 实际负载见区域详情",
     yourNodeBadge: "你",
     regionProjectionLoadingTitle: "正在读取区域网络",
     regionProjectionLoadingDesc: "正在加载在线节点与任务分布。",
@@ -4384,7 +4375,6 @@ timeHoursAgo: "{n}小时前",
     heroSub: "查看参与资格、发放时间和奖励记录。",
     currentRulesTitle: "当前规则",
     currentRules: "达到 V{rank} 即可参与，奖励以实际发放为准。",
-    localRules: "本地演示仅用于界面预览，不代表发放规则。",
     nextPayout: "下次发放时间：{time}",
     s1Title: "什么是团队激励池？",
     s1Para1:
@@ -5603,7 +5593,6 @@ openSeaErrorPool: {
     reasonNewAddressAge: "安全确认中",
     startFailed: "操作失败,请稍后重试",
 
-sandboxMockNotice: "体验模式 · 不会发起真实转账",
 },
   learning: {
     centerTitle: "教程中心",

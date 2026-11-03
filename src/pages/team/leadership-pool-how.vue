@@ -14,7 +14,7 @@
 
       <template v-else>
         <HowSection anchor="rules" :title="w.currentRulesTitle">
-          <text class="block" :style="bodyStyle">{{ currentRulesText }}</text>
+          <text v-if="currentRulesText" class="block" :style="bodyStyle">{{ currentRulesText }}</text>
           <text v-if="nextPayoutText" class="block" :style="{ ...bodyStyle, marginTop: '10px' }">{{ nextPayoutText }}</text>
         </HowSection>
 
@@ -132,7 +132,7 @@ const shareText = computed(() => remotePool.value && remotePool.value.totalVotes
   ? `${(remotePool.value.mySharePct * 100).toLocaleString(locale.code, { maximumFractionDigits: 2 })}%` : '—');
 const currentRulesText = computed(() => facts.value
   ? fmt(w.value.currentRules, { rank: facts.value.unlockRank })
-  : w.value.localRules);
+  : "");
 const nextPayoutText = computed(() => {
   if (!remotePool.value) return "";
   return fmt(w.value.nextPayout, { time: formatDisplayDateTime(remotePool.value.nextPayoutAt, locale.code, true) });

@@ -587,7 +587,6 @@ export const vi: Messages = {
     onGridOnline: "trực tuyến",
     networkPulseTitle: "Nhịp mạng lưới",
     networkLive: "trực tiếp",
-    networkPublishedScope: "Quy mô ước tính công bố · không phải kết nối trực tiếp",
     networkEstimatedDevices: "Ước tính trực tuyến",
     networkGlobalGrid: "Lưới toàn cầu · trực tiếp",
     networkMembers: "Thành viên",
@@ -787,8 +786,6 @@ export const vi: Messages = {
     liveFeedEmpty: "Chưa có hoạt động nhiệm vụ.",
 
 quickMissionsActive: "5 mở",
-sandboxQuoteLedgerTitle: "Báo giá tác vụ minh họa",
-sandboxQuoteNoCredit: "Dữ liệu minh họa · Không cộng vào số dư",
 trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
 },
   earn: {
@@ -3291,9 +3288,6 @@ earningsMilestone: "Mốc thu nhập ${threshold}",
     loadMore: "Tải thêm",
     retry: "Thử lại",
 
-sandboxPayCta: "Tiếp tục thanh toán trải nghiệm",
-sandboxPayBusy: "Đang xác nhận thanh toán trải nghiệm…",
-sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem trạng thái đơn hàng sau khi hoàn tất.",
 },
   staking: {
     title: "Staking",
@@ -3435,11 +3429,9 @@ sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem tr�
     centerFrankfurt: "Frankfurt",
     centerNewYork: "New York",
     centerSanJose: "San Jose",
-    simulationHint: "Nút, tác vụ và độ trễ là dữ liệu mô phỏng, không phải số liệu trực tiếp.",
     superComputeCenter: "Trung tâm siêu máy tính",
     title: "Mạng lưới toàn cầu",
     back: "Quay lại",
-    headline: "Sơ đồ mạng UVEL",
     activeNodes: "Node hoạt động",
     activeJobs: "Tác vụ đang chạy",
     jobsPerHour: "Tác vụ/giờ",
@@ -3453,7 +3445,6 @@ sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem tr�
     regionDevices: "{n} thiết bị",
     regionJobs: "{n} tác vụ / giờ",
     regionLatency: "Độ trễ TB {n}ms",
-    legend: "Các chấm và nhịp nhấp nháy chỉ để minh họa · xem tải thực tế trong chi tiết khu vực",
     yourNodeBadge: "Bạn",
     regionProjectionLoadingTitle: "Đang tải mạng theo khu vực",
     regionProjectionLoadingDesc: "Đang tải phân bố node và tác vụ đang hoạt động.",
@@ -4369,7 +4360,6 @@ timeHoursAgo: "{n} giờ",
     heroSub: "Xem điều kiện tham gia, thời gian chi trả và lịch sử thưởng.",
     currentRulesTitle: "Quy tắc hiện hành",
     currentRules: "Đạt V{rank} để tham gia. Thưởng theo kết quả chi trả thực tế.",
-    localRules: "Bản xem trước cục bộ chỉ để minh họa giao diện, không phải quy tắc chi trả.",
     nextPayout: "Lần chi trả tiếp theo: {time}",
     s1Title: "Quỹ thưởng nhóm là gì?",
     s1Para1:
@@ -5601,7 +5591,6 @@ openSeaErrorPool: {
     reasonNewAddressAge: "Đang kiểm tra an toàn",
     startFailed: "Có lỗi xảy ra, vui lòng thử lại sau",
 
-sandboxMockNotice: "Chế độ trải nghiệm · Không thực hiện chuyển tiền thật",
 },
   learning: {
     centerTitle: "Trung tâm hướng dẫn",
