@@ -501,6 +501,23 @@ export const useApp = defineStore("app", () => {
     );
   }
   /**
+   * 「N 个全球作业进行中」: real active jobs + the H9 published `activeJobsBase` (real only when unpublished).
+   * The Earn task centre and the globe page both show this number; null = unavailable.
+   * The Home overview reports `activeJobs` as `null` when the period has no
+   * settled receipts — "no value" — while the fleet snapshot defines the same
+   * day's realized total as a genuine 0. When that snapshot proves today
+   * realized exactly 0 USDT and 0 NEX, the null job count is the confirmed 0
+   * rather than unknown, so the header agrees with the device cards. #128
+   */
+  const activeJobsDisplay = computed<number | null>(() => {
+    const base = cfg.config.publicStats.activeJobsBase ?? 0;
+    if (!remoteApiEnabled) return global.value.activeJobs + base;
+    const real = homeTruth.value?.onGrid.activeJobs ?? null;
+    if (real !== null) return real + base;
+    const fleet = remoteRealizedToday.value;
+    return fleet && fleet.usdt === 0 && fleet.nex === 0 ? base : null;
+  });
+  /**
    * 🔴 提现单**列表**是源真理(与真后端 GET /api/withdrawals 同构)。
    * 此前只存最新一条,第二笔建单会把第一笔整个顶掉 —— 钱已扣、单据不可达、
    * 到账推进也永不再碰它。列表化后并发/跨日的多笔各自独立推进,互不覆盖。
@@ -2379,7 +2396,7 @@ export const useApp = defineStore("app", () => {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, remoteSlotUsage, remoteSlotsUsed, remotePendingEarned, remoteComputeProtocolVersion, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError,
-    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePhoneBindingInvalid,
+    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, activeJobsDisplay, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePhoneBindingInvalid,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshHomeTruth, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, invalidateRemoteTaskAssignments, setRemoteTaskForeground, pauseLocalPhoneRuntimeBeforeSignOut,
     tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining,
