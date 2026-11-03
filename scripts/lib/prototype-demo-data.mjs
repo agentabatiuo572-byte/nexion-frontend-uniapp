@@ -692,9 +692,8 @@ export function demoFixture(url,locale,state,request) {
     const facts=demoFleetFacts(url,locale,state);
     const data=base();data.walletUsdt=state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
     Object.assign(data,facts);
-    // Presentation only: Lite compute scenarios show device 42 as their Cloud Share cycle; the image knob may swap it.
+    // Presentation only: Lite compute scenarios show device 42 as their Cloud Share cycle.
     if((state.computeState??'app')!=='app')Object.assign(data.devices.find(device=>device.id===42)??{},{instanceNo:'DEMO-CLOUD',name:'Cloud Share',productCode:'CLOUD-SHARE',deviceType:'CLOUD'});
-    if(state.machineImageState==='alternate')Object.assign(data.devices.find(device=>device.id===42)??{},{instanceNo:'DEMO-RACK',name:'UVELRack P1',productCode:'STELLARRACK-P1',dailyUsdt:45,dailyNex:30,actualPaidUsdt:12999});
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
