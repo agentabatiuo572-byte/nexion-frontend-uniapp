@@ -39,6 +39,10 @@ export interface PublicStatsShape {
   registeredUsersBase: number;
   registeredUsersMonthlyGrowthPct: number;
   registeredUsersAnchorAt: number;
+  /** Optional until the public estimate settings are published. Seconds / users. */
+  registeredUsersTickIntervalSec?: number;
+  registeredUsersTickStepMin?: number;
+  registeredUsersTickStepMax?: number;
   realUserCount: number;
   virtualUserCount: number;
   hashratePercentileTable: ReadonlyArray<{ tops: number; cumPct: number }>;
@@ -62,8 +66,15 @@ export function publicStatsHealth(ps: PublicStatsShape | undefined | null): {
   const jitterOk = inRange(ps.onlineJitter, 0, 500);
   const devicesOk = fleetOk && rateOk && jitterOk;
   const membersOk = inRange(ps.registeredUsersBase, 0, 100_000_000)
-    && inRange(ps.registeredUsersMonthlyGrowthPct, 0, 50)
-    && fin(ps.registeredUsersAnchorAt);
+    && Number.isInteger(ps.registeredUsersBase)
+    && inRange(ps.registeredUsersTickIntervalSec, 1, 86_400)
+    && Number.isInteger(ps.registeredUsersTickIntervalSec)
+    && inRange(ps.registeredUsersTickStepMin, 0, 100_000_000)
+    && Number.isInteger(ps.registeredUsersTickStepMin)
+    && inRange(ps.registeredUsersTickStepMax, 0, 100_000_000)
+    && Number.isInteger(ps.registeredUsersTickStepMax)
+    && ps.registeredUsersTickStepMin! <= ps.registeredUsersTickStepMax!
+    && fin(ps.registeredUsersAnchorAt) && ps.registeredUsersAnchorAt >= 0;
   const rankOk = inRange(ps.realUserCount, 0, 100_000_000)
     && inRange(ps.virtualUserCount, 0, 10_000_000);
   return { fleetOk, rateOk, jitterOk, membersOk, devicesOk, rankOk };
@@ -83,17 +94,39 @@ export function payoutPerSecUsdOf(ps: PublicStatsShape): number { return dailyPa
 export function monthlyPayoutUsdOf(ps: PublicStatsShape): number { return dailyPayoutUsdOf(ps) * 30; }
 
 /**
- * 注册用户展示值:从锚点按月增速**推算**,不累加、不回退(规格 FEAT-HOME02 ③,
+ * 注册用户展示值:从锚点按公布间隔和增量**推算**,不累加、不回退(规格 FEAT-HOME02 ③,
  * 与上面 PAYOUT 同范式)。刷新页面得到同一时刻同一值;运营改基数即重置锚点。
  * 该值只用于营销展示；排名分母使用服务端 realUserCount，避免公布基数影响真实资格口径。
  */
 export function derivedRegisteredUsers(
-  ps: { registeredUsersBase: number; registeredUsersMonthlyGrowthPct: number; registeredUsersAnchorAt: number },
+  ps: Pick<PublicStatsShape, 'registeredUsersBase' | 'registeredUsersAnchorAt' | 'registeredUsersTickIntervalSec' | 'registeredUsersTickStepMin' | 'registeredUsersTickStepMax'>,
   now: number,
 ): number {
-  const months = Math.max(0, (now - ps.registeredUsersAnchorAt) / (30 * 24 * 3_600_000));
-  const v = ps.registeredUsersBase * Math.pow(1 + ps.registeredUsersMonthlyGrowthPct / 100, months);
-  return Number.isFinite(v) ? Math.floor(v) : Number.NaN;
+  const { registeredUsersBase: base, registeredUsersAnchorAt: anchor, registeredUsersTickIntervalSec: interval } = ps;
+  const { registeredUsersTickStepMin: min, registeredUsersTickStepMax: max } = ps;
+  if (!Number.isFinite(now) || !Number.isFinite(anchor) || anchor < 0
+      || !Number.isInteger(base) || base < 0 || base > 100_000_000
+      || interval == null || !Number.isInteger(interval) || interval < 1 || interval > 86_400
+      || min == null || max == null || !Number.isInteger(min) || !Number.isInteger(max)
+      || min < 0 || max > 100_000_000 || min > max) return Number.NaN;
+  // Same function as the server's GrowthPublicStatsService.tickedMembers: start + floor(n × (min + max) / 2)
+  // + offset(n). The offset keeps every tick within [min, max] while any tick count stays O(1).
+  const ticks = Math.floor(Math.max(0, now - anchor) / (interval * 1000));
+  const sum = min + max;
+  const spread = Math.min(Math.floor(sum / 2) - min, max - Math.ceil(sum / 2));
+  const value = base + Math.floor(ticks * sum / 2) + (ticks === 0 || spread === 0 ? 0 : tickOffset(anchor, ticks, spread));
+  return Number.isSafeInteger(value) ? value : Number.NaN;
+}
+
+/** Seeded 32-bit hash in [0, spread]; bit-identical to the server (wrapping multiply, unsigned shifts). */
+export function tickOffset(anchorAt: number, tick: number, spread: number): number {
+  let h = (anchorAt % 4294967296) ^ Math.imul(tick, 0x9E3779B1);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x7FEB352D);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846CA68B);
+  h ^= h >>> 16;
+  return (h >>> 0) % (spread + 1);
 }
 
 /** ≈ $20.5M — the "this month" round expression (30-day anchor month). */
@@ -134,4 +167,11 @@ export function compactNumber(n: number): string {
   if (n >= 999_500) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 99_950) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString();
+}
+
+/** Public population display: floor validated counts to a shared approximate band. */
+export function networkPopulationBand(value: number): string {
+  return value >= 10000 ? `${Math.floor(value / 1000) / 10}W+`
+    : value >= 1000 ? `${Math.floor(value / 100) / 10}K+`
+    : value >= 100 ? `${Math.floor(value / 100) * 100}+` : '<100';
 }

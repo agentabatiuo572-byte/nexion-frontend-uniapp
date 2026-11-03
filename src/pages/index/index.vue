@@ -95,7 +95,7 @@
       <QuickActionRow />
       <MyFleetSection />
       <OnGridSection />
-      <NetworkPulseCard />
+      <HomeNetworkSnapshot />
 
       <!-- ZONE 3: AI advisor bridge -->
       <NovaCardSlot v-if="NOVA_SUPPORT_VISIBLE && !remoteApiEnabled" />
@@ -131,7 +131,7 @@ import FeaturedLearningCard from "@/components/home/featured-learning-card.vue";
 import QuickActionRow from "@/components/home/quick-action-row.vue";
 import MyFleetSection from "@/components/home/my-fleet-section.vue";
 import OnGridSection from "@/components/home/on-grid-section.vue";
-import NetworkPulseCard from "@/components/home/network-pulse-card.vue";
+import HomeNetworkSnapshot from "@/components/home/network-snapshot.vue";
 import NovaCardSlot from "@/components/home/nova-card-slot.vue";
 import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
 import DoTheMathCard from "@/components/home/do-the-math-card.vue";

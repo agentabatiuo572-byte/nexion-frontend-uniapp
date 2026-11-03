@@ -563,22 +563,17 @@ sandboxSponsorEnvironmentMismatch: "Mã mời này không dùng được. Kiểm
     networkPulseTitle: "Nhịp mạng lưới",
     networkLive: "trực tiếp",
     networkPublishedScope: "Quy mô ước tính công bố · không phải kết nối trực tiếp",
-    networkEstimatedDevices: "Ước tính trực tuyến",
     networkGlobalGrid: "Lưới toàn cầu · trực tiếp",
     networkMembers: "Thành viên",
     networkDevices: "Thiết bị",
     networkYourRank: "Hạng của bạn",
     // FEAT-HOME02 phụ đề 3 ô nhịp mạng + 3 trạng thái hạng
     networkMembersSub: "+{n}%/tháng",
-    networkVerifiedMembers: "Cập nhật {at}",
-    networkVerifiedDevices: "Cập nhật {at}",
     networkDevicesSub: "chạy tác vụ",
-    networkRankUp24h: "+{n} bậc/24h",
     // 🔴 值槽 90.3px@20px 装不下任何含 "hạng" 的越南语说法(实测:Chưa xếp hạng 139.1 /
     //   Chưa có hạng 127.8 / Không hạng 110.0 / Chưa hạng 101.1),故保留最地道的标准说法,
     //   由接线方对「未上榜整态降档」渲染:≤12px 时 "Chưa xếp hạng" = 83.5px 才放得下。
     networkRankUnranked: "Chưa xếp hạng",
-    networkRankUnrankedHint: "Xem thiết bị",
     networkRankTipRanked: "Máy chủ tính thứ hạng mạng lưới. Thứ hạng chỉ để tham khảo, không ảnh hưởng đến thu nhập hay phần thưởng.",
     networkRankTipUnranked: "Bạn chưa được xếp hạng. Thứ hạng dựa trên sức mạnh tính toán hiệu dụng của các thiết bị đang chạy và đáp ứng điều kiện. Chỉ kích hoạt thiết bị chưa đảm bảo có thứ hạng.",
     // 值槽 89.3px@20px 放不下 "Đang cập nhật"(实测 135.0px),换 "Đang tải" = 78.5px。
