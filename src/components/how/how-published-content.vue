@@ -56,6 +56,7 @@ import type { HowContentDocument, HowContentKey } from "@/api/how-content-api";
 import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { PublishedContentRequestFence } from "./p3-14-published-request-fence";
+import { serverLanguage } from "@/i18n";
 
 const props = defineProps<{ contentKey: HowContentKey; back: string; neutral?: boolean }>();
 const emit = defineEmits<{ unavailable: [] }>();
@@ -90,7 +91,7 @@ async function load() {
   loading.value = true;
   error.value = false;
   try {
-    const next = await howContentApi.published(props.contentKey, locale.code);
+    const next = await howContentApi.published(props.contentKey, serverLanguage(locale.code));
     if (!requestFence.isCurrent(generation)) return;
     // An unresolved rule is unavailable; an internal reference is never its public value.
     if (next.blocks.some(block => [block.title, block.body, ...(block.items ?? [])].some(text => text.includes("{value}")))) {

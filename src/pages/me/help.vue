@@ -111,6 +111,7 @@ import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
 import { passiveTabReadScope } from "@/lib/passive-tab-read";
 import { readPublishedFaqPage, readPublishedFaqs } from "@/store/published-content";
+import { serverLanguage } from "@/i18n";
 
 const t = useT();
 const w = computed(() => t.value.help);
@@ -152,9 +153,9 @@ async function loadFaqs(force = false) {
     const targetId = requestedFaqId.value;
     const isCurrent = () => requestGeneration === faqRequestGeneration && requestedLanguage === locale.code
       && remoteAccountScope.isCurrent(requestScope) && displayScope === passiveTabReadScope(false);
-    const allItems = targetId ? await readPublishedFaqs(requestedLanguage, isCurrent, force) : null;
+    const allItems = targetId ? await readPublishedFaqs(serverLanguage(requestedLanguage), isCurrent, force) : null;
     const next = allItems ? { items: allItems, total: allItems.length, pageNum: 1 }
-      : await readPublishedFaqPage(requestedLanguage, 1, FAQ_PAGE_SIZE, force);
+      : await readPublishedFaqPage(serverLanguage(requestedLanguage), 1, FAQ_PAGE_SIZE, force);
     if (isCurrent()) {
       faqs.value = next.items;
       faqDisplayScope = displayScope;
@@ -190,7 +191,7 @@ async function loadMoreFaqs() {
   faqLoadError.value = false;
   faqLoading.value = true;
   try {
-    const next = await readPublishedFaqPage(requestedLanguage, nextPage, FAQ_PAGE_SIZE, force);
+    const next = await readPublishedFaqPage(serverLanguage(requestedLanguage), nextPage, FAQ_PAGE_SIZE, force);
     if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)
       && displayScope === passiveTabReadScope(false)) {
       faqs.value = [...new Map([...faqs.value, ...next.items].map(item => [item.id, item])).values()];

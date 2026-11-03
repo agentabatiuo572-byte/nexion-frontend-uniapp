@@ -12,8 +12,8 @@
       <text v-if="!snapshot.draws.length" class="raffle-copy">{{ copy.empty }}</text>
       <view v-for="draw in snapshot.draws" :key="draw.id" class="nx-glass-card raffle-card">
         <text class="raffle-title">{{ localizedTitle(draw) }}</text>
-        <view class="raffle-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(draw.startsAt, language) }}</text></view>
-        <view class="raffle-row"><text>{{ copy.draw }}</text><text>{{ displayDeadline(draw.drawAt, language) }}</text></view>
+        <view class="raffle-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(draw.startsAt, locale.code) }}</text></view>
+        <view class="raffle-row"><text>{{ copy.draw }}</text><text>{{ displayDeadline(draw.drawAt, locale.code) }}</text></view>
         <text class="raffle-heading">{{ copy.prizes }}</text>
         <view v-for="prize in draw.prizes" :key="prize.id" class="raffle-prize"><text>{{ localizedName(prize) }}</text><text>{{ copy.each }} {{ rewardText(prize) }} · {{ copy.places }} {{ prize.quantity }}</text></view>
         <view class="raffle-row"><text>{{ copy.mine }}</text><text>{{ draw.myEntries }}</text></view>
@@ -55,8 +55,9 @@ import { useLocaleStore } from "@/store/locale";
 import { displayDeadline } from "@/lib/promotion-display";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
+import { serverLanguage } from "@/i18n";
 const app = useApp(), locale = useLocaleStore(), api = createGenesisRaffleApi(apiClient);
-const language = computed(() => locale.code === "zh" || locale.code === "vi" ? locale.code : "en");
+const language = computed(() => serverLanguage(locale.code));
 const copy = computed(() => genesisRaffleCopy[language.value]);
 const snapshot = ref<GenesisRaffleState | null>(null), loading = ref(true), error = ref(false), busy = ref("");
 const pending = ref<Record<string, PendingRaffleEntry | null>>({}), tickets = ref<Record<string, string>>({});
