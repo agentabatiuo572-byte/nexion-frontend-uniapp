@@ -16,7 +16,7 @@
              改 radiogroup/radio + aria-checked + roving tabindex + 上下方向键。 -->
         <view :style="groupStyle" role="radiogroup" :aria-label="t.language.pageTitle">
           <view
-            v-for="(l, i) in LOCALES"
+            v-for="(l, i) in platformConfig.offeredLocales"
             :key="l.code"
             :class="['flex items-center active:opacity-80', `nx-language-row-${l.code}`]"
             :style="rowStyle(i !== 0, l.code === code)"
@@ -69,20 +69,23 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
-import { LOCALES, type LocaleCode } from "@/i18n";
+import type { LocaleCode } from "@/i18n";
+import { useConfig } from "@/store/config";
 import { profileLocaleSyncState, retryCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 
 const t = useT();
 const locale = useLocaleStore();
+const platformConfig = useConfig();
 const code = computed(() => locale.code);
-const localeCount = LOCALES.length;
+const localeCount = computed(() => platformConfig.offeredLocales.length);
 
 function pick(next: LocaleCode) {
   locale.setLocale(next);
 }
 /** 单选组的上下方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
 function moveLocale(index: number, delta: number): void {
-  const next = LOCALES[(index + delta + LOCALES.length) % LOCALES.length];
+  const offered = platformConfig.offeredLocales;
+  const next = offered[(index + delta + offered.length) % offered.length];
   if (!next) return;
   locale.setLocale(next.code);
   void nextTick(() => {

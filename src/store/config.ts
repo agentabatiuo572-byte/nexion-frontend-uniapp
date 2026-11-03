@@ -7,6 +7,7 @@ import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
 import { apiRuntimeConfig, apiRuntimeClientOrigin, platformConfigApi, remoteApiEnabled } from "@/api/runtime";
 import type { PlatformPublicStatsAuthority } from "@/api/platform-config-api";
+import { LOCALES } from "@/i18n";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 
@@ -125,6 +126,14 @@ export const useConfig = defineStore("config", () => {
   const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
   const publicStatsAuthority = ref<PlatformPublicStatsAuthority | null>(null);
   const configStatus = ref<"idle" | "loading" | "ready" | "failed">(remoteApiEnabled ? "idle" : "ready");
+  // Interface languages from the last successful platform read; null = not configured, so every
+  // launched language is offered (also while loading and after a failed read).
+  const interfaceLanguages = ref<readonly string[] | null>(null);
+  /** Launched languages the loaded configuration switches on, in registry order; zh/en/vi always. */
+  const offeredLocales = computed(() => {
+    const switchedOn = interfaceLanguages.value;
+    return switchedOn ? LOCALES.filter((locale) => ["zh", "en", "vi"].includes(locale.code) || switchedOn.includes(locale.code)) : LOCALES;
+  });
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
   // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
@@ -173,6 +182,7 @@ export const useConfig = defineStore("config", () => {
   function clearRemotePlatformAuthority() {
     if (!remoteApiEnabled) return;
     publicStatsAuthority.value = null;
+    interfaceLanguages.value = null;
     config.value = {
       ...config.value,
       publicStats: { ...unavailableServerConfig.publicStats },
@@ -252,6 +262,7 @@ export const useConfig = defineStore("config", () => {
         };
         if (!current()) return;
         publicStatsAuthority.value = remote.publicStatsAuthority;
+        interfaceLanguages.value = remote.interfaceLanguages;
         if (!current()) return;
         syncFailed.value = false;
         if (!current()) return;
@@ -321,7 +332,7 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, publicStatsAuthority, configStatus, syncFailed, loading, load, revalidate, ensureLoaded, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
+  return { config, publicStatsAuthority, configStatus, interfaceLanguages, offeredLocales, syncFailed, loading, load, revalidate, ensureLoaded, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 
 // currentNetworkConfirmFeeUsd(权威网络费跨 store 纯函数)已随 c37e642 的 D5 policy
