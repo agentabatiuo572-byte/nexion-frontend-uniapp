@@ -30,7 +30,7 @@ const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null
 export const demoDefaults = {trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
-  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU · 首页横幅与购机活动）'],['phone-gift','买 S1 送 iphone15（DEVICE 赠品为手机）']],
+  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU · 首页横幅与购机活动）'],['phone-gift','手机赠品：买 S1 送 iphone15 / 邀请礼送 iphone15 / 组合礼 S1 规则送 iphone15']],
   downloadState:[['unavailable','下载入口未发布'],['published','iOS / Android / 官网入口（示例链接）']],
   ...authDemoOptions,
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换'],['capacity-error','容量读取失败'],['setup-required','需完成初始设置']],
@@ -345,6 +345,8 @@ export function demoFixture(url,locale,state,request) {
       return {...item,lineId:'demo-line-'+index,unitPriceUsdt:product.price.toFixed(2),subtotalUsdt:(product.price*item.quantity).toFixed(2),discountUsdt:'0.00',payableUsdt:(product.price*item.quantity).toFixed(2)};
     });
     const subtotal=items.reduce((sum,item)=>sum+Number(item.subtotalUsdt),0).toFixed(2);
+    // phone-gift: without a chosen activity the server auto-selects the S1 phone-gift offer unless autoSelectPromotion=false.
+    if(!input.activityId&&state.promoState==='phone-gift'&&input.autoSelectPromotion!==false&&items.some(item=>item.productNo==='stellarbox-s1'))input.activityId='demo-promo-0';
     const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:input.activityId?1:null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
     if(input.activityId){const activity=demoFixture(new URL('/api/promotions/'+input.activityId,url.origin),locale,state,request);for(const line of items){const rule=activity.rewardRules?.find(r=>r.productNo===line.productNo);if(rule){const {disclosure,...reward}=rule.buyerReward;quote.expectedRewards.push({lineId:line.lineId,activityId:activity.activityId,version:activity.version,ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});}}}
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
@@ -436,6 +438,12 @@ export function demoFixture(url,locale,state,request) {
       }
       return item;
     });
+    if(state.promoState==='phone-gift'&&items.length===5){
+      // Referral offer 2 gives the buyer an iphone15 and the inviter UVT; combo offer 3 adds an S1 rule that gives an iphone15.
+      const phoneGift=items[0].rewardRules[0].buyerReward,inviter={rewardRuleId:'demo-reward-2-inviter',beneficiaryRole:'DIRECT_INVITER',type:'UVT',amount:'100',disclosure:{...structuredClone(items[2].rewardRules[0].buyerReward.disclosure),title:{zh:'邀请奖励',en:'Referral reward',vi:'Thưởng giới thiệu'},benefitDescription:{zh:'领取 100 UVT',en:'Receive 100 UVT',vi:'Nhận 100 UVT'}}};
+      Object.assign(items[2].rewardRules[0],{buyerReward:{...structuredClone(phoneGift),rewardRuleId:'demo-reward-2'},inviterReward:inviter});
+      items[3].rewardRules.push({...structuredClone(items[3].rewardRules[0]),ruleId:'demo-rule-3-s1',productNo:'stellarbox-s1',buyerReward:{...structuredClone(phoneGift),rewardRuleId:'demo-reward-3-s1'}});
+    }
     if(pathname!=='/api/promotions') return items.find(item=>item.activityId===pathname.split('/').pop())||{};
     const activityId=url.searchParams.get('activityId'),placement=url.searchParams.get('placement');
     return {items:items.filter(item=>(!activityId||item.activityId===activityId)&&(!placement||item.placement===placement)),hasMore:false,nextCursor:null};
@@ -467,10 +475,12 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/promotion-rewards'||/^\/api\/promotion-rewards\/demo-reward-\d+$/.test(pathname)){
     const offer=demoFixture(new URL('/api/promotions/demo-promo-0',url.origin),locale,{...state,eventState:'mixed',dataState:'normal'},request),spec=offer.rewardRules[0].buyerReward,{disclosure,...reward}=spec;
     const items=empty?[]:['PENDING','READY','PROCESSING','ISSUED','RETRYABLE_FAILED','OUTCOME_UNKNOWN','CANCELLED','REVERSAL_PENDING','REVERSED','MANUAL_REVIEW'].map((status,i)=>({obligationId:'demo-reward-'+i,orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',orderLineId:'demo-line-0',updatedAt:iso,reward,disclosure,refundHold:status==='REVERSAL_PENDING',beneficiaryRole:'BUYER',state:status,refundRequestIds:[],assetReceipt:status==='ISSUED'?{deviceIds:[41],instanceNos:['REVIEW-S1'],source:'PROMOTION_GIFT',issuedAt:iso,ledgerBizNo:null,earningsEntryNo:null}:null}));
+    if(!empty&&state.promoState==='phone-gift'){const referral=demoFixture(new URL('/api/promotions/demo-promo-2',url.origin),locale,{...state,eventState:'mixed',dataState:'normal'},request).rewardRules[0].inviterReward,{disclosure:inviterDisclosure,...inviterReward}=referral;
+      items.push({...items[3],obligationId:'demo-reward-10',activityId:'demo-promo-2',orderNo:'DEMO-ORDER-005',reward:inviterReward,disclosure:inviterDisclosure,beneficiaryRole:'DIRECT_INVITER',assetReceipt:null});}
     if(pathname!=='/api/promotion-rewards')return items.find(r=>r.obligationId===pathname.split('/').pop())||{};
     return {items:items.filter(r=>['state','activityId','orderNo'].every(key=>!url.searchParams.get(key)||r[key]===url.searchParams.get(key))),nextCursor:null,hasMore:false};
   }
-  if(/^\/api\/promotions\/demo-promo-\d+\/referral-progress$/.test(pathname))return {activityId:pathname.split('/')[3],qualifyingOrders:2,ownRewards:[],serverTime:iso};
+  if(/^\/api\/promotions\/demo-promo-\d+\/referral-progress$/.test(pathname))return {activityId:pathname.split('/')[3],qualifyingOrders:2,ownRewards:state.promoState==='phone-gift'&&pathname.split('/')[3]==='demo-promo-2'?[demoFixture(new URL('/api/promotion-rewards/demo-reward-10',url.origin),locale,state,request)]:[],serverTime:iso};
   if(pathname==='/api/app/security/account-deletion')return {status:'NONE'};
   if(pathname==='/api/app/security/phone-number')return {windowDays:30,maxChanges:2,usedChanges:0,remainingChanges:2,nextAvailableAt:iso};
   if(pathname==='/api/quests/state') {
