@@ -111,7 +111,7 @@ const fil: CheckoutFlowCopy = {
   selected: 'Napili', paymentHint: 'Susunod, i-verify ang PIN mo sa pagbabayad.',
   confirmPayment: 'Kumpirmahin ang bayad', paying: 'Pinoproseso…', balanceUnavailable: 'Hindi ma-load ang balanse mo. Subukan ulit.',
   insufficientBalance: 'Kulang ang balanse ng wallet. Mag-top up at subukan ulit.', topup: 'Mag-top up ng wallet', legalLead: 'Basahin muna ang sumusunod bago magbayad.',
-  afterSalesShort: 'After-sales', termsShort: 'Terms',
+  afterSalesShort: 'After-sales', termsShort: 'Tuntunin',
   device: 'Device', resultTitle: 'Setup ng device', deviceInventory: 'Imbentaryo ng device', paid: 'Congrats! Tapos ang pagbili', paidHint: 'Kumpirmado ang bayad. Ina-activate na ang device mo.', paidInventoryHint: 'Kumpirmado ang bayad. Idinadagdag ang device mo sa inventory.',
   activating: 'Ina-activate…', activatingHint: 'Inihahanda ang device mo.',
   activated: 'Na-activate ang device', activatedHint: 'Handa na ang device mo. Tingnan ito sa device inventory.',
