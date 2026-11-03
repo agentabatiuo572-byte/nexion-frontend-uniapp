@@ -58,7 +58,7 @@ export function bankDemo(url, state, request) {
   });
   if (path === '/api/withdrawals/bank/quotes' && method === 'POST') {
     const bank = config().beneficiary, amountUsdt = Number(input().amountUsdt);
-    if (!bank?.canWithdraw || !Number.isFinite(amountUsdt) || amountUsdt < 10 || amountUsdt > 10000) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
+    if (!bank?.canWithdraw || !Number.isFinite(amountUsdt) || amountUsdt < 10 || amountUsdt > config().capacity.maxWithdrawableUsdt) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
     const feeUsdt = Math.round(Math.max(1, Math.min(100, amountUsdt * .01)) * 1e6) / 1e6;
     const netUsdt = Math.round((amountUsdt - feeUsdt) * 1e6) / 1e6;
     const quote = { quoteNo: 'BQ-' + randomBytes(16).toString('hex'), amountUsdt, feeUsdt, netUsdt, rateVnd: 25000, amountVnd: Math.round(netUsdt * 25000), bankCode: bank.bankCode, bankName: bank.bankName, bankRoutingVerified: true, maskedAccount: bank.maskedAccount, expiresAt: new Date(now + 300000).toISOString() };
