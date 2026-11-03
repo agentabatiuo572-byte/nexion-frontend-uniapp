@@ -1463,7 +1463,6 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
       regional: "Thi đấu khu vực",
       boost: "Sự kiện nhân thưởng",
       seasonal: "Sự kiện theo mùa",
-      holding: "Thưởng nắm giữ",
       onboarding: "Tăng tốc người mới",
     },
     tabs: {

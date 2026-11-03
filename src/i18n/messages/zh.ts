@@ -1448,7 +1448,6 @@ trustReserve: "暂无可核验的储备资料。",
       regional: "区域 PK",
       boost: "加成活动",
       seasonal: "季节活动",
-      holding: "持仓奖励",
       onboarding: "新用户冲刺",
     },
     tabs: {
