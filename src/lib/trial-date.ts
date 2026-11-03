@@ -14,11 +14,3 @@ export function formatTrialDateTime(timestamp: number, locale = "zh"): string {
 export function formatTrialDeadline(timestamp: number, locale = "zh"): string {
   return typeof timestamp === "number" ? formatDisplayDateTime(timestamp, locale, false) : "—";
 }
-
-/** Deadlines in compact rows and chips: minute precision is enough. */
-export function formatTrialDeadline(timestamp: number): string {
-  const day = formatTrialDate(timestamp);
-  if (day === "—") return day;
-  const date = new Date(timestamp);
-  return `${day} ${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
-}
