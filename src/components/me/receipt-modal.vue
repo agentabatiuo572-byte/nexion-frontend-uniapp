@@ -23,19 +23,19 @@
       <!-- Header -->
       <view :style="headerStyle">
         <text class="block" :style="headerKickerStyle">{{ receiptTitle }}</text>
-        <view class="flex items-center flex-wrap" style="margin-top: 8px; gap: 8px">
+        <view class="flex items-center" style="margin-top: 8px; gap: 8px">
           <text v-if="isReceiptSettled" class="inline-flex items-center" :style="stampStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="margin-left: 4px">{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</text>
           </text>
-          <text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ receiptStatus }} · {{ fmtDate(receipt.settledAt) }}</text>
+          <text class="nx-receipt-line" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ receiptStatus }} · {{ fmtDate(receipt.settledAt) }}</text>
         </view>
       </view>
 
       <view class="nx-receipt-body" :style="bodyStyle">
       <view :style="summaryStyle">
         <text class="block" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ copy.result }}</text>
-        <text class="block tabular-nums" style="font-family: var(--font-amount); margin-top:6px;font-size:26px;line-height:1.3;font-weight:600;overflow-wrap:anywhere">{{ summaryAmount }}</text>
+        <text class="nx-receipt-line tabular-nums" :title="summaryAmount" style="font-family: var(--font-amount); margin-top:6px;font-size:26px;line-height:1.3;font-weight:600">{{ summaryAmount }}</text>
       </view>
       <!-- Only identifiers and hashes use monospace; raw values remain unchanged. -->
       <view v-for="(sec, si) in visibleSections" :key="si" :style="sectionStyle(si)">
@@ -46,7 +46,7 @@
           class="nx-receipt-row"
           :style="rowStyle"
         >
-          <text style="min-width:0;color:var(--v5-ink-2);overflow-wrap:anywhere">{{ fieldLabel(row.k) }}</text>
+          <text class="nx-receipt-line" :title="fieldLabel(row.k)" style="color:var(--v5-ink-2)">{{ fieldLabel(row.k) }}</text>
           <view v-if="row.divider" :style="dividerStyle" />
           <view
             v-else-if="row.copyValue"
@@ -59,20 +59,20 @@
             @keydown.enter.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
             @keydown.space.prevent="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
           >
-            <text style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-jet-mono),ui-monospace,monospace;color:var(--v5-ink)">{{ row.v }}</text>
-            <text v-if="row.hint" style="color:var(--v5-ink-2);font-size:12px">({{ row.hint }})</text>
+            <text class="nx-receipt-line" style="font-family:var(--font-jet-mono),ui-monospace,monospace;color:var(--v5-ink)">{{ receiptLine(row.v) }}</text>
+            <text v-if="row.hint" class="nx-receipt-line" style="color:var(--v5-ink-2);font-size:12px">({{ row.hint }})</text>
             <!-- Check when just-copied, else Copy affordance (mirrors prototype RowCopy) -->
             <svg v-if="copiedField === (row.copyKey ?? row.k)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
             <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
-          <text v-else class="text-right" :style="valueStyle(row)">{{ row.v }}</text>
+          <text v-else class="nx-receipt-line text-right" :style="valueStyle(row)" :title="row.v" @longpress="row.v && copyRow(row.k, row.v)">{{ receiptLine(row.v) }}</text>
         </view>
         <!-- 历史验证回执的核验清单(渲染兜底,仅存量数据) -->
         <view v-if="sec.checks" style="margin-top: 4px">
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ chk }}</text>
-            <text style="margin-left:auto;font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ t.uiChrome.passed }}</text>
+            <text class="nx-receipt-line" :title="chk" style="font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ receiptLine(chk) }}</text>
+            <text class="nx-receipt-line" style="flex-shrink:0;margin-left:auto;font-size:var(--ui-type-list-subtitle);color:var(--v5-ink-2)">{{ t.uiChrome.passed }}</text>
           </view>
         </view>
       </view>
@@ -85,6 +85,7 @@
 <script setup lang="ts">
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { receiptLine } from "@/lib/receipt-line";
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import type { Receipt, ReceiptDetails } from "@/mock/receipt";
@@ -343,7 +344,7 @@ const sections = computed<DescSection[]>(() => {
       {
         rows: [
           { k: "device", v: r.deviceName },
-          { k: "device_instance", v: r.deviceInstanceNo },
+          { k: "device_instance", v: shortenHex(r.deviceInstanceNo, 8, 6), copyValue: r.deviceInstanceNo },
           { k: "device_type", v: r.deviceType },
           ...(r.deviceGpu ? [{ k: "gpu", v: r.deviceGpu }] : []),
           ...(r.vramTotalGb !== null ? [{ k: "vram", v: `${r.vramTotalGb} GB` }] : []),
@@ -532,10 +533,12 @@ const headerKickerStyle: CSSProperties = {
   lineHeight: 1.4,
   color: "var(--v5-ink)",
 };
-const bodyStyle: CSSProperties = { minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", paddingBottom: "16px" };
+const bodyStyle: CSSProperties = { minHeight: 0, overflowX: "hidden", overflowY: "auto", overscrollBehavior: "contain", paddingBottom: "16px" };
 const summaryStyle: CSSProperties = { padding: "20px", borderBottom: "1px solid var(--v5-border)" };
 const stampStyle = computed<CSSProperties>(() => ({
   alignItems: "center",
+  flexShrink: 0,
+  whiteSpace: "nowrap",
   // Prototype: px-1.5 py-0.5 = 2px 6px, rounded-md = 6px, rotate(-4deg).
   padding: "2px 6px",
   borderRadius: "6px",
@@ -560,7 +563,7 @@ const sectionHeadStyle: CSSProperties = {
 };
 // Prototype Section uses `space-y-1` = 4px gap between rows. `padding: 2px 0`
 // on every row yields the same 4px inter-row spacing.
-const rowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, .9fr) minmax(0, 1.25fr)", alignItems: "center", gap: "12px", fontSize: "var(--ui-type-list-subtitle)", lineHeight: 1.5, padding: "6px 0" };
+const rowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.4fr)", alignItems: "center", gap: "12px", fontSize: "var(--ui-type-list-subtitle)", lineHeight: 1.5, padding: "6px 0" };
 const dividerStyle: CSSProperties = {
   flex: "1",
   height: "1px",
@@ -569,8 +572,6 @@ const dividerStyle: CSSProperties = {
 };
 function valueStyle(row: DescRow): CSSProperties {
   return {
-    minWidth: 0,
-    overflowWrap: "anywhere",
     fontFamily: identifierFields.has(row.k) ? "var(--font-jet-mono), ui-monospace, monospace" : "var(--font-v5)",
     color: row.muted ? "var(--v5-ink-2)" : "var(--v5-ink)",
     fontWeight: row.strong ? 600 : 400,
@@ -579,3 +580,13 @@ function valueStyle(row: DescRow): CSSProperties {
 // Prototype RowCopy: `flex items-center gap-1` (4px) — value + hint + copy icon.
 const copyRowStyle: CSSProperties = { gap: "6px", minHeight: "44px", minWidth: 0, justifyContent: "flex-end", flexWrap: "nowrap" };
 </script>
+
+<style scoped>
+.nx-receipt-line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+</style>
