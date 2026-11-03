@@ -132,8 +132,8 @@ function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
 // Detail-page live activity (PRD §7.2.2; the backend follows the same rule, uvel-docs B24). Derived from
 // product + clock, so every poll and tab agrees. Sales come from a sparse per-minute purchase stream of
 // about 1.2 × √cumulative a day, so the 24h / 30m counts change only when a sale enters or leaves its
-// window. Viewers scale with that rate and drift smoothly: a person or two per 4-second poll at tens
-// of viewers, about 2% at hundreds.
+// window. Viewers never drop below 200: each product's floor is 200 plus a sales-scaled and a per-product
+// part, and the count drifts smoothly up to 25% above that floor, a few people per 4-second poll.
 const demoNoise=(...parts)=>{let h=0x811c9dc5;for(const c of parts.join(':')){h^=c.charCodeAt(0);h=Math.imul(h,0x01000193);}
   h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return (h>>>0)/4294967296;};
 function demoLiveActivity(product,now) {
@@ -141,9 +141,9 @@ function demoLiveActivity(product,now) {
   let sales24h=0,sales30m=0;
   for(let m=minute-1439;m<=minute;m++) if(demoNoise(product.id,'sale',m)<daily/1440){sales24h++;if(m>minute-30)sales30m++;}
   sales24h=Math.min(sales24h,product.sold);
-  const curve=(period,amplitude)=>{const x=now/period,k=Math.floor(x),f=x-k,ease=f*f*(3-2*f),at=i=>(demoNoise(product.id,period,i)*2-1)*amplitude;return at(k)+(at(k+1)-at(k))*ease;};
-  const usual=12+Math.round(daily*.8)+Math.round(demoNoise(product.id,'viewers')*20);
-  return {viewers:Math.max(3,Math.round(usual+curve(150_000,usual*.25)+curve(15_000,1.5))),sales24h,sales30m:sales24h?Math.max(1,sales30m):0};
+  const curve=(period,low,high)=>{const x=now/period,k=Math.floor(x),f=x-k,ease=f*f*(3-2*f),at=i=>low+demoNoise(product.id,period,i)*(high-low);return at(k)+(at(k+1)-at(k))*ease;};
+  const floor=200+Math.round(daily*.8)+Math.round(demoNoise(product.id,'viewers')*20);
+  return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:sales24h?Math.max(1,sales30m):0};
 }
 
 /** Mutable state belongs only to the loopback demonstration server. */
