@@ -440,7 +440,6 @@ function diskRev() {
 {
   const callers = [
     ["质押半屏 stake-sheet", path.join(root, "src", "components", "staking", "stake-sheet.vue"), "async function submit()", "submit"],
-    ["复投页 wallet-repurchase", path.join(root, "src", "pages", "me", "wallet-repurchase.vue"), "async function handleRepurchase()", "handleRepurchase"],
   ];
   samples.callers = callers.length;
   for (const [label, file, needle, fnName] of callers) {

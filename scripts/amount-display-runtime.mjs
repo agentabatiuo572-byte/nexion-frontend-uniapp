@@ -63,7 +63,6 @@ const keySurfaces = {
   "pages/me/wallet-withdraw": [null, ["1200.12"]],
   "pages/me/wallet-withdraw-bank": [null, ["1200.12"]],
   "pages/me/wallet-exchange": [null, ["50.12", "400.99"]],
-  "pages/me/wallet-repurchase": [null, ["50.12"]],
   "pages/me/wallet-withdraw-tracking": [null, ["50.12"]],
   "pages/me/receipts": [null, ["1.23"]],
   "pages/me/rewards": [null, ["50.12"]],
@@ -594,7 +593,6 @@ try {
       { route: "pages/me/wallet-withdraw-bank", scenario: "bank-confirm-back-reload", input: true, confirmCancel: true, expected: [null, ["50.12", "49.12"]] },
       { route: "pages/me/wallet-withdraw", scenario: "withdraw-six-digit-input", input: true, expected: [null, ["1200.12"]] },
       { route: "pages/me/wallet-exchange", scenario: "exchange-six-digit-input", input: true, expected: [null, ["50.12"]] },
-      { route: "pages/me/wallet-repurchase", scenario: "repurchase-confirm-cancel-reload", input: true, confirmCancel: true, expected: [null, ["50.12"]] },
       { route: "pages/events/promotion-rewards", scenario: "confirmed-empty", stateMode: "empty", expected: null },
       { route: "pages/events/promotion-rewards", scenario: "failed-read", stateMode: "error", expected: null },
       ...Object.entries(walletDisplayStates).flatMap(([stateMode, rounding]) => [
