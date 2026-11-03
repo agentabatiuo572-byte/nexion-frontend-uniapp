@@ -2973,7 +2973,7 @@ const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-r
 .checkout-step-label--active { color:var(--v5-brand); font-weight:600; }
 .checkout-group { position:relative; overflow:hidden; border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); }
 .checkout-product { display:flex; align-items:center; gap:var(--v5-space-3); min-height:90px; margin:var(--v5-space-5) var(--v5-space-4) 0; padding:10px 16px; }
-.checkout-product-art { display:grid; place-items:center; flex:none; width:68px; height:68px; border-radius:16px; overflow:hidden; background:radial-gradient(60% 30% at 50% 84%,color-mix(in srgb,var(--ui-lime-soft) 35%,transparent),transparent 70%),linear-gradient(180deg,var(--ui-content-surface-3),var(--ui-content-surface-2)); }
+.checkout-product-art { display:grid; place-items:center; flex:none; width:68px; height:68px; border-radius:16px; overflow:hidden; }
 .checkout-product-art image { width:74px; height:74px; }
 .checkout-product-copy { flex:1; min-width:0; }
 .checkout-product-name { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
