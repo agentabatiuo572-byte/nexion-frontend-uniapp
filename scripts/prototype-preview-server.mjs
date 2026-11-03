@@ -54,6 +54,9 @@ const server=http.createServer(async(req,res)=>{
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.authState)delete state.scopeCalls;
         if(update.stakingOpenState){delete state.stakingAttempts;delete state.stakingStatusReads;}
+        // A scenario change seeds the fleet again on its next read (reset clears the whole state). Lite's compute and
+        // scope scenarios change the seeded devices too (Cloud Share device 42, hidden phones).
+        if(['fleetState','checkoutState','trialState','benefitState','machineImageState','computeState','scopeState'].some(key=>key in update))delete state.fleetSeed;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}

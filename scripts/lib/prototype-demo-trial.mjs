@@ -38,11 +38,11 @@ export function trialDemo(url,locale,state,request,capacityFull){
     const nex=claimed?number(units(cfg.shadowDailyNEX)*elapsedDays/100000000n):0;
     const offset=live?number(capped(units(shadow),cfg.trialOffsetCapUSD)):0;
     const eligible=!claimed||(mode==='eligible-again'&&row.state==='FAILED');
-    const full=capacityFull||mode==='capacity-full';
-    const canStart=eligible&&!full;
+    // capacity-full comes from the fleet facts alone; the capacity-full preset seeds a genuinely full fleet.
+    const canStart=eligible&&!capacityFull;
     const quote=live?quoteFor(shadow,nex,row.state==='ACTIVE'&&now<row.startedAt+duration):undefined;
     const conversion=row.state==='REDEEMED'?conversionFacts():null;
-    return {...data,state:row.state,canStart,eligibilityReason:eligible&&full?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
+    return {...data,state:row.state,canStart,eligibilityReason:eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?'DEMO-TRIAL':null,version:row.version||1,serverNowEpochMs:now,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,graceEndsAtEpochMs:claimed?row.startedAt+duration+grace:null,
       finishedAtEpochMs:['FAILED','CANCELLED','REDEEMED'].includes(row.state)?row.finishedAt||row.startedAt+duration+grace:null,
