@@ -37,7 +37,7 @@
              当 toggle button,读屏按复选框朗读(zentao #94)。改 radiogroup/radio + aria-checked。 -->
         <view class="tos-language__choices" role="radiogroup" :aria-label="t.terms.languageLabel">
           <view
-            v-for="(language, li) in LOCALES"
+            v-for="(language, li) in platformConfig.offeredLocales"
             :key="language.code"
             class="tos-language__choice active:opacity-70"
             :class="{ 'tos-language__choice--active': language.code === locale.code }"
@@ -100,7 +100,8 @@ import { useT } from "@/i18n/use-t";
 import { navBack, navTo } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
-import { serverLanguage, LOCALES, type LocaleCode } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
+import { useConfig } from "@/store/config";
 import type { LegalTermsCurrent } from "@/api/legal-terms-api";
 import {
   buildLegalTermsRoute,
@@ -117,6 +118,7 @@ import { createLegalTermsRequestFence } from "@/lib/legal-terms-request-fence";
 
 const t = useT();
 const locale = useLocaleStore();
+const platformConfig = useConfig();
 const serverTerms = ref<LegalTermsCurrent | null>(null);
 const effectiveDate = computed(() => formatLegalEffectiveDate(serverTerms.value?.effectiveAt, dateLocale()));
 type TermsErrorKey = "loadFailed" | "sessionChanged" | "runChanged" | "loginRequired" | "ackFailed" | "languageSyncFailed";
@@ -268,7 +270,8 @@ function switchTermsLanguage(next: LocaleCode) {
 }
 /** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
 function moveTermsLanguage(index: number, delta: number): void {
-  const next = LOCALES[(index + delta + LOCALES.length) % LOCALES.length];
+  const offered = platformConfig.offeredLocales;
+  const next = offered[(index + delta + offered.length) % offered.length];
   if (!next) return;
   switchTermsLanguage(next.code);
   void nextTick(() => {
