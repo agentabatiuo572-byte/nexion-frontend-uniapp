@@ -94,8 +94,10 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === 'in-progress' ? copy.value.viewTrial
   : claimErrorReason.value === 'used' ? copy.value.buyDevice
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
+  : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
   : claimError.value || freeTrial.authorityStatus === 'error' ? t.value.trial.claimRetryCta : copy.value.activateCta);
 const claimErrorText = computed(() => claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
+  : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : claimErrorReason.value === 'capacity-full' ? copy.value.capacityFull
   : claimErrorReason.value === "unknown"
   ? t.value.trial.claimUnknownInline
@@ -126,6 +128,8 @@ async function onClaim() {
   if (claimErrorReason.value === 'capacity-full' || claimErrorReason.value === 'converted') { goDevices(); return; }
   if (claimErrorReason.value === 'in-progress' || claimErrorReason.value === 'used') { goTrial(); return; }
   if (claimErrorReason.value === "terms-required") { hide(); navTo("/pages/onboarding/terms"); return; }
+  // Lite has no setup step: a server setup refusal can only be resolved by support.
+  if (claimErrorReason.value === "onboarding-required") { hide(); navTo("/pages/support/messages"); return; }
   const requestedEpoch = app.accountBindingEpoch;
   const requestedSequence = ++claimSequence;
   claiming.value = true;
