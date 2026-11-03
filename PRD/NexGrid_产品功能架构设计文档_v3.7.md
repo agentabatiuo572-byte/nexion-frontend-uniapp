@@ -1397,7 +1397,9 @@ flowchart TD
 
 > 锁额 `remaining` 是该 SKU"还剩 N 件"的**单一来源**(收编原 `stock` 展示,消除双口径)。其余 SKU 默认无购买门;Pro v2 / Rack P2 维持阶段门(`unlocksAtPhase`)。
 
-**列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexGridBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。2026-10-30 起：其上的「算力阶梯」各档放在一张内容卡内，滚动到该区域时进度条从 0 逐行展开（系统减少动态时直接显示）；阶梯收益与本卡两侧金额、倍数按 DS-27 用统计数字字体，设备名与「/天」用界面字体。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
+**算力阶梯（2026-11-03 P-66 起六档）**：自下而上为 手机、Box S1、Box Pro、Box Pro v2、Rack P1、Rack P2；手机取典型 T3 档日产，五档硬件分别取当前目录 `stellarbox-s1` / `stellarbox-pro` / `stellarbox-pro-v2` / `stellarrack-p1` / `stellarrack-p2` 的 `dailyEarn`，某个 SKU 缺失或无效时该行仍保留并显示「—」、进度条为空。标题右侧显示实际行数（6 档）。进度条宽度按六档中最高日产等比，透明度自下而上 0.25 → 0.75 逐档递增；两档 Rack 的 $/天 用品牌色，其余用正文色。用户已激活的最高硬件档（含手机）所在行显示「←你」并用 brand-2 色，金额取该设备自身日产；每档硬件都有固定行，不再为 Pro v2 / Rack P2 另插一行。
+
+**列表顶端 VsPhoneHero**:`手机 $0.06/天 ↔ Box S1 $X/天`,中间倍数 chip `NNN×`,两侧带 `+UVT/天` 副字(双币展示)。2026-10-30 起：其上的「算力阶梯」各档放在一张内容卡内，滚动到该区域时进度条从 0 逐行展开（系统减少动态时直接显示）；阶梯收益与本卡两侧金额、倍数按 DS-27 用统计数字字体，设备名与「/天」用界面字体。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
 
 **Promo 并存**:升级置换横幅(§7.6)已改为按「用户是否持有可置换设备」动态显隐(无 phase 窗口),与 S1 促销条各自独立渲染;旧「window 开放时隐藏 S1 promo」互斥规则随 phase 窗口机制一并退役。
 
@@ -1431,30 +1433,20 @@ flowchart TD
 
 **Phase gate（历史原型，仅作背景，不替代当前服务端资格流程）**:商品详情外层包 `<ProductDetailGate product={product}>` 客户端 wrapper。读 `useProductPhase()`,若 `product.unlocksAtPhase` 未 reached,**post-mount 替换整页**为 `<LockedProductCard>` 完整变体(lock icon + `New silicon — coming next quarter` 大字 + tagline + GPU/VRAM mini-spec + Estimated arrival + 全宽 `Notify me when live` 按钮)。直链 URL(`/store/stellarbox-pro-v2` 等)仍返回 HTTP 200,不走 `notFound()` — 用户从分享链接落地也能看到 anticipation 卡。SSR + first paint 渲染完整产品页(避免 hydration mismatch),mount 后再 swap,接受短暂闪烁(deep-link 场景为边缘 case)。
 
-页面自上而下(unlocked 状态):
+页面自上而下(unlocked 状态,2026-11-03 按现行页面更正):
 
-1. **Hero card**:产品大渲染图 + tagline + 规格 2×2 grid(GPU / VRAM / Hash Rate / TDP)
-2. **Price box**:
-   - 大字 `$649`
-   - Est. daily 行:`$7.00` + `+40 NEX/d` 副字(双币展示)
-   - **ROI hero strip**:
-     - 上行 `⏱ PAYS FOR ITSELF IN` 小字标签
-     - 大字 `93 days`(payback ≥60 天显示 `X.X months`)
-     - chip 行:`Year 1 profit +$1,906` + `14,600 NEX/yr`
-   - Buy Now CTA
-   - 库存告警(<50):`Only N units left at this price` 脉冲点
-3. **LiveSocialProof strip**(Price box 之后,vs-phone 之前):3 stat 横排紧迫感卡,详见 §7.2.2
-4. **vs-phone strip**(独立 section,LiveSocialProof 与 AI Performance 之间):
-   `📱 Your phone $0.06/d ↔ 📦 $X.XX/d` + chip `NNN×`
-   速度倍数 = round(dailyEarn / 0.06)。S1=117× / Pro=217× / Rack P1=750×
-5. **AI Performance section**:2 列 spec grid(🖼 Image Gen / 💬 LLM / 🎬 Video Gen / 🔧 Fine-tune)+ 🔓 解锁池 chip
-6. **What's Included**:features 列表带 ShieldCheck 图标
-7. **Managed service strip**:3 列 promise(99.9% uptime / 24/7 service / Live monitor)
-8. **ROI Calculator**(详见 §7.2.1)
-9. **Social proof**:用户头像 + reviews 节选(详见 §7.2.3,作为深度信任)
-10. **Final CTA**:全宽 `Order {product.name} →` 按钮
+1. **Hero card**:商品主图(目录 `imageUrl`,可带详情视频)+ 角标 ribbon + 主图左下实时成交弹幕(§7.2.2);下方商品名、tagline,再下为两项销售数据:左「累计已售」(`sold`),右「本周剩余」(硬件 `stock` > 0 时;缺货显示「暂时缺货」)。
+   - **团队算力点(2026-11-03 P-66)**:销售数据正下方一行安静提示「[三节点图标] 每台为团队增加 12,990 算力点」(Cloud Share 为「每份…」;英文 `Each unit/share adds {n} compute pts to your team`,越南语 `Mỗi máy/phần cộng {n} điểm tính toán cho nhóm`)。数值读目录 `computePoints`(单件计入团队的算力点,与后端 `nx_product.compute_points` 同值),按语言千分位(越南语用「.」),数字用统计数字字体、ink-2 色,其余 12px 正文 ink-3 色;无分隔线、无强调色、不可点击。仅商品详情显示,商品卡和结算页不显示;`computePoints` 缺失、null 或为 0 时整行隐藏;不受「隐藏数据」眼睛遮盖(商品信息,非个人数据);窄屏可折成两行,不得溢出。目录下发该字段前(后端待办 B24)此行不显示。
+2. **活动 / 代金券提示**:从活动或代金券入口进入时,在 Hero 下方显示活动状态或代金券条款。
+3. **Cloud Share 收益卡**(仅 Cloud Share):见下方 Cloud Share variant。
+4. **vs-phone strip**(仅硬件,用户有已激活手机时):`你的手机 $X/天 ↔ $Y/天` + chip `预估 NNN×`,倍数 = 本商品日产 / 该手机日产,向下取 1 位小数;没有已激活手机时整条不显示(本地 mock 用典型 T3 档)。
+5. **预估收益**(仅硬件,非活动入口):「预估每日收益」「预估每月」两格,来自当前目录日产;不显示回本天数、年化或首年净利。
+6. **硬件规格** / **AI 性能**:见本节开头「硬件规格、AI 性能与相关资料」。
+7. **信任资料**:合作方与本商品相关资料。
+8. **FAQ**。
+9. **底部固定购买栏**:价格、预估每日收益、数量步进和「立即购买」;资格与配额状态见上方「当前资格交互」。
 
-Cloud Share variant:Cloud Share 现为**入门级日产出设备**(非份额 / 非年化理财)。详情页隐藏硬件专属的 ROI hero strip 与 ROI Calculator,Price box 显示设备日产出(`$0.19/d` + `+3 NEX/d` 双币),Hero 下方显示日产出区(与硬件同形,无年化 % / 质押 / 锁仓 / 赎回语义)。走立即购买流程,`$19.9` 一次性购买。
+Cloud Share variant:Cloud Share 是数字份额(`productType=SHARE`,`inventoryMode=UNLIMITED`,不占实物库存)。详情页不显示 vs-phone strip 和预估收益两格,改为「预估每日收益」卡:USDT 日收益按当前价格、所选份数与目录参考年奖励率区间(`shareYieldMin`–`shareYieldMax`)折算成区间,另列 UVT 日收益和「参考年奖励率」,附「以实际到账为准」说明;不显示本周剩余。走立即购买流程。
 
 #### 7.2.1 ROI Calculator
 
