@@ -723,6 +723,7 @@ function remoteLoginError(error: unknown): string {
   // #ifdef H5
   if (code === "COOKIE_LOCK_UNAVAILABLE") return t.value.session.secureBrowserUnsupported;
   // #endif
+  if (code === "OAUTH_LOGIN_EXPIRED") return t.value.thirdParty.restartExpired;
   const geoMessage = geoText(code);
   if (geoMessage) return geoMessage;
   switch (resolveRemoteLoginErrorKind(code)) {

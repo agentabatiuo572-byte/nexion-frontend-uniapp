@@ -9,6 +9,7 @@ export const zh: Messages = {
   paymentPin: paymentPinZH,
   coreReview: coreReviewCopy.zh,
   thirdParty: {
+    restartExpired: "授权已过期，尚未登录。请重新授权，或使用手机号登录。",
     signInTitle: "其他登录方式",
     linkTitle: "第三方登录账号",
     unavailable: "第三方登录暂不可用。",

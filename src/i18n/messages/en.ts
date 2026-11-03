@@ -8,6 +8,7 @@ export const en = {
   paymentPin: paymentPinEN,
   coreReview: coreReviewCopy.en,
   thirdParty: {
+    restartExpired: "Authorization expired without signing you in. Start again or sign in with your phone.",
     signInTitle: "Sign in with",
     linkTitle: "Linked sign-in accounts",
     unavailable: "Third-party sign-in is currently unavailable.",

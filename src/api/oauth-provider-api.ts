@@ -21,7 +21,7 @@ function providerList(value: unknown): ThirdPartyProvider[] {
 }
 export function validateOAuthFlow(value: unknown): OAuthFlow {
   const flow = value as OAuthFlow;
-  if (!flow || !/^OIDC-[a-f0-9]{32}$/.test(flow.flowId) || !/^[A-Za-z0-9_-]{43}$/.test(flow.flowKey)
+  if (!flow || typeof flow.authorizationUrl !== "string" || !/^OIDC-[a-f0-9]{32}$/.test(flow.flowId) || !/^[A-Za-z0-9_-]{43}$/.test(flow.flowKey)
       || !Number.isInteger(flow.expiresInSec) || flow.expiresInSec < 1 || flow.expiresInSec > 600) throw invalid();
   // App Plus service JS has no browser URL constructor. Accept only the backend's
   // canonical HTTPS handoff route, with an optional deployment path prefix.
