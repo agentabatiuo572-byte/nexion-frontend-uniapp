@@ -132,7 +132,7 @@
               <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="reviewMoney(cardFee)" class="checkout-fee" />
               <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" class="checkout-fee" />
               <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" class="checkout-fee" />
-              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ flowCopy.paymentTotal }}</text><CheckoutAmount :value="netPrice + cardFee" currency="USD" /></view>
+              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ flowCopy.paymentTotal }}</text><CheckoutAmount :value="confirmationTotal" currency="USD" /></view>
             </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
               <text>{{ trialCopy.afterPurchaseLabel }}</text>
@@ -248,7 +248,7 @@
         <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky">
-        <view class="checkout-sticky-copy"><CheckoutAmount class="checkout-total" :value="netPrice + cardFee" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
+        <view class="checkout-sticky-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
     </template>
@@ -960,6 +960,10 @@ const netPrice = computed(() => {
   if (pendingCheckoutCreate.value) return pendingCheckoutCreate.value.amount;
   const canonical = remoteApiEnabled ? appliedTradeinView.value?.canonicalQuote ?? null : null;
   if (canonical) return canonical.payableUsdt;
+  // The server trial quote states the six-decimal amount convert() settles.
+  // Re-adding its parts here would round it in binary before confirmationTotal.
+  const trialAmount = remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote?.amountUSD : undefined;
+  if (trialAmount !== undefined) return trialAmount;
   return Math.max(
     0,
     +(
@@ -1292,10 +1296,28 @@ const netPriceText = computed(() => formatAmount(netPrice.value));
 // 被 IEEE754 压低一分(实测 14 个金额少收 1 分),同一笔费率两种算法两个答案。
 const cardFee = computed(() => (remoteApiEnabled && appliedTradeinView.value?.canonicalQuote
   ? 0 : isCard.value ? cardFeeUsd(netPrice.value) : 0));
+// Trial quotes retain six decimals; convert confirms cents using decimal HALF_UP.
+// Add the existing cent-denominated card fee without changing its calculation.
+const confirmationTotal = computed(() => {
+  if (!remoteApiEnabled || !trialConversionMode.value) return netPrice.value + cardFee.value;
+  let cents = 0n;
+  for (const amount of [netPrice.value, cardFee.value]) {
+    const [mantissa, exponent = "0"] = String(amount).toLowerCase().split("e");
+    const [whole, fraction = ""] = mantissa.split(".");
+    const scale = fraction.length - Number(exponent);
+    const digits = BigInt(whole + fraction);
+    if (scale <= 2) cents += digits * 10n ** BigInt(2 - scale);
+    else {
+      const divisor = 10n ** BigInt(scale - 2);
+      cents += (digits * 2n + divisor) / (divisor * 2n);
+    }
+  }
+  return Number(cents) / 100;
+});
 const cardFeeText = computed(() => formatAmount(cardFee.value));
 // The legacy card debit is settled in cents; keep its sum's binary float noise
 // out of the display while retaining canonical fee-free USDT precision.
-const confirmTotalText = computed(() => cardFee.value > 0
+const confirmTotalText = computed(() => remoteApiEnabled && trialConversionMode.value ? formatPlainAmount(confirmationTotal.value) : cardFee.value > 0
   ? formatPlainAmount(netPrice.value + cardFee.value).replace(/\B(?=(\d{3})+\.)/g, ',')
   : formatAmount(netPrice.value));
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
@@ -1431,7 +1453,7 @@ async function requestConfirmPay() {
   if (trialQuoteUnavailable.value && !createdCheckoutOrder.value && !pendingCheckoutCreate.value) return;
   if (voucherSelecting.value || purchaseConfirmationOpen || confirming || checkoutWalletRefreshing.value || step.value !== "confirm") return;
   const scope = captureCheckoutRoute();
-  const amount = netPrice.value + cardFee.value;
+  const amount = confirmationTotal.value;
   const reviewedTrialApplied = trialView.value.applied;
   const reviewedTrialQuoteVersion = trialView.value.quoteVersion;
   if (!Number.isFinite(amount) || amount < 0) return;
@@ -1442,7 +1464,7 @@ async function requestConfirmPay() {
     paymentSheetAmount.value = amount;
     await nextTick();
     if (!isCurrentCheckoutRoute(scope) || ((!createdCheckoutOrder.value && !pendingCheckoutCreate.value) && trialQuoteScreenUnavailable.value) || step.value !== "confirm") return;
-    if (amount !== netPrice.value + cardFee.value
+    if (amount !== confirmationTotal.value
         || (!createdCheckoutOrder.value && !pendingCheckoutCreate.value && !freeTrial.hasPendingConversion() && (reviewedTrialApplied !== trialView.value.applied
           || reviewedTrialQuoteVersion !== trialView.value.quoteVersion))) {
       toast.warn(t.value.store.coTotalQuoteChanged);
@@ -1471,7 +1493,7 @@ async function onConfirmPay() {
     return;
   }
   const recoveryScope = captureCheckoutRoute();
-  const confirmedAmount = netPrice.value + cardFee.value;
+  const confirmedAmount = confirmationTotal.value;
   const confirmedTrialApplied = trialView.value.applied;
   const confirmedTrialQuoteVersion = trialView.value.quoteVersion;
   if (remoteApiEnabled) {
@@ -1488,7 +1510,7 @@ async function onConfirmPay() {
     if (!trialReady || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
   }
   if (trialQuoteUnavailable.value) { confirming = false; return; }
-  if (confirmedAmount !== netPrice.value + cardFee.value
+  if (confirmedAmount !== confirmationTotal.value
       || (!freeTrial.hasPendingConversion() && (confirmedTrialApplied !== trialView.value.applied
         || confirmedTrialQuoteVersion !== trialView.value.quoteVersion))) {
     confirming = false;
@@ -1497,7 +1519,7 @@ async function onConfirmPay() {
     return;
   }
   trialQuote = trialView.value;
-  quotedTotal = remoteApiEnabled ? netPrice.value + cardFee.value : +(netPrice.value + cardFee.value).toFixed(2);
+  quotedTotal = remoteApiEnabled ? confirmationTotal.value : +(netPrice.value + cardFee.value).toFixed(2);
   voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
   quotedTradeIn = appliedTradeinView.value ? { deviceId: appliedTradeinView.value.device.id } : null;
   if (remoteApiEnabled) {
@@ -1523,18 +1545,19 @@ async function onConfirmPay() {
       }
       let conversion = await freeTrial.convert(p.id, quotedTotal, trialQuote.quoteVersion);
       if (conversion.reason === 'payment-required') {
-        const authorized = await executeSelectedPurchase({amount:quotedTotal,currency:'USDT',summary:p.name},
+        const originalAmount = quotedTotal, originalVersion = trialQuote.quoteVersion;
+        const authorized = await executeSelectedPurchase({amount:originalAmount,currency:'USDT',summary:p.name},
           async authorization=>{
-            if (!isCurrentCheckoutRoute(confirmationScope) || confirmedAmount!==netPrice.value+cardFee.value
+            if (!isCurrentCheckoutRoute(confirmationScope) || confirmedAmount!==confirmationTotal.value
                 || confirmedTrialQuoteVersion!==trialView.value.quoteVersion) return null;
-            return freeTrial.convert(p.id,quotedTotal,trialQuote.quoteVersion,authorization);
+            return freeTrial.convert(p.id,originalAmount,originalVersion,authorization);
           },
           ()=>isCurrentCheckoutRoute(confirmationScope)&&!trialQuoteScreenUnavailable.value
-            &&confirmedAmount===netPrice.value+cardFee.value&&confirmedTrialApplied===trialView.value.applied
+            &&confirmedAmount===confirmationTotal.value&&confirmedTrialApplied===trialView.value.applied
             &&confirmedTrialQuoteVersion===trialView.value.quoteVersion,
-          {kind:'TRIAL_CONVERT',payload:{productNo:p.id,expectedAmountUsdt:quotedTotal,quoteVersion:trialQuote.quoteVersion},
-            commandKey:()=>freeTrial.conversionPaymentKey(p.id,quotedTotal,trialQuote.quoteVersion),
-            parseReceipt:async raw=>{const receipt=parseTrialConvertReceipt(raw);const result=await freeTrial.convert(p.id,quotedTotal,trialQuote.quoteVersion);if(!result.ok||result.orderNo!==receipt.orderNo)throw new Error('TRIAL_CONVERT_RESULT_UNKNOWN');return result;}});
+          {kind:'TRIAL_CONVERT',payload:{productNo:p.id,expectedAmountUsdt:originalAmount,quoteVersion:originalVersion},
+            commandKey:()=>freeTrial.conversionPaymentKey(p.id,originalAmount,originalVersion),
+            parseReceipt:async raw=>{const receipt=parseTrialConvertReceipt(raw);const result=await freeTrial.convert(p.id,originalAmount,originalVersion);if(!result.ok||result.orderNo!==receipt.orderNo)throw new Error('TRIAL_CONVERT_RESULT_UNKNOWN');return result;}});
         if (!authorized) { confirming=false; return; }
         conversion = authorized;
       }
@@ -2135,7 +2158,7 @@ async function offerWalletTopup(requiredUsdt: number, routeScope = captureChecko
 async function submitRemoteOrder(): Promise<void> {
   const submissionScope = captureCheckoutRoute();
   const scopeIsCurrent = () => isCurrentCheckoutRoute(submissionScope);
-  const reviewedTotal = netPrice.value + cardFee.value;
+  const reviewedTotal = confirmationTotal.value;
   const reviewedTrialVersion = trialView.value.quoteVersion;
   if (await resumePendingRemoteTradein(submissionScope)
       || (!hasOriginalCheckout.value && recoverCapacityBeforePurchase([submissionScope.productNo]))) { confirming = false; return; }
@@ -2168,7 +2191,7 @@ async function submitRemoteOrder(): Promise<void> {
     return;
   }
   if (!createdCheckoutOrder.value && !pendingCheckoutCreate.value && (trialQuoteScreenUnavailable.value || trialView.value.applied || freeTrial.hasPendingConversion()
-      || reviewedTrialVersion !== trialView.value.quoteVersion || reviewedTotal !== netPrice.value + cardFee.value)) {
+      || reviewedTrialVersion !== trialView.value.quoteVersion || reviewedTotal !== confirmationTotal.value)) {
     confirming = false;
     toast.warn(t.value.store.coTotalQuoteChanged);
     step.value = "select-payment";
