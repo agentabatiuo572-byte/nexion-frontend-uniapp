@@ -82,14 +82,14 @@ describe('checkout amount and legal components', () => {
     const s=screen(amountSource,{value:null,currency:'USD'});
     expect(s.text()).toBe('$—');
   });
-  it('keeps the three parent-owned legal actions and changes all labels with locale', async () => {
+  it('keeps the two parent-owned legal actions and changes all labels with locale', async () => {
     const s = screen(legalSource, {});
     const links = s.tree().filter(node => node.props?.role === 'link');
     links.forEach(link => link.props.onClick());
-    expect(s.emit.mock.calls).toEqual([['navigate', 'aftersales'], ['navigate', 'terms'], ['navigate', 'risk']]);
+    expect(s.emit.mock.calls).toEqual([['navigate', 'aftersales'], ['navigate', 'terms']]);
     s.locale.code = 'vi'; await Vue.nextTick();
     expect(s.text()).toContain(checkoutFlowCopy('vi').legalLead);
-    expect(s.tree().filter(node => node.props?.role === 'link').map(node => node.children[0].children)).toEqual(['Hậu mãi', 'Điều khoản', 'Rủi ro']);
+    expect(s.tree().filter(node => node.props?.role === 'link').map(node => node.children[0].children)).toEqual(['Hậu mãi', 'Điều khoản']);
   });
 });
 
