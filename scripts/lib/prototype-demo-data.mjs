@@ -139,6 +139,8 @@ export function demoAccountOrders(products,state,now=Date.now()) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
   return [...own,...demoOrders(products,state,now).filter(order=>!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
+    // replace's two-slot cap keeps one reservation (002), leaving a slot for a device, the trial or its conversion.
+    &&(state.checkoutState!=='replace'||order.orderNo!=='DEMO-ORDER-003')
     &&(state.fleetState!=='none'||order.orderNo!=='DEMO-ORDER-004'))];
 }
 // Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.
