@@ -1,6 +1,6 @@
 import { useLocaleStore } from "@/store/locale";
 import { DICTS } from "./use-t";
-import type { LocaleCode } from "./index";
+import { uiLocale, type LocaleCode } from "./index";
 
 /**
  * Tiny string interpolator for i18n keys with placeholders.
@@ -31,14 +31,17 @@ export function fmtMoney(value: number | null | undefined, detail = false): stri
   return `${value < 0 ? "−" : ""}$${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: detail ? 4 : 2 })}`;
 }
 
+const RATE_UNIT = { zh: "天", en: "day", vi: "ngày", id: "day", ms: "day", fil: "day", ru: "day", kk: "day", uz: "day" };
+const JUST_NOW = { zh: "刚刚", en: "Just now", vi: "Vừa xong", id: "Just now", ms: "Just now", fil: "Just now", ru: "Just now", kk: "Just now", uz: "Just now" };
+
 export function fmtRate(value: number | null | undefined, locale: string = "en"): string {
-  return `${fmtMoney(value)}/${locale === "zh" ? "天" : locale === "vi" ? "ngày" : "day"}`;
+  return `${fmtMoney(value)}/${RATE_UNIT[uiLocale(locale)]}`;
 }
 
 export function fmtRelTime(timestamp: number, locale = "en", now = Date.now()): string {
   if (!Number.isFinite(timestamp)) return "-";
   const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
-  if (!minutes) return locale === "zh" ? "刚刚" : locale === "vi" ? "Vừa xong" : "Just now";
+  if (!minutes) return JUST_NOW[uiLocale(locale)];
   const unit = minutes < 60 ? "minute" : minutes < 1440 ? "hour" : "day";
   const count = unit === "minute" ? minutes : unit === "hour" ? Math.floor(minutes / 60) : Math.floor(minutes / 1440);
   return new Intl.RelativeTimeFormat(locale, { numeric: "always" }).format(-count, unit);
