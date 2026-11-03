@@ -57,7 +57,9 @@ const app = useApp();
 
 const calculator = computed(() => {
   const value = app.homeTruth?.doTheMath;
-  return value && value.base.kind !== "cloud-share" && value.target.kind !== "cloud-share" ? value : null;
+  // Lite never compares against a phone (no phone compute on the web); identity is the explicit device kind.
+  return value && value.base.kind !== "cloud-share" && value.target.kind !== "cloud-share"
+    && value.base.kind !== "phone" && value.target.kind !== "phone" ? value : null;
 });
 const baseShort = computed(() => calculator.value
   ? deviceNameInline(t.value, calculator.value.base.kind, calculator.value.base.name)
