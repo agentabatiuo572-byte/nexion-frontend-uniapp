@@ -3,8 +3,8 @@
     <view class="phone-binding-page">
       <SubPageHeader back="/pages/me/security" :title="t.security.phoneBindingTitle" />
       <view class="phone-binding-card">
-        <text class="phone-binding-note" role="status">{{ bound ? t.security.phoneBindingDone : t.security.phoneBindingRequired }}</text>
-        <template v-if="!bound">
+        <text class="phone-binding-note" role="status">{{ bound === null ? t.security.phoneBindingLoading : bound ? t.security.phoneBindingDone : t.security.phoneBindingRequired }}</text>
+        <template v-if="bound === false">
           <view class="phone-binding-number">
             <view class="phone-binding-code" role="button" tabindex="0" :aria-label="t.countryCodes.title"
               :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true"
@@ -18,7 +18,7 @@
           <view v-if="challengeNo" class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validCode" @click="submit" @keydown.enter.prevent="submit">{{ t.security.phoneBindingConfirm }}</view>
           <text v-if="error" class="phone-binding-error" role="alert">{{ error }}</text>
         </template>
-        <view v-else class="phone-binding-action" role="button" tabindex="0" @click="navTo('/pages/me/security')" @keydown.enter.prevent="navTo('/pages/me/security')">{{ t.security.back }}</view>
+        <view v-else-if="bound" class="phone-binding-action" role="button" tabindex="0" @click="navTo('/pages/me/security')" @keydown.enter.prevent="navTo('/pages/me/security')">{{ t.security.back }}</view>
       </view>
       <ServerCaptchaSlider v-if="showCaptcha" :phone="`${countryCode}${phone}`" scene="REGISTER" @success="onCaptchaSuccess" @close="showCaptcha = false" />
     </view>
@@ -47,7 +47,8 @@ const phone = ref("");
 const code = ref("");
 const challengeNo = ref("");
 const busy = ref(false);
-const bound = ref(false);
+// Unknown (null) until there is a session: after an H5 reload it is restored after the page shows.
+const bound = ref<boolean | null>(null);
 const error = ref("");
 const showCaptcha = ref(false);
 const resendLeft = ref(0);
@@ -55,8 +56,10 @@ const validPhone = computed(() => validateNationalPhone(countryCode.value, phone
 const validCode = computed(() => /^\d{6}$/.test(code.value));
 let timer: ReturnType<typeof setInterval> | null = null;
 
-onShow(() => { bound.value = !!sessionVault.read()?.user.phone; });
-onUnmounted(() => { if (timer) clearInterval(timer); });
+function readBinding() { const session = sessionVault.read(); bound.value = session ? !!session.user.phone : null; }
+onShow(readBinding);
+const unsubscribe = sessionVault.subscribe?.(readBinding);
+onUnmounted(() => { if (timer) clearInterval(timer); unsubscribe?.(); });
 watch([phone, countryCode], () => { challengeNo.value = ""; code.value = ""; });
 function startCooldown(seconds: number) {
   resendLeft.value = seconds;
