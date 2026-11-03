@@ -6,6 +6,7 @@ import type { PublicPromotion } from '@/api/promotion-contracts';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { canPreviewPromotion, createPromotionReadFence, isPromotionActive } from '@/lib/promotion-entry';
+import { litePromotion } from '@/lib/promotion-landing';
 
 /** Shared by the existing catalog/detail/bundle surfaces; no qualification calculation. */
 export function usePromotionContext(activityId: Ref<string>, retainPresentation = false) {
@@ -32,7 +33,8 @@ export function usePromotionContext(activityId: Ref<string>, retainPresentation 
       const read = () => promotionApi.get(id, !!sessionVault.read());
       const result = await (passive === true ? runPassiveTabRead('promotion-detail', read, { id, authenticated: !!sessionVault.read() }) : (invalidatePassiveTabRead('promotion-detail'), read()));
       if (!visible || !fence.current(ticket) || id !== activityId.value || identity !== passiveTabReadScope()) return;
-      activity.value = isPromotionActive(result) ? result : null;
+      // Lite: phone rules are dropped; a campaign left with nothing for the web is treated as absent.
+      activity.value = isPromotionActive(result) ? litePromotion(result) : null;
       status.value = 'ready';
     } catch {
       if (visible && fence.current(ticket) && identity === passiveTabReadScope()) { activity.value = null; status.value = 'error'; }

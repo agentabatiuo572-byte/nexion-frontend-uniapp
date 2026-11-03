@@ -160,6 +160,7 @@ import { registerCheckoutLeaveGuard } from '@/lib/promotion-leave-guard';
 import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadline-clock';
 import { displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { promotionCheckoutHref, promotionStoreHref } from '@/lib/promotion-entry';
+import { litePromotion } from '@/lib/promotion-landing';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
@@ -328,7 +329,7 @@ async function loadQuote(){
     if(!liteSelectionAllowed.value)throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
     const sampledAt=readTrustedMonotonicNowMs();
     if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
-      if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?value:null;promotionReceivedAt=sampledAt;updateClock();}
+      if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?litePromotion(value):null;promotionReceivedAt=sampledAt;updateClock();}
     }).catch(()=>{});
     try{
       const requestedItems=selection.value.map(item=>({...item}));
@@ -345,8 +346,8 @@ async function loadQuote(){
         if(eventVoucherStatus.value!=='available'){quotePresentation.value=null;promotion.value=null;return;}
         voucherId.value=eventVoucherId;activityId=null;
         if(props.upgradeActivityId){
-          const candidate=await promotionApi.get(props.upgradeActivityId,true);if(!readCurrent(generation))return;
-          if(candidate.state==='ACTIVE'&&candidate.eligibility==='ESTIMATE_ELIGIBLE'&&candidate.productNos.includes(requestedItems[0].productNo)){
+          const candidate=litePromotion(await promotionApi.get(props.upgradeActivityId,true));if(!readCurrent(generation))return;
+          if(candidate&&candidate.state==='ACTIVE'&&candidate.eligibility==='ESTIMATE_ELIGIBLE'&&candidate.productNos.includes(requestedItems[0].productNo)){
             activityId=candidate.activityId;promotion.value=candidate;promotionReceivedAt=sampledAt;
           }
         }
@@ -378,6 +379,8 @@ async function loadQuote(){
       }
       if(!readCurrent(generation)||inputKey!==quotePresentationKey())return;
       if(result.items.length!==requestedItems.length||requestedItems.some(item=>!result.items.some(line=>line.productNo===item.productNo&&line.quantity===item.quantity)))throw new Error('QUOTE_INPUT_CHANGED');
+      // Lite never gives a phone: a quote with a phone gift is refused like a phone SKU selection.
+      if(result.expectedRewards.some(row=>row.reward.type==='DEVICE'&&!isLiteProduct(getProduct(row.reward.giftProductNo)??{id:row.reward.giftProductNo})))throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
       voucherId.value=selectedId;
       session.setQuote(result,selectedId);quotePresentation.value={key:quotePresentationKey(),quote:result};freshQuoteReady.value=true;receivedAt=sampledAt;revision.value++;updateClock();
     }catch(cause){if(readCurrent(generation)){if(!(cause instanceof ApiError&&cause.kind==='network')){quotePresentation.value=null;promotion.value=null;}throw cause;}}
