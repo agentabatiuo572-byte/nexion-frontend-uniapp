@@ -378,9 +378,16 @@ async function loadQuote(){
         }
       }
       if(!readCurrent(generation)||inputKey!==quotePresentationKey())return;
+      // Lite never gives a phone. A campaign the server chose by itself gives way to an ordinary quote
+      // (same items and voucher) for the user to confirm; an explicitly chosen phone-gift campaign is
+      // refused like a phone SKU selection. Rewards are never edited out of a server quote.
+      const givesPhone=(q:typeof result)=>q.expectedRewards.some(row=>row.reward.type==='DEVICE'&&!isLiteProduct(getProduct(row.reward.giftProductNo)??{id:row.reward.giftProductNo}));
+      if(givesPhone(result)&&!eventVoucherId&&!props.activityId){
+        result=await promotionApi.quote(requestedItems,null,selectedId,false);
+        if(!readCurrent(generation)||inputKey!==quotePresentationKey())return;
+      }
       if(result.items.length!==requestedItems.length||requestedItems.some(item=>!result.items.some(line=>line.productNo===item.productNo&&line.quantity===item.quantity)))throw new Error('QUOTE_INPUT_CHANGED');
-      // Lite never gives a phone: a quote with a phone gift is refused like a phone SKU selection.
-      if(result.expectedRewards.some(row=>row.reward.type==='DEVICE'&&!isLiteProduct(getProduct(row.reward.giftProductNo)??{id:row.reward.giftProductNo})))throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
+      if(givesPhone(result))throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
       voucherId.value=selectedId;
       session.setQuote(result,selectedId);quotePresentation.value={key:quotePresentationKey(),quote:result};freshQuoteReady.value=true;receivedAt=sampledAt;revision.value++;updateClock();
     }catch(cause){if(readCurrent(generation)){if(!(cause instanceof ApiError&&cause.kind==='network')){quotePresentation.value=null;promotion.value=null;}throw cause;}}
