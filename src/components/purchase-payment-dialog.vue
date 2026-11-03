@@ -73,11 +73,8 @@
 
         <!-- Bank shows the same $ fee list as USDT, without a network fee; the ₫ amount stays on the payment page. -->
         <view v-if="s.step !== 'methods'" class="pp-fees">
-          <template v-if="rounded">
-            <view class="pp-kv"><text class="pp-kv__k">{{ copy.businessAmount }}</text><text class="pp-kv__v">{{ s.quote?.businessAmountUsdt }}</text></view>
-            <view class="pp-kv"><text class="pp-kv__k">{{ copy.roundingAdjustment }}</text><text class="pp-kv__v">{{ s.quote?.roundingAdjustmentUsdt }}</text></view>
-          </template>
-          <view v-else class="pp-kv"><text class="pp-kv__k">{{ copy.subtotal }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.subtotalUsdt) : '—' }}</text></view>
+          <!-- subtotalUsdt is the server's cent amount (business amount + rounding adjustment), so the rows add up to the total. -->
+          <view class="pp-kv"><text class="pp-kv__k">{{ copy.subtotal }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.subtotalUsdt) : '—' }}</text></view>
           <view class="pp-kv"><text class="pp-kv__k">{{ copy.channelFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.channelFeeUsdt) : '—' }}</text></view>
           <view v-if="s.step === 'network'" class="pp-kv"><text class="pp-kv__k">{{ copy.networkFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.networkConfirmFeeUsdt) : '—' }}</text></view>
         </view>
@@ -261,7 +258,6 @@ const networks = computed(() => [
   { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
 ].filter(tab => payment.available(tab.id)));
 const sheetTitle = computed(() => s.step === 'network' ? copy.value.networkTitle : s.step === 'bank' ? copy.value.bankTitle : copy.value.title);
-const rounded = computed(() => !!s.quote?.roundingAdjustmentUsdt && Number(s.quote.roundingAdjustmentUsdt) !== 0);
 const fees = computed(() => s.intent ?? s.quote);
 const isBank = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'HDPAY_BANK');
 const received = computed(() => s.intent?.status === 'FUNDS_CONFIRMED');
