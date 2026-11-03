@@ -555,8 +555,10 @@ onUnmounted(() => {
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.accountId], () => {
   readPhoneBinding();
   clearSecurityAccountState();
-  refreshSecurityForCurrentAccount();
 }, { flush: "sync" });
+// Sign-in changes these keys before it rebinds the account scope; a read started here would be fenced out as stale.
+// The default flush runs once after the whole sign-in step, under the rebound scope.
+watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.accountId], refreshSecurityForCurrentAccount);
 
 const passwordHintLine = computed(() => {
   if (remoteApiEnabled && !securityPresentation.value) return "—";
