@@ -25,7 +25,7 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-export const demoDefaults = {paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
@@ -49,6 +49,8 @@ export const demoOptions = {
   sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
   promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
   promotionRewardType:[['reward','首购 / 复购发 UVT'],['discount','首购 / 复购为订单立减'],['gift-discount','购机赠礼为订单立减']],
+  jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
+  globeShareState:[['nodes','未下发占比 · 按节点数分配'],['share','已下发占比 sharePct']],
   fleetState:[['normal','默认设备'],['none','暂无设备'],['inventory','含仓库未激活设备'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['erc20-off','ERC20 未开通'],['low-balance','钱包余额不足（820.64 USDT）']],
 };
@@ -168,7 +170,11 @@ export function demoFixture(url,locale,state,request) {
     config.featureFlags.stakingVisible=state.stakingState!=='delisted';
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
-    Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0});
+    Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0,activeJobsBase:state.jobsBaseState==='published'?1000:null});
+    // Globe split and drift; totals come from networkPulse.onlineDevices and the task-centre job count.
+    const globeCenters=[['sg',236000,18,12.5],['jp',253000,22,13],['vn',163000,26,8.5],['uk',249000,16,12],['fr',208000,20,10],['de',217000,14,11],['us-ny',316000,24,17],['us-sj',284000,17,16]];
+    config.publicStats.globeDisplay={intervalMs:5400,nodeJitterPct:.4,activeJobsMinPct:8,activeJobsMaxPct:14,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,
+      centers:globeCenters.map(([id,nodes,latencyMs,sharePct])=>({id,nodes,latencyMs,...(state.globeShareState==='share'?{sharePct}:{})}))};
     // Verified aggregates feed the trust centre's platform figures; the empty fixture has none.
     const aggregate=(value,kind)=>({value,definition:'Preview figure',kind});
     config.publicStats.verified=empty?null:{activeAccounts:aggregate(8642,'COUNT'),registeredAccounts:aggregate(12480,'COUNT'),installedDevices:aggregate(3315,'COUNT'),onlineDevices:aggregate(2968,'COUNT'),completedPayoutUsdt:aggregate(1284650.5,'SUM'),capturedAt:new Date(demoStartedAt).toISOString()};

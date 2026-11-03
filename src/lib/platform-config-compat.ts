@@ -12,6 +12,7 @@ const RUNTIME_PUBLIC_STATS_DEFAULT: PlatformConfig["publicStats"] = {
   registeredUsersBase: 0,
   registeredUsersMonthlyGrowthPct: -1,
   registeredUsersAnchorAt: 0,
+  activeJobsBase: null,
   realUserCount: 0,
   virtualUserCount: -1,
   hashratePercentileTable: [],

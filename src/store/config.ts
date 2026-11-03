@@ -43,6 +43,7 @@ export const useConfig = defineStore("config", () => {
       registeredUsersBase: 0,
       registeredUsersMonthlyGrowthPct: -1,
       registeredUsersAnchorAt: 0,
+      activeJobsBase: null,
       realUserCount: 0,
       virtualUserCount: -1,
       hashratePercentileTable: [],
