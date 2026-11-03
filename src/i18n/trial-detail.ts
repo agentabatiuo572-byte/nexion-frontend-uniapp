@@ -1,5 +1,6 @@
 import { computed } from 'vue';
 import { useLocaleStore } from '@/store/locale';
+import { uiLocale } from '@/i18n';
 
 /** P-59 free-trial detail page (/pages/me/trial): strings only this page uses. */
 export const trialDetailCopy = {
@@ -45,9 +46,93 @@ export const trialDetailCopy = {
     rulesRow: 'Quy tắc khấu trừ và hoàn tiền', earnRow: 'Xem ở trang Kiếm tiền', buyCta: 'Mua ngay · {amount}', freeDays: 'Miễn phí {n} ngày',
     rulesBeforeNoCap: 'Trước khi mua, tiền khấu trừ dùng thử chỉ dùng để trừ vào giá máy.',
   },
+  id: {
+    countdownDays: "{days}d {hours}:{minutes}",
+    remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
+    graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy',
+    earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}',
+    earlySubtitle: 'Your full trial earnings, paid early', earlyEstimate: ' (estimated)',
+    graceTitle: "Don't let your trial earnings expire",
+    totalBreakdown: '{discount} off this order + {credit} after purchase', totalDiscountOnly: '{discount} off this order', totalLabel: 'Total benefit',
+    unitPrice: 'Device price', promoRow: 'Trial discount ({pct}%, up to {cap})', promoRowNoCap: 'Trial discount ({pct}%)', limitedTag: 'Limited time',
+    earlyRow: 'Trial-only discount', offsetRow: 'Trial credit ({amount} USDT)',
+    discountTotal: 'Total discount', finalPrice: 'Final price', creditRow: 'Estimated earnings (withdrawable)',
+    rulesRow: 'Credit and refund rules', earnRow: 'View on Earn', buyCta: 'Buy now · {amount}', freeDays: '{n} days free',
+    rulesBeforeNoCap: 'Before purchase, trial credit only offsets the device price.',
+  },
+  ms: {
+    countdownDays: "{days}d {hours}:{minutes}",
+    remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
+    graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy',
+    earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}',
+    earlySubtitle: 'Your full trial earnings, paid early', earlyEstimate: ' (estimated)',
+    graceTitle: "Don't let your trial earnings expire",
+    totalBreakdown: '{discount} off this order + {credit} after purchase', totalDiscountOnly: '{discount} off this order', totalLabel: 'Total benefit',
+    unitPrice: 'Device price', promoRow: 'Trial discount ({pct}%, up to {cap})', promoRowNoCap: 'Trial discount ({pct}%)', limitedTag: 'Limited time',
+    earlyRow: 'Trial-only discount', offsetRow: 'Trial credit ({amount} USDT)',
+    discountTotal: 'Total discount', finalPrice: 'Final price', creditRow: 'Estimated earnings (withdrawable)',
+    rulesRow: 'Credit and refund rules', earnRow: 'View on Earn', buyCta: 'Buy now · {amount}', freeDays: '{n} days free',
+    rulesBeforeNoCap: 'Before purchase, trial credit only offsets the device price.',
+  },
+  fil: {
+    countdownDays: "{days}d {hours}:{minutes}",
+    remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
+    graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy',
+    earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}',
+    earlySubtitle: 'Your full trial earnings, paid early', earlyEstimate: ' (estimated)',
+    graceTitle: "Don't let your trial earnings expire",
+    totalBreakdown: '{discount} off this order + {credit} after purchase', totalDiscountOnly: '{discount} off this order', totalLabel: 'Total benefit',
+    unitPrice: 'Device price', promoRow: 'Trial discount ({pct}%, up to {cap})', promoRowNoCap: 'Trial discount ({pct}%)', limitedTag: 'Limited time',
+    earlyRow: 'Trial-only discount', offsetRow: 'Trial credit ({amount} USDT)',
+    discountTotal: 'Total discount', finalPrice: 'Final price', creditRow: 'Estimated earnings (withdrawable)',
+    rulesRow: 'Credit and refund rules', earnRow: 'View on Earn', buyCta: 'Buy now · {amount}', freeDays: '{n} days free',
+    rulesBeforeNoCap: 'Before purchase, trial credit only offsets the device price.',
+  },
+  ru: {
+    countdownDays: "{days}d {hours}:{minutes}",
+    remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
+    graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy',
+    earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}',
+    earlySubtitle: 'Your full trial earnings, paid early', earlyEstimate: ' (estimated)',
+    graceTitle: "Don't let your trial earnings expire",
+    totalBreakdown: '{discount} off this order + {credit} after purchase', totalDiscountOnly: '{discount} off this order', totalLabel: 'Total benefit',
+    unitPrice: 'Device price', promoRow: 'Trial discount ({pct}%, up to {cap})', promoRowNoCap: 'Trial discount ({pct}%)', limitedTag: 'Limited time',
+    earlyRow: 'Trial-only discount', offsetRow: 'Trial credit ({amount} USDT)',
+    discountTotal: 'Total discount', finalPrice: 'Final price', creditRow: 'Estimated earnings (withdrawable)',
+    rulesRow: 'Credit and refund rules', earnRow: 'View on Earn', buyCta: 'Buy now · {amount}', freeDays: '{n} days free',
+    rulesBeforeNoCap: 'Before purchase, trial credit only offsets the device price.',
+  },
+  kk: {
+    countdownDays: "{days}d {hours}:{minutes}",
+    remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
+    graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy',
+    earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}',
+    earlySubtitle: 'Your full trial earnings, paid early', earlyEstimate: ' (estimated)',
+    graceTitle: "Don't let your trial earnings expire",
+    totalBreakdown: '{discount} off this order + {credit} after purchase', totalDiscountOnly: '{discount} off this order', totalLabel: 'Total benefit',
+    unitPrice: 'Device price', promoRow: 'Trial discount ({pct}%, up to {cap})', promoRowNoCap: 'Trial discount ({pct}%)', limitedTag: 'Limited time',
+    earlyRow: 'Trial-only discount', offsetRow: 'Trial credit ({amount} USDT)',
+    discountTotal: 'Total discount', finalPrice: 'Final price', creditRow: 'Estimated earnings (withdrawable)',
+    rulesRow: 'Credit and refund rules', earnRow: 'View on Earn', buyCta: 'Buy now · {amount}', freeDays: '{n} days free',
+    rulesBeforeNoCap: 'Before purchase, trial credit only offsets the device price.',
+  },
+  uz: {
+    countdownDays: "{days}d {hours}:{minutes}",
+    remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
+    graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy',
+    earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}',
+    earlySubtitle: 'Your full trial earnings, paid early', earlyEstimate: ' (estimated)',
+    graceTitle: "Don't let your trial earnings expire",
+    totalBreakdown: '{discount} off this order + {credit} after purchase', totalDiscountOnly: '{discount} off this order', totalLabel: 'Total benefit',
+    unitPrice: 'Device price', promoRow: 'Trial discount ({pct}%, up to {cap})', promoRowNoCap: 'Trial discount ({pct}%)', limitedTag: 'Limited time',
+    earlyRow: 'Trial-only discount', offsetRow: 'Trial credit ({amount} USDT)',
+    discountTotal: 'Total discount', finalPrice: 'Final price', creditRow: 'Estimated earnings (withdrawable)',
+    rulesRow: 'Credit and refund rules', earnRow: 'View on Earn', buyCta: 'Buy now · {amount}', freeDays: '{n} days free',
+    rulesBeforeNoCap: 'Before purchase, trial credit only offsets the device price.',
+  },
 };
 
 export function useTrialDetailCopy() {
   const locale = useLocaleStore();
-  return computed(() => trialDetailCopy[locale.code === 'zh' || locale.code === 'vi' ? locale.code : 'en']);
+  return computed(() => trialDetailCopy[uiLocale(locale.code)]);
 }

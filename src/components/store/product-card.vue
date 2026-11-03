@@ -141,13 +141,14 @@ import type { PublicPromotion } from '@/api/promotion-contracts';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
 
 import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDetailHref,type VoucherEntryContext } from '@/lib/promotion-entry';
+import { uiLocale } from "@/i18n";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean; compact?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean; voucherContext?:VoucherEntryContext }>(), {
   featured: false,
 });
 const t = useT();
 const locale = useLocaleStore();
-const estimateLabel = computed(() => locale.code === 'zh' ? '预估' : locale.code === 'vi' ? 'Ước tính' : 'Est.');
+const estimateLabel = computed(() => ({ zh: '预估', en: 'Est.', vi: 'Ước tính', id: 'Est.', ms: 'Est.', fil: 'Est.', ru: 'Est.', kk: 'Est.', uz: 'Est.' })[uiLocale(locale.code)]);
 const earnConfig = useEarnConfig();
 prepareEarnConfig();
 const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code, earnConfig.taskPricing.value?.taskClasses));

@@ -42,6 +42,7 @@ import { useReferralReward } from "@/store/referral-reward";
 import { useConfig } from "@/store/config";
 import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { uiLocale } from '@/i18n';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "openPoster"): void }>();
@@ -171,9 +172,17 @@ function icon(paths: string): string {
 // 品牌名为专有名词(双语一致);sms/copy/poster/system 走 i18n。
 // One short line under the two local actions.
 function channelHint(key: ShareChannelKey): string {
-  const hints = locale.code === "zh" ? { poster: "带二维码，可保存", copy: "好友打开即可注册" }
-    : locale.code === "vi" ? { poster: "Có mã QR, lưu được", copy: "Bạn bè mở là đăng ký" }
-      : { poster: "With QR code, saveable", copy: "Friends sign up from it" };
+  const hints = ({
+    zh: { poster: "带二维码，可保存", copy: "好友打开即可注册" },
+    en: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+    vi: { poster: "Có mã QR, lưu được", copy: "Bạn bè mở là đăng ký" },
+    id: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+    ms: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+    fil: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+    ru: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+    kk: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+    uz: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+  })[uiLocale(locale.code)];
   return key === "poster" || key === "copy" ? hints[key] : "";
 }
 function channelMeta(key: ShareChannelKey): ChannelMeta {

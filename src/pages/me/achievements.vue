@@ -140,8 +140,9 @@ import { readAchievementsForCurrentSession, type AchievementRemoteReadFailure } 
 
 const t = useT();
 import { useLocaleStore } from '@/store/locale';
+import { uiLocale } from "@/i18n";
 const locale = useLocaleStore();
-const emptyAchievements = computed(() => locale.code === 'zh' ? '暂时没有可参与的成就' : locale.code === 'vi' ? 'Hiện chưa có thành tích khả dụng' : 'No achievements available yet');
+const emptyAchievements = computed(() => ({ zh: '暂时没有可参与的成就', en: 'No achievements available yet', vi: 'Hiện chưa có thành tích khả dụng', id: 'No achievements available yet', ms: 'No achievements available yet', fil: 'No achievements available yet', ru: 'No achievements available yet', kk: 'No achievements available yet', uz: 'No achievements available yet' })[uiLocale(locale.code)]);
 const w = computed(() => t.value.achievements);
 const app = useApp();
 const ach = useAchievements();

@@ -1,4 +1,5 @@
 import type { VRankDef } from '@/store/v-rank';
+import { uiLocale } from '@/i18n';
 
 export const rankBenefitKeys = ['directBonus', 'unilevelDepth', 'peerBonus', 'leadershipVotes'] as const;
 export type RankBenefitKey = typeof rankBenefitKeys[number];
@@ -19,5 +20,5 @@ export function increasedRankBenefitKeys(current: RankBenefits | null | undefine
 }
 
 export function rankBenefitIncreaseHeading(locale: string): string {
-  return locale === 'zh' ? '新增／提升权益' : locale === 'vi' ? 'Quyền lợi mới hoặc nâng cao' : 'New or improved benefits';
+  return ({ zh: '新增／提升权益', en: 'New or improved benefits', vi: 'Quyền lợi mới hoặc nâng cao', id: 'New or improved benefits', ms: 'New or improved benefits', fil: 'New or improved benefits', ru: 'New or improved benefits', kk: 'New or improved benefits', uz: 'New or improved benefits' })[uiLocale(locale)];
 }

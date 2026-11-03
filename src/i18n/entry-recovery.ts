@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 // Copy scoped to the audited entry pages, separate from shared dictionaries.
 export const entryRecoveryCopy = {
@@ -36,9 +37,75 @@ export const entryRecoveryCopy = {
     txHashLabel: "Mã băm giao dịch",
     viewBills: "Xem lịch sử giao dịch",
   },
+  id: {
+    referralLoading: "Loading invitation details…",
+    referralUnavailable: "Invitation details could not be loaded. Retry or continue creating an account.",
+    referralInvalid: "This invite code is unavailable. You can still create an account.",
+    txMissingTitle: "Missing transaction information",
+    txMissingBody: "No transaction hash was provided. Return to Bills and select the transaction you want to view.",
+    txInvalidTitle: "Invalid transaction information",
+    txInvalidBody: "The transaction hash has an invalid format. Return to Bills and reopen the transaction record.",
+    txHashLabel: "Transaction hash",
+    viewBills: "View bills",
+  },
+  ms: {
+    referralLoading: "Loading invitation details…",
+    referralUnavailable: "Invitation details could not be loaded. Retry or continue creating an account.",
+    referralInvalid: "This invite code is unavailable. You can still create an account.",
+    txMissingTitle: "Missing transaction information",
+    txMissingBody: "No transaction hash was provided. Return to Bills and select the transaction you want to view.",
+    txInvalidTitle: "Invalid transaction information",
+    txInvalidBody: "The transaction hash has an invalid format. Return to Bills and reopen the transaction record.",
+    txHashLabel: "Transaction hash",
+    viewBills: "View bills",
+  },
+  fil: {
+    referralLoading: "Loading invitation details…",
+    referralUnavailable: "Invitation details could not be loaded. Retry or continue creating an account.",
+    referralInvalid: "This invite code is unavailable. You can still create an account.",
+    txMissingTitle: "Missing transaction information",
+    txMissingBody: "No transaction hash was provided. Return to Bills and select the transaction you want to view.",
+    txInvalidTitle: "Invalid transaction information",
+    txInvalidBody: "The transaction hash has an invalid format. Return to Bills and reopen the transaction record.",
+    txHashLabel: "Transaction hash",
+    viewBills: "View bills",
+  },
+  ru: {
+    referralLoading: "Loading invitation details…",
+    referralUnavailable: "Invitation details could not be loaded. Retry or continue creating an account.",
+    referralInvalid: "This invite code is unavailable. You can still create an account.",
+    txMissingTitle: "Missing transaction information",
+    txMissingBody: "No transaction hash was provided. Return to Bills and select the transaction you want to view.",
+    txInvalidTitle: "Invalid transaction information",
+    txInvalidBody: "The transaction hash has an invalid format. Return to Bills and reopen the transaction record.",
+    txHashLabel: "Transaction hash",
+    viewBills: "View bills",
+  },
+  kk: {
+    referralLoading: "Loading invitation details…",
+    referralUnavailable: "Invitation details could not be loaded. Retry or continue creating an account.",
+    referralInvalid: "This invite code is unavailable. You can still create an account.",
+    txMissingTitle: "Missing transaction information",
+    txMissingBody: "No transaction hash was provided. Return to Bills and select the transaction you want to view.",
+    txInvalidTitle: "Invalid transaction information",
+    txInvalidBody: "The transaction hash has an invalid format. Return to Bills and reopen the transaction record.",
+    txHashLabel: "Transaction hash",
+    viewBills: "View bills",
+  },
+  uz: {
+    referralLoading: "Loading invitation details…",
+    referralUnavailable: "Invitation details could not be loaded. Retry or continue creating an account.",
+    referralInvalid: "This invite code is unavailable. You can still create an account.",
+    txMissingTitle: "Missing transaction information",
+    txMissingBody: "No transaction hash was provided. Return to Bills and select the transaction you want to view.",
+    txInvalidTitle: "Invalid transaction information",
+    txInvalidBody: "The transaction hash has an invalid format. Return to Bills and reopen the transaction record.",
+    txHashLabel: "Transaction hash",
+    viewBills: "View bills",
+  },
 };
 
 export function useEntryRecoveryCopy() {
   const locale = useLocaleStore();
-  return computed(() => entryRecoveryCopy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+  return computed(() => entryRecoveryCopy[uiLocale(locale.code)]);
 }

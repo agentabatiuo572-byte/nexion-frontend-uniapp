@@ -30,12 +30,13 @@ import { homeTaskSummary } from './home-task-summary';
 import NxSection from '@/components/ui/nx-section.vue';
 import NxListGroup from '@/components/ui/nx-list-group.vue';
 import HomeActionRowView, { type HomeActionRow } from './home-action-row.vue';
+import { uiLocale } from "@/i18n";
 const visibility = useDataVisibility();
 const app = useApp(), quest = useQuest(), orders = useOrders(), voucher = useVoucher(), trial = useFreeTrial(), config = useConfig(), copy = useAuditUiCopy();
 const expanded = ref(false), securityNeedsAction = ref(false), ordersReady = ref(false);
 const t = useT(), initialPending = ref(remoteApiEnabled);
 const locale = useLocaleStore(), now = useNow();
-const detailCopy = computed(() => homeActionsCopy[locale.code === 'zh' || locale.code === 'vi' ? locale.code : 'en']);
+const detailCopy = computed(() => homeActionsCopy[uiLocale(locale.code)]);
 let visible = true, generation = 0;
 const rows = computed<HomeActionRow[]>(() => {
   const list: HomeActionRow[] = [];
