@@ -1397,7 +1397,7 @@ flowchart TD
 
 > 锁额 `remaining` 是该 SKU"还剩 N 件"的**单一来源**(收编原 `stock` 展示,消除双口径)。其余 SKU 默认无购买门;Pro v2 / Rack P2 维持阶段门(`unlocksAtPhase`)。
 
-**算力阶梯（2026-11-03 P-66 起六档）**：自下而上为 手机、Box S1、Box Pro、Box Pro v2、Rack P1、Rack P2；手机取典型 T3 档日产，五档硬件分别取当前目录 `stellarbox-s1` / `stellarbox-pro` / `stellarbox-pro-v2` / `stellarrack-p1` / `stellarrack-p2` 的 `dailyEarn`，某个 SKU 缺失或无效时该行仍保留并显示「—」、进度条为空。标题右侧显示实际行数（6 档）。进度条宽度按六档中最高日产等比，透明度自下而上 0.25 → 0.75 逐档递增；两档 Rack 的 $/天 用品牌色，其余用正文色。用户已激活的最高硬件档（含手机）所在行显示「←你」并用 brand-2 色，金额取该设备自身日产；每档硬件都有固定行，不再为 Pro v2 / Rack P2 另插一行。
+**算力阶梯（2026-11-03 P-66 起六档）**：自下而上为 手机、Box S1、Box Pro、Box Pro v2、Rack P1、Rack P2；手机取典型 T3 档日产，五档硬件分别取当前目录 `stellarbox-s1` / `stellarbox-pro` / `stellarbox-pro-v2` / `stellarrack-p1` / `stellarrack-p2` 的 `dailyEarn`，某个 SKU 缺失或无效时该行仍保留并显示「—」、进度条为空。标题右侧显示实际行数（6 档）。进度条宽度按六档中最高日产等比，透明度自下而上 0.25 → 0.75 逐档递增；两档 Rack 的 $/天 用品牌色，其余用正文色。用户已激活的最高硬件档（含手机）所在行显示「←你」并用 brand-2 色，金额取该设备自身日产；名称列宽固定，放不下标记时标记折到第二行，不截断；每档硬件都有固定行，不再为 Pro v2 / Rack P2 另插一行。
 
 **列表顶端 VsPhoneHero**:`手机 $0.06/天 ↔ Box S1 $X/天`,中间倍数 chip `NNN×`,两侧带 `+UVT/天` 副字(双币展示)。2026-10-30 起：其上的「算力阶梯」各档放在一张内容卡内，滚动到该区域时进度条从 0 逐行展开（系统减少动态时直接显示）；阶梯收益与本卡两侧金额、倍数按 DS-27 用统计数字字体，设备名与「/天」用界面字体。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
 
@@ -1436,7 +1436,7 @@ flowchart TD
 页面自上而下(unlocked 状态,2026-11-03 按现行页面更正):
 
 1. **Hero card**:商品主图(目录 `imageUrl`,可带详情视频)+ 角标 ribbon + 主图左下实时成交弹幕(§7.2.2);下方商品名、tagline,再下为两项销售数据:左「累计已售」(`sold`),右「本周剩余」(硬件 `stock` > 0 时;缺货显示「暂时缺货」)。
-   - **团队算力点(2026-11-03 P-66)**:销售数据正下方一行安静提示「[三节点图标] 每台为团队增加 12,990 算力点」(Cloud Share 为「每份…」;英文 `Each unit/share adds {n} compute pts to your team`,越南语 `Mỗi máy/phần cộng {n} điểm tính toán cho nhóm`)。数值读目录 `computePoints`(单件计入团队的算力点,与后端 `nx_product.compute_points` 同值),按语言千分位(越南语用「.」),数字用统计数字字体、ink-2 色,其余 12px 正文 ink-3 色;无分隔线、无强调色、不可点击。仅商品详情显示,商品卡和结算页不显示;`computePoints` 缺失、null 或为 0 时整行隐藏;不受「隐藏数据」眼睛遮盖(商品信息,非个人数据);窄屏可折成两行,不得溢出。目录下发该字段前(后端待办 B24)此行不显示。
+   - **团队算力点(2026-11-03 P-66)**:销售数据正下方一行安静提示「[三节点图标] 每台为团队增加 12,990 算力点」(Cloud Share 为「每份…」;英文 `Each unit/share adds {n} compute pts to your team`,越南语 `Mỗi máy/phần cộng {n} điểm tính toán cho nhóm`)。数值读目录 `computePoints`(单件计入团队的算力点,与后端 `nx_product.compute_points` 同值),按语言千分位(越南语用「.」),数字用统计数字字体、ink-2 色,其余 12px 正文 ink-3 色;无分隔线、无强调色、不可点击。仅商品详情显示,商品卡和结算页不显示;`computePoints` 缺失、null 或为 0 时整行隐藏;不受「隐藏数据」眼睛遮盖(商品信息,非个人数据);窄屏可折成两行,不得溢出。目录下发该字段前(后端待办 B25)此行不显示。
 2. **活动 / 代金券提示**:从活动或代金券入口进入时,在 Hero 下方显示活动状态或代金券条款。
 3. **Cloud Share 收益卡**(仅 Cloud Share):见下方 Cloud Share variant。
 4. **vs-phone strip**(仅硬件,用户有已激活手机时):`你的手机 $X/天 ↔ $Y/天` + chip `预估 NNN×`,倍数 = 本商品日产 / 该手机日产,向下取 1 位小数;没有已激活手机时整条不显示。

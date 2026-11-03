@@ -16,8 +16,8 @@
         :key="tier.id"
         class="ladder-row"
       >
-        <view class="whitespace-nowrap truncate" :style="labelStyle(tier)">
-          <text>{{ (tier.label) }}</text>
+        <view class="ladder-label" :style="labelStyle(tier)">
+          <text class="ladder-name">{{ (tier.label) }}</text>
           <text v-if="tier.you" class="ladder-you">{{ t.store.ladderYou }}</text>
         </view>
         <view class="ladder-track">
@@ -117,7 +117,9 @@ function yieldColor(tier: Tier): string {
 <style scoped>
 .ladder-card { display: flex; flex-direction: column-reverse; gap: var(--v5-space-1); padding: var(--ui-space-inline) var(--ui-space-inset); border-radius: var(--nx-glass-radius); background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); }
 .ladder-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 92px; align-items: center; column-gap: var(--ui-space-inline); min-height: 32px; }
-.ladder-you { margin-left: var(--v5-space-1); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand-2-ink); }
+.ladder-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--v5-space-1); min-width: 0; }
+.ladder-name { white-space: nowrap; }
+.ladder-you { white-space: nowrap; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-brand-2-ink); }
 .ladder-track { position: relative; height: 6px; overflow: hidden; border-radius: 999px; background: var(--v5-surface-3); }
 .ladder-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; }
 .ladder-yield { overflow: hidden; text-align: right; white-space: nowrap; font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; }
