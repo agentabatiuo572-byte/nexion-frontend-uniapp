@@ -32,12 +32,13 @@ export function landingProductNos(activity: Pick<PublicPromotion, 'productNos'>)
 }
 /** Lite presentation of a campaign: phone products and their rules are dropped (explicit identity). A campaign
  *  whose products or rules were all phones returns null and is not shown on the web. */
-export function litePromotion<T extends Pick<PublicPromotion, 'productNos' | 'rewardRules'>>(activity: T): T | null {
+export function litePromotion<T extends Pick<PublicPromotion, 'productNos' | 'rewardRules' | 'bannerImageUrl'>>(activity: T): T | null {
   const productNos = landingProductNos(activity);
   const rewardRules = activity.rewardRules.filter(rule => isLiteProduct(landingProduct(rule.productNo) ?? { id: rule.productNo }));
   if ((activity.productNos.length && !productNos.length) || (activity.rewardRules.length && !rewardRules.length)) return null;
+  // The operator banner may picture the dropped phone offer, so a trimmed campaign uses the product and reward cards.
   return productNos.length === activity.productNos.length && rewardRules.length === activity.rewardRules.length
-    ? activity : { ...activity, productNos, rewardRules };
+    ? activity : { ...activity, productNos, rewardRules, bannerImageUrl: null };
 }
 export function landingProductImage(sku: string): string | undefined {
   return catalogReady() ? getProduct(sku)?.imageUrl : getProductMedia(sku)?.src;
