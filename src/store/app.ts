@@ -1176,6 +1176,16 @@ export const useApp = defineStore("app", () => {
         remoteFleetStatus.value = "ready";
         return true;
       } catch (cause) {
+        // A catalog publish advances the runtime revision while this read is in flight (production starts both
+        // together). Nothing else re-reads the fleet for that, so read again under the new revision instead of
+        // leaving the fleet "loading" with no snapshot.
+        if (!isCurrentRuntimeRevision(runScope)
+          && remoteAccountEpoch.isCurrent(request)
+          && remoteFleetRefreshCoordinator.isCurrent(lease)
+          && refreshSequence != null
+          && refreshSequence === remoteFleetRefreshSequence) {
+          return refreshRemoteFleet(request, options);
+        }
         if (remoteAccountEpoch.isCurrent(request)
           && isCurrentRuntimeRevision(runScope)
           && remoteFleetRefreshCoordinator.isCurrent(lease)
