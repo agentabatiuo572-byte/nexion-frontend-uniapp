@@ -1933,7 +1933,6 @@ export const ms: Messages = {
       regional: "Saingan wilayah",
       boost: "Galakan bonus",
       seasonal: "Bermusim",
-      holding: "Ganjaran pemegang",
       onboarding: "Pengguna baharu",
     },
     tabs: {

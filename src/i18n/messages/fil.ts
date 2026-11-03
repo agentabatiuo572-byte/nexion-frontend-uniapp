@@ -1933,7 +1933,6 @@ export const fil: Messages = {
       regional: "Labanan ng rehiyon",
       boost: "Bonus boost",
       seasonal: "Seasonal",
-      holding: "Holder reward",
       onboarding: "Para sa bagong user",
     },
     tabs: {
