@@ -204,6 +204,7 @@ function product(value: unknown): CatalogProduct {
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
     shareYieldMin,
     shareYieldMax,
+    computePoints: optionalInteger(source.computePoints),
     price: finiteNumber(source.price, Number.EPSILON),
     sold: integer(source.sold),
     imageUrl: productMediaUrl(source.imageUrl),
