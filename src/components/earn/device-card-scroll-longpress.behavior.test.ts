@@ -1,9 +1,17 @@
+import { computeV2Copy } from "@/i18n/compute-v2";
+import * as progress from "@/lib/task-progress";
+vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
 import * as Vue from "vue";
+import * as tabLifecycle from "@/composables/use-tab-page-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
+import { canControlDevice } from '@/lib/device-control-platform';
+import { deviceStatisticsCapabilityCopy } from "@/i18n/device-statistics-capability";
 import type { Component } from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import ts from "typescript";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+vi.mock("@dcloudio/uni-app", () => ({ onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn(), onUnload: vi.fn() }));
 import source from "./device-card-pc.vue?raw";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import * as deadline from "@/lib/server-deadline-clock";
@@ -50,6 +58,15 @@ const now = 1_800_000_000_000;
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); useCapacityExplainer().close(); });
 afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); useCapacityExplainer().close(); vi.useRealTimers(); });
 
+test.each([false, true])("shows expired-task recovery in Earn and detail (detail=%s) without a task or progress", async detail => {
+  const device = { ...cloudDevice(), currentTask: null, recoveryPending: true };
+  const card = await mount(en, device, true, true, true, detail);
+  expect(text(card.root)).toContain(computeV2Copy.en.statuses.RECOVERING);
+  expect(text(card.root)).not.toContain(en.earn.noCurrentTask);
+  expect(find(card.root, "nx-device-task-progress")).toBeUndefined();
+  expect(all(card.root).some(node => node.props.role === "progressbar")).toBe(false);
+});
+
 function cloudDevice(): Device {
   return { id: "render-cloud", rowVersion: 1, kind: "cloud-share", name: "Cloud Share", gpu: "RTX 4090",
     vramTotal: 96, basePower: 1200, baseRate: 100, baseRateNEX: 50, purchasedAt: now - 172_800_000,
@@ -58,25 +75,37 @@ function cloudDevice(): Device {
     todayEarnings: 0, todayEarningsNEX: 0, cumulativeEarningsUsdt: 0, paidPriceUsdt: 0, capacitySource: "server" };
 }
 
-async function mount(copy: Messages = zh, device = cloudDevice(), expanded = false, native = true, calibrated = true) {
+async function mount(copy: Messages = zh, device = cloudDevice(), expanded = false, native = true, calibrated = true, detailPage = false, hidden = false) {
   const navTo = vi.fn();
   const setPhoneRuntime = vi.fn();
   const toggle = vi.fn();
-  const app = Vue.reactive({ accountKey: "render-only", visibleDevices: [device], remotePhoneBindingInvalid: false, setPhoneRuntime });
+  const handleDeactivate = vi.fn(), handleTradein = vi.fn();
+  const app = Vue.reactive({ remoteAssignmentStatus: "ready", remoteAssignmentHasSnapshot: true, accountKey: "render-only", visibleDevices: [device], remotePhoneBindingInvalid: false, setPhoneRuntime });
   const blank = Vue.defineComponent({ setup: () => () => Vue.h("view") });
-  const dependencies: Record<string, unknown> = {
+  const dependencies: Record<string, unknown> = { '@/store/data-visibility': { useDataVisibility: () => ({ hidden, mask: (value: unknown) => hidden ? "••••" : String(value) }) },
+    '@/lib/device-control-platform': { canControlDevice },
+    "@/composables/use-tab-page-lifecycle": tabLifecycle,
     "@/lib/amount-display": { formatAmount },
+    "@/lib/usd-display": { formatUsd },
+    "@/i18n/device-statistics-capability": { useDeviceStatisticsCapabilityCopy: () => Vue.ref(deviceStatisticsCapabilityCopy[copy === zh ? "zh" : copy === vietnamese ? "vi" : "en"]) },
     vue: Vue, "@/components/home/device-slot.vue": { __esModule: true, default: blank },
+    "@/components/ui/nx-button.vue": { __esModule: true, default: blank },
+    "@/components/ui/nx-tag.vue": { __esModule: true, default: blank },
+    "@/components/liquid-glass.vue": { __esModule: true, default: blank },
+    "@/components/me/device-deactivate-sheet.vue": { __esModule: true, default: blank },
+    "@/composables/use-device-deactivation": { useDeviceDeactivation: () => ({ sheetDevice: Vue.ref(null), handleDeactivate, onSheetWait: vi.fn(), onSheetForce: vi.fn() }) },
+    "@/composables/use-tradein-strip": { useTradeinStrip: () => ({ tradeinStrip: (d: Device) => d.kind === "stellarbox-s1" ? { tradeinCtaLabel: "cta" } : {}, handleTradein }) },
     "@/store/app": { useApp: () => app },
     "@/store/session": { useSession: () => ({ isCurrentDeviceCalibrated: () => calibrated }) },
     "@/store/config": { useConfig: () => ({ config: { onlineBonus: {} } }) },
     "@/store/earn-config": { prepareEarnConfig: () => {}, useEarnConfig: () => ({ lockedTeasers: () => [], averageEligibleReward: () => 1 }) },
-    "@/lib/native-phone-runtime": { hasNativeAndroidPhoneRuntime: () => native },
+    "@/lib/native-phone-runtime": { hasNativeAndroidPhoneRuntime: () => native, hasNativePhoneRuntime: () => native, nativePhonePlatform: () => null },
     "@/api/runtime": { remoteApiEnabled: true }, "@/i18n/use-t": { useT: () => Vue.ref(copy) },
     "@/lib/route": { navTo }, "@/composables/use-capacity-explainer": { useCapacityExplainer },
     "@/lib/server-deadline-clock": deadline, "@/lib/phone-activation-guidance": phoneGuidance,
     "@/store/device-types": deviceTypes, "@/lib/workload-label": workload,
-    "@/lib/task-result-confirmation": confirmation, "@/lib/device-copy": deviceCopy,
+    "@/components/earn/task-v2-status.vue": { __esModule: true, default: Vue.defineComponent({ setup: () => () => null }) },
+    "@/lib/task-result-confirmation": confirmation, "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, "@/lib/task-progress": progress, "@/lib/device-copy": deviceCopy,
     "@/store/device-lifecycle": lifecycle, "@/store/interrupt": interrupt,
     "@/lib/hashpower": hashpower, "@/lib/device-capability": capability,
     "@/lib/today-completed-tasks": completions, "@/i18n/format": { fmt },
@@ -92,14 +121,117 @@ async function mount(copy: Messages = zh, device = cloudDevice(), expanded = fal
     return dependencies[key];
   }, module, module.exports);
   const root = node();
-  const instance = renderer.createApp(module.exports.default, { device, expanded, onToggle: toggle });
+  const tabVisit = tabLifecycle.createTabLifecycle({}, true);
+  const instance = renderer.createApp({ setup() {
+    Vue.provide(tabLifecycle.TAB_LIFECYCLE, tabVisit);
+    return () => Vue.h(module.exports.default, { device, expanded, detailPage, showManage: detailPage, onToggle: toggle });
+  } });
   instance.mount(root);
   let mounted = true;
   const unmount = () => { if (mounted) { instance.unmount(); mounted = false; } };
   unmounts.push(unmount);
   await Vue.nextTick();
-  return { root, device, toggle, navTo, setPhoneRuntime, unmount };
+  return { root, device, app, toggle, navTo, handleDeactivate, handleTradein, setPhoneRuntime, unmount, hide: () => tabVisit.setVisible(false), show: () => tabVisit.setVisible(true) };
 }
+
+test.each([en, zh, vietnamese])('detail management opens the existing deactivation confirmation in place without changing the device', async copy => {
+  const device = { ...cloudDevice(), id: 'box / 41', kind: 'stellarbox-s1' } as Device;
+  const view = await mount(copy, device, true, true, true, true);
+  const before = JSON.stringify(device);
+  await fire(find(view.root, 'nx-device-card')!, 'onTouchstart', touch(50, 50));
+  await vi.advanceTimersByTimeAsync(480);
+  expect(find(view.root, 'nx-device-quick-stats')).toBeUndefined();
+  const action = find(view.root, 'nx-device-quick-deactivate')!;
+  expect(text(action)).toBe(copy.myDevices.inventoryRowDeactivate);
+  await fire(action, 'onClick');
+  expect(view.handleDeactivate).toHaveBeenCalledExactlyOnceWith(device);
+  expect(view.navTo).not.toHaveBeenCalled();
+  expect(find(view.root, 'nx-device-quick-menu')).toBeUndefined();
+  expect(JSON.stringify(device)).toBe(before);
+});
+
+test('trade-in opens the retire flow for this device in place and is absent without eligibility', async () => {
+  const device = { ...cloudDevice(), id: 'box-42', kind: 'stellarbox-s1' } as Device;
+  const view = await mount(zh, device, true, true, true, true);
+  await fire(find(view.root, 'nx-device-card')!, 'onTouchstart', touch(50, 50));
+  await vi.advanceTimersByTimeAsync(480);
+  const action = find(view.root, 'nx-device-quick-tradein')!;
+  expect(text(action)).toBe(zh.earn.quickMenu.tradein);
+  await fire(action, 'onClick');
+  expect(view.handleTradein).toHaveBeenCalledExactlyOnceWith(device);
+  expect(view.navTo).not.toHaveBeenCalled();
+  const cloud = await mount(zh, cloudDevice(), true, true, true, true);
+  await fire(find(cloud.root, 'nx-device-card')!, 'onTouchstart', touch(50, 50));
+  await vi.advanceTimersByTimeAsync(480);
+  expect(find(cloud.root, 'nx-device-quick-tradein')).toBeUndefined();
+});
+
+test.each([en, zh, vietnamese])("shows lifecycle Online independently of task execution health", async copy => {
+  for (const kind of ["stellarbox-s1", "phone"] as const) {
+    const device = Vue.reactive({ ...cloudDevice(), kind, status: "online", runtimeStatus: "ONLINE" } as Device);
+    const card = await mount(copy, device, true);
+    const assertStatus = (label: string, online: boolean) => {
+      expect(text(find(card.root, "nx-device-status-label")!)).toBe(label);
+      expect(all(card.root).filter(entry => String(entry.props.class ?? "").split(/\s+/).includes("device-status-online"))).toHaveLength(online ? 1 : 0);
+    };
+    assertStatus("Online", true);
+    // The last local status must not override the current server conclusion.
+    device.runtimeStatus = "OFFLINE"; await Vue.nextTick(); assertStatus(copy.earn.online, true);
+    device.runtimeStatus = "UNKNOWN"; await Vue.nextTick(); assertStatus(copy.earn.online, true);
+    device.runtimeStatus = "ONLINE";
+    if (kind === "phone") {
+      device.interruptedAt = now; await Vue.nextTick(); assertStatus(copy.earn.online, true);
+      device.interruptedAt = null;
+      device.currentTask = { id: "paused-task", category: "LL", type: "LLM inference", model: "Llama", client: "UVEL", location: "Device",
+        totalSec: 120, startedAt: now, reward: 0, status: "PAUSED" };
+      await Vue.nextTick(); assertStatus(copy.earn.online, true);
+      device.currentTask = null; device.pausedReason = "low-battery";
+      await Vue.nextTick(); assertStatus(copy.earn.online, true);
+      device.pausedReason = null;
+    }
+    device.pendingDeactivate = true; await Vue.nextTick(); assertStatus(copy.earn.online, true);
+    device.pendingDeactivate = false; await Vue.nextTick(); assertStatus("Online", true);
+  }
+});
+
+test.each([en, zh, vietnamese])("keeps an activated account phone readable without local calibration or a native runtime", async copy => {
+  const phone = { ...cloudDevice(), kind: "phone", todayEarnings: 1.25 } as Device;
+  const before = JSON.stringify(phone);
+  for (const [native, calibrated] of [[true, false], [false, false]]) {
+    const card = await mount(copy, phone, true, native, calibrated);
+    expect(text(find(card.root, "nx-device-status-label")!)).toBe(copy.earn.online);
+    expect(text(card.root)).not.toContain(copy.myDevices.phoneActivationTitle);
+    expect(text(card.root)).toContain(formatUsd(1.25));
+    expect(card.setPhoneRuntime).not.toHaveBeenCalled();
+    expect(JSON.stringify(phone)).toBe(before);
+  }
+});
+
+test.each([en, zh, vietnamese])("expanded phone and detail distinguish unknown task reads from confirmed waiting", async copy => {
+  for (const detailPage of [false, true]) {
+    const card = await mount(copy, { ...cloudDevice(), kind: "phone" }, true, false, false, detailPage);
+    for (const status of ["error", "loading"]) {
+      card.app.remoteAssignmentStatus = status; card.app.remoteAssignmentHasSnapshot = false; await Vue.nextTick();
+      expect(text(card.root)).toContain(copy.earn.runtimeUnknown);
+      expect(text(card.root)).not.toContain(copy.earn.phoneWaitingTask);
+      expect(text(card.root)).not.toContain(copy.earn.phoneWaitingHint);
+      expect(find(card.root, "nx-spin")).toBeUndefined();
+    }
+    card.app.remoteAssignmentStatus = "ready"; await Vue.nextTick();
+    expect(text(card.root)).toContain(copy.earn.phoneWaitingTask);
+    expect(text(card.root)).toContain(copy.earn.phoneWaitingHint);
+    expect(all(card.root).some(node => node.props.role === "progressbar")).toBe(false);
+  }
+});
+
+test("the retained device clock stops while hidden and resumes without duplicate intervals", async () => {
+  const card = await mount();
+  const shown = vi.getTimerCount();
+  card.hide(); expect(vi.getTimerCount()).toBe(shown - 1);
+  card.show(); expect(vi.getTimerCount()).toBe(shown);
+  card.show(); expect(vi.getTimerCount()).toBe(shown);
+  card.unmount(); expect(vi.getTimerCount()).toBe(shown - 1);
+});
 
 for (const copy of [en, zh, vietnamese]) {
   test(`${copy.earn.hashCapability}: missing server phone capacity is compact and a later valid value recovers`, async () => {
@@ -116,7 +248,7 @@ for (const copy of [en, zh, vietnamese]) {
     expect(text(label().parent!.children[1].children[0])).toBe("-");
     expect(text(label().parent!.parent!)).toContain(copy.earn.hashCapabilityUnknown);
     for (const [native, calibrated] of [[true, false], [false, true]]) {
-      const blocked = await mount(copy, phone, true, native, calibrated);
+      const blocked = await mount(copy, { ...phone, activatedAt: null }, true, native, calibrated);
       expect(all(blocked.root).some(entry => text(entry) === copy.earn.hashCapability)).toBe(false);
       const guidance = phoneGuidance.resolvePhoneActivationGuidance(native, copy.myDevices);
       expect(text(blocked.root)).toContain(guidance.title);
@@ -161,6 +293,9 @@ for (const [locale, copy] of [["en", en], ["zh", zh], ["vi", vietnamese]] as con
     await vi.advanceTimersByTimeAsync(1);
     const dialog = menu(view.root)!;
     expect(dialog.props.role).toBe("dialog");
+    expect(find(dialog, "nx-action-sheet")).toBeDefined();
+    expect(find(dialog, "nx-action-sheet__handle")).toBeDefined();
+    expect(find(dialog, "nx-action-sheet__cancel")).toBeDefined();
     expect(text(dialog)).toContain(copy.earn.quickMenu.stats);
     expect(text(dialog)).toContain(copy.earn.quickMenu.cancel);
     await fire(card, "onTouchend");
@@ -241,6 +376,14 @@ test("keyboard/context-menu access and Escape remain available", async () => {
   expect(menu(view.root)).toBeDefined();
 });
 
+test("statistics navigates to this device's real section and closes the menu", async () => {
+  const view = await mount(zh, { ...cloudDevice(), id: 'cloud / 1' });
+  await fire(find(view.root, 'nx-device-card__header')!, 'onContextmenu');
+  await fire(find(view.root, 'nx-device-quick-stats')!, 'onClick');
+  expect(view.navTo).toHaveBeenCalledExactlyOnceWith('/pages/earn/device-detail?id=cloud%20%2F%201&section=statistics');
+  expect(menu(view.root)).toBeUndefined();
+});
+
 test("ordinary subsidy tap still opens the real shared explainer switch", async () => {
   const device = { ...cloudDevice(), kind: "stellarbox-s1" as const,
     capacityPct: 100, capacityAgeMonths: 0, capacitySubsidized: true,
@@ -259,4 +402,54 @@ test("ordinary subsidy tap still opens the real shared explainer switch", async 
   expect(JSON.stringify(device)).toBe(original);
   expect(view.navTo).not.toHaveBeenCalled();
   expect(view.setPhoneRuntime).not.toHaveBeenCalled();
+});
+
+
+test.each([en, zh, vietnamese])("collapsed queue exposes each actual task and frozen paused progress, without completing it", async copy => {
+  const device = Vue.reactive({ ...cloudDevice(), taskServerNow: now,
+    currentTask: { id: "actual-job-41", category: "LL", type: "LLM inference", model: "BGE-M3", client: "UVEL", location: "Device",
+      totalSec: 120, startedAt: now - 60_000, reward: 0.1, status: "RUNNING", completableAt: now + 60_000 } } as Device);
+  const before = JSON.stringify(device);
+  const card = await mount(copy, device);
+  const summary = () => find(card.root, "nx-device-current-task")!;
+  expect(text(summary())).toContain("BGE-M3");
+  expect(text(summary())).toContain("#actual-job-41");
+  expect(text(summary())).toContain("50%");
+  expect(find(card.root, "nx-device-task-progress")!.props.style.width).toBe("50%");
+  await vi.advanceTimersByTimeAsync(61_000);
+  expect(text(summary())).toContain("99%");
+  expect(text(summary())).not.toContain("100%");
+  expect(text(summary())).toContain(copy.earn.taskAwaitingExecutionResultConfirmation);
+  expect(JSON.stringify(device)).toBe(before);
+  device.currentTask!.status = "PAUSED"; device.currentTask!.pausedAt = now; await Vue.nextTick();
+  expect(text(summary())).toContain(copy.earn.phoneTaskPaused);
+  expect(text(summary())).toContain("50%");
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(text(summary())).toContain("50%");
+  await vi.advanceTimersByTimeAsync(19_000);
+  device.taskServerNow = now + 90_000; await Vue.nextTick();
+  expect(text(summary())).toContain("50%");
+  device.currentTask!.status = "RUNNING";
+  device.currentTask!.pausedAt = null;
+  device.currentTask!.pausedSeconds = 90;
+  device.currentTask!.completableAt = now + 150_000;
+  await Vue.nextTick(); expect(text(summary())).toContain("50%");
+  const expanded = await mount(copy, device, true);
+  expect(text(expanded.root)).toContain("BGE-M3");
+  const privateCard = await mount(copy, device, false, true, true, false, true);
+  expect(text(privateCard.root)).not.toContain("BGE-M3");
+  expect(text(privateCard.root)).not.toContain("actual-job-41");
+  expect(find(privateCard.root, "nx-device-task-progress")).toBeUndefined();
+  expect(all(privateCard.root).find(node => node.props.role === "progressbar")!.props["aria-valuenow"]).toBeUndefined();
+  const reconnectingDevice = { ...device, kind: "phone", interruptedAt: now } as Device;
+  const privateDetails = await mount(copy, reconnectingDevice, true, true, true, true, true);
+  expect(text(privateDetails.root)).not.toContain("BGE-M3");
+  expect(text(privateDetails.root)).not.toContain("actual-job-41");
+  device.currentTask!.status = "PAUSED"; device.currentTask!.pausedAt = undefined; await Vue.nextTick();
+  expect(find(card.root, "nx-device-task-progress")).toBeUndefined();
+  expect(text(summary())).not.toContain("50%");
+  device.currentTask = null; await Vue.nextTick();
+  expect(summary()).toBeUndefined();
+  expect(text(card.root)).toContain(copy.earn.noCurrentTask);
+  expect(all(card.root).some(node => node.props.role === "progressbar")).toBe(false);
 });

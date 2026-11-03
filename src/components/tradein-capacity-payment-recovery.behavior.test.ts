@@ -128,10 +128,10 @@ describe('actual capacity purchase result recovery',()=>{
     expect(JSON.stringify([...p.storage.values()])).not.toContain('039417');
     expect(p.capacityRecovery.value).toMatchObject({quote:null});
   });
-  it('the existing Lite choice surface permits only the explicitly allowed original-key PIN resume',async()=>{
+  it('the dedicated KEEP recovery surface permits only the explicitly allowed original-key PIN resume',async()=>{
     const p=page(),intent='keep|1156|stellarbox-pro-v2|5|2639|2639|6';
     writeAccountRow(p.CAPACITY_COMMAND_TABLE,'account-a',{commands:{[intent]:'legacy-keep-key'}});
-    p.state.value={kind:'choice',targetKind:'stellarbox-pro-v2',newPrice:2639,tradeInSources:[]};
+    p.state.value={kind:'keep-recovery',targetKind:'stellarbox-pro-v2'};
     p.readPaymentCommand.mockResolvedValue({status:'NOT_SEEN',canResumeSameKey:true});
     p.deviceE3Api.replayCapacityKeep.mockRejectedValueOnce(new Error('response lost again'));
     await p.actual.recoverCapacityPurchase(false);

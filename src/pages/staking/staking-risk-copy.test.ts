@@ -5,6 +5,7 @@ import {en} from '@/i18n/messages/en';
 import {zh} from '@/i18n/messages/zh';
 import {vi} from '@/i18n/messages/vi';
 import {fmt} from '@/i18n/format';
+import {stakingReviewCopy} from '@/lib/staking-review-copy';
 describe('staking risk copy uses current policy and evidenced claims',()=>{
   for(const [locale,messages] of Object.entries({en,zh,vi})){
     it(`${locale} does not promise an unsupported execution mechanism or duration`,()=>{
@@ -27,7 +28,7 @@ describe('staking risk copy uses current policy and evidenced claims',()=>{
       expect(r2Label).toMatch(/扣费.*奖励|charge.*rewards|phí.*thưởng/i);
       expect(r2Body).toMatch(/锁定金额|locked amount|số tiền khóa/i);
       // Existing stakes keep their recorded terms; the page states it once, in the third rule.
-      expect(messages.stakingHowItWorks.r3Body).toMatch(/已开始的质押|Existing stakes|các khoản đang staking/i);
+      expect(stakingReviewCopy(locale).rules.r3Body).toMatch(/已开始的质押|Existing stakes|các khoản đang staking/i);
       expect(r1Body).not.toMatch(/到期日前无法用作任何事|cannot be used for anything else until|không thể dùng vào việc gì khác cho tới/i);
     });
     it(`${locale} does not retain the unapproved reserve guarantee`,()=>{

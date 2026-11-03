@@ -10,18 +10,22 @@ function setup() {
   const mounted: (() => void)[] = [], shown: (() => void)[] = [], hidden: (() => void)[] = [], removed: (() => void)[] = [];
   const revisions = new Set<() => void>();
   const cfg = { refresh: vi.fn(async () => {}) };
-  const genesis = { remotePublicReadState: "loading", syncRemote: vi.fn(async () => true) };
+  const genesis = { remotePublicReadState: "loading", syncRemote: vi.fn(async () => true),
+    captureRemoteReadBinding: () => ({ accountKey: "user:1", epoch: 1 }), remotePublicSuccessRevision: 0, remoteAccountSuccessRevision: 0 };
+  // Ownership fence declared above the sliced lifecycle: one stable account/locale/environment owner.
+  const fence = { app: { accountKey: "user:1" }, marketOwner: { value: "owner" }, marketOwnerGeneration: 0, marketEnvironmentInvalidated: false,
+    publicReadOwner: { value: "" }, accountReadOwner: { value: "" } };
   const report = vi.fn();
   const registered = vi.fn(() => vi.fn());
   const methods = new Function("cfg", "genesis", "remoteApiEnabled", "reactive", "nextTick",
     "onMounted", "onShow", "onHide", "onUnmounted", "subscribeRuntimeRevision",
     "registerActivePageRefresh", "captureAccountScope", "isCurrentAccountScope", "sessionVault",
-    "authenticatedPageObservationReporter", "h3ObservationApi", code)(
+    "authenticatedPageObservationReporter", "h3ObservationApi", ...Object.keys(fence), code)(
     cfg, genesis, true, (value: unknown) => value, async () => {},
     (cb: () => void) => mounted.push(cb), (cb: () => void) => shown.push(cb),
     (cb: () => void) => hidden.push(cb), (cb: () => void) => removed.push(cb),
     (cb: () => void) => { revisions.add(cb); return () => revisions.delete(cb); },
-    registered, () => ({}), () => true, { read: () => null }, { report }, { secondaryMarket: vi.fn() },
+    registered, () => ({}), () => true, { read: () => null }, { report }, { secondaryMarket: vi.fn() }, ...Object.values(fence),
   ) as { retryMarketplaceFacts(): Promise<void> };
   return { ...methods, mounted, shown, hidden, removed, revisions, cfg, genesis, report, registered };
 }
@@ -105,7 +109,8 @@ test("runtime read rejection is consumed and a later retry starts another read",
   await view.retryMarketplaceFacts();
   expect(view.genesis.syncRemote).toHaveBeenCalledTimes(3);
   expect(view.report).not.toHaveBeenCalled();
-  expect(page.match(/@(?:click|cta)="retryMarketplaceFacts\(\)"/g)).toHaveLength(3);
+  // One recovery entry remains available independently of the selected tab.
+  expect(page.match(/@click="retryMarketplaceFacts\(\)"/g)).toHaveLength(1);
   view.removed[0]();
 });
 

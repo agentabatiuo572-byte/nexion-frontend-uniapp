@@ -20,7 +20,7 @@ function invalid(): never { throw new ApiError({ kind: "protocol", message: "TEA
 function row(value: unknown): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) return invalid(); return value as Record<string, unknown>; }
 function text(value: unknown, nullable = false): string | null { if (nullable && value === null) return null; if (typeof value !== "string" || !value.trim()) return invalid(); return value.trim(); }
 function count(value: unknown): number { if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) return invalid(); return value; }
-function amount(value: unknown): number { if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return invalid(); return value; }
+function points(value: unknown): number { return count(value); }
 
 function member(value: unknown): TeamNetworkMember {
   const source = row(value); const layer = count(source.layer); const vRank = count(source.vRank);
@@ -31,8 +31,8 @@ function member(value: unknown): TeamNetworkMember {
   if (layer < 1 || layer > 7 || vRank > 8 || !Number.isFinite(Date.parse(joinedAt))) return invalid();
   return { id: text(source.id) as string, name: text(source.name) as string,
     avatarUrl: text(source.avatarUrl, true), vRank, layer: layer as TeamNetworkMember["layer"], leg,
-    joinedAt, monthComputePoints: count(source.monthComputePoints),
-    lifetimeComputePoints: count(source.lifetimeComputePoints), status, region: text(source.region, true) };
+    joinedAt, monthComputePoints: points(source.monthComputePoints), lifetimeComputePoints: points(source.lifetimeComputePoints),
+    status, region: text(source.region, true) };
 }
 
 function provenance(source: Record<string, unknown>, mode: ApiEnvironment): { sourceEnvironment: TeamNetworkSnapshot["sourceEnvironment"]; runId: string } {
@@ -52,8 +52,9 @@ function snapshot(value: unknown, mode: ApiEnvironment): TeamNetworkSnapshot {
   if (totalMembers !== members.length || directMembers !== members.filter((item) => item.layer === 1).length
       || activeMembers !== members.filter((item) => item.status === "ACTIVE").length
       || new Set(members.map((item) => item.id)).size !== members.length || !Number.isFinite(Date.parse(generatedAt))) return invalid();
-  return { totalMembers, directMembers, activeMembers, monthComputePoints: count(source.monthComputePoints),
-    lifetimeComputePoints: count(source.lifetimeComputePoints), members, source: "server", ...proof,
+  return { totalMembers, directMembers, activeMembers,
+    monthComputePoints: points(source.monthComputePoints), lifetimeComputePoints: points(source.lifetimeComputePoints),
+    members, source: "server", ...proof,
     serverCanonical: true, generatedAt, nextCursor: source.nextCursor === undefined || source.nextCursor === null ? null : text(source.nextCursor) };
 }
 

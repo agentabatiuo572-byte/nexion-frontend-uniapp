@@ -2,7 +2,7 @@ import ts from "typescript";
 import nativeRuntime from "@dcloudio/uni-app-plus/dist/uni.runtime.esm.js?raw";
 import * as vue from "vue";
 import { initPreContext, preJs } from "@dcloudio/uni-cli-shared/dist/preprocess";
-import { createPinia, setActivePinia } from "pinia";
+import { createPinia, disposePinia, setActivePinia } from "pinia";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import source from "./profile.vue?raw";
 import { zh } from "@/i18n/messages/zh";
@@ -13,11 +13,11 @@ import { profileVRankProjection } from "@/lib/profile-vrank-display";
 import { rankName } from "@/lib/v-rank-copy";
 import { createP318AccountPageFence } from "./p3-18-account-page-fence";
 import { reconcileProfileEdit } from "@/lib/profile-save-flow";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { displayNickname } from "@/lib/brand-copy";
 import { ApiError, asApiError } from "@/api/errors";
-import { formatTrialDeadline } from "@/lib/trial-date";
+import { formatDisplayDateTime } from "@/lib/display-date";
 
-const remote = vi.hoisted(() => ({ remoteApiEnabled: true, vRankApi: { ladder: vi.fn(), current: vi.fn() } }));
+const remote = vi.hoisted(() => ({ remoteApiEnabled: true, apiRuntimeConfig: { environment: "dev", baseUrl: "https://test.invalid" }, vRankApi: { ladder: vi.fn(), current: vi.fn() } }));
 vi.mock("@/api/runtime", () => remote);
 const { useVRank } = await import("@/store/v-rank");
 function deferred() {
@@ -32,7 +32,8 @@ const flush = async () => { await vue.nextTick(); for (let n = 0; n < 8; n++) aw
 
 // Runs the actual page worker and Pinia V-rank store. All network edges are synthetic.
 function mount(localeCode: "zh" | "en" | "vi" = "zh", platform: "app" | "h5" = "app") {
-  setActivePinia(createPinia()); runtimeRevision.advanceRuntimeRevision(null);
+  const pinia = createPinia();
+  setActivePinia(pinia); runtimeRevision.advanceRuntimeRevision(null);
   const reads: Array<{ ladder: ReturnType<typeof deferred>; current: ReturnType<typeof deferred> }> = [];
   remote.vRankApi.ladder.mockReset().mockImplementation(() => {
     const row = { ladder: deferred(), current: deferred() }; reads.push(row); return row.ladder.promise;
@@ -41,10 +42,12 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh", platform: "app" | "h5" = "
   const rank = useVRank();
   const app = vue.reactive({ accountKey: "A", accountBindingEpoch: 1, user: { tier: "L5", joinedAt: 1 } });
   const auth = vue.reactive({ accountId: "A", email: "" });
+  const session = { accessToken: "fixture-access-token" };
   const profile = vue.reactive({ displayName: "Confirmed", phoneE164: "", nicknameCandidates: [],
     refreshNicknameCandidates: vi.fn(async () => true),
     setDisplayName: vi.fn(async () => true),
     projectServerNickname: vi.fn((nickname: string) => { profile.displayName = nickname; }),
+    projectServerAvatar: vi.fn(),
   });
   const payout = vue.reactive({ hasAnyAddress: false, provenance: null as unknown, currentFor: () => undefined,
     refreshRemote: vi.fn(async () => false),
@@ -61,7 +64,7 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh", platform: "app" | "h5" = "
   const modules: Record<string, unknown> = {
     vue: { ...vue, onMounted: (fn: () => void) => hooks.mount.push(fn), onUnmounted: (fn: () => void) => hooks.unmount.push(fn) },
     "@dcloudio/uni-app": { onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn) },
-    "@/api/runtime": { remoteApiEnabled: true, profileApi: { profile: profileRead, uploadAvatar } },
+    "@/api/runtime": { remoteApiEnabled: true, profileApi: { profile: profileRead, uploadAvatar }, sessionVault: { read: () => session } },
     "@/lib/route": { navTo: vi.fn() }, "@/i18n/use-t": { useT: () => vue.ref({ zh, en, vi: vietnamese }[localeCode]) },
     "@/i18n/format": { dateLocale: () => "zh-CN" }, "@/store/app": { useApp: () => app },
     "@/store/auth": { useAuth: () => auth }, "@/store/profile": { useProfile: () => profile },
@@ -76,9 +79,9 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh", platform: "app" | "h5" = "
     "@/lib/profile-save-flow": { reconcileProfileEdit }, "@/lib/secure-command-id": { requireCryptoUuid: cryptoUuid },
     "@/lib/profile-date": { formatJoinedDate: () => "" }, "@/lib/profile-vrank-display": { profileVRankProjection },
     "@/lib/v-rank-copy": { rankName },
-    "@/lib/brand-copy": { nexGridBrandText },
+    "@/lib/brand-copy": { displayNickname },
     "@/api/order-api": runtimeRevision, "./p3-18-account-page-fence": { createP318AccountPageFence },
-    "@/api/errors": { asApiError }, "@/lib/trial-date": { formatTrialDeadline },
+    "@/api/errors": { asApiError }, "@/lib/display-date": { formatDisplayDateTime },
   };
   const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
   initPreContext(platform);
@@ -90,15 +93,15 @@ function mount(localeCode: "zh" | "en" | "vi" = "zh", platform: "app" | "h5" = "
     return modules[id];
   }, {}, { chooseImage }));
   const fire = (event: string) => hooks[event].forEach(fn => fn());
-  cleanups.push(() => { fire("unmount"); scope.stop(); });
+  cleanups.push(() => { fire("unmount"); scope.stop(); disposePinia(pinia); });
   const accept = (index: number, value: number, published = false) => {
     reads[index].ladder.resolve({ ranks: Array.from({ length: 13 }, (_, v) => {
       const title = published && v < 2 ? ["注册会员", "活跃新星"][v] : `级别${v}`;
       return { v, title: published ? title : `Rank ${v}`, cnTitle: title, rewards: [] };
     }) });
-    reads[index].current.resolve({ rankCode: `V${value}`, progress: { selfComputePoints: 0, directRefs: 0, teamComputePoints: 0, vDownlineCounts: {} } });
+    reads[index].current.resolve({ rankCode: `V${value}`, progress: { selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {} } });
   };
-  return { page, rank, reads, accept, app, auth, payout, profile, profileReads, toast, confirm, fire, chooseImage, uploadAvatar, cryptoUuid };
+  return { page, rank, reads, accept, app, auth, session, payout, profile, profileReads, toast, confirm, fire, chooseImage, uploadAvatar, cryptoUuid };
 }
 
 // Execute the installed native chooser's actionSheet cancel and its real failure
@@ -257,29 +260,32 @@ describe("profile avatar picker cancellation", () => {
 });
 
 describe("profile authoritative read lifecycle", () => {
-  it("brands the nickname row for an untouched historical default without saving a renamed value", async () => {
+  it("preserves an untouched historical nickname without saving a renamed value", async () => {
     const h = mount();
     const oldBrand = "Nexi" + "on";
     const read = h.page.loadRemoteProfile();
     h.profileReads[0].resolve({ nickname: `${oldBrand} 3778`, avatarUrl: "", avatarRevision: "" });
     await read;
     expect(h.page.name.value).toBe(`${oldBrand} 3778`);
-    expect(h.page.displayName.value).toBe("UVEL 3778");
+    expect(h.page.displayName.value).toBe(`${oldBrand} 3778`);
     expect(h.page.dirty.value).toBe(false);
-    expect(source).toContain("{{ nexGridBrandText(name) }}");
-    expect(nexGridBrandText(h.page.name.value)).toBe("UVEL 3778");
+    expect(source).toContain("{{ displayNickname(name) }}");
+    expect(displayNickname(h.page.name.value)).toBe(`${oldBrand} 3778`);
     expect(h.profile.setDisplayName).not.toHaveBeenCalled();
   });
   it.each([
     ["en", "Registered Member", "Rising Star"],
     ["vi", "Thành viên đã đăng ký", "Ngôi sao mới"],
-  ] as const)("renders the published current and next rank in %s", async (localeCode, current, next) => {
+  ] as const)("renders only the V level for the current and next rank in %s", async (localeCode, current, next) => {
     const h = mount(localeCode);
     const read = h.page.refreshVRankForCurrentAccount();
     h.accept(0, 0, true);
     await read;
-    expect(h.page.tierLabel.value).toBe(`V0 · ${current}`);
-    expect(h.page.tierProgressLine.value).toContain(`V1 · ${next}`);
+    // App shows the V level only (APP-COPY-AUDIT D6); configured titles stay internal.
+    expect(h.page.tierLabel.value).toBe("V0");
+    expect(h.page.tierProgressLine.value).toContain("V1");
+    expect(h.page.tierProgressLine.value).not.toContain(next);
+    expect(h.page.tierLabel.value).not.toContain(current);
   });
   it("does not render a locally seeded tier or unset wallet while reads are unconfirmed", () => {
     const h = mount();
@@ -292,8 +298,8 @@ describe("profile authoritative read lifecycle", () => {
     h.reads[0].current.reject(Error("offline")); await first;
     expect(h.rank.remoteError).toBeTruthy(); expect(h.page.tierLabel.value).toBe("—");
     const retry = h.page.refreshVRankForCurrentAccount(); h.accept(1, 4); await retry;
-    expect(h.rank.remoteError).toBeNull(); expect(h.page.tierLabel.value).toBe("V4 · 级别4");
-    expect(h.page.tierProgressLine.value).toContain("V5 · 级别5");
+    expect(h.rank.remoteError).toBeNull(); expect(h.page.tierLabel.value).toBe("V4");
+    expect(h.page.tierProgressLine.value).toContain("V5");
   });
   for (const event of ["runtime", "account", "rebind", "hide-show"]) {
     for (const failed of [false, true]) {
@@ -306,16 +312,29 @@ describe("profile authoritative read lifecycle", () => {
         h.accept(latest, 8); await flush();
         if (failed) h.reads[0].current.reject(Error("late")); else h.accept(0, 2);
         await old;
-        expect(h.page.tierLabel.value).toBe("V8 · 级别8"); expect(h.rank.remoteError).toBeNull();
+        expect(h.page.tierLabel.value).toBe("V8"); expect(h.rank.remoteError).toBeNull();
       });
     }
   }
   it("does not launch runtime reads while hidden and unsubscribes on unmount", async () => {
     const h = mount(); h.fire("hide"); runtimeRevision.advanceRuntimeRevision("hidden");
-    await h.page.refreshVRankForCurrentAccount(); expect(h.reads).toHaveLength(0);
-    h.fire("show"); expect(h.reads).toHaveLength(1); h.accept(0, 3); await flush();
-    h.fire("unmount"); runtimeRevision.advanceRuntimeRevision("gone");
+    // The account store refreshes globally; the hidden page must add no reads.
     await h.page.refreshVRankForCurrentAccount(); expect(h.reads).toHaveLength(1);
+    expect(h.profileReads).toHaveLength(0);
+    h.fire("show"); expect(h.reads).toHaveLength(2); h.accept(1, 3); await flush();
+    h.fire("unmount"); runtimeRevision.advanceRuntimeRevision("gone");
+    await h.page.refreshVRankForCurrentAccount(); expect(h.reads).toHaveLength(3);
+    expect(h.profileReads).toHaveLength(1);
+  });
+  it("waits for server session restore before initial profile reads", async () => {
+    const h = mount(); h.session.accessToken = "";
+    h.fire("show"); h.fire("mount"); await flush();
+    expect(h.profileReads).toHaveLength(0);
+    expect(h.profile.refreshNicknameCandidates).not.toHaveBeenCalled();
+    expect(h.toast.error).not.toHaveBeenCalled();
+    h.session.accessToken = "restored-token"; h.app.accountBindingEpoch++;
+    await flush(); expect(h.profileReads).toHaveLength(1);
+    expect(h.profile.refreshNicknameCandidates).toHaveBeenCalledOnce();
   });
   for (const event of ["hide", "account", "rebind"]) {
     it(`discards old profile identity after ${event}`, async () => {
@@ -342,7 +361,7 @@ describe("profile change interval", () => {
     const h = mount(); await load(h, null, null);
     expect(h.page.nicknameHint.value).toBe(`${zh.profile.displayNameHint} · ${zh.profile.changeIntervalHint.replace("{days}", "7")}`);
     await load(h, later, null);
-    const date = formatTrialDeadline(later);
+    const date = formatDisplayDateTime(later, "zh-CN");
     expect(h.page.nicknameHint.value).toBe(`${zh.profile.displayNameHint} · ${zh.profile.nicknameLockedHint.replace("{date}", date)}`);
     await h.page.openNicknameSheet();
     expect(h.page.nicknameSheetOpen.value).toBe(false);
@@ -353,7 +372,7 @@ describe("profile change interval", () => {
     await h.page.handleRegen();
     expect(h.chooseImage).not.toHaveBeenCalled(); expect(h.confirm).not.toHaveBeenCalled();
     expect(h.toast.info).toHaveBeenCalledWith(zh.profile.avatarLockedTitle,
-      zh.profile.avatarLockedHint.replace("{date}", formatTrialDeadline(later)));
+      zh.profile.avatarLockedHint.replace("{date}", formatDisplayDateTime(later, "zh-CN")));
     await load(h, null, null); h.confirm.mockResolvedValueOnce(false);
     await h.page.handleRegen();
     expect(h.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: zh.profile.avatarConfirmTitle,
@@ -376,6 +395,6 @@ describe("profile change interval", () => {
     await save;
     expect(h.page.name.value).toBe("Confirmed"); expect(h.toast.error).not.toHaveBeenCalled();
     expect(h.toast.info).toHaveBeenCalledWith(zh.profile.nicknameLockedTitle,
-      zh.profile.nicknameLockedHint.replace("{date}", formatTrialDeadline(later)));
+      zh.profile.nicknameLockedHint.replace("{date}", formatDisplayDateTime(later, "zh-CN")));
   });
 });

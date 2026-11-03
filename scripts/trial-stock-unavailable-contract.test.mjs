@@ -17,27 +17,33 @@ test("zero-stock S1 stays visible but every trial and purchase CTA is disabled",
   assert.match(card, /@keydown\.enter\.prevent\.stop="onBuy"/);
   assert.doesNotMatch(card, /<text role="button" tabindex="0" @click\.stop="onBuy">/);
   assert.doesNotMatch(card, /:style="cardStyle" role="button"/);
-  assert.match(card, /:style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText\(product\.name\)"/);
+  // Stored product names are shown as-is since 95e10bfa.
+  assert.match(card, /:role="compact \? 'link' : undefined" :tabindex="compact \? 0 : -1" :aria-label="compact \? \(product\.name\) : undefined" @click="goDetail"/);
+  assert.match(card, /:style="renderWrapStyle" :role="compact \? undefined : 'button'" :tabindex="compact \? -1 : 0" :aria-label="compact \? undefined : \(product\.name\)" @click\.stop="goDetail"/);
   assert.match(detail, /const stockUnavailable = computed/);
   assert.match(detail, /disabled:\s*true/);
   assert.match(detail, /buttonLabel:\s*t\.value\.store\.temporarilyOutOfStock/);
+  const eligibilityGuard = detail.search(/if \(remoteApiEnabled && \(?eligibility\.value\.status !== "ready"/);
+  assert.ok(eligibilityGuard >= 0, "purchase eligibility must have a pending/failed guard");
   assert.ok(
     detail.indexOf("if (stockUnavailable.value)")
-      < detail.indexOf('if (remoteApiEnabled && eligibility.value.status !== "ready")'),
+      < eligibilityGuard,
     "zero-stock CTA must win over a pending/failed purchase-eligibility request",
   );
   assert.match(stickyCta, /:aria-disabled="cta\.disabled \? 'true' : 'false'"/);
   assert.match(stickyCta, /if \(!cta\.value \|\| cta\.value\.disabled\) return/);
   assert.match(trialHero, /product-unavailable/);
   assert.match(trialHero, /heroProductUnavailable/);
-  assert.match(trialHero, /:tabindex="canClaim \? 0 : -1"/);
-  assert.match(trialHero, /@keydown\.enter\.prevent="onClick"/);
-  assert.match(trialHero, /@keydown\.space\.prevent="onClick"/);
+  assert.match(trialHero, /:tabindex="canOpen \? 0 : -1"/);
+  assert.match(trialHero, /const canOpen = computed\(\(\) => hasLifecycle\.value \|\| canClaim\.value \|\| capacityFull\.value\)/);
+  assert.match(trialHero, /if \(!canClaim\.value\) return/);
+  // Keyboard activation (added for a11y in 067e7533/7f39702a) goes through onClick, whose claim guard still holds.
+  for (const handler of trialHero.match(/@keydown[.\w]*="[^"]*"/g) ?? []) assert.match(handler, /onClick/);
   assert.match(trialPage, /product-unavailable/);
   assert.match(trialPage, /trialProductUnavailable/);
   assert.match(trialPage, /:tabindex="canStartNow \? 0 : -1"/);
   assert.match(trialPage, /:aria-disabled="trialProductUnavailable \? 'true' : 'false'"/);
-  assert.match(trialPage, /if \(trialProductUnavailable\.value\) return/);
+  assert.match(trialPage, /if \(authorityUnavailable\.value \|\| trialProductUnavailable\.value\) return/);
   for (const locale of locales) {
     assert.match(locale, /temporarilyOutOfStock:\s*"[^"]+"/);
     assert.match(locale, /heroProductUnavailable:\s*"[^"]+"/);

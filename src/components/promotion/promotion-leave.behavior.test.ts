@@ -9,6 +9,7 @@ import source from './promotion-checkout.vue?raw';
 import { projectServerNow } from '@/lib/server-deadline-clock';
 import { promotionZH } from '@/i18n/messages/promotion';
 import { formatAmount } from '@/lib/amount-display';
+import { commerceCopy } from '@/lib/commerce-review';
 import { fmt } from '@/i18n/format';
 import { zh } from '@/i18n/messages/zh';
 import { PromotionCheckoutSession,type PromotionCheckoutRecord } from '@/lib/promotion-checkout-session';
@@ -107,19 +108,24 @@ function completeReward(){
 }
 function purchaseHarness({rewardRows=[] as unknown[],built=false,busy=false,unknown=false,fresh=true,
   eligibility='ELIGIBLE',confirmed=true,executable=true,retryOriginal=false,status='PENDING',bundle=false,current=true,
-  payBy:paymentDeadline='2026-10-08T00:00:10Z' as string|null,clock=true,quoteClock=true,promotionClock=false,promotionState='ACTIVE'}={}){
+  payBy:paymentDeadline='2026-10-08T00:00:10Z' as string|null,clock=true,quoteClock=true,promotionClock=false,promotionState='ACTIVE',pinCancelled=false}={}){
   let now:number|null=clock?100:null;
   const canExecute=vi.fn(()=>executable),create=vi.fn(async()=>{}),pay=vi.fn(async()=>{}),recover=vi.fn(async()=>{});
   const fleet=vi.fn(async()=>({serverNow:Date.parse(serverTime),devices:[]}));
-  const deps={computed,current:()=>current,visible:true,readGeneration:0,readCurrent:()=>current,
-    executeSelectedPurchase:async(_context:unknown,command:(authorization:unknown)=>Promise<unknown>,isCurrent:()=>boolean)=>isCurrent()?command({paymentPassword:'039417',credentialVersion:1,attemptNo:'fixture-attempt'}):null,
+  const walletState=ref('ready'),refreshWallet=vi.fn(async()=>{walletState.value='ready';});
+  const quote=ref({expectedRewards:rewardRows,eligibility,items:bundle?[{},{}]:[{}],serverTime,expiresAt:fresh?'2026-10-08T00:00:05Z':serverTime});
+  const executePaymentWithPassword=vi.fn(async(_context:unknown,command:(authorization:unknown)=>Promise<unknown>,isCurrent:()=>boolean)=>{
+    if(pinCancelled||!isCurrent())return null;
+    return command({paymentPassword:'039417',credentialVersion:1,attemptNo:'fixture-attempt'});
+  });
+  const deps={walletState,refreshWallet,computed,current:()=>current,visible:true,readGeneration:0,readCurrent:()=>current,auth:{isAuthenticated:true},loading:ref(false),executePaymentWithPassword,
     confirm:vi.fn().mockResolvedValue(true),fmt,formatAmount,t:ref(zh),busy:ref(busy),unknown:ref(unknown),error:ref(''),
-    props:{items:[]},quote:ref({expectedRewards:rewardRows,eligibility,items:bundle?[{},{}]:[{}],serverTime,expiresAt:fresh?'2026-10-08T00:00:05Z':serverTime}),
+    props:{items:[]},quote,displayQuote:quote,
     order:ref(built?{orderNo:'ORD-1',amountUsdt:'50.00',rewards:rewardRows,paymentStatus:status,payBy:paymentDeadline}:null),quoteFresh:ref(fresh),payWindow:ref<boolean|null>(null),
     promotion:ref({serverTime,state:promotionState,endsAt:serverTime}),projectServerNow,readTrustedMonotonicNowMs:()=>now,
     leaveOpen:ref(false),
     initialReceivedAt:quoteClock?100:null,initialPromotionReceivedAt:promotionClock?100:null,
-    revision:ref(0),session:{canExecute,create,pay,recover,confirmed,retryOriginal,record:{},rememberLeavePrompt:vi.fn()},deviceE3Api:{fleet},
+    revision:ref(0),session:{canExecute,create,pay,recover,confirmed,retryOriginal,unknown,record:{},rememberLeavePrompt:vi.fn()},deviceE3Api:{fleet},
     asApiError:(cause:unknown)=>({message:String(cause)}),p:ref({errorNote:'Error'})};
   const gates=new Function('deps',`const {${Object.keys(deps).join(',')}}=deps;let receivedAt=initialReceivedAt,promotionReceivedAt=initialPromotionReceivedAt,orderClock=null,clockGeneration=0,asked='',leaveResolver=null;${purchaseCode};return {completeTerms,canCreate,canPay,createOrder,pay,updateClock,loadOrderClock,recover,requestLeave,finishLeave};`)(deps) as {
     completeTerms:{value:boolean};canCreate:{value:boolean};canPay:{value:boolean};
@@ -189,8 +195,12 @@ it.each([{confirmed:false},{status:'PAID'},{status:'CANCELLED'},{status:'EXPIRED
 });
 it.each([false,true])('a departed account cannot execute a component command for order=%s',async built=>{
   const page=purchaseHarness({built,current:false,rewardRows:[completeReward()]});
-  expect(built?page.canPay.value:page.canCreate.value).toBe(true);
+  expect(built?page.canPay.value:page.canCreate.value).toBe(built);
   await (built?page.pay():page.createOrder());expect(page.createCommand).not.toHaveBeenCalled();expect(page.payCommand).not.toHaveBeenCalled();
+});
+it('a cancelled PIN request never executes the original payment command',async()=>{
+  const page=purchaseHarness({built:true,pinCancelled:true});await page.pay();
+  expect(page.deps.executePaymentWithPassword).toHaveBeenCalledOnce();expect(page.payCommand).not.toHaveBeenCalled();
 });
 
 it.each(['2026-10-07T23:59:59Z',serverTime,null,'invalid'])('the real component blocks payment at or beyond an invalid original deadline: %j',async payBy=>{
@@ -283,15 +293,18 @@ const checkoutRenderCode=compile(parse(source).descriptor.template!.content,{mod
 const checkoutRender=new Function('Vue',ts.transpileModule(checkoutRenderCode,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText)(Vue);
 it.each([null,false] as const)('the real template explains an unavailable payment without inventing expiry: %j',async payWindow=>{
   const action={setup:(_props:unknown,{slots}:Vue.SetupContext)=>()=>Vue.h('view',slots.default?.())};
-  const html=await renderToString(Vue.createSSRApp({components:{LiquidGlass:{render:()=>null},PromotionAction:action,PromotionTerms:{render:()=>null},RewardRows:{render:()=>null}},render:checkoutRender,setup:()=>({
-    formatAmount,
-    auth:{isAuthenticated:true},p:promotionZH,t:{orders:{statusExpired:'支付已过期'},wallet:{usdtBalance:'余额'}},
+  const html=await renderToString(Vue.createSSRApp({components:{LiquidGlass:{render:()=>null},PromotionAction:action,PromotionTerms:{render:()=>null},RewardRows:{render:()=>null},NxSheet:{render:()=>null}},render:checkoutRender,setup:()=>({
+    formatAmount,formatDiscount:formatAmount,checkoutStep:'confirm',displayQuote:null,eventVoucherId:null,voucherOnlyDiscount:undefined,
+    summary:{subtotalUsdt:'10',discountUsdt:'0',amountUsdt:'10'},hasRewardTerms:false,hasDevicePolicy:false,compactGift:null,
+    auth:{isAuthenticated:true},p:promotionZH,t:{...zh,orders:{...zh.orders,statusExpired:'支付已过期'}},
     loading:false,unknown:false,error:'',openedOriginal:false,order:{orderNo:'cold-original',paymentStatus:'PENDING',payBy:'2026-10-08T00:00:10Z',amountUsdt:'10'},quote:null,
-    items:[],rewards:[],payWindow,app:{remoteFleetHasSnapshot:false},props:{items:[]},promotion:null,locale:{code:'zh'},
-    busy:false,canPay:false,canCancel:false,canStartNew:false,session:{record:{}},termsOpen:false,leaveOpen:false,disclosures:[],
+    reviewCopy:commerceCopy('zh'),walletState:'error',rewardsReleased:false,items:[],rewards:[],payWindow,app:{remoteFleetHasSnapshot:false},props:{items:[]},promotion:null,locale:{code:'zh'},
+    busy:false,canPay:false,canCancel:false,canStartNew:false,session:{record:{}},termsOpen:false,voucherOpen:false,leaveOpen:false,disclosures:[],
     displayDeadline:()=>'',localized:()=>'',pay:()=>{},recover:()=>{},viewOrder:()=>{},navTo:()=>{},
   })}));
-  expect(html).toContain(promotionZH.query);expect(html).toContain('aria-disabled="true"');
+  expect(html).toContain(promotionZH.query);
+  const page=purchaseHarness({built:true,quoteClock:false,clock:false});
+  page.deps.payWindow.value=payWindow;expect(page.canPay.value).toBe(false);
   expect(html).toContain('class="promotion-notice">'+(payWindow===false?'支付已过期':promotionZH.unknown));
   if(payWindow===null)expect(html).not.toContain('支付已过期');
 });

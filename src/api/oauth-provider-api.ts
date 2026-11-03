@@ -1,5 +1,5 @@
 import type { ApiClient } from "./api-client";
-import type { AuthApi, OAuthLoginApi } from "./auth-api";
+import type { AuthApi } from "./auth-api";
 import { getDeviceId } from "@/lib/device-id";
 import { ApiError } from "./errors";
 
@@ -36,7 +36,7 @@ export function validateOAuthFlow(value: unknown): OAuthFlow {
   if (path.includes("\\") || path.split("/").some(segment => segment === "." || segment === "..")) throw invalid();
   return flow;
 }
-export function createOAuthProviderApi(client: ApiClient, auth: Pick<AuthApi, "pendingLogin"> & OAuthLoginApi) {
+export function createOAuthProviderApi(client: ApiClient, auth: Pick<AuthApi, "pendingLogin" | "completeProviderLogin">) {
   const headers = () => ({
     "X-NexGrid-Installation-Id": getDeviceId(),
     "X-NexGrid-Client-Surface": "H5",
@@ -47,12 +47,15 @@ export function createOAuthProviderApi(client: ApiClient, auth: Pick<AuthApi, "p
     async available() {
       return providerList(await client.request({ path: `${ROOT}/available`, authenticated: false }));
     },
-    async start(provider: ThirdPartyProvider, intent: "LOGIN", sponsorCode?: string | null) {
+    async linked() {
+      return providerList(await client.request({ path: `${ROOT}/linked` }));
+    },
+    async start(provider: ThirdPartyProvider, intent: "LOGIN" | "LINK", sponsorCode?: string | null) {
       if (intent === "LOGIN" && auth.pendingLogin())
         throw new ApiError({ kind: "configuration", message: "LOGIN_RESULT_UNKNOWN" });
       return validateOAuthFlow(await client.request({
         path: `${ROOT}/start`, method: "POST", body: { provider, intent,
-          ...(intent === "LOGIN" && sponsorCode ? { sponsorCode } : {}) }, authenticated: false,
+          ...(intent === "LOGIN" && sponsorCode ? { sponsorCode } : {}) }, authenticated: intent === "LINK",
         headers: headers(),
       }));
     },
@@ -70,6 +73,10 @@ export function createOAuthProviderApi(client: ApiClient, auth: Pick<AuthApi, "p
       if (!flow.receipt || !/^[A-Za-z0-9_-]{43}$/.test(flow.receipt)) throw invalid();
       return auth.completeProviderLogin({ provider, ...proof(flow), receipt: flow.receipt,
         challengeNo, code, captchaTicket }, expectedRevision);
+    },
+    async link(flow: OAuthFlow, password: string) {
+      if (!flow.receipt || !/^[A-Za-z0-9_-]{43}$/.test(flow.receipt)) throw invalid();
+      await client.request({ path: `${ROOT}/link`, method: "POST", body: { ...proof(flow), password } });
     },
   };
 }

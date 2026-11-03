@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 const source = (import.meta.glob("./leadership-pool-how.vue", { query: "?raw", import: "default", eager: true })["./leadership-pool-how.vue"] ?? "") as string;
 
 describe("leadership How server facts", () => {
-  it("uses live eligibility and payout facts without a rank-weight table", () => {
+  it("uses live eligibility, published weights and current participation without invented funding rules", () => {
     expect(source).toContain("leadershipHowFacts");
     expect(source).toContain("rank: facts.value.unlockRank");
-    expect(source).toContain("new Date(facts.value.nextPayoutAt)");
-    expect(source).not.toMatch(/voteRows|V_VOTES|leadershipHowRows|leadershipHowRanks|injectRatePct/);
+    expect(source).toContain("formatDisplayDateTime(remotePool.value.nextPayoutAt, locale.code, true)");
+    expect(source).toContain("configuredVoteRows");
+    expect(source).toContain("row.leadershipVotes");
+    expect(source).toContain("remotePool.value?.distribution");
+    expect(source).not.toContain("V_VOTES");
+    // Warm-read rule metadata may cache the accepted rate; it is never rendered
+    // as a funding formula that the published guide does not provide.
+    expect(source.slice(0, source.indexOf('<script setup'))).not.toContain("injectRatePct");
     expect(source).not.toContain("[3, 4, 5, 6, 7, 8, 9, 10, 11, 12]");
     expect(source).toContain("leadershipPoolFailureState");
   });

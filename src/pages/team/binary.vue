@@ -1,124 +1,101 @@
-<!--
-  Binary — ported from Nexion-prototype/app/(main)/team/binary/page.tsx.
-  Balance Match (Track A vs Track B): remote amounts and rates come from the canonical projection. Demo daily cap from
-  phase (P1-P3 $5K → P4+ $2K). Blocked if either track < $1,000/mo. De-carded:
-  floor hero → tint block warning → 2 filled wing columns (top member + VBadge)
-  → transparent gap block → auto-placement tint row → recent matches
-  (transparent hairline group). Sub-page → <AppChassis active="team"> with
-  in-page back row. Reuses network + commission stores + use-product-phase.
-  De-MLM'd copy preserved (Track A/B / 平衡匹配, no "binary leg"/"spillover" in UI).
--->
 <template>
   <AppChassis active="team">
-    <view class="pb-6" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamBinary" :subtitle="t.headerSubtitles.teamBinary" />
-
-        <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px">
-          <EmptyState
-            v-if="remoteApiEnabled && pageState.primary === 'error'"
-            kind="recoverable-error"
-            :title="t.network.projectionErrorTitle"
-            :desc="t.network.projectionErrorDesc"
-            :cta-label="t.network.retry"
-            compact
-            @cta="retryCanonicalData"
-          />
-          <view
-            v-else-if="remoteApiEnabled && pageState.primary === 'loading'"
-            class="rounded-2xl"
-            style="height: 184px; background: color-mix(in srgb, var(--v5-surface-2) 65%, transparent)"
-            role="status"
-            aria-live="polite"
-            aria-busy="true"
-          />
-          <template v-if="pageState.primary === 'ready'">
-        <!-- match hero — de-carded: the number sits on the page floor. Rules-intro
-             pill rides the cap row (owner 2026-07-09: kill the empty gap above the hero). -->
-        <view :style="heroStyle">
-          <view class="flex items-center justify-between" style="gap: 8px">
-            <text class="block font-mono-tabular" :style="heroCapStyle">{{ estimateText }}</text>
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="button" tabindex="0" @click="go('/pages/team/binary-how')"  @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-              <text>{{ t.binary.howItWorksEntry }}</text>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </view>
-          </view>
-          <text class="block font-display tabular-nums" :style="heroAmtStyle">+${{ formatAmount(periodMatch) }}</text>
-        </view>
-
-        <!-- blocked warning -->
-        <view v-if="blocked" class="rounded-2xl flex items-start" :style="blockedStyle">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-          <view style="font-size: 12px; line-height: 1.375">
-            <text class="block" :style="{ color: 'var(--v5-ink)', fontWeight: 600 }">{{ blockedTitleText }}</text>
-            <text class="block" :style="{ color: 'var(--v5-ink-3)', marginTop: '4px' }">{{ blockedRecoveryText }}</text>
-            <view v-if="showGrowthRecoveryCta" class="inline-flex items-center active:opacity-70" :style="inviteCtaStyle" @click="go('/pages/team/team')">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
-              <text>{{ t.binary.inviteCta }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- two wings -->
-        <view class="grid grid-cols-2" style="gap: 10px">
-          <view v-for="wing in wings" :key="wing.key" class="nx-glass-card rounded-2xl" :style="wingStyle(wing.isWeak)">
-            <view class="flex items-center justify-between">
-              <text class="font-display" :style="{ fontSize: '13px', fontWeight: 600, color: wing.color }">{{ wing.name }}</text>
-              <text v-if="wing.isWeak" class="font-mono-tabular" :style="weakBadgeStyle">{{ t.binary.weakBadge }}</text>
-            </view>
-            <text class="block font-display tabular-nums" :style="wingVolStyle">${{ formatAmount(wing.monthVol) }}</text>
-            <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '4px' }">{{ wingMembersText(wing.count) }}</text>
-            <view v-if="wing.top" class="flex items-center border-t" :style="topMemberStyle">
-              <text :style="{ fontSize: '15px' }">{{ wing.top.avatar }}</text>
-              <view class="flex-1 min-w-0">
-                <text class="block truncate" :style="{ fontSize: '12px' }">{{ wing.top.name }}</text>
-                <view class="flex items-center" style="gap: 4px; margin-top: 2px">
-                  <VBadge :v="wing.top.vRank" size="sm" :show-title="false" />
-                  <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ formatComputePoints(wing.top.monthComputePoints, locale.code) }}</text>
+    <RewardPageSurface>
+      <view class="pb-6 nx-viz-motion" style="color: var(--v5-ink)">
+        <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamBinary" :subtitle="t.headerSubtitles.teamBinary" />
+        <view class="binary-content">
+          <view ref="comparisonRef">
+          <EmptyState v-if="remoteApiEnabled && pageState.primary === 'error'" kind="recoverable-error"
+            :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.network.retry"
+            compact @cta="retryCanonicalData" />
+          <view v-else-if="remoteApiEnabled && pageState.primary === 'loading' && !snapshot" class="binary-loading"
+            role="status" aria-live="polite" aria-busy="true" />
+            <view v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)" class="binary-comparison-section">
+            <view class="binary-hero nx-viz-press">
+              <view class="binary-hero-heading">
+                <text class="binary-label">{{ binaryCopy.contributions }}</text>
+                <view class="binary-rule-link" role="button" tabindex="0" :aria-label="t.binary.howItWorksEntry"
+                  @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')"><text class="binary-rule-pill">{{ binaryCopy.rules }} ›</text></view>
+              </view>
+              <view class="binary-comparison">
+                <view v-for="(wing, index) in wings" :key="wing.key" class="binary-contribution">
+                  <view class="binary-group-heading"><text v-if="!visibility.hidden && leftMonthVol !== rightMonthVol" class="binary-group-badge" :class="{ 'binary-weak': wing.isWeak }">{{ wing.isWeak ? t.binary.weakBadge : t.binary.strongBadge }}</text></view>
+                  <view class="binary-contribution-track" aria-hidden="true"><view v-if="contributionWidths && !visibility.hidden" class="binary-contribution-fill" :class="{ 'binary-contribution-fill--other': index === 1 }" :style="{ height: (comparisonInView === false ? 0 : contributionWidths[index]) + '%', transition: comparisonInView === false ? 'none' : VIZ_GROW_HEIGHT_TRANSITION, transitionDelay: comparisonInView === false ? '0ms' : vizStagger(index, 120) }" /></view>
+                  <text class="binary-group-name">{{ wing.name }}</text>
+                  <text class="binary-points tabular-nums">{{ visibility.mask('$' + formatFinanceAmount(wing.monthVol)) }}</text>
+                  <text class="binary-note">{{ wingMembersText(wing.count) }}</text>
                 </view>
+                <view class="binary-rate"><text class="nx-num-metric">×{{ rateLabel }}%</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><text class="binary-note">{{ t.binary.weakBadge }}</text></view>
+              </view>
+              <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text class="reward-amount nx-num-amount"><text class="binary-dollar">$</text>{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text></text></view>
+            </view>
+              <view class="reward-binary-basis">
+                <text class="binary-note">{{ formulaText }}</text>
+                <text class="binary-note">{{ gapHintText }}</text>
               </view>
             </view>
           </view>
-        </view>
 
-        <view v-if="remoteApiEnabled && pageState.memberDetails === 'error'" class="rounded-xl flex items-center justify-between" :style="memberReadErrorStyle">
-          <text :style="{ fontSize: '12px', color: 'var(--v5-ink-2)' }">{{ t.binary.memberDetailsUnavailable }}</text>
-          <view role="button" tabindex="0" class="active:opacity-70" :style="memberReadRetryStyle" @click="retryNetworkMembers"  @keydown.enter.prevent="retryNetworkMembers" @keydown.space.prevent="retryNetworkMembers">
-            <text>{{ t.network.retry }}</text>
-          </view>
-        </view>
-
-        <!-- recent matches — transparent hairline group -->
-        <view v-if="recentBinaries.length > 0" :style="recentBlockStyle">
-          <text class="block font-mono-tabular" :style="recentCapStyle">{{ t.binary.recentMatches }}</text>
-          <view :style="recentGroupStyle">
-          <view
-            v-for="(e, i) in recentBinaries"
-            :key="e.id"
-            class="flex items-center"
-            :style="recentRowStyle(i === recentBinaries.length - 1)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
-              <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ formatTrialDate(e.ts) }}</text>
+          <template v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)">
+            <view v-if="blocked" class="binary-notice" :style="blockedStyle">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4m0 4h.01"/></svg>
+              <view class="binary-notice-copy">
+                <text class="binary-notice-title">{{ blockedTitleText }}</text>
+                <text class="binary-note">{{ blockedRecoveryText }}</text>
+                <view v-if="showGrowthRecoveryCta" class="binary-text-action" role="button" tabindex="0"
+                  @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')"><text>{{ t.binary.inviteCta }}</text><text aria-hidden="true">→</text></view>
+              </view>
             </view>
-            <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '13px', color: binaryAmountColor(e.status), fontWeight: 600 }">{{ binaryAmountLabel(e) }}</text>
-          </view>
-          </view>
-        </view>
+
+            <view v-if="remoteApiEnabled && pageState.memberDetails === 'error'" class="binary-member-recovery" :style="memberReadErrorStyle">
+              <text class="binary-note">{{ t.binary.memberDetailsUnavailable }}</text>
+              <view role="button" tabindex="0" class="binary-text-action" @click="retryNetworkMembers" @keydown.enter.prevent="retryNetworkMembers" @keydown.space.prevent="retryNetworkMembers"><text>{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
+            </view>
+            <view v-if="wings.some(wing => wing.top)" class="binary-leaders">
+              <text class="binary-section-title">{{ binaryCopy.leadingMembers }}</text>
+              <view class="reward-wings">
+                <view v-for="wing in wings" :key="wing.key" class="reward-wing nx-viz-press" :style="wingStyle(wing.isWeak)">
+                  <view v-if="wing.top" class="reward-wing-member" :style="topMemberStyle">
+                      <view class="reward-wing-member__facts">
+                        <VBadge v-if="!visibility.hidden" class="reward-wing-member__rank" :v="wing.top.vRank" size="lg" :show-title="false" />
+                        <text v-else class="reward-wing-member__rank">{{ visibility.mask('') }}</text>
+                        <view class="reward-wing-member__body">
+                        <text class="binary-label">{{ wing.name }}{{ binaryCopy.leads }}</text>
+                        <text class="reward-wing-member__name">{{ wing.top.name }}</text>
+                        <text class="reward-wing-member__points nx-num-metric">{{ visibility.mask(formatComputePoints(wing.top.monthComputePoints, locale.code)) }}</text>
+                        </view>
+                      </view>
+                  </view>
+                  <template v-else><text class="binary-label">{{ wing.name }}</text><text class="binary-note">—</text></template>
+                </view>
+              </view>
+            </view>
+
+            <view v-if="recentBinaries.length > 0" class="binary-recent" :style="recentBlockStyle">
+              <text class="binary-section-title" :style="recentCapStyle">{{ t.binary.recentMatches }}</text>
+              <view class="binary-recent-card" :style="recentGroupStyle">
+                <view v-for="(e, i) in recentBinaries" :key="e.id" class="binary-recent-row nx-viz-press" :style="recentRowStyle(i === recentBinaries.length - 1)">
+                  <view class="binary-record-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></view>
+                  <view class="binary-recent-source"><text class="binary-record-name">{{ e.sourceUserName }}</text><text class="binary-note">{{ formatTrialDate(e.ts, dateLocale()) }}<template v-if="binaryStatusLabel(e.status)">{{ ' · ' + binaryStatusLabel(e.status) }}</template></text></view>
+                  <view class="reward-match-amount"><text class="binary-record-value nx-num-metric" :style="{ color: binaryAmountColor(e.status) }">{{ visibility.mask(binaryAmountLabel(e)) }}</text><text v-if="'amountNEX' in e" class="binary-record-uvt">{{ visibility.mask(formatFinanceAmount(e.amountNEX)) }} UVT</text></view>
+                </view>
+              </view>
+            </view>
           </template>
         </view>
       </view>
+    </RewardPageSurface>
   </AppChassis>
 </template>
-
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { useScrollGrowProgress, VIZ_GROW_HEIGHT_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
+import { useDataVisibility } from "@/store/data-visibility";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { useLocaleStore } from "@/store/locale";
-import { computed, onMounted, watch, type CSSProperties } from "vue";
+import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import EmptyState from "@/components/empty-state.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -129,7 +106,7 @@ import { useNetwork, type NetworkMember } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { BINARY_SETTLE_PERIOD, SETTLE_PERIOD_DAYS } from "@/lib/binary-settlement";
-import { remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { apiRuntimeConfig, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { onShow } from "@dcloudio/uni-app";
 import { navTo } from "@/lib/route";
 import { binaryPageState } from "@/lib/binary-page-state";
@@ -141,15 +118,36 @@ import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 
 const t = useT();
-const locale = useLocaleStore();
+const visibility = useDataVisibility();
 const network = useNetwork();
 const commission = useCommission();
 const phase = useProductPhase();
 const auth = useAuth();
 const app = useApp();
+const locale = useLocaleStore();
+const { elRef: comparisonRef, inView: comparisonInView } = useScrollGrowProgress();
 const canonicalReadCoalescer = createScopedReadCoalescer();
+const binaryCopy = computed(() => ({
+  zh: { rules: '玩法说明', contributions: '本月两组订单额', leadingMembers: '各组领先成员', leads: '领先' },
+  en: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+  vi: { rules: 'Cách nhận thưởng', contributions: 'Doanh số hai nhóm tháng này', leadingMembers: 'Thành viên dẫn đầu mỗi nhóm', leads: ' dẫn đầu' },
+})[locale.code === 'zh' ? 'zh' : locale.code === 'vi' ? 'vi' : 'en']);
 
-const snapshot = computed(() => commission.binarySnapshot);
+const displayEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
+let environmentInvalidated = false;
+watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
+const displayEnvironmentCurrent = () => !environmentInvalidated && displayEnvironment[0] === apiRuntimeConfig.environment && displayEnvironment[1] === apiRuntimeConfig.baseUrl;
+const snapshotPresentation = ref<NonNullable<typeof commission.binarySnapshot> | null>(null);
+let rejectedsnapshotSource: NonNullable<typeof commission.binarySnapshot> | null = null;
+watch(() => [commission.binaryStatus, commission.binarySnapshot] as const, ([status, value]) => {
+  if (status === 'error') { snapshotPresentation.value = null; rejectedsnapshotSource = value; }
+  else if (status === 'ready' && auth.isAuthenticated && displayEnvironmentCurrent() && value && value !== rejectedsnapshotSource) snapshotPresentation.value = value;
+}, { immediate: true, flush: 'sync' });
+watch(() => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => {
+  rejectedsnapshotSource = commission.binarySnapshot; snapshotPresentation.value = null;
+  if (auth.isAuthenticated && displayEnvironmentCurrent()) void retryCanonicalData();
+}, { flush: 'sync' });
+const snapshot = computed(() => commission.binaryStatus === 'error' ? null : snapshotPresentation.value);
 const remoteSessionReady = computed(() => binarySessionReady({
   remote: remoteApiEnabled,
   authenticated: auth.isAuthenticated,
@@ -162,16 +160,24 @@ const pageState = computed(() => binaryPageState({
   binaryStatus: commission.binaryStatus,
   networkStatus: network.remoteStatus,
 }));
-const remoteTrackA = computed(() => commission.binarySnapshot?.trackA ?? 0);
-const remoteTrackB = computed(() => commission.binarySnapshot?.trackB ?? 0);
+const memberDetailsReadable = computed(() => pageState.value.memberDetails === 'ready'
+  || (pageState.value.memberDetails === 'loading' && network.hasRemoteSnapshot));
+const remoteTrackA = computed(() => snapshot.value?.trackA ?? 0);
+const remoteTrackB = computed(() => snapshot.value?.trackB ?? 0);
 const settlePeriod = computed(() => remoteApiEnabled ? snapshot.value?.settlePeriod ?? "monthly" : BINARY_SETTLE_PERIOD);
 const settleDays = computed(() => SETTLE_PERIOD_DAYS[settlePeriod.value]);
 const MIN_THRESHOLD = computed(() => remoteApiEnabled ? snapshot.value?.threshold ?? 0 : 1000);
 const MATCH_RATE = computed(() => remoteApiEnabled ? snapshot.value?.matchRate ?? 0 : 0.1);
+const rateLabel = computed(() => (MATCH_RATE.value * 100).toLocaleString(dateLocale(), { maximumFractionDigits: 8 }));
 const DAILY_CAP = computed(() => remoteApiEnabled ? snapshot.value?.dailyCap ?? 0 : phase.value.binaryDailyCapUSD);
 const sides = computed(() => network.byBinary());
 const leftMonthVol = computed(() => remoteApiEnabled ? remoteTrackA.value : network.leftVolumeMonth());
 const rightMonthVol = computed(() => remoteApiEnabled ? remoteTrackB.value : network.rightVolumeMonth());
+// Visual scale uses the same raw group volume; it does not calculate rewards.
+const contributionWidths = computed(() => {
+  const maximum = Math.max(leftMonthVol.value, rightMonthVol.value);
+  return maximum > 0 ? [leftMonthVol.value / maximum * 100, rightMonthVol.value / maximum * 100] : [0, 0];
+});
 const weakSide = computed(() => (leftMonthVol.value <= rightMonthVol.value ? "left" : "right"));
 const weakVol = computed(() => Math.min(leftMonthVol.value, rightMonthVol.value));
 const strongVol = computed(() => Math.max(leftMonthVol.value, rightMonthVol.value));
@@ -182,6 +188,7 @@ const periodMatch = computed(() => {
   const factor = settleDays.value / 30;
   return Math.min(weakVol.value * factor * MATCH_RATE.value, DAILY_CAP.value * settleDays.value);
 });
+const estimateAmountParts = computed(() => visibility.mask(formatFinanceAmount(periodMatch.value)).split('.'));
 const blocked = computed(() => remoteApiEnabled
   ? Boolean(snapshot.value?.blockedReason)
   : leftMonthVol.value < MIN_THRESHOLD.value || rightMonthVol.value < MIN_THRESHOLD.value);
@@ -212,22 +219,22 @@ const wings = computed<Wing[]>(() => [
   {
     key: "left",
     name: t.value.binary.leftWing,
-    count: remoteApiEnabled && pageState.value.memberDetails !== "ready"
+    count: remoteApiEnabled && !memberDetailsReadable.value
       ? snapshot.value?.trackAMembers ?? 0 : sides.value.left.length,
     monthVol: leftMonthVol.value,
-    isWeak: weakSide.value === "left",
-    color: "var(--v5-brand)",
-    top: pageState.value.memberDetails === "ready" ? topOf(sides.value.left) : undefined,
+    isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "left",
+    color: "var(--v5-ink)",
+    top: memberDetailsReadable.value ? topOf(sides.value.left) : undefined,
   },
   {
     key: "right",
     name: t.value.binary.rightWing,
-    count: remoteApiEnabled && pageState.value.memberDetails !== "ready"
+    count: remoteApiEnabled && !memberDetailsReadable.value
       ? snapshot.value?.trackBMembers ?? 0 : sides.value.right.length,
     monthVol: rightMonthVol.value,
-    isWeak: weakSide.value === "right",
-    color: "var(--v5-tech-cyan)",
-    top: pageState.value.memberDetails === "ready" ? topOf(sides.value.right) : undefined,
+    isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "right",
+    color: "var(--v5-ink)",
+    top: memberDetailsReadable.value ? topOf(sides.value.right) : undefined,
   },
 ]);
 
@@ -241,7 +248,7 @@ const gapHintText = computed(() => fmt(t.value.binary.gapHint, { freq: periodFre
 const formulaText = computed(() =>
   fmt(t.value.binary.formula, {
     rate: (MATCH_RATE.value * 100).toLocaleString(dateLocale(), { maximumFractionDigits: 8 }),
-    cap: formatAmount(DAILY_CAP.value),
+    cap: formatFinanceAmount(DAILY_CAP.value),
     freq: periodFreqLabel.value,
   }),
 );
@@ -253,7 +260,7 @@ const blockedDetailText = computed(() => {
   }
   return fmt(t.value.binary.blockedDetail, {
     side: weakSide.value === "left" ? t.value.binary.left : t.value.binary.right,
-    vol: formatAmount(weakVol.value),
+    vol: visibility.mask(formatFinanceAmount(weakVol.value)),
   });
 });
 const blockedGuidance = computed(() => binaryBlockedGuidance({
@@ -271,7 +278,7 @@ const spilloverTitleText = computed(() =>
   fmt(t.value.binary.spilloverTitle, { n: spilloverCount.value }),
 );
 function wingMembersText(n: number): string {
-  return fmt(t.value.binary.monthVolMembers, { n });
+  return fmt(t.value.binary.monthVolMembers, { n: visibility.mask(n) });
 }
 
 function go(url: string) {
@@ -279,17 +286,27 @@ function go(url: string) {
 }
 
 function binaryAmountLabel(event: { amountUSDT: number; status?: string }): string {
-  const amount = formatAmount(event.amountUSDT);
-  if (event.status === "reversed") return `−${amount}`;
-  if (event.status === "frozen" || event.status === "rejected") return amount;
-  return `+${amount}`;
+  const amount = formatFinanceAmount(event.amountUSDT);
+  if (event.status === "reversed") return `−$${amount}`;
+  if (event.status === "frozen" || event.status === "rejected") return `$${amount}`;
+  return `+$${amount}`;
+}
+
+function binaryStatusLabel(status?: string): string {
+  if (status === "cooling") return t.value.commissions.cooling;
+  if (status === "unlocked") return t.value.commissions.readyTag;
+  if (status === "withdrawn") return t.value.commissions.withdrawnTag;
+  if (status === "frozen") return t.value.commissions.frozenTag;
+  if (status === "reversed") return t.value.commissions.reversedTag;
+  if (status === "rejected") return t.value.commissions.rejectedTag;
+  return "";
 }
 
 function binaryAmountColor(status?: string): string {
   if (status === "rejected") return "var(--v5-danger)";
-  if (status === "frozen") return "var(--v5-tech-cyan)";
+  if (status === "frozen") return "var(--v5-ink-2)";
   if (status === "reversed") return "var(--v5-ink-4)";
-  return "var(--v5-warning)";
+  return "var(--v5-brand)";
 }
 
 function retryCanonicalData(): void {
@@ -323,133 +340,73 @@ onShow(() => {
   if (remoteApiEnabled) retryCanonicalData();
 });
 
-// ─── styles ───
-// Soft tint pill — chip idiom, fill only (no border, single visual difference).
-const howItWorksStyle: CSSProperties = {
-  gap: "6px",
-  padding: "0 12px",
-  height: "44px",  // 《07》tap≥44(原 34)
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-brand-2)",
-};
-// De-carded hero — cap + number + formula on the page floor. The old radial
-// glow card was a page-floor aura → deleted outright (owner call 2026-07-08).
-const heroStyle: CSSProperties = { padding: "6px 2px 0" };
-const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--v5-warning)" };
-const heroAmtStyle: CSSProperties = {
-  marginTop: "8px",
-  fontSize: "34px",
-  fontWeight: 600,
-  lineHeight: 1,
-  letterSpacing: "-0.022em",
-  color: "var(--v5-warning)",
-};
-const heroFormulaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "6px" };
-
-// Status callout — tint fill only, border chrome dropped (single difference).
-const blockedStyle: CSSProperties = {
-  padding: "14px",
-  gap: "10px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 12%, transparent)",
-};
-const inviteCtaStyle: CSSProperties = {
-  marginTop: "8px",
-  gap: "4px",
-  fontSize: "12px",
-  color: "var(--v5-brand)",
-  textDecoration: "underline",
-};
-
-// Filled wing columns (podium idiom) — weak side takes the warning-soft fill;
-// single visual difference, no borders, no hardcoded hex.
-function wingStyle(isWeak: boolean): CSSProperties {
-  return {
-    padding: "14px",
-    // 非弱侧原用 surface-2,与页面底同色(亮色 ΔE 2.2)不可辨,改 L1 surface。
-    background: isWeak ? "var(--v5-warning-soft)" : "var(--v5-surface)",
-  };
-}
-const weakBadgeStyle: CSSProperties = {
-  fontSize: "12px",
-  background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
-  color: "var(--v5-warning)",
-  padding: "2px 6px",
-  borderRadius: "4px",
-};
-const wingVolStyle: CSSProperties = { marginTop: "8px", fontSize: "20px", fontWeight: 600, lineHeight: 1 };
-const topMemberStyle: CSSProperties = {
-  marginTop: "10px",
-  paddingTop: "10px",
-  borderColor: "var(--v5-border)",
-  gap: "6px",
-};
-const memberReadErrorStyle: CSSProperties = {
-  padding: "10px 12px",
-  gap: "12px",
-  background: "var(--v5-surface-2)",
-};
-const memberReadRetryStyle: CSSProperties = {
-  minHeight: "36px",
-  padding: "0 10px",
-  display: "inline-flex",
-  alignItems: "center",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-brand) 12%, transparent)",
-  color: "var(--v5-brand)",
-  fontSize: "12px",
-  fontWeight: 600,
-};
-
-// Frosted-glass gap block (owner 2026-07-09) — chassis glass-tile token,
-// fill only / zero border; +12px top margin keeps the 24px section rhythm.
-const gapBlockStyle: CSSProperties = {
-  marginTop: "12px",
-  padding: "16px",
-  borderRadius: "16px",
-  background: "var(--v5-glass-bg)",
-  backdropFilter: "blur(18px) saturate(180%)",
-};
-const gapCapStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: "var(--v5-ink-3)",
-  marginBottom: "10px",
-};
-const gapBarTrackStyle: CSSProperties = { height: "8px", background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)" };
-
-// Nav row tile — soft tint fill only, border chrome dropped.
-const spilloverStyle: CSSProperties = {
-  padding: "14px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-};
-const spilloverIconStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
-};
-
-// Transparent hairline group — cap label outside, border-top opens the rows.
-const recentBlockStyle: CSSProperties = { marginTop: "12px" };
-const recentCapStyle: CSSProperties = {
-  padding: "0 2px",
-  marginBottom: "8px",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  color: "var(--v5-ink-3)",
-};
-const recentGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
+const blockedStyle: CSSProperties = { padding: "16px 0", gap: "10px" };
+function wingStyle(_isWeak: boolean): CSSProperties { return { padding: "14px 0" }; }
+const topMemberStyle: CSSProperties = {};
+const memberReadErrorStyle: CSSProperties = { gap: "12px" };
+const recentBlockStyle: CSSProperties = {};
+const recentCapStyle: CSSProperties = { marginBottom: "12px" };
+const recentGroupStyle: CSSProperties = {};
 function recentRowStyle(isLast: boolean): CSSProperties {
-  return {
-    padding: "11px 0",
-    gap: "10px",
-    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
-  };
+  return { padding: "14px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
-
-
 </script>
+
+<style scoped>
+.binary-content { display: flex; flex-direction: column; gap: 28px; padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
+.binary-loading { height: 156px; border-radius: 20px; background: var(--v5-surface-2); }
+.binary-hero { padding: var(--v5-space-2) var(--v5-space-4) var(--v5-space-4); border-radius: 28px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--ui-device-ink) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.binary-hero-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-4); }
+.binary-label { display: block; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); }
+.binary-hero-heading > .binary-label { flex: 1; min-width: 0; }
+.binary-rule-link { display: flex; align-items: center; justify-content: flex-end; min-width: 44px; min-height: 44px; flex: 0 0 auto; }
+.binary-rule-pill { padding: 4px 10px; border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); }
+.binary-estimate { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-4); padding: 14px var(--v5-space-4); border-radius: 18px; background: color-mix(in srgb, var(--ui-device-ink) 10%, transparent); }
+.binary-estimate .binary-label { flex: 1; min-width: 0; }
+.binary-hero .reward-amount { margin: 0; max-width: 68%; font-size: 30px; line-height: 38px; font-weight: 550; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.binary-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
+.binary-decimals { color: var(--v5-ink-3); }
+.binary-section-title { display: block; font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: 600; color: var(--v5-ink); }
+.binary-note { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: anywhere; }
+.binary-notice { display: flex; align-items: flex-start; border-bottom: 1px solid var(--v5-border); margin-top: -12px; }
+.binary-notice > svg { flex: 0 0 18px; color: var(--v5-warning); margin-top: 2px; }
+.binary-notice-copy { min-width: 0; flex: 1; }
+.binary-notice-title { display: block; font-weight: 500; font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); margin-bottom: 6px; }
+.binary-text-action { display: inline-flex; align-items: center; gap: var(--ui-space-row-y); min-height: 44px; min-width: 44px; color: var(--v5-ink-2); font-size: var(--ui-type-button); line-height: var(--ui-type-button-lh); }
+.binary-comparison { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px; margin-top: 6px; padding: 0 var(--v5-space-3); }
+.binary-contribution { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
+.binary-group-heading { display: flex; align-items: center; justify-content: center; min-height: 24px; color: var(--v5-ink-2); }
+.binary-group-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 2px var(--ui-space-row-y); border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
+.binary-weak { background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); color: var(--ui-device-ink); }
+.binary-group-name { color: var(--v5-ink-2); font-size: 13px; line-height: 18px; }
+.binary-points { display: block; color: var(--v5-ink); font: 600 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.binary-contribution-track { position: relative; width: 64px; height: 150px; margin: var(--v5-space-1) 0; border-radius: 18px; background: var(--v5-surface-3); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; }
+.binary-contribution-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px; background: linear-gradient(180deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 25%, transparent)); }
+.binary-contribution-fill--other { background: linear-gradient(180deg, var(--ui-device-ink), color-mix(in srgb, var(--ui-device-ink) 25%, transparent)); }
+.binary-rate { position: absolute; left: 50%; top: 132px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; color: var(--ui-device-ink); font: 600 14px/20px var(--font-metric); text-align: center; overflow-wrap: anywhere; }
+.binary-rate .binary-note { font-size: 11px; line-height: 16px; }
+.reward-binary-basis { display: flex; flex-direction: column; gap: var(--v5-space-1); margin-top: var(--v5-space-3); padding-inline: var(--v5-space-1); }
+.binary-member-recovery { display: flex; align-items: center; justify-content: space-between; }
+.binary-member-recovery > .binary-note { flex: 1; }
+.binary-member-recovery > .binary-text-action { flex: none; font: 600 13px/20px var(--font-v5); }
+.reward-wings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin-top: var(--v5-space-3); }
+.reward-wing { min-width: 0; padding: var(--v5-space-4) !important; border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.reward-wing-member__body { min-width: 0; }
+.reward-wing-member__body > .binary-label { font-size: 11px; line-height: 16px; }
+.reward-wing-member__name { display: block; font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.reward-wing-member__facts { display: flex; align-items: center; gap: var(--ui-space-row-y); min-width: 0; }
+.reward-wing-member__rank { flex: none; }
+.reward-wing-member__rank :deep(.nx-vbadge__level) { display: none; }
+.reward-wing-member__points { display: block; max-width: 100%; overflow-wrap: anywhere; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
+.binary-recent-card { padding: 0 var(--v5-space-4); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.binary-recent-row { display: flex; align-items: center; min-height: 64px; }
+.binary-recent-row .binary-note { font-size: 12px; line-height: 16px; }
+.binary-record-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 12px; color: var(--ui-device-ink); background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); }
+.binary-recent-source { min-width: 0; flex: 1; }
+.binary-record-name { display: block; font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 500; overflow-wrap: anywhere; margin-bottom: var(--v5-space-1); }
+.binary-record-value { font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); font-weight: 600; overflow-wrap: anywhere; }
+.binary-record-uvt { color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); overflow-wrap: anywhere; }
+.reward-match-amount { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: var(--v5-space-1); max-width: 48%; }
+[role="button"]:focus-visible, [role="link"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+@media (max-width: 374px) { .binary-content { padding-inline: var(--v5-space-4); gap: var(--v5-space-6); } .binary-hero { padding-inline: 14px; } .binary-comparison { gap: 48px; padding-inline: 0; } .reward-wing { padding: var(--v5-space-3) !important; } .binary-hero .reward-amount { font-size: 26px; } }
+</style>

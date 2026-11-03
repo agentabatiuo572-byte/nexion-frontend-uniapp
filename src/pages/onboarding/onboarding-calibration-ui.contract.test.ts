@@ -31,6 +31,13 @@ describe("onboarding calibration read and presentation contract", () => {
     }
   });
 
+  it("renders reason-specific recovery and offers defer only for a settled non-active state", () => {
+    expect(connect).toContain(": failureActionText");
+    expect(connect).toMatch(/v-if="canDefer"[^>]*@click="deferPhoneActivation"/);
+    expect(connect).toContain("activationOutcome.value !== \"unconfirmed\"");
+    expect(connect).not.toContain("t.value.onboarding.activationBindRetry");
+  });
+
   it("keeps the estimator title neutral before activation", () => {
     expect(zh).toContain('estimatorTitleH: "查看手机算力估算"');
     expect(en).toContain('estimatorTitleH: "View your phone compute estimate"');

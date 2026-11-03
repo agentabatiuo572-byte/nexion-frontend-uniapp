@@ -6,14 +6,14 @@
   Centered-modal范式(scrim flex-centers panel, both `nx-sheet-fade-in`, prop
   `open` / emit `close`, P-032 page-mounted) — same convention as global-ui.vue
   nx-mask/nx-modal. Overlay z-index 790/800 对齐主流 sheet(trial-claim / slot-action
-  等),盖过 chassis header/tabbar/nova(z 90–110);device-deactivate 的 79/80 会被那些
+  等),盖过 chassis header/tabbar/客服浮标(z 90–110);device-deactivate 的 79/80 会被那些
   chrome 浮在遮罩之上,勿照抄。
   Device-local preference — no backend call.
 -->
 <template>
   <view v-if="open" class="nx-theme-picker-root" role="dialog" aria-modal="true" :aria-label="t.me.themePickerTitle">
     <view class="nx-sheet-fade-in" :style="scrimStyle" @click="emit('close')">
-      <view class="nx-glass-sheet nx-sheet-fade-in" :style="panelStyle" @click.stop>
+      <view class="nx-glass-sheet nx-dialog-pop-in" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="gap: 12px; margin-bottom: 14px">
           <text class="block" :style="titleStyle">{{ t.me.themePickerTitle }}</text>
@@ -49,7 +49,7 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 const t = useT();
 const theme = useTheme();
-useDialogA11y(computed(() => props.open), ".nx-theme-picker-root", () => emit("close"));
+useDialogA11y(computed(() => props.open), ".nx-theme-picker-root", () => emit("close"), true);
 
 const SUN = ["M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41", "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8"];
 const MOON = ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"];
@@ -90,11 +90,16 @@ const scrimStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  padding: "24px",
+  boxSizing: "border-box",
+  padding: "max(24px, var(--nx-overlay-top)) 24px var(--nx-overlay-bottom)",
 };
 const panelStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   width: "100%",
   maxWidth: "320px",
+  boxSizing: "border-box",
+  maxHeight: "calc(100vh - max(24px, var(--nx-overlay-top)) - var(--nx-overlay-bottom))",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
   zIndex: 800,
   borderRadius: "var(--nx-glass-radius)",
   background: "var(--nx-glass-fill)",
@@ -103,8 +108,8 @@ const panelStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
 };
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-hero-title)",
+  fontWeight: "var(--ui-type-hero-title-weight)",
   color: "var(--v5-ink)",
 };
 const closeBtnStyle: CSSProperties = {
@@ -137,7 +142,7 @@ function labelStyle(m: ThemeMode): CSSProperties {
   const on = isActive(m);
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "15px",
+    fontSize: "var(--ui-type-body)",
     fontWeight: on ? 600 : 500,
     color: on ? "var(--v5-ink)" : "var(--v5-ink-2)",
   };

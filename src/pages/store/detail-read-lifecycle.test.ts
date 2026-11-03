@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ref, computed, reactive, shallowRef, watch, nextTick, createRenderer, defineComponent, getCurrentInstance, h, KeepAlive, onActivated, onDeactivated, onUnmounted, type ComponentInternalInstance, type Ref } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
-import { promotionCheckoutHref } from "@/lib/promotion-entry";
+import { promotionCheckoutHref,voucherEntryContext,type VoucherEntryContext } from "@/lib/promotion-entry";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 import ts from "typescript";
@@ -33,10 +33,11 @@ function setup() {
   const trust = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
   const observe = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const productCatalogState = { status: "loading" };
-  const app = reactive({ accountKey: "default", accountBindingEpoch: 1 });
+  const app = reactive({ accountKey: "default", accountBindingEpoch: 1,
+    captureRemoteAccountRequest: () => ({}), refreshRemoteFleet: vi.fn(async () => true) });
   let currentAccountScope = { accountKey: "user:1", epoch: 1 };
   const value = new Function(
-    "ref", "computed", "watch", "app", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState", "observeCanonicalProductDetail", "takeNavigationQuery", "sessionVault", "usePromotionContext",
+    "ref", "computed", "watch", "app", "Promise", "refreshProductCatalog", "refreshServerProductPhase", "remoteApiEnabled", "refreshTrust", "onLoad", "onShow", "captureAccountScope", "isCurrentAccountScope", "productCatalogState", "observeCanonicalProductDetail", "takeNavigationQuery", "sessionVault", "usePromotionContext", "nextTick", "eligibility", "purchaseEligibilityMessage", "retryEligibility", "voucherEntryContext", "earnConfig",
     lifecycleCode,
   )(ref, computed, watch, app, Promise, catalog, phase, true, trust,
     (callback: (options?: Record<string, string>) => Promise<void>) => loaded.push(callback),
@@ -46,6 +47,7 @@ function setup() {
     productCatalogState, observe, () => "?id=stellarbox-pro",
     { read: () => ({ user: { userId: 1 } }) },
     () => ({ activity: ref(null), status: ref("idle"), available: ref(false), refresh: vi.fn() }),
+    nextTick, ref({ status: "ready" }), ref(null), vi.fn(), voucherEntryContext, {refresh:vi.fn().mockResolvedValue(true)},
   ) as {
     id: { value: string };
     catalogRetrying: { value: boolean };
@@ -108,19 +110,20 @@ describe("store detail canonical read lifecycle", () => {
     const sticky = { show: vi.fn(), hide: vi.fn() };
     new Function(
       "watch", "stickyPageVisible", "catalogStatus", "product", "isShare", "isLocked",
-      "purchaseUnavailable", "stockUnavailable", "priceText", "dailyEarnText", "paybackLabel",
+      "purchaseUnavailable", "stockUnavailable", "priceText", "dailyEarnText", "dailyYieldText",
       "purchaseGate", "eligibility", "purchaseEligibilityMessage", "sticky", "stickyOwner",
-      "remoteApiEnabled", "t", "paybackDays", "fmt", "purchaseEligibilityUnlockHref",
-      "activityId", "promotionStatus", "promotionAvailable", "activity", "qty",
+      "remoteApiEnabled", "t", "fmt", "purchaseEligibilityUnlockHref",
+      "activityId", "promotionStatus", "promotionAvailable", "activity", "qty", "maxQuantity", "voucherContext", "dec", "inc",
       ctaCode,
     )(
       watch, ref(true), catalogStatus, product, ref(false), ref(false), ref(false), ref(false),
-      ref("1199"), ref("13"), ref("93"), ref({ blocked: false }), ref({ status: "ready", eligible: true }),
-      ref(""), sticky, Symbol("detail"), true, ref({ store: { cardBuyNow: "Buy", detPaybackUnavailableNote: "Unavailable" } }),
-      ref(null), vi.fn(), vi.fn(),
-      ref(""), ref("idle"), ref(false), ref(null), ref(1),
+      ref("1199"), ref("13"), ref("13.00"), ref({ blocked: false }), ref({ status: "ready", eligible: true }),
+      ref(""), sticky, Symbol("detail"), true, ref(en),
+      vi.fn(), vi.fn(),
+      ref(""), ref("idle"), ref(false), ref(null), ref(1), ref(6), ref({}), vi.fn(), vi.fn(),
     );
     expect(sticky.show).toHaveBeenCalledOnce();
+    expect(sticky.show.mock.calls[0][0].amountSubtext).toBe(`${en.bundle.estimatedDaily}: $13.00`);
     catalogStatus.value = "loading";
     await nextTick();
     expect(sticky.hide).toHaveBeenCalledOnce();
@@ -209,6 +212,7 @@ describe("store detail canonical read lifecycle", () => {
     s.trust.mockReturnValue(trust.promise);
     const reading = s.value.refreshDetailFacts();
     await Promise.resolve();
+    await nextTick();
     expect(s.trust).toHaveBeenCalledTimes(1);
     expect(s.observe).not.toHaveBeenCalled();
     phase.resolve(true);
@@ -227,6 +231,7 @@ describe("store detail canonical read lifecycle", () => {
       s.trust.mockReturnValue(trust.promise);
       const reading = s.value.refreshDetailFacts();
       await Promise.resolve();
+      await nextTick();
       expect(s.trust).toHaveBeenCalledTimes(1);
       if (boundary === "hide") s.value.invalidateDetailFacts();
       else s.rebindAccount();
@@ -252,6 +257,7 @@ describe("store detail canonical read lifecycle", () => {
     await loading;
     second.resolve(true);
     await Promise.resolve();
+    await nextTick();
     expect(s.trust).toHaveBeenCalledTimes(1);
   });
 
@@ -326,10 +332,10 @@ const stickyEnd = page.indexOf("// ─── styles", stickyStart);
 if (stickyStart < 0 || stickyEnd < stickyStart) throw new Error("store detail sticky lifecycle source is required");
 const runSticky = new Function("dependencies", ts.transpileModule(`
   const { ref, watch, useStickyCTA, catalogStatus, product, isShare, isLocked,
-    purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, paybackLabel,
+    purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyYieldText,
     purchaseGate, eligibility, purchaseEligibilityMessage, remoteApiEnabled, t,
     purchaseEligibilityUnlockHref, activityId, promotionStatus, promotionAvailable,
-    activity, qty, promotionCheckoutHref, onShow, onHide, onUnload, onActivated,
+    activity, qty, maxQuantity, voucherContext, dec, inc, promotionCheckoutHref, onShow, onHide, onUnload, onActivated,
     onDeactivated, onUnmounted, invalidateDetailFacts } = dependencies;
   let detailPageVisible = true;
   let detailObservationEpoch = 0;
@@ -345,6 +351,7 @@ type StickyPage = {
   invalidate: ReturnType<typeof vi.fn>;
   qty: Ref<number>;
   activityId: Ref<string>;
+  voucherContext: Ref<VoucherEntryContext>;
   controls: { stickyPageVisible: Ref<boolean>; stickyOwner: symbol; visible(): boolean; observationEpoch(): number };
 };
 
@@ -361,23 +368,24 @@ async function stickyNavigation() {
       const hooks: StickyPage["hooks"] = { onShow: [], onHide: [], onUnload: [] };
       const qty = ref(1), activityId = ref(key === "detail" ? "DEVICEgift" : "USDTgift");
       const invalidate = vi.fn();
+      const voucherContext=ref<VoucherEntryContext>({});
       // Adapt Uni notification registration only; execute the page's real watcher and Vue hooks.
       const controls = runSticky({
         ref, watch, useStickyCTA, catalogStatus, product: catalog,
         isShare: ref(false), isLocked: ref(false), purchaseUnavailable: ref(false), stockUnavailable: ref(false),
         priceText: computed(() => catalog.value.price.toLocaleString()),
         dailyEarnText: computed(() => catalog.value.dailyEarn.toFixed(2)),
-        paybackLabel: computed(() => translations.value.store.detPaybackUnavailable),
+        dailyYieldText: computed(() => (catalog.value.dailyEarn * qty.value).toFixed(2)),
         purchaseGate: ref({ blocked: false }), eligibility: ref({ status: "ready", eligible: true }),
         purchaseEligibilityMessage: ref(""), remoteApiEnabled: true, t: translations,
         purchaseEligibilityUnlockHref: vi.fn(), activityId, promotionStatus: ref("ready"), promotionAvailable: ref(true),
-        activity: ref({ productNos: [catalog.value.id], eligibility: "ESTIMATE_ELIGIBLE" }), qty, promotionCheckoutHref,
+        activity: ref({ productNos: [catalog.value.id], eligibility: "ESTIMATE_ELIGIBLE" }), qty, maxQuantity: ref(100), voucherContext, dec:vi.fn(), inc:vi.fn(), promotionCheckoutHref,
         onShow: (callback: () => void) => hooks.onShow.push(callback),
         onHide: (callback: () => void) => hooks.onHide.push(callback),
         onUnload: (callback: () => void) => hooks.onUnload.push(callback),
         onActivated, onDeactivated, onUnmounted, invalidateDetailFacts: invalidate,
       }) as StickyPage["controls"];
-      instances.set(key, { instance: getCurrentInstance()!, hooks, invalidate, qty, activityId, controls });
+      instances.set(key, { instance: getCurrentInstance()!, hooks, invalidate, qty, activityId, voucherContext, controls });
       return () => h("detail");
     },
   })]));
@@ -425,6 +433,7 @@ describe("store detail sticky lifecycle with real KeepAlive", () => {
     expect(query.get("activityId")).toBe("USDT current");
     expect(JSON.parse(query.get("items")!)).toEqual([{ productNo: "stellarbox-pro", quantity: 4 }]);
     expect(p.sticky.cta!.buttonLabel).toBe(vietnamese.store.cardBuyNow);
+    expect(p.sticky.cta!.amountSubtext).toBe(`${vietnamese.bundle.estimatedDaily}: $52.00`);
   });
 
   it("keeps a replacement instance's CTA through the old owner's late hide and unmount", async () => {
@@ -467,4 +476,15 @@ describe("store detail sticky lifecycle with real KeepAlive", () => {
     expect(p.sticky.cta).not.toBeNull();
     expect(p.sticky.cta!.href).toContain("activityId=DEVICEgift");
   });
+});
+
+it('a normal single-model detail preserves BF20 and edited quantity across hide and return',async()=>{
+  const p=await stickyNavigation(),detail=p.instances.get('detail')!;
+  detail.activityId.value='';detail.voucherContext.value={voucherId:'BF20',upgradeActivityId:'pro-upgrade'};detail.qty.value=3;
+  await nextTick();let query=new URL(p.sticky.cta!.href,'https://app.test').searchParams;
+  expect(query.get('voucherId')).toBe('BF20');expect(query.has('activityId')).toBe(false);expect(JSON.parse(query.get('items')!)).toEqual([{productNo:'stellarbox-pro',quantity:3}]);
+  expect(p.sticky.cta!.amountSubtext).toBe(`${en.bundle.estimatedDaily}: $39.00`);
+  await p.go('store');expect(p.sticky.cta).toBeNull();await p.go('detail');
+  query=new URL(p.sticky.cta!.href,'https://app.test').searchParams;expect(query.get('voucherId')).toBe('BF20');expect(query.get('upgradeActivityId')).toBe('pro-upgrade');
+  expect(p.sticky.cta!.amountSubtext).toBe(`${en.bundle.estimatedDaily}: $39.00`);
 });

@@ -36,9 +36,9 @@ describe("binary settlement heading", () => {
 });
 
 for (const [locale, messages, expected] of [
-  ["zh", zh, ["平衡匹配暂停", "等待结算日", "暂无法结算"]],
-  ["en", en, ["Balance Match paused", "Waiting for settlement date", "Settlement unavailable"]],
-  ["vi", vi, ["Ghép Cân Bằng tạm dừng", "Chờ ngày quyết toán", "Chưa thể quyết toán"]],
+  ["zh", zh, ["奖励暂停发放", "等待发放日", "暂时无法发放"]],
+  ["en", en, ["Rewards paused", "Waiting for payout day", "Payout unavailable"]],
+  ["vi", vi, ["Tạm dừng chi trả thưởng", "Chờ đến ngày chi trả", "Tạm thời chưa thể chi trả"]],
 ] as const) {
   it(`${locale} resolves real localized titles independently from the reason detail`, () => {
     for (const [index, reason] of ["F3_BINARY_PAUSED", "F3_SETTLEMENT_NOT_DUE", "UNKNOWN"].entries()) {

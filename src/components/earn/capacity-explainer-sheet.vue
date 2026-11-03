@@ -6,12 +6,14 @@
 <template>
   <view v-if="visible" class="nx-capacity-explainer-root fixed inset-0" style="z-index: 900" role="dialog" aria-modal="true" :aria-label="t.earn.capExplainTitle" @click.stop>
     <!-- 仅 @click(uni 编译器小程序端自动映射 tap;H5 双绑会双触发) -->
-    <view class="absolute inset-0" style="background: var(--v5-bg-color-mask)" @click="close" />
-    <view class="nx-glass-sheet absolute left-0 right-0 bottom-0" :style="sheetStyle">
+    <view class="absolute inset-0 nx-sheet-fade-in" style="background: var(--v5-bg-color-mask)" @click="close" />
+    <view class="nx-glass-sheet nx-sheet-slide-up absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
-        <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 650; color: var(--v5-ink)">{{ t.earn.capExplainTitle }}</text>
-        <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click.stop="close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+        <text style="font-family: var(--font-v5); font-size: var(--ui-type-hero-title); font-weight: var(--ui-type-hero-title-weight); color: var(--v5-ink)">{{ t.earn.capExplainTitle }}</text>
+        <view class="grid place-items-center active:opacity-70" style="width:44px;height:44px;flex:none" role="button" tabindex="0" :aria-label="t.ui.close" @click.stop="close">
+          <view class="grid place-items-center" :style="closeBtnStyle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </view>
         </view>
       </view>
 
@@ -48,7 +50,7 @@ import { navTo } from "@/lib/route";
 const t = useT();
 const { visible, close } = useCapacityExplainer();
 
-useDialogA11y(computed(() => visible.value), ".nx-capacity-explainer-root", close);
+useDialogA11y(computed(() => visible.value), ".nx-capacity-explainer-root", close, true);
 
 function goStore() {
   close();
@@ -58,10 +60,15 @@ function goStore() {
 const sheetStyle: CSSProperties = {
   background: "var(--nx-glass-fill)",
   borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0",
-  padding: "18px 18px 30px",
+  boxSizing: "border-box",
+  maxHeight: "calc(100vh - var(--nx-overlay-top))",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  padding: "18px 18px var(--nx-overlay-bottom)",
   boxShadow: "var(--nx-glass-edge)",
 };
 const closeBtnStyle: CSSProperties = {
+  boxSizing: "border-box",
   width: "30px",
   height: "30px",
   borderRadius: "10px",
@@ -75,7 +82,7 @@ const secTitleStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
 };
 const secBodyStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   lineHeight: 1.65,
   color: "var(--v5-ink-3)",
 };

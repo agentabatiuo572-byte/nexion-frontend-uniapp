@@ -1,10 +1,11 @@
 // Shared view-model types for the conversation thread body (ConversationThread.vue).
-// Pages normalise either the nova store (AI/Nova) or the conversations store
-// (advisor/support) into ThreadMsg[] before handing them to the presentational thread.
+// The chat page normalises the conversations store (advisor/support) into
+// ThreadMsg[] before handing it to the presentational thread.
 
+export type MessageDeliveryState = 'sending' | 'sent' | 'read' | 'failed' | 'unknown' | 'queued';
 export interface ThreadMsg {
   id: string;
-  /** Bubble alignment: left = agent/Nova, right = the user. */
+  /** Bubble alignment: left = agent, right = the user. */
   side: "left" | "right";
   /** Bubble tone → colour treatment. */
   tone: "agent" | "user" | "system";
@@ -17,8 +18,15 @@ export interface ThreadMsg {
   imageAttachmentId?: string;
   authorAvatarSrc?: string;
   meta?: string;
-  /** Pre-localised delivery receipt shown under the bubble (user messages only). */
+  /** Original message creation instant in epoch milliseconds; never receipt/retry time. */
+  timestamp?: number;
+  /** Pre-localised, authoritative receipt placed beside its own bubble. */
   receipt?: string;
+  deliveryState?: MessageDeliveryState;
+  /** Current local human outbox entry, not a confirmed server message. */
+  localSend?: boolean;
+  /** Exact original command correlation, never inferred from matching body text. */
+  clientMessageId?: string;
   ctaLabel?: string;
   /** Logical route (mapped by lib/route navTo at tap time). */
   ctaHref?: string;

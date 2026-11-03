@@ -19,6 +19,10 @@ function workload(overrides: Partial<AppHomeWorkload> = {}): AppHomeWorkload {
 }
 
 describe("presentHomeMarketWorkload", () => {
+  it.each([zh, en, vi])('uses compact English pricing units in all three languages', copy => {
+    expect(['IG','VG','LL','FT','EM','SP'].map(code => presentHomeMarketWorkload(workload({ code: code as AppHomeWorkload['code'] }), copy).unitText))
+      .toEqual(['/img','/sec','/1k tok','/job','/1k ch','/aud s']);
+  });
   it.each([
     ["IG", "IMG"],
     ["VG", "VID"],
@@ -38,9 +42,9 @@ describe("presentHomeMarketWorkload", () => {
       sparkline: [3, 3.1, 3.2],
     }), vi)).toEqual({
       tag: "IMG",
-      name: "Tạo ảnh",
-      priceText: "$0.00",
-      unitText: "mỗi ảnh",
+      name: "Image Gen",
+      priceText: "$0.0003",
+      unitText: "/img",
       deltaText: "+3.2%",
       deltaTone: "positive",
       sparkline: [3, 3.1, 3.2],
@@ -58,7 +62,7 @@ describe("presentHomeMarketWorkload", () => {
       tag: "IMG",
       name: "Image Gen",
       priceText: "—",
-      unitText: "per image",
+      unitText: "/img",
       deltaText: "—",
       deltaTone: "neutral",
       sparkline: null,
@@ -73,8 +77,9 @@ describe("presentHomeMarketWorkload", () => {
 
   it("ignores server language for known workload codes", () => {
     const row = workload({ code: "FT", name: "模型微调", unit: "/job" });
-    expect(presentHomeMarketWorkload(row, vi)).toMatchObject({ name: "Tinh chỉnh", unitText: "mỗi tác vụ" });
-    expect(presentHomeMarketWorkload(row, zh)).toMatchObject({ name: "微调", unitText: "按任务" });
+    // Market board labels are English in every language (owner, 2026-10-29: long Vietnamese breaks the table).
+    expect(presentHomeMarketWorkload(row, vi)).toMatchObject({ name: "Fine-tune", unitText: "/job" });
+    expect(presentHomeMarketWorkload(row, zh)).toMatchObject({ name: "Fine-tune", unitText: "/job" });
   });
 
   it("falls back safely for an unknown code", () => {

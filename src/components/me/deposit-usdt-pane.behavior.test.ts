@@ -82,18 +82,26 @@ const rows = statuses.map((status, index) => ({ depositId: `CR-${index + 1}`, st
   createdAt: 1_791_072_000_000 + index,
 }));
 type Messages = typeof zh | typeof en | typeof vietnamese;
+test("paused deposits retain historical credits and risk records", async () => {
+  const h=await pane({enabled:false,creditEnabled:false,network:"BEP20",reason:"CREGIS_DEPOSIT_PAUSED"},rows);
+  expect((h.state.serverRecords as Vue.Ref<unknown[]>).value).toHaveLength(rows.length);
+  expect(h.text()).toContain("CR-2");
+  expect(controls(h.root,"nx-dep-qr-box")).toHaveLength(0);
+});
 type BankHistoryStore = Pick<ReturnType<typeof useDeposits>, "records" | "remoteReceiptInitialStatus"
   | "currentAccountKey" | "refreshRemoteVietQrDeposits">;
 async function pane(response: object, records: unknown[] | Promise<unknown[]> = [], messages: Messages = zh,
   options: { dep?: BankHistoryStore; cold?: boolean } = {}) {
   const request = vi.fn(async ({ path }: { path: string }) => path.startsWith("/api/deposits/address") ? response : records);
-  const api = createCregisDepositApi({ request } as unknown as ApiClient), navTo = vi.fn();
+  const api = createCregisDepositApi({ request } as unknown as ApiClient), navTo = vi.fn(), info = vi.fn();
   const app = Vue.reactive({ accountKey: options.cold ? "default" : "user:7", accountBindingEpoch: 1 });
   const auth = Vue.reactive({ isAuthenticated: !options.cold, accountId: "user:7" });
   const sessionUserId = Vue.ref<number | null>(options.cold ? null : 7);
   const dep: BankHistoryStore = options.dep ?? Vue.reactive({ records: [], remoteReceiptInitialStatus: "ready",
     currentAccountKey: () => app.accountKey, refreshRemoteVietQrDeposits: vi.fn(async () => {}) });
+  const lifecycle = { show: () => {}, hide: () => {} };
   const modules: Record<string, unknown> = {
+    "@dcloudio/uni-app": { onShow: (fn: () => void) => { lifecycle.show = fn; }, onHide: (fn: () => void) => { lifecycle.hide = fn; } },
     "@/lib/amount-display": { formatAmount },
     "@/api/cregis-deposit-api": { exactDepositAmount },
     vue: Vue, "qrcode-generator": { default: qrcode },
@@ -102,7 +110,7 @@ async function pane(response: object, records: unknown[] | Promise<unknown[]> = 
     "@/lib/binary-session-ready": { binarySessionReady },
     "@/store/app": { useApp: () => app }, "@/store/auth": { useAuth: () => auth },
     "@/i18n/use-t": { useT: () => Vue.ref(messages) }, "@/i18n/format": { fmt },
-    "@/lib/route": { navTo }, "@/store/ui": { toast: { info: vi.fn() } },
+    "@/lib/route": { navTo }, "@/store/ui": { toast: { info } },
     "@/store/deposits": { useDeposits: () => dep },
     "@/store/server-time": { mockServerNow: () => 1_791_072_060_000 }, "@/store/deposits-core": depositsCore,
   };
@@ -112,14 +120,42 @@ async function pane(response: object, records: unknown[] | Promise<unknown[]> = 
       if (!(name in modules)) throw new Error(`Unexpected deposit dependency: ${name}`);
       return modules[name];
     }, {});
-    return { ...state, fmt, formatAmount: (v: number | string | null | undefined) => formatAmount(v, 6), fundsServerEnabled: true, CHAIN_DEPOSIT_FEE_USDT: depositsCore.CHAIN_DEPOSIT_FEE_USDT };
+    return { ...state, fmt, formatAmount: state.formatAmount, fundsServerEnabled: true, CHAIN_DEPOSIT_FEE_USDT: depositsCore.CHAIN_DEPOSIT_FEE_USDT };
   } });
   const root = node("root"); mounted.mount(root);
   cleanups.push(() => mounted.unmount());
   await new Promise<void>(resolve => setTimeout(resolve, 0));
   await Vue.nextTick();
-  return { root, navTo, request, state, app, auth, sessionUserId, dep, text: () => textOf(root) };
+  return { root, navTo, info, request, state, app, auth, sessionUserId, dep, lifecycle, text: () => textOf(root) };
 }
+
+test.each([zh, en, vietnamese])("paused channel and disabled button use the same message without account allowlisting", async messages => {
+  const h = await pane({ enabled: false, network: "BEP20", reason: "CREGIS_DEPOSIT_PAUSED" }, [], messages);
+  expect(h.text()).toContain(messages.topupChrome.channelPaused);
+  (h.state.pickNet as (id: string) => void)("usdt-bep20");
+  expect(h.info).toHaveBeenCalledWith(messages.topupChrome.channelPaused);
+  expect(nodesOf(h.root).filter(n => n.kind === "image")).toHaveLength(0);
+});
+
+test.each([undefined, "CREGIS_DEPOSIT_ACCOUNT_NOT_OPEN", "UNKNOWN_REASON"])("legacy or missing reason %s does not introduce account permission UI", async reason => {
+  const h = await pane({ enabled: false, network: "BEP20", reason });
+  expect(h.text()).toContain(zh.topupChrome.channelPaused);
+  expect(h.text()).not.toContain("当前账号暂未开放");
+});
+
+test("paused channel recovers after network failure and retry without retaining account data", async () => {
+  const h = await pane({ enabled: false, network: "BEP20", reason: "CREGIS_DEPOSIT_PAUSED" });
+  h.request.mockRejectedValueOnce(new Error("NETWORK_DOWN"));
+  (h.state.load as () => void)();
+  await vi.waitFor(() => expect(h.text()).toContain(zh.topupChrome.addrLoadFailed));
+  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : []);
+  (controls(h.root, "nx-dep-retry-cta")[0].props.onClick as () => void)();
+  await vi.waitFor(() => expect((h.state.serverEnabled as Vue.Ref<boolean>).value).toBe(true));
+  expect(h.text()).not.toContain(zh.topupChrome.channelPaused);
+  h.auth.isAuthenticated = false;
+  await Vue.nextTick();
+  expect((h.state.serverAddress as Vue.Ref<string>).value).toBe("");
+});
 
 // Read the real store's canonical projection and generation fence; only transport is replaced.
 const bankSnapshots: VietQrIntentSnapshot[] = [
@@ -218,7 +254,7 @@ test("an unfinished bank read stays unknown while receipt-only pagination leaves
   expect(controls(h.root, "nx-dep-history-loading")).toHaveLength(0);
 });
 
-test("a kept-alive 30-second chain poll preserves appended bank receipts and their cursor", async () => {
+test("a kept-alive staggered chain poll preserves appended bank receipts and their cursor", async () => {
   const dep = await bankStore(bankSnapshots);
   const receipt = (n: number) => ({ receiptNo: `R${n}`, intentNo: bankSnapshots[0].intentNo,
     viewType: "credited", status: "credited", creditedUsdt: 1299, createdAt: bankSnapshots[0].createdAt! });
@@ -226,7 +262,7 @@ test("a kept-alive 30-second chain poll preserves appended bank receipts and the
   bankRuntime.paymentApi.listVietQrReceipts.mockResolvedValue({ items: [first], nextOffset: 50 });
   let tick!: () => void;
   vi.stubGlobal("setInterval", (callback: () => void, delay: number) => {
-    expect(delay).toBe(30_000); tick = callback; return 1;
+    expect(delay).toBe(1_000); tick = callback; return 1;
   });
   vi.stubGlobal("clearInterval", vi.fn());
   const h = await pane(address, [], zh, { dep });
@@ -239,7 +275,9 @@ test("a kept-alive 30-second chain poll preserves appended bank receipts and the
   const intentReads = bankRuntime.paymentApi.listVietQrIntents.mock.calls.length;
   const receiptReads = bankRuntime.paymentApi.listVietQrReceipts.mock.calls.length;
   h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : [rows[1]]);
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 45_001);
   tick();
+  clock.mockRestore();
   await vi.waitFor(() => expect(controls(h.root, "nx-dep-record-row")).toHaveLength(3));
   expect({ receipts: dep.remoteReceipts, nextOffset: dep.remoteReceiptNextOffset }).toEqual({ receipts: [first, second], nextOffset: 100 });
   expect(bankRuntime.paymentApi.listVietQrIntents).toHaveBeenCalledTimes(intentReads);
@@ -282,6 +320,21 @@ test("cold or unbound account history never exposes cached bank records or start
   dep.bindAccount("user:8");
   await vi.waitFor(() => expect(dep.serverStatus).toBe("ready")); await Vue.nextTick();
   expect(h.text()).toContain(zh.topupChrome.noDepositsYet);
+});
+
+test.each([zh, en, vietnamese])("refunded and reversed deposits retain the address without showing a new credit", async messages => {
+  const terminalRows = ["REFUNDED", "REORG_REVERSED"].map((status, index) => ({ ...rows[1],
+    depositId: `CR-${index + 7}`, status, creditedUsdt: 0 }));
+  const h = await pane({ ...address, creditEnabled: true }, terminalRows, messages);
+  const records = controls(h.root, "nx-dep-record-row");
+  expect(records).toHaveLength(2);
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(1);
+  expect(h.text()).not.toContain(messages.topupChrome.addrLoadFailed);
+  expect(textOf(records[0])).toContain(messages.topupChrome.depositReturned);
+  expect(textOf(records[1])).toContain(messages.commissions.reversedTag);
+  expect(textOf(records[1])).toContain("0.00");
+  for (const record of records) expect(record.props.onClick).toBeUndefined();
+  expect(h.navTo).not.toHaveBeenCalled();
 });
 
 test.each([zh, en, vietnamese])("a mixed six-state list stays visible and risk records preserve historical credit without confirmed details", async messages => {
@@ -335,7 +388,7 @@ for (const messages of [zh, en, vietnamese]) {
 for (const messages of [zh, en, vietnamese]) {
   test.each([undefined, address.address])("a disabled address %s has no address promise, QR or transfer instructions", async retainedAddress => {
     const h = await pane({ enabled: false, creditEnabled: false, network: "BEP20", address: retainedAddress }, [], messages);
-    expect(h.text()).toContain(messages.topupChrome.allNetworksPaused);
+    expect(h.text()).toContain(messages.topupChrome.channelPaused);
     expect(h.text()).not.toContain(messages.topupChrome.depositAddrNote);
     expect(h.text()).not.toContain(messages.topupChrome.scanOrCopy);
     expect(h.text()).not.toContain(messages.topupChrome.amountAtSenderNote);
@@ -385,14 +438,14 @@ test("a risk record with no historical credit does not substitute its gross tran
   expect(record.props.onClick).toBeUndefined();
 });
 
-test("Native display preserves six-decimal credit and transaction URL", async () => {
+test("Native display rounds to two places while preserving six-decimal credit and transaction URL", async () => {
   vi.stubGlobal("Intl", undefined);
   const nativeLocale = vi.spyOn(Number.prototype, "toLocaleString").mockImplementation(() => { throw new Error("NATIVE_LOCALE_UNAVAILABLE"); });
   try {
     const transfer = { ...rows[1], grossAmountUsdt: 10.123456, creditedUsdt: 9.123456 };
     const h = await pane({ ...address, creditEnabled: true }, [transfer]);
     const record = controls(h.root, "nx-dep-record-row")[0];
-    expect(nodesOf(record).filter(target => target.kind === "text").map(textOf)).toContain("9.123456");
+    expect(nodesOf(record).filter(target => target.kind === "text").map(textOf)).toContain("+9.12"); // credited rows lead with "+"
     expect(h.text()).toContain("$10.00");
     expect(h.text()).toContain("1.00 USDT");
     expect((h.state.serverRecords as Vue.Ref<unknown[]>).value[0]).toMatchObject({
@@ -443,6 +496,34 @@ test.each(["a", "b"])("the rendered QR bitmap decodes to the server address %s w
 });
 
 
+test.each([zh,en,vietnamese])("empty pool prepares automatically without an error or copyable address", async messages => {
+  const h=await pane({ enabled:false, network:"BEP20", reason:"CREGIS_ADDRESS_PREPARING" }, [], messages);
+  expect(h.text()).toContain(messages.topupChrome.addrPreparing);
+  expect(h.text()).not.toContain(messages.topupChrome.addrLoadFailed);
+  expect(h.text()).not.toContain(messages.topupChrome.channelPaused);
+  expect(nodesOf(h.root).filter(n=>n.props["aria-label"]===messages.topupChrome.copyAddress)).toHaveLength(0);
+  h.request.mockImplementation(async ({path})=>path.startsWith("/api/deposits/address")?address:[]);
+  h.lifecycle.hide();
+  (h.state.load as (background:boolean)=>void)(true);
+  expect(h.request.mock.calls.filter(([r])=>r.path.startsWith("/api/deposits/address"))).toHaveLength(1);
+  h.lifecycle.show();
+  await new Promise(resolve=>setTimeout(resolve,0));await Vue.nextTick();
+  expect(h.text()).not.toContain(messages.topupChrome.addrPreparing);
+  expect((h.state.serverAddress as Vue.Ref<string>).value).toBe(address.address);
+});
+
+
+test("polling is independently staggered and error recovery backs off", async () => {
+  const h=await pane(address);
+  const delay=h.state.pollDelay as (state:string,failures?:number)=>number;
+  const random=vi.spyOn(Math,"random");
+  random.mockReturnValue(0);expect(delay("preparing")).toBe(5000);expect(delay("ready")).toBe(30000);
+  random.mockReturnValue(0.999999);expect(delay("preparing")).toBe(10000);expect(delay("ready")).toBe(45000);
+  expect(delay("error",0)).toBe(15000);expect(delay("error",2)).toBe(45000);expect(delay("error",20)).toBe(45000);
+  random.mockRestore();
+});
+
+
 test.each([zh, en, vietnamese])("each pending deposit uses its own confirmation requirement and unknown stays unknown", async messages => {
   const pending = [
     { ...rows[0], depositId: "CR-11", confirmations: 3, requiredConfirmations: 20 },
@@ -459,120 +540,16 @@ test.each([zh, en, vietnamese])("each pending deposit uses its own confirmation 
   }
 });
 
-test.each([zh, en, vietnamese])("mixed history retains refunded and reversed deposits without presenting them as new credits", async messages => {
-  const terminal = ["REFUNDED", "REORG_REVERSED"].map((status, index) => ({ ...rows[1], depositId: `CR-${index + 7}`, status, creditedUsdt: 0 }));
-  const h = await pane({ ...address, creditEnabled: true }, [...rows, ...terminal], messages);
-  const records = controls(h.root, "nx-dep-record-row");
-  expect(records).toHaveLength(8);
-  const refunded = records.find(record => textOf(record).includes("CR-7"))!;
-  const reversed = records.find(record => textOf(record).includes("CR-8"))!;
-  expect(textOf(refunded)).toContain(messages.topupChrome.depositReturned);
-  expect(textOf(reversed)).toContain(messages.commissions.reversedTag);
-  expect(textOf(reversed)).toContain("0.00");
-  expect(refunded.props.onClick).toBeUndefined();
-  expect(reversed.props.onClick).toBeUndefined();
-  expect(h.text()).toContain(fmt(messages.topupChrome.confirmingProgress, { n: 3, total: 15 }));
-});
 
-test("a failed background refresh preserves the snapshot and can recover on retry", async () => {
-  const interval = vi.spyOn(globalThis, "setInterval");
-  const h = await pane({ ...address, creditEnabled: true }, [rows[0]]);
-  h.request.mockRejectedValue(new Error("temporary failure"));
-  (h.state.load as (background: boolean) => void)(true);
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(h.text()).toContain("CR-1");
-  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
-  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
-  expect(h.text()).toContain(zh.topupChrome.addressStatusUnverified);
-  expect(controls(h.root, "nx-dep-background-error")).toHaveLength(1);
-  expect((h.state.phase as Vue.Ref<string>).value).toBe("ready");
-  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : [{ ...rows[0], confirmations: 6 }]);
-  (controls(h.root, "nx-dep-background-retry")[0].props.onClick as () => void)();
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(controls(h.root, "nx-dep-background-error")).toHaveLength(0);
-  expect(h.text()).toContain(fmt(zh.topupChrome.confirmingProgress, { n: 6, total: 15 }));
-  h.request.mockRejectedValue(new Error("temporary failure"));
-  (h.state.load as (background: boolean) => void)(true);
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : [{ ...rows[0], confirmations: 8 }]);
-  const periodic = interval.mock.calls.find(([, delay]) => delay === 30_000)![0] as () => void;
-  periodic();
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(controls(h.root, "nx-dep-background-error")).toHaveLength(0);
-  expect(h.text()).toContain(fmt(zh.topupChrome.confirmingProgress, { n: 8, total: 15 }));
-  interval.mockRestore();
-});
-
-test.each([zh, en, vietnamese])("a paused address takes effect before a failing history refresh", async messages => {
-  const h = await pane({ ...address, creditEnabled: true }, [rows[0]], messages);
-  let rejectHistory!: (error: Error) => void;
-  h.request.mockImplementation(({ path }) => path.startsWith("/api/deposits/address")
-    ? Promise.resolve({ enabled: false, network: "BEP20" })
-    : new Promise((_resolve, reject) => { rejectHistory = reject; }));
-  (h.state.load as (background: boolean) => void)(true);
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
-  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
-  expect(h.text()).toContain(messages.topupChrome.allNetworksPaused);
-  expect(h.text()).toContain("CR-1");
-  rejectHistory(new Error("history failed"));
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(h.text()).toContain("CR-1");
-  expect(controls(h.root, "nx-dep-background-retry")).toHaveLength(1);
-});
-
-test("a new fee takes effect even when history fails, and an unverified address cannot be copied", async () => {
-  const clipboard = vi.fn();
-  vi.stubGlobal("uni", { setClipboardData: clipboard });
-  const h = await pane({ ...address, creditEnabled: true }, [rows[0]]);
-  h.request.mockImplementation(async ({ path }) => {
-    if (path.startsWith("/api/deposits/address")) return { ...address, minDepositUsdt: 1, feeUsdt: 0, confirmations: 20 };
-    throw new Error("history failed");
-  });
-  (h.state.load as (background: boolean) => void)(true);
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(h.text()).toContain("$1.00");
-  expect(h.text()).toContain("0.00 USDT");
-  expect(h.text()).toContain("CR-1");
-  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(1);
-  h.request.mockRejectedValue(new Error("address failed"));
-  (h.state.load as (background: boolean) => void)(true);
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
-  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
-  (h.state.copyAddr as () => void)();
-  expect(clipboard).not.toHaveBeenCalled();
-  expect(h.text()).toContain(zh.topupChrome.addressStatusUnverified);
-  for (const field of ["nx-dep-min-value", "nx-dep-fee-value", "nx-dep-confirmations-value"]) {
-    expect(textOf(controls(h.root, field)[0])).toBe("—");
-  }
-  expect(textOf(controls(h.root, "nx-dep-net-bep20")[0])).toContain("—");
-  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address")
-    ? { ...address, minDepositUsdt: 2, feeUsdt: 0.5, confirmations: 25 } : [rows[0]]);
-  (controls(h.root, "nx-dep-background-retry")[0].props.onClick as () => void)();
-  await new Promise<void>(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
-  expect(textOf(controls(h.root, "nx-dep-min-value")[0])).toBe("$2.00");
-  expect(textOf(controls(h.root, "nx-dep-fee-value")[0])).toBe("0.50 USDT");
-  expect(textOf(controls(h.root, "nx-dep-confirmations-value")[0])).toBe("25");
-  expect(textOf(controls(h.root, "nx-dep-net-bep20")[0])).toContain("0.50");
-});
-
-test("initial history failure does not claim that deposit history is empty", async () => {
-  const h = await pane(address, Promise.reject(new Error("history unavailable")));
-  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(1);
-  expect(h.text()).not.toContain(zh.topupChrome.noDepositsYet);
-  expect(controls(h.root, "nx-dep-background-retry")).toHaveLength(1);
-});
-
-
-test("shows six decimal deposit rules and history and preserves large exact strings", async () => {
-  const h = await pane({ ...address, minDepositUsdt: 0.000001, feeUsdt: 0.004999 }, [
+test("shows integer minimum and two-place fees/history while preserving exact large transaction amounts", async () => {
+  const h = await pane({ ...address, minDepositUsdt: 1, feeUsdt: 0.004999 }, [
     { ...rows[1], grossAmountUsdt: 1.005001, creditedUsdt: 1.000002 },
     { ...rows[0], depositId: "CR-21", grossAmountUsdt: 1.005001, creditedUsdt: 0 },
     { ...rows[1], depositId: "CR-20", grossAmountUsdt: 999999999999, grossAmountUsdtExact: "999999999999.000001", creditedUsdt: 999999999999, creditedUsdtExact: "999999999999.000001" },
   ]);
-  expect(h.text()).toContain("0.000001"); expect(h.text()).toContain("0.004999");
-  expect(h.text()).toContain("1.000002"); expect(h.text()).toContain("1.005001"); expect(h.text()).toContain("999999999999.000001");
+  expect(h.text()).toContain("$1.00"); expect(h.text()).toContain("0.00 USDT");
+  expect(h.text()).toContain("1.00"); expect(h.text()).toContain("1.01"); expect(h.text()).toContain("999999999999.00");
+  expect((h.state.serverRecords as Vue.Ref<unknown[]>).value).toMatchObject([{ grossExact: "1.005001", creditedExact: "1.000002" }, {}, { grossExact: "999999999999.000001", creditedExact: "999999999999.000001" }]);
   const big = controls(h.root, "nx-dep-record-row").find(r => textOf(r).includes("CR-20"))!;
   (big.props.onClick as () => void)();
   expect(h.navTo.mock.calls[0][0]).toContain("amount=999999999999.000001");
@@ -584,4 +561,121 @@ test("withholds unsafe legacy numeric amounts", async () => {
   ]);
   expect(h.text()).not.toContain("999999999999");
   expect(controls(h.root, "nx-dep-record-row")[0].props.onClick).toBeUndefined();
+});
+
+
+test("history failure preserves verified address and existing records, then recovers", async () => {
+  const h = await pane(address, [rows[1]]);
+  h.request.mockImplementation(async ({ path }) => {
+    if (path.startsWith("/api/deposits/address")) return { ...address, feeUsdt: 0.004999 };
+    throw new Error("history failed");
+  });
+  (h.state.load as (background: boolean) => void)(true);
+  await vi.waitFor(() => expect(h.text()).toContain(zh.topupChrome.depositOpFailedNote));
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(1);
+  expect(controls(h.root, "nx-dep-record-row")).toHaveLength(1);
+  expect(h.text()).toContain("0.00 USDT");
+  expect(h.state.feeUsdt).toMatchObject({ value: "0.004999" });
+  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : []);
+  (controls(h.root, "nx-dep-chain-history-retry")[0].props.onClick as () => void)();
+  await vi.waitFor(() => expect(h.text()).toContain(zh.topupChrome.noDepositsYet));
+  expect(h.text()).not.toContain(zh.topupChrome.depositOpFailedNote);
+});
+
+test("initial history failure retains address without asserting an empty list", async () => {
+  const h = await pane(address, Promise.reject(new Error("history failed")));
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(1);
+  expect(h.text()).toContain(zh.topupChrome.depositOpFailedNote);
+  expect(h.text()).not.toContain(zh.topupChrome.noDepositsYet);
+});
+
+
+test("background address failure withholds the address but preserves history and recovers", async () => {
+  const h = await pane(address, [rows[1]]);
+  h.request.mockImplementation(async ({ path }) => {
+    if (path.startsWith("/api/deposits/address")) throw new Error("address unavailable");
+    return [rows[1]];
+  });
+  (h.state.load as (background: boolean) => void)(true);
+  await vi.waitFor(() => expect(h.text()).toContain(zh.topupChrome.addrLoadFailed));
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
+  expect(controls(h.root, "nx-dep-record-row")).toHaveLength(1);
+  expect(h.text()).not.toContain(zh.topupChrome.channelPaused);
+  expect(h.text()).not.toContain(zh.topupChrome.noDepositsYet);
+  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address") ? address : [rows[1]]);
+  (controls(h.root, "nx-dep-background-retry")[0].props.onClick as () => void)();
+  await vi.waitFor(() => expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(1));
+  expect(h.text()).not.toContain(zh.topupChrome.addrLoadFailed);
+  expect(controls(h.root, "nx-dep-record-row")).toHaveLength(1);
+});
+
+
+test.each([{ minDepositUsdt: undefined }, { feeUsdt: undefined }, { minDepositUsdt: null }, { feeUsdt: null }, { minDepositUsdt: 1.5 }])('unknown or noninteger remote rules %j never substitute zero fee or minimum ten', async patch => {
+  const h = await pane({ ...address, ...patch });
+  expect(h.text()).toContain(zh.topupChrome.addrLoadFailed);
+  expect(controls(h.root, 'nx-dep-qr-box')).toHaveLength(0);
+  expect(h.text()).not.toContain('$10.00'); expect(h.text()).not.toContain('0.00 USDT');
+  expect((h.state.serverAddress as Vue.Ref<string>).value).toBe('');
+  expect(h.navTo).not.toHaveBeenCalled();
+});
+
+test('a remote integer minimum and explicit zero fee remain valid and display two decimal places', async () => {
+  const h = await pane({ ...address, minDepositUsdt: 37, feeUsdt: 0 });
+  expect(h.text()).toContain('$37.00'); expect(h.text()).toContain('0.00 USDT');
+  expect(controls(h.root, 'nx-dep-qr-box')).toHaveLength(1);
+  expect((h.state.minDeposit as Vue.Ref<string>).value).toBe('37');
+});
+
+
+test.each([zh, en, vietnamese])("switching networks clears QR and copy immediately; disabled ERC20 never borrows the BEP20 address", async messages => {
+  const h = await pane(address, [], messages);
+  let resolveErc20!: (value: object) => void;
+  h.request.mockImplementation(async ({ path }) => path.endsWith("network=ERC20")
+    ? new Promise(resolve => { resolveErc20 = resolve; }) : []);
+  (controls(h.root, "nx-dep-net-erc20")[0].props.onClick as () => void)();
+  await Vue.nextTick();
+  expect((h.state.serverAddress as Vue.Ref<string>).value).toBe("");
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
+  resolveErc20({ enabled: false, network: "ERC20", reason: "CREGIS_DEPOSIT_PAUSED", address: address.address });
+  await vi.waitFor(() => expect(h.text()).toContain(messages.topupChrome.channelPaused));
+  expect(controls(h.root, "nx-dep-qr-box")).toHaveLength(0);
+  expect(h.request).toHaveBeenCalledWith({ method: "GET", path: "/api/deposits/address?network=ERC20" });
+});
+
+test("late ERC20 response cannot replace a later BEP20 selection; ERC20 history keeps its network in transaction details", async () => {
+  const h = await pane(address);
+  let resolveErc20!: (value: object) => void;
+  h.request.mockImplementation(async ({ path }) => path.endsWith("network=ERC20")
+    ? new Promise(resolve => { resolveErc20 = resolve; }) : path.startsWith("/api/deposits/address") ? address : [{ ...rows[1], network: "ERC20" }]);
+  (h.state.pickNet as (network: string) => void)("usdt-erc20");
+  (h.state.pickNet as (network: string) => void)("usdt-bep20");
+  await vi.waitFor(() => expect((h.state.serverAddress as Vue.Ref<string>).value).toBe(address.address));
+  resolveErc20({ ...address, network: "ERC20", address: "0x" + "e".repeat(40) });
+  await new Promise(resolve => setTimeout(resolve, 0)); await Vue.nextTick();
+  expect((h.state.serverAddress as Vue.Ref<string>).value).toBe(address.address);
+  const record = controls(h.root, "nx-dep-record-row")[0];
+  expect(textOf(record)).toContain("ERC20");
+  (record.props.onClick as () => void)();
+  expect(h.navTo.mock.calls[0][0]).toContain("net=ERC20");
+});
+
+test("an ERC20 success changes both the QR payload and copied address, and logout clears both", async () => {
+  const copied = vi.fn();
+  vi.stubGlobal("uni", { setClipboardData: copied });
+  const h = await pane(address);
+  const erc20Address = "0x" + "e".repeat(40);
+  h.request.mockImplementation(async ({ path }) => path.startsWith("/api/deposits/address")
+    ? { ...address, network: "ERC20", address: erc20Address, creditEnabled: true } : []);
+  (h.state.pickNet as (network: string) => void)("usdt-erc20");
+  await vi.waitFor(() => expect((h.state.serverAddress as Vue.Ref<string>).value).toBe(erc20Address));
+  expect(h.text()).toContain(fmt(zh.topupChrome.sendVia, { network: "ERC20" }));
+  (controls(h.root, "nx-dep-copy-address-cta")[0].props.onClick as () => void)();
+  expect(copied).toHaveBeenCalledWith(expect.objectContaining({ data: erc20Address }));
+  const qr = qrcode(0, "M"); qr.addData(erc20Address); qr.make();
+  expect(controls(h.root, "nx-dep-qr-image")[0].props.src).toBe(qr.createDataURL(4, 16));
+  h.auth.isAuthenticated = false; await Vue.nextTick();
+  expect((h.state.serverAddress as Vue.Ref<string>).value).toBe("");
+  expect(controls(h.root, "nx-dep-copy-address-cta")).toHaveLength(0);
 });

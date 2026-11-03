@@ -5,15 +5,19 @@ import { renderToString } from '@vue/server-renderer';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import { compile } from '@vue/compiler-dom';
 import ts from 'typescript';
-import { expect, it } from 'vitest';
+import { afterEach, expect, it } from 'vitest';
 import rewardRowsSource from './reward-rows.vue?raw';
 import orderRewardsSource from './order-rewards.vue?raw';
 import rewardDetailSource from '@/pages/events/promotion-reward-detail.vue?raw';
 import checkoutSource from './promotion-checkout.vue?raw';
 import termsSource from './promotion-terms.vue?raw';
+import sheetSource from '@/components/ui/nx-sheet.vue?raw';
 import entrySource from './promotion-entry.vue?raw';
-import { promotionZH } from '@/i18n/messages/promotion';
-import { localized, rewardAmount, rewardStateKey } from '@/lib/promotion-display';
+import { promotionZH, promotionEN, promotionVI } from '@/i18n/messages/promotion';
+import { localized, rewardSummary, rewardStateKey } from '@/lib/promotion-display';
+
+let promotionCopy=promotionZH;
+afterEach(()=>{promotionCopy=promotionZH;});
 
 const descriptor=parse(rewardRowsSource,{filename:'reward-rows.vue'}).descriptor;
 const script=compileScript(descriptor,{id:'reward-rows-behavior',inlineTemplate:true,templateOptions:{compilerOptions:{isCustomElement:tag=>['view','text'].includes(tag)}}});
@@ -22,16 +26,53 @@ const dependencies:Record<string,unknown>={
     "@/lib/brand-copy": { platformDisplayText },
     "@/lib/amount-display": { formatAmount },
   vue:Vue,
-  '@/i18n/use-t':{useT:()=>Vue.ref({promotion:promotionZH})},
+  '@/i18n/use-t':{useT:()=>Vue.ref({promotion:promotionCopy})},
   '@/store/locale':{useLocaleStore:()=>({code:'zh'})},
   '@/mock/products':{getProduct:(id:string)=>({name:({'sku-a':'Device Alpha','sku-b':'Device Beta'} as Record<string,string>)[id]??'Actual gift'})},
   '@/store/product-catalog':{productCatalogState:Vue.reactive({status:'ready'})},
-  '@/lib/promotion-display':{localized,rewardAmount,rewardStateKey},
+  '@/lib/promotion-display':{localized,rewardSummary,rewardStateKey},
   '@/lib/route':{navTo:()=>Promise.resolve(true)},
 };
 const componentExports={default:{} as Vue.Component};
 new Function('require','exports',code)((id:string)=>{if(!(id in dependencies))throw new Error('Unexpected import '+id);return dependencies[id];},componentExports);
 const reward={obligationId:'reward-1',reward:{rewardRuleId:'r1',type:'USDT',amount:'3.000000',beneficiaryRole:'BUYER'},state:'ISSUED',refundHold:false};
+const discount={lineId:'900101',rewardRuleId:'discount',groups:1,reward:{rewardRuleId:'discount',type:'DISCOUNT_USDT',amount:'500.000000',calculation:'FIXED',beneficiaryRole:'BUYER'},disclosure:{deviceName:null}};
+
+it.each([promotionZH,promotionEN,promotionVI])('discount rows use localized deduction terms without an issuance promise',async copy=>{
+  promotionCopy=copy;
+  for(const props of [{expected:[discount]},{specs:[{...discount.reward,disclosure:discount.disclosure}]}]){
+    const html=await renderToString(Vue.createSSRApp(componentExports.default,props));
+    expect(html).toContain(copy.orderDiscount+' · 500.00 USDT');expect(html).toContain(copy.orderDiscountNote);
+    expect(html).not.toContain('DISCOUNT_USDT');expect(html).not.toContain(copy.settle);expect(html).not.toContain(copy.rewardPending);expect(html).not.toContain(copy.rewardGranted);
+  }
+});
+
+it.each([promotionZH,promotionEN,promotionVI])('personal rewards opt into masking while public rules and detail-page defaults stay readable', async copy => {
+  promotionCopy = copy;
+  const personal = { ...reward, reward: { ...reward.reward, amount: '123.450000' } };
+  const props = { rewards: [personal], valueMask: '••••' };
+  const hidden = await renderToString(Vue.createSSRApp(componentExports.default, props));
+  expect(hidden).toContain('••••');
+  expect(hidden).not.toContain('123.45');
+  expect(hidden).toContain(copy.rewardGranted);
+  expect(hidden).toContain(copy['reward-detail']);
+  expect(personal.reward.amount).toBe('123.450000');
+  const details = await renderToString(Vue.createSSRApp(componentExports.default, { rewards: [personal] }));
+  expect(details).toContain('123.45 USDT');
+  const rules = await renderToString(Vue.createSSRApp(componentExports.default, { specs: [{ ...reward.reward, type: 'UVT', amount: '10.000000' }] }));
+  expect(rules).toContain('10.00 UVT');
+  expect(rules).not.toContain('••••');
+});
+
+it('opted-in reward rows also replace actual purchased quantities while retaining their product and reward-detail entry', async () => {
+  const props = { valueMask: '••••', lines: [{ lineId: 'line-a', productNo: 'sku-a', quantity: 67 }],
+    rewards: [{ ...reward, orderLineId: 'line-a' }] };
+  const html = await renderToString(Vue.createSSRApp(componentExports.default, props));
+  expect(html.replace(/<!--.*?-->/g, '')).toContain('Device Alpha × ••••');
+  expect(html).not.toContain('× 67');
+  expect(html).not.toContain('3.00 USDT');
+  expect(html).toContain(promotionZH['reward-detail']);
+});
 
 it('home advert copy keeps AA contrast against captured light background samples',()=>{
   const styles=parse(entrySource).descriptor.styles.find(style=>style.scoped)!.content;
@@ -74,7 +115,7 @@ it('final recovery and cancellation remain visible when a historical refund hold
 
 it('two canonical order-line IDs keep purchase quantities and rewards paired regardless of array order',async()=>{
   const props={lines:[{lineId:'900101',productNo:'sku-a',quantity:2},{lineId:'900102',productNo:'sku-b',quantity:3}],rewards:[
-    {...reward,obligationId:'reward-beta',orderLineId:'900102',reward:{...reward.reward,type:'NEX',amount:'7.000000'}},
+    {...reward,obligationId:'reward-beta',orderLineId:'900102',reward:{...reward.reward,type:'UVT',amount:'7.000000'}},
     {...reward,obligationId:'reward-alpha',orderLineId:'900101',reward:{...reward.reward,type:'USDT',amount:'5.000000'}},
   ]};
   const html=await renderToString(Vue.createSSRApp(componentExports.default,props));
@@ -99,6 +140,11 @@ it('first-load double failure leaves a visible order reward error and retry',asy
 it('loading has status feedback while a confirmed ordinary order does not claim rewards',async()=>{
   expect(await orderHtml(false,true)).toContain(promotionZH.loading);expect(await orderHtml(false)).not.toContain(promotionZH.orderRewards);
 });
+it('paid order details retain the discount beside issued rewards and omit a wallet-reward link for discount-only orders',async()=>{
+  const html=async(rewards:unknown[])=>renderToString(Vue.createSSRApp({components:{RewardRows:componentExports.default,PromotionAction:{render:()=>Vue.h('view')}},render:orderRender,setup:()=>({error:false,loading:false,receipt:{promotionQuoteId:'q1',paymentStatus:'PAID',items:[],rewards:[discount]},rewards,orderNo:'o1',t:{promotion:promotionZH},load:()=>{},navTo:()=>{},resume:()=>{}})}));
+  const only=await html([]);expect(only).toContain('订单立减 · 500.00 USDT');expect(only).not.toContain(promotionZH.rewards);expect(only).not.toContain(promotionZH.settle);
+  const mixed=await html([reward]);expect(mixed).toContain('订单立减 · 500.00 USDT');expect(mixed).toContain('3.00 USDT');expect(mixed).toContain(promotionZH.rewardGranted);
+});
 
 it('a recovered device keeps its receipt without sending the owner to a removed device',async()=>{
   const template=parse(rewardDetailSource).descriptor.template!.content;
@@ -108,29 +154,55 @@ it('a recovered device keeps its receipt without sending the owner to a removed 
   expect(await html('ISSUED')).toContain(promotionZH.viewDevice);
 });
 
-it.each([[checkoutSource, 'finishLeave'], [termsSource, 'emit']] as const)('separate promotion masks close with Uni normalized events without closing from modal children', (source, action) => {
-  const template = parse(source).descriptor.template!.content;
-  const renderCode = compile(template, { mode: 'function', prefixIdentifiers: true, isTS: true, expressionPlugins: ['typescript'], isCustomElement: tag => ['view', 'text'].includes(tag) }).code;
-  const render = new Function('Vue', ts.transpileModule(renderCode, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText)(Vue);
-  const calls: unknown[][] = [];
-  const context = { auth: { isAuthenticated: false }, p: promotionZH, t: { promotion: promotionZH }, leaveOpen: true, open: true,
-    loading: false, unknown: false, error: '', openedOriginal: false, order: null, quote: null, items: [], rewards: [],
-    disclosures: [], title: '', terms: '', locale: { code: 'zh' }, deadline: '', promotion: null, localized,
-    finishLeave: (...args: unknown[]) => calls.push(args), emit: (...args: unknown[]) => calls.push(args) };
-  let vnode!: Vue.VNode;
-  const app = Vue.createSSRApp({ render: () => { vnode = render(context, []); return vnode; } });
-  // A real render context preserves component resolution; the sibling mask is
-  // tested with the distinct target wrappers emitted by Uni H5.
-  return renderToString(app).then(() => {
-    function find(node: Vue.VNode, className: string): Vue.VNode | undefined {
-      if (typeof node.props?.class === 'string' && node.props.class.split(' ').includes(className)) return node;
-      if (Array.isArray(node.children)) for (const child of node.children) {
-        if (Vue.isVNode(child)) { const result = find(child, className); if (result) return result; }
-      }
-    }
-    const overlay = find(vnode, 'promotion-overlay')!, mask = find(vnode, 'promotion-overlay-dismiss')!, modal = find(vnode, 'promotion-modal')!;
-    expect(mask).toBeTruthy(); expect(overlay.props?.onClick).toBeUndefined(); expect(modal.props?.onClick).toBeUndefined();
-    mask.props!.onClick({ target: { id: 'mask' }, currentTarget: { id: 'mask' } });
-    expect(calls).toEqual(action === 'finishLeave' ? [[false]] : [['close']]);
-  });
+function templateRender(source:string) {
+  const code=compile(parse(source).descriptor.template!.content,{mode:'function',prefixIdentifiers:true,isTS:true,expressionPlugins:['typescript'],isCustomElement:tag=>['view','text'].includes(tag)}).code;
+  return new Function('Vue',ts.transpileModule(code,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText)(Vue);
+}
+function findVNode(node:Vue.VNode,className:string):Vue.VNode|undefined {
+  if(typeof node.props?.class==='string'&&node.props.class.split(' ').includes(className))return node;
+  if(Array.isArray(node.children))for(const child of node.children)if(Vue.isVNode(child)){const found=findVNode(child,className);if(found)return found;}
+}
+it('checkout leave mask keeps the purchase open and never closes from modal children',async()=>{
+  const render=templateRender(checkoutSource),calls:unknown[][]=[];
+  const context={$slots:{},auth:{isAuthenticated:false},p:promotionZH,t:{promotion:promotionZH},leaveOpen:true,voucherOpen:false,
+    loading:false,unknown:false,error:'',openedOriginal:false,order:null,quote:null,items:[],rewards:[],voucherOptions:[],
+    disclosures:[],locale:{code:'zh'},promotion:null,localized,finishLeave:(...args:unknown[])=>calls.push(args)};
+  let vnode!:Vue.VNode;
+  await renderToString(Vue.createSSRApp({render:()=>{vnode=render(context,[]);return vnode;}}));
+  const overlay=findVNode(vnode,'promotion-overlay')!,mask=findVNode(vnode,'promotion-overlay-dismiss')!,modal=findVNode(vnode,'promotion-modal')!;
+  expect(mask).toBeTruthy();expect(overlay.props?.onClick).toBeUndefined();expect(modal.props?.onClick).toBeUndefined();
+  mask.props!.onClick({target:{id:'mask'},currentTarget:{id:'mask'}});
+  expect(calls).toEqual([[false]]);
+});
+it('promotion terms forwards only the shared NxSheet close event',async()=>{
+  const render=templateRender(termsSource),calls:unknown[][]=[];
+  let vnode!:Vue.VNode;
+  await renderToString(Vue.createSSRApp({components:{NxSheet:{render:()=>null}},render:()=>{
+    vnode=render({open:true,title:'Rules',t:{promotion:promotionZH},uniqueDisclosures:[],uniqueTerms:'Terms',locale:{code:'zh'},localized,emit:(...args:unknown[])=>calls.push(args)},[]);return vnode;
+  }}));
+  expect(vnode.props?.open).toBe(true);expect(vnode.props?.title).toBe('Rules');
+  expect(calls).toEqual([]);vnode.props!.onClose();expect(calls).toEqual([['close']]);
+});
+it('retains matching per-person limits in each separate product rule',async()=>{
+  const render=templateRender(termsSource);
+  const rules=['S1','P1','Cloud Share'].map((sku,index)=>({id:`rule-${index}`,text:`${sku}\nUp to 1 reward per order · Up to 1 reward per person`}));
+  const html=await renderToString(Vue.createSSRApp({components:{NxSheet:{setup:(_:unknown,{slots}:any)=>()=>Vue.h('view',slots.default?.())}},render:()=>render({open:true,title:'Rules',t:{promotion:promotionEN},uniqueDisclosures:[],uniqueTerms:'Shared refund terms',rules,locale:{code:'en'},localized,emit:()=>{}},[])}));
+  expect(html.match(/Up to 1 reward per person/g)).toHaveLength(3);
+  for(const rule of rules)expect(html).toContain(rule.text);
+});
+it('real NxSheet mask closes only on its backdrop or close control, and renders nothing when closed',async()=>{
+  const render=templateRender(sheetSource),calls:string[]=[];
+  const context={open:true,id:'sheet-test',title:'Rules',copy:{close:'Close'},$slots:{default:()=>[Vue.h('text','Terms')]},$emit:(event:string)=>calls.push(event)};
+  let vnode!:Vue.VNode;
+  const html=()=>renderToString(Vue.createSSRApp({render:()=>{vnode=render(context,[]);return vnode;}}));
+  expect(await html()).toContain('role="dialog"');
+  const mask=findVNode(vnode,'nx-sheet-mask')!,body=findVNode(vnode,'nx-sheet__body')!;
+  expect(body.props?.onClick).toBeUndefined();
+  const backdrop={id:'backdrop'},child={id:'child'};
+  mask.props!.onClick({target:child,currentTarget:backdrop});expect(calls).toEqual([]);
+  mask.props!.onClick({target:backdrop,currentTarget:backdrop});expect(calls).toEqual(['close']);
+  const header=findVNode(vnode,'nx-sheet__header')!;
+  const button=(header.children as Vue.VNode[]).find(node=>node.props?.onClick)!;
+  button.props!.onClick();expect(calls).toEqual(['close','close']);
+  context.open=false;expect(await html()).not.toContain('role="dialog"');
 });

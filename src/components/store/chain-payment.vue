@@ -229,8 +229,8 @@ const expiredIconStyle: CSSProperties = {
 const expiredTitleStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 

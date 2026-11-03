@@ -16,13 +16,13 @@
     <view>
       <text class="est-step">{{ t.onboarding.step2of3 }}</text>
       <text class="est-title">{{ nativePhoneAvailable ? t.onboarding.estimatorTitleH : phoneActivationGuidance.title }}</text>
-      <text class="est-hint">{{ nativePhoneAvailable ? (deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : t.onboarding.detecting)) : phoneActivationGuidance.body }}</text>
+      <text class="est-hint">{{ nativePhoneAvailable ? (deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : detectingText)) : phoneActivationGuidance.body }}</text>
     </view>
 
     <!-- Device reveal: loading → phone card -->
     <view v-if="nativePhoneAvailable" class="est-reveal">
         <view v-if="loadFailed || deferred" key="failed" class="est-loading est-loading--failed">
-          <text class="est-loading__t">{{ deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDefer : calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingTitle : t.onboarding.calibrationFailedTitle }}</text>
+          <text class="est-loading__t">{{ deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDefer : iosPending ? t.onboarding.phoneCalibrationPendingIosTitle : calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingTitle : t.onboarding.calibrationFailedTitle }}</text>
           <text v-if="loadFailed" class="est-failed__hint">{{ failureDetail }}</text>
           <text v-if="!deferFailed" class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
           <text class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
@@ -41,7 +41,7 @@
           <svg class="est-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round">
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
-          <text class="est-loading__t">{{ t.onboarding.detecting }}</text>
+          <text class="est-loading__t">{{ detectingText }}</text>
         </view>
         <view v-else key="reveal" class="est-phone anim-up">
           <view class="est-phone__pill">
@@ -110,7 +110,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { getDeviceId } from "@/lib/device-id";
-import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { hasNativeAndroidPhoneRuntime, hasNativePhoneRuntime, nativePhonePlatform } from "@/lib/native-phone-runtime";
 import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
@@ -153,7 +153,10 @@ const deferred = ref(false);
 const loading = ref(false);
 const deferBusy = ref(false);
 const calibration = ref<OnboardingCalibration | null>(null);
-const failureDetail = computed(() => calibration.value?.calibrationStatus === "PENDING_VERIFICATION"
+const iosPending = computed(() => calibration.value?.calibrationStatus === "PENDING_VERIFICATION" && calibration.value.signals?.platform === "ios");
+const failureDetail = computed(() => iosPending.value
+  ? t.value.onboarding.phoneCalibrationPendingIosBody
+  : calibration.value?.calibrationStatus === "PENDING_VERIFICATION"
   ? t.value.onboarding.phoneCalibrationPendingBody
   : deferFailed.value ? t.value.onboarding.activationDeferFailed : t.value.onboarding.calibrationRetry);
 const comparison = (key: string) => computed(() => calibration.value?.comparisonConfig.find((item) => item.key === key) ?? null);
@@ -175,7 +178,9 @@ let accountWatchKey = String(app.accountKey || "");
 let deferIntent: { revision: number; idempotencyKey: string } | null = null;
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
   collect: collectCalibrationSignals, key: () => `onboarding:${requireCryptoUuid()}` });
-const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
+const nativePhoneAvailable = hasNativePhoneRuntime();
+const iosPhone = nativePhonePlatform() === "ios";
+const detectingText = computed(() => iosPhone ? t.value.onboarding.iosIdentifying : t.value.onboarding.detecting);
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 
 function scopePair(): { estimator: EstimatorScope; remote: RemoteAccountRequest } {
@@ -412,7 +417,7 @@ async function deferPhoneActivation() {
 .est-hint {
   display: block;
   margin-top: 4px;
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
 }
 .est-reveal {
@@ -434,7 +439,7 @@ async function deferPhoneActivation() {
   to { transform: rotate(360deg); }
 }
 .est-loading__t {
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
 }
 .est-loading--failed {
@@ -518,15 +523,17 @@ async function deferPhoneActivation() {
 }
 .est-phone__name {
   display: block;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--ui-type-subheading);
+  font-weight: var(--ui-type-subheading-weight);
   color: var(--v5-ink);
+  overflow-wrap: anywhere;
 }
 .est-phone__spec {
   display: block;
   font-size: 12px;
   color: color-mix(in oklab, var(--v5-brand) 90%, transparent);
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 .est-phone__rate {
   text-align: right;
@@ -534,7 +541,7 @@ async function deferPhoneActivation() {
 }
 .est-phone__rate-v {
   display: block;
-  font-family: var(--font-v5);
+  font-family: var(--font-metric);
   font-variant-numeric: tabular-nums;
   font-size: 20px;
   font-weight: 600;
@@ -583,7 +590,7 @@ async function deferPhoneActivation() {
 }
 .cmp__label {
   display: block;
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   font-weight: 500;
   color: var(--v5-ink);
 }
@@ -594,7 +601,7 @@ async function deferPhoneActivation() {
   margin-top: 2px;
 }
 .cmp__val {
-  font-family: var(--font-v5);
+  font-family: var(--font-metric);
   font-size: 20px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -625,8 +632,8 @@ async function deferPhoneActivation() {
   background: var(--v5-brand);
 }
 .est-go__t {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--ui-type-button);
+  font-weight: var(--ui-type-button-weight);
   color: var(--v5-ink-4);
 }
 .est-go--on .est-go__t {

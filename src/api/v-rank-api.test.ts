@@ -36,7 +36,7 @@ const ladder = () => Array.from({ length: 9 }, (_, v) => row(v));
 const current = {
   source: "nx_team_member + server VRankPerformanceRepository",
   serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
-  rankCode: "V2", progress: { selfComputePoints: 100, directRefs: 2, teamComputePoints: 300, vDownlineCounts: {} },
+  rankCode: "V2", progress: { selfComputePoints: 1000, directRefs: 2, teamComputePoints: 3000, vDownlineCounts: {} },
 };
 
 describe("v-rank API authority provenance", () => {
@@ -103,4 +103,44 @@ describe("v-rank API authority provenance", () => {
     await expect(createVRankApi({ request } as never, "dev").current())
       .rejects.toMatchObject({ message: "V_RANK_RESPONSE_INVALID" });
   });
+});
+
+
+it("reads the active V0-V8 ladder from F1 without fabricating higher ranks", async () => {
+  const request = vi.fn().mockResolvedValue({ source: "nx_v_rank_config", serverCanonical: true,
+    sourceEnvironment: "PRODUCTION", runId: "", prizeName: "Ranks", capabilities: { peer: false, genesis: false },
+    ranks: ladder().slice(0, 9) });
+  expect((await createVRankApi({ request } as never).ladder()).ranks.map(r => r.v)).toEqual([0,1,2,3,4,5,6,7,8]);
+});
+
+describe("independent canonical compute points", () => {
+  const ladderResponse = (fields: Record<string, unknown>) => ({ source: "server", serverCanonical: true,
+    sourceEnvironment: "PRODUCTION", runId: "", prizeName: "Ranks", ranks: [{ ...row(0), ...fields }] });
+  it("reads whole point counts, including zero, and no dollar fields", async () => {
+    const request = vi.fn().mockResolvedValueOnce(ladderResponse({ selfComputePoints: 0, teamComputePoints: 200000 }))
+      .mockResolvedValueOnce({ ...current, progress: { ...current.progress, selfComputePoints: 1280, teamComputePoints: 12800 } });
+    const api = createVRankApi({ request } as never);
+    const rank = (await api.ladder()).ranks[0];
+    expect(rank).toMatchObject({ selfComputePoints: 0, teamComputePoints: 200000 });
+    expect(rank).not.toHaveProperty("selfBuyUSD");
+    expect((await api.current()).progress).toMatchObject({ selfComputePoints: 1280, teamComputePoints: 12800 });
+  });
+  it("leaves an absent rank threshold unknown but requires current progress points", async () => {
+    const { selfComputePoints: _self, ...progress } = current.progress;
+    const request = vi.fn().mockResolvedValueOnce(ladderResponse({})).mockResolvedValueOnce({ ...current, progress });
+    const api = createVRankApi({ request } as never);
+    const rank = (await api.ladder()).ranks[0];
+    expect(rank.selfComputePoints).toBeUndefined();
+    expect(rank.teamComputePoints).toBeUndefined();
+    await expect(api.current()).rejects.toMatchObject({ message: "V_RANK_RESPONSE_INVALID" });
+  });
+  for (const field of ["selfComputePoints", "teamComputePoints"]) {
+    it.each([-1, 1.5, NaN, Infinity, -Infinity, "1280", "", null, true, {}])(`rejects invalid ${field} in row and progress: %s`, async value => {
+      const request = vi.fn().mockResolvedValueOnce(ladderResponse({ [field]: value }))
+        .mockResolvedValueOnce({ ...current, progress: { ...current.progress, [field]: value } });
+      const api = createVRankApi({ request } as never);
+      await expect(api.ladder()).rejects.toMatchObject({ message: "V_RANK_RESPONSE_INVALID" });
+      await expect(api.current()).rejects.toMatchObject({ message: "V_RANK_RESPONSE_INVALID" });
+    });
+  }
 });

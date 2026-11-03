@@ -1,6 +1,6 @@
 <!--
   WalletTopup — 充值页(PAY-规格 [FEAT-PAY01] ⑤ 信息架构,参照 pay-vn-rails.html)。
-  正式模式提供 USDT（BEP20 / ERC20）与银行卡两个入口；本地非正式模式仍可展示旧卡片原型。
+  正式模式提供 USDT-BEP20 与银行转账两个入口；本地非正式模式仍可展示旧卡片原型。
 
   Wrapped in <AppChassis active="me">. Header is the shared sticky <SubPageHeader>
   (back=/pages/me/wallet).
@@ -8,7 +8,7 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
+      <SubPageHeader back="/pages/me/me" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
 
       <!-- Topping up for an unpaid order: what is missing, when the order closes, and the way back once funds arrive. -->
       <view v-if="orderTopup" class="topup-order" :class="{ 'is-done': orderTopupLeft <= 0 }" role="status">
@@ -189,7 +189,7 @@ function segPillStyle(id: Seg): CSSProperties {
 function segLabelStyle(id: Seg): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "var(--ui-type-list-subtitle, 13px)",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: seg.value === id ? 600 : 500,
     color: seg.value === id ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
@@ -201,14 +201,14 @@ const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
 })));
 </script>
 <style scoped>
-.topup-order { margin: 0 16px 16px; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface, var(--v5-radius-xl)); background: radial-gradient(240px 160px at 100% 0%, color-mix(in srgb, var(--v5-warning) 9%, transparent), transparent 72%), var(--v5-surface); }
+.topup-order { margin: 0 16px 16px; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: radial-gradient(240px 160px at 100% 0%, color-mix(in srgb, var(--v5-warning) 9%, transparent), transparent 72%), var(--v5-surface); }
 .topup-order.is-done { background: radial-gradient(240px 160px at 100% 0%, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent 72%), var(--v5-surface); }
-.topup-order__t { display: flex; align-items: center; gap: var(--v5-space-2); font: 500 var(--ui-type-list-title, 15px)/var(--ui-type-list-title-lh, 20px) var(--font-v5); color: var(--v5-ink); }
+.topup-order__t { display: flex; align-items: center; gap: var(--v5-space-2); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .topup-order__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-warning); }
 .topup-order.is-done .topup-order__dot { background: var(--v5-brand); }
-.topup-order__d { display: block; margin-top: 6px; color: var(--v5-ink-3); font: var(--ui-type-description-weight, 400) var(--ui-type-description, 13px)/var(--ui-type-description-lh, 20px) var(--font-v5); }
+.topup-order__d { display: block; margin-top: 6px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .topup-order__b { font-weight: 500; color: var(--v5-ink); }
-.topup-order__cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-2); color: var(--v5-warning); font: var(--ui-type-description-weight, 400) var(--ui-type-description, 13px)/var(--ui-type-description-lh, 20px) var(--font-v5); }
+.topup-order__cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-2); color: var(--v5-warning); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .topup-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
 .topup-sticky { gap: 12px; }
 .topup-sticky__btn { display: flex; flex: 1 1 0; }
@@ -216,6 +216,6 @@ const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
 .topup-sticky__spin { width: 16px; height: 16px; flex: none; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: spin 1s linear infinite; }
 .topup-seg { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
 .topup-seg > svg { flex: none; }
-.topup-seg__label { font: var(--ui-type-segment-weight, 500) var(--ui-type-segment, 14px)/var(--ui-type-segment-lh, 20px) var(--font-v5); white-space: nowrap; }
+.topup-seg__label { font: var(--ui-type-segment-weight) var(--ui-type-segment)/var(--ui-type-segment-lh) var(--font-v5); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .topup-sticky__spin { animation-duration: 2s; } }
 </style>

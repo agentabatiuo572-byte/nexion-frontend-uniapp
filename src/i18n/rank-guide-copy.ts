@@ -1,0 +1,52 @@
+// Navigation and presentation only. Business rules remain in the published policy.
+const copy = {
+  zh: {
+    pageTitle: '等级说明',
+    headline: '你的晋级路径',
+    intro: '满足条件即可升级，等级越高，奖励越多。',
+    ladder: '等级一览',
+    authority: '以平台最新公布的规则为准。',
+    overview: '什么是等级', overviewHint: '等级由什么决定',
+    conditions: '晋级条件', conditionsHint: '自购、邀请和团队要求',
+    steps: '晋级步骤', stepsHint: '怎么一步步升级',
+    rewards: '权益与奖励', rewardsHint: '每级解锁的奖励',
+    faq: '常见问题', faqHint: '升级常见疑问',
+    more: '补充规则', moreHint: '其他已发布说明',
+    rankLink: '查看各级条件',
+    rewardScope: '查看奖励说明',
+  },
+  en: {
+    pageTitle: 'Rank guide',
+    headline: 'Your path to the next rank',
+    intro: 'Meet the requirements to move up. Higher ranks earn more rewards.',
+    ladder: 'Ranks at a glance',
+    authority: 'The latest published rules apply.',
+    overview: 'What ranks are', overviewHint: 'What decides your rank',
+    conditions: 'Requirements', conditionsHint: 'Own purchases, invites and team',
+    steps: 'Promotion steps', stepsHint: 'How to move up step by step',
+    rewards: 'Benefits and rewards', rewardsHint: 'What each rank unlocks',
+    faq: 'Common questions', faqHint: 'Questions about moving up',
+    more: 'Additional rules', moreHint: 'Other published guidance',
+    rankLink: 'View rank requirements',
+    rewardScope: 'View reward details',
+  },
+  vi: {
+    pageTitle: 'Hướng dẫn hạng',
+    headline: 'Lộ trình thăng hạng',
+    intro: 'Đáp ứng điều kiện để lên hạng. Hạng càng cao, thưởng càng nhiều.',
+    ladder: 'Các hạng',
+    authority: 'Áp dụng theo quy tắc mới nhất do nền tảng công bố.',
+    overview: 'Hạng là gì', overviewHint: 'Yếu tố quyết định hạng của bạn',
+    conditions: 'Điều kiện', conditionsHint: 'Mua cá nhân, mời bạn và nhóm',
+    steps: 'Các bước thăng hạng', stepsHint: 'Lên hạng từng bước',
+    rewards: 'Quyền lợi và thưởng', rewardsHint: 'Mỗi hạng mở khóa gì',
+    faq: 'Câu hỏi thường gặp', faqHint: 'Thắc mắc khi lên hạng',
+    more: 'Quy tắc bổ sung', moreHint: 'Hướng dẫn khác đã công bố',
+    rankLink: 'Xem điều kiện từng hạng',
+    rewardScope: 'Xem chi tiết thưởng',
+  },
+};
+
+export function rankGuideCopy(locale: string) {
+  return copy[locale.split('-')[0] as keyof typeof copy] ?? copy.en;
+}

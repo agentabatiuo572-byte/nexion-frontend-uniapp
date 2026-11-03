@@ -1,4 +1,6 @@
 import { dayOnePageObservationFixture } from "@/lib/day-one-page-observation.test-support";
+import { useCountUp } from "@/composables/use-count-up";
+import { useEarningsLedger } from "@/composables/use-earnings-ledger";
 // @ts-expect-error Vitest executes this structural contract in Node; the App tsconfig intentionally omits Node globals.
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,16 +60,24 @@ describe("earn history Proof-of-Compute interaction", () => {
 
 import * as Vue from 'vue';
 import { formatAmount } from '@/lib/amount-display';
+import { formatUsdOverviewParts } from '@/lib/usd-display';
+import { remainderUiCopy } from '@/i18n/remainder-ui';
+import { computeV2Copy } from '@/i18n/compute-v2';
+import { auditUiCopy } from '@/i18n/audit-ui';
 import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
 import { createPinia, setActivePinia } from 'pinia';
 import { zh } from '@/i18n/messages/zh';
-import { fmt } from '@/i18n/format';
-import { taskRelativeTime } from '@/lib/task-relative-time';
+import { en } from '@/i18n/messages/en';
+import { fmt, dateLocale } from '@/i18n/format';
+import { formatDisplayDateTime } from '@/lib/display-date';
 import { workloadLabel } from '@/lib/workload-label';
 import { isActiveSlotDevice } from '@/lib/device-slot-policy';
+import * as passiveTabRead from '@/lib/passive-tab-read';
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true, fundsServerEnabled: true, expectedApiEnvironment: 'dev',
+  apiRuntimeConfig: { environment: 'dev', baseUrl: 'http://127.0.0.1:8110' },
+  apiRuntimeClientOrigin: { environment: 'dev', baseUrl: 'http://127.0.0.1:8110' },
   sessionVault: { read: vi.fn() }, deviceE3Api: { fleet: vi.fn() },
   taskAssignmentApi: { state: vi.fn(), receipt: vi.fn() }, appHomeApi: { fetch: vi.fn() },
   withdrawalApi: { submit: vi.fn(), list: vi.fn(), get: vi.fn() },
@@ -75,6 +85,7 @@ const remote = vi.hoisted(() => ({
 vi.mock('@/api/runtime', () => remote);
 const { useApp } = await import('@/store/app');
 const { useUI, toast } = await import('@/store/ui');
+const tabLifecycle = await import('@/composables/use-tab-page-lifecycle');
 const sourceRoot = new URL("../../", import.meta.url);
 const stopped: Array<() => void> = [];
 function deferred<T>() { let resolve!: (v:T)=>void; let reject!:(e:unknown)=>void; const promise=new Promise<T>((a,b)=>{resolve=a;reject=b;}); return {promise,resolve,reject}; }
@@ -101,17 +112,31 @@ function compile(path:string, imports:(id:string)=>any, template=false) {
 }
 async function setup() {
   const app=useApp(); app.bindAccount('A'); const ui=useUI(); const shows:Function[]=[]; const hides:Function[]=[];
+  const lifecycle=tabLifecycle.createTabLifecycle({},true);
+  shows.push(()=>lifecycle.setVisible(true));hides.push(()=>lifecycle.setVisible(false));
   const modal={props:['receipt'],emits:['close'],setup:(p:any,c:any)=>()=>Vue.h('probe-modal',{receipt:p.receipt,onClose:()=>c.emit('close')})};
   const noChild={render:()=>null}; const navigation={navTo:vi.fn()};
   const imports=(id:string):any=>{
+    if(id==='@/lib/passive-tab-read') return passiveTabRead;
+    if(id==='@/store/data-visibility') return { useDataVisibility: () => ({ hidden:false, mask:String }) };
     if(id==='@/lib/amount-display')return{formatAmount};
+    if(id==='@/lib/usd-display')return{formatUsdOverviewParts};
+    if(id==='@/i18n/remainder-ui')return{useRemainderUiCopy:()=>Vue.ref(remainderUiCopy.zh)};
+    if(id==='@/i18n/compute-v2')return{useComputeV2Copy:()=>Vue.ref(computeV2Copy.zh)};
+    if(id==='@/i18n/audit-ui')return{useAuditUiCopy:()=>Vue.ref(auditUiCopy.zh)};
+    if(id==='@/store/config')return{useConfig:()=>({configStatus:'ready',isEnabled:()=>false})};
+    if(id==='@/lib/native-phone-runtime')return{hasNativeAndroidPhoneRuntime: ()=>true, hasNativePhoneRuntime: ()=>true, nativePhonePlatform: () => null};
     if(id==='vue')return Vue;
+    if(id==='@/composables/use-tab-page-lifecycle')return tabLifecycle;
+    if(id==='@/composables/use-count-up')return{useCountUp};
+    if(id==='@/composables/use-earnings-ledger')return{useEarningsLedger};
     if(id==='@dcloudio/uni-app')return{onShow:(f:Function)=>shows.push(f),onHide:(f:Function)=>hides.push(f)};
     if(id==='@/store/app')return{useApp:()=>app};
     if(id==='@/store/ui')return{toast};
     if(id==='@/i18n/use-t')return{useT:()=>Vue.ref(zh)};
-    if(id==='@/i18n/format')return{fmt};
-    if(id==='@/lib/task-relative-time')return{taskRelativeTime};
+    if(id==='@/i18n/messages/en')return{en};
+    if(id==='@/i18n/format')return{fmt,dateLocale};
+    if(id==='@/lib/display-date')return{formatDisplayDateTime};
     if(id==='@/lib/workload-label')return{workloadLabel};
     if(id==='@/lib/device-slot-policy')return{isActiveSlotDevice};
     if(id==='@/lib/route')return navigation;
@@ -119,6 +144,7 @@ async function setup() {
     if(id==='@/store/receipts')return{useReceipts:()=>{throw new Error('MOCK_RECEIPTS_FORBIDDEN');}};
     if(id==='@/store/earn-config')return{prepareEarnConfig:()=>{},useEarnConfig:()=>({lockedTeasers:()=>[],refreshRoute:()=>Promise.resolve()})};
     if(id==='@/store/free-trial')return{useFreeTrial:()=>({refreshRemote:()=>Promise.resolve()})};
+    if(id==='@/composables/use-trial-presentation')return{useTrialPresentation:()=>({active:Vue.ref(false),reservedSlots:Vue.ref(0)})};
     if(id==='@/composables/use-capacity-explainer')return{useCapacityExplainer:()=>({open:vi.fn()})};
     if(id==='@/lib/account-scope')return{captureAccountScope:()=>({accountKey:app.accountKey,bindingEpoch:app.accountBindingEpoch}),isCurrentAccountScope:()=>true};
     if(id==='@/lib/day-one-page-observation')return dayOnePageObservationFixture();
@@ -131,19 +157,39 @@ async function setup() {
   const renderer=Vue.createRenderer<any,any>({
     insert:(child,p,anchor)=>{child.parent=p;p.children??=[]; const at=anchor?p.children.indexOf(anchor):-1;if(at<0)p.children.push(child);else p.children.splice(at,0,child);},
     remove:n=>{if(n.parent)n.parent.children=n.parent.children.filter((x:any)=>x!==n);},
-    createElement:tag=>({tag,props:{},children:[]}),createText:text=>({text,children:[]}),createComment:text=>({comment:text,children:[]}),setText:(n,text)=>{n.text=text;},setElementText:(n,text)=>{n.text=text;},parentNode:n=>n.parent??null,nextSibling:()=>null,patchProp:(n,k,_o,v)=>{n.props[k]=v;},
+    createElement:tag=>({tag,props:{},children:[],style:{}}),createText:text=>({text,children:[]}),createComment:text=>({comment:text,children:[]}),setText:(n,text)=>{n.text=text;},setElementText:(n,text)=>{n.text=text;},parentNode:n=>n.parent??null,nextSibling:()=>null,patchProp:(n,k,_o,v)=>{n.props[k]=v;},
   });
   let taskState:any; const child={...task,setup:(p:any,c:any)=>{taskState=task.setup(p,c);return taskState;}};
-  const root:any={children:[]}; const mounted=renderer.createApp({...parent,render:()=>Vue.h(child)}); mounted.mount(root);
+  const content={...parent,render:()=>Vue.h(child)};
+  const root:any={children:[]}; const mounted=renderer.createApp({setup(){Vue.provide(tabLifecycle.TAB_LIFECYCLE,lifecycle);return()=>Vue.h(content);}}); mounted.mount(root);
   let active=true; const stop=()=>{if(active){active=false;mounted.unmount();}}; stopped.push(stop); await flush();
+  const toggleHistory=(n:any):any=>String(n.props?.class??'').split(' ').includes('earn-tc__row')?n:(n.children??[]).map(toggleHistory).find(Boolean);
+  toggleHistory(root).props.onClick(); await flush();
   const find=(tag:string):any=>{const walk=(n:any):any=>n.tag===tag?n:(n.children??[]).map(walk).find(Boolean);return walk(root);};
   return {app,ui,task:taskState,root,stop,find,hide:()=>hides.forEach(f=>f()),show:()=>shows.forEach(f=>f()),rebind:(key:string)=>app.bindAccount(key)};
 }
 const row={id:'task-synthetic',receiptNo:'receipt-synthetic'} as any;
 const receipt={receiptNo:'receipt-synthetic',serverCanonical:true} as any;
 describe('actual Earn/TaskCenter mounted handlers with production App/UI stores',()=>{
+  it('completed-history dates do not add a timer across hide/show',async()=>{
+    const s=await setup();const shown=vi.getTimerCount();
+    s.hide();expect(vi.getTimerCount()).toBe(shown);
+    s.show();expect(vi.getTimerCount()).toBe(shown);
+    s.show();expect(vi.getTimerCount()).toBe(shown);
+    s.stop();expect(vi.getTimerCount()).toBe(shown);
+  });
   it('current success opens only the selected receipt',async()=>{
     const s=await setup();remote.taskAssignmentApi.receipt.mockResolvedValue(receipt);await s.task.openTaskReceipt(row);await flush();expect(s.find('probe-modal').props.receipt).toEqual(receipt);expect(s.ui.toasts).toHaveLength(0);
+  });
+  it('a V2 receipt keeps the canonical posting time separate from completion',async()=>{
+    const s=await setup();remote.taskAssignmentApi.receipt.mockResolvedValue({...receipt,taskNo:row.id,settledAt:1000});
+    await s.task.openTaskReceipt({...row,protocolVersion:2,settlementStatus:'POSTED',settledAt:65000},true);await flush();
+    expect(s.find('probe-modal').props.receipt.settledAt).toBe(65000);
+  });
+  it.each(['taskNo','receiptNo'])('a V2 receipt rejects a mismatching %s before using its posting time',async field=>{
+    const s=await setup();remote.taskAssignmentApi.receipt.mockResolvedValue({...receipt,taskNo:row.id,[field]:'other',settledAt:1000});
+    await s.task.openTaskReceipt({...row,protocolVersion:2,settlementStatus:'POSTED',settledAt:65000},true);await flush();
+    expect(s.find('probe-modal').props.receipt).toBeNull();expect(s.ui.toasts).toHaveLength(1);
   });
   it.each(['account','same-account-rebind','unmount'])('late rejection remains fenced after %s',async boundary=>{
     const s=await setup();const r=deferred<any>();remote.taskAssignmentApi.receipt.mockReturnValue(r.promise);const pending=s.task.openTaskReceipt(row);

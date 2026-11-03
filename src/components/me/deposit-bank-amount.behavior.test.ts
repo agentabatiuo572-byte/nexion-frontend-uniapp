@@ -1,4 +1,5 @@
 import { formatAmount } from "@/lib/amount-display";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import * as Vue from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,12 +69,15 @@ async function mount(messages = en, initial?: DepositIntent) {
     createRemoteBankIntent: vi.fn(async (amount: number, _expectedAccountKey: string): Promise<DepositIntent | null> => {
       const intent = payment(amount); dep.intents = [intent]; return intent;
     }) });
-  const fx = Vue.reactive({ fxAvailable: true, configReady: true, vietQrEnabled: true, dailyCapacityKnown: true,
+  const fx = Vue.reactive({ syncFailed: false, loading: false, fxAvailable: true, configReady: true, vietQrEnabled: true, dailyCapacityKnown: true,
     minDepositUsdt: 10, maxDepositUsdt: 5000, todayRemainingDepositUsdt: 100,
     quoteRate, feeUsdt: 0, feeVnd: 0, lockWindowMin: 30, load: vi.fn(async () => {}) });
   const open = vi.fn(() => true), toast = { error: vi.fn(), success: vi.fn(), warn: vi.fn() };
   const modules: Record<string, unknown> = {
     "@/lib/amount-display": { formatAmount },
+    "@/lib/display-date": { formatDisplayDateTime: (value: number) => new Date(value).toISOString() },
+    "@/store/locale": { useLocaleStore: () => ({ code: "en" }) },
+    "@/lib/finance-amount-display": { formatFinanceAmount },
     vue: Vue, "@/components/me/fx-rate-line.vue": { default: Vue.defineComponent(() => () => Vue.h("aside")) },
     "@/i18n/use-t": { useT: () => Vue.ref(messages) }, "@/i18n/format": { fmt },
     "@/lib/route": { navTo: vi.fn(), navBack: vi.fn() }, "@/store/ui": { toast, confirm: vi.fn() },
@@ -93,7 +97,12 @@ async function mount(messages = en, initial?: DepositIntent) {
     if (!(id in modules)) throw new Error(`Unexpected bank amount dependency: ${id}`);
     return modules[id];
   }, exports);
-  const root = node(), app = renderer.createApp(exports.default);
+  // wallet-topup renders the create action in its fixed bar from the pane's exposed state; mirror that host.
+  type Action = { className: string; label: string; enabled: boolean; run: () => void };
+  const pane = Vue.ref<{ primaryAction: Action | null; secondaryAction: Action | null } | null>(null);
+  const bar = (action?: Action | null) => action ? Vue.h("view", { class: action.className, "aria-disabled": !action.enabled, onClick: () => action.run() }, action.label) : null;
+  const host = Vue.defineComponent(() => () => [Vue.h(exports.default, { ref: pane }), bar(pane.value?.secondaryAction), bar(pane.value?.primaryAction)]);
+  const root = node(), app = renderer.createApp(host);
   app.mount(root); cleanups.push(() => app.unmount()); await flush();
   const control = (className: string) => {
     const target = nodes(root).find(entry => String(entry.props.class).split(" ").includes(className));
@@ -123,7 +132,8 @@ const storeCode = ts.transpileModule(["remoteIntentStatus", "remoteVietQrIntent"
 function localTransport(dep: Awaited<ReturnType<typeof mount>>["dep"], statuses = [200], gate?: Promise<void>) {
   let saved: unknown;
   const storage: VietQrCommandStorage = { read: () => saved, write: value => { saved = structuredClone(value); } };
-  const registry = new VietQrCommandKeyRegistry(storage, () => "bank-amount-local-0001"), vault = createSessionVault();
+  const mint = vi.fn(() => "bank-amount-local-0001");
+  const registry = new VietQrCommandKeyRegistry(storage, mint), vault = createSessionVault();
   vault.save({ accessToken: "local-test-access", refreshToken: "local-test-refresh", tokenType: "Bearer",
     user: { userId: 7, countryCode: "+86", phone: "13800000007", nickname: "Test", onboardingComplete: true } });
   const requests = vi.fn(async (request: HttpRequest) => {
@@ -148,14 +158,50 @@ function localTransport(dep: Awaited<ReturnType<typeof mount>>["dep"], statuses 
   const create = new Function("context", `const { ${Object.keys(context).join(", ")} } = context;\n${storeCode}\nreturn createRemoteBankIntent;`)(context) as
     (amount: number, account: string) => Promise<DepositIntent | null>;
   dep.createRemoteBankIntent.mockImplementation(create);
-  return requests;
+  return Object.assign(requests, { mint });
 }
 
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); vi.spyOn(console, "warn").mockImplementation(() => {}); });
 afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("mounted bank top-up amount", () => {
-  it.each(["0x20", "-20", "+20", "2e1", "20USD", "20.1.2", "25.123", " 20", "20 ", "20,50", "２０", "25.", "25.1", "0025.12", "25.12", "0"] )(
+  it.each([zh, en, vietnamese])("starts blank without a draft or premature minimum error (%#)", async messages => {
+    const pane = await mount(messages);
+    pane.fx.minDepositUsdt = 50; await Vue.nextTick();
+    expect(pane.input().props.value).toBe("");
+    expect(pane.text()).not.toContain(fmt(messages.bankPane.minimumLimitExceeded, { min: "$50.00" }));
+    expect(pane.control("nx-bank-create-cta").props["aria-disabled"]).toBe(true);
+    await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+    await pane.enter("100");
+    expect(pane.control("nx-bank-create-cta").props["aria-disabled"]).toBe(false);
+  });
+
+  it("combines quote and order-read failures into one recovery, keeps retrying the remaining cause and preserves amount", async () => {
+    const pane = await mount(); await pane.enter("100");
+    pane.fx.syncFailed = true; pane.fx.configReady = false; pane.fx.fxAvailable = false; pane.fx.vietQrEnabled = false;
+    pane.dep.remoteReceiptInitialStatus = "error"; pane.dep.serverStatus = "error";
+    await Vue.nextTick();
+    expect(pane.text()).not.toContain(en.bankPane.createFxUnavailable);
+    expect(pane.text().split(en.topupChrome.depositOpFailedNote)).toHaveLength(2);
+    expect(pane.text()).not.toContain(en.bankPane.railPaused);
+    pane.dep.refreshRemoteVietQrDeposits.mockImplementationOnce(async () => {
+      pane.dep.serverStatus = "ready"; pane.dep.remoteReceiptInitialStatus = "ready";
+    });
+    await pane.click("nx-bank-read-retry");
+    expect(pane.text()).not.toContain(en.topupChrome.depositOpFailedNote);
+    expect(pane.text()).toContain(en.bankPane.createFxUnavailable);
+    expect(pane.fx.load).toHaveBeenCalledOnce();
+    pane.fx.load.mockImplementationOnce(async () => {
+      pane.fx.syncFailed = false; pane.fx.configReady = true; pane.fx.fxAvailable = true; pane.fx.vietQrEnabled = true;
+    });
+    await pane.click("nx-bank-read-retry");
+    expect(pane.fx.load).toHaveBeenCalledTimes(2);
+    expect(pane.dep.refreshRemoteVietQrDeposits).toHaveBeenCalledTimes(3);
+    expect(pane.text()).not.toContain(en.bankPane.createFxUnavailable);
+    expect(pane.input().props.value).toBe("100");
+    expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+  });
+  it.each(["0x20", "-20", "+20", "2e1", "20USD", "20.1.2", "25.123", " 20", "20 ", "20,50", "２０", "25.", "25.1", "25.12", "0025.12", "25.00", "0025", "0"])(
     "keeps invalid input visible, clears the numeric preview and blocks creation: %s", async amount => {
       const pane = await mount(); await pane.enter(amount);
       expect(pane.input().props.value).toBe(amount);
@@ -164,7 +210,7 @@ describe("mounted bank top-up amount", () => {
       await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
     });
 
-  it.each([["10", "263900.00₫"], ["100", "2639000.00₫"], ["25", "659750.00₫"]])(
+  it.each([["10", "263,900 ₫"], ["100", "2,639,000 ₫"], ["25", "659,750 ₫"]])(
     "uses the visible positive integer for the preview and local mocked create argument: %s", async (amount, vnd) => {
       const pane = await mount(); await pane.enter(amount);
       expect(pane.input().props.value).toBe(amount);
@@ -181,11 +227,12 @@ describe("mounted bank top-up amount", () => {
     await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
   });
 
-  it("rejects the leading-dot fraction without creating an order", async () => {
+  it("keeps a leading-dot edit visible but rejects it as a noninteger", async () => {
     const pane = await mount(); await pane.enter(".5");
     expect(pane.input().props.value).toBe(".5");
     expect(pane.text()).toContain(fmt(en.bankPane.approx, { vnd: "—" }));
     expect(pane.text()).toContain(en.bankPane.amountFormatError);
+    expect(pane.text()).not.toContain(fmt(en.bankPane.minimumLimitExceeded, { min: "$10.00" }));
     await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
   });
 
@@ -230,12 +277,13 @@ describe("mounted bank top-up amount", () => {
     expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled(); expect(requests).not.toHaveBeenCalled();
   });
 
-  it("preserves the historical fractional snapshot without submitting a replacement", async () => {
+  it("keeps a historical fractional order snapshot without creating or minting a replacement", async () => {
     const original = { ...payment(37.12), paymentMode: "hosted" as const, providerStatus: "rejected" as const };
     const pane = await mount(en, original), requests = localTransport(pane.dep);
     await pane.click("nx-bank-regen-cta");
-    expect(requests).not.toHaveBeenCalled(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
-    expect(pane.dep.intents[0]).toEqual(original); expect(pane.input().props.value).toBe("");
+    expect(requests).not.toHaveBeenCalled(); expect(requests.mint).not.toHaveBeenCalled();
+    expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+    expect(pane.dep.intents).toEqual([original]); expect(pane.input().props.value).toBe('');
     expect(pane.text()).toContain(en.bankPane.amountFormatError);
   });
 
@@ -245,10 +293,10 @@ describe("mounted bank top-up amount", () => {
     await pane.click(); expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(25, accountKey);
   });
 
-  it.each([zh, en, vietnamese])("retains translated limits and blocks out-of-range decimals (%#)", async messages => {
+  it.each([zh, en, vietnamese])("retains translated limits and blocks out-of-range whole principals (%#)", async messages => {
     const pane = await mount(messages);
     for (const [amount, error] of [["9", fmt(messages.bankPane.minimumLimitExceeded, { min: "$10.00" })],
-      ["5001", fmt(messages.bankPane.singleLimitExceeded, { max: "$5000.00" })],
+      ["5001", fmt(messages.bankPane.singleLimitExceeded, { max: "$5,000.00" })],
       ["101", fmt(messages.bankPane.dailyCapacityExceeded, { max: "$100.00" })]]) {
       await pane.enter(amount); expect(pane.input().props.value).toBe(amount); expect(pane.text()).toContain(error);
       expect(pane.control("nx-bank-create-cta").props["aria-disabled"]).toBe(true); await pane.click();
@@ -264,10 +312,37 @@ describe("mounted bank top-up amount", () => {
     await pane.click(); expect(pane.dep.createRemoteBankIntent.mock.calls).toEqual([[25, accountKey], [25, accountKey]]);
   });
 
-  it("keeps an existing integer order's original amount on explicit retry", async () => {
+  it("keeps an existing integer rejected order's original amount on explicit retry", async () => {
     const original = { ...payment(37), paymentMode: "hosted" as const, providerStatus: "rejected" as const };
     const pane = await mount(en, original); await pane.click("nx-bank-regen-cta");
     expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(37, accountKey);
+  });
+
+  it('uses the current remote minimum rather than the old ten-unit default, with two-place display', async () => {
+    const pane = await mount(); pane.fx.minDepositUsdt = 37; await Vue.nextTick();
+    await pane.enter('36');
+    expect(pane.text()).toContain(fmt(en.bankPane.minimumLimitExceeded, { min: '$37.00' }));
+    await pane.click(); expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+    await pane.enter('37'); await pane.click();
+    expect(pane.dep.createRemoteBankIntent).toHaveBeenCalledExactlyOnceWith(37, accountKey);
+  });
+
+  it('an unavailable remote minimum/fee snapshot hides numeric defaults and rejects even a queued create', async () => {
+    const pane = await mount(); await pane.enter('25'); const queued = pane.control('nx-bank-create-cta').props.onClick;
+    Object.assign(pane.fx, { syncFailed: true, configReady: false, fxAvailable: false, minDepositUsdt: 0, feeUsdt: 0, feeVnd: 0 });
+    await Vue.nextTick();
+    expect(pane.text()).not.toContain(en.bankPane.feeNote);
+    expect(pane.text()).not.toContain(fmt(en.bankPane.limitNote, { min: '$10.00', max: '$5,000.00' }));
+    expect(pane.text()).toContain(en.bankPane.createFxUnavailable);
+    expect(() => pane.control('nx-bank-create-cta')).toThrow('Missing mounted bank control');
+    queued(); await vi.advanceTimersByTimeAsync(600); await flush();
+    expect(pane.dep.createRemoteBankIntent).not.toHaveBeenCalled();
+  });
+
+  it.each([25.12, 0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])('the production store rejects new invalid principal %s before key creation or transport', async amount => {
+    const pane = await mount(), requests = localTransport(pane.dep);
+    expect(await pane.dep.createRemoteBankIntent(amount, accountKey)).toBeNull();
+    expect(requests).not.toHaveBeenCalled(); expect(requests.mint).not.toHaveBeenCalled(); expect(pane.dep.intents).toEqual([]);
   });
 
   it.each([zh, en, vietnamese])("explains illegal syntax and excess precision in the active locale (%#)", async messages => {

@@ -56,8 +56,8 @@ const internal=/服务端|数据库|接口|投影|本地(?:数据|模拟|不会)
 const readCopy = (copy: unknown, key: string): string => key.split('.').reduce<unknown>(
   (node, segment) => (node as Record<string, unknown>)[segment], copy) as string;
 it.each([{ locale: 'zh', copy: zh }, { locale: 'en', copy: en }, { locale: 'vi', copy: vi }])(
-  '$locale all 61 approved public keys keep their real consumers and format every placeholder without engineering prose', ({ copy }) => {
-    expect(reviewedCopyR2).toHaveLength(61);
+  '$locale all retained public keys keep their real consumers and format every placeholder without engineering prose', ({ copy }) => {
+    expect(reviewedCopyR2).toHaveLength(57);
     for (const item of reviewedCopyR2) {
       const value = readCopy(copy, item.key);
       expect(value, item.key).toBeTruthy();
@@ -111,8 +111,8 @@ it.each([
   expect(copy.onboarding.policyLine3).toContain('120');
 });
 it.each([
-  {locale:'zh',copy:zh,text:'上方设备规格为估算值，已校准算力暂不可用；任务状态单独展示。'},
-  {locale:'en',copy:en,text:'The device specifications above are estimates; calibrated compute capacity is unavailable. Task status is shown separately.'},
+  {locale:'zh',copy:zh,text:'上方设备规格为估算值，已校准算力暂不可用；作业状态单独展示。'},
+  {locale:'en',copy:en,text:'The device specifications above are estimates; calibrated compute capacity is unavailable. Job status is shown separately.'},
   {locale:'vi',copy:vi,text:'Thông số thiết bị ở trên chỉ là ước tính; công suất đã hiệu chuẩn chưa có. Trạng thái tác vụ được hiển thị riêng.'},
 ])('$locale unavailable hashpower keeps two explanations and a dash in compact metric slots',({copy,text})=>{
   expect(deviceSource.match(/t(?:\.value)?\.earn\.hashCapabilityUnknown/g)).toHaveLength(2);
@@ -121,30 +121,30 @@ it.each([
   expect(copy.earn.hashCapabilityUnknown).toBe(text);
 });
 const consumers:{key:string;sources:string[]}[]=[
-  {key:'home.networkVerifiedMembers',sources:[networkSource]},
-  {key:'home.networkVerifiedDevices',sources:[networkSource]},
+  {key:'home.networkMembers',sources:[networkSource]},
+  {key:'home.networkDevices',sources:[networkSource]},
   {key:'earn.summaryUnavailableBody',sources:[earnSource]},
   {key:'earn.hashCapabilityUnknown',sources:[deviceSource]},
   {key:'events.loadErrorBody',sources:[eventsSource]},
   {key:'store.catalogLoadingBody',sources:[storeSource,bundleSource,ordinaryBundleSource]},
   {key:'store.catalogEmptyBody',sources:[storeSource]},
   {key:'store.coAwaitingServer',sources:[ordinaryCheckoutSource]},
-  {key:'store.purchaseEligibilityFailClosed',sources:[detailSource]},
-  {key:'store.purchaseEligibilityNoFacts',sources:[detailSource]},
+  {key:'store.purchaseEligibilityError',sources:[detailSource]},
   {key:'orders.refreshing',sources:[orderSource,meSource]},
-  {key:'trust.errorUnavailable',sources:[detailSource]},
+  {key:'store.relatedMaterialsEmpty',sources:[detailSource]},
   {key:'pool.loading',sources:[poolSource,teamSource,poolPageSource,poolHowSource]},
-  {key:'promotion.existingInvite',sources:[inviteSource]},
+  {key:'promotion.existingInvite',sources:[rewardDetailSource]},
 ];
 it.each([{locale:'zh',copy:zh},{locale:'en',copy:en},{locale:'vi',copy:vi}])('$locale task-page copy has actual consumers and excludes internal explanations',({copy})=>{
   for(const {key,sources} of consumers){
     const [namespace,name]=key.split('.');
     const value=(copy as unknown as Record<string,Record<string,string>>)[namespace][name];
     expect(value,key).toBeTruthy();expect(value,key).not.toMatch(internal);
-    for(const source of sources)expect(source,key).toContain(key);
+    for(const source of sources)expect(source,key).toContain(key === 'promotion.existingInvite' ? 'p.existingInvite' : key);
   }
   expect(copy.promotion).not.toHaveProperty('statusRead');expect(copy.promotion).not.toHaveProperty('specNote');
   expect(rewardDetailSource).not.toContain('p.statusRead');expect(rewardDetailSource).toContain('p.existingInvite');
+  expect(networkSource).not.toMatch(/networkVerifiedMembers|networkVerifiedDevices|capturedAt/);
 });
 
 const render=new Function('Vue',compile(parse(rewardDetailSource).descriptor.template!.content,{mode:'function',prefixIdentifiers:true,isCustomElement:tag=>['view','text'].includes(tag)}).code)(Vue);

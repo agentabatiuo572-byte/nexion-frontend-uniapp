@@ -144,7 +144,7 @@ function mountNotifications() {
   const script = notificationsPage.split('<script setup lang="ts">')[1].split('</script>')[0];
   const ast = ts.createSourceFile('notifications.ts', script, ts.ScriptTarget.ES2022, true);
   const variables = new Set(['pageGeneration', 'pageVisible', 'disposed', 'center', 'touchStarts', 'suppressedClick',
-    'sectionLoaded', 'sectionAccountWasBound', 'initialSectionAccountEpoch', 'sectionEntryAllowed', 'initialSection', 'section']);
+    'sectionLoaded', 'sectionAccountWasBound', 'initialSectionAccountEpoch', 'sectionEntryAllowed', 'initialSection', 'section', 'clearingRead']);
   const parts = ast.statements.filter(node =>
     (ts.isVariableStatement(node) && node.declarationList.declarations.some(item => variables.has(item.name.getText(ast))))
     || (ts.isFunctionDeclaration(node) && ['invalidatePage', 'invalidatePendingIntents', 'preserveSectionInH5'].includes(node.name?.text ?? ''))
@@ -152,7 +152,7 @@ function mountNotifications() {
       && ((Object.keys(hooks).includes(node.expression.expression.getText(ast)) && /disposed|invalidatePage|center\.refresh/.test(node.getText(ast)))
         || (node.expression.expression.getText(ast) === 'watch' && node.getText(ast).includes('app.account'))))
   ).map(node => node.getText(ast));
-  const dependencies = { watch, computed, app, remoteApiEnabled: runtime.remoteApiEnabled, useMessageDrawer: () => center, expandedId: ref(null), filter: ref('all'), serviceFilter: ref('all'),
+  const dependencies = { watch, computed, ref, app, remoteApiEnabled: runtime.remoteApiEnabled, useMessageDrawer: () => center, expandedId: ref(null), filter: ref('all'), serviceFilter: ref('all'),
     resetHeader: vi.fn(), ui: { clearConfirmsBy: vi.fn() }, confirmOwner: 'fixture',
     ...Object.fromEntries(Object.keys(hooks).map(name => [name, (callback: () => void) => hooks[name].push(callback)])) };
   const run = (code: string, deps: Record<string, unknown>) => new Function('deps', `const {${Object.keys(deps).join(',')}}=deps;
@@ -216,14 +216,14 @@ it('message Service defers hidden bindings until show and never resumes after un
   expect(page.conversations.categoryAvailabilityStatus).toBe('loading');
 });
 
-it.each(['conversations'] as const)('message Service exposes a retryable error after current %s recovery fails', async kind => {
+it('message Service exposes a retryable error after current conversations recovery fails', async () => {
   const page = mountNotifications(); page.show(); await settle();
-  const api = runtime.supportApi[kind], store = page.conversations;
+  const api = runtime.supportApi.conversations, store = page.conversations;
   const older = deferred<any>(), recovery = deferred<any>(), count = api.mock.calls.length;
   api.mockReturnValueOnce(older.promise).mockReturnValueOnce(recovery.promise);
   const initial = store.refresh(); await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(count + 1));
   const originalFailure = new ApiError({ kind: 'network', message: 'original command failure' });
-  const outcome = page.create(kind, originalFailure).catch(cause => cause);
+  const outcome = page.create('conversations', originalFailure).catch(cause => cause);
   await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(count + 2));
   recovery.reject(new Error('current list read failed')); expect(await outcome).toBe(originalFailure);
   older.resolve({ items: [], total: 0 }); await initial;
@@ -233,12 +233,20 @@ it.each(['conversations'] as const)('message Service exposes a retryable error a
   expect(store.error).toBeNull(); expect(page.state()).toEqual({ loading: false, failed: false, empty: true });
 });
 
-it.each(['conversations'] as const)('message Service clears an earlier %s list error when current recovery succeeds', async kind => {
+it('message Service clears an earlier conversations list error when current recovery succeeds', async () => {
   const page = mountNotifications(); page.show(); await settle();
   const store = page.conversations;
   store.error = 'earlier list read failed';
   const originalFailure = new ApiError({ kind: 'network', message: 'original command failure' });
-  const outcome = page.create(kind, originalFailure);
+  const outcome = page.create('conversations', originalFailure);
   expect(await outcome.catch(cause => cause)).toBe(originalFailure);
   expect(page.state()).toEqual({ loading: false, failed: false, empty: true }); expect(store.error).toBeNull();
+});
+
+it('message Service reads conversations only', async () => {
+  const page = mountNotifications();
+  page.show(); await settle(); page.retry(); await settle();
+  expect(Object.keys(runtime.supportApi)).not.toContain('tickets');
+  expect(page.center.serviceUnread).toBe(0);
+  expect(page.state()).toEqual({ loading: false, failed: false, empty: true });
 });

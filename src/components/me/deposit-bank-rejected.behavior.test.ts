@@ -1,4 +1,5 @@
 import { formatAmount } from "@/lib/amount-display";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { compile } from "@vue/compiler-dom";
 import { parse } from "@vue/compiler-sfc";
@@ -38,6 +39,8 @@ const exposed = ast.statements.flatMap((statement) => {
 const script = ts.transpileModule(setupSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText + `;return { ${exposed.join(", ")} };`;
+// defineExpose is a compiler macro; this harness runs the raw setup, so it is a no-op here.
+const runnable = `const defineExpose = () => {};\n${script}`;
 const render = new Function("Vue", compile(descriptor.template!.content, {
   mode: "function", prefixIdentifiers: true, isCustomElement: tag => ["view", "text"].includes(tag),
 }).code)(Vue) as Vue.RenderFunction;
@@ -173,6 +176,9 @@ function pane(providerStatus: DepositIntent["providerStatus"] = "rejected", tran
   const mounted: Array<() => void> = [], unmounted: Array<() => void> = [];
   const modules: Record<string, unknown> = {
     "@/lib/amount-display": { formatAmount },
+    "@/lib/finance-amount-display": { formatFinanceAmount },
+    "@/lib/display-date": { formatDisplayDateTime: (value: number) => new Date(value).toISOString() },
+    "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     vue: { ...Vue, onMounted: (callback: () => void) => mounted.push(callback),
       onUnmounted: (callback: () => void) => unmounted.push(callback) },
     "@/components/me/fx-rate-line.vue": {}, "@/i18n/use-t": { useT: () => Vue.ref(translations) },
@@ -191,7 +197,7 @@ function pane(providerStatus: DepositIntent["providerStatus"] = "rejected", tran
     "@/lib/hosted-payment": { findResumablePaymentIntent, openHostedPaymentPage: open },
   };
   const scope = Vue.effectScope();
-  const state = scope.run(() => new Function("require", "exports", script)(
+  const state = scope.run(() => new Function("require", "exports", runnable)(
     (name: string) => {
       if (!(name in modules)) throw new Error(`Unexpected bank pane dependency: ${name}`);
       return modules[name];
@@ -200,8 +206,14 @@ function pane(providerStatus: DepositIntent["providerStatus"] = "rejected", tran
   mounted.forEach(callback => callback());
   const dispose = () => { unmounted.forEach(callback => callback()); scope.stop(); };
   cleanups.push(dispose);
+  // The create action lives in wallet-topup's fixed bar; mirror its wiring (shown while formCtaVisible,
+  // disabled unless ctaEnabled, click -> createOrder()) next to the real pane template.
+  type Action = { className: string; label: string; enabled: boolean; run: () => void };
+  const button = (action: Action | null) => action ? Vue.h("view", { class: action.className, style: {}, "aria-disabled": !action.enabled, onClick: () => action.run() }, action.label) : null;
+  const bar = () => [button((state.secondaryAction as Vue.Ref<Action | null>).value), button((state.primaryAction as Vue.Ref<Action | null>).value)];
   const definition = () => ({
-    components: { FxRateLine: { render: () => null } }, setup: () => ({ fmt, fmtVnd, formatAmount, ...state }), render,
+    components: { FxRateLine: { render: () => null } }, setup: () => ({ fmt, fmtVnd, formatAmount, ...state }),
+    render(this: unknown, ...args: unknown[]) { return Vue.h(Vue.Fragment, [(render as (...input: unknown[]) => Vue.VNode).apply(this, args), ...bar()]); },
   });
   return { state, dep, fx, app, auth, navTo, open, toast, html: () => renderToString(Vue.createSSRApp(definition())),
     mount: () => {
@@ -252,6 +264,7 @@ test.each([zh, en, vietnamese])("precise safe 503 reasons render translated guid
 test.each([zh, en, vietnamese])("unknown 503 messages and raw provider text retain neutral generic guidance", async messages => {
   for (const reason of ["HDPAY_ORDER_SUBMISSION_UNKNOWN", "HDPAY_ORDER_READ_AFTER_WRITE_FAILED", "NEW_SERVER_REASON", "<script>private-token</script>", "FX_QUOTE_UNAVAILABLE\nprivate-token"]) {
     const view = pane("rejected", messages); view.dep.intents = [];
+    view.state.amount.value = "25";
     const mounted = view.mount(), flow = creationFlow(view.dep, [503], memoryStorage(), "user:7", undefined,
       { providerReason: "private-token" }, reason);
     view.dep.createRemoteBankIntent.mockImplementation(flow.create);
@@ -283,17 +296,17 @@ test.each(unavailableReasons)("only the exact HTTP 503 envelope can translate %s
   }
 });
 
-test.each([zh, en, vietnamese])("a bounded CREATE provider reason keeps explicit source and original retry behavior", async messages => {
+test.each([zh, en, vietnamese])("a bounded CREATE provider reason is not shown and keeps the original retry behavior", async messages => {
   const view = pane("rejected", messages), mounted = view.mount();
   const providerReason = "充值金额不正确：请输入整数";
   const flow = creationFlow(view.dep, [422], memoryStorage(), "user:7", undefined, { providerReason });
   view.dep.createRemoteBankIntent.mockImplementation(flow.create);
   click(mounted.retry()!);
   await vi.advanceTimersByTimeAsync(600); await Vue.nextTick();
-  expect(view.state.createError.value).toContain(providerReason);
-  const copy = `${messages.bankPane.hostedRejectedNote}\n${fmt(messages.bankPane.providerReason, { reason: providerReason })}`;
+  // The provider's raw reason is not shown to users; only our own rejection copy is.
+  const copy = messages.bankPane.hostedRejectedNote;
   expect(view.state.createError.value).toBe(copy);
-  expect(await view.html()).toContain(fmt(messages.bankPane.providerReason, { reason: providerReason }));
+  expect(await view.html()).not.toContain(providerReason);
   expect(view.toast.error).toHaveBeenCalledExactlyOnceWith(copy);
   expect(view.state.creating.value).toBe(false); expect(flow.requests).toHaveBeenCalledOnce();
   expect(mounted.retry()?.props["aria-disabled"]).toBe(false);
@@ -303,9 +316,9 @@ test.each([zh, en, vietnamese])("a bounded CREATE provider reason keeps explicit
   expect((flow.storage.read() as { pending: Record<string, unknown> }).pending[scope]).toBeUndefined();
 });
 
-test.each([zh, en, vietnamese])("a fresh pane reads the provider reason through real GET/list parser and store projection", async messages => {
+test.each([zh, en, vietnamese])("a fresh pane reads a historical fractional snapshot and provider reason without a new create", async messages => {
   const view = pane("rejected", messages);
-  const original = view.dep.intents[0];
+  const original = { ...view.dep.intents[0], usdtAmount: 37.12, vndAmount: vndForUsdt(37.12, quoteRate) };
   const snapshot = { intentNo: original.intentId, usdtAmount: original.usdtAmount, fxRate: original.fxRate,
     vndAmount: original.vndAmount, status: original.status, expiresAt: new Date(original.expireAt).toISOString(),
     createdAt: new Date(original.createdAt).toISOString(), creditedUsdt: 0, feeVnd: 0, feeUsdt: 0, version: 1,
@@ -317,11 +330,10 @@ test.each([zh, en, vietnamese])("a fresh pane reads the provider reason through 
       user: { userId: 7, countryCode: "+86", phone: "13800000007", nickname: "Test", onboardingComplete: true } }); return vault;
   })(), transport: { request } }));
   const rows = await api.listVietQrIntents(), readback = await api.getVietQrIntent(snapshot.intentNo);
-  expect(readback.providerReason).toBe(snapshot.providerReason);
+  expect(readback.providerReason).toBe(snapshot.providerReason); expect(readback.usdtAmount).toBe(37.12);
   const project = new Function("snapshot", `${storeScript}; return remoteVietQrIntent(snapshot);`);
   view.dep.intents = rows.map(item => project(item));
-  const copy = fmt(messages.bankPane.providerReason, { reason: snapshot.providerReason });
-  expect(await view.html()).toContain(copy);
+  expect(await view.html()).not.toContain(snapshot.providerReason);
   expect(view.state.createError.value).toBe("");
   expect(request.mock.calls.every(args => args[0].method === "GET")).toBe(true);
   expect(view.dep.createRemoteBankIntent).not.toHaveBeenCalled(); expect(view.open).not.toHaveBeenCalled();
@@ -403,8 +415,19 @@ test.each(["20.00", "20.", "20.001"])("recovery keeps the raw edited amount %s t
   expect(flow.storage.read()).toEqual(beforeReturn);
   expect(flow.requests).toHaveBeenCalledOnce();
   expect(returned.dep.intents).toEqual([]);
-  if (rawAmount === "20.001") {
+  if (rawAmount.includes(".")) {
     expect(returned.state.amountError).toMatchObject({ value: zh.bankPane.amountFormatError });
+    click(action(remounted.root, "nx-bank-create-cta")!);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(flow.requests).toHaveBeenCalledOnce();
+    expect(flow.storage.read()).toEqual(beforeReturn);
+    (input(remounted.root)!.props.onInput as (event: unknown) => void)({ detail: { value: "20" } });
+    await Vue.nextTick();
+    click(action(remounted.root, "nx-bank-create-cta")!);
+    await vi.advanceTimersByTimeAsync(600); await Vue.nextTick();
+    expect(flow.requests).toHaveBeenCalledTimes(2);
+    expect(flow.requests.mock.calls[1][0].body).toMatchObject({ usdtAmount: 20 });
+    expect(returned.dep.bankRecoveryDraft).toBeNull();
   } else {
     click(action(remounted.root, "nx-bank-create-cta")!);
     await vi.advanceTimersByTimeAsync(600); await Vue.nextTick();
@@ -423,12 +446,12 @@ test("account changes clear the visible recovery input and reject another accoun
   click(action(mounted.root, "nx-bank-setup-recovery")!);
   first.auth.accountId = "user:8"; first.app.accountKey = "user:8"; first.app.accountBindingEpoch++;
   await Vue.nextTick();
-  expect(input(mounted.root)!.props.value).toBe("25");
+  expect(input(mounted.root)!.props.value).toBe("");
   first.state.goCreateRecovery();
   expect(first.navTo).toHaveBeenCalledOnce();
   mounted.unmount();
   const returned = pane("rejected", zh, first), remounted = returned.mount();
-  expect(input(remounted.root)!.props.value).toBe("25");
+  expect(input(remounted.root)!.props.value).toBe("");
   expect(first.dep.createRemoteBankIntent).toHaveBeenCalledOnce();
 });
 
@@ -484,7 +507,7 @@ test.each([zh, en, vietnamese])("a resumed rejected order offers explicit retry,
   expect(html).toContain(messages.bankPane.regenCta);
   expect(html).toContain(messages.bankPane.newTopupCta);
   expect(html).not.toContain(messages.bankPane.hostedPendingNote);
-  expect(html).not.toContain(fmt(messages.bankPane.countdown, { time: "06:00" }));
+  expect(html.replace(/<[^>]+>/g, "")).not.toContain(fmt(messages.bankPane.countdown, { time: "06:00" }));
   expect(html).toContain("nx-bank-regen-cta");
   expect(html).toContain("nx-bank-new-topup-cta");
   expect(html).not.toMatch(/nx-bank-(?:create|hosted-continue|cancel)-cta/);
@@ -500,7 +523,8 @@ test.each(["pending", "submit_unknown", "not_submitted", undefined] as const)("%
   view.dep.intents[0].providerStatus = status;
   const html = await view.html();
   expect(html).toContain(zh.bankPane.hostedPendingNote);
-  expect(html).toContain(fmt(zh.bankPane.countdown, { time: "06:00" }));
+  // The ring caption sets the time in its own run; compare the visible text.
+  expect(html.replace(/<[^>]+>/g, "")).toContain(fmt(zh.bankPane.countdown, { time: "06:00" }));
   expect(html).not.toContain(zh.bankPane.hostedRejectedNote);
   expect(html).not.toContain("nx-bank-regen-cta");
   expect(html).not.toContain("nx-bank-new-topup-cta");
@@ -542,7 +566,7 @@ test("the rejected-order new top-up entry preserves the order and creates a diff
   expect(view.state.createError.value).toBe("");
   expect(errorBanner(mounted.root)).toBeUndefined();
   expect(view.dep.intents).toEqual([original]);
-  const amountInput = action(mounted.root, "tabular-nums")!;
+  const amountInput = action(mounted.root, "nx-bank-amt")!;
   expect(amountInput.kind).toBe("input");
   (amountInput.props.onInput as (event: unknown) => void)({ detail: { value: "26" } });
   view.dep.intents = [{ ...original }, { ...original, intentId: "VQR-older", status: "expired" }];
@@ -701,6 +725,8 @@ test.each(["cancelled", "return_pending"] as const)("a real %s form submits with
   expect(view.state.paneView.value).toBe("form");
   expect(mounted.retry()).toBeUndefined();
   expect(errorBanner(mounted.root)).toBeDefined();
+  (input(mounted.root)!.props.onInput as (event: unknown) => void)({ detail: { value: "25" } });
+  await Vue.nextTick();
   const submit = action(mounted.root, "nx-bank-create-cta")!;
   expect(submit.props["aria-disabled"]).toBe(false);
   click(submit);

@@ -1,12 +1,21 @@
+import { computeV2Copy } from "@/i18n/compute-v2";
+vi.mock("@/services/native-push", () => ({ revokeNativePush: vi.fn(), resumeNativePush: vi.fn() }));
+import * as progress from "@/lib/task-progress";
 import * as Vue from "vue";
+import * as tabLifecycle from "@/composables/use-tab-page-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
+import { canControlDevice } from "@/lib/device-control-platform";
+import { deviceStatisticsCapabilityCopy } from "@/i18n/device-statistics-capability";
 import type { Component } from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import ts from "typescript";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+vi.mock("@dcloudio/uni-app", () => ({ onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn(), onUnload: vi.fn(), onBackPress: vi.fn() }));
 import source from "./device-detail.vue?raw";
 import cardSource from "../../components/earn/device-card-pc.vue?raw";
 import sheetSource from "../../components/earn/capacity-explainer-sheet.vue?raw";
+import buttonSource from "../../components/ui/nx-button.vue?raw";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import * as deadline from "@/lib/server-deadline-clock";
@@ -37,6 +46,7 @@ function component(raw: string, id: string, dependencies: Record<string, unknown
   }).outputText;
   const module = { exports: {} as { default: Component } };
   new Function("require", "module", "exports", code)((key: string) => {
+    if (key === "@/composables/use-tab-page-lifecycle") return tabLifecycle;
     if (!(key in dependencies)) throw new Error(`Unexpected device-detail import: ${key}`);
     return dependencies[key];
   }, module, module.exports);
@@ -68,7 +78,7 @@ const unmounts: Array<() => void> = [];
 const now = 1_800_000_000_000;
 const day = 86_400_000;
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); useCapacityExplainer().close(); });
-afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); useCapacityExplainer().close(); vi.useRealTimers(); });
+afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); useCapacityExplainer().close(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 // Existing E3 server-device contract shape; only static render inputs, no requests.
 function serverDevice(overrides: Partial<Device> = {}): Device {
@@ -94,35 +104,45 @@ async function mount(copy: Messages, device = serverDevice()) {
   const setPhoneRuntime = vi.fn();
   const request = { accountKey: "render-only", epoch: 0 };
   const refreshRemoteFleet = vi.fn().mockResolvedValue(true);
+  const handleDeactivate = vi.fn();
   const onShow: Array<() => void> = [];
   const app = Vue.reactive({ accountKey: request.accountKey, accountBindingEpoch: request.epoch,
     visibleDevices: [device], remoteFleetStatus: "ready", remotePhoneBindingInvalid: false,
-    setPhoneRuntime, refreshRemoteFleet, captureRemoteAccountRequest: vi.fn(() => ({ ...request })) });
+    setPhoneRuntime, refreshRemoteFleet, setTaskReadPageVisible: vi.fn(), captureRemoteAccountRequest: vi.fn(() => ({ ...request })) });
   const passthrough = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("view", slots.default?.()) });
   const blank = Vue.defineComponent({ setup: () => () => Vue.h("view") });
   const sfc = (value: Component) => ({ __esModule: true, default: value });
-  const dependencies: Record<string, unknown> = {
+  const dependencies: Record<string, unknown> = { '@/store/data-visibility': { useDataVisibility: () => ({ hidden: false, mask: String }) },
+    "@/lib/device-control-platform": { canControlDevice },
     "@/lib/amount-display": { formatAmount },
+    "@/lib/usd-display": { formatUsd },
+    "@/i18n/device-statistics-capability": { useDeviceStatisticsCapabilityCopy: () => Vue.ref(deviceStatisticsCapabilityCopy[copy === zh ? "zh" : copy === vietnamese ? "vi" : "en"]) },
     vue: Vue, "@dcloudio/uni-app": { onLoad: (callback: (query: object) => void) => callback({ id: device.id }),
-      onShow: (callback: () => void) => onShow.push(callback) },
+      onShow: (callback: () => void) => onShow.push(callback), onHide: vi.fn(), onUnload: vi.fn(), onBackPress: vi.fn() },
     "@/components/app-chassis.vue": sfc(passthrough), "@/components/empty-state.vue": sfc(blank),
     "@/components/sub-page-header.vue": sfc(blank), "@/components/home/device-slot.vue": sfc(blank),
+    "@/components/liquid-glass.vue": sfc(blank), "@/components/ui/nx-tag.vue": sfc(blank),
+    "@/components/me/device-deactivate-sheet.vue": sfc(blank),
+    "@/composables/use-device-deactivation": { useDeviceDeactivation: () => ({ sheetDevice: Vue.ref(null), handleDeactivate, onSheetWait: vi.fn(), onSheetForce: vi.fn() }) },
+    "@/composables/use-tradein-strip": { useTradeinStrip: () => ({ tradeinStrip: () => ({}), handleTradein: vi.fn() }) },
     "@/store/app": { useApp: () => app },
     "@/store/session": { useSession: () => ({ isCurrentDeviceCalibrated: () => true }) },
     "@/store/config": { useConfig: () => ({ config: { onlineBonus: {} } }) },
     "@/store/earn-config": { prepareEarnConfig: () => {}, useEarnConfig: () => ({ lockedTeasers: () => [], averageEligibleReward: () => 1 }) },
-    "@/lib/native-phone-runtime": { hasNativeAndroidPhoneRuntime: () => true },
+    "@/lib/native-phone-runtime": { hasNativeAndroidPhoneRuntime: () => true, hasNativePhoneRuntime: () => true, nativePhonePlatform: () => null },
     "@/api/runtime": { remoteApiEnabled: true }, "@/i18n/use-t": { useT: () => Vue.ref(copy) },
     "@/lib/route": { navTo, navBack: vi.fn(), takeNavigationQuery: () => "" },
     "@/composables/use-capacity-explainer": { useCapacityExplainer },
     "@/composables/use-dialog-a11y": { useDialogA11y }, "@/lib/server-deadline-clock": deadline,
     "@/lib/phone-activation-guidance": phoneGuidance, "@/store/device-types": deviceTypes,
-    "@/lib/workload-label": workload, "@/lib/task-result-confirmation": confirmation,
+    "@/components/earn/task-v2-status.vue": sfc(blank),
+    "@/lib/workload-label": workload, "@/lib/task-result-confirmation": confirmation, "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, "@/lib/task-progress": progress,
     "@/lib/device-copy": deviceCopy, "@/store/device-lifecycle": lifecycle, "@/store/interrupt": interrupt,
     "@/lib/hashpower": hashpower, "@/lib/device-capability": capability,
     "@/lib/today-completed-tasks": completions, "@/lib/device-detail-navigation": detailNavigation,
     "@/i18n/format": { fmt },
   };
+  dependencies["@/components/ui/nx-button.vue"] = sfc(component(buttonSource, "detail-button", dependencies));
   dependencies["@/components/earn/device-card-pc.vue"] = sfc(component(cardSource, "detail-card", dependencies));
   dependencies["@/components/earn/capacity-explainer-sheet.vue"] = sfc(component(sheetSource, "detail-explainer", dependencies));
   const root = node();
@@ -136,8 +156,34 @@ async function mount(copy: Messages, device = serverDevice()) {
   expect(refreshRemoteFleet).toHaveBeenCalledExactlyOnceWith(request);
   // The page's initial authority read is required; sheet interactions must not reread it.
   refreshRemoteFleet.mockClear();
-  return { root, device, navTo, setPhoneRuntime, refreshRemoteFleet };
+  return { root, device, navTo, handleDeactivate, setPhoneRuntime, refreshRemoteFleet };
 }
+
+test.each([en, zh, vietnamese])("shows supported device statistics and current status without inventing history", async copy => {
+  const device = Vue.reactive(serverDevice({ todayEarnings: 0.00032, cumulativeEarningsUsdt: 1234.56789 }));
+  const view = await mount(copy, device);
+  const statistics = find(view.root, "device-statistics")!;
+  const capabilityCopy = deviceStatisticsCapabilityCopy[copy === zh ? "zh" : copy === vietnamese ? "vi" : "en"];
+  expect(text(statistics)).toContain("<$0.01");
+  expect(text(statistics)).toContain("$1,234.57");
+  expect(text(find(view.root, "device-statistics__scope")!)).toBe(capabilityCopy.scope);
+  expect(text(find(view.root, "device-statistics__status")!)).toContain(copy.earn.online);
+  expect(find(view.root, "device-status-online")).toBeDefined();
+  expect(text(statistics)).not.toContain(copy.coreReview.historyUnavailable);
+  expect(text(statistics)).not.toContain(copy.coreReview.onlineRateUnavailable);
+  device.runtimeStatus = "ONLINE"; await Vue.nextTick();
+  expect(text(find(view.root, "device-statistics__status")!)).toContain("Online");
+  expect(find(find(view.root, "device-management-heading")!, "device-status-online")).toBeDefined();
+  expect(find(find(view.root, "device-statistics__status")!, "device-status-online")).toBeDefined();
+  device.runtimeStatus = "UNKNOWN"; await Vue.nextTick();
+  expect(text(find(view.root, "device-statistics__status")!)).toContain(copy.earn.online);
+  expect(find(view.root, "device-status-online")).toBeDefined();
+  device.runtimeStatus = "ONLINE"; device.currentTask!.status = "PAUSED"; await Vue.nextTick();
+  expect(text(find(view.root, "device-statistics__status")!)).toContain(copy.earn.online);
+  expect(find(view.root, "device-status-online")).toBeDefined();
+  expect(device.todayEarnings).toBe(0.00032);
+  expect(device.cumulativeEarningsUsdt).toBe(1234.56789);
+});
 
 async function fire(target: Host, event: "click" | "Enter" | " ") {
   const nativeEvent = { key: event, stopPropagation: vi.fn(), preventDefault: vi.fn() };
@@ -154,7 +200,7 @@ for (const [locale, copy] of languages) {
     const original = JSON.stringify(view.device);
     const card = find(view.root, "nx-device-card")!;
     const originalCardText = text(card);
-    for (const value of ["CTA-pending", "$0.43", "$0.00", "0.00 NEX"]) expect(originalCardText).toContain(value);
+    for (const value of ["CTA-pending", "$0.425", "$0.00", "0.00 UVT"]) expect(originalCardText).toContain(value);
     const badge = find(view.root, "nx-device-explainer")!;
     expect(text(badge)).toBe(fmt(copy.earn.subsidyBadge, { n: 28 }));
     expect(find(view.root, "nx-capacity-explainer-root")).toBeUndefined();
@@ -178,14 +224,20 @@ for (const [locale, copy] of languages) {
   });
 }
 
-test.each([0, 1])("expired-subsidy capacity entry %s uses the same detail sheet", async index => {
+test.each([0, 1])("expired-subsidy capacity entry %s below 70%% uses the same detail sheet", async index => {
   const view = await mount(en, serverDevice({ capacitySubsidized: false, capacitySubsidyRemainingDays: 0,
-    capacitySubsidyEndsAt: null, capacityPct: 73.25, capacityAgeMonths: 5 }));
+    capacitySubsidyEndsAt: null, capacityPct: 64.5, capacityAgeMonths: 5 }));
   const entries = all(view.root).filter(entry => hasClass(entry, "nx-device-explainer"));
   expect(entries).toHaveLength(2);
   await fire(entries[index], "click");
   expect(find(view.root, "nx-capacity-explainer-root")?.props["aria-label"]).toBe(en.earn.capExplainTitle);
-  expect(view.device.capacityPct).toBe(73.25);
+  expect(view.device.capacityPct).toBe(64.5);
+});
+
+test("capacity at or above 70% shows no capacity tag", async () => {
+  const view = await mount(en, serverDevice({ capacitySubsidized: false, capacitySubsidyRemainingDays: 0,
+    capacitySubsidyEndsAt: null, capacityPct: 73.25, capacityAgeMonths: 5 }));
+  expect(all(view.root).filter(entry => hasClass(entry, "nx-capacity-tag"))).toHaveLength(0);
 });
 
 test("the existing sheet CTA closes then navigates to the store without business changes", async () => {
@@ -211,4 +263,27 @@ test("unknown remote capacity does not invent a subsidy/capacity entry", async (
   expect(find(view.root, "nx-capacity-explainer-root")).toBeUndefined();
   expect(useCapacityExplainer().visible.value).toBe(false);
   expect(view.device.capacityPct).toBeNull();
+});
+
+test('detail has one earnings summary, known totals, an accurate capability note, and a working management action', async () => {
+  const view = await mount(zh, serverDevice({ todayEarnings: 12.34, cumulativeEarningsUsdt: 567.89 }));
+  expect(find(view.root, 'nx-device-card__header')).toBeUndefined();
+  expect(all(view.root).filter(entry => entry.children.length === 0 && text(entry) === zh.earn.todayEarnings)).toHaveLength(1);
+  const stats = all(view.root).find(entry => entry.props.id === 'device-statistics')!;
+  expect(text(stats)).toContain('$12.34');
+  expect(text(stats)).toContain('$567.89');
+  expect(text(stats)).toContain(deviceStatisticsCapabilityCopy.zh.scope);
+  expect(text(stats)).not.toContain(zh.coreReview.historyUnavailable);
+  expect(text(stats)).not.toContain(zh.coreReview.onlineRateUnavailable);
+  expect(text(stats)).not.toContain('100%');
+  expect(text(view.root)).toContain(zh.coreReview.management);
+  expect(text(view.root)).toContain(zh.coreReview.jobs);
+  await fire(all(view.root).find(entry => entry.props['aria-label'] === zh.home.fleetManage)!, 'click');
+  expect(find(view.root, 'nx-device-quick-stats')).toBeUndefined();
+  await fire(find(view.root, 'nx-device-quick-deactivate')!, 'click');
+  await Vue.nextTick();
+  expect(find(view.root, 'nx-device-quick-menu')).toBeUndefined();
+  expect(view.handleDeactivate).toHaveBeenCalledExactlyOnceWith(view.device);
+  expect(view.navTo).not.toHaveBeenCalled();
+  expect(view.refreshRemoteFleet).not.toHaveBeenCalled();
 });

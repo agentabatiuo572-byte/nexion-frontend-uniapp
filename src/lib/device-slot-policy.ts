@@ -7,11 +7,7 @@ type SlotDevice = {
   pendingDeactivate?: boolean;
 };
 
-/** Every activated instance, including Cloud Share, occupies a server slot. */
-export function occupiesDeviceSlot(kind: DeviceKind): boolean {
-  return true;
-}
-
+/** Every activated instance keeps its slot until actual deactivation, including while waiting for its task. */
 export function isActiveSlotDevice(device: SlotDevice): boolean {
   return device.activatedAt !== null;
 }

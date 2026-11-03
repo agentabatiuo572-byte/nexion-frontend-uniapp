@@ -105,3 +105,42 @@ describe("notification unread summary contract", () => {
       .rejects.toMatchObject({ message: "NOTIFICATION_PAGE_INCONSISTENT" });
   });
 });
+
+describe("notification category pagination", () => {
+  it("sends a selected category before paging and accepts its last page with account-wide unread", async () => {
+    const request = vi.fn().mockResolvedValue({ items: [{ id: 7, kind: "wallet", priority: "normal", title: "Funds",
+      body: "", ctaLabel: "", ctaHref: "", createdAt: createdInstant, readAt: null }], nextCursor: null, unread: 203 });
+    const api = createNotificationApi({ request } as never);
+    expect(await api.page(undefined, 100, "finance")).toMatchObject({ nextCursor: null, unread: 203 });
+    expect(request).toHaveBeenLastCalledWith({ method: "GET", path: "/api/notifications?limit=100&category=finance" });
+    await api.page("7", 20, "finance");
+    expect(request).toHaveBeenLastCalledWith({ method: "GET", path: "/api/notifications?limit=20&category=finance&cursor=7" });
+  });
+
+  it("accepts an empty category while preserving legacy all-page consistency", async () => {
+    const request = vi.fn().mockResolvedValue({ items: [], nextCursor: null, unread: 1 });
+    const api = createNotificationApi({ request } as never);
+    expect(await api.page(undefined, undefined, "device")).toMatchObject({ items: [], unread: 1, nextCursor: null });
+    await expect(api.page()).rejects.toMatchObject({ message: "NOTIFICATION_PAGE_INCONSISTENT" });
+    expect(request).toHaveBeenLastCalledWith({ method: "GET", path: "/api/notifications?limit=100" });
+  });
+});
+
+
+describe("actionable notification authority", () => {
+  const requestPage = (extra: Record<string, unknown>, cursor?: string) => createNotificationApi({
+    request: vi.fn().mockResolvedValue({ items: [{ id: 1, kind: "marketing", priority: "normal", title: "Offer", body: "", ctaLabel: "", ctaHref: "", createdAt: createdInstant, readAt: null }], unread: 8, nextCursor: "older", ...extra }),
+  } as never).page(cursor);
+  it("keeps reading unread and actionable counts separate on every page", async () => {
+    expect(await requestPage({ actionableUnread: 3 })).toMatchObject({ unread: 8, actionableUnread: 3 });
+    expect(await requestPage({ actionableUnread: 3, nextCursor: null }, "older")).toMatchObject({ unread: 8, actionableUnread: 3 });
+    expect(await requestPage({ actionableUnread: 0 })).toMatchObject({ unread: 8, actionableUnread: 0 });
+  });
+  it("leaves older/unknown policy unknown, even with a full kind summary", async () => {
+    expect((await requestPage({ unreadByKind: { marketing: 8 } })).actionableUnread).toBeUndefined();
+    expect((await requestPage({ actionableUnread: null })).actionableUnread).toBeNull();
+  });
+  it.each([-1, 0.5, "0", true, {}, 9, Infinity, Number.MAX_SAFE_INTEGER + 1])("rejects invalid actionable count %j", async actionableUnread => {
+    await expect(requestPage({ actionableUnread })).rejects.toMatchObject({ message: "NOTIFICATION_ACTIONABLE_UNREAD_INVALID" });
+  });
+});

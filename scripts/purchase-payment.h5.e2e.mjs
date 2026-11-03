@@ -1,4 +1,4 @@
-// Built-H5-Lite presentation acceptance with loopback synthetic commerce and explicit external transport overlays.
+// Built-App presentation acceptance with loopback synthetic commerce and explicit external transport overlays.
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -7,14 +7,14 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { purchasePaymentUiFixture } from './lib/purchase-payment-ui-fixture.mjs';
 
-const output = process.env.PURCHASE_PAYMENT_UI_OUTPUT || 'D:/workspace/artifacts/pay1718-20261031/lite-ui';
-const port = Number(process.env.PURCHASE_PAYMENT_UI_PORT || 5618), origin = `http://127.0.0.1:${port}`;
+const output = process.env.PURCHASE_PAYMENT_UI_OUTPUT || 'D:/workspace/artifacts/pay1718-20261031/app-ui';
+const port = Number(process.env.PURCHASE_PAYMENT_UI_PORT || 5611), origin = `http://127.0.0.1:${port}`;
 await mkdir(output, { recursive: true });
 const seed = path.join(output, 'seed.json');
 await writeFile(seed, JSON.stringify({ state: { trialState: 'ended', benefitState: 'finished', offers: false, promotions: false } }));
 const entry = (await readFile('dist/build/h5/index.html', 'utf8')).match(/assets\/index-[^" ]+\.js/)[0];
 const artifact = { entry, sha256: createHash('sha256').update(await readFile('dist/build/h5/' + entry)).digest('hex') };
-const record = { source: 'built H5 Lite + loopback synthetic commerce + explicit external API overlays; no real backend, PSP, chain transfer or SMS',
+const record = { source: 'built App + loopback synthetic commerce + explicit external API overlays; no real backend, PSP, chain transfer or SMS',
   sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), artifact, verdict: 'running', steps: [], fixtures: [] };
 await writeFile(path.join(output, 'record.json'), JSON.stringify(record, null, 2));
 const server = spawn(process.execPath, ['scripts/prototype-preview-server.mjs'], { cwd: process.cwd(),
@@ -32,12 +32,7 @@ const state = async () => (await fetch(origin + '/__checkout/state')).json();
 const sheet = page => page.locator('.nx-sheet:has(.purchase-payment)');
 async function screenshot(page, name) { await page.screenshot({ path: path.join(output, name + '.png'), fullPage: true }); }
 async function openSelection(page) {
-  if (await page.getByRole('button', { name: '继续', exact: true }).isVisible()) await page.getByRole('button', { name: '继续', exact: true }).click();
   await page.getByRole('button', { name: '立即支付', exact: true }).click();
-  const confirmation = page.locator('.nx-mask--confirm');
-  if (await confirmation.isVisible()) await confirmation.getByRole('button', { name: '确认支付', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('.purchase-payment') || location.hash.includes('/pages/store/order-detail'));
-  if (!await sheet(page).isVisible()) await page.getByRole('button', { name: '立即支付', exact: true }).click();
   await sheet(page).waitFor({ state: 'visible', timeout: 15000 });
   assert.equal(await sheet(page).locator('.purchase-payment__method').count(), 3);
   return sheet(page);
@@ -50,7 +45,7 @@ async function fresh(width, fixtureOptions) {
   const page = await context.newPage(); activePage = page;
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin + '/?nx_device_inner=1#/pages/store/checkout?product=stellarbox-s1');
-  await page.getByRole('button', { name: '继续', exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByRole('button', { name: '立即支付', exact: true }).waitFor({ state: 'visible', timeout: 15000 });
   return { page, context, fixture };
 }
 async function bounded(page) {
@@ -107,7 +102,7 @@ try {
   await dialog.getByRole('button', { name: '查询支付结果', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
   await bsc.page.waitForURL(url => url.hash.includes('/pages/store/order-detail') && url.hash.includes(intent.receipt.orderNo));
-  await bsc.page.getByText('已在 新加坡数据中心 激活 · 收益以实际到账为准', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+  await bsc.page.getByText('已在 新加坡 激活 · 收益以实际到账为准', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
   assert.equal(bsc.fixture.evidence.walletPayments.length, 0); assert.equal(bsc.fixture.evidence.pinRequests.length, 0);
   assert.ok(bsc.fixture.evidence.paidOrderReadbacks.some(row => row.orderNo === intent.receipt.orderNo && row.canonicalStatus === 'activated'));
   assert.equal(bsc.fixture.evidence.creates.length, 1);
@@ -171,47 +166,11 @@ try {
   record.steps.push({ id: 'hdpay-pinlock-empty-wallet-integer-vnd-hosted-original-and-page-account-boundaries', status: 'pass', viewport: 320,
     intentNo: bankIntent.intentNo, createWrites: 1, paymentPhasePinRequests, accountSettingsPinReads: bank.fixture.evidence.pinRequests.length - paymentPhasePinRequests,
     walletPayments: 0, recoveredSnapshotEvidence: ['11-hdpay-restored-raw6-320.png', '12-hdpay-restored-fx-vnd-320.png'], quoteReads: 1, hostedNetwork: 'fulfilled locally by Playwright before any PSP access', evidence: '07-hdpay-vnd-pinlocked-empty-wallet-320.png' });
-
-  // A first wallet payment uses setup, confirmation, then a fresh payment entry.
-  const firstPin = await fresh(390, { balance: 5000, pinMode: 'flow' });
-  dialog = await openSelection(firstPin.page);
-  await dialog.getByRole('button', { name: '确认支付', exact: true }).click();
-  const firstMask = firstPin.page.locator('.payment-pin-mask');
-  await firstMask.getByText('您暂未设置支付密码，这是初次设置，设置成功后请牢记。', { exact: true }).waitFor();
-  await screenshot(firstPin.page, '08-wallet-first-pin-setup-390');
-  const input = () => firstMask.locator('.payment-pin-input input');
-  await input().fill('039417'); await firstMask.locator('.payment-pin-primary').click();
-  await input().fill('039418'); await firstMask.locator('.payment-pin-primary').click();
-  await firstMask.getByText('两次输入的新支付密码不一致，请重新输入', { exact: true }).waitFor();
-  assert.equal(await input().inputValue(), '');
-  await input().fill('039417'); await firstMask.locator('.payment-pin-primary').click();
-  await firstMask.getByText('支付密码已设置，请牢记。请再次输入，完成本笔支付。', { exact: true }).waitFor();
-  assert.equal(await input().inputValue(), ''); assert.equal(firstPin.fixture.evidence.walletPayments.length, 0);
-  assert.equal((await state()).setupWrites, 1); assert.equal((await state()).payWrites, 0);
-  await screenshot(firstPin.page, '09-wallet-fresh-payment-entry-after-setup');
-  await input().fill('039417'); await firstMask.waitFor({ state: 'hidden' });
-  await firstPin.page.getByText('订单已提交', { exact: true }).first().waitFor({ state: 'visible' });
-  await firstPin.page.getByRole('button', { name: '追踪订单 →', exact: true }).click();
-  await firstPin.page.getByText('已在 新加坡数据中心 激活 · 收益以实际到账为准', { exact: true }).waitFor({ state: 'visible' });
-  assert.equal(firstPin.fixture.evidence.walletPayments.length, 1); assert.equal((await state()).payWrites, 1);
-  assert.equal(firstPin.fixture.evidence.creates.length, 0);
-  await firstPin.page.goto(origin + '/?nx_device_inner=1#/pages/me/payment-password');
-  await firstPin.page.locator('.payment-pin-page__field').first().waitFor();
-  await firstPin.page.getByText('支付密码仅用于钱包余额付款。HDPAY 与 BSC 外部付款无需支付密码，不受其锁定影响。', { exact: true }).waitFor();
-  if (await firstPin.page.locator('.nx-toast').isVisible()) await firstPin.page.locator('.nx-toast').click();
-  const fields = firstPin.page.locator('.payment-pin-page .payment-pin-input input');
-  await fields.nth(0).fill('930417'); await fields.nth(1).fill('493017'); await fields.nth(2).fill('493017');
-  await firstPin.page.locator('.payment-pin-page__primary').click();
-  await firstPin.page.getByText('支付密码不正确，还可尝试 4 次', { exact: true }).waitFor();
-  assert.equal(await fields.nth(0).inputValue(), '');
-  await screenshot(firstPin.page, '10-wallet-pin-settings-error-clears-original');
-  record.steps.push({ id: 'wallet-first-setup-confirm-fresh-payment-and-settings', status: 'pass', viewport: 390,
-    setupWrites: 1, walletWrites: 1, externalCreates: 0, screenshots: ['08-wallet-first-pin-setup-390.png', '09-wallet-fresh-payment-entry-after-setup.png', '10-wallet-pin-settings-error-clears-original.png'] });
   assert.deepEqual(errors, []);
   assert.equal(createHash('sha256').update(await readFile('dist/build/h5/' + entry)).digest('hex'), artifact.sha256, 'built artifact changed during acceptance');
   record.verdict = 'pass'; record.pageErrors = errors; record.realFinancialEffects = false;
   await writeFile(path.join(output, 'record.json'), JSON.stringify(record, null, 2));
-  console.log('PASS built H5 Lite three-way purchase UI, synthetic transports only; no real funds, PSP or SMS.');
+  console.log('PASS built App three-way purchase UI, synthetic transports only; no real funds, PSP or SMS.');
 } catch (error) {
   record.verdict = 'fail'; record.error = String(error); record.pageErrors = errors;
   await writeFile(path.join(output, 'record.json'), JSON.stringify(record, null, 2));

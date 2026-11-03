@@ -4,7 +4,7 @@
 // 现场(2026-08-13 对齐轮):verify.sh 里这一族哨兵钉的是**具体函数名**
 //   `useConversations().reset()` / `writeAccountRow` / `useXxx().bindAccount(accountKey)`。
 // 而实现换了机制之后,同一条不变量用**更严**的方式满足了,哨兵却全红:
-//   · tickets —— 改成按「账号 + 运行会话」双维拼持久化键(比单账号维更严);
+//   · tickets —— 用户工单已退役(2026-10-28),不再有客户端 store;
 //   · weekly-quest —— 改成服务端权威 + 版次围栏(切号清内存重取,本地不落盘);
 //   · conversations —— 从 reset() 改成 bindAccount(accountKey)。
 // 钉函数名 = 钉「我以为它会长的那个样子」,换一种更好的写法就误报。

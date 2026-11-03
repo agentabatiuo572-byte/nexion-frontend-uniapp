@@ -83,7 +83,7 @@
 
       <!-- Trial-cycle progress -->
       <view class="mt-3 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
-        <view class="h-full rounded-full" :style="{ width: progressPct + '%', background: tint }" />
+        <view v-viz-inview class="h-full rounded-full nx-viz-grow" :style="{ width: progressPct + '%', background: tint }" />
       </view>
 
       <!-- Bottom row — early-buy savings (left) + de-emphasized buy pill (right) -->
@@ -107,12 +107,14 @@
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import { computed, ref } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
 import { useTrialConfig, computeDiscountedPrice } from "@/store/trial-config";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { trialCardLabels } from "@/lib/trial-card-copy";
+import { formatTrialRemaining } from "@/i18n/core-review";
 
 const ONE_DAY = 86_400_000;
 
@@ -121,15 +123,7 @@ const trialCfg = useTrialConfig();
 const t = useT();
 
 const now = ref(Date.now());
-let timer: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
-  timer = setInterval(() => {
-    now.value = Date.now();
-  }, 1000);
-});
-onUnmounted(() => {
-  if (timer) clearInterval(timer);
-});
+useVisibleInterval(() => { now.value = Date.now(); }, 1000);
 
 const visible = computed(() => trial.status === "active" || trial.status === "grace");
 const trialLabels = computed(() => trialCardLabels(trial.status, t.value.trial));
@@ -159,15 +153,7 @@ const tint = computed(() =>
   trial.status === "grace" ? "var(--v5-warning)" : "var(--v5-brand-2)",
 );
 
-const etaLabel = computed(() => {
-  const m = ms.value;
-  const days = Math.floor(m / ONE_DAY);
-  const hours = Math.floor((m % ONE_DAY) / 3_600_000);
-  const minutes = Math.floor((m % 3_600_000) / 60_000);
-  return days > 0
-    ? `${days}d ${String(hours).padStart(2, "0")}h`
-    : `${hours}h ${String(minutes).padStart(2, "0")}m`;
-});
+const etaLabel = computed(() => formatTrialRemaining(ms.value, t.value.coreReview));
 
 const progressPct = computed(() => {
   const cfg = trialCfg.config;

@@ -128,6 +128,7 @@ import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { commerceCopy } from '@/lib/commerce-review';
 import PromotionAction from '@/components/promotion/promotion-action.vue';
 import NxSheet from '@/components/ui/nx-sheet.vue';
+import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import { computed,ref,shallowRef,watch,onMounted,onBeforeUnmount } from 'vue';
@@ -634,17 +635,17 @@ onBeforeUnmount(()=>{hide();alive=false;if(timer)clearInterval(timer);if(walletT
 <style scoped>
 .promotion-main { padding-bottom:140px; }
 .promotion-main--result { padding-bottom:var(--ui-space-inset); min-height:calc(100dvh - var(--nx-overlay-top) - var(--ui-space-section-gap) * 3); box-sizing:border-box; }
-.checkout-review-title { display:block; margin:var(--v5-space-2) 0; font:var(--ui-type-page-title-weight, 600) var(--ui-type-page-title, 24px)/var(--ui-type-page-title-lh, 32px) var(--font-v5); color:var(--v5-ink); }
+.checkout-review-title { display:block; margin:var(--v5-space-2) 0; font:var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); color:var(--v5-ink); }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:22px; background:var(--ui-content-surface); }
 .checkout-section { min-width:0; }
-.checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section, 17px)/20px var(--font-v5); }
+.checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); }
 .checkout-product-line { display:grid; grid-template-columns:68px minmax(0,1fr); align-items:center; gap:var(--ui-space-row-y) var(--ui-space-inset); padding:var(--ui-space-section) var(--ui-space-inset); border-color:color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-product-art { display:grid; place-items:center; width:68px; height:68px; border-radius:16px; overflow:hidden; }
 .checkout-product-art .promotion-image { width:74px; height:74px; }
 .checkout-discount-row { display:flex; align-items:center; gap:var(--ui-space-inline); min-height:64px; box-sizing:border-box; padding:var(--ui-space-inline) var(--ui-space-inset); border-bottom:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-discount-row:last-child { border-bottom:0; }
 .checkout-discount-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); color:var(--v5-ink-2); }
-.checkout-discount-title { display:block; font:500 var(--ui-type-list-title, 15px)/20px var(--font-v5); overflow-wrap:anywhere; }
+.checkout-discount-title { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
 .checkout-discount-description { display:block; margin-top:2px; font:400 13px/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
 .checkout-discount-chevron { flex:none; color:var(--v5-ink-4); }
 .checkout-voucher-row { gap:12px; color:var(--v5-ink); }
@@ -656,26 +657,26 @@ onBeforeUnmount(()=>{hide();alive=false;if(timer)clearInterval(timer);if(walletT
 .checkout-rewards :deep(.promotion-row) { align-items:center; min-height:64px; box-sizing:border-box; padding:10px 16px; }
 .checkout-rewards :deep(.promotion-symbol) { display:grid; place-items:center; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); color:var(--v5-ink-2); }
 .checkout-rewards :deep(.promotion-symbol svg) { width:18px; height:18px; }
-.checkout-rewards :deep(.promotion-grow > text:not([class])),.checkout-rewards :deep(.promotion-grow > uni-text:not([class])) { font:500 var(--ui-type-list-title, 15px)/20px var(--font-v5) !important; }
-.checkout-rewards :deep(.promotion-copy) { margin-top:2px; font:400 var(--ui-type-list-subtitle, 13px)/18px var(--font-v5); }
+.checkout-rewards :deep(.promotion-grow > text:not([class])),.checkout-rewards :deep(.promotion-grow > uni-text:not([class])) { font:500 var(--ui-type-list-title)/20px var(--font-v5) !important; }
+.checkout-rewards :deep(.promotion-copy) { margin-top:2px; font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); }
 .checkout-reward-terms { margin:0 16px 0 64px; }
 .checkout-discount-value { color:var(--v5-brand); font-variant-numeric:tabular-nums; }
 .checkout-discount-row .checkout-discount-value { flex-shrink:0; max-width:45%; overflow-wrap:anywhere; text-align:right; font:600 15px/20px var(--font-v5); }
 .checkout-wallet { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:var(--ui-space-inline); padding:var(--ui-space-inset); }
-.checkout-wallet-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:var(--ui-radius-icon, 12px); color:var(--v5-brand); background:var(--ui-content-surface-2); }
+.checkout-wallet-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:var(--ui-radius-icon); color:var(--v5-brand); background:var(--ui-content-surface-2); }
 .checkout-wallet-details { min-width:0; }
 .checkout-wallet-balance { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--v5-space-1) var(--v5-space-2); margin-top:var(--v5-space-1); }
-.checkout-wallet-label,.checkout-wallet-state { font:400 var(--ui-type-list-subtitle, 13px)/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
-.checkout-wallet-amount { font-size:var(--ui-type-list-title, 15px); font-weight:600; line-height:1.5; color:var(--v5-ink); overflow-wrap:anywhere; }
-.checkout-wallet-topup { display:flex; align-items:center; justify-content:flex-end; gap:var(--v5-space-1); min-width:44px; min-height:44px; color:var(--v5-brand); font:500 var(--ui-type-list-subtitle, 13px)/18px var(--font-v5); cursor:pointer; }
+.checkout-wallet-label,.checkout-wallet-state { font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
+.checkout-wallet-amount { font-size:var(--ui-type-list-title); font-weight:600; line-height:1.5; color:var(--v5-ink); overflow-wrap:anywhere; }
+.checkout-wallet-topup { display:flex; align-items:center; justify-content:flex-end; gap:var(--v5-space-1); min-width:44px; min-height:44px; color:var(--v5-brand); font:500 var(--ui-type-list-subtitle)/18px var(--font-v5); cursor:pointer; }
 .checkout-wallet-topup svg { flex:none; }
 .checkout-wallet-topup:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
-.checkout-wallet-recovery { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--v5-space-2); margin:0 var(--ui-space-inset); border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:400 var(--ui-type-list-subtitle, 13px)/18px var(--font-v5); }
+.checkout-wallet-recovery { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--v5-space-2); margin:0 var(--ui-space-inset); border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); }
 .checkout-fees { padding:6px 16px; }
 .checkout-fees .promotion-summary { box-sizing:border-box; align-items:center; min-height:calc(var(--ui-space-inset) * 3); font-variant-numeric:tabular-nums; border-bottom:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); }
 .checkout-fees .promotion-summary:last-child { border-bottom:0; }
 .checkout-fees .promotion-summary > :last-child { max-width:65%; }
-.checkout-item-name { display:block; font:500 var(--ui-type-list-title, 15px)/20px var(--font-v5); overflow-wrap:anywhere; }
+.checkout-item-name { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
 .checkout-line-price { display:block; margin-top:6px; line-height:1.5; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .checkout-voucher-options { display:flex; flex-direction:column; gap:var(--ui-space-inline); }
 .checkout-voucher-option { align-items:flex-start; flex-direction:column; gap:6px; text-align:left; }

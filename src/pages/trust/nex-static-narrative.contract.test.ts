@@ -13,7 +13,7 @@ const contracts: readonly LocaleContract[] = [
   {
     file: "../../i18n/messages/zh.ts",
     expected: [
-      "UVT 的发放和兑换以已发布规则和真实记录为准，平台不承诺价格。",
+      "你可以通过以下方式获得 UVT：",
       "在兑换页按当前报价兑换，每日有兑换额度。",
     ],
     faqExpected: "需要先在兑换页面将 UVT 换成 USDT，再按可用渠道提现。每日兑换上限可能适用。",
@@ -22,7 +22,7 @@ const contracts: readonly LocaleContract[] = [
   {
     file: "../../i18n/messages/en.ts",
     expected: [
-      "UVT issuance and exchange follow the published rules and actual records. We do not promise a price.",
+      "You can earn UVT in these ways:",
       "Exchange at the current quote on the exchange page. A daily limit applies.",
     ],
     faqExpected: "First exchange UVT for USDT on the exchange page, then withdraw USDT through an available channel. Daily exchange caps may apply.",
@@ -31,7 +31,7 @@ const contracts: readonly LocaleContract[] = [
   {
     file: "../../i18n/messages/vi.ts",
     expected: [
-      "Việc phát hành và quy đổi UVT theo các quy tắc đã công bố và bản ghi thực tế; nền tảng không cam kết kết quả về giá.",
+      "Bạn có thể nhận UVT theo các cách sau:",
       "Quy đổi theo báo giá hiện tại trên trang quy đổi. Có hạn mức mỗi ngày.",
     ],
     faqExpected: "Trước hết, hãy đổi UVT sang USDT trên trang Quy đổi, sau đó rút USDT qua kênh hiện có. Hạn mức quy đổi hằng ngày có thể áp dụng.",
@@ -40,7 +40,8 @@ const contracts: readonly LocaleContract[] = [
 ];
 
 describe("NEX static narrative contract", () => {
-  it("uses published rules and actual records for issuance in every supported locale", () => {
+  // Copy audit 2026-10-29 (9dd4d088): issuance is a plain list of earning sources, no schedule or promise.
+  it("introduces UVT through its earning sources in every supported locale", () => {
     for (const contract of contracts) {
       const source = readFileSync(new URL(contract.file, import.meta.url), "utf8");
       expect(source).toContain(contract.expected[0]);

@@ -1,5 +1,13 @@
 import * as Vue from "vue";
-import { formatAmount } from "@/lib/amount-display";
+import { teamRedesignCopy } from '@/i18n/team-redesign';
+import { createPinia } from 'pinia';
+import { useDataVisibility } from '@/store/data-visibility';
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { networkReauditCopy } from "@/i18n/network-reaudit";
+import { commissionFilterCopy } from "@/i18n/commission-filter-copy";
+import { teamRuleGuideCopy } from '@/components/team/team-rule-guide-copy';
+import { commissionPublishedBlocks } from '@/components/team/team-rule-commission-copy';
+import { ruleDocument, ruleHero, ruleSection } from '@/components/team/team-rule-guide.test-support';
 import type { Component } from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
 import ts from "typescript";
@@ -14,6 +22,7 @@ import { formatTrialDate } from "@/lib/trial-date";
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { buildCommissionsHowContent, createCommissionsHowResource, COMMISSIONS_HOW_SLOTS, type CommissionsHowSnapshot } from "@/lib/commissions-how-content";
 import type { CommissionEvent, CommissionKind } from "@/store/commission";
+import type { TeamCommissionSnapshot } from "@/api/team-insights-api";
 
 // Mount the production page scripts/templates with isolated read boundaries.
 // The fixtures describe render states; they are not live server business facts.
@@ -42,7 +51,7 @@ const copyComponent = (name: string) => Vue.defineComponent({
   props: ["label", "title", "sub", "body", "q", "a"],
   setup: (props, { slots }) => () => Vue.h("view", { "data-component": name }, [
     ...Object.values(props).filter(value => value != null).map(value => Vue.h("text", String(value))),
-    ...(slots.default?.() ?? []),
+    ...(slots.default?.() ?? []), ...(slots.footer?.() ?? []),
   ]),
 });
 const emptyState = Vue.defineComponent({
@@ -52,13 +61,11 @@ const emptyState = Vue.defineComponent({
     props.ctaLabel ? Vue.h("view", { role: "button", onClick: () => emit("cta") }, String(props.ctaLabel)) : null,
   ]),
 });
-const segments = Vue.defineComponent({
-  props: ["modelValue", "options"], emits: ["update:modelValue"],
-  setup: (props, { emit }) => () => Vue.h("view", { role: "tablist" },
-    props.options.map((item: { value: string; label: string }) => Vue.h("view", {
-      role: "tab", "aria-selected": item.value === props.modelValue,
-      onClick: () => emit("update:modelValue", item.value),
-    }, item.label))),
+const sheet = Vue.defineComponent({
+  props: ["open", "title"], emits: ["close"],
+  setup: (props, { slots }) => () => props.open
+    ? Vue.h("view", { role: "dialog", "aria-label": props.title }, slots.default?.())
+    : null,
 });
 async function mount(source: string, dependencies: Record<string, unknown>) {
   const { descriptor } = parse(source);
@@ -69,13 +76,34 @@ async function mount(source: string, dependencies: Record<string, unknown>) {
   const exports = { default: {} as Component };
   const shows: Array<() => void> = [];
   const defaults: Record<string, unknown> = {
-    "@/lib/amount-display": { formatAmount },
+    '@/components/team/team-rule-guide-copy': { teamRuleGuideCopy },
+    '@/components/team/team-rule-commission-copy': { commissionPublishedBlocks },
+    // The guide passes its copy as props, so the shared rule components render for real.
+    '@/components/team/team-rule-hero.vue': ruleHero,
+    '@/components/team/team-rule-section.vue': ruleSection,
+    '@/components/team/team-rule-document.vue': ruleDocument,
+    '@/components/ui/nx-tag.vue': { default: slot },
+    '@/store/app': { useApp: () => Vue.reactive({ accountKey: 'user:A', accountBindingEpoch: 1 }) },
+    '@/store/auth': { useAuth: () => Vue.reactive({ isAuthenticated: true }) },
+    '@/store/locale': { useLocaleStore: () => Vue.reactive({ code: 'en' }) },
+    '@/lib/account-scope': { captureAccountScope: () => 1, isCurrentAccountScope: () => true },
+    "@/lib/amount-display": { formatAmount, formatGroupedAmount },
+    "@/i18n/network-reaudit": { networkReauditCopy },
+    "@/i18n/commission-filter-copy": { commissionFilterCopy }, "@/i18n/team-redesign": { teamRedesignCopy },
     "@/lib/trial-date": { formatTrialDate },
-    vue: Vue, "@dcloudio/uni-app": { onShow: (callback: () => void) => shows.push(callback) },
+    vue: Vue, "@dcloudio/uni-app": { onHide: () => {}, onShow: (callback: () => void) => shows.push(callback) },
     "@/components/app-chassis.vue": { default: slot },
+    "@/components/team/reward-page-surface.vue": { default: slot },
+    "@/components/team/reward-compact-hero.vue": { default: copyComponent("hero") },
+    "@/components/team/reward-rule-block.vue": { default: Vue.defineComponent({
+      props: ["label", "title", "sub", "body", "q", "a", "n"],
+      setup: (props, { slots }) => () => Vue.h("view", { "data-component": slots.default ? "section" : "rule" }, [
+        ...Object.values(props).filter(value => value != null).map(value => Vue.h("text", String(value))), ...(slots.default?.() ?? []),
+      ]),
+    }) },
     "@/components/sub-page-header.vue": { default: slot },
     "@/components/empty-state.vue": { default: emptyState },
-    "@/components/glass-segments.vue": { default: segments },
+    "@/components/ui/nx-sheet.vue": { default: sheet },
     ...Object.fromEntries(["hero", "section", "icon-row", "callout-box", "faq-row"].map(name => [
       `@/components/how/how-${name}.vue`, { default: copyComponent(name) },
     ])),
@@ -107,10 +135,10 @@ const event = (kind: CommissionKind): CommissionEvent => ({
   id: `fixture-${kind}`, kind, sourceUserName: `Event ${kind}`, amountUSDT: 7, amountNEX: 0,
   ts: 1790812800000, unlockAt: 1790812800000, status: "unlocked",
 });
-async function commissions(code: Locale = "en") {
+async function commissions(code: Locale = "en", visibility: Pick<ReturnType<typeof useDataVisibility>, 'hidden' | 'mask'> = { hidden: false, mask: String }) {
   const locale = Vue.ref(code);
   const commission = Vue.reactive({
-    eventsStatus: "idle", events: [] as CommissionEvent[], eventsEvidence: null, eventsTotalRows: 0,
+    eventsStatus: "idle", events: [] as CommissionEvent[], eventsEvidence: null as (Omit<Partial<TeamCommissionSnapshot>, 'aggregate'> & { aggregate: Partial<TeamCommissionSnapshot['aggregate']> }) | null, eventsTotalRows: 0,
     eventsLoadMoreStatus: "idle", unlockMatured: vi.fn(), loadMoreCanonicalEvents: vi.fn(),
     unlockedUSDT: () => 0, unlockedNEX: () => 0, coolingUSDT: () => 0, monthUSDT: () => 0, totalUSDTLifetime: () => 0,
     byKind: () => Object.fromEntries(kinds.map(kind => [kind, { usdt: 0, nex: 0, count: 0 }])),
@@ -120,13 +148,18 @@ async function commissions(code: Locale = "en") {
   commission.refreshCanonicalEvents.mockImplementation(async () => {
     commission.eventsStatus = "loading"; commission.events = [];
     const read = deferred<CommissionEvent[]>(); reads.push(read);
-    try { commission.events = await read.promise; commission.eventsStatus = "ready"; }
+    try { commission.events = await read.promise;
+      commission.eventsEvidence = { events: commission.events, totalRows: commission.events.length,
+        aggregate: { byKind: commission.byKind() as TeamCommissionSnapshot['aggregate']['byKind'] } };
+      commission.eventsStatus = "ready"; }
     catch { commission.eventsStatus = "error"; }
   });
   const navTo = vi.fn();
   const page = await mount(commissionsSource, {
-    "@/store/commission": { useCommission: () => commission }, "@/api/runtime": { remoteApiEnabled: true },
+    '@/store/data-visibility': { useDataVisibility: () => visibility },
+    "@/store/commission": { useCommission: () => commission }, "@/api/runtime": { remoteApiEnabled: true, apiRuntimeConfig: { environment: 'prod', baseUrl: 'https://fixture.invalid' } },
     "@/i18n/use-t": { useT: () => Vue.computed(() => dictionaries[locale.value]) }, "@/lib/route": { navTo },
+    "@/store/locale": { useLocaleStore: () => Vue.reactive({ code: locale }) },
     "@/i18n/format": { fmt, dateLocale: () => ({ en: "en-US", zh: "zh-CN", vi: "vi-VN" })[locale.value] },
   });
   return { ...page, commission, reads, navTo, locale };
@@ -149,6 +182,8 @@ function guideSnapshot(): CommissionsHowSnapshot {
 }
 async function guide(code: Locale = "en") {
   const locale = Vue.reactive({ code });
+  const app = Vue.reactive({ accountKey: 'user:A', accountBindingEpoch: 1 });
+  let boundEpoch = 1;
   const reads: Array<ReturnType<typeof deferred<CommissionsHowSnapshot>>> = [];
   let current: ReturnType<typeof deferred<CommissionsHowSnapshot>>;
   const published = vi.fn(() => {
@@ -157,21 +192,110 @@ async function guide(code: Locale = "en") {
   });
   const navBack = vi.fn();
   const page = await mount(guideSource, {
+    '@/store/app': { useApp: () => app },
+    '@/lib/account-scope': { captureAccountScope: () => boundEpoch, isCurrentAccountScope: (epoch: number) => epoch === boundEpoch },
     "@/i18n/use-t": { useT: () => Vue.computed(() => dictionaries[locale.code]) },
     "@/store/locale": { useLocaleStore: () => locale }, "@/lib/route": { navBack },
-    "@/api/runtime": { apiClient: {}, expectedApiEnvironment: "PRODUCTION", howContentApi: { published },
+    "@/api/runtime": { apiClient: {}, apiRuntimeConfig: { environment: 'prod', baseUrl: 'https://fixture.invalid' }, expectedApiEnvironment: "PRODUCTION", howContentApi: { published },
       vRankApi: { ladder: () => current.promise.then(facts => ({ ranks: facts.ranks })) } },
     "@/api/commission-guide-api": { createCommissionGuideApi: () => ({
       read: () => current.promise.then(facts => facts.guide),
     }) },
     "@/api/direct-referral-api": { createDirectReferralApi: () => ({ policy: () => current.promise.then(facts => facts.directPolicy) }) },
   });
-  return { ...page, locale, reads, published, navBack };
+  return { ...page, locale, reads, published, navBack, rebind() {
+    // Startup updates app identity before the synchronous store-scope rebind completes.
+    app.accountBindingEpoch++;
+    app.accountKey = 'user:B';
+    boundEpoch++;
+  } };
 }
 const buttons = (root: Host) => all(root).filter(item => item.props.role === "button");
+const ruleParts = (root: Host, name: string) => all(root).filter(item => String(item.props.class ?? "").split(" ").includes(name));
+const guideShown = (root: Host) => ruleParts(root, "team-rule-hero").length + ruleParts(root, "team-rule-section").length > 0;
+const filterTrigger = (root: Host) => buttons(root).find(item => item.props["aria-haspopup"] === "dialog")!;
+const filterOptions = (root: Host) => buttons(root).filter(item => item.props["aria-pressed"] !== undefined);
+const publicOutput = (root: Host) => [text(root), ...all(root).flatMap(item => Object.entries(item.props)
+  .filter(([key]) => key.startsWith('aria-') || key === 'title').map(([, value]) => String(value)))].join('\n');
+async function openFilters(root: Host) {
+  expect(filterTrigger(root).props["aria-expanded"]).toBe(false);
+  expect(filterOptions(root)).toHaveLength(0);
+  filterTrigger(root).props.onClick(); await Vue.nextTick();
+  expect(filterTrigger(root).props["aria-expanded"]).toBe(true);
+  expect(all(root).filter(item => item.props.role === "dialog")).toHaveLength(1);
+  expect(filterOptions(root)).toHaveLength(kinds.length + 1);
+}
+async function selectFilter(root: Host, label: string) {
+  await openFilters(root);
+  const option = filterOptions(root).find(item => item.props["aria-label"] === label);
+  expect(option).toBeDefined(); option!.props.onClick(); await Vue.nextTick();
+  expect(filterTrigger(root).props["aria-expanded"]).toBe(false);
+  expect(filterOptions(root)).toHaveLength(0);
+}
 afterEach(() => {
   unmounts.splice(0).forEach(unmount => unmount());
   vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
+});
+
+test.each(['zh', 'en', 'vi'] as const)('B06 %s global privacy masks totals, open filter counts and reward records without changing data', async code => {
+  vi.stubGlobal('uni', { getStorageSync: () => false, setStorageSync: vi.fn() });
+  const visibility = useDataVisibility(createPinia());
+  const page = await commissions(code, visibility); await page.show();
+  const records = [
+    { ...event('direct_purchase'), amountUSDT: 32.75, amountNEX: 98.25, orderAmountUSD: 1741.36 },
+    { ...event('binary'), amountUSDT: 16.28, amountNEX: 46.39, status: 'cooling' as const },
+    { ...event('peer'), amountUSDT: 18.47, amountNEX: 58.69, status: 'recovery_pending' as const, recoveryPendingUSDT: 2.13, recoveryPendingNEX: 7.27 },
+    { ...event('genesis'), amountUSDT: 27.63, amountNEX: 84.19, status: 'reversed' as const },
+  ];
+  page.reads[0].resolve(records); await flush();
+  const byKind = { ...page.commission.byKind(), direct_purchase: { usdt: 321.56, nex: 765.43, count: 19 } } as TeamCommissionSnapshot['aggregate']['byKind'];
+  page.commission.eventsEvidence = { events: records, totalRows: 59, aggregate: { byKind,
+    monthUSDT: 250.17, monthNEX: 40.23, totalUSDT: 1250.31, totalNEX: 70.37,
+    unlockedUSDT: 25.43, unlockedNEX: 62.57, coolingUSDT: 50.79 } };
+  await flush(); await openFilters(page.root);
+  const shown = publicOutput(page.root), before = structuredClone(Vue.toRaw(page.commission.eventsEvidence));
+  const amounts = ['250.17', '40.23', '1250.31', '70.37', '25.43', '62.57', '50.79',
+    '32.75', '98.25', '1,741.36', '16.28', '46.39', '18.47', '58.69', '2.13', '7.27', '27.63', '84.19'];
+  for (const value of amounts) expect(shown).toContain(value);
+  expect(text(filterOptions(page.root)[0])).toBe(`${commissionFilterCopy(code).all}59`);
+  visibility.toggle(); await Vue.nextTick();
+  for (const value of amounts) expect(publicOutput(page.root)).not.toContain(value);
+  expect(filterTrigger(page.root).props['aria-expanded']).toBe(true);
+  expect(filterOptions(page.root).map(item => text(item.children.at(-1)!))).toEqual(kinds.map(() => '••••').concat('••••'));
+  expect(text(page.root)).toContain(dictionaries[code].directReferral.recoveryPending);
+  expect(text(page.root)).toContain(dictionaries[code].commissions.reversedTag);
+  expect(text(page.root)).toContain('UVT');
+  visibility.toggle(); await Vue.nextTick();
+  expect(publicOutput(page.root)).toBe(shown);
+
+  visibility.toggle(); await Vue.nextTick();
+  filterOptions(page.root).find(item => item.props['aria-label'] === dictionaries[code].commissions.kind.direct_purchase)!.props.onClick();
+  await Vue.nextTick();
+  const summary = () => all(page.root).find(item => item.props.class === 'commission-filter-summary')!;
+  expect(text(summary())).toContain('$•••• · •••• UVT');
+  expect(publicOutput(page.root)).not.toMatch(/321\.56|765\.43|32\.75|98\.25|1,741\.36/);
+  visibility.toggle(); await Vue.nextTick();
+  expect(text(summary())).toContain('$321.56 · 765.43 UVT');
+  expect(page.commission.eventsEvidence).toEqual(before);
+  expect(page.commission.refreshCanonicalEvents).toHaveBeenCalledTimes(1);
+});
+
+test('B06 entering with privacy enabled preserves zero and unknown asset meanings when shown again', async () => {
+  vi.stubGlobal('uni', { getStorageSync: () => true, setStorageSync: vi.fn() });
+  const visibility = useDataVisibility(createPinia());
+  const page = await commissions('en', visibility); await page.show();
+  page.reads[0].resolve([]); await flush();
+  page.commission.eventsEvidence = { events: [], totalRows: 0, aggregate: { monthUSDT: 0, totalNEX: 0, unlockedUSDT: 0 } };
+  await flush(); await openFilters(page.root);
+  expect(publicOutput(page.root)).not.toContain('0.00');
+  expect(text(filterOptions(page.root)[0])).toBe(`${commissionFilterCopy('en').all}••••`);
+  visibility.toggle(); await Vue.nextTick();
+  const hero = all(page.root).find(item => item.props['data-component'] === 'hero')!;
+  const lifetime = all(page.root).find(item => item.props.class === 'reward-income-lifetime')!;
+  expect(text(hero)).toContain('$0.00— UVT');
+  expect(text(lifetime)).toContain('— USD0.00 UVT');
+  expect(text(filterOptions(page.root)[0])).toBe(`${commissionFilterCopy('en').all}0`);
+  expect(page.commission.eventsEvidence.aggregate.monthNEX).toBeUndefined();
 });
 
 for (const [zone, localDate] of [["Asia/Tokyo", "2026-10-12"], ["Asia/Ho_Chi_Minh", "2026-10-11"]]) {
@@ -188,13 +312,19 @@ for (const [zone, localDate] of [["Asia/Tokyo", "2026-10-12"], ["Asia/Ho_Chi_Min
     page.reads[0].resolve(originalEvents); await flush();
     for (const language of ["zh", "en", "vi"] as const) {
       page.locale.value = language; await Vue.nextTick();
+      if (language !== 'zh') {
+        expect(page.commission.eventsStatus).toBe('loading');
+        page.reads.at(-1)!.resolve(originalEvents); await flush();
+      }
+      const shownDate = language === "zh" ? localDate.replace(/-/g, "/") : language === "vi" ? `${localDate.slice(8)}/${localDate.slice(5, 7)}/${localDate.slice(0, 4)}` : `Oct ${Number(localDate.slice(8))}, 2026`;
       for (const kind of kinds) {
         const copy = dictionaries[language];
-        expect(text(page.root)).toContain(`${copy.commissions.kind[kind]} · ${kind === "direct_purchase" ? copy.directReferral.order : copy.directReferral.receipt} REF-${kind} · ${copy.directReferral.device}: DEVICE-7 · ${localDate}`);
+        expect(text(page.root)).toContain(`${copy.commissions.kind[kind]} · ${kind === "direct_purchase" ? copy.directReferral.order : copy.directReferral.receipt} REF-${kind} · ${copy.directReferral.device}: DEVICE-7`);
       }
+      // P-42 groups records under their local date instead of repeating it on every row.
+      const labels = all(page.root).filter(item => item.props.class === 'commission-day__label').map(text);
+      expect(labels).toHaveLength(1); expect(labels[0].startsWith(shownDate)).toBe(true);
       expect(text(page.root)).not.toMatch(/Mon Oct|Invalid Date|NaN|GMT\+/);
-      expect(all(page.root).filter(item => item.props.style?.marginTop === "2px" && item.props.style?.fontSize === "12px")
-        .some(item => item.props.style.color === "var(--v5-ink-3)" && text(item).endsWith(localDate))).toBe(true);
     }
     expect(nativeLocale).not.toHaveBeenCalled();
     expect(originalEvents.map(item => [item.ts, item.amountUSDT, item.amountNEX, item.status]))
@@ -206,10 +336,16 @@ test.each([NaN, Infinity, -Infinity, 8.64e15 + 1, -8.64e15 - 1, null, undefined,
   "544 unknown or invalid commission timestamp %s stays unknown",
   async timestamp => {
     const page = await commissions("zh"); await page.show();
-    page.reads[0].resolve([{ ...event("direct_purchase"), ts: timestamp as number }]); await flush();
+    const records = [{ ...event("direct_purchase"), ts: timestamp as number }];
+    page.reads[0].resolve(records); await flush();
     for (const language of ["zh", "en", "vi"] as const) {
       page.locale.value = language; await Vue.nextTick();
-      expect(text(page.root)).toContain(`${dictionaries[language].commissions.kind.direct_purchase} · —`);
+      if (language !== 'zh') {
+        expect(page.commission.eventsStatus).toBe('loading');
+        page.reads.at(-1)!.resolve(records); await flush();
+      }
+      expect(text(page.root)).toContain(dictionaries[language].commissions.kind.direct_purchase);
+      expect(all(page.root).filter(item => item.props.class === 'commission-day__label').map(text)).toEqual(['—']);
       expect(text(page.root)).not.toMatch(/Invalid Date|NaN|1970/);
     }
   },
@@ -251,21 +387,23 @@ test("commissions true error keeps its retry; two Rules returns retain Peer, and
   expect(text(page.root)).toContain(en.network.projectionLoadingTitle);
   expect(buttons(page.root)).toHaveLength(0);
   page.reads[1].resolve([event("peer"), event("binary")]); await flush();
-  const peer = all(page.root).find(item => item.props.role === "radio" && String(item.props["aria-label"]).startsWith(en.commissions.kind.peer))!;
-  peer.props.onClick(); await Vue.nextTick();
+  await selectFilter(page.root, en.commissions.kind.peer);
   for (let returnNumber = 0; returnNumber < 2; returnNumber++) {
     all(page.root).find(item => item.props.role === "link")!.props.onClick();
     expect(page.navTo).toHaveBeenLastCalledWith("/pages/team/commissions-how");
     await page.show();
-    expect(text(page.root)).toContain(en.network.projectionLoadingTitle);
+    expect(text(page.root)).not.toContain(en.network.projectionLoadingTitle);
     expect(text(page.root)).not.toContain(en.network.projectionErrorDesc);
     page.reads[2 + returnNumber].resolve([event("peer"), event("binary")]); await flush();
     expect(text(page.root)).toContain("Event peer"); expect(text(page.root)).not.toContain("Event binary");
-    expect(all(page.root).filter(item => item.props.role === "tab" && item.props["aria-selected"]).map(text)).toEqual([en.commissions.kind.peer]);
+    expect(text(filterTrigger(page.root))).toBe(commissionFilterCopy('en').kinds.peer);
   }
   const fresh = await commissions(); await fresh.show(); fresh.reads[0].resolve([event("peer"), event("binary")]); await flush();
   expect(text(fresh.root)).toContain("Event peer"); expect(text(fresh.root)).toContain("Event binary");
-  expect(all(fresh.root).filter(item => item.props.role === "tab" && item.props["aria-selected"]).map(text)).toEqual([en.commissions.all]);
+  expect(text(filterTrigger(fresh.root))).toBe(commissionFilterCopy('en').all);
+  await openFilters(fresh.root);
+  expect(filterOptions(fresh.root).filter(item => item.props['aria-pressed']).map(item => item.props['aria-label']))
+    .toEqual([en.commissions.all]);
 });
 
 test.each(["en", "zh", "vi"] as const)("guide %s pending has one loading notice; ready keeps actual missing rules and disabled payouts", async code => {
@@ -275,13 +413,14 @@ test.each(["en", "zh", "vi"] as const)("guide %s pending has one loading notice;
     expect(text(page.root).split(copy.loading)).toHaveLength(2);
     expect(text(page.root)).not.toContain(copy.unavailable);
     expect(text(page.root)).not.toContain(copy.missing);
-    expect(all(page.root).some(item => item.props["data-component"] === "hero" || item.props["data-component"] === "section")).toBe(false);
-    expect(buttons(page.root).map(text)).toEqual([dictionaries[code].commissionsHowItWorks.ctaBack]);
+    expect(guideShown(page.root)).toBe(false);
+    expect(buttons(page.root).map(text)).toEqual([networkReauditCopy(code).backCommissions]);
   }
   expect(page.published).toHaveBeenCalledOnce(); // Same-locale pending reads stay deduplicated.
   page.reads[0].resolve(guideSnapshot()); await flush();
   expect(text(page.root)).not.toContain(copy.loading); expect(text(page.root)).not.toContain(copy.unavailable);
-  expect(all(page.root).filter(item => item.props["data-component"] === "section")).toHaveLength(5);
+  expect(ruleParts(page.root, "team-rule-section")).toHaveLength(5);
+  expect(ruleParts(page.root, "team-rule-fold")).toHaveLength(1);
   expect(text(page.root)).toContain(copy.missing); expect(text(page.root)).toContain(copy.hold);
   expect(text(page.root)).toContain(copy.unsupported); expect(text(page.root)).toContain(copy.notOpen);
   expect(text(page.root)).toContain(copy.noTotal);
@@ -293,7 +432,8 @@ test("guide failed read shows one real error and keyboard Retry, then replaces i
   const copy = buildCommissionsHowContent(null, "en").copy;
   page.reads[0].reject(new Error("isolated failed guide")); await flush();
   expect(text(page.root).split(copy.unavailable)).toHaveLength(2);
-  expect(all(page.root).some(item => item.props["data-component"] === "section")).toBe(false);
+  expect(buttons(page.root).at(-1) && text(buttons(page.root).at(-1)!)).toBe(networkReauditCopy('en').backCommissions);
+  expect(guideShown(page.root)).toBe(false);
   const retry = buttons(page.root).find(item => text(item) === copy.retry)!;
   expect(retry.props.tabindex).toBe("0");
   const preventDefault = vi.fn();
@@ -305,18 +445,30 @@ test("guide failed read shows one real error and keyboard Retry, then replaces i
   expect(text(page.root)).toContain("Published overview"); expect(text(page.root)).not.toContain(copy.retry);
 });
 
-test("guide refresh hides prior published rules while pending and preserves incomplete-read warnings", async () => {
+test.each(['zh', 'en', 'vi'] as const)('guide %s completes cold loading after startup finishes binding the account scope', async language => {
+  const page = await guide(language); await page.show();
+  const prior = page.reads[0];
+  page.rebind(); await flush();
+  prior.resolve(guideSnapshot()); await flush();
+  expect(text(page.root)).not.toContain('Published overview');
+  page.reads.at(-1)!.resolve(guideSnapshot()); await flush();
+  expect(text(page.root)).toContain('Published overview');
+  expect(text(page.root)).not.toContain(buildCommissionsHowContent(null, language).copy.loading);
+});
+
+test("guide refresh retains prior published rules while pending and preserves incomplete-read warnings", async () => {
   const page = await guide(); await page.show(); page.reads[0].resolve(guideSnapshot()); await flush();
   expect(text(page.root)).toContain("Published overview");
   await page.show();
-  expect(text(page.root)).not.toContain("Published overview");
+  expect(text(page.root)).toContain("Published overview");
   expect(text(page.root)).not.toContain(buildCommissionsHowContent(null, "en").copy.unavailable);
   const incomplete = guideSnapshot(); incomplete.document.blocks = incomplete.document.blocks.filter(block => block.id !== "overview");
   page.reads[1].resolve(incomplete); await flush();
   const copy = buildCommissionsHowContent(incomplete, "en").copy;
   expect(text(page.root)).toContain(copy.unavailable);
+  expect(text(buttons(page.root).at(-1)!)).toBe(networkReauditCopy('en').backCommissions);
   expect(buttons(page.root).some(item => text(item) === copy.retry)).toBe(true);
-  expect(all(page.root).some(item => item.props["data-component"] === "hero" || item.props["data-component"] === "section")).toBe(false);
+  expect(guideShown(page.root)).toBe(false);
   expect(text(page.root)).not.toContain("13 USDT"); // Incomplete published context still suppresses amounts.
 });
 
@@ -328,14 +480,69 @@ test.each(["en", "zh", "vi"] as const)("577 %s promotion and other filters prese
   const other = {...event("other"), id:"CM-900", amountUSDT:3, amountNEX:0};
   page.reads[0].resolve([promotion, other, event("genesis")]); await flush();
   for (const kind of ["promotion", "other", "genesis"] as const) {
-    const selector = all(page.root).find(item => item.props.role === "radio"
-      && String(item.props["aria-label"]).startsWith(dictionaries[code].commissions.kind[kind]))!;
-    expect(selector).toBeDefined(); selector.props.onClick(); await Vue.nextTick();
+    await selectFilter(page.root, dictionaries[code].commissions.kind[kind]);
     expect(text(page.root)).toContain(`Event ${kind}`);
     for (const excluded of ["promotion", "other", "genesis"].filter(item => item !== kind))
       expect(text(page.root)).not.toContain(`Event ${excluded}`);
-    expect(all(page.root).filter(item => item.props.role === "tab" && item.props["aria-selected"]).map(text))
-      .toEqual([dictionaries[code].commissions.kind[kind]]);
+    expect(text(filterTrigger(page.root))).toBe(commissionFilterCopy(code).kinds[kind]);
   }
   expect(promotion).toMatchObject({id:"CM-389",amountUSDT:100,amountNEX:50,orderId:"PROMOTION-1",status:"cooling",unlockAt:1793863394000});
+});
+
+
+test.each(['en', 'zh', 'vi'] as const)('T1 %s filter keeps pagination reachable until matching records have loaded', async language => {
+  const page = await commissions(language); await page.show();
+  page.reads[0].resolve(Array.from({ length: 20 }, (_, i) => ({ ...event('direct_purchase'), id: `first-${i}` }))); await flush();
+  const copy = dictionaries[language];
+  page.commission.eventsTotalRows = 21; page.commission.eventsEvidence!.totalRows = 21;
+  page.commission.byKind = () => Object.fromEntries(kinds.map(kind => [kind, { usdt: kind === 'leadership' ? 1 : 0, nex: 0, count: kind === 'leadership' ? 1 : 20 }]));
+  page.commission.eventsEvidence!.aggregate.byKind = page.commission.byKind() as TeamCommissionSnapshot["aggregate"]["byKind"];
+  await flush();
+  await openFilters(page.root);
+  const option = (label: string) => filterOptions(page.root).find(item => item.props['aria-label'] === label)!;
+  expect(text(option(copy.commissions.all))).toBe(`${commissionFilterCopy(language).all}21`);
+  option(copy.commissions.kind.leadership).props.onClick(); await flush();
+  expect(filterOptions(page.root)).toHaveLength(0);
+  expect(text(page.root)).not.toContain(copy.empty.filterTitle);
+  expect(text(page.root)).not.toContain('Event leadership');
+  const nextReads: Array<ReturnType<typeof deferred<CommissionEvent[]>>> = [];
+  page.commission.loadMoreCanonicalEvents.mockImplementation(async () => {
+    page.commission.eventsLoadMoreStatus = 'loading';
+    const read = deferred<CommissionEvent[]>(); nextReads.push(read);
+    try { page.commission.events.push(...await read.promise); page.commission.eventsLoadMoreStatus = 'idle'; }
+    catch { page.commission.eventsLoadMoreStatus = 'error'; }
+  });
+  const load = buttons(page.root).find(n => text(n) === copy.unilevel.loadMore)!;
+  expect(load).toBeDefined();
+  load.props.onClick(); load.props.onClick(); await flush();
+  expect(page.commission.loadMoreCanonicalEvents).toHaveBeenCalledTimes(1);
+  expect(load.props['aria-busy']).toBe(true);
+  nextReads[0].reject(new Error('page unavailable')); await flush();
+  expect(text(page.root)).not.toContain(copy.empty.filterTitle);
+  buttons(page.root).find(n => text(n) === copy.network.retry)!.props.onClick(); await flush();
+  nextReads[1].resolve([{ ...event('leadership'), sourceUserName: 'Audit20', amountUSDT: 1 }]); await flush();
+  expect(text(page.root)).toContain('Audit20');
+  expect(text(page.root)).toContain('+$1.00');
+  expect(buttons(page.root).some(n => text(n) === copy.unilevel.loadMore)).toBe(false);
+  expect(text(filterTrigger(page.root))).toBe(commissionFilterCopy(language).kinds.leadership);
+  await openFilters(page.root);
+  expect(option(copy.commissions.kind.leadership).props['aria-pressed']).toBe(true);
+  option(copy.commissions.kind.promotion).props.onClick(); await flush();
+  expect(filterOptions(page.root)).toHaveLength(0);
+  expect(text(page.root)).toContain(copy.empty.filterTitle);
+});
+
+test.each(['en', 'zh', 'vi'] as const)('T6 %s monthly and lifetime summaries keep independent USD and UVT aggregates', async language => {
+  const page = await commissions(language); await page.show(); page.reads[0].resolve([]); await flush();
+  page.commission.eventsEvidence = { ...page.commission.eventsEvidence, aggregate: { monthUSDT: 250, monthNEX: 40, totalUSDT: 1250, totalNEX: 70 } };
+  await flush();
+  const hero = all(page.root).find(n => n.props['data-component'] === 'hero')!;
+  const lifetime = all(page.root).find(n => String(n.props.class).split(' ').includes('reward-income-lifetime'))!;
+  expect(text(hero)).toContain('$250.00+40.00 UVT');
+  expect(text(lifetime)).toContain('$1250.0070.00 UVT');
+  page.commission.eventsEvidence = { ...page.commission.eventsEvidence, aggregate: { monthUSDT: 0, monthNEX: 0, totalUSDT: 0, totalNEX: 0 } }; await flush();
+  expect(text(hero)).toContain('$0.000.00 UVT');
+  page.commission.eventsEvidence = { ...page.commission.eventsEvidence, aggregate: { monthUSDT: 250, totalUSDT: 1250 } }; await flush();
+  expect(text(hero)).toContain('$250.00— UVT');
+  expect(text(lifetime)).toContain('$1250.00— UVT');
 });

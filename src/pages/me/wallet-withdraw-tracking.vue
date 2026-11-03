@@ -9,8 +9,8 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="padding-bottom: 16px">
-      <SubPageHeader :back="'/pages/me/wallet'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
+    <view class="tr-page" :class="{ 'tr-page--id': !!wd }" style="padding-bottom: 16px">
+      <SubPageHeader :back="'/pages/me/me'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
 
       <!-- Exact deep-link reads wait for the authenticated account before presenting any absence. -->
       <view v-if="trackingReadPending && !wd" class="px-5" style="padding-top: 4px">
@@ -20,7 +20,7 @@
       </view>
       <view v-else-if="trackingReadError" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ t.empty.errorDesc }}</text>
-        <view class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" @click.stop="retryTrackedWithdrawal">
+        <view class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" @click.stop="retryTrackedWithdrawal" @keydown.enter.prevent="retryTrackedWithdrawal" @keydown.space.prevent="retryTrackedWithdrawal">
           <text :style="emptyLinkStyle">{{ t.empty.errorCta }}</text>
         </view>
       </view>
@@ -39,43 +39,36 @@
       <template v-else>
         <!-- Single-theme continuous flow: page-floor blocks separated by 12px,
              hairlines open the stepper + ETA groups (de-carded). -->
-        <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-          <!-- Amount hero — de-carded to the page floor (no surface/border; the
-               floor glow + dot-grid are deleted, not re-tuned). -->
-          <view :style="heroStyle">
-            <text class="block" :style="amountLabelStyle">{{ t.wallet.trackAmountLabel }}</text>
-            <text class="block" :style="amountStyle">${{ formatAmount(wd.amount) }}</text>
-            <text class="block" :style="viaStyle">{{ viaLine }}</text>
-            <text class="block" :style="addrStyle">{{ wd.address }}</text>
-          </view>
-
-          <!-- Status stepper — outer card dropped, stepper structure kept;
-               hairline opens the group. -->
-          <!-- 失败终态不渲染步进条:五步全灰、连「已提交」都不打勾,而下方卡片说转账失败(对抗证伪坐实) -->
-          <view v-if="!isFailedEnd" :style="stepperStyle">
-            <text class="block" :style="progressLabelStyle">{{ t.wallet.trackProgressLabel }}</text>
-            <view class="relative">
-              <view v-for="(step, i) in steps" :key="step.key" class="flex relative" :style="stepLiStyle(i === steps.length - 1)">
-                <!-- connector -->
-                <view v-if="i < steps.length - 1" :style="connectorStyle(i < doneUpTo)" />
-                <!-- icon -->
-                <view class="grid place-items-center shrink-0" style="width: 24px; height: 24px">
-                  <view v-if="i < doneUpTo" class="grid place-items-center" :style="doneIconStyle">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+        <view class="tr">
+          <!-- P-45 tracking ticket: amount + status, tear line, timeline (only reached steps carry labels — DS-30). -->
+          <view class="tr-ticket">
+            <view class="tr-tk">
+              <view class="tr-row1"><text class="tr-k">{{ t.wallet.trackAmountLabel }}</text><text class="tr-tag" :class="`tr-tag--${statusTone}`">{{ statusTag }}</text></view>
+              <text class="tr-amt"><text class="tr-cur">$</text>{{ amountParts[0] }}<text class="tr-dec">{{ amountParts[1] }}</text></text>
+              <text class="tr-note">{{ viaLine }}</text>
+              <text class="tr-addr">{{ wd.address }}</text>
+            </view>
+            <!-- 失败终态不渲染步进条:五步全灰、连「已提交」都不打勾,而下方卡片说转账失败(对抗证伪坐实) -->
+            <template v-if="!isFailedEnd">
+              <view class="tr-tear" aria-hidden="true" />
+              <view class="tr-tl" role="list" :aria-label="t.wallet.trackProgressLabel">
+                <view
+                  v-for="(step, i) in steps" :key="step.key" class="tr-st" role="listitem"
+                  :class="i < doneUpTo ? 'tr-st--done' : i === currentIdx ? 'tr-st--cur' : 'tr-st--todo'"
+                  :aria-current="i === currentIdx && i >= doneUpTo ? 'step' : undefined"
+                  :aria-hidden="i > currentIdx && i >= doneUpTo ? 'true' : undefined"
+                >
+                  <view class="tr-nd" :class="{ 'tr-nd--live': i === currentIdx && i >= doneUpTo && showSpinner }">
+                    <svg v-if="i < doneUpTo" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                    <view v-else class="tr-nd__dot" />
                   </view>
-                  <view v-else-if="i === currentIdx && showSpinner" class="grid place-items-center glow-green" :style="currentIconStyle">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                  <view v-if="i < doneUpTo || i === currentIdx" class="tr-st__body">
+                    <text class="tr-st__t">{{ step.label }}</text>
+                    <text class="tr-st__d">{{ stepTimeText(i) ? `${step.hint} · ${stepTimeText(i)}` : step.hint }}</text>
                   </view>
-                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2"><circle cx="12" cy="12" r="9" /></svg>
-                </view>
-                <!-- text -->
-                <view style="flex: 1; padding-top: 2px">
-                  <text class="block" :style="stepLabelStyle(i >= doneUpTo && i !== currentIdx)">{{ step.label }}</text>
-                  <text class="block" :style="stepHintStyle">{{ step.hint }}</text>
-                  <text v-if="stepTimeText(i)" class="block" :style="stepTimeStyle">{{ stepTimeText(i) }}</text>
                 </view>
               </view>
-            </view>
+            </template>
           </view>
 
           <!-- Estimated completion / SPEC-7 风控持有态(manual/delay=审核中,freeze=冻结)
@@ -114,18 +107,24 @@
             <text v-if="againDisabled" id="wd-again-reason" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
           </view>
 
-          <!-- Back to wallet -->
-          <view class="flex items-center justify-center active:opacity-80" :style="backBtnStyle" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @click.stop="goWallet">
-            <text>{{ t.wallet.trackBackToWallet }}</text>
-          </view>
         </view>
+        <view class="tr-bar-space" />
       </template>
     </view>
+    <!-- Back to wallet is the page's main action, in the fixed bottom bar (DS-30). -->
+    <template #pageFixed>
+      <view v-if="wd && !trackingReadPending && !trackingReadError" class="tr-bar">
+        <view class="tr-bar__btn" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @click.stop="goWallet" @keydown.enter.prevent="goWallet" @keydown.space.prevent="goWallet">
+          <text>{{ t.wallet.trackBackToWallet }}</text>
+        </view>
+      </view>
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatDisplayDateTime } from "@/lib/display-date";
+import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import { remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
@@ -136,7 +135,7 @@ import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import type { Withdrawal, WithdrawalStatus } from "@/store/types";
 import { navTo, navReplace } from "@/lib/route";
@@ -211,9 +210,11 @@ const trackedWithdrawalRead = createWithdrawalTrackingRead<WithdrawalDetailSnaps
   setStatus: (status) => { trackingReadStatus.value = status; },
 });
 
-const trackingReadPending = computed(() => deepLinkId.value !== null
-  && (trackingReadStatus.value === "waiting" || trackingReadStatus.value === "loading"));
-const trackingReadError = computed(() => deepLinkId.value !== null && trackingReadStatus.value === "error");
+const trackingReadPending = computed(() => remoteApiEnabled && (deepLinkId.value !== null
+  ? trackingReadStatus.value === "waiting" || trackingReadStatus.value === "loading"
+  : !app.remoteWithdrawalListHasSnapshot && app.remoteWithdrawalListStatus !== "ready" && app.remoteWithdrawalListStatus !== "error"));
+const trackingReadError = computed(() => remoteApiEnabled && (deepLinkId.value !== null
+  ? trackingReadStatus.value === "error" : app.remoteWithdrawalListStatus === "error"));
 const wd = computed(() => {
   if (deepLinkId.value) {
     if (remoteApiEnabled && trackingReadStatus.value === "not-found") return null;
@@ -241,6 +242,7 @@ watch(() => wd.value, openBankTracking);
 
 function refreshTrackedWithdrawal(): void {
   if (deepLinkId.value) void trackedWithdrawalRead.refresh();
+  else if (remoteApiEnabled && app.remoteWithdrawalListStatus !== "loading") void app.refreshRemoteWithdrawalList();
 }
 
 function retryTrackedWithdrawal(): void {
@@ -398,9 +400,7 @@ const retryBlockedLine = computed(() =>
   (isFailedEnd.value && wd.value?.retriable === false ? t.value.wallet.trackRetryBlocked : null));
 const againDisabled = computed(() => dailyLimit.value.reached);
 const againReasonText = computed(() => {
-  const at = new Date(dailyLimit.value.resetAt);
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  const stamp = `${p2(at.getMonth() + 1)}-${p2(at.getDate())} ${p2(at.getHours())}:${p2(at.getMinutes())}`;
+  const stamp = formatDisplayDateTime(dailyLimit.value.resetAt, dateLocale());
   return fmt(t.value.walletV3.dailyLimitReached, { time: stamp });
 });
 // SPEC-7: freeze 路由/冻结状态用独立危险态文案;manual/delay 用审核中文案。
@@ -432,6 +432,14 @@ const reasonLines = computed(() => [...new Set([
   ...(retryBlockedLine.value ? [retryBlockedLine.value] : []),
 ])]);
 // FEAT-WD02:fee 是结构化快照,展示只读 actualFeeUsd(旧单读盘时已归一,禁重算)。
+// Ticket header: amount anatomy and a status tag that names where the withdrawal stands.
+const amountParts = computed<[string, string]>(() => {
+  const text = wd.value ? formatAmount(wd.value.amount) : "", at = text.lastIndexOf(".");
+  return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
+});
+const statusTag = computed(() => isTerminalDone.value ? steps.value[steps.value.length - 1]!.label
+  : isFailedEnd.value ? failedTitle.value : isFrozenHold.value ? etaTitle.value : steps.value[currentIdx.value]?.label ?? "");
+const statusTone = computed(() => isTerminalDone.value ? "ok" : isFailedEnd.value ? "bad" : isFrozenHold.value ? "warn" : "brand");
 const viaLine = computed(() =>
   wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: formatAmount(wd.value.fee.actualFeeUsd) }) : "",
 );
@@ -464,11 +472,9 @@ const etaSub = computed(() => {
   return Number.isFinite(at) ? fmt(t.value.wallet.trackExpectedAt, { time: absTime(at as number) }) : t.value.wallet.trackReviewNote;
 });
 
-/** 「MM-DD HH:mm」本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */
+/** 按界面语言显示包含年份的本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */
 function absTime(ts: number): string {
-  const d = new Date(ts);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return formatDisplayDateTime(ts, dateLocale());
 }
 
 /**
@@ -504,7 +510,7 @@ function goWithdraw() {
   navTo("/pages/me/wallet-withdraw-method");
 }
 function goWallet() {
-  navTo("/me/wallet");
+  navTo("/pages/me/me");
 }
 function goSupport() {
   navTo("/pages/me/support");
@@ -515,39 +521,12 @@ function skelStyle(w: string, h: string, mt = "0", radius = "6px"): CSSPropertie
   return { width: w, height: h, marginTop: mt, borderRadius: radius, background: "var(--v5-surface-2)", opacity: 0.6 };
 }
 
-const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyTextStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)" };
 const emptyLinkStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-brand)" };
 // De-carded amount hero — left-aligned on the page floor (2px optical inset);
 // no surface/border, and the floor glow + dot-grid element are deleted outright.
-const heroStyle: CSSProperties = { padding: "0 2px" };
-const amountLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
-const amountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "34px", fontWeight: 600, color: "var(--v5-ink)", marginTop: "4px", fontVariantNumeric: "tabular-nums" };
-const viaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
-const addrStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", wordBreak: "break-all" };
 // De-carded — the stepper structure is kept; a hairline opens the group and
 // content sits at the 2px optical inset (no surface/border).
-const stepperStyle: CSSProperties = { padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
-const progressLabelStyle: CSSProperties = { marginBottom: "14px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
-function stepLiStyle(last: boolean): CSSProperties {
-  return { gap: "12px", paddingBottom: last ? "0" : "20px" };
-}
-function connectorStyle(done: boolean): CSSProperties {
-  return {
-    position: "absolute",
-    left: "11px",
-    top: "28px",
-    bottom: "4px",
-    width: "1px",
-    background: done ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  };
-}
-const doneIconStyle: CSSProperties = { width: "24px", height: "24px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
-const currentIconStyle: CSSProperties = { width: "24px", height: "24px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
-function stepLabelStyle(pending: boolean): CSSProperties {
-  return { fontSize: "13px", fontWeight: 500, color: pending ? "var(--v5-ink-4)" : "var(--v5-ink)" };
-}
-const stepHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
-const stepTimeStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px", fontVariantNumeric: "tabular-nums" };
 // Normal ETA — floor note; a hairline opens it (no surface/border).
 const etaCardStyle: CSSProperties = { gap: "12px", padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
 // Frozen/held ETA — danger accent callout (tint + border: the whitelisted
@@ -559,7 +538,7 @@ const etaFrozenCardStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
   border: "1px solid color-mix(in srgb, var(--v5-danger) 30%, transparent)",
 };
-const etaTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
+const etaTitleStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", fontWeight: 500, color: "var(--v5-ink)" };
 const etaSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const reasonLineStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 // 客服出口 —— 独占一行的行动链接,撑到 44px 热区(《07》tap≥44,不吃 inline 豁免)。
@@ -567,26 +546,65 @@ const supportLinkStyle: CSSProperties = { display: "inline-flex", alignItems: "c
 const supportLinkTextStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)" };
 // 「再提一笔」= 主行动,但在追踪页不抢主 CTA 的位置(用描边而非实心品牌色);
 // 置灰态压低对比并去掉 active 反馈,视觉上就说明「现在按不了」。
+// "再提一笔" is secondary here (返回钱包 is the page's single primary in the bar): quiet ink text on a 44px row.
 const againBtnStyle = computed<CSSProperties>(() => ({
   width: "100%",
   height: "44px",
   borderRadius: "999px",
-  background: againDisabled.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
-  color: againDisabled.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
+  background: "transparent",
+  color: againDisabled.value ? "var(--v5-ink-4)" : "var(--v5-ink-2)",
   fontSize: "13px",
-  fontWeight: 600,
+  fontWeight: 500,
   opacity: againDisabled.value ? 0.6 : 1,
   transition: "opacity 150ms ease",
 }));
 const againReasonStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
-const backBtnStyle: CSSProperties = {
-  width: "100%",
-  height: "44px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  fontSize: "13px",
-  fontWeight: 500,
-  color: "var(--v5-ink)",
-  transition: "opacity 150ms ease",
-};
 </script>
+
+<style scoped>
+/* P-45 withdrawal tracking: ticket with amount + status, tear line, timeline; back to wallet in the fixed bar. */
+/* The order number in the header reads as an identifier (mono, as on the board). */
+.tr-page--id :deep(.spv-title) { font-family: var(--font-metric); }
+.tr { display: flex; flex-direction: column; gap: 12px; padding: 0 16px; }
+.tr-ticket { position: relative; margin-top: 3px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.tr-tk { padding: 18px 20px 16px; }
+.tr-row1 { display: flex; align-items: center; justify-content: space-between; }
+.tr-k { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.tr-tag { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); font: 500 12px/16px var(--font-v5); white-space: nowrap; }
+.tr-tag--brand { background: var(--v5-brand-soft); color: var(--v5-brand); }
+.tr-tag--ok { background: var(--v5-success-soft); color: var(--v5-success-ink); }
+.tr-tag--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
+.tr-tag--bad { background: var(--v5-danger-soft); color: var(--v5-danger); }
+.tr-amt { display: block; margin-top: 6px; color: var(--v5-ink); font: 500 36px/44px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tr-cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
+.tr-dec { color: var(--v5-ink-3); }
+.tr-note { display: block; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.tr-addr { display: block; margin-top: 6px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-metric); word-break: break-all; }
+.tr-tear { position: relative; height: 0; margin: 0 18px; border-top: 1.5px dashed var(--v5-border-strong); }
+.tr-tear::before, .tr-tear::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-bg); }
+.tr-tear::before { left: -28px; } .tr-tear::after { right: -28px; }
+.tr-tl { padding: 18px 20px 20px; }
+.tr-st { position: relative; display: flex; gap: 14px; padding-bottom: 20px; }
+.tr-st:last-child { padding-bottom: 0; }
+.tr-st::before { content: ""; position: absolute; left: 11px; top: 26px; bottom: 2px; width: 2px; border-radius: 2px; background: var(--v5-surface-3); }
+.tr-st--done::before { background: var(--v5-brand); }
+.tr-st:last-child::before { display: none; }
+.tr-st--todo { min-height: 4px; }
+.tr-nd { position: relative; display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; }
+.tr-st--done .tr-nd { background: var(--v5-brand); color: var(--v5-on-brand); }
+.tr-st--cur .tr-nd { background: var(--v5-brand-soft); box-shadow: inset 0 0 0 2px var(--v5-brand); }
+.tr-nd__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--v5-ink-4); }
+.tr-st--cur .tr-nd__dot { background: var(--v5-brand); }
+/* Live state only: the current step breathes while the withdrawal is still moving. */
+.tr-nd--live::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--v5-brand); opacity: 0; animation: tr-pulse 1.8s ease-out infinite; }
+@keyframes tr-pulse { 0% { transform: scale(.8); opacity: .7; } 100% { transform: scale(1.3); opacity: 0; } }
+.tr-st__t { display: block; color: var(--v5-ink); font: 500 15px/22px var(--font-v5); }
+.tr-st--cur .tr-st__t { color: var(--v5-brand); }
+.tr-st__d { display: block; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.tr-bar-space { height: 110px; }
+.tr-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.tr-bar__btn { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: pointer; }
+.tr-bar__btn:active { transform: scale(.98); }
+.tr-bar__btn:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .tr-nd--live::after { animation: none; } .tr-bar__btn:active { transform: none; } }
+</style>

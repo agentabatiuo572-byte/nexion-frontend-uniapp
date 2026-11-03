@@ -23,8 +23,53 @@ const valid = {
   signals: { memGB: 8, cores: 8, model: "Pixel", brand: "Google", gpu: "Mali", pxDensity: 900, pingMs: 42, batteryLevel: 80, charging: true, networkReachable: true },
   comparisonConfig: [{ key: "phone", label: "Phone", dailyUsdt: 0.06, dailyNex: 10, sortOrder: 1 }],
 };
+const versions = { expectedBindingVersion: null, expectedPolicyVersion: 1, replacementConfirmed: false };
+const publicSignals: Record<string, unknown> = { ...valid.signals };
+delete publicSignals.gpu;
+const android = { ...valid, calibrationStatus: "MATCHED", calibrationMethod: "ANDROID_SOC_RANGE",
+  computeUnit: "platform", computeValue: 65.42, tops: 65.42, score: 65,
+  signals: { ...publicSignals, platform: "android" } };
 
 describe("onboarding calibration API", () => {
+  it("reads nullable initial binding and rejects missing or invalid version metadata", async () => {
+    const eligibility = { binding: null, policy: { policyVersion: 4 }, canReplace: true, blockedReasons: [], grant: null };
+    const request = vi.fn().mockResolvedValue(eligibility);
+    const api = createOnboardingCalibrationApi({ request } as never);
+    expect(await api.activationEligibility()).toEqual({ binding: null, policyVersion: 4, canActivate: true, blockedReasons: [] });
+    for (const invalid of [{ ...eligibility, binding: undefined }, { ...eligibility, policy: {} },
+      { ...eligibility, binding: { installationId: "old", bindingVersion: null } },
+      { ...eligibility, canReplace: "true" }, { ...eligibility, blockedReasons: [null] }]) {
+      request.mockResolvedValue(invalid);
+      await expect(api.activationEligibility()).rejects.toThrow("ONBOARDING_CALIBRATION_RESPONSE_INVALID");
+    }
+  });
+  it("settles a retry only from its failed activation receipt", async () => {
+    const request = vi.fn(); const api = createOnboardingCalibrationApi({ request } as never);
+    for (const response of [null, { commandType: "PHONE_ACTIVATE", status: "PROCESSING" },
+      { commandType: "PHONE_ACTIVATE", status: "SUCCEEDED" }, { commandType: "OTHER", status: "FAILED" }]) {
+      request.mockResolvedValue(response); expect(await api.activationFailed("phone-key:1")).toBe(false);
+    }
+    request.mockResolvedValue({ commandType: "PHONE_ACTIVATE", status: "FAILED" });
+    expect(await api.activationFailed("phone-key:1")).toBe(true);
+    expect(request.mock.lastCall?.[0].path).toContain("idempotencyKey=phone-key%3A1");
+  });
+  it("reads the original activation status and reason without inferring from missing or malformed receipts", async () => {
+    const request = vi.fn(); const api = createOnboardingCalibrationApi({ request } as never);
+    request.mockResolvedValue(null); expect(await api.activationReceipt("phone-key:1")).toBeNull();
+    request.mockResolvedValue({ commandType: "PHONE_ACTIVATE", status: "PENDING" });
+    expect(await api.activationReceipt("phone-key:1")).toEqual({ status: "PENDING" });
+    request.mockResolvedValue({ commandType: "PHONE_ACTIVATE", status: "FAILED", originalResult: { conflictType: "CAPACITY_REPLACEMENT_REQUIRED" } });
+    expect(await api.activationReceipt("phone-key:1")).toEqual({ status: "FAILED", reason: "CAPACITY_REPLACEMENT_REQUIRED" });
+    request.mockResolvedValue({ commandType: "PHONE_ACTIVATE", status: "SUCCEEDED", originalResult: { ...android, activationStatus: "ACTIVE" } });
+    expect(await api.activationReceipt("phone-key:1")).toMatchObject({ status: "SUCCEEDED", result: { activationStatus: "ACTIVE", userId: 9 } });
+    for (const invalid of [{}, { commandType: "OTHER", status: "FAILED" }, { commandType: "PHONE_ACTIVATE", status: "PROCESSING" },
+      { commandType: "PHONE_ACTIVATE", status: "FAILED", originalResult: {} },
+      { commandType: "PHONE_ACTIVATE", status: "FAILED", originalResult: { conflictType: "<raw server content>" } },
+      { commandType: "PHONE_ACTIVATE", status: "SUCCEEDED", originalResult: android }]) {
+      request.mockResolvedValue(invalid);
+      await expect(api.activationReceipt("phone-key:1")).rejects.toThrow("ONBOARDING_CALIBRATION_RESPONSE_INVALID");
+    }
+  });
   afterEach(() => advanceRuntimeRevision(null));
 
   it("reads binding existence without an installation login or inferred fallback", async () => {
@@ -64,12 +109,38 @@ describe("onboarding calibration API", () => {
     const denial = new ApiError({ kind: "business", message: "PHONE_REPLACEMENT_DISABLED" });
     const request = vi.fn().mockRejectedValue(denial);
     const api = createOnboardingCalibrationApi({ request } as never);
-    await expect(api.activate("device-a", 2, "phone-active-001")).rejects.toBe(denial);
+    await expect(api.activate("device-a", 2, "phone-active-001", versions)).rejects.toBe(denial);
     expect(request).toHaveBeenCalledTimes(1);
   });
 
   it("accepts only a server-canonical capability projection", () => {
     expect(parseOnboardingCalibration(valid, "PRODUCTION")).toMatchObject({ source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", tier: 3, tops: 28.3 });
+  });
+
+  it("accepts Android server-hidden hardware echoes on every calibration response path", async () => {
+    const request = vi.fn().mockResolvedValue(android);
+    const api = createOnboardingCalibrationApi({ request } as never);
+    for (const result of [await api.calibrate("device-a", valid.signals, 1, "calibration-key"),
+      await api.result("device-a"), await api.activate("device-a", 2, "phone-active-001", versions),
+      await api.defer("device-a", 2, "phone-defer-001")]) {
+      expect(result).toMatchObject({ calibrationStatus: "MATCHED", calibrationAvailable: true,
+        computeValue: 65.42, tops: 65.42, signals: { platform: "android", soc: "", gpu: "" } });
+      expect(result.signals).not.toHaveProperty("socIds");
+    }
+  });
+
+  it("rejects explicit invalid GPU echoes and still requires canonical identity and capability facts", () => {
+    for (const gpu of [null, false, 7, {}, [], "x".repeat(257)]) {
+      expect(() => parseOnboardingCalibration({ ...android, signals: { ...android.signals, gpu } }))
+        .toThrow("ONBOARDING_CALIBRATION_RESPONSE_INVALID");
+    }
+    for (const change of [{ userId: undefined }, { deviceId: "" }, { source: "client" }, { serverCanonical: false },
+      { activationStatus: "UNKNOWN" }, { calibrationStatus: "UNKNOWN" }, { computeValue: 0, tops: 0 },
+      { computeValue: NaN, tops: NaN }, { computeValue: Infinity, tops: Infinity }, { tops: 65.41 },
+      { tier: 0 }, { baseRateUsdt: 0 }]) {
+      expect(() => parseOnboardingCalibration({ ...android, ...change }), JSON.stringify(change))
+        .toThrow("ONBOARDING_CALIBRATION_RESPONSE_INVALID");
+    }
   });
 
   it("rejects an environment/run mismatch", () => {
@@ -81,7 +152,11 @@ describe("onboarding calibration API", () => {
     const pending = { ...valid, calibrationAvailable: false, calibrationStatus: "PENDING_VERIFICATION",
       pendingReason: "RULES_UNAVAILABLE", computeUnit: "platform", computeValue: null, ruleId: null, ruleVersion: 0,
       score: null, tier: null, tierName: null, tops: null, baseRateUsdt: null, baseRateNex: null, comparisonConfig: [] };
-    expect(parseOnboardingCalibration(pending)).toMatchObject({ calibrationStatus: "PENDING_VERIFICATION", calibrationAvailable: false, computeValue: null });
+    for (const platform of ["android", "ios"]) {
+      expect(parseOnboardingCalibration({ ...pending, signals: { ...publicSignals, platform } }))
+        .toMatchObject({ calibrationStatus: "PENDING_VERIFICATION", calibrationAvailable: false,
+          computeValue: null, signals: { platform, soc: "", gpu: "" } });
+    }
     expect(() => parseOnboardingCalibration({ ...pending, activationStatus: "ACTIVE" })).toThrow();
     expect(() => parseOnboardingCalibration({ ...valid, calibrationStatus: "PENDING_VERIFICATION", computeUnit: "platform", computeValue: null, ruleId: null, ruleVersion: 0 })).toThrow();
     const matched = { ...valid, calibrationStatus: "MATCHED", computeUnit: "platform", computeValue: 120.5,
@@ -89,6 +164,24 @@ describe("onboarding calibration API", () => {
     expect(parseOnboardingCalibration(matched)).toMatchObject({ computeValue: 120.5, ruleVersion: 2 });
     expect(() => parseOnboardingCalibration({ ...matched, tops: 119 })).toThrow();
     expect(() => parseOnboardingCalibration({ ...matched, ruleId: null })).toThrow();
+  });
+
+  it("reads the stored iPhone allocation by model without needing the server-only range", () => {
+    const iphone = { ...valid, calibrationStatus: "MATCHED", computeUnit: "platform", computeValue: 113.42, tops: 113.42, score: 113,
+      tier: 5, ruleId: "ios-iphone-16-pro", ruleVersion: 4, calibrationMethod: "IOS_MODEL_RANGE", model: "iPhone 16 Pro",
+      signals: { ...publicSignals, platform: "ios", memGB: null, cores: null, model: "iPhone17,1", brand: "Apple" } };
+    const parsed = parseOnboardingCalibration(iphone);
+    expect(parsed).toMatchObject({ computeValue: 113.42, iosModel: { method: "IOS_MODEL_RANGE", model: "iPhone 16 Pro" } });
+    expect(JSON.stringify(parsed)).not.toMatch(/minComputeValue|maxComputeValue|OPERATOR_PRESET/);
+    // An older server that still sends the range parses the same; the range is never kept.
+    expect(parseOnboardingCalibration({ ...iphone, minComputeValue: 100, maxComputeValue: 120, valueSource: "OPERATOR_PRESET" }))
+      .toEqual(parsed);
+    for (const change of [{ computeValue: 113.425, tops: 113.425 }, { calibrationMethod: "GPU_BENCHMARK" }, { model: "" },
+      { calibrationStatus: "PENDING_VERIFICATION" }]) {
+      expect(() => parseOnboardingCalibration({ ...iphone, ...change }), JSON.stringify(change)).toThrow();
+    }
+    expect(parseOnboardingCalibration({ ...valid, calibrationStatus: "MATCHED", computeUnit: "platform", computeValue: 28.3,
+      ruleId: "fixture", ruleVersion: 2 }).iosModel).toBeUndefined();
   });
 
   it("rejects a client/mock projection or out-of-range raw signal", () => {
@@ -153,12 +246,12 @@ describe("onboarding calibration API", () => {
       .mockResolvedValueOnce({ ...valid, activationStatus: "DEFERRED", revision: 4 });
     const api = createOnboardingCalibrationApi({ request } as never);
 
-    await api.activate("device-a", 2, "phone-active-001");
+    await api.activate("device-a", 2, "phone-active-001", versions);
     await api.defer("device-a", 3, "phone-defer-001");
 
     expect(request).toHaveBeenNthCalledWith(1, expect.objectContaining({
       method: "POST", path: "/api/onboarding/calibrate/activate", idempotencyKey: "phone-active-001",
-      body: { deviceId: "device-a", expectedRevision: 2 },
+      body: { deviceId: "device-a", expectedRevision: 2, ...versions },
     }));
     expect(request).toHaveBeenNthCalledWith(2, expect.objectContaining({
       method: "POST", path: "/api/onboarding/calibrate/defer", idempotencyKey: "phone-defer-001",

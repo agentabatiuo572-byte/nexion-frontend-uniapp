@@ -10,7 +10,7 @@ import { en } from "@/i18n/messages/en";
 import { vi } from "@/i18n/messages/vi";
 import { formatUnreadBadge } from "./unread-badge";
 import chassis from "@/components/app-chassis.vue?raw";
-import bubble from "@/components/nova/nova-bubble.vue?raw";
+import bubble from "@/components/support/support-bubble.vue?raw";
 import services from "@/components/support/service-message-list.vue?raw";
 import conversations from "@/pages/support/messages.vue?raw";
 import notifications from "@/pages/me/notifications.vue?raw";
@@ -38,7 +38,7 @@ function elementMarkup(source: string, matches: (node: ElementNode) => boolean):
 const hasClass = (name: string) => (node: ElementNode) => node.props.some(prop => prop.type === 6 && prop.name === "class" && prop.value?.content.split(" ").includes(name));
 const markup = {
   bell: elementMarkup(chassis, hasClass("nx-badge")),
-  bubble: elementMarkup(bubble, hasClass("nx-nova-badge")),
+  bubble: elementMarkup(bubble, hasClass("nx-support-badge")),
   service: elementMarkup(services, hasClass("service-unread")),
   conversation: elementMarkup(conversations, hasClass("nx-conv-unread")),
   segment: elementMarkup(segments, hasClass("nx-glass-option__count")),
@@ -74,7 +74,7 @@ function sourceFunction<T>(source: string, name: string, bindings: Record<string
   return expression<T>(source, node => ts.isFunctionDeclaration(node) && node.name?.text === name, bindings);
 }
 const serviceUnavailable = sourceFunction<(row: { unread: unknown; kind?: string }) => boolean>(services, "unreadUnavailable", { conversations: {} });
-const conversationUnavailable = sourceFunction<(row: { unread: unknown; isAi?: boolean }) => boolean>(conversations, "unreadUnavailable", { humanReadFailed: Vue.ref(false) });
+const conversationUnavailable = sourceFunction<(row: { unread: unknown }) => boolean>(conversations, "unreadUnavailable", { humanReadFailed: Vue.ref(false) });
 const normalTypeBadge = (count: number) => sourceFunction<(key: string) => string | undefined>(conversations, "typeUnreadBadge", { typeUnread: () => count, humanReadFailed: Vue.ref(false), formatUnreadBadge });
 
 describe("message unread badge display", () => {
@@ -105,9 +105,8 @@ describe("message unread badge display", () => {
       const sections = computedValue<CountOption[]>(notifications, "sectionOptions", { t, notifs: { unread: count }, center: { serviceUnread: count } });
       const types = computedValue<CountOption[]>(conversations, "typeOptions", { TYPES: Vue.ref([{ key: "advisor" }, { key: "support" }, { key: "ai" }]), typeLabel: (key: string) => key, typeUnreadBadge: normalTypeBadge(count) });
       for (const option of sections) {
-        expect(option.count).toBe(count);
-        const html = await renderBadge(markup.segment, { option });
-        expect(html.match(/<text[^>]*>([^<]*)<\/text>/)?.[1]).toBe(String(count));
+        expect(option.count).toBeUndefined();
+        expect((option as { hasUnread: boolean }).hasUnread).toBe(count > 0);
       }
       for (const option of types) {
         expect(option.count).toBe(label || undefined);
@@ -125,25 +124,26 @@ describe("message unread badge display", () => {
         const invalid = !Number.isSafeInteger(count) || (count as number) < 0;
         for (const failed of [false, true]) {
           const serviceCheck = sourceFunction<(row: { unread: unknown; kind: string }) => boolean>(services, "unreadUnavailable", { conversations: { error: failed ? "read failed" : "", categoryAvailabilityStatus: "ready" } });
-          for (const kind of ["advisor"]) {
+          for (const kind of ["advisor", "support"]) {
             const row = { unread: count, kind };
             const html = await renderBadge(markup.service, { row, unreadUnavailable: serviceCheck, formatUnreadBadge });
             const expected = invalid || failed ? "-" : formatUnreadBadge(count as number);
             expect(html.match(/<text[^>]*>([^<]*)<\/text>/)?.[1] || "").toBe(expected);
           }
-          const conversationCheck = sourceFunction<(row: { unread: unknown; isAi: boolean }) => boolean>(conversations, "unreadUnavailable", { humanReadFailed: Vue.ref(failed) });
+          const conversationCheck = sourceFunction<(row: { unread: unknown }) => boolean>(conversations, "unreadUnavailable", { humanReadFailed: Vue.ref(failed) });
           const typeBadge = sourceFunction<(key: string) => string | undefined>(conversations, "typeUnreadBadge", { typeUnread: () => count, humanReadFailed: Vue.ref(failed), formatUnreadBadge });
-          for (const isAi of [false, true]) {
-            const r = { unread: count, isAi };
-            const expected = invalid || failed && !isAi ? "-" : formatUnreadBadge(count as number);
+          {
+            const r = { unread: count };
+            const expected = invalid || failed ? "-" : formatUnreadBadge(count as number);
             const html = await renderBadge(markup.conversation, { r, unreadUnavailable: conversationCheck, formatUnreadBadge });
             expect(html.match(/<text[^>]*>([^<]*)<\/text>/)?.[1] || "").toBe(expected);
-            expect(typeBadge(isAi ? "ai" : "advisor") || "").toBe(expected);
+            expect(typeBadge("advisor") || "").toBe(expected);
           }
         }
       }
       const categoryFailed = sourceFunction<(row: { unread: number; kind: string }) => boolean>(services, "unreadUnavailable", { conversations: { categoryAvailabilityStatus: "failed" } });
       expect(categoryFailed({ unread: 0, kind: "advisor" })).toBe(true);
+      expect(categoryFailed({ unread: 0, kind: "support" })).toBe(true);
       expect(computedValue<boolean>(conversations, "humanReadFailed", { convStore: { categoryAvailabilityStatus: "failed" } })).toBe(true);
       expect(services).toContain('@click="openRow(row)"');
       expect(conversations).toContain('@click="openRow(r)"');
@@ -155,11 +155,14 @@ describe("message unread badge display", () => {
         visibleFilterIds: Vue.ref(['all', 'finance', 'device']), filterLabel: (value: string) => value,
         notifs: { unread: 111, unreadByCategory: { finance: 100, device: 0 }, unreadByCategoryExact: exact },
       });
-      expect(options[0].count).toBe(111);
+      expect(options[0].count).toBeUndefined();
+      expect(options[0].hasUnread).toBe(true);
       expect(options[1].hasUnread).toBe(true);
       expect(options[2].hasUnread).toBe(false);
-      expect(options[1].count).toBe(exact ? 100 : undefined);
-      expect(options[2].count).toBe(exact ? 0 : undefined);
+      expect(options[1].count).toBeUndefined();
+      expect(options[2].count).toBeUndefined();
     }
   });
 });
+
+it("does not display unknown actionable authority as zero", () => { expect(formatUnreadBadge(null)).toBe("—"); expect(formatUnreadBadge(0)).toBe(""); });

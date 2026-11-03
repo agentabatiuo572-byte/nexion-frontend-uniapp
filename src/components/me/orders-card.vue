@@ -11,7 +11,7 @@
     <view class="nx-glass-card relative overflow-hidden" :style="cardStyle">
       <view v-if="latestOrder" class="flex items-center justify-between" style="gap: 8px">
         <view class="min-w-0">
-          <text class="block truncate" style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ nexGridBrandText(latestOrder.productName) }}</text>
+          <text class="block truncate" style="font-family: var(--font-v5); font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink)">{{ (latestOrder.productName) }}</text>
           <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">${{ formatAmount(latestOrder.total) }} · {{ latestOrder.dataCenter }}</text>
         </view>
         <text class="shrink-0 font-mono-tabular" :style="statusPillStyle(latestOrder.status)">{{ statusLabel(latestOrder.status) }}</text>
@@ -24,7 +24,7 @@
       </view>
 
       <view class="flex items-center justify-between active:opacity-70" :style="footerStyle" data-me-action="view-all-orders" role="button" tabindex="0" :aria-label="t.me.viewAllOrders" @click="goOrders"  @keydown.enter.prevent="goOrders" @keydown.space.prevent="goOrders">
-        <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.me.viewAllOrders }}</text>
+        <text style="font-family: var(--font-v5); font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink)">{{ t.me.viewAllOrders }}</text>
         <view class="inline-flex items-center gap-0.5">
           <text v-if="orderCount > 0" class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ orderCount }}</text>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -42,7 +42,6 @@ import SectionHeader from "@/components/me/section-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useOrders } from "@/store/orders";
 import { latestOrder as selectLatestOrder } from "@/lib/latest-order";
-import { nexGridBrandText } from "@/lib/brand-copy";
 
 const t = useT();
 const orders = useOrders();
@@ -61,6 +60,7 @@ const ORDER_STATUS_STYLE: Record<string, { color: string; bg: string; border: st
   placed: { color: "var(--v5-brand-2-ink)", bg: "var(--v5-brand-2-soft)", border: "var(--v5-brand-2-border)" },
   paid: { color: "var(--v5-brand)", bg: "var(--v5-brand-soft)", border: "var(--v5-brand-border)" },
   provisioning: { color: "var(--v5-success-ink)", bg: "var(--v5-success-soft)", border: "color-mix(in srgb, var(--v5-success) 30%, transparent)" },
+  inventory: { color: "var(--v5-success-ink)", bg: "var(--v5-success-soft)", border: "color-mix(in srgb, var(--v5-success) 30%, transparent)" },
   activated: { color: "var(--v5-success-ink)", bg: "var(--v5-success-soft)", border: "color-mix(in srgb, var(--v5-success) 30%, transparent)" },
   cancelled: { color: "var(--v5-brand-2-ink)", bg: "var(--v5-brand-2-soft)", border: "var(--v5-brand-2-border)" },
 };
@@ -82,6 +82,7 @@ function statusLabel(status: string): string {
     paid: t.value.orders.statusPaid,
     provisioning: t.value.orders.statusProvisioning,
     activated: t.value.orders.statusActivated,
+    inventory: t.value.orders.statusInventory,
     payment_failed: t.value.orders.statusPaymentFailed,
     expired: t.value.orders.statusExpired,
     provisioning_failed: t.value.orders.statusProvisioningFailed,

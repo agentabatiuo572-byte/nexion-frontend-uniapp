@@ -42,7 +42,6 @@ import { createReferralRewardApi } from "./referral-reward-api";
 import { createSupportApi } from "./support-api";
 import { renewAppConversationRealtime, withConversationRealtime } from "./app-conversation-realtime";
 import { createProfileApi } from "./profile-api";
-import { createNovaAiApi } from "./nova-ai-api";
 import { createNetworkRegionsApi } from "./network-regions-api";
 import { createTeamNetworkApi } from "./team-network-api";
 import { createDeveloperAccessApi } from "./developer-access-api";
@@ -74,6 +73,8 @@ import { createNativeSessionStorage, type NativeSessionStorage } from "./native-
 import { getDeviceId } from "@/lib/device-id";
 
 export const apiRuntimeConfig = readApiRuntimeConfig();
+/** Immutable identity of the client constructed below; mutable UI config cannot rebind it. */
+export const apiRuntimeClientOrigin = Object.freeze({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl });
 export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
 export const remoteApiEnabled = true;
 // The formal App uses the Java service's canonical development contract in
@@ -90,15 +91,18 @@ refreshCredentialMode = "cookie";
 // #endif
 export const h5RefreshCookieEnabled = refreshCredentialMode === "cookie";
 let nativeSessionStorage: NativeSessionStorage | undefined;
+let nativeAttemptStorage: NativeSessionStorage | undefined;
 // #ifdef APP-PLUS
 if (!h5RefreshCookieEnabled) {
   nativeSessionStorage = createNativeSessionStorage({ baseUrl: apiRuntimeConfig.baseUrl, installationId: getDeviceId });
+  nativeAttemptStorage = createNativeSessionStorage({ baseUrl: apiRuntimeConfig.baseUrl, purpose: "login-attempt", installationId: getDeviceId });
 }
 // #endif
 export const sessionVault = createRuntimeSessionVault(nativeSessionStorage);
 export async function prepareSessionVault(): Promise<void> {
   if (!nativeSessionStorage) return;
   await nativeSessionStorage.ready();
+  await nativeAttemptStorage?.ready();
   sessionVault.hydrate();
 }
 let clientSurface: "APP" | "H5" | undefined;
@@ -133,11 +137,11 @@ export const apiClient = createRuntimeApiClient({
 export const authApi = createAuthApi(apiClient, sessionVault, { refreshCredentialMode, clientSurface,
   installationId: getDeviceId,
   executionSupported: () => false,
-  attemptStorage: typeof sessionStorage !== "undefined" ? {
+  attemptStorage: nativeAttemptStorage ?? (typeof sessionStorage !== "undefined" ? {
     get: () => { const value = sessionStorage.getItem("uvel-login-attempt"); return value ? JSON.parse(value) : null; },
     set: value => sessionStorage.setItem("uvel-login-attempt", JSON.stringify(value)),
     remove: () => sessionStorage.removeItem("uvel-login-attempt"),
-  } : undefined,
+  } : undefined),
 });
 export const accountApi = createAccountApi(apiClient);
 export const paymentApi = createPaymentApi(apiClient, expectedApiEnvironment);
@@ -181,7 +185,6 @@ export const taskAssignmentApi = createTaskAssignmentApi(apiClient, expectedApiE
 export const referralRewardApi = createReferralRewardApi(apiClient, expectedApiEnvironment);
 export const supportApi = createSupportApi(withConversationRealtime(apiClient));
 export const profileApi = createProfileApi(apiClient);
-export const novaAiApi = createNovaAiApi(apiClient);
 export const networkRegionsApi = createNetworkRegionsApi(apiClient);
 export const teamNetworkApi = createTeamNetworkApi(apiClient, expectedApiEnvironment);
 export const developerAccessApi = createDeveloperAccessApi(apiClient, expectedApiEnvironment);

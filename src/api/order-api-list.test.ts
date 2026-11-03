@@ -22,12 +22,51 @@ function api(payload: unknown, mode: "prod" | "dev") {
 afterEach(() => advanceRuntimeRevision(null));
 
 describe("order list provenance", () => {
+  it("keeps fulfilled order history readable after its device activation timestamp is cleared", async () => {
+    const fulfilled = { ...order(), orderNo: "LEGACY-S1", paymentStatus: "PAID", orderStatus: "COMPLETED",
+      activationStatus: "ACTIVATED", canonicalStatus: "activated", paidAt: 2_000, activatedAt: null, expiresAt: null };
+    const envelope = { source: "server", sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true };
+    const snapshot = await api({ ...envelope, orders: [order(), fulfilled, { ...fulfilled, orderNo: "LEGACY-CLOUD" },
+      { ...order(), orderNo: "OLD-EXPIRED", paymentStatus: "EXPIRED", orderStatus: "EXPIRED",
+        canonicalStatus: "expired", expiresAt: null },
+      { ...order(), orderNo: "OLD-REFUND", paymentStatus: "REFUNDED", orderStatus: "REFUNDED",
+        activationStatus: "REFUNDED", canonicalStatus: "refunded", expiresAt: null },
+    ] }, "prod").list();
+    expect(snapshot.orders).toHaveLength(5);
+    expect(snapshot.orders[1]).toMatchObject({ canonicalStatus: "activated", activatedAt: null });
+    for (const invalid of [{ paidAt: null }, { paymentStatus: "PENDING" }, { orderStatus: "PAID" },
+      { activationStatus: "WAITING_PROVISIONING" }]) {
+      await expect(api({ ...envelope, orders: [{ ...fulfilled, ...invalid }] }, "prod").list())
+        .rejects.toMatchObject({ message: "ORDER_RESPONSE_INVALID" });
+    }
+  });
+
   it("preserves promotion decimal strings in ordinary order history without rounding", async () => {
     const row={...order(),promotionQuoteId:'approved-quote',amountUsdt:'999999999999.999999'};
     const envelope={source:'server',sourceEnvironment:'PRODUCTION',runId:null,serverCanonical:true,orders:[row]};
     await expect(api(envelope,'prod').list()).resolves.toMatchObject({orders:[{amountUsdt:'999999999999.999999'}]});
     for(const amountUsdt of ['1e3','-1.000000','1.0000001','1000000000000.000000'])await expect(api({...envelope,orders:[{...row,amountUsdt}]},'prod').list()).rejects.toMatchObject({message:'ORDER_RESPONSE_INVALID'});
     await expect(api({...envelope,orders:[{...row,promotionQuoteId:null}]},'prod').list()).rejects.toMatchObject({message:'ORDER_RESPONSE_INVALID'});
+  });
+  it.each(["SINGLE","BUNDLE"])("keeps promotion %s history readable alongside a completed trade-in",async orderType=>{
+    const promotion={...order(),orderType,promotionQuoteId:"approved-quote",subtotalUsdt:"39.800000",discountUsdt:"1.000000",amountUsdt:"38.800000",
+      ...(orderType==="BUNDLE"?{lineItems:[{sku:"cloud-share",name:"Cloud Share",quantity:2,unitPriceUsdt:19.9,lineAmountUsdt:39.8}]}:{})};
+    const tradein={...order(),orderNo:"TIO-ORIGINAL",orderType:"TRADE_IN",paymentStatus:"PAID",orderStatus:"COMPLETED",
+      activationStatus:"ACTIVATED",canonicalStatus:"activated",paidAt:2,expiresAt:null,tradeinNo:"TIN-ORIGINAL",sourceDeviceId:1207,targetDeviceId:1211};
+    const snapshot=await api({source:"server",sourceEnvironment:"PRODUCTION",runId:null,serverCanonical:true,orders:[tradein,promotion]},"prod").list();
+    expect(snapshot.orders).toHaveLength(2);
+    expect(snapshot.orders[0]).toMatchObject({orderNo:"TIO-ORIGINAL",targetDeviceId:1211});
+    expect(snapshot.orders[1]).toMatchObject({subtotalUsdt:39.8,discountUsdt:1,amountUsdt:"38.800000"});
+  });
+  it.each(["subtotalUsdt","discountUsdt"])("retains strict decimal validation for promotion %s and rejects strings on ordinary orders",async field=>{
+    const envelope={source:"server",sourceEnvironment:"PRODUCTION",runId:null,serverCanonical:true};
+    const promotion={...order(),promotionQuoteId:"approved-quote",subtotalUsdt:"100.000000",discountUsdt:"0.000000",amountUsdt:"100.000000"};
+    for(const value of ["-1.000000","1e3","1.0000001","1000000000000.000000","01.000000"," 1.00","NaN","Infinity"]) {
+      await expect(api({...envelope,orders:[order(),{...promotion,[field]:value}]},"prod").list())
+        .rejects.toMatchObject({message:"ORDER_RESPONSE_INVALID"});
+    }
+    await expect(api({...envelope,orders:[{...order(),[field]:"1.000000"}]},"prod").list())
+      .rejects.toMatchObject({message:"ORDER_RESPONSE_INVALID"});
   });
   it("defaults to a single page of twenty", async () => {
     const request = vi.fn().mockResolvedValue({ source: "server", sourceEnvironment: "PRODUCTION", runId: null,
@@ -144,6 +183,20 @@ describe("order list provenance", () => {
     for (const refundReasonCode of ["customer called support", "duplicate_payment", null, undefined]) {
       await expect(api({ ...envelope, orders: [{ ...refunded, refundReasonCode }] }, "prod").list())
         .resolves.toMatchObject({ orders: [{ refundReasonCode: null }] });
+    }
+  });
+
+  it("keeps known close reasons and drops unknown or operator text", async () => {
+    const cancelled = {
+      ...order(), paymentStatus: "CANCELLED", orderStatus: "CANCELLED", activationStatus: "WAITING_PAYMENT",
+      canonicalStatus: "cancelled", expiresAt: null,
+    };
+    const envelope = { source: "server", sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true };
+    await expect(api({ ...envelope, orders: [{ ...cancelled, closeReasonCode: "USER_CANCELLED" }] }, "prod").list())
+      .resolves.toMatchObject({ orders: [{ closeReasonCode: "USER_CANCELLED" }] });
+    for (const closeReasonCode of ["stock ran out", "user_cancelled", null, undefined]) {
+      await expect(api({ ...envelope, orders: [{ ...cancelled, closeReasonCode }] }, "prod").list())
+        .resolves.toMatchObject({ orders: [{ closeReasonCode: null }] });
     }
   });
 });

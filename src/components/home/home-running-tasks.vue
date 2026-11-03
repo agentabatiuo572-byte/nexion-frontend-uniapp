@@ -6,14 +6,14 @@
     </view>
     <view class="nx-feed-copy">
       <text class="nx-feed-title">{{ visibility.mask(row.name) }}</text>
-      <text class="nx-feed-sub">{{ row.confirming ? computeCopy.confirming : row.simulated && row.status === 'RUNNING' ? computeCopy.running : row.status ? computeCopy.statuses[row.status] : computeCopy.running }}</text>
+      <text class="nx-feed-sub">{{ row.confirming ? computeCopy.confirming : row.simulated && row.status === 'RUNNING' ? computeCopy.running : row.status ? computeCopy.statuses[row.status] : t.home.feedRunning }}</text>
     </view>
     <view class="nx-feed-figure">
       <text class="nx-feed-pct font-mono-tabular">{{ visibility.mask(row.pct == null ? '—' : `${row.pct}%`) }}</text>
-      <text class="nx-feed-est font-mono-tabular">{{ computeCopy.reward }} {{ visibility.mask(row.rewardText) }}</text>
+      <text class="nx-feed-est font-mono-tabular">{{ t.home.feedEstimated }} {{ visibility.mask(row.rewardText) }}</text>
     </view>
     <view class="nx-feed-progress" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || row.pct == null ? undefined : row.pct" aria-valuemin="0" aria-valuemax="100">
-      <view v-if="!visibility.hidden && row.pct != null" class="nx-feed-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
+      <view v-if="!visibility.hidden && row.pct != null" v-viz-inview class="nx-feed-progress__fill nx-viz-grow" :style="{ width: `${row.pct}%` }" />
     </view>
   </view>
 </template>
@@ -44,22 +44,20 @@ useVisibleInterval(() => {
 }, 1000);
 // Same readiness rule as the home fleet rows: a retained snapshot may show while it refreshes.
 const tasksReady = computed(() => !remoteApiEnabled || app.remoteAssignmentHasSnapshot);
-const rows = computed(() => !tasksReady.value ? [] : app.visibleDevices.filter(device => device.kind !== "phone").flatMap((device) => {
+// Lite hides phone devices and their tasks (rule: device-level views hide phones).
+const rows = computed(() => !tasksReady.value ? [] : app.visibleDevices.filter((device) => device.kind !== "phone").flatMap((device) => {
   const task = device.currentTask;
-  if (!task) return device.recoveryPending ? [{ id: `${device.id}:recovery`, name: device.name, rewardText: "—", pct: null, simulated: false, confirming: false, status: "RECOVERING" as const }] : [];
+  if (!task || task.status === "PAUSED" || device.interruptedAt != null) return [];
   const taskNow = device.taskServerNow != null && device.taskServerNowReceivedAt != null
     ? projectServerNow(device.taskServerNow, device.taskServerNowReceivedAt, monotonicNow.value) : now.value;
-  const pct = taskProgressPercent(task, taskNow, device.interruptedAt);
+  const validUntil = device.kind === "phone" ? device.phoneValidUntil : null;
+  const expired = validUntil != null && taskNow >= validUntil && (task.completableAt == null || task.completableAt > validUntil);
+  const pct = taskProgressPercent(task, taskNow, device.interruptedAt, validUntil);
   const simulated = task.executionMode === "SIMULATED";
-  const confirming = simulated && task.status === "RUNNING" && task.completableAt != null && taskNow >= task.completableAt;
+  const confirming = simulated && !expired && task.status === "RUNNING" && task.completableAt != null && taskNow >= task.completableAt;
   return task.protocolVersion === undefined && (pct === null || pct >= 100) ? []
     : [{ id: `${device.id}:${task.id}`, name: task.type, rewardText: formatTaskReward(task, true), pct, simulated, confirming,
-      status: task.protocolVersion ? task.status : undefined }];
+      status: expired ? "PAUSED" as const : task.protocolVersion ? task.status : undefined }];
 }).slice(0, props.limit));
 watch(() => rows.value.length, count => emit("count", count), { immediate: true });
 </script>
-
-<style scoped>
-.nx-feed-row { display:flex;align-items:center;gap:10px;position:relative;padding:14px 2px 18px;border-bottom:1px solid var(--v5-border); }
-.nx-feed-icon { color:var(--v5-brand);flex:none; }.nx-feed-copy { flex:1;min-width:0; }.nx-feed-title,.nx-feed-sub,.nx-feed-pct,.nx-feed-est { display:block; }.nx-feed-title { font-size:13px;overflow-wrap:anywhere; }.nx-feed-sub,.nx-feed-est { font-size:12px;color:var(--v5-ink-3); }.nx-feed-figure { text-align:right;flex:none; }.nx-feed-progress { position:absolute;bottom:6px;left:28px;right:2px;height:3px;background:var(--v5-surface-3);border-radius:3px;overflow:hidden; }.nx-feed-progress__fill { height:100%;background:var(--v5-brand); }
-</style>

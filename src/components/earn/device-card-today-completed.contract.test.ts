@@ -1,11 +1,18 @@
+import { computeV2Copy } from "@/i18n/compute-v2";
+import * as progress from "@/lib/task-progress";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@dcloudio/uni-app", () => ({ onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn(), onUnload: vi.fn() }));
 import source from "./device-card-pc.vue?raw";
+import * as tabLifecycle from "@/composables/use-tab-page-lifecycle";
 import zh from "../../i18n/messages/zh.ts?raw";
 import en from "../../i18n/messages/en.ts?raw";
 import viSource from "../../i18n/messages/vi.ts?raw";
 
 import * as Vue from 'vue';
 import { formatAmount } from '@/lib/amount-display';
+import { formatUsd } from '@/lib/usd-display';
+import { canControlDevice } from '@/lib/device-control-platform';
+import { deviceStatisticsCapabilityCopy } from '@/i18n/device-statistics-capability';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
 import { createPinia, setActivePinia } from 'pinia';
@@ -40,7 +47,7 @@ describe("per-device today-completed section", () => {
     expect(source).toContain("deviceTodayCompleted.length");
     expect(source).toContain("const liveTaskNow = computed");
     expect(source).toContain("props.device.taskServerNowReceivedAt");
-    expect(source).toMatch(/elapsedRatio[\s\S]*liveTaskNow\.value/);
+    expect(source).toMatch(/progressPct[\s\S]*liveTaskNow\.value/);
     expect(source).toMatch(/elapsedRemaining[\s\S]*liveTaskNow\.value/);
     expect(source).not.toContain("device.kind === 'phone'\" class=\"nx-phone-today-completed");
     expect(source).not.toContain("今日已完成（5）");
@@ -72,6 +79,8 @@ describe("per-device today-completed section", () => {
 // Full production SFCs + real App store and wire parsers; RAM GET boundary only.
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true, fundsServerEnabled: true, expectedApiEnvironment: 'dev',
+  apiRuntimeConfig: { environment: 'dev', baseUrl: 'http://127.0.0.1:8110' },
+  apiRuntimeClientOrigin: { environment: 'dev', baseUrl: 'http://127.0.0.1:8110' },
   sessionVault: { read: vi.fn() }, deviceE3Api: { fleet: vi.fn() },
   taskAssignmentApi: { state: vi.fn() }, appHomeApi: { fetch: vi.fn() },
   withdrawalApi: { submit: vi.fn(), list: vi.fn(), get: vi.fn() },
@@ -183,11 +192,19 @@ async function setup(name: string) {
   const blank = { render: () => null };
   const chassis = Vue.defineComponent({ setup: (_p, ctx) => () => Vue.h('view', ctx.slots.default?.()) });
   const deps: Record<string, unknown> = {
+    '@/composables/use-loops-in-view': { useLoopsInView: () => ({ elRef: Vue.ref(null), running: Vue.ref(false) }) },
+    '@/components/device-art.vue': { __esModule: true, default: blank },
+    '@/components/earn/job-gauge.vue': { __esModule: true, default: blank },
+    '@/lib/device-control-platform': { canControlDevice },
+    '@/store/data-visibility': { useDataVisibility: () => ({ hidden: false, mask: String }) },
     '@/lib/amount-display': { formatAmount },
+    '@/lib/usd-display': { formatUsd },
+    '@/i18n/device-statistics-capability': { useDeviceStatisticsCapabilityCopy: () => Vue.ref(deviceStatisticsCapabilityCopy.zh) },
     vue: Vue, '@/store/app': { useApp: () => app }, '@/store/session': { useSession },
     '@/store/config': { useConfig }, '@/lib/native-phone-runtime': native,
     '@/lib/phone-activation-guidance': guidance, '@/store/device-types': deviceTypes,
-    '@/lib/workload-label': workload, '@/lib/task-result-confirmation': confirmation,
+    '@/components/earn/task-v2-status.vue': { __esModule: true, default: blank },
+    '@/lib/workload-label': workload, '@/lib/task-result-confirmation': confirmation, "@/i18n/compute-v2": { useComputeV2Copy: () => Vue.ref(computeV2Copy.en) }, '@/lib/task-progress': progress,
     '@/lib/device-copy': deviceCopy, '@/store/device-lifecycle': lifecycle,
     '@/store/interrupt': interrupt, '@/lib/hashpower': hashpower, '@/lib/device-capability': capability,
     '@/lib/today-completed-tasks': completions, '@/lib/device-detail-navigation': navigation,
@@ -195,14 +212,21 @@ async function setup(name: string) {
     '@/i18n/format': { fmt }, '@/i18n/use-t': { useT: () => Vue.ref(taskHistoryCopy) }, '@/api/runtime': remote,
     '@/lib/route': { navTo: vi.fn(), navBack: vi.fn(), takeNavigationQuery: () => '' },
     '@/store/earn-config': { prepareEarnConfig: () => {}, useEarnConfig: () => ({ lockedTeasers: () => [], averageEligibleReward: () => 0 }) },
-    '@dcloudio/uni-app': { onLoad: (f: Function) => loads.push(f), onShow: (f: Function) => shows.push(f) },
+    '@dcloudio/uni-app': { onLoad: (f: Function) => loads.push(f), onShow: (f: Function) => shows.push(f), onHide: vi.fn(), onUnload: vi.fn() },
     '@/components/app-chassis.vue': { __esModule: true, default: chassis },
     '@/components/empty-state.vue': { __esModule: true, default: blank },
     '@/components/sub-page-header.vue': { __esModule: true, default: blank },
     '@/components/earn/capacity-explainer-sheet.vue': { __esModule: true, default: blank },
     '@/components/home/device-slot.vue': { __esModule: true, default: blank },
+    '@/components/ui/nx-button.vue': { __esModule: true, default: blank },
+    '@/components/ui/nx-tag.vue': { __esModule: true, default: blank },
+    '@/components/liquid-glass.vue': { __esModule: true, default: blank },
+    '@/components/me/device-deactivate-sheet.vue': { __esModule: true, default: blank },
+    '@/composables/use-device-deactivation': { useDeviceDeactivation: () => ({ sheetDevice: Vue.ref(null), handleDeactivate: vi.fn(), onSheetWait: vi.fn(), onSheetForce: vi.fn() }) },
+    '@/composables/use-tradein-strip': { useTradeinStrip: () => ({ tradeinStrip: () => ({}), handleTradein: vi.fn() }) },
   };
   const imports = (id: string) => {
+    if (id === '@/composables/use-tab-page-lifecycle') return tabLifecycle;
     if (!(id in deps)) throw new Error('UNEXPECTED_IMPORT ' + id);
     return deps[id];
   };
@@ -240,13 +264,18 @@ it('initial independent task GET failure must not present confirmed zero/empty h
   expect(o.fleetStatus).toBe('ready'); expect(o.fleetHasSnapshot).toBe(true);
   expect(o.assignmentStatus).toBe('error'); expect(o.assignmentHasSnapshot).toBe(false);
   expect(o.detailSurfaceVisible).toBe(true);
-  expect(o.taskHistoryText).not.toContain(taskHistoryCopy.taskHistory.historyEmpty);
+  expect(o.taskHistoryText).not.toContain('暂无已完成作业。');
   expect(o.taskHistoryText).not.toContain('(0)');
 });
-it('canonical successful empty state remains a legitimate zero and empty history', async () => {
+it('canonical successful empty state shows the count and receipt entry without duplicate copy', async () => {
   const s = await setup('confirmed-empty'); const o = s.observe('ready');
   expect(o.assignmentStatus).toBe('ready'); expect(o.assignmentHasSnapshot).toBe(true);
-  expect(o.taskHistoryText).toContain('(0)'); expect(o.taskHistoryText).toContain(taskHistoryCopy.taskHistory.historyEmpty);
+  expect(o.taskHistoryText).toContain('(0)'); expect(o.taskHistoryText).not.toContain('暂无已完成作业。');
+  expect(o.taskHistoryText).toContain(taskHistoryCopy.taskHistory.viewAllAccountReceipts);
+  expect(o.taskHistoryText).not.toContain(taskHistoryCopy.taskHistory.loading);
+  const section = find(s.root, 'nx-device-today-completed')!;
+  expect(section.children.filter(child => child.tag)).toHaveLength(1);
+  expect(section.children.find(child => child.tag)?.props.style.marginBottom).toBe('0');
 });
 it('ordinary page show retry recovers error into parser-confirmed per-device history', async () => {
   assignment = () => Promise.reject(new Error('SYNTHETIC_TASK_READ_UNAVAILABLE'));
@@ -254,7 +283,7 @@ it('ordinary page show retry recovers error into parser-confirmed per-device his
   assignment = () => Promise.resolve(taskState(true)); await s.show(); const o = s.observe('retry ready');
   expect(o.assignmentStatus).toBe('ready'); expect(o.assignmentHasSnapshot).toBe(true);
   expect(o.recentCount).toBe(1); expect(o.taskHistoryText).toContain('(1)');
-  expect(o.taskHistoryText).toContain('Synthetic model'); expect(o.taskHistoryText).not.toContain(taskHistoryCopy.taskHistory.historyEmpty);
+  expect(o.taskHistoryText).toContain('Synthetic task'); expect(o.taskHistoryText).not.toContain('Synthetic model'); expect(o.taskHistoryText).not.toContain('暂无已完成作业。');
 });
 it.each(['account-switch', 'same-account-rebind'])('late task read cannot restore prior history after %s', async boundary => {
   const late = deferred<unknown>(); assignment = () => late.promise;
@@ -263,7 +292,7 @@ it.each(['account-switch', 'same-account-rebind'])('late task read cannot restor
   s.app.bindAccount(boundary === 'account-switch' ? 'user:7002' : 'user:7001');
   await flush(); late.resolve(taskState(true)); await flush(); const o = s.observe('old resolved');
   expect(o.assignmentHasSnapshot).toBe(false); expect(o.deviceCount).toBe(0);
-  expect(o.taskHistoryText).not.toContain('Synthetic model'); expect(o.uiToasts).toEqual([]);
+  expect(o.taskHistoryText).not.toContain('Synthetic task'); expect(o.uiToasts).toEqual([]);
 });
 it('unmounted detail does not render late read data or produce global feedback', async () => {
   const late = deferred<unknown>(); assignment = () => late.promise;
@@ -284,10 +313,10 @@ it('history loading after the first read failure cannot turn missing authority i
   expect(s.app.remoteAssignmentHasSnapshot).toBe(false);
   expect(historyText()).toContain(taskHistoryCopy.taskHistory.loading);
   expect(historyText()).not.toContain('(0)');
-  expect(historyText()).not.toContain(taskHistoryCopy.taskHistory.historyEmpty);
+  expect(historyText()).not.toContain('暂无已完成作业。');
   pending.resolve(taskState()); await expect(read).resolves.toBe(true); await flush();
   expect(historyText()).toContain('(0)');
-  expect(historyText()).toContain(taskHistoryCopy.taskHistory.historyEmpty);
+  expect(historyText()).not.toContain('暂无已完成作业。');
 });
 
 it('loading preserves confirmed history, error discloses failure, and ready empty recovers normally', async () => {
@@ -301,7 +330,7 @@ it('loading preserves confirmed history, error discloses failure, and ready empt
   expect(s.app.remoteAssignmentStatus).toBe('loading');
   expect(s.app.remoteAssignmentHasSnapshot).toBe(true);
   expect(historyText()).toContain('(1)');
-  expect(historyText()).toContain('Synthetic model');
+  expect(historyText()).toContain('Synthetic task');
   pending.reject(new Error('SYNTHETIC_TASK_READ_UNAVAILABLE'));
   await expect(read).resolves.toBe(true); await flush();
   expect(s.app.remoteAssignmentStatus).toBe('error');
@@ -309,10 +338,10 @@ it('loading preserves confirmed history, error discloses failure, and ready empt
   expect(s.app.devices[0].recentTasks).toHaveLength(1); // Existing store facts remain unchanged.
   expect(historyText()).toContain(taskHistoryCopy.wallet.assignmentsUnavailableTitle);
   expect(historyText()).not.toContain('(1)');
-  expect(historyText()).not.toContain(taskHistoryCopy.taskHistory.historyEmpty);
+  expect(historyText()).not.toContain('暂无已完成作业。');
   assignment = () => Promise.resolve(taskState());
   await expect(s.app.refreshRemoteFleet()).resolves.toBe(true); await flush();
   expect(s.app.remoteAssignmentStatus).toBe('ready');
   expect(historyText()).toContain('(0)');
-  expect(historyText()).toContain(taskHistoryCopy.taskHistory.historyEmpty);
+  expect(historyText()).not.toContain('暂无已完成作业。');
 });

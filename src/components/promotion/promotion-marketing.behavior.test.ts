@@ -1,10 +1,19 @@
 import * as Vue from 'vue';
+import { chromium } from 'playwright';
+// @ts-expect-error Node builtins are used only by this test runner.
+import { readFileSync, writeFileSync } from 'node:fs';
+// @ts-expect-error Node builtins are used only by this test runner.
+import { env } from 'node:process';
 import { compileScript,parse } from '@vue/compiler-sfc';
 import { compile } from '@vue/compiler-dom';
 import { renderToString } from '@vue/server-renderer';
 import ts from 'typescript';
 import { afterEach,expect,it,vi } from 'vitest';
 import entrySource from './promotion-entry.vue?raw';
+import machineSource from '@/components/catalog-machine-image.vue?raw';
+import homeReadSource from '@/store/home-promotions.ts?raw';
+import { ApiError } from '@/api/errors';
+import buttonSource from '@/components/ui/nx-button.vue?raw';
 import productSource from './promotion-product.vue?raw';
 import bundleSource from './promotion-bundle.vue?raw';
 import contextSource from '@/composables/use-promotion-context.ts?raw';
@@ -19,7 +28,10 @@ import { fmt } from '@/i18n/format';
 import { platformDisplayText } from "@/lib/brand-copy";
 import { formatAmount } from '@/lib/amount-display';
 import * as entry from '@/lib/promotion-entry';
+import { commerceCopy } from '@/lib/commerce-review';
 import * as display from '@/lib/promotion-display';
+import { promotionMachineSlots } from '@/components/catalog-machine-image';
+import { createPassiveTabReadFixture } from '@/lib/passive-tab-read.test-support';
 
 const code=(source:string)=>ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 const script=(source:string)=>code(compileScript(parse(source).descriptor,{id:'promotion-marketing'}).content);
@@ -27,61 +39,191 @@ const empty={render:()=>null};
 function evaluate(source:string,modules:Record<string,unknown>){
   const exports:Record<string,any>={};
   new Function('require','exports',source)((id:string)=>{
+    if(id==='@/composables/use-tab-page-lifecycle')id='@dcloudio/uni-app';
     if(id in modules)return modules[id];
     if(id.endsWith('.vue'))return{default:empty};
     throw new Error('Unexpected marketing dependency '+id);
   },exports);
   return exports;
 }
+const button=evaluate(code(compileScript(parse(buttonSource).descriptor,{id:'marketing-button',inlineTemplate:true,templateOptions:{compilerOptions:{isCustomElement:tag=>['view','text'].includes(tag)}}}).content),{vue:Vue}).default;
 const cleanups:Array<()=>void>=[];
 afterEach(()=>cleanups.splice(0).forEach(cleanup=>cleanup()));
-const flush=async()=>{await Promise.resolve();await Vue.nextTick();await Promise.resolve();};
+const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();await Vue.nextTick();};
 function deferred<T>(){let resolve!:(result:T)=>void,reject!:(error:Error)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};}
 const activity=(extra:Partial<PublicPromotion>={}):PublicPromotion=>({activityId:'a1',version:2,template:'SKU_GIFT',state:'ACTIVE',startsAt:'2026-10-07T00:00:00Z',endsAt:'2026-10-30T00:00:00Z',serverTime:'2026-10-08T00:00:00Z',title:{zh:'真实活动',en:'Live offer',vi:'Ưu đãi đang mở'},terms:{zh:'真实条件',en:'Live terms',vi:'Điều khoản'},placement:'home.purchase-promotion',target:'STORE',productNos:['sku'],minimumClientCapabilities:[],eligibility:'ESTIMATE_ELIGIBLE',eligibilityMessage:null,rewardRules:[],...extra});
 const page=(items:PublicPromotion[]):PublicPromotionPage=>({items,nextCursor:null,hasMore:false});
 function platform(){
-  const app=Vue.reactive({accountKey:'user:7',accountBindingEpoch:1}),locale=Vue.reactive({code:'zh'});
+  const app=Vue.reactive({accountKey:'user:7',accountBindingEpoch:1}),locale=Vue.reactive({code:'zh'}),theme=Vue.reactive({resolved:'dark'});
   const shown:Array<()=>void>=[],hidden:Array<()=>void>=[],mounted:Array<()=>void>=[];
   const modules:Record<string,unknown>={
     '@/lib/brand-copy':{platformDisplayText},
     '@/lib/amount-display':{formatAmount},
+    '@/lib/commerce-review':{commerceCopy},
     vue:{...Vue,onMounted:(fn:()=>void)=>mounted.push(fn),onBeforeUnmount:()=>{}},
     '@dcloudio/uni-app':{onShow:(fn:()=>void)=>shown.push(fn),onHide:(fn:()=>void)=>hidden.push(fn)},
     '@/store/app':{useApp:()=>app},'@/store/locale':{useLocaleStore:()=>locale},
+    '@/store/theme':{useTheme:()=>theme},
+    '@/lib/passive-tab-read':createPassiveTabReadFixture(()=>JSON.stringify([app.accountKey,app.accountBindingEpoch,locale.code])),
     '@/lib/promotion-entry':entry,'@/lib/promotion-display':display,
+    '@/components/catalog-machine-image':{promotionMachineSlots},
     '@/i18n/format':{fmt},
   };
   const scope=Vue.effectScope();cleanups.push(()=>{hidden.forEach(fn=>fn());scope.stop();});
-  return{app,locale,modules,scope,start:()=>mounted.forEach(fn=>fn()),show:()=>shown.forEach(fn=>fn()),hide:()=>hidden.forEach(fn=>fn())};
+  return{app,locale,theme,modules,scope,start:()=>mounted.forEach(fn=>fn()),show:()=>shown.forEach(fn=>fn()),hide:()=>hidden.forEach(fn=>fn())};
 }
-function context(){
+function context(retainPresentation=false){
   const screen=platform(),get=vi.fn<(...args:unknown[])=>Promise<PublicPromotion>>();
-  screen.modules['@/api/runtime']={promotionApi:{get},remoteApiEnabled:true,sessionVault:{read:()=>({user:{userId:7}})}};
+  const environment=Vue.reactive({environment:'dev'});
+  screen.modules['@/api/runtime']={promotionApi:{get},remoteApiEnabled:true,apiRuntimeConfig:environment,sessionVault:{read:()=>({user:{userId:7}})}};
   const id=Vue.ref('a1'),create=evaluate(code(contextSource),screen.modules).usePromotionContext;
-  const view=screen.scope.run(()=>create(id)) as{activity:Vue.Ref<PublicPromotion|null>;status:Vue.Ref<string>;available:Vue.ComputedRef<boolean>;refresh:()=>Promise<void>};
-  return{...screen,get,id,view};
+  const view=screen.scope.run(()=>create(id,retainPresentation)) as{activity:Vue.Ref<PublicPromotion|null>;status:Vue.Ref<string>;available:Vue.ComputedRef<boolean>;refresh:()=>Promise<void>};
+  return{...screen,get,id,view,environment};
 }
-function renderer(source:string,context:Record<string,unknown>){
+function renderer(source:string,context:Record<string,unknown>,components:Record<string,Vue.Component>={}){
   const template=source.includes('<template>')?parse(source).descriptor.template!.content:source;
   const render=new Function('Vue',compile(template,{mode:'function',prefixIdentifiers:true,isCustomElement:tag=>['view','text','image'].includes(tag)}).code)(Vue);
   let node!:Vue.VNode;
-  return{node:()=>node,html:()=>renderToString(Vue.createSSRApp({components:{LiquidGlass:empty,PromotionTerms:empty,PromotionProduct:empty,RewardRows:empty,DisclosureDetails:empty},render:()=>{node=render(Vue.proxyRefs(context),[]);return node;}}))};
+  return{node:()=>node,html:()=>renderToString(Vue.createSSRApp({components:{NxButton:button,TeamArt:empty,CatalogMachineImage:empty,LiquidGlass:empty,PromotionTerms:empty,PromotionProduct:empty,RewardRows:empty,DisclosureDetails:empty,...components},render:()=>{node=render(Vue.proxyRefs(context),[]);return node;}}))};
 }
 function find(node:Vue.VNode,className:string):Vue.VNode|undefined{
   if(String(node.props?.class??'').split(/\s+/).includes(className))return node;
   if(Array.isArray(node.children))for(const child of node.children)if(Vue.isVNode(child)){const match=find(child,className);if(match)return match;}
 }
-function advert(activities?:PublicPromotion[],copy=promotionZH){
+function advert(activities?:PublicPromotion[],copy=promotionZH,components:Record<string,Vue.Component>={}){
   const screen=platform(),list=vi.fn<(...args:unknown[])=>Promise<PublicPromotionPage>>().mockResolvedValue(page([])),navTo=vi.fn();
+  const products=Vue.reactive<Record<string,{name:string;imageUrl?:string}>>({});
+  const catalog=Vue.reactive<{status:string;revision:string|null}>({status:'ready',revision:null});
+  const refreshProductCatalog=vi.fn().mockResolvedValue(true);
   Object.assign(screen.modules,{
     '@/api/runtime':{apiRuntimeConfig:{baseUrl:'https://api.example.test/'},promotionApi:{list},remoteApiEnabled:true,sessionVault:{read:()=>({user:{userId:7}})}},
-    '@/i18n/use-t':{useT:()=>Vue.ref({promotion:copy})},'@/mock/products':{getProduct:()=>({name:'Actual device'})},
-    '@/store/product-catalog':{productCatalogState:Vue.reactive({status:'ready'})},'@/lib/route':{navTo},
+    '@/i18n/use-t':{useT:()=>Vue.ref({promotion:copy})},'@/mock/products':{getProduct:(id:string)=>products[id]??({name:'Actual device'})},
+    '@/store/product-catalog':{productCatalogState:catalog,refreshProductCatalog,revalidateProductCatalog:refreshProductCatalog},'@/lib/route':{navTo},
   });
+  screen.modules['@/store/home-promotions']=evaluate(code(homeReadSource),{'@/api/runtime':screen.modules['@/api/runtime'],'@/api/errors':{ApiError},'@/lib/passive-tab-read':createPassiveTabReadFixture(()=>JSON.stringify([screen.app.accountKey,screen.app.accountBindingEpoch,screen.locale.code]))});
   const props=Vue.reactive({mode:'home',active:true,activities}),component=evaluate(script(entrySource),screen.modules).default;
   const view=screen.scope.run(()=>component.setup(props,{expose(){}}))!;
-  return{...screen,props,view,list,navTo,...renderer(entrySource,{...Vue.toRefs(props),...view})};
+  return{...screen,props,view,list,navTo,products,catalog,refreshProductCatalog,...renderer(entrySource,{...Vue.toRefs(props),...view},components)};
 }
+
+function purchaseRule(type:'DEVICE'|'DISCOUNT_USDT'|'UVT'):PublicPromotion['rewardRules'][number]{
+  const disclosure={title:{zh:'活动奖励',en:'Offer reward',vi:'Thưởng ưu đãi'},terms:{zh:'满足条件',en:'Conditions apply',vi:'Theo điều kiện'},refundTerms:{zh:'退款撤回',en:'Reversed on refund',vi:'Thu hồi khi hoàn tiền'},benefitDescription:{zh:'',en:'',vi:''},deviceRights:null,deviceName:type==='DEVICE'?'Actual gift device':null};
+  const common={rewardRuleId:'reward',beneficiaryRole:'BUYER' as const,disclosure};
+  return {ruleId:'rule',productNo:'sku',minBuyQty:2,repeatMode:'PER_GROUP',maxGroups:{mode:'LIMITED',value:3},maxGroupsPerPerson:{mode:'LIMITED',value:4},inviterReward:null,buyerReward:type==='DEVICE'?{...common,type,giftProductNo:'gift',quantity:1}:{...common,type,calculation:'FIXED',amount:'50'}};
+}
+
+it('040 keeps published purchase/gift text and gives gifts distinct hierarchy across four widths and three languages',async()=>{
+  const browser=await chromium.launch({headless:true}),browserPage=await browser.newPage();
+  const tokens=readFileSync(new URL('../../styles/tokens.css',import.meta.url),'utf8').replace(/^@import[^;\r\n]+;\r?$/gm,'');
+  const fonts=readFileSync(new URL('../../styles/fonts.css',import.meta.url),'utf8').replace(/url\("\.\.\/static\/fonts\/([^"/]+)"\)/g,(_match:string,name:string)=>
+    `url("data:${name.endsWith('woff2')?'font/woff2':'font/ttf'};base64,${readFileSync(new URL(`../../static/fonts/${name}`,import.meta.url)).toString('base64')}")`);
+  const machine=parse(machineSource).descriptor;
+  const css=[tokens,fonts,readFileSync(new URL('./promotion.css',import.meta.url),'utf8'),...parse(entrySource).descriptor.styles.map(style=>style.content),...machine.styles.map(style=>style.content)].join('\n');
+  const assets=Object.fromEntries([['stellarbox-s1','s1'],['stellarbox-pro','pro'],['cloud-share','cloud']].map(([sku,file])=>[sku,`data:image/webp;base64,${readFileSync(new URL(`../../static/img/home-glass-20260928/${file}.webp`,import.meta.url)).toString('base64')}`]));
+  // Keep the production template/fields/styles; only adapt image transport for
+  // this isolated Chromium render. No shared preview server or build is used.
+  const machineRender=new Function('Vue',compile(machine.template!.content.replace(/<image\b/g,'<img').replace('mode="aspectFit"','style="object-fit:contain"'),{mode:'function',prefixIdentifiers:true,isCustomElement:tag=>['view','text'].includes(tag)}).code)(Vue);
+  const CatalogMachineImage=Vue.defineComponent({props:['sku','imageUrl','scopeKey','refreshKey'],render:machineRender,
+    setup:props=>({ready:true,frame:Vue.computed(()=>({key:props.sku,src:props.imageUrl,load:()=>{},error:()=>{}}))})});
+  const measurements:unknown[]=[];
+  try{
+    for(const alternate of [false,true])for(const [language,copy] of [['zh',promotionZH],['en',promotionEN],['vi',promotionVI]] as const){
+      const purchaseName=alternate?'UVELBox Pro':'UVELBox S1',giftName=alternate?'UVELBox S1':'Cloud Share';
+      const purchaseSku=alternate?'stellarbox-pro':'stellarbox-s1',giftSku=alternate?'stellarbox-s1':'cloud-share';
+      const rule=purchaseRule('DEVICE');rule.productNo=purchaseSku;
+      if(rule.buyerReward.type!=='DEVICE')throw new Error('Expected device gift fixture');
+      rule.buyerReward.giftProductNo=giftSku;rule.buyerReward.disclosure.deviceName=giftName;
+      rule.buyerReward.disclosure.benefitDescription={zh:`送 ${giftName} 1 份`,en:`Get 1 ${giftName}`,vi:`Tặng 1 ${giftName}`};
+      const offer=activity({title:{zh:`买 ${purchaseName}`,en:`Buy ${purchaseName}`,vi:`Mua ${purchaseName}`},rewardRules:[rule]}),before=JSON.stringify(offer);
+      const screen=advert([offer],copy,{CatalogMachineImage});screen.products[purchaseSku]={name:purchaseName,imageUrl:assets[purchaseSku]};screen.products[giftSku]={name:giftName,imageUrl:assets[giftSku]};screen.locale.code=language;await flush();
+      for(const theme of ['dark','light']){
+        screen.theme.resolved=theme;await flush();const html=await screen.html();
+        for(const width of [320,360,390,430]){
+          await browserPage.setViewportSize({width,height:500});
+          await browserPage.setContent(`<html lang="${language}" data-theme="${theme}"><style>${css}
+            body{margin:0;padding:16px;background:var(--v5-bg);font-family:var(--font-v5)}view{display:block}
+          </style><body>${html}</body></html>`);
+          await browserPage.evaluate(async()=>{await document.fonts.ready;});
+          const result=await browserPage.evaluate(()=>{
+            const info=(selector:string)=>{const element=document.querySelector<HTMLElement>(selector)!,rect=element.getBoundingClientRect(),style=getComputedStyle(element);
+              return{text:element.textContent,fontSize:parseFloat(style.fontSize),fontWeight:Number(style.fontWeight),fontFamily:style.fontFamily,color:style.color,
+                left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height,overflow:element.scrollWidth>element.clientWidth+1};};
+            return{purchase:info('.entry-title'),gift:info('.entry-benefit'),rules:info('.entry-home-deadline'),card:info('.entry-advert'),
+              pageOverflow:document.documentElement.scrollWidth>innerWidth};
+          });
+          expect(result.purchase.text).toBe(offer.title[language]);expect(result.gift.text).toBe(rule.buyerReward.disclosure.benefitDescription[language]);
+          expect(result.purchase.fontFamily).toContain('Inter');expect(result.gift.fontSize-result.purchase.fontSize).toBeGreaterThanOrEqual(4);
+          expect(result.gift.fontWeight).toBeGreaterThan(result.purchase.fontWeight);expect(result.gift.color).not.toBe(result.purchase.color);
+          expect(result.gift.top).toBeGreaterThanOrEqual(result.purchase.bottom);expect(result.rules.top).toBeGreaterThanOrEqual(result.gift.bottom);
+          for(const line of [result.purchase,result.gift,result.rules]){expect(line.overflow).toBe(false);expect(line.left).toBeGreaterThanOrEqual(result.card.left);expect(line.right).toBeLessThanOrEqual(result.card.right+1);}
+          expect(result.rules.height).toBeGreaterThanOrEqual(44);expect(result.pageOverflow).toBe(false);
+          measurements.push({language,theme,width,alternate,...result});
+          if(env.UI_OPT_040_EVIDENCE_DIR&&!alternate&&(width===320||width===430))await browserPage.screenshot({path:`${env.UI_OPT_040_EVIDENCE_DIR}/promotion-hierarchy-040-${language}-${theme}-${width}.png`});
+        }
+        find(screen.node(),'entry-advert-target')!.props!.onClick();expect(screen.navTo).toHaveBeenLastCalledWith('/pages/store/store?activityId=a1');
+        find(screen.node(),'entry-home-deadline')!.props!.onClick({stopPropagation(){}});expect(screen.view.termsActivity.value).toEqual(offer);
+      }
+      expect(JSON.stringify(offer)).toBe(before);
+    }
+    expect(measurements).toHaveLength(48);
+    if(env.UI_OPT_040_EVIDENCE_DIR)writeFileSync(`${env.UI_OPT_040_EVIDENCE_DIR}/promotion-hierarchy-040-layout.json`,JSON.stringify(measurements,null,2));
+  }finally{await browser.close();}
+},30000);
+
+it('cycles actual home offers and leaves absolute expiry and purchase conditions inside rules',async()=>{
+  const first=activity({rewardRules:[purchaseRule('DEVICE')],endsAt:'2026-11-06T00:00:00Z'});
+  const screen=advert([first,activity({activityId:'a2'}),activity({activityId:'a3'})]);
+  const html=await screen.html();
+  expect(html).toContain('剩 29 天');expect(html).toContain('购机赠礼');expect(html).toContain('活动规则');
+  find(screen.node(),'entry-home-deadline')!.props!.onClick({stopPropagation(){}});
+  expect(screen.view.termsText.value).toContain('2026/11/06 00:00 · UTC');
+  expect(screen.view.termsRules.value[0].text).toContain('2');
+  find(screen.node(),'entry-pagination')!.props!.onClick();
+  expect(screen.view.items.value[screen.view.activeIndex.value].activityId).toBe('a2');
+  screen.view.cycleOffer(-1);screen.view.cycleOffer(-1);
+  expect(screen.view.items.value[screen.view.activeIndex.value].activityId).toBe('a3');
+});
+
+it.each([['DEVICE','gift','Actual gift device × 1'],['DISCOUNT_USDT','coupon','50.00 USDT'],['UVT','spark','50.00 UVT']] as const)('renders %s from published rewards without inventing claim or completion state',async(type,kind,benefit)=>{
+  const offer=activity({rewardRules:[purchaseRule(type)]}),screen=advert([offer]);screen.props.mode='events';
+  const html=await screen.html();expect(html).toContain(`data-activity-kind="${kind}"`);expect(html).toContain(benefit);
+  expect(html).toContain('nx-button--secondary');expect(html).not.toContain('nx-button--primary');
+  expect(html).not.toContain('role="progressbar"');expect(html).not.toContain(promotionZH.rewardGranted);
+  find(screen.node(),'entry-cta')!.props!.onClick();expect(screen.navTo).toHaveBeenCalledExactlyOnceWith('/pages/store/store?activityId=a1');
+  find(find(screen.node(),'entry-event-actions')!,'promotion-link')!.props!.onClick();
+  expect(screen.view.termsActivity.value.activityId).toBe('a1');
+  expect(screen.view.termsRules.value.map((rule:{text:string})=>rule.text).join(' ')).toContain(fmt(promotionZH.orderRewardLimit,{n:3}));
+  expect(screen.view.termsRules.value.map((rule:{text:string})=>rule.text).join(' ')).toContain(fmt(promotionZH.personRewardLimit,{n:4}));
+});
+
+it('does not assign a gift or milestone to an offer with no published rewards',async()=>{
+  const screen=advert([activity({template:'FIRST_PURCHASE'})]);screen.props.mode='events';
+  expect(await screen.html()).toContain('data-activity-kind="plain"');
+  expect(find(screen.node(),'entry-event-art')).toBeUndefined();
+  expect(find(screen.node(),'entry-benefits')).toBeUndefined();
+});
+
+it.each([promotionZH,promotionEN,promotionVI])('keeps ineligibility and the full refund disclosures reachable with compact event copy',async copy=>{
+  const offer=activity({rewardRules:[purchaseRule('DISCOUNT_USDT')],eligibility:'INELIGIBLE',eligibilityMessage:{zh:'暂不符合活动条件',en:'Not eligible',vi:'Chưa đủ điều kiện'}}),screen=advert([offer],copy);screen.props.mode='events';
+  expect(await screen.html()).toContain('暂不符合活动条件');
+  find(find(screen.node(),'entry-event-actions')!,'promotion-link')!.props!.onClick();
+  expect(entry.promotionDisclosures(screen.view.termsActivity.value)[0].refundTerms.zh).toBe('退款撤回');
+  expect(screen.view.termsRules.value.map((rule:{text:string})=>rule.text).join(' ')).toContain(copy.orderDiscount);
+});
+
+it('event pagination deduplicates records and the retry resets the cursor after failure',async()=>{
+  const screen=advert();screen.props.mode='events';screen.list.mockResolvedValueOnce({items:[activity()],nextCursor:'page-2',hasMore:true});
+  await screen.view.load(true);expect(screen.view.hasMore.value).toBe(true);
+  screen.list.mockResolvedValueOnce({items:[activity(),activity({activityId:'a2'})],nextCursor:'page-3',hasMore:true});
+  await screen.view.load(false);expect(screen.list).toHaveBeenLastCalledWith({limit:20,cursor:'page-2'},true);
+  expect(screen.view.items.value.map((row:PublicPromotion)=>row.activityId)).toEqual(['a1','a2']);
+  screen.list.mockRejectedValueOnce(new Error('offline'));await screen.view.load(false);
+  expect(screen.view.status.value).toBe('error');expect(await screen.html()).toContain(promotionZH.retry);
+  screen.list.mockResolvedValueOnce(page([activity({activityId:'recovered'})]));
+  find(screen.node(),'entry-retry')!.props!.onClick();await flush();
+  expect(screen.list).toHaveBeenLastCalledWith({limit:20,cursor:null},true);
+  expect(screen.view.items.value[0].activityId).toBe('recovered');expect(screen.view.status.value).toBe('ready');
+});
 
 it.each(['DRAFT','SCHEDULED','PAUSED','ENDED','ARCHIVED'] as const)('the shared read removes %s marketing without hiding active personal-ineligible offers',async state=>{
   const screen=context();screen.get.mockResolvedValueOnce(activity({eligibility:'INELIGIBLE'}));await screen.view.refresh();
@@ -110,8 +252,8 @@ it('both supplied and independently fetched adverts require ACTIVE, independent 
   const own=advert();own.list.mockResolvedValueOnce(page([activity(),activity({activityId:'closed',state:'ENDED'})]));await own.view.load(true);
   expect(own.view.items.value.map((row:PublicPromotion)=>row.activityId)).toEqual(['a1']);
   const late=deferred<PublicPromotionPage>();own.list.mockReturnValueOnce(late.promise);const read=own.view.load(true);
-  expect(own.view.items.value).toEqual([]);own.hide();late.resolve(page([activity()]));await read;expect(own.view.items.value).toEqual([]);
-  own.list.mockRejectedValueOnce(new Error('unavailable'));own.show();await flush();expect(own.view.items.value).toEqual([]);expect(own.view.status.value).toBe('error');
+  expect(own.view.items.value.map((row:PublicPromotion)=>row.activityId)).toEqual(['a1']);own.hide();late.resolve(page([activity()]));await read;expect(own.view.items.value.map((row:PublicPromotion)=>row.activityId)).toEqual(['a1']);
+  own.list.mockResolvedValueOnce(page([activity()]));own.show();await flush();own.list.mockRejectedValueOnce(new Error('unavailable'));await own.view.load(true);expect(own.view.items.value.map((row:PublicPromotion)=>row.activityId)).toEqual(['a1']);expect(own.view.status.value).toBe('error');
 });
 it.each(['account','locale'] as const)('an independent advert clears marketing and fences the old read across %s',async boundary=>{
   const screen=advert();screen.list.mockResolvedValueOnce(page([activity()]));await screen.view.load(true);
@@ -124,39 +266,115 @@ it.each(['account','locale'] as const)('an independent advert clears marketing a
 it.each([promotionZH,promotionEN,promotionVI])('the complete uploaded image replaces fallback copy while retaining a localized whole-banner action',async copy=>{
   const screen=advert([activity({bannerImageUrl:'/api/promotions/a1/banner/2'})],copy);
   expect(await screen.html()).toContain(copy.browse);
-  const image=find(screen.node(),'entry-artwork')!;expect(image.props).toMatchObject({src:'https://api.example.test/api/promotions/a1/banner/2',mode:'aspectFit'});
-  image.props!.onLoad();const loaded=await screen.html();
-  expect(loaded).not.toContain('class="entry-copy"');expect(loaded).not.toContain('class="entry-label"');
+  const image=find(screen.node(),'entry-artwork')!;expect(image.props).toMatchObject({imageUrl:'https://api.example.test/api/promotions/a1/banner/2',sku:'a1'});
+  image.props!.onReady(true);const loaded=await screen.html();
+  expect(loaded).not.toContain('class="entry-label"');
+  expect(find(screen.node(),'entry-remaining')).toBeDefined();
+  expect(loaded).toContain(fmt(copy.daysRemaining,{n:22}));
+  find(screen.node(),'entry-home-deadline')!.props!.onClick({stopPropagation(){}});
+  expect(screen.view.termsActivity.value.activityId).toBe('a1');
   const action=find(screen.node(),'entry-advert-target')!;expect(action.props).toMatchObject({role:'button',tabindex:0,'aria-label':'真实活动 · '+copy.browse});
   action.props!.onClick();expect(screen.navTo).toHaveBeenCalledWith('/pages/store/store?activityId=a1');
   screen.props.active=false;await screen.html();expect(find(screen.node(),'entry-advert-target')?.props?.tabindex).toBe(-1);
-  screen.props.active=true;await screen.html();find(screen.node(),'entry-artwork')!.props!.onError();
-  const failed=await screen.html();expect(failed).toContain('class="entry-copy"');expect(failed).toContain(copy.browse);expect(failed).not.toContain('entry-artwork');expect(failed).not.toContain('purchase-gift-reference');
+  screen.props.active=true;await screen.html();find(screen.node(),'entry-artwork')!.props!.onReady(false);
+  const failed=await screen.html();expect(failed).toContain('class="entry-copy"');expect(failed).toContain(copy.browse);expect(screen.view.bannerReady(screen.view.items.value[0])).toBe(false);expect(failed).not.toContain('purchase-gift-reference');
 });
 it('fallback uses the whole existing banner width and has no fixed artwork dependency',()=>{
   const styles=parse(entrySource).descriptor.styles.find(style=>style.scoped)!.content;
   expect(styles).not.toContain('purchase-gift-reference');expect(styles).not.toContain('44%');expect(styles).not.toContain('45%');
 });
+it.each([promotionZH,promotionEN,promotionVI])('theme changes use published structured content in light and fence late dark banner events',async copy=>{
+  const offer=activity({bannerImageUrl:'/api/promotions/a1/banner/2',rewardRules:[purchaseRule('DEVICE')]}),screen=advert([offer],copy);
+  await screen.html();const old=find(screen.node(),'entry-artwork')!;
+  old.props!.onReady(true);expect(await screen.html()).not.toContain('class="entry-label"');
+  screen.theme.resolved='light';await flush();
+  const light=await screen.html();expect(find(screen.node(),'entry-artwork')).toBeUndefined();
+  expect(light).toContain('data-color-scheme="light"');expect(light).toContain('class="entry-copy"');
+  expect(screen.view.promoSlots(offer).map((slot:{sku:string})=>slot.sku)).toEqual(['sku','gift']);
+  old.props!.onReady(true);expect(screen.view.bannerReady(offer)).toBe(false);
+  find(screen.node(),'entry-advert-target')!.props!.onClick();expect(screen.navTo).toHaveBeenCalledWith('/pages/store/store?activityId=a1');
+  find(screen.node(),'entry-home-deadline')!.props!.onClick({stopPropagation(){}});expect(screen.view.termsActivity.value).toEqual(offer);
+  screen.theme.resolved='dark';await flush();await screen.html();const current=find(screen.node(),'entry-artwork')!;
+  expect(current.key).not.toBe(old.key);old.props!.onReady(true);expect(screen.view.bannerReady(offer)).toBe(false);
+  current.props!.onReady(true);expect(await screen.html()).not.toContain('class="entry-label"');
+});
 it('a carousel rerender preserves a loaded banner while a closed activity still disappears',async()=>{
   const offer=activity({bannerImageUrl:'/api/promotions/a1/banner/2'}),screen=advert([offer]);
-  await screen.html();find(screen.node(),'entry-artwork')!.props!.onLoad();await screen.html();
+  await screen.html();find(screen.node(),'entry-artwork')!.props!.onReady(true);await screen.html();
   const imageKey=find(screen.node(),'entry-artwork')!.key;
   screen.props.activities=[{...offer}];screen.props.active=false;await flush();
-  expect(await screen.html()).not.toContain('class="entry-copy"');
+  expect(await screen.html()).not.toContain('class="entry-label"');
   expect(find(screen.node(),'entry-artwork')!.key).toBe(imageKey);
   screen.props.active=true;screen.props.activities=[{...offer}];await flush();
-  expect(await screen.html()).not.toContain('class="entry-copy"');
+  expect(await screen.html()).not.toContain('class="entry-label"');
   screen.props.activities=[{...offer,state:'PAUSED'}];await flush();
   expect(await screen.html()).not.toContain('entry-artwork');expect(screen.view.items.value).toEqual([]);
 });
 it.each(['account','epoch','locale'] as const)('a supplied banner remounts and reloads after the %s boundary',async boundary=>{
   const offer=activity({bannerImageUrl:'/api/promotions/a1/banner/2'}),screen=advert([offer]);
-  await screen.html();find(screen.node(),'entry-artwork')!.props!.onLoad();await screen.html();
+  await screen.html();find(screen.node(),'entry-artwork')!.props!.onReady(true);await screen.html();
   const imageKey=find(screen.node(),'entry-artwork')!.key;
   if(boundary==='account')screen.app.accountKey='user:8';else if(boundary==='epoch')screen.app.accountBindingEpoch++;else screen.locale.code='en';
   await flush();expect(await screen.html()).toContain('class="entry-copy"');
   const image=find(screen.node(),'entry-artwork')!;expect(image.key).not.toBe(imageKey);
-  image.props!.onLoad();expect(await screen.html()).not.toContain('class="entry-copy"');
+  image.props!.onReady(true);expect(await screen.html()).not.toContain('class="entry-label"');
+});
+
+it('keeps purchase and gift slots from the first rule when the purchase image is missing',async()=>{
+  const rule=purchaseRule('DEVICE');rule.productNo='purchase-b';
+  if(rule.buyerReward.type==='DEVICE')rule.buyerReward.giftProductNo='gift-c';
+  const screen=advert([activity({rewardRules:[rule,purchaseRule('DEVICE')]})]);
+  screen.products['gift-c']={name:'Gift C',imageUrl:'https://images.example/gift-c'};
+  await screen.html();
+  expect(find(screen.node(),'entry-main-image')!.props!.sku).toBe('purchase-b');
+  expect(find(screen.node(),'entry-main-image')!.props!['image-url']).toBeUndefined();
+  expect(find(screen.node(),'entry-gift-image')!.props).toMatchObject({sku:'gift-c','image-url':'https://images.example/gift-c'});
+  screen.products['purchase-b']={name:'Purchase B',imageUrl:'https://images.example/purchase-b'};
+  await screen.html();expect(find(screen.node(),'entry-main-image')!.props!['image-url']).toBe('https://images.example/purchase-b');
+  delete screen.products['gift-c'].imageUrl;await screen.html();
+  expect(find(screen.node(),'entry-gift-image')!.props!['image-url']).toBeUndefined();
+  expect(find(screen.node(),'entry-main-image')!.props!.sku).toBe('purchase-b');
+});
+
+it('keeps distinct roles for the same SKU and reloads current URLs after catalog recovery',async()=>{
+  const rule=purchaseRule('DEVICE');if(rule.buyerReward.type==='DEVICE')rule.buyerReward.giftProductNo='sku';
+  const screen=advert([activity({rewardRules:[rule]})]);screen.products.sku={name:'Same SKU',imageUrl:'https://images.example/same'};
+  await screen.html();const purchase=find(screen.node(),'entry-main-image')!,gift=find(screen.node(),'entry-gift-image')!;
+  expect(purchase.key).not.toBe(gift.key);expect(purchase.props!['image-url']).toBe('https://images.example/same');expect(purchase.props!['image-url']).toBe(gift.props!['image-url']);
+  const refresh=purchase.props!['refresh-key'];
+  screen.catalog.status='error';await screen.html();expect(find(screen.node(),'entry-main-image')!.props!['image-url']).toBeUndefined();
+  screen.catalog.status='ready';screen.catalog.revision='next';await screen.html();
+  expect(find(screen.node(),'entry-main-image')!.props!['image-url']).toBe('https://images.example/same');
+  expect(find(screen.node(),'entry-main-image')!.props!['refresh-key']).toBe(refresh);
+});
+
+it.each(['account','epoch','locale','version','url','refresh','hide'] as const)('rejects stale banner readiness after %s',async boundary=>{
+  const offer=activity({bannerImageUrl:'/api/promotions/a1/banner/2'}),screen=advert([offer]);
+  await screen.html();const old=find(screen.node(),'entry-artwork')!;
+  if(boundary==='account')screen.app.accountKey='user:8';
+  if(boundary==='epoch')screen.app.accountBindingEpoch++;
+  if(boundary==='locale')screen.locale.code='en';
+  if(boundary==='version')screen.props.activities=[{...offer,version:3}];
+  if(boundary==='url')screen.props.activities=[{...offer,version:3,bannerImageUrl:'/api/promotions/a1/banner/3'}];
+  if(boundary==='refresh')await screen.view.load(true);
+  if(boundary==='hide')screen.hide();
+  await flush();old.props!.onReady(true);
+  const pending=await screen.html();if(boundary!=='hide')expect(pending).toContain('class="entry-copy"');
+  expect(screen.view.items.value.every((item:PublicPromotion)=>!screen.view.bannerReady(item))).toBe(true);
+  if(boundary!=='hide'){
+    const current=find(screen.node(),'entry-artwork')!;current.props!.onReady(true);old.props!.onReady(false);
+    expect(await screen.html()).not.toContain('class="entry-label"');
+  }
+});
+
+it('retries a failed complete banner at the same URL on refresh and preserves its priority',async()=>{
+  const offer=activity({bannerImageUrl:'/api/promotions/a1/banner/2',rewardRules:[purchaseRule('DEVICE')]}),screen=advert([offer]);
+  await screen.html();const failed=find(screen.node(),'entry-artwork')!;failed.props!.onReady(false);
+  expect(await screen.html()).toContain('class="entry-copy"');expect(find(screen.node(),'entry-main-image')).toBeDefined();
+  await screen.view.load(true);await screen.html();const retry=find(screen.node(),'entry-artwork')!;
+  expect(retry.key).not.toBe(failed.key);expect(retry.props!.imageUrl).toBe(failed.props!.imageUrl);
+  retry.props!.onReady(true);failed.props!.onReady(false);
+  expect(await screen.html()).not.toContain('class="entry-label"');expect(find(screen.node(),'entry-main-image')).toBeUndefined();
 });
 it('the production bundle clears quote rewards and open terms synchronously when activity is cleared for a new read',()=>{
   const screen=platform(),current=Vue.ref<PublicPromotion|null>(activity());
@@ -201,11 +419,35 @@ it.each(['PAUSED','ENDED'] as const)('direct product promotion props suppress re
   expect(await renderer(productSource,view).html()).not.toContain('promotion-product');
 });
 it.each([promotionZH,promotionEN,promotionVI])('old store, detail and bundle links expose only status and an ordinary-product exit',async copy=>{
-  const context={activityId:'a1',scopeId:'a1',activity:null,promotionStatus:'ready',contextStatus:'ready',publicOnly:true,t:{promotion:copy},locale:{code:'zh'},localized:display.localized,clearPromotion:vi.fn(),clearScope:vi.fn(),navTo:vi.fn(),promotionStoreHref:entry.promotionStoreHref};
+  const context={activityId:'a1',scopeId:'a1',activity:null,voucherContext:{},promotionStatus:'ready',contextStatus:'ready',publicOnly:true,t:{promotion:copy},locale:{code:'zh'},localized:display.localized,clearPromotion:vi.fn(),clearScope:vi.fn(),navTo:vi.fn(),promotionStoreHref:entry.promotionStoreHref};
   const store=storeSource.slice(storeSource.indexOf('<view v-if="activityId"'),storeSource.indexOf('<template v-else-if="!publicOnly">'));
   const detail=detailSource.slice(detailSource.indexOf('<view v-if="publicOnly"'),detailSource.indexOf('<view v-else-if="catalogStatus'));
   for(const source of [store,detail,bundleSource]){
     const html=await renderer(source,context).html();expect(html).toContain(copy.disabled);expect(html).toContain(copy.allProducts);
     for(const hidden of [copy.activityProducts,copy.gift,copy.bundle,copy.expected,copy.signIn])expect(html).not.toContain('>'+hidden+'<');
   }
+});
+
+it('keeps catalog/detail activity presentation through warm reads without carrying preview authority',async()=>{
+ const s=context(true);s.get.mockResolvedValueOnce(activity());await s.view.refresh();const previous=s.view.activity.value;
+ const pending=deferred<PublicPromotion>();s.get.mockReturnValueOnce(pending.promise);const warm=s.view.refresh();
+ expect(s.view.status.value).toBe('loading');expect(s.view.available.value).toBe(false);expect(s.view.activity.value).toBe(previous);
+ pending.resolve(activity({version:3}));await warm;expect(s.view.activity.value?.version).toBe(3);expect(s.view.available.value).toBe(true);
+ s.hide();expect(s.view.activity.value?.version).toBe(3);expect(s.view.available.value).toBe(false);
+ s.get.mockRejectedValueOnce(new Error('403'));s.show();await flush();expect(s.view.activity.value).toBeNull();expect(s.view.status.value).toBe('error');
+});
+it.each(['account','binding','locale','activity'] as const)('clears retained activity before a new %s read and rejects the old completion',async boundary=>{
+ const s=context(true);s.get.mockResolvedValueOnce(activity());await s.view.refresh();
+ const old=deferred<PublicPromotion>(),fresh=deferred<PublicPromotion>();s.get.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);const read=s.view.refresh();
+ if(boundary==='account')s.app.accountKey='user:8';else if(boundary==='binding')s.app.accountBindingEpoch++;else if(boundary==='locale')s.locale.code='en';else s.id.value='a2';
+ await flush();expect(s.view.activity.value).toBeNull();expect(s.view.available.value).toBe(false);
+ old.resolve(activity({version:99}));await read;expect(s.view.activity.value).toBeNull();
+ fresh.resolve(activity({activityId:s.id.value,version:4}));await flush();expect(s.view.activity.value?.version).toBe(4);
+});
+
+it('rejects an in-flight retained activity across an unsupported live environment A-B-A change',async()=>{
+ const s=context(true);s.get.mockResolvedValueOnce(activity());await s.view.refresh();
+ const pending=deferred<PublicPromotion>();s.get.mockReturnValueOnce(pending.promise);const warm=s.view.refresh();
+ s.environment.environment='prod';s.environment.environment='dev';expect(s.view.activity.value).toBeNull();expect(s.view.available.value).toBe(false);
+ pending.resolve(activity({version:99}));await warm;expect(s.view.activity.value).toBeNull();expect(s.view.available.value).toBe(false);
 });

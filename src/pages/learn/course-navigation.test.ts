@@ -2,13 +2,30 @@ import { describe, expect, it, vi } from "vitest";
 import { courseRewardHref, preserveCourseSourceInH5, resolveCourseNavigation } from "./course-navigation";
 
 describe("course return after a cold H5 refresh", () => {
+  it.each([['home','/pages/index/index'],['missions','/pages/missions/missions']])("returns %s recommendations to their entry on native and cold H5 refresh", (source, back) => {
+    expect(resolveCourseNavigation({ id: "account-security", source }, "")).toEqual({
+      id: "account-security", source, back,
+    });
+    const location = { pathname: "/app/", search: "", hash: "#/pages/learn/course?id=account-security" };
+    const history = { state: {}, replaceState: vi.fn((_state, _title, url: string) => {
+      location.hash = url.slice(url.indexOf("#"));
+    }) };
+    vi.stubGlobal("window", { location, history });
+    try {
+      preserveCourseSourceInH5("account-security", source);
+      expect(resolveCourseNavigation(undefined, location.hash.split("?")[1]).back).toBe(back);
+      preserveCourseSourceInH5("account-security", source);
+      expect(history.replaceState).toHaveBeenCalledOnce();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("keeps the NEX reward source in the deep link and returns to its list", () => {
     const url = courseRewardHref("account-security");
     expect(resolveCourseNavigation(undefined, url.split("?")[1])).toEqual({
-      id: "account-security", source: "rewards-nex", back: "/pages/me/rewards-list?cat=nex",
+      id: "account-security", source: "rewards-uvt", back: "/pages/me/rewards-list?cat=uvt",
     });
-    expect(resolveCourseNavigation({ id: "account-security", source: "rewards-nex" }, "").back)
-      .toBe("/pages/me/rewards-list?cat=nex");
+    expect(resolveCourseNavigation({ id: "account-security", source: "rewards-uvt" }, "").back)
+      .toBe("/pages/me/rewards-list?cat=uvt");
   });
 
   it("restores a source dropped from the visible H5 hash before refresh", () => {
@@ -24,9 +41,9 @@ describe("course return after a cold H5 refresh", () => {
       );
       preserveCourseSourceInH5(nav.id, nav.source);
       expect(history.replaceState).toHaveBeenCalledOnce();
-      expect(location.hash).toBe("#/pages/learn/course?id=account-security&source=rewards-nex");
+      expect(location.hash).toBe("#/pages/learn/course?id=account-security&source=rewards-uvt");
       expect(resolveCourseNavigation(undefined, location.hash.split("?")[1]).back)
-        .toBe("/pages/me/rewards-list?cat=nex");
+        .toBe("/pages/me/rewards-list?cat=uvt");
       preserveCourseSourceInH5(nav.id, nav.source);
       expect(history.replaceState).toHaveBeenCalledOnce();
       location.hash = "#/pages/learn/courses";
@@ -42,4 +59,10 @@ describe("course return after a cold H5 refresh", () => {
     expect(resolveCourseNavigation(undefined, "?id=account-security&source=courses").back).toBe("/pages/learn/courses");
     expect(resolveCourseNavigation(undefined, "?source=%2Fpages%2Fme%2Fwallet").back).toBe("/pages/learn/courses");
   });
+});
+
+
+it("recovers an old reward-source hash to the canonical uvt list after refresh", () => {
+  expect(resolveCourseNavigation(undefined, "id=account-security&source=rewards-nex")).toEqual({ id: "account-security", source: "rewards-uvt", back: "/pages/me/rewards-list?cat=uvt" });
+  expect(resolveCourseNavigation({ id: "account-security", source: "rewards-nex" }, "").back).toBe("/pages/me/rewards-list?cat=uvt");
 });

@@ -103,7 +103,8 @@ const descLine = computed(() =>
 const progressPct = computed(() => {
   const tk = task.value;
   if (!tk) return 0;
-  return taskProgressPercent(tk, taskNow.value, props.device?.interruptedAt) ?? 0;
+  return taskProgressPercent(tk, taskNow.value, props.device?.interruptedAt,
+    props.device?.kind === "phone" ? props.device.phoneValidUntil : null) ?? 0;
 });
 const etaSec = computed(() => {
   const tk = task.value;
@@ -153,8 +154,8 @@ const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxS
 };
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-hero-title)",
+  fontWeight: "var(--ui-type-hero-title-weight)",
   color: "var(--v5-ink)",
 };
 const descStyle: CSSProperties = {
@@ -235,7 +236,7 @@ const forceBtnStyle: CSSProperties = {
 };
 const forceLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
@@ -247,7 +248,7 @@ const backBtnStyle: CSSProperties = {
 };
 const backLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-2)",
 };
 

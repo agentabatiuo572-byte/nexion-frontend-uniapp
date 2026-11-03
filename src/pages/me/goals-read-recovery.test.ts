@@ -1,4 +1,5 @@
-import { formatAmount } from "@/lib/amount-display";
+import { growthButton, growthProgress } from "@/lib/entry-review.test-support";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 // @ts-expect-error Node is used only by the test runner.
 import { readFileSync } from "node:fs";
 import { compile } from "@vue/compiler-dom";
@@ -15,7 +16,7 @@ import { fmt } from "@/i18n/format";
 const source = readFileSync(new URL("./goals.vue", import.meta.url), "utf8");
 const template = parse(source, { filename: "goals.vue" }).descriptor.template!.content;
 const render = new Function("formatAmount", "Vue", compile(template, { mode: "function", prefixIdentifiers: true }).code)(formatAmount, Vue);
-const wrapper = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("main", slots.default?.()) });
+const wrapper = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("main", [...(slots.default?.() ?? []), ...(slots.pageFixed?.() ?? [])]) });
 const progress = Vue.defineComponent({ setup: () => () => Vue.h("i") });
 
 function goal(id = "goal-1") {
@@ -37,26 +38,26 @@ async function show(
 ) {
   const app = Vue.createSSRApp({
     render,
-    setup: () => ({ formatAmount,
+    setup: () => ({ formatAmount: formatGroupedAmount, formatGoalDailyRate: formatAmount,
       remoteApiEnabled: true,
-      t: { goals: {
+      t: { growthUi: en.growthUi, goals: {
         navTitle: "Goals", heroLabel: "Goal", heroTitle: "Plan", heroSubtitle: "Current {current}", targetLabel: "Target",
-        deadlineLabel: "Deadline", recHeader: "Recommendation", loading: "Loading", serverUnavailable: "Read unavailable",
+        deadlineLabel: "Deadline", recHeader: "Recommendation", dailyNeeded: "About ${amount} per day", loading: "Loading", serverUnavailable: "Read unavailable",
         noEligibleProduct: "No eligible product", recPath: "", recReasonServer: "", shopCta: "Shop", saveCta: "Save",
         activeGoals: "Active goals", deadlineRow: "{n} days", achievedBadge: "Achieved", minTargetWarn: "", savedToast: "",
         targetPresetsLabel: "Quick target amounts", targetPresetOption: "Target {amount} USDT",
-        deadlinePresetOption: "{days}-day term", removeGoalLabel: "Delete goal ${amount}",
+        deadlinePresetOption: "{days}-day term", deadlinePresetLabel: "{days} days", removeGoalLabel: "Delete goal ${amount}",
       }, ui: { retry: "Retry" } },
       // The template formats its preset/remove accessible names through the shared helper.
       fmt: (template: string, params: Record<string, string>) =>
         template.replace(/\{(\w+)\}/g, (_m, key: string) => params[key] ?? ""),
       target: 1000, days: 90, savePending: false, editorBlocked: status !== "ready", saveBlocked: status !== "ready",
-      editorHasSnapshot: status === "ready",
-      PRESET_TARGETS: [500], PRESET_DEADLINES_DAYS: [30],
+      recommendationWarmDisplay: "", editorHasSnapshot: status === "ready", editorDisplayReady: status === "ready",
+      PRESET_TARGETS: [500], PRESET_DEADLINES_DAYS: [30], savedCustomDeadline: null,
       goalsStore: { status, error: status === "error" ? "temporary" : "", goals, lifetimeEarningsUsdt: 25,
         recommendationStatus: recommendationState.status, recommendationError: recommendationState.error,
         recommendation: recommendationState.recommendation },
-      goals,
+      goals: status === "ready" ? goals : [],
       lifeTimeEarnings: 25, heroSubLine: "", recPathLine: "", recommendation: { reason: "" },
       retryGoals() {}, onTarget() {}, selectTarget() {}, selectDays() {}, onSave() {}, remove() {}, goStore() {},
       presetTargetStyle: () => ({}), presetTargetLabelStyle: () => ({}), presetDeadlineStyle: () => ({}), presetDeadlineLabelStyle: () => ({}),
@@ -66,17 +67,18 @@ async function show(
       deadlineLine: () => "90 days", goalPct: () => 5,
     }),
   });
-  app.component("AppChassis", wrapper); app.component("SubPageHeader", wrapper); app.component("GoalProgressBar", progress);
+  app.component("AppChassis", wrapper); app.component("SubPageHeader", wrapper); app.component("GoalProgressBar", progress); app.component("NxButton", growthButton); app.component("GrowthProgress", growthProgress);
   return renderToString(app);
 }
 
 describe("earning-goal read recovery", () => {
   it.each([en, zh, vietnamese])("renders the actual hero amount only after a current-account goal read", async copy => {
-    const goalsStore = Vue.reactive({ accountEpoch: 1, status: "error", goals: [], lifetimeEarningsUsdt: 0,
+    const goalsStore = Vue.reactive({ accountEpoch: 1, readSuccessRevision: 0, readSuccessScope:{accountKey:"user:1",epoch:1}, captureReadBinding:()=>({accountKey:"user:1",epoch:1}), status: "error", goals: [], lifetimeEarningsUsdt: 0,
       recommendationStatus: "idle", recommendation: null, recommendationError: null,
-      ensure: vi.fn(async () => {}), refreshRecommendation: vi.fn(async () => {}) });
+      ensure: vi.fn(async () => { goalsStore.readSuccessRevision++; }), refreshRecommendation: vi.fn(async () => {}) });
     const modules: Record<string, unknown> = {
-      "@/lib/amount-display": { formatAmount },
+      "@/components/ui/nx-button.vue": {default: growthButton}, "@/components/ui/growth-progress.vue": {default: growthProgress},
+      "@/lib/amount-display": { formatAmount, formatGroupedAmount },
       vue: { ...Vue, onMounted() {}, onUnmounted() {} },
       "@dcloudio/uni-app": { onShow() {}, onHide() {} },
       "@/store/goals": { useGoals: () => goalsStore }, "@/store/app": { useApp: () => ({ accountKey: "user:1", accountBindingEpoch: 1 }) },
@@ -95,7 +97,7 @@ describe("earning-goal read recovery", () => {
     const page = scope.run(() => exports.default.setup({}, { expose() {} }))!;
     const showActual = () => {
       const actual = Vue.createSSRApp({ render, setup: () => ({ ...page }) });
-      actual.component("AppChassis", wrapper); actual.component("SubPageHeader", wrapper); actual.component("GoalProgressBar", progress);
+      actual.component("AppChassis", wrapper); actual.component("SubPageHeader", wrapper); actual.component("GoalProgressBar", progress); actual.component("NxButton", growthButton); actual.component("GrowthProgress", growthProgress);
       return renderToString(actual).then(html => html.replaceAll("&#39;", "'"));
     };
     const hero = (current: string) => fmt(copy.goals.heroSubtitle, { current });
@@ -106,6 +108,8 @@ describe("earning-goal read recovery", () => {
       html = await showActual(); expect(html).toContain(hero("0.00")); expect(html).not.toContain("$$");
       goalsStore.lifetimeEarningsUsdt = 12.25;
       html = await showActual(); expect(html).toContain(hero("12.25"));
+      goalsStore.status = "loading";
+      html = await showActual(); expect(html).toContain(hero("12.25")); expect(html).not.toContain(copy.goals.loading);
       goalsStore.status = "error";
       html = await showActual(); expect(html).toContain(copy.goals.serverUnavailable); expect(html).not.toContain(hero("12.25"));
       goalsStore.accountEpoch += 1; goalsStore.status = "ready";
@@ -117,15 +121,17 @@ describe("earning-goal read recovery", () => {
 
   it("shows loading instead of default editor values until the server goal has loaded", async () => {
     const html = await show("loading", []);
-    expect(html).not.toContain("<input");
+    expect(html).toContain("<input");
+    expect(html).toContain('placeholder="—"');
     expect(html).toContain("Loading");
+    expect(html).toContain('aria-label="Save"');
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toMatch(/<text[^>]*>Recommendation<\/text>/);
   });
 
   it("keeps a confirmed snapshot and exposes a retry after a later list failure", async () => {
     const html = await show("error", [goal()]);
-    expect(html).toContain("$500.00");
+    expect(html).not.toMatch(/<text[^>]*>Active goals<\/text>/);
     expect(html).toContain("Retry");
   });
 
@@ -134,9 +140,9 @@ describe("earning-goal read recovery", () => {
       status: "ready", error: null,
       recommendation: { purchaseRequired: true, targetUsdt: 100, days: 180, requiredDaily: 100 / 180 },
     });
-    expect(html).toContain("$100.00");
+    expect(html).not.toContain("$100.00");
     expect(html).toContain("Loading");
-    expect(html).not.toContain('value="1000"');
+    expect(html).not.toContain('value="1,000"');
     expect(html).not.toContain('aria-checked="true"');
     expect(html).not.toContain("Shop");
   });
@@ -146,10 +152,10 @@ describe("earning-goal read recovery", () => {
       status: "ready", error: null,
       recommendation: { purchaseRequired: true, targetUsdt: 100, days: 180, requiredDaily: 100 / 180 },
     });
-    expect(html).toContain("$100.00");
+    expect(html).not.toContain("$100.00");
     expect(html).toContain("Read unavailable");
     expect(html).toContain("Retry");
-    expect(html).not.toContain('value="1000"');
+    expect(html).not.toContain('value="1,000"');
     expect(html).not.toContain("Shop");
   });
 
@@ -166,7 +172,7 @@ describe("earning-goal read recovery", () => {
       status: "ready", error: null,
       recommendation: { purchaseRequired: true, targetUsdt: 1000, days: 90, requiredDaily: 1000 / 90 },
     });
-    expect(html).toContain('value="1000"');
+    expect(html).toContain('value="1,000"');
     expect(html).toContain("Shop");
   });
 
@@ -195,13 +201,13 @@ describe("earning-goal read recovery", () => {
 
   it("formats the recommendation amount, term and daily rate from the same server response", () => {
     const start = source.indexOf("const recPathLine = computed");
-    const end = source.indexOf("function detailVal", start);
+    const end = source.indexOf("const recommendationPresentation", start);
     const implementation = ts.transpileModule(source.slice(start, end), {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
     }).outputText;
     const format = (text: string, params: Record<string, string | number>) =>
       text.replace(/\{(\w+)\}/g, (_m, key: string) => String(params[key] ?? ""));
-    const read = new Function("formatAmount", "computed", "fmt", "t", "target", "days", "goalsStore", "recommendation", `${implementation}; return recPathLine.value;`);
+    const read = new Function("formatAmount", "computed", "fmt", "t", "target", "days", "goalsStore", "recommendation", `const formatGoalDailyRate = formatAmount; ${implementation}; return recPathLine.value;`);
     expect(read(formatAmount, Vue.computed, format, { value: { goals: { recPath: "{target}|{days}|{perDay}|{tier}" } } },
       Vue.ref(1000), Vue.ref(90), { recommendation: { targetUsdt: 100, days: 180, requiredDaily: 100 / 180 } },
       { value: { tier: "S1" } })).toBe("100.00|180|0.56|S1");
@@ -209,8 +215,10 @@ describe("earning-goal read recovery", () => {
 
   it("offers retry on an initial list failure without inventing an active goal", async () => {
     const html = await show("error", []);
-    expect(html).toContain("Read unavailable");
+    expect(html.split("Read unavailable")).toHaveLength(2);
     expect(html).toContain("Retry");
+    expect(html).toContain('aria-label="Save"');
+    expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("90 days");
   });
 
@@ -255,11 +263,11 @@ describe("earning-goal read recovery", () => {
     const stored = { ...goal("newer"), deadlineMs: Date.now() + 89 * 86_400_000,
       createdAt: Date.now() - 86_400_000 };
     const goalsStore = {
-      accountEpoch: 1, status: "ready", goals: [stored, older],
-      ensure: vi.fn().mockResolvedValue(undefined), refresh: vi.fn().mockResolvedValue(undefined),
+      accountEpoch: 1, readSuccessRevision:0, readSuccessScope:{accountKey:"user:1",epoch:1}, captureReadBinding:()=>({accountKey:"user:1",epoch:1}), status: "ready", goals: [stored, older],
+      ensure: vi.fn(async()=>{goalsStore.readSuccessRevision++;}), refresh: vi.fn(async()=>{goalsStore.readSuccessRevision++;}),
       refreshRecommendation: vi.fn().mockResolvedValue(undefined),
     };
-    const execute = new Function("remoteApiEnabled", "goalsStore", "target", "days", "restoredGoal", "savePending", "editorReadPending", "ONE_DAY_MS", "onMounted", "onShow", "onHide", "onUnmounted", "watch", "app", `let editorReadEpoch = 0; let restoringEditor = false; let deleteFeedbackVisible = true; let deleteFeedbackGeneration = 0; ${ts.transpileModule(implementation, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText}; return { refreshRemoteGoals, retryGoals, deleteFeedbackSnapshot: () => ({ visible: deleteFeedbackVisible, generation: deleteFeedbackGeneration }) };`);
+    const execute = new Function("remoteApiEnabled", "goalsStore", "target", "days", "restoredGoal", "savePending", "editorReadPending", "ONE_DAY_MS", "onMounted", "onShow", "onHide", "onUnmounted", "watch", "app", `const t={value:{}}; let editorEnvironmentInvalidated = false; const editorDisplayReady = {value:false}; let editorReadEpoch = 0; let restoringEditor = false; let deleteFeedbackVisible = true; let deleteFeedbackGeneration = 0; ${ts.transpileModule(implementation, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText}; return { refreshRemoteGoals, retryGoals, deleteFeedbackSnapshot: () => ({ visible: deleteFeedbackVisible, generation: deleteFeedbackGeneration }) };`);
     const scope = Vue.effectScope();
     const page = scope.run(() => execute(true, goalsStore, target, days, restoredGoal, savePending, editorReadPending, 86_400_000, (hook: () => void) => mount.push(hook), (hook: () => void) => showHooks.push(hook), (hook: () => void) => hideHooks.push(hook), (hook: () => void) => unmountHooks.push(hook), Vue.watch, app));
     expect(mount).toHaveLength(1);
@@ -300,6 +308,7 @@ describe("earning-goal read recovery", () => {
     const reading = page.refreshRemoteGoals(true);
     expect(editorReadPending.value).toBe(true);
     goalsStore.status = "ready";
+    goalsStore.readSuccessRevision++;
     release();
     await reading;
     expect(editorReadPending.value).toBe(false);

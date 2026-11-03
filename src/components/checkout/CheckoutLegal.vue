@@ -22,9 +22,9 @@ const links = computed(() => [
 </script>
 <style scoped>
 .checkout-legal-group { margin-top: var(--v5-space-6); text-align: center; }
-.checkout-legal-group__intro { display: block; margin-bottom: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-note-weight, 400) var(--ui-type-note, 12px)/var(--ui-type-note-lh, 18px) var(--font-v5); }
+.checkout-legal-group__intro { display: block; margin-bottom: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .checkout-legal-group__links { display: flex; justify-content: center; }
-.checkout-legal-group__link { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: var(--v5-space-2) var(--v5-space-4); color: var(--v5-brand); font: var(--ui-type-text-link-weight, 500) var(--ui-type-text-link, 13px)/var(--ui-type-text-link-lh, 18px) var(--font-v5); cursor: pointer; transition: filter 160ms ease-out; }
+.checkout-legal-group__link { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: var(--v5-space-2) var(--v5-space-3); color: var(--v5-brand); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); cursor: pointer; transition: filter 160ms ease-out; }
 .checkout-legal-group__link + .checkout-legal-group__link::before { content: ''; position: absolute; left: 0; top: 50%; width: 1px; height: 16px; transform: translateY(-50%); background: color-mix(in srgb, var(--v5-ink) 5%, transparent); pointer-events: none; }
 .checkout-legal-group__link:active { filter: brightness(.85); }
 .checkout-legal-group__link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; }

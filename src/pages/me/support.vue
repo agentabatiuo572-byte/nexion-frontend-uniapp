@@ -1,6 +1,6 @@
 <!--
   Support hub (ported from Nexion-prototype/app/(main)/me/support/page.tsx).
-  Remote support uses App chat. Mock-only external demos
+  Live chat opens the advisor thread directly. Mock-only external demos
   are retained for local presentation. Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -51,18 +51,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
-import { useMessageDrawer } from "@/store/message-drawer";
+import { useConversations } from "@/store/conversations";
+import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { openExternalSupportChannel, type ExternalSupportChannel } from "@/lib/external-support-channel";
 import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
-const messageCenter = useMessageDrawer();
+const convStore = useConversations();
 const w = computed(() => t.value.support);
 
 interface Channel {
@@ -75,13 +76,13 @@ interface Channel {
   externalId?: ExternalSupportChannel;
 }
 
-const CHAT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" /></svg>`;
+const CHAT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" /></svg>`;
 const SEND_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>`;
 const DISCORD_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 7.2A18 18 0 0 1 12 6.5a18 18 0 0 1 4.5.7" /><path d="M8 11a16 16 0 0 0 8 0" /><circle cx="9" cy="13" r="1" /><circle cx="15" cy="13" r="1" /><path d="M7.5 17.2A18 18 0 0 0 12 17.9a18 18 0 0 0 4.5-.7" /></svg>`;
 const MAIL_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>`;
 
 const internalChannels = computed<Channel[]>(() => [
-  { id: "lc", label: w.value.chLiveChat, hint: w.value.chLiveChatHint, icon: CHAT_SVG, tintSoft: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" },
+  { id: "lc", label: w.value.chLiveChat, hint: w.value.chLiveChatHint, icon: CHAT_SVG, tintSoft: "var(--v5-surface-2)" },
 ]);
 const externalChannels = computed<Channel[]>(() => [
   { id: "tg", externalId: "telegram", label: w.value.chTelegram, hint: w.value.chTelegramHint, icon: SEND_SVG, tintSoft: "color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent)" },
@@ -94,9 +95,20 @@ const channels = computed<Channel[]>(() => {
 
 const pinned = computed(() => [w.value.pinnedItem1, w.value.pinnedItem2, w.value.pinnedItem3, w.value.pinnedItem4]);
 
+const openingChat = ref(false);
+async function openLiveChat() {
+  if (openingChat.value) return;
+  openingChat.value = true;
+  try {
+    navTo(await advisorChatRoute(convStore));
+  } finally {
+    openingChat.value = false;
+  }
+}
+
 function onChannel(c: Channel) {
   if (c.id === "lc") {
-    messageCenter.show("service");
+    void openLiveChat();
     return;
   }
   if (c.href) {
@@ -148,5 +160,5 @@ const pinDotStyle: CSSProperties = {
   background: "var(--v5-warning)",
   flexShrink: 0,
 };
-const pinTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.6 };
+const pinTextStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)", lineHeight: 1.6 };
 </script>

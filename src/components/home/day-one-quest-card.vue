@@ -3,12 +3,12 @@
   <view
     id="home-newcomer-task-card"
     class="nx-glass-card newcomer-task"
-    :class="{ 'newcomer-task--expanded': expanded }"
+    :class="{ 'newcomer-task--expanded': expanded, 'newcomer-task--mission': missionLayout }"
     :style="rootStyle"
     :aria-hidden="!props.active"
   >
     <view class="newcomer-task__summary">
-      <view style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+      <view class="newcomer-task__top" style="display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3)">
         <view style="min-width: 0">
           <view style="display: flex; align-items: center; flex-wrap: wrap; gap: 7px">
             <view class="newcomer-task__mark" aria-hidden="true">
@@ -19,33 +19,38 @@
             <text class="newcomer-task__eyebrow">{{ t.home.dayOneFirstDayReward }}</text>
             <text class="newcomer-task__count">{{ taskCountText }}</text>
           </view>
-          <view class="newcomer-task__reward">
+          <view v-if="!claimState.empty" class="newcomer-task__reward">
             <text class="newcomer-task__reward-value">{{ rewardText === "—" ? "—" : `+${rewardText}` }}</text>
-            <text style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">UVT</text>
+            <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">UVT</text>
           </view>
         </view>
-        <view v-if="!questUnavailable && (!remoteApiEnabled || dayOneWindow)" style="text-align: right; flex-shrink: 0">
+        <view v-if="!claimState.empty && !questUnavailable && (!remoteApiEnabled || dayOneWindow)" class="newcomer-task__clock" style="text-align: right; flex-shrink: 0">
           <text v-if="!dayOneExpired" class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
           <text class="block" :style="{ marginTop: dayOneExpired ? '0' : '4px' }" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 15px; color: var(--v5-quest-violet-ink); font-variant-numeric: tabular-nums; line-height: 1" :aria-label="dayOneExpired ? t.home.dayOneExpired : undefined">{{ dayOneExpired ? t.quest.expired : remainingLabel }}</text>
         </view>
       </view>
 
-      <view style="margin-top: 10px">
-        <view v-show="!questUnavailable" ref="elRef" style="height: 6px; border-radius: 999px; overflow: hidden; background: var(--v5-surface-2); position: relative">
-          <view :style="barStyle" />
+      <view v-if="!claimState.empty" style="margin-top: 10px">
+        <view v-if="!missionLayout && !liteGroupUnavailable" ref="elRef" style="height: 6px; border-radius: var(--v5-radius-full); overflow: hidden; background: var(--v5-surface-2); position: relative">
+          <view v-if="!visibility.hidden" :style="barStyle" />
         </view>
-        <view style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
-          <text v-if="questUnavailable" role="status" style="color: var(--v5-ink-4)">{{ unavailableLabel }}</text>
+        <view v-if="missionLayout && !liteGroupUnavailable" class="newcomer-task__segments" role="progressbar" :aria-label="t.home.dayOneFirstDayReward" :aria-valuenow="visibility.hidden || questUnavailable ? undefined : completedCount" aria-valuemin="0" :aria-valuemax="total">
+          <view v-for="(_, segment) in tasks" :key="segment" :class="{'newcomer-task__segment--done': !visibility.hidden && !questUnavailable && segment < completedCount}" :style="{animationDelay: segment * 40 + 'ms'}" />
+        </view>
+        <view class="newcomer-task__progress-copy" style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
+          <text v-if="questUnavailable" style="color: var(--v5-ink-4)">{{ unavailableLabel }}</text>
           <template v-else>
-            <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
+            <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ visibility.mask(completedCount) }}</text> / {{ visibility.mask(total) }} {{ t.home.dayOneDoneSuffix }}<text v-if="missionLayout && !claimState.claimed && !claimState.unverified"> · {{ t.home.dayOneCompleteAllHint }}</text></text>
             <text v-if="remoteApiEnabled" style="color: var(--v5-nex)">{{ claimState.empty ? t.home.dayOneNoActiveTasks : claimState.claimed ? t.home.dayOneRewardClaimed : claimState.unverified ? t.home.dayOneSnapshotUnverified : t.home.dayOneRewardUnclaimed }}</text>
-            <text v-else style="color: var(--v5-nex); font-variant-numeric: tabular-nums">{{ nexEarnedText === "—" ? "—" : `+${nexEarnedText}` }} {{ t.home.dayOneEarnedSuffix }}</text>
+            <text v-else style="color: var(--v5-nex); font-variant-numeric: tabular-nums">{{ visibility.mask(nexEarnedText === "—" ? "—" : `+${nexEarnedText}`) }} {{ t.home.dayOneEarnedSuffix }}</text>
           </template>
         </view>
       </view>
 
       <!-- 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 12+12 -->
-      <view v-if="expanded && !questUnavailable" style="margin-top: 24px; display: flex; flex-direction: column; gap: 4px">
+      <text v-if="claimState.empty" class="block" style="margin-top:var(--v5-space-3);color:var(--v5-ink-3);font-size:var(--ui-type-list-subtitle)">{{ t.home.dayOneNoActiveTasks }}</text>
+      <view v-if="expanded && !claimState.empty && !liteGroupUnavailable" style="margin-top: var(--v5-space-6); display: flex; flex-direction: column; gap: var(--v5-space-1)">
+        <text v-if="!missionLayout && remoteApiEnabled && !questUnavailable && !claimState.unverified && !claimState.claimed && !dayOneExpired" class="newcomer-task__reward-hint">{{ t.home.dayOneCompleteAllHint }}</text>
         <view
           v-for="task in tasks"
           :key="task.id"
@@ -55,26 +60,24 @@
           :tabindex="props.active && isActionable(task) ? 0 : -1"
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
-
-          @keydown.enter.prevent="onRowTap(task)" @keydown.space.prevent="onRowTap(task)"
         >
           <view :style="circleStyle(task)">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
                  深墨压亮色品牌蓝=2.77。 -->
-            <svg v-if="isDone(task)" width="10" height="10" viewBox="0 0 24 24" fill="none" :stroke="task.onColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+            <svg v-if="isDone(task)" width="10" height="10" viewBox="0 0 24 24" fill="none" :stroke="missionLayout ? 'var(--v5-on-brand)' : task.onColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12l5 5L20 7" />
             </svg>
-            <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: task.color }">{{ task.order }}</text>
+            <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: missionLayout ? 'var(--v5-ink-3)' : task.color }">{{ task.order }}</text>
           </view>
           <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
             <text class="truncate" :style="labelStyle(task)">{{ task.label }}</text>
             <text :style="catStyle(task)">{{ task.cat }}</text>
           </view>
-          <text :style="rewardStyle(task)">{{ task.nex === null ? "—" : `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
+          <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
-            <svg v-if="isActionable(task)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7">
+            <svg v-if="isActionable(task)" :width="missionLayout ? 16 : 11" :height="missionLayout ? 16 : 11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" :stroke-width="missionLayout ? 2 : 2.4" stroke-linecap="round" stroke-linejoin="round" :style="{opacity: missionLayout ? 1 : .7}">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </view>
@@ -82,26 +85,18 @@
       </view>
     </view>
 
-    <view v-if="remoteApiEnabled && !questUnavailable && !claimState.empty && (claimState.claimCode || quest.dayOneClaiming)"
-      class="newcomer-task__claim" role="button"
-      :tabindex="props.active && !quest.dayOneClaiming ? 0 : -1"
-      :aria-disabled="!props.active || quest.dayOneClaiming"
-      @click="onClaim"  @keydown.enter.prevent="onClaim" @keydown.space.prevent="onClaim">
-      <text>{{ quest.dayOneClaiming ? t.home.dayOneClaiming : t.home.dayOneClaimReward }}</text>
-    </view>
+    <NxButton v-if="remoteApiEnabled && !questUnavailable && !claimState.empty && (claimState.claimCode || quest.dayOneClaiming)" class="newcomer-task__claim" variant="brand" size="medium" :disabled="!props.active" :busy="quest.dayOneClaiming" :label="quest.dayOneClaiming ? t.home.dayOneClaiming : t.home.dayOneClaimReward" @click="onClaim" />
     <view v-if="expanded && observationNotices.length" class="newcomer-task__observation">
       <view v-for="notice in observationNotices" :key="notice.task.id" class="newcomer-task__observation-item">
         <text role="status">{{ notice.task.label }} · {{ observationMessage(notice.reason) }}</text>
         <view class="newcomer-task__observation-actions">
           <view v-if="notice.reason !== 'unconfirmed'" role="button" :tabindex="props.active ? 0 : -1"
             :aria-disabled="!props.active" class="newcomer-task__observation-action"
-            @click="recoverObservation(notice.task)" @keydown.enter.prevent="recoverObservation(notice.task)"
-            @keydown.space.prevent="recoverObservation(notice.task)">
+            @click="recoverObservation(notice.task)">
             <text>{{ notice.reason === 'terms' ? t.home.dayOneObservationTermsAction : t.home.dayOneObservationSetupAction }}</text>
           </view>
           <view role="button" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
-            class="newcomer-task__observation-action" @click="recoverObservation(notice.task, true)"
-            @keydown.enter.prevent="recoverObservation(notice.task, true)" @keydown.space.prevent="recoverObservation(notice.task, true)">
+            class="newcomer-task__observation-action" @click="recoverObservation(notice.task, true)">
             <text>{{ t.home.dayOneObservationRetry }}</text>
           </view>
         </view>
@@ -112,6 +107,7 @@
     </text>
 
     <view
+      v-if="(!missionLayout || !expanded || questLoadError) && (!claimState.empty || questLoadError)"
       class="nx-glass-action newcomer-task__toggle"
       :style="toggleStyle"
       role="button"
@@ -120,10 +116,8 @@
       :aria-disabled="questUnavailable && !questLoadError"
       :aria-label="toggleLabel"
       @click="toggleExpanded"
-
-      @keydown.enter.prevent="toggleExpanded" @keydown.space.prevent="toggleExpanded"
     >
-      <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink-3)">{{ toggleLabel }}</text>
+      <text style="font-family: var(--font-v5); font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink-3)">{{ toggleLabel }}</text>
       <svg v-if="!questUnavailable" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path :d="expanded ? 'M19 15l-7-7-7 7' : 'M5 9l7 7 7-7'" />
       </svg>
@@ -133,10 +127,11 @@
 
 <script setup lang="ts">
 import { isLiteQuest } from "@/lib/lite-scope";
-import { useConfig } from "@/store/config";
+import NxButton from "@/components/ui/nx-button.vue";
+import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { isStakingVisibilityRoute, navTo } from "@/lib/route";
-import { computed, watch, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNow } from "@/composables/use-now";
@@ -151,6 +146,7 @@ import { dayOneQuestDisplayName } from "@/lib/quest-presentation";
 import { dayOneObservationRecovery, observationRecoveryRoute, type DayOneObservationReason } from "@/lib/day-one-observation-recovery";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { useApp } from "@/store/app";
+import { useConfig } from "@/store/config";
 
 interface QuestTask {
   id: string;
@@ -167,7 +163,8 @@ interface QuestTask {
   eligible: boolean;
 }
 
-const props = withDefaults(defineProps<{ active?: boolean; expanded?: boolean }>(), {
+const visibility = useDataVisibility();
+const props = withDefaults(defineProps<{ missionLayout?: boolean; active?: boolean; expanded?: boolean }>(), {
   active: true,
   expanded: false,
 });
@@ -180,13 +177,13 @@ const expanded = computed({
   set: (value: boolean) => emit("update:expanded", value),
 });
 
-const stakingDisplay = useConfig();
 const t = useT();
 const locale = useLocaleStore();
 const nowTick = useNow();
 const { elRef, inView } = useScrollGrowProgress();
 const quest = useQuest();
 const app = useApp();
+const stakingDisplay = useConfig();
 const mockReward = 500;
 
 const categoryLabel = (category: QuestTaskCategory): string => ({
@@ -226,8 +223,9 @@ const remoteTasks = computed<QuestTask[]>(() => {
       ...palette[index % palette.length],
     }));
 });
+// Lite: a Day-One group that still contains web-unavailable (phone) tasks cannot be completed or claimed here.
 const liteGroupUnavailable = computed(() => remoteApiEnabled && quest.remoteStatus === "ready"
-  && dayOneRows.value.length !== remoteTasks.value.length);
+  && dayOneRows.value.some((row) => !isLiteQuest(row)));
 const questUnavailable = computed(() => remoteApiEnabled && (quest.remoteStatus !== "ready" || liteGroupUnavailable.value));
 const questLoadError = computed(() => remoteApiEnabled && quest.remoteStatus === "error");
 const unavailableLabel = computed(() => liteGroupUnavailable.value ? t.value.home.dayOneLiteUnavailable
@@ -284,10 +282,10 @@ const nexEarned = computed(() => {
   return completed.reduce((sum, task) => sum + (task.nex ?? 0), 0);
 });
 const nexEarnedText = computed(() => nexEarned.value === null ? "—" : formatAmount(nexEarned.value));
-const viewTasksText = computed(() => fmt(t.value.home.dayOneViewTasks, { n: total.value }));
+const viewTasksText = computed(() => fmt(t.value.home.dayOneViewTasks, { n: visibility.mask(total.value) }));
 const taskCountText = computed(() => questUnavailable.value
   ? "-"
-  : fmt(t.value.home.dayOneTaskCount, { n: total.value }));
+  : fmt(t.value.home.dayOneTaskCount, { n: visibility.mask(total.value) }));
 const toggleLabel = computed(() => questLoadError.value
   ? t.value.home.dayOneRetryLoad
   : liteGroupUnavailable.value ? t.value.home.dayOneUnavailable
@@ -342,21 +340,25 @@ function toggleExpanded() {
   expanded.value = !expanded.value;
 }
 
+const progressEntered = ref(false);
+watch(inView, value => { if (value) progressEntered.value = true; }, {immediate: true});
 const barStyle = computed<CSSProperties>(() => ({
   height: "100%",
-  width: `${inView.value ? progressPct.value : 0}%`,
-  transition: inView.value ? PROGRESS_GROW_TRANSITION : "none",
-  willChange: "width",
+  width: `${progressPct.value}%`,
+  transform: progressEntered.value ? "scaleX(1)" : "scaleX(0)",
+  transformOrigin: "left",
+  transition: "transform 1400ms cubic-bezier(.16,1,.3,1)",
+
   background: "linear-gradient(90deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%)",
   borderRadius: "4px",
-  boxShadow: "0 0 8px rgba(198,255,58,0.55)",
+
 }));
 
 function rowStyle(task: QuestTask): CSSProperties {
   return {
     display: "grid",
-    gridTemplateColumns: "20px 1fr auto 14px",
-    gap: "10px",
+    gridTemplateColumns: props.missionLayout ? "22px minmax(0, 1fr) 16px" : task.nex === null ? "20px minmax(0, 1fr) 14px" : "20px minmax(0, 1fr) auto 14px",
+    gap: props.missionLayout ? "12px" : "10px",
     alignItems: "center",
     padding: "8px 0",
     cursor: isActionable(task) ? "pointer" : "default",
@@ -366,11 +368,11 @@ function rowStyle(task: QuestTask): CSSProperties {
 function circleStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
   return {
-    width: "18px",
-    height: "18px",
+    width: props.missionLayout ? "22px" : "18px",
+    height: props.missionLayout ? "22px" : "18px",
     borderRadius: "50%",
-    background: done ? task.color : "transparent",
-    border: done ? "none" : `1px solid ${task.color}55`,
+    background: done ? (props.missionLayout ? "var(--v5-brand)" : task.color) : "transparent",
+    border: done ? "none" : props.missionLayout ? "1.5px solid var(--v5-ink-4)" : `1px solid color-mix(in srgb, ${task.color} 33%, transparent)`,
     display: "grid",
     placeItems: "center",
   };
@@ -380,15 +382,16 @@ function labelStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
-    color: done ? "var(--v5-ink-4)" : "var(--v5-ink)",
+    fontSize: props.missionLayout ? "15px" : "var(--ui-type-list-subtitle)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : "var(--v5-ink)",
     fontWeight: 500,
-    textDecoration: done ? "line-through" : "none",
+    textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };
 }
 
 function catStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
+  if (props.missionLayout) return {font:'400 12px/16px var(--font-v5)', color: task.cat === t.value.home.dayOneCatIdentity ? 'var(--v5-nex-ink)' : task.cat === t.value.home.dayOneCatSocial ? 'var(--v5-success-ink)' : 'var(--v5-warning-ink)'};
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "12px",
@@ -438,22 +441,23 @@ const toggleStyle: CSSProperties = {
 </script>
 
 <style scoped>
-.newcomer-task__observation { margin-top: 12px; color: var(--v5-ink-2); font-size: 15px; }
-.newcomer-task__observation-item { margin-top: 8px; }
-.newcomer-task__observation-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
+.newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
+.newcomer-task__observation-item { margin-top: var(--v5-space-2); }
+.newcomer-task__observation-actions { display: flex; flex-wrap: wrap; gap: var(--v5-space-2); }
 .newcomer-task__observation-action { min-height: 44px; display: flex; align-items: center; padding: 0 12px; cursor: pointer; color: var(--v5-ink); }
 .newcomer-task__observation-action:focus-visible { outline: 2px solid var(--v5-ink); outline-offset: 2px; }
 .newcomer-task__claim {
-  margin: 12px 16px 0;
-  padding: 12px;
-  border-radius: 12px;
+  margin: var(--v5-space-3) 16px 0;
+  padding: var(--v5-space-3);
+  border-radius: var(--v5-radius-s);
   text-align: center;
   background: var(--v5-brand);
   color: var(--v5-on-brand);
   cursor: pointer;
 }
 .newcomer-task__claim[aria-disabled="true"] { opacity: 0.6; }
-.newcomer-task__claim-error { margin: 8px 16px 0; font-size: 12px; color: var(--v5-ink-3); }
+.newcomer-task__claim-error { margin: var(--v5-space-2) 16px 0; font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__summary {
   box-sizing: border-box;
   min-height: 112px;
@@ -472,7 +476,7 @@ const toggleStyle: CSSProperties = {
 
 .newcomer-task__eyebrow {
   font-family: var(--font-v5);
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   font-weight: 500;
   color: var(--v5-ink-2);
   letter-spacing: 0.01em;
@@ -480,7 +484,7 @@ const toggleStyle: CSSProperties = {
 
 .newcomer-task__count {
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--v5-radius-full);
   background: var(--v5-surface-2);
   font-family: var(--font-jet-mono), ui-monospace, monospace;
   font-size: 12px;
@@ -491,7 +495,7 @@ const toggleStyle: CSSProperties = {
 .newcomer-task__reward {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: var(--v5-space-1);
   margin-top: 5px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -499,7 +503,7 @@ const toggleStyle: CSSProperties = {
 }
 
 .newcomer-task__reward-value {
-  font-family: var(--font-v5);
+  font-family: var(--font-amount);
   font-size: 34px;
   font-weight: 500;
   color: var(--v5-nex);
@@ -519,4 +523,40 @@ const toggleStyle: CSSProperties = {
 .newcomer-task--expanded .newcomer-task__toggle {
   margin-top: 14px;
 }
+.newcomer-task--mission { padding: 18px 16px 6px !important; border-radius: var(--ui-radius-surface); background: var(--v5-surface) !important; box-shadow: inset 0 1px 0 color-mix(in srgb,var(--v5-nex) 70%,transparent) !important; }
+.newcomer-task--mission .newcomer-task__eyebrow { font: 600 16px/22px var(--font-v5); color: var(--v5-ink); }
+.newcomer-task--mission .newcomer-task__mark { display: none; }
+.newcomer-task--mission .newcomer-task__reward-value { font: 500 36px/44px var(--font-amount); font-variant-numeric:tabular-nums; color: var(--v5-nex-ink); }
+.newcomer-task--mission .newcomer-task__count { font: 500 12px/16px var(--font-metric); }
+.newcomer-task--mission .newcomer-task__reward-hint { background: transparent; padding: 0; font: 400 12px/16px var(--font-v5); }
+.newcomer-task--mission .newcomer-task__summary > view:nth-child(3) { margin-top: 10px !important; gap: 0 !important; }
+.newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view { min-height: 52px; border-top: 1px solid var(--v5-border); }
+.newcomer-task--mission .newcomer-task__claim { display: flex; margin-top: var(--v5-space-2); background: transparent; padding: 0; }
+@media (prefers-reduced-motion: reduce) { .newcomer-task :deep(*) { transition: none !important; animation: none !important; } }
+.newcomer-task__segments { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:var(--v5-space-1); margin-top:var(--v5-space-3); }.newcomer-task__segments > view { height:6px; border-radius:3px; background:var(--v5-surface-3); }.newcomer-task__segments > .newcomer-task__segment--done { background:var(--v5-brand); animation:nx-viz-light 320ms cubic-bezier(.2,.8,.2,1) both; }
+@media (prefers-reduced-motion:reduce) { .newcomer-task__segments > view { animation:none !important; } }
+.newcomer-task--mission .newcomer-task__summary {padding:0;}.newcomer-task--mission .newcomer-task__reward {margin-top:10px;}.newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view:first-of-type {border-top:0;}
+
+/* Approved growth board geometry and material. */
+ .newcomer-task--mission { position:relative; padding:25px 16px 5px !important; box-shadow:var(--v5-glass-shadow) !important; overflow:visible; }
+.newcomer-task--mission::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 200deg,transparent 0 45%,color-mix(in srgb,var(--v5-warning) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
+.newcomer-task--mission .newcomer-task__reward { margin-top:17px; }
+.newcomer-task--mission .newcomer-task__count { background:var(--v5-surface-3); color:var(--v5-ink-2); font:500 12px/16px var(--font-v5); }
+.newcomer-task--mission .newcomer-task__unit { font:500 12px/16px var(--font-v5) !important; color:var(--v5-nex-ink) !important; margin-left:6px !important; }
+.newcomer-task--mission .newcomer-task__clock > text:first-child { font:400 12px/16px var(--font-v5) !important; color:var(--v5-ink-3) !important; letter-spacing:normal !important; }
+.newcomer-task--mission .newcomer-task__clock > text:last-child { font:500 15px/20px var(--font-metric) !important; color:var(--v5-ink) !important; margin-top:0 !important; }
+.newcomer-task--mission .newcomer-task__progress-copy { margin-top:8px !important; font:400 12px/16px var(--font-v5) !important; gap:4px; align-items:baseline; }
+.newcomer-task--mission .newcomer-task__progress-copy > text { color:var(--v5-ink-3) !important; }
+.newcomer-task--mission .newcomer-task__progress-copy > text:last-child { color:var(--v5-nex-ink) !important; white-space:nowrap; }
+.newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view { box-sizing:border-box; min-height:53px; }
+
+
+.newcomer-task--mission .newcomer-task__count { display:inline-flex; align-items:center; height:24px; min-width:38px; box-sizing:border-box; justify-content:center; padding:0 8px; }
+.newcomer-task--mission .newcomer-task__reward { gap:6px; margin-top:17.5px; }
+.newcomer-task--mission .newcomer-task__unit { margin-left:0!important; }
+.newcomer-task--mission .newcomer-task__top { position:relative; }
+.newcomer-task--mission .newcomer-task__clock { position:absolute; right:0; top:12px; transform:translateY(-50%); }
+.newcomer-task--mission .newcomer-task__progress-copy { margin-top:9.5px!important; }
+.newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view > view:last-child { display:flex; align-items:center; justify-content:flex-end; }
+
 </style>

@@ -1,4 +1,12 @@
-# NexGrid · 产品需求文档(PRD)
+# UVEL · 产品需求文档(PRD)
+
+> **2026-11-02 展示缓存分层**：[现行规则](../docs/PRD/UVEL_展示数据分层缓存_20261102.md)：稳定邀请码按账号/服务持久保存；FAQ/课程按语言与版本以内存 5 分钟复用；动态展示 5 秒、配置/头像 60 秒。同账号暖刷新保留已有内容，手动刷新强制查询。支付、提现、领取和实际操作资格仍实时。此规则覆盖历史“展示每次实时读取”描述，不改变服务端单一权威。
+
+> **2026-11-02 登录与手机初始化分离**：普通 App 登录及冷启动会话恢复不检查手机绑定来决定页面，不自动进入连接、校准或激活页；未激活手机算力也正常进入首页。自动初始化引导仅由新账号注册成功流程发起，已有账号可在设备管理主动校准或激活。此规则覆盖下文历史的新设备登录自动校准描述。
+
+> **2026-11-01付款截止与确认宽限**：[统一截止、确认中与异常结果](UVEL_付款截止与确认宽限_20261101.md)。确认宽限不延长付款；到期收起收款入口，继续原意图查询，服务端确认终态后才展示取消。
+
+> **2026-10-31现行统一支付**：[统一支付与钱包支付密码](UVEL_统一支付与钱包支付密码_20261031.md)。仅钱包需要PIN；HDPAY/BSC直付免PIN。费用、整数充值及最低额、异步收款和恢复按此增量执行。
 
 | 项 | 值 |
 |---|---|
@@ -6,9 +14,9 @@
 | 版本 | v3.7 |
 | 文档类型 | Product Requirements Document |
 | 适用对象 | 产品 / 设计 / 前端 / 测试 / 业务 |
-| 适用系统 | NexGrid 移动端 H5 应用 |
+| 适用系统 | UVEL App 与共享 H5 |
 
-> **声明**:本文档为研究性原型的产品需求规格,系统中所有业务数据(收益、佣金、价格、TVL)均为模拟生成,不涉及真实资金。
+> **现行适用范围（2026-10-25）**：本文承接历史原型，现用于正式 UVEL App/H5 的需求索引；业务数据以正式服务端为准，不能据旧原型声明生成模拟资金或状态。本轮 Tab、UVT/品牌、团队 V0–V8、H9 数字、商城资格/图片/标题的现行契约见 [UVEL_体验与运营配置同步_20261025.md](UVEL_体验与运营配置同步_20261025.md)。历史文件名与接口标识保留；用户可见 NEX 统一显示 UVT，Nexion/NexGrid 显示 UVEL，团队“业绩/业绩额”显示“算力额”。
 
 ---
 
@@ -109,9 +117,9 @@ NexGrid 是面向全球非中国市场(北美、欧洲、东南亚、日韩、�
 
 > 内部 `UserTier` enum 保留 `"L0"|"L1"|…|"L5"` 标识符;UI 一律走 i18n `profile.tierLabels` 显示功能化标签,**不暴露 L\d 编号**,避免与已废弃的 MLM 层级数字混淆。
 
-### 2.2 V 级头衔(V0-V12,基于团队业绩)
+### 2.2 V 级头衔(V0–V8,基于团队算力额)
 
-跟 L 级独立,V 级是团队业绩驱动的军衔体系(详见 §8.2)。L0-L5 反映"产品使用阶段",V0-V12 反映"团队规模阶段",两套体系并存。
+跟 L 级独立,V 级是团队算力额驱动的军衔体系(详见 §8.2)。L0-L5 反映"产品使用阶段",V0–V8 反映"团队规模阶段",两套体系并存。
 
 ### 2.3 核心使用场景
 
@@ -143,6 +151,8 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 
 ## 3. 信息架构与导航
 
+底部 Tab 现行交互：原生常驻页面壳保留状态，一次点击只播放一次滑块移动；避免切页黑帧和到达后重复滑动。快速连点以最后目标为准，详见 [本轮同步规格](UVEL_体验与运营配置同步_20261025.md) §1。
+
 ### 3.1 应用框架(IOSFrame chassis)
 
 所有路由统一套进 iOS 414×874 设备外壳:
@@ -160,6 +170,8 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 - **滚动位置记忆**:chassis 记录各页滚动容器位置;从二级页 `navigateBack` 回上层时恢复到跳转前的滚动位置,前进进入新页则落到顶部
 - overscroll-behavior contain
 - **默认主题 dark**(产品默认 dark mode 体验)。SSR 阶段 `<html data-theme="dark">` 直出,zustand `useTheme.mode` 初值同步为 `"dark"`,避免首屏闪光;旧用户在 localStorage `nexgrid-theme-v1` 中 persist 过 `"light"` 仍保留其个性选择,新用户 / 清缓存进来即落到 dark
+- 原生页面采用应用已解析的深浅主题；首次显示、返回页面和切换主题时，同步页面主题标记与浏览器配色声明，保留卡片与玻璃控件的原底色、透明度、边缘高光、阴影及图片原色规则，系统自动深色不得再次改色。
+- 第三方收银台为独立网页，不继承应用主题样式，其外观需单独验收。
 - **Chassis 顶部留白**:tab 路由首屏 hero 紧贴 brand row;sub-route(`SetPageHeader` 模式页)在此基础上再下移,避免第一张 IOSList 撞 header 底沿
 
 ### 3.2 底部 5-Tab 主导航
@@ -209,6 +221,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/profile                      个人资料
 /me/devices                      我的设备(全 inventory 激活/取消激活管理)
 /me/security                     安全设置
+/me/payment-password             支付密码设置、修改与身份找回
 /me/security/kyc-express         KYC-Express 说明页
 /me/wallet                       钱包主页
 /me/wallet/topup                 充值 + KYC-Express
@@ -223,7 +236,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/wallet/bills                 账单流水
 /me/wallet/cards                 我的银行卡(saved-cards 列表)
 /me/wallet/cards/new             绑定银行卡(可带 returnTo)
-/me/trial                        免费试用(绑卡式 3 天 + 7 grace + 3 extension)
+/me/trial                        免费试用(无需绑卡；时长、保留期与延长资格由后台决定)
 /me/wallet/nex                   NEX 资产详情页(持仓 / P&L / 用途 / 活动)
 /me/receipts                     推理收据
 /me/rewards                      我的奖励(类别汇总:优惠券 / USDT / NEX 奖励)
@@ -239,7 +252,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/support                      实时客服(渠道枢纽)
 /me/support/tickets              工单系统(列表 / 创建 / 详情 3 mode)
 /support/messages                统一会话中心(多类别客服会话列表)
-/support/chat                    会话聊天线程(?cid= 人工 / ?type=ai Nova)
+/support/chat                    会话聊天线程(?cid= 已有人工会话 / ?start= 新建;其他参数回到会话中心)
 /me/language                     语言切换
 /me/notifications                通知中心
 /staking                         Staking 4 档质押
@@ -261,7 +274,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /register/success                注册成功页(礼包确认 + 引导下载 APP,仅 H5,§4.1.1)
 /onboarding/intro                启动语
 /onboarding/estimator            收益估算
-/onboarding/connect              算力校准 + 接单规则告知(新设备登录复用此页 ?mode=recalibrate 重新校准)
+/onboarding/connect              注册引导或用户主动手机管理的算力校准 + 接单规则告知，普通登录不自动进入
 /onboarding/terms                服务条款(从 intro 脚注 / register 注册脚注进入)
 /session/kicked                  登录失效阻断屏(退出 / 指定会话下线 / 被吊销 → 在途任务回退 + 重新登录)
 ```
@@ -330,6 +343,8 @@ Lite 手机号注册完成（含保存的手机号注册尝试恢复），或第
 
 双模式登录:默认密码登录(`password`),可切换至验证码登录(`otp`)。返回用户主要走 password 路径以加快再访;丢失密码或更换设备的用户走 OTP 路径。两种模式共用相同的手机号识别。Google / Apple / Telegram 沿用 §4.1 的浏览器授权流程，账号不存在时可携带邀请码注册；已有账号不由浏览器重新绑定邀请关系。授权结果未知时保留原登录尝试、安装 ID 与 recovery proof，通过原尝试查询或重试恢复；查询到非会话响应不视为登录成功。H5 恢复时必须使用尝试中冻结的安装 ID（包括历史空值或 localStorage 清除前的 ID），不因当前浏览器 ID 改变而改写；只有新尝试使用当前 ID。若 OAuth complete 未送达，原尝试恢复无结果且重放返回 `OAUTH_FLOW_EXPIRED`，再次用原 proof 查询；只有后端明确返回 `LOGIN_ATTEMPT_RECOVERY_INVALID` 才清除尝试，提示重新授权或手机号登录。已签发会话仍用原 proof 恢复，查询暂不可用时保留 pending。过期流程的恢复沿用 `issue()` 开始时捕获的 vault revision；发送恢复请求前、接受恢复响应/结束尝试前及会话写入时均要求版本未变。其他页面已恢复会话后，旧操作以 `SESSION_CHANGED_DURING_AUTH` 退出，不能覆盖、清除或撤销该新会话。
 
+手机号、验证码、注册自动登录及 Google/Apple/Telegram 登录共用一次登录尝试。提交结果未知时先查询原结果，刷新或返回页面后继续恢复，不另发新登录；重新验证复用原身份和安装上下文，不保存密码或验证码。MFA/CAPTCHA 是待验证状态，支持改正输入及明确取消；已提交但结果未知的登录不能以关闭页面当作取消。第三方身份须先在已登录账号的安全页验证当前密码绑定，未绑定时不自动注册或按邮箱合并。H5 登录不获得手机执行能力，账号关联不签发或替换当前会话。
+
 #### 4.2.1 密码登录(默认)
 
 | 步骤 | 字段 | 校验规则 | 交互 |
@@ -391,13 +406,13 @@ Lite 手机号注册完成（含保存的手机号注册尝试恢复），或第
 | Sponsor 卡 | 公开邀请预览接口返回的邀请人展示名(已打码)、首字头像与 V 级;预览成功后才显示 |
 | 欢迎礼包 | 新人礼开启时显示 `rewards` 配置的 USDT + UVT 金额;关闭时整块隐藏 |
 | 权益列表 | 注册礼包(礼包开启时)/ 24/7 处理全球 AI 任务 / 邀请人帮你上手(邀请人为用户时)。H5 Lite 不展示手机算力相关权益 |
-| 网络脉搏(2026-11-03) | 与首页网络脉搏卡(§5.12)同源同格式:「注册用户」为注册用户估算值、「在线设备」为 H9 `networkPulse.onlineDevices`,均按人口档显示(如 1.2W+、3.2K+);「累计已发放」读首页展示批次 `/api/config/home-display`,以千分位金额显示并在页面可见时逐秒更新。两项人数并排,累计已发放独占一行。不显示真实平台聚合、来源或统计时刻;单项不可用时显示 `-` |
+| 网络脉搏(2026-11-03) | 与首页网络实况卡(§5.8)同源同格式:「注册用户」为注册用户估算值、「在线设备」为 H9 `networkPulse.onlineDevices`,均按人口档显示(如 1.2W+、3.2K+);「累计已发放」读首页展示批次 `/api/config/home-display`,以千分位金额显示并在页面可见时逐秒更新。两项人数并排,累计已发放独占一行。不显示真实平台聚合、来源或统计时刻;单项不可用时显示 `-` |
 | CTA(主) | 预览成功时「领取我的 $X + Y UVT」(礼包关闭时「使用邀请码加入 UVEL」)→ `/register?ref=CODE`;码不可用时退为普通「创建账号」 |
 | CTA(次) | 「已有账号? 登录」→ `/login?ref=CODE` |
 
 **状态变体与归因暂存**:
 - 码格式预检:`NEXGRID-XXXX`(大小写不敏感;服务端权威校验与反作弊另行,§4.3.5)。缺失 / 非法码 → 隐藏 Sponsor 卡与 `REF/CODE` 徽章,其余内容照常(通用落地,不阻断注册;注册页邀请码回到可手输)。
-- 本机已登录 → 顶部提示条「你已注册 UVEL。邀请链接对新用户有效,新人礼每账号仅一次。」(礼包关闭时「你已注册 UVEL。邀请码与分享链接仍可正常使用。」),隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 UVEL」(不重复发礼)。
+- 本机已登录 → 顶部提示条「你已登录。新人礼仅限新账号领取一次。」(礼包关闭时「你已登录，可直接进入 UVEL。」),隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 UVEL」(不重复发礼)。
 - **pendingRefCode(归因暂存)**:合法码到达落地页即写入本地暂存;访客当场不注册、此后从任意入口进注册页仍自动带码并锁定(§4.1)。注册前新码 last-touch 覆盖;绑定发生即清除;已绑定设备忽略新码(first-wins,§4.3.2)。
 - 生产短链 `{share.baseUrl}CODE`(§13.3)由服务端 302 至本页;`share.baseUrl` 未配置(开发 / 演示)时分享链接回退当前站点地址直连本页,扫码当场可达。
 
@@ -580,7 +595,7 @@ logout client 副作用:清 access + refresh cookie + 调 `rebindAccountScopedSt
 
 ### 4.6 密码与凭证规则
 
-统一应用于注册设密(§4.1 步骤 3)、忘记密码 reset(§4.2.3 步骤 3)、安全管理修改密码(§4.5)三个入口。Client 实时校验仅为体验层提示,实际通过 / 拒绝以 server 提交校验为准。
+§4.6.1—§4.6.5 应用于登录密码的注册设密(§4.1 步骤 3)、忘记密码 reset(§4.2.3 步骤 3)、安全管理修改密码(§4.5)三个入口；支付密码独立按 §4.6.6 执行。Client 实时校验仅为体验层提示,实际通过 / 拒绝以 server 提交校验为准。
 
 #### 4.6.1 强度要求
 
@@ -676,9 +691,23 @@ verify 业务错误:`otp_invalid`(附剩余次数)/ `otp_expired` / `otp_attempt
 
 所有 endpoint server-side 完整执行 §4.6.1 强度规则、§4.6.2 锁定逻辑、§4.6.3 存储规则。
 
+#### 4.6.6 支付密码
+
+本节同步已批准的 [DOC18 支付密码方案](https://github.com/agentabatiuo572-byte/uvel-docs/blob/main/handoffs/2026-10-28/app/18-payment-password.md)；完整覆盖范围、密码规则、接口、身份找回及异常恢复均以该文档为准，不将本次能力自动扩展到其他资金业务。支付密码只用于钱包支付，HDPAY银行卡和外部USDT-BSC不读取也不验证。支付密码为独立于登录密码的 **6 位数字**，不能沿用本节登录密码的长度、强度或锁定规则。
+
+**入口与状态**：个人中心直接显示“支付密码”及服务端状态，进入 `/me/payment-password`（正式前端页面 `src/pages/me/payment-password.vue`）。明确未设置才进入首次设置；已设置进入修改，并提供“忘记支付密码”。加载、读取失败或未知不得显示为“未设置”，失败须允许重试。
+
+**首次设置与付款**：结算内和个人中心首次设置前完整显示 **“您暂未设置支付密码，这是初次设置，设置成功后请牢记。”**；结算来源另显示“设置完成后，请再次输入支付密码，继续本笔支付。”。首次输入与再次确认一致后提交设置；设置成功清空两次输入，回到本笔结算上下文，要求用户重新输入第三次支付密码，不能自动复用设置值或视为已付款。付款输入区提前说明输入完成即提交，第 6 位输入完成后才将本次凭证交给原业务支付接口。
+
+**修改与身份找回**：修改使用“当前支付密码／新支付密码／确认新支付密码”三个独立字段，旧密码由服务端验证，新密码两次一致且不能与当前相同。忘记密码只通过当前账号符合恢复条件的已验证绑定手机验证身份，再两次设置新密码；不能现场填写任意新号码重置，也不能只凭登录态跳过身份核验。手机不可用时引导既有客服渠道协助核实身份。结算来源找回成功后仍需重新输入新密码授权原支付，个人中心来源不触发支付。
+
+**安全与锁定**：密码、短信验证码和找回证明只在必要的请求与内存生命周期内使用，不写入本地持久化、日志或埋点；取消、离页、进入后台、登录失效或切换账号清空敏感输入。支付密码失败次数、锁定及解锁由服务端决定，前端显示服务端剩余次数与时间；倒计时结束需重新读取状态，不能自行判定解锁或放行。
+
+**未知结果与退出**：设置、修改、重置或支付提交后结果未知，先用原命令键查询原结果，仅保留当前账号的非敏感命令与交易摘要；不得因超时认定失败或“未扣款”，也不得换键重发。只有服务端明确允许同键恢复且用户主动继续，才重新输入密码并恢复原请求。关闭支付密码弹层只返回原结算确认页，不自动取消原订单；确认页顶部“返回退出”仍按原单取消合同处理。已有未决支付或取消须先解决原结果，不能以新密码输入绕过。
+
 ### 4.7 Onboarding 流程
 
-注册 / 登录完成后进入 Onboarding,3 步骤揭示价值主张并完成手机算力激活。
+仅新账号注册成功后自动进入 Onboarding，3 步骤揭示价值主张并引导手机算力初始化；普通登录正常进入首页，不以手机激活作为前置条件。已有账号需要手机算力时从设备管理主动进入。
 
 #### 4.7.1 Step 1 — `/onboarding/intro` 启动页
 
@@ -690,7 +719,7 @@ Hero 信息层:
 | 标题 line 1 | "AI 时代,算力就是钱。" | 资本视角钩 — AI 缺算力,你刚好有 |
 | 标题 line 2 | "24 小时 替你打工。" | 第二人称 + 强动词 + 数字前置 |
 | 副标题 | "插上充电,就开始接 AI 任务。越多 · 越久 · 赚得越多。" | 隐性 phone hint + 增长承诺 |
-| 实时统计 chip | 「台设备在线」与「累计已发放」读取 `GET /api/config/home-display` 发布的首页展示批次,与 App 一致:按每秒序列显示,刷新不重置,页面隐藏时暂停;读取失败显示「—」。不读取 `verifiedStats` 等真实聚合。窄屏(宽度 < 375)缩小字号,保持一行(H5 Lite 2026-11-03) | 社会证明 + 规模信任;只展示发布的展示数据,不展示平台运营实测数字 |
+| 实时统计 chip | 在线设备与累计已发放读取 H9 首页数字增长批次；每秒按共享序列显示，刷新不重置，失败显示“—” | 独立展示数据；开关、随机批次与性能规则见本轮同步规格 §4 |
 | 中央 ComputeOrb | SVG 动画:旋转轨道 + 卫星节点 + 中央芯片标 "N" | 真平台仿真 — 算力网络可视化 |
 | 主 CTA | "立即开始 →"(brand 大按钮) | 零门槛字眼,无扣款 / 绑卡暴露 |
 | 副 CTA | "登录"(surface ghost) | 复访用户路径 |
@@ -729,7 +758,7 @@ CTA "激活手机算力 →" 在服务端确认绑定成功后路由到 `/`(Home
 1. user 进入 L1 阶段(`{ tier: "L1" }`)
 2. `POST /api/onboarding/calibrate/activate` 以校准 revision 和幂等键创建/更新 `nx_user_device` 手机设备，并把校准记录与 `user_device_id` 绑定；只有服务端回读 `activationStatus=ACTIVE` 才算激活成功
 3. UI 在 `/me/devices` 显示 phone "在线" 状态(若 `isCharging + isWifiConnected` 满足);否则按中断状态显示「重连中」或「未接单」(见 §12.2 手机算力门槛与任务中断模型)
-4. 校准检测或绑定失败时显示「重试」「暂不激活」两个按钮；重试复用原观测值/幂等指令，暂缓不阻塞注册完成
+4. 校准检测、网络失败或结果未知时显示「重试」「暂不激活」，重试复用原观测值/幂等指令；服务端明确返回 `PHONE_REPLACEMENT_DISABLED` 时说明「当前安装记录与已绑定记录不一致，暂时无法激活。请联系支持确认手机绑定，其他已购设备不受影响」，主操作为「联系客服」进入既有消息页，保留「暂不激活」，不盲目重复激活或断言用户使用了另一部手机。真实 `PHONE_REPLACEMENT_COOLDOWN` 保持换绑间隔未到的独立说明，可在间隔满足后重新读取资格重试，不解释成安装记录错误。暂缓不阻塞注册完成；不据同型号自动迁移安装ID、解绑或放开策略，详见[安装记录不一致提示](UVEL_手机安装记录不一致提示_20261101.md)
 5. 暂缓后设备仓库显示重新激活入口；手机未绑定或校准状态不是 `ACTIVE` 时，不得分配任务，也不得写收益、回执或钱包奖励
 
 **真后台对接**:
@@ -738,7 +767,7 @@ CTA "激活手机算力 →" 在服务端确认绑定成功后路由到 `/`(Home
 |---|---|---|---|
 | `/api/onboarding/phone-installation/challenge` | POST | 历史 `{deviceId}` | 已退役（superseded，2026-10-03）；返回 410，零业务副作用，不生成挑战 |
 | `/api/onboarding/phone-installation/verify` | POST | 历史 `{deviceId,certificates,signature}` | 已退役（superseded，2026-10-03）；返回 410，零业务副作用，不验证或发放资格 |
-| `/api/onboarding/phone-installation/login` | POST | `{deviceId}` | 普通认证请求检查当前账号的执行安装及换机资格；异机先停止旧手机任务 |
+| `/api/onboarding/phone-installation/login` | POST | `{deviceId}` | 保留的显式手机绑定核验端点，兼容 `connect?mode=login`；普通登录/会话恢复不自动调用，标准主动校准/激活仍走对应校准 API |
 | `/api/onboarding/calibrate` | POST | `{deviceId,signals,expectedRevision}` + `Idempotency-Key` | 服务端按观测值确定性派生并保存 score/tier/yield baseline |
 | `/api/onboarding/calibrate/result?deviceId=` | GET | — | 回读该账号、设备与环境下的服务端校准事实 |
 | `/api/onboarding/calibrate/activate` | POST | `{deviceId,expectedRevision}` + `Idempotency-Key` | 原子绑定 canonical 手机设备并发布 `ACTIVE` |
@@ -764,44 +793,47 @@ Persist 字段 `userSet: boolean`:false 时允许 auto-detect 覆盖;一旦用�
 **入口**:
 - intro 启动页脚注「继续即表示你同意 服务条款」的「服务条款」(§4.7.1)
 - 注册页底部脚注「创建账号即表示同意服务条款和隐私政策」的「服务条款」(§4.1)
-- 结算页底部「售后说明 | 服务条款」与售后说明弹层里的「服务条款」(§7.3.1)
+- 结算页底部「售后说明 | 服务条款」与售后说明弹层里的「服务条款」(§7.3)
+- 信任中心「规则与资料」的「服务条款」(§11.3)
 
-页面返回(顶部 back chevron / 底部按钮)回到来源页,冷启动无历史时回 intro;带合法 `return` 参数时回到该页。
+页面返回(顶部 back chevron / 底部「我已了解」)回到来源页,冷启动无历史时 fallback 回 intro。隐私政策为独立页 `/onboarding/privacy`。
 
-**结构**:顶部返回头(back chevron + 品牌行)+ 生效日 / 版本 eyebrow + 标题 + 引言 + 7 编号条款段 + 风险披露交叉链接 + 底部确认按钮。
+**结构**:顶部返回头 + 生效日与版本 eyebrow + 标题 + 摘要 + 7 编号条款段 + 风险披露交叉链接 + 底部「我已了解」按钮。
 
-**正文来源**:真后端模式读取 `GET /api/legal/terms/current`(按语言和法域返回服务端发布的标题、摘要和条款段,按 `sortOrder` 排序),需要确认时由服务端记录确认版本。无后端时使用 i18n `terms` 命名空间:`heroTitle` / `heroSubtitle` 为标题与摘要,`s1Title/s1Body … s7Title/s7Body` 为 7 段正文(zh / en / vi)。本地预览的同名接口返回同一份正文。
+**内容来源**:正文读服务端已发布版本 `GET /api/legal/terms/current`(标题、摘要、按 sortOrder 排序的章节);未接远端(`remoteApiEnabled=false`)时用 i18n `terms.heroTitle/heroSubtitle/s1Title/s1Body … s7Title/s7Body` 兜底。本地预览夹具与兜底文案同为下列新版条款(2026-11-03,取代原 10 段条款与「服务条款 · 演示」样例)。
 
-**7 条款段**(2026-11-03 新版简洁条款,适用于 UVEL AI LTD 运营的 UVEL 服务):
+**7 条款段**(章节 key 与 sortOrder:account 10 / service 20 / purchase 30 / earnings 40 / wallet 50 / conduct 60 / updates 70):
 
-| # | 主题 | 要点 |
-|---|---|---|
-| 01 | 账户与安全 | 年满 18 周岁、信息真实;保管密码、验证码和支付密码;账户内操作由本人负责 |
-| 02 | 服务内容 | 设备购买、算力任务、钱包及相关功能;功能、价格和规则以 App 内当前显示为准 |
-| 03 | 购买与售后 | 下单前确认商品、价格和费用;退款与售后以结算页「售后说明」为准 |
-| 04 | 收益与奖励 | 显示的收益为预估,以实际到账为准,平台不承诺收益;奖励按当时公布的条件发放 |
-| 05 | 钱包与提现 | 提现前核对收款信息、金额和手续费;链上转账确认后无法撤回;部分交易可能需要额外确认或延后处理 |
-| 06 | 禁止行为 | 禁止欺诈、多账户刷取奖励、攻击或干扰平台;违规可能受限、取消奖励或停用账户 |
-| 07 | 条款更新与联系 | 重大变更在 App 内通知;联系 App 内客服或 staff@uvel.ai |
+| # | 主题 |
+|---|---|
+| 01 | 账户与安全(年满 18 周岁 · 真实信息 · 妥善保管密码、验证码和支付密码) |
+| 02 | 服务内容(设备购买、算力任务、钱包等 · 以 App 内当前显示为准) |
+| 03 | 购买与售后(下单前确认商品、价格和费用 · 以结算页「售后说明」为准) |
+| 04 | 收益与奖励(收益为预估,以实际到账为准,平台不承诺收益) |
+| 05 | 钱包与提现(核对收款信息、金额和手续费 · 链上转账确认后不可撤回) |
+| 06 | 禁止行为(欺诈、多账户刷奖励、攻击或干扰平台) |
+| 07 | 条款更新与联系(重大变更 App 内通知 · 客服或 staff@uvel.ai) |
 
-风险披露交叉链接 →「平台风险披露」`/me/risk-disclosure`,带回到条款页的 `return` 参数(§11.4a)。
+摘要:「本条款适用于 UVEL AI LTD 运营的 UVEL 服务。注册或使用即表示你同意以下内容。」(英、越同步)。
 
-#### 4.7.6 登录态路由守卫(Auth / Onboarding Guard)
+风险披露交叉链接 →「另见:平台风险披露」`/me/risk-disclosure?return=<条款页>&country=VN`(§11.4a)。
 
-会话态由 `useAuth`(persist key `nexgrid-auth-v1`)的两个标志决定:`isAuthenticated`(是否已登录)与 `onboardingComplete`(是否完成 onboarding)。守卫负责拦截「未登录」或「已登录但未走完 onboarding」的用户访问受保护页,把他们送回正确的漏斗起点。
+#### 4.7.6 登录态路由守卫(Auth Guard)
+
+受保护页的访问依据真实认证、有效会话和账号绑定状态。`useAuth` 的 `onboardingComplete` 仅表示手机初始化状态，不参与登录态路由守卫；已登录但未校准或未激活手机算力的账号也可正常进入首页与其他业务页。
 
 **守卫规则**:每次路由变化(以及应用回到前台时)校验当前页面:
 
 | 条件 | 处置 |
 |---|---|
 | 当前页在白名单内 | 放行(漏斗自身页面不自我重定向,避免循环) |
-| `isAuthenticated === false` | 重定向至 `/onboarding/intro`(回到注册漏斗起点) |
-| `isAuthenticated === true` 且 `onboardingComplete === false` | 重定向至 `/onboarding/estimator`(回到 onboarding 收益估算步骤) |
-| 已登录且已完成 onboarding | 放行 |
+| 无有效登录态或服务端会话已失效 | 进入既有登录/会话恢复流程，不进入手机校准 |
+| 有效登录态，手机未初始化、未校准或未激活 | 放行；普通登录进入首页或合法业务返回目标 |
+| 新账号注册成功 | 由注册入口明确启动注册后引导，不由通用守卫推断 |
 
-**白名单**(不受守卫拦截的无壳页):onboarding 全流程(`/onboarding/*`)、登录(`/login`)、注册(`/register`)、推荐落地(`/ref/*`)、交易/凭证详情(`/tx/*`)。这些页面是漏斗本身或公开入口,守卫对其放行,使漏斗永不自我重定向。
+**公开页**：沿当前公开路由白名单开放登录、注册、介绍、条款/隐私/风险披露及指定推荐、交易凭证入口。手机连接/校准不是因此全部公开；其主动设备操作仍需认证与设备校验。公开页不自我重定向。
 
-**默认登录态**:全新安装(无 persist 记录)默认视为「已登录 + 已完成 onboarding」的用户,应用直接打开到 Home,守卫在正常使用中处于休眠态。仅当用户主动 `signOut()` 后,守卫才被激活,任何受保护页都会把用户送回 onboarding 漏斗。历史 persist 用户(无 `onboardingComplete` 字段)视为已完成 onboarding(向后兼容)。
+**默认登录态**：正式 App 全新安装没有服务端有效会话时不伪造已登录状态；已有会话按既有安全存储和服务端恢复规则处理。恢复成功不检查手机绑定来决定路由，也不以历史 `onboardingComplete` 字段缺失或为 false 强制初始化。
 
 ```mermaid
 sequenceDiagram
@@ -811,25 +843,23 @@ sequenceDiagram
     participant Page as 目标页
 
     Route->>Guard: 读取当前路由
-    alt 路由在白名单 (onboarding/login/register/ref/tx)
+    alt 当前路由是已声明公开页
         Guard-->>Page: 放行
     else 受保护页
-        Guard->>Auth: 读 isAuthenticated / onboardingComplete
-        alt 未登录
-            Guard->>Page: reLaunch → /onboarding/intro
-        else 已登录但未完成 onboarding
-            Guard->>Page: reLaunch → /onboarding/estimator
-        else 已登录且已完成
+        Guard->>Auth: 读取认证、会话及当前账号绑定
+        alt 未登录或会话失效
+            Guard->>Page: 登录 / 会话恢复流程
+        else 具有有效登录态
             Guard-->>Page: 放行
         end
     end
 ```
 
-**真后台对接**:把本地 `useAuth` 替换为真实会话(`GET /api/auth/session` 提供 `isAuthenticated` / `onboardingComplete`),守卫判定逻辑完全不变。`signUp` / `signIn` → `POST /api/auth/{register,login}` 返回 token + canonical user;`completeOnboarding` → `POST /api/onboarding/complete`。
+**服务端事实**：登录和恢复沿现有认证 API、会话与账号隔离实现执行，`onboardingComplete` 只作为信息保留；不增加手机初始化前置条件或新的认证接口。手机激活与换绑由用户主动设备操作或新账号注册引导负责。
 
 ### 4.7 多载体会话、会话下线与新设备校准
 
-**目的**:SPEC-4 后,同一账号允许签名 App / H5 / 白 App 接管态等多载体会话并存,算力设备在线状态与业务登录会话解耦。包含三项强相关能力:① 多载体 session registry;② 会话被主动退出、指定下线或风控停用时在途任务中断回退;③ 新物理设备登录触发算力重新校准。
+**目的**:SPEC-4 后,同一账号允许签名 App / H5 / 白 App 接管态等多载体会话并存,算力设备在线状态与业务登录会话解耦。包含三项能力:① 多载体 session registry;② 会话被主动退出、指定下线或风控停用时在途任务中断回退;③ 用户在设备管理主动发起手机校准。普通登录不因新物理设备、未校准或未激活而插入手机初始化流程。
 
 **设备身份**:每个安装持有稳定的 `deviceId`(`lib/device-id.ts`,首次用 `uni.getSystemInfo` + uuid 生成并持久化 `nexgrid-device-id-v1`)+ 友好 `deviceName`(如「iPhone · iOS」)。deviceId 是「是否同一台物理设备」的判据。
 
@@ -840,7 +870,7 @@ sequenceDiagram
 
 **失效处置(任务中断回退)**:当前会话失效 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[已退出 / 会话已停用]+ 任务已回退提示 +「重新登录」)。重新登录新增当前载体会话 → 守卫恢复挖矿(`resumeMining`)。
 
-**新设备校准**:登录时比对本机 deviceId 与该账号上次校准设备(`nexgrid-calibrated-device-v1`)。**不同且账号曾校准过** → `requiresRecalibration` → 登录后跳转算力重新校准仪式(`/onboarding/connect?mode=recalibrate`,复用 §6.10 校准流程,文案「检测到新设备,正在重新校准算力」)。完成后记录本机为该账号校准设备、重置连续在线稳定加成、回首页。首次注册的首次校准走标准 onboarding,不触发此分支。
+**按需手机校准（2026-11-02）**：密码、验证码和第三方普通登录正常进入首页；已有合法业务返回目标继续沿用现有安全返回规则。登录与冷启动恢复不调用手机登录核验来自动跳转，不因 `onboardingComplete=false`、`requiresRecalibration`、未绑定、需换绑或手机状态不可用而进入手机连接/校准页，也不据此停止原手机任务或修改校准记录。自动初始化引导仅由新账号注册成功流程发起；已有账号仍可在设备管理主动发起 `/onboarding/connect?mode=recalibrate`，其安装绑定、校准、换绑和显式激活规则沿用 §6.10。
 
 **会话状态机**:
 
@@ -896,320 +926,185 @@ flowchart TD
 
 ---
 
-## 5. Home Dashboard
+## 5. Home Dashboard（2026-10-25 更新）
 
-`/` 路由,从上到下 14 个 section,集中展示用户最关心的实时数据。
+本节按用户批准的 UI/UX 审查和最终设计画布修订，取代原 14/16 模块首页。设计依据见 `docs/audit/2026-10-25-ux-audit.md`；后续明确要求为：除底部 Liquid Glass 导航外按最终画布还原，福利卡也使用画布的并排票券/试用设计。历史模块的出现位置不再作为当前首页验收标准。
 
-### 5.1 个性化问候(Greeting Header)
+### 5.0 H5 Lite 差异（2026-11-03 追平合并）
 
-- 时间感知:`Good morning/afternoon/evening, <用户首名>`(高亮名字)
-- 副标:`Your phone is earning $0.04 today`(显示手机设备 today earnings,实时跳动)
+H5 Lite 首页采用本节的 App 结构与视觉（P-56 / P-57 / P-62），只保留以下网页规则：
 
-### 5.2 今日收益 Hero(双引擎)
+- **我的设备**（§5.6）：折叠条头像、展开卡带、作业数和「我的算力动态」中的进行中作业都不显示手机设备，按明确设备身份（`kind=phone` 等）识别，不按显示名称判断。隐藏的手机仍占服务端槽位，槽位环与空闲槽位数按服务端正式占槽数，不按可见卡片数重算。
+- **待办**（§5.5）：不出现手机绑定 / 校准待办，H5 不提供手机执行入口。
+- **设备对比**（§5.8b）：不以手机为基准，也不展示手机升级对比。
+- **App 下载横幅**：仅 H5、已登录时在每日签到下方显示通用 App 下载横幅，「下载 App」进入 `/pages/register/success?download=1` 下载专用模式（§4.1.1）。
+- **新手 / 周任务**：正式模式读取服务器首次进入时冻结的任务组，不在客户端重建任务或逐项发奖。显示时隐藏手机连接、校准、激活及购买任务；`stakingVisible=false` 时同时隐藏质押 / 复投任务。首页、任务页和周任务转换横幅一致过滤；服务端组数量与领取判定保持原样。若首日任务组有成员因 Lite 范围被过滤，整组显示「该任务组包含网页版不可用的任务，暂时无法在此完成或领取」，隐藏进度和领取入口，不把剩余任务展示成完成。
+- **资金记录**：今日收益、收益流水、最近收入等金额记录完整包含手机收益，不套用设备列表过滤。
 
-- **标题行**:`EARNINGS · TODAY` 左 + `+5.2% 24h` chip 右
-- **大字数字**:`$X.XX`,实时跳动。**作用域:跨所有收入流的今日总入账** = `earnings.today`(设备 mining 当日聚合)+ `useCommission.todayUSDT()`(今日 0:00 起入账的团队佣金)。Earn 页 `Compute earned · today` 只算前者(纯设备),因此 Home Hero 数字永远 ≥ Earn Today,差额即"团队 commission 今日入账"。真后台:`GET /api/me/earnings?range=today` 服务端合并返回(TBD;candidate,见 §9.11c.1)
-- **增量 chip**:每次跳动触发 `+$0.000X` 小 chip 在标题行右侧出现(无位移,不挡数字)
-- **副标**:`3 of 3 devices streaming · since 9:41`
-- **NEX 持仓 chip**(链 `/me/wallet`):`NEX badge + 持仓数(toLocaleString) + "+X today" 增量 + $0.171 价格 + +20.4% 24h chip(涨 / 跌)`
-- **分隔线 + 双引擎内嵌**:
-  - **Static**:今日 +$X.XX · {N} mining · live dot(链接 `/earn`)
-  - **Dynamic**:今日 +$Y.YY · {M} network · {K} commissions(链接 `/team/commissions`)
+### 5.1 页面结构与问候
 
-### 5.3 升级推荐 Chip(Boost Upsell)
+顺序为问候与今日收益、每日签到、我的福利、待办、我的设备（§5.6）、单个活动位、我的算力动态（§5.8a）、UVEL 网络动态、网络实况、设备对比、算力市场，底部为平台资质（§5.5a）。可选内容按实际资格、可用资料和未处理状态出现，不以样例补齐空位。常规内容左右 16px，区块间距 20px，单一内容面圆角 22px；玻璃用于导航和操作控件。收益流水只在赚取页（§6.4a），首页不显示（2026-11-02 P-62 起）；首页也不放设备规格或快捷四宫格。
 
-Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
+问候和今日收益的现有视觉、光晕、网格、实时标签保持；昵称来自当前账号完整资料，不擅自截短。顶栏独立搜索与消息玻璃按钮，滚动背板保护文字可读性；底部导航沿用现有折射与交互效果。
 
-| Slot | 文案 | CTA | 触发条件 |
-|---|---|---|---|
-| Pro vs Phone | `Pro owners earned +$1.74 more today` | Add Pro → `/store/stellarbox-pro` | 用户没 Pro |
-| Rack day rate | `Rack owners just hit $8.00/day per node` | See math → `/store/stellarrack-p1` | 用户没 Rack |
-| Genesis floor | `Genesis floor up +18% · 7d on OpenSea` | Browse → `/genesis/marketplace` | 始终 |
-| Staking APY | `180-day vault APY just hit 95% for 24h` | Lock now → `/staking` | 始终 |
+### 5.2 今日收益
 
-### 5.4 我的设备 Fleet
+继续显示服务端首页汇总，不在客户端重新更改财务口径。设备、团队等实际收入与 Earn 页设备收益有不同范围；范围解释放在赚取页。服务端成功读取并确认今日结算笔数为 0 时返回今日金额 0，首页显示 `$0.00`；读取未就绪、失败或今日笔数未知时显示缺值「—」，失败保留可恢复状态，不把未知值转成 0，不用样例金额替换真实账号。
 
-H5 Lite 保留现有双列设备模板，展示已激活的硬件和 Cloud Share，不展示手机设备。设备收益、在线状态和槽位均来自服务端；未知数据显示「—」。
+收益下方第二行显示「较昨日同期」/“vs same time yesterday”/“So với cùng giờ hôm qua”，金额直接读取 `earnings.todayVsYesterdayUsdt`：今日已结算 USDT 减昨日相同时间段已结算 USDT，沿用业务日历和同一次汇总快照。成功确认结算笔数为 0 的窗口按 0 参与计算；任一窗口的汇总、笔数或非空窗口金额未知时差额为 `null`，App 显示「—」。差额允许正、负、零，保留正负号、美元符号及三位小数；不由百分比反推，也不替代上方今日主金额。原布局、样式、动效与隐私遮罩保留。
 
-试用中及抵扣期以独立生命周期设备行展示，显示倒计时、当前抵扣与详情入口，不合并到已购设备数量。优先使用服务端 `slotsUsed`（包含已激活、试用预留和待完成订单预留）；只有缺少该字段时才按已激活设备与一个试用槽位计算，不能重复累加试用。空位入口沿用 Lite 模板。
+原生基座进入首页时，动态初始化和后续刷新须兼容其运行环境；汇总返回有效金额后沿用现有收益布局显示，不根据历史动态推算今日收益。
 
-首页动态区先显示本账号硬件及 Cloud Share 的当前任务；任务名称、状态、收益与 Earn/设备详情共用同一服务端快照。恢复中无任务时显示恢复提示，不生成临时任务；运行进度最多到 99%，服务端确认完成后才完成。不移植 App P-62 首页/Earn 重设计。
+### 5.3 每日签到
 
-### 5.5 实时网络任务(On NexGrid Grid)
+收益区之后保留签到：连续天数、今天的已发布奖励、7 天进度与签到按钮。奖励数量、签到日及完成状态由现有签到接口返回；不硬写第 7 天奖励。用户点击才签到，等待结果期间禁重复提交，成功按读回状态更新；已签到仍可查看签到详情。账号切换、离开页面后不应用旧结果。
 
-标题「UVEL 网格实时」,右侧「地图 →」进入全球网络页。
+签到卡在深浅主题均保留完整的圆角软边及顶部、侧面高光，与收益区底光形成分层。
 
-客户行读取 Home 公开投影 `onGrid.clients`:客户首字母标 + 客户名 + 模型 · 城市;自 2026-11-03 起不再显示每个客户的 GPU 数量(与 App 一致)。无数据时不补行。
+### 5.4 我的福利
 
-底部两项与 App 一致(H5 Lite 2026-11-03),不读取 Home 统计的真实在线设备数和每秒金额:
-- 左侧在线数:读取 H9 公开投影 `networkPulse.onlineDevices`,按与网络脉搏相同的区间显示(如 `3.2K+ 在线`)。
-- 右侧每秒金额:读取 `/api/config/home-display` 发布批次的相邻秒差(`+0.00/sec`),每秒本地播放,每分钟或批次到期时重取;页面或浏览器标签隐藏时暂停,返回时重取。
-- 两项独立降级:一项不可用时该侧显示可点重试的「-」,另一项照常显示;两项都不可用时显示一条「更新中」(读取中)或「暂无数据」并可点重试。在线数重读平台配置,金额重读展示批次。
+区块标题为「福利」。上排放还能领的领取卡，下排放领了还没用完的待使用小卡，两排间隔 12px；两排都没有内容时整个区块隐藏，不留占位。面额来自可领取及未使用券的实际定义，非可叠加券不得求和。若存在无封顶折扣券，不将其他券的有限金额称作整体最高金额。试用保留“购机抵扣、不可提现”含义，不采用未经确认的随时取消承诺。弹层中的抵扣上限、资格与领取操作继续由现有接口控制。
 
-### 5.6 V 级进度卡
+领取卡：代金券和试用都能领时两张半宽卡并排，只有一项时该卡整宽。领取卡是液态玻璃柔边卡，材质同签到卡（半透明填充、柔和内缘、顶部与侧面高光，深浅主题各一套），不加背景模糊；左上角一团氛围光（券琥珀、试用青绿）铺在卡片最底层，内缘与高光压在光晕之上，四周边缘完整。整张卡是一个入口，按钮胶囊只是视觉提示。
 
-链接 `/team/rank`:
-- 当前 V 级 + 头衔
-- 距下一阶 进度条
-- 仍需条件文字描述
-- 等级奖励 chip(培育奖 NEX)
+- 代金券为票券样式：券图、面额（主金额字体）、「代金券 · 购机时抵扣」，打孔虚线两侧半圆缺口，缺口描边与卡片内缘同色；底栏「领取后可用」＋品牌玻璃「领取」。整宽版横排为券图｜「代金券 · N 张」、面额、「购机时抵扣 · 领取后可用」｜竖向撕线｜「领取」。点击时券数据已就绪且可在首页领取则打开领取弹层，否则进入券列表。
+- 试用：试用机型图、预计收益（主金额字体，币种与小数为辅助色，金额为可抵扣上限，与详情及结算一致）、「机型名 · 预计收益」。半宽底栏「免费 N 天」＋「领取」；整宽版顶部标签「免费 N 天」，底栏「无需付款」＋「领取试用」。冷却结束可再领时按钮为「再次领取」，点击打开再领确认。队列已满时底栏为「槽位已满」＋「管理 ›」，点击进入设备管理。资格核实中、读取失败或缺货时按钮显示对应状态并变淡，卡片不可点；资格读取失败时区块下方给出重试。
 
-### 5.7 $NEX 代币行情(当前阶段隐藏)
+待使用小卡（64px 高、实底卡，不用玻璃材质）：
+- 代金券：「$50 代金券」＋警示色「待使用」；整宽版补「 · 结算时自动抵扣」，右侧「去使用 →」；点击进入商城。
+- 试用：试用中缩略图带在线点。半宽显示「试用中」或「可抵扣 $x」＋倒计时；整宽显示机型名＋「试用中 · 剩 …」或「抵扣有效 · 剩 …」，右侧「可抵」＋金额（跟随统计隐私遮罩）。倒计时为 `2d 23h:44`，按剩余分钟向上取整；未知显示“-”，显示到零不改变服务端状态。已结束且不能再领时缩略图变灰，显示「试用已结束」，整宽版右侧「选购设备 →」。点击进入试用详情。已转购不在首页显示。
 
-当前阶段首页不展示此卡(组件保留未渲染)。恢复渲染时规格:
+首页不自动打开福利弹层，chassis 不向其他 tab 重复注入。
 
-链接 `/market`:
-- 当前价 + 24h 涨幅(`$0.171 +20.4%`)
-- 24h sparkline(从 useMarket.klineHourly)
+### 5.5 待办
 
-### 5.8 全球领导池快照
+单一列表容器：手机绑定、新手任务、待支付订单、已有券、试用进度、安全提醒及继续学习。默认最多 3 个待办；更多通过查看全部展开。已处理状态不持续占位。副文案按性质着色：等你处理的状态（如「N 笔待处理」「N 张可用」）用提醒色、500；说明类副文案用正文色 ink-2；新手任务的奖励与倒计时保持原配色。手机执行权限只属于 APP；H5 不提供校准、绑定、心跳或执行任务入口。
 
-链接 `/team/leadership-pool`:
-- 本周池子总额(`$487.3K · ends in 3d`)
-- 用户预估分红 + 占比
-- V<3 用户显示"V3+ to unlock"提示
+课程推荐优先未完成且已有进度的课，其次已发布推荐课，再次首个未完成课；全部完成改为复习/查看教程中心。推荐课和奖励均来自接口。
 
-### 5.9 Quick Action 3 件套
+### 5.5a 平台资质（首页底部信任入口）
 
-横排 3 个 chip:
-- Stake → `/staking`(显示 `180% APY`)
-- Genesis → `/genesis`(显示 `150 left`,红框 urgent)
-- Daily Check-in → `/daily`(显示当前 streak)
+区块标题「平台资质」，右侧「信任中心 ›」，整卡点按同样进入信任中心。卡内依次为：运营主体与公司名、「美国纽约州注册的 AI 算力服务平台」与官方可查说明、三项资质标签（纽约注册／FinCEN MSB／IRS EIN，同排、各配图标，资质尺寸 28px）、「已完成提现」与宣传口号「资质看得见，参与更安心」。主体、说明与资质标签只在信任中心资料接口读到时显示，读取失败时显示中性引导文案；「已完成提现」读取与引导页「累计已发放」、首页 On grid 相同的服务端展示数据（`/api/config/home-display`），卡片在屏幕上时逐秒更新、离开屏幕或页面隐藏时暂停；读不到时整行不显示。配色用创世金（盾牌、资质标签、实时圆点与口号面板），与绿色的收益、领取操作区分。不展示活跃账户、在线设备或核验统计等平台运营明细；合作伙伴标识须有对方授权的官方文件后再上线，不以占位图或虚构金额代替。
 
-### 5.10 实时活动流卡 (LiveFeedCard)
+### 5.6 我的设备
 
-单卡 tab-切换合并两类社会证明 feed,共享 chrome 不重复占用 home 流量。挂在 MissionControl 转化区(ZONE 1 hook),紧跟 DayOneQuestCard 之后,作为 conversion stack 之后的 social proof 锚点。
+2026-11-02 起（P-62 设计 B）。标题「我的设备」，其后是槽位分段环，右侧「管理 ›」进设备仓库。
 
-**Tab 1 — Activity**(全网视角平台动态,默认激活):
-- 实时滚动 6 行全平台事件,每 ~3.2s 替换一条
-- 事件类型(随机生成,dot 区分):
+**槽位分段环**（首页与赚取页共用）：每个槽位一段，依次为试用、Online 设备、其他已占用设备、已占用但未分类、开通中、空位；Online 为成功色，其他已占用为禁用色，开通中为品牌色半透明，空位为浅色。占槽数未确认或隐藏统计时所有段统一灰色，不露占比。读屏读「{n}/{max} 个槽位已占用」，隐藏时读「槽位占用已隐藏」。段数以服务端正式占槽数为准：多于已分类条目时补中性段，少于已分类条目（如过期的试用快照）时先去掉试用段再截尾，与读屏数字一致。
 
-| kind | who 标签 | 文案模板 | tone |
-|---|---|---|---|
-| ok | `You` | `{model} @ {client}` | success |
-| live | `Peer` | `{name} · {region} — {model} @ {client}` | tech-cyan |
-| warn | `Lock` | `{model} @ {client} — needs {vram}GB` | warning |
+**默认折叠**（每次进入首页都折叠，不记忆）：一条卡片，左侧设备头像叠排（顺序同环，第一个在最上层；在线灯 Online 时呼吸，其余静止；空位为虚线加号，开通中为转圈；≤374px 最多显示 4 个），中间「{n} Online」和「{n} 个作业运行中」，右侧展开箭头，整条是展开/收起按钮。作业数只计服务端状态为运行中、且未中断、未在恢复的作业；暂停、排队、重连中、恢复中不计；作业快照未确认时显示「—」。
 
-- 行内字段:`ts(相对) · who tag · msg · val`(`val` = 收益 $X.XXXX 或 `locked`)
-- Live 指示:脉冲 dot + "live" chip
+**展开**：横滑卡带（吸附，左右出血）。设备卡：状态（Online / 状态待确认 / 恢复中，沿用下方激活即 Online 规则）、机图（Online 时淡绿光，非在线灰度）、名称、「今日 +$x」、「作业」状态（作业中 / 空闲 / 作业已暂停 / Reconnecting / 恢复中 / 排队等服务端状态；非在线或未确认显示「—」），点进设备详情（`from=home`）。首页不显示作业名称、进度或百分比，这些只在赚取页。试用卡：「试用」角标、剩余倒计时（如 `1d 23h:12`，按分钟向上取整）与可抵金额，点进试用详情。有空槽时末尾一张「添加设备 · {n} 空闲槽位」卡，打开槽位操作弹窗（§6.9）。卡带下方「在赚取页查看作业 ›」。
 
-**Tab 2 — Earnings**(用户视角佣金 / 同行购买):
-- 3 行,每 ~6.5s 推一条新事件
-- 文案 `{name} bought {product}` + 右侧 `+${amount}`
-- mock 名字池 7 个 / 3 档产品(S1 $29.9 / Pro $89.9 / Rack $349.9)
-- Live 指示:脉冲 dot + "live" chip
-- 底部 `See all →` footer cue,整卡 `<Link href="/team/commissions">` 包装
+**状态**：无设备时折叠条换成「添加设备 / {n} 空闲槽位」，整条打开槽位操作弹窗，不展开。首次读取时环为灰色，条内 6 个静止占位圆和「正在读取设备」。设备或试用读取失败时条内显示「设备状态暂不可用」和「重试」（重新读取设备与试用状态）。隐藏统计时环为灰色，今日收益与可抵金额为 ••••，状态与名称照常。
 
-**结构规则**:
-- Tab 切换 iOS-style segmented control;**live chip 随 tab 走**(Activity=tech-cyan / Earnings=success)
-- sr-only span 保留 `Live platform activity · Live network earnings` 双 needle 字符串,确保 verify.sh 在任一 tab 激活时都能命中
+**动效**：环分段依次淡入、头像依次弹入、卡片从右侧依次滑入，均为一次性；循环只有在线灯呼吸和开通中转圈，离开视口（含被卡带裁掉的卡片）或页面隐藏时暂停；减少动态时全部静止。
 
-**节奏**(两条 ticker 并行运行):
-- Activity:每 3.2s 替换 1 行,counter ref 永递增防 React key 冲突
-- Earnings:每 6.5s 推 1 行,id ref 同上
-- 两条独立 useEffect interval,切 tab 后台依然在 tick,切回直接显示最新状态
+槽位数统一为服务端正式占槽数加一个有效试用预留；转购以真实设备替换预留，结束释放预留。读取失败不把设备当作 0 台；同账号已确认的设备快照仍可见。添加设备入口继续遵守资格与原生/H5 边界。
 
-**SSR 处理**:服务端直出 placeholder 行(deterministic seed),客户端 mount 后才进入 random tick 模式,避免 hydration mismatch。
+设备在线呈现纠正（2026-10-30）：购买成功自动激活，激活即业务 `Online`（绿色圆点），取消激活直接退出算力队列并回到仓库，中英越一致；不显示 Offline，也不并列四种设备状态。暂停、重连及执行器健康属于任务运行信息，不改写设备激活事实；实际执行权限、回执及收益仍依原真实证明。未确认激活事实保留读取/确认反馈。设备仓库展开后左侧显示「已获得收益」及该设备累计收益（服务端累计产出；隐藏数据时遮盖，设备读取未确认时显示“-”），激活/停用操作在右侧，禁用和二次确认规则保持。
 
-**i18n**:`home.liveActivityLabel / liveNetworkEarnings` + `Activity / Earnings` tab labels(en + zh 镜像)。
+### 5.7 活动位
 
-### 5.11 收益事件流(Earnings Ledger)
+仅展示有效且 `placement=home.purchase-promotion` 的活动；每次一个，用户手动切换，有页码指示，无自动轮播。优先已发布活动图片；无图时标题、实际商品和赠品图来自活动规则与目录，不把条款作为广告副标题。规则、截止时间与退款条件仍在操作前可查看。可选活动无数据时隐藏，不自行补活动或紧迫数字。
 
-5 条最新收益,每 5.8s 推一条新行:
-- 客户 logo + 模型 + 客户名 + 城市
-- 金额 +$0.000XX + 时间
-- 新行入场:mc-ledger-in
+### 5.8 网络实况
 
-### 5.12 网络脉搏(Network Pulse)
-
-H5 Lite 与 App 首页网络快照一致(2026-11-03):标题「网络脉搏」,右侧箭头进入全球网络页;下方一张三栏紧凑卡。
+三栏：注册用户、在线设备、设备排名。「注册用户」为按 H9 公布起跳值、锚点、间隔和步长推算的注册用户估算值，「在线设备」为 H9 发布的 `networkPulse.onlineDevices`，两者都按人口档显示（≥1 万为「x.xW+」，≥1000 为「x.xK+」，≥100 为整百「+」，否则「<100」）；估算值只用于展示，不能写入真实人口、财务或排名。「设备排名」为当前账号真实排名。
 
-- 注册用户:公开估算值,按 `publicStats` 的起跳值、锚点、跳动间隔和每次增加人数范围计算(与服务端同一规则),按间隔跳动,页面隐藏时暂停。
-- 在线设备:读取 H9 公开投影 `networkPulse.onlineDevices`。
-- 两项人数按区间显示(如 `3.2K+`、`1.2W+`),不显示精确值。
-- 你的排名:服务端账号排名(`/api/app/network/rank`),未上榜显示「未上榜」;点按弹出排名说明。排名受数据可见性开关遮挡。
-- 三项都可用时才显示整卡;注册用户估算参数缺失或无效、在线设备缺失、配置同步失败或排名读取失败时整卡隐藏,不用其他口径代替。
-- 不读取 `verifiedStats`,不显示「更新于」时间、走势折线、每秒发放或今日发放。
-- 同源展示(2026-11-03):信任中心(§11.3)与邀请落地页(§4.3.1)的注册用户、在线设备与本卡同源同格式,并加一项「累计已发放」(读 `/api/config/home-display`,千分位金额);这些页面不再显示真实平台聚合,单项不可用时显示 `-`。
+不显示更新时间、估算标注或历史折线。个人排名独立读真实排名接口，H9 失败不能抹掉已取得的个人排名。注册用户估算、在线设备或排名任一不可用时整卡隐藏，不用其他口径填充。
 
-### 5.13 设备对比卡(Math Card)
+**同源展示（2026-11-03）**：信任中心「平台运行数据」（§11.3）与邀请落地页「网络脉搏」（§4.3.1）的注册用户、在线设备与本卡同源同格式，并加一项「累计已发放」（读首页展示批次 `/api/config/home-display`，千分位金额）；这些页面不再显示真实平台聚合（活跃账户、真实在线设备、已完成提现、注册账户数）、来源或统计时刻，单项不可用时显示 `-`。
 
-`Your phone needs 27 days to earn $1.62. NexGridBox S1 earns it in 90 seconds.`
-- 双 bar 对比(phone 长 vs box 短)
-- CTA:`See the math` → `/store`
+**UVEL 网络动态（On grid）**：标题右侧「地图 →」进入全球网络页。客户行来自首页概览投影，每行显示客户首字、客户名与「模型 · 城市」；自 2026-11-03 起不再显示每个客户的 GPU 数量。底部左侧为 `networkPulse.onlineDevices` 的人口档「x 在线」，右侧为首页展示批次的每秒发放额「+x/sec」，两项各自降级为 `-` 并可点按重试，都不可用时合并为一行「暂无数据 · 重试」。
 
-### 5.14 信任标识(Trust Chip Wall)
+### 5.8a 我的算力动态 / 最近收入
 
-底部 chip 列表:NVIDIA / Intel / AMD / CertiK ✓ / SOC 2 / GDPR / ISO 27001
-- 链接 `/trust`
-- 副标:`Reserve proof on-chain · 102.4% backed · Trust Center →`
-
-### 5.15 首日任务(Day-One Quest)— 3 phase 状态机
-
-新用户引导任务卡,渲染位置在 GreetingHeader 之后、EarningsHero 之前。
+设备规则任务在运行中、结算动态与凭证上均展示派发时冻结的 PC 任务名称。例如 E2 配置的 `image gen - watercolor portrait` 在入账后仍使用该名称。运营改名影响后续派单，已入账记录保留当时的名称；旧真实模型记录仍可按原资料查询。
 
-#### 5.15.1 3 phase 状态机(Sprint Quest-A+B 改造)
+任务凭证列表和详情显示同一编号，例如 `UVEL-RC-00C1HE`（14 个字符）。`UVEL-RC-` 后接凭证主键的大写 36 进制编号，左补零至至少 6 位，超过 6 位保留全部位数。已签发凭证下次查询时自动使用同一格式。查询、核验和复制继续使用完整原业务号。详情字段值均单行，超宽用省略号。长按普通字段可复制全文，凭证号、作业号、设备编号和哈希可点图标复制。类型与派发时的名称分行。规则任务的「核验信息 → 证明哈希」展示服务端以随机凭证号、任务、用户、设备、规则版本、周期与实际入账金额计算的 SHA-256 **凭证哈希**；反复查看结果相同，可复制完整 64 位。真实模型凭证继续显示原始证明哈希。详情为独立固定弹框，只有正文可滚动；在正文上下边界继续拖动不移动弹框、不触发列表刷新。关闭后列表仍停在原位置。
 
-| Phase | 时间窗 | 完成奖励 | Badge | 文案 | Home 占位 |
-|---|---|---|---|---|---|
-| **active** | 0-24h | 500 NEX | Day-One Hero | 倒计时 chip | 渲染 |
-| **grace** | 24-72h | 200 NEX(降 60%) | Latecomer Hero | banner `First 24h closed. Grace window: claim 200 NEX...` | 渲染 |
-| **expired** | 72h+ | 0 | — | — | **不渲染**(`QuestHero` return null,让出 Home 黄金位置) |
+本次清理涵盖整个公共 TEST，按截点冻结任务、逐笔账本和用户余额。旧设备收益、设备 UTC 日奖及推荐收益按各自原件核对，英文版本及截点后新入账保留。指定余额不足的测试账户先用 C3「系统纠错」补差，再扣旧收益；补差不记为累计收益。C3 须不同管理员复核，已解锁的关联推荐走原 F5/A2 冲正。无入账的终态可先归档；已付款记录在相应冲正生效后移出业务列表、统计和凭证直达，原资金原件及 D4 对账保留。此流程不自动清理其他环境。
+直属设备推荐收益跟随源任务凭证归档。归档生效后，App「直属设备收益」的明细、笔数和合计同步移除该来源。受益人钱包里的原推荐入账按已核准的结算组关联到源任务。购买推荐和其他设备的收益仍按各自凭证查询。
 
-**铁律**:expired phase 不渲染 — 任务窗口已过,在 Home 顶部展示 6 行灰显失败任务违反 §1 转化优先原则。用户已 claim 的 Day-One Hero / Latecomer Hero badge 保留在 `/me/achievements`,作为成就 closure 真正应在的位置。
-
-**实现**:
-- `lib/mock/quest.ts` 提供 `getQuestState(elapsed, claimedFinal): "active" | "grace" | "expired"` 纯函数
-- `lib/mock/quest.ts` 提供 `rewardNexForState(state): number`(500 / 200 / 0)
-- `useQuest.claimFinal(phase)` 参数化 — phase = "active" 解锁 Day-One Hero badge,phase = "grace" 解锁 Latecomer Hero badge,phase = "expired" 拒绝(reward = 0,不应到达)
-- `useQuest` zustand persist v2 + `migrate` — 老 localStorage 自动 backfill `claimedPhase = null`
-- `<QuestHero>` `if (phase === "expired") return null` 守卫整张卡隐藏
-
-#### 5.15.2 UI 规格(active / grace 通用)
-
-- 顶部行:Trophy icon + phase 标签(`Day-One Quest` / `Day-One Quest · Grace window` / `Day-One Quest Complete`)+ 右侧 chip:
-  - active / grace 未完成 + timer 未到 0:倒计时 `⏰ HH:MM:SS`
-  - 全部完成:右侧 `6/6 done`
-- 进度 bar(by completed/total)
-- 6 任务 row:`<QuestRow>` **默认展开**(`expanded` state true)— 直接渲染 6 行任务列表给出具体完成路径。`allDone` 强制 expand。底部 collapse bar 仍保留供用户主动收起。设计目的:转化优先 — 用户首次看到 Quest 时立即获知 6 个完成动作,比单看进度条更能驱动行动
-- 卡片底部三层交互区(参 §5.15.4)
-
-**Timer 起算**:基于 `useQuest.startedAt`,QuestHero mount 时 `ensureStarted()` set `Date.now()`,persist 锁定。新老 mock 用户首次访问 Home 都会触发一次完整 3 phase 体验。
-
-#### 5.15.3 任务清单
-
-**Lite 当前规则（2026-11-03）**：正式模式读取服务器首次进入时冻结的任务组，不按下表在客户端重建任务或逐项发奖。显示时隐藏手机连接、校准、激活及购买任务；`stakingVisible=false` 时同时隐藏质押 / 复投任务。首页、任务页和周任务转换横幅一致过滤；服务端组数量与领取判定保持原样。若冻结组有成员因 Lite 范围或质押开关被过滤，整组显示“包含网页版不可用的任务，暂时无法在此完成或领取”，隐藏完成比例、进度条和领取入口，不把剩余任务展示成 1/1 或 100%。无删减的组仍按服务器原始快照展示和领取。下表仅为本地演示的旧默认清单，不代表线上发布条件。
-- 进度行:`{done} of {total} tasks` / 右侧累计 `+N NEX`(已完成任务的 rewardNex 之和)
-- progress bar(by completed/total)
-- 6 任务 row(纵向,固定顺序按 funnel 难度):
-  - 未完成态:序号圆点(1-6 数字)+ 任务名 + 右侧奖励 `+NN NEX` + ArrowRight
-  - 已完成态:勾选圆点 + 任务名(line-through)+ 右侧奖励 `+NN NEX`(invite 行额外 `+$1`)
-  - 每行整体是 `<Link href={task.href}>`,点击直接跳触发路由
-
-| # | id | 标题 i18n | 跳转 | 完成触发 | 奖励 |
-|---|---|---|---|---|---|
-| 1 | bind_bank_card | Link a bank card | `/me/wallet/cards/new` | 绑卡页绑卡成功(server-canonical `card.bound`)时 markComplete | +50 NEX |
-| 2 | visit_earn | Open Earn tab | `/earn` | QuestRouteWatcher 监听 pathname | +30 NEX |
-| 3 | visit_store | Browse the store | `/store` | QuestRouteWatcher 监听 pathname | +50 NEX |
-| 4 | view_product_roi | View a NexGridBox ROI | `/store/stellarbox-s1` | QuestRouteWatcher 监听 `/store/{id}`(排除 `/store/orders` 和 `/store/checkout`)| +100 NEX |
-| 5 | setup_profile | Set up your profile | `/me/profile` | Profile 页 Save 时 markComplete | +80 NEX |
-| 6 | invite_friend | Invite 1 friend | `/team` | Team 页 copyCode 时 markComplete | +200 NEX + $1 USDT |
-
-#### 5.15.4 底部交互区(三层分层 hint + 主 CTA + 次 CTA)
-
-未完成态下,卡片底部按视觉权重分三层:
-
-**L1 — 完成提示行**(plain text,inline icon)
-- active:文案 `Complete all 6 to unlock +500 NEX bonus` + 右侧 Trophy icon
-- grace:文案 `Complete all 6 to unlock +200 NEX bonus` + Trophy icon
-- 设计目的:告诉用户最终目标存在,但不喧宾夺主
-
-**L2 — 主 CTA bar**(整宽)
-- 文案 i18n `quest.buyCta`:
-  - zh `购首台 NexGridBox · 启动 $38/日永续收益`
-  - en `Get your first NexGridBox · earn $38/day forever`
-- 左侧 Sparkles icon + 右侧 ArrowRight icon
-- href = `/store/stellarbox-s1`(主推 SKU 详情页)
-- 设计目的:服务 [转化优先级第一原则](#§1 NexGridBox 购买导向),把 Day-One Quest 直接接到入金动作。点击同时也会触发 task #4 `view_product_roi` 自动完成(+100 NEX),双重激励
-
-**L3 — 次 CTA bar**(整宽)
-- 文案 i18n `quest.expand`(`查看 6 项任务` / `View 6 tasks`)+ ChevronDown icon
-- 展开后切换 `quest.collapse`(`收起任务` / `Hide tasks`)+ ChevronUp icon
-- 设计目的:Apple Music / Spotify "Show More" 模式,让用户主动选择展开任务列表;不与主 CTA 抢注意力
-
-**全部完成态**(allDone=true)
-- L1/L2/L3 替换为整宽 claim button(原 footer claim 逻辑保留):
-  - active 未领:button `Claim +500 NEX bonus` → `claimFinal("active")` + `creditNex(500)` + `useAchievements.unlock("day_one_hero")`
-  - grace 未领:button `Claim Latecomer +200 NEX` → `claimFinal("grace")` + `creditNex(200)` + `useAchievements.unlock("day_one_latecomer")`
-  - 已领奖:phase-color 卡显示 `🎉 Day-One Hero badge + 500 NEX claimed` 或 `🎉 Latecomer Hero badge + 200 NEX claimed`(由 `claimedPhase` 派发)
-
-#### 5.15.5 Nova 召回 push
-
-| Push | 触发条件 | 文案钩子 | CTA href |
-|---|---|---|---|
-| `questGraceReminderPush` | 进入 grace + 未 claim + 未完成所有任务 | `Your Day-One Quest just rolled into the grace window. You can still claim +200 NEX (down from 500)...` | `/`(回 Home 继续 quest) |
-| `questFinalExpiredPush` | 进入 expired + 未 claim | `Day-One Quest has fully closed. Your activity log remains in the achievements page — check whether you unlocked the Day-One Hero or Latecomer Hero badge.` | `/me/achievements` |
-
-**接入位置**:`<StellaTriggers>` `useQuest.startedAt + claimedFinal + completed.length` 订阅,5 min tick + 7 day cooldown(实际一次性 push per phase transition)。
-
-#### 5.15.6 实现细节
-
-- **SSR 处理**:`useState<number | null>(null)` mounted 守卫,server 输出 null,client mount 后才渲染倒计时,避免 Date.now hydration mismatch
-- **路由监听器** `QuestRouteWatcher`:挂在 `(main)/layout.tsx` 的 silent client 组件,`usePathname` listener,自动 markComplete 路由型任务(visit_earn / visit_store / view_product_roi)。非路由型任务在对应动作的 click handler 内手动 `useQuest.getState().markComplete(...)`
-- **partial reward 一致性**:`nexEarned = useMemo(() => progressNexEarned(completed), [completed])` 紧跟 useState 声明,**必须放在所有 early-return 之前**(rules-of-hooks)。React 保证 `completed.length`(用于 progress text `已完成 X/Y`)与 `nexEarned`(用于 `+N NEX` 累计奖励)在同一 commit 内呈现一致状态,杜绝"3/6 + 0 NEX"或"0/6 + 180 NEX"类不一致瞬态
-- **expand toggle**:`useState(true)` 默认展开(详见 §5.15.2 设计意图 — 转化优先,用户首屏即看到 6 个具体任务路径);`effectiveExpanded = expanded || allDone` 衍生,6/6 完成时强制保持展开让 claim 按钮可见;底部 collapse bar 仍允许用户主动收起
-- **i18n**:`quest.*` namespace
-  - phase / 状态 keys:`title / titleGrace / completeTitle / progress / completed / finalBonusHint / claimBonus / claimLatecomer / bonusClaimed / latecomerClaimed`
-  - 交互 keys:`buyCta`(主 CTA 文案)/ `expand`(展开任务列表,带 `{n}` 任务数 placeholder)/ `collapse`(收起任务列表)
-  - 6 task titles:`t_bind_bank_card / t_visit_earn / t_visit_store / t_view_product_roi / t_setup_profile / t_invite_friend`
-  - grace phase 不再渲染独立警示 banner — 窗口紧迫感由 §5.15.2 的 phase styling + 顶部倒计时 chip + L1 hint + L2 主 CTA 四点共同暗示
-  - expired phase 整张卡 return null,无相关文案 keys
-
-#### 5.15.7 路由型任务自动完成派奖
-
-路由型任务(visit_earn / visit_store / view_product_roi)无需用户点击"完成",平台监听用户落地页自动判定完成并派奖:
-
-- 平台以固定节奏(每 1 秒一拍)读取当前页面,页面变化时映射到对应任务:`/earn` → `visit_earn`、`/store` → `visit_store`、商品详情页 `/store/{id}` → `view_product_roi`(排除 `/store/orders`、`/store/checkout`)。
-- 首次落在匹配页 → `markComplete(id)` 返回该任务的奖励(NEX,部分含 USDT);仅在**首次完成**时入账 NEX / USDT 并弹 `+N NEX` toast。
-- 幂等:已完成任务重复访问返回 `firstTime:false`,不重复派奖(完成态持久化于 `nexgrid-quest-v1`,刷新后不再触发)。
-- 非路由型任务(bind_bank_card / setup_profile / invite_friend)在对应动作处(绑卡成功 / Profile 保存 / 分享邀请)手动调 `markComplete` 派奖,不由本监听覆盖;首次派奖同步写账单 bonus 行。
-
-```mermaid
-sequenceDiagram
-    participant Watch as 路由监听(每 1s)
-    participant Q as useQuest
-    participant App as 钱包余额
-
-    Watch->>Watch: 读取当前路由
-    alt 路由未变
-        Watch-->>Watch: 无操作
-    else 路由变化且映射到任务 id
-        Watch->>Q: markComplete(id)
-        alt 首次完成
-            Q-->>Watch: firstTime=true · 返回 rewardNex / rewardUsdt
-            Watch->>App: creditNex(rewardNex) / creditBalance(rewardUsdt)
-            Watch-->>Watch: toast "+N NEX"
-        else 已完成(幂等)
-            Q-->>Watch: firstTime=false · 奖励 0
-        end
-    end
-```
-
-> 真后台对接:任务定义 `GET /api/quest`;完成派奖 `POST /api/quest/complete` 返回 `{ firstTime, rewardNex, rewardUsdt }` + canonical 余额 / 账本行,替换本地判定对调用方零改动。
+
+本次公共 TEST 验收数据清理仅适用于选定账号和旧任务清单。以旧模型执行记录或初始六项配置的派发版本识别旧单；新版英文任务即使复用同一配置 ID，也保留其凭证和收益。已入账的旧收益按原币种、实际流水冲回一次，未入账的不扣款；完成后旧单不再进入用户任务历史、凭证、收益明细和汇总。原账及冲回关联留作对账。清理不是正式环境的自动到期规则。
+
+首页卡片双页签，固定 5 行、行高一致，作业从进行中转为已结算时卡片高度不变。「动态」：账号设备上进行中的作业最多 2 条（进度、预计收益），其下为首页结算账本的已结算记录（对勾图标、客户与完成时间、收益），新结算逐条滚入，滚入期间锁定列表高度。「收益」：收入方向账单最近 5 条（类型图标、类型与状态、说明与时间、金额与币种），切到该页签时才读取；点一行进入账单页并预选收入与该行币种。「查看全部」分别进入作业回执与账单页（预选收入）。不显示「你」之类的身份标签，不生成模拟数据。
+
+原生基座首次挂载、返回首页及后续滚入均不依赖较新运行时的数组取尾方法；无待滚入记录时保持现有内容，有记录时沿用原顺序与节奏。
+
+### 5.8b 设备对比
+
+只展示服务端首页投影 `doTheMath` 的有效对比，基准为当前账号最高日收益的活跃真实设备，目标为服务端选定的可购买目录商品；不展示云份额对比，不用 `derivePromoUpgrade`、本地档位或样例兜底。已拥有最高档设备、没有更高档可购商品、购买资格探测失败或没有有效基准设备时，服务端返回空对比。投影为空、尚未读到有效数据或读取失败且无可用对比时，整个区块隐藏，包含标题、加载/错误/暂无设备提示与占位；前后可见模块保持正常 20px 间距。刷新重新读到有效投影后恢复展示。
+
+有效对比沿用设备图、收益柱、倍数和日收益，CTA 按投影的目标 `productNo` 进入商品详情，不由本地档位推断。隐藏统计时遮盖个人收益与倍数，柱高统一，不泄露比例；离开视口或页面隐藏时暂停循环动效。
+
+### 5.9 状态与验收
+
+320/390px、中/英/越、亮暗主题与减少动画均须检查；长文自然换行，不裁掉金额或关键条件。每日自动奖励提示按账号和 UTC 日限频，不影响实际奖励发放或账本。页面滚动留足底部导航安全区，浮标不挡主要操作。
+
+最终画布版本为 `1792868600-583d`（artifact `7cc57828-35e5-42d6-b889-f92286cb8aad`）。视觉评分与运行截图是前端隔离证据；真实 TEST 服务和 Android 真机另行验收，不能用构建或测试响应代替。
 
 ---
 
 ## 6. Earn(算力赚取)
 
-### 6.1 我的设备
+### 6.0 页面结构
 
-Lite 仅展示已激活硬件和 Cloud Share，库存由 `/me/devices` 管理，不显示手机设备或实时手机任务（PHONE、MOBILE 均视为手机）。账号收益记录仍完整展示，见 §6.3、§11.5.1。保留现有折叠设备卡，展开可查看当前任务、最近完成任务与设备详情。
+2026-11-02 起（P-62「赚取页定稿」）自上而下：周期切换（今天 / 本周 / 本月 / 全部）→ 便当格（§6.4）→「我的算力列队」与设备舞台（§6.1）→ 收益流水（§6.4a）→ 行情看板（§6.5）→ 作业中心（§6.3）→ 更多赚取方式。§6.6–§6.8 的三条横幅当前未在赚取页渲染（组件保留）；§6.9 的槽位卡已由设备切换条和舞台里的添加入口取代。
 
-任务读取 `/api/tasks/assignments`，识别当前 v3 服务端周期及其中保留的 v2 任务；旧服务端可回退至 `/api/tasks/v2/assignments`。每条任务保留自己的协议版本，不能用根版本覆盖。显示服务端任务名称、冻结收益/周期收益、预计和实际时长、执行状态与结算状态。Cloud Share 同样显示任务过程；`RULE_CYCLE` 明示按规则结算且未执行模型，`SIMULATED` 显示任务周期与任务凭证，不包装为本地推理。
+**H5 Lite（2026-11-03 追平合并）**：Lite 采用同一赚取页结构。设备舞台、设备切换条、槽位环和作业中心里的设备任务不显示手机设备（PHONE、MOBILE），按明确设备身份识别；隐藏的手机仍占服务端槽位，占槽数按服务端正式占槽数。手机专有内容（重连、无充电 / 无网络暂停、后台模式、锁定作业、实时算力等）在 Lite 不出现。账号级收益汇总、便当格、收益流水、结算批次与明细及凭证历史完整包含手机收益（§6.11、§11.5.1）。
 
-v2 阶段：排队、计算、校验、恢复、暂停、完成、失败、取消。排队/恢复/失败/取消无假进度，开始时间允许为空。进度以服务端时间锚和单调时钟投影；暂停冻结，运行最多 99%，到时等待服务端确认，不在浏览器完成任务、发奖或生成凭证。恢复标记可在无当前任务时显示。
+### 6.1 我的算力列队与设备舞台
 
-### 6.2 设备槽位卡 (EmptySlotsHint)
+区块标题「我的算力列队」，其后是槽位分段环（§5.6）和火箭按钮（作业产能说明弹层）。只显示已激活设备（`activatedAt !== null`，见 §12.2）；已购未激活的设备在 `/me/devices` 管理。
 
-详见 §6.9。沿用 Lite 槽位卡与操作弹窗，试用生命周期行独立展示。
+**设备切换条**（横滑胶囊，`tablist`）：试用排第一（有试用时），其后为已激活设备的现有顺序；胶囊含机图、名称、试用角标和状态点。有空槽时末尾一个虚线「+」打开槽位操作弹窗。每次访问固定一个选中项：默认第一个有进行中作业的设备，没有就选第一个；选中设备存在期间不随作业刷新改变，设备消失时才换，新访问或切换账号时重置。
 
-### 6.3 任务中心(Task Center)
+**设备舞台**（`tabpanel`）：
+- 顶行：设备名与状态；「…」打开现有设备菜单（统计 / 升级置换 / 取消激活，与长按相同，守卫不变）。
+- 半圆仪表：6px 轨道；进度弧从品牌色 12% 渐变到 70%，进度点为 4px 实心圆，不发光；进度来自现有作业进度估算，入场从 0 扫到当前值一次（1400ms），之后平滑过渡不回 0。作业运行中，已完成弧段内有柔和波纹持续流向进度点（不从起点单独滑出），进度点外圈脉冲；试用累计中同样（琥珀色）；暂停、排队、重连中、恢复中、等待结果确认、隐藏统计时不循环。空闲为虚线轨道；非在线只显示灰度机图；状态待确认 / 恢复中只显示状态文案、不画进度。
+- 作业行：跳动条（只在作业运行中跳）+ 作业名称与百分比。作业名称按作业类别显示英文名（Image Gen / Video Gen / LLM Inference / Fine-tune / Embedding / Speech），中英越三种语言相同，不显示服务端的 `taskName`（后台配置的单一文案，不随语言切换）；暂停、重连中、等待结果确认等提示放在下方。空闲显示「暂无进行中作业，等待新作业」。
+- 手机专有内容（重连、无充电 / 无网络暂停、等待作业、后台模式、锁定作业、实时算力等）保留现有逻辑，放在作业行下方。
+- 三格统计：今日收益、今日 UVT、作业产能（新机期显示新机期文案；可降级设备点按打开产能说明）。
+- 「今日最近完成」胶囊（模型与金额）+「查看全账户收据 ›」；右下「设备详情 ›」。
+- 试用舞台：琥珀色仪表，进度为当前可抵扣占预计抵扣的比例；显示当前可抵扣、预计抵扣、剩余时间与「抵扣仅用于购机，不能直接提现」；底部「取消试用」（现有确认与防重入）、「详情」与「提前购买 →」（到期抵扣期为「抵扣购机 →」）。
+- 隐藏统计：仪表只留轨道，模型名、百分比、三格统计和胶囊金额为 ••••，数值不再着色，舞台不显示在线光晕。
+- 无设备且无试用时，舞台位置换成虚线「添加设备 · {n} 空闲槽位」入口卡；首次读取时为灰色占位（三个胶囊、标题、空轨道、「正在读取设备」、三格占位）；设备读取失败时显示「设备暂时无法刷新」条与「重试」。
 
-标题右侧显示「{n} 个全球作业进行中」：{n} = 首页概览的真实进行中作业数（`onGrid.activeJobs`）+ H9「首页与网络展示设置」发布的全球作业展示基数（`publicStats.activeJobsBase`，非负整数），按千分位显示。基数只用于这里和全球节点地图（§11.6）的展示，不写入任何真实统计。基数未发布（缺失、为 null 或不是非负整数）时只显示真实数。真实数为空时：当日结算为 0 USDT 且 0 UVT 时按 0 计（显示基数，未发布时为 0），否则显示「—」，不显示基数。全球节点地图「进行中任务」与这里是同一个数，由同一处计算。（基数字段依赖后端 B21。）
+### 6.2 添加设备入口
 
-跨可见硬件和 Cloud Share 展示最近完成任务，保留服务端任务名。点击 v2/v3 任务可查看阶段、时长、收益与结算状态；已入账且有凭证号时才进入凭证。打开的详情按任务 ID 跟随轮询更新，待结算/挂起变为已入账时无需重开即可查看凭证；v2 凭证优先使用任务投影的真实入账时间。查看全部进入 `/me/receipts`。收益保留最多六位小数，平台币展示为 UVT（兼容旧接口 NEX 字段），微额收益不能舍入成零。
+赚取页的添加设备入口为切换条末尾的「+」和无设备时的虚线入口卡，均打开槽位操作弹窗（§6.9）。原 EmptySlotsHint 槽位卡已移除。
 
-分钟结算区读取 `/api/tasks/v2/settlements` 及批次详情：显示待结算金额、批次号、币种、任务数、完成窗口、入账时间和逐任务金额。`PENDING` 待结算与 `BLOCKED` 挂起不等于可用余额；只有 `POSTED` 才已入账。v3 周期可同时查看遗留 v2 批次；接口未提供批次能力时不伪造批次，读取失败提供重试。账号汇总、待结算金额、批次及逐任务明细完整保留全账号收益，包括 PHONE、MOBILE，金额与明细必须一致。此规则与账单、历史凭证一致；设备卡、运行任务、任务中心设备任务列表仍隐藏手机。
+### 6.3 作业中心(Task Center)
 
-### 6.4 收益统计(Earnings Overview)
+区块标题「作业中心」，右侧心跳图标与「{n} 个全球作业进行中」。
+「{n}」= 首页概览的真实进行中作业数（`onGrid.activeJobs`）+ H9「首页与网络展示设置」发布的全球作业展示基数（`publicStats.activeJobsBase`，非负整数），按千分位显示。基数只用于这里的展示，不写入任何真实统计。基数未发布（缺失、为 null 或不是非负整数）时只显示真实数，与原来一致。真实数为空时：当日结算为 0 USDT 且 0 UVT 时按 0 计（显示基数，未发布时为 0），否则显示「—」，不显示基数。全球网络页（§11.6）「进行中任务」与这里是同一个数，由同一处计算。（基数字段依赖后端 B21。）
 
-保留 Lite 的 Today / Week / Month / All 切换，默认 Today。卡片读取服务端算力收益汇总，与首页含团队等来源的总入账口径不同。浏览器计时只驱动进度展示，不递增钱包或已结算收益。待结算金额单独列示，不能消费或提现。读取失败保留明确错误与重试，不把未知金额显示为零。
+卡内两行入口：
+- **作业历史**（「最近 {n} 笔作业凭证」）：点按展开现有跨设备已完成作业列表（最近 20 笔，按完成时间倒序；有收据的行可打开 Proof-of-Compute 收据详情，§11.5）和「查看全部」（`/me/receipts`）；升级可解锁的高阶作业示例（VRAM 门控，点进商城）也在展开区内。作业历史与解锁示例的作业名称同 §6.1，三种语言都显示英文类别名。
+- **结算批次**（「按批次查看到账明细」）：服务端提供结算批次时才出现，点按展开现有批次列表与明细。
+读取失败的就地说明与重试保留。
 
-### 6.5 Market Overview(行情)
+### 6.4 收益统计（便当格）
 
-- AI Workload Price Index:6 个模型单价(SDXL Turbo / Llama 70B / Whisper / Embedding / Flux Schnell / Phi-3-mini)
-- 顶部 sparkline + 横向 chip 滚动
-- 数据每 1.6s tick
+- 大格：「设备收益 · {周期}」与隐私开关、「不含团队奖励」；主金额（整数、`$` 与小数分开，首次计数动画），下方 UVT 数额。右上角一团琥珀色光，是赚取页唯一的氛围光。收益汇总读取失败时就地说明并提供「重试」。
+- 小格「已完成作业」：当前周期作业数（中文后缀「个」），未知为「—」。
+- 小格「最新结算」：收益流水第一条的金额与「模型 · 客户」，点按进入账单页（与收益流水「查看全部」相同）；无数据时金额为「—」并显示收益流水的状态文案。
+- **作用域：仅设备算力收益**，不含团队奖励、质押或任务奖励；Today 与首页今日收益口径不同，差额来自首页包含的其他收入。
+- 隐藏统计时金额与计数为 ••••。
+
+### 6.4a 收益流水
+
+区块标题「收益流水」与「查看全部 ›」（账单页）。卡内最近 5 条已结算收益：「模型 · 客户」与金额，不显示时间（04.6）。数据来自首页汇总的结算账本；读取中、无数据和失败沿用现有文案与重试。首页不再显示这张卡。
+
+### 6.5 行情看板(Market Overview)
+
+- 区块标题「行情看板」，右侧「● 已更新」（汇总读取成功时）。
+- AI WORKLOAD PRICE INDEX：每个工作负载一格（每行 3 格），含名称、单位、单价、24h 涨跌（↑ 涨 / ↓ 跌 / → 持平）与 7 点走势线；有旗舰档涨幅时在该格内追加一行（如「405B flagship ↑32.1%」，持平时不加箭头）。
+- 设备预估日收益排行：名次、机图、名称（有「适用场景」时在名称下方）、`$x/天` 与按最高值等比的细条；有机型的行点进该机型商品页。
+- 数据来自首页汇总的服务端行情；读取中或不可用时显示现有状态文案与重试，不用样例数字。
 
 ### 6.6 错过收益 Banner(MissedIncomeBanner)
 
@@ -1339,15 +1234,18 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 **刷新节奏**:client mount 后 setInterval(60s)重计算,monthsOwned / 产能系数在用户停留期间持续平滑变化。
 
-### 6.9 设备槽位卡(EmptySlotsHint)
+### 6.9 槽位口径与槽位操作弹窗
 
-位置在 Earn 设备列表。Lite 保留原模板与「添加设备」入口，不引入 App P-62 视觉重设计。
+原 EmptySlotsHint 槽位卡（潜在日收益 hero、6 格槽位、Fill slots CTA）已于 2026-11-02（P-62）移除；槽位占用改由首页与赚取页的槽位分段环（§5.6）表达，添加入口见 §5.6 与 §6.2。
 
-槽位上限及占用以服务端为准：硬件和 Cloud Share 激活后各占一槽，已购未激活库存不占槽；试用 active/grace（含服务端 EXTENDED）独占一槽，订单预留也占槽。顶部计数优先直接读取 `slotsUsed`，不可再加一次试用槽。设备等待任务结束后停用期间仍占槽，服务端确认停用后才释放。
+**槽位口径（2026-10-30 更新）**:全部设备共用最多 6 个激活槽位，Cloud Share、手机、PC 算力、Box、Rack 每个有效激活实例各占一槽，同款重购不合并。未激活、取消激活或已回收设备不占槽；原有试用与订单预留规则保持。首页、赚取、设备仓库和选择弹窗统一计数，满槽不能新增激活任何型号。此规则取代 2026-08-25 的 Cloud Share 免槽规定，不改变购买资格、收益和抵扣置换规则。
 
-试用设备行与已购设备行分开，显示机型、剩余时间、已累计/可抵扣金额与详情入口，不把它作为普通购机库存。结束、转正、退款后的状态由试用生命周期接口决定。
+**槽位操作弹窗(Slot Action Sheet)** — 由首页「添加设备」卡与无设备条、赚取页切换条的「+」与无设备入口卡触发,两个并存入口引导填满空槽位:
 
-点击空位：已有库存时打开槽位弹窗，直接列出可激活库存，同时提供购买入口；无库存时进入商城。激活前要求服务端容量状态就绪，购机容量报价按明确决策处理，不能仅凭本地数量判断有空位；容量未知或存在订单预留时不得假定可激活。满槽位引导管理设备，不能重复领取试用或额外占槽。
+1. **购买新设备**(主入口):跳转 `/store`。**始终呈现**。
+2. **激活已有设备**(次入口):仅当存在未激活设备(`activatedAt === null` 的库存设备)时出现,**默认折叠**;展开后列出全部未激活设备,点选即调 `activateDevice` 激活进槽。激活受 `MAX_DEVICES`(6)上限约束 —— 槽位已满(`activeCount + trial 预留槽 ≥ MAX_DEVICES`)则提示槽位已满、不激活。
+
+仓库无未激活设备时,弹窗仅呈现「购买新设备」入口;每次打开弹窗,次入口默认折叠。
 
 ### 6.10 手机算力显示规则与校准
 
@@ -1363,11 +1261,15 @@ H5 Lite 是唯一网页产品线。手机号注册和带注册回执的第三方
 
 Lite 不展示手机设备、激活 / 校准卡、手机收益方式、重新校准动作或扫码邀请入口；首页、Earn、设备仓库、详情和搜索只展示可在网页管理的设备。隐藏手机仍保留在服务器设备账本中并占用原槽位，不以可见卡片数重算容量。设备与实时任务视图同时排除 PHONE / MOBILE；账号级结算汇总、批次及明细、任务 / 周期凭证历史仍完整包含手机收益（§6.3、§11.5.1），不套用设备列表过滤。试用独占一槽，服务器 slotsUsed 已包含试用与预留时不再叠加（§6.4）。服务端任务以明确手机动作路由、任务码或中英越文标题识别并隐藏；账号手机号任务先按稳定代码（如 `bind_mobile` / `bind_phone` / `verify_phone`）或资料 / 安全页动作路由豁免，不依赖标题翻译判断。商品只按明确身份过滤：结构化 `productType=SHARE` 与已知硬件 SKU 优先保留，包括 Mobile Cloud Share，以及 ID 为 `stellarbox-pro`、名为 Mobile GPU Server 的设备。其余仅在明确 `kind=phone` 或已知手机 SKU ID / code（`phone`、`phone-basic`、`iphone15`，不区分大小写）时隐藏，绝不按显示名称推断手机；目标推荐共用此规则并可读取现有目录类型。当前目录只有 DEVICE / SHARE，没有手机专属 device kind；未知 SKU 保留，后台仍需约束手机发布并补充结构化身份。首页促销在 API 边界先将后端原始 `SERVER` 归一为 `DEVICE`，再校验并保留 `productType`；`SERVER` 不得导致首日 / 周任务快照整体失效。随后选取周任务来源和生成卡片时共用同一份身份过滤结果；`targetDevice` 仅精确匹配已知 SKU，不对自由名称作手机判断。活动 SHARE 无论名称都保留，未下发类型的旧促销仍兼容。首日任务的原始组条件、数量和奖励不改写，若服务器组仍要求隐藏任务，应由服务器调整发布。无法识别的运营自由文案需后台清理，不猜测不透明标识。公开法律文本及手机号身份、验证码功能保留。
 
-APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手机登录核验。服务端返回 BOUND 时直接进入首页，不重新校准；明确返回 NEEDS_CALIBRATION 或 REPLACEMENT_REQUIRED 时才引导相应流程，未知或失败显示可重试错误，不称已校准或已换机。不同安装登录先停止原手机未完成任务，再判断 E6 的 allowReplacement 和 minReplacementIntervalDays；不允许或处于冷却期时明确提示，已购设备不受影响。允许时重新采集并校准，显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。
+APP 普通登录及冷启动会话恢复直接进入首页或既有合法返回目标，不自动读取手机登录核验来决定路由，不要求手机已校准或已激活。新账号在 App 注册成功后仍由注册流程进入 estimator → connect；H5 注册仍进入注册成功与下载引导页。已有账号需要手机算力时从设备管理主动进入校准/激活，届时核验当前安装绑定与 E6 的 allowReplacement、minReplacementIntervalDays；明确不允许或处于冷却期时提示，未知或失败允许重试，不称已校准或已换机。显式激活原子替换绑定及槽位，旧仓库手机不能借旧结果在新安装激活。重新校准、暂缓、退出均不重置换机冷却时间。购机、置换、提现等其他业务门禁不因本次导航修改而变化。
 
-账号只允许当前执行安装领取或提交手机任务。PHONE/MOBILE 任务领取与完成以普通业务头 X-Phone-Installation-Id 与当前账号绑定匹配；心跳使用既有请求体 calibrationDeviceId 与绑定匹配，不重复添加安装头。非手机任务不受此头约束，正式 App 当前无任务领取/完成 API 入口，本次不新增。原绑定手机重新登录可恢复执行权，但只解除换机引起的暂停，保留运营或风控暂停，并等待新心跳。H5 不采集或上报原生手机运行状态；H5 登录本身不踢掉仍在线的原 APP，原 APP 离线后按服务端心跳有效期停止手机任务，不进行离线托管补收益。已购设备沿用各自运行和结算规则。
+账号只允许当前执行安装领取或提交手机任务。PHONE/MOBILE 任务领取与完成以普通业务头 X-Phone-Installation-Id 与当前账号绑定匹配；心跳使用既有请求体 calibrationDeviceId 与绑定匹配，不重复添加安装头。非手机任务不受此头约束，正式 App 当前无任务领取/完成 API 入口，本次不新增。原绑定手机执行恢复由用户主动设备操作与既有服务端规则负责；普通账号登录不自动触发手机状态变更。设备恢复只解除换机引起的暂停，保留运营或风控暂停，并等待新心跳。H5 不采集或上报原生手机运行状态；H5 登录本身不踢掉仍在线的原 APP，原 APP 离线后按服务端心跳有效期停止手机任务，不进行离线托管补收益。已购设备沿用各自运行和结算规则。
 
-2026-10-03 起采用最小业务校验：不再使用 AndroidKeyStore、挑战/签名/证书、包签名校验或证明资格有效期，不新增安全开关或资格 TTL。安装标识仅用于账号与当前手机绑定的业务匹配，不证明硬件真实性。保留 Android 原生采集与 H5/iOS 不执行手机任务的边界、服务端硬件规则匹配、canonical 结果、幂等/revision、换机资格、任务状态与收益结算校验；手机心跳超时继续沿用现有运行规则。需按真机交接清单验收后再发布。
+2026-10-03 起采用最小业务校验：不再使用 AndroidKeyStore、挑战/签名/证书、包签名校验或证明资格有效期，不新增安全开关或资格 TTL。安装标识仅用于账号与当前手机绑定的业务匹配，不证明硬件真实性。保留服务端规则匹配、canonical 结果、幂等/revision、换机资格、任务状态与收益结算校验；手机心跳超时继续沿用现有运行规则。
+
+**2026-10-28 Android / iOS 手机算力（代码已合入 test，待真机验收）**：Android 与 iOS 原生 App 均支持手机算力。Android 按手机上报的芯片标识（`Build.SOC_MODEL`、系统芯片属性、`Build.HARDWARE`，最多 4 个）匹配后台芯片档，不区分机型和内存：六档区间为旗舰 115–140、次旗舰 95–115、高端 75–95、中端 55–75、中低端 38–55、入门 20–38，同一账号同一档只抽一次值；通称、多颗芯片共用的标识、未知或互相冲突的芯片进入待核验，同一安装改报其他芯片按机型锁拦截、由客服解除。E6 维护芯片档并可载入版本化芯片预设（只补缺失，主动删除的不自动恢复），经 A2 审批发布，详见 [Android 芯片档校准方案](../docs/plans/2026-10-28-android-soc-calibration.md) §12。iOS 只按原生识别的机型（名称或已核验的硬件标识符）精确匹配后台 iPhone 机型规则，不区分容量，不要求 SoC/GPU/内存。首次成功校准时服务端在该机型区间内抽取两位小数并保存，重试、换幂等键、重装和刷新都读回同一值，试算、预览、GET 和激活复核不抽取。未知、通称或停用机型进入待核验，不授予算力。后台 E6 维护机型、别名、上下限和启停，可载入从 iPhone 6 起 47 款已售机型的预设目录（只补缺失），经 A2 审批发布，A2 显示与已发布规则的差异。用户侧校准中只显示「算力校验中…」，结果只显示算力值、档位和下一步，不显示机型、芯片、区间或运营规则；H5 保持只读。详细设计见 [机型区间校准方案](../docs/plans/2026-10-27-ios-model-calibration.md) §12。iPhone 真机、iOS 最低系统版本和正式发布另行验收。
+
+**2026-11-01 校准结果兼容**：服务端面向 App 的结果会省略原始芯片与 GPU 回显（`signals.socIds`、`signals.soc`、`signals.gpu`）。Android / iOS 的校准、回读、激活和暂缓响应共用解析边界，允许省略这些回显；省略的文本在客户端保留为空字符串，不推断硬件或能力。显式非法 GPU 类型（含 `null`）及超长文本仍按协议错误处理。`MATCHED` 仍须满足服务端权威、账号与安装身份、状态和有效算力校验；`PENDING_VERIFICATION` 保持待核验且能力为空，不能激活；无能力的 `DEFERRED` 仍须是服务端明确的暂缓记录。候选验证、TEST 发布及 Android / iOS 真机验收分别记录。
 
 历史方案（superseded，2026-10-03）：原生证明挑战绑定账号、会话与安装，一次性且两分钟过期；通过 Android 硬件密钥证书、应用包名、签名及设备启动状态验证后发放十五分钟资格。此方案仅留作历史背景，不再作为当前执行或验收要求。
 
@@ -1412,7 +1314,7 @@ APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手
 
 **购买门(等级门 + 锁额门)**(`Product.purchaseGate`):
 
-上架节奏门(`unlocksAtPhase`,阶段门)之外,高客单设备可挂第二类 per-product 购买门 —— **等级/条件门**(谁有资格买)+ **锁额门**(本期限量多少)。两者正交,任一可单独设。目的:高价机型挂资格条件 + 限量,制造稀缺感并把"达成团队条件"作为购买前提,驱动用户冲直推数 / 团队业绩。门为**后台可配**(运营在后台 SKU「购买限制」配置组设定,server-canonical,见后台 PRD E 域),前端只读、服务端二次校验为权威。
+上架节奏门(`unlocksAtPhase`,阶段门)之外,高客单设备可挂第二类 per-product 购买门 —— **等级/条件门**(谁有资格买)+ **锁额门**(本期限量多少)。两者正交,任一可单独设。目的:高价机型挂资格条件 + 限量,制造稀缺感并把"达成团队条件"作为购买前提,驱动用户冲直推数 / 团队算力额。门为**后台可配**(运营在后台 SKU「购买限制」配置组设定,server-canonical,见后台 PRD E 域),前端只读、服务端二次校验为权威。
 
 数据结构 `PurchaseGate`(全字段可选,任一条件省略=不校验该项;`purchaseGate` 整体未设=自由购买无门):
 
@@ -1420,7 +1322,7 @@ APP 登录完成当前条款确认后，以当前安装 deviceId 调用普通手
 |---|---|
 | `rankMin?` | 最低 V 级(0-12),需 `myRank ≥ rankMin` |
 | `activeDirectMin?` | 最少活跃直推数 |
-| `teamVolumeMin?` | 最低团队业绩(USD) |
+| `teamVolumeMin?` | 最低团队算力额(USD) |
 | `mode` | 多条件判定:`all`(全满足 AND)/ `either`(任一满足 OR)|
 | `quotaCap?` | 锁额:本期可售上限(未设=不限量)|
 | `quotaSold?` | 已售(服务端维护;余量 `remaining = max(0, quotaCap − quotaSold)`)|
@@ -1451,11 +1353,11 @@ flowchart TD
 | 产品 | 门类型 | 条件 | mode | 锁额 cap / sold | enforce |
 |---|---|---|---|---|---|
 | NexGridBox Pro | 单活跃直推 | ≥ 5 活跃直推 | all | 1,000 / 977(余 23)| 硬拦 |
-| NexGridRack P1 | 组合 | V≥3 **或** ≥15 活跃直推 **或** 团队业绩 ≥ $20,000 | either | 100 / 92(余 8)| 硬拦 |
+| NexGridRack P1 | 组合 | V≥3 **或** ≥15 活跃直推 **或** 团队算力额 ≥ $20,000 | either | 100 / 92(余 8)| 硬拦 |
 
 > 锁额 `remaining` 是该 SKU"还剩 N 件"的**单一来源**(收编原 `stock` 展示,消除双口径)。其余 SKU 默认无购买门;Pro v2 / Rack P2 维持阶段门(`unlocksAtPhase`)。
 
-**列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexGridBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
+**列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexGridBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。2026-10-30 起：其上的「算力阶梯」各档放在一张内容卡内，滚动到该区域时进度条从 0 逐行展开（系统减少动态时直接显示）；阶梯收益与本卡两侧金额、倍数按 DS-27 用统计数字字体，设备名与「/天」用界面字体。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
 
 **Promo 并存**:升级置换横幅(§7.6)已改为按「用户是否持有可置换设备」动态显隐(无 phase 窗口),与 S1 促销条各自独立渲染;旧「window 开放时隐藏 S1 promo」互斥规则随 phase 窗口机制一并退役。
 
@@ -1477,7 +1379,17 @@ flowchart TD
 
 ### 7.2 商品详情 `/store/[productId]`
 
-**Phase gate**:商品详情外层包 `<ProductDetailGate product={product}>` 客户端 wrapper。读 `useProductPhase()`,若 `product.unlocksAtPhase` 未 reached,**post-mount 替换整页**为 `<LockedProductCard>` 完整变体(lock icon + `New silicon — coming next quarter` 大字 + tagline + GPU/VRAM mini-spec + Estimated arrival + 全宽 `Notify me when live` 按钮)。直链 URL(`/store/stellarbox-pro-v2` 等)仍返回 HTTP 200,不走 `notFound()` — 用户从分享链接落地也能看到 anticipation 卡。SSR + first paint 渲染完整产品页(避免 hydration mismatch),mount 后再 swap,接受短暂闪烁(deep-link 场景为边缘 case)。
+**硬件规格、AI 性能与相关资料（2026-10-25）**：硬件区依次显示 GPU、显存、功耗、在线率，数据来自 E1 当前商品配置；数据中心保留在部署位置 FAQ，不替代在线率。在线率只显示运营配置值，不自动补写 99.9% 或把自由文本扩大为 SLA 保证。已配置质保可追加显示。AI 性能在正式 App/H5 展示图像生成、LLM 推理、视频生成、LoRA 微调和解锁任务池；真实零值保留，小于 1k 的词元速率不能取整为零。各项缺值显示 `-`，不借用原型的 320/12.4k/18/6 等数值。任务池读取当前商品所选内容，已知任务类别按三语显示。
+
+“相关资料”优先使用 E1 当前商品的资料名称与 HTTPS 链接（`specDocumentTitle/specDocumentUrl`），展示厂商规格或产品手册，独立于 I4 加载状态；切换商品/刷新以当前商品配置为准。未配置时回退 I4 已发布审计/储备资料；均无有效资料时显示“暂无相关资料”，资料区无重试按钮。技术规格不作为 UVEL 审计或实机性能证明。PC 可单独填写 GPU 型号与数量，App 读组合规格如 `4× RTX 4090`；功率值应写明 GPU 额定合计或整机实测口径，默认不推算 AI 吞吐和在线率。
+
+**标题栏（2026-10-25 对齐原型）**：商品详情顶部使用一整条圆角玻璃栏，返回图标、居中商品名称与消息图标置于同一背景内，不为两侧按钮另加圆形底。商品名称下显示当前目录商品的 `tier`（如 S1 的 Entry、Pro 的 Pro），不固定套用截图商品名称。双行高 56px，未提供副标题时高 44px；内容与栏底间距 24px。滚动时整条栏和标题保持可见。目录加载、错误、未找到状态保留相应标题，不展示旧商品副标题；返回和消息入口保持可用。
+
+**商品图片缓存（2026-10-25）**：原生 App 的商品列表与详情共用本地持久缓存，首次下载后重复访问和重启均复用；只缓存当前目录提供的有效签名商品图片。缓存按图片资产版本识别，签名续期不重复下载，换图后下载新资产。最多 64 张、32 MiB，按最近使用顺序清理；文件缺失或损坏时重新下载，保存失败仍可展示本次下载图片。H5 保持网页图片加载方式，不调用原生文件缓存。购买资格失败通过错误提示反馈，详情上方不额外放置资格说明；底部入口依据真实资格保持购买限制。
+
+**当前资格交互**：详情上方移除资格、条件和错误说明块；底部“查看解锁条件”展示真实等级及配额条件；配额耗尽则显示耗尽状态并禁用按钮，不跳解锁页。查询失败用统一错误提示，未知资格仍限制购买，恢复后重查，离页后丢弃迟到反馈；服务端最终购买校验保留。图片压缩与缓存异常边界见本轮同步规格 §6。
+
+**Phase gate（历史原型，仅作背景，不替代当前服务端资格流程）**:商品详情外层包 `<ProductDetailGate product={product}>` 客户端 wrapper。读 `useProductPhase()`,若 `product.unlocksAtPhase` 未 reached,**post-mount 替换整页**为 `<LockedProductCard>` 完整变体(lock icon + `New silicon — coming next quarter` 大字 + tagline + GPU/VRAM mini-spec + Estimated arrival + 全宽 `Notify me when live` 按钮)。直链 URL(`/store/stellarbox-pro-v2` 等)仍返回 HTTP 200,不走 `notFound()` — 用户从分享链接落地也能看到 anticipation 卡。SSR + first paint 渲染完整产品页(避免 hydration mismatch),mount 后再 swap,接受短暂闪烁(deep-link 场景为边缘 case)。
 
 页面自上而下(unlocked 状态):
 
@@ -1616,6 +1528,8 @@ USDT 页绑定所选网络，显示应付总额、二维码、地址、复制操
 
 ### 7.5 升级置换(Trade-in)— 随时下架 + 产出阶梯抵扣
 
+**中文命名（2026-10-30 用户统一）**：面向用户的功能名称统一为「升级置换」，包括页面、入口、搜索及推荐文案；`tradein`、API 与路由标识保持不变，不改变资格或支付规则。
+
 **代际概念已取消**。任何已购付费设备可**随时下架**,按其累计产出落阶梯折算抵扣金额,用于购买**任何更高价 SKU**(默认规则,后台可配)。三个入口表面:
 
 1. **设备仓库置换条**(`/me/devices`,主动入口)— 每台合规设备行内「可抵 $X」chip(→阶梯规则说明弹层)+「升级置换」CTA(→选目标 → 确认 → 去结算);
@@ -1719,6 +1633,13 @@ flowchart TD
   J -- 通过 --> L["原子块:扣净额 → 旧机下架移除<br/>→ 订单(含抵扣明细) → 账单"]
   L --> M["新机经履约管线未激活入库<br/>(实付=订单净额,作为下一跳抵扣基数)"]
 ```
+
+**确认弹窗购买资格（2026-10-30 用户补充，F07截图精简覆盖）**：确认层读取精确目标 SKU 的服务端购买资格。资格满足时保留完整报价与旧机位置继承说明；未达标／名额耗尽时采用短标题「暂未满足升级条件」，删除旧机、累计产出、抵扣比例／金额、预计应付整块及余额、交付和支付长说明，只呈现真正阻挡的未满足条件及当前值／门槛／差额／进度。已满足的规则组、直推和可用名额不展示。EITHER已有门槛满足而仅名额耗尽时，只呈现名额阻挡；多个缺项才保留必要的全部／任一关系，不重复标题。累计／月度名额按已用／总额与剩余展示，不参与任一解锁，不将剩余名额误称尚差。精确SKU只读条件页仍展示完整E1及所有F4B条件。总资格与各规则矛盾或未知时按未确认处理，不重算或放宽资格。
+
+- 未达标：短弹窗仅显示缺项及进度，单缺项应在手机一屏看见主操作与取消，无须长滚动；主按钮「查看解锁条件」，只打开该 SKU 的条件页；该只读入口不提供购买或跳商城 CTA，不创建订单、不扣款、不取消旧设备。返回原确认弹窗重新读取，旧报价仅为当前流程内存，不持久化为成交意图。
+- 满足：主按钮显示原「确认置换 · 去结算」，点击时强制复验最新资格，满足才传原报价进入结算；后端成交资格、容量、资金及幂等守卫保持。
+- 未确认／加载／失败（F08）：只显示小的中性资格验证提示或错误重试与取消，不渲染旧机换新大标题、完整报价、资金缺口或交付／支付长说明，也不展示旧条件快照。结果直接进入精简未达标态或本次明确eligible的完整确认态，禁止先显示完整卡再收缩；首次进入、返回条件页、重试及点击确认的fresh读取均适用，不以旧快照缓存放行。加载不重复操作，失败可重试；名额耗尽保留原因、禁用主按钮与独立刷新。资格明确满足时，钱包不足才随完整确认独立显示权威缺口，不冒充资格失败。原交易恢复入口仍优先。
+- 读取和延迟导航按账号绑定代际、旧实例及版本、精确目标、弹窗代际和页面可见性隔离；关闭、换号、换源、换目标后的迟到响应不覆盖或导航。同 SKU 存在原待确认交易（已知回执或响应未知）时先读原账号指针，不发新资格 GET、不要求已回收旧机仍存在，仅导航原结算恢复；点击再次查指针，存储读取异常阻止新购。原交易沿既有只读或同键恢复，不另建单、不重复扣款。三语、隐私遮挡、滚动可达操作沿用现有组件。
 
 #### 7.5.4 `/me/devices` 设备仓库置换条 + 阶梯说明弹层
 
@@ -1861,7 +1782,7 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 
 **内容**(自上而下):
 
-1. **邀请码展示 + 复制**:展示 `user.referralCode`(如 `NEXGRID-8K9X`),配复制按钮 · 点击调 `navigator.clipboard.writeText(code)` + toast `Copied {code}` + 1.6s 内反馈 Check
+1. **邀请码展示 + 复制**:文字邀请码由服务端首次成功返回后，按当前 API 服务与登录账号持久缓存到 App；再次进入团队页、切换语言、奖励接口刷新或 App 重启时直接读取该账号缓存，不为展示邀请码额外查询，也不随奖励加载/失败闪成空值。账号切换先读取新账号自己的缓存，退出登录或切换 API 服务清空当前展示，禁止串号或使用演示码。后续正常奖励接口若确认邀请码已变更则更新缓存；奖励金额、邀请人数、奖励记录仍按原规则实时读取，不从邀请码缓存取得。配复制按钮，调用跨端剪贴板并反馈复制结果；分享面板、分享链接及海报使用同一个邀请码。本规则只缓存文字邀请码，不持久缓存二维码图片或整张海报。
 
 2. **双向奖励**:
    - 邀请人注册奖励读取注册奖励政策；直属购买与设备收益分成读取 §8.3 的独立政策，不展示固定购买费率或未来收入估算。
@@ -1883,7 +1804,7 @@ flowchart LR
   R -->|领取 CTA 自动带码| G[注册 ?ref 锁定<br/>§4.1]
   R -.中途离开.-> P[pendingRefCode 暂存] -.此后任意入口注册.-> G
   G -->|bind first-wins + 礼包分桶 §4.3.2/4.3.5| S[注册成功页 · 仅 H5<br/>§4.1.1]
-  S -->|下载 APP 后登录| O[APP onboarding]
+  S -->|下载 APP 后登录| O[APP 首页 · 可主动管理手机算力]
   S -->|继续网页版| H[H5 首页]
 ```
 
@@ -1894,7 +1815,7 @@ flowchart LR
 
 #### 8.1.2 团队收益卡(TeamLedgerCard)
 
-**目的**:把"本月可领、累计业绩、网络结构拆分、可提现/冷却余额、提现入口"聚合在单卡,替代原"团队累计 lifetime 卡 + 月份佣金卡"双卡布局,消除同一 $195.09 数据重复出现。
+**目的**:把"本月可领、累计算力额、网络结构拆分、可提现/冷却余额、提现入口"聚合在单卡,替代原"团队累计 lifetime 卡 + 月份佣金卡"双卡布局,消除同一 $195.09 数据重复出现。
 
 **内容**(自上而下):
 
@@ -1946,7 +1867,7 @@ flowchart LR
 ### 8.1.3 Team finance controls
 
 - Commissions:展示 5 类佣金事件明细,入口必须可从 Team 主页到达。
-- V Rank:展示 V0-V12 进度、晋升条件、维持期与等级奖励/培育奖。
+- V Rank:展示 V0–V8 进度、晋升条件、维持期与等级奖励/培育奖。
 - Balance Match:展示双轨 balance、弱区/强区、日封顶与 spillover 逻辑。
 - Leadership Pool:展示全球领导奖池、参与资格、分配周期与说明页。
 
@@ -1954,25 +1875,9 @@ flowchart LR
 
 ### 8.2 V 级头衔体系 `/team/rank`
 
-#### 8.2.1 13 阶完整表
+#### 8.2.1 V0–V8 有效等级
 
-| V | 头衔 | 升级条件 | 扩展版税覆盖(数学层 `unilevelDepth`) | 平级奖 | 领导池票数 |
-|---|---|---|---|---|---|
-| V0 | Cadet 学员 | 注册即得 | 仅直推 | — | — |
-| V1 | Pilot 飞行员 | 自买 ≥ $299 + 直推 3 | 直推 + 1 度扩展 | — | — |
-| V2 | Operator 操作员 | 团队 $5K | 直推 + 2 度扩展 | — | — |
-| V3 | Captain 舰长 | $20K + 2×V1 | 直推 + 3 度扩展 | 5% | 1 |
-| V4 | Commander 指挥官 | $50K + 3×V2 | 直推 + 4 度扩展 | 5% | 2 |
-| V5 | Wing Leader 翼领 | $150K + 4×V3 | 直推 + 5 度扩展 | 5% | 4 |
-| V6 | Squadron 中队长 | $500K + 5×V4 | 直推 + 6 度扩展 | 5% | 8 |
-| V7 | Fleet Cmdr 舰队司令 | $1M + 6×V5 | 直推 + 7 度扩展 | 5% | 16 |
-| V8 | Star Admiral 星上将 | $3M + 7×V6 | 直推 + 8 度扩展 | 5% | 32 |
-| V9 | Galaxy Lord 星河领主 | $10M | 直推 + 9 度扩展 | 5% | 64 |
-| V10 | NexGrid Founder 联合创始 | $30M | 无限扩展 0.5% | 5% | 128 |
-| V11 | Cosmic Sovereign 宇宙至尊 | $100M | 无限扩展 1% | 5% | 256 |
-| V12 | Singularity 奇点 | $500M | 无限扩展 1.5% | 5% | 512 |
-
-> unilevelDepth与购买资格继续由原七层引擎解释；设备收益分成只认真实直属来源，不按深度推算。
+有效范围为 V0–V8（共 9 个等级），名称、升级条件、权益、领导池票数及等级/培育奖励均读取后端发布配置，不以旧原型的固定门槛或奖励表代替。PC F1 与后端停用 V9–V12 配置并保留历史记录；迁移前检查存量高等级账号，不静默降级。购买资格和佣金计算仍按对应服务端规则，不因展示范围调整而重写结算。
 
 #### 8.2.2 升级判定规则
 
@@ -1982,14 +1887,14 @@ flowchart LR
 |---|---|---|
 | 自买累计 | `selfBuyUSD` | **仅本人下单**支付的 NexGridBox / NexGridRack / Cloud Share USDT 金额。复投锁仓 / NEX 内购 / 礼包赠送 **不计**。退款金额从累计中扣除。 |
 | 直推数 | `directRefs` | 直接邀请并完成注册 + KYC-Express 的下家数(数学层 L1)。**仅去重计数**(同手机号 / 同钱包重复绑定不重复计)。降级 / 注销的下家从计数中扣除。 |
-| 团队业绩 | `teamVolumeUSD` | 直推 + 扩展网络全部下线**所有订单 USDT 金额累加**(数学层 L1-L7;超过 V7 后按对应 unilevelDepth)。包括首购 / 复投 / 商城升级 / Cloud Share 充值。退款扣减。 |
+| 团队算力额 | `teamVolumeUSD` | 直推 + 扩展网络全部下线**所有订单 USDT 金额累加**(数学层 L1-L7;超过 V7 后按对应 unilevelDepth)。包括首购 / 复投 / 商城升级 / Cloud Share 充值。退款扣减。 |
 | 下属 V 级数 | `vDownlines` | "≥Vn 等级"直推下家数,**含直推中达到目标 V 级或更高的人**。例:V3 要求 `vDownlines: { 1: 2 }` 表示需要 ≥2 个 V≥1 的直推(若直推中有 V3,也按 V≥1 计 1 个)。 |
 
 **判定方式**:
 
 - **同时满足全部条件**(`AND` 逻辑)才晋升。`progressPct = avg(每个 check 完成度)`,但实际晋升要求 **每个 check 必须独立 ≥ 1**(并非平均 ≥ 1)。
 - 进度条 UI 显示 `progressPct`(平均完成度),Missing 文案逐条列出未达成项。
-- **不可越级**:必须按 V0→V1→V2→...→V12 顺序升,每跳一阶。即使一次性满足 V5 的条件,系统也只先晋升到 V3(下一阶),下一次结算再升 V4,以此类推。这保证奖项 / 解锁深度 / 培育奖按阶逐次发放。
+- **不可越级**:必须按 V0→V1→V2→...→V8 顺序升,每跳一阶。即使一次性满足 V5 的条件,系统也只先晋升到 V3(下一阶),下一次结算再升 V4,以此类推。这保证奖项 / 解锁深度 / 培育奖按阶逐次发放。
 
 #### 8.2.3 晋升触发时机
 
@@ -2000,57 +1905,39 @@ flowchart LR
   - 直推下家自身晋升 V 级 → 上线 `vDownlineCounts` 更新
 - **晋升瞬时性**:check 通过后系统**当前帧自动 setMyRank**(无审批等待 / 无月结结算),立即生效:
   - 扩展版税覆盖范围加宽(下一笔订单按新覆盖度结算)
-  - 解锁平级奖(若 V≥3)
+  - 按发布配置和能力状态展示平级权益；能力未开放时标明未发放，不因达到 V3 就承诺发奖
   - 解锁领导池票数(下次周结自动并入)
   - 上线触发 cultivationBonus NEX(见 §8.2.5)
 - **晋升通知**:推送至 useNotifications(`kind: team`)+ Nova 推一条 `🎉 Congratulations! You're now V{n} {Title}.` + Home BoostUpsell 轮换插入 5s 庆祝条幅
 
 #### 8.2.4 维持期 / 降级规则
 
-- **不降级**:V 级一旦达成,**永久保留**。即使后续团队业绩缩水 / 下家流失 / V 级下家降级,自身 V 级不回退。
-- **不需要月度维护**:无"月度业绩门槛""活跃考核""90 天激活窗口"等典型 MLM 维持机制。
+- **不降级**:V 级一旦达成,**永久保留**。即使后续团队算力额缩水 / 下家流失 / V 级下家降级,自身 V 级不回退。
+- **不需要月度维护**:无"月度算力额门槛""活跃考核""90 天激活窗口"等典型 MLM 维持机制。
 - **唯一例外**:账户注销 → V 级清零(账户重新注册视为 V0)。
-- **保留机制目的**:晋升后用户视角是"已锁定身份和未来收益"(包括 unilevel 深度 / 平级奖 / 领导池票数),减少持续投入压力。
+- **保留机制**：保留已达等级；可用权益、奖励与领导池票数按发布配置和实际能力状态展示，未开放能力不能作为已锁定的未来收益承诺。
 
 #### 8.2.5 等级奖励 & 培育奖
 
 **等级奖励(运营可配)**:每个 V 级的晋升奖励由运营后台(F1 V-Rank)配置,支持 **USDT / NEX / 代金券 / 系统 SKU / 自定义** 多种类型,可一阶多项。原「实物奖品 + 发货队列」机制已下线。下方「培育奖 NEX」是默认随阶发放的代币奖励(发给上线 sponsor)。
 
-**培育奖(cultivationBonus,NEX)**:
-
-| 培育对象升至 | 上线一次性获得 NEX |
-|---|---|
-| V1 | 500 |
-| V2 | 2,000 |
-| V3 | 10,000 |
-| V4 | 50,000 |
-| V5 | 200,000 |
-| V6 | 800,000 |
-| V7 | 3,200,000 |
-| V8 | 10,000,000 |
-| V9+ | 0(高阶停发,改靠平级 / 领导池) |
+**培育奖（`cultivationBonus`，展示 UVT）**：读取各有效等级发布值，不写死金额。字段和资产代码仍为原协议；本人等级奖励与发给直接推荐人的培育奖励分开显示。
 
 - **触发对象**:被培育者的**直接上线**(L1 sponsor)。L2 及以上不分培育奖。
-- **重复触发限制**:同一被培育对象升 V 级时仅触发**该次跨阶**对应奖励;若被培育者从 V2 直接达成 V5 条件(实际仍需逐阶升,见 §8.2.2),则上线分别在 V3 / V4 / V5 三次晋升时累计拿到 10K + 50K + 200K NEX。
+- **重复触发限制**:同一被培育对象升 V 级时仅触发**该次跨阶**对应奖励;若被培育者从 V2 直接达成 V5 条件(实际仍需逐阶升,见 §8.2.2),则直接推荐人分别按 V3 / V4 / V5 各阶发布配置取得对应培育奖励（显示 UVT），不采用旧示例写死金额。
 - **结算**:NEX 即时入 `user.nexBalance`,无冷却期,无门槛。
 - **通知**:`kind: team` 推一条 `🌱 Your direct {name} just hit V{n} — you earned +{nex} NEX cultivation bonus.`
 
-#### 8.2.6 V 级矩阵设计意图
+#### 8.2.6 等级范围与展示边界
 
-| 阶段 | V 范围 | 用户体验目标 |
-|---|---|---|
-| 入门 | V0 → V3 | 低门槛快速上手 — 3 个直推 + $20K 团队业绩可达,平均 2-4 周内 90% 活跃用户能升 V3,解锁平级奖 + 领导池 1 票 + 培育奖 NEX |
-| 攀升 | V4 → V6 | 业绩门槛指数级跳跃($50K → $500K),需稳定下线团队 + V 级下属;典型 MLM "中坚干部"区间 |
-| 高阶 | V7 → V9 | $1M-$10M 团队业绩,需 6+ V5 / 7+ V6 下属;少数顶尖大区领袖区间 |
-| 远期 | V10 → V12 | $30M-$500M 远期天花板;高阶领导池权重 + 全网分红作为长期 aspirational 锚 |
+V0–V8 为当前有效等级；已停用的 V9–V12 不作为新增晋升目标，也不提供当前等级奖励入口。V8 展示已达最高有效等级，不生成 V9 的升级差额。奖励、条件与票权按当前配置展示，不写死未来等级收益示例。
 
 #### 8.2.7 UI 规格
 
-- 当前 V 级 hero(V Badge + 头衔英中文双行)
-- 升至下一阶进度条(`Math.round(progressPct × 100)%`)
-- Missing 条件清单(`nextRankProgress().missing` 数组逐条列出)
-- 13 阶完整列表(已达成 / CURRENT / 锁定 3 状态)
-- 每阶展示升级条件与已开放权益；购买资格沿原七层规则，设备直属奖励资格独立。
+- 整条圆角标题栏显示“V 级头衔”，保留返回、消息和“规则介绍”入口。
+- 当前等级区保持紧凑；下方列出 V0–V8，并标记已达成、当前、未解锁。
+- 每级展示所需条件、对应权益及奖励；下一阶进度与差额放入该级条目，移除上方重复的长说明和升级引导块。
+- 奖励标明本人/直接推荐人等实际领取对象，未配置或未开放权益不冒充已开放。团队金额统一显示“算力额”，计量与业务计算不变。
 
 ### 8.3 网络版税 `/team/unilevel`
 
@@ -2088,15 +1975,15 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 ##### 8.4.0.1 在团队体系中的角色
 
-双轨平衡匹配与直属分成(§8.3)并行；对碰按原业绩及结算规则执行，直属分成只来自直接成员的合格购买与真实设备收益，两者互不替代。
+双轨平衡匹配与直属分成(§8.3)并行；对碰按原算力额及结算规则执行，直属分成只来自直接成员的合格购买与真实设备收益，两者互不替代。
 
 ##### 8.4.0.2 4 个核心机制要点
 
 | # | 机制 | 业务效果 |
 |---|---|---|
 | 1 | 较小轨匹配公式 | Balance Match = `min(A, B) × 10%`,日上限随平台 Phase 收紧(P1–P3 $5,000 / P4+ $2,000,详见 §11 Phase 参数表)。仅按较小一轨体量发放,鼓励两轨均衡发展。**结算周期**(每日 / 每周 / 每月)与**沉淀处置策略**(较大一轨未匹配体量如何处理:每月清零 / 每次对碰清零 / 转结)均由运营后台配置(默认每月结算 + 每月清零),详见 §8.4.1.2。 |
-| 2 | 最低业绩门槛 | 强制两轨各 ≥ $1,000 才进入结算队列。未达门槛的业绩计为 pending,达标后批量结算 → 自然形成业绩沉淀缓冲池,稳定平台日结资金流。 |
-| 3 | 自动分配机制(内部 spillover) | 网络伙伴在某轨业绩饱和时,新邀请自动分配到下游轨道,形成"网络伙伴主动帮你扩展轨道"的体验。增强网络绑定关系,降低用户主动退出意愿。 |
+| 2 | 最低算力额门槛 | 强制两轨各 ≥ $1,000 才进入结算队列。未达门槛的算力额计为 pending,达标后批量结算 → 自然形成算力额沉淀缓冲池,稳定平台日结资金流。 |
+| 3 | 自动分配机制(内部 spillover) | 网络伙伴在某轨算力额饱和时,新邀请自动分配到下游轨道,形成"网络伙伴主动帮你扩展轨道"的体验。增强网络绑定关系,降低用户主动退出意愿。 |
 | 4 | LTV 延长 | 两轨无封顶 + 强制平衡,提供"持续投入还能再增长"的长期激励路径,把用户活跃生命周期从单一网络版税的 ~6 个月延长到 ~18-24 个月(基于行业基准数据)。 |
 
 ##### 8.4.0.3 与 NexGrid 产品目标的契合
@@ -2104,7 +1991,7 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 | 产品目标 | 双轨对碰的贡献 |
 |---|---|
 | 用户增长速率 | 自动分配机制把网络伙伴的拉新激励传递给下游用户,加速底层用户基数扩展 |
-| 用户留存率 | 强制平衡门槛 + 业绩沉淀机制提升用户继续投入意愿 |
+| 用户留存率 | 强制平衡门槛 + 算力额沉淀机制提升用户继续投入意愿 |
 | 体系包装一致性 | Dual-Track Growth Program 命名与 V 级 / 影响力网络版税 / 领导池等模块共用"成长激励"语义,保持产品语言统一 |
 
 #### 8.4.1 规则
@@ -2115,9 +2002,9 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 **强制平衡**:必须 Track A ≥ $1,000 且 Track B ≥ $1,000 才能领奖,否则当月归零
 
-##### 8.4.1.1 轨道月活跃业绩(Group Volume, GV)计算
+##### 8.4.1.1 轨道月活跃算力额(Group Volume, GV)计算
 
-每条轨道的月活跃业绩 = **该轨道全部下游成员**(从直推到轨道末端,不限网络深度)**当月合格交易 USDT 金额累加**。
+每条轨道的月活跃算力额 = **该轨道全部下游成员**(从直推到轨道末端,不限网络深度)**当月合格交易 USDT 金额累加**。
 
 **计入项**:
 - 设备首购(NexGridBox S1 / Pro / NexGridRack P1 / Cloud Share)
@@ -2133,7 +2020,7 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 **扣减项**:
 - 30 天内退款 / 取消订单的 USDT 金额按比例扣减当月 GV
-- 下游成员降级 / 注销后,其历史业绩从对应轨道累加值中移除
+- 下游成员降级 / 注销后,其历史算力额从对应轨道累加值中移除
 
 **周期**:按自然月统计,每月 1 日 00:00 UTC 滚动归零;月底 23:59 UTC 锁定结算。
 
@@ -2147,12 +2034,12 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 **结算周期 `settlePeriod`**:对碰奖金的派发节奏,枚举 `每日 | 每周 | 每月`,默认 `每月`。
 
-- 每条轨道的活跃业绩(GV)始终按自然月累计(§8.4.1.1);结算周期决定按何种节奏计算并派发 Balance Match Bonus。
-- **预计金额口径**:hero 显示的预计奖金随结算周期联动 = 较小轨「该周期业绩」× 10%,封顶 = 日封顶 × 周期天数。其中「周期业绩」= 月业绩 ×(周期天数 / 30),周期天数 `每日=1 / 每周=7 / 每月=30`。
-  - 默认每月:hero 显示「本月平衡匹配奖估算」= `min(月 Track A, 月 Track B) × 10%`,与双轨卡可见的月业绩、玩法说明页 `$2,000 × 10% = $200` 示例同口径,用户可自行验算。
+- 每条轨道的活跃算力额(GV)始终按自然月累计(§8.4.1.1);结算周期决定按何种节奏计算并派发 Balance Match Bonus。
+- **预计金额口径**:hero 显示的预计奖金随结算周期联动 = 较小轨「该周期算力额」× 10%,封顶 = 日封顶 × 周期天数。其中「周期算力额」= 月算力额 ×(周期天数 / 30),周期天数 `每日=1 / 每周=7 / 每月=30`。
+  - 默认每月:hero 显示「本月平衡匹配奖估算」= `min(月 Track A, 月 Track B) × 10%`,与双轨卡可见的月算力额、玩法说明页 `$2,000 × 10% = $200` 示例同口径,用户可自行验算。
   - 每周 / 每日:hero 标签与金额随之切换为「本周 / 今日 …估算」并按周期天数折算。
 
-**沉淀处置策略 `residualPolicy`**:较大一轨未被匹配的剩余业绩(沉淀池)在周期边界如何处理,枚举三档,默认 `每月清零`:
+**沉淀处置策略 `residualPolicy`**:较大一轨未被匹配的剩余算力额(沉淀池)在周期边界如何处理,枚举三档,默认 `每月清零`:
 
 | 策略 | 语义 | 平台资金影响 |
 |---|---|---|
@@ -2160,7 +2047,7 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 | 每次对碰清零 | 每次结算事件后较大轨未匹配体量即清零(清零频率 = 结算周期) | 与每月清零在周期=每月时重合,但概念为「结算事件驱动」而非「日历驱动」 |
 | 转结 | 较大轨未匹配体量结转到下一周期继续累计,不清零 | 沉淀持续累积、最终可被匹配派发 → 拉大利息负债(科目 #3)与佣金应付,改前须过 B1 兑付覆盖率核验 |
 
-**最低业绩门槛**(独立于结算周期):必须 Track A ≥ $1,000/月 且 Track B ≥ $1,000/月 才进入结算队列,未达门槛该周期匹配归零;此门槛恒按月口径,与结算周期正交。
+**最低算力额门槛**(独立于结算周期):必须 Track A ≥ $1,000/月 且 Track B ≥ $1,000/月 才进入结算队列,未达门槛该周期匹配归零;此门槛恒按月口径,与结算周期正交。
 
 **前后端联动**:运营在后台改 `settlePeriod` / `residualPolicy` → server-canonical 配置经平台配置接口下发 → 前端读取并联动:① 预计金额数字与「本周期…估算」标签;② 公式行「{周期}结算」节奏文案;③ 玩法说明页结算频率 FAQ 与沉淀处置 FAQ。前端以 backend-replaceable 单源(`lib/binary-settlement.ts`,枚举 `settlePeriod` / `residualPolicy` + i18n label map)承接,接真后台时把常量换成配置接口拉取即可,渲染层零重写。
 
@@ -2172,7 +2059,7 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 - 本周期(默认本月)Balance Match 预计 hero(大字,金额随结算周期联动,见 §8.4.1.2)+ 公式(min(Track A, Track B) × 10% · 日上限 · {周期}结算)
 - 阻塞警告(若任一轨 < $1,000)
-- Track A / Track B 双轨卡(月业绩 + 成员数 + Top member)
+- Track A / Track B 双轨卡(月算力额 + 成员数 + Top member)
 - 较大 vs 较小差距比较条
 - 自动分配记录(`↳` 图标)
 - 最近匹配历史
@@ -2235,9 +2122,9 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 8. **§6 Common questions**(5 FAQ 行,纯展开列表)
    - Q1 能否选 track?A1 可以,首次签约时选,placement 之后锁定
    - Q2 一轨没人怎么办?A2 继续邀请该轨或等网络伙伴自动分配;两轨 < $1,000 无 bonus
-   - Q3 多久结算?A3 按平台配置的结算周期(默认每月),按周期统计两轨累计业绩、于下一周期初支付(§8.4.1.2)
+   - Q3 多久结算?A3 按平台配置的结算周期(默认每月),按周期统计两轨累计算力额、于下一周期初支付(§8.4.1.2)
    - Q4 不邀请也赚吗?A4 可以,Balance Match Bonus 只是 channel 之一,设备产出 / 直推奖照常
-   - Q5 未匹配的业绩会保留吗?A5 取决于沉淀处置策略(§8.4.1.2):每月清零 / 每次对碰清零 → 不结转;转结 → 累积到下一周期
+   - Q5 未匹配的算力额会保留吗?A5 取决于沉淀处置策略(§8.4.1.2):每月清零 / 每次对碰清零 → 不结转;转结 → 累积到下一周期
 
 9. **底部 footer**:全宽 CTA `Got it · see my Dual-Track →` 链 `/team/binary`
 
@@ -2252,11 +2139,11 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 - 池子来源:平台每周总交易额(GMV)的 5% 注入;池额 = 周 GMV × 比例派生,当前周池约 $487.3K(GMV ~$9.75M)
 - 参与门槛:V3(Captain)解锁——票权首个非零等级;V3 以下可查看池子但不参与分配
-- 分配:V3+ 领袖按指数票权(V3=1, V4=2, V5=4 ... V12=512,每升一级翻倍)分配,个人份额 = 个人票数 ÷ 全网总票
+- 分配：有效等级的票权读取服务端领导池配置，个人份额 = 个人票数 ÷ 全网总票；不以旧 V12 固定票表生成当前分红。
 - 结算:每周一次——周日 23:59 UTC 票权快照 → 周一 00:00 UTC 自动派发入钱包(无需 claim)
 - **头部集中(派生)**:高阶领袖稀少但指数票权碾压,池子向 V-Rank 顶层集中。顶部 N 名领袖(当前全网分布下 ≈ V8 星上将及以上约 10 人)凭票权分走约六成奖池。集中度按真实全网 V 级分布 × 票权运行时派生展示,不写死固定百分比;调整全网分布或票权,集中度同步变化
 
-**示例**(当前全网分布,周池 $487.3K,全网总票约 2,100):V3 入门单人约占 0.05% → 周入约 $232(尝鲜);V8 约占 1.5% → 约 $7.4K;V12 顶阶单人约占 24% → 约 $119K。
+分布、周池、个人份额和分红均读取当前真实结果，不展示旧 V12 的静态收益示例。
 
 **业务流程(周结算循环)**:
 
@@ -2280,18 +2167,20 @@ flowchart TD
 - 你的预估分红 + 票数 + 全网票数 + 占比
 - V<3 时显示"V3+ to unlock" + 升级路径 CTA
 - 顶部集中度提示条(派生):顶部 N 名领袖分走约 X% 池子,X 按当前全网分布与票权派生
-- V 级 → 票数权重完整表(显示全网 V3-V12 分布 + 各档占池比与人均派发,派生)
+- V 级 → 票数权重完整表(显示全网 V3–V8 分布 + 各档占池比与人均派发,派生)
 - 历史周池列表
 
 #### 8.5.3 玩法说明页 `/team/leadership-pool/how-it-works`
 
-从全球领导奖池页进入。顶部标签「团队激励池」，标题「团队激励池规则」，副标题「查看参与资格、发放时间和奖励记录。」。
+从全球领导奖池页进入。标题「团队激励池规则」，副标题「查看参与资格、发放时间和奖励记录。」，下方是三节目录。
 
-- 状态：奖池或等级规则读取中显示加载提示；读取失败或奖池暂未开放时显示对应提示和「重试」。
-- 「当前规则」：「达到 V{rank} 即可参与，奖励以实际发放为准。」，参与等级以服务端奖池数据为准；下一行「下次发放时间：{time}」（奖池数据缺少有效发放时间时按读取失败处理）。读不到奖池数据时本节不显示正文，不显示本地兜底说明。
-- 底部按钮「明白了 · 查看本周池子」返回 `/team/leadership-pool`。
+- 状态：读取中显示加载提示；读取失败或奖池暂未开放时显示对应提示和「重试」。已有奖池数据或等级规则时，重新读取期间保留现有内容。
+- 「当前规则」：「达到 V{rank} 即可参与，奖励以实际发放为准。」，参与等级以服务端返回为准；有奖池数据时另起一行「下次发放时间：{time}」。两项都读不到时本节不显示正文，不显示本地兜底说明。
+- 「当前等级票数」：按服务端等级配置列出参与等级及以上各级的票权（等级 / 票数），不写死权重；等级配置读取中或失败时显示加载或失败提示与重试。
+- 「本期参与情况」：我的票数、本期总票数、本期占比（数据隐藏开启时遮罩），下方按等级列出人数 × 票权与该级总票数，附「实际发放金额以发放记录为准。」。
+- 底部按钮「查看本期票数、占比与分配记录」返回 `/team/leadership-pool`。
 
-文案在 `poolHowItWorks.*`，中、英、越三语。
+文案在 `poolHowItWorks.*` 和 `network-reaudit` 的奖池部分，中、英、越三语。
 
 ### 8.6 佣金事件 `/team/commissions`
 
@@ -2301,8 +2190,8 @@ flowchart TD
 | 直属设备收益分成 | 直接成员真实已入账设备凭证 | 由当笔政策决定等待期 | USDT + NEX，同一结算组 |
 | 网络购买奖励 | 网络成员实付设备订单 | 原七层冷却规则 | L2–L7保留原USDT及额外NEX；历史原账保留 |
 | 平衡匹配(Balance Match) | 双轨对碰条件满足 | 每日 | USDT,30 天冷却 |
-| Peer | 同 V 级团员业绩 5% | 每月 | USDT |
-| Cultivation | 下属升 V 一次性 NEX | 实时 | V1 500 / V2 2K / V3 10K / V4 50K / V5 200K NEX |
+| Peer | 保留配置参数；当前能力未开放、未发放 | 不作发放承诺 | USDT |
+| Cultivation | 直接推荐人按下属晋升有效等级的发布配置获得奖励 | 按实际结算状态 | UVT（协议 NEX） |
 | Leadership | 领导池周分红 | 每周 | USDT(V3+ 解锁) |
 | Genesis | 创世节点持有人排放 | 上所后 | $NEX(创世持有人,vesting 释放) |
 
@@ -2312,7 +2201,7 @@ flowchart TD
 - `layer === 1` → **直推**(`commissions.directBadge`)
 - `layer >= 2` → **扩展**(`commissions.extendedBadge`)
 
-层级标签区分购买的直属/网络来源；设备分成只认服务端真实直属来源，不按客户端月业绩推算。
+层级标签区分购买的直属/网络来源；设备分成只认服务端真实直属来源，不按客户端月算力额推算。
 
 #### 8.6.1 玩法说明页 `/team/commissions/how-it-works`
 
@@ -2343,7 +2232,7 @@ flowchart TD
 - **Extended 外圈**(虚线轨道):扩展网络节点带轻微径向偏移分散,呈环带分布
 - **Top metrics**:Members 总数 / Active 活跃数 / **Direct** 直推数
 - 每 1.2 秒随机 pulse 一个 active 节点(模拟新订单经过)
-- Tap 节点 → bottom sheet 显示详情(头像 + V 级 + DIRECT/EXTENDED badge + city + 月业绩 / 累计 / 加入天数 / 头衔 / 状态)
+- Tap 节点 → bottom sheet 显示详情(头像 + V 级 + DIRECT/EXTENDED badge + city + 月算力额 / 累计 / 加入天数 / 头衔 / 状态)
 - Legend:Direct friends / Extended network
 - 不暴露 L1-L7 / 左右翼 / 4 色 layer 编码 / Spillover ring;内部数据仍保留 layer 字段供数学层使用,可视化层只呈现 Direct(L1) vs Extended(L2-L7 合并)
 - SVG cx/cy 计算后 `Math.round(n*100)/100` 规整精度,避免 SSR/CSR 浮点字符串化漂移
@@ -2352,14 +2241,14 @@ flowchart TD
 
 Direct / Extended 二分类可折叠列表:
 
-- **Top metrics**:Total network 成员数 / Monthly volume 全网月业绩
+- **Top metrics**:Total network 成员数 / Monthly volume 全网月算力额
 - **Direct section**(DIRECT badge,默认展开):
   - Header subtitle:`{n} contributing · ~$X/mo Direct Royalty`
   - member row 按 monthVolume 降序
 - **Extended section**(EXT badge,默认展开):
   - Header subtitle:`{n} members · ~$X/mo Network Yield Bonus`
   - member row 按 monthVolume 降序
-- 成员记录保留关系、等级、活跃状态与入网信息；收益只读服务端结算记录，不按成员月业绩或旧层级费率推算。
+- 成员记录保留关系、等级、活跃状态与入网信息；收益只读服务端结算记录，不按成员月算力额或旧层级费率推算。
 - 不展示 7 层 sections / 左右翼 filter / Spillover badge
 
 ### 8.9 硬件配额解锁 `/team/quota`
@@ -2367,7 +2256,7 @@ Direct / Extended 二分类可折叠列表:
 | 设备 | 解锁条件 | 月度库存 |
 |---|---|---|
 | NexGridBox Pro | 5+ 已激活直推 | 1,000 台(余 23)|
-| NexGridRack P1 | 15+ 直推 **或** 团队月业绩 ≥ $20,000 | 100 台(余 8)|
+| NexGridRack P1 | 15+ 直推 **或** 团队月算力额 ≥ $20,000 | 100 台(余 8)|
 
 > 解锁条件 / 阈值 / 库存 / 进度**单源自商品目录的 `purchaseGate` 配置**(§7.1)与 `evaluatePurchaseGate`,本页不自带硬编码数值;运营在后台调门槛 / 锁额,本页与商城卡 / 详情 / 结账同步变化。tier 的名称 / 价格 / perks 同源自 catalog,杜绝口径分叉。
 
@@ -2855,86 +2744,103 @@ Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则
    - ⚠️ 提前赎回 forfeit 全部累计利息(只拿本金扣罚款)
    - 📉 APY 浮动,但已质押位按原利率到期
    + CalloutBox `Why it's safe`(102.4% 超额抵押兑付 + 信任中心公开储备)
-7. §5 FAQ 5 问(最低金额 / NEX 能否质押 / 到期不 claim 怎样 / 多笔并行 / 是否算团队业绩)
+7. §5 FAQ 5 问(最低金额 / NEX 能否质押 / 到期不 claim 怎样 / 多笔并行 / 是否算团队算力额)
 8. 底部 CTA 回 `/staking`
 
 ### 9.7 账单 `/me/wallet/bills`
 
-2026-11-01 分页规则：H5 Lite 当前账单页的全部 / 收入 / 支出列表及共用账单分页的 USDT / UVT 奖励分类记录，首次只向服务端查询 20 条；用户向下滚动至列表底部附近才携带原筛选和游标查询下一页 20 条并追加，不预取或循环拉完整个列表。切换筛选从第一页重新读取，禁止混入旧组合。分页中合并重复触发；失败保留已加载记录并允许同游标重试，游标耗尽停止查询。没有可用滚动事件的平台保留“加载更多”入口。按单号定位仍沿用独立查找流程。H5 Lite 兼容服务端 UVT 与历史 NEX 币种标识，按同一种平台代币显示，保持原始金额精度与收支方向。
+2026-11-01 分页规则：USDT / UVT 与全部 / 收入 / 支出 / 奖励各组合首次只向服务端查询 20 条；用户向下滚动至列表底部附近才携带原筛选和游标查询下一页 20 条并追加，不预取或循环拉完整个列表。切换币种或筛选从该组合第一页重新读取，禁止混入旧组合。分页中合并重复触发；失败保留已加载记录并允许同游标重试，游标耗尽停止查询。切换币种、筛选、账号或离开页面后，旧触底通知失效。保留“加载更多”与失败重试入口。共用账单分页的奖励分类记录同为每批 20 条；按单号定位仍沿用独立查找流程。
 
-按日期 grouping 流水:
-- type / amount / symbol / status / memo / ref
-- 6 type:swap / topup / withdraw / earning / commission / refund
+2026-10-30 起为收支统计页：
+- 顶部 USDT / UVT 切换；概览卡为所选币种的本月收益，下列今日、本周、累计，取首页收益汇总的同一组时段数据，随全局隐藏数据一起遮罩。
+- 筛选：全部 / 收入 / 支出 / 奖励（奖励按服务端 `REWARD` 类别筛选），每种币种与筛选组合各自分页读取服务端账单。可带 `?filter=in&asset=UVT` 预选筛选与币种进入（首页「最近收入」）。
+- 流水按天分组（今天 / 昨天 / 日期 · 星期，跨年带年份），每组一张卡片；行内为类型图标、类型名与状态标签、说明 · 参考号 · 时分、带正负号的金额与币种，USDT 行显示服务端下发的余额。
+- 提现行进入提现追踪，可确认网络的链上充值行进入交易详情；其余行点开账单详情弹层（类型、时间、来源、状态、单号可复制、余额），只展示这条账单自己的字段。
+- 按单号定位（`?ledgerBizNo=`）时隐藏切换、概览与筛选，在全部账单里查找。
 
 ### 9.8 每日签到 `/daily`
 
+> 2026-11-02 改版（P-65）：能量环 + 横滑奖券 + 2×2 增益 + 领奖台榜单，签到主按钮移到底部固定操作栏。下文为现行结构；奖励数额、里程碑与增益一律以后台配置和接口返回为准，文中数字只是当前默认配置。
+
 #### 9.8.1 规则
 
-签到是一个小额 NEX 水龙头(NEX 主产出仍是设备挖矿,见 §13.1)。
+签到是小额 UVT 奖励入口（UVT 主产出仍是设备挖矿，见 §13.1）。规则由后台签到规则表（`nx_growth_checkin_rule`）配置，接口 `/api/points/state` 的 `rules` 下发，页面只读不写死：
 
-- 每日签到 baseline +2 NEX
-- 连续 7 天满额外 +5 NEX bonus
-- **Lucky multiplier**:每次签到 15% 概率触发 1.5×,5% 概率触发 2× 随机奖励倍率(作用于当次 NEX 发放量)
-- 同一天不可重复签到;同一天 0:00 之前不算新一天
-- 中断 streak(>48h 未签)→ 重置为 0,但可消耗 1 张 Streak Saver 恢复至历史最长 streak(上限 30 天)
-- `longestStreak` 字段在签到时同步更新
+- `baseline` 每日基础奖励（默认 1 UVT）；按钮文案「签到 · 基础奖励 {n} UVT」取这个值，取不到时只显示「签到」
+- `bonus7` 连续 7 天额外奖励（默认 5 UVT）
+- **幸运加倍**：服务端随机，`p15` 概率 1.5×、`p2` 概率 2×（默认 15% / 5%），作用于当次 UVT 发放；页面显示的概率取自这两项，取不到时退回一句通用说明
+- `broken` 断签判定小时（默认 48h）；`revive` 默认复活卡张数（默认 1）
+- 同一业务日（服务端 `serverDate`）只能签一次；签到幂等键用服务端业务日
+- **签到加成**（连签增益 CHECKIN_MULTIPLIER，默认 30 天解锁，×1.5）：激活后签到奖励按倍率计，断签即失效，可与活动倍率叠加（后端交接 B17）
 
-#### 9.8.2 30 天里程碑路线图
+#### 9.8.2 连签里程碑奖励
 
-7 阶梯奖励,签到累计满 N 天后,Claim 按钮变亮可手动领取:
+里程碑由后台配置（`nx_streak_milestone`），默认 7 档：
 
-| Day | 奖励 | 类型 |
+| 天 | 奖励 | 类型 |
 |---|---|---|
-| 3   | +5 NEX | nex |
-| 7   | +15 NEX | nex |
-| 14  | +1 USDT | usdt |
-| 21  | +100 NEX | nex |
-| 30  | 🎰 Lucky Spin × 1 | spin |
-| 60  | +10 USDT | usdt |
-| 100 | ⭐ Streak Master Badge(NFT) | badge |
+| 3   | 5 UVT | UVT |
+| 7   | 15 UVT | UVT |
+| 14  | 1 USDT | USDT |
+| 21  | 100 UVT | UVT |
+| 30  | 抽奖次数 ×1 | SPIN |
+| 60  | 10 USDT | USDT |
+| 100 | 徽章「连续签到大师」 | BADGE（STREAK_MASTER） |
 
-每个里程碑 claim 一次后状态变为 `claimed`(Claimed 按钮);未达成显示 Lock icon + "Xd to unlock"。
-里程碑奖励本质上是 sunk-cost 强化:user 累计越久,放弃损失越大。
+- 每档一张奖券（上半：第 N 天、奖励类型图标、单位与金额；中间打孔线和两侧缺口；下半票根）。标题右侧有可领取时显示「{n} 个可领取」。
+- 票根状态：可领取 = 品牌色「领取」按钮，整券琥珀→珊瑚描边；已领 = 「已领」，右上角灰勾，金额变灰；下一档 = 「还需 N 天」（琥珀）；其他未解锁 = 锁 +「还需 N 天」；服务端尚未确认可领（天数已到但未解锁）= 「领取资格待确认」。点未解锁的券提示「保持连签继续解锁」。
+- 进入页面时横滑条自动滚到第一张可领取的券（没有则下一档），保留它左边一张可见。
+- 领取成功提示奖励与「第 N 天里程碑已领取」；抽奖次数奖励发放抽奖券（进入 §11.10.9 幸运转盘）。
 
-Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.10.9 Lucky Spin 转盘(与每日免费转盘同一奖池);claim 后提示"已领到一次幸运转盘机会",可选立即前往转盘。
+#### 9.8.3 断签复活卡（Streak Saver）
 
-#### 9.8.3 断签复活卡(Streak Saver)
+- 卡片显示剩余张数（插画角标 ×N）、「中断连签后可用复活卡恢复」、「N 张复活卡可用」/「暂无可用复活卡」。
+- 只有连签真正断掉（距上次签到超过 48h）且还有复活卡时按钮「使用 1 张」可点；否则按钮半透明，点了提示「断签时才能使用复活卡」。
+- 使用后由服务端恢复连签并扣 1 张，页面显示服务端返回的恢复后天数，提示「连签已恢复」，复活卡回到连签增益之后的位置。
 
-- 用户默认 1 张
-- 仅当 streak 真正断掉(`Date.now() - lastSignedInAt > 48h`)时按钮亮起
-- 消耗 1 张 → `signInStreak` 恢复到 `min(longestStreak, 30)`,`lastSignedInAt` 设置为 "yesterday" 使次日签到可续上
-- Day-30 里程碑可获得 +1 张复活卡(未来扩展)
-- 0 张时按钮 disabled + 副字 `No savers left · earn one at Day-30 milestone`
+#### 9.8.4 签到达人榜
 
-#### 9.8.4 Top Streakers 迷你榜
+- 标题右侧「你的最长：N 天」。前三名在领奖台上（顺序 2-1-3，第一名带皇冠，头像为名字首字母），显示名字、国家代码与连签天数；第 4 名起为列表行。名次柱高度只是装饰。
+- 远程模式数据来自接口 `topStreakers`；不足 3 人时领奖台只放现有人数，0 人显示空态。
 
-5 行社会证明 leaderboard,显示当前全平台最长连签人(Daniel_K 🇺🇸 412 / Mei_C 🇸🇬 387 / Lukas_F 🇩🇪 341 / Carlos_M 🇧🇷 298 / Priya_S 🇮🇳 256),
-右上角显示 `Your best: {longestStreak} days`,驱动用户与榜单对标。
+#### 9.8.5 页面结构（自上而下）
 
-#### 9.8.5 UI(完整页面结构,自上而下)
+页头沿用子页面头（返回 + 标题「每日签到」）。读取失败时页头下方显示琥珀提示条「暂时无法确认账号状态，请重试」+「重新同步」。区块间距 32px（≤374px 为 24px）。
 
-1. **Streak hero** — 大字 streak 数字 + `days` + "Active streak" 标签 + 距下次里程碑 daysToMilestone 文案 + 已签到时显示 `Next claim in HH:MM:SS` 倒计时 chip
-2. **本周 7 天日历**(Mon-Sun grid)— 已完成 / Sun 第 7 天 / 今日高亮 / future
-3. **签到主 CTA** + 副字 `Streak day + 15% chance of 1.5×, 5% chance of 2×` Lucky 提示
-4. **30 天里程碑路线图**(7 行卡片,见 §9.8.2)
-5. **Streak Power-Ups 卡**(Sparkles header)— 4 行 conversion-tied unlock(参 §9.8.6)
-6. **Streak Saver 卡** — Shield icon + 余量 + `Use 1 saver` 按钮(仅断签时可用)
-7. **Top Streakers 榜**(见 §9.8.4)
-8. 3 stats grid:NEX Balance / Lifetime earned / Burned
-9. "Your NEX unlocks up to $X USDT withdrawal" 卡 → 跳提现(NEX 用于抵扣提现手续费,见 §9.3.2)
-10. Recent 10 条 NEX 发放历史(`mounted` guard,避免 SSR/CSR 时间戳 hydration mismatch)
+1. **连签能量环**（主视觉）——环按「当前阶段」分格：里程碑天数升序，上一档（≤ 当前连签的最大里程碑天，没有为 0）到下一档之间每天一格；已签格从琥珀渐变到珊瑚（今天刚签的一格为珊瑚端），今天未签那格为品牌色并缓慢呼吸；超过最后一档时画 7 格全亮、不放礼物标记。签到当天正好达到某个里程碑天（如第 14 天）时，当天显示刚完成的这一阶段满环（上一档到这一档全部点亮），环顶礼物标记变为「已达成」（琥珀实心底、礼物图标用页面底色），第二天再切到下一阶段。环顶礼物标记表示下一档奖励；环心为火焰、连签天数、「连续天数」。环下一行：0 天「今日开始你的连续签到」，有下一档「再签到 N 天可领取 {奖励}」（奖励名琥珀色），无下一档「暂无下一档连签奖励」；再下一行「幸运加倍」+ 1.5× / 2× 两个概率胶囊。环背后是整页唯一一团琥珀→珊瑚氛围光。
+2. **断签复活卡**——断签可复活时（见 §9.8.3）整块移到能量环正下方，描边改为珊瑚渐变、按钮可点；否则在连签增益之后。
+3. **连签里程碑奖励**——横滑奖券，见 §9.8.2。
+4. **连签增益**——2×2 卡格，见 §9.8.6。
+5. **签到达人榜**——见 §9.8.4。
+6. **UVT 卡**——余额（UVT，整数大字 + 小数辅助色）；下方两栏「累计 · 已入账奖励」「消耗 · 提现抵扣净额」；口径说明「累计包含全部已入账 UVT 奖励；提现抵扣已扣除退回金额」；余额或汇总读取失败时卡内说明并给重试；卡底整行入口「UVT 可用于抵扣提现网络费」→ 提现方式页（UVT 用于抵扣提现手续费，见 §9.3.2）。
+7. **最近**——UVT 账单最近记录（名称、时间、金额，入账为成功色）；空、读取中、失败重试各有状态。
+8. **底部固定操作栏**（DS-30）——见 §9.8.7。内容底部留白，最后一行能滚到操作栏上方。
 
-#### 9.8.6 Streak Power-Ups（连续签到增益）
+远程模式下账号签到事实还没读到（读取中或失败）时，不显示任何连签数、里程碑、增益或榜单：能量环显示空轨道和「—」，读取中时环下显示「正在加载最新签到状态…」，里程碑区显示 3 张虚线占位券，增益和榜单显示「—」。
 
-正式模式读取服务端发布的增益名称、解锁天数、状态及目标路由，激活由服务端确认；本地演示才使用旧的 7 / 14 / 30 / 60 天默认档。Lite 保留现有每日页布局，不移植 App P-65 改版。
+#### 9.8.6 连签增益（Streak Power-Ups）
 
-BUG-062：移植 `src/lib/power-up-copy.ts`（App `493d67b5`、`fc6726cf` 及 `a276ac10` 文案修正）。已知默认 ROUTE_BADGE 名称在 zh / en / vi 下本地化；运营自定义名称保留原文。`CHECKIN_MULTIPLIER=1.5` 显示“签到奖励 × 1.5，断签后失效” / “Check-in reward × 1.5, ends if your streak breaks” / “Thưởng điểm danh × 1.5, mất khi đứt chuỗi”。未知效果、空值或无效数值不显示效果描述，绝不拼接原始服务端代码。`stakingVisible=false` 时隐藏质押增益，包括指向 `/wallet/staking` 的 `STAKING_APY` 发布项；其他增益的解锁与激活行为保持原样。
+增益由后台配置（`nx_streak_power_up`），接口返回状态（LOCKED / AVAILABLE / ACTIVATED）和目标业务可用性。默认：
 
-#### 9.8.7 SSR/CSR 安全
+| 天 | 增益 | code | 激活后去向 |
+|---|---|---|---|
+| 7  | 团队成长徽章 | ROYALTY_BOOST | 团队页 |
+| 14 | 连续签到徽章 | STREAK_BADGE | 奖励页 |
+| 30 | 签到加成（签到奖励 × 1.5，断签后失效） | CHECKIN_BOOST（CHECKIN_MULTIPLIER） | 留在本页（`/daily` 不在跳转表） |
+| 60 | Genesis 资格入口 | GENESIS_ALLOWLIST | Genesis 页 |
 
-- 历史时间戳列表 + 已签到倒计时 chip 都依赖 `Date.now()` / persisted store,需 `mounted` flag 守卫,避免 hydration mismatch
-- Lucky multiplier 仅在 signIn 事件 handler 内 roll,不在 render 时调 Math.random()
-- 正式模式 Streak Power-Ups 的已激活态来自服务端快照；本地演示才读取账号隔离的持久化状态。
+- 标题右侧「当前 N 天」。两列卡格：图标块 + 门槛「N 天」、名称、有效果说明时一行描述、底部状态。图标按 code：团队（天蓝）、徽章（琥珀）、签到加成（闪电，琥珀）、Genesis（宝石，珊瑚），其他未知 code 用通用图标。
+- 门槛显示「N 天」（英文「N days」、越南语「N ngày」）。
+- 状态：可激活 = 「激活 ›」按钮，激活成功提示「已激活「{name}」」并按去向跳转；已激活 = 成功色勾「已激活」；未解锁 = 虚线空位卡 + 锁「再签 N 天解锁」（越南语「Mở sau N ngày」）；目标业务暂停 = 「业务暂停」+ 说明；业务状态无法核实 = 「业务状态待核实」+ 说明。
+- 卡下提示：有可激活时「「{name}」已解锁，可以激活了」；否则「再签 N 天即可解锁「{name}」」；全部激活「全部 N 个增益已激活 · 继续签到保留权益」；再下一行「连签权益以当前可用状态和签到记录为准。」
+
+#### 9.8.7 底部操作栏与签到反馈
+
+- 未签到：品牌色主按钮「签到 · 基础奖励 {n} UVT」；提交中显示加载、不可重复提交；读取中保持按钮外观但不提交。
+- 已签到：中性玻璃胶囊「今日已签到」+ 时钟 + 倒计时「HH:MM:SS 后可签」（按服务端下次重置时间每秒走；页面隐藏时停走，回到页面按当前时间重算）。
+- 签到状态未确认（读取失败）：中性按钮「签到状态未确认 · 请重新同步」，点击重新读取（不发签到请求）。
+- 签到成功：今天那格补满并迸一次光点，天数从旧值数到新值，实际奖励「+{奖励} UVT」从环心数字处升到火焰位置停留后再微微上移淡出，共约 1.9 秒，期间火焰淡出、结束后淡回，飘字不压环顶礼物标记（触发幸运加倍时附倍率；能量环已滚出屏幕时，同一飘字改为从底部操作栏上方升起），不再弹成功提示；离页或切换账号时取消。失败、地区限制与冲突仍用提示条。
+- 动效只用位移和透明度；循环只有今天那格的呼吸和已签到倒计时，离屏或页面隐藏时暂停；系统「减少动态」下全部静止，上飘改为在火焰位置原位淡入淡出并保留 1.9 秒，火焰同步隐藏和恢复。
 
 ### 9.9 NEX 资产详情页 `/me/wallet/nex`
 
@@ -2951,7 +2857,7 @@ BUG-062：移植 `src/lib/power-up-copy.ts`（App `493d67b5`、`fc6726cf` 及 `a
    - 大字 NEX 余额 + 副字 `NEX`
    - 右侧 USD 估值 + `▲/▼ XX.XX% (24h)`
    - sparkline area chart
-   - `View market →` 链 `/market`
+   - `View market →` 链 `/market`，按普通子页压栈保留钱包入口；行情顶部返回及原生系统返回优先回到原钱包页面并保留原滚动位置，余额继续按钱包原有权威读取更新。只有无上一级页面的行情直达/冷开，才沿用首页返回目标；不以清栈打开行情，不改变买卖方向、报价或交易资格。
 
 2. **Quick Actions 4-cell**:
    - Buy(TrendingUp)→ `/me/wallet/exchange`
@@ -3066,6 +2972,34 @@ BUG-062：移植 `src/lib/power-up-copy.ts`（App `493d67b5`、`fc6726cf` 及 `a
 
 ⚠️ 当前原型用本地状态模拟收单方 token 库,并用一个托管字段容器组件充当 SDK 的对等物:卡号 / CVV 的明文只存在于该组件内部,三个调用面(充值 / 绑卡 / 结账)在代码上取不到。真后台对接时替换该组件为收单方 SDK,调用面不改;所有 mutation 走 server endpoint,client 只 cache 展示字段(`brand / last4 / expiry / holder`)。
 
+### 9.10a 银行收款账户（越南银行卡提现）`/me/wallet/cards/new`
+
+正式 App 的「绑定银行卡」是越南银行卡提现的收款账户（VND 到账），不是 9.10 的支付卡。规则来自 2026-09-16 用户决定；绑定与更换流程按 2026-10-30 P-31 设计稿（设计画布 P-31 ①–⑦）。
+
+**规则**
+
+- 只填收款账号与收款户名，按收款账号入账，不选择银行，不采集有效期／CVV。须使用本人账户。
+- 首次绑定不需要短信验证；更换必须验证账号绑定手机号的短信验证码（5 分钟有效，60 秒后可重发，与提现地址共享每日 10 次发送上限）。
+- 绑定和更换都立即生效，没有 7 天间隔，也没有等待期。
+- 有未决报价或在途提现（`config.unresolvedIntent` 非空）时不能更换；服务端同样拒绝。
+- 保存前用户须核对收款账号与户名，请求携带 `accountRoutingConfirmed=true`，否则服务端拒绝。
+- 收款账号、户名和验证码只留在页面内存，离开页面即清除；结果未知时只用原请求重试，不重新提交新绑定。
+
+**流程与界面**
+
+| 状态 | 界面 | 主操作 |
+|---|---|---|
+| 已绑定（概览） | 当前收款账户卡：脱敏账号、生效时间、状态标签（已生效／暂不可用）；下方绑定及换卡规则 | 中性玻璃「更换收款账户」 |
+| 有提现处理中 | 同概览，更换按钮禁用并在下方写明原因 | 文字链接「查看提现进度 ›」 |
+| 更换 · 第 1 步 | 步骤条「1 新账户 · 2 核对并验证」；收款账号、收款户名 | 「下一步」 |
+| 更换 · 第 2 步 | 原账号 → 新账号、户名，可返回修改；短信验证码与发送／倒计时 | 「确认更换」即提交（本步即核对确认） |
+| 首次绑定 | 添加收款账户：收款账号、收款户名（无短信） | 「确认绑定」→ 底部核对弹层「确认并保存／返回修改」 |
+| 已保存 | 首次为「银行账户已保存」，更换为「收款账户已更换」；新脱敏账号、账户状态、立即生效说明 | 「去提现」／「完成」 |
+
+页头返回在更换流程中逐步后退（第 2 步 → 第 1 步 → 概览），其他状态返回上一页。读取失败、通道不可用、短信发送失败、验证码错误或过期、结果未知各有就地提示；结果未知时按钮改为「核对原绑定结果」。
+
+**接口**：`GET /api/withdrawals/bank/config`（就绪状态、`bindingOtpRequired`、脱敏绑定资料、`unresolvedIntent`）· `POST /api/withdrawals/bank/beneficiary/otp`（更换短信，返回 challengeNo、有效期与重发间隔，不返回验证码或完整手机号）· `POST /api/withdrawals/bank/beneficiary`（幂等绑定／更换，需 `accountRoutingConfirmed=true`，更换另带 challengeNo 与验证码）。
+
 ### 9.11 免费试用 `/me/trial`（Lite P-59）
 
 免费领取无需绑卡，不自动扣款、不自动下单；购买必须由用户主动确认并完成现有支付授权。首页福利、Earn、我的设备和详情共用 `use-trial-presentation` 与服务端试用状态，避免各入口自行推进生命周期。
@@ -3119,7 +3053,7 @@ BUG-062：移植 `src/lib/power-up-copy.ts`（App `493d67b5`、`fc6726cf` 及 `a
 |---|---|---|---|
 | Unilevel rates L1-L7(USDT + NEX) | `lib/v3/commission.ts:56-62` | `GET /api/config/commission/rates` | Promotion 周 multiplier / phase 紧缩 |
 | Commission 30-day cooling-off | `lib/v3/commission.ts:141` | `GET /api/config/commission/cooling-days` | 监管紧缩 → 拉长 30d→45d→60d |
-| V-Rank ladder(13 级 selfBuyUSD / directRefs / teamVolumeUSD / votes / prize) | `lib/v3/v-rank.ts:49-140` | `GET /api/config/v-ranks` | 阶段调整门槛 |
+| V-Rank ladder(V0–V8 有效等级 selfBuyUSD / directRefs / teamVolumeUSD / votes / prize) | `lib/v3/v-rank.ts:49-140` | `GET /api/config/v-ranks` | 阶段调整门槛 |
 | V_VOTES + GLOBAL_V_DISTRIBUTION | `lib/v3/leadership-pool.ts:27-43` | `GET /api/config/leadership-pool` | 周池金额 + vote weight |
 | Staking pools 统一(USDT 锁仓 + NEX 池)| `lib/v3/staking.ts:28-40` + `lib/mock/staking-pools.ts:13-46` | `GET /api/config/staking/pools` | APY / penalty / enabled / minStake |
 | Genesis 节点经济(TOTAL_SLOTS / unitPriceUSDT / dailyDividendShare) | `lib/v3/genesis.ts:25,76,82` | `GET /api/genesis/state` | 供应 / 单价 / 排放比例 |
@@ -3208,7 +3142,7 @@ BUG-062：移植 `src/lib/power-up-copy.ts`（App `493d67b5`、`fc6726cf` 及 `a
 
 | 实验值 | 当前位置 | 替换 |
 |---|---|---|
-| `chargeFailRate=0.01` 客户端 Math.random | `lib/store/trial-config.ts:59` + `free-trial.ts:55-60` | server-only,`POST /api/trial/charge` 返 `{ok, reason}` |
+| 试用购机结果 | 正式 `POST /api/trial/convert` | 由真实钱包余额、订单事务及幂等结果决定，客户端不模拟扣款成功率 |
 | Unilevel rates promotion 周 multiplier | `lib/v3/commission.ts:56-62` | server feature flag(server-side 计算佣金时按 user bucket 应用 multiplier)|
 | Sign-in lucky multiplier(5% 2x / 15% 1.5x,作用于签到 NEX 发放)| `lib/store/nex-faucet.ts` | `POST /api/faucet/sign-in` 返 multiplier |
 | PHASES 全表(每 phase 多个时变 dials,含 `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`)| `lib/store/product-phase.ts` | `GET /api/admin/platform/phase-config` + user bucket-aware override |
@@ -3226,8 +3160,8 @@ BUG-062：移植 `src/lib/power-up-copy.ts`（App `493d67b5`、`fc6726cf` 及 `a
 | Early withdraw staking | `useStaking.earlyWithdraw` + `useApp.creditBalance` + (missing `addBill` / penalty bill / `addReceipt`) | `POST /api/staking/:id/early-withdraw` |
 | Re-invest from wallet | `useApp.debitBalance` + `useStaking.stake` + (missing `addBill`) | `POST /api/wallet/reinvest` |
 | Submit withdrawal | `useApp.debitNex`(烧 nexBurned 抵手续费,可为 0) + `useApp.submitWithdrawal(amount,network,address,fee)` | `POST /api/withdrawals` 原子(烧 nexBurned / 扣 USDT / queue tx / 写 USDT 提现单(fee=actualFee)+ 烧 NEX 时写 NEX 抵扣单 / 返 withdrawalId;失败回滚 NEX) |
-| Open free trial | `useCards.bind` + `useFreeTrial.startWithCard` + (missing PSP authorization) | `POST /api/trial/start` |
-| 试用早购 | `useFreeTrial.redeemEarly` + `useOrders.createOrder` + `useApp.creditDevice` | `POST /api/trial/redeem-early` |
+| Open free trial | `useFreeTrial.start` 请求并读回同一领取单，不写本地正式资产 | `POST /api/trial/start` |
+| 试用早购 | 显示真实抵扣与应付、用户二次确认；订单/余额/设备由后台同一事务完成 | `POST /api/trial/convert` |
 
 每个 endpoint 必须支持 `Idempotency-Key` header(由客户端 mint UUIDv4,server 用作 dedup key 24h)— 当前所有 client mutation 都没有 idempotency,网络抖动 retry 会造成重复扣款 / 重复开仓。
 
@@ -3472,6 +3406,8 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 
 `/me` 是 5 个 tab 之一,定位为**导航 / 摘要中心**,而非完整资金操作中心。所有完整流程(钱包、设备、网络、成就、设置)都通过摘要卡的链入口跳到对应子页。**首屏 4 张大卡** + 下方 Settings 列表 + 底部 Sign out。
 
+**2026-10-31提现提醒归属决定**：收益概览下面不展示任何提现状态卡，包括处理中、失败、冻结、待处理、已退回及最近提现；不留空壳、占位或替代横条。原钱包及充值/提现/兑换操作入口保留。提现失败及需用户处理的事项统一在消息中心资金分类查看，点击进入对应原单详情；账单和提现历史继续保留真实记录。接口读取错误仍走原页尾恢复区，不在收益与常用功能之间插卡。
+
 **1. Profile compact row**(无独立 card,扁平 Link row → `/me/profile`)
 - 头像
 - 显示名 + V badge + KYC pending chip(若未验证)
@@ -3497,7 +3433,7 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 定位:升级引导卡 — 展示距下一阶 V 级的具体动作 + 升级解锁的核心权益,引导用户进 `/team` 操作。**不展示状态信息**(可提现 / cooling 已在钱包卡覆盖),保持单一主题。
 
 **进行中状态**(`gap.next` 不为空):
-- 奖励锚点:下一阶解锁的培育奖 NEX(如 V3 = 10,000 NEX)
+- 奖励锚点：当前发布配置中的下一阶本人权益/等级奖励；培育奖须单独注明发给直接推荐人，不当作本人升级奖励，不写死示例金额。
 - 主标:`距 V{N+1} {title}` + 主缺口文案(取 `nextRankGap(state).primaryGap`,按 `progress = have/required` 比例选离完成最远的条件)
 - 升级权益:`topUnlocks` 取前 2 项(emotional weight 排序见 §13.2)
 - 进度条 + 百分比;`progressPct ≥ 0.8` 时进度条切 warning(冲刺暗示)
@@ -3528,7 +3464,7 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 
 ### 11.0A 自动通知与人工服务边界
 
-当前整合版关闭 Nova AI 会话入口。浮标只提供人工顾问/客服快捷入口；铃铛与 Me 消息中心包含通知和服务两个分区，具体契约见 §11.2、§11.8.4。
+Nova AI 会话已下线，App 内的 AI 会话、帮助页 AI 问答及相关代码已于 2026-10-30 移除（BUG-008）。浮标只提供人工顾问/客服快捷入口；铃铛与 Me 消息中心包含通知和服务两个分区，具体契约见 §11.2、§11.8.4。
 
 #### 11.0A.1 自动通知
 
@@ -3573,11 +3509,19 @@ flowchart LR
 
 ### 11.1 我的设备 `/me/devices`
 
-Lite 的硬件和 Cloud Share 库存管理入口，不展示手机设备（PHONE、MOBILE）。设备卡与槽位卡隐藏手机，但不能因此扣减服务端 slotsUsed；账号资金历史仍完整展示手机收益。保留顶部槽位计数、独立试用设备行、已激活/待激活分组。购买不等于激活，未激活库存不占槽；激活硬件、Cloud Share、试用与订单预留统一占用服务端槽位（§6.9）。
+**目的**:全 inventory 管理入口。购买成功自动激活为 Online，手动停用后退出算力队列、回到仓库并保留归属，可在空闲槽位内重新启用。六槽仍由后端验证，购买失败不产生成功激活。
 
-激活前检查服务端槽位快照及设备行版本，服务端成功后刷新设备和任务快照。未知容量不能当空位；槽位满时引导管理设备。数据读取失败给出重试，不以本地模拟替代。
+2026-10-30 纠正：算力队列按已激活 Online 的设备实例展示；同型号重购保留独立实例和历史订单。全部类型含 Cloud Share 共用六个激活槽位，每实例各占一槽，取消 Cloud Share 免槽。账号已激活手机的业务状态不由当前安装是否已校准或技术心跳决定；本机执行资格仍独立校验。首页添加设备先查可选仓库、有则弹窗选择、无才进商城；折叠队列仍展示当前任务与进度条。六槽与本轮口径见[算力激活队列与六槽](UVEL_算力激活队列与六槽_20261029.md)。
 
-停用按当前模型处理：空闲设备确认后停用；有任务时可等当前任务完成后自动停用，或立即停止且放弃未完成任务收益。v3 服务端周期使用 `/api/tasks/simulated/stop` 并携带 `expectedVersion`，`CLOSING` 表示服务端仍在确认完成收益，继续占槽直到实际停用；不在浏览器中结束周期或直接释放槽位。已有待停用任务仍可选择立即停止。v2/旧模型沿用设备命令接口。
+**两段分组**:
+
+抵扣升级（2026-10-30 用户补充）按指定旧实例的位置继承：旧机已激活→先取消旧激活并抵扣→新机原槽激活；旧机仓库未激活→新机仓库。无需按满槽分支，失败回滚设备、任务和付款；真实旧任务只取消、不生成完成奖励。此为抵扣置换规则，普通全价购买仍按正常容量和资格自动激活。
+- **Online**：权威确认已激活的设备，每行显示设备名、收益、规格与停用动作；任务结束后停用的设备在实际停用前仍 Online。
+- **仓库**：权威确认未激活或已停用的设备，不显示 Offline 状态，每行同上并提供激活动作，槽位满时禁用；读取未确认与错误另提供反馈。
+
+**顶部 slot meter（2026-10-30 容量投影）**:`slotsUsed / slotCap` 双色进度条(6 格)+ 文字 mono 标识。总占用`C=实际激活N+有效订单预留+有效试用预留`；原后端容量上限保持6。`GET /api/devices/earnings` 数据顶层与Home overview的`onboarding`均提供 `reservedSlotCount`、`trialSlotCount`、`slotsUsed`及既有`slotCap`，实际激活N由同一fleet真实激活实例统计，Home的`onboarding.activeDevices`仍为N。槽位条、空槽与普通新增容量守卫用同一fleet epoch/revision接收的权威C，不能再次叠加本地试用或被Home独立旧快照覆盖；Online列表与执行仍按真实激活实例，订单预留不生成设备、额外任务或收益。等待停用在实际停用前仍计N。旧后端缺字段时兼容原有`N+已确认试用预留`回退，容量事实未知不当零并关闭新增动作；复用账号epoch/revision隔离，迟到结果不能跨账号、覆盖较新投影或放行操作。抵扣升级位置继承、试用预留交换和原交易恢复不变，详见[六槽专题](UVEL_算力激活队列与六槽_20261029.md)。
+
+**H5 Lite**：不展示手机设备（PHONE、MOBILE）；设备卡与槽位卡隐藏手机，但不扣减服务端 `slotsUsed`，隐藏的手机仍占原槽位。账号资金历史仍完整展示手机收益。
 
 停用只改变运行状态，不删除库存、订单和历史收益。重新激活后等待服务端下发任务；首页、Earn 与详情刷新同一个权威状态，不在本地随机挑任务。
 
@@ -3597,6 +3541,8 @@ Lite 的硬件和 Cloud Share 库存管理入口，不展示手机设备（PHONE
 | rewards 活动 | 活动、任务奖励、Genesis 及对应已启用业务提醒 |
 | system 系统 | 安全、维护、风险披露与未知类型 |
 
+提现失败及需要用户关注/处理的提醒统一在资金分类承载，不在My收益下重复展示。提醒使用真实状态、原因及事件时间；查看/处理与原生推送深链须携有效原提现单号，银行单沿原银行详情分流。无原单标识时不回退到最新提现单；读取或重复事件不重复造提醒，不重置已读，不自动执行提现、退款或重试写命令。
+
 分组不改变旧六键通知偏好协议。未知类型必须可读、可执行原 CTA。服务分区按最近更新时间展示人工会话及工单，可按专属客服、工单筛选；advisor/support 历史类型合并展示，不修改原会话标识或消息作者。
 
 #### 11.2.2 未读与读取
@@ -3607,7 +3553,8 @@ Lite 的硬件和 Cloud Share 库存管理入口，不展示手机设备（PHONE
 - 展开通知才确认该条已读；打开中心、切换分类不读会话或工单。“通知全部已读”仅影响通知。
 - 人工与工单只在实际详情内容展示后按现有版本读确认协议更新；有新回复冲突时刷新，不能吞掉未看过的内容。
 - 加载、失败、无记录及当前页无匹配但还有下一页分别展示；失败保留已有快照并提供重试，不把失败当零未读。
-- 周期补拉保留已加载历史和游标。账户退出/重绑后清除旧快照，旧请求不得回写。
+- 通知按当前「全部／资金／设备／团队／活动／系统」分类在服务端筛选后分页，当前分类的游标只代表该分类还有记录；到尾页隐藏「加载更多」，其他分类仍有数据不能令当前分类继续分页。空分类直接展示该分类空态，不自动循环翻阅其他分类的页。
+- 周期补拉只刷新当前分类，保留该分类已加载历史和游标；已到尾页时不因头页刷新重新显示分页按钮。分页操作去重，后台头页刷新不冒充「正在加载更多」；真实错误保留重试。切分类独立管理结果与游标，账户退出/重绑后清除旧快照，旧分类或旧账号请求不得回写。
 - 浏览长列表时收起大标题与一级分区、保留末级筛选和当前分区上下文；明显回滑恢复一级切换，回到顶部恢复标题，轻微滚动不反复切换。
 
 #### 11.2.2a Swipe-to-action(conversion-tied)
@@ -3615,6 +3562,8 @@ Lite 的硬件和 Cloud Share 库存管理入口，不展示手机设备（PHONE
 通知 CTA 与既有左滑导航均由服务端确认动作后返回路由，前端不能猜测已到账、代发资金操作或改变业务权限。重复动作按原幂等键查询；主动作成功但附属读确认失败，仍保留已确认路由并允许后续读状态对账。
 
 清理已读须确认，只删除服务端允许清理的记录，保留 critical 消息。正式模式不提供客户端单条删除；通知与业务记录不是同一对象，清理通知不删除订单、资金或会话历史。
+
+「清空已读」位于通知分区固定页底操作区，置于消息列表滚动容器之外，长列表顶部和滚动后均可触达；沿用原按钮样式，适配安全区且不遮挡末条内容。服务分区不显示通知清理入口。清理范围仍为当前账号全部可清理已读通知，不限当前筛选；确认、取消、系统返回和离页/换账号后的旧意图失效规则保持。
 
 #### 11.2.3 入口
 
@@ -3638,7 +3587,7 @@ Lite 的硬件和 Cloud Share 库存管理入口，不展示手机设备（PHONE
 优先级、排序与保留由服务端决定；前端展示 critical/high 的重要标识，不自行重置已读或提升优先级。低优先级过期由服务端执行，客户端不作为权威消息仓库。资金、安全和风险披露必收规则由后端执行，不能仅靠禁用开关实现。
 
 **真后台接口契约**:
-- `GET /api/notifications?cursor=&limit=&priority=` — 分页拉取,支持按优先级过滤
+- `GET /api/notifications?cursor=&limit=&priority=&category=` — 按分类与优先级筛选后分页；category可省略或all表示全部，其余为finance/device/team/rewards/system，未知类型归system，非法分类拒绝。`unread`及可选未读摘要仍是账号全量，不随分类/游标变化。
 - `POST /api/notifications/:id/read` — server-side 标读
 - `POST /api/notifications/read-all`、`DELETE /api/notifications/read` — 批量已读、清理已读；服务端校验账户归属与保留规则。
 - 客户端通过游标及前台补拉对账，不宣称存在未接入的通知 SSE。
@@ -3652,23 +3601,14 @@ Lite 的硬件和 Cloud Share 库存管理入口，不展示手机设备（PHONE
 | 银行卡已解绑 | `card.unbound`(真实解绑完成) | payment_method | high | `/pages/me/wallet-cards`(§9.10 我的银行卡) | 说明解除绑定，提示查看当前支付方式 |
 | 支付卡换绑提醒 | `card.rebind_notified`(后台换绑提醒动作) | payment_method | high | `/pages/me/wallet-cards` | 说明需要查看或更新支付方式，不宣称已完成换绑 |
 
-- 触发时机与担保规则权威在后台侧(担保中的卡不可被后台静默解绑,仅可收到本换绑引导;用户自解绑担保卡经挽留流程仍可达,见 §9.11 试用担保)。
+- 卡片换绑与解绑资格由后台决定；免费试用无需绑定或担保银行卡，不因试用状态阻止解绑。
 - 文案由后端按账户语言提供中/英/越，已发消息保留原文；本地 builder 仅适用于 mock，正式模式不伪造通知。
 
 ### 11.3 信任中心 `/trust`
 
-(2026-11-03 按 H5 Lite 现行页面更正;原 14 个 section 的原型描述——TVL、投资方、媒体、季度财报、NEX 客户消费榜、上市交易所、漏洞赏金等——不再展示。)
+展示 I4 发布的平台简介、平台运行数据、公开资料，以及 UVT 使用说明、服务条款、隐私政策、风险披露四个正式入口。「平台运行数据」与首页网络脉搏卡同源同格式（2026-11-03，§5.8）：「注册用户」「在线设备」按人口档显示（如 1.2W+、3.2K+），「累计已发放」为首页展示批次的千分位金额并在页面可见时逐秒更新；不显示活跃账户、真实在线设备或已完成提现等真实平台聚合，不显示「实时更新」、来源或统计时刻，单项不可用时显示 `-`。资料入口在远程请求失败时仍可使用。标题和内容分组遵循 App 圆角标题栏样式，三语适配。
 
-页面自上而下:
-
-- **主体卡**:运营主体、公司法定名称、标题与副标题;信任中心资料接口读到时再显示资质标签与公司事实(注册地、DOS ID、授权资本、注册地址)。
-- **资质与登记**:来自信任中心资料接口的公司注册、FinCEN MSB、EIN 三张卡,含登记号、官网查询链接与「查看」文件入口;读取中显示加载提示,失败显示错误与重试。白皮书已发布时显示白皮书卡,进入白皮书页。
-- **I4 发布内容**:读取中显示加载提示,失败或离线显示错误(远程模式可重试)。读到后按已发布的 section 显示:
-  - 「财务披露」(I4 已发布 financials section 时):显示平台运行数字,与首页网络脉搏卡(§5.12)同源同格式(2026-11-03)——「注册用户」「在线设备」按人口档显示(如 1.2W+、3.2K+),「累计已发放」为 `/api/config/home-display` 展示批次的千分位金额,页面可见时逐秒更新、独占一行。不显示活跃账户、真实在线设备或已完成提现等真实平台聚合,也不显示来源或统计时刻;单项不可用时显示 `-`。
-  - 审计与储备:只列有有效链接的资料行。
-  - 管理团队:只列有有效链接的成员(首字头像、姓名、职位、过往经历)。
-
-所有资料缺失时不编造、不以占位链接代替。
+原型中的投资方、认证、审计、媒体、客户、上市交易所、财务数字及占位文件不是已验证资料，不得直接发布。仅展示有证据支持且链接有效的公开内容，资料缺失时不编造。详见[现行规则 §3](UVEL_首页信任与活动规则_20261025.md)。
 
 #### 11.3.1 NEX 代币说明页 `/trust/nex`
 
@@ -3761,11 +3701,33 @@ sequenceDiagram
 
 ### 11.4a 风险提示书 `/me/risk-disclosure`
 
-风险说明保留为可公开阅读的法律文本，服务条款页的交叉链接保留；Lite 搜索不再收录此路由。结算页的入口只在「购买、退款与售后说明」弹层内（§7.3.1，2026-11-03）。提现与质押不再把阅读或确认作为前置步骤（App `95641b63`，§9.3.4a / §9.6.2a）。
+强制阅读的平台风险说明,正文由运营在后台(PC I5)按地区发布;后端在没有已发布版本时写入一份默认版本(只插入,运营发布新版本即替换)。
+
+**入口**:结算页「购买、退款与售后说明」弹层的「风险提示书」(§7.3)、信任中心「规则与资料」的「风险披露」(§11.3)、服务条款页「另见:平台风险披露」(§4.7.5,未登录可读)。个人中心不设入口;提现与质押不再在提交前拦截。
+
+**数据**:Store `src/store/risk-disclosure.ts`(`useRiskDisclosure`,随账号切换重绑)。已登录读 `GET /api/legal/risk-disclosure/current`,未登录(带 `country`)读 `GET /api/legal/risk-disclosure/public/current`;确认写 `POST /api/legal/risk-disclosure/acknowledgment`,是否已确认以服务端返回为准。章节按当前语言显示已发布原文,缺该语言时显示可用语言并提示。
+
+**页面结构**:
+1. 顶部返回头 + 标题
+2. Hero:「必读文档」标签 + 标题 + 副文 + 地区 · 版本 · 生效日期
+3. 7 章节(编号 01-07 由页面生成 + 标题 + 正文)
+4. 未滚到底时显示「请滚动浏览所有章节后再确认」
+5. 确认区:滚到底后才能勾选已阅读;勾选且阅读满 `minimumReadingSeconds` 秒(按钮显示剩余秒数)后「我已知悉 — 继续」可点;确认后回到来源页,已确认时显示「已确认」
+
+**默认版本 7 章(2026-11-03,中/英/越)**:
+| # | 中文标题 | 要点 |
+|---|---|---|
+| 01 | 收益为预估，不构成承诺 | 以到账记录为准,可能低于预估或无收益 |
+| 02 | 设备产出会变化 | 任务供给、在线时长、网络电力维护影响产出;产能随使用时长下降;手机受机型、电量和系统限制 |
+| 03 | UVT 价格波动 | 价格和流动性可能大幅波动,可能暂时无法交易 |
+| 04 | 购买、退款与活动 | 设备一般不退款可置换;退款时相关奖励可能收回 |
+| 05 | 充值与提现 | 转错网络或地址可能无法找回;链上确认后不可撤回;提现可能需安全确认 |
+| 06 | 推荐与团队奖励 | 依当期规则,不保证持续;虚假账户等获得的奖励作废 |
+| 07 | 账户安全与服务变更 | 保管密码与验证码;为安全或合规可能暂停部分功能;变更在 App 内通知 |
+
+页面只渲染后台返回的章节;未连接后台时显示加载失败,不显示本地文案。本地预览夹具(`/api/legal/risk-disclosure/current`、`/public/current`)使用此默认文本,取代原「演示说明 … 原型演示资料」样例;i18n `riskDisclosure.s1Title/s1Body … s7Title/s7Body` 同步为此文本,当前不参与渲染;原 `riskDisclosure.s4BodyLargeAmount` 已删除。
 
 页面内容按当前账号地区和语言读取服务器发布版本，确认状态也由服务器管理；加载失败、地区未配置或账号切换不产生本地“已确认”事实。页面自身的阅读完成与勾选规则保留。**后端 B12 依赖尚未解除**：客户端不再前置确认，不等于服务端不检查确认状态。当前 `content/application/AppRiskDisclosureService.java#checkUserGate` 对未确认账号返回 code 409；`market/application/AppStakingService.java#open` 在 `executeOnce` 前拒绝开仓；`finance/application/AppWithdrawalService.java` 提交时仍可能先 `reserveFunds`，而 `finance/application/OpsFinanceService.java` 在 APPROVE 阶段调用 `disclosureGateFacade.checkUserGate`，返回 `RISK_DISCLOSURE_ACK_REQUIRED` 后不继续批准。B12 必须解除对应后端门禁并完成真实提交 / 审批链验收，才可声称风险确认不再影响这些业务；Lite 保持与 App 相同的前端产品决策，不恢复确认步骤。zh / en / vi 均使用 `riskDisclosure.*` 文案；移除已无调用方的 `search.routes.risk` 和 `riskDisclosure.gateUnavailable`。
-
-**默认正文（2026-11-03）**:正文由运营在后台 I5 配置发布;后台未发布替换版本时使用默认版本,共 7 章(zh / en / vi):① 收益为预估，不构成承诺 ② 设备产出会变化 ③ UVT 价格波动 ④ 购买、退款与活动 ⑤ 充值与提现 ⑥ 推荐与团队奖励 ⑦ 账户安全与服务变更。页面只渲染后台返回的章节,未连接后台时显示加载失败,不显示本地文案。本地预览的 `GET /api/legal/risk-disclosure/current`、`/public/current` 样例使用此默认正文,不再出现演示 / 原型样例;i18n `riskDisclosure.s1Title/s1Body … s7Title/s7Body` 同步为此正文,当前不参与渲染;已无调用方的 `riskDisclosure.s4BodyLargeAmount` 移除。默认正文的后端种子由后端另行交付。
 
 ### 11.5 推理收据 `/me/receipts` + `/me/proof`
 
@@ -3811,17 +3773,15 @@ flowchart LR
 
 ### 11.6 全球节点地图 `/globe`
 
-(2026-11-03 与 App 对齐,改为 H9 公布的模拟展示;原「28K 节点 + 国家活跃排行」描述及此前读取 `/api/app/network/regions` 真实区域数据的做法不再适用。同日再次与 App 对齐:两个总数改为与首页、任务中心同源,H9 只负责拆分。)
+从「我的」进入。顶部两格：「在线节点」与「进行中任务」；下方为抽象点阵世界地图（8 个超级算力中心节点，新加坡为「你」所在中心并画连接线，脉冲按采样节奏依次扫过各中心），再下为 8 个中心列表（名称、「超级算力中心」、任务/小时），点按打开中心详情抽屉（在线节点、任务/小时、延迟）。页面不显示「模拟展示」「仅作示意」一类说明（§16.2.5）。
 
-从首页「UVEL 网格实时」的「地图 →」、网络脉搏卡右侧箭头或搜索进入。页面不显示「模拟展示」「仅作示意」一类说明(§16.2.5)。
-
-- 顶部两格:「在线节点」「进行中任务」,按千分位显示。「在线节点」= 首页网络脉搏卡的在线设备数(H9 `networkPulse.onlineDevices`,同一个数;运营在 H9「首页与网络展示设置」的「首页数字增长」模块配置);「进行中任务」= 任务中心「{n} 个全球作业进行中」的同一个数(§6.3,同一处计算),进入页面时与赚取页一样读取首页概览和设备列表。
-- 地图:点阵底图上固定 8 个超级算力中心(新加坡、东京、胡志明市、伦敦、巴黎、法兰克福、纽约、圣何塞),新加坡为用户所在中心并连线到其他中心;相近城市错开显示并以引线指回实际位置。脉冲按顺序轮流点亮各中心,系统开启「减少动态」时不显示脉冲。
-- 中心列表:城市名、「超级算力中心」与「任务/小时」;点按地图节点或列表行打开详情弹层,显示该中心在线节点(按首页人口档:≥1 万「x.xW+」、≥1000「x.xK+」、≥100 整百「+」,否则「<100」)、任务/小时和延迟。点遮罩、关闭按钮或 Esc 关闭;页面隐藏时自动关闭。
-- 拆分:两个总数按各中心占比拆到 8 个中心,用最大余数法取整,8 个中心之和恰好等于总数。`publicStats.globeDisplay` 接受两种格式:新格式(后端 B22)每个中心都带 `sharePct`(百分比,8 个合计 100),占比取它,不要求 `nodes` 和已退役的 `nodeJitterPct` / `activeJobsMinPct` / `activeJobsMaxPct`;旧格式所有中心都不带 `sharePct`,以各中心 `nodes` 为相对权重(nodes 全为 0 视为无效)。部分中心带 `sharePct`、`sharePct` 越界或合计不为 100 时视为无效。已退役字段即使下发也不参与展示,在线节点不再叠加浮动。
-- 任务/小时 = 该中心进行中任务 × 小时处理量漂移(`throughputMin`–`throughputMax`);延迟 = 中心 `latencyMs` + `latencyJitterMs` 漂移;采样间隔 `intervalMs`。两种格式都校验这些字段,客户端不内置数值。按采样间隔确定性地平滑变化(同一时刻刷新得到同一数值),页面隐藏时暂停,进入页面时重新读取配置。
-- 占位各自独立:顶部「在线节点」直接读在线设备数、「进行中任务」直接读任务中心的数,各自不可用时只该格显示「—」,两格都不依赖 `globeDisplay`。8 个中心的数字依赖拆分输入:`globeDisplay` 缺失或无效时各中心在线节点、任务/小时、延迟都显示「—」;在线设备数不可用时各中心在线节点显示「—」;任务数不可用时各中心任务/小时显示「—」。地图与城市始终显示。
-- 不读取 `/api/app/network/regions` 真实区域数据,不显示更新时间或在线率。「进行中任务」含首页概览的真实进行中作业数(§6.3),因此进入页面时与赚取页一样读取首页概览和设备列表;各中心的拆分、任务/小时和延迟仍是模拟展示。
+数据来源（与首页、赚取页同一配置入口）：
+- **在线节点总数** = 首页网络脉搏卡的在线设备数（H9 `networkPulse.onlineDevices`，同一个数；运营在 H9「首页与网络展示设置」的「首页数字增长」模块配置），顶部按千分位显示。
+- **进行中任务总数** = 赚取页作业中心「{n} 个全球作业进行中」的同一个数（§6.3：真实进行中作业 + H9 全球作业展示基数，未发布时只取真实数），由同一处计算供两页共用；本页显示时与赚取页一样读取首页概览和设备列表。
+- **按中心拆分**：两个总数按各中心占比拆到 8 个中心，用最大余数法取整，8 个中心之和恰好等于总数。`globeDisplay` 接受两种格式：新格式（后端 B22）每个中心都带 `sharePct`（百分比，8 个合计 100），占比取它，不要求 `nodes` 和已退役的 `nodeJitterPct` / `activeJobsMinPct` / `activeJobsMaxPct`；旧格式所有中心都不带 `sharePct`，以各中心 `nodes` 为相对权重（占比 = nodes ÷ 各中心 nodes 之和，nodes 全为 0 视为无效）。部分中心带 `sharePct`、`sharePct` 越界或合计不为 100 时视为无效。两种格式都校验采样间隔、吞吐区间和延迟。已退役字段即使下发也不参与展示，在线节点不再叠加抖动。
+- **任务/小时** = 该中心进行中任务 × 吞吐漂移（`throughputMin`–`throughputMax` 之间平滑漂移）。**延迟** = 中心 `latencyMs` + `latencyJitterMs` 漂移。采样间隔为 `intervalMs`，均与原来相同。
+- 抽屉里的中心在线节点按首页人口档显示（≥1 万「x.xW+」、≥1000「x.xK+」、≥100 整百「+」，否则「<100」）。
+- 占位各自独立：顶部「在线节点」直接读在线设备数，不可用时只这一格显示「—」；「进行中任务」直接读作业中心的数，不可用时只这一格显示「—」；两格都不依赖 `globeDisplay`。8 个中心的数字依赖拆分输入：`globeDisplay` 缺失或无效时各中心在线节点、任务/小时、延迟都显示「—」；在线设备数不可用时各中心在线节点显示「—」；任务数不可用时各中心任务/小时显示「—」。
 
 ### 11.7 Developer API `/developer`
 
@@ -3899,32 +3859,35 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 |---|---|---|
 | `advisor` 专属客服 | 当前专属客服 | 人工服务的新建及展示入口；未分配时客户可留言等待分配 |
 | `support` 兼容类型 | 当前专属客服 | 旧链接和历史会话继续读取；入口及类别可用性按专属客服处理，不迁移历史标识 |
-| `ai` Nova | 兼容类型 | 当前入口关闭；不展示、不计入总未读，旧 AI 路由回到可用的人工入口 |
+| `ai` | 兼容类型 | 服务端仍可能返回该分类；App 不展示、不计入总未读，旧 AI 路由回到会话中心 |
 
 **入口与路由**:
 - `/me/notifications?section=service` — 人工服务统一入口；会话行直接进入全屏聊天。
 - `/support/messages` — 会话管理:按类别查看历史、发起新会话和移除列表；保留旧链接与聊天异常回退。
-- `/support/chat?cid={id}` — 人工类别会话聊天线程；旧 `/support/chat?type=ai` 链接按当前关闭状态返回服务入口，不创建 Nova 聊天线程。
+- `/support/chat?cid={id}` — 人工类别会话聊天线程；旧 `/support/chat?type=ai` 等其他参数一律回到会话中心。
 - 入口:人工服务浮标、客服渠道枢纽 `/me/support`「在线会话」行(§11.8.2)统一到消息中心“服务”分区；分区内“会话管理”进入管理页。
 
 **业务规则**:
 - 人工 `advisor` / `support` 均采用当前归属；客户端读取 `GET /api/app/support/advisor` 的当前专属客服、归属状态和可用性。未分配、客服停用或忙碌均可留言，界面说明实际状态；未知在线状态不显示在线。
 - 客户只可读取和发送自己的会话。归属变更后，服务端按当前归属授权，客户端清除旧会话缓存、图片和待发草稿，再取新快照。历史姓名及时间保持原作者；仅作者已确认且头像标识有效时经鉴权读取其头像，不用当前客服头像替换。页面、账号或归属变化清理头像内存并丢弃迟到响应。
 - 人工浮标仅显示 advisor/support 的可见未读；铃铛和 Me 消息中心将人工、工单和通知合计。AI 隐藏不影响已有后台业务通知，业务通知按来源归类。
+- 浮标使用品牌卡通客服头像（深浅主题各一张独立资产）。聊天顶部身份胶囊取当前归属客服最新一条已确认消息：带作者头像且已鉴权读取时显示本人头像，否则显示品牌卡通头像；客服移除头像或会话转给他人后随之回到卡通头像。浮标仅在有人工未读时亮起琥珀色光晕并每 2 秒外扩一圈，与未读角标同色；滚动、页面隐藏时暂停，减少动态时只保留静态光晕。
 - 客户发送TEXT或IMAGE；客服入站消息还支持SKU商品卡和LINK内部入口。图片先按服务端策略选择PNG/JPEG、私有上传成为READY，再随同一条消息提交；未提交图片仅上传者可见。已发图片每次鉴权读取，不使用公开URL。上传失败、过期、撤权可重选；页面离开或换账号清理私有图片内存URL。
 - SKU使用合法商品ID和名称；LINK仅接受HOME/WALLET/SUPPORT且参数为空，禁止任意URL及额外参数。仅targetAvailability=AVAILABLE提供既有页面跳转；UNAVAILABLE/UNKNOWN保留原消息，说明当前内容不可用或待核实，不提供可执行跳转。
-- **客服已切换提示**（2026-11-02，依赖后端 B15）：换人接待时，服务端在新接待人的第一条消息前写入一条系统消息（`senderType=system`、`kind=AGENT_SWITCH`，`senderName` 为新接待人显示名，正文可为空）。聊天线程按现有系统提示样式居中显示，按当前语言本地化：有名字时为「客服已切换为 {name}」/“You're now chatting with {name}”/“Đã chuyển sang {name} hỗ trợ bạn”，没有名字时为「客服已切换」/“Your support agent has changed”/“Đã chuyển nhân viên hỗ trợ khác”。只显示名字，不显示主管、管理员等身份。该提示不改变会话列表预览、未读数和最后消息时间。只有系统消息可以带这个类型；其他未知消息类型仍按响应无效处理。前端须先上线能识别该类型的版本，后端再开始写入，否则旧版本打开这类会话会失败。
+- SKU/LINK在气泡内的显示:先显示客服正文；SKU正文已含商品名时不再追加，未含时另起一行补商品名。可跳转时，气泡最后一行是品牌色文字链接加 →(查看商品 / 打开首页 / 打开钱包 / 打开在线客服)，时间在同一行右侧；链接点击热区44px高，不撑高气泡。不使用胶囊或玻璃按钮。
+- 气泡外观:每条气泡只显示单色半透明填充，无边框、无描线、无内缘高光或阴影；强制颜色模式下显示系统轮廓。
+- **客服已切换提示**（2026-11-02，依赖后端 B15）：换人接待时，服务端在新接待人的第一条消息前写入一条系统消息（`senderType=system`、`kind=AGENT_SWITCH`，`senderName` 为新接待人显示名，正文可为空）。聊天线程按现有系统提示样式居中显示，按当前语言本地化：有名字时为「客服已切换为 {name}」/“You're now chatting with {name}”/“Đã chuyển sang {name} hỗ trợ bạn”，没有名字时为「客服已切换」/“Your support agent has changed”/“Đã chuyển nhân viên hỗ trợ khác”。只显示名字，不显示主管、管理员等身份。该提示不改变会话列表预览、未读数和最后消息时间。只有系统消息可以带这个类型；其他未知消息类型仍按响应无效处理。App 须先上线能识别该类型的版本，后端再开始写入，否则旧版本打开这类会话会失败。
 - 草稿按账号和会话隔离；明确发送失败可编辑、重试或放弃，发送结果未知只能按原命令查询或同键重试。图片和文字随同一发送意图恢复，不因刷新或重试生成第二条消息。
 - 新建会话最终发送前核类别可用性；support旧类型复用advisor门。已有结果未知的新建仅在同账号、同权限运行作用域且原待确认键仍匹配时恢复原命令，不因类别随后关闭生成新键；作用域或原键变化时拒绝旧恢复。
-- **发送频控**:单会话发送限流,两道独立闸——滚动窗口(每 15 秒最多 5 条)+ 相邻两条最小间隔(至少隔 1 秒),防连点刷屏;两闸都放行才发出,超限提示的重试秒数取两者较长值。超限提示同一时刻只显示一条,连续触发刷新该条不叠加;被拦下的这条消息文本回填输入框,不丢失。规则覆盖三类会话的自由输入与快捷提问(chip)。真后台以 HTTP 429 + Retry-After 镜像同一策略。
-- **消息回执与状态**:用户发出的消息显示「已送达 / 已读」回执，状态只取服务端返回的消息回执，客户端不推断、不模拟节奏。客服「正在输入…」只在聊天页的实时连接收到客服 typing 事件时显示在顶部状态行，约 5 秒无更新自动消失；实时连接不可用时不显示。
-- **注册欢迎语**（2026-11-02，依赖后端 B16）：用户注册成功时（手机号注册和第三方注册），服务端在写入客服绑定的同一事务里，往该用户的专属客服会话发一条欢迎语，注册后第一次加载就能看到。按普通客服文字消息处理，接口格式不变。
-  - 注册时已有专属客服（好友邀请码继承的绑定，或客服邀请码绑定）：欢迎语以该客服身份发出，聊天顶部和服务分区显示客服名字；头像按上文规则。
-  - 没有专属客服（进入待分配池）：照样发送。产品里只有专属客服，不为此新增通用客服身份。欢迎语是普通的左侧客服气泡，不是居中系统提示。聊天页保持现有待分配状态：顶部「待分配客服 · 等待分配客服」；用户留言前，线程顶部显示「暂未分配专属客服，可先留言。留言确认接收后，由专属客服接续。」，留言后改为「留言已收到，分配后由专属客服接续。」。之后分配的专属客服在同一会话里接续。
-  - 未读：欢迎语计入人工未读，首页人工服务浮标显示未读角标，服务分区该行显示未读数；进入会话后按现有已读回执清除。
-  - 文案：运营在 PC M5 配置一份，中文、英文、越南语各一段；有没有专属客服都用同一段，不含占位符。服务端按注册时记录的账号语言选取（zh / en / vi，其他语言用 en）。已发出的欢迎语是快照，之后修改文案不影响已发消息。
+- **发送频控**:单会话发送限流,两道独立闸——滚动窗口(每 15 秒最多 5 条)+ 相邻两条最小间隔(至少隔 1 秒),防连点刷屏;两闸都放行才发出,超限提示的重试秒数取两者较长值。超限提示同一时刻只显示一条,连续触发刷新该条不叠加;被拦下的这条消息文本回填输入框,不丢失。规则覆盖人工会话的自由输入(AI 会话和快捷提问已随 Nova 下线移除)。真后台以 HTTP 429 + Retry-After 镜像同一策略。
+- **消息回执与状态**:用户发出的消息显示「已送达 / 已读」回执，状态只取服务端返回的消息回执，客户端不推断、不模拟节奏。客服「正在输入…」只在聊天页打开、实时连接收到该会话的客服 typing 事件时显示在聊天顶部状态行，约 5 秒无更新自动消失；离开聊天页即清除；实时连接不可用时不显示。
+- **注册欢迎语**（2026-11-02，依赖后端 B16）：用户注册成功时（手机号注册和第三方注册），服务端在写入客服绑定的同一事务里，往该用户的专属客服会话发一条欢迎语，注册后 App 第一次加载就能看到。App 按普通客服文字消息处理，接口格式不变。
+  - 注册时已有专属客服（好友邀请码继承的绑定，或客服邀请码绑定）：欢迎语以该客服身份发出，聊天顶部和服务分区显示客服名字；头像按上文规则（作者已确认且有头像时显示本人头像，否则品牌卡通头像）。
+  - 没有专属客服（进入待分配池）：照样发送。浮标进入服务分区，列表里就是这条会话；Me 页、客服渠道枢纽「在线会话」和订单详情的客服入口直接打开最近一条待分配会话，不进入空白的新建会话页。用户留言落在同一会话。产品里只有专属客服，不为此新增通用客服身份。欢迎语是普通的左侧客服气泡，不是居中系统提示；服务分区该行标题为「专属客服」。聊天页保持现有待分配状态：顶部「待分配客服 · 等待分配客服」和品牌卡通头像；用户留言前，线程顶部显示「暂未分配专属客服，可先留言。留言确认接收后，由专属客服接续。」，留言后改为「留言已收到，分配后由专属客服接续。」。之后分配的专属客服在同一会话里接续。
+  - 未读：欢迎语计入人工未读，首页人工服务浮标亮琥珀光晕并显示角标，服务分区该行显示未读数；进入会话后按现有已读回执清除，返回后浮标角标和光晕消失。
+  - 文案：运营在 PC M5 配置一份，中文、英文、越南语各一段；有没有专属客服都用同一段，不含占位符。服务端按注册时记录的账号语言选取（zh / en / vi，其他语言用 en）。已发出的欢迎语是快照，之后修改文案不影响已发消息。默认文案：「你好，欢迎加入 UVEL！设备、收益或充值提现有任何问题，直接在这里给我们留言，我们会尽快回复你。」
   - 欢迎语不算客户首次接触，不计入维护、服务考核和客户活跃，不产生待回复事项。
-- **消息定位**:进入会话、发送或收到新消息后,线程自动滚动定位到最新一条。
+- **消息定位与阅读**:进入会话定位到最新一条；已在末尾时，发送、收到新消息或输入区高度变化继续跟随末尾。手动上滑阅读历史后，新消息不强制拉到底；上下滑动、惯性与快速反向滚动保持手势方向，不因延迟滚动通知回拉。加载更早历史及图片预览返回保留当前阅读位置，同一位置的再次恢复仍可生效；气泡随可视位置取色和输入框玻璃效果保持。页面隐藏、会话或账号变化取消旧定位。
 
 **数据模型**:§12.9a Conversation。**i18n**:`conversations.*` 命名空间 + `support.chLiveChat` 渠道键。
 
@@ -3980,6 +3943,8 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 - 可从 `/trust/nex` 等 NEX 说明页加 "查看行情" 入口
 
 ### 11.10 活动中心 `/events`
+
+> **2026-10-25 现行裁定**：以下历史“4 trackable + 6 decorative”、本地领奖和示例奖励不再是执行依据。全部十项活动均按[首页与活动规则 §4–5](UVEL_首页信任与活动规则_20261025.md)实现真实条件与权益，PC 配置完整后启用；新增独立创世抽奖，奖励、票据、结算与失败恢复均由服务端执行。
 
 #### 11.10.1 目的
 
@@ -4194,7 +4159,7 @@ Events 分两大类:
 #### 11.12.14 Home 行情入口(Sprint A-2 / D.2)
 
 - `<MarketBoard>` 主体在 `/earn`(操作时的决策辅助)+ `/market` 专用路由
-- 不在 Home `<MissionControl>` 渲染:Home 16 sections 已聚焦"状态总览 + 转化触发",再嵌 MarketBoard 会重复 4 子卡内容并稀释主转化注意力(Earnings hero → Quest → Buy)
+- 不在 Home `<MissionControl>` 渲染:Home 当前结构已聚焦"状态总览 + 转化触发",再嵌 MarketBoard 会重复 4 子卡内容并稀释主转化注意力(Earnings hero → Quest → Buy)
 
 #### 11.12.15 邀请 promo chip(Sprint 3 第三阶段 / inviteBonusMultiplier)
 
@@ -4397,18 +4362,18 @@ Events 分两大类:
 
 客户端 store 只 mirror server 推送的 `pausedReason`,不参与 gating 决策。Demo 阶段在 `device-card-pc.tsx` 提供 tap-to-toggle 状态 pill 让 reviewer 模拟拔电 / 断网。
 
-**激活生命周期 (`activatedAt`)** — 购买与激活解耦的核心数据。`useApp.devices[]` 同时承载库存(已购未激活 / `activatedAt=null`)与已激活设备(在槽位中 / `activatedAt=number`)。两类 derived selectors:
+**激活生命周期 (`activatedAt`)** — 购买成功由服务端同步自动激活；已购实例之后可以正常停用、重新启用。`useApp.devices[]` 同时承载可选择库存（权威确认未激活或已停用）与 Online 设备（权威确认激活且未停用），不能用技术心跳替代业务激活状态。两类 derived selectors:
 
 - `selectActiveDevices(s)` / `selectInactiveDevices(s)` — 派生过滤
 - `selectActiveCount(s)` — 槽位占用数
 - `selectActivePhone(s)` — 手机激活状态(可能因用户在 `/me/devices` 取消激活而为 undefined)
-- `derivePromoUpgrade(devices)` — pure helper,返回 `{ baseKind, baseName, baseDaily, targetKind, targetName, targetDaily, multiplier, targetPayback }`,推广文本(weekly quest / Home upsell / EmptySlotsHint / DoTheMathCard / MissedIncomeBanner)动态接此 helper。**base(`base*` 字段 = 最高日收益活跃真实设备)+ targetPayback(目标设备按其日收益的回本天数)详见 §13.2a**
+- `derivePromoUpgrade(devices)` — pure helper,返回 `{ baseKind, baseName, baseDaily, targetKind, targetName, targetDaily, multiplier, targetPayback }`,推广文本(weekly quest / Home upsell / EmptySlotsHint / MissedIncomeBanner)动态接此 helper；首页 `DoTheMathCard` 仅消费服务端投影，见 §5.8b。**base(`base*` 字段 = 最高日收益活跃真实设备)+ targetPayback(目标设备按其日收益的回本天数)详见 §13.2a**
 
 **Store actions**:
-- `addDevice(kind)` — 新购入库存,**无上限**(`activatedAt=null`)
-- `activateDevice(id) → boolean` — 进槽位,**返回 false 当且仅当**:设备不存在 / 已激活 / **(当前激活数 + 试用预留槽 `trialReservesSlotNow() ? 1 : 0`)≥ `MAX_DEVICES`(6)**;成功时清零 `pendingDeactivate`(恢复激活时清除遗留挂起标记)
+- 正式购买流程 — 订单成功由服务端在原支付事务中创建设备并自动激活 Online，返回后刷新权威 fleet；不得调用本地 `addDevice(kind)` 冒充已购或激活。原型本地 action 仅作演示，不作为正式业务依据。
+- `activateDevice(id) → boolean` — 进槽位,失败包括设备不存在 / 已激活 / 容量事实未确认 / **权威 `slotsUsed ≥ slotCap`（原产品上限6）**；`slotsUsed`已包含有效订单和试用预留，不重复叠加试用；旧后端缺字段时沿原已知事实计算回退，未知不放行。成功时清零 `pendingDeactivate`(恢复激活时清除遗留挂起标记)，后端仍校验归属、版本与并发容量。
 - `deactivateDevice(id)` — **立即**出槽位:清零运行态遥测 + `currentTask=null`(放弃任务奖励)+ `pendingDeactivate=false`,保留 `purchasedAt` / `cumulativeEarningsUsdt` / `paidPriceUsdt` / 其他元数据
-- `scheduleDeactivation(id)` — **优雅出槽位**:若 `currentTask !== null` 则只设 `pendingDeactivate=true`(等任务完成);若 `currentTask === null` 则立即执行 `deactivateDevice` 等效行为
+- `scheduleDeactivation(id)` — **排期停用**:若 `currentTask !== null` 则只设 `pendingDeactivate=true`(等任务完成)，实际停用前仍是已激活 Online、仍占六槽之一，不得提前释放容量允许第七台；若 `currentTask === null` 则立即执行 `deactivateDevice` 等效行为。2026-10-30 明确以实际激活事实而非排期标记统计容量。
 - `tick()` 守卫:`activatedAt === null` 的设备不参与 earnings / task 累计;任务完成处理时检查 `pendingDeactivate=true` → 自动执行 deactivate(清零 telemetry + `activatedAt=null`,不再 pickRandomTask)
 
 **初始设备**:注册与普通 onboarding 完成均不生成本地 phone seed。只有 `POST /api/onboarding/calibrate/activate` 返回 canonical `ACTIVE` 后，服务端才创建/更新并绑定 phone `nx_user_device`；检测或绑定失败可选 `DEFERRED` 完成注册，设备仓库保留重新激活入口，未激活期间不发手机相关奖励。
@@ -4601,7 +4566,7 @@ Conversation:
 }
 ```
 
-派生:`byType(type)` 按类别取会话、`totalUnread` 人工侧未读合计(Nova 未读在页面层合并)。`typingIds` 和在线状态仅来自当前授权会话的实时事件；断线、未知和归属失效时清空，不推断为在线。待发命令保留同一幂等键，账号/归属边界清除本地草稿和私有图片。
+派生:`byType(type)` 按类别取会话、`totalUnread` 人工侧未读合计（`ai` 分类不计入）。`typingIds` 和在线状态仅来自当前授权会话的实时事件；断线、未知和归属失效时清空，不推断为在线。待发命令保留同一幂等键，账号/归属边界清除本地草稿和私有图片。
 
 ### 12.10 Exchange Cap(useExchangeV3)
 
@@ -4773,46 +4738,25 @@ SavedCard = {
 - `^62` → unionpay
 - 否则 → unknown
 
-### 12.18 FreeTrial(useFreeTrial,persist key `nexgrid-trial-v1`)
+### 12.18 试用状态与呈现
 
-```
-{
-  status: "idle" | "active" | "grace" | "extended" | "redeemed" | "failed" | "cancelled";
-  cardTokenId: string | null;       // 绑定卡 token,自动扣款 + 解绑挽留拦截依据
-  startedAt: number | null;          // ms epoch — 试用激活时刻
-  activeEndsAt: number | null;       // = startedAt + trialDays
-  graceEndsAt: number | null;        // = activeEndsAt + graceDays
-  extendedEndsAt: number | null;     // = graceEndsAt + extensionDays(仅 extended 时)
-  scheduledChargeAt: number | null;  // 当前下次扣款时间,跟随 grace/extended 切换
-  finishedAt: number | null;          // 终态时刻,驱动 cooldown 计算
-  failReason: "insufficient_funds" | "card_invalid" | "unknown" | null;
-  extensionGranted: boolean;          // 已接受高质量延长(防重弹)
-  shadowFrozenAtUSD: number;          // grace 进入瞬间冻结的 shadow 累计(USD)
-  shadowFrozenAtNEX: number;
-}
+| 数据 | 契约 |
+|---|---|
+| 服务端状态 | ELIGIBLE / CLAIMED / ACTIVE / GRACE / EXTENDED / REDEEMED / FAILED / CANCELLED |
+| 页面状态 | none / active / grace / converted / ended；不能单靠页面状态决定再领资格 |
+| authorityStatus | unknown / loading / ready / error；只有已确认的资格与金额可以授权领取、转购 |
+| claimNo / version | 后台生成并用于读回一致性，客户端不得创建正式领取单编号 |
+| startedAt / expiresAt / graceEndsAt / finishedAt | 服务端时间边界；EXTENDED 对应抵扣保留截止时间 |
+| shadowUSD / shadowNEX | 已累计但未购前不可提现的试用收益 |
+| authoritativeOffsetUSD / authoritativeRemainderUSD / authoritativePriceUSD | 当前可抵扣、购后剩余收益及领取价；缺失不得按零处理 |
+| canStart / eligibilityReason | 后台决定当前可否领取，包括冷却、容量、库存、名额和风险拒绝 |
+| reservedTrialSlots | active/grace 为1，确认的终态为0，读取失败时为未知；与正式 devices 数组分开 |
 
-// Actions
-startWithCard(tokenId): void
-redeemEarly(): { ok: boolean; reason?: ChargeFailReason }
-cancel("unbind" | "explicit"): void
-acceptExtension(): void
-declineExtension(): void
-poll(now): void                       // SimulationProvider 每 4s 调
-reset(): void
-canStart(): boolean                   // idle + cooldown 过期 + phaseOpen
+start、cancel、convert 只通过既有接口提交幂等命令。start 成功后读回同一领取单；convert 返回正式订单编号后进入订单详情。poll 只刷新状态，不扣款、不在客户端制造设备。
 
-// Derived helpers (lib/store/free-trial.ts exports)
-liveShadowUSD(now): number             // active 时实时累加;grace/extended 返冻结值
-liveShadowNEX(now): number
-remainingMs(now): number               // 当前阶段倒计时
-isHighQualityEligible(): boolean       // grace + !extensionGranted + shadow >= threshold
-computeDiscountedPrice(config): { subtotal; discount; total }
-```
+试用卡在领取后持续显示；失败保留同账号已确认身份，金额未知时显示“-”及重试。终态移除试用槽但不删除正式设备。冷却结束且后台明确允许再领时，首页与详情复用领取确认入口。
 
-**关键安全约束**:
-- shadow 字段**永不**入资金账户 / commission events / lifetime stats / network 统计
-- `cardTokenId` 只在持卡人本人的 `useCards` 内匹配存在的卡才有效;cards.remove 时检查 trial 占用并拦截
-- `poll()` 触发的扣款成功 → 同步调 `useApp.addDevice + activateDevice`(走 Sprint #146-1 激活流程,槽满则进库存)
+**资金边界**：购前累计收益不得进入可提现余额或正式设备收益；转购抵扣、超额剩余收益及 UVT 的购后处理由后台原子结算。没有绑卡、卡片占用拦截或客户端自动扣款流程。
 
 ---
 
@@ -4865,7 +4809,7 @@ realPrizeActive(): boolean             // 售罄 / 降级 → false(真实奖档
 | applicableSkus | string[] | 适用设备 product id 列表(空 = 全设备 → 领取 CTA 跳商城) |
 | audience | "new" \| "all" | 受众:新人礼 / 全部活动 |
 | startAt / endAt | number | 有效期起止(epoch ms;endAt=0 → 长期无到期) |
-| claimSurfaces | ("home"\|"store"\|"me"\|"earn")[] | 关闭弹窗后展示领券 banner 的页面 |
+| claimSurfaces | ("home"\|"store"\|"me"\|"earn")[] | 允许领取的页面；空数组表示不限入口，非空只允许指定页面。入口和领取弹层统一判断，仍遵守当前领取资格及弹窗频率 |
 | popupEnabled | boolean | 是否参与首页自动弹窗 |
 | stackWithTrial / stackWithOthers / splittable | boolean | 叠加试用收益 / 叠加其它优惠 / 可拆分(默认均 false) |
 | status | "active" \| "paused" | 投放中 / 暂停 |
@@ -4875,6 +4819,8 @@ realPrizeActive(): boolean             // 售罄 / 降级 → false(真实奖档
 派生:`claimableVouchers`(可领:active + 有效期内 + 受众匹配 + 未领)/ `claimedUnused`(已领未用且有效)/ `expiredVouchers`(已领未用但过期);`bestVoucherFor(skuId, price)` 在已领适用券中选抵扣最大者;纯函数 `computeVoucherDiscount(def, subtotal)` 为单源折扣算法(满减按门槛、折扣按封顶、抵扣不超小计)。
 
 **写操作**:领取 `claim`(`POST /api/vouchers/:id/claim`,每券每用户限领一次)、核销 `markUsed`(下单成功后置 usedAt,单次)。代金券折扣只在结算抵扣价格、**永不计入可提现余额**(不可提现由设计保证)。后台对端为运营控制台 H7 代金券域,其 `OpsVoucher` 是本结构的结构化超集(字段级镜像门),两端映射同一后端资源。
+
+**已领取权益**：暂停投放或删除定义只停止新发放；个人券的最新状态为 `AVAILABLE` 且处于有效期内时，App/H5 我的奖励与结算继续提供使用，不根据定义投放状态将其归为过期。`USED`、`REVOKED`、`EXPIRED` 不可用；只有真实到期或个人状态为 `EXPIRED` 才进入过期列表，未开始不等于过期。取消未付订单后以同一 grant 最新读回状态决定恢复。
 
 ---
 
@@ -5032,11 +4978,13 @@ progressPct = avg(checks);
 - `targetPayback = round(DEVICE_PRICE_USDT[targetKind] / targetDaily)`:目标设备按其日收益的回本天数(全无激活的 fallback 用 S1 价 / S1 日收益)
 
 **应用**:
-- Home `ConversionBanner` / `DoTheMathCard`("Activate {targetName} · earn ${targetDaily}/day · payback ~{targetPayback} days · {multiplier}× {baseName}")
+- Home `ConversionBanner`("Activate {targetName} · earn ${targetDaily}/day · payback ~{targetPayback} days · {multiplier}× {baseName}")
 - `EmptySlotsHint` Subtitle("{empty} × {targetName} @ ${targetDaily}/d · {multiplier}× {baseName}")
 - `MissedIncomeBanner`(试用期隐藏):非试用态显示 base 与 target 的日收益差(gap = targetDaily − baseDaily)累计错过收益,ceiling 对比 = {targetName}
-- Home `AddDeviceRow`("Add a NexGridBox")与 `DoTheMathCard` 的 CTA href 均指向 `derivePromoUpgrade().targetKind`(已激活 Pro/Rack 的用户被推向下一档,而非硬锚 S1;无激活设备时 fallback S1)
+- Home `AddDeviceRow`("Add a NexGridBox")的 CTA href 指向 `derivePromoUpgrade().targetKind`(已激活 Pro/Rack 的用户被推向下一档,而非硬锚 S1;无激活设备时 fallback S1)
 - 任何未来推广卡片接同一 helper,不重复实现倍数算法
+
+首页 `DoTheMathCard` 不适用上述本地 helper 与 fallback 规则：以服务端 `doTheMath` 为唯一对比来源，CTA 使用目标 `productNo`，无有效对比整块隐藏（§5.8b）。
 
 **边界**:
 - 全无激活设备 → fallback 锚定 S1 baseline,`multiplier = 0`,UI 隐藏倍数行,只显示 target 设备(eg "Activate NexGridBox S1 · earn $7.00/day · anchor pricing")
@@ -5227,7 +5175,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 - LocaleSwitcher 组件在 Header / 注册页 / 登录页
 - 用户选择持久化到 localStorage
-- 不可翻译保留英文:品牌名(NEXGRID / NVIDIA / TechCrunch...)、token 符号(USDT / NEX / ERC-721)
+- 不可翻译保留英文:品牌名(UVEL / NVIDIA / TechCrunch...)、token 展示符号(USDT / UVT / ERC-721)；历史 NEX 接口/账本标识保持兼容
 
 ---
 
@@ -5409,6 +5357,8 @@ Skeleton 视觉实现统一使用 `<Skeleton.{Line/Card/Circle/Hero/Block}>` 组
 
 ### 18.1 功能验收
 
+2026-10-25 正式 TEST 活动与优惠券实际结果见[首页与活动规则 §6.1](UVEL_首页信任与活动规则_20261025.md#61-2026-10-25-test-实际验收结果)：按立减/取消、库存 readiness、空入口领券、暂停权益、并发额度、原生报价 TTL 与 PC 面值分别记录通过范围及未执行边界。历史脚本统计不替代这些实际业务回执，也不代表重复退款 API、新期赠机并发或券有效期自然跨时已经完成。
+
 `bash scripts/verify.sh all` → **232/232 全过**
 `npx tsc --noEmit` → **0 errors**
 
@@ -5462,6 +5412,7 @@ Skeleton 视觉实现统一使用 `<Skeleton.{Line/Card/Circle/Hero/Block}>` 组
 | 活动 mock | `lib/mock/events.ts` |
 | NEX 资产详情页 | `app/(main)/me/wallet/nex/page.tsx` |
 | KYC-Express 说明页 | `app/(main)/me/security/kyc-express/page.tsx` |
+| 支付密码 `/me/payment-password`（正式前端） | `src/pages/me/payment-password.vue`；注册于 `src/pages.json`、映射于 `src/lib/route.ts` |
 | 工单系统页 | `app/(main)/me/support/tickets/page.tsx` |
 | 工单 mock | `lib/mock/tickets.ts` |
 | Genesis 持有人 dashboard | `app/(main)/genesis/holder/page.tsx` |
@@ -5477,3 +5428,10 @@ Skeleton 视觉实现统一使用 `<Skeleton.{Line/Card/Circle/Hero/Block}>` 组
 
 NexGrid Product Team
 本文档为研究性原型的产品需求规格,仅供产品研究与教学用途。
+
+
+### 2026-11-01 L6 有效页面目录与历史保留
+
+行为采集只接受当前有效业务页面。目录补齐活动详情、创世抽奖、绑定手机号，支付密码页继续有效；旧支持工单、旧钱包首页、复投及复投说明页退役，不再接受新行为事件，也不出现在运营后台当前页面目录。退役只停止采集，保留原目录行和历史事件，历史统计与热力查询仍可按原路由读取。
+
+工程契约从后端正式启动迁移链读取完整追加迁移，并按登记/退役顺序计算最终有效目录；每个 `pages.json` 业务页必须对应唯一有效登记。原生容器 `pages/tabs/tabs` 不作为独立业务页。已发布迁移不可改写或删除，新目录变化通过追加迁移完成。

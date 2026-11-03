@@ -15,6 +15,33 @@ const receipt = { orderNo: 'ORD-1', paymentNo: 'PAY-1', paymentStatus: 'PAID', o
 const context = () => ({ kind: 'ORDER_PAY' as const, payload: { orderNo: 'ORD-1' }, amount: 100, summary: 'Synthetic device', current: () => true, commandKey: () => 'business-original-key' });
 beforeEach(() => { vi.resetModules(); ports.request.mockReset(); ports.rows.clear(); ports.account = 'user:1'; ports.nav.mockReset(); });
 describe('durable external payment orchestration', () => {
+  it('shows a bank refund review after delivery for both the active flow and original-intent recovery', async () => {
+    const frozen = { ...quote, paymentMethod: 'HDPAY_BANK', network: 'VND_BANK', networkConfirmFeeUsdt: '0.00',
+      totalUsdt: '101.75', amountVnd: '2543750', fxRateVndPerUsdt: '25000' };
+    const original = { ...intent, ...frozen, address: null, paymentUrl: 'https://api.hdpayadmin.com/pay/original' };
+    const reviewed = { ...original, status: 'MANUAL_REVIEW', reason: 'PAYMENT_REFUNDED_REVIEW', fulfilmentStatus: 'DELIVERED',
+      receipt: { ...receipt, paymentMethod: 'HDPAY_BANK' } };
+    const { requestPurchasePayment, usePurchasePayment } = await import('./purchase-payment');
+    const payment = usePurchasePayment();
+    ports.request.mockResolvedValueOnce(frozen).mockResolvedValueOnce(original).mockResolvedValueOnce(reviewed);
+    let resolved = false;
+    const choice = requestPurchasePayment(context());
+    void choice.then(() => { resolved = true; });
+    await payment.select('HDPAY_BANK'); await payment.confirm(); await payment.query();
+    expect(payment.state.notice).toBe('review');
+    expect(payment.state.open).toBe(true);
+    expect(payment.state.pending?.businessDelivered).toBe(true);
+    expect(resolved).toBe(false);
+    const saved = payment.state.pending!;
+    payment.close(); expect(await choice).toBeNull();
+    ports.request.mockResolvedValueOnce(reviewed);
+    await payment.resume(saved);
+    expect(payment.state.notice).toBe('review');
+    expect(payment.state.open).toBe(true);
+    expect(payment.state.intent?.fulfilmentStatus).toBe('DELIVERED');
+    expect(ports.request.mock.calls.filter(([request]) => request.method === 'POST' && request.path.endsWith('-intents'))).toHaveLength(1);
+    payment.close();
+  });
   it('reloads an HDPAY intent with its original FX/raw amount/rounding without a quote or a second POST', async () => {
     const frozen = { ...quote, paymentMethod: 'HDPAY_BANK', network: 'VND_BANK', networkConfirmFeeUsdt: '0.00', totalUsdt: '101.75',
       fxRateVndPerUsdt: '25000.123456', amountVnd: '2543763', businessAmountUsdt: '99.995000', roundingAdjustmentUsdt: '0.005000' };
@@ -96,4 +123,52 @@ describe('durable external payment orchestration', () => {
     expect(payment.state.error).toBe(false); expect(ports.request.mock.calls[0]![0].body.payload.expectedPayableUsdt).toBe(19.995);
     payment.close(); expect(await choice).toBeNull();
   });
+});
+
+
+it('rejects another rail with the same original key and quote before showing its address, including after reload', async () => {
+  const ethereumQuote = { ...quote, paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20' };
+  const ethereumIntent = { ...intent, ...ethereumQuote, address: '0x' + 'e'.repeat(40) };
+  ports.request.mockResolvedValueOnce(ethereumQuote).mockResolvedValueOnce(intent).mockResolvedValueOnce(intent).mockResolvedValueOnce(ethereumIntent);
+  let store = await import('./purchase-payment'), payment = store.usePurchasePayment();
+  const first = store.requestPurchasePayment(context());
+  await payment.select('CREGIS_USDT_ERC20'); await payment.confirm();
+  expect(payment.state.error).toBe(true); expect(payment.state.intent).toBeNull();
+  expect(payment.pending()).toMatchObject([{ paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20', commandKey: 'business-original-key', paymentQuoteId: 'Q-1' }]);
+  payment.close(); expect(await first).toBeNull();
+  vi.resetModules(); store = await import('./purchase-payment'); payment = store.usePurchasePayment();
+  const restored = store.requestPurchasePayment(context());
+  await vi.waitFor(() => expect(payment.state.error).toBe(true));
+  expect(payment.state.intent).toBeNull();
+  expect(payment.pending()).toMatchObject([{ paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20' }]);
+  await payment.query();
+  expect(payment.state.intent).toMatchObject({ paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20', address: ethereumIntent.address });
+  expect(ports.request.mock.calls.filter(([request]) => request.method === 'POST' && request.path.endsWith('-intents'))).toHaveLength(1);
+  payment.close(); expect(await restored).toBeNull();
+});
+
+it('rejects a changed network spelling for a known quote even when the rail is unchanged', async () => {
+  ports.request.mockResolvedValueOnce(quote).mockResolvedValueOnce({ ...intent, network: 'BEP20' });
+  const store = await import('./purchase-payment'), payment = store.usePurchasePayment();
+  const result = store.requestPurchasePayment(context());
+  await payment.select('CREGIS_USDT_BSC'); await payment.confirm();
+  expect(payment.state.error).toBe(true); expect(payment.state.intent).toBeNull();
+  expect(payment.pending()).toMatchObject([{ paymentMethod: 'CREGIS_USDT_BSC', network: 'BSC' }]);
+  payment.close(); expect(await result).toBeNull();
+});
+
+it('binds legacy recovery rows to their first validated original intent without inventing the old rail', async () => {
+  const ethereumIntent = { ...intent, paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20', address: '0x' + 'e'.repeat(40) };
+  const original = { fingerprint: JSON.stringify(['ORDER_PAY', context().payload]), kind: 'ORDER_PAY', commandKey: 'business-original-key', paymentQuoteId: 'Q-1', summary: 'Legacy order' };
+  ports.rows.set('uvel-purchase-payment-accounts-v1user:1', { records: { 'business-original-key': original } });
+  ports.request.mockResolvedValueOnce(ethereumIntent).mockResolvedValueOnce(intent);
+  const store = await import('./purchase-payment'), payment = store.usePurchasePayment();
+  const result = store.requestPurchasePayment(context());
+  await vi.waitFor(() => expect(payment.state.intent?.network).toBe('ERC20'));
+  expect(payment.pending()).toMatchObject([{ paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20', intentNo: 'PI-1' }]);
+  await payment.query();
+  expect(payment.state.error).toBe(true);
+  expect(payment.state.intent).toMatchObject({ paymentMethod: 'CREGIS_USDT_ERC20', network: 'ERC20', address: ethereumIntent.address });
+  expect(ports.request.mock.calls.every(([request]) => request.method !== 'POST')).toBe(true);
+  payment.close(); expect(await result).toBeNull();
 });

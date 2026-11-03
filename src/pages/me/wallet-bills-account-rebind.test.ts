@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import pageSource from "./wallet-bills.vue?raw";
 
 const start = pageSource.indexOf("watch([remoteSessionReady, () => app.accountBindingEpoch]");
-const end = pageSource.indexOf("useManualScrollLoadMore(scrollAnchor", start);
+const end = pageSource.indexOf("const scrollPager = useManualScrollLoadMore(scrollAnchor", start);
 if (start < 0 || end < start) throw new Error("wallet bills account watcher missing");
 const watcher = ts.transpileModule(`let lookupGeneration = 0; const locatingReceipt = ref(true);\n${pageSource.slice(start, end)}\nreturn { locatingReceipt, generation: () => lookupGeneration };`, {
   compilerOptions: { target: ts.ScriptTarget.ES2020 },

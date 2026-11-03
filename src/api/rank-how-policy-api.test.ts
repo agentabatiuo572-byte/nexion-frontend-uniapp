@@ -14,9 +14,9 @@ describe("rank how policy API", () => {
     await expect(createRankHowPolicyApi({ request } as never).published("en")).rejects.toThrow("RANK_HOW_POLICY_RESPONSE_INVALID");
   });
   it("retains only the allowlisted server rule projection", async () => {
-    const request = vi.fn().mockResolvedValue({ ...policy, rules: { permanentProtection: false, qualifiedReferralSelfComputePoints: 876.123456, leadershipConfigured: false, privateExtra: "not for app" } });
+    const request = vi.fn().mockResolvedValue({ ...policy, rules: { permanentProtection: false, qualifiedReferralSelfComputePoints: 8761, leadershipConfigured: false, privateExtra: "not for app" } });
     const result = await createRankHowPolicyApi({ request } as never).published("zh");
-    expect(result.rules).toEqual({ permanentProtection: false, qualifiedReferralSelfComputePoints: 876.123456, leadershipConfigured: false });
+    expect(result.rules).toEqual({ permanentProtection: false, qualifiedReferralSelfComputePoints: 8761, leadershipConfigured: false });
   });
   it("accepts a configured zero minimum, distinct from a missing threshold", async () => {
     const request = vi.fn().mockResolvedValue({ ...policy, rules: { ...policy.rules, qualifiedReferralSelfComputePoints: 0 } });
@@ -25,7 +25,7 @@ describe("rank how policy API", () => {
   it.each([
     { permanentProtection: "on", qualifiedReferralSelfComputePoints: 12, leadershipConfigured: true },
     { permanentProtection: true, qualifiedReferralSelfComputePoints: -1, leadershipConfigured: true },
-    { permanentProtection: true, qualifiedReferralSelfComputePoints: Infinity, leadershipConfigured: true },
+    { permanentProtection: true, qualifiedReferralSelfComputePoints: 1.5, leadershipConfigured: true },
     { permanentProtection: true, qualifiedReferralSelfComputePoints: 12, leadershipConfigured: 1 },
     null,
     undefined,

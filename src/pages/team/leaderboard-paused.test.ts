@@ -1,3 +1,5 @@
+import { leaderboardPointsCopy } from '@/i18n/leaderboard-points-copy';
+import { teamPrivacyFixture } from './team-privacy.test-support';
 // @ts-expect-error Node is used only by the test runner.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -21,16 +23,16 @@ const readPaused = new Function("remoteApiEnabled", "remoteSnapshot", "period", 
 async function page(paused: boolean, period: string, t: typeof en, poolUSD = 0, snapshotAvailable = true) {
   const styles = Object.fromEntries([...compiled.matchAll(/_ctx\.(\w+)/g)].map(match => [match[1], {}]));
   const app = Vue.createSSRApp({ render, setup: () => ({
-    ...styles, paused, period, t, remoteApiEnabled: true, remoteState: "ready", snapshotAvailable,
+    ...styles, pointsCopy: leaderboardPointsCopy(t === zh ? 'zh' : t === vi ? 'vi' : 'en'), pointsRankingAvailable: true, visibility: teamPrivacyFixture().visibility, paused, period, t, remoteApiEnabled: true, remoteState: "ready", snapshotAvailable,
     pauseCapturedAt: "2026-10-08T12:30:00Z",
     heroCapStyle: () => ({}), fmtCompactUSD: () => `$${poolUSD}`, prize: { poolUSD, topN: poolUSD > 0 ? 21 : 0 },
     payoutToText: "PAYOUT_TO_FROZEN_21",
-    totalRows: 0, myRankDisplay: "—", gapText: t.leaderboard.myRank.notRanked,
-    podiumDisplay: [], visibleRest: [], hasMore: false, periodOptions: [],
+    totalRows: 0, me: { rank: null }, myRankDisplay: "—", myRowPoints: null, gapText: t.leaderboard.myRank.notRanked,
+    visibleRows: [], rankingGroups: [], hasMore: false, periodOptions: [],
     go() {}, selectPeriod() {}, loadRemote() {},
   }) });
   const wrapper = Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("section", slots.default?.()) });
-  for (const component of ["AppChassis", "SubPageHeader", "GlassSegments"]) app.component(component, wrapper);
+  for (const component of ["AppChassis", "SubPageHeader", "GlassSegments", "TeamArt", "TeamRankEmblem"]) app.component(component, wrapper);
   return renderToString(app);
 }
 
@@ -45,7 +47,7 @@ describe("leaderboard paused presentation", () => {
   }
   it("labels a factual frozen value with its durable capture time", async () => {
     const html = await page(true, "week", en, 900, true);
-    expect(html).toContain("$900");
+    expect(html).not.toContain("$900");
     expect(html).toContain("2026-10-08T12:30:00Z");
     expect(html).not.toContain(escapeHtml(en.leaderboard.snapshotUnavailable));
   });
@@ -58,30 +60,34 @@ describe("leaderboard paused presentation", () => {
         expect(html).toContain('role="status"');
         expect(html).not.toContain(t.leaderboard.cta.share);
         expect(html).not.toContain(t.leaderboard.myRank.climb);
-        expect(html).not.toContain(t.leaderboard.note);
-        expect(html).not.toContain(t.leaderboard.noteAllTime);
+        expect(html).not.toContain(leaderboardPointsCopy(t === zh ? 'zh' : t === vi ? 'vi' : 'en').note);
+        expect(html).not.toContain(leaderboardPointsCopy(t === zh ? 'zh' : t === vi ? 'vi' : 'en').noteAll);
       });
     }
   }
   it("keeps a zero-pool active empty board distinct from maintenance", async () => {
     const html = await page(false, "week", en);
     expect(html).toContain(en.leaderboard.cta.share);
-    expect(html).toContain(en.leaderboard.note);
+    expect(html).toContain(leaderboardPointsCopy('en').note);
     expect(html).not.toContain(en.leaderboard.pausedTitle);
   });
   for (const period of ["today", "week", "month", "all"]) {
     it(`${period} hides the frozen snapshot payout prompt when current pause becomes true`, async () => {
       const html = await page(true, period, en, 100);
       expect(html).toContain(en.leaderboard.pausedTitle);
-      expect(html).toContain("$100");
+      expect(html).not.toContain("$100");
       expect(html).not.toContain("PAYOUT_TO_FROZEN_21");
       expect(html).not.toContain(en.leaderboard.cta.share);
-      expect(html).not.toContain(en.leaderboard.note);
+      expect(html).not.toContain(leaderboardPointsCopy('en').note);
     });
   }
-  it("keeps the payout prompt on an active positive-pool snapshot", async () => {
+  it("closes the additional payout promotion even on an active positive-pool snapshot", async () => {
     const html = await page(false, "week", en, 100);
-    expect(html).toContain("PAYOUT_TO_FROZEN_21");
+    expect(html).not.toContain("PAYOUT_TO_FROZEN_21");
+    expect(html).not.toContain(en.leaderboard.pool.resetsIn);
+    // Count visible copy, not the same label repeated in the button attribute.
+    expect(html.replace(/<[^>]*>/g, "").split(en.leaderboard.cta.share)).toHaveLength(2);
+    expect(html).not.toContain(en.leaderboard.myRank.climb);
   });
   it("does not use another period or a local fixture as a paused server fact", () => {
     expect(readPaused(true, { value: { period: "week", paused: true } }, { value: "week" })).toBe(true);

@@ -57,12 +57,12 @@
             <g v-for="(s, i) in satellites" :key="`sat-${i}`">
               <circle :cx="s.x" :cy="s.y" r="6" fill="var(--v5-brand)" opacity="0.12" filter="url(#orb-soft)" />
               <circle :cx="s.x" :cy="s.y" r="2.4" fill="var(--v5-brand)" opacity="0.75">
-                <animate attributeName="opacity" values="0.75;0.3;0.75" :dur="`${2.2 + i * 0.4}s`" repeatCount="indefinite" />
+                <animate v-if="motionAllowed" attributeName="opacity" values="0.75;0.3;0.75" :dur="`${2.2 + i * 0.4}s`" repeatCount="indefinite" />
               </circle>
             </g>
 
             <!-- Active orbiting node + comet halo -->
-            <g>
+            <g v-if="motionAllowed">
               <circle r="7" fill="var(--v5-brand)" opacity="0.25">
                 <animateMotion dur="9s" repeatCount="indefinite" :path="orbitPath" rotate="auto" />
               </circle>
@@ -70,15 +70,19 @@
                 <animateMotion dur="9s" repeatCount="indefinite" :path="orbitPath" rotate="auto" />
               </circle>
             </g>
+            <g v-else transform="translate(120 12)">
+              <circle r="7" fill="var(--v5-brand)" opacity="0.25" />
+              <circle r="3.4" fill="var(--v5-brand)" />
+            </g>
 
             <!-- Expanding pulse rings (2× staggered) -->
             <circle cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4">
-              <animate attributeName="r" from="36" to="92" dur="2.6s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="r" from="36" to="92" dur="2.6s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" repeatCount="indefinite" />
             </circle>
             <circle cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4">
-              <animate attributeName="r" from="36" to="92" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="r" from="36" to="92" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
+              <animate v-if="motionAllowed" attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
             </circle>
 
             <!-- Middle thin ring —— 此前写死一个深灰色号,浅色档就是那圈扎眼的黑环。
@@ -102,7 +106,7 @@
         <text class="intro-title">{{ t.intro.title1 }}</text>
         <text class="intro-sub">{{ t.intro.subtitleLine1 }}</text>
 
-        <HomeDisplayStats class="anim-stats" :active="statsActive" />
+        <HomeDisplayStats :active="statsActive" />
       </view>
 
       <view class="intro-cta anim-cta">
@@ -169,8 +173,10 @@ import { useT } from "@/i18n/use-t";
 import { LOCALES, type LocaleCode } from "@/i18n";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { useIntroMotion } from "@/composables/use-intro-motion";
 
 const t = useT();
+const motionAllowed = useIntroMotion();
 const locale = useLocaleStore();
 const langOpen = ref(false);
 function closeLang() {
@@ -328,6 +334,9 @@ function goPrivacy() {
   background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge);
 
   padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 38px);
+  box-sizing: border-box;
+  max-height: calc(100% - var(--nx-overlay-top));
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -339,7 +348,7 @@ function goPrivacy() {
   margin: 2px auto 10px;
 }
 .intro-lang-sheet__title {
-  font-size: 15px;
+  font-size: var(--ui-type-hero-title);
   font-weight: 600;
   color: var(--v5-ink);
   padding: 0 4px 10px;
@@ -364,7 +373,7 @@ function goPrivacy() {
   flex-direction: column;
 }
 .intro-lang-row__native {
-  font-size: 15px;
+  font-size: var(--ui-type-list-title);
   font-weight: 550;
   color: var(--v5-ink);
 }
@@ -390,6 +399,7 @@ function goPrivacy() {
 .intro-content {
   position: relative;
   min-height: 100%;
+  box-sizing: border-box;
   padding: 0 24px;
   display: flex;
   flex-direction: column;
@@ -403,8 +413,8 @@ function goPrivacy() {
 }
 .intro-orb {
   position: relative;
-  width: 240px;
-  height: 240px;
+  width: clamp(104px, calc(100vh - 510px), 240px);
+  height: clamp(104px, calc(100vh - 510px), 240px);
 }
 .orb-glow {
   position: absolute;
@@ -441,11 +451,64 @@ function goPrivacy() {
 .intro-sub {
   display: block;
   margin-top: 12px;
-  font-size: 15px;
+  font-size: var(--ui-type-body);
   line-height: 1.625;
   color: var(--v5-ink-3);
   padding: 0 16px;
 }
+.intro-stats {
+  margin-top: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  /* 🔴 此前写死 rgba(15,15,15,0.8) —— 浅色主题下是**深色药丸**,而里面的数字走
+     --v5-ink(浅色档=近黑),等于深底压深字,主人实测「人眼根本看不清」。
+     改走 surface 档:浅色是白药丸配近黑字,暗色是深色药丸配浅字,两边都读得出。
+     不加 border:《03》§3 要求带填充的容器零描边,层级靠 surface 微差色 ——
+     --v5-surface 压在 --v5-bg 上本身就是一档可读色差。(我加过一次 border,被 zero-border 门当场逮住)
+     🔴 注释里也别写色号:verify 那道「no hardcoded hex」哨兵扫**全文**(含注释),
+     我就是在这行写了页面底色的十六进制被它逮住。描述颜色一律用 token 名 ——
+     被点名的只是若干个有 token 对应的色号,但写 token 名本来就更准(值会变,角色不变)。 */
+  background: color-mix(in srgb, var(--v5-surface) 80%, transparent);
+  backdrop-filter: blur(12px);
+}
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--v5-brand);
+  animation: intro-pulse 1.6s ease-in-out infinite;
+}
+.stat-num {
+  font-family: var(--font-v5);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v5-ink);
+}
+.stat-num--brand {
+  color: var(--v5-brand);
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--v5-ink-3);
+}
+.stat-sep {
+  width: 2px;
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--v5-surface-3);
+}
+
 .intro-cta {
   padding-top: 40px;
   padding-bottom: 0;
@@ -465,7 +528,7 @@ function goPrivacy() {
   transition: transform 0.15s ease;
 }
 .cta-primary__t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 500;
   color: var(--v5-on-brand);
 }
@@ -480,30 +543,47 @@ function goPrivacy() {
   transition: transform 0.15s ease;
 }
 .cta-secondary__t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-ink);
 }
 .intro-terms {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 6px;
   text-align: center;
-  padding-top: 8px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--v5-ink-4);
 }
+.terms-left {
+  width: 100%;
+}
 .terms-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   color: var(--v5-ink-3);
   text-decoration: underline;
   text-underline-offset: 2px;
-  /* inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 只扩热区不撑行高(原 34×17) */
-  padding: 14px 0;
 }
 
-/* framer-motion → CSS entrance animations */
-.anim-orb {
-  animation: intro-scale-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-/* Keep the published figures on one line on narrow phones. */
-@media (max-width: 374px) {
+/* Reserve the shell's status/home areas; compact the illustration and spacing,
+   not the content. Larger text settings can still scroll naturally. */
+@media (max-width: 374px), (max-height: 740px) {
+  .intro-content { padding-inline: 20px; }
+  .intro-orb-area { padding-top: 44px; }
+  .intro-orb {
+    width: clamp(104px, calc(100vh - 530px), 196px);
+    height: clamp(104px, calc(100vh - 530px), 196px);
+  }
+  .intro-hero { padding-bottom: 0; }
+  .intro-title { font-size: 26px; line-height: 1.2; }
+  .intro-sub { margin-top: 8px; padding-inline: 0; font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
   .intro-hero :deep(.home-display-stats) {
     max-width: 100%;
     box-sizing: border-box;
@@ -513,6 +593,21 @@ function goPrivacy() {
     font-size: 11px;
   }
   .intro-hero :deep(.home-display-item) { gap: 4px; }
+  .intro-cta { padding-top: 20px; gap: 8px; }
+  .cta-primary, .cta-secondary { height: 44px; flex-shrink: 0; }
+  .intro-terms { font-size: 11px; }
+}
+@media (max-height: 620px) {
+  .intro-orb-area { padding-top: 44px; }
+  .intro-title { font-size: 24px; }
+  .intro-sub { margin-top: 6px; }
+  .intro-hero :deep(.home-display-stats) { margin-top: 8px; }
+  .intro-cta { padding-top: 12px; gap: 6px; }
+}
+
+/* framer-motion → CSS entrance animations */
+.anim-orb {
+  animation: intro-scale-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .anim-hero {
   animation: intro-fade-up 0.6s ease 0.5s both;
@@ -534,5 +629,12 @@ function goPrivacy() {
 @keyframes intro-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+@keyframes intro-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-root :deep(*) { animation: none !important; transition: none !important; }
 }
 </style>

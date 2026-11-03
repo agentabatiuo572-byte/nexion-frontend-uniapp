@@ -1,3 +1,4 @@
+import * as displayDate from "@/lib/display-date";
 import * as Vue from "vue";
 import type { Component } from "vue";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -10,6 +11,8 @@ import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
 import { fmt } from "@/i18n/format";
 import { formatAmount } from "@/lib/amount-display";
+import { platformDisplayText } from "@/lib/brand-copy";
+import { genesisConsumerCopyFor } from "./genesis-consumer-copy";
 import { formatGenesisPrice } from "@/lib/genesis-marketplace-presentation";
 import { refreshActivePage, registerActivePageRefresh, resetActivePageRefreshForTest } from "@/lib/active-page-refresh";
 import source from "./holder.vue?raw";
@@ -36,7 +39,7 @@ it.each([en, zh, vietnamese])("renders actual holder allocations from parser-con
   const at = new Date().toISOString();
   const payload = { serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "", eligible: true,
     reasons: [], ownedCount: 0, maxPerUser: 20, remainingCap: 20, minAccountAgeDays: 0, accountAgeDays: 30,
-    status: "READY", reservedAllocation: null as number | null, reservedAllocationUnit: "NEX",
+    status: "READY", reservedAllocation: null as number | null, reservedAllocationUnit: "UVT",
     priorityRank: null, priorityTier: "STANDARD", qualificationReasonCodes: [] as string[], policyVersion: "1",
     effectiveAt: at, asOf: at, serverTime: at,
     provenance: { source: "holder-eligibility", environment: "PRODUCTION", runId: "" } };
@@ -52,13 +55,17 @@ it.each([en, zh, vietnamese])("renders actual holder allocations from parser-con
   const pointsRefresh = vi.fn(async () => {});
   const wrapper = { setup: (_props: unknown, { slots }: { slots: Vue.Slots }) => () => Vue.h("view", slots.default?.()) };
   const dependencies: Record<string, unknown> = {
+    "@/lib/brand-copy": { platformDisplayText },
+    "@/store/locale": { useLocaleStore: () => ({ code: copy === zh ? "zh" : copy === vietnamese ? "vi" : "en" }) },
+    "./genesis-consumer-copy": { genesisConsumerCopyFor },
     "@/lib/amount-display": { formatAmount },
     "@/lib/genesis-marketplace-presentation": { formatGenesisPrice },
     vue: Vue, "@dcloudio/uni-app": { onShow: (hook: () => void) => shows.push(hook), onHide: (hook: () => void) => hides.push(hook) },
     "@/lib/route": { navTo: vi.fn() }, "@/i18n/use-t": { useT: () => Vue.ref(copy) },
-    "@/i18n/format": { fmt, dateLocale: () => "en-US" },
+    "@/lib/display-date": displayDate, "@/i18n/format": { fmt, dateLocale: () => "en-US" },
     "@/store/genesis": { useGenesis: () => genesis, GENESIS_EMISSION: {} },
     "@/store/genesis-config": { useGenesisConfig: () => ({ refresh: configRefresh }) },
+    "@/store/config": { useConfig: () => ({ isEnabled: () => true }) },
     "@/composables/use-genesis-sale-gate": { useGenesisSaleGate: () => ({ showUrgency: Vue.ref(false), blockText: Vue.ref(null) }) },
     "@/store/genesis-points": { useGenesisPoints: () => ({ projection: null, status: "idle", refresh: pointsRefresh }) },
     "@/lib/active-page-refresh": { registerActivePageRefresh },
@@ -79,37 +86,49 @@ it.each([en, zh, vietnamese])("renders actual holder allocations from parser-con
   for (const owned of [0, 2]) {
     genesis.myOwned = owned;
     await genesis.syncRemote();
-    let page = await show(); expect(page.allocation).toBe("-");
+    let page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-");
+    if (owned === 0) {
+      expect(page.html).not.toContain(copy.genesisHolder.previewModeBanner);
+      expect(page.html).not.toContain(copy.genesis.ctaSoldOut);
+      expect(page.html).toContain(genesisConsumerCopyFor(copy === zh ? "zh" : copy === vietnamese ? "vi" : "en").trust);
+    }
     expect(page.html).toContain(copy.holderFacts.confirmed);
     expect(page.html).toContain(copy.holderFacts.allocationUnavailable);
     expect(page.html).not.toContain(copy.holderFacts.unavailable);
     payload.qualificationReasonCodes = ["HOLDINGS_CONFIRMED"]; await genesis.syncRemote();
-    page = await show(); expect(page.allocation).toBe("-");
+    page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-");
     expect(page.html).toContain(copy.holderFacts.reasons.HOLDINGS_CONFIRMED);
     expect(page.html).toContain(copy.holderFacts.allocationUnavailable);
     payload.reservedAllocation = 0; await genesis.syncRemote();
-    page = await show(); expect(page.allocation).toBe("0.00 NEX");
+    page = await show(); expect(page.allocation).toBe("0.00 UVT");
     expect(page.html).toContain(copy.holderFacts.reasons.HOLDINGS_CONFIRMED);
     expect(page.html).not.toContain(copy.holderFacts.allocationUnavailable);
     payload.reservedAllocation = 1.234567; await genesis.syncRemote();
-    expect((await show()).allocation).toBe("1.23 NEX");
+    expect((await show()).allocation).toBe("1.23 UVT");
     expect(genesis.remoteEligibility?.reservedAllocation).toBe(1.234567);
     for (const status of ["CONFIG_UNAVAILABLE", "NOT_EFFECTIVE", "NOT_ELIGIBLE"]) {
       payload.status = status; payload.reservedAllocation = null; await genesis.syncRemote();
-      page = await show(); expect(page.allocation).toBe("-");
+      page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-");
       expect(page.html).not.toContain(copy.holderFacts.allocationUnavailable);
       const reason = status === "CONFIG_UNAVAILABLE" ? copy.holderFacts.unpublished
         : status === "NOT_EFFECTIVE" ? copy.holderFacts.notEffective : copy.holderFacts.notEligible;
       expect(page.html).toContain(reason);
     }
     payload.status = "READY"; payload.asOf = new Date(Date.now() - 16 * 60_000).toISOString();
-    await genesis.syncRemote(); page = await show(); expect(page.allocation).toBe("-"); expect(page.html).toContain(copy.holderFacts.stale);
+    await genesis.syncRemote(); page = await show(); expect(page.allocation).toBe(owned === 0 ? "—" : "-"); expect(page.html).toContain(copy.holderFacts.stale);
     expect(page.html).not.toContain(copy.holderFacts.allocationUnavailable);
     payload.asOf = at; payload.reservedAllocation = null; payload.qualificationReasonCodes = [];
-    genesis.remoteEligibility = null; expect((await show()).allocation).toBe("-");
+    genesis.remoteEligibility = null; expect((await show()).allocation).toBe(owned === 0 ? "—" : "-");
     shows.at(-1)!(); await Promise.resolve(); await Promise.resolve();
     expect(genesis.remoteEligibility).toMatchObject({ reservedAllocation: null });
   }
+
+  genesis.remoteAccountReadState = "unavailable";
+  const unavailable = await show();
+  expect(unavailable.html).toContain(copy.holderFacts.unconfirmed);
+  expect(unavailable.html).not.toContain(copy.genesisHolder.notHolderTitle);
+  expect(unavailable.html).not.toContain('class="gh-hero gh-surface"');
+  genesis.remoteAccountReadState = "ready";
 
   const lifecyclePage = Vue.defineComponent({ setup(props, context) {
     (exports.default as { setup: (props: object, context: unknown) => unknown }).setup(props, context);
@@ -123,7 +142,7 @@ it.each([en, zh, vietnamese])("renders actual holder allocations from parser-con
   expect((await show()).html).toContain(copy.holderFacts.allocationUnavailable);
   payload.reservedAllocation = 0; request.mockClear();
   await refreshActivePage(); expect(request).toHaveBeenCalledTimes(1);
-  const recovered = await show(); expect(recovered.allocation).toBe("0.00 NEX");
+  const recovered = await show(); expect(recovered.allocation).toBe("0.00 UVT");
   expect(recovered.html).not.toContain(copy.holderFacts.allocationUnavailable);
   holderHide(); request.mockClear(); await refreshActivePage(); expect(request).not.toHaveBeenCalled();
 

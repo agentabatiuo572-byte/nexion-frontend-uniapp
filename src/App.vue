@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
+import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
+import { installNativePush, refreshNativePush, flushNativePushClick } from "@/services/native-push";
 import { navReset } from "@/lib/route";
+import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
 import { reportNativeSessionStage, reportNativeSessionTiming } from "@/api/native-session-storage";
 import { watch } from "vue";
@@ -8,6 +12,7 @@ import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
 import { useConversations } from '@/store/conversations';
 import { useMessageDrawer } from "@/store/message-drawer";
+import { useNotifications } from "@/store/notifications";
 import {
   useFreeTrial,
   liveShadowUSD,
@@ -27,7 +32,7 @@ import { useProfile } from "@/store/profile";
 import { useTheme } from "@/store/theme";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDateTime } from "@/lib/trial-date";
 import {
   canonicalH5RouteUrl,
@@ -70,16 +75,12 @@ import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
 import { useMarket } from "@/store/market";
-import {
-  enforcePendingLegalTermsGate,
-  hasPendingLegalTermsRequirement,
-  scheduleLegalTermsGate,
-} from "@/lib/legal-terms-gate-runtime";
 import { isLegalTermsGateExemptRoute } from "@/lib/legal-terms-gate";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
 let tickTimer: ReturnType<typeof setInterval> | undefined;
+let lastPlatformConfigLoadAt = 0;
 let lastTick = Date.now();
 let accountSessionBootstrapped = false;
 let businessLoopsRunning = false;
@@ -304,26 +305,31 @@ async function pollTrial() {
   if (!ensureBusinessLoopsAllowed() || trialPollRunning) return;
   trialPollRunning = true;
   const freeTrial = useFreeTrial();
+  const trialBindingEpoch = freeTrial.getBindingEpoch();
   const before = freeTrial.status;
   const nowMs = Date.now();
+  let confirmed = false;
   try {
-    await freeTrial.poll(nowMs);
+    confirmed = await freeTrial.poll(nowMs);
   } finally {
     trialPollRunning = false;
   }
+  if (!confirmed || !ensureBusinessLoopsAllowed()) return;
   const after = freeTrial.status;
   const t = useT().value;
+  if (remoteApiEnabled ? freeTrial.takeExpiryNotice(trialBindingEpoch)
+    : (before === "active" || before === "grace") && after === "ended") {
+    toast.info(t.trial.endedToast);
+  }
 
   if (before !== after) {
     if (after === "grace") {
       // Production stopped; the credit stays usable until graceEndsAt — always
       // hand the user the exact time + next step (spec ④).
-      const until = freeTrial.graceEndsAt !== null ? formatTrialDateTime(freeTrial.graceEndsAt) : "";
+      const until = freeTrial.graceEndsAt !== null ? formatTrialDateTime(freeTrial.graceEndsAt, dateLocale()) : "";
       toast.info(fmt(t.trial.graceStartToast, { time: until }));
       urgencyFired.grace24h = false;
       urgencyFired.grace1h = false;
-    } else if (after === "ended") {
-      toast.info(t.trial.endedToast);
     } else if (after === "active") {
       urgencyFired.active24h = false;
       urgencyFired.grace24h = false;
@@ -431,7 +437,7 @@ function pollMilestones() {
   // (与 reconcileBills 同一套「该做什么从数据推出来」的思路)。
   if (postMoneyBill({
     type: "achievement",
-    symbol: "NEX",
+    symbol: "UVT",
     amount: step.nexReward,
     status: "posted",
     memo: `Earnings milestone · $${step.thresholdUSD}`,
@@ -536,8 +542,7 @@ async function refreshAuthenticatedRemoteFleet(): Promise<boolean> {
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth)) return false;
   if (apiRuntimeConfig.environment === "dev" && !(await refreshProductCatalog())) return false;
-  // A cold-start fleet read must follow the local phone's runtime report, so
-  // a stale PAUSED assignment cannot be projected ahead of its resume POST.
+  // Confirm the bound phone online before the initial account snapshot.
   await useApp().syncRemoteTaskAssignments();
   return true;
 }
@@ -852,21 +857,6 @@ function detachSessionWatch() {
 const QUEST_TICK_MS = 1000;
 let questTimer: ReturnType<typeof setInterval> | undefined;
 let lastQuestRoute = "";
-let lastLegalTermsGateRoute = "";
-let lastLegalTermsGateLocale = "";
-
-// An explicit language change can change the account's required legal document
-// without navigating. Close the gate synchronously before the profile write.
-watch(() => useLocaleStore().code, () => {
-  if (!remoteApiEnabled || !questTimer || !canRefreshRemoteAccount(useAuth())) return;
-  const route = readCurrentRoute();
-  if (!route || isStaticReviewRoute(route)) return;
-  lastLegalTermsGateRoute = route;
-  lastLegalTermsGateLocale = useLocaleStore().code;
-  void scheduleLegalTermsGate(`/${route}`);
-  if (hasPendingLegalTermsRequirement()) stopBusinessLoops();
-}, { flush: "sync" });
-
 // 🔴 本文件**唯一**的路由读取口 —— 不要加第二个(verify 哨兵 app-route-single-reader 盯着)。
 //
 // 2026-08-07 同形洞一天三处(守门 checkAuthGuard / 会话驱逐 checkSession / 任务播种)。
@@ -882,6 +872,9 @@ function readCurrentRoute(): string {
   try {
     const ps = getCurrentPages();
     pageRoute = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    // #ifdef APP-PLUS
+    pageRoute = logicalNativePage(ps[ps.length - 1]).route;
+    // #endif
   } catch { /* 页面栈不可用 → 走下方兜底 */ }
   let route = pageRoute;
   // #ifdef H5
@@ -1018,6 +1011,9 @@ function questIdForRoute(route: string): QuestTaskId | null {
 }
 
 function checkQuestRoute() {
+  // #ifdef APP-PLUS
+  flushNativePushClick();
+  // #endif
   const route = readCurrentRoute();
   const retiredRoute = resolveRetiredRoute(route);
   if (retiredRoute) {
@@ -1043,21 +1039,9 @@ function checkQuestRoute() {
   // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
   if (checkSession()) return; // evicted/invalid session → redirected; recalibration is explicit device management only
-  if (route !== lastLegalTermsGateRoute || useLocaleStore().code !== lastLegalTermsGateLocale) {
-    lastLegalTermsGateRoute = route;
-    lastLegalTermsGateLocale = useLocaleStore().code;
-    if (canRefreshRemoteAccount(useAuth())) scheduleLegalTermsGate(`/${route}`);
-  }
-  if (enforcePendingLegalTermsGate(`/${route}`)) {
-    stopBusinessLoops();
-    return;
-  }
-  // Risk disclosure remains readable from the required Terms page, but it is
-  // still a legal-only surface: no earnings, orders, trials or analytics may
-  // run until the current account acknowledges the authoritative version.
-  if (hasPendingLegalTermsRequirement()) {
-    stopBusinessLoops();
-    return;
+  if (remoteApiEnabled && Date.now() - lastPlatformConfigLoadAt >= 15_000) {
+    lastPlatformConfigLoadAt = Date.now();
+    void useConfig().load();
   }
   void refreshBusinessCalendar();
   // H5 站内路由不会重发 App.onShow。静态评审页会按安全边界停掉业务循环，
@@ -1070,7 +1054,7 @@ function checkQuestRoute() {
     // In formal server mode, task identity, completion facts and reward state
     // all come from the backend. A route visit only triggers a fresh readback;
     // the legacy task-code table below is never consulted.
-    void useQuest().refreshRemote();
+    void runPassiveTabRead("quest", () => useQuest().refreshRemote(), undefined, () => useQuest().remoteStatus === "ready");
     return;
   }
   const id = questIdForRoute(route);
@@ -1090,7 +1074,7 @@ function checkQuestRoute() {
   const ref = `QST-${id}`; // 稳定 ref:任务一次性,带时间戳会让判重永不命中 = 假幂等
   const memo = fmt(t.quest.routeMemo, { task: QUEST_ROUTE_MEMO_TASK[id](t) });
   const drafts: ReceiptDraft[] = [];
-  if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo, ref });
+  if (task.nexReward) drafts.push({ type: "bonus", symbol: "UVT", amount: task.nexReward, status: "posted", memo, ref });
   if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo, ref });
   if (!drafts.length) return;
   if (postMoneyBillsOnce(drafts) !== "ok") return;
@@ -1103,8 +1087,6 @@ function startQuestWatch() {
   // 播种置空,故意不预填当前页:quest 一次性 + 发钱/markComplete 幂等,重放无害;
   // 冷启深链落地页要记一次访问(112b9d0 以此作实证基线),预填会把这一次吞掉。
   lastQuestRoute = "";
-  lastLegalTermsGateRoute = "";
-  lastLegalTermsGateLocale = "";
   questTimer = setInterval(checkQuestRoute, QUEST_TICK_MS);
 }
 function stopQuestWatch() {
@@ -1239,6 +1221,13 @@ onLaunch(() => {
   // 同样必须在 early return 之前挂 —— 退役路由 / 静态评审页也有输入框。
   installFieldNaming();
   const auth = useAuth();
+  // #ifdef APP-PLUS
+  installNativePush({ client: apiClient, vault: sessionVault,
+    canNavigate: () => canRefreshRemoteAccount(useAuth())
+      && !!readCurrentRoute() && !isAuthWhitelisted(readCurrentRoute()) && !isStaticReviewRoute(readCurrentRoute()),
+    received: () => { if (canRefreshRemoteAccount(useAuth())) void useNotifications().refreshRemote(); },
+  });
+  // #endif
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler(() => {
       // Preserve only the non-secret trace long enough to choose the login explanation.
@@ -1303,21 +1292,20 @@ onLaunch(() => {
 onShow(() => {
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
+  acceptNativeOAuthReturn(plus.runtime.arguments || "");
+  refreshNativePush();
   // #endif
   attachSessionWatch();
   if (remoteApiEnabled) {
     useApp().setRemoteTaskForeground(true);
     void useConfig().load();
+    lastPlatformConfigLoadAt = Date.now();
     // PC-managed runtime configuration must converge when the App returns to
     // foreground; a launch-only fetch leaves pricing, phase and translations
     // stale for an entire long-lived session.
     void refreshEarnConfig().catch(() => undefined);
     void refreshServerProductPhase(true).catch(() => false);
     void useI18nRuntime().refresh(useLocaleStore().code, true).catch(() => undefined);
-  }
-  const termsGateRoute = readCurrentRoute();
-  if (termsGateRoute && !isAuthWhitelisted(termsGateRoute) && canRefreshRemoteAccount(useAuth())) {
-    scheduleLegalTermsGate(`/${termsGateRoute}`);
   }
   // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
   // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」
@@ -1326,16 +1314,6 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
-  // startQuestWatch resets the route marker. Seed it with the check just
-  // scheduled above so the first one-second tick does not duplicate the same
-  // current-terms request; a real route change still schedules immediately.
-  lastLegalTermsGateRoute = termsGateRoute;
-  lastLegalTermsGateLocale = useLocaleStore().code;
-  if (termsGateRoute && (enforcePendingLegalTermsGate(`/${termsGateRoute}`)
-    || hasPendingLegalTermsRequirement())) {
-    stopBusinessLoops();
-    return;
-  }
   if (canRefreshRemoteAccount(useAuth())) {
     void probeServerSession();
   }

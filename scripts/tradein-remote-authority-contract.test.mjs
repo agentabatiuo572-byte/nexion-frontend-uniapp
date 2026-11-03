@@ -41,28 +41,37 @@ test("share checkout never enters the physical-device trade-in capacity prefligh
 
 test("remote trade-in sheet revalidates eligibility and never previews local credit", () => {
   const source = read("src/components/tradein-sheets.vue");
-  assert.match(source, /deviceE3Api\.eligibility\(targetKind\)/);
+  const open = source.slice(source.indexOf("async function openTradeinQuote"), source.indexOf("function onChooseTradein"));
+  assert.match(open, /deviceE3Api\.quote\(Number\(oldDevice\.id\), targetKind\)/);
+  assert.match(open, /purchaseEligibilityApi\.get\(targetKind\)/);
+  assert.doesNotMatch(open, /deviceE3Api\.eligibility/);
+  assert.match(source, /deviceE3Api\.eligibility\(id\)/);
   assert.match(source, /remoteRetireEligibleTargets\.value\.has\(p\.id\)/);
   assert.match(source, /eligibility\.sources\.some\(\(candidate\) => candidate\.eligible/);
   assert.doesNotMatch(source, /remoteApiEnabled\s*\?\s*isProductAvailable\(p, phase\.value\)/);
-  assert.match(source, /remoteApiEnabled \? "—" :/);
+  // Remote rows show only the server quote's payable, never a locally computed credit.
+  assert.match(source, /remoteApiEnabled\s*\?\s*\(remotePayable == null \? "—" : formatAmount\(remotePayable\)\)/);
+  assert.match(source, /deviceE3Api\.quote\(Number\(current\.oldDeviceId\), id\)/);
 });
 
-test("remote keep-and-buy uses the atomic server command and verifies paid inactive readback", () => {
+test("remote keep-and-buy uses the atomic server command and verifies completed active readback", () => {
   const source = read("src/components/tradein-sheets.vue");
   const start = source.indexOf("async function submitCanonicalKeepBuy");
   const end = source.indexOf("function onKeepBuy", start);
   const keep = source.slice(start, end);
-  assert.match(keep, /deviceE3Api\.capacityKeep/);
-  assert.doesNotMatch(keep, /orderApi\.create/);
-  assert.match(keep, /canonicalStatus !== "paid"/);
-  assert.match(keep, /activationStatus\.toUpperCase\(\) !== "WAITING_PROVISIONING"/);
+  // The atomic command is sent by the shared PIN-authorized capacity runner; this function verifies its receipt.
+  const runner = source.slice(source.indexOf("async function runCanonicalCapacityPurchase"), start);
+  assert.match(runner, /deviceE3Api\.capacityKeep\(/);
+  assert.match(keep, /if \(!recovered\) return runCanonicalCapacityPurchase\('keep',quote,newKind\);/);
+  assert.doesNotMatch(runner + keep, /orderApi\.create/);
+  assert.match(keep, /canonicalStatus !== "activated"/);
+  assert.match(keep, /activationStatus\.toUpperCase\(\) !== "ACTIVATED"/);
   assert.match(keep, /persisted\.targetDeviceId !== submitted\.targetDeviceId/);
-  assert.match(keep, /target\.activatedAt !== null/);
+  assert.match(keep, /target\.activatedAt == null/);
 });
 
 test("remote device and product cards do not render a locally estimated trade-in credit", () => {
-  const devices = read("src/pages/me/devices.vue");
+  const devices = read("src/composables/use-tradein-strip.ts");
   const product = read("src/components/store/product-card.vue");
   const banner = read("src/components/store/tradein-window-banner.vue");
   assert.match(devices, /if \(remoteApiEnabled\)[\s\S]{0,250}tradeinCtaLabel/);

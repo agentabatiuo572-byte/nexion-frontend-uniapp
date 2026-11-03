@@ -206,7 +206,7 @@ describe("mounted NEX Back to Trust Center", () => {
     }
     expect(s.uni.navigateTo).not.toHaveBeenCalled(); expect(s.uni.navigateBack).not.toHaveBeenCalled();
     expect(s.uni.reLaunch).toHaveBeenCalledTimes(2);
-    trustHeaderBack(); expect(s.pages).toEqual([{ route: "/pages/me/me" }]);
+    trustHeaderBack(); expect(s.pages).toEqual([{ route: "/pages/tabs/tabs?target=%2Fpages%2Fme%2Fme" }]);
   });
 
   it("leaves no NEX or duplicate Trust entry after repeated warm visits", async () => {
@@ -243,11 +243,13 @@ describe("mounted NEX Back to Trust Center", () => {
     expect(s.pages).toEqual([s.me, s.trust]);
   });
 
-  it.each(["loading", "error", "unpublished"] as const)("does not invent a ready-content CTA when narrative is %s", async state => {
-    sdk([{ route: "/pages/trust/nex" }]);
+  it.each(["loading", "error", "unpublished"] as const)("keeps static navigation without inventing a published narrative when %s", async state => {
+    const s = sdk([{ route: "/pages/trust/nex" }]);
     const page = await mountNex(state === "unpublished" ? "ready" : state, state === "unpublished" ? [] : published);
-    expect(find(page.root, entry => entry.props.role === "button" && textContent(entry) === en.nexHowItWorks.ctaBack)).toBeUndefined();
-    expect(find(page.root, entry => entry.props.role === "button" && textContent(entry) === en.nexHowItWorks.ctaExchange)).toBeUndefined();
+    expect(page.button(en.nexHowItWorks.ctaBack)).toBeDefined();
+    expect(page.button(en.nexHowItWorks.ctaExchange)).toBeDefined();
+    expect(s.uni.navigateTo).not.toHaveBeenCalled();
+    expect(textContent(page.root)).not.toContain("Published NEX narrative");
   });
 });
 

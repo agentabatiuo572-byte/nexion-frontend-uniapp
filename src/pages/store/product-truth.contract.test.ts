@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { en } from "@/i18n/messages/en";
+import { zh } from "@/i18n/messages/zh";
+import { vi } from "@/i18n/messages/vi";
 import { catalogProductImageUrl, productTierCode } from "@/lib/product-image";
 
 const detail = (import.meta.glob("./detail.vue", {
@@ -35,12 +38,12 @@ const socialProof = (import.meta.glob("../../components/store/live-social-proof.
 describe("store product truth rendering", () => {
   it("uses only the canonical catalog image in both card and detail views", () => {
     expect(productCard).toContain("props.product.imageUrl");
-    expect(productCard).toContain("catalogProductImageUrl(props.product.imageUrl, failedImageUrl.value)");
+    expect(productCard).toContain("useProductImage(() => props.product.imageUrl)");
     expect(detail).toContain(':product-id="product.id"');
     expect(detail).toContain(':image-url="product.imageUrl"');
     expect(productRender).toContain("productId: string");
     expect(productRender).toContain("imageUrl?: string");
-    expect(productRender).toContain("catalogProductImageUrl(props.imageUrl, failedImageUrl.value)");
+    expect(productRender).toContain("useProductImage(() => props.imageUrl)");
     expect(productImage).not.toContain("/static/img/products/");
     expect(Object.keys(embeddedProductImages)).toHaveLength(0);
     expect(productCard).not.toContain("productImageMeta");
@@ -78,8 +81,11 @@ describe("store product truth rendering", () => {
   });
 
   it("does not claim a fixed data-center location in the FAQ", () => {
-    expect(detail).toContain("product.value?.datacenter");
-    expect(detail).not.toContain("f.location, f.withdraw");
+    expect(detail).toContain("f.location");
+    for (const copy of [en, zh, vi]) {
+      expect(copy.store.faq.location.a).not.toMatch(/Singapore|Singapore DC|新加坡/i);
+      expect(copy.store.faq.location.a.length).toBeGreaterThan(0);
+    }
   });
 });
 

@@ -16,33 +16,32 @@ import { demoNotifications } from './prototype-demo-notifications.mjs';
 import { accountDemo } from './prototype-demo-account.mjs';
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
-import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
+import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
 const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
+const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-export const demoDefaults = {trialQuoteState:"default",computeState:"cycles",fleetState:"normal",checkoutState:'ordinary',paymentState:'delivered',topupState:'form',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',stakingOpenState:'readonly',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
+export const demoDefaults = {trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
   promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU）']],
   downloadState:[['unavailable','下载入口未发布'],['published','iOS / Android / 官网入口（示例链接）']],
   ...authDemoOptions,
-  checkoutState:[['ordinary','普通结算'],['tradein','可选择旧机抵扣'],['replace','容量已满·需选择替换'],['capacity-error','容量读取失败'],['setup-required','需完成初始设置']],
-  paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款结果读取失败'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','ERC20 未开通'],['low-balance','钱包余额不足（820.64 USDT）']],
-  topupState:[['form','充值输入'],['paying','充值银行单待付款'],['credited','充值已到账']],
+  checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换'],['capacity-error','容量读取失败'],['setup-required','需完成初始设置']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
-  computeState:[['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
-  fleetState:[['normal','硬件 + Cloud Share'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含未激活设备'],['full','已满 6/6'],['reserved','含预留槽位']],
+  computeState:[['app','App 默认（v1 任务）'],['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
   trialQuoteState:[['default','默认报价'],['full-term','整期抵扣 · 应付 910'],['precision','六位报价 · 342.123456'],['half-cent','半分报价 · 342.135 → 342.14'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','提前优惠变更 · 应付 909'],['capped','抵扣上限 · 余款 10'],['excess-offset','抵扣超过原价']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（重试原消息）'],['timeout','确认超时（15 秒转待确认）']],
-  messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['agent-switch','客服已切换提示（有名字/无名字）'],['read','会话全部已读']],
-  machineImageState:[['normal','原活动机型'],['alternate','后台换机型（Pro 赠 S1）'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
+  messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['author-photo','客服带本人头像'],['recommendations','商品与链接推荐'],['agent-switch','客服已切换提示（有名字/无名字）'],['welcome-unassigned','刚注册 · 未分配客服 · 欢迎语未读'],['welcome-assigned','刚注册 · 已有专属客服 · 欢迎语未读'],['read','会话全部已读']],
+  machineImageState:[['normal','原活动机型'],['alternate','后台换机型（Pro 赠 S1）'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全'],['lite-filtered','冻结组：网页已完成 / 手机未完成'],['web-complete','纯网页冻结组：全部完成']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
@@ -52,12 +51,19 @@ export const demoOptions = {
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
   stakingState:[['enabled','正常开放'],['legacy','未下发开关（默认开放）'],['delisted','功能下架'],['error','质押读取失败（其他正常）']],
   stakingOpenState:[['readonly','只读预览'],['disclosure','开仓拒绝风险确认（HTTP 200 / code 409）'],['unknown','开仓结果未知 / 状态 NOT_FOUND']],
+  topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
   bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
-  streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
+  streakState:[['normal','连续签到'],['first','首次签到·连续 0 天'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
+  promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],
+  sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
+  promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
+  promotionRewardType:[['reward','首购 / 复购发 UVT'],['discount','首购 / 复购为订单立减'],['gift-discount','购机赠礼为订单立减']],
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
+  fleetState:[['normal','默认设备'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含仓库未激活设备'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
+  paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款结果读取失败'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','ERC20 未开通'],['low-balance','钱包余额不足（820.64 USDT）']],
 };
 const skuDefinitions = [
   ['stellarbox-s1','UVELBox S1','Entry',1299,6.2,3,'4 × RTX 4090','96 GB',1200],
@@ -71,7 +77,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
   return skuDefinitions.map(([id,name,tier,price,dailyEarn,dailyEarnNEX,gpu,vram,watts],index)=>{
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
     return {id,name,tier,price,dailyEarn,dailyEarnNEX,gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,vram,power:watts?watts+' W':null,hashRate:null,
-      tagline:localized(locale,['入门款 · 70B 大模型推理','旗舰款 · 训练与 405B 推理','进阶款 · 高性能推理','机架款 · 多任务并行','旗舰机架 · 大型算力作业','云算力 · 灵活参与'][index],['Starter · 70B model inference','Flagship · Training & 405B inference','Advanced · High-performance inference','Rack · Parallel workloads','Flagship rack · Large compute jobs','Cloud compute · Flexible access'][index],['Cơ bản · Suy luận mô hình 70B','Cao cấp · Huấn luyện và suy luận 405B','Nâng cao · Suy luận hiệu năng cao','Máy chủ · Tác vụ song song','Máy chủ cao cấp · Tác vụ tính toán lớn','Điện toán đám mây · Tham gia linh hoạt'][index]),badge:null,imageUrl:new URL(index<2||share?'/static/img/home-glass-20260928/'+(share?'cloud':index===0?'s1':'pro')+'.webp':'/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
+      tagline:localized(locale,['入门款 · 70B 大模型推理','旗舰款 · 训练与 405B 推理','进阶款 · 高性能推理','机架款 · 多任务并行','旗舰机架 · 大型算力作业','云算力 · 灵活参与'][index],['Starter · 70B model inference','Flagship · Training & 405B inference','Advanced · High-performance inference','Rack · Parallel workloads','Flagship rack · Large compute jobs','Cloud compute · Flexible access'][index],['Cơ bản · Suy luận mô hình 70B','Cao cấp · Huấn luyện và suy luận 405B','Nâng cao · Suy luận hiệu năng cao','Máy chủ · Tác vụ song song','Máy chủ cao cấp · Tác vụ tính toán lớn','Điện toán đám mây · Tham gia linh hoạt'][index]),badge:index===0?localized(locale,'推荐','Recommended','Đề xuất'):index===1?localized(locale,'热销','Best seller','Bán chạy'):null,imageUrl:new URL(index<2||share?'/static/img/home-glass-20260928/'+(share?'cloud':index===0?'s1':'pro')+'.webp':'/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock:share?null:state.catalogState==='soldout'&&index===0?0:60-index*7,sold:42+index*13,
       features:[],ai:null,datacenter:localized(locale,'新加坡','Singapore','Singapore'),uptime:'99.9%',warranty:share?undefined:localized(locale,'36 个月','36 months','36 tháng'),status:'active',available:!upcoming,
       releaseState:upcoming?'LOCKED':'RELEASED',releasePhaseId:upcoming?'phase-next':'phase-current',unlocksAtPhase:null,purchaseGate:null,
@@ -85,7 +91,7 @@ function demoOrders(products,state,now) {
   return Object.entries(orderStates).map(([original,statuses],i)=>{
     const orderNo='DEMO-ORDER-'+String(i+1).padStart(3,'0'),canonicalStatus=state.orderStatuses?.[orderNo]||original;
     const [paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus],product=products[i%products.length];
-    return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt:now-(i+1)*day,expiresAt:canonicalStatus==='placed'?now+15*60000:canonicalStatus==='expired'?now-day:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?now-i*day:null,activatedAt:canonicalStatus==='activated'?now-3600000:null,refundedAt:canonicalStatus==='refunded'?now-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:canonicalStatus==='activated'?41:null,targetDeviceInstanceNo:canonicalStatus==='activated'?'REVIEW-S1':null,itemCount:1};
+    return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt:now-(i+1)*day,expiresAt:canonicalStatus==='placed'?now+15*60000:canonicalStatus==='expired'?now-day:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?now-i*day:null,activatedAt:canonicalStatus==='activated'?now-3600000:null,refundedAt:canonicalStatus==='refunded'?now-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:canonicalStatus==='activated'?41:null,targetDeviceInstanceNo:canonicalStatus==='activated'?'REVIEW-S1':null,itemCount:1};
   });
 }
 
@@ -103,7 +109,7 @@ function demoEvents(locale,state,now) {
     const mode=state.eventState, eventCode='demo-'+code;
     const eventState=['upcoming','ended'].includes(mode)?mode:mode==='mixed'?baseState:'ongoing';
     const userStatus=state.eventStatuses?.[eventCode] || (['available','joined','claimable','claimed'].includes(mode)?mode.toUpperCase():baseStatus);
-    return {eventCode,kind,state:eventState,title:localized(locale,zh,en,vi),subtitle:localized(locale,'完成活动条件，查看进度并领取奖励。','Complete the activity goals and claim your reward.','Hoàn thành mục tiêu và nhận thưởng.'),rewardName:'UVT',rewardType:'NEX',rewardAmount,featured:i===0&&eventState==='ongoing',trackable:!['wheel','discount'].includes(kind),targetValue:5,progressValue:['CLAIMABLE','CLAIMED'].includes(userStatus)?5:userStatus==='JOINED'?2:0,userStatus,geo:'GLOBAL',href,startsAt:new Date(eventState==='upcoming'?now+day:now-3*day).toISOString(),endsAt:new Date(eventState==='ended'?now-day:now+7*day).toISOString()};
+    return {eventCode,kind,state:eventState,title:localized(locale,zh,en,vi),subtitle:localized(locale,'完成活动条件，查看进度并领取奖励。','Complete the activity goals and claim your reward.','Hoàn thành mục tiêu và nhận thưởng.'),rewardName:'UVT',rewardType:'UVT',rewardAmount,featured:i===0&&eventState==='ongoing',trackable:!['wheel','discount'].includes(kind),targetValue:5,progressValue:['CLAIMABLE','CLAIMED'].includes(userStatus)?5:userStatus==='JOINED'?2:0,userStatus,geo:'GLOBAL',href,startsAt:new Date(eventState==='upcoming'?now+day:now-3*day).toISOString(),endsAt:new Date(eventState==='ended'?now-day:now+7*day).toISOString()};
   });
 }
 
@@ -115,14 +121,55 @@ function genesisPublic(now) {
     marketStats:{floorUsdt:null,volume24hUsdt:null,owners:null,floorDeltaPct:null,lastSaleUsdt:null}};
 }
 
+function demoPhysicalSlots(url,locale,state,products,excludeOrderNo) {
+  const fleet=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
+  const active=fleet.devices.filter(device=>device.activatedAt!==null
+    &&['ACTIVE','ONLINE','BUSY','RUNNING','OFFLINE'].includes(device.status)).length;
+  // Static demoOrders() rows illustrate order states. Only actual session orders reserve slots.
+  const reserved=(state.createdOrders||[])
+    .filter(order=>order.orderNo!==excludeOrderNo&&(state.checkoutNoPendingReservation?['paid','provisioning']:['placed','paid','provisioning']).includes(order.canonicalStatus))
+    .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
+  return {used:active+reserved,cap:fleet.slotCap};
+}
+
+function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
+  const requested=lines.reduce((count,line)=>count+line.quantity,0);
+  const trial=trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false);
+  const capacity=demoPhysicalSlots(url,locale,state,products,excludeOrderNo);
+  const trialSlots=['ACTIVE','GRACE'].includes(trial.state)?1:0;
+  return capacity.used+trialSlots+requested<=capacity.cap;
+}
+
 /** Mutable state belongs only to the loopback demonstration server. */
 export function demoFixture(url,locale,state,request) {
   const now=Date.now(),iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin,locale);
+  if (pathname === '/api/config/phone-tiers') return { tiers: [1,2,3,4,5].map(tier => ({
+    tier, name:`Tier ${tier}`, baseRateUsdt:[.02,.04,.06,.09,.12][tier-1], baseRateNex:tier*.1, effectiveAt:iso,
+  })), sources:['Local prototype demo'] };
+  // Published home display feed (intro stats, home on-grid, trust card): one sample per second for two minutes.
+  if (pathname === '/api/config/home-display' && !empty) {
+    const startAt=Math.floor(now/1000)*1000, elapsed=Math.max(0,Math.floor((startAt-demoStartedAt)/1000));
+    const at=offset=>elapsed+offset, seconds=Array.from({length:121},(_,offset)=>at(offset));
+    return { enabled:true, startAt, serverNow:now, validUntil:startAt+120_000, sequence:elapsed,
+      online:seconds.map(t=>2968+Math.floor(t/45)), paidCents:seconds.map(t=>128465050+t*160+Math.floor(t/3)*29) };
+  }
+  const socialProduct = pathname.match(/^\/api\/storefront\/products\/([^/]+)\/social-proof$/);
+  if (socialProduct) {
+    const product = products.find(item => item.id === decodeURIComponent(socialProduct[1]));
+    if (!product) return undefined;
+    return { ...authority, source:'nx_product/nx_order/nx_order_item', productName:product.name,
+      cumulativeSales:empty?0:product.sold, windowDays:Number(url.searchParams.get('windowDays') || 30),
+      windowSales:empty?0:Math.floor(product.sold / 3),
+      liveActivity: { viewers:empty?0:24+Math.floor(Math.random()*92), sales24h:empty?0:8+Math.floor(Math.random()*30), sales30m:empty?0:1+Math.floor(Math.random()*7) } };
+  }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
-  const compute=computeDemo(url,locale,state,request);if(compute!==undefined)return compute;
-  const trial=trialDemo(url,locale,state,request,state.fleetState==='full');if(trial!==undefined)return trial;
+  if((state.computeState??'app')!=='app'){const compute=computeDemo(url,locale,state,request);if(compute!==undefined)return compute;}
+  if(pathname.startsWith('/api/trial/')) {
+    const capacity=demoPhysicalSlots(url,locale,state,products);
+    return trialDemo(url,locale,state,request,capacity.used>=capacity.cap);
+  }
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
   const remember=(operation,targetId,response,order)=>{
     if(commandKey){state.commands??={};state.commands[commandKey]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(order),response:structuredClone(response)};}
@@ -130,13 +177,6 @@ export function demoFixture(url,locale,state,request) {
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
   if(request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
-  // Published home display feed for the intro stats: one sample per second for two minutes.
-  if(pathname==='/api/config/home-display'&&!empty){
-    const startAt=Math.floor(now/1000)*1000,elapsed=Math.max(0,Math.floor((startAt-demoStartedAt)/1000));
-    const seconds=Array.from({length:121},(_,offset)=>elapsed+offset);
-    return {enabled:true,startAt,serverNow:now,validUntil:startAt+120_000,sequence:elapsed,
-      online:seconds.map(t=>2968+Math.floor(t/45)),paidCents:seconds.map(t=>128465050+t*160+Math.floor(t/3)*29)};
-  }
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     if(state.downloadState==='published') Object.assign(config.share.appDownload,{source:'official',officialUrl:'https://example.com/uvel',iosUrl:'https://example.com/uvel/ios',androidUrl:'https://example.com/uvel/android',version:'preview',releaseNotes:{zh:'本地预览示例链接',en:'Local preview example links'}});
@@ -145,16 +185,16 @@ export function demoFixture(url,locale,state,request) {
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
     Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0,activeJobsBase:state.jobsBaseState==='published'?1000:null});
-    // Verified aggregates feed the trust centre's platform figures; the empty fixture has none.
-    const aggregate=(value,kind)=>({value,definition:'Preview figure',kind});
-    config.publicStats.verified=empty?null:{activeAccounts:aggregate(8642,'COUNT'),registeredAccounts:aggregate(12480,'COUNT'),installedDevices:aggregate(3315,'COUNT'),onlineDevices:aggregate(2968,'COUNT'),completedPayoutUsdt:aggregate(1284650.5,'SUM'),capturedAt:new Date(demoStartedAt).toISOString()};
-    // The H9 globe split and drift; totals come from networkPulse.onlineDevices and the task-centre job count.
-    // Old shape: nodes as weights plus the retired jitter/ratio fields. B22 shape: sharePct only. The empty data state leaves it unpublished.
+    // Globe split and drift; totals come from networkPulse.onlineDevices and the task-centre job count.
     const globeCenters=[['sg',236000,18,12.5],['jp',253000,22,13],['vn',163000,26,8.5],['uk',249000,16,12],['fr',208000,20,10],['de',217000,14,11],['us-ny',316000,24,17],['us-sj',284000,17,16]];
-    if(!empty)config.publicStats.globeDisplay=state.globeShareState==='nodes'
+    // Old shape: nodes as weights plus the retired jitter/ratio fields. B22 shape: sharePct only.
+    config.publicStats.globeDisplay=state.globeShareState==='nodes'
       ?{intervalMs:5400,nodeJitterPct:.4,activeJobsMinPct:8,activeJobsMaxPct:14,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:globeCenters.map(([id,nodes,latencyMs])=>({id,nodes,latencyMs}))}
       :{intervalMs:5400,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:globeCenters.map(([id,,latencyMs,sharePct],i)=>({id,latencyMs,sharePct:state.globeShareState==='invalid'&&i===0?sharePct-10:sharePct}))};
     if(state.globeShareState==='missing')delete config.publicStats.globeDisplay;
+    // Verified aggregates feed the trust centre's platform figures; the empty fixture has none.
+    const aggregate=(value,kind)=>({value,definition:'Preview figure',kind});
+    config.publicStats.verified=empty?null:{activeAccounts:aggregate(8642,'COUNT'),registeredAccounts:aggregate(12480,'COUNT'),installedDevices:aggregate(3315,'COUNT'),onlineDevices:aggregate(2968,'COUNT'),completedPayoutUsdt:aggregate(1284650.5,'SUM'),capturedAt:new Date(demoStartedAt).toISOString()};
     if(empty){delete config.publicStats.registeredUsersBase;config.publicStats.networkPulse=null;}
     return withDemoShareChannels(config,state);
   }
@@ -175,9 +215,23 @@ export function demoFixture(url,locale,state,request) {
   const risk=riskDemo(url,locale,state,request);if(risk!==undefined)return risk;
   if(pathname==='/api/app/home/overview') {
     const overview=structuredClone(base());
-    // Same demo clients as the App preview; the server row carries gpus, which the card does not show.
-    if(!empty)overview.onGrid={...overview.onGrid,clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}]};
-    overview.earningsLedger=empty?[]:[['DEMO-EARNING-1','Demo Studio','SDXL',2.34],['DEMO-EARNING-2','Demo Lab','Llama',.00032],['DEMO-EARNING-3','Demo Lab','Whisper',.00005]].map(([id,client,model,rewardUsdt],index)=>({id,client,model,rewardUsdt,completedAt:new Date(now-(index+1)*600000).toISOString(),synthetic:false}));
+    // A settlement lands every 20s, so each Home refresh brings new rows for the live feed to reveal.
+    const settlementPool=[['Pocket Studios','SDXL Turbo',.0031],['Helix Labs','Llama 70B',.0024],['Echo Earbuds','Whisper tiny',.00009],['Mosaic','Flux dev',.0042],['Vector Foundry','MobileBERT',.00007],['Atrium AI','Qwen 7B',.0018]],settlementSlot=Math.floor(now/20000);
+    const recentSettlements=Array.from({length:12},(_,i)=>{const slot=settlementSlot-i,[client,model,rewardUsdt]=settlementPool[slot%settlementPool.length];return {id:'DEMO-SETTLE-'+slot,client,model,rewardUsdt,completedAt:new Date(slot*20000).toISOString(),synthetic:false};});
+    overview.earningsLedger=empty?[]:[...recentSettlements,...[['DEMO-EARNING-1','Demo Studio','SDXL',2.34],['DEMO-EARNING-2','Demo Lab','Llama',.00032],['DEMO-EARNING-3','Demo Lab','Whisper',.00005]].map(([id,client,model,rewardUsdt],index)=>({id,client,model,rewardUsdt,completedAt:new Date(now-(index+1)*600000).toISOString(),synthetic:false}))];
+    if(!empty){
+      overview.marketBoard={workloads:[
+        {code:'IG',name:'SDXL Turbo',unit:null,price:.003,deltaPct:4.2,sparkline:[.4,.5,.42,.55,.6,.7,.72],flagshipDeltaPct:null},
+        {code:'LL',name:'Llama 70B',unit:null,price:.0024,deltaPct:18.7,sparkline:[.3,.35,.4,.42,.6,.78,.88],flagshipDeltaPct:32.1},
+        {code:'VG',name:'Video generation',unit:null,price:.1,deltaPct:-1.2,sparkline:[.8,.75,.78,.72,.7,.72,.69],flagshipDeltaPct:null},
+      ],deviceRankings:[
+        {rank:1,kind:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,bestFor:null},
+        {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null},
+        {rank:3,kind:'phone',name:null,dailyUsdt:.06,bestFor:null},
+      ]};
+      overview.doTheMath={basis:'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',base:{kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2},target:{kind:'stellarbox-pro',productNo:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,priceUsdt:4999},multiplier:4,paybackDays:223};
+      overview.onGrid={clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}],activeDevices:3206,activeJobs:128,perSecUsdt:.028};
+    }
     return overview;
   }
   if(pathname==='/api/store/bundle-discount')return {source:'server',serverCanonical:true,policyVersion:1,tiers:[{minItems:2,rate:.04},{minItems:3,rate:.07},{minItems:4,rate:.11}]};
@@ -192,7 +246,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/config/v-ranks') {
     const data=structuredClone(base());
     const own=[0,320,640,2000,4000,8000,16000,32000,64000],team=[0,1280,6400,20000,64000,160000,480000,1280000,3200000];
-    data.ranks=data.ranks.map((rank,index)=>({...rank,cultivationBonus:rank.rewards.filter(reward=>reward.type==='NEX').reduce((sum,reward)=>sum+reward.amount,0),selfComputePoints:own[index],teamComputePoints:team[index]}));
+    data.ranks=data.ranks.map((rank,index)=>({...rank,cultivationBonus:rank.rewards.filter(reward=>reward.type==='UVT').reduce((sum,reward)=>sum+reward.amount,0),selfComputePoints:own[index],teamComputePoints:team[index]}));
     return data;
   }
   if(pathname==='/api/team/rank') {
@@ -213,21 +267,52 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/product/phase') return {phase:'P2',source:'H1_GROWTH_RHYTHM',devOverrideAllowed:false};
   if(pathname==='/api/store/purchase-eligibility') return {...authority,runId:null,productNo:url.searchParams.get('productNo'),eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',policies:[{policy:'E1',eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',mode:'ALL',conditions:state.catalogState==='restricted'?[{kind:'rank',required:3,current:2,gap:1,met:false}]:[]},{policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]}],evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
   if(pathname==='/api/app/team/quota')return {...authority,source:'server',generatedAt:iso,facts:{rank:state.highestRank?8:2,directRefs:3,directInvites:3,activeDirect:2,teamComputePoints:12800},tiers:products.filter(p=>p.productType==='DEVICE').map(p=>({productId:p.id,quotaCode:p.id.toUpperCase(),name:p.name,price:p.price,monthlyStock:60,soldThisMonth:p.sold,unlockKind:'ALL',conditions:[{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:empty?0:12800},...(state.catalogState==='restricted'?[{kind:'rank',required:3,current:2}]:[])],perks:[],available:p.available&&state.catalogState!=='restricted'}))};
-  if(pathname==='/api/app/trade-in/config')return {enabled:state.checkoutState==='tradein',eligibility:'NONE',outputRatioCutsPct:[20,40,60,80],creditRatesPct:[80,60,40,20,10],requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:7,source:'server'};
-  if(['/api/app/trade-in/eligibility','/api/app/trade-in/capacity-quote'].includes(pathname)){
+  const tradeinCuts=[25,50,75,100],tradeinRates=[75,60,45,30,15];
+  if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'OPEN',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:7,source:'server'};
+  if(pathname==='/api/app/trade-in/eligibility'){
+    // Paid devices may trade up to any higher-priced device SKU (PRD §7.5.1).
+    const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo)||products[0];
+    const devices=empty||product.productType!=='DEVICE'?[]:demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices;
+    const sources=devices.filter(d=>d.actualPaidUsdt>0).map(d=>{
+      const reasonCode=d.productCode.toLowerCase()===product.id?'TARGET_MUST_DIFFER':product.price>d.actualPaidUsdt?'OK':'HIGHER_PRICE_REQUIRED';
+      return {sourceDeviceId:d.id,sourceProductName:d.name,eligible:reasonCode==='OK',reasonCode};
+    });
+    const eligible=sources.some(source=>source.eligible);
+    return {enabled:!empty,eligible,decisionCode:eligible?'ELIGIBLE':'NO_ELIGIBLE_SOURCE',targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price,requireHigherPrice:true,maxDevicesPerOrder:1,sources,decisionSource:'server'};
+  }
+  const tradeinQuote=(sourceDeviceId,targetProductNo)=>{
+    const product=products.find(p=>p.id===targetProductNo)||products[0];
+    const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices.find(d=>d.id===sourceDeviceId);
+    if(!device)throw new Error('Unknown demo trade-in source');
+    const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
+    const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
+    return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
+  };
+  if(pathname==='/api/app/trade-in/quote'){const input=request.postDataJSON();return tradeinQuote(input.sourceDeviceId,input.targetProductNo);}
+  if(pathname==='/api/app/trade-in/submit'){
+    // Settles like the server: debit the payable, retire the old device, and put the new one in its place.
+    const input=request.postDataJSON(),quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo),product=products.find(p=>p.id===quote.targetProductNo);
+    if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
+    if(!quote.sufficientFunds)throw new Error('Insufficient demo balance');
+    state.walletBalance=Math.round((quote.walletBalanceUsdt-quote.payableUsdt)*100)/100;
+    (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
+    const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
+    const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;(state.deviceIds??={})[orderNo+'-0-0']=targetDeviceId;
+    const canonicalStatus=active?'activated':'inventory';
+    const order={...demoOrders(products,state,now)[0],orderNo,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:'WALLET',orderType:'TRADE_IN',itemCount:1,
+      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo:orderNo+'-0-0',
+      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,activatedAt:active?now:null};
+    (state.createdOrders||=[]).unshift(order);
+    return remember('tradeinSubmit',orderNo,{tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance},order);
+  }
+  if(pathname==='/api/app/trade-in/capacity-quote'){
     const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo)||products[0],data=structuredClone(base());
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
-    if(pathname.endsWith('capacity-quote')) {
-      if(state.checkoutState==='capacity-error')throw Object.assign(new Error('CAPACITY_UNAVAILABLE'),{status:503});
-      if(state.checkoutState==='setup-required')throw Object.assign(new Error('USER_ONBOARDING_REQUIRED'),{status:428});
-      Object.assign(data,{activeDevices:2,payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
-      if(state.checkoutState==='replace')Object.assign(data,{decision:'REPLACE_REQUIRED',maxActiveDevices:2,sourceDeviceId:41,sourceDeviceName:'UVELBox S1'});
-    } else if(state.checkoutState==='tradein'&&product.price>1299)Object.assign(data,{eligible:true,decisionCode:'ELIGIBLE',sources:[{sourceDeviceId:41,sourceProductName:'UVELBox S1',eligible:true,reasonCode:'OK'}]});
+    if(state.checkoutState==='capacity-error')throw Object.assign(new Error('CAPACITY_UNAVAILABLE'),{status:503});
+    if(state.checkoutState==='setup-required')throw Object.assign(new Error('USER_ONBOARDING_REQUIRED'),{status:428});
+    if(pathname.endsWith('capacity-quote'))Object.assign(data,{activeDevices:2,payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
+    if(state.checkoutState==='replace')Object.assign(data,{decision:'REPLACE_REQUIRED',maxActiveDevices:2,sourceDeviceId:41,sourceDeviceName:'UVELBox S1'});
     return data;
-  }
-  if(pathname==='/api/app/trade-in/quote') {
-    const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo),discount=1039.2,payable=product.price-discount;
-    return {sourceDeviceId:41,sourceRowVersion:1,targetDeviceStatus:'ACTIVE',sourceProductName:'UVELBox S1',targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:1299,cumulativeOutputUsdt:100,outputRatioPct:7.7,creditRatePct:80,discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:state.walletBalance??52800.64,walletShortfallUsdt:0,sufficientFunds:true,discountToWallet:false,pricingSource:'server'};
   }
   if(pathname==='/api/orders/quote') {
     const input=request.postDataJSON();
@@ -242,16 +327,21 @@ export function demoFixture(url,locale,state,request) {
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
     let remaining=bundleDiscount+voucherDiscount(state,input.voucherId,Number(subtotal)-bundleDiscount);quote.discountUsdt=remaining.toFixed(2);quote.amountUsdt=(Number(subtotal)-remaining).toFixed(2);
     for(const line of items){const discount=Math.min(remaining,Number(line.subtotalUsdt));line.discountUsdt=discount.toFixed(2);line.payableUsdt=(Number(line.subtotalUsdt)-discount).toFixed(2);remaining-=discount;}
+    if(!demoOrderFitsCapacity(url,locale,state,products,items)){
+      quote.eligibility='INELIGIBLE';
+      quote.warnings.push({zh:'设备槽不足，请先在设备管理中腾出位置或减少购买数量。',en:'Not enough device slots. Free up a slot in device management or reduce the quantity.',vi:'Không đủ vị trí thiết bị. Hãy giải phóng vị trí trong phần quản lý thiết bị hoặc giảm số lượng mua.'});
+    }
     state.quotes||={};state.quotes[quote.quoteId]=quote;return quote;
   }
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);
   if(pathname==='/api/genesis/account') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:{...authority,series:null,sale:null,eligibility:null,marketEnabled:false,emissionOpen:false,holdings:[],emissions:[],orders:[],walletBalanceUsdt:5280};
-  if(pathname==='/api/genesis/eligibility') return {...authority,eligible:false,reasons:['SALE_NOT_OPEN'],ownedCount:0,maxPerUser:2,remainingCap:2,minAccountAgeDays:0,accountAgeDays:42,status:'NOT_ELIGIBLE',reservedAllocation:null,reservedAllocationUnit:'NEX',priorityRank:null,priorityTier:'NONE',qualificationReasonCodes:['NO_ACTIVE_HOLDINGS'],policyVersion:null,effectiveAt:null,asOf:iso,serverTime:iso,provenance:{source:'nx_genesis_holding+nx_config_item',environment:'PRODUCTION',runId:''},halted:false};
+  if(pathname==='/api/genesis/eligibility') return {...authority,eligible:false,reasons:['SALE_NOT_OPEN'],ownedCount:0,maxPerUser:2,remainingCap:2,minAccountAgeDays:0,accountAgeDays:42,status:'NOT_ELIGIBLE',reservedAllocation:null,reservedAllocationUnit:'UVT',priorityRank:null,priorityTier:'NONE',qualificationReasonCodes:['NO_ACTIVE_HOLDINGS'],policyVersion:null,effectiveAt:null,asOf:iso,serverTime:iso,provenance:{source:'nx_genesis_holding+nx_config_item',environment:'PRODUCTION',runId:''},halted:false};
   if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:empty?[]:[...(state.createdOrders||[]),...demoOrders(products,state,now)],nextCursor:null};
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
     const lines=quote?.items||input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))||[{productNo:input.productNo,quantity:input.quantity}],product=products.find(p=>p.id===lines[0].productNo);
     if(lines.some(line=>!products.some(p=>p.id===line.productNo)||!Number.isInteger(line.quantity)||line.quantity<1))throw new Error('Invalid demo order items');
+    if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
     const quantity=lines.reduce((s,l)=>s+l.quantity,0),subtotal=lines.reduce((s,l)=>s+products.find(p=>p.id===l.productNo).price*l.quantity,0),discountRate=bundleRate(lines.length),bundleDiscount=Number((subtotal*discountRate).toFixed(2)),voucherAmount=voucherDiscount(state,input.voucherId??quote?.voucherId,subtotal-bundleDiscount),amount=Number(quote?.amountUsdt??(subtotal-bundleDiscount-voucherAmount).toFixed(2));
     if(input.productNos&&(input.policyVersion!==1||Math.abs(input.expectedAmountUsdt-amount)>0.000001))throw new Error('Demo bundle quote changed');
     const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:quote?amount.toFixed(2):amount,placedAt:now,orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
@@ -268,6 +358,7 @@ export function demoFixture(url,locale,state,request) {
     if(!order) return {};
     const replay=order.paymentStatus==='PAID';
     if(action==='pay'&&!['PENDING','PAID'].includes(order.paymentStatus)||action==='cancel'&&order.paymentStatus==='PAID')throw new Error('Demo order action unavailable');
+    if(action==='pay'&&!replay&&state.createdOrders?.includes(order)&&!demoOrderFitsCapacity(url,locale,state,products,order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
     if(action==='pay'&&!replay){if(Number(order.amountUsdt)>(state.walletBalance??52800.64))throw new Error('Insufficient demo balance');state.walletBalance=(state.walletBalance??52800.64)-Number(order.amountUsdt);}
     state.orderStatuses||={};state.orderStatuses[orderNo]=action==='pay'?'activated':'cancelled';
     const canonicalStatus=state.orderStatuses[orderNo],[paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus];
@@ -278,24 +369,38 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
     const sample=base('/api/promotions').items[0];
-    const configs=[['SKU_GIFT','买 UVELBox S1','Buy UVELBox S1','Mua UVELBox S1','stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
+    const configs=[['SKU_GIFT','买 S1，送 Cloud Share','Buy S1, get Cloud Share','Mua S1, tặng Cloud Share','stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
     if(state.machineImageState==='alternate'){
-      configs[0]=['SKU_GIFT','买 UVELBox Pro','Buy UVELBox Pro','Mua UVELBox Pro','stellarbox-pro'];
+      configs[0]=['SKU_GIFT','买 Pro，送 S1','Buy Pro, get S1','Mua Pro, tặng S1','stellarbox-pro'];
       configs[2][4]='stellarrack-p1';
     }
     const items=empty||state.eventState==='empty'?[]:configs.map(([template,zh,en,vi,productNo],i)=>{
       const item=structuredClone(sample);item.activityId='demo-promo-'+i;item.template=template;item.title={zh,en,vi};item.productNos=template==='MULTI_PRODUCT'?['stellarbox-pro','stellarrack-p1','stellarbox-s1']:[productNo];item.placement=[0,1,4].includes(i)?'home.purchase-promotion':null;
       item.rewardRules[0].productNo=productNo;item.rewardRules[0].ruleId='demo-rule-'+i;
       item.serverTime=iso;
+      // Landing pages (P-58): eligibility follows the panel switch; first purchase and repurchase end in under six days.
+      item.eligibility={eligible:'ESTIMATE_ELIGIBLE','sign-in':'SIGN_IN_REQUIRED',ineligible:'INELIGIBLE',unknown:'UNKNOWN'}[state.promotionEligibility]||'ESTIMATE_ELIGIBLE';
+      if(i>0)item.endsAt=new Date(now+6*day-19*60000).toISOString();
       if(i===0){
-        item.endsAt=new Date(now+29*day).toISOString();
+        item.startsAt=new Date(now-2*day).toISOString();item.endsAt=new Date(now+28*day-60*60000).toISOString();
         const alternate=state.machineImageState==='alternate',giftName=alternate?'UVELBox S1':'Cloud Share';
         const reward=item.rewardRules[0].buyerReward;reward.giftProductNo=alternate?'stellarbox-s1':'cloud-share';reward.quantity=1;
         reward.disclosure.deviceName=giftName;
         reward.disclosure.benefitDescription={zh:'送 '+giftName+' 1 份',en:'Get 1 '+giftName,vi:'Tặng 1 '+giftName};
+        reward.disclosure.terms={zh:'订单付款完成后，赠品发放到你的设备仓库。',en:'Once the order is paid, the gift is added to your device inventory.',vi:'Sau khi đơn hàng được thanh toán, quà tặng sẽ vào kho thiết bị của bạn.'};
+        reward.disclosure.refundTerms={zh:'整单退款时，赠品随订单一并撤销。',en:'If the whole order is refunded, the gift is withdrawn with it.',vi:'Khi hoàn tiền toàn bộ đơn hàng, quà tặng sẽ bị thu hồi cùng đơn.'};
+        reward.disclosure.deviceRights={activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:365,taskEnabled:true,countsAsDeviceHolding:true,countsForRank:false,transferable:false,exchangeable:false,revocationMode:'REVOKE_IF_UNUSED'};
+        if(state.promotionRewardType==='gift-discount'){const {disclosure}=reward;item.rewardRules[0].buyerReward={rewardRuleId:reward.rewardRuleId,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:'100',disclosure:{...disclosure,deviceName:null,deviceRights:null}};}
       }
-      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward={rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'NEX',amount:String(i*50),disclosure:d};}
+      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&[1,4].includes(i)?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(i*10),disclosure:d}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
       if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
+      // Boundary scenarios flip on the clock, one minute after the switch.
+      const edge=(state.promotionTimingAt||now)+60000;
+      if(state.promotionTiming==='starting'){item.startsAt=new Date(edge).toISOString();item.state=now<edge?'SCHEDULED':'ACTIVE';}
+      else if(state.promotionTiming==='ending'){item.endsAt=new Date(edge).toISOString();item.state=now<edge?'ACTIVE':'ENDED';}
+      // Like PromotionPublicService, an offer that is not running is never eligible.
+      if(item.state!=='ACTIVE')item.eligibility='INELIGIBLE';
+      if(state.machineImageState==='banner'&&item.state==='ACTIVE')item.bannerImageUrl=`/api/promotions/${item.activityId}/banner/${item.version}`;
       return item;
     });
     if(pathname!=='/api/promotions') return items.find(item=>item.activityId===pathname.split('/').pop())||{};
@@ -391,11 +496,11 @@ export function demoFixture(url,locale,state,request) {
   if(eventRoute) {
     const [,id,action]=eventRoute,event=events.find(item=>item.eventCode===id);
     if(!event) return {};
-    if(action==='detail') return {event,rules:{description:event.subtitle,terms:localized(locale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.')},enabled:event.state!=='ended',eligible:event.state==='ongoing',eligibilityReason:event.state==='upcoming'?'NOT_STARTED':event.state==='ended'?'ENDED':event.userStatus==='CLAIMED'?'CLAIMED':event.userStatus==='CLAIMABLE'?'READY':'IN_PROGRESS',progressValue:event.progressValue,targetValue:event.targetValue,rewards:[{type:'NEX',amount:event.rewardAmount}],results:[],userStatus:event.userStatus,claimKeys:[],reminderSubscribed:!!state.reminders?.includes(id)};
+    if(action==='detail') return {event,rules:{description:event.subtitle,terms:localized(locale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.')},enabled:event.state!=='ended',eligible:event.state==='ongoing',eligibilityReason:event.state==='upcoming'?'NOT_STARTED':event.state==='ended'?'ENDED':event.userStatus==='CLAIMED'?'CLAIMED':event.userStatus==='CLAIMABLE'?'READY':'IN_PROGRESS',progressValue:event.progressValue,targetValue:event.targetValue,rewards:[{type:'UVT',amount:event.rewardAmount}],results:[],userStatus:event.userStatus,claimKeys:[],reminderSubscribed:!!state.reminders?.includes(id)};
     if(action==='join'){state.eventStatuses||={};state.eventStatuses[id]='JOINED';return {eventId:id,status:'JOINED'};}
-    if(action==='claim'){state.eventStatuses||={};state.eventStatuses[id]='CLAIMED';return {eventId:id,rewardType:'NEX',rewardAmount:event.rewardAmount,badgeCode:null};}
+    if(action==='claim'){state.eventStatuses||={};state.eventStatuses[id]='CLAIMED';return {eventId:id,rewardType:'UVT',rewardAmount:event.rewardAmount,badgeCode:null};}
     if(action==='reminder'){state.reminders||=[];state.reminders.push(id);return {eventId:id,status:'SUBSCRIBED'};}
-    const segments=[5,10,20,50,100,200].map((amount,index)=>({tierId:'demo-tier-'+index,rewardType:'NEX',rewardAmount:amount,rewardName:amount+' UVT',realOutflow:false,displayOrder:index}));
+    const segments=[5,10,20,50,100,200].map((amount,index)=>({tierId:'demo-tier-'+index,rewardType:'UVT',rewardAmount:amount,rewardName:amount+' UVT',realOutflow:false,displayOrder:index}));
     if(action==='spin/state') return {eventCode:id,eventId:id,serverDate:iso.slice(0,10),nextResetAtUtc:new Date(now+day).toISOString(),freeAvailable:!state.spun,bonusTickets:0,availableSpins:state.spun?0:1,segments,history:state.spinHistory||[],source:'nx_event_spin'};
     state.spun=true;const result={spinId:'demo-spin-'+now,eventId:id,spinDate:iso.slice(0,10),sourceType:'DAILY',...segments[2],downgraded:false,downgradeReason:'NONE'};state.spinHistory=[{...result,awardedAt:iso}];return result;
   }
@@ -403,24 +508,33 @@ export function demoFixture(url,locale,state,request) {
     const data=base();
     if(empty) return data;
     const unlocked=state.taskState==='claimed'||state.taskState==='complete';
+    // Like the design boards: a 12-day streak (13 once checked in today), one saver in hand.
+    const dayOf=t=>new Date(t).toISOString().slice(0,10);
+    if(state.streakState==='normal')data.streak={...data.streak,currentStreak:state.checkedIn?13:12,longestStreak:state.checkedIn?13:12,streakSavers:1,lastCheckInDate:dayOf(state.checkedIn?now:now-day),checkedInToday:!!state.checkedIn};
+    if(state.streakState==='first')data.streak={...data.streak,currentStreak:state.checkedIn?1:0,longestStreak:state.checkedIn?1:0,streakSavers:0,lastCheckInDate:state.checkedIn?dayOf(now):null,checkedInToday:!!state.checkedIn};
     if(state.streakState==='broken'&&!state.saverUsed)data.streak={...data.streak,currentStreak:state.checkedIn?1:0,longestStreak:7,streakSavers:state.checkedIn?0:1,lastCheckInDate:new Date(state.checkedIn?now:now-3*day).toISOString().slice(0,10),checkedInToday:!!state.checkedIn};
     if(state.saverUsed)data.streak={...data.streak,currentStreak:state.checkedIn?8:7,longestStreak:state.checkedIn?8:7,streakSavers:0,lastCheckInDate:new Date(state.checkedIn?now:now-day).toISOString().slice(0,10),checkedInToday:!!state.checkedIn};
-    data.dailyMilestones=[3,7,14,30].map((milestoneDay,i)=>({milestoneId:i+1,milestoneDay,rewardType:'NEX',rewardAmount:(i+1)*20,badgeCode:null,status:state.milestoneClaims?.includes(i+1)?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
+    // Mirrors the backend seeds (nx_growth_checkin_rule / nx_streak_milestone / nx_streak_power_up); day 3 is already claimed in the 12-day scenario.
+    data.rules=[['baseline','1'],['bonus7','5'],['luckyMultiplierMax','2'],['p15','15'],['p2','5'],['broken','48'],['revive','1']].map(([key,value])=>({key,value}));
+    data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:state.milestoneClaims?.includes(i+1)||state.streakState==='normal'&&milestoneDay===3?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
     data.earningMilestones=[10,100,1000].map((amount,i)=>({milestoneId:'demo-earning-'+i,thresholdUsdt:amount,rewardNex:amount,lifetimeEarningsUsdt:128.5,status:i===0||i===1&&state.earningClaimed?'FIRED':i===1?'CLAIMABLE':'LOCKED',achievedAt:i===0||i===1&&state.earningClaimed?iso:null}));
     const names=locale==='zh'?['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星']:locale==='vi'?['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']:['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'];
     data.badgeAchievements=names.map((name,i)=>({achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],rewardPoints:50*(i+1),status:i<2||unlocked?'UNLOCKED':'LOCKED',unlockedAt:i<2||unlocked?iso:null}));
-    data.powerUps=[{powerUpId:1,powerUpCode:'demo-checkin-boost',name:localized(locale,'签到加成','Check-in boost','Thưởng điểm danh'),unlockStreakDays:3,targetPath:'/pages/daily/daily',effectType:'CHECKIN_MULTIPLIER',effectValue:'1.5',status:state.powerUp?'ACTIVATED':'AVAILABLE',businessAvailable:true}];
+    // Route badges keep the seeded Chinese name (the App localizes them); the check-in boost is the B17 multiplier.
+    data.powerUps=[[1,'ROYALTY_BOOST','团队成长徽章','/team',7,'ROUTE_BADGE','连续签到 7 天可查看团队成长权益',null],[2,'STREAK_BADGE','连续签到徽章','/me/rewards',14,'ROUTE_BADGE','连续签到 14 天解锁专属徽章',null],[3,'CHECKIN_BOOST',localized(locale,'签到加成','Check-in boost','Thưởng điểm danh'),'/daily',30,'CHECKIN_MULTIPLIER','1.5',null],[4,'GENESIS_ALLOWLIST','Genesis 资格入口','/market/genesis',60,'ROUTE_BADGE','连续签到 60 天解锁 Genesis 资格入口',true]]
+      .map(([powerUpId,powerUpCode,name,targetPath,unlockStreakDays,effectType,effectValue,businessAvailable])=>({powerUpId,powerUpCode,name,unlockStreakDays,targetPath,effectType,effectValue,status:state.powerUps?.includes(powerUpId)?'ACTIVATED':data.streak.currentStreak>=unlockStreakDays?'AVAILABLE':'LOCKED',businessAvailable}));
     if(state.scopeState==='mixed') data.powerUps.push(
-      {powerUpId:2,powerUpCode:'STAKING_APY',name:'质押活动入口',unlockStreakDays:30,targetPath:'/wallet/staking',effectType:'ROUTE_BADGE',effectValue:'0',status:'LOCKED',businessAvailable:true},
-      {powerUpId:3,powerUpCode:'ROYALTY_BOOST',name:'团队成长徽章',unlockStreakDays:7,targetPath:'/team',effectType:'ROUTE_BADGE',effectValue:'0',status:'AVAILABLE',businessAvailable:true},
-      {powerUpId:4,powerUpCode:'demo-unknown',name:localized(locale,'成长徽章','Growth badge','Huy hiệu phát triển'),unlockStreakDays:60,targetPath:'/team',effectType:'UNKNOWN_RAW_EFFECT',effectValue:'10',status:'AVAILABLE',businessAvailable:true});
-    data.topStreakers=[{name:'Maya',countryCode:'SG',streak:28},{name:'Linh',countryCode:'VN',streak:24},{name:'Alex',countryCode:'JP',streak:14}];
+      {powerUpId:5,powerUpCode:'STAKING_APY',name:'质押活动入口',unlockStreakDays:30,targetPath:'/wallet/staking',effectType:'ROUTE_BADGE',effectValue:'0',status:'LOCKED',businessAvailable:true},
+      {powerUpId:6,powerUpCode:'demo-unknown',name:localized(locale,'成长徽章','Growth badge','Huy hiệu phát triển'),unlockStreakDays:60,targetPath:'/team',effectType:'UNKNOWN_RAW_EFFECT',effectValue:'10',status:'AVAILABLE',businessAvailable:true});
+    data.topStreakers=[{name:'Daniel_K',countryCode:'US',streak:412},{name:'Mei_C',countryCode:'SG',streak:387},{name:'Lukas_F',countryCode:'DE',streak:341},{name:'Carlos_M',countryCode:'BR',streak:298},{name:'Priya_S',countryCode:'IN',streak:256}];
     return data;
   }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
-  if(milestoneClaim){const id=Number(milestoneClaim[1]);state.milestoneClaims||=[];state.milestoneClaims.push(id);return {...authority,milestoneId:id,milestoneDay:[3,7,14,30][id-1],rewardType:'NEX',rewardAmount:id*20,badgeCode:null,spinTickets:0};}
-  if(pathname==='/api/points/power-ups/1/activate'){state.powerUp=true;return {...authority,powerUpId:1,powerUpCode:'demo-checkin-boost',badgeCode:null,status:'ACTIVATED'};}
-  if(pathname==='/api/points/sign-in'&&(state.saverUsed||state.streakState==='broken')){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:5,rewardNex:5,streakBonusNex:0,multiplier:1,streakDays:state.saverUsed?8:1};}
+  if(milestoneClaim){const id=Number(milestoneClaim[1]),[milestoneDay,rewardType,rewardAmount,badgeCode]=demoStreakMilestones[id-1];state.milestoneClaims||=[];state.milestoneClaims.push(id);return {...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};}
+  const powerUpActivate=pathname.match(/^\/api\/points\/power-ups\/([1-4])\/activate$/);
+  if(powerUpActivate){const id=Number(powerUpActivate[1]);state.powerUps||=[];state.powerUps.push(id);return {...authority,powerUpId:id,powerUpCode:['ROYALTY_BOOST','STREAK_BADGE','CHECKIN_BOOST','GENESIS_ALLOWLIST'][id-1],badgeCode:null,status:'ACTIVATED'};}
+  if(pathname==='/api/points/sign-in'&&(state.saverUsed||state.streakState!=='normal')){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:1,rewardNex:1,streakBonusNex:0,multiplier:1,streakDays:state.saverUsed?8:1};}
+  if(pathname==='/api/points/sign-in'){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:1,rewardNex:1,streakBonusNex:0,multiplier:1,streakDays:13};}
   if(pathname==='/api/points/streak-saver/use'){if(state.streakState!=='broken'||state.saverUsed||state.checkedIn)throw new Error('No interrupted streak to restore');state.saverUsed=true;return {...authority,restoredStreak:7,streakSavers:0,effectiveLastCheckInDate:new Date(now-day).toISOString().slice(0,10)};}
   if(pathname==='/api/earnings/milestones/evaluate'){const fired=state.earningClaimed?[]:[{milestoneId:'demo-earning-1',thresholdUsd:100,rewardNex:100,lifetimeEarningsUsd:128.5}];state.earningClaimed=true;return {...authority,fired,count:fired.length};}
   if(pathname==='/api/app/security') return {twoFactorEnabled:state.twoFactorEnabled??true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};
@@ -432,7 +546,9 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/devices/earnings') {
     const data=base();data.walletUsdt=empty?0:state.paymentState==='low-balance'?820.64:state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
     if(state.checkoutState==='replace')data.slotCap=2;
-    data.devices=empty?[]:data.devices.concat({...data.devices[0],id:42,instanceNo:'DEMO-CLOUD',name:'Cloud Share',productCode:'CLOUD-SHARE',deviceType:'CLOUD',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}).map(device=>({...device,runtimeStatus:'ONLINE'}));
+    // Lite compute scenarios pair device 42 with their Cloud Share cycle.
+    if(!empty&&(state.computeState??'app')!=='app')data.devices=data.devices.concat({...data.devices[0],id:42,instanceNo:'DEMO-CLOUD',name:'Cloud Share',productCode:'CLOUD-SHARE',deviceType:'CLOUD',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}).map(device=>({...device,runtimeStatus:'ONLINE'}));
+    else data.devices=empty?[]:data.devices.concat({...data.devices[0],id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}).map(device=>({...device,runtimeStatus:'ONLINE'}));
     if(!empty&&state.machineImageState==='alternate')Object.assign(data.devices.at(-1),{instanceNo:'DEMO-RACK',name:'UVELRack P1',productCode:'STELLARRACK-P1',dailyUsdt:45,dailyNex:30,actualPaidUsdt:12999});
     if(!empty&&state.scopeState==='mixed'&&state.fleetState!=='phone-history') data.devices.push({...data.devices[0],id:43,instanceNo:'DEMO-PHONE',name:'Phone',deviceType:'PHONE',productCode:'PHONE',dailyUsdt:0.1,dailyNex:0,todayEarningsUsdt:0,todayEarningsNex:0,actualPaidUsdt:0});
     if(!empty)for(const order of state.createdOrders||[])if(['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
@@ -449,7 +565,6 @@ export function demoFixture(url,locale,state,request) {
       if(state.fleetState==='phone-history')for(const [id,type]of [[43,'PHONE'],[44,'MOBILE']])data.devices.push(clone(id,type,`Demo ${type}`,1,0,{deviceType:type}));
       if(state.fleetState==='inventory')data.devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       if(state.fleetState==='full'){
-        data.devices.push(clone(48,'STELLARBOX-S1','UVELBox S1',6.2,1299,{}));
         data.devices.push(clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),clone(46,'CLOUD-SHARE','Cloud Share',0.6,19.9,{todayEarningsUsdt:.2}));
         data.devices.push(clone(47,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       }
@@ -457,15 +572,11 @@ export function demoFixture(url,locale,state,request) {
       if(state.fleetState==='reserved'){const trialSlots=['active','final-day','grace'].includes(state.trialState)?1:0;data.slotsUsed=data.devices.filter(d=>d.activatedAt!==null).length+trialSlots+1;data.reservedSlotCount=1;data.trialSlotCount=trialSlots;}
     }
     if(state.stoppedDevices?.length)data.devices=data.devices.map(device=>state.stoppedDevices.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device);
-    const trial=trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false);
-    data.trialSlotCount=['ACTIVE','GRACE'].includes(trial.state)?1:0;
-    data.reservedSlotCount=state.fleetState==='reserved'?1:0;
-    data.slotsUsed=data.devices.filter(device=>device.activatedAt!==null).length+data.trialSlotCount+data.reservedSlotCount;
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
-    const bills=empty?[]:[['COMPUTE_EARNING','NEX','IN',15,'earn'],['REFERRAL_REWARD','NEX','IN',10,'refer'],['DEVICE_PURCHASE','USDT','OUT',1299,'purchase'],['CHECK_IN','NEX','IN',5,'bonus'],['COMPUTE_EARNING','USDT','IN',128.5,'earn'],['COMPUTE_EARNING','USDT','IN',0.00032,'earn']].map(([bizType,asset,direction,amount,category],i)=>({id:'demo-bill-'+i,bizNo:'DEMO-'+(1000+i),bizType,asset,direction,amount,balanceAfter:asset==='NEX'?1280:5280.64,status:'SUCCESS',remark:'',createdAt:new Date(now-i*day).toISOString(),category}));
-    if(pathname.endsWith('/summary')) return {source:'server',sourceEnvironment:'PRODUCTION',timeZone:'UTC',asOf:iso,rewardsUsdt:empty?0:128.5,rewardsNex:empty?0:150,settledRewardsNex:empty?0:140,withdrawalOffsetNexSpent:empty?0:10,latestRewardAt:empty?null:iso,todayNexEarn:empty?0:15,pendingNex:empty?0:10,monthBillCount:bills.length,recentNexBills:bills.filter(b=>b.asset==='NEX')};
+    const bills=empty?[]:[['COMPUTE_EARNING','UVT','IN',15,'earn'],['REFERRAL_REWARD','UVT','IN',10,'refer'],['DEVICE_PURCHASE','USDT','OUT',1299,'purchase'],['CHECK_IN','UVT','IN',5,'bonus'],['COMPUTE_EARNING','USDT','IN',128.5,'earn'],['COMPUTE_EARNING','USDT','IN',0.00032,'earn']].map(([bizType,asset,direction,amount,category],i)=>({id:'demo-bill-'+i,bizNo:'DEMO-'+(1000+i),bizType,asset,direction,amount,balanceAfter:asset==='UVT'?1280:5280.64,status:'SUCCESS',remark:'',createdAt:new Date(now-i*day).toISOString(),category}));
+    if(pathname.endsWith('/summary')) return {source:'server',sourceEnvironment:'PRODUCTION',timeZone:'UTC',asOf:iso,rewardsUsdt:empty?0:128.5,rewardsNex:empty?0:150,settledRewardsNex:empty?0:140,withdrawalOffsetNexSpent:empty?0:10,latestRewardAt:empty?null:iso,todayNexEarn:empty?0:15,pendingNex:empty?0:10,monthBillCount:bills.length,recentNexBills:bills.filter(b=>b.asset==='UVT')};
     const filtered=bills.filter(bill=>['asset','direction'].every(key=>!url.searchParams.get(key)||url.searchParams.get(key)===bill[key])&&(url.searchParams.get('category')!=='REWARD'||bill.direction==='IN'));
     return {source:'server',sourceEnvironment:'PRODUCTION',bills:filtered,page:1,pageSize:20,total:filtered.length,nextPage:null,nextCursor:null};
   }

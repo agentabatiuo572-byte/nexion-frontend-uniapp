@@ -43,7 +43,7 @@
             <NexChart :data="nexChartData" :up="nexUp" />
           </view>
           <view v-else class="rounded-xl flex items-center justify-center" :style="chartBoxStyle">
-            <text class="active:opacity-70" :style="marketHoldBodyStyle" role="button" tabindex="0" :aria-label="market.remoteError ? t.ui.retry : historyUnavailableText" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : historyUnavailableText }}</text>
+            <text class="active:opacity-70" :style="[marketHoldBodyStyle, market.remoteError ? { font: '600 13px/20px var(--font-v5)' } : {}]" role="button" tabindex="0" :aria-label="market.remoteError ? t.ui.retry : historyUnavailableText" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : historyUnavailableText }}</text>
           </view>
 
           <!-- buy / sell CTAs -->
@@ -225,7 +225,7 @@ function segItemStyle(active: boolean): CSSProperties {
 function segLabelStyle(active: boolean): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",

@@ -3,13 +3,37 @@ import { createPinia, setActivePinia } from "pinia";
 import ts from "typescript";
 import { computed, effectScope, nextTick, reactive, ref, watch, type Ref } from "vue";
 import { ApiError } from "@/api/errors";
-import { isSettledRejection } from "@/api/errors";
+import { isConversationDeliveryAmbiguous, isConversationPeerChanged } from '@/lib/conversation-delivery-policy';
 import { isSupportAttachmentNotReady } from "@/api/support-api";
+import { fmt } from '@/i18n/format';
+import { MESSAGE_MAX_LENGTH, normalizeMessageText } from '@/lib/message-length-policy';
+import { createConversationSendBudgets } from '@/lib/send-limiter';
 import appSource from "../App.vue?raw";
 import meSource from "../pages/me/me.vue?raw";
 import securitySource from "../pages/me/security.vue?raw";
 import chatSource from "../pages/support/chat.vue?raw";
 import { zh } from "../i18n/messages/zh";
+
+const chatAst = ts.createSourceFile('chat.ts', chatSource.split('<script setup lang="ts">')[1].split('</script>')[0], ts.ScriptTarget.ES2022, true);
+function extractChat(names: string[]) {
+  return ts.transpileModule(names.map(name => {
+    const node = chatAst.statements.find(statement => ts.isFunctionDeclaration(statement) ? statement.name?.text === name
+      : ts.isVariableStatement(statement) && statement.declarationList.declarations.some(d => d.name.getText(chatAst) === name));
+    expect(node, `Missing production declaration: ${name}`).toBeDefined();
+    return node!.getText(chatAst);
+  }).join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+}
+const sendPolicyDeps = { ApiError, fmt, MESSAGE_MAX_LENGTH, normalizeMessageText };
+function humanSendHarness(inputs: Record<string, unknown>) {
+  const deps = { ref, computed, ...sendPolicyDeps, isSupportAttachmentNotReady, isConversationDeliveryAmbiguous, isConversationPeerChanged, t: ref(zh),
+    conversationSendLimiter: createConversationSendBudgets(), isAi: ref(false),
+    chatDisposed: false, pageVisible: true, ...inputs };
+  const code = extractChat(['localHumanSend', 'localHumanSequence', 'sendSuccessRevision', 'sendSuccessOwner', 'threadComposerKey', 'noteSendSuccess',
+    'SEND_MAX', 'SEND_WINDOW_MS', 'SEND_MIN_GAP_MS', 'sendLimiter', 'bindHumanDispatchKey',
+    'onSend', 'retryHumanSend', 'sendHumanMessage', 'stageHumanSend', 'humanSendFailed']);
+  return new Function('deps', `const {${Object.keys(deps).join(',')}} = deps; ${code}
+    return { onSend, retryHumanSend, sendHumanMessage, sendSuccessRevision, localHumanSend };`)(deps);
+}
 
 const runtime = vi.hoisted(() => ({ remoteApiEnabled: true, supportApi: {
   authorityRevision: vi.fn(), commandResult: vi.fn(), conversation: vi.fn(),
@@ -125,11 +149,11 @@ it("same-account epoch reset clears private Blob/input without writing empties o
   const clearEnd = chatSource.indexOf("async function loadPrivateImages", clearStart);
   const saveStart = chatSource.indexOf("watch([draftText, imageDraft, failedHumanSend]");
   const saveEnd = chatSource.indexOf("const humanRealtime =", saveStart);
-  const code = ts.transpileModule(chatSource.slice(clearStart, clearEnd) + chatSource.slice(saveStart, saveEnd),
+  const code = extractChat(['attachmentPolicyGeneration', 'resetAttachmentPolicy']) + ts.transpileModule(chatSource.slice(clearStart, clearEnd) + chatSource.slice(saveStart, saveEnd),
     { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const scope = effectScope();
   scope.run(() => new Function("watch", "app", "convStore", "imageSources", "imageFailures", "imageDraft", "failedHumanSend", "draftText",
-    "attachmentPolicy", "attachmentPolicyError", "novaPageVisible", "isAi", "remoteApiEnabled", "loadAttachmentPolicy", "humanComposerKey", "humanSendBusy", "restoreRecoveredComposer",
+    "attachmentPolicy", "attachmentPolicyError", "pageVisible", "isAi", "remoteApiEnabled", "loadAttachmentPolicy", "humanComposerKey", "humanSendBusy", "restoreRecoveredComposer",
     code)(watch, app, store, images, failures, imageDraft, failed, draft, ref(null), ref(false), false, ref(false), true, vi.fn(), ref("conversation:CV-1"), ref(false), vi.fn()));
   try {
     app.accountBindingEpoch++;
@@ -148,7 +172,7 @@ it("old recovery navigation callbacks cannot clear a newer account's composer", 
   const app = { accountBindingEpoch: 1 }, store = { scopeInvalidated: 0, clearComposer: vi.fn() };
   let release!: (value: boolean) => void;
   const navigation = new Promise<boolean>(resolve => { release = resolve; });
-  const recover = new Function("app", "convStore", "startType", "cid", "novaPageVisible", "recoveredNavigation", "navReplace",
+  const recover = new Function("app", "convStore", "startType", "cid", "pageVisible", "recoveredNavigation", "navReplace",
     code + "\nreturn restoreRecoveredComposer;")(app, store, ref("support"), ref(""), true, "", () => navigation);
   recover({ recoveredId: "CV-1" }, "start:support"); app.accountBindingEpoch++;
   release(true); await navigation; await nextTick(); expect(store.clearComposer).not.toHaveBeenCalled();
@@ -165,19 +189,12 @@ it.each(["reply", "opening", "preflight"] as const)("fences both held success an
     vi.spyOn(store, "categoryEnabled").mockReturnValue(true);
     const draft = ref("next draft"), failed = ref<any>(null), image = ref(null);
     const key = mode === "reply" ? "conversation:CV-1" : "start:support";
-    const script = chatSource.slice(chatSource.indexOf('<script setup lang="ts">') + '<script setup lang="ts">'.length, chatSource.indexOf("</script>"));
-    const ast = ts.createSourceFile("chat.ts", script, ts.ScriptTarget.ES2022, true);
-    const functions = ["sendHumanMessage", "stageHumanSend", "humanSendFailed"].map(name => {
-      const node = ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === name);
-      expect(node).toBeDefined(); return node!.getText(ast);
-    }).join("\n");
-    const code = ts.transpileModule(functions, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
     const recovery = { begin: vi.fn(() => ({})), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() };
-    const send = new Function("convStore", "app", "cid", "startType", "humanCreateRecovery", "remoteApiEnabled", "imageDraft", "humanComposerKey", "draftText", "failedHumanSend",
-      "isReplyAllowed", "isTransferredSession", "restoreCompletedHumanCreate", "toast", "t", "isSupportAttachmentNotReady", "isSettledRejection", "supportSessionReady",
-      code + "\nreturn sendHumanMessage;")(store, { accountBindingEpoch: 1 }, ref(mode === "reply" ? "CV-1" : ""), ref("support"), recovery, true,
-      image, ref(key), draft, failed, ref(true), ref(false), vi.fn(), { info: vi.fn(), error: vi.fn() }, ref({}), isSupportAttachmentNotReady, isSettledRejection, ref(true));
-    const pending = send("old scope intent");
+    const ops = humanSendHarness({ convStore: store, app: { accountBindingEpoch: 1 }, cid: ref(mode === 'reply' ? 'CV-1' : ''),
+      startType: ref('support'), humanCreateRecovery: recovery, remoteApiEnabled: true, imageDraft: image,
+      humanComposerKey: ref(key), draftText: draft, failedHumanSend: failed, isReplyAllowed: ref(true),
+      isTransferredSession: ref(false), restoreCompletedHumanCreate: vi.fn(), toast: { info: vi.fn(), error: vi.fn() }, supportSessionReady: ref(true) });
+    const pending = ops.sendHumanMessage("old scope intent");
     await vi.waitFor(() => expect(mode === "preflight" ? store.hasPendingHumanCreate : mode === "reply" ? store.sendUser : store.startConversation).toHaveBeenCalledOnce());
     store.discardHumanOutbox(); store.bindAccount("user:1"); store.scopeInvalidated++;
     draft.value = "new scope draft"; failed.value = null;
@@ -189,6 +206,7 @@ it.each(["reply", "opening", "preflight"] as const)("fences both held success an
     expect(saves).not.toHaveBeenCalled(); expect(failed.value).toBeNull();
     expect(store.composer(key)).toMatchObject({ text: "new scope draft", failedSend: null });
     expect(recovery.complete).not.toHaveBeenCalled();
+    expect(ops.sendSuccessRevision.value).toBe(0);
   }
 });
 
@@ -203,17 +221,13 @@ it.each(["reply", "opening"] as const)("keeps the next draft visible while a rea
     const key = ref(mode === "reply" ? "conversation:CV-1" : "start:support");
     const draft = ref(""), failed = ref<any>(null), image = ref(null), busy = ref(true);
     const scope = installComposerWatches(store, key, draft, failed, image, busy);
-    const script = chatSource.slice(chatSource.indexOf('<script setup lang="ts">') + '<script setup lang="ts">'.length, chatSource.indexOf("</script>"));
-    const ast = ts.createSourceFile("chat.ts", script, ts.ScriptTarget.ES2022, true);
-    const functions = ["sendHumanMessage", "stageHumanSend", "humanSendFailed"].map(name => ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === name)!.getText(ast)).join("\n");
-    const code = ts.transpileModule(functions, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-    const send = new Function("convStore", "app", "cid", "startType", "humanCreateRecovery", "remoteApiEnabled", "imageDraft", "humanComposerKey", "draftText", "failedHumanSend",
-      "isReplyAllowed", "isTransferredSession", "restoreCompletedHumanCreate", "toast", "t", "isSupportAttachmentNotReady", "isSettledRejection", "supportSessionReady",
-      code + "\nreturn sendHumanMessage;")(store, { accountBindingEpoch: 1 }, ref(mode === "reply" ? "CV-1" : ""), ref("support"),
-      { begin: () => ({}), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() }, true, image, key, draft, failed,
-      ref(true), ref(false), vi.fn(), { info: vi.fn(), error: vi.fn() }, ref({}), isSupportAttachmentNotReady, isSettledRejection, ref(true));
+    const ops = humanSendHarness({ convStore: store, app: { accountBindingEpoch: 1 }, cid: ref(mode === 'reply' ? 'CV-1' : ''),
+      startType: ref('support'), humanCreateRecovery: { begin: () => ({}), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() },
+      remoteApiEnabled: true, imageDraft: image, humanComposerKey: key, draftText: draft, failedHumanSend: failed,
+      isReplyAllowed: ref(true), isTransferredSession: ref(false), restoreCompletedHumanCreate: vi.fn(),
+      toast: { info: vi.fn(), error: vi.fn() }, supportSessionReady: ref(true) });
     try {
-      const work = send("original"); await nextTick();
+      const work = ops.sendHumanMessage("original"); await nextTick();
       expect(failed.value).toBeNull();
       draft.value = "next draft"; await nextTick(); draft.value = "next draft continued"; await nextTick();
       expect(failed.value).toBeNull();
@@ -225,6 +239,7 @@ it.each(["reply", "opening"] as const)("keeps the next draft visible while a rea
       expect(draft.value).toBe("next draft continued");
       if (outcome === "success") expect(failed.value).toBeNull();
       else expect(failed.value).toMatchObject({ text: "original", kind: "unknown" });
+      expect(ops.sendSuccessRevision.value).toBe(outcome === 'success' ? 1 : 0);
     } finally { scope.stop(); }
   }
 });
@@ -292,8 +307,8 @@ it("retires an opening send waiting for category admission after support transfe
   const store = { scopeInvalidated: 0, categoryAvailabilityStatus: "loading", hasPendingHumanCreate: vi.fn().mockResolvedValue(false), refreshCategories: vi.fn(() => held), categoryEnabled: () => true };
   const send = vi.fn(), busy = ref(false), slot = vi.fn(() => true), restore = vi.fn();
   const toast = { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
-  const onSend = new Function("isAi", "remoteApiEnabled", "humanSendBusy", "humanOpenRequest", "cid", "startType", "app", "convStore", "novaPageVisible", "acquireSendSlot", "imageDraft", "sendHumanMessage", "supportSessionReady", "toast", "t",
-    code + "\nreturn onSend;")(ref(false), true, busy, null, ref(""), ref("support"), { accountBindingEpoch: 1 }, store, true, slot, ref(null), send, ref(true), toast, ref(zh));
+  const onSend = new Function("isAi", "remoteApiEnabled", "humanSendBusy", "humanOpenRequest", "cid", "startType", "app", "convStore", "pageVisible", "acquireSendSlot", "imageDraft", "sendHumanMessage", "supportSessionReady", "toast", "t", "policy",
+    `const { ApiError, fmt, MESSAGE_MAX_LENGTH, normalizeMessageText } = policy;\n${code}\nreturn onSend;`)(ref(false), true, busy, ref(null), ref(""), ref("support"), { accountBindingEpoch: 1 }, store, true, slot, ref(null), send, ref(true), toast, ref(zh), sendPolicyDeps);
   const work = onSend("old opening intent", restore);
   await vi.waitFor(() => expect(store.refreshCategories).toHaveBeenCalledOnce());
   expect(store.hasPendingHumanCreate).toHaveBeenCalledExactlyOnceWith("support", "old opening intent", undefined);
@@ -313,17 +328,12 @@ it("preserves the original draft/key before auth readiness and admits only one o
   const pending = vi.spyOn(store, "hasPendingHumanSend"), busy = ref(false), failed = ref<any>(original), ready = ref(false);
   let release!: (id: string) => void;
   const start = vi.spyOn(store, "startConversation").mockImplementation(() => new Promise(resolve => { release = resolve; }));
-  const script = chatSource.split('<script setup lang="ts">')[1].split("</script>")[0];
-  const ast = ts.createSourceFile("chat.ts", script, ts.ScriptTarget.ES2022, true);
-  const code = ts.transpileModule(["onSend", "retryHumanSend", "sendHumanMessage", "stageHumanSend", "humanSendFailed"].map(name =>
-    ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name)!.getText(ast)).join("\n"),
-    { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const deps = { convStore: store, app: { accountBindingEpoch: 1 }, isAi: ref(false), remoteApiEnabled: true,
-    cid: ref(""), startType: ref("support"), humanOpenRequest: null, novaPageVisible: true, supportSessionReady: ready,
+    cid: ref(""), startType: ref("support"), humanOpenRequest: ref(null), pageVisible: true, supportSessionReady: ready,
     humanSendBusy: busy, failedHumanSend: failed, draftText: ref("next draft"), imageDraft: ref(null), humanComposerKey: ref("start:support"),
     acquireSendSlot: () => true, humanCreateRecovery: { begin: () => ({}), isCurrent: () => true, complete: vi.fn(), finish: vi.fn() },
-    restoreCompletedHumanCreate: vi.fn(), toast: { info: vi.fn(), error: vi.fn() }, t: ref({}), isSupportAttachmentNotReady, isSettledRejection };
-  const ops = new Function("deps", `const {${Object.keys(deps).join(",")}} = deps; ${code}\nreturn { onSend, retryHumanSend, sendHumanMessage };`)(deps);
+    restoreCompletedHumanCreate: vi.fn(), toast: { info: vi.fn(), error: vi.fn() } };
+  const ops = humanSendHarness(deps);
   await ops.onSend("early"); await ops.sendHumanMessage("early"); await ops.retryHumanSend();
   expect(writes).not.toHaveBeenCalled(); expect(pending).not.toHaveBeenCalled(); expect(start).not.toHaveBeenCalled();
   expect(failed.value).toMatchObject(original); expect(busy.value).toBe(false);
@@ -344,9 +354,9 @@ it.each(["binding", "scope", "current"])("failed pending preflight restores only
   const ast = ts.createSourceFile("chat.ts", script, ts.ScriptTarget.ES2022, true);
   const node = ast.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === "onSend")!;
   const code = ts.transpileModule(node.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-  const deps = { app, convStore: store, isAi: ref(false), remoteApiEnabled: true, supportSessionReady: ref(true),
-    humanSendBusy: ref(false), humanOpenRequest: null, cid: ref(""), startType: ref("support"), imageDraft: ref(null),
-    novaPageVisible: true, acquireSendSlot: vi.fn(() => true), sendHumanMessage: vi.fn(),
+  const deps = { ...sendPolicyDeps, app, convStore: store, isAi: ref(false), remoteApiEnabled: true, supportSessionReady: ref(true),
+    humanSendBusy: ref(false), humanOpenRequest: ref(null), cid: ref(""), startType: ref("support"), imageDraft: ref(null),
+    pageVisible: true, acquireSendSlot: vi.fn(() => true), sendHumanMessage: vi.fn(),
     toast: { error: vi.fn(), info: vi.fn(), warn: vi.fn() }, t: ref(zh) };
   const send = new Function("deps", `const {${Object.keys(deps).join(",")}} = deps; ${code}\nreturn onSend;`)(deps);
   const restore = vi.fn(); const pending = send("old account draft", restore);

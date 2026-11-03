@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test, { mock } from "node:test";
 import ts from "typescript";
 import { createP318AccountPageFence } from "../src/pages/me/p3-18-account-page-fence.ts";
+import { ApiError } from "../src/api/errors.ts";
 
 function read(path) {
   return fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -31,7 +32,7 @@ function passwordChangeFixture({ changePassword = async () => undefined, readbac
     securityPageFence: createP318AccountPageFence(() => binding.key, () => binding.epoch),
     captureAccountScope: () => ({ ...binding }),
     isCurrentAccountScope: (scope) => currentScope && scope.key === binding.key && scope.epoch === binding.epoch,
-    securityPageVisible: true, auth,
+    securityPageVisible: true, securityEnvironmentInvalidated: false, auth, ApiError, clearSecurityAccountState: mock.fn(),
     isPasswordOk: (value) => value === "NewPass2!", remoteApiEnabled: true,
     SECURITY_COMMAND_TABLE: "password-fixture-commands", acquireAccountCommandKey: mock.fn(() => "command-fixture"),
     releaseAccountCommandKey: mock.fn(),
@@ -65,7 +66,7 @@ function twoFactorFixture() {
   const deps = {
     securityBusy: { value: false }, securityPageFence: { capture: () => ({}) },
     captureAccountScope: () => ({}), auth: { accountId: "two-factor-fixture" },
-    isCurrentSecurityRequest: () => true, remoteApiEnabled: true,
+    isCurrentSecurityRequest: () => true, remoteApiEnabled: true, requireAccountPhone: () => true,
     remoteSecurity: { value: { twoFactorEnabled: false } }, err: { value: "" },
     twoFactorPassword: { value: "" }, twoFactorPasswordError: { value: "" },
     twoFactorPasswordFocus: { value: false }, twoFactorEnabled: { value: false },
@@ -119,15 +120,21 @@ test("password change sends only the values validated before awaiting a prior re
 
 test("password buttons expose busy disabled state to keyboard and assistive input", () => {
   const page = read("src/pages/me/security.vue");
+  // 2026-11-01 redesign delegates password-button keyboard and disabled semantics to NxButton.
   for (const handler of ["cancelPwd", "submitPasswordChange"]) {
     const button = page.split("\n").find((line) => line.includes(`@click="${handler}"`));
     assert.ok(button);
-    assert.match(button, /:aria-disabled="securityBusy"/);
-    assert.match(button, /:tabindex="securityBusy \? -1 : 0"/);
-    assert.match(button, /securityBusy \? 'opacity-50'/);
-    assert.ok(button.includes(`@keydown.enter.prevent="${handler}"`));
-    assert.ok(button.includes(`@keydown.space.prevent="${handler}"`));
+    assert.match(button, /^\s*<NxButton\b/);
+    assert.match(button, /:(?:disabled|busy)="securityBusy"/);
   }
+  const component = read("src/components/ui/nx-button.vue");
+  assert.ok(component.includes('role="button"'));
+  assert.ok(component.includes(':tabindex="disabled || busy ? -1 : 0"'));
+  assert.ok(component.includes(':aria-disabled="disabled || busy"'));
+  assert.ok(component.includes("'nx-button--disabled': disabled || busy"));
+  assert.match(component, /\.nx-button--disabled\s*\{[^}]*opacity:\s*\.5\b/);
+  assert.ok(component.includes('@keydown.enter.prevent="activate"'));
+  assert.ok(component.includes('@keydown.space.prevent="activate"'));
 });
 
 test("idle password cancel clears fields without sending a command", () => {
@@ -325,7 +332,7 @@ test("remote top-up exposes server-backed USDT and VietQR without card", () => {
   const deposits = read("src/store/deposits.ts");
   assert.match(topup, /const segments = remoteApiEnabled \? SEGMENTS\.filter\(\(item\) => item\.id !== "card"\)/);
   assert.match(topup, /<DepositUsdtPane v-if="seg === 'crypto'" \/>/);
-  assert.match(topup, /<DepositBankPane v-else-if="seg === 'bank'" \/>/);
+  assert.match(topup, /<DepositBankPane v-else-if="seg === 'bank'"(?: ref="bankPane")? \/>/);
   assert.doesNotMatch(topup, /v-if="remoteApiEnabled"[\s\S]{0,200}railsClosedTitle/);
   assert.match(deposits, /paymentApi\.createVietQrIntent\(/);
   assert.match(deposits, /paymentApi\.listVietQrIntents\(/);
@@ -363,15 +370,12 @@ test("remote achievements render and claim server milestone facts instead of loc
   assert.match(page, /Local prototype achievements stay available only in mock mode[\s\S]{0,120}v-else/);
 });
 
-test("remote Nova and globe consume their authenticated server authorities", () => {
-  const chat = read("src/pages/support/chat.vue");
+// Since 3d3acc05 the globe presents H9-configured simulation metrics (PRD H9-首页与网络展示配置-20261028).
+test("globe presentation follows the H9 platform configuration", () => {
   const globe = read("src/pages/globe/globe.vue");
-  assert.match(chat, /novaAiApi\.status/);
-  assert.match(chat, /novaAiApi\.chat/);
-  assert.match(globe, /remoteApiEnabled/);
-  assert.match(globe, /networkRegionsApi\.list\(\)/);
-  assert.match(globe, /networkProjection\.value\?\.regions/);
-  assert.match(globe, /projectionStatus\.value = next\.regions\.length > 0 \? "ready" : "empty"/);
+  assert.match(globe, /const globeSettings = computed\(\(\) => cfg\.config\.publicStats\.globeDisplay\)/);
+  assert.match(globe, /globeSimulation\(/);
+  assert.doesNotMatch(globe, /networkRegionsApi/);
   assert.doesNotMatch(globe, /GLOBE_REGION_PROJECTION_HOLD/);
   assert.match(globe, /const regions = computed/);
 });

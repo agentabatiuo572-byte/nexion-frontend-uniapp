@@ -7,7 +7,7 @@
   + writes a bill. Decomposed into src/components/events/* (FeaturedHero /
   Card) — each carries its own scroll-grow bar.
 
-  Wrapped in <AppChassis active="home"> (reached from Home). SetPageHeader
+  Wrapped in <NxPageContent :embedded="embedded" active="home"> (reached from Home). SetPageHeader
   backHref="/" → SubPageHeader back="/pages/index/index". SegmentedControl →
   inline pill tabs. The source's live evaluateEventProgress() is replaced by
   the mock's `trackable`/`done` flags (self-contained, backend-replaceable).
@@ -17,12 +17,13 @@
   Achievements unlock on claim is omitted (no achievements store ported).
 -->
 <template>
-  <AppChassis active="home">
+  <NxPageContent :embedded="embedded" active="home">
     <CardStagger class="pb-8" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/index/index" />
+      <SubPageHeader v-if="!embedded" back="/pages/index/index" />
 
       <view class="px-4 space-y-3">
         <GlassSegments :label="t.promotion.events" v-model="eventSource" :options="sourceOptions" />
+        <view class="nx-glass-card" style="padding:14px;border-radius:var(--nx-glass-radius)" role="link" tabindex="0" @click="navTo('/pages/events/genesis-raffle')" @keydown.enter.prevent="navTo('/pages/events/genesis-raffle')"><text class="block" style="font-size:14px;font-weight:600;color:var(--v5-brand)">{{ raffleCopy.title }} ›</text><text class="block" style="margin-top:4px;font-size:12px;color:var(--v5-ink-3)">{{ raffleCopy.intro }}</text></view>
         <PromotionEntry v-if="eventSource==='promotions'" mode="events" />
         <view v-else-if="!signedIn" class="promotion-flat"><view class="promotion-action" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent('/pages/events/events'))"><text>{{ t.promotion.signIn }}</text></view></view>
         <template v-else>
@@ -43,8 +44,15 @@
         <GlassSegments :label="t.events.categoryGroupLabel" v-model="tab" :options="tabOptions" layout="scroll"  />
 
         <!-- Event list -->
+        <view v-if="remoteEventsLoading && filtered.length === 0" class="space-y-2.5" aria-busy="true" role="status" :aria-label="locale.code === 'zh' ? '加载中' : locale.code === 'vi' ? 'Đang tải' : 'Loading'">
+          <view v-for="row in 3" :key="row" class="nx-glass-card" style="height: 132px; padding: 18px">
+            <view style="width: 58%; height: 18px; border-radius: 6px; background: var(--v5-surface-3)" />
+            <view style="width: 86%; height: 12px; margin-top: 16px; border-radius: 4px; background: var(--v5-surface-2)" />
+            <view style="width: 35%; height: 12px; margin-top: 10px; border-radius: 4px; background: var(--v5-surface-2)" />
+          </view>
+        </view>
         <EmptyState
-          v-if="remoteEventsError"
+          v-else-if="remoteEventsError"
           kind="recoverable-error"
           :title="t.events.loadErrorTitle"
           :desc="t.events.loadErrorBody"
@@ -72,14 +80,15 @@
         </template>
       </view>
     </CardStagger>
-  </AppChassis>
+  </NxPageContent>
 </template>
 
 <script setup lang="ts">
+const { embedded = false } = defineProps<{ embedded?: boolean }>();
 import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
-import { onHide, onShow } from "@dcloudio/uni-app";
-import AppChassis from "@/components/app-chassis.vue";
+import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
+import NxPageContent from "@/components/ui/nx-page-content.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -87,7 +96,7 @@ import EventsFeaturedHero from "@/components/events/events-featured-hero.vue";
 import EventsCard from "@/components/events/events-card.vue";
 import PromotionEntry from "@/components/promotion/promotion-entry.vue";
 import { useT } from "@/i18n/use-t";
-import { isStakingVisibilityRoute, navTo } from '@/lib/route';
+import { isStakingVisibilityRoute, navTo, takeNavigationQuery } from '@/lib/route';
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { eventsApi, remoteApiEnabled,sessionVault } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
@@ -106,6 +115,8 @@ import { EVENTS, type EventStatus, type NexEvent } from "@/mock/events";
 import { remoteEventView, type EventActionLabels } from "./remote-event-view";
 import { runRemoteEventAction } from "./remote-event-action";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { subscribeRuntimeRevision } from "@/api/order-api";
+import { genesisRaffleCopy } from "@/i18n/genesis-raffle";
 
 type TabId = "all" | EventStatus | "joined";
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
@@ -114,6 +125,10 @@ const TABS: TabId[] = ["all", "ongoing", "upcoming", "joined", "ended"];
 
 const t = useT();
 const eventSource=ref('promotions');
+onLoad(options => {
+  const query = new URLSearchParams(takeNavigationQuery("/pages/events/events"));
+  if ((options?.source ?? query.get("source")) === "legacy") eventSource.value = "legacy";
+});
 const signedIn=computed(()=>{void app.accountKey;void app.accountBindingEpoch;return !!sessionVault.read();});
 const sourceOptions=computed(()=>[
   {value:'promotions',label:t.value.promotion.promotionList},
@@ -125,6 +140,7 @@ const app = useApp();
 const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const language = computed(() => locale.code);
+const raffleCopy = computed(() => genesisRaffleCopy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
 
 const tab = ref<TabId>("ongoing");
 const remoteEvents = ref<CanonicalEvent[]>([]);
@@ -173,6 +189,10 @@ async function loadRemoteEvents() {
 function retryRemoteEvents() {
   void loadRemoteEvents();
 }
+const stopRuntimeRefresh = subscribeRuntimeRevision(() => {
+  if (mounted) void loadRemoteEvents();
+});
+onUnmounted(stopRuntimeRefresh);
 
 const eventVisibility = createPageVisibilityRefresh((reason) => {
   if (!remoteApiEnabled) return;
@@ -208,6 +228,9 @@ onUnmounted(() => {
   releaseActiveRefresh();
   remoteRequestFence.invalidate();
   remoteCommandFence.invalidate();
+});
+watch(() => luckySpin.open, (open, wasOpen) => {
+  if (remoteApiEnabled && mounted && wasOpen && !open) void loadRemoteEvents();
 });
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => language.value], ([accountKey]) => {
   remoteCommandFence.invalidate();
@@ -333,7 +356,7 @@ async function handleClaim(ev: EnrichedEvent) {
     const paid = reward > 0
     ? postMoneyBillsOnce([{
       type: "achievement",
-      symbol: "NEX",
+      symbol: "UVT",
       amount: reward,
       status: "posted",
       memo: `Event reward · ${ev.id}`,
@@ -402,7 +425,7 @@ function pillLabelStyle(id: TabId): CSSProperties {
   const on = tab.value === id;
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)",

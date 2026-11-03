@@ -1,6 +1,7 @@
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
-import { earnConfigApi, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, earnConfigApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import type { EarnPhoneTiers, EarnTaskPricing, EarnTaskRoute, TaskClass } from "@/api/earn-config-api";
 import { applyCanonicalPhoneTierYields } from "@/mock/phone-tiers";
 import { TASK_CATEGORY_LABEL } from "@/store/types";
@@ -16,14 +17,50 @@ const error = ref("");
 const route = ref<EarnTaskRoute | null>(null);
 const routeError = ref("");
 let loadVersion = 0;
+let environmentInvalidated = false;
+let inFlight: Promise<boolean> | null = null;
+
+function clearEarnConfig() {
+  invalidatePassiveTabRead("earn-config");
+  loadVersion += 1;
+  inFlight = null;
+  taskPricing.value = null;
+  phoneTiers.value = null;
+  route.value = null;
+  routeError.value = "";
+  status.value = "idle";
+  error.value = "";
+  if (remoteApiEnabled) applyCanonicalPhoneTierYields([]);
+}
+watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
+  environmentInvalidated = true;
+  clearEarnConfig();
+}, { flush: "sync" });
+sessionVault.subscribe?.((_previous, _next, continuation) => { if (!continuation) clearEarnConfig(); });
 
 // The mutable compatibility table is consumed by legacy presentation code.
 // Clear its prototype rows immediately in server mode; only a validated
 // /api/config/phone-tiers response is allowed to repopulate it.
 if (remoteApiEnabled) applyCanonicalPhoneTierYields([]);
 
-export async function refreshEarnConfig(): Promise<void> {
-  if (!remoteApiEnabled) return;
+export function ensureEarnConfig(): Promise<boolean> {
+  return runPassiveTabRead("earn-config", () => inFlight ?? refreshEarnConfig(), undefined,
+    () => status.value === "ready", 60_000);
+}
+
+export function refreshEarnConfig(): Promise<boolean> {
+  invalidateBeforePassiveTabRead("earn-config");
+  const promise = readEarnConfig();
+  inFlight = promise;
+  rememberPassiveTabRead("earn-config", promise, undefined, undefined, () => status.value === "ready");
+  const clear = () => { if (inFlight === promise) inFlight = null; };
+  void promise.then(clear, clear);
+  return promise;
+}
+
+async function readEarnConfig(): Promise<boolean> {
+  if (!remoteApiEnabled) return true;
+  if (environmentInvalidated) return false;
   const version = ++loadVersion;
   status.value = "loading";
   error.value = "";
@@ -39,7 +76,7 @@ export async function refreshEarnConfig(): Promise<void> {
       earnConfigApi.taskPricing(),
       earnConfigApi.phoneTiers(),
     ]);
-    if (version !== loadVersion) return;
+    if (version !== loadVersion) return false;
     if (pricingResult.status === "fulfilled") {
       taskPricing.value = pricingResult.value;
     } else {
@@ -58,31 +95,38 @@ export async function refreshEarnConfig(): Promise<void> {
     if (failures.length === 0) {
       status.value = "ready";
       error.value = "";
+      return true;
     } else {
       status.value = "error";
       const first = failures[0] as PromiseRejectedResult;
       error.value = first.reason instanceof Error ? first.reason.message : "E2_CONFIG_UNAVAILABLE";
+      return false;
     }
   } catch (cause) {
-    if (version !== loadVersion) return;
+    if (version !== loadVersion) return false;
     taskPricing.value = null;
     phoneTiers.value = null;
     applyCanonicalPhoneTierYields([]);
     status.value = "error";
     error.value = cause instanceof Error ? cause.message : "E2_CONFIG_UNAVAILABLE";
+    return false;
   }
 }
 
 export function prepareEarnConfig(): void {
-  if (remoteApiEnabled && status.value === "idle") void refreshEarnConfig();
+  if (remoteApiEnabled && status.value === "idle") void ensureEarnConfig();
 }
 
 async function refreshRoute(deviceVramGb: number): Promise<void> {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || environmentInvalidated) return;
+  const version = loadVersion;
   routeError.value = "";
   try {
-    route.value = await earnConfigApi.route(deviceVramGb);
+    const next = await earnConfigApi.route(deviceVramGb);
+    if (version !== loadVersion) return;
+    route.value = next;
   } catch (cause) {
+    if (version !== loadVersion) return;
     route.value = null;
     routeError.value = cause instanceof Error ? cause.message : "E2_TASK_ROUTE_UNAVAILABLE";
   }
@@ -98,8 +142,9 @@ function lockedTeasers(maxVram: number, count = 3): LockedTeaser[] {
     .slice(0, count)
     .map((row) => ({
       category: row.taskClass as TaskClass,
+      // English job name in every language, as on current jobs.
       type: TASK_CATEGORY_LABEL[row.taskClass],
-      model: row.models[0] || row.taskName,
+      model: row.models[0] || TASK_CATEGORY_LABEL[row.taskClass],
       minVRAM: row.minVRAM,
       rewardHint: `$${formatAmount(row.minReward)}-$${formatAmount(row.maxReward)}`,
       unlockTier: `${row.minVRAM}GB VRAM`,
@@ -124,6 +169,7 @@ export function useEarnConfig() {
     lockedTeasers,
     averageEligibleReward,
     refresh: refreshEarnConfig,
+    ensure: ensureEarnConfig,
     refreshRoute,
   };
 }

@@ -13,9 +13,9 @@
 -->
 <template>
   <AppChassis active="me">
-    <BankAccountBinding v-if="!cardBindingAvailable" :active="bankFormVisible" :return-to="returnTo" />
+    <BankAccountBinding v-if="!cardBindingAvailable" ref="binding" class="bank-binding-layout" :active="bankFormVisible" :return-to="returnTo" />
     <view v-else style="color: var(--v5-ink)">
-      <SubPageHeader :back="cardBindingAvailable ? '/pages/me/wallet-cards' : '/pages/me/wallet'" :title="t.cards.newTitle" />
+      <SubPageHeader :back="cardBindingAvailable ? '/pages/me/wallet-cards' : '/pages/me/me'" :title="t.cards.newTitle" />
       <CardSimulationBadge />
 
       <view :style="bodyStyle">
@@ -23,7 +23,7 @@
         <view :style="formCardStyle">
           <view class="flex items-center" :style="formHeadStyle">
             <view class="grid place-items-center shrink-0" :style="formHeadIconStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
             </view>
             <view class="flex-1 min-w-0">
               <text class="block" :style="formHeadTitleStyle">{{ t.cards.formCardType }}</text>
@@ -85,6 +85,14 @@
         <text class="block" :style="disclaimerStyle">{{ cardBindingAvailable ? t.cards.formDisclaimer : t.cards.bindingEntryDisclaimer }}</text>
       </view>
     </view>
+    <!-- The binding flow's main action (change / next / confirm) in the fixed bottom bar (DS-30). -->
+    <template #pageFixed>
+      <view v-if="!cardBindingAvailable && binding?.primaryAction" class="bind-bar">
+        <view class="bind-bar__btn" :class="{ 'bind-bar__btn--on': binding.primaryAction.enabled }" role="button" :tabindex="binding.primaryAction.enabled ? 0 : -1" :data-testid="binding.primaryAction.testid" :aria-disabled="!binding.primaryAction.enabled" @click="binding.primaryAction.enabled && binding.primaryAction.run()" @keydown.enter.prevent="binding.primaryAction.enabled && binding.primaryAction.run()" @keydown.space.prevent="binding.primaryAction.enabled && binding.primaryAction.run()">
+          <text>{{ binding.primaryAction.label }}</text>
+        </view>
+      </view>
+    </template>
   </AppChassis>
 </template>
 
@@ -110,6 +118,8 @@ import { paymentMethodApi, remoteApiEnabled, developmentPaymentEnabled } from "@
 import { useApp } from "@/store/app";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 
+// The binding component exposes its main action; the page shows it in the fixed bottom bar.
+const binding = ref<InstanceType<typeof BankAccountBinding> | null>(null);
 const t = useT();
 const cardsStore = useCards();
 const app = useApp();
@@ -258,7 +268,7 @@ async function handleBind() {
     // 同一次任务完成的两腿一次落盘,入账由收据的 amount/symbol 派生(模式同 lib/share.ts)。
     const drafts: ReceiptDraft[] = [];
     if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
-    if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    if (task.nexReward) drafts.push({ type: "bonus", symbol: "UVT", amount: task.nexReward, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
     // 发奖失败已弹错并还原;绑卡本身已成立,照常回上一页,不把用户卡在表单里。
     if (!drafts.length || postMoneyBillsOnce(drafts) === "ok") {
       questStore.markComplete("bind_bank_card"); // 消费失败:重试命中同 ref 不会再发
@@ -275,10 +285,10 @@ async function handleBind() {
 
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px" };
-const providerHoldTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const providerHoldTitleStyle: CSSProperties = { fontSize: "var(--ui-type-card-title)", fontWeight: 600, color: "var(--v5-ink)" };
 const providerHoldBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
 const providerHoldCtaStyle: CSSProperties = { minHeight: "44px", marginTop: "16px", borderRadius: "999px", background: "var(--v5-surface-2)" };
-const providerHoldCtaTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink-2)" };
+const providerHoldCtaTextStyle: CSSProperties = { fontSize: "13px", fontWeight: "var(--ui-type-card-title-weight)", color: "var(--v5-ink-2)" };
 
 // De-carded form wrapper — the head + recessed input fields sit on the page
 // floor. Input controls (PAN/expiry/CVV/holder) are untouched; only the
@@ -289,13 +299,13 @@ const formCardStyle: CSSProperties = {
 const formHeadStyle: CSSProperties = {
   padding: "0 2px 14px",
   borderBottom: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
-  gap: "12px",
+  gap: "var(--ui-space-inline)",
 };
 const formHeadIconStyle: CSSProperties = {
   width: "36px",
   height: "36px",
   borderRadius: "8px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
+  background: "var(--v5-surface-2)",
 };
 const formHeadTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const formHeadNoteStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
@@ -306,7 +316,7 @@ const brandChipStyle: CSSProperties = {
   borderRadius: "6px",
   padding: "4px 8px",
 };
-const formFieldsStyle: CSSProperties = { padding: "16px 2px 0" };
+const formFieldsStyle: CSSProperties = { padding: "var(--ui-space-inset) 2px 0" };
 const labelStyle: CSSProperties = { marginBottom: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const inputStyle: CSSProperties = {
   // uni <input> renders taller than a native one — pin a fixed 40px box (=
@@ -319,10 +329,11 @@ const inputStyle: CSSProperties = {
   borderRadius: "8px",
   padding: "0 12px",
   marginBottom: "12px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-input)",
+  lineHeight: "var(--ui-type-input-lh)",
   color: "var(--v5-ink)",
 };
-const checkboxLabelStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const checkboxLabelStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)" };
 const checkboxStateStyle = computed<CSSProperties>(() => ({
   marginLeft: "auto",
   fontSize: "12px",
@@ -342,3 +353,16 @@ const submitTextStyle = computed<CSSProperties>(() => ({
 }));
 const disclaimerStyle: CSSProperties = { marginTop: "12px", padding: "0 4px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
 </script>
+
+<style scoped>
+/* Separate the bound account, fields and conditions without changing their gates. */
+
+/* P-52: binding flow main action in the fixed bottom bar. */
+.bind-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.bind-bar__btn { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
+.bind-bar__btn--on { opacity: 1; cursor: pointer; }
+.bind-bar__btn--on:active { transform: scale(.98); }
+.bind-bar__btn:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.bank-binding-layout { padding-bottom: 96px; }
+@media (prefers-reduced-motion: reduce) { .bind-bar__btn--on:active { transform: none; } }
+</style>

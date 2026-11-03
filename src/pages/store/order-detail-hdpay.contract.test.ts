@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import detailSource from "./order-detail.vue?raw";
+import commandFenceSource from "@/lib/order-command-fence.ts?raw";
 import ts from "typescript";
 
 describe("wallet payment for a pending commerce order", () => {
   it("lets a placed remote order retry the idempotent wallet debit", () => {
     expect(detailSource).toContain("canPayFromWallet");
     expect(detailSource).toContain("orderApi.pay(");
-    expect(detailSource).toContain("`wallet-pay:${requestOrderNo}`");
+    expect(detailSource).toContain("beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'WALLET')");
+    expect(detailSource).toContain("beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL')");
+    expect(detailSource).toContain("orderApi.pay(requestOrderNo,action.key,authorization)");
+    expect(commandFenceSource).toContain("`wallet-pay:${orderNo}`");
     expect(detailSource).toContain("adoptCommerceWallet");
   });
 
@@ -18,9 +22,16 @@ describe("wallet payment for a pending commerce order", () => {
   });
 
   it("keeps the wallet-payment CTA activatable from pointer and keyboard input", () => {
-    expect(detailSource).toContain('@keydown.enter.prevent.stop="handleWalletPayment"');
-    expect(detailSource).toContain('@keydown.space.prevent.stop="handleWalletPayment"');
-    expect(detailSource).toContain('<text @click.stop="handleWalletPayment">{{ t.store.coPayNow }}</text>');
+    // NxButton supplies the pointer, Enter and Space activation.
+    expect(detailSource).toMatch(/<NxButton[^>]*@click="requestPendingPayment\(\)"/);
+    expect(detailSource).toContain('void handleWalletPayment();');
+    expect(detailSource).toContain('await executeSelectedPurchase(');
+  });
+
+  it("explains that an order cannot be cancelled while its external payment is underway", () => {
+    // The cancel request is never sent; the centered notice offers to continue the same payment.
+    expect(detailSource).toContain('if (externalPayment.value) { cancelBlocked.value = true; return; }');
+    expect(detailSource).toMatch(/<NxNoticeDialog :open="cancelBlocked"[^>]*:title="t\.orders\.cancelBlockedTitle"[^>]*@primary="cancelBlocked = false; requestPendingPayment\(\)"/);
   });
 
   it("fences payment and readback to the account that opened the detail", () => {
@@ -36,25 +47,30 @@ describe("wallet payment for a pending commerce order", () => {
   });
 
   it("blocks cancellation while wallet payment is in flight or confirmed but readback is pending", () => {
-    expect(detailSource.replace(/\r\n/g, "\n")).toContain('return order.value?.status === "placed"\n    && !order.value.promotionQuoteId\n    && !walletPaymentConfirmed.value\n    && !payingFromWallet.value;');
+    expect(detailSource).toContain('return !orderEnvironmentInvalidated.value && liveOrder.value?.status === "placed"');
+    expect(detailSource).toContain('&& !liveOrder.value.promotionQuoteId');
+    expect(detailSource).toContain('&& !walletPaymentConfirmed.value');
+    expect(detailSource).toContain('&& !payingFromWallet.value');
+    expect(detailSource).toContain('currentOrderPayable()&&!orderAction.value&&!orderCommandUnavailable.value');
     expect(detailSource).toContain("const cancellingOrder = ref(false);");
     expect(detailSource).toContain("let cancelAttemptSequence = 0;");
-    expect(detailSource).toContain("&& !cancellingOrder.value");
+    expect(detailSource).toMatch(/&&\s*!cancellingOrder\.value/);
     expect(detailSource).toContain("if (!cancellable.value) return;");
     expect(detailSource).toContain("cancellingOrder.value = true;");
     expect(detailSource).toContain("const cancelAttempt = ++cancelAttemptSequence;");
-    expect(detailSource).toContain("if (!ok || !canCancelCurrentOrder() || !isCurrentDetailScope(scope) || !order.value) return;");
+    expect(detailSource).toContain("if (!ok || !canCancelCurrentOrder() || !isCurrentDetailScope(scope) || !liveOrder.value) return;");
     expect(detailSource).toContain("if (cancelAttempt === cancelAttemptSequence) cancellingOrder.value = false;");
-    expect(detailSource).toContain('@keydown.enter.prevent.stop="handleCancel"');
-    expect(detailSource).toContain('@keydown.space.prevent.stop="handleCancel"');
+    expect(detailSource).toMatch(/<NxButton[^>]*:busy="cancellingOrder"[^>]*@click="handleCancel"/);
   });
 
   it("keeps ordinary cancellation available while quoted promotion orders use their own command flow", () => {
     const script = detailSource.split('<script setup lang="ts">')[1].split("</script>")[0];
     const source = ts.createSourceFile("order-detail.ts", script, ts.ScriptTarget.Latest, true);
     const declaration = source.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "canCancelCurrentOrder");
+    const payable = source.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "currentOrderPayable");
     expect(declaration).toBeDefined();
-    const code = ts.transpileModule(declaration!.getText(source), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+    expect(payable).toBeDefined();
+    const code = ts.transpileModule(payable!.getText(source)+declaration!.getText(source), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
     for (const [status, promotionQuoteId, confirmed, paying, expected] of [
       ["placed", null, false, false, true],
       ["placed", "quote-1", false, false, false],
@@ -62,8 +78,8 @@ describe("wallet payment for a pending commerce order", () => {
       ["placed", null, false, true, false],
       ["paid", null, false, false, false],
     ]) {
-      const result = new Function("order", "walletPaymentConfirmed", "payingFromWallet", `${code}; return canCancelCurrentOrder();`)(
-        { value: { status, promotionQuoteId } }, { value: confirmed }, { value: paying },
+      const result = new Function("liveOrder", "walletPaymentConfirmed", "payingFromWallet", "orderEnvironmentInvalidated", "remoteOrderRefreshing", "remoteOrderError", "orderAction", "orderCommandUnavailable", `${code}; return canCancelCurrentOrder();`)(
+        { value: { status, promotionQuoteId } }, { value: confirmed }, { value: paying },{value:false},{value:false},{value:false},{value:null},{value:false},
       );
       expect(result).toBe(expected);
     }

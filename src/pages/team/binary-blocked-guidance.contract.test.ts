@@ -23,18 +23,19 @@ describe("binary blocked guidance page contract", () => {
   });
 
   it("keeps all visible invite guidance conditional and non-guaranteeing", () => {
-    expect(zh).toContain('结算能否恢复以资格确认结果为准');
-    expect(en).toContain('Settlement can resume only if eligibility is confirmed');
-    expect(vi).toContain('Việc khôi phục quyết toán phụ thuộc vào kết quả xác nhận điều kiện');
+    // The invite nudge names an action, never a payout outcome.
+    expect(zh).toContain('邀请好友加入，尽快达标。');
+    expect(en).toContain('Invite friends to get there sooner.');
+    expect(vi).toContain('Mời thêm bạn bè để sớm đạt mức này.');
     expect(zh).not.toContain('本月奖励即可恢复');
     expect(en).not.toContain("lift this month's payout");
     expect(vi).not.toContain('nâng khoản thưởng tháng này');
   });
 
-  it("describes the smaller-track formula without implying that a member can choose a track or increase payout", () => {
-    expect(zh).toContain('成员按安置规则分配，是否结算以最终确认状态为准');
-    expect(en).toContain('Members follow placement rules; settlement eligibility depends on the confirmed status');
-    expect(vi).toContain('Thành viên được phân theo quy tắc sắp xếp; điều kiện kết toán theo trạng thái đã xác nhận');
+  it("describes group volume from confirmed orders without promising payment", () => {
+    expect(zh).toContain('订单额按已确认订单统计，奖励以实际发放为准。');
+    expect(en).toContain('Volume counts confirmed orders. Rewards are subject to actual payout.');
+    expect(vi).toContain('Doanh số tính theo đơn hàng đã xác nhận. Thưởng thực nhận theo kết quả chi trả.');
     expect(zh).not.toContain('继续邀请较小一轨提升{freq}发放');
     expect(en).not.toContain('Grow the smaller track to lift your {freq} payout');
     expect(vi).not.toContain('Bồi thêm nhánh nhỏ để nâng khoản thưởng {freq} của bạn');

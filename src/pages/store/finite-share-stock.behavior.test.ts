@@ -8,7 +8,7 @@ import ts from "typescript";
 import cardRaw from "../../components/store/product-card.vue?raw";
 import detailRaw from "./detail.vue?raw";
 import { zh } from "@/i18n/messages/zh";
-import { fmt } from "@/i18n/format";
+import * as i18nFormat from "@/i18n/format";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { catalogProductImageUrl, productTierCode } from "@/lib/product-image";
 import { localizedDatacenterValue, productCopy, specRow, specText } from "@/lib/product-copy";
@@ -79,12 +79,14 @@ async function mountPair(product: Product,promotion?:PublicPromotion) {
   const openSnapshot: PurchaseEligibilitySnapshot = {
     productNo: current.id, eligible: true, decisionCode: "ELIGIBLE", evaluatedAt: 1,
     source: PURCHASE_ELIGIBILITY_SOURCE, sourceEnvironment: "PRODUCTION", runId: null, serverCanonical: true,
-    policies: [{ policy: "E1", eligible: true, decisionCode: "ELIGIBLE", mode: "ALL", conditions: [] }],
+    policies: [{ policy: "E1", eligible: true, decisionCode: "ELIGIBLE", mode: "ALL", conditions: [] },
+      { policy: "F4B", eligible: true, decisionCode: "F4B_NOT_CONFIGURED", mode: "ALL", conditions: [] }],
   };
   const eligibility = Vue.ref<{ status: PurchaseEligibilityRequestStatus; eligible: boolean; snapshot: PurchaseEligibilitySnapshot | null }>({ status: "ready", eligible: true, snapshot: openSnapshot });
   const catalogState = Vue.reactive({ status: "ready" });
   const presentation = Vue.ref({ products: [current] });
   const navTo = vi.fn();
+  const toastError = vi.fn();
   const forbiddenNetwork = vi.fn(() => { throw new Error("No business transport in component fixture"); });
   const onLoads: Array<(options: Record<string, string>) => Promise<void>> = [];
   const onUnloads: Array<() => void> = [];
@@ -96,12 +98,14 @@ async function mountPair(product: Product,promotion?:PublicPromotion) {
     "@/lib/day-one-page-observation": dayOnePageObservationFixture(),
     vue: Vue,
     "@/i18n/use-t": { useT: () => Vue.ref(zh) }, "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
-    "@/i18n/format": { fmt }, "@/lib/brand-copy": { nexGridBrandText },
+    "@/i18n/format": i18nFormat, "@/lib/brand-copy": { nexGridBrandText },
     "@/lib/product-copy": { localizedDatacenterValue, productCopy, specRow, specText },
     "@/lib/product-image": { catalogProductImageUrl, productTierCode },
+    "@/composables/use-product-image": { useProductImage: (source: () => string | undefined) => ({ imageSrc: Vue.computed(() => source() ?? null), imageError: () => {} }) },
     "@/lib/route": { navTo, takeNavigationQuery: () => "" },
     "@/api/runtime": { remoteApiEnabled: true, sessionVault: { read: () => ({ user: { userId: 7101 } }) },
       dayOnePageObservationApi: { s1Roi: forbiddenNetwork }, h3ObservationApi: { productInterest: forbiddenNetwork } },
+    "@/store/earn-config": { prepareEarnConfig: () => {}, useEarnConfig: () => ({ refresh: async () => true, taskPricing: Vue.ref(null) }) },
     "@/store/product-catalog": { productCatalogState: catalogState, productCatalogPresentation: presentation, refreshProductCatalog: async () => true },
     "@/store/purchase-eligibility": { useRemotePurchaseEligibility: () => ({ eligibility, retry: vi.fn() }) },
     "@/composables/use-scroll-grow-progress": { useScrollGrowProgress: () => ({ elRef: Vue.ref(null), inView: Vue.ref(false) }) },
@@ -118,12 +122,12 @@ async function mountPair(product: Product,promotion?:PublicPromotion) {
     "@/store/product-availability": { isProductAvailable },
     "@/composables/use-page-header": { useSetPageHeader: () => {} },
     "@/store/sticky-cta-bar": { useStickyCTA: () => ({ activate: () => {}, show: (value: Record<string, unknown>) => { cta.value = value; }, hide: () => { cta.value = null; } }) },
-    "@/lib/product-payback": { estimatePaybackDays: () => null },
     "@/mock/phone-tiers": { getPhoneTierYields: () => [] },
     "@/lib/store-upgrade": { activePhoneDailyRate: () => 0, storeYieldMultiplier: () => 0 },
-    "@/store/app": { useApp: () => Vue.reactive({ accountKey: "user:7101", accountBindingEpoch: 0, remoteFleetHasSnapshot: false }) },
+    "@/store/app": { useApp: () => Vue.reactive({ accountKey: "user:7101", accountBindingEpoch: 0, remoteFleetHasSnapshot: false,
+      captureRemoteAccountRequest: () => ({}), refreshRemoteFleet: async () => true }) },
     "@/store/server-product-phase": { refreshServerProductPhase: async () => true },
-    "@/store/ui": { toast: { error: vi.fn() } },
+    "@/store/ui": { toast: { error: toastError } },
     "@/lib/account-scope": { captureAccountScope: () => ({}), isCurrentAccountScope: () => true },
     "@/lib/authenticated-page-observation": { authenticatedPageObservationReporter: { report: async () => false } },
     "@/lib/purchase-eligibility-copy": { resolvePurchaseEligibilityMessage, purchaseEligibilityUnlockHref, purchaseEligibilityPolicyHasNoRestriction },
@@ -157,7 +161,7 @@ async function mountPair(product: Product,promotion?:PublicPromotion) {
   await onLoads[0]({ id: current.id });
   await Vue.nextTick();
   return {
-    current, eligibility, catalogState, cta, navTo, forbiddenNetwork, cardRoot, detailRoot,
+    toastError, current, eligibility, catalogState, cta, navTo, forbiddenNetwork, cardRoot, detailRoot,
     buy: () => find(cardRoot, entry => entry.props.role === "button" && "aria-disabled" in entry.props)!,
   };
 }
@@ -251,7 +255,9 @@ test("mounted finite share follows 1→0→1 inventory and still fail-closes eli
   expect(h.cta.value?.disabled).not.toBe(true);
   h.eligibility.value = { status: "error", eligible: false, snapshot: null }; await Vue.nextTick();
   expect(textContent(h.buy())).toBe(zh.store.purchaseEligibilityRetry);
-  expect(h.cta.value).toBeNull();
+  expect(h.cta.value).toMatchObject({ disabled: true, buttonLabel: zh.store.cardBuyNow });
+  expect(h.toastError).toHaveBeenCalledExactlyOnceWith(zh.store.purchaseEligibilityError);
+  expect(textContent(h.detailRoot)).not.toContain(zh.store.purchaseEligibilityError);
   activate(h.buy()); expect(h.navTo).not.toHaveBeenCalled();
   h.catalogState.status = "loading"; await Vue.nextTick();
   expect(h.buy().props["aria-disabled"]).toBe("true");
@@ -279,3 +285,22 @@ test("release-closed detail remains hidden ahead of a physical stock0 hint", asy
   expect(h.cta.value).toBeNull();
   expect(h.forbiddenNetwork).not.toHaveBeenCalled();
 });
+
+ test("detail keeps known denial in CTA and reports query failures only once via toast", async () => {
+  const h = await mountPair(canonicalProduct("DEVICE", "FINITE", 1));
+  const snapshot = { ...h.eligibility.value.snapshot!, eligible: false, decisionCode: "PURCHASE_GATE_NOT_MET",
+    policies: [{ policy: "E1" as const, eligible: false, decisionCode: "PURCHASE_GATE_NOT_MET", mode: "ALL" as const,
+      conditions: [{ kind: "rank" as const, required: 3, current: 2, gap: 1, met: false }] }] };
+  h.eligibility.value = { status: "ready", eligible: false, snapshot }; await Vue.nextTick();
+  expect(h.cta.value).toMatchObject({ buttonLabel: zh.store.gateLockedCta, href: "/pages/team/rank", disabled: false });
+  expect(textContent(h.detailRoot)).not.toContain(zh.store.purchaseEligibilityIneligible);
+  expect(h.toastError).not.toHaveBeenCalled();
+  h.eligibility.value = { status: "error", eligible: false, snapshot: null }; await Vue.nextTick();
+  expect(h.cta.value).toMatchObject({ disabled: true, buttonLabel: zh.store.cardBuyNow });
+  expect(h.toastError).toHaveBeenCalledTimes(1);
+  h.current.price += 1; await Vue.nextTick();
+  expect(h.toastError).toHaveBeenCalledTimes(1);
+  h.eligibility.value = { status: "loading", eligible: false, snapshot: null }; await Vue.nextTick();
+  h.eligibility.value = { status: "ready", eligible: false, snapshot }; await Vue.nextTick();
+  expect(h.cta.value).toMatchObject({ disabled: false, buttonLabel: zh.store.gateLockedCta });
+ });

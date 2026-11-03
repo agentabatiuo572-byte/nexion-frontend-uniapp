@@ -4,6 +4,7 @@ import * as Vue from "vue";
 import ts from "typescript";
 import source from "./day-one-quest-card.vue?raw";
 import { createDayOneObservationRecovery, observationRecoveryRoute } from "@/lib/day-one-observation-recovery";
+import { installKeyboardActivation, uninstallKeyboardActivation } from "@/lib/a11y-activate";
 import { ApiError } from "@/api/errors";
 import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
@@ -42,11 +43,18 @@ describe("DayOne card real recovery template and handler",()=>{
   });
   it.each(["Enter"," "])("activates terms once with %s and retains the exact task return",async key=>{
     const f=await fixture("LEGAL_TERMS_ACK_REQUIRED",true);
-    const event={key,preventDefault:mock.fn()};
-    const handlers=f.buttons[0].props.onKeydown;
-    for(const call of Array.isArray(handlers)?handlers:[handlers]) call(event);
-    expect(f.navTo).toHaveBeenCalledExactlyOnceWith("/pages/onboarding/terms?return="+encodeURIComponent("/pages/earn/earn"));
-    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    const listeners: Array<(event: KeyboardEvent) => void> = [];
+    mock.stubGlobal("document", { addEventListener: (_type: string, listener: (event: KeyboardEvent) => void) => listeners.push(listener), removeEventListener: mock.fn() });
+    try {
+      installKeyboardActivation();
+      const control = f.buttons[0];
+      expect(control.props.tabindex).toBe(0);
+      expect(control.props.onKeydown).toBeUndefined();
+      const event={key, preventDefault:mock.fn(), target:{ tagName:"UNI-VIEW", getAttribute:(name: string)=>control.props[name] === undefined ? null : String(control.props[name]), click:()=>control.props.onClick() }};
+      listeners.forEach(listener => listener(event as unknown as KeyboardEvent));
+      expect(f.navTo).toHaveBeenCalledExactlyOnceWith("/pages/onboarding/terms?return="+encodeURIComponent("/pages/earn/earn"));
+      expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    } finally { uninstallKeyboardActivation(); mock.unstubAllGlobals(); }
   });
   it("offers only the original task retry for an unknown rejection and no inactive actions",async()=>{
     const f=await fixture("UNKNOWN_PRECONDITION",false);

@@ -1,9 +1,11 @@
 export type ConversationType = "ai" | "advisor" | "support";
 export type ConversationCategoryAvailability = Record<ConversationType, boolean>;
-export type ConvRoleKey = "roleAi" | "roleAdvisor" | "roleSupport";
+export type ConvRoleKey = "roleAdvisor" | "roleSupport";
 export type ConvSessionStatus = "active" | "closed";
 export interface ConvMessage {
   id: string;
+  /** Original idempotent message key echoed by the server, when supplied. */
+  clientMessageId?: string;
   sender: "user" | "agent" | "system";
   status?: "sent" | "read";
   text: string;
@@ -25,6 +27,10 @@ export interface Conversation {
   status: "open" | "transferred" | "resolved" | "closed";
   version: number;
   agentName: string;
+  /** Stable server staff identity. A display name must never identify a thread. */
+  ownerAgentId?: string | null;
+  /** Server account/peer visibility boundary; never removes staff-side history. */
+  userClearedThroughMessageId?: number;
   roleKey: ConvRoleKey;
   avatarTint: string;
   messages: ConvMessage[];

@@ -57,10 +57,8 @@ for (const l of LOCALES) {
   // z1 判决(2026-08-10):{h} 时限承诺句已有意改版为服务端口径(以服务端订单状态为准),
   // s4Body / terms.s6Body 的占位符断言退役;无写死数字 + 非空 + 三语相异照守
   // (前两者由上面 SLA_KEYS 循环覆盖,三语相异在循环后单独断言)。
-  // 首审提示改成不给时间承诺后,它自己也不许再出现数字
-  check(`[${l}] wallet.firstTimeReview 不做时间承诺(系统对人工复核无推进机制)`,
-    !hasHardcodedNumber(at(msgs[l], "wallet.firstTimeReview")),
-    String(at(msgs[l], "wallet.firstTimeReview") ?? ""));
+  // 2026-10-29 文案审查 D1:首笔审核提示已删除,不再告诉用户哪些提现会转人工。
+  check(`[${l}] wallet.firstTimeReview 已删除`, at(msgs[l], "wallet.firstTimeReview") === undefined);
 }
 
 // 三语互不相同:整份复制粘贴 = 有值但没翻译,「存在 + 无数字」两道门都看不出来。

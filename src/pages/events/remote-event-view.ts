@@ -27,7 +27,7 @@ const TINT_BY_KIND: Record<CanonicalEvent["kind"], string> = {
 
 function businessCtaLabel(event: CanonicalEvent, labels: EventActionLabels): string | undefined {
   if (event.trackable) return undefined;
-  if (event.kind === "wheel") return labels.spin;
+  if (event.kind === "wheel") return event.state === "ended" ? labels.viewDetails : labels.spin;
   if (!event.href) return undefined;
   if (event.kind === "discount") return labels.claimDiscount;
   if (event.href === "/pages/daily/daily") return labels.checkIn;
@@ -50,8 +50,8 @@ export function remoteEventView(event: CanonicalEvent, labels: EventActionLabels
     subtitle: platformDisplayText(event.subtitle),
     emoji: "✦",
     tint: TINT_BY_KIND[event.kind],
-    reward: event.kind === "wheel" ? platformDisplayText(event.rewardName) : `${event.rewardType === "USDT" || event.rewardType === "NEX" ? formatAmount(event.rewardAmount) : event.rewardAmount} ${platformDisplayText(event.rewardName)}`,
-    progress: event.trackable
+    reward: event.kind === "wheel" || !["USDT", "UVT"].includes(event.rewardType) ? platformDisplayText(event.rewardName) : `${formatAmount(event.rewardAmount)} ${platformDisplayText(event.rewardName)}`,
+    progress: event.trackable && event.kind !== "regional"
       ? { current: event.progressValue, total: event.targetValue, label: labels.progress }
       : null,
     joined: ["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus),
@@ -62,6 +62,6 @@ export function remoteEventView(event: CanonicalEvent, labels: EventActionLabels
     featured: event.featured,
     trackable: event.trackable,
     done: ["CLAIMABLE", "CLAIMED"].includes(event.userStatus),
-    rewardNEX: event.rewardType === "NEX" ? event.rewardAmount : 0,
+    rewardNEX: event.rewardType === "UVT" ? event.rewardAmount : 0,
   };
 }

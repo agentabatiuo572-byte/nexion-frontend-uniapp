@@ -40,6 +40,14 @@
       </view>
 
       <!-- Phase: calibrating -->
+      <view v-else-if="phase === 'calibrating' && iosPhone" key="calibrating-ios" class="cn-phase">
+        <view class="cn-steps nx-glass-card" role="list">
+          <view v-for="step in iosSteps" :key="step.label" class="cn-steps__row" role="listitem">
+            <text class="cn-steps__label" :class="{ 'cn-steps__label--idle': !step.running }">{{ step.label }}</text>
+            <text class="cn-steps__state" :class="{ 'cn-steps__state--running': step.running }">{{ step.state }}</text>
+          </view>
+        </view>
+      </view>
       <view v-else-if="phase === 'calibrating'" key="calibrating" class="cn-phase">
         <view class="cn-prog-row">
           <svg class="cn-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -49,6 +57,15 @@
       </view>
 
       <!-- Phase: result: the server score is the only public calibration figure. -->
+      <view v-else-if="phase === 'result' && iosPhone" key="result-ios" class="cn-phase anim-up">
+        <view class="cn-ios-card nx-glass-card nx-glass-hero" role="group" :aria-label="`${t.onboarding.iosComputeEstimate} ${finalScore} ${t.onboarding.phoneComputeUnit}`">
+          <text class="cn-ios-card__k">{{ t.onboarding.iosComputeEstimate }}</text>
+          <view class="cn-ios-card__value">
+            <text class="cn-ios-card__v">{{ shownScore }}</text>
+            <text class="cn-ios-card__u">{{ t.onboarding.phoneComputeUnit }}<template v-if="canonical?.tierName"> · {{ canonical.tierName }}</template></text>
+          </view>
+        </view>
+      </view>
       <view v-else-if="phase === 'result'" key="result" class="cn-phase anim-up">
         <view class="cn-score cn-score--hex" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore} ${t.onboarding.phoneComputeUnit}`">
           <view class="cn-score__aurora" aria-hidden="true" />
@@ -63,6 +80,13 @@
         </view>
       </view>
 
+      <!-- An iPhone waiting for verification: where to go next, never which model or rule was involved. -->
+      <view v-else-if="iosPending" key="error-ios" class="cn-phase anim-up">
+        <text class="cn-ios-body">{{ t.onboarding.phoneCalibrationPendingIosBody }}</text>
+        <view class="cn-ios-card nx-glass-card">
+          <text class="cn-ios-card__k">{{ t.onboarding.iosPendingHint }}</text>
+        </view>
+      </view>
       <!-- A failed calibration is a real terminal state until the user retries. -->
       <view v-else key="error" class="cn-phase anim-up">
         <view class="cn-policy">
@@ -71,8 +95,8 @@
             <text class="cn-policy__cap-t">{{ failureTitle }}</text>
           </view>
           <text class="cn-policy__t">{{ failureDetail }}</text>
-          <text v-if="failedAction !== 'defer'" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationDeferredHint }}</text>
-          <text class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationRewardGate }}</text>
+          <text v-if="canDefer" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationDeferredHint }}</text>
+          <text v-if="activationOutcome !== 'active'" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationRewardGate }}</text>
         </view>
       </view>
     </view>
@@ -83,16 +107,36 @@
       </view>
     </view>
     <view v-if="nativePhoneAvailable" class="cn-cta">
-      <view v-if="phase === 'result'" class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
-        <text class="cn-go__t cn-go__t--on">{{ activateText }}</text>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+      <view v-if="phase === 'result'" :class="{ 'cn-error-actions': iosPhone }">
+        <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
+          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : activateText }}</text>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        </view>
+        <view v-if="iosPhone && canDefer" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+          <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.iosActivateLater }}</text>
+        </view>
+      </view>
+      <view v-else-if="phase === 'error' && iosPending" class="cn-error-actions">
+        <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
+          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : t.onboarding.iosRecalibrate }}</text>
+        </view>
+        <view class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="contactSupport" @keydown.enter.prevent="contactSupport" @keydown.space.prevent="contactSupport">
+          <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.iosContactSupport }}</text>
+        </view>
+        <!-- Onboarding must still be able to continue without a phone. -->
+        <view v-if="canDefer" class="cn-link active:opacity-60" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+          <text class="cn-link__t">{{ t.onboarding.activationDefer }}</text>
+        </view>
       </view>
       <view v-else-if="phase === 'error'" class="cn-error-actions">
         <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
-          <text class="cn-go__t cn-go__t--on">{{ t.onboarding.activationRetry }}</text>
+          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : failureActionText }}</text>
         </view>
-        <view v-if="failedAction !== 'defer'" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
-          <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.activationDefer }}</text>
+        <view v-if="failureFeedback?.action === 'devices' && canDefer" class="cn-link active:opacity-60" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
+          <text class="cn-link__t">{{ t.onboarding.activationRetry }}</text>
+        </view>
+        <view v-if="canDefer" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+          <text class="cn-go__t cn-go__t--secondary" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : t.onboarding.activationDefer }}</text>
         </view>
       </view>
     </view>
@@ -105,16 +149,18 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
       </view>
     </view>
+    <GlobalUi />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
-import { navReset } from "@/lib/route";
-import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
+import { navReset, navTo } from "@/lib/route";
+import { hasNativeAndroidPhoneRuntime, hasNativePhoneRuntime, nativePhonePlatform } from "@/lib/native-phone-runtime";
 import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { onLoad, onBackPress } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
+import GlobalUi from "@/components/global-ui.vue";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
@@ -141,10 +187,13 @@ async function collectCalibrationSignals() {
 }
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
-import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
+import type { OnboardingCalibration, PhoneActivationVersions } from "@/api/onboarding-calibration-api";
+import { confirm as uiConfirm, useUI } from "@/store/ui";
 import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { ApiError } from "@/api/errors";
+import { phoneActivationFeedback, confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
 import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
 import { isCurrentOnboardingCalibrationScope, type OnboardingCalibrationScope } from "@/lib/onboarding-calibration-scope";
 
@@ -165,6 +214,9 @@ const shownScore = ref(0);
 let scoreTimer: ReturnType<typeof setInterval> | null = null;
 const failedAction = ref<FailedAction>("calibration");
 const failureCode = ref("");
+const activationOutcome = ref<"idle" | "preflight-unconfirmed" | "unconfirmed" | "active">("idle");
+const canDefer = computed(() => failedAction.value !== "defer" && activationOutcome.value !== "unconfirmed" && activationOutcome.value !== "active"
+  && canonical.value?.activationStatus !== "ACTIVE");
 
 // Every runtime mode receives final facts from the authenticated server. The
 // onboarding path intentionally has no local capability fallback, so mock,
@@ -188,6 +240,7 @@ function acceptCurrentCanonical(scope: RequestScope, result: OnboardingCalibrati
   return scopeIsCurrent(scope) && calibrationBelongsTo(result, accountKey(), getDeviceId());
 }
 const authenticatedAccountKey = computed(() => auth.isAuthenticated ? accountKey() : "");
+const confirmOwner = `phone-activation-${Date.now()}-${Math.random()}`;
 watch(authenticatedAccountKey, (next, previous) => {
   if (next === previous) return;
   // Remote login hydrates the non-secret account routing key after the
@@ -197,9 +250,12 @@ watch(authenticatedAccountKey, (next, previous) => {
   activationBusy.value = false;
   accountEpoch += 1;
   requestGeneration += 1;
+  useUI().clearConfirmsBy(confirmOwner);
   calibrationFlow.reset();
   activationIntent = null;
+  activationOutcome.value = "idle";
   canonical.value = null;
+  failureCode.value = "";
   if (phase.value !== "intro") phase.value = "error";
   failedAction.value = "calibration";
 });
@@ -207,25 +263,47 @@ watch(authenticatedAccountKey, (next, previous) => {
 // Copy swaps: recalibrate vs first-time onboarding.
 const stepText = computed(() => (isRecal.value ? t.value.onboarding.recalStep : t.value.onboarding.step3of3));
 const titleText = computed(() => phase.value === "error" ? failureTitle.value
+  : iosPhone && phase.value === "calibrating" ? t.value.onboarding.iosCalibrationTitle
+  : iosPhone && phase.value === "result" ? t.value.onboarding.resultTitle
   : loginCheckNeeded.value ? t.value.onboarding.phoneBindingCheckTitle
   : isRecal.value ? t.value.onboarding.recalTitle : t.value.onboarding.calibrationTitle);
-const subText = computed(() => loginCheckNeeded.value ? t.value.onboarding.phoneBindingCheckBody
+const subText = computed(() => iosPhone && phase.value === "calibrating" ? t.value.onboarding.iosIdentifying
+  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingCheckBody
   : isRecal.value ? t.value.onboarding.recalSubtitle : t.value.onboarding.calibrationSubtitle);
 const activateText = computed(() => (isRecal.value ? t.value.onboarding.recalActivate : t.value.onboarding.activatePhone));
-const failureDetail = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
-  ? t.value.onboarding.phoneCalibrationPendingBody
-  : failureCode.value === "PHONE_REPLACEMENT_DISABLED" ? t.value.onboarding.phoneReplacementDisabled
-  : failureCode.value === "PHONE_REPLACEMENT_COOLDOWN" ? t.value.onboarding.phoneReplacementCooldown
-  : failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED" ? t.value.onboarding.phoneCalibrationRulesChanged
+const iosPending = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION" && canonical.value.signals?.platform === "ios");
+const iosSteps = computed(() => [t.value.onboarding.iosStepIdentify, t.value.onboarding.iosStepResult, t.value.onboarding.iosStepActivate]
+  .map((label, index) => ({ label, running: index === 0, state: index === 0 ? t.value.onboarding.iosStepRunning : t.value.onboarding.iosStepWaiting })));
+function contactSupport() {
+  if (!activationBusy.value) navTo("/pages/support/messages");
+}
+const failureFeedback = computed(() => phoneActivationFeedback(failureCode.value));
+const supportRequired = computed(() => activationOutcome.value === "idle" && failureFeedback.value?.action === "support");
+const failureActionText = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSyncAction
+  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationCheckResult
+  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.activationRetry
+  : failureFeedback.value?.action === "devices" ? t.value.onboarding.phoneActivationManageDevices
+  : failureFeedback.value?.action === "login" ? t.value.onboarding.phoneActivationLoginAction
+  : failureFeedback.value?.action === "terms" ? t.value.onboarding.phoneActivationTermsAction
+  : failureFeedback.value?.action === "recalibrate" ? t.value.onboarding.iosRecalibrate
+  : supportRequired.value ? t.value.onboarding.iosContactSupport : t.value.onboarding.activationRetry);
+const failureDetail = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSync
+  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationUnconfirmed
+  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.phoneActivationEligibilityUnavailable
+  : failureFeedback.value ? t.value.onboarding[failureFeedback.value.detail]
+  : iosPending.value ? t.value.onboarding.phoneCalibrationPendingIosBody
+  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION" ? t.value.onboarding.phoneCalibrationPendingBody
   : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableBody
   : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailed
   : failedAction.value === "calibration" ? t.value.onboarding.calibrationRetry
-  : t.value.onboarding.activationBindRetry);
-const failureTitle = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION"
-  ? t.value.onboarding.phoneCalibrationPendingTitle
+  : t.value.onboarding.phoneActivationRejected);
+const failureTitle = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSyncTitle
+  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationUnconfirmedTitle
+  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.phoneActivationEligibilityUnavailableTitle
+  : iosPending.value ? t.value.onboarding.phoneCalibrationPendingIosTitle
+  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION" ? t.value.onboarding.phoneCalibrationPendingTitle
   : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableTitle
-  : failedAction.value === "calibration"
-  ? t.value.onboarding.calibrationFailedTitle
+  : failedAction.value === "calibration" ? t.value.onboarding.calibrationFailedTitle
   : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailedTitle
   : t.value.onboarding.activationFailedTitle);
 
@@ -243,13 +321,15 @@ const whyPoints = computed(() => [
 // warehouse remeasurement/resume can replace an existing calibration.
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
   collect: collectCalibrationSignals, key: () => `onboarding:${requireCryptoUuid()}` });
-const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
+const nativePhoneAvailable = hasNativePhoneRuntime();
+const iosPhone = nativePhonePlatform() === "ios";
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
-let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string } | null = null;
+let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string; versions?: PhoneActivationVersions; submitted?: boolean } | null = null;
 const activationBusy = ref(false);
 
 async function startCalibration() {
-  if (!nativePhoneAvailable) return;
+  if (!nativePhoneAvailable || activationOutcome.value === "unconfirmed" || activationOutcome.value === "active") return;
+  activationOutcome.value = "idle";
   failureCode.value = "";
   canonical.value = null;
   activationIntent = null;
@@ -324,7 +404,23 @@ watch(phase, (p) => {
 
 function retryCalibration() {
   if (!nativePhoneAvailable || activationBusy.value) return;
-  if (failureCode.value === "PHONE_CALIBRATION_RULES_CHANGED") {
+  if (activationOutcome.value !== "idle") {
+    void activate();
+    return;
+  }
+  if (failureFeedback.value?.action === "devices") { navTo("/pages/me/devices"); return; }
+  if (failureFeedback.value?.action === "login") {
+    auth.signOut();
+    void navReset("/pages/login/login");
+    return;
+  }
+  if (failureFeedback.value?.action === "terms") { navTo("/pages/onboarding/terms"); return; }
+  if (supportRequired.value) {
+    contactSupport();
+    return;
+  }
+  if (failureFeedback.value?.action === "recalibrate") {
+    activationIntent = null;
     calibrationFlow.reset();
     resumeDeferred.value = true;
     phase.value = "calibrating";
@@ -369,39 +465,117 @@ function completeOnboardingLocally(): boolean {
   return false;
 }
 
+/** Reconcile the original operation before any new eligibility check or write. */
+async function readActivationOutcome(idempotencyKey: string, deviceId: string, scope: RequestScope) {
+  let rejection = "";
+  let pending = false;
+  try {
+    const receipt = await onboardingCalibrationApi.activationReceipt(idempotencyKey);
+    if (!scopeIsCurrent(scope)) return { rejection, pending, result: null };
+    if (receipt?.status === "SUCCEEDED" && acceptCurrentCanonical(scope, receipt.result)) {
+      return { rejection, pending, result: receipt.result };
+    }
+    if (receipt?.status === "FAILED") rejection = receipt.reason;
+    pending = receipt?.status === "PENDING";
+  } catch { /* An unavailable receipt does not settle the original operation. */ }
+  if (!scopeIsCurrent(scope)) return { rejection, pending, result: null };
+  try {
+    const readback = await onboardingCalibrationApi.result(deviceId);
+    if (acceptCurrentCanonical(scope, readback) && readback.calibrationAvailable && readback.activationStatus === "ACTIVE") {
+      return { rejection, pending, result: readback };
+    }
+  } catch { /* Keep the original rejection or uncertainty, never this secondary read error. */ }
+  return { rejection, pending, result: null };
+}
+
 async function activate() {
   if (!nativePhoneAvailable || !mounted || !canonical.value?.calibrationAvailable
       || canonical.value.calibrationStatus !== "MATCHED" || activationBusy.value) return;
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   const before = canonical.value;
-  const command = activationCommand("ACTIVE", before.revision);
-  const app = useApp();
-  // Apply the server-confirmed baseline to the live phone device + record this
-  // device as the account's calibrated device (so future logins on it skip
-  // recalibration, while a different device triggers it).
   try {
-    let activated: OnboardingCalibration;
-    try {
-      activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey);
-    } catch (cause) {
-      if (!scopeIsCurrent(requestScope)) return;
-      const readback = await onboardingCalibrationApi.result(before.deviceId);
-      if (!acceptCurrentCanonical(requestScope, readback)) return;
-      canonical.value = readback;
-      if (!readback.calibrationAvailable || readback.activationStatus !== "ACTIVE") throw cause;
-      activated = readback;
+    let activated: OnboardingCalibration | null = before.activationStatus === "ACTIVE" ? before : null;
+    if (!activated) {
+      if (activationOutcome.value === "idle") activationOutcome.value = "preflight-unconfirmed";
+      const command = activationCommand("ACTIVE", before.revision);
+      if (command.submitted) {
+        const outcome = await readActivationOutcome(command.idempotencyKey, before.deviceId, requestScope);
+        if (!scopeIsCurrent(requestScope)) return;
+        activated = outcome.result;
+        if (!activated && outcome.rejection) {
+          activationIntent = null;
+          activationOutcome.value = "idle";
+          throw new Error(outcome.rejection);
+        }
+        if (!activated && outcome.pending) throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
+      }
+      if (!activated) {
+        if (!command.versions) {
+          let eligibility;
+          try { eligibility = await onboardingCalibrationApi.activationEligibility(); }
+          catch (cause) {
+            if (scopeIsCurrent(requestScope) && confirmedPhoneActivationRejection(cause)) activationOutcome.value = "idle";
+            throw cause;
+          }
+          if (!scopeIsCurrent(requestScope)) return;
+          if (!eligibility.canActivate) {
+            activationOutcome.value = "idle";
+            throw new Error(eligibility.blockedReasons[0] || "PHONE_ACTIVATION_UNAVAILABLE");
+          }
+          const replacing = eligibility.binding !== null && (eligibility.binding.installationId !== before.deviceId
+            || failureCode.value === "PHONE_REPLACEMENT_CONFIRMATION_REQUIRED");
+          if (replacing) {
+            const confirmed = await uiConfirm({ title: t.value.onboarding.replacementConfirmTitle,
+              message: t.value.onboarding.replacementConfirmBody, confirmLabel: t.value.onboarding.replacementConfirmAction,
+              owner: confirmOwner });
+            if (!scopeIsCurrent(requestScope)) return;
+            if (!confirmed) { activationOutcome.value = "idle"; return; }
+          }
+          command.versions = {
+            expectedBindingVersion: eligibility.binding?.bindingVersion ?? null,
+            expectedPolicyVersion: eligibility.policyVersion,
+            replacementConfirmed: replacing,
+            ...(eligibility.grantId ? { exceptionGrantId: eligibility.grantId } : {}),
+          };
+        }
+        command.submitted = true;
+        activationOutcome.value = "unconfirmed";
+        try {
+          activated = await onboardingCalibrationApi.activate(before.deviceId, command.revision, command.idempotencyKey, command.versions);
+          if (!scopeIsCurrent(requestScope)) return;
+          if (!acceptCurrentCanonical(requestScope, activated)) {
+            throw new ApiError({ kind: "protocol", message: "ONBOARDING_CALIBRATION_SCOPE_INVALID" });
+          }
+          if (!activated.calibrationAvailable || activated.activationStatus !== "ACTIVE") {
+            throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
+          }
+        } catch (cause) {
+          if (!scopeIsCurrent(requestScope)) return;
+          const outcome = await readActivationOutcome(command.idempotencyKey, before.deviceId, requestScope);
+          if (!scopeIsCurrent(requestScope)) return;
+          activated = outcome.result;
+          if (!activated) {
+            if (outcome.rejection || confirmedPhoneActivationRejection(cause)) {
+              activationIntent = null;
+              activationOutcome.value = "idle";
+              if (outcome.rejection && outcome.rejection !== "PHONE_ACTIVATION_FAILED") throw new Error(outcome.rejection);
+            }
+            throw cause;
+          }
+        }
+      }
     }
-    if (!acceptCurrentCanonical(requestScope, activated)) return;
-    if (!activated.calibrationAvailable || activated.activationStatus !== "ACTIVE") throw new Error("PHONE_ACTIVATION_NOT_CONFIRMED");
-    if (!useSession().markCalibrated(auth.email || auth.accountId || "default")
-        || !completeOnboardingLocally()) {
+    if (!activated || !acceptCurrentCanonical(requestScope, activated)) return;
+    // Server success survives local persistence errors; retry synchronizes this result without another POST.
+    canonical.value = activated;
+    activationOutcome.value = "active";
+    activationIntent = null;
+    if (!useSession().markCalibrated(auth.email || auth.accountId || "default") || !completeOnboardingLocally()) {
       throw new Error("PHONE_ACTIVATION_LOCAL_COMMIT_FAILED");
     }
-    canonical.value = activated;
-    // Activation is already committed by the canonical endpoint. A secondary
-    // fleet refresh must not turn that success into a false activation error;
-    // App-level resilience owns refresh failure and the next page can retry it.
+    const app = useApp();
+    app.acceptPhoneActivation();
     void app.refreshRemoteFleet();
     if (isRecal.value) app.resumeMining();
     navReset({ url: "/pages/index/index", fail: () => {} });
@@ -412,20 +586,22 @@ async function activate() {
       phase.value = "error";
     }
   } finally {
-    if (scopeIsCurrent(requestScope)) activationBusy.value = false;
+    if (isCurrentOnboardingCalibrationScope(requestScope, currentScope())) activationBusy.value = false;
   }
 }
 
 async function deferPhoneActivation() {
-  if (!nativePhoneAvailable || !mounted || activationBusy.value) return;
+  if (!nativePhoneAvailable || !mounted || activationBusy.value
+      || activationOutcome.value === "unconfirmed" || activationOutcome.value === "active") return;
+  if (canonical.value?.activationStatus === "ACTIVE") { void navReset("/pages/index/index"); return; }
+  activationOutcome.value = "idle";
   activationBusy.value = true;
   const requestScope = { ...currentScope() };
   try {
     if (isLogin.value) {
       // Login can mean replacing an existing phone. "NEEDS_CALIBRATION" alone
       // cannot distinguish that from an account which has never bound one.
-      if (loginCheckNeeded.value || isRecal.value || canonical.value?.userDeviceId
-          || canonical.value?.activationStatus === "ACTIVE") {
+      if (loginCheckNeeded.value || isRecal.value || canonical.value?.userDeviceId) {
         void navReset({ url: "/pages/index/index", fail: () => {} });
         return;
       }
@@ -466,7 +642,7 @@ async function deferPhoneActivation() {
       phase.value = "error";
     }
   } finally {
-    if (scopeIsCurrent(requestScope)) activationBusy.value = false;
+    if (isCurrentOnboardingCalibrationScope(requestScope, currentScope())) activationBusy.value = false;
   }
 }
 function leaveConnect() {
@@ -498,6 +674,7 @@ onMounted(() => {
 onBackPress(() => { leaveConnect(); return true; });
 onUnmounted(() => {
   mounted = false;
+  useUI().clearConfirmsBy(confirmOwner);
   if (scoreTimer) clearInterval(scoreTimer);
   requestGeneration += 1;
 });
@@ -520,7 +697,7 @@ onUnmounted(() => {
 .cn-bar__fill--full { width: 100%; }
 .cn-step { display: block; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-title { display: block; font-family: var(--font-v5); margin-top: 4px; font-size: 20px; font-weight: 600; line-height: 1.25; color: var(--v5-ink); }
-.cn-sub { display: block; margin-top: 4px; font-size: 13px; color: var(--v5-ink-3); }
+.cn-sub { display: block; margin-top: 4px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
 .cn-phase { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
 
 .cn-why { background: var(--v5-surface); border-radius: 16px; padding: 16px; }
@@ -528,7 +705,7 @@ onUnmounted(() => {
 .cn-why__list { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .cn-point { display: flex; align-items: flex-start; gap: 10px; }
 .cn-point__ic { width: 24px; height: 24px; border-radius: 6px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
-.cn-point__t { flex: 1; font-size: 13px; line-height: 1.375; color: var(--v5-ink); }
+.cn-point__t { flex: 1; font-size: var(--ui-type-list-subtitle); line-height: 1.375; color: var(--v5-ink); }
 
 .cn-prog-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .cn-prog-row__t { font-size: 12px; color: var(--v5-ink-3); }
@@ -547,15 +724,15 @@ onUnmounted(() => {
 .cn-score__cap { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-score__cap-t { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.18em; color: var(--v5-brand); }
 .cn-score__num { margin-top: 12px; display: flex; align-items: baseline; justify-content: center; gap: 4px; }
-.cn-score__v { font-family: var(--font-v5); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.025em; color: var(--v5-brand); font-size: 56px; font-weight: 600; }
-.cn-score__d { font-family: var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-ink-3); font-size: 20px; font-weight: 500; }
+.cn-score__v { font-family: var(--font-metric); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.025em; color: var(--v5-brand); font-size: 56px; font-weight: 600; }
+.cn-score__d { font-family: var(--font-metric); font-variant-numeric: tabular-nums; color: var(--v5-ink-3); font-size: 20px; font-weight: 500; }
 .cn-score__tier { display: block; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--v5-ink); }
 .cn-score__yield { margin: 12px auto 0; display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 12px; border-radius: 9999px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); }
 .cn-score__yield-cap { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-score__yield-v { font-family: var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-brand); font-size: 15px; font-weight: 600; }
 
 .cn-summary { border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--v5-surface); }
-.cn-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.cn-row { display: flex; align-items: center; gap: 10px; font-size: var(--ui-type-list-subtitle); }
 .cn-row__check { width: 24px; height: 24px; border-radius: 6px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .cn-row__label { color: var(--v5-ink-3); }
 .cn-row__val { margin-left: auto; font-family: var(--font-jet-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--v5-ink); font-weight: 600; }
@@ -568,12 +745,27 @@ onUnmounted(() => {
 .cn-policy__dot { flex-shrink: 0; margin-top: 6px; width: 4px; height: 4px; border-radius: 9999px; background: color-mix(in oklab, var(--v5-warning) 55%, transparent); }
 .cn-policy__t { flex: 1; font-size: 12px; line-height: 1.375; color: var(--v5-ink-2); }
 .cn-policy__t--spaced { display: block; margin-top: 8px; }
+/* iPhone calibration: flat content card for steps, glass hero only for the key result. */
+.cn-steps { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.cn-steps__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cn-steps__label { font-size: 14px; color: var(--v5-ink); }
+.cn-steps__label--idle, .cn-steps__state { color: var(--v5-ink-3); }
+.cn-steps__state { flex: none; font-size: 13px; }
+.cn-steps__state--running { color: var(--v5-brand); font-weight: 600; }
+.cn-ios-body { display: block; margin-bottom: 16px; font-size: var(--ui-type-list-subtitle); line-height: 1.5; color: var(--v5-ink-2); }
+.cn-ios-card { display: flex; flex-direction: column; gap: 6px; padding: 18px; }
+.cn-ios-card__k { display: block; font-size: 12px; color: var(--v5-ink-3); }
+.cn-ios-card__value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.cn-ios-card__v { font-family: var(--font-metric); font-variant-numeric: tabular-nums; font-size: 34px; font-weight: 700; color: var(--v5-ink); }
+.cn-ios-card__u { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); }
+.cn-link { min-height: 44px; display: flex; align-items: center; justify-content: center; }
+.cn-link__t { font-size: 13px; color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 3px; }
 
 .cn-cta { margin-top: auto; padding-top: 24px; }
 .cn-go { width: 100%; height: 48px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--v5-brand); transition: transform 0.15s ease; }
 .cn-go--glow { box-shadow: 0 0 24px color-mix(in oklab, var(--v5-brand) 35%, transparent); }
-.cn-go__t { font-size: 15px; font-weight: 600; color: var(--v5-on-brand); }
-.cn-go__t--on { font-size: 15px; }
+.cn-go__t { font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); color: var(--v5-on-brand); }
+.cn-go__t--on { font-size: var(--ui-type-body); }
 .cn-error-actions { display: flex; flex-direction: column; gap: 10px; }
 .cn-go--secondary { background: var(--v5-surface); }
 .cn-go__t--secondary { color: var(--v5-ink); }

@@ -80,6 +80,7 @@ function api(overrides: Partial<AuthApi>): AuthApi {
     pendingLogin: vi.fn(() => false),
     pendingLoginContext: vi.fn(() => null),
     cancelLoginChallenge: vi.fn(),
+    completeProviderLogin: vi.fn(),
     retryLogin: vi.fn(),
     recoverLogin: vi.fn(),
     register: vi.fn(),

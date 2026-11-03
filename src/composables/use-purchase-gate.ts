@@ -29,7 +29,7 @@ export function usePurchaseGate(
     return evaluatePurchaseGate(p, {
       rank: vRank.myRank,
       activeDirect: activeDirect.value,
-      teamComputePoints: vRank.teamComputePoints,
+      teamComputePoints: vRank.teamComputePoints ?? 0,
     });
   });
 

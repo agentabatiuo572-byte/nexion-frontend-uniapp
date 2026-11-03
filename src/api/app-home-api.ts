@@ -61,6 +61,8 @@ export interface AppHomeOverview {
   earnings: {
     today: AppHomePeriod;
     todayVsYesterdayPct: number | null;
+    /** Today's settled USDT minus yesterday's same-period amount; null when either amount is unknown. */
+    todayVsYesterdayUsdt: number | null;
     week: AppHomePeriod;
     month: AppHomePeriod;
     all: AppHomePeriod;
@@ -76,7 +78,8 @@ export interface AppHomeOverview {
     endAt: string | null;
     product: { kind: string | null; name: string | null; dailyUsdt: number | null; priceUsdt: number | null };
   } | null;
-  onboarding: { cumulativePaidUsdt: number | null; activeDevices: number | null };
+  onboarding: { cumulativePaidUsdt: number | null; activeDevices: number | null;
+    slotsUsed?: number | null; slotCap?: number | null; reservedSlotCount?: number | null; trialSlotCount?: number | null };
   onGrid: { clients: AppHomeOnGridClient[]; activeDevices: number | null; activeJobs: number | null; perSecUsdt: number | null };
   source: string;
 }
@@ -193,12 +196,14 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
   const todayVsYesterdayPct = e?.todayVsYesterdayPct === null
     ? null
     : finiteNumber(e?.todayVsYesterdayPct);
+  const todayVsYesterdayUsdt = e?.todayVsYesterdayUsdt == null ? null : finiteNumber(e.todayVsYesterdayUsdt);
   if (!generatedAt || !production
       || accountScope !== APP_HOME_ACCOUNT_SCOPE
       || row.serverCanonical !== true || !e || !market || !onboarding || !grid
       || ledgerMode !== "SETTLED"
       || !isRow(e.today) || !isRow(e.week) || !isRow(e.month) || !isRow(e.all)
       || (e.todayVsYesterdayPct !== null && todayVsYesterdayPct === null)
+      || (e.todayVsYesterdayUsdt != null && todayVsYesterdayUsdt === null)
       || !Array.isArray(row.earningsLedger) || row.earningsLedger.length > 20
       || !Array.isArray(market.workloads) || !Array.isArray(market.deviceRankings) || !Array.isArray(grid.clients)) return invalid();
   const promoRow = row.weeklyPromo;
@@ -216,6 +221,13 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
   }
   const onboardingPaid = onboarding.cumulativePaidUsdt == null ? null : nonNegative(onboarding.cumulativePaidUsdt);
   const onboardingDevices = onboarding.activeDevices == null ? null : integer(onboarding.activeDevices);
+  const onboardingCapacity: Record<string, number | null> = { slotsUsed: null, slotCap: null, reservedSlotCount: null, trialSlotCount: null };
+  for (const key of ["slotsUsed", "slotCap", "reservedSlotCount", "trialSlotCount"]) {
+    if (onboarding[key] === undefined) continue;
+    const count = integer(onboarding[key]);
+    if (count === null || (key === "slotCap" && count < 1)) return invalid();
+    onboardingCapacity[key] = count;
+  }
   const activeDevices = grid.activeDevices == null ? null : integer(grid.activeDevices);
   const activeJobs = grid.activeJobs == null ? null : integer(grid.activeJobs);
   const perSecUsdt = grid.perSecUsdt == null ? null : nonNegative(grid.perSecUsdt);
@@ -227,13 +239,13 @@ export function parseAppHomeOverview(value: unknown, mode: ApiEnvironment = "pro
     sourceEnvironment: row.sourceEnvironment as AppHomeOverview["sourceEnvironment"],
     runId: row.runId as string, generatedAt, accountScope,
     earnings: {
-      today: period(e.today), todayVsYesterdayPct,
+      today: period(e.today), todayVsYesterdayPct, todayVsYesterdayUsdt,
       week: period(e.week), month: period(e.month), all: period(e.all),
     },
     earningsLedgerMode: ledgerMode as AppHomeOverview["earningsLedgerMode"], earningsLedger,
     marketBoard: { workloads: market.workloads.map(workload), deviceRankings: market.deviceRankings.map(ranking) },
     doTheMath: calculator,
-    weeklyPromo, onboarding: { cumulativePaidUsdt: onboardingPaid, activeDevices: onboardingDevices },
+    weeklyPromo, onboarding: { cumulativePaidUsdt: onboardingPaid, activeDevices: onboardingDevices, ...onboardingCapacity },
     onGrid: { clients: grid.clients.map(client), activeDevices, activeJobs, perSecUsdt }, source,
   };
 }

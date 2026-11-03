@@ -54,11 +54,8 @@ function onePath(source: Source, match: (node: ElementNode) => boolean) {
   expect(found).toHaveLength(1);
   return found[0].map(node => ({ node, bindings: source.bindings }));
 }
-const chassis = sfc("components/app-chassis.vue", [], { pullActive: false, contentTop: 0, pendingBarInset: 0, contentBottom: 0 });
+const chassis = sfc("components/app-chassis.vue", [], { pullActive: false, isTabRoute: false, contentTop: 0, pendingBarInset: 0, contentBottom: 0 });
 const chassisPath = onePath(chassis, node => node.tag === "slot" && !attribute(node, "name"));
-const orders = sfc("pages/store/orders.vue", ["badge", "orderRowStyle", "statusChipStyle"], {
-  t: { value: { orders: {} } }, o: { status: "payment_failed" }, i: 0, orderList: [{}],
-});
 const me = sfc("pages/me/me.vue");
 const security = sfc("pages/me/security.vue", ["cardStyle", "groupGap", "revokeAllRowStyle", "revokeAllLabelStyle"]);
 const weekly = sfc("components/home/weekly-quest-list.vue", ["cardStyle", "completedRowStyle", "categoryLabelStyle", "claimErrorStyle"], { i: 0, tier2Quests: [{}] });
@@ -70,10 +67,8 @@ const home = sfc("pages/index/index.vue");
 const withdraw = sfc("pages/me/wallet-withdraw.vue", ["holdBannerStyle"]);
 const boundStyle = (name: string) => (node: ElementNode) => node.tag === "text" && attribute(node, "style", true) === name;
 const cases = [
-  ...["payment_failed", "provisioning_failed", "chargeback"].map(status => ({
-    name: `orders ${status}`, chain: onePath({ ...orders, bindings: { ...orders.bindings, o: { status } } }, boundStyle("statusChipStyle(o.status)")),
-  })),
-  { name: "me order retry", chain: onePath(me, node => node.tag === "text" && node.loc.source.includes("{{ t.orders.retry }}")) },
+  // Order status chips now use the shared NxTag danger tone instead of a page-owned style.
+  { name: "me order retry", chain: onePath(me, node => node.tag === "text" && node.loc.source.includes("{{ t.ui.retry }}")) },
   ...["revokeAll", "cancelDeletionRequest"].map(action => ({
     name: `security ${action}`, chain: onePath(security, node => boundStyle("revokeAllLabelStyle")(node) && node.loc.source.includes(`t.security.${action} }`)),
   })),
@@ -144,8 +139,8 @@ it.each(matrix)("keeps $name readable in $theme/$state on its real ancestor back
 });
 
 it.each([
-  { name: "array", value: ["inline-flex", "active:opacity-70"] },
-  { name: "object", value: { "inline-flex": true, "active:opacity-70": true } },
+  { name: "array", value: ["inline-flex", "active:opacity-40"] },
+  { name: "object", value: { "inline-flex": true, "active:opacity-40": true } },
 ])("detects an opacity regression when the actual retry ancestor uses a $name class binding", ({ value }) => {
   const binding = (baseParse('<view :class="classNames" />').children[0] as ElementNode).props;
   const chain = cases.find(consumer => consumer.name === "me order retry")!.chain.map(entry => attribute(entry.node, "data-me-action") === "retry-orders"

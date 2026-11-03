@@ -1,6 +1,9 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import { parseServerTimestamp } from "./server-time";
+import type { NotificationCategory } from "@/lib/notification-category";
+
+export type NotificationFilter = "all" | NotificationCategory;
 
 export type CanonicalNotificationPriority = "critical" | "high" | "normal" | "low";
 
@@ -20,6 +23,8 @@ export interface CanonicalNotificationPage {
   items: CanonicalNotification[];
   nextCursor: string | null;
   unread: number;
+  /** Account-wide actionable count. Missing/null means the server has not supplied this policy. */
+  actionableUnread?: number | null;
   /** Account-wide counts, independent of the requested page. Omitted by older servers. */
   unreadByKind?: Record<string, number>;
 }
@@ -32,7 +37,7 @@ export interface NotificationActionResult {
 }
 
 export interface NotificationApi {
-  page(cursor?: string, limit?: number): Promise<CanonicalNotificationPage>;
+  page(cursor?: string, limit?: number, category?: NotificationFilter): Promise<CanonicalNotificationPage>;
   markRead(notificationId: number): Promise<void>;
   markAllRead(): Promise<number>;
   clearRead(): Promise<number>;
@@ -98,12 +103,18 @@ function parsePage(value: unknown): CanonicalNotificationPage {
       || (row.nextCursor != null && nextCursor === null)) {
     return invalid();
   }
+  const actionableUnread = row.actionableUnread;
+  if (actionableUnread != null && (typeof actionableUnread !== "number"
+      || !Number.isSafeInteger(actionableUnread) || actionableUnread < 0 || actionableUnread > unread)) {
+    return invalid("NOTIFICATION_ACTIONABLE_UNREAD_INVALID");
+  }
+  const actionable = actionableUnread === undefined ? {} : { actionableUnread: actionableUnread as number | null };
   const items = row.items.map(parseNotification);
   const ids = new Set(items.map((item) => item.id));
   if (ids.size !== items.length) {
     return invalid("NOTIFICATION_PAGE_INCONSISTENT");
   }
-  if (!Object.prototype.hasOwnProperty.call(row, "unreadByKind")) return { items, nextCursor, unread };
+  if (!Object.prototype.hasOwnProperty.call(row, "unreadByKind")) return { items, nextCursor, unread, ...actionable };
   const summary = record(row.unreadByKind);
   if (!summary) return invalid("NOTIFICATION_UNREAD_SUMMARY_INVALID");
   let total = 0;
@@ -126,7 +137,7 @@ function parsePage(value: unknown): CanonicalNotificationPage {
       return invalid("NOTIFICATION_PAGE_INCONSISTENT");
     }
   }
-  return { items, nextCursor, unread, unreadByKind };
+  return { items, nextCursor, unread, unreadByKind, ...actionable };
 }
 
 function parseCount(value: unknown): number {
@@ -159,15 +170,16 @@ function requiredKey(value: string): string {
 
 export function createNotificationApi(client: ApiClient): NotificationApi {
   return {
-    page: async (cursor, limit = 100) => {
+    page: async (cursor, limit = 100, category = "all") => {
       const params = new URLSearchParams({ limit: String(Math.max(1, Math.min(limit, 100))) });
+      if (category !== "all") params.set("category", category);
       const normalizedCursor = cursor?.trim() || "";
       if (normalizedCursor) params.set("cursor", normalizedCursor);
       const page = parsePage(await client.request({
         method: "GET",
         path: `/api/notifications?${params.toString()}`,
       }));
-      if (!normalizedCursor && page.nextCursor === null
+      if (category === "all" && !normalizedCursor && page.nextCursor === null
           && page.unread > page.items.filter((item) => item.readAt === null).length) {
         return invalid("NOTIFICATION_PAGE_INCONSISTENT");
       }

@@ -1,19 +1,12 @@
-<!--
-  Commissions — ported from Nexion-prototype/app/(main)/team/commissions/page.tsx.
-  5+1-kind commission event stream: overview hero (de-carded, floor-sitting) →
-  6-kind summary tiles (tap to filter) → filter pills → event list (transparent
-  hairline group). Sub-page → <AppChassis active="team"> with
-  in-page back row (back → /team). Reuses commission store. mount-effect
-  unlockMatured → onMounted. lucide kind icons → inline SVG. <button>→<view @click>.
--->
 <template>
   <AppChassis active="team">
+    <RewardPageSurface>
     <view class="pb-6" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamCommissions" :subtitle="t.headerSubtitles.teamCommissions" />
+      <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamCommissions" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <EmptyState
-          v-if="remoteApiEnabled && commission.eventsStatus !== 'ready'"
+          v-if="remoteApiEnabled && !ledger"
           :kind="commission.eventsStatus === 'error' ? 'recoverable-error' : 'empty-list'"
           :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionLoadingTitle"
           :desc="commission.eventsStatus === 'error' ? t.network.projectionErrorDesc : undefined"
@@ -21,148 +14,154 @@
           compact
           @cta="commission.refreshCanonicalEvents()"
         />
-        <template v-if="!remoteApiEnabled || commission.eventsStatus === 'ready'">
-        <!-- overview — de-carded: the two headline numbers sit on the page floor.
-             Dual-number hero (Withdrawable/Cooling grid) has no single cap to host
-             the rules-intro pill, so the pill rides a tight top-right row hugging
-             the grid (owner 2026-07-09: kill the empty gap above the hero). -->
-        <view :style="heroWrapStyle">
-          <!-- rules-intro pill hugs the top-right; 4px above the grid so no empty gap. -->
-          <view class="flex items-center justify-end" style="margin-bottom: 4px">
-            <view class="nx-commissions-focusable inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" role="link" tabindex="0" :aria-label="t.commissions.howItWorksEntry" @click="go('/pages/team/commissions-how')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-              <text>{{ t.commissions.howItWorksEntry }}</text>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-            </view>
-          </view>
-          <view class="grid grid-cols-2" style="gap: 12px">
+        <template v-if="!remoteApiEnabled || ledger !== null">
+
+        <RewardHero class="commission-overview" kind="ledger" panel :label="designCopy.monthRewards">
+          <text class="reward-amount"><text v-if="monthAmount.currency" class="reward-amount__currency">$</text>{{ monthAmount.integer }}<text v-if="monthAmount.fraction" class="reward-amount__fraction">.{{ monthAmount.fraction }}</text></text>
+          <text class="block reward-income-uvt">{{ (monthTotals.nex ?? 0) > 0 && !visibility.hidden ? '+' : '' }}{{ assetTotal(monthTotals.nex, 'uvt') }}</text>
+          <view v-if="settlementSplit" class="commission-split" aria-hidden="true"><view :style="{ flexGrow: settlementSplit.unlocked }" /><view :style="{ flexGrow: settlementSplit.cooling }" /></view>
+          <view class="reward-income-summary">
             <view>
-              <text class="block font-mono-tabular" :style="overviewCapStyle">{{ t.directReferral.creditedTotal }}</text>
-              <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-brand)')">${{ formatAmount(commission.unlockedUSDT()) }}</text>
-              <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ formatAmount(commission.unlockedNEX()) }} UVT</text>
+              <text class="block reward-caption">{{ t.directReferral.creditedTotal }}</text>
+              <text class="block reward-income-summary__amount">${{ assetNumber('unlockedUSDT', commission.unlockedUSDT()) }}</text>
+              <text class="block reward-caption">{{ assetNumber('unlockedNEX', commission.unlockedNEX()) }} UVT</text>
             </view>
             <view>
-              <text class="block font-mono-tabular" :style="overviewCapStyle">{{ t.commissions.cooling }}</text>
-              <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-warning)')">${{ formatAmount(commission.coolingUSDT()) }}</text>
-              <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ coolingOverviewText }}</text>
+              <text class="block reward-caption">{{ t.commissions.cooling }}</text>
+              <text class="block reward-income-summary__amount">${{ assetNumber('coolingUSDT', commission.coolingUSDT()) }}</text>
+              <text class="block reward-caption">{{ coolingOverviewText }}</text>
             </view>
           </view>
-          <view class="grid grid-cols-2" :style="heroFooterStyle">
-            <view class="flex items-center justify-between">
-              <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.commissions.thisMonth }}</text>
-              <text class="font-display tabular-nums" :style="{ fontWeight: 600 }">${{ formatAmount(commission.monthUSDT()) }}</text>
-            </view>
-            <view class="flex items-center justify-between">
-              <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.commissions.lifetime }}</text>
-              <text class="font-display tabular-nums" :style="{ fontWeight: 600 }">${{ formatAmount(commission.totalUSDTLifetime()) }}</text>
-            </view>
+          <view class="reward-income-lifetime"><text>{{ designCopy.totalEarned }}</text><view class="reward-income-lifetime__amounts"><text>{{ assetTotal(lifetimeTotals.usdt, 'usdt') }}</text><text>{{ assetTotal(lifetimeTotals.nex, 'uvt') }}</text></view></view>
+          <template #footer><view class="commission-overview__rules nx-commissions-focusable" role="link" tabindex="0" :aria-label="t.commissions.howItWorksEntry" @click="go('/pages/team/commissions-how')" @keydown.enter.prevent="go('/pages/team/commissions-how')"><text>{{ t.commissions.howItWorksEntry }}</text><text aria-hidden="true">›</text></view></template>
+        </RewardHero>
+
+
+        <view class="commission-filter-bar">
+          <text>{{ filterCopy.title }}</text>
+          <view class="commission-filter-trigger" role="button" tabindex="0" aria-haspopup="dialog" :aria-expanded="filterOpen" @click="filterOpen = true" @keydown.enter.prevent="filterOpen = true" @keydown.space.prevent="filterOpen = true">
+            <text>{{ selectedFilterLabel }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
           </view>
         </view>
 
-        <!-- 6-kind summary。这些卡片与下方 pill 行驱动**同一个** filter,是互斥单选组;
-             原先 role="button" + aria-pressed 被浏览器当 toggle button,读屏按复选框朗读
-             (zentao #94)。改 radiogroup/radio + aria-checked + roving tabindex,与下方
-             tablist 同为「选中即筛选」的语义,键盘行为一致。 -->
-        <view class="grid grid-cols-3" style="gap: 8px" role="radiogroup" :aria-label="t.commissions.kindFilterLabel">
-          <view
-            v-for="(k, i) in KIND_ORDER"
-            :key="k"
-            class="nx-commissions-focusable text-left active:scale-[0.97]"
-            :style="kindCardStyle(k)"
-            role="radio"
-            :tabindex="filter === k || (filter === 'all' && i === 0) ? 0 : -1"
-            :aria-label="kindCardLabel(k)"
-            :aria-checked="filter === k ? 'true' : 'false'"
-            @click="filter = k"
+        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text>${{ visibility.mask(formatAmount(byKind[filter].usdt)) }} · {{ visibility.mask(formatAmount(byKind[filter].nex)) }} UVT</text></view>
 
-
-             @keydown.enter.prevent="filter = k" @keydown.space.prevent="filter = k" @keydown.left.prevent="moveKindCard(i, -1)" @keydown.right.prevent="moveKindCard(i, 1)"
-          >
-            <text :style="{ color: KIND[k].color }">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="KIND[k].color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in KIND[k].paths" :key="pi" :d="p" /></svg>
-            </text>
-            <text class="block tabular-nums" :style="kindAmtStyle">${{ formatAmount(byKind[k].usdt) }}</text>
-            <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.kind[k] }}</text>
-            <text class="block font-mono-tabular" :style="kindCountStyle">{{ byKind[k].count }} {{ t.commissions.events }}</text>
-          </view>
-        </view>
-
-        <text v-if="remoteApiEnabled" class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.commissions.recentEventsHint, { n: events.length }) }}</text>
-
-        <!-- filter pills -->
-        <GlassSegments :label="t.commissions.pageTitle" v-model="filter" :options="filterOptions" layout="scroll"  />
-
-        <!-- event list — transparent hairline group on the page floor -->
-        <EmptyState v-if="filtered.length === 0" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
-        <view v-else :style="listGroupStyle">
+        <EmptyState v-if="filtered.length === 0 && !hasMoreEvents" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
+        <view v-if="filtered.length > 0" class="commission-days">
+          <view v-for="day in eventDays" :key="day.key" class="commission-day">
+            <text class="commission-day__label">{{ day.label }}</text>
+            <view class="commission-day__card">
             <view
-              v-for="(e, i) in filtered"
+              v-for="(e, i) in day.events"
               :key="e.id"
-              class="flex items-center"
-              :style="eventRowStyle(i === filtered.length - 1)"
+              class="flex items-center reward-income-event"
+              :style="eventRowStyle(i === day.events.length - 1)"
             >
-              <view class="grid place-items-center shrink-0" :style="eventIconStyle(e.kind)">
+              <view class="grid place-items-center shrink-0 reward-income-icon" :style="{ background: `color-mix(in srgb, ${KIND[e.kind].color} 16%, transparent)` }">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="KIND[e.kind].color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in KIND[e.kind].paths" :key="pi" :d="p" /></svg>
               </view>
               <view class="flex-1 min-w-0">
                 <view class="flex items-center" style="gap: 6px">
-                  <text class="truncate" :style="{ fontSize: '13px', color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
+                  <text class="truncate" :style="{ fontSize: '14px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
                   <text v-if="e.layer" class="font-mono-tabular" :style="e.layer === 1 ? directBadgeStyle : extendedBadgeStyle">{{ e.layer === 1 ? t.commissions.directBadge : t.commissions.extendedBadge }}</text>
                 </view>
-                <text class="block font-mono-tabular" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
+                <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
               </view>
               <view class="text-right" style="max-width: 48%; overflow-wrap: anywhere">
                 <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>
-                <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'nex')">{{ commissionNexLabel(e) }}</text>
+                <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'uvt')">{{ commissionNexLabel(e) }}</text>
                 <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
                 <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
                 <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
-                <text v-else-if="e.status === 'frozen'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-tech-cyan)', marginTop: '2px' }">{{ t.commissions.frozenTag }}</text>
+                <text v-else-if="e.status === 'frozen'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-brand-2)', marginTop: '2px' }">{{ t.commissions.frozenTag }}</text>
                 <text v-else-if="e.status === 'reversed'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ t.commissions.reversedTag }}</text>
                 <text v-else-if="e.status === 'rejected'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-danger)', marginTop: '2px' }">{{ t.commissions.rejectedTag }}</text>
                 <text v-else-if="e.status === 'waiting_calculation'" class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.directReferral.waitingCalculation }}</text>
                 <text v-else-if="e.status === 'recovery_pending'" class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.directReferral.recoveryPending }}</text>
-                <text v-if="e.status === 'recovery_pending' && e.recoveryPendingUSDT !== undefined && e.recoveryPendingNEX !== undefined" class="block" style="font-size: 12px; color: var(--v5-warning)">{{ fmt(t.directReferral.pendingAmounts, { usdt: formatAmount(e.recoveryPendingUSDT), nex: formatAmount(e.recoveryPendingNEX) }) }}</text>
+                <text v-if="e.status === 'recovery_pending' && e.recoveryPendingUSDT !== undefined && e.recoveryPendingNEX !== undefined" class="block" style="font-size: 12px; color: var(--v5-warning)">{{ fmt(t.directReferral.pendingAmounts, { usdt: visibility.mask(formatAmount(e.recoveryPendingUSDT)), nex: visibility.mask(formatAmount(e.recoveryPendingNEX)) }) }}</text>
               </view>
             </view>
+            </view>
+          </view>
+        </view>
             <view
-              v-if="remoteApiEnabled && commission.events.length < commission.eventsTotalRows"
-              class="flex items-center justify-center active:opacity-70"
-              :style="loadMoreStyle"
+              v-if="hasMoreEvents"
+              class="reward-cta reward-cta--wide"
               role="button"
-              tabindex="0"
-              :aria-disabled="commission.eventsLoadMoreStatus === 'loading'"
-              @click="commission.loadMoreCanonicalEvents()"
+              :tabindex="commission.eventsStatus !== 'ready' || commission.eventsLoadMoreStatus === 'loading' ? -1 : 0"
+              :aria-disabled="commission.eventsStatus !== 'ready' || commission.eventsLoadMoreStatus === 'loading'"
+              :aria-busy="commission.eventsLoadMoreStatus === 'loading'"
+              @click="loadMoreEvents"
               @keydown="activateLoadMore"
             >
-              <text>{{ commission.eventsLoadMoreStatus === "loading" ? "…" : commission.eventsLoadMoreStatus === "error" ? t.network.retry : t.unilevel.loadMore }}</text>
+              <text>{{ commission.eventsLoadMoreStatus === "error" ? t.network.retry : t.unilevel.loadMore }}</text>
             </view>
-        </view>
         </template>
       </view>
     </view>
+    <NxSheet :open="filterOpen" :title="filterCopy.title" @close="filterOpen = false">
+      <view class="commission-filter-options">
+        <view v-for="option in filterOptions" :key="option.value" class="commission-filter-option" :class="{ 'commission-filter-option--selected': filter === option.value }" role="button" tabindex="0" :aria-pressed="filter === option.value" :aria-label="option.fullLabel" @click="selectFilter(option.value)" @keydown.enter.prevent="selectFilter(option.value)" @keydown.space.prevent="selectFilter(option.value)">
+          <text>{{ option.label }}</text><text class="commission-filter-option__count">{{ visibility.mask(option.count ?? '—') }}</text>
+        </view>
+      </view>
+    </NxSheet>
+    </RewardPageSurface>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { teamRedesignCopy } from "@/i18n/team-redesign";
 import { navTo } from "@/lib/route";
-import { ref, computed, nextTick, onMounted, type CSSProperties } from "vue";
+import { ref, computed, watch, onMounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import RewardHero from "@/components/team/reward-compact-hero.vue";
+import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
+import { commissionFilterCopy } from '@/i18n/commission-filter-copy';
+import { useApp } from '@/store/app';
+import { useAuth } from '@/store/auth';
+import { useLocaleStore } from '@/store/locale';
+import { useDataVisibility } from '@/store/data-visibility';
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDate } from "@/lib/trial-date";
 import { useCommission, type CommissionEvent, type CommissionKind } from "@/store/commission";
-import { remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const commission = useCommission();
+const app = useApp();
+const auth = useAuth();
+const locale = useLocaleStore();
+const designCopy = computed(() => teamRedesignCopy(locale.code));
+const visibility = useDataVisibility();
+const displayEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
+let environmentInvalidated = false;
+watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
+const displayEnvironmentCurrent = () => !environmentInvalidated && displayEnvironment[0] === apiRuntimeConfig.environment && displayEnvironment[1] === apiRuntimeConfig.baseUrl;
+const ledgerPresentation = ref<NonNullable<typeof commission.eventsEvidence> | null>(null);
+let rejectedledgerSource: NonNullable<typeof commission.eventsEvidence> | null = null;
+watch(() => [commission.eventsStatus, commission.eventsEvidence] as const, ([status, value]) => {
+  if (status === 'error') { ledgerPresentation.value = null; rejectedledgerSource = value; }
+  else if (status === 'ready' && auth.isAuthenticated && displayEnvironmentCurrent() && value && value !== rejectedledgerSource) ledgerPresentation.value = value;
+}, { immediate: true, flush: 'sync' });
+watch(() => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => {
+  rejectedledgerSource = commission.eventsEvidence; ledgerPresentation.value = null;
+  if (auth.isAuthenticated && displayEnvironmentCurrent()) void commission.refreshCanonicalEvents();
+}, { flush: 'sync' });
+const ledger = computed(() => commission.eventsStatus === 'error' ? null : ledgerPresentation.value);
 
 type Filter = "all" | CommissionKind;
 const filter = ref<Filter>("all");
+const filterOpen = ref(false);
+const filterCopy = computed(() => commissionFilterCopy(locale.code));
+const selectedFilterLabel = computed(() => filter.value === 'all' ? filterCopy.value.all : filterCopy.value.kinds[filter.value]);
+function selectFilter(value: Filter) { filter.value = value; filterOpen.value = false; }
 
 const KIND_ORDER: CommissionKind[] = ["direct_purchase", "direct_device_earning", "unilevel", "binary", "peer", "cultivation", "leadership", "genesis", "promotion", "other"];
 
@@ -172,15 +171,15 @@ interface KindSpec {
 }
 const KIND: Record<CommissionKind, KindSpec> = {
   direct_purchase: { color: "var(--v5-brand)", paths: ["M3 3h2l3 12h11l2-8H6", "M9 20h.01M18 20h.01"] },
-  direct_device_earning: { color: "var(--v5-brand-2)", paths: ["M4 3h16v14H4z", "M8 21h8M12 17v4"] },
-  unilevel: { color: "var(--v5-brand)", paths: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"] },
+  direct_device_earning: { color: "var(--v5-nex)", paths: ["M4 3h16v14H4z", "M8 21h8M12 17v4"] },
+  unilevel: { color: "var(--ui-device-ink)", paths: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"] },
   binary: { color: "var(--v5-warning)", paths: ["M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z"] },
-  peer: { color: "var(--v5-tech-cyan)", paths: ["m11 17 2 2a1 1 0 1 0 3-3", "m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4", "M21 3v9h-9"] },
-  cultivation: { color: "var(--v5-success)", paths: ["M7 20h10", "M10 20c5.5-2.5.8-6.4 3-10", "M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z", "M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"] },
-  leadership: { color: "var(--v5-tech-cyan)", paths: ["m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14"] },
-  promotion: { color: "var(--v5-success)", paths: ["M12 3v18M5 10l7-7 7 7"] },
-  other: { color: "var(--v5-brand-2)", paths: ["M4 4h16v16H4z", "M8 12h8"] },
-  genesis: { color: "var(--v5-brand-2)", paths: ["M6 3h12l4 6-10 13L2 9z", "M11 3 8 9l4 13 4-13-3-6", "M2 9h20"] },
+  peer: { color: "var(--v5-brand-2)", paths: ["m11 17 2 2a1 1 0 1 0 3-3", "m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4", "M21 3v9h-9"] },
+  cultivation: { color: "var(--v5-brand)", paths: ["M7 20h10", "M10 20c5.5-2.5.8-6.4 3-10", "M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z", "M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"] },
+  leadership: { color: "var(--v5-nex)", paths: ["m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14"] },
+  promotion: { color: "var(--v5-brand-2)", paths: ["M12 3v18M5 10l7-7 7 7"] },
+  other: { color: "var(--v5-ink-2)", paths: ["M4 4h16v16H4z", "M8 12h8"] },
+  genesis: { color: "var(--v5-warning)", paths: ["M6 3h12l4 6-10 13L2 9z", "M11 3 8 9l4 13 4-13-3-6", "M2 9h20"] },
 };
 
 onMounted(() => {
@@ -188,23 +187,75 @@ onMounted(() => {
 });
 onShow(() => { if (remoteApiEnabled) void commission.refreshCanonicalEvents(); });
 
-const events = computed(() => commission.events);
-const byKind = computed(() => commission.byKind());
+const events = computed(() => remoteApiEnabled ? ledger.value?.events ?? [] : commission.events);
+const byKind = computed(() => remoteApiEnabled ? ledger.value?.aggregate.byKind ?? commission.byKind() : commission.byKind());
+// The month amount with a small grey currency sign and cents, like the team page hero.
+const monthAmount = computed(() => {
+  const text = assetTotal(monthTotals.value.usdt, 'usdt'), dot = text.lastIndexOf('.');
+  return text.startsWith('$') && dot > 0 ? { currency: '$', integer: text.slice(1, dot), fraction: text.slice(dot + 1) } : { currency: '', integer: text, fraction: '' };
+});
+// "Today" or the weekday beside each local date; weekday names avoid Intl so they survive without it.
+function dayLabel(ts: number): string {
+  const date = formatTrialDate(ts, dateLocale()), at = new Date(ts);
+  if (typeof ts !== "number" || !Number.isFinite(ts) || !Number.isFinite(at.getTime())) return date;
+  const now = new Date();
+  if (at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth() && at.getDate() === now.getDate())
+    return `${locale.code === "zh" ? "今天" : locale.code === "vi" ? "Hôm nay" : "Today"} · ${date}`;
+  const days = locale.code === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : locale.code === "vi" ? ["CN", "T2", "T3", "T4", "T5", "T6", "T7"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${date} · ${days[at.getDay()]}`;
+}
+// Records group under their local date; the formatter falls back safely without Intl.
+const eventDays = computed(() => {
+  const days: { key: string; label: string; events: CommissionEvent[] }[] = [];
+  for (const e of filtered.value) {
+    const label = dayLabel(e.ts);
+    const day = days.find(item => item.key === label);
+    if (day) day.events.push(e); else days.push({ key: label, label, events: [e] });
+  }
+  return days;
+});
+// Settled vs pending share of the lifetime amounts, drawn as one bar.
+const settlementSplit = computed(() => {
+  if (visibility.hidden || (remoteApiEnabled && !ledger.value)) return null;
+  const unlocked = Math.max(0, commission.unlockedUSDT()), cooling = Math.max(0, commission.coolingUSDT());
+  return unlocked + cooling > 0 ? { unlocked, cooling } : null;
+});
 const filtered = computed(() =>
   filter.value === "all" ? events.value : events.value.filter((e) => e.kind === filter.value),
 );
+const hasMoreEvents = computed(() => remoteApiEnabled && ledger.value !== null && ledger.value.events.length < ledger.value.totalRows);
+// Read canonical totals directly so a missing asset remains unknown instead of
+// inheriting a store helper's zero fallback. Never total the current page.
+const monthTotals = computed(() => remoteApiEnabled
+  ? { usdt: ledger.value?.aggregate.monthUSDT, nex: ledger.value?.aggregate.monthNEX }
+  : { usdt: commission.monthUSDT(), nex: commission.monthNEX() });
+const lifetimeTotals = computed(() => remoteApiEnabled
+  ? { usdt: ledger.value?.aggregate.totalUSDT, nex: ledger.value?.aggregate.totalNEX }
+  : { usdt: commission.totalUSDTLifetime(), nex: commission.totalNEXLifetime() });
+function assetNumber(key: 'unlockedUSDT' | 'unlockedNEX' | 'coolingUSDT', mock: number): string {
+  const value = remoteApiEnabled ? ledger.value?.aggregate[key] : mock;
+  return visibility.mask(typeof value === 'number' && Number.isFinite(value) ? formatAmount(value) : '—');
+}
+function assetTotal(value: number | null | undefined, asset: 'usdt' | 'uvt'): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return asset === 'uvt' ? `${visibility.mask('—')} UVT` : `${visibility.mask('—')} USD`;
+  return asset === 'usdt' ? `$${visibility.mask(formatAmount(value))}` : `${visibility.mask(formatAmount(value))} UVT`;
+}
+function loadMoreEvents() {
+  if (commission.eventsStatus !== 'ready' || !hasMoreEvents.value || commission.eventsLoadMoreStatus === 'loading') return;
+  void commission.loadMoreCanonicalEvents();
+}
 
 const coolingOverviewText = computed(() => {
   if (remoteApiEnabled) {
-    const next = commission.eventsEvidence?.aggregate.nextUnlockAt;
-    return next == null ? "—" : fmt(t.value.commissions.coolingTag, { n: Math.max(0, Math.ceil((next - Date.now()) / 86400000)) });
+    const next = ledger.value?.aggregate.nextUnlockAt;
+    return next == null ? "—" : fmt(designCopy.value.earliestCredit, { n: Math.max(0, Math.ceil((next - Date.now()) / 86400000)) });
   }
   const next = events.value
     .filter((event) => event.status === "cooling" && Number.isFinite(event.unlockAt))
     .sort((a, b) => a.unlockAt - b.unlockAt)[0];
   if (!next) return remoteApiEnabled ? "—" : t.value.commissions.unlocksIn30d;
   const days = Math.max(0, Math.ceil((next.unlockAt - Date.now()) / 86400000));
-  return fmt(t.value.commissions.coolingTag, { n: days });
+  return fmt(designCopy.value.earliestCredit, { n: days });
 });
 
 const noKindText = computed(() =>
@@ -213,10 +264,9 @@ const noKindText = computed(() =>
 
 function eventMeta(e: CommissionEvent): string {
   const kindLabel = t.value.commissions.kind[e.kind];
-  const order = e.sourceRef ? ` · ${e.kind === "direct_purchase" ? t.value.directReferral.order : t.value.directReferral.receipt} ${e.sourceRef}` : e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${e.orderAmountUSD}` : "";
+  const order = e.sourceRef ? ` · ${e.kind === "direct_purchase" ? t.value.directReferral.order : t.value.directReferral.receipt} ${e.sourceRef}` : e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${visibility.mask(formatGroupedAmount(e.orderAmountUSD))}` : "";
   const device = e.sourceDeviceId ? ` · ${t.value.directReferral.device}: ${e.sourceDeviceId}` : "";
-  const date = formatTrialDate(e.ts);
-  return `${kindLabel}${order}${device} · ${date}`;
+  return `${kindLabel}${order}${device}`;
 }
 function coolingTag(e: CommissionEvent): string {
   const days = Math.max(0, Math.ceil((e.unlockAt - Date.now()) / 86400000));
@@ -224,28 +274,31 @@ function coolingTag(e: CommissionEvent): string {
 }
 
 function commissionAmountLabel(e: CommissionEvent): string {
-  const amount = `${formatAmount(e.amountUSDT)} USDT`;
+  const amount = `$${visibility.mask(formatAmount(e.amountUSDT))}`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;
 }
 
 function commissionNexLabel(e: CommissionEvent): string {
-  const amount = `${formatAmount(e.amountNEX)} UVT`;
+  const amount = `${visibility.mask(formatAmount(e.amountNEX))} UVT`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;
 }
 
-function commissionAmountStyle(e: CommissionEvent, asset: "usdt" | "nex"): CSSProperties {
+function commissionAmountStyle(e: CommissionEvent, asset: "usdt" | "uvt"): CSSProperties {
   const color = e.status === "rejected"
     ? "var(--v5-danger)"
     : e.status === "frozen"
-      ? "var(--v5-tech-cyan)"
+      ? "var(--v5-ink-2)"
       : e.status === "reversed"
         ? "var(--v5-ink-4)"
-        : asset === "usdt" ? "var(--v5-brand)" : "var(--v5-warning)";
-  return { fontSize: asset === "usdt" ? "13px" : "12px", fontWeight: asset === "usdt" ? 600 : 400, color };
+        : "var(--v5-ink)";
+  // Credited and pending money reads in the brand colour; settled-out or held rows stay neutral.
+  const live = asset === "usdt" && color === "var(--v5-ink)" && ["unlocked", "cooling", "waiting_calculation"].includes(e.status);
+  const uvt = e.status === "frozen" ? "var(--v5-brand-2)" : "var(--v5-ink-3)";
+  return { fontSize: asset === "usdt" ? "15px" : "12px", fontWeight: asset === "usdt" ? 500 : 400, color: live ? "var(--v5-brand)" : asset === "uvt" ? uvt : color };
 }
 
 function go(url: string) {
@@ -255,150 +308,21 @@ function go(url: string) {
 // Reward summary cards double as filter controls: name them with the kind label
 // + current amount/count so a screen reader hears what the tile selects.
 function kindCardLabel(k: CommissionKind): string {
-  return `${t.value.commissions.kind[k]} · ${formatAmount(byKind.value[k].usdt)} · ${byKind.value[k].count} ${t.value.commissions.events}`;
-}
-
-// Filter pills are one roving-tabindex tablist (same idiom as leaderboard/unilevel):
-// arrows move selection and the focus ring follows the newly selected tab.
-const FILTER_ORDER: Filter[] = ["all", ...KIND_ORDER];
-function moveFilter(delta: -1 | 1) {
-  const currentIndex = FILTER_ORDER.indexOf(filter.value);
-  filter.value = FILTER_ORDER[(currentIndex + delta + FILTER_ORDER.length) % FILTER_ORDER.length];
-  void nextTick(() => {
-    if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>(".nx-commissions-pill[tabindex='0']")?.focus();
-  });
-}
-
-/**
- * 六张 kind 卡的左右方向键。
- *
- * 卡片与下方 pill 行驱动**同一个** filter,但它们是两个独立的单选组:卡组只有 6 个成员
- * (没有「全部」),所以方向键必须在**卡组内部**环转,不能复用 moveFilter —— 那会把选中项
- * 移到「全部」,而卡组里没有对应成员,焦点随即无处可去。
- *
- * 焦点目标按 tabindex 而不是 aria-checked 取:filter 为「全部」时卡组无成员被选中,
- * 此时可 Tab 进入的是第一张卡(tabindex=0),按 aria-checked 会取到 null 而丢失焦点。
- */
-function moveKindCard(index: number, delta: -1 | 1) {
-  const next = KIND_ORDER[(index + delta + KIND_ORDER.length) % KIND_ORDER.length];
-  if (!next || next === filter.value) return;
-  filter.value = next;
-  void nextTick(() => {
-    if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')?.focus();
-  });
+  return `${t.value.commissions.kind[k]} · ${visibility.mask(formatAmount(byKind.value[k].usdt))} · ${visibility.mask(byKind.value[k].count)} ${t.value.commissions.events}`;
 }
 
 function activateLoadMore(event: KeyboardEvent) {
-  if (event.key !== "Enter" && event.key !== " ") return;
+  if (event.repeat || (event.key !== "Enter" && event.key !== " ")) return;
   event.preventDefault();
-  void commission.loadMoreCanonicalEvents();
+  loadMoreEvents();
 }
-
-// ─── styles ───
-// Soft tint pill — chip idiom, fill only (no border, single visual difference).
-const howItWorksStyle: CSSProperties = {
-  gap: "6px",
-  padding: "0 12px",
-  height: "44px",  // 《07》tap≥44(原 34)
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-brand-2)",
-};
-// De-carded overview hero — numbers on the page floor; hairline footer closes the block.
-const heroWrapStyle: CSSProperties = { padding: "6px 2px 0" };
-// -2px side margins pull the hairline back to full width (2px optical inset above).
-const heroFooterStyle: CSSProperties = {
-  margin: "12px -2px 0",
-  padding: "12px 2px 0",
-  borderTop: "1px solid var(--v5-border)",
-  gap: "8px",
-  fontSize: "12px",
-};
-const overviewCapStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
-function overviewBigStyle(color: string): CSSProperties {
-  return {
-    marginTop: "4px",
-    fontFamily: "var(--font-v5)",
-    fontWeight: 600,
-    fontSize: "20px",
-    letterSpacing: "-0.018em",
-    color,
-  };
-}
-const overviewSmallStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
-
-// Selection tiles — filled, no border/ring; active = soft kind tint (single difference).
-function kindCardStyle(k: CommissionKind): CSSProperties {
-  const active = filter.value === k;
-  return {
-    padding: "10px",
-    borderRadius: "12px",
-    background: active ? `color-mix(in srgb, ${KIND[k].color} 12%, transparent)` : "var(--v5-surface)",
-  };
-}
-const kindAmtStyle: CSSProperties = {
-  marginTop: "6px",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "15px",
-  letterSpacing: "-0.014em",
-  color: "var(--v5-ink)",
-  lineHeight: 1,
-};
-const kindCountStyle: CSSProperties = {
-  marginTop: "2px",
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-};
-
-function pillStyle(active: boolean, color: string): CSSProperties {
-  return {
-    height: "44px",
-    padding: "0 16px",
-    // 未选中态原用 surface-2,与页面底同色(亮色 ΔE 2.2)不可辨,改 L1 surface。
-    background: active ? color : "var(--v5-surface)",
-  };
-}
-// Bright active fill → on-brand text (brand-2 fill takes on-brand-2), incl. inactive fallback.
-function pillTextStyle(active: boolean, color: string): CSSProperties {
-  return {
-    fontSize: "12px",
-    fontWeight: 600,
-    color: active
-      ? color === "var(--v5-brand-2)"
-        ? "var(--v5-on-brand-2)"
-        : "var(--v5-on-brand)"
-      : "var(--v5-ink-3)",
-  };
-}
-
-// Empty state — dashed outline hint, no fill (V5 empty-state idiom).
-const emptyStyle: CSSProperties = { borderRadius: "16px", border: "1px dashed var(--v5-border-strong)", padding: "32px", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Transparent hairline group — border-top opens the group, rows separate with hairlines.
-const listGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
-const loadMoreStyle: CSSProperties = { minHeight: "44px", color: "var(--v5-ink-3)", fontSize: "13px" };
 function eventRowStyle(isLast: boolean): CSSProperties {
   return {
+    minHeight: "68px",
     padding: "12px 0",
     gap: "12px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
-  };
-}
-function eventIconStyle(kind: CommissionKind): CSSProperties {
-  return {
-    width: "36px",
-    height: "36px",
-    borderRadius: "12px",
-    background: `color-mix(in srgb, ${KIND[kind].color} 20%, transparent)`,
   };
 }
 const directBadgeStyle: CSSProperties = {
@@ -412,21 +336,61 @@ const directBadgeStyle: CSSProperties = {
 const extendedBadgeStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 500,
-  color: "var(--v5-brand-2)",
-  background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
+  color: "var(--v5-ink-2)",
+  background: "color-mix(in srgb, var(--v5-ink) 8%, transparent)",
   padding: "0 4px",
   borderRadius: "4px",
 };
 const eventMetaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 
-import GlassSegments from "@/components/glass-segments.vue";
+
 const filterOptions = computed(() => [
-  { value: "all", label: t.value.commissions.all, count: commission.events.length },
-  ...KIND_ORDER.map(value => ({ value, label: t.value.commissions.kind[value], count: byKind.value[value].count })),
+  { value: "all" as Filter, label: filterCopy.value.all, fullLabel: t.value.commissions.all, count: remoteApiEnabled ? ledger.value?.totalRows : commission.events.length },
+  ...KIND_ORDER.map(value => ({ value, label: filterCopy.value.kinds[value], fullLabel: t.value.commissions.kind[value], count: byKind.value[value].count })),
 ]);
 </script>
 
 <style scoped>
+.commission-overview.reward-hero--panel { position: relative; box-sizing: border-box; border: 0; padding: 20px; border-radius: 28px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-brand) 10%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.commission-overview :deep(.reward-hero__art) { display: none; }
+.commission-overview__rules { position: absolute; right: 12px; top: 10px; display: flex; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-width: 44px; min-height: 44px; padding: 0 10px; color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); isolation: isolate; }
+.commission-overview__rules::before { content: ""; position: absolute; inset: 8px 0; z-index: -1; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.reward-income-uvt { margin-top: 2px; font: 500 14px/18px var(--font-metric); color: var(--v5-brand); font-variant-numeric: tabular-nums; }
+.commission-overview .reward-amount { font: 600 44px/48px var(--font-amount); letter-spacing: -.03em; }
+.reward-amount__currency { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
+.reward-amount__fraction { color: var(--v5-ink-4); }
+.reward-income-summary > view > text:first-child::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; vertical-align: middle; background: var(--v5-brand); }
+.reward-income-summary > view + view > text:first-child::before { background: var(--v5-warning); }
+.reward-income-summary > view + view > text:last-child { color: var(--v5-warning); }
+.reward-income-summary > view:first-child > text:last-child { font-family: var(--font-metric); }
+.reward-income-lifetime__amounts > text + text::before { content: "· "; }
+/* Data-visual entrance (DS-29): the split reveals left to right once its data arrives. Its segments are
+   flex shares, so the bar is uncovered rather than grown from width 0. */
+.commission-split { display: flex; gap: 3px; height: 8px; margin-top: 14px; animation: commission-split-grow 1400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes commission-split-grow { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .commission-split { animation: none; } }
+.commission-split > view { min-width: 4px; border-radius: 999px; background: var(--v5-brand); }
+.commission-split > view + view { background: var(--v5-warning); }
+.reward-income-summary { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-top: 14px; }
+.reward-income-summary__amount { margin: 2px 0; font: 600 17px/22px var(--font-metric); font-variant-numeric: tabular-nums; }
+.reward-income-lifetime { display: flex; justify-content: space-between; gap: var(--ui-space-inline); margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3); }
+.reward-income-lifetime__amounts { display: flex; gap: 6px; text-align: right; font-family: var(--font-metric); color: var(--v5-ink-2); font-variant-numeric: tabular-nums; }
+.commission-days { display: flex; flex-direction: column; gap: var(--v5-space-4); }
+.commission-day { display: flex; flex-direction: column; gap: var(--v5-space-2); }
+.commission-day__label { padding: 0 4px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.commission-day__card { padding: 0 var(--ui-space-inset); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.reward-income-icon { width: 36px; height: 36px; border-radius: 12px; color: var(--v5-ink-2); background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.reward-income-event { align-items: center; }
+.commission-filter-summary { display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;color:var(--v5-ink-2);font-size:12px; }
+.commission-filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); }
+.commission-filter-trigger { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; max-width: 70%; padding: 0 14px; color: var(--v5-ink); font: 600 13px/18px var(--font-v5); cursor: pointer; }
+.commission-filter-trigger::before { content: ""; position: absolute; inset: 4px 0; z-index: -1; border-radius: 999px; background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), color-mix(in srgb, var(--v5-ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.commission-filter-trigger svg { flex: none; }
+.commission-filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.commission-filter-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--v5-surface-2); font-size: var(--ui-type-list-subtitle); line-height: 1.4; overflow-wrap: anywhere; cursor: pointer; }
+.commission-filter-option--selected { color: var(--v5-brand); background: var(--v5-brand-soft); }
+.commission-filter-option__count { flex: none; font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); font-variant-numeric: tabular-nums; }
+.commission-filter-trigger:focus-visible, .commission-filter-option:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 /* Keyboard focus must be visible on the self-drawn tiles/pills — they are
    focusable now (role+tabindex), and without this the focus ring is the
    browser default outline clipped by the scroll-view on the pill row. */

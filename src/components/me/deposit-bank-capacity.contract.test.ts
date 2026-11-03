@@ -3,8 +3,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { computed, reactive, ref } from "vue";
 import ts from "typescript";
-import { fmt } from "@/i18n/format";
-import { en } from "@/i18n/messages/en";
 
 const source = readFileSync(new URL("./deposit-bank-pane.vue", import.meta.url), "utf8");
 
@@ -23,37 +21,41 @@ describe("VietQR live daily-capacity guard", () => {
 
   it("keeps per-transaction and daily-capacity limits as separate concepts", () => {
     expect(source).toMatch(/usdt > maxDeposit\.value[\s\S]{0,500}singleLimitExceeded/);
-    expect(source).toMatch(/todayRemainingNote/);
+    expect(source).toMatch(/bankPane\.factTodayRemaining[\s\S]{0,200}todayRemainingFact/);
+    expect(source).toMatch(/bankPane\.factSingleLimit[\s\S]{0,200}limitFact/);
     expect(source).toMatch(/dailyCapacityExhausted/);
   });
 
   it("shows configured per-transaction minimum and maximum independently from today's capacity", () => {
-    expect(source).toContain("bankPane.limitNote");
-    expect(source).toMatch(/const limitLine = computed\([\s\S]{0,250}minLabel[\s\S]{0,250}maxLabel/);
-    expect(source).toMatch(/limitLine[\s\S]{0,500}todayRemainingLine/);
+    expect(source).toMatch(/const limitFact = computed\([\s\S]{0,250}minDeposit[\s\S]{0,250}maxDeposit/);
+    expect(source).toMatch(/const todayRemainingFact = computed\([\s\S]{0,120}dailyCapacityKnown/);
   });
 
-  it("does not present a numeric transaction limit before the FX configuration is ready", () => {
-    const start = source.indexOf("const limitLine = computed(");
-    const end = source.indexOf("const todayRemainingLabel", start);
+  it("does not present a numeric transaction limit or today's capacity before they are known", () => {
+    const start = source.indexOf("const limitFact = computed(");
+    const end = source.indexOf("const feeFact", start);
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
-    const code = ts.transpileModule(source.slice(start, end) + "; return limitLine;", {
+    const code = ts.transpileModule(source.slice(start, end) + "; return { limitFact, todayRemainingFact };", {
       compilerOptions: { target: ts.ScriptTarget.ES2022 },
     }).outputText;
     const fx = reactive({ configReady: false });
-    const minLabel = ref("$10");
-    const maxLabel = ref("$5,000");
-    const limit = new Function("computed", "fx", "fmt", "t", "minLabel", "maxLabel", code)(
-      computed, fx, fmt, ref(en), minLabel, maxLabel,
+    const minDeposit = ref(10), maxDeposit = ref(5000), dailyCapacityKnown = ref(false), todayRemainingDeposit = ref(0);
+    const shortUsdt = (value: number) => `$${value.toLocaleString("en-US")}`;
+    const usdtLabel = (value: number) => `$${value.toFixed(2)}`;
+    const facts = new Function("computed", "fx", "minDeposit", "maxDeposit", "dailyCapacityKnown", "todayRemainingDeposit", "shortUsdt", "usdtLabel", code)(
+      computed, fx, minDeposit, maxDeposit, dailyCapacityKnown, todayRemainingDeposit, shortUsdt, usdtLabel,
     );
-    expect(limit.value).toBe("—");
+    expect(facts.limitFact.value).toBe("—");
+    expect(facts.todayRemainingFact.value).toBe("—");
     fx.configReady = true;
-    expect(limit.value).toBe(fmt(en.bankPane.limitNote, { min: "$10", max: "$5,000" }));
-    maxLabel.value = "$100";
-    expect(limit.value).toBe(fmt(en.bankPane.limitNote, { min: "$10", max: "$100" }));
+    expect(facts.limitFact.value).toBe("$10–$5,000");
+    maxDeposit.value = 100;
+    expect(facts.limitFact.value).toBe("$10–$100");
+    dailyCapacityKnown.value = true;
+    expect(facts.todayRemainingFact.value).toBe("$0.00");
     fx.configReady = false;
-    expect(limit.value).toBe("—");
+    expect(facts.limitFact.value).toBe("—");
   });
 
   it("returns credited users to the wallet while new top-up remains a separate reset action", () => {

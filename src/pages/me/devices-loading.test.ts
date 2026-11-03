@@ -4,7 +4,7 @@ import source from "./devices.vue?raw";
 
 const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
 const ast = ts.createSourceFile("devices.ts", script, ts.ScriptTarget.Latest, true);
-const names = ["trialReady", "inventoryReady", "inventoryError", "inventoryLoading", "inventoryStale"];
+const names = ["inventoryReady", "inventoryError", "inventoryLoading", "inventoryStale"];
 const declarations = new Map<string, string>();
 function visit(node: ts.Node) {
   if (ts.isVariableDeclaration(node) && names.includes(node.name.getText(ast))) {
@@ -32,14 +32,15 @@ function inventoryState(
 
 describe("device inventory first render", () => {
   it("waits for fleet and trial authority before exposing slots, binding, or empty inventory", () => {
-    expect(source).toContain('v-if="inventoryLoading"');
-    expect(source).toContain('v-else-if="inventoryError"');
+    expect(source).toContain('v-if="inventoryLoading" class="device-hero__loading"');
+    expect(source).toContain('v-if="inventoryError"');
+    expect(source).toContain('v-if="!inventoryError" class="device-stage');
     expect(source).toContain('v-if="inventoryReady" class="mx-4"');
     const app: Record<string, unknown> = { remoteFleetHasSnapshot: false, remoteFleetStatus: "idle" };
     const trial: Record<string, unknown> = { authorityStatus: "unknown", authorityServerState: null };
     expect(inventoryState(true, app, trial)).toEqual({ ready: false, loading: true, error: false, stale: false });
     app.remoteFleetHasSnapshot = true;
-    expect(inventoryState(true, app, trial).ready).toBe(false);
+    expect(inventoryState(true, app, trial).ready).toBe(true);
     trial.authorityStatus = "ready";
     trial.authorityServerState = "ACTIVE";
     expect(inventoryState(true, app, trial)).toEqual({ ready: true, loading: false, error: false, stale: false });

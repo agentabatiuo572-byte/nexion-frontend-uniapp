@@ -19,7 +19,7 @@
 
       <!-- Avatar + email — de-carded: identity sits on the page floor. -->
       <view :style="avatarBlockStyle">
-        <view class="flex items-center" style="gap: 16px">
+        <view class="flex items-center" style="gap: var(--ui-space-inset)">
           <view class="relative">
             <view class="grid place-items-center overflow-hidden" :style="avatarStyle">
               <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" style="width: 64px; height: 64px" />
@@ -40,6 +40,7 @@
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="nameStyle">{{ displayName }}</text>
             <text class="block truncate" :style="emailStyle">{{ email }}</text>
+            <ProfileUid />
             <view class="flex items-center" style="gap: 6px; margin-top: 2px">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
               <text :style="joinedStyle">{{ t.profile.joinedOn }} {{ joinedDate }}</text>
@@ -65,7 +66,7 @@
             :aria-label="t.profile.nicknameChange"
             @click="openNicknameSheet"
           >
-            <text class="flex-1 truncate" :style="nameValueStyle">{{ nexGridBrandText(name) }}</text>
+            <text class="flex-1 truncate" :style="nameValueStyle">{{ displayNickname(name) }}</text>
             <text class="shrink-0" :style="[nameChangeStyle, nicknameLocked ? { color: 'var(--v5-ink-4)' } : {}]">{{ t.profile.nicknameChange }}</text>
           </view>
           <text class="block" :style="fieldHintStyle">{{ nicknameHint }}</text>
@@ -80,10 +81,10 @@
       </view>
       <text class="block" :style="tierProgressStyle">{{ tierProgressLine }}</text>
       <view v-if="remoteApiEnabled && vRank.remoteError" class="mx-4 mt-2" role="status" aria-live="polite">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-2)">{{ t.profile.rankUnavailable }}</text>
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ t.profile.rankUnavailable }}</text>
         <view
           class="nx-profile-rank-retry inline-flex items-center active:opacity-80"
-          style="min-height: 44px; font-size: 13px; color: var(--v5-brand)"
+          style="min-height: 44px; font-size: var(--ui-type-list-subtitle); color: var(--v5-brand)"
           role="button"
           tabindex="0"
           :aria-label="t.rank.retry"
@@ -94,12 +95,12 @@
       <!-- Wallet binding — navigates to address management, so it is a link. -->
       <view class="nx-glass-card mx-4 flex items-center active:opacity-90" :style="walletCardStyle" role="link" tabindex="0" :aria-label="`${t.profile.walletAddress} · ${walletAction}`" @click="goWallet">
         <view class="grid place-items-center shrink-0" :style="walletIconStyle">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
         </view>
         <view class="flex-1 min-w-0">
           <view class="flex items-center" style="gap: 6px">
             <text :style="walletTitleStyle">{{ t.profile.walletAddress }}</text>
-            <svg v-if="paired" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+            <svg v-if="paired" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           </view>
           <text class="block truncate" :style="walletSubStyle">{{ walletSub }}</text>
         </view>
@@ -107,7 +108,7 @@
       </view>
 
       <!-- Save bar -->
-      <view style="padding: 0 16px; margin-top: 20px">
+      <view style="padding: 0 16px; margin-top: var(--ui-space-section)">
         <!-- 未改动时这个按钮点了没用,原先只是「不给按下反馈」—— 那是把禁用态藏起来。
              显式 aria-disabled 让读屏用户也知道现在按不动(《05》§6.1 disabled 公式)。 -->
         <view class="w-full flex items-center justify-center" :class="dirty ? 'active:opacity-90' : ''" :style="saveBtnStyle" role="button" tabindex="0" :aria-disabled="dirty ? 'false' : 'true'" :aria-label="t.profile.saveChanges" @click="handleSave">
@@ -129,11 +130,12 @@
 </template>
 
 <script setup lang="ts">
+import ProfileUid from "@/components/me/profile-uid.vue";
 import { navTo } from "@/lib/route";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { displayNickname } from "@/lib/brand-copy";
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
-import { profileApi, remoteApiEnabled } from "@/api/runtime";
+import { profileApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import AppChassis from "@/components/app-chassis.vue";
 import NicknameSheet from "@/components/me/nickname-sheet.vue";
@@ -149,7 +151,7 @@ import { useVRank } from "@/store/v-rank";
 import { useLocaleStore } from "@/store/locale";
 import { maskAddressMid, PAYOUT_NETWORKS } from "@/store/payout-address-core";
 import { confirm, toast, useUI } from "@/store/ui";
-import { formatTrialDeadline } from "@/lib/trial-date";
+import { formatDisplayDateTime } from "@/lib/display-date";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { claimSetupProfileQuest } from "@/lib/remote-profile-quest";
 import { reconcileProfileEdit } from "@/lib/profile-save-flow";
@@ -229,6 +231,9 @@ function clearProfileAccountState() {
 
 function refreshProfileForCurrentAccount() {
   if (!profilePageVisible || !remoteApiEnabled) return;
+  // A restored UI shell can mount before its server session is ready.
+  // The account-binding watcher refreshes after successful session restore.
+  if (!sessionVault.read()?.accessToken) return;
   void refreshPayoutForCurrentAccount();
   void loadProfileCandidates();
   void loadRemoteProfile();
@@ -261,7 +266,8 @@ onShow(() => {
   refreshProfileForCurrentAccount();
 });
 const unsubscribeProfileRankRuntime = subscribeRuntimeRevision(() => {
-  if (profilePageVisible && remoteApiEnabled) void refreshVRankForCurrentAccount();
+  if (!profilePageVisible || !remoteApiEnabled) return;
+  void refreshVRankForCurrentAccount();
 });
 onHide(() => {
   profilePageVisible = false;
@@ -277,7 +283,7 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch], () => {
   refreshProfileForCurrentAccount();
 });
 
-const displayName = computed(() => nexGridBrandText(profile.displayName));
+const displayName = computed(() => displayNickname(profile.displayName));
 // A remote session's user-id key is internal routing state, never profile copy.
 // Until the backend supplies a phone projection, show an honest blank field.
 const email = computed(() => remoteApiEnabled ? profile.phoneE164 : (auth.email || app.user.email));
@@ -334,7 +340,7 @@ const nicknameHint = computed(() => {
   const days = changeIntervalDays.value;
   if (!remoteApiEnabled || days === null) return t.value.profile.displayNameHint;
   const rule = nicknameLocked.value
-    ? t.value.profile.nicknameLockedHint.replace("{date}", formatTrialDeadline(nicknameChangeAvailableAt.value ?? 0))
+    ? t.value.profile.nicknameLockedHint.replace("{date}", formatDisplayDateTime(nicknameChangeAvailableAt.value, dateLocale()))
     : t.value.profile.changeIntervalHint.replace("{days}", String(days));
   return `${t.value.profile.displayNameHint} · ${rule}`;
 });
@@ -344,7 +350,7 @@ function showChangeLocked(field: "nickname" | "avatar") {
   const copy = t.value.profile;
   const title = field === "nickname" ? copy.nicknameLockedTitle : copy.avatarLockedTitle;
   const hint = field === "nickname" ? copy.nicknameLockedHint : copy.avatarLockedHint;
-  toast.info(title, at ? hint.replace("{date}", formatTrialDeadline(at)) : undefined);
+  toast.info(title, at ? hint.replace("{date}", formatDisplayDateTime(at, dateLocale())) : undefined);
 }
 
 function showAvatarRejected(reason: "type" | "size") {
@@ -481,6 +487,7 @@ async function loadRemoteProfile() {
     changeIntervalDays.value = projection.changeIntervalDays;
     nicknameChangeAvailableAt.value = projection.nicknameChangeAvailableAt;
     avatarChangeAvailableAt.value = projection.avatarChangeAvailableAt;
+    profile.projectServerAvatar(projection);
   } catch {
     if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
     toast.error(t.value.profile.serverMutationFailed);
@@ -541,12 +548,14 @@ async function handleRegen() {
         if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
         avatarUrl.value = result.avatarUrl;
         avatarRevision.value = result.avatarRevision;
+        profile.projectServerAvatar(result);
       } catch (cause) {
         const authoritative = await profileApi.profile().catch(() => null);
         if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
         if (!authoritative || !authoritative.avatarRevision || authoritative.avatarRevision === before) throw cause;
         avatarUrl.value = authoritative.avatarUrl;
         avatarRevision.value = authoritative.avatarRevision;
+        profile.projectServerAvatar(authoritative);
       }
       if (isCurrentProfileRequest(pageScope, scope, accountKey)) {
         toast.success(t.value.profile.avatarSavedToast,
@@ -614,8 +623,8 @@ const regenBtnStyle: CSSProperties = {
 };
 const nameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 const emailStyle: CSSProperties = {
@@ -633,7 +642,7 @@ const joinedStyle: CSSProperties = {
 const sectionLabelStyle: CSSProperties = {
   margin: "22px 18px 12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-section)",
   fontWeight: 600,
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
@@ -644,7 +653,7 @@ const fieldsWrapStyle: CSSProperties = {
   padding: "0 2px",
   display: "flex",
   flexDirection: "column",
-  gap: "16px",
+  gap: "var(--ui-space-inset)",
 };
 const fieldLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -659,7 +668,7 @@ const nameRowStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderRadius: "8px",
   padding: "0 12px",
-  gap: "10px",
+  gap: "var(--ui-space-row-y)",
 };
 const nameValueStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -693,8 +702,8 @@ const tierHeaderStyle: CSSProperties = {
 };
 const tierTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
 };
@@ -713,20 +722,20 @@ const tierProgressStyle: CSSProperties = {
 // Wallet-binding nav row keeps its surface (nav-list whitelist) — border dropped.
 const walletCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   marginTop: "20px",
-  gap: "12px",
+  gap: "var(--ui-space-inline)",
   background: "var(--nx-glass-fill)",
   borderRadius: "var(--nx-glass-radius)",
-  padding: "16px",
+  padding: "var(--ui-space-inset)",
 };
 const walletIconStyle: CSSProperties = {
   width: "40px",
   height: "40px",
   borderRadius: "12px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
+  background: "var(--v5-surface-2)",
 };
 const walletTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
@@ -740,7 +749,7 @@ const walletActionStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   fontWeight: 500,
-  color: paired.value ? "var(--v5-brand-2)" : "var(--v5-brand)",
+  color: paired.value ? "var(--v5-ink-2)" : "var(--v5-brand)",
 }));
 const saveBtnStyle = computed<CSSProperties>(() => ({
   height: "44px",

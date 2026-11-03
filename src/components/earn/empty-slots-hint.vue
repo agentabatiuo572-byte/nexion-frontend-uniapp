@@ -3,13 +3,14 @@
   <view class="earn-fleet-list mx-4">
     <view class="nx-home-glass-panel" aria-hidden="true" />
     <view class="earn-fleet-content">
-      <TrialDeviceRow variant="earn" />
+      <TrialDeviceRow variant="earn" :expanded="trialExpanded" @toggle="emit('toggleTrial')" />
       <slot />
-      <view class="earn-add-wrap">
-        <view class="earn-add-device nx-home-pill" role="button" tabindex="0"
+      <view v-if="slotsUsed < app.slotCap" class="earn-add-wrap">
+        <view class="earn-add-device" role="button" tabindex="0"
           @click="openAddDevice"  @keydown.enter.stop.prevent="openAddDevice" @keydown.space.stop.prevent="openAddDevice">
-          <text>{{ t.earn.fillSlots }}</text>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-7-7 7 7-7 7" /></svg>
+          <view class="earn-add-device__slot" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view>
+          <text class="earn-add-device__label">{{ t.earn.fillSlots }}</text>
+          <svg class="earn-add-device__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
         </view>
       </view>
     </view>
@@ -17,8 +18,8 @@
 </template>
 
 <script setup lang="ts">
-import TrialDeviceRow from "@/components/trial-device-row.vue";
 import { computed, type CSSProperties } from "vue";
+import TrialDeviceRow from "@/components/trial-device-row.vue";
 import { useApp } from "@/store/app";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { trialReservesSlotNow } from "@/store/free-trial";
@@ -28,9 +29,12 @@ import { useT } from "@/i18n/use-t";
 
 const app = useApp();
 const t = useT();
+defineProps<{ trialExpanded?: boolean }>();
+const emit = defineEmits<{ (event: "toggleTrial"): void }>();
 
 const activeDevices = computed(() => app.visibleDevices.filter(isActiveSlotDevice));
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
+const slotsUsed = computed(() => app.remoteSlotsUsed ?? app.activeSlotCount + trialSlot.value);
 const realCount = computed(() => activeDevices.value.length);
 
 type SlotCell =
@@ -119,7 +123,7 @@ const ctaStyle: CSSProperties = {
 const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   letterSpacing: "-0.005em",
   color: "var(--v5-on-brand)",
 };
@@ -130,10 +134,15 @@ const ctaLabelStyle: CSSProperties = {
 <style scoped>
 .earn-fleet-list { position: relative; border-radius: var(--v5-radius-2xl); }
 .earn-fleet-content { position: relative; }
+.earn-fleet-content > :deep(.trial-device-row:first-child) { border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; }
 .earn-trial-reservation { display: flex; justify-content: space-between; gap: 12px; margin: 0 16px; padding: 14px 0 10px; font: 500 12px/1.4 var(--font-v5); color: var(--v5-ink-2); border-bottom: 1px solid var(--v5-border); }
 .earn-add-wrap { padding: 4px 14px 14px; }
-.earn-add-device { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 18px; font: 600 15px/1.4 var(--font-v5); transition: transform .4s cubic-bezier(.16,1.4,.3,1); }
-.earn-add-device:active { transform: scale(.975); }
+.earn-add-device { display:flex; align-items:center; box-sizing:border-box; gap:12px; min-height:60px; padding:10px 12px; border:1px dashed color-mix(in srgb,var(--v5-ink-3) 30%,transparent); border-radius:16px; background:color-mix(in srgb,var(--v5-surface-2) 48%,transparent); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); box-shadow:inset 0 1px 0 color-mix(in srgb,var(--v5-ink) 5%,transparent); color:var(--v5-ink-2); cursor:pointer; touch-action:manipulation; transition:transform 140ms ease-out,background-color 140ms ease-out; }
+.earn-add-device__slot { display:grid; place-items:center; width:32px; height:32px; flex:none; border-radius:10px; background:color-mix(in srgb,var(--v5-ink-3) 7%,transparent); color:var(--v5-ink-3); }
+.earn-add-device__label { flex:1; min-width:0; font:500 clamp(12px,3.6vw,14px)/20px var(--font-v5); overflow-wrap:anywhere; }
+.earn-add-device__chevron { flex:none; color:var(--v5-ink-3); }
+.earn-add-device:active { transform:scale(.985); background:color-mix(in srgb,var(--v5-surface-2) 72%,transparent); }
+.earn-add-device:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
 .earn-add-device[aria-busy="true"] { opacity: .6; }
 @media (prefers-reduced-motion: reduce) { .earn-add-device { transition: none; transform: none; } }
 </style>

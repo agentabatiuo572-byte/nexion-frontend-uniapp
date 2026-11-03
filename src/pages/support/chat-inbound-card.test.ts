@@ -10,7 +10,7 @@ import routeSource from "@/lib/route.ts?raw";
 
 const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
 const ast = ts.createSourceFile("chat.ts", script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-const wanted = new Set(["threadMessages", "humanMessageRecommendation", "avatarImageKey", "loadPrivateImages", "clearPrivateImages", "humanMessageTime", "receiptFor"]);
+const wanted = new Set(["threadMessages", "humanMessageRecommendation", "avatarImageKey", "loadPrivateImages", "clearPrivateImages", "receiptFor"]);
 const nodes = ast.statements.filter(node => ts.isFunctionDeclaration(node) ? wanted.has(node.name?.text ?? "")
   : ts.isVariableStatement(node) && node.declarationList.declarations.some(d => wanted.has(d.name.getText(ast))));
 const code = ts.transpileModule(nodes.map(node => node.getText(ast)).join("\n"), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -28,7 +28,7 @@ function harness(messages: unknown[], translations = zh, download = vi.fn(async 
   const sources = ref<Record<string, string>>({}), failures = ref<Record<string, boolean>>({});
   const api = { authorAvatarContent: download, attachmentContent: vi.fn(async () => "blob:attachment"), conversation: vi.fn(async () => conv.value) };
   const state = new Function("computed", "ref", "conv", "app", "convStore", "imageSources", "imageFailures", "supportApi", "t", "localizedIdleClose", "humanHistory",
-    `const isAi=ref(false), nova={}, locale={code:'zh'}, supportSessionReady=ref(true);let novaPageVisible=true,imageEpoch=0,imageLoads=new Set();\n${code}\nreturn {threadMessages,loadPrivateImages,clearPrivateImages};`)(
+    `const isAi=ref(false), nova={}, locale={code:'zh'}, supportSessionReady=ref(true),failedHumanSend=ref(null),humanSendBusy=ref(false),localHumanSend=ref(null),humanComposerKey=ref('conversation:test'),imageDraft=ref(null);let pageVisible=true,imageEpoch=0,imageLoads=new Set();\n${code}\nreturn {threadMessages,loadPrivateImages,clearPrivateImages};`)(
     computed, ref, conv, app, store, sources, failures, api, ref(translations), localizedIdleClose, humanHistory);
   return { state, conv, app, store, sources, failures, api, humanHistory };
 }
@@ -38,11 +38,11 @@ describe("human incoming cards reuse existing CTA", () => {
       ...["HOME", "WALLET", "SUPPORT"].map((type, i) => ({ ...author, id: String(i + 2), kind: "LINK", text: "Link body", linkTarget: { type, params: {} }, targetAvailability: "AVAILABLE" })),
       { id: "5", sender: "user", text: "Reply", status: "read", ts: 1 }];
     const h = harness(cards, translations); const result = h.state.threadMessages.value;
-    expect(result.map((m: any) => m.ctaHref)).toEqual(["/pages/store/detail?id=stellarbox-s1", "/home", "/me/wallet", "/pages/support/messages", undefined]);
+    expect(result.map((m: any) => m.ctaHref)).toEqual(["/pages/store/detail?id=stellarbox-s1", "/home", "/pages/me/me", "/pages/support/messages", undefined]); // wallet lives on Me
     expect(result[0].text).toBe("Actual body\nSnapshot");
     expect(result.slice(0, 4).map((m: any) => toUniRoute(m.ctaHref))).toEqual([
       { url: "/pages/store/detail?id=stellarbox-s1", tab: false }, { url: "/pages/index/index", tab: true },
-      { url: "/pages/me/wallet", tab: false }, { url: "/pages/support/messages", tab: false },
+      { url: "/pages/me/me", tab: true }, { url: "/pages/support/messages", tab: false },
     ]);
     expect(result[0].meta).toContain("Real historical author");
     expect(result[0].receipt).toBeUndefined(); expect(result[4].receipt).toBe(translations.conversations.receiptRead);
@@ -103,4 +103,56 @@ describe("author avatar uses existing private image owner guard", () => {
     expect(h.sources.value).toEqual({}); expect(h.state.threadMessages.value[0].authorAvatarSrc).toBeUndefined();
     expect(h.api.conversation).toHaveBeenCalledWith("CV-old-support", 2);
   });
+});
+
+
+it.each([zh, en, vietnamese])("uses stored SKU snapshots verbatim while preserving authored messages and raw history", translations => {
+  const cards = [
+    { ...author, id: "1", kind: "SKU", text: "NexGridBox S1", skuName: "NexGridBox S1", skuId: "stellarbox-s1", targetAvailability: "AVAILABLE" },
+    { ...author, id: "2", kind: "SKU", text: "I liked NexGrid", skuName: "NexGridBox S1", skuId: "stellarbox-s1", targetAvailability: "UNAVAILABLE" },
+    { ...author, id: "3", kind: "TEXT", text: "NexGridBox S1" },
+    { ...author, id: "4", sender: "user", kind: "TEXT", text: "My NexGrid" },
+  ];
+  const h = harness(cards, translations);
+  expect(h.state.threadMessages.value[0].text).toBe("NexGridBox S1");
+  expect(h.state.threadMessages.value[0].ctaHref).toBe("/pages/store/detail?id=stellarbox-s1");
+  expect(h.state.threadMessages.value[1].text).toContain("I liked NexGrid\nNexGridBox S1");
+  expect(h.state.threadMessages.value[1].ctaHref).toBeUndefined();
+  expect(h.state.threadMessages.value[2].text).toBe("NexGridBox S1");
+  expect(h.state.threadMessages.value[3].text).toBe("My NexGrid");
+  expect(h.conv.value.messages).toEqual(cards);
+});
+
+
+it.each([
+  ["custom", "My NexGrid collection"], ["custom", "NexGridBox S1"],
+  ["stellarbox-s1", "My NexGrid collection"], ["stellarbox-s1", "NexGridBox S1 Limited"],
+])("preserves custom SKU snapshots and identical authored bodies for %s / %s", (skuId, skuName) => {
+  const card = { ...author, id: "custom", kind: "SKU", text: skuName, skuName, skuId, targetAvailability: "AVAILABLE" };
+  const h = harness([card]);
+  expect(h.state.threadMessages.value[0].text).toBe(skuName);
+  expect(h.conv.value.messages[0]).toEqual(card);
+});
+
+it.each([zh, en, vietnamese])("retains stored recommendation templates and authored text verbatim", translations => {
+  const cards = [
+    ["stellarbox-s1", "NexGridBox S1", "NexGridBox S1"],
+    ["stellarbox-pro-v2", "NexGridBox Pro v2", "NexGridBox Pro v2"],
+    ["stellarbox-pro", "StellarBox Pro", "StellarBox Pro"],
+    ["stellarrack-p1", "StellarRack P1", "StellarRack P1"],
+    ["custom", "NexGridBox S1", "NexGridBox S1"],
+    ["stellarbox-s1", "NexGridBox S1 Limited", "NexGridBox S1 Limited"],
+  ].flatMap(([skuId, skuName, displayName]) => ["AVAILABLE", "UNAVAILABLE", "UNKNOWN"].map(targetAvailability => ({
+    card: { ...author, id: `${skuId}-${targetAvailability}`, kind: "SKU", skuId, skuName,
+      text: `推荐商品：${skuName}`, targetAvailability }, displayName,
+  })));
+  for (const { card, displayName } of cards) {
+    const h = harness([card], translations);
+    expect(h.state.threadMessages.value[0].text).toContain(`推荐商品：${displayName}\n${displayName}`);
+    expect(h.conv.value.messages[0]).toEqual(card);
+  }
+  const authored = { ...author, id: "authored", kind: "SKU", skuId: "stellarbox-s1", skuName: "NexGridBox S1",
+    text: "推荐商品：NexGridBox S1 was my favorite", targetAvailability: "AVAILABLE" };
+  expect(harness([authored], translations).state.threadMessages.value[0].text)
+    .toBe("推荐商品：NexGridBox S1 was my favorite\nNexGridBox S1");
 });

@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { CanonicalVRankRow } from "@/api/v-rank-api";
 import type { RankHowPolicy } from "@/api/rank-how-policy-api";
 import { buildRankHowContent, createRankHowResource } from "./rank-how-content";
-import { formatComputePoints } from "../i18n/compute-points";
+import { teamRedesignCopy } from "@/i18n/team-redesign";
+import { formatComputePoints } from "@/i18n/compute-points";
 
 const labels = { selfBuy: "自购 ${n}", directRefs: "合格直推 {n}", teamVol: "团队 ${n}", register: "注册", vDownlines: "{n} 个 V{v}" };
 const rank = (v: number, patch: Partial<CanonicalVRankRow> = {}): CanonicalVRankRow => ({ v, title: `Title ${v}`, cnTitle: `头衔${v}`, directBonus: .123456, unilevelDepth: 99, peerBonus: .0275, leadershipVotes: 17, cultivationBonus: 321.123456, rewards: [], visible: true, ...patch });
 const ranks = [rank(0), rank(1, { selfComputePoints: 7891, directRefs: 8 }), rank(2, { selfComputePoints: 9870, directRefs: 9, teamComputePoints: 456781, requiredDownlineRank: 1, requiredDownlineCount: 6 })];
+const pointless = ranks.map(({ selfComputePoints: _self, teamComputePoints: _team, ...row }) => row as CanonicalVRankRow);
 const enabled = { peer: true, genesis: false } as const;
 const unavailable = { peer: false, genesis: false } as const;
 const policy: RankHowPolicy = { version: "p1", locale: "zh", hero: "Published hero", source: "server", sourceEnvironment: "PRODUCTION", runId: "", rules: { permanentProtection: false, qualifiedReferralSelfComputePoints: 7891, leadershipConfigured: false }, sections: [
@@ -17,7 +19,78 @@ const policy: RankHowPolicy = { version: "p1", locale: "zh", hero: "Published he
 ] };
 
 describe("rank-how published presentation", () => {
-  it("shows thresholds in compute points and preserves rate precision", () => {
+  it.each([
+    ["zh", "不要求自购算力点"],
+    ["en", "No self compute-point minimum"],
+    ["vi", "Không yêu cầu điểm tính toán tự mua"],
+  ])("R1-R01 shows the referral threshold in points and distinguishes zero from unavailable in %s", (locale, zero) => {
+    const shown = buildRankHowContent(policy, ranks, enabled, locale, labels);
+    const configured = buildRankHowContent({ ...policy, rules: { ...policy.rules, qualifiedReferralSelfComputePoints: 0 } }, ranks, enabled, locale, labels);
+    const absent = buildRankHowContent({ ...policy, rules: { ...policy.rules, qualifiedReferralSelfComputePoints: null } }, ranks, enabled, locale, labels);
+    expect(shown.section("requirement-direct")).toMatchObject({ available: true, body: formatComputePoints(7891, locale) });
+    expect(configured.section("requirement-direct")).toMatchObject({ available: true, body: zero });
+    expect(absent.section("requirement-direct").available).toBe(false);
+    expect(shown.section("requirement-direct").body).not.toMatch(/USD|\$/);
+  });
+  it.each(['zh', 'en', 'vi'])('uses the %s incentive-pool term while retaining the settlement gate and published wording', locale => {
+    const input = { ...policy, sections: [
+      { id: 'status', title: 'Published leadership title', body: '{leadershipStatus}', order: 1 },
+      { id: 'plain', title: 'Published title', body: 'Leadership pool: published wording', order: 2 },
+    ] };
+    const held = buildRankHowContent(input, ranks, enabled, locale, labels);
+    const ready = buildRankHowContent({ ...input, rules: { ...input.rules, leadershipConfigured: true } }, ranks, enabled, locale, labels);
+    const pool = teamRedesignCopy(locale).teamIncentivePool.toLowerCase();
+    expect(held.section('status').body.toLowerCase()).toContain(pool);
+    expect(ready.section('status').body.toLowerCase()).toContain(pool);
+    expect(held.section('status').body).toMatch(/暂未开放发放|aren’t open yet|chưa mở chi trả/);
+    expect(held.section('status').body).toMatch(/票数不代表奖励已到账|Votes do not mean rewards have been received|Phiếu bầu không đồng nghĩa với phần thưởng đã nhận/);
+    expect(ready.section('status').body).toMatch(/实际发放|actual payout|chi trả thực tế/);
+    expect(held.section('plain')).toMatchObject({ title: 'Published title', body: 'Leadership pool: published wording' });
+  });
+  it.each([
+    ["zh", "自购算力", "团队算力", "2,000 算力点", "20,000 算力点"],
+    ["en", "Own compute", "Team compute", "2,000 compute pts", "20,000 compute pts"],
+    ["vi", "Điểm cá nhân", "Điểm của nhóm", "2.000 điểm tính toán", "20.000 điểm tính toán"],
+  ])("renders published point requirements and examples without legacy dollars in %s", (locale, self, team, ownValue, teamValue) => {
+    const pointsPolicy = { ...policy, sections: [
+      { id: "requirement-self", title: self, body: "{selfComputePoints}", order: 1 },
+      { id: "requirement-team", title: team, body: "{teamComputePoints}", order: 2 },
+      { id: "example-self", title: self, body: "{fromRank} → {toRank}: {selfComputePoints}", order: 3 },
+      { id: "example-team", title: team, body: "{fromRank} → {toRank}: {teamComputePoints}", order: 4 },
+    ] };
+    const changed = ranks.map(row => row.v === 2 ? { ...row, selfComputePoints: 2000, teamComputePoints: 20000 } : row);
+    vi.stubGlobal("Intl", undefined);
+    try {
+      const content = buildRankHowContent(pointsPolicy, changed, enabled, locale, labels);
+      expect(content.section("requirement-self")).toMatchObject({ available: true, body: ownValue });
+      expect(content.section("requirement-team")).toMatchObject({ available: true, body: teamValue });
+      expect(content.section("example-self").body).toBe(`V1 → V2: ${ownValue}`);
+      expect(content.section("example-team").body).toBe(`V1 → V2: ${teamValue}`);
+      for (const { id } of pointsPolicy.sections) {
+        expect(content.section(id).body).not.toMatch(/\$|USD/);
+        const missing = buildRankHowContent(pointsPolicy, pointless, enabled, locale, labels).section(id);
+        expect(missing.available).toBe(false);
+        expect(missing.body).not.toMatch(/\$|USD/);
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("binds point policy tokens only to canonical point fields", () => {
+    const pointsPolicy = { ...policy, sections: [{ id: "points", title: "Points", body: "{selfComputePoints} / {teamComputePoints}", order: 1 }, ...policy.sections] };
+    const changed = ranks.map(r => r.v === 2 ? { ...r, selfComputePoints: 2000, teamComputePoints: 20000 } : r);
+    const content = buildRankHowContent(pointsPolicy, changed, enabled, "zh", labels);
+    expect(content.section("points")).toMatchObject({ available: true, body: "2,000 算力点 / 20,000 算力点" });
+    expect(content.section("rewards").body).toContain("321.12 UVT");
+    const missing = buildRankHowContent(pointsPolicy, pointless, enabled, "zh", labels);
+    expect(missing.section("points").available).toBe(false);
+  });
+  it("selects a point-only example", () => {
+    const p = { ...policy, sections: [{ id: "points", title: "{fromRank} → {toRank}", body: "{selfComputePoints} / {teamComputePoints}", order: 1 }] };
+    const content = buildRankHowContent(p, [rank(0), rank(1, { selfComputePoints: 0, teamComputePoints: 20000.125 })], enabled, "vi", labels);
+    expect(content.section("points")).toMatchObject({ available: true, title: "V0 → V1", body: "0 điểm tính toán / 20.000,125 điểm tính toán" });
+  });
+  it("formats example thresholds in points without changing reward and rate formatting", () => {
     const content = buildRankHowContent(policy, ranks, enabled, "zh", labels);
     expect(content.section("example").title).toBe("V1 → V2");
     expect(content.section("example").body).toContain("456,781 算力点");
@@ -26,9 +99,9 @@ describe("rank-how published presentation", () => {
     expect(content.section("rewards").body).toContain("12.3456%");
     expect(content.section("rewards").body).toContain("2.75%");
     expect(content.section("rewards").body).toContain("321.12 UVT");
-    expect(content.section("rewards").body).toContain("暂不可结算");
+    expect(content.section("rewards").body).toContain("暂未开放发放");
     expect(content.section("requirement-direct").body).toBe("7,891 算力点");
-    expect(content.section("protection").body).toContain("未开启");
+    expect(content.section("protection").body).toContain("可能调整");
   });
   it.each(["zh", "en", "vi"])("renders large point thresholds in %s when native Intl is absent", locale => {
     const expected = formatComputePoints(1234567, locale);
@@ -47,7 +120,7 @@ describe("rank-how published presentation", () => {
     const content = buildRankHowContent({ ...policy, rules: { ...policy.rules!, permanentProtection: true, leadershipConfigured: true } }, changed, enabled, "zh", labels);
     expect(content.section("example").body).toContain("123 算力点");
     expect(content.section("rewards").body).toContain("29");
-    expect(content.section("protection").body).toContain("已开启");
+    expect(content.section("protection").body).toContain("会保留");
   });
   it("distinguishes a configured zero referral minimum from unavailable configuration", () => {
     const content = buildRankHowContent({ ...policy, rules: { ...policy.rules, qualifiedReferralSelfComputePoints: 0 } }, ranks, enabled, "zh", labels);
@@ -89,7 +162,7 @@ describe("rank-how published presentation", () => {
     ] };
     const off = buildRankHowContent(peerPolicy, ranks, unavailable, "zh", labels);
     expect(off.section("unlock-peer").body).toContain("暂未开放");
-    expect(off.section("result-peer").body).toContain("当前不派发");
+    expect(off.section("result-peer").body).toContain("暂未开放");
     expect(`${off.section("unlock-peer").body} ${off.section("result-peer").body}`).not.toContain("2.75%");
 
     const on = buildRankHowContent(peerPolicy, ranks, enabled, "zh", labels);

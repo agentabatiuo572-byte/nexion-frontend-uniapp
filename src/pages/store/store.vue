@@ -1,52 +1,45 @@
-<!--
-  Store (main list page) — ported from Nexion-prototype/app/(main)/store/page.tsx.
-  v5 light-fintech tier ladder upgrade flow, top→bottom:
-    StoreHero → ClusterLadder → VsPhoneHero → TradeinWindowBanner →
-    "Recommended" header + featured ProductCard → PurchaseTicker →
-    "More tiers" header + rest ProductCards → "Coming soon" LockedProductCards →
-    footer note. (Orders entry moved to Me → Account — see me.vue.)
-  Phase-gated products (Pro v2 / Rack P2, unlocksAtPhase): shown as live cards
-  once the platform phase is reached, otherwise as locked "Coming soon" cards.
-  Wrapped in <AppChassis active="store">; entrance via <CardStagger>.
--->
+<!-- Live catalogue, voucher benefits and upgrade recommendations; pricing and eligibility remain store-owned. -->
 <template>
   <AppChassis active="store">
-    <CardStagger class="px-4 pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
+    <CardStagger class="store-content">
       <view v-if="activityId" class="promotion store-promotion-scope" data-testid="store-promotion-scope">
         <view class="store-promotion-actions">
           <text v-if="activity" class="promotion-badge">{{ t.promotion.activityProducts }}</text>
           <view class="promotion-link" role="button" tabindex="0" @click="clearPromotion"><text>{{ activity?t.promotion.scopeClear:t.promotion.allProducts }}</text></view>
         </view>
         <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
-        <text v-if="promotionStatus==='loading'||promotionStatus==='idle'" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-        <view v-else-if="promotionStatus==='error'" role="alert"><text class="promotion-copy">{{ t.promotion.errorNote }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
-        <text v-else-if="activity&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
+        <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
+        <view v-else-if="promotionStatus==='error'" class="nx-inline-recovery" role="alert"><text class="promotion-copy nx-inline-recovery__copy">{{ t.promotion.errorNote }}</text><view class="promotion-link nx-inline-recovery__action" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
+        <text v-else-if="activity&&promotionStatus==='ready'&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
         <text v-else-if="activity" class="promotion-copy">{{ t.promotion.promoSub }}</text>
-        <view v-if="activity" class="promotion-link" role="button" tabindex="0" @click="navTo(promotionBundleHref(activityId))"><text>{{ t.promotion.bundle }}</text></view>
+        <view v-if="activity && unlockedProducts.filter(p=>p.productType!=='SHARE').length>=2" :aria-disabled="!promotionAvailable" class="promotion-link" role="button" tabindex="0" @click="promotionAvailable && navTo(promotionBundleHref(activityId))"><text>{{ t.promotion.bundle }}</text></view>
       </view>
       <template v-else-if="!publicOnly">
-        <StoreHero :multiplier="upgrade?.multiplier ?? null" />
-        <view class="nx-glass-card flex items-center justify-between active:opacity-70" data-testid="store-bundle-entry"
-          role="button" tabindex="0" :aria-label="t.promotion.bundle"
-          style="min-height: 48px; padding: 12px 16px; color: var(--v5-brand); font-size: 15px; font-weight: 600"
-          @click="navTo('/pages/store/bundle')"
-          @keydown.enter.prevent="navTo('/pages/store/bundle')" @keydown.space.prevent="navTo('/pages/store/bundle')">
-          <text>{{ t.promotion.bundle }}</text>
-          <text aria-hidden="true">›</text>
+        <view v-if="voucherContext.voucherId" class="promotion promotion-flat"><text class="promotion-title">{{ t.promotion.eventVoucher }}</text><text class="promotion-copy">{{ t.promotion.eventVoucherTerms }}</text><view class="promotion-link" role="button" tabindex="0" @click="clearPromotion" @keydown.enter.prevent="clearPromotion" @keydown.space.prevent="clearPromotion"><text>{{ t.promotion.scopeClear }}</text></view></view>
+        <view v-if="voucherOffers.length&&!voucherContext.voucherId" class="store-voucher-ticket" data-testid="store-voucher-ticket" role="button" tabindex="0" @click="openStoreVouchers" @keydown.enter.prevent="openStoreVouchers" @keydown.space.prevent="openStoreVouchers">
+          <view class="store-voucher-ticket__value"><text v-if="voucherBenefit.amount != null" class="store-voucher-ticket__currency">$</text><text>{{ voucherBenefit.amount != null ? fmtMoney(voucherBenefit.amount).replace(/^\$/, '').replace(/\.00$/, '') : voucherBenefit.percent != null ? voucherBenefit.percent + '%' : '–' }}</text></view>
+          <view class="store-voucher-ticket__rule" aria-hidden="true" />
+          <view class="store-voucher-ticket__copy"><text class="store-voucher-ticket__title">{{ auditCopy.voucherShort }} · {{ fmt(auditCopy.voucherShortCount,{n:voucherOffers.length}) }}</text><view class="store-voucher-ticket__hint"><view v-if="voucherBenefit.amount == null">{{ auditCopy.voucherDiscount }}</view><view>{{ voucherClaimable.length ? auditCopy.claimToUse : auditCopy.autoApplyVoucher }}</view></view></view>
+          <image class="store-voucher-ticket__art" src="/static/img/home-glass-20260928/coupon.webp" mode="aspectFit" aria-hidden="true" />
         </view>
-        <PromotionEntry mode="home" />
-        <ClusterLadder :authority="yieldAuthority" :owned="ownedHardware" />
-        <VsPhoneHero v-if="upgrade" :authority="yieldAuthority" :comparison="upgrade" />
+        <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" />
+        <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :target="upgrade.target" />
+        <template v-if="!voucherContext.voucherId">
+          <StoreHero :multiplier="yieldAuthority.multiplier" />
+          <ClusterLadder :authority="yieldAuthority" :owned="ownedHardware" />
+          <VsPhoneHero :authority="yieldAuthority" />
+          <TradeinWindowBanner />
+        </template>
       </template>
 
       <view v-if="publicOnly" class="promotion" data-testid="promotion-public-store">
         <template v-if="activity"><PromotionProduct v-for="productNo in activity.productNos" :key="productNo" :activity="activity" :product-no="productNo" public-only /></template>
-        <view v-if="activity" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionStoreHref(activityId)))"><text>{{ t.promotion.signIn }}</text></view>
+        <view v-if="activity||voucherContext.voucherId" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionStoreHref(activityId,voucherContext)))"><text>{{ t.promotion.signIn }}</text></view>
       </view>
       <template v-else>
 
       <!-- Sprint 2 finale — phase + legacy-ownership trade-in window -->
-      <TradeinWindowBanner v-if="!activityId" />
+
 
       <!-- Goal-recommendation context (BUG 71). Arriving from an earning goal
            carries `focus`; the card locates the recommended SKU instead of
@@ -69,7 +62,7 @@
       <view class="nx-glass-card" v-else-if="catalogStatus === 'error' && !catalogHasProducts" data-testid="store-catalog-error" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
-        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog">
+        <view class="nx-card-recovery-action active:opacity-70" role="button" tabindex="0" @click="retryCatalog">
           <text>{{ t.store.catalogRetry }}</text>
         </view>
       </view>
@@ -79,88 +72,71 @@
       </view>
       <view v-if="activity&&promotionStatus==='ready'&&catalogStatus==='ready'&&!unlockedProducts.length" class="promotion-flat"><text class="promotion-copy">{{ t.promotion.noMatchingProducts }}</text><view class="promotion-link" role="button" tabindex="0" @click="clearPromotion"><text>{{ t.promotion.allProducts }}</text></view></view>
       <template v-if="catalogHasProducts">
-        <SectionHeader v-if="!activityId" :title="t.store.secRecommended" style="height: 44px">
-          <template #right>
-            <view style="height: 44px; max-width: 65%; display: flex; align-items: center; overflow: hidden">
-              <text v-if="catalogStatus === 'loading'" role="status" style="font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ t.store.catalogLoadingTitle }}</text>
-              <view v-else-if="catalogStatus === 'error'" role="button" tabindex="0"
-                :aria-label="`${t.store.catalogErrorTitle} · ${t.store.catalogRetry}`"
-                style="height: 44px; min-width: 0; display: flex; flex-direction: column; justify-content: center; font-size: 12px; line-height: 18px"
-                @click="retryCatalog"  @keydown.enter.prevent="retryCatalog" @keydown.space.prevent="retryCatalog">
-                <text style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ t.store.catalogErrorTitle }}</text>
-                <text style="color: var(--v5-brand)">{{ t.store.catalogRetry }}</text>
-              </view>
-              <text v-else class="font-mono-tabular inline-flex items-center gap-1" :style="amberTagStyle">{{ t.store.secRecommendedTag }}</text>
-            </view>
-          </template>
-        </SectionHeader>
-        <ProductCard v-if="featured" :key="featured.id" :product="featured" :promotion="activity" :activity-id="activityId" :promotion-ready="promotionStatus==='ready'" featured />
-
-        <PurchaseTicker v-if="!activityId" />
-
-        <SectionHeader v-if="restProducts.length > 0&&!activityId" :title="t.store.secMoreTiers" />
-        <ProductCard v-for="p in restProducts" :key="p.id" :product="p" :promotion="activity" :activity-id="activityId" :promotion-ready="promotionStatus==='ready'" />
-
-        <!-- "Coming soon" — gen-2 phase-locked -->
-        <view v-if="lockedProducts.length > 0">
-          <SectionHeader :title="t.store.secComingSoon">
-            <template #right>
-              <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.comingSoonNote }}</text>
-            </template>
-          </SectionHeader>
-          <view class="space-y-2.5">
-            <LockedProductCard v-for="p in lockedProducts" :key="p.id" :product="p" />
+        <NxSection class="store-catalogue" :title="t.store.allProducts" :meta="String(unlockedProducts.length)" :action="catalogStatus === 'error' ? t.store.catalogRetry : undefined" @action="retryCatalog">
+          <view class="store-product-grid">
+            <ProductCard v-for="p in catalogProducts" :key="p.id" :product="p" :promotion="activity" :activity-id="activityId" :voucher-context="voucherContext" :promotion-ready="promotionStatus==='ready'" compact />
           </view>
-        </view>
+          <text class="store-estimate-note">{{ t.store.cardEstimateNote }}</text>
+        </NxSection>
+        <NxListGroup v-if="(!activityId && genesisCfg.config.showcaseEnabled) || lockedProducts.length" class="store-more">
+          <NxListRow v-if="!activityId && genesisCfg.config.showcaseEnabled" :title="t.store.secGenesis" :subtitle="t.store.genesisCardPerks" :value="genesisCfg.config.marketOpenState === 'closed' ? auditCopy.comingSoon : undefined" @click="navTo('/pages/genesis/genesis')"><template #leading><view class="store-more__icon store-more__icon--gold"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m2 8 4 10h12l4-10-5 3-5-7-5 7z" /></svg></view></template></NxListRow>
+          <NxListRow v-if="lockedProducts.length" :title="t.store.secComingSoon" :subtitle="lockedProducts.map(p => p.name).join(' · ')" :value="comingSoonOpen ? auditCopy.close : undefined" @click="comingSoonOpen = !comingSoonOpen"><template #leading><view class="store-more__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></view></template></NxListRow>
+        </NxListGroup>
+        <view v-if="comingSoonOpen && lockedProducts.length" class="store-locked-list"><LockedProductCard v-for="p in lockedProducts" :key="p.id" :product="p" /></view>
       </template>
 
-      <!-- 尊享席位 — Genesis 独立金融 SKU 入口(升级阶梯压轴;规格 FEAT-GEN07,
-           非设备目录成员,经济模型与当前服务端资格投影在 store/genesis.ts)。
-           showcaseEnabled 运营开关(FEAT-GEN09):关=整区隐藏,预售页/二级不受影响。-->
-      <view v-if="!activityId&&genesisCfg.config.showcaseEnabled">
-        <SectionHeader :title="t.store.secGenesis" />
-        <GenesisShowcaseCard />
+      <view v-if="!publicOnly && !activityId && !voucherContext.voucherId" class="store-bundle-entry" data-testid="store-bundle-entry" role="button" tabindex="0" :aria-label="t.promotion.bundle"
+        @click="navTo('/pages/store/bundle')" @keydown.enter.prevent="navTo('/pages/store/bundle')" @keydown.space.prevent="navTo('/pages/store/bundle')">
+        <text>{{ t.promotion.bundle }}</text><text aria-hidden="true">›</text>
       </view>
 
       <!-- 《02》§7:Mono 仅限 <5 词短标签/数字;这是 8 词促销 callout 整句,改正文字体 -->
-      <text class="block text-center" style="margin-top: 20px; padding-bottom: 8px; font-size: 12px; line-height: 16px; color: var(--v5-ink-3)">{{ t.store.pageFooter }}</text>
+      <text class="store-footer">{{ t.store.pageFooter }}</text>
       </template>
     </CardStagger>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
+import { runPassiveTabRead } from "@/lib/passive-tab-read";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSProperties } from "vue";
-import AppChassis from "@/components/app-chassis.vue";
+import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
-import SectionHeader from "@/components/store/section-header.vue";
-import StoreHero from "@/components/store/store-hero.vue";
-import ClusterLadder from "@/components/store/cluster-ladder.vue";
-import VsPhoneHero from "@/components/store/vs-phone-hero.vue";
-import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
+import UpgradeSpotlight from "@/components/store/upgrade-spotlight.vue";
 import ProductCard from "@/components/store/product-card.vue";
 import PromotionEntry from '@/components/promotion/promotion-entry.vue';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
 import { usePromotionContext } from '@/composables/use-promotion-context';
-import { promotionBundleHref,promotionStoreHref } from '@/lib/promotion-entry';
+import { promotionBundleHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
 import { localized } from '@/lib/promotion-display';
 import { useLocaleStore } from '@/store/locale';
 import { navTo,takeNavigationQuery } from '@/lib/route';
-import PurchaseTicker from "@/components/store/purchase-ticker.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
-import GenesisShowcaseCard from "@/components/store/genesis-showcase-card.vue";
-import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
+import { onHide, onLoad, onShow } from "@/composables/use-tab-page-lifecycle";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesis } from "@/store/genesis";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { fmt, fmtMoney } from "@/i18n/format";
+import { useAuditUiCopy } from "@/i18n/audit-ui";
+import { useVoucher } from "@/store/voucher";
+import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { voucherBenefitSummary } from "@/lib/voucher-benefit-summary";
+import { voucherSupportsSurface } from "@/lib/voucher-sheet-authority";
+import NxSection from "@/components/ui/nx-section.vue";
+import NxListGroup from "@/components/ui/nx-list-group.vue";
+import NxListRow from "@/components/ui/nx-list-row.vue";
 import { PRODUCTS } from "@/mock/products";
-import { productCatalogState, productCatalogPresentation, refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogState, productCatalogPresentation, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
+import StoreHero from "@/components/store/store-hero.vue";
+import ClusterLadder from "@/components/store/cluster-ladder.vue";
+import VsPhoneHero from "@/components/store/vs-phone-hero.vue";
+import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
 import { useApp } from "@/store/app";
@@ -170,16 +146,20 @@ import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
 import { behaviorTracker, createStoreViewEvent } from "@/services/behavior-analytics";
 
 const t = useT();
+const auditCopy = useAuditUiCopy(), voucher = useVoucher(), comingSoonOpen = ref(false);
+const voucherClaimSheet = useVoucherClaimSheet();
 const app = useApp();
 const locale=useLocaleStore();
 const activityId=ref('');
+const voucherContext=ref<VoucherEntryContext>({});
 const publicOnly=computed(()=>{void app.accountKey;void app.accountBindingEpoch;return !sessionVault.read();});
-const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId);
+const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId, true);
 function readPromotionQuery(query:Record<string,string|undefined>){
-  if(query.scope==='all')activityId.value='';
+  voucherContext.value=voucherEntryContext(query);
+  if(query.scope==='all'||voucherContext.value.voucherId)activityId.value='';
   else if(query.activityId)activityId.value=query.activityId.trim();
 }
-function clearPromotion(){activityId.value='';void navTo(promotionStoreHref());}
+function clearPromotion(){activityId.value='';voucherContext.value={};void navTo(promotionStoreHref());}
 // The fleet store clears this flag on every account binding. Retained devices
 // are presentation only and never supply purchase eligibility.
 const ownedDevices = computed(() => app.remoteFleetHasSnapshot ? app.visibleDevices : []);
@@ -200,24 +180,39 @@ let storePageVisible = false;
 let storeObservationEpoch = 0;
 let storeViewReportedScope = "";
 let storeViewAttempt: { scopeKey: string; userId: number; event: ReturnType<typeof createStoreViewEvent>; tries: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
+let releaseActiveRefresh = () => {};
+async function refreshVisibleStore() {
+  if (!storePageVisible) return;
+  if (publicOnly.value) { await refreshPromotion(); return; }
+  await Promise.allSettled([
+    voucher.revalidateRemote(), runPassiveTabRead('genesis-state', () => genesis.syncRemote()),
+    runPassiveTabRead('product-phase', () => refreshServerProductPhase(true)),
+    revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(), refreshPromotion(),
+  ]);
+}
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
 //   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
 //   只有页面级 onShow 能把它翻回来。
 onShow(() => {
   const pending=takeNavigationQuery('/pages/store/store');
-  if(pending){const query=new URLSearchParams(pending);readPromotionQuery({scope:query.get('scope')??undefined,activityId:query.get('activityId')??undefined});}
+  if(pending){const query=new URLSearchParams(pending),values:Record<string,string>={};query.forEach((value,key)=>{values[key]=value;});readPromotionQuery(values);}
   storePageVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleStore);
   if(publicOnly.value)return;
-  genesisCfg.refresh();
+  void runPassiveTabRead('genesis-config', () => genesisCfg.refresh(), undefined, () => genesisCfg.loaded);
+  void voucher.revalidateRemote();
   // G4's public state owns supply independently of the configuration fields.
   // Re-read it whenever the store becomes visible so a prior failed 0/0
   // bootstrap can recover without an account rebind or a Genesis-detail visit.
-  void genesis.syncRemote();
-  void refreshServerProductPhase(true);
-  void refreshProductCatalog(true);
+  void runPassiveTabRead('genesis-state', () => genesis.syncRemote());
+  void runPassiveTabRead('product-phase', () => refreshServerProductPhase(true));
+  void revalidateProductCatalog();
+  void earnConfig.ensure();
   void observeDayOneStorePage();
 });
 onHide(() => {
+  releaseActiveRefresh();
   storePageVisible = false;
   storeObservationEpoch += 1;
   storeViewReportedScope = "";
@@ -230,6 +225,7 @@ onHide(() => {
   focusProductName.value = "";
 });
 onUnmounted(() => {
+  releaseActiveRefresh();
   storePageVisible = false;
   storeObservationEpoch += 1;
   storeViewReportedScope = "";
@@ -323,6 +319,19 @@ const lockedProducts = computed(() =>
 );
 
 const upgrade = computed(() => storeUpgrade(unlockedProducts.value, ownedDevices.value));
+const upgradeBaseImageUrl = computed(() => {
+  const base = upgrade.value?.base;
+  return base ? displayProducts.value.find(p => p.id === base.kind)?.imageUrl : undefined;
+});
+const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentationClaimable : voucher.claimableVouchers).filter(offer => voucherSupportsSurface(offer, 'store')));
+const voucherOffers = computed(() => remoteApiEnabled
+  ? voucher.presentationOffers.filter(offer => !voucher.presentationClaimable.some(item => item.id === offer.id) || voucherSupportsSurface(offer, 'store'))
+  : [...new Map([...voucherClaimable.value, ...voucher.claimedUnused].map(offer => [offer.id, offer])).values()]);
+const voucherBenefit = computed(() => voucherBenefitSummary(voucherOffers.value));
+function openStoreVouchers() {
+  if (voucher.remoteStatus === 'ready' && voucher.claimableVouchers.some(offer => voucherSupportsSurface(offer, 'store'))) voucherClaimSheet.show('store');
+  else if (voucherOffers.value.length) navTo('/pages/me/rewards-list?cat=voucher');
+}
 
 // Goal-recommendation landing context (BUG 71) is declared above, before the
 // lifecycle hooks that clear it.
@@ -364,6 +373,10 @@ const restProducts = computed(() =>
   unlockedProducts.value.filter((p) => p.id !== featured.value?.id),
 );
 
+const catalogProducts = computed(() => focusFeatured.value
+  ? [focusFeatured.value, ...unlockedProducts.value.filter(p => p.id !== focusFeatured.value?.id)]
+  : unlockedProducts.value);
+
 function retryCatalog() {
   void refreshProductCatalog(true);
 }
@@ -392,24 +405,14 @@ const catalogStateStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
 };
 const catalogStateTitleStyle: CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 const catalogStateBodyStyle: CSSProperties = {
   fontSize: "13px",
   lineHeight: "19px",
   color: "var(--v5-ink-3)",
-};
-const catalogRetryStyle: CSSProperties = {
-  minHeight: "44px",
-  alignItems: "center",
-  padding: "0 14px",
-  borderRadius: "9999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontSize: "13px",
-  fontWeight: 600,
 };
 
 // Goal-recommendation context card — same filled/no-border L1 idiom as the
@@ -427,7 +430,7 @@ const goalFocusTitleStyle: CSSProperties = {
   color: "var(--v5-brand-2-ink)",
 };
 const goalFocusBodyStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   lineHeight: "19px",
   color: "var(--v5-ink)",
 };
@@ -444,7 +447,26 @@ const goalFocusRetryStyle: CSSProperties = {
 
 </script>
 <style src="@/components/promotion/promotion.css"></style>
+<style scoped src="@/components/store/voucher-ticket.css"></style>
 <style scoped>
-.store-promotion-scope { display:flex;flex-direction:column;gap:12px; }
-.store-promotion-actions { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.store-content { padding:12px 16px 16px; color:var(--v5-ink); }
+.store-content > * + * { margin-top:16px; }
+.store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); box-shadow:none; background:radial-gradient(70% 90% at 82% 72%,color-mix(in srgb,var(--v5-brand) 24%,transparent),transparent 62%),linear-gradient(135deg,var(--ui-spotlight-top),var(--ui-ticket-bottom)); }
+.store-campaign :deep(.entry-label) { top:18px; left:18px; padding:0; border:0; background:transparent; color:var(--ui-lime-soft); font:500 12.5px/18px var(--font-v5); }
+.store-campaign :deep(.entry-title) { font-size:19px; line-height:25px; }
+.store-catalogue { margin-top:20px; }
+.store-catalogue :deep(.nx-section__heading) { padding:0 2px; }
+.store-catalogue :deep(.nx-section__meta) { font-size:var(--ui-type-list-subtitle); font-weight:500; }
+.store-product-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:stretch; }
+.store-estimate-note { display:block; margin-top:10px; padding:0 2px; font:400 12.5px/1.6 var(--font-v5); color:var(--v5-ink-3); }
+.store-more__icon { display:grid; place-items:center; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); }
+.store-more__icon--gold { color:var(--v5-warning-ink); background:linear-gradient(160deg,color-mix(in srgb,var(--v5-warning) 32%,transparent),color-mix(in srgb,var(--v5-warning) 8%,transparent)); box-shadow:inset 0 1px 0 color-mix(in srgb,var(--v5-warning) 35%,transparent); }
+.store-more :deep(.nx-list-row__subtitle) { color:var(--v5-ink-3); }
+.store-locked-list { display:flex; flex-direction:column; gap:10px; }
+.store-bundle-entry { display:flex; align-items:center; justify-content:flex-end; gap:6px; min-height:44px; padding:0 2px; color:var(--v5-brand); font:500 var(--ui-type-list-subtitle)/18px var(--font-v5); cursor:pointer; }
+.store-bundle-entry:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:8px; }
+.store-bundle-entry:active { opacity:.75; }
+.store-footer { display:block; margin-top:20px; padding-bottom:8px; font:400 12px/18px var(--font-v5); text-align:center; color:var(--v5-ink-3); }
+.store-promotion-scope { display:flex; flex-direction:column; gap:12px; }
+.store-promotion-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 </style>

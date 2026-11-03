@@ -1,3 +1,4 @@
+import * as displayDate from "@/lib/display-date";
 import { notificationCategory } from "@/lib/notification-category";
 import { advanceMessageHeader, createMessageHeaderState } from "@/lib/message-header-scroll";
 import ts from "typescript";
@@ -10,6 +11,8 @@ import { fmt } from "@/i18n/format";
 import { formatUnreadBadge } from "@/lib/unread-badge";
 import { createPinia, setActivePinia } from "pinia";
 import { useUI } from "@/store/ui";
+import { notificationActionsCopy } from "@/i18n/notification-actions";
+import { isDirectNotificationSummary } from "@/lib/notification-summary";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -30,8 +33,8 @@ function mount(remote = true, realQueue = false, navigationQuery = "", initialAc
   const read = deferred<void>();
   const hooks: Record<string, Array<(...args: any[]) => void>> = { load: [], show: [], hide: [], unmount: [], mounted: [] };
   const notifs = vue.reactive({
-    items: [], unread: 0, error: null, loading: false, nextCursor: null,
-    clearRead: vi.fn(async () => {}), refreshRemote: vi.fn(),
+    items: [] as Array<{ id: string; kind: string; readAt: number | null }>, unread: 0, error: null as string | null, loading: false, nextCursor: null,
+    clearRead: vi.fn(async () => {}), refreshRemote: vi.fn(), selectCategory: vi.fn(),
     recordCta: vi.fn(() => action.promise), recordSwipeConversion: vi.fn(() => action.promise),
     markRead: vi.fn(() => read.promise), markAllRead: vi.fn(),
   });
@@ -47,15 +50,20 @@ function mount(remote = true, realQueue = false, navigationQuery = "", initialAc
   const navTo = vi.fn();
   const confirm = vi.fn((options: Parameters<typeof ui.confirm>[0]) => realQueue ? ui.confirm(options) : confirmation.promise);
   const modules: Record<string, unknown> = {
+    "@/store/conversations": { useConversations: () => ({ realtimeFallback: false, categoryLoading: false }) },
     vue: { ...vue, inject: (_key: unknown, fallback: unknown) => fallback, onMounted: (fn: () => void) => hooks.mounted.push(fn), onUnmounted: (fn: () => void) => hooks.unmount.push(fn) },
-    "@dcloudio/uni-app": { onResize: vi.fn(), onLoad: (fn: (...args: any[]) => void) => hooks.load.push(fn), onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn) },
+    "@dcloudio/uni-app": { onBackPress: vi.fn(), onResize: vi.fn(), onLoad: (fn: (...args: any[]) => void) => hooks.load.push(fn), onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn) },
     "@/lib/notification-category": { notificationCategory },
+    "@/lib/notification-summary": { isDirectNotificationSummary },
+    "@/i18n/notification-actions": { notificationActionsCopy },
     "@/lib/message-header-scroll": { advanceMessageHeader, createMessageHeaderState },
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
     "@/store/pending-checkout-core": { PENDING_BAR_INSET_KEY: Symbol() },
-    "@/i18n/use-t": { useT: () => vue.ref(zh) }, "@/i18n/format": { fmt },
+    "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
+    "@/i18n/use-t": { useT: () => vue.ref(zh) }, "@/lib/display-date": displayDate, "@/i18n/format": { fmt },
     "@/lib/unread-badge": { formatUnreadBadge },
     "@/store/notifications": { useNotifications: () => notifs },
+    "@/store/preferences": { usePreferences: () => ({}), isMandatoryNotifKind: (kind: string) => kind === "system" },
     "@/store/message-drawer": { useMessageDrawer: () => drawer },
     "@/lib/route": { navTo, takeNavigationQuery: () => navigationQuery }, "@/api/runtime": { remoteApiEnabled: remote },
     "@/lib/remote-account-epoch": { remoteAccountScope: account },
@@ -63,11 +71,11 @@ function mount(remote = true, realQueue = false, navigationQuery = "", initialAc
     "@/store/ui": { confirm, useUI: () => ui },
     "@/store/app": { useApp: () => app },
   };
-  const source = pageSource;
-  const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
+  const script = pageSource.split('<script setup lang="ts">')[1].split("</script>")[0];
   const output = ts.transpileModule(script, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const scope = vue.effectScope(); scopes.push(scope);
-  const worker = scope.run(() => new Function("require", "exports", output + ";return { confirmClearRead, onTap, onTouchStart, onTouchEnd, section, filter, serviceFilter, expandedId, headerFocused, headerState, onMessageScroll };")((name: string) => {
+  const exposed = "{ confirmClearRead, clearingRead, directNotice, toggle, dateHeading, timeAgo, onTap, onTouchStart, onTouchEnd, section, filter, expandedId, headerFocused, headerState, onMessageScroll }";
+  const worker = scope.run(() => new Function("require", "exports", output + `;return ${exposed};`)((name: string) => {
     if (name.endsWith(".vue")) return {};
     if (!(name in modules)) throw new Error(`Unexpected dependency ${name}`);
     return modules[name];
@@ -79,6 +87,60 @@ const notification = { id: "fixture", ctaHref: "/pages/team/team" };
 const touch = (x: number) => ({ changedTouches: [{ clientX: x, clientY: 20 }] });
 
 describe("notification pending intent isolation", () => {
+  it('confirms bulk cleanup once with distinct impact/action copy and leaves deletion to the store', async () => {
+    const h = mount();
+    const pending = h.worker.confirmClearRead();
+    await h.worker.confirmClearRead();
+    expect(h.confirm).toHaveBeenCalledOnce();
+    expect(h.notifs.clearRead).not.toHaveBeenCalled();
+    expect(h.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: notificationActionsCopy.zh.title, message: notificationActionsCopy.zh.message,
+      confirmLabel: '清空', cancelLabel: '取消', danger: true,
+    }));
+    h.confirmation.resolve(true); await pending;
+    expect(h.notifs.clearRead).toHaveBeenCalledOnce();
+    expect(h.worker.clearingRead.value).toBe(false);
+  });
+  it('does nothing when cleanup is cancelled or the list is loading', async () => {
+    const h = mount(); h.notifs.loading = true;
+    await h.worker.confirmClearRead(); expect(h.confirm).not.toHaveBeenCalled();
+    h.notifs.loading = false;
+    const pending = h.worker.confirmClearRead(); h.confirmation.resolve(false); await pending;
+    expect(h.notifs.clearRead).not.toHaveBeenCalled();
+  });
+  for (const invalidation of ['account', 'rebind', 'hide-show', 'unmount']) {
+    it(`center cleanup cannot outlive ${invalidation}`, async () => {
+      const h = mount(); const pending = h.worker.confirmClearRead();
+      if (invalidation === 'account') h.account.bind('b');
+      if (invalidation === 'rebind') h.account.bind('a');
+      if (invalidation === 'hide-show') { h.fire('hide'); h.fire('show'); }
+      if (invalidation === 'unmount') h.fire('unmount');
+      h.confirmation.resolve(true); await pending;
+      expect(h.notifs.clearRead).not.toHaveBeenCalled();
+      expect(h.worker.clearingRead.value).toBe(false);
+    });
+  }
+  it('removes only the center confirmation when leaving', async () => {
+    const h = mount(true, true); const pending = h.worker.confirmClearRead();
+    const foreign = h.ui.confirm({ title: 'Other action', owner: 'foreign' });
+    h.fire('hide'); await pending;
+    expect(h.ui.confirmQueue.map(row => row.owner)).toEqual(['foreign']);
+    expect(h.notifs.clearRead).not.toHaveBeenCalled();
+    h.ui.clearConfirmsBy('foreign'); await foreign;
+  });
+  it('expands long text before navigation and uses the canonical route only for short text', async () => {
+    const h = mount();
+    const long = { ...notification, body: '通知'.repeat(40) };
+    h.worker.toggle(long);
+    expect(h.worker.expandedId.value).toBe(long.id);
+    expect(h.notifs.markRead).toHaveBeenCalledWith(long.id);
+    expect(h.notifs.recordCta).not.toHaveBeenCalled();
+    expect(h.worker.directNotice({ body: '已到账。' })).toBe(false);
+    h.worker.toggle({ ...notification, body: '已到账。' });
+    h.action.resolve('/pages/store/order-detail?id=canonical');
+    await Promise.resolve(); await Promise.resolve();
+    expect(h.navTo).toHaveBeenCalledWith('/pages/store/order-detail?id=canonical');
+  });
   it("shares its section with the bell, accepts native/H5 route parameters and ignores unknown sections", () => {
     const h = mount(true, false, "?section=service");
     h.fire("load", {});
@@ -101,38 +163,6 @@ describe("notification pending intent isolation", () => {
     expect(h.worker.headerState.value.primary).toBe(true);
     expect(pageSource).toContain('<scroll-view :key="section"');
   });
-  for (const invalidation of ["hide", "unmount", "account", "rebind"]) {
-    it(`cancels only this page's queued confirmation on ${invalidation}`, async () => {
-      const h = mount(true, true);
-      const pending = h.worker.confirmClearRead();
-      const foreign = h.ui.confirm({ title: "Another page", owner: "foreign" });
-      if (invalidation === "account") h.account.bind("b");
-      else if (invalidation === "rebind") h.account.bind("a");
-      else h.fire(invalidation);
-      expect(h.ui.confirmQueue.map(row => row.owner)).toEqual(["foreign"]);
-      await pending; expect(h.notifs.clearRead).not.toHaveBeenCalled();
-      h.ui.clearConfirmsBy("foreign"); expect(await foreign).toBe(false);
-    });
-  }
-  for (const invalidation of ["account", "rebind", "hide-show", "unmount"]) {
-    it(`does not clear notifications when confirmation outlives ${invalidation}`, async () => {
-      const h = mount();
-      const pending = h.worker.confirmClearRead();
-      if (invalidation === "account") h.account.bind("b");
-      if (invalidation === "rebind") h.account.bind("a");
-      if (invalidation === "hide-show") { h.fire("hide"); h.fire("show"); }
-      if (invalidation === "unmount") h.fire("unmount");
-      h.confirmation.resolve(true); await pending;
-      expect(h.notifs.clearRead).not.toHaveBeenCalled();
-    });
-  }
-  for (const accepted of [true, false]) {
-    it(`honors a current confirmation (${accepted})`, async () => {
-      const h = mount(); const pending = h.worker.confirmClearRead();
-      h.confirmation.resolve(accepted); await pending;
-      expect(h.notifs.clearRead).toHaveBeenCalledTimes(accepted ? 1 : 0);
-    });
-  }
   for (const action of ["tap", "swipe", "mock-tap"]) {
     it(`allows a current ${action} route`, async () => {
       const h = mount(action !== "mock-tap");
@@ -165,12 +195,12 @@ describe("notification pending intent isolation", () => {
     const h = mount(); h.fire("show");
     expect(h.notifs.refreshRemote).toHaveBeenCalledTimes(1);
     h.fire("unmount"); h.fire("show"); h.confirmation.resolve(true);
-    await h.worker.confirmClearRead();
+    await h.worker.onTap(notification);
     expect(h.notifs.refreshRemote).toHaveBeenCalledTimes(1);
-    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.notifs.recordCta).not.toHaveBeenCalled();
+    expect(h.navTo).not.toHaveBeenCalled();
   });
 });
-
 
 // Platform IO is synthetic; page onLoad/onShow/setter/watchers are the actual SFC.
 function h5Entry(href = "https://fixture.invalid/app/?outer=keep#/pages/me/notifications?section=notifications&from=me") {
@@ -210,7 +240,6 @@ describe("message primary partition route lifecycle", () => {
       await vue.nextTick();
       expect(restored.worker.section.value).toBe(selected);
       expect(primaryQuery(browser.location)).toBe(selected);
-      expect(restored.worker.serviceFilter.value).toBe("all");
     });
   }
   it("keeps explicit onLoad section ahead of a conflicting pending query", async () => {
@@ -250,11 +279,10 @@ describe("message primary partition route lifecycle", () => {
       const browser = h5Entry();
       const h = mount(true, false, "?section=service", "default");
       h.fire("load", {}); h.account.bind("a"); await vue.nextTick();
-      h.worker.serviceFilter.value = "ticket"; h.worker.filter.value = "finance"; h.worker.expandedId.value = "old";
+      h.worker.filter.value = "finance"; h.worker.expandedId.value = "old";
       h.account.bind(key); await vue.nextTick();
       expect(h.worker.section.value).toBe("notifications");
       expect(primaryQuery(browser.location)).toBe("notifications");
-      expect(h.worker.serviceFilter.value).toBe("all");
       expect(h.worker.filter.value).toBe("all");
       expect(h.worker.expandedId.value).toBeNull();
       h.fire("hide"); h.fire("show"); await vue.nextTick();
@@ -313,3 +341,37 @@ describe("message primary partition route lifecycle", () => {
     expect(h.notifs.markRead).not.toHaveBeenCalled();
   });
 });
+
+ it("opens an actionable notification in one tap while retaining the canonical route gate", async () => {
+  const h = mount();
+  h.worker.toggle(notification);
+  expect(h.notifs.recordCta).toHaveBeenCalledWith(notification.id);
+  expect(h.navTo).not.toHaveBeenCalled();
+  expect(h.worker.expandedId.value).toBeNull();
+  h.action.resolve('/pages/store/order-detail?id=canonical');
+  await Promise.resolve(); await Promise.resolve();
+  expect(h.navTo).toHaveBeenCalledWith('/pages/store/order-detail?id=canonical');
+});
+it("expands messages with no destination without inventing navigation", () => {
+  const h = mount();
+  h.worker.toggle({ id: 'plain', ctaHref: '' });
+  expect(h.worker.expandedId.value).toBe('plain');
+  expect(h.notifs.recordCta).not.toHaveBeenCalled();
+  expect(h.notifs.markRead).toHaveBeenCalledWith('plain');
+  h.worker.toggle({ id: 'plain', ctaHref: '' });
+  expect(h.worker.expandedId.value).toBeNull();
+});
+
+for (const body of ['Long message '.repeat(12), 'First line\nSecond line']) {
+  it(`keeps long/multiline notification content expandable before the CTA (${body.length})`, async () => {
+    const h = mount(); const row = { ...notification, body };
+    h.worker.toggle(row);
+    expect(h.worker.expandedId.value).toBe(row.id);
+    expect(h.notifs.markRead).toHaveBeenCalledWith(row.id);
+    expect(h.notifs.recordCta).not.toHaveBeenCalled(); expect(h.navTo).not.toHaveBeenCalled();
+    const action = h.worker.onTap(row);
+    expect(h.notifs.recordCta).toHaveBeenCalledWith(row.id);
+    h.action.resolve('/pages/team/team'); await action;
+    expect(h.navTo).toHaveBeenCalledWith('/pages/team/team');
+  });
+}

@@ -2,10 +2,10 @@
 <template>
   <view v-if="open" class="nx-elig-root" role="dialog" aria-modal="true" :aria-label="t.genesisEligibility.title">
     <transition name="nx-elig-fade">
-      <view v-if="open" class="nx-elig-backdrop" @click="emitClose" />
+      <view v-if="open" class="nx-elig-backdrop nx-sheet-fade-in" @click="emitClose" />
     </transition>
     <transition name="nx-elig-slide">
-      <view v-if="open" class="nx-glass-sheet nx-elig-panel" :style="panelStyle" @click.stop>
+      <view v-if="open" class="nx-glass-sheet nx-elig-panel nx-sheet-slide-up" :style="panelStyle" @click.stop>
         <view class="flex items-start justify-between" style="margin-bottom: 14px">
           <view>
             <text class="block" :style="titleStyle">{{ t.genesisEligibility.title }}</text>
@@ -111,20 +111,20 @@ function emitClose() { emit("update:open", false); }
 function emitSubscribe() { emit("subscribe"); }
 
 const panelStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)", background: "var(--nx-glass-fill)", borderTop: "none", padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)" };
-const titleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, letterSpacing: "-0.018em", color: "var(--v5-ink)", lineHeight: 1.2 };
-const subtitleStyle: CSSProperties = { marginTop: "4px", fontFamily: "var(--font-v5)", fontSize: "13px", color: "var(--v5-ink-3)" };
+const titleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: "var(--ui-type-card-title-weight)", letterSpacing: "-0.018em", color: "var(--v5-ink)", lineHeight: 1.2 };
+const subtitleStyle: CSSProperties = { marginTop: "4px", fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-3)" };
 const closeBtnStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "999px", color: "var(--v5-ink-3)" };
 const unlockedBannerStyle: CSSProperties = { background: "color-mix(in srgb, var(--v5-success) 12%, transparent)", borderRadius: "14px", padding: "12px 14px", marginBottom: "12px" };
-const unlockedTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
+const unlockedTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-card-title)", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
 const unlockedSubStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
 const ruleListStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "10px" };
 const ruleRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", background: "var(--v5-surface-2)", borderRadius: "14px", padding: "13px 14px" };
-const ruleLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
+const ruleLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-list-subtitle)", fontWeight: 500, color: "var(--v5-ink)" };
 const ruleValueStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", whiteSpace: "nowrap" };
 const reasonRowStyle: CSSProperties = { background: "color-mix(in srgb, var(--v5-warning) 10%, var(--v5-surface-2))", borderRadius: "14px", padding: "12px 14px" };
 const reasonTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.45 };
 const capNoteStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)", textAlign: "center", lineHeight: 1.45 };
-const subscribeStyle: CSSProperties = { marginTop: "14px", height: "50px", padding: "0 28px", borderRadius: "999px", gap: "6px", background: "var(--v5-brand)", boxShadow: "var(--v5-spotlight-brand)", color: "var(--v5-on-brand)", fontFamily: "var(--font-v5)", fontWeight: 500, fontSize: "15px" };
+const subscribeStyle: CSSProperties = { marginTop: "14px", height: "50px", padding: "0 28px", borderRadius: "999px", gap: "6px", background: "var(--v5-brand)", boxShadow: "var(--v5-spotlight-brand)", color: "var(--v5-on-brand)", fontFamily: "var(--font-v5)", fontWeight: 500, fontSize: "var(--ui-type-button)" };
 
 useDialogA11y(computed(() => props.open), ".nx-elig-root", emitClose);
 
@@ -133,7 +133,7 @@ useDialogA11y(computed(() => props.open), ".nx-elig-root", emitClose);
 
 <style scoped>
 .nx-elig-backdrop { position: fixed; inset: 0; z-index: 790; background: var(--v5-bg-color-mask); backdrop-filter: blur(8px); }
-.nx-elig-panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 800; border-top-left-radius: 16px; border-top-right-radius: 16px; }
+.nx-elig-panel { box-sizing: border-box; max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; position: fixed; left: 0; right: 0; bottom: 0; z-index: 800; border-top-left-radius: 16px; border-top-right-radius: 16px; }
 .nx-elig-fade-enter-active, .nx-elig-fade-leave-active { transition: opacity 0.24s cubic-bezier(0.32, 0.72, 0, 1); }
 .nx-elig-fade-enter-from, .nx-elig-fade-leave-to { opacity: 0; }
 .nx-elig-slide-enter-active { transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); }

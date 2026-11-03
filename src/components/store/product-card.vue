@@ -12,39 +12,34 @@
 -->
 <template>
   <!-- 《08》§2:tap 反馈 active:scale+opacity(禁 hover 做移动端反馈) -->
-  <view ref="cardRef" class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :class="marketingPromotion ? 'promotion-catalog-card' : 'nx-glass-card'" :style="marketingPromotion ? promotionCardStyle : cardStyle" @click="goDetail">
-    <view v-if="featured&&!marketingPromotion" aria-hidden :style="featuredGlowStyle" />
+  <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': cardInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? (product.name) : undefined" @click="goDetail">
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
-    <view class="relative overflow-hidden" :style="renderWrapStyle" role="button" tabindex="0" :aria-label="nexGridBrandText(product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
-      <image v-if="photo" :src="photo.src" mode="aspectFit" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" />
+    <view class="product-media relative overflow-hidden" :style="renderWrapStyle" :role="compact ? undefined : 'button'" :tabindex="compact ? -1 : 0" :aria-label="compact ? undefined : (product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
+      <view v-if="photo" class="product-art-entry"><image class="product-art" :style="{viewTransitionName:'catalog-'+product.id.replace(/[^a-zA-Z0-9_-]/g,'-')}" :key="photo.src" :src="photo.src" mode="aspectFit" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" /></view>
       <view v-else class="absolute inset-0 grid place-items-center" style="color: var(--v5-ink-3)">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
       </view>
 
       <!-- Badge ribbon -->
-      <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
+      <view v-if="copy.badge" class="product-ribbon absolute" :style="ribbonStyle">
         <text>{{ copy.badge }}</text>
       </view>
 
-      <!-- Tier-code chip + Legacy chip (photo) -->
-      <view v-if="photo && !isShare" class="absolute flex flex-col items-start gap-1.5" style="bottom: 12px; left: 14px; pointer-events: none">
-        <text class="font-mono-tabular" :style="tierChipStyle">{{ photo.tierCode }}</text>
-        <text v-if="product.status === 'legacy'" class="font-mono-tabular" :style="legacyChipStyle">{{ t.store.cardLegacyBadge }}</text>
-      </view>
+
     </view>
 
     <!-- ───── Body ───── -->
-    <view class="relative" style="padding: 14px 16px">
+    <view v-if="!compact" class="relative" style="padding: 14px 16px">
       <view>
         <view class="min-w-0">
-          <text class="block" :style="nameStyle">{{ nexGridBrandText(product.name) }}</text>
+          <text class="block" :style="nameStyle">{{ (product.name) }}</text>
         </view>
       </view>
 
       <!-- ROI 4-line hero -->
       <!-- 去线(主人 2026-08-17 全站令):mt-6 = 原 mt-3 + pt-3 的总间距 -->
-      <view v-if="!marketingPromotion" class="mt-6">
+      <view v-if="!marketingPromotion" class="mt-3">
         <!-- Eyebrow -->
         <view class="font-mono-tabular inline-flex items-center gap-1.5" :style="earnEyebrowStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
@@ -54,13 +49,13 @@
         <!-- Line 1: daily earn -->
         <view class="mt-1 flex items-baseline gap-2 flex-wrap">
           <text v-if="isShare" class="tabular-nums" :style="bigEarnStyle">{{ shareYieldText }}</text>
-          <text v-else class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 15px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
+          <text v-else class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: var(--ui-type-list-title); color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
           <!-- 「/天」单位后缀恒用弱化色,不跟数字的强调色走 —— 与同行美元侧同一档 ink-3
                (主人 2026-08-17:两侧 /天 字色必须一致) -->
-          <text class="font-mono-tabular tabular-nums" style="font-size: 13px; color: var(--v5-warning-ink); font-weight: 500">{{ nexPerDayText }}<text style="color: var(--v5-ink-3)">{{ t.store.cardPerDaySuffix }}</text></text>
+          <text class="font-mono-tabular tabular-nums" style="font-size: 13px; color: var(--v5-quest-violet-ink); font-weight: 500">{{ nexPerDayText }}<text style="color: var(--v5-ink-3)">{{ t.store.cardPerDaySuffix }}</text></text>
           <text v-if="stockLow" class="font-mono-tabular tabular-nums" :style="stockHintStyle">{{ stockHintText }}</text>
         </view>
-        <text v-if="isShare" class="block mt-1.5" style="font-size: 12px; line-height: 1.35; color: var(--v5-ink-4)">{{ t.store.shareYieldDisclaimer }}</text>
+        <text class="block mt-1.5" style="font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ isShare ? t.store.shareYieldDisclaimer : t.store.cardEstimateNote }}</text>
 
         <!-- FEAT-DEV01: 高阶任务能力线(算力越高可接任务面越大 · 数据取 SKU 解锁算力池) -->
         <view v-if="copy.unlocks" class="mt-1.5 flex items-center gap-1.5">
@@ -69,7 +64,7 @@
         </view>
 
         <!-- Purchase gate — remote mode is server-authoritative and fail-closed. -->
-        <view v-if="gateLockedView" class="nx-glass-inset mt-2.5 active:opacity-70" :style="gateBoxStyle" role="button" tabindex="0" @click.stop="toggleGateDetails">
+        <view v-if="gateLockedView" class="mt-2.5 active:opacity-70" :style="gateBoxStyle" role="button" tabindex="0" @click.stop="toggleGateDetails">
           <view class="flex items-center justify-between">
             <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
@@ -85,7 +80,7 @@
         </view>
 
         <!-- Trade-in callout (legacy) -->
-        <view v-if="showTradein" class="nx-glass-inset mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
+        <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
           <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success-ink); font-weight: 500">{{ tradeCreditText }}</text></text>
           <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
@@ -93,18 +88,27 @@
       <PromotionProduct v-if="marketingPromotion" :activity="marketingPromotion" :product-no="product.id" />
     </view>
 
+    <view v-if="compact" class="product-compact-body">
+      <text class="product-compact-name">{{ (product.name) }}</text>
+      <text class="product-compact-tagline">{{ copy.tagline }}</text>
+      <view class="product-compact-bottom">
+        <text class="product-compact-price">{{ fmtMoney(product.price).replace(/\.00$/, '') }}</text>
+        <text class="product-compact-estimate" :aria-label="(isShare ? t.store.shareReferenceAnnual : t.store.cardYouEarn) + ' · ' + (isShare ? shareYieldText : fmtMoney(product.dailyEarn) + t.store.cardPerDaySuffix)">{{ isShare ? t.store.shareReferenceAnnual + ' · ' + shareYieldText : estimateLabel + ' · ' + fmtMoney(product.dailyEarn).replace(/\.00$/, '') + t.store.cardPerDaySuffix }}</text>
+      </view>
+      <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
+    </view>
+
     <!-- ───── Footer: price + Buy CTA ───── -->
-    <view class="nx-glass-inset grid items-center gap-3" :style="footerStyle">
+    <view v-if="!compact" class="product-footer grid items-center gap-3" :style="footerStyle">
       <view class="min-w-0">
         <text class="block font-mono-tabular" :style="priceEyebrowStyle">{{ t.store.cardPriceLabel }}</text>
         <view class="tabular-nums flex items-baseline" :style="priceRowStyle">
-          <text style="font-size: 15px; color: var(--v5-ink-3); font-weight: 500">$</text>
-          <text style="font-size: 26px; font-weight: 600">{{ priceText }}</text>
+          <text style="font-size: var(--ui-type-list-title); color: var(--v5-ink-3); font-weight: 500">$</text>
+          <text style="font-family: var(--font-amount); font-size: 26px; font-weight: 600">{{ priceText }}</text>
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
-      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :class="{'promotion-buy':!!marketingPromotion}" :style="buyBtnDynStyle" role="button" :tabindex="buyUnavailable ? -1 : 0" :aria-disabled="buyUnavailable ? 'true' : 'false'" @click.stop="onBuy"  @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
-        <LiquidGlass v-if="marketingPromotion" :radius="999" tone="control" />
+      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :class="{'promotion-buy nx-frosted-button':!!marketingPromotion}" :style="buyBtnDynStyle" role="button" :tabindex="buyUnavailable ? -1 : 0" :aria-disabled="buyUnavailable ? 'true' : 'false'" @click.stop="onBuy"  @keydown.enter.prevent.stop="onBuy" @keydown.space.prevent.stop="onBuy">
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -122,46 +126,48 @@ import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { computeTradeInCredit } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
-import { fmt } from "@/i18n/format";
+import { fmt, fmtMoney } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
-import { nexGridBrandText } from "@/lib/brand-copy";
-import { catalogProductImageUrl, productTierCode } from "@/lib/product-image";
+import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
+import { productTierCode } from "@/lib/product-image";
+import { useProductImage } from "@/composables/use-product-image";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { productCatalogState } from "@/store/product-catalog";
 import type { PublicPromotion } from '@/api/promotion-contracts';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
-import LiquidGlass from '@/components/liquid-glass.vue';
-import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDetailHref } from '@/lib/promotion-entry';
 
-const props = withDefaults(defineProps<{ product: Product; featured?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean }>(), {
+import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDetailHref,type VoucherEntryContext } from '@/lib/promotion-entry';
+
+const props = withDefaults(defineProps<{ product: Product; featured?: boolean; compact?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean; voucherContext?:VoucherEntryContext }>(), {
   featured: false,
 });
 const t = useT();
 const locale = useLocaleStore();
-const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code));
+const estimateLabel = computed(() => locale.code === 'zh' ? '预估' : locale.code === 'vi' ? 'Ước tính' : 'Est.');
+const earnConfig = useEarnConfig();
+prepareEarnConfig();
+const copy = computed(() => productCopy(t.value, props.product, remoteApiEnabled, locale.code, earnConfig.taskPricing.value?.taskClasses));
 
 const isShare = computed(() => props.product.productType === "SHARE");
 const catalogUnavailable = computed(() => remoteApiEnabled && productCatalogState.status !== "ready");
 const marketingPromotion=computed(()=>isPromotionActive(props.promotion)?props.promotion:null);
 const promotionUnavailable=computed(()=>!!props.activityId&&(!props.promotionReady||!canPreviewPromotion(props.promotion??null)||!props.promotion?.productNos.includes(props.product.id)));
+// The catalog supplies a scoped retained activity only for read-only labels.
+const promotionPresentationReady=computed(()=>!!props.activityId&&canPreviewPromotion(props.promotion??null)&&!!props.promotion?.productNos.includes(props.product.id));
+const promotionPresentationSignIn=computed(()=>promotionPresentationReady.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
 const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.value&&props.promotion?.eligibility==='SIGN_IN_REQUIRED');
 const stockUnavailable = computed(() => props.product.inventoryMode === "FINITE"
   && props.product.stock === 0);
-const failedImageUrl = ref("");
-watch(() => props.product.imageUrl, () => { failedImageUrl.value = ""; }, { immediate: true });
-// Product videos stay detail-only: listing cards use the catalog image
-// so browsing never triggers downloads or playback before the user chooses it.
+const { imageSrc, imageError: fallbackProductImage } = useProductImage(() => props.product.imageUrl);
 const photo = computed(() => {
-  const imageUrl = catalogProductImageUrl(props.product.imageUrl, failedImageUrl.value);
+  const imageUrl = imageSrc.value;
   return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.product.id, props.product.tier) } : null;
 });
-function fallbackProductImage() {
-  failedImageUrl.value = props.product.imageUrl ?? "";
-}
+
 
 const stockLow = computed(
   () => !isShare.value && props.product.stock != null && props.product.stock < 50,
@@ -181,6 +187,8 @@ const showTradein = computed(() => !remoteApiEnabled && bestTradeinCredit.value 
 // eligibility response is the only source that can unlock this card.
 const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(() => props.product);
 const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
+const entered = ref(false);
+watch(cardInView, visible => { if (visible) entered.value = true; });
 const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id, cardInView);
 const gate = computed(() => stockUnavailable.value
   ? {
@@ -238,7 +246,7 @@ const gateProgressText = computed(() =>
   fmt(t.value.store.gateProgress, { pct: Math.round(gate.value.progressPct * 100) }),
 );
 const buyLabel = computed(() =>
-  promotionSignIn.value ? t.value.promotion.signIn : promotionUnavailable.value ? t.value.promotion.unavailable : catalogUnavailable.value
+  promotionPresentationSignIn.value ? t.value.promotion.signIn : promotionUnavailable.value && !promotionPresentationReady.value ? t.value.promotion.unavailable : catalogUnavailable.value
     ? productCatalogState.status === "loading" ? t.value.store.catalogLoadingTitle : t.value.store.catalogErrorTitle
     : stockUnavailable.value
     ? t.value.store.temporarilyOutOfStock
@@ -301,38 +309,39 @@ const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: forma
 const tradeCreditText = computed(() =>
   fmt(t.value.store.cardTradeCredit, { n: formatAmount(bestTradeinCredit.value) }),
 );
-const priceText = computed(() => formatAmount(props.product.price));
+const priceText = computed(() => fmtMoney(props.product.price).replace(/^\$/, ""));
 const stockHintText = computed(() => fmt(t.value.store.cardStockCompact, { n: props.product.stock ?? 0 }));
 
 function goDetail() {
-  navTo(promotionDetailHref(props.product.id,props.activityId));
+  // #ifdef H5
+  const transitionDocument = typeof document === 'undefined' ? undefined : document as Document & {
+    startViewTransition?: (update: () => Promise<void>) => { finished: Promise<void> };
+  };
+  if(typeof transitionDocument?.startViewTransition === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const transition=transitionDocument.startViewTransition(async()=>{await navTo(promotionDetailHref(props.product.id,props.activityId,props.voucherContext));});
+    void transition.finished.catch(()=>{}); // Unsupported snapshots must never cancel navigation.
+    return;
+  }
+  // #endif
+  navTo(promotionDetailHref(props.product.id,props.activityId,props.voucherContext));
 }
 function goCheckout() {
-  navTo(props.activityId ? promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId) : `/pages/store/checkout?product=${encodeURIComponent(props.product.id)}`);
+  navTo(props.activityId||props.voucherContext?.voucherId ? promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId,props.voucherContext) : `/pages/store/checkout?product=${encodeURIComponent(props.product.id)}`);
 }
 function goDevices() {
   navTo("/pages/me/devices");
 }
 
 // ───── styles ─────
-const promotionCardStyle: CSSProperties = { background:'var(--v5-surface)',borderRadius:'20px' };
-const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
-};
-const featuredGlowStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background: "radial-gradient(40% 50% at 80% 0%, var(--v5-tech-cyan-soft) 0%, transparent 60%)",
-  filter: "blur(12px)",
-  opacity: 0.6,
-  pointerEvents: "none",
+const promotionCardStyle: CSSProperties = { background:'var(--ui-content-surface)',borderRadius:'22px' };
+const cardStyle: CSSProperties = {
+  background: "var(--ui-content-surface)",
+  borderRadius: "22px",
 };
 const renderWrapStyle: CSSProperties = {
   width: "100%",
-  aspectRatio: "1",
-  borderRadius: "var(--v5-radius-m)",
-  background: "var(--v5-surface-2)",
+  aspectRatio: "1.45",
+  background: "radial-gradient(70% 22% at 50% 86%, color-mix(in srgb, var(--ui-lime-soft) 30%, transparent), transparent 70%), radial-gradient(90% 85% at 50% 58%, var(--ui-content-surface-3), var(--ui-content-surface-2) 55%, var(--ui-content-surface) 100%)",
 };
 const vignetteStyle: CSSProperties = {
   position: "absolute",
@@ -383,7 +392,7 @@ const legacyChipStyle: CSSProperties = {
 const nameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "26px",
+  fontSize: "22px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.022em",
   lineHeight: 1.15,
@@ -391,14 +400,14 @@ const nameStyle: CSSProperties = {
 const earnEyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 500,
-  letterSpacing: "0.08em",
-  color: "var(--v5-warning-ink)",
+  letterSpacing: "0.02em",
+  color: "var(--v5-ink-3)",
 };
 const bigEarnStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 400,
-  fontSize: "26px",
-  color: "var(--v5-warning-ink)",
+  fontSize: "24px",
+  color: "var(--v5-ink)",
   letterSpacing: "-0.022em",
   lineHeight: 1,
 };
@@ -418,7 +427,7 @@ const tradeinBoxStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const footerStyle: CSSProperties = {
-  padding: "13px 16px",
+  padding: "16px",
   borderTop: "1px solid var(--v5-border)",
   gridTemplateColumns: "1fr auto",
 };
@@ -500,8 +509,48 @@ const gateMetaStyle: CSSProperties = {
 
 </script>
 <style scoped>
+.product-card { transition: transform 180ms ease; }
+.product-card:active { transform: scale(.99); }
+.product-media:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -3px; }
+.product-art-entry { position: absolute; inset: 0; }
+.product-card--entered .product-art-entry { animation: product-enter 420ms ease-out both; }
+@keyframes product-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.product-media::after { content:''; position:absolute; inset:0 auto 0 -45%; width:38%; pointer-events:none; background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent); opacity:0; transform:translateX(0) skewX(-12deg); animation:product-auto-sheen 6.8s ease-out var(--product-sheen-delay, .6s) infinite; animation-play-state:paused; }
+.product-card--in-view .product-media::after { animation-play-state:running; }
+.product-card:nth-child(4n + 2) { --product-sheen-delay:1.7s; }
+.product-card:nth-child(4n + 3) { --product-sheen-delay:2.8s; }
+.product-card:nth-child(4n + 4) { --product-sheen-delay:3.9s; }
+@keyframes product-auto-sheen { 0% { transform:translateX(0) skewX(-12deg); opacity:0; } 2% { opacity:.85; } 15% { transform:translateX(480%) skewX(-12deg); opacity:0; } 100% { transform:translateX(480%) skewX(-12deg); opacity:0; } }
+.product-card:nth-child(even) .product-art { animation-delay: -1.5s; }
+.product-art { transform-origin: 50% 55%; animation: product-float 4s ease-in-out infinite; animation-play-state: paused; }
+.product-card--in-view .product-art { animation-play-state: running; }
+@keyframes product-float { 0%, 100% { transform: translateY(2px) scale(1); } 50% { transform: translateY(-4px) scale(1.015); } }
+@media (prefers-reduced-motion: reduce) { .product-card { transition: none; } .product-art, .product-card--entered .product-art-entry { animation: none; } .product-media::after { display: none; } }
+
 .promotion-buy { --v5-liquid-tint:transparent; }
 .promotion-buy :deep(.nx-liquid-glass[data-glass-strategy="solid"]),
 .promotion-buy :deep(.nx-liquid-glass[data-glass-strategy="solid"] .nx-liquid-optics) { background:inherit; }
 .promotion-buy > text,.promotion-buy > svg { position:relative;z-index:1; }
+</style>
+
+<style scoped>
+.product-card--compact { display:flex; flex-direction:column; min-width:0; border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); cursor:pointer; }
+.product-card--compact:active { transform:scale(.98); }
+.product-card--compact:focus-visible { outline:2px solid var(--v5-brand); outline-offset:3px; }
+.product-card--compact .product-media { height:150px; aspect-ratio:auto !important; flex:none; }
+.product-card--compact .product-art-entry { display:flex; align-items:center; justify-content:center; padding:0; }
+.product-card--compact .product-art { position:relative !important; inset:auto !important; width:min(172px,100%) !important; height:auto !important; aspect-ratio:1; max-width:172px; margin:0; animation-name:product-compact-float; animation-duration:4.2s; }
+@keyframes product-compact-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
+.product-card--compact .product-ribbon { top:0 !important; left:0 !important; padding:2px 9px !important; border-radius:0 0 6px 0 !important; background:var(--v5-brand) !important; color:var(--v5-on-brand) !important; font:500 11px/16px var(--font-v5) !important; }
+.product-compact-body { flex:1; display:flex; flex-direction:column; padding:10px 14px 14px; }
+.product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:anywhere; }
+.product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
+.product-compact-price { color:var(--v5-ink); font:600 16px/21px var(--font-v5); }
+.product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }
+.product-compact-status { display:block; margin-top:8px; font:400 12px/17px var(--font-v5); color:var(--v5-warning-ink); }
+.product-card--compact:nth-child(2n) .product-art { animation-delay:-1.1s; }
+.product-card--compact:nth-child(3n) .product-art { animation-delay:-2.2s; }
+.product-card--compact:nth-child(4n) .product-art { animation-delay:-3.1s; }
+@media(prefers-reduced-motion:reduce) { .product-card--compact { transition:none; }.product-card:active,.product-card--compact:active,.product-footer [role="button"]:active { transform:none; }.product-card--compact .product-art,.product-card--compact .product-art-entry,.product-media::after { animation:none; } }
 </style>

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ts from "typescript";
 import type { ApiClient } from "./api-client";
 import { createBundleOrderApi, matchesBundleQuote, normalizeBundleExpectedAmountUsdt } from "./bundle-order-api";
@@ -6,23 +6,38 @@ import { ApiError, asApiError, isAmbiguousOutcome } from "./errors";
 import { advanceRuntimeRevision } from "./order-api";
 import bundleSource from "../pages/store/bundle.vue?raw";
 import { en } from "../i18n/messages/en";
+import { promotionCheckoutHref } from "../lib/promotion-entry";
+import { beginOrderAction, readOrderAction, clearOrderAction, markOrderActionPaid } from "../lib/order-command-fence";
+
+beforeEach(()=>{
+  const disk:Record<string,unknown>={};
+  vi.stubGlobal('uni',{getStorageSync:(key:string)=>disk[key],setStorageSync:(key:string,value:unknown)=>{disk[key]=structuredClone(value);}});
+});
 
 const onCheckoutCompiled = ts.transpileModule(
-  bundleSource.slice(bundleSource.indexOf("async function onCheckout()"), bundleSource.indexOf("// ───── style objects ─────"))
+  bundleSource.slice(bundleSource.indexOf("function bundleFingerprint("), bundleSource.indexOf("function acquireBundleCommand("))
+    + bundleSource.slice(bundleSource.indexOf("async function openBundleReview("), bundleSource.indexOf("// ───── style objects ─────"))
     + "\nreturn onCheckout;",
   { compilerOptions: { target: ts.ScriptTarget.ES2022 } },
 ).outputText;
 
-function onCheckoutHarness(receipt: { productNos: string[]; amountUsdt: number }) {
+function onCheckoutHarness(receipt: { productNos: string[]; amountUsdt: number }, mode: "recovery" | "new" = "recovery") {
   const created = {
     orderNo: "BND-1", orderType: "BUNDLE", itemCount: 2, productNos: receipt.productNos,
     subtotalUsdt: 300, discountRate: 0.05, discountUsdt: 15, amountUsdt: receipt.amountUsdt,
     paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT", idSource: "server", policyVersion: 3,
   } as const;
+  // Existing money/eligibility assertions exercise the original durable intent.
+  // A new purchase instead reaches the shared review without creating or paying.
+  const originalCommand = { key: "bundle-key", expectedAmountUsdt: 285, productNos: ["sku-a", "sku-b"] };
   const deps = {
     products: { value: [{ id: "sku-a" }, { id: "sku-b" }] }, submitting: { value: false }, walletRefreshing: { value: false },
+    receiptWriteFailure: { value: null }, BUNDLE_COMMAND_KEY: "nexgrid-bundle-order-command-v1",
+    readAccountRow: vi.fn(() => ({ commands: mode === "recovery" ? { "sku-a|sku-b": originalCommand } : {} })),
+    promotionCheckoutHref,
     remoteApiEnabled: true, captureAccountScope: () => ({}), isCurrentAccountScope: () => true,
     orders: { currentAccountKey: () => "account-a", refreshRemote: vi.fn().mockResolvedValue(undefined),
+      ensureRemoteOrder:vi.fn().mockResolvedValue({id:'BND-1',total:receipt.amountUsdt,status:'placed'}),
       orders: [{ id: "BND-1", status: "activated" }] },
     app: { captureRemoteAccountRequest: () => ({}), user: { usdtBalance: 300 }, adoptCommerceWallet: vi.fn(), refreshRemoteFleet: vi.fn() },
     total: { value: 285 }, normalizeBundleExpectedAmountUsdt, toast: { warn: vi.fn(), success: vi.fn(), error: vi.fn() },
@@ -32,12 +47,14 @@ function onCheckoutHarness(receipt: { productNos: string[]; amountUsdt: number }
       ensure: vi.fn().mockResolvedValue(true),
       state: vi.fn(() => ({ status: "ready" })),
     },
-    acquireBundleCommand: vi.fn(() => ({ key: "bundle-key", expectedAmountUsdt: 285, productNos: ["sku-a", "sku-b"] })),
+    acquireBundleCommand: vi.fn(() => originalCommand),
     offerBundleWalletTopup: vi.fn(), bundleOrderApi: { create: vi.fn().mockResolvedValue(created) }, matchesBundleQuote,
     ApiError, orderApi: { pay: vi.fn().mockResolvedValue({ orderNo: "BND-1", paymentMethod: "OTHER" }) },
     retireBundleKey: vi.fn(), cart: { clear: vi.fn() }, fmt: (message: string) => message, navTo: vi.fn(),
     asApiError, isAmbiguousOutcome, BUNDLE_COMMAND_LEGACY_RECOVERY_REQUIRED: "BUNDLE_COMMAND_LEGACY_RECOVERY_REQUIRED",
     refreshBundlePolicy: vi.fn(), refreshProductCatalog: vi.fn(),
+    beginOrderAction,readOrderAction,clearOrderAction,markOrderActionPaid,
+    executePaymentWithPassword:vi.fn(async(_context,command,current)=>current()?command({paymentPassword:'039417',credentialVersion:1,attemptNo:'A-1'}):null),
   };
   const onCheckout = new Function(...Object.keys(deps), onCheckoutCompiled)(...Object.values(deps)) as () => Promise<void>;
   return { ...deps, onCheckout };
@@ -45,6 +62,30 @@ function onCheckoutHarness(receipt: { productNos: string[]; amountUsdt: number }
 
 describe("bundle order API", () => {
   afterEach(() => advanceRuntimeRevision(null));
+
+  it("opens shared review for a new bundle without acquiring a command or paying", async () => {
+    const h = onCheckoutHarness({ productNos: ["sku-a", "sku-b"], amountUsdt: 285 }, "new");
+    await h.onCheckout();
+    expect(h.readAccountRow).toHaveBeenCalledWith(h.BUNDLE_COMMAND_KEY, "account-a", true);
+    expect(h.navTo).toHaveBeenCalledExactlyOnceWith(promotionCheckoutHref([
+      { productNo: "sku-a", quantity: 1 }, { productNo: "sku-b", quantity: 1 },
+    ]));
+    expect(h.acquireBundleCommand).not.toHaveBeenCalled();
+    expect(h.bundleOrderApi.create).not.toHaveBeenCalled();
+    expect(h.orderApi.pay).not.toHaveBeenCalled();
+    expect(h.submitting.value).toBe(false);
+  });
+
+  it("changing products cannot bypass another unresolved bundle through the new review", async () => {
+    const h = onCheckoutHarness({ productNos: ["sku-a", "sku-b"], amountUsdt: 285 });
+    h.products.value = [{ id: "sku-a" }, { id: "sku-c" }];
+    await h.onCheckout();
+    expect(h.navTo).toHaveBeenCalledExactlyOnceWith("/pages/store/orders");
+    expect(h.acquireBundleCommand).not.toHaveBeenCalled();
+    expect(h.bundleOrderApi.create).not.toHaveBeenCalled();
+    expect(h.orderApi.pay).not.toHaveBeenCalled();
+    expect(h.retireBundleKey).not.toHaveBeenCalled();
+  });
 
   it("accepts a dynamically configured server discount", async () => {
     const request = vi.fn().mockResolvedValue({
@@ -217,13 +258,32 @@ describe("bundle order API", () => {
   ])("executes the real bundle submit handler and $name before payment", async ({ receipt, pays }) => {
     const h = onCheckoutHarness(receipt);
     await h.onCheckout();
+    expect(h.readAccountRow).toHaveBeenCalledWith(h.BUNDLE_COMMAND_KEY, "account-a", true);
+    expect(h.acquireBundleCommand).toHaveBeenCalledWith(h.products.value, "account-a", 285);
     expect(h.bundleOrderApi.create).toHaveBeenCalledWith(["sku-a", "sku-b"], 3, 285, "bundle-key");
     if (pays) {
-      expect(h.orderApi.pay).toHaveBeenCalledWith("BND-1", "wallet-pay:BND-1");
+      expect(h.orderApi.pay).toHaveBeenCalledWith("BND-1", "wallet-pay:BND-1",expect.objectContaining({credentialVersion:1}));
     } else {
       expect(h.orderApi.pay).not.toHaveBeenCalled();
       expect(h.navTo).toHaveBeenCalledWith("/pages/store/order-detail?id=BND-1");
     }
+  });
+
+  it('keeps a lost bundle payment fenced and resumes through the original order',async()=>{
+    const h=onCheckoutHarness({productNos:['sku-a','sku-b'],amountUsdt:285});
+    h.orderApi.pay.mockRejectedValueOnce(new Error('lost response'));
+    await h.onCheckout();
+    expect(readOrderAction('account-a','BND-1')).toMatchObject({kind:'pay',phase:'pending',key:'wallet-pay:BND-1'});
+    await h.onCheckout();
+    expect(h.orderApi.pay).toHaveBeenCalledOnce();expect(h.executePaymentWithPassword).toHaveBeenCalledOnce();
+    expect(h.navTo).toHaveBeenCalledWith('/pages/store/order-detail?id=BND-1');
+  });
+  it('does not request another PIN when bundle create replays an already paid order',async()=>{
+    const h=onCheckoutHarness({productNos:['sku-a','sku-b'],amountUsdt:285});
+    h.orders.ensureRemoteOrder.mockResolvedValueOnce({id:'BND-1',total:285,status:'activated'});
+    await h.onCheckout();
+    expect(h.orderApi.pay).not.toHaveBeenCalled();expect(h.executePaymentWithPassword).not.toHaveBeenCalled();
+    expect(h.navTo).toHaveBeenCalledWith('/pages/store/order-detail?id=BND-1');
   });
 
   it("executes recovery-only legacy and unknown-result exits without creating a payment", async () => {

@@ -45,7 +45,7 @@ describe("连签增益只在目标业务可用时承诺可激活(BUG 195)", () =
     expect(suspended).toBeGreaterThan(-1);
     expect(activatable).toBeGreaterThan(-1);
     expect(suspended).toBeLessThan(activatable);
-    expect(streak).toContain("if (!isBusinessReady(p)) return;");
+    expect(streak).toContain("if (!isBusinessReady(p) || claimBusy.value || isClaimed(p.id)) return;");
     expect(streak).toContain("p.labelText ?? w[`${p.key}_label`]");
     expect(streak).toContain("isClaimed(p.id) ? (p.descText");
     expect(streak).toContain('isClaimed(p.id) && !isBusinessReady(p)');
@@ -67,7 +67,10 @@ describe("连签增益只在目标业务可用时承诺可激活(BUG 195)", () =
 describe("等级卡不把下一阶奖励说成本阶奖励(BUG 196)", () => {
   it("精简等级卡只展示当前阶位,不把下一阶奖励当成当前奖励", () => {
     const rankCard = team.slice(team.indexOf("<!-- My V-rank summary -->"), team.indexOf("<!-- Unified quick nav -->"));
-    expect(rankCard).toContain("{{ myRankDisplay }}");
+    // The rank shows only after a confirmed V-rank read: rankPresentation is set when vrank.remoteReady, else "V—".
+    expect(rankCard).toContain('<TeamRankEmblem v-if="!visibility.hidden && rankReadable" :rank="remoteApiEnabled ? rankPresentation : myRank"');
+    expect(team).toContain('if (displayCatalogValid.value && vrank.remoteReady) rankPresentation.value = vrank.myRank;');
+    expect(team).toContain('rankPresentation.value === null ? "V—" : `V${rankPresentation.value}`');
     expect(rankCard).not.toContain("cultivationBonus");
     expect(rankCard).not.toContain("prize");
   });

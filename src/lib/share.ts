@@ -39,10 +39,10 @@ const SHARE_EVENT_CHANNELS = new Set<ShareEventChannel>([
   "copy", "poster", "system", "code", "link",
 ]);
 
-// 单源分享链接:服务端模式只能取 H8 当前用户投影中的邀请码；该投影缺失时
-// 返回空串而不是回退到浏览器 demo 身份。mock 模式仍保持原有本地演示行为。
+// 邀请码由服务端首次确认后按账号和API服务持久缓存；奖励刷新不清空它。
+// 未取得该账号的真实邀请码时返回空串，不回退到演示身份。
 export function currentShareReferralCode(): string {
-  if (remoteApiEnabled) return useReferralReward().snapshot?.referralCode?.trim() ?? "";
+  if (remoteApiEnabled) return useReferralReward().referralCode;
   return useApp().user.referralCode.trim();
 }
 
@@ -51,7 +51,8 @@ export function currentShareReferralCode(): string {
 export function buildShareLink(referralCode = currentShareReferralCode()): string {
   const code = referralCode.trim();
   if (!code) return "";
-  if (remoteApiEnabled && useConfig().configStatus !== "ready") return "";
+  // Polling retains the last validated public base; initial/failing loads have no share authority.
+  if (remoteApiEnabled && ["idle", "failed"].includes(useConfig().configStatus)) return "";
   const base = useConfig().config.share.baseUrl;
   if (base) return `${base}${code}`;
   if (remoteApiEnabled) return "";
@@ -90,9 +91,9 @@ export function channelIntentUrl(def: ShareChannelDef, link: string, text: strin
 }
 
 // 渠道可见性([FEAT-SHARE3] 平台矩阵):enabled 过滤;H5 上 system 需
-// navigator.share 支持(异常2),scheme 型保留(点击走复制降级,异常4)。
+// navigator.share 支持。scheme 当前只有复制降级，不冒充可用的外部渠道。
 export function visibleChannels(): ShareChannelDef[] {
-  const list = useConfig().config.share.channels.filter((c) => c.enabled);
+  const list = useConfig().config.share.channels.filter((c) => c.enabled && c.intentType !== "scheme");
   // #ifdef H5
   return list.filter(
     (c) => c.intentType !== "system" || (typeof navigator !== "undefined" && typeof navigator.share === "function"),
@@ -108,7 +109,11 @@ export function visibleChannels(): ShareChannelDef[] {
 
 export function copyText(data: string): Promise<boolean> {
   return new Promise((resolve) => {
-    uni.setClipboardData({ data, showToast: false, success: () => resolve(true), fail: () => resolve(false) });
+    try {
+      uni.setClipboardData({ data, showToast: false, success: () => resolve(true), fail: () => resolve(false) });
+    } catch {
+      resolve(false);
+    }
   });
 }
 
@@ -134,11 +139,17 @@ export function shareIntentRecordsEvent(intentType: ShareChannelDef["intentType"
 
 export async function activateChannel(def: ShareChannelDef, surface: ShareSurface, label: string): Promise<void> {
   const t = useT();
-  const link = buildShareLink();
+  const accountScope = captureAccountScope();
+  const referralCode = currentShareReferralCode();
+  const link = buildShareLink(referralCode);
   if (!link) {
     notifyUnavailableShareLink();
     return;
   }
+  // External actions cannot be recalled. Their late result belongs only to
+  // the initiating account generation and its confirmed invitation link.
+  const current = () => isCurrentAccountScope(accountScope)
+    && currentShareReferralCode() === referralCode && buildShareLink() === link;
   const remoteRewardEnabled = useReferralReward().snapshot?.rewardEnabled === true;
   const text = remoteApiEnabled
     ? referralShareText(
@@ -172,10 +183,12 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       }
       // #endif
       if (opened) {
+        if (!current()) return;
         await recordShareEvent(def.key, surface);
       } else {
         // 异常3:intent 被拦 → 复制降级;复制也失败则禁误报、不计事件(防白耗一次性任务奖励)。
         const ok = await copyText(text);
+        if (!current()) return;
         if (ok) {
           toast.info(fmt(t.value.share.openFailedCopied, { channel: label }));
         } else {
@@ -187,6 +200,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
     case "scheme": {
       // 当前 scheme 渠道只提供复制引导,并未确认内容已发送。
       const ok = await copyText(text);
+      if (!current()) return;
       if (ok) {
         toast.info(fmt(t.value.share.schemeCopied, { channel: label }));
       } else {
@@ -202,6 +216,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       //   一次纯本地操作被说成了一次失败的分享。
       //   scheme 和 web 拦截后的复制降级同样不能证明内容已发送。
       const ok = await copyText(link);
+      if (!current()) return;
       if (ok) {
         toast.success(t.value.team.inviteLinkCopied);
       } else {
@@ -213,10 +228,11 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       // #ifdef H5
       try {
         await navigator.share({ title: "UVEL", text, url: link });
+        if (!current()) return;
         await recordShareEvent(def.key, surface);
-      } catch {
-        // 取消与真实失败在此均静默不计事件:取消不该报错;AbortError 与其它
-        // 异常无法可靠区分,宁可少计不误报(诊断依赖后端 share.performed 对账)。
+      } catch (error) {
+        // Dismissal is silent; a real failure leaves a useful local recovery path.
+        if (current() && (error as { name?: string } | null)?.name !== "AbortError") toast.info(t.value.share.actionFailed);
       }
       // #endif
       break;
@@ -286,7 +302,7 @@ export async function recordShareEvent(channel: string, surface: ShareSurface): 
   // 同一次任务完成的两腿一次落盘 —— 入账由收据的 amount/symbol 派生,不再单独 credit*。
   const drafts: ReceiptDraft[] = [];
   if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo: t.value.share.questRewardMemo, ref });
-  if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo: t.value.share.questRewardMemo, ref });
+  if (task.nexReward) drafts.push({ type: "bonus", symbol: "UVT", amount: task.nexReward, status: "posted", memo: t.value.share.questRewardMemo, ref });
   if (drafts.length && postMoneyBillsOnce(drafts) !== "ok") return false;
   if (!useQuest().markComplete("invite_friend").firstTime) return false; // 消费失败:重试命中同 ref 不再发
   toast.success(`+${formatAmount(task.nexReward)} UVT · +$${formatAmount(task.usdtReward ?? 0)}`, t.value.share.questRewardToast);

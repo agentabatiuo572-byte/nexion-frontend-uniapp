@@ -15,10 +15,10 @@
       <view style="color: var(--v5-ink)">
         <SubPageHeader back="/pages/me/me" :title="t.proof.title" />
 
-        <view v-if="remoteApiEnabled && remoteError" :style="remoteErrorStyle">
-          <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-          <view role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof"  @keydown.enter.stop.prevent="refreshRemoteProof" @keydown.space.stop.prevent="refreshRemoteProof"><text>{{ t.network.retry }}</text></view>
+        <view v-if="!proofDisplayReady || (!remoteLoading && !proofReady)" :style="remoteErrorStyle" role="status" :aria-busy="remoteLoading">
+          <text class="block" style="font-weight: 600">{{ recoveryTitle }}</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ recoveryHint }}</text>
+          <view v-if="!remoteLoading" role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof" @keydown.enter.stop.prevent="refreshRemoteProof" @keydown.space.stop.prevent="refreshRemoteProof"><text>{{ t.ui.retry }}</text></view>
         </view>
 
       <view :style="bodyStyle">
@@ -29,8 +29,8 @@
         </view>
 
         <!-- Share card -->
-        <view v-if="!remoteApiEnabled || remoteSnapshot" class="nx-glass-card relative overflow-hidden" :style="shareCardStyle">
-          <text v-if="!remoteApiEnabled || remoteSnapshot?.sourceEnvironment === 'SANDBOX'" class="block" style="margin-bottom: 12px; font-size: 12px; color: var(--v5-ink-3)">{{ t.proof.shareDemo }}</text>
+        <view class="nx-glass-card relative overflow-hidden" :style="shareCardStyle">
+          <text v-if="!remoteApiEnabled || remoteSnapshot?.sourceEnvironment === 'SANDBOX'" class="block" style="margin-bottom: var(--ui-space-inline); font-size: 12px; color: var(--v5-ink-3)">{{ t.proof.shareDemo }}</text>
           <!-- brand -->
           <view class="flex items-center" style="gap: 8px">
             <BrandLockup :height="40" />
@@ -38,7 +38,7 @@
           </view>
 
           <!-- profile -->
-          <view class="flex items-center justify-between" style="margin-top: 16px">
+          <view class="flex items-center justify-between" style="margin-top: var(--ui-space-inset)">
             <view class="min-w-0">
               <text class="block truncate" :style="profileNameStyle">{{ profileName }}</text>
               <text class="block" :style="memberSinceStyle">{{ memberSinceText }}</text>
@@ -50,11 +50,11 @@
           </view>
 
           <!-- variant hero stat -->
-          <view v-if="variant === 'earnings'" style="margin-top: 16px">
+          <view v-if="variant === 'earnings'" style="margin-top: var(--ui-space-inset)">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand)')">{{ t.proof.totalEarned }}</text>
             <text class="block font-display tabular-nums" :style="heroBigStyle">${{ earningsTotalText }}</text>
           </view>
-          <view v-else-if="variant === 'streak'" style="margin-top: 16px">
+          <view v-else-if="variant === 'streak'" style="margin-top: var(--ui-space-inset)">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand-2)')">{{ t.proof.longestStreak }}</text>
             <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
@@ -62,7 +62,7 @@
               <text v-if="longestOrCurrent !== null" :style="heroUnitStyle">{{ t.proof.daysShort }}</text>
             </view>
           </view>
-          <view v-else style="margin-top: 16px">
+          <view v-else style="margin-top: var(--ui-space-inset)">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand-2)')">{{ t.proof.teamReach }}</text>
             <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -71,7 +71,7 @@
           </view>
 
           <!-- secondary stats -->
-          <view class="grid grid-cols-3" style="margin-top: 16px; gap: 8px">
+          <view class="grid grid-cols-3" style="margin-top: var(--ui-space-inset); gap: 8px">
             <view :style="miniStatStyle">
               <text class="block truncate" :style="miniLabelStyle">{{ t.proof.activeDays }}</text>
               <text class="block font-display tabular-nums" :style="miniValueStyle">{{ activeDays === null ? "—" : activeDays }}</text>
@@ -87,7 +87,7 @@
           </view>
 
           <!-- achievement chips -->
-          <view style="margin-top: 12px">
+          <view style="margin-top: var(--ui-space-inline)">
             <text class="block font-mono-tabular" :style="chipsLabelStyle">{{ t.proof.achievementsRow }}</text>
             <view class="flex" style="gap: 6px; flex-wrap: wrap">
               <text class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-brand)')">{{ vRankChip }}</text>
@@ -108,12 +108,13 @@
                 role="button"
                 tabindex="0"
                 :aria-label="t.proof.shareDestinations.copy"
+                :aria-disabled="!proofReady"
                 @click="copyLink"
 
                 @keydown.enter.stop.prevent="copyLink" @keydown.space.stop.prevent="copyLink"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                <text style="margin-left: 4px; pointer-events: none">{{ referralLink }}</text>
+                <text style="margin-left: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; pointer-events: none">{{ referralLink }}</text>
               </view>
             </view>
             <view class="grid place-items-center shrink-0" :style="qrBoxStyle">
@@ -124,14 +125,15 @@
           </view>
         </view>
 
-        <!-- Copy share text for browser users -->
-        <view style="margin-top: 12px">
+        <!-- Quick native share -->
+        <view style="margin-top: var(--ui-space-inline)">
           <view
             class="flex items-center justify-center active:scale-[0.98]"
             :style="nativeBtnStyle"
             role="button"
             tabindex="0"
             :aria-label="t.proof.shareNative"
+            :aria-disabled="!proofReady"
             @click="copyShare"
 
             @keydown.enter.stop.prevent="copyShare" @keydown.space.stop.prevent="copyShare"
@@ -143,7 +145,7 @@
         </view>
 
         <!-- Destination grid 6 -->
-        <view class="grid grid-cols-3" style="margin-top: 12px; gap: 8px">
+        <view class="grid grid-cols-3" style="margin-top: var(--ui-space-inline); gap: 8px">
           <view
             v-for="d in destinations"
             :key="d.label"
@@ -152,6 +154,7 @@
             role="button"
             tabindex="0"
             :aria-label="d.label"
+            :aria-disabled="!proofReady"
             @click="d.onClick"
 
             @keydown.enter.stop.prevent="d.onClick" @keydown.space.stop.prevent="d.onClick"
@@ -183,6 +186,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatDisplayDate } from "@/lib/display-date";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onUnload } from "@dcloudio/uni-app";
@@ -197,14 +201,16 @@ import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
 import { buildShareLink, copyText as copyToClipboard } from "@/lib/share";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { displayNickname } from "@/lib/brand-copy";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { useVRank } from "@/store/v-rank";
 import { rankTitle } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
+import { useConfig } from "@/store/config";
+import { proofRecoveryCopyFor } from "./proof-recovery-copy";
 import { useNetwork } from "@/store/network";
 import { useNexFaucet } from "@/store/nex-faucet";
-import { proofApi, remoteApiEnabled } from "@/api/runtime";
+import { proofApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
 import type { ProofSnapshot } from "@/api/proof-api";
 import { proofStreakFacts } from "@/lib/proof-streak";
 import { proofPosterText } from "@/lib/proof-poster-values";
@@ -219,6 +225,8 @@ const app = useApp();
 const profile = useProfile();
 const vRank = useVRank();
 const locale = useLocaleStore();
+const config = useConfig();
+const recoveryCopy = computed(() => proofRecoveryCopyFor(locale.code));
 const network = useNetwork();
 const faucet = useNexFaucet();
 
@@ -236,13 +244,18 @@ function moveVariant(index: number, delta: number): void {
 const exportingPoster = ref(false);
 const remoteSnapshot = ref<ProofSnapshot | null>(null);
 const remoteError = ref(false);
+const remoteLoading = ref(remoteApiEnabled);
 let remoteRequest = 0;
 let remoteMounted = true;
+let proofEnvironmentInvalidated = false;
+watch(() => apiRuntimeConfig?.environment, () => { proofEnvironmentInvalidated = true; clearRemoteProof(); }, { flush: 'sync' });
+watch(() => locale.code, () => { if (remoteApiEnabled) { clearRemoteProof(); void refreshRemoteProof(); } }, { flush: 'sync' });
 
 function clearRemoteProof(): void {
   remoteRequest += 1;
   remoteSnapshot.value = null;
   remoteError.value = false;
+  remoteLoading.value = false;
 }
 
 function invalidateRemoteProof(): void {
@@ -252,8 +265,10 @@ function invalidateRemoteProof(): void {
 }
 
 async function refreshRemoteProof() {
+  if (!remoteMounted || proofEnvironmentInvalidated) return;
   const request = ++remoteRequest;
   remoteError.value = false;
+  remoteLoading.value = true;
   void app.refreshRemoteFleet(undefined, { coalesce: true });
   const expectedAccount = app.accountKey;
   const accountScope = captureAccountScope();
@@ -263,10 +278,16 @@ async function refreshRemoteProof() {
     && isCurrentAccountScope(accountScope)
     && isCurrentRuntimeRevision(runScope);
   try {
-    const value = await proofApi.snapshot();
-    if (current()) remoteSnapshot.value = value;
+    // Both facts and the published link base are required for sharing. Their
+    // failures stay distinct: a missing base does not invalidate proof facts.
+    const [facts] = await Promise.allSettled([proofApi.snapshot(), config.load()]);
+    if (!current()) return;
+    if (facts.status === "fulfilled") remoteSnapshot.value = facts.value;
+    else { remoteSnapshot.value = null; remoteError.value = true; }
   } catch {
     if (current()) { remoteSnapshot.value = null; remoteError.value = true; }
+  } finally {
+    if (current()) remoteLoading.value = false;
   }
 }
 
@@ -276,10 +297,10 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch], () => {
   remoteSnapshot.value = null;
   remoteError.value = false;
   void refreshRemoteProof();
-});
+}, { flush: "sync" });
 const unsubscribeProofRun = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled || !remoteMounted) return;
-  clearRemoteProof();
+  remoteRequest += 1;
   void refreshRemoteProof();
 });
 onUnload(invalidateRemoteProof);
@@ -295,10 +316,11 @@ onShow(() => {
 const earningsTotal = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.earningsTotalUsdt ?? null : app.earnings.total);
 const earningsTotalText = computed(() => earningsTotal.value === null ? "—" : formatAmount(earningsTotal.value));
 const onlineDevices = computed(
+  // Lite counts only visible non-phone devices from the confirmed fleet (phones are hidden on the web).
   () => remoteApiEnabled && (!remoteSnapshot.value || app.remoteFleetStatus !== "ready") ? null
     : app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
 );
-const profileName = computed(() => nexGridBrandText(profile.displayName));
+const profileName = computed(() => displayNickname(profile.displayName));
 const myRank = computed(() => remoteApiEnabled && !vRank.remoteReady ? null : vRank.myRank);
 const totalMembers = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.team.totalMembers ?? null : network.totalMembers);
 const streakFacts = computed(() => proofStreakFacts(
@@ -318,8 +340,7 @@ const streakHeroValue = computed(() => longestOrCurrent.value === null
 const joined = computed(() => {
   const raw = remoteApiEnabled ? remoteSnapshot.value?.joinedAt : app.user.joinedAt;
   if (!raw) return "—";
-  const ts = typeof raw === "string" ? Date.parse(raw) : raw;
-  return Number.isFinite(ts) ? new Date(ts).toLocaleDateString(dateLocale(), { month: "short", year: "numeric" }) : "—";
+  return formatDisplayDate(raw, dateLocale());
 });
 const activeDays = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.activeDays ?? null
   : Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
@@ -327,18 +348,34 @@ const activeDays = computed<number | null>(() => remoteApiEnabled ? remoteSnapsh
 // [FEAT-SHARE1] 链接单源收编:构造走 lib/share(禁自拼 nexgrid.ai/ref/)。
 const refCode = computed(() => remoteApiEnabled ? remoteSnapshot.value?.referralCode ?? "—" : app.user.referralCode);
 const referralLink = computed(() => refCode.value === "—" ? "" : buildShareLink(refCode.value));
+const proofDisplayReady = computed(() => !remoteApiEnabled || (!remoteError.value && remoteSnapshot.value !== null));
+const proofReady = computed(() => remoteMounted && !remoteLoading.value
+  && (!remoteApiEnabled || (!remoteError.value && remoteSnapshot.value !== null))
+  && referralLink.value.trim().length > 0);
+const recoveryTitle = computed(() => remoteLoading.value ? recoveryCopy.value.loading
+  : remoteApiEnabled && (remoteError.value || !remoteSnapshot.value) ? recoveryCopy.value.unavailable
+  : recoveryCopy.value.linkUnavailable);
+const recoveryHint = computed(() => remoteLoading.value ? recoveryCopy.value.loadingHint
+  : remoteApiEnabled && (remoteError.value || !remoteSnapshot.value) ? recoveryCopy.value.unavailableHint
+  : recoveryCopy.value.linkUnavailableHint);
 
 const topPct = computed(() => remoteApiEnabled ? remoteSnapshot.value?.topPercentile ?? null : null);
 const topPctText = computed(() => topPct.value === null ? "—" : `Top ${topPct.value}%`);
 
 const shareText = computed(() => {
+  const copy = t.value.proof;
+  const link = referralLink.value;
   if (variant.value === "streak")
     return longestOrCurrent.value === null
-      ? `🔥 My UVEL streak is not available right now. Daily check-ins = passive UVT. Join me: ${referralLink.value}`
-      : `🔥 ${longestOrCurrent.value}-day streak on UVEL. Daily check-ins = passive UVT. Join me: ${referralLink.value}`;
+      ? fmt(copy.shareIntro, { link })
+      : fmt(copy.shareStreak, { days: longestOrCurrent.value, link });
   if (variant.value === "network")
-    return `🌐 My UVEL network has ${totalMembers.value ?? "—"} members. Explore UVEL: ${referralLink.value}`;
-  return `💸 Earned ${earningsTotalText.value} on UVEL in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
+    return totalMembers.value === null
+      ? fmt(copy.shareIntro, { link })
+      : fmt(copy.shareNetwork, { members: totalMembers.value, link });
+  return earningsTotal.value === null || activeDays.value === null
+    ? fmt(copy.shareIntro, { link })
+    : fmt(copy.shareEarnings, { amount: earningsTotalText.value, days: activeDays.value, link });
 });
 
 // ── derived labels ──
@@ -350,35 +387,59 @@ const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String
 const daysActiveChip = computed(() => fmt(t.value.proof.badges.daysActive, { n: String(activeDays.value ?? "—") }));
 
 // ── share actions: copy text/link or export a browser-downloadable poster ──
+function beginProofAction(): (() => boolean) | null {
+  if (!proofReady.value || !remoteMounted) return null;
+  const request = remoteRequest;
+  const snapshot = remoteSnapshot.value;
+  const link = referralLink.value;
+  const expectedAccount = app.accountKey;
+  const expectedBinding = app.accountBindingEpoch;
+  const accountScope = captureAccountScope();
+  const runScope = captureRuntimeRevision();
+  return () => remoteMounted && proofReady.value && request === remoteRequest
+    && snapshot === remoteSnapshot.value && link === referralLink.value
+    && expectedAccount === app.accountKey && expectedBinding === app.accountBindingEpoch
+    && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
+}
 function copyShare() {
-  copyText(shareText.value, t.value.proof.sharedToast);
+  const current = beginProofAction();
+  if (!current) return;
+  void copyText(shareText.value, t.value.proof.sharedToast, "", current);
 }
 function copyLink() {
-  copyText(referralLink.value, t.value.proof.copiedToast);
+  return copyText(referralLink.value, t.value.proof.copiedToast);
 }
 function copyShareText(networkName: string) {
-  copyText(shareText.value, t.value.proof.sharedToast, `Open ${networkName} and paste`);
+  return copyText(shareText.value, t.value.proof.sharedToast, fmt(t.value.proof.sharePasteHint, { channel: networkName }));
 }
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1350;
 
 async function downloadPng() {
-  if (exportingPoster.value) return;
+  const current = beginProofAction();
+  if (!current || exportingPoster.value) return;
+  const posterVariant = variant.value;
+  const posterCurrent = () => current() && posterVariant === variant.value;
   exportingPoster.value = true;
   try {
     await drawProofPoster();
+    if (!posterCurrent()) return;
     const tempFilePath = await exportProofCanvas();
+    if (!posterCurrent()) return;
+    if (!tempFilePath.trim()) throw new Error("PROOF_EXPORT_EMPTY");
     if (typeof document !== "undefined") downloadProofOnH5(tempFilePath);
     else await saveProofToAlbum(tempFilePath);
-    toast.success(t.value.proof.downloadToast, "");
+    if (posterCurrent()) toast.success(t.value.proof.downloadToast, "");
   } catch {
-    toast.error(t.value.proof.downloadErrorToast);
+    if (posterCurrent()) toast.error(t.value.proof.downloadErrorToast);
   } finally {
     exportingPoster.value = false;
   }
 }
-async function copyText(data: string, title: string, desc = "") {
+async function copyText(data: string, title: string, desc = "", current = beginProofAction()) {
+  if (!data.trim() || !current?.()) return;
   const copied = await copyToClipboard(data).catch(() => false);
+  if (!current()) return;
   if (copied) toast.success(title, desc);
   else toast.info(t.value.share.copyFailed);
 }
@@ -399,22 +460,23 @@ const qrCells = computed<boolean[]>(() => {
   return modules;
 });
 
-function drawProofPoster(): Promise<void> {
+async function drawProofPoster(): Promise<void> {
+  const logoPath = await new Promise<string>((resolve, reject) => uni.getImageInfo({
+    src: "/static/img/brand/header-logo-dark.png",
+    success: image => image.path ? resolve(image.path) : reject(new Error("PROOF_LOGO_EMPTY")),
+    fail: reject,
+  }));
   return new Promise((resolve, reject) => {
     try {
       const ctx = uni.createCanvasContext("proofPosterCanvas");
-      ctx.setFillStyle("#07101f");
+      ctx.setFillStyle("#0b0b0b");
       ctx.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
-      ctx.setFillStyle("#b7ff3c");
-      ctx.fillRect(72, 72, 18, 76);
-      ctx.setFillStyle("#f7fbff");
-      ctx.setFontSize(54);
-      ctx.fillText("UVEL", 116, 128);
+      ctx.drawImage(logoPath, 72, 40, 356, 123);
       ctx.setFillStyle("#9cabbd");
       ctx.setFontSize(24);
       ctx.fillText("PROOF OF CONTRIBUTION", 72, 204);
 
-      ctx.setFillStyle("#111d30");
+      ctx.setFillStyle("#171717");
       ctx.fillRect(72, 254, 936, 948);
       ctx.setFillStyle("#f7fbff");
       ctx.setFontSize(46);
@@ -548,8 +610,8 @@ function tint(svg: string, color: string): string {
 
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px 32px" };
-const remoteErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "12px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
-const remoteRetryStyle: CSSProperties = { minHeight: "44px", display: "grid", placeItems: "center", marginTop: "6px", color: "var(--v5-warning)" };
+const remoteErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "var(--ui-space-inline)", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
+const remoteRetryStyle: CSSProperties = { minHeight: "44px", display: "grid", placeItems: "center", marginTop: "6px", color: "var(--v5-warning)", font: "600 13px/20px var(--font-v5)" };
 const variantLabelStyle: CSSProperties = {
   marginBottom: "6px",
   fontSize: "12px",
@@ -573,7 +635,7 @@ function variantPillTextStyle(v: Variant): CSSProperties {
   const on = variant.value === v;
   return { fontSize: "12px", fontWeight: 600, color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)" };
 }
-const shareCardStyle: CSSProperties = { marginTop: "12px", padding: "20px" };
+const shareCardStyle: CSSProperties = { marginTop: "12px", padding: "var(--ui-space-section)" };
 const profileNameStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)" };
 const memberSinceStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function heroKickerStyle(color: string): CSSProperties {
@@ -587,7 +649,7 @@ const heroBigStyle: CSSProperties = {
   lineHeight: 1,
 };
 const heroBigInlineStyle: CSSProperties = { fontSize: "34px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
-const heroUnitStyle: CSSProperties = { fontSize: "15px", fontWeight: 500, color: "var(--v5-ink-3)" };
+const heroUnitStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", fontWeight: 500, color: "var(--v5-ink-3)" };
 // Nested tint blocks inside the share card — soft surface-2 fill, no border.
 const miniStatStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
@@ -620,9 +682,9 @@ function chipStyle(tintColor: string): CSSProperties {
 }
 const refBlockStyle: CSSProperties = {
   marginTop: "16px",
-  padding: "12px",
+  padding: "var(--ui-space-inline)",
   borderRadius: "12px",
-  gap: "12px",
+  gap: "var(--ui-space-inline)",
   background: "color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
 };
 const refLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.18em", color: "var(--v5-brand)" };
@@ -634,6 +696,12 @@ const refCodeStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const refLinkStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: "0",
+  boxSizing: "border-box",
+  overflowWrap: "anywhere",
+  wordBreak: "break-all",
   marginTop: "4px",
   minHeight: "44px",
   marginLeft: "-4px",
@@ -651,7 +719,7 @@ const qrGridStyle = computed<CSSProperties>(() => ({
   padding: "4px",
 }));
 function qrCellStyle(on: boolean): CSSProperties {
-  return { width: "100%", height: "100%", background: on ? "var(--v5-on-brand)" : "transparent" };
+  return { width: "100%", height: "100%", background: on ? "#121212" : "transparent" };
 }
 const posterCanvasStyle: CSSProperties = {
   position: "fixed",
@@ -662,13 +730,13 @@ const posterCanvasStyle: CSSProperties = {
   pointerEvents: "none",
 };
 const nativeBtnStyle: CSSProperties = { height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
-const nativeBtnTextStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-on-brand)" };
+const nativeBtnTextStyle: CSSProperties = { fontSize: "var(--ui-type-button)", fontWeight: 600, color: "var(--v5-on-brand)" };
 const nativeHintStyle: CSSProperties = { marginTop: "6px", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Share-destination icon grid (form b) — filled surface tiles, no border.
 const destBtnStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderRadius: "16px",
-  padding: "12px",
+  padding: "var(--ui-space-inline)",
   textAlign: "center",
 };
 function destIconStyle(color: string): CSSProperties {
@@ -676,8 +744,8 @@ function destIconStyle(color: string): CSSProperties {
 }
 const destLabelStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.25 };
 const tipStyle: CSSProperties = {
-  margin: "16px 0 8px",
-  padding: "12px",
+  margin: "var(--ui-space-inset) 0 8px",
+  padding: "var(--ui-space-inline)",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };

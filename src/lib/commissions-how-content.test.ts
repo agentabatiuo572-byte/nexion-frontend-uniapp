@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 // @ts-expect-error Native compatibility witness executes in Node.
 import { spawnSync } from "node:child_process";
 import { buildCommissionsHowContent, createCommissionsHowResource, COMMISSIONS_HOW_SLOTS, type CommissionsHowSnapshot } from "./commissions-how-content";
+import { teamRedesignCopy } from "@/i18n/team-redesign";
 const snapshot = (): CommissionsHowSnapshot => ({
   document: { contentKey: "team-commissions-how", version: "2026.10.05-direct-referral", versionSource: "ENTRY", status: "PUBLISHED",
     source: "server", sourceEnvironment: "PRODUCTION", runId: "", locale: "en",
@@ -18,6 +19,22 @@ const snapshot = (): CommissionsHowSnapshot => ({
   ranks: [{ v: 4, title: "Live", cnTitle: "Live", directBonus: .123456, unilevelDepth: 7, peerBonus: .0375, leadershipVotes: 9, cultivationBonus: 321.123456, rewards: [], visible: true }],
 });
 describe("published direct and independent reward explanations", () => {
+  it.each(['zh', 'en', 'vi'])('uses neutral %s reward terms without turning configured amounts into payments', locale => {
+    const facts = snapshot();
+    facts.document.blocks.find(block => block.id === 'cultivation')!.title = 'Published cultivation title';
+    const view = buildCommissionsHowContent(facts, locale);
+    const terms = teamRedesignCopy(locale);
+    expect(view.section('cultivation').body.toLowerCase()).toContain(terms.memberGrowthReward.toLowerCase());
+    expect(view.section('cultivation').body).toMatch(/以实际发放为准|subject to actual payout|theo kết quả chi trả thực tế/);
+    expect(view.section('cultivation').title).toBe('Published cultivation title');
+    expect(view.section('leadership').body.toLowerCase()).toContain(terms.teamIncentivePool.toLowerCase());
+    expect(view.section('example-network').body.toLowerCase()).toMatch(/团队奖励|team reward|thưởng đội nhóm/);
+    expect(view.section('example-cultivation').body.toLowerCase()).toContain(terms.memberGrowthReward.toLowerCase());
+    expect(view.section('example-cultivation').body).toMatch(/不代表个人到账|not a personal payment|không phải khoản cá nhân đã nhận/);
+    expect(view.amounts.cultivation).toContain('321.12 UVT');
+    expect(view.amounts.cultivation).toContain(view.copy.configured);
+    expect(view.amounts.network).toBe(view.copy.pendingAmount);
+  });
   it.each(["en", "zh", "vi"])("accepts a matching seven-layer v2 publication and refuses incomplete semantics in %s", locale => {
     const facts = snapshot();
     Object.assign(facts.directPolicy, { schemaVersion: 2, settlementMode: "SEVEN_V2", purchaseSplit: { enabled: true, usdtSharePct: 60 },
@@ -32,12 +49,13 @@ describe("published direct and independent reward explanations", () => {
     facts.document.blocks.find(b => b.id === "network")!.body = "{directPurchaseRules} {directDeviceRules}";
     expect(buildCommissionsHowContent(facts, locale).incomplete).toBe(true);
   });
-  it.each([["en", "12.3456%", "6789.00"], ["zh", "12.3456%", "6789.00"], ["vi", "12,3456%", "6789.00"]])("renders configured direct splits and preserves public limits in %s", (locale, rate, cap) => {
+  it.each([["en", "12.3456%", "6,789.00"], ["zh", "12.3456%", "6,789.00"], ["vi", "12,3456%", "6,789.00"]])("renders configured direct splits and keeps payout caps out of the guide in %s", (locale, rate, cap) => {
     const view = buildCommissionsHowContent(snapshot(), locale);
     expect(view.incomplete).toBe(false);
     expect(view.section("network").body).toContain(rate); expect(view.section("network").body).toContain("60%");
     expect(view.section("network").body).toContain("40%"); expect(view.section("network").body).toContain("70%");
-    expect(view.section("binary").body).toContain(`${cap} USDT`);
+    // Caps are payout mechanics, not user guidance (APP-COPY-AUDIT rule 6).
+    expect(view.section("binary").body).not.toContain(`${cap} USDT`);
     expect(view.section("binary").body).not.toMatch(/876[.,]123456|13[.,]75%/);
     expect(view.section("cultivation").body).toBe(view.copy.cultivation);
     expect(view.section("network").body).not.toMatch(/L[1-7]|V4/);
@@ -57,7 +75,7 @@ describe("published direct and independent reward explanations", () => {
   });
   it("does not call configuration examples actual earnings or replace missing tokens", () => {
     let view = buildCommissionsHowContent(snapshot(), "en");
-    expect(view.exampleTotal).toBe("Not an earnings total"); expect(view.amounts.network).toBe("Requires settlement");
+    expect(view.exampleTotal).toBe("Not an earnings total"); expect(view.amounts.network).toBe("To be paid");
     const facts = snapshot(); facts.document.blocks.find(b => b.id === "binary")!.body = "{unknown}";
     view = buildCommissionsHowContent(facts, "en"); expect(view.incomplete).toBe(true);
     expect(Object.values(view.amounts)).toEqual(["—", "—", "—", "—"]);
@@ -70,7 +88,7 @@ describe("published direct and independent reward explanations", () => {
       const {buildCommissionsHowContent:build} = await import(${JSON.stringify(moduleUrl)});
       const view=build(${JSON.stringify(snapshot())},"vi");
       assert.equal(view.incomplete,false); assert.ok(view.section("network").body.includes("12,3456%"));
-      assert.ok(view.section("binary").body.includes("6789.00 USDT"));
+      assert.ok(!view.section("binary").body.includes("6,789.00 USDT"));
       assert.ok(!view.section("binary").body.includes("876,123456"));`;
     const process = (globalThis as unknown as { process: { execPath: string } }).process;
     const result = spawnSync(process.execPath, ["--experimental-strip-types", "--import", loader, "--input-type=module", "--eval", code], { encoding: "utf8" });

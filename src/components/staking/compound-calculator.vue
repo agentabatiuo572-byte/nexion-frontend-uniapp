@@ -1,16 +1,12 @@
 <!--
-  CompoundCalculator — single vs compound payout comparison (staking/page.tsx
-  CompoundCalculator). Amount input + term selector (inline 4-segment pills, the
-  source segmented control) + two scroll-grow bars + a footnote nudging toward
-  re-staking. Uses stakingV3.calc i18n. Bars use useScrollGrowProgress (P-019
-  $el-safe).
+  CompoundCalculator — estimated payout at maturity for one stake. Amount input +
+  term selector (inline 4-segment pills) + one scroll-grow bar. No re-stake
+  comparison: projecting repeated stakes at today's rate reads as a return promise.
+  Uses stakingV3.calc i18n. The bar uses useScrollGrowProgress (P-019 $el-safe).
 -->
 <template>
   <view v-if="configAvailable && hasSellablePlan" class="nx-glass-card relative overflow-hidden nx-compound-calculator" :style="cardStyle">
     <CalculatorWebviewAccessibility :amount-label="w.amountLabel" />
-    <!-- aurora + grid -->
-    <view aria-hidden class="gen-anim" :style="auroraStyle" />
-    <view aria-hidden :style="gridStyle" />
 
     <view class="relative">
       <!-- meta-row -->
@@ -19,7 +15,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
           <text>{{ w.label }}</text>
         </text>
-        <text class="tabular-nums" :style="apyChipStyle">{{ formatStakingPercentage(apy) }}% · {{ term }}d</text>
+        <text class="tabular-nums" :style="apyChipStyle">{{ formatStakingPercentage(apy) }}% · {{ copy.days(term) }}</text>
       </view>
 
       <!-- Input row -->
@@ -33,34 +29,14 @@
       <template v-if="amountNum > 0">
         <!-- Single bar -->
         <view class="flex items-center" style="margin-top: 8px; gap: 10px">
-          <view ref="singleBarRef" class="flex-1 relative overflow-hidden" :style="barTrackStyle">
-            <view :style="singleFillStyle" />
-            <text class="block absolute flex items-center" :style="barLabelStyle">{{ singleLabel }}</text>
+          <view class="flex-1 min-w-0">
+            <text class="block" :style="barLabelStyle">{{ singleLabel }}</text>
+            <view ref="singleBarRef" class="relative overflow-hidden" :style="barTrackStyle"><view :style="singleFillStyle" /></view>
           </view>
           <view class="text-right" style="min-width: 88px">
             <text class="block tabular-nums" :style="barAmtStyle('var(--v5-ink)')">${{ singleText }}</text>
             <text class="block tabular-nums" :style="barDeltaStyle">+${{ singleProfitText }}</text>
           </view>
-        </view>
-
-        <!-- Compound bar -->
-        <view class="flex items-center" style="margin-top: 8px; gap: 10px">
-          <view ref="compoundBarRef" class="flex-1 relative overflow-hidden" :style="barTrackStyle">
-            <view :style="compoundFillStyle" />
-            <text class="block absolute flex items-center" :style="barLabelStyle">{{ compoundLabel }}</text>
-          </view>
-          <view class="text-right" style="min-width: 88px">
-            <text class="block tabular-nums" :style="barAmtStyle('var(--v5-brand)')">${{ compoundText }}</text>
-            <text class="block tabular-nums" :style="barDeltaStyle">+${{ compoundProfitText }}</text>
-          </view>
-        </view>
-
-        <!-- Footnote nudging toward re-staking -->
-        <view v-if="extraFromCompounding > 0" class="tabular-nums" :style="footnoteStyle">
-          <text style="color: var(--v5-brand); font-weight: 500">+${{ extraText }}</text>
-          <!-- 分隔空格显式拼在表达式里,不藏在词典值的前导空格里(不可见契约,trim 型格式化会静默吃掉);
-               也不能只在模板里打一个空格 —— Vue 的空白折叠会把标签边上的空白删掉(实景实测粘成 `+$550来自复投`)。 -->
-          <text>{{ " " + fmt(t.stakingV3.calc.compoundSuffix, { n: reinvestments }) }}</text>
         </view>
       </template>
 
@@ -75,23 +51,21 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import CalculatorWebviewAccessibility from "./calculator-webview-accessibility.vue";
-import { ref, computed, onMounted, nextTick, watch, type CSSProperties } from "vue";
+import { ref, computed, nextTick, watch, type CSSProperties } from "vue";
+import { useStakingReviewCopy } from "@/lib/staking-review-copy";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { canOpenStakingPool, resolveStakingPool } from "@/lib/staking-canonical";
-import { compoundDurationDays, reinvestmentCount } from "@/lib/compound-cycles";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
+const copy = useStakingReviewCopy();
 const w = computed(() => t.value.stakingV3.calc);
 const staking = useStaking();
-onMounted(() => {
-  if (!staking.isMockMode) void staking.syncRemote();
-});
 
 const terms: StakingTerm[] = [30, 90, 180, 365];
 const DEFAULT_TERM: StakingTerm = 180;
@@ -126,33 +100,13 @@ const configAvailable = computed(() => pool.value !== null);
 const hasSellablePlan = computed(() => sellableTerms.value.length > 0);
 const single = computed(() => amountNum.value * (1 + (apy.value * term.value) / 365));
 const singleProfit = computed(() => single.value - amountNum.value);
-const cycles = computed(() => Math.floor(365 / term.value));
-const reinvestments = computed(() => reinvestmentCount(cycles.value));
-const compoundDays = computed(() => compoundDurationDays(term.value));
-const compound = computed(() => {
-  let c = amountNum.value;
-  for (let i = 0; i < cycles.value; i++) c *= 1 + (apy.value * term.value) / 365;
-  return c;
-});
-const compoundProfit = computed(() => compound.value - amountNum.value);
-const extraFromCompounding = computed(() => compound.value - single.value);
-
-const compoundBarPct = 100;
-const singleBarPct = computed(() => (compound.value > 0 ? Math.max(20, (single.value / compound.value) * 100) : 20));
+const singleBarPct = 100;
 
 const { elRef: singleBarRef, inView: singleBarInView } = useScrollGrowProgress();
-const { elRef: compoundBarRef, inView: compoundBarInView } = useScrollGrowProgress();
 
 const singleText = computed(() => formatAmount(single.value));
 const singleProfitText = computed(() => formatAmount(singleProfit.value));
-const compoundText = computed(() => formatAmount(compound.value));
-const compoundProfitText = computed(() => formatAmount(compoundProfit.value));
-const extraText = computed(() => formatAmount(extraFromCompounding.value));
 const singleLabel = computed(() => fmt(w.value.singlePayoutDuration, { days: term.value }));
-const compoundLabel = computed(() => fmt(w.value.compoundPayoutDuration, {
-  reinvestments: reinvestments.value,
-  days: compoundDays.value,
-}));
 
 function onAmountInput(e: Event) {
   const raw = (e as unknown as { detail: { value: string } }).detail.value;
@@ -204,8 +158,8 @@ const gridStyle: CSSProperties = {
 };
 const headStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };
@@ -257,32 +211,23 @@ function segPillStyle(active: boolean): CSSProperties {
   };
 }
 const barTrackStyle: CSSProperties = {
-  height: "28px",
+  height: "8px",
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
 };
 const singleFillStyle = computed<CSSProperties>(() => ({
   height: "100%",
-  width: `${singleBarInView.value ? singleBarPct.value : 0}%`,
+  width: `${singleBarInView.value ? singleBarPct : 0}%`,
   background: "var(--v5-ink-4)",
   borderRadius: "6px",
   transition: singleBarInView.value ? PROGRESS_GROW_TRANSITION : "none",
   willChange: "width",
 }));
-const compoundFillStyle = computed<CSSProperties>(() => ({
-  height: "100%",
-  width: `${compoundBarInView.value ? compoundBarPct : 0}%`,
-  background: "linear-gradient(90deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%)",
-  borderRadius: "6px",
-  transition: compoundBarInView.value ? PROGRESS_GROW_TRANSITION : "none",
-  willChange: "width",
-}));
 const barLabelStyle: CSSProperties = {
-  top: 0,
-  bottom: 0,
-  left: "12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  marginBottom: "6px",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
+  lineHeight: "18px",
   color: "var(--v5-ink)",
   fontWeight: 500,
   pointerEvents: "none",
@@ -302,12 +247,6 @@ const barDeltaStyle: CSSProperties = {
   color: "var(--v5-success)",
   marginTop: "1px",
 };
-const footnoteStyle: CSSProperties = {
-  // 去线(主人 2026-08-17 全站令):总间距沿用有线时代的 12+12。
-  marginTop: "24px",
-  fontSize: "13px",
-  color: "var(--v5-ink-2)",
-};
 const disclaimerStyle: CSSProperties = {
   marginTop: "12px",
   fontSize: "12px",
@@ -319,9 +258,9 @@ const unavailableStyle: CSSProperties = {
   borderRadius: "16px",
   background: "var(--v5-warning-soft)",
   color: "var(--v5-ink-2)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
 };
 
 import GlassSegments from "@/components/glass-segments.vue";
-const termOptions = computed(() => sellableTerms.value.map(value => ({ value, label: `${value}d` })));
+const termOptions = computed(() => sellableTerms.value.map(value => ({ value, label: copy.value.days(value) })));
 </script>

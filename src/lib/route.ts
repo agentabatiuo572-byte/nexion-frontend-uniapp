@@ -1,6 +1,4 @@
-import { useConfig } from "@/store/config";
-import { isLiteNativeRoute } from "@/lib/lite-scope";
-// Map a prototype-style LOGICAL path (the web routes baked into nova /
+// Map a prototype-style LOGICAL path (the web routes baked into support /
 // notification CTA data, e.g. "/team/commissions", "/genesis",
 // "/me/wallet/exchange", "/store") to the actual uni-app route, then navigate.
 //
@@ -11,7 +9,7 @@ import { isLiteNativeRoute } from "@/lib/lite-scope";
 //   /store /team /earn /me / -> tab roots, reLaunch to /pages/x/x
 //
 // Without this, navigating raw logical hrefs (message-drawer did) or naive
-// `/pages${href}` prefixing (nova-drawer did) hits non-existent routes and
+// `/pages${href}` prefixing (the retired chat drawer did) hits non-existent routes and
 // uni's navigateTo silently fails → "点击无跳转". (P-046)
 
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -19,12 +17,8 @@ import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { toast } from "@/store/ui";
 import { getT } from "@/i18n/use-t";
 import { requestCheckoutLeave, hasCheckoutLeaveGuard, clearCheckoutLeaveForReset } from "@/lib/promotion-leave-guard";
-
-export function isStakingVisibilityRoute(href: string): boolean {
-  const path = href.split(/[?#]/)[0];
-  return path.startsWith("/pages/staking/") || path === "/wallet/staking"
-    || path === "/pages/me/wallet-repurchase" || path === "/pages/me/wallet-repurchase-how";
-}
+import { useConfig } from "@/store/config";
+import { isLiteNativeRoute } from "@/lib/lite-scope";
 
 const TAB_ROOT: Record<string, string> = {
   "/": "/pages/index/index",
@@ -61,8 +55,11 @@ function isUsableNavigationHref(href: unknown): href is string {
 export function toUniRoute(href: string): { url: string; tab: boolean } {
   const qi = href.indexOf("?");
   const path = qi >= 0 ? href.slice(0, qi) : href;
-  if (path === "/me/payment-password") return { url: "/pages/me/payment-password" + (qi >= 0 ? href.slice(qi) : ""), tab: false };
   const query = qi >= 0 ? href.slice(qi) : "";
+  if (path === "/me/payment-password") return { url: "/pages/me/payment-password" + query, tab: false };
+  if (["/me/wallet", "/pages/me/wallet", "/me/wallet/repurchase", "/me/wallet-repurchase", "/pages/me/wallet-repurchase", "/me/wallet/repurchase/how", "/me/wallet-repurchase-how", "/pages/me/wallet-repurchase-how"].includes(path)) {
+    return { url: "/pages/me/me" + query, tab: true };
+  }
   // Already a uni route → pass through, while still recognizing real tab roots.
   // Calling navigateTo for a tabBar page fails on App/mini-program runtimes.
   if (path.startsWith("/pages/")) {
@@ -98,7 +95,7 @@ function forceNavigation(target: string | ForcedNavigationOptions, replace: bool
     return Promise.resolve(false);
   }
   const { url } = toUniRoute(options.url.trim());
-  if (isLiteNativeRoute(url) || (isStakingVisibilityRoute(url) && !useConfig().isEnabled("stakingVisible"))) return Promise.resolve(false);
+  if (isLiteNativeRoute(url)) return Promise.resolve(false);
   return new Promise((resolve) => {
     let settled = false;
     const invoke = (callback: Function | undefined, result: unknown) => {
@@ -182,7 +179,7 @@ function performNavBack(fallbackHref?: string): void {
   }
   // No declared back target on a singleton stack — never leave the back button a
   // dead end; fall back to home so a cold-opened caller without a backHref still moves.
-  uni.reLaunch({ url: "/pages/index/index", fail: reportNavigationFailure });
+  void navReset("/pages/index/index");
 }
 
 type NavigationAttempt = (
@@ -244,6 +241,13 @@ function runNavigationChain(attempts: NavigationAttempt[]): Promise<boolean> {
 }
 
 /** Navigate to a logical-or-uni href, picking reLaunch for tab roots. */
+export function isStakingVisibilityRoute(href: string): boolean {
+  const path = href.split("?")[0];
+  return path.startsWith("/pages/staking/")
+    || path === "/pages/me/wallet-repurchase"
+    || path === "/pages/me/wallet-repurchase-how";
+}
+
 export function navTo(href: string): Promise<boolean> {
   if (hasCheckoutLeaveGuard()) return requestCheckoutLeave().then(allowed=>allowed?performNavTo(href):false);
   return performNavTo(href);

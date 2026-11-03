@@ -46,7 +46,6 @@ const EXPECTED_TEMPLATE_DIFFERENCES = [
   "wallet-topup.vue",
   "wallet-withdraw-tracking.vue",
   "wallet-withdraw.vue",
-  "wallet.vue"
 ];
 // Reviewed touch-target/countdown fix: 44px controls and localized seconds slot.
 // Pin the exact formal/reference template pair for every approved difference.
@@ -59,7 +58,8 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "achievements.vue": "e7cfef2560a4a60747043f2a4d76b875a0faad0383b5cbcf1fb15deeab98e60f",
   "devices.vue": "227aa03a6c8ba621deb6d5e69fa1672cd80e918fc18cf37deeac446818adb125",
   // Keep #223 authority gates; hide the removed internal recommendation footnote.
-  "goals.vue": "2ecbc0a56d928f5e7cdabe370fd01ff02ae81845839310ecf761475bc79e40c8",
+  // N01: one read-recovery region; no save action without a current snapshot.
+  "goals.vue": "7552b82fcbd4824ee8cc2b2cf114e33016b998d3af0d2609089d308844c4f469",
   "help.vue": "3eeec6995d290e03d6a008b83f3a2ba8365f702b6c59d3acb306eab055437d7d",
   "language.vue": "147e4114cec9c44704a643c833d582e043565ee17240fe474622f656ae104da9",
   // Owner requested removal of the unsolicited overview withdrawal warning.
@@ -68,15 +68,19 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   // Approved smooth centered message header and shared message-family interactions.
   "notifications.vue": "0c754690e400fe1b137de31e968d31a0f347c5020ed6d4a22322abb7fe327344",
   "preferences.vue": "f671d2462d5c346657790bfb9f75c92cfb0a63d1039c886ed8ad02cd6789e3cc",
-  "profile.vue": "67bb87df27035ea1a2f8a374d3653b44d7c2623bc002ff054d412eb6fccc9e95",
-  "proof.vue": "956e804b2c96dced42cc10cb0dd757e7abd5c4a6a3596c56bca63490e93f3616",
+  // #633: narrow nickname display helper; raw edit/CAS value and layout stay unchanged.
+  "profile.vue": "977b5e1226621ec07476dd0611d3d7fe6348f26e41ade0a0361e483754b72586",
+  // N02: proof-specific recovery; sharing requires current facts and a nonempty link.
+  "proof.vue": "a1d26717ebed2db908459515e1f9b5a7aeea3cf414fe662a4c805c8cbe9f2488",
   "receipts.vue": "aaf76128cf09b5a8648eb547e453964efb1be7cf30063e17bb941366166ff891",
   // Approved promotion category reuses the existing reward hub and list.
   "rewards-list.vue": "450f0917d2ba2af0b8215ad9ea8e0f126357a6858ead54038f226700278a1da9",
   "rewards.vue": "720da0cce42564baaa4451ee4002b6e92f83be5e1ab0317963e22490927e59ef",
   "risk-disclosure.vue": "5f1d1f52b62559b79785d91fd28fd9e4de6597cf91b9174a87191740c95ba2bf",
   // Reviewed ME41: busy save/cancel remain visible and reject keyboard/pointer re-entry.
-  "security.vue": "97dd537c7c35262b3946475b4f897fd499de49437050c08e66c937f291b8a4ed",
+  // Reviewed OAuth binding panel: configured providers, account-scoped lifetime and current-password confirmation.
+  // 5dff851d keeps the compact 2FA track inside a 44px keyboard/pointer target.
+  "security.vue": "c0a05d3ca82030063f20aec791403b34330b739d9a8b9bf52f28d1476552e376",
   // Reviewed #439: BASIC retains the existing hint; enhanced policy owns retry timing and existing-ticket/retry actions.
   // Reviewed #470: cursor-spacing=72 on the detail reply textarea only.
   "support.vue": "9a89c364bbc52d36f0218752b5bb69ffbba692fd113feaf285e7d0273180bad0",
@@ -94,16 +98,16 @@ const EXPECTED_TEMPLATE_PAIR_SHA256: Record<string, string> = {
   "wallet-exchange.vue": "c0254329c6ca1986c73fc1c1a8f31fe1e63b34a223343366069e60ddca6d585f",
   // Reviewed #413: native number/date formatting and finite display boundaries.
   "wallet-nex.vue": "e79b540f1eacd429f044fba4bfd7fb2d15732cac2fc7cda274406416d035ee86",
-  "wallet-repurchase-how.vue": "238439b99d5b73f9cf7c6ad7b8479cb86f39ef92f93d216938b071c28372e4f0",
+  // G1 hides the entire reinvestment surface, including direct entry and prior orders.
+  "wallet-repurchase-how.vue": "cf5593f2be3a07e1006ce752dc1befa50ef7fe4dc6289e606c033e9cf5740180",
   // R833: owned pending status lookup remains available while product/config reads fail; no money command.
   // #584: reviewed configured minimum and disabled-action reason beside the re-investment form.
-  "wallet-repurchase.vue": "d2a28ced522ef9de623ec1060478ee7088d098a9d88688bd94eef1115af936a2",
+  "wallet-repurchase.vue": "4cb3655b512234ef7085da4d38588edfaa15551dc1843feb6e90614fa1b88793",
   "wallet-topup.vue": "010252b7630c35defdf57a3f262d0e389c011d2b9d79ad2f5fb788e794d87768",
   "wallet-withdraw-tracking.vue": "8df13af397e2fcb7b6de4164285dd222d6d8f851c8c153af03f300d2883de2f5",
   // Original pending requests expose retry even when the new-transfer form is incomplete.
   "wallet-withdraw.vue": "7ca90c0482579ea2ae27a162e1c080089317fff24b5789c70078eab3875655c2",
   // Reviewed e0a491a earnings reasons/retry with fixed two-decimal amount displays.
-  "wallet.vue": "eb813b7dfcb664f836091f06472188a2bd101f73c05aa6b607debf35051da849"
 };
 const EXPECTED_STYLE_PAIR_SHA256: Record<string, string> = {
   // Reviewed touch-target/countdown fix: a fixed localized seconds slot.
@@ -251,7 +255,7 @@ describe("Me page 5174 normal-state UI parity", () => {
 
   it("derives the unified Message Center badge from the same total as the bell", () => {
     expect(source).toContain('import { useMessageDrawer } from "@/store/message-drawer"');
-    expect(source).toContain("const messageUnread = computed(() => messageCenter.totalUnread)");
+    expect(source).toContain("const messageUnread = computed(() => messageCenter.actionableUnread)");
     expect(source).toContain('key: "messages", label: t.value.notifs.drawerTitle, href: "/me/notifications"');
     expect(source).toContain('badge: formatUnreadBadge(messageUnread.value) || undefined');
   });

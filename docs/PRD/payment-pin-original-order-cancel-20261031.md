@@ -17,3 +17,5 @@ App 的普通 checkout、order detail、legacy bundle 钱包与外部回调均�
 本地定向行为测试使用实际 session、SFC 提取函数和可控 transport/方法选择端口；不是公网/真机取消验收。此前 cb4 原记录缺少来源，真机须在相同 CloudShare 数量2的原 session 中显式选钱包原键再错 PIN一次后返回；如原单已自然到期，应记录真实 EXPIRED，不改TTL、不用新单冒充原恢复。
 
 取消命令查询暂未找到时，权威原单若已CANCELLED/EXPIRED/PAID则接受原单终态、清活动取消fence并保留previousPayment，不把已完成取消留成未决命令。
+
+订单详情成功进入统一方式门时即消费自动继续付款入口；取消方式选择后不因旧pay意图自动再次打开。Lite 追平 App 后使用同一订单详情与 autoPay 入口。

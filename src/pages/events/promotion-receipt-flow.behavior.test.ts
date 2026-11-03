@@ -16,6 +16,7 @@ const remote = vi.hoisted(() => ({ fundsServerEnabled: true,
   walletBillsApi: { list: vi.fn(), summary: vi.fn() } }));
 vi.mock("@/api/runtime", () => remote);
 const { useBills } = await import("@/store/bills");
+const { WALLET_BILL_TYPE_COLOR } = await import("@/lib/wallet-bill-display");
 const disposals: (() => void)[] = [];
 const vueDependencies = { ref: Vue.ref, computed: Vue.computed, watch: Vue.watch, nextTick: Vue.nextTick };
 
@@ -41,7 +42,7 @@ function lifecycle() {
     onShow: (fn: () => void) => hooks.show.push(fn), onHide: (fn: () => void) => hooks.hide.push(fn),
     onBeforeUnmount: (fn: () => void) => hooks.unmount.push(fn) } };
 }
-const row = (id: string, bizNo: string, asset: "USDT" | "NEX" = "USDT"): WalletBillRow => ({
+const row = (id: string, bizNo: string, asset: "USDT" | "UVT" = "USDT"): WalletBillRow => ({
   id, bizNo, bizType: "PROMOTION_REWARD", asset, direction: "IN", amount: 0.000001,
   amountExact: "0.000001", balanceAfter: 999999999999.999999, balanceAfterExact: "999999999999.999999",
   status: "SUCCESS", remark: "private ledger note", createdAt: 1000,
@@ -63,7 +64,7 @@ function billsHarness(target = "R1:receipt + exact", query = "") {
     useBills: () => store, useCourseRewardTitles: () => Vue.ref({}), useDeposits: () => ({ records: [] }),
     fundsServerEnabled: true, sessionVault: { read: () => ({ user: { userId: Number(auth.accountId.slice(5)) } }) },
     binarySessionReady, useManualScrollLoadMore: vi.fn(), takeNavigationQuery: () => query,
-    dateLocale: () => "en", navTo: vi.fn(),
+    dateLocale: () => "en", navTo: vi.fn(), useDataVisibility: () => ({ hidden: false, mask: String }), useDialogA11y: vi.fn(), WALLET_BILL_TYPE_COLOR,
   }, "ledgerBizNo, filtered, locatingReceipt, initialLoading, initialError, showManualLoadMore, tab, refreshLedger");
   life.hooks.load.forEach(fn => fn(target ? { ledgerBizNo: target } : {}));
   disposals.push(() => store.$dispose());
@@ -120,7 +121,7 @@ beforeEach(() => {
 afterEach(() => { disposals.splice(0).forEach(fn => fn()); });
 
 describe("promotion receipt exact wallet lookup", () => {
-  it.each(["USDT", "NEX"] as const)("finds only the exact server receipt on a later page and keeps %s decimals", async asset => {
+  it.each(["USDT", "UVT"] as const)("finds only the exact server receipt on a later page and keeps %s decimals", async asset => {
     const first = deferred<WalletBillsSnapshot>(), second = deferred<WalletBillsSnapshot>();
     remote.walletBillsApi.list.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const h = billsHarness(); const read = h.page.refreshLedger();
@@ -176,7 +177,7 @@ describe("promotion receipt exact wallet lookup", () => {
     expect(remote.walletBillsApi.list).toHaveBeenCalledTimes(1); expect(h.page.filtered.value).toHaveLength(1);
     expect(h.page.showManualLoadMore.value).toBe(true);
     h.page.tab.value = "out"; await settle();
-    expect(remote.walletBillsApi.list).toHaveBeenLastCalledWith(1, 50, { direction: "OUT", cursor: "start" });
+    expect(remote.walletBillsApi.list).toHaveBeenLastCalledWith(1, 50, { asset: "USDT", direction: "OUT", cursor: "start" });
   });
 });
 
