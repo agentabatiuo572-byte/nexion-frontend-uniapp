@@ -191,7 +191,7 @@ import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { shortenHex } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
-import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
@@ -389,7 +389,8 @@ function retryRemoteReceipts(): void {
 }
 
 function loadSelectedRemoteReceipts(): void {
-  if (!remoteReceiptsMode || !receiptsPageFence.isVisible()) return;
+  // After an H5 reload the session is restored after the page shows; the account watch reads once it is bound.
+  if (!remoteReceiptsMode || !receiptsPageFence.isVisible() || !sessionVault.read()) return;
   if (remoteReceiptKind.value === "compute") {
     void loadRemoteComputeReceipts(0, false);
     return;
