@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { serverLanguage } from "@/i18n";
 
 export type CanonicalEventKind =
   | "discount"
@@ -334,7 +335,7 @@ export function createEventsApi(client: ApiClient): EventsApi {
   return {
     state: async (locale = "en") => parseSnapshot(await client.request({
       method: "GET",
-      path: `/api/events?locale=${encodeURIComponent(["en", "zh", "vi"].includes(locale) ? locale : "en")}`,
+      path: `/api/events?locale=${encodeURIComponent(serverLanguage(locale))}`,
     })),
     spinState: async (eventCode) => parseSpinState(await client.request({
       method: "GET",

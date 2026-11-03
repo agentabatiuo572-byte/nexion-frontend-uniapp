@@ -31,6 +31,7 @@ import type { PrivacyPolicy } from "@/api/privacy-policy-api";
 import { navBack } from "@/lib/route";
 import { resolvePrivacyReturn } from "@/lib/privacy-return";
 import { platformDisplayText } from "@/lib/brand-copy";
+import { serverLanguage } from "@/i18n";
 const t = useT();
 const locale = useLocaleStore();
 const policy = ref<PrivacyPolicy | null>(null);
@@ -43,7 +44,7 @@ async function load() {
   loading.value = true;
   failed.value = false;
   policy.value = null;
-  try { const value = await privacyPolicyApi.current(locale.code); if (request === generation) policy.value = value; }
+  try { const value = await privacyPolicyApi.current(serverLanguage(locale.code)); if (request === generation) policy.value = value; }
   catch { if (request === generation) failed.value = true; }
   finally { if (request === generation) loading.value = false; }
 }

@@ -100,6 +100,7 @@ import { createCommissionGuideApi } from "@/api/commission-guide-api";
 import { createDirectReferralApi } from "@/api/direct-referral-api";
 import { buildCommissionsHowContent, createCommissionsHowResource, type CommissionsHowState } from "@/lib/commissions-how-content";
 import { navBack } from "@/lib/route";
+import { serverLanguage } from "@/i18n";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -123,7 +124,7 @@ function makeResource() {
   return createCommissionsHowResource({
   async read(language) {
     const [document, directPolicy, guide, ladder] = await Promise.all([
-      howContentApi.published("team-commissions-how", language),
+      howContentApi.published("team-commissions-how", serverLanguage(language)),
       directReferralApi.policy(), commissionGuideApi.read(), vRankApi.ladder(),
     ]);
     return { document, directPolicy, guide, ranks: ladder.ranks };

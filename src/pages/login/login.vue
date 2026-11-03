@@ -169,7 +169,7 @@ import { toast } from "@/store/ui";
 import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { stageRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
-import type { LocaleCode } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
 import { apiRuntimeConfig, authApi, h5RefreshCookieEnabled, remoteApiEnabled } from "@/api/runtime";
 import { apiEnvironmentBadgeLabel } from "@/api/runtime-config";
@@ -604,8 +604,11 @@ function finishSignIn(
     serverProfile: session.serverProfile,
     serverSessionRevision: session.serverSessionRevision,
     deferNavigation: session.recoveredRegistration,
+    // The recorded request carries the server projection (en for id/ms/fil/ru/kk/uz); the language
+    // still selected on this device is the one the user registered in.
     registrationLocale: session.recoveredRegistration && ["zh", "vi", "en"].includes(session.registrationLanguage ?? "")
-      ? session.registrationLanguage as LocaleCode : undefined,
+      ? serverLanguage(useLocaleStore().code) === session.registrationLanguage ? useLocaleStore().code : session.registrationLanguage as LocaleCode
+      : undefined,
   });
   if (result.ok && session.recoveredRegistration) {
     stageRemoteRegistrationReceipt(session.registrationReceipt, session.accountId);

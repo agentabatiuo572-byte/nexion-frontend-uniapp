@@ -212,12 +212,13 @@ import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-
 import { useTrustDocuments } from "@/composables/use-trust-documents";
 import { usePublishedNetworkStats } from "@/composables/use-published-network-stats";
 import { subscribeRuntimeRevision } from "@/api/order-api";
+import { serverLanguage } from "@/i18n";
 
 const t = useT();
 const openCategory = ref('');
 const tr = computed(() => t.value.trust);
 const locale = useLocaleStore();
-const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
+const language = computed<TrustLocale>(() => serverLanguage(locale.code));
 const auditCopy = computed(() => networkReauditCopy(language.value));
 const resources = computed(() => trustResources(language.value));
 const continuity = computed(() => continuityCopy(language.value));

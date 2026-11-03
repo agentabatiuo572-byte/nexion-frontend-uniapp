@@ -67,6 +67,11 @@ const DATE_LOCALE_TAGS: Record<LocaleCode, string> = {
   ar: "ar-SA",
   de: "de-DE",
   fr: "fr-FR",
+  kk: "kk-KZ",
+  uz: "uz-Latn-UZ",
+  id: "id-ID",
+  ms: "ms-MY",
+  fil: "fil-PH",
 };
 
 export function dateLocale(): string {

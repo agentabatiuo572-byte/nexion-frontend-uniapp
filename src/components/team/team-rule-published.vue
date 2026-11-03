@@ -31,6 +31,7 @@ import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
 import { navBack } from '@/lib/route';
 import { PublishedContentRequestFence } from '@/components/how/p3-14-published-request-fence';
+import { serverLanguage } from '@/i18n';
 
 const props = defineProps<{ contentKey: HowContentKey; back: string; backLabel: string; kind: 'members' | 'balance'; heading: string }>();
 const locale = useLocaleStore(), t = useT();
@@ -52,7 +53,7 @@ async function load() {
   if (generation === null) return;
   loading.value = true; error.value = false;
   try {
-    const next = await howContentApi.published(props.contentKey, locale.code);
+    const next = await howContentApi.published(props.contentKey, serverLanguage(locale.code));
     if (!requestFence.isCurrent(generation)) return;
     if (next.blocks.some(block => [block.title, block.body, ...(block.items ?? [])].some(text => text.includes('{value}')))) throw new Error('HOW_CONTENT_RULE_VALUE_UNRESOLVED');
     if (props.contentKey === 'team-unilevel-how' && (!next.blocks.some(block => block.id === 'direct-referral-scope')
