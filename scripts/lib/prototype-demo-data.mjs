@@ -57,7 +57,7 @@ export const demoOptions = {
   streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
-  globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）']],
+  globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
 };
 const skuDefinitions = [
   ['stellarbox-s1','UVELBox S1','Entry',1299,6.2,3,'4 × RTX 4090','96 GB',1200],
@@ -154,6 +154,7 @@ export function demoFixture(url,locale,state,request) {
     if(!empty)config.publicStats.globeDisplay=state.globeShareState==='nodes'
       ?{intervalMs:5400,nodeJitterPct:.4,activeJobsMinPct:8,activeJobsMaxPct:14,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:globeCenters.map(([id,nodes,latencyMs])=>({id,nodes,latencyMs}))}
       :{intervalMs:5400,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:globeCenters.map(([id,,latencyMs,sharePct],i)=>({id,latencyMs,sharePct:state.globeShareState==='invalid'&&i===0?sharePct-10:sharePct}))};
+    if(state.globeShareState==='missing')delete config.publicStats.globeDisplay;
     if(empty){delete config.publicStats.registeredUsersBase;config.publicStats.networkPulse=null;}
     return withDemoShareChannels(config,state);
   }
