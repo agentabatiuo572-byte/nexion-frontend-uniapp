@@ -523,26 +523,6 @@
    "note": "存量,C2 批次待判"
   },
   {
-   "route": "/pages/me/wallet-repurchase-how",
-   "kind": "partial",
-   "cls": "spv",
-   "size": "390x44",
-   "radius": "0px",
-   "sample": "Re-invest · How it works",
-   "count": 1,
-   "note": "存量,C2 批次待判"
-  },
-  {
-   "route": "/pages/me/wallet-repurchase",
-   "kind": "partial",
-   "cls": "spv",
-   "size": "390x44",
-   "radius": "0px",
-   "sample": "Re-invest",
-   "count": 1,
-   "note": "存量,C2 批次待判"
-  },
-  {
    "route": "/pages/me/wallet-topup",
    "kind": "partial",
    "cls": "spv",

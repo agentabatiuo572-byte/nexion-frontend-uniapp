@@ -642,7 +642,6 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/pages/me/achievements.vue", ["postMoneyBillsOnce"]],
     ["src/pages/me/wallet-cards-new.vue", ["postMoneyBillsOnce"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],
-    ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
     // 提现:钱由服务端在 POST /api/withdrawals 里扣(本页零资金写),但收据必须落地 ——
     // 走 postReceiptForAccount(账号取提交快照,不看当前绑定)。
     ["src/pages/me/wallet-withdraw.vue", ["postReceiptForAccount"]],

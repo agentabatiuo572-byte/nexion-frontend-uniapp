@@ -317,7 +317,7 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     && /if \(!r\.conflict\) return \{ ok: false, position: null, conflict: false \};/.test(stakeBody),
     stakeBody.replace(/\s+/g, " ").slice(-200));
 
-  for (const rel of ["src/components/staking/stake-sheet.vue", "src/pages/me/wallet-repurchase.vue"]) {
+  for (const rel of ["src/components/staking/stake-sheet.vue"]) {
     const src = strip(readFileSync(path.join(root, rel), "utf8"));
     samples.wiring += 1;
     check(`⑥ ${rel.split("/").pop()} 按归因分文案(存储异常不许说「别处刚有变动」)`,
