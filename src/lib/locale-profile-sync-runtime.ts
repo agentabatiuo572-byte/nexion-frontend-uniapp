@@ -51,6 +51,17 @@ export function syncExplicitProfileLocale(language: string): void {
 }
 
 /**
+ * A loaded platform config switched off the language in use: show its server projection (en)
+ * without an explicit choice or a profile write, and retire a matching anonymous choice so a
+ * later sign-in cannot bring the switched-off language back.
+ */
+export function fallBackFromSwitchedOffLocale(code: LocaleCode): void {
+  const fallback = serverLanguage(code);
+  if (pendingAnonymousSelection === code) pendingAnonymousSelection = fallback;
+  useLocaleStore().applyServerLocale(fallback);
+}
+
+/**
  * A completed sign-in reads the account-owned language before changing the UI.
  * An explicit picker action made during that read wins and is queued instead.
  */
