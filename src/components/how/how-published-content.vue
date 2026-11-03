@@ -75,7 +75,6 @@ const languageFallback = computed(() => !!content.value
 function heroLabel(contentKey: HowContentKey): string {
   switch (contentKey) {
     case "wallet-exchange-how": return t.value.exchangeHowItWorks.heroLabel;
-    case "wallet-repurchase-how": return t.value.repurchaseHowItWorks.heroLabel;
     case "genesis-how": return t.value.genesisHowItWorks.heroLabel;
     case "team-binary-how": return t.value.binaryHowItWorks.heroLabel;
     case "team-commissions-how": return t.value.commissionsHowItWorks.heroLabel;
