@@ -102,7 +102,7 @@ export class PromotionCheckoutSession {
       const order = await command(pending.key);
       if (!this.ports.current()) return;
       if(operation==='cancelOrder'&&!['CANCELLED','EXPIRED'].includes(order.paymentStatus))throw new Error('ORDER_CANCELLATION_UNCONFIRMED');
-      this.acceptOrder(order);
+      this.acceptOrder(order, false, operation === 'createOrder' || operation === 'createBundle');
     } catch (error) {
       if (operation === 'payOrder' && error instanceof Error && /^PAYMENT_PASSWORD_/.test(error.message)) {
         if (this.ports.current()) {
@@ -116,10 +116,9 @@ export class PromotionCheckoutSession {
       throw error;
     } finally { this.busy = false; }
   }
-  private validateOrder(order: OrderReceipt): void {
+  private validateOrder(order: OrderReceipt, q = this.record.quote): void {
     const previous = this.record.order;
     if (previous && previous.orderNo !== order.orderNo) throw new Error('ORIGINAL_ORDER_MISMATCH');
-    const q = this.record.quote;
     const decimal = (value: unknown) => String(value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
     if (q && (order.promotionQuoteId !== q.quoteId || order.quantity !== q.quantity || decimal(order.amountUsdt) !== decimal(q.amountUsdt))) throw new Error('ORDER_QUOTE_MISMATCH');
     if (!order.promotionQuoteId || !order.payBy || !Array.isArray(order.rewards)||!Array.isArray(order.items)||!order.items.length) throw new Error('ORDER_RECEIPT_INCOMPLETE');
@@ -144,9 +143,18 @@ export class PromotionCheckoutSession {
       if(stable(rewards(order.rewards,order.items,q))!==stable(rewards(q.expectedRewards,q.items)))throw new Error('ORDER_REWARDS_MISMATCH');
     }
   }
-  private acceptOrder(order: OrderReceipt, retireRejectedPayment=false): void {
-    this.validateOrder(order);
-    this.persist({ ...this.record, order, pending: null,
+  private acceptOrder(order: OrderReceipt, retireRejectedPayment=false, createReceipt=false): void {
+    let quote = this.record.quote;
+    if (order.recoveredQuoteId !== undefined) {
+      const pending = this.record.pending;
+      if (!createReceipt || !quote || !order.promotionQuoteId || order.recoveredQuoteId !== quote.quoteId
+        || pending?.targetId !== quote.quoteId || pending.operation !== (quote.items.length > 1 ? 'createBundle' : 'createOrder')) {
+        throw new Error('ORDER_QUOTE_MISMATCH');
+      }
+      quote = { ...quote, quoteId: order.promotionQuoteId };
+    }
+    this.validateOrder(order, quote);
+    this.persist({ ...this.record, quote, order, pending: null,
       ...(retireRejectedPayment?{paymentIntentRevision:(this.record.paymentIntentRevision??0)+1}:{}) });
     this.unknown = false;
     this.confirmed = true;
@@ -193,7 +201,8 @@ export class PromotionCheckoutSession {
         }
         const result = await this.ports.api.command(pending.key, pending.operation, pending.targetId);
         if (!this.ports.current()) return;
-        if (result.status === 'SUCCEEDED' && result.order) this.acceptOrder(result.order);
+        if (result.status === 'SUCCEEDED' && result.order)
+          this.acceptOrder(result.order, false, pending.operation === 'createOrder' || pending.operation === 'createBundle');
         else if(result.status==='FAILED'&&!result.order){
           if(this.record.order){
             const order=await this.ports.api.findOrder(this.record.order.orderNo);
