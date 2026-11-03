@@ -38,7 +38,6 @@ function fixture(url, locale, state, request) {
 
   if (url.pathname === '/api/content/trust/sections/current') return { ...authority, source: 'nx_trust_section_version:published', sections: ['financials', 'leadership', 'nexNarrative', 'complianceBadges', 'auditsReserves', 'listings'].map(sectionKey => ({ sectionKey, version: 'v1', description: 'UI review fixture', structure: 'Published resources', fields: [] })) };
   if (/^\/api\/content\/trust\/sections\/[^/]+\/view$/.test(url.pathname)) return null;
-  if (url.pathname === '/api/app/network/rank') return {...authority,source:'nx_user_device',currentRank:184,rankChange24h:3,snapshotAvailable:true,generatedAt:iso};
   if (url.pathname === '/api/app/network/device-rank') return {...authority,source:'SIMULATED_DEVICE_DISTRIBUTION',currentRank:184,state:'ranked',population:3206,deviceTops:80,modelVersion:1,generatedAt:iso};
   if (url.pathname === '/api/app/support/conversation-categories') return [{type:'advisor',enabled:true},{type:'support',enabled:true},{type:'ai',enabled:false}];
   if (url.pathname === '/api/promotions') {
