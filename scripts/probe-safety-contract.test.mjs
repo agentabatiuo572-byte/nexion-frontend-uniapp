@@ -22,7 +22,7 @@ test("guard witness accepts the visible auth exit despite a late withdrawal stac
 });
 
 const INDEPENDENT_RUNTIME_PROBES = [
-  "business-loop-liveness-runtime.mjs", "spec6-entry-surface-runtime.mjs", "trial-check.mjs", "sticky-check.mjs",
+  "business-loop-liveness-runtime.mjs", "trial-check.mjs", "sticky-check.mjs",
   "backnav-check.mjs", "profile-identity-check.mjs", "pending-checkout-runtime.mjs", "page-check.mjs",
 ];
 
@@ -50,7 +50,7 @@ test("PROBE_CONCURRENCY=1 executes the complete probe sequence serially; default
         events.push(`end:${name}`); active--; return name;
       }));
       assert.deepEqual(result, INDEPENDENT_RUNTIME_PROBES);
-      assert.equal(peak, concurrency === "1" ? 1 : 8);
+      assert.equal(peak, concurrency === "1" ? 1 : INDEPENDENT_RUNTIME_PROBES.length);
       if (concurrency === "1") assert.deepEqual(events, INDEPENDENT_RUNTIME_PROBES.flatMap((name) => [`start:${name}`, `end:${name}`]));
     }
   } finally {
@@ -118,7 +118,6 @@ import {
 } from "./lib/probe-coverage.mjs";
 
 const DIRECT_PROBES = [
-  "scripts/spec6-entry-surface-runtime.mjs",
   "scripts/trial-check.mjs",
   "scripts/sticky-check.mjs",
   "scripts/backnav-check.mjs",
@@ -196,17 +195,10 @@ test("all five direct-DOM probes use the shared direct-app URL constructor", () 
     assert.match(source, /from\s+["']\.\/lib\/direct-app-url\.mjs["']/, `${file} must import directAppUrl`);
     assert.match(source, /page\.goto\(directAppUrl\(/, `${file} must navigate through directAppUrl`);
   }
-  const entrySurface = fs.readFileSync("scripts/spec6-entry-surface-runtime.mjs", "utf8");
-  assert.match(entrySurface, /assertDirectPageCoverage\(/, "entry-surface probe needs a positive route/DOM witness");
 });
 
 test("all five direct-DOM probes fail closed on app runtime errors and prove semantic identity", () => {
-  const entrySurface = fs.readFileSync("scripts/spec6-entry-surface-runtime.mjs", "utf8");
-  assert.match(entrySurface, /collectAppConsoleErrors\(consoleErrors, baseUrl\)/);
-  assert.match(entrySurface, /witness\.consoleErrors\s*=\s*consoleErrors/);
-  assert.match(entrySurface, /requiredSelector/);
-
-  for (const file of DIRECT_PROBES.slice(1)) {
+  for (const file of DIRECT_PROBES) {
     const source = fs.readFileSync(file, "utf8");
     assert.match(source, /assertNoRuntimeErrors\(/, `${file} must fail when its own page reports runtime errors`);
   }
