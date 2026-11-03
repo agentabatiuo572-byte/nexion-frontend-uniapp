@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 export type EntrySurfaceKey = "signed" | "h5" | "white";
 
@@ -124,10 +125,250 @@ const copy = {
       },
     },
   },
+  id: {
+    navTitle: "Getting started", eyebrow: "Get started", title: "Choose how to use UVEL",
+    body: "Manage phone computing in the phone app, or view earnings, devices and your account on the web.",
+    otherWays: "Other ways to use UVEL",
+    surfaces: {
+      signed: {
+        linkLabel: "Phone app", summary: "Calibrate, link and activate phone computing",
+        kicker: "Phone computing", title: "Start with the phone app",
+        body: "Calibrate and activate in the phone app, then check its status on the devices page.",
+        primaryLabel: "Open home", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "Sign in on your phone", body: "Sign in to your account and follow the phone calibration steps." },
+          { title: "Link and activate", body: "Open the devices page to link your phone, then follow the activation steps." },
+          { title: "View records", body: "After activation, check completed jobs and earnings on the earnings page." },
+        ],
+      },
+      h5: {
+        linkLabel: "Web access", summary: "View earnings records and device status",
+        kicker: "Check anytime", title: "View your account on the web",
+        body: "Check earnings and devices in your browser. Phone calibration and activation require the phone app.",
+        primaryLabel: "View earnings", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "View earnings", body: "Open the earnings page to check completed jobs and earnings records." },
+          { title: "View devices", body: "Check your linked devices and their latest status on the devices page." },
+          { title: "Activate phone computing", body: "Use the phone app to calibrate or activate your phone." },
+        ],
+      },
+      white: {
+        linkLabel: "Account management", summary: "Check your account overview and sign-in security",
+        kicker: "Account and security", title: "Manage your account",
+        body: "View your account overview from home, or manage sign-in methods and devices in security settings.",
+        primaryLabel: "Open home", secondaryLabel: "Sign-in and security",
+        steps: [
+          { title: "View your overview", body: "Check earnings, devices and tasks on the home page." },
+          { title: "Review sign-in security", body: "Review signed-in devices and manage your security settings." },
+          { title: "Find help", body: "Use the help entry on the home page when you need support." },
+        ],
+      },
+    },
+  },
+  ms: {
+    navTitle: "Getting started", eyebrow: "Get started", title: "Choose how to use UVEL",
+    body: "Manage phone computing in the phone app, or view earnings, devices and your account on the web.",
+    otherWays: "Other ways to use UVEL",
+    surfaces: {
+      signed: {
+        linkLabel: "Phone app", summary: "Calibrate, link and activate phone computing",
+        kicker: "Phone computing", title: "Start with the phone app",
+        body: "Calibrate and activate in the phone app, then check its status on the devices page.",
+        primaryLabel: "Open home", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "Sign in on your phone", body: "Sign in to your account and follow the phone calibration steps." },
+          { title: "Link and activate", body: "Open the devices page to link your phone, then follow the activation steps." },
+          { title: "View records", body: "After activation, check completed jobs and earnings on the earnings page." },
+        ],
+      },
+      h5: {
+        linkLabel: "Web access", summary: "View earnings records and device status",
+        kicker: "Check anytime", title: "View your account on the web",
+        body: "Check earnings and devices in your browser. Phone calibration and activation require the phone app.",
+        primaryLabel: "View earnings", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "View earnings", body: "Open the earnings page to check completed jobs and earnings records." },
+          { title: "View devices", body: "Check your linked devices and their latest status on the devices page." },
+          { title: "Activate phone computing", body: "Use the phone app to calibrate or activate your phone." },
+        ],
+      },
+      white: {
+        linkLabel: "Account management", summary: "Check your account overview and sign-in security",
+        kicker: "Account and security", title: "Manage your account",
+        body: "View your account overview from home, or manage sign-in methods and devices in security settings.",
+        primaryLabel: "Open home", secondaryLabel: "Sign-in and security",
+        steps: [
+          { title: "View your overview", body: "Check earnings, devices and tasks on the home page." },
+          { title: "Review sign-in security", body: "Review signed-in devices and manage your security settings." },
+          { title: "Find help", body: "Use the help entry on the home page when you need support." },
+        ],
+      },
+    },
+  },
+  fil: {
+    navTitle: "Getting started", eyebrow: "Get started", title: "Choose how to use UVEL",
+    body: "Manage phone computing in the phone app, or view earnings, devices and your account on the web.",
+    otherWays: "Other ways to use UVEL",
+    surfaces: {
+      signed: {
+        linkLabel: "Phone app", summary: "Calibrate, link and activate phone computing",
+        kicker: "Phone computing", title: "Start with the phone app",
+        body: "Calibrate and activate in the phone app, then check its status on the devices page.",
+        primaryLabel: "Open home", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "Sign in on your phone", body: "Sign in to your account and follow the phone calibration steps." },
+          { title: "Link and activate", body: "Open the devices page to link your phone, then follow the activation steps." },
+          { title: "View records", body: "After activation, check completed jobs and earnings on the earnings page." },
+        ],
+      },
+      h5: {
+        linkLabel: "Web access", summary: "View earnings records and device status",
+        kicker: "Check anytime", title: "View your account on the web",
+        body: "Check earnings and devices in your browser. Phone calibration and activation require the phone app.",
+        primaryLabel: "View earnings", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "View earnings", body: "Open the earnings page to check completed jobs and earnings records." },
+          { title: "View devices", body: "Check your linked devices and their latest status on the devices page." },
+          { title: "Activate phone computing", body: "Use the phone app to calibrate or activate your phone." },
+        ],
+      },
+      white: {
+        linkLabel: "Account management", summary: "Check your account overview and sign-in security",
+        kicker: "Account and security", title: "Manage your account",
+        body: "View your account overview from home, or manage sign-in methods and devices in security settings.",
+        primaryLabel: "Open home", secondaryLabel: "Sign-in and security",
+        steps: [
+          { title: "View your overview", body: "Check earnings, devices and tasks on the home page." },
+          { title: "Review sign-in security", body: "Review signed-in devices and manage your security settings." },
+          { title: "Find help", body: "Use the help entry on the home page when you need support." },
+        ],
+      },
+    },
+  },
+  ru: {
+    navTitle: "Getting started", eyebrow: "Get started", title: "Choose how to use UVEL",
+    body: "Manage phone computing in the phone app, or view earnings, devices and your account on the web.",
+    otherWays: "Other ways to use UVEL",
+    surfaces: {
+      signed: {
+        linkLabel: "Phone app", summary: "Calibrate, link and activate phone computing",
+        kicker: "Phone computing", title: "Start with the phone app",
+        body: "Calibrate and activate in the phone app, then check its status on the devices page.",
+        primaryLabel: "Open home", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "Sign in on your phone", body: "Sign in to your account and follow the phone calibration steps." },
+          { title: "Link and activate", body: "Open the devices page to link your phone, then follow the activation steps." },
+          { title: "View records", body: "After activation, check completed jobs and earnings on the earnings page." },
+        ],
+      },
+      h5: {
+        linkLabel: "Web access", summary: "View earnings records and device status",
+        kicker: "Check anytime", title: "View your account on the web",
+        body: "Check earnings and devices in your browser. Phone calibration and activation require the phone app.",
+        primaryLabel: "View earnings", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "View earnings", body: "Open the earnings page to check completed jobs and earnings records." },
+          { title: "View devices", body: "Check your linked devices and their latest status on the devices page." },
+          { title: "Activate phone computing", body: "Use the phone app to calibrate or activate your phone." },
+        ],
+      },
+      white: {
+        linkLabel: "Account management", summary: "Check your account overview and sign-in security",
+        kicker: "Account and security", title: "Manage your account",
+        body: "View your account overview from home, or manage sign-in methods and devices in security settings.",
+        primaryLabel: "Open home", secondaryLabel: "Sign-in and security",
+        steps: [
+          { title: "View your overview", body: "Check earnings, devices and tasks on the home page." },
+          { title: "Review sign-in security", body: "Review signed-in devices and manage your security settings." },
+          { title: "Find help", body: "Use the help entry on the home page when you need support." },
+        ],
+      },
+    },
+  },
+  kk: {
+    navTitle: "Getting started", eyebrow: "Get started", title: "Choose how to use UVEL",
+    body: "Manage phone computing in the phone app, or view earnings, devices and your account on the web.",
+    otherWays: "Other ways to use UVEL",
+    surfaces: {
+      signed: {
+        linkLabel: "Phone app", summary: "Calibrate, link and activate phone computing",
+        kicker: "Phone computing", title: "Start with the phone app",
+        body: "Calibrate and activate in the phone app, then check its status on the devices page.",
+        primaryLabel: "Open home", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "Sign in on your phone", body: "Sign in to your account and follow the phone calibration steps." },
+          { title: "Link and activate", body: "Open the devices page to link your phone, then follow the activation steps." },
+          { title: "View records", body: "After activation, check completed jobs and earnings on the earnings page." },
+        ],
+      },
+      h5: {
+        linkLabel: "Web access", summary: "View earnings records and device status",
+        kicker: "Check anytime", title: "View your account on the web",
+        body: "Check earnings and devices in your browser. Phone calibration and activation require the phone app.",
+        primaryLabel: "View earnings", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "View earnings", body: "Open the earnings page to check completed jobs and earnings records." },
+          { title: "View devices", body: "Check your linked devices and their latest status on the devices page." },
+          { title: "Activate phone computing", body: "Use the phone app to calibrate or activate your phone." },
+        ],
+      },
+      white: {
+        linkLabel: "Account management", summary: "Check your account overview and sign-in security",
+        kicker: "Account and security", title: "Manage your account",
+        body: "View your account overview from home, or manage sign-in methods and devices in security settings.",
+        primaryLabel: "Open home", secondaryLabel: "Sign-in and security",
+        steps: [
+          { title: "View your overview", body: "Check earnings, devices and tasks on the home page." },
+          { title: "Review sign-in security", body: "Review signed-in devices and manage your security settings." },
+          { title: "Find help", body: "Use the help entry on the home page when you need support." },
+        ],
+      },
+    },
+  },
+  uz: {
+    navTitle: "Getting started", eyebrow: "Get started", title: "Choose how to use UVEL",
+    body: "Manage phone computing in the phone app, or view earnings, devices and your account on the web.",
+    otherWays: "Other ways to use UVEL",
+    surfaces: {
+      signed: {
+        linkLabel: "Phone app", summary: "Calibrate, link and activate phone computing",
+        kicker: "Phone computing", title: "Start with the phone app",
+        body: "Calibrate and activate in the phone app, then check its status on the devices page.",
+        primaryLabel: "Open home", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "Sign in on your phone", body: "Sign in to your account and follow the phone calibration steps." },
+          { title: "Link and activate", body: "Open the devices page to link your phone, then follow the activation steps." },
+          { title: "View records", body: "After activation, check completed jobs and earnings on the earnings page." },
+        ],
+      },
+      h5: {
+        linkLabel: "Web access", summary: "View earnings records and device status",
+        kicker: "Check anytime", title: "View your account on the web",
+        body: "Check earnings and devices in your browser. Phone calibration and activation require the phone app.",
+        primaryLabel: "View earnings", secondaryLabel: "Manage devices",
+        steps: [
+          { title: "View earnings", body: "Open the earnings page to check completed jobs and earnings records." },
+          { title: "View devices", body: "Check your linked devices and their latest status on the devices page." },
+          { title: "Activate phone computing", body: "Use the phone app to calibrate or activate your phone." },
+        ],
+      },
+      white: {
+        linkLabel: "Account management", summary: "Check your account overview and sign-in security",
+        kicker: "Account and security", title: "Manage your account",
+        body: "View your account overview from home, or manage sign-in methods and devices in security settings.",
+        primaryLabel: "Open home", secondaryLabel: "Sign-in and security",
+        steps: [
+          { title: "View your overview", body: "Check earnings, devices and tasks on the home page." },
+          { title: "Review sign-in security", body: "Review signed-in devices and manage your security settings." },
+          { title: "Find help", body: "Use the help entry on the home page when you need support." },
+        ],
+      },
+    },
+  },
 };
 
 export function entrySurfaceCopyFor(locale: string) {
-  return copy[locale === "zh" || locale === "vi" ? locale : "en"];
+  return copy[uiLocale(locale)];
 }
 
 export function useEntrySurfaceCopy() {

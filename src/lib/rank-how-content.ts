@@ -4,6 +4,7 @@ import type { CanonicalVRankRow, CommissionCapabilities } from "@/api/v-rank-api
 import type { RankHowConditionLabels } from "./v-rank-how-policy";
 import { formatAmount } from "./amount-display";
 import { formatComputePoints } from "../i18n/compute-points";
+import { uiLocale } from "@/i18n";
 
 // Interface/status copy only. Published business explanations come from the policy API.
 const COPY = {
@@ -34,10 +35,64 @@ const COPY = {
     leadershipHold: "Quỹ thưởng nhóm chưa mở chi trả. Phiếu bầu không đồng nghĩa với phần thưởng đã nhận.",
     peerUnavailable: "Thưởng đồng cấp chưa mở.",
   },
+  id: {
+    headline: "Understand each step and its benefits.", unavailable: "The rank guide is temporarily unavailable. Please try again later.", loading: "Loading the rank guide…",
+    example: "Worked example · current rules", noThreshold: "No threshold set for this rank", noReferralMinimum: "No self compute-point minimum", noExample: "No adjacent rank thresholds are currently available for an example.", emptyLadder: "No visible ranks", retry: "Reload",
+    protected: "Once reached, your rank is kept even if your team changes.",
+    unprotected: "If you no longer meet the requirements, your rank may be adjusted to the one you currently qualify for.",
+    leadershipReady: "Team incentive pool rewards are subject to actual payout.",
+    leadershipHold: "Team incentive pool payouts aren’t open yet. Votes do not mean rewards have been received.",
+    peerUnavailable: "Same-rank rewards aren’t open yet.",
+  },
+  ms: {
+    headline: "Understand each step and its benefits.", unavailable: "The rank guide is temporarily unavailable. Please try again later.", loading: "Loading the rank guide…",
+    example: "Worked example · current rules", noThreshold: "No threshold set for this rank", noReferralMinimum: "No self compute-point minimum", noExample: "No adjacent rank thresholds are currently available for an example.", emptyLadder: "No visible ranks", retry: "Reload",
+    protected: "Once reached, your rank is kept even if your team changes.",
+    unprotected: "If you no longer meet the requirements, your rank may be adjusted to the one you currently qualify for.",
+    leadershipReady: "Team incentive pool rewards are subject to actual payout.",
+    leadershipHold: "Team incentive pool payouts aren’t open yet. Votes do not mean rewards have been received.",
+    peerUnavailable: "Same-rank rewards aren’t open yet.",
+  },
+  fil: {
+    headline: "Understand each step and its benefits.", unavailable: "The rank guide is temporarily unavailable. Please try again later.", loading: "Loading the rank guide…",
+    example: "Worked example · current rules", noThreshold: "No threshold set for this rank", noReferralMinimum: "No self compute-point minimum", noExample: "No adjacent rank thresholds are currently available for an example.", emptyLadder: "No visible ranks", retry: "Reload",
+    protected: "Once reached, your rank is kept even if your team changes.",
+    unprotected: "If you no longer meet the requirements, your rank may be adjusted to the one you currently qualify for.",
+    leadershipReady: "Team incentive pool rewards are subject to actual payout.",
+    leadershipHold: "Team incentive pool payouts aren’t open yet. Votes do not mean rewards have been received.",
+    peerUnavailable: "Same-rank rewards aren’t open yet.",
+  },
+  ru: {
+    headline: "Understand each step and its benefits.", unavailable: "The rank guide is temporarily unavailable. Please try again later.", loading: "Loading the rank guide…",
+    example: "Worked example · current rules", noThreshold: "No threshold set for this rank", noReferralMinimum: "No self compute-point minimum", noExample: "No adjacent rank thresholds are currently available for an example.", emptyLadder: "No visible ranks", retry: "Reload",
+    protected: "Once reached, your rank is kept even if your team changes.",
+    unprotected: "If you no longer meet the requirements, your rank may be adjusted to the one you currently qualify for.",
+    leadershipReady: "Team incentive pool rewards are subject to actual payout.",
+    leadershipHold: "Team incentive pool payouts aren’t open yet. Votes do not mean rewards have been received.",
+    peerUnavailable: "Same-rank rewards aren’t open yet.",
+  },
+  kk: {
+    headline: "Understand each step and its benefits.", unavailable: "The rank guide is temporarily unavailable. Please try again later.", loading: "Loading the rank guide…",
+    example: "Worked example · current rules", noThreshold: "No threshold set for this rank", noReferralMinimum: "No self compute-point minimum", noExample: "No adjacent rank thresholds are currently available for an example.", emptyLadder: "No visible ranks", retry: "Reload",
+    protected: "Once reached, your rank is kept even if your team changes.",
+    unprotected: "If you no longer meet the requirements, your rank may be adjusted to the one you currently qualify for.",
+    leadershipReady: "Team incentive pool rewards are subject to actual payout.",
+    leadershipHold: "Team incentive pool payouts aren’t open yet. Votes do not mean rewards have been received.",
+    peerUnavailable: "Same-rank rewards aren’t open yet.",
+  },
+  uz: {
+    headline: "Understand each step and its benefits.", unavailable: "The rank guide is temporarily unavailable. Please try again later.", loading: "Loading the rank guide…",
+    example: "Worked example · current rules", noThreshold: "No threshold set for this rank", noReferralMinimum: "No self compute-point minimum", noExample: "No adjacent rank thresholds are currently available for an example.", emptyLadder: "No visible ranks", retry: "Reload",
+    protected: "Once reached, your rank is kept even if your team changes.",
+    unprotected: "If you no longer meet the requirements, your rank may be adjusted to the one you currently qualify for.",
+    leadershipReady: "Team incentive pool rewards are subject to actual payout.",
+    leadershipHold: "Team incentive pool payouts aren’t open yet. Votes do not mean rewards have been received.",
+    peerUnavailable: "Same-rank rewards aren’t open yet.",
+  },
 };
 
 export function rankHowCopy(locale: string) {
-  return COPY[locale.split("-")[0] as keyof typeof COPY] ?? COPY.en;
+  return COPY[uiLocale(locale.split("-")[0])];
 }
 
 // Native UniApp can omit Intl; round decimal digits without binary toFixed ties.

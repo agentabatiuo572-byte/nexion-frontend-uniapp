@@ -73,12 +73,12 @@ import { displayDeadline } from "@/lib/promotion-display";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
 import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref } from "./event-detail-display";
-import { serverLanguage } from "@/i18n";
+import { uiLocale, serverLanguage } from "@/i18n";
 
 const app = useApp(), locale = useLocaleStore(), api = createEventDetailApi(apiClient);
 const language = computed(() => serverLanguage(locale.code));
-const copy = computed(() => eventDetailCopy[language.value]);
-const reminderCopy = computed(() => eventReminderCopy[language.value]);
+const copy = computed(() => eventDetailCopy[uiLocale(locale.code)]);
+const reminderCopy = computed(() => eventReminderCopy[uiLocale(locale.code)]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);
 const ruleRows = computed(() => eventDetailRules(detail.value?.rules ?? {}, copy.value));
 const action = computed(() => detail.value ? eventDetailAction(detail.value) : null);

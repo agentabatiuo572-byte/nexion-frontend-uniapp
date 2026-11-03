@@ -176,6 +176,7 @@ import { useLocaleStore } from "@/store/locale";
 import { eventStatusCopy } from "@/components/events/event-status-copy";
 import type { EventSpinHistory } from "@/api/events-api";
 import { displayDeadline } from "@/lib/promotion-display";
+import { uiLocale } from "@/i18n";
 
 const R = 94; // wheel radius (viewBox 200)
 const CX = 100;
@@ -186,7 +187,7 @@ const spin = useLuckySpin();
 const app = useApp();
 const t = useT();
 const locale = useLocaleStore();
-const statusCopy = computed(() => eventStatusCopy[locale.code as keyof typeof eventStatusCopy] ?? eventStatusCopy.en);
+const statusCopy = computed(() => eventStatusCopy[uiLocale(locale.code)]);
 
 const poolOpen = ref(false);
 let accountGeneration = 0;
@@ -226,9 +227,15 @@ const wheelUnits = {
   zh: { points: "积分", coupon: "券" },
   en: { points: "pts", coupon: "coupon" },
   vi: { points: "điểm", coupon: "phiếu" },
+  id: { points: "pts", coupon: "coupon" },
+  ms: { points: "pts", coupon: "coupon" },
+  fil: { points: "pts", coupon: "coupon" },
+  ru: { points: "pts", coupon: "coupon" },
+  kk: { points: "pts", coupon: "coupon" },
+  uz: { points: "pts", coupon: "coupon" },
 };
 function wheelLabel(sp: Pick<SpinPrize, "kind" | "amount">): string[] {
-  const units = wheelUnits[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"];
+  const units = wheelUnits[uiLocale(locale.code)];
   return [
     `${sp.kind === "usdt" || sp.kind === "coupon" ? "$" : ""}${sp.amount}`,
     sp.kind === "uvt" ? "UVT" : sp.kind === "usdt" ? "USDT" : units[sp.kind],

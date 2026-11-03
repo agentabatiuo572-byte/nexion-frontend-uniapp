@@ -21,6 +21,7 @@
 import { computed } from "vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 const visibility = useDataVisibility();
 const locale = useLocaleStore();
@@ -28,9 +29,15 @@ const copy = {
   zh: { hide: "隐藏资产、收益、算力和团队统计", show: "显示资产、收益、算力和团队统计" },
   en: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
   vi: { hide: "Ẩn tài sản, thu nhập, sức mạnh tính toán và thống kê nhóm", show: "Hiện tài sản, thu nhập, sức mạnh tính toán và thống kê nhóm" },
+  id: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
+  ms: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
+  fil: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
+  ru: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
+  kk: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
+  uz: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
 };
 const label = computed(() => {
-  const text = copy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"];
+  const text = copy[uiLocale(locale.code)];
   return visibility.hidden ? text.show : text.hide;
 });
 

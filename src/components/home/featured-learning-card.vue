@@ -24,7 +24,7 @@
 </template>
 <script setup lang="ts">
 import GrowthProgress from '@/components/ui/growth-progress.vue';
-import { serverLanguage } from '@/i18n';
+import { uiLocale, serverLanguage } from '@/i18n';
 const { missionLayout = false } = defineProps<{missionLayout?: boolean}>();
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -47,7 +47,7 @@ const locale = useLocaleStore();
 const courses = ref<LearningCourse[]>([]);
 const featuredCourse = computed(() => selectRecommendedCourse(courses.value));
 const language = computed(() => serverLanguage(locale.code));
-const copy = computed(() => learningRecommendationCopy[language.value]);
+const copy = computed(() => learningRecommendationCopy[uiLocale(locale.code)]);
 const courseMeta = computed(() => featuredCourse.value ? fmt(t.value.learning.courseMeta, {
   duration: courseDurationText(featuredCourse.value.duration, t.value.learning.durationMinutes),
   nex: formatAmount(featuredCourse.value.rewardNex),

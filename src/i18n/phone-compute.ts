@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 const copy = {
   zh: {
@@ -20,9 +21,45 @@ const copy = {
     web: "Bản web chỉ xem trạng thái. Mở App có mạng trên điện thoại đã liên kết để tiếp tục.",
     validUntil: "Hoạt động đến", expired: "Đã tạm dừng. Mở App có mạng trên điện thoại đã liên kết để tiếp tục.",
   },
+  id: {
+    title: "Phone tasks", loading: "Loading task status…", unavailable: "Unable to update task status. Showing the last record.", restoring: "Restoring task status…",
+    running: "Running", waiting: "No current task", missing: "Task status for this phone was not found.",
+    web: "The web app is read-only. Open the App online on the bound phone to resume.",
+    validUntil: "Active until", expired: "Paused. Open the App online on the bound phone to resume.",
+  },
+  ms: {
+    title: "Phone tasks", loading: "Loading task status…", unavailable: "Unable to update task status. Showing the last record.", restoring: "Restoring task status…",
+    running: "Running", waiting: "No current task", missing: "Task status for this phone was not found.",
+    web: "The web app is read-only. Open the App online on the bound phone to resume.",
+    validUntil: "Active until", expired: "Paused. Open the App online on the bound phone to resume.",
+  },
+  fil: {
+    title: "Phone tasks", loading: "Loading task status…", unavailable: "Unable to update task status. Showing the last record.", restoring: "Restoring task status…",
+    running: "Running", waiting: "No current task", missing: "Task status for this phone was not found.",
+    web: "The web app is read-only. Open the App online on the bound phone to resume.",
+    validUntil: "Active until", expired: "Paused. Open the App online on the bound phone to resume.",
+  },
+  ru: {
+    title: "Phone tasks", loading: "Loading task status…", unavailable: "Unable to update task status. Showing the last record.", restoring: "Restoring task status…",
+    running: "Running", waiting: "No current task", missing: "Task status for this phone was not found.",
+    web: "The web app is read-only. Open the App online on the bound phone to resume.",
+    validUntil: "Active until", expired: "Paused. Open the App online on the bound phone to resume.",
+  },
+  kk: {
+    title: "Phone tasks", loading: "Loading task status…", unavailable: "Unable to update task status. Showing the last record.", restoring: "Restoring task status…",
+    running: "Running", waiting: "No current task", missing: "Task status for this phone was not found.",
+    web: "The web app is read-only. Open the App online on the bound phone to resume.",
+    validUntil: "Active until", expired: "Paused. Open the App online on the bound phone to resume.",
+  },
+  uz: {
+    title: "Phone tasks", loading: "Loading task status…", unavailable: "Unable to update task status. Showing the last record.", restoring: "Restoring task status…",
+    running: "Running", waiting: "No current task", missing: "Task status for this phone was not found.",
+    web: "The web app is read-only. Open the App online on the bound phone to resume.",
+    validUntil: "Active until", expired: "Paused. Open the App online on the bound phone to resume.",
+  },
 };
 
 export function usePhoneComputeCopy() {
   const locale = useLocaleStore();
-  return computed(() => copy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+  return computed(() => copy[uiLocale(locale.code)]);
 }

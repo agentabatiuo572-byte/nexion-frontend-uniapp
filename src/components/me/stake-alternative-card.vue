@@ -32,10 +32,11 @@ import { fmt } from "@/i18n/format";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { useConfig } from "@/store/config";
 import { canRecommendStakingPool, resolveStakingPool } from "@/lib/staking-canonical";
+import { uiLocale } from "@/i18n";
 
 const props = defineProps<{ amountNum: number }>();
 const locale = useLocaleStore();
-const w = computed(() => stakeAlternativeCopy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+const w = computed(() => stakeAlternativeCopy[uiLocale(locale.code)]);
 const expanded = ref(false);
 const staking = useStaking();
 const config = useConfig();

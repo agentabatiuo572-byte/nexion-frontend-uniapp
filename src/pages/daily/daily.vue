@@ -282,6 +282,7 @@ import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
 import { dailyBadgeName, dailyBaseReward, dailyLuckyOdds, dailyMilestoneRewardKind, dailyMilestoneRewardText, type DailyMilestoneRewardKind, dailyRewardLabels, dailyStreakRing, dailyUpcomingMilestone } from "./daily-reward-view";
 import { dailyCheckInSuccessCopy } from "./daily-success-copy";
+import { uiLocale } from "@/i18n";
 
 const ONE_DAY_MS = 86400 * 1000;
 
@@ -574,7 +575,7 @@ const historyRows = computed(() => remoteApiEnabled
   : faucet.history.slice(0, 10));
 function daysLeftText(day: number): string {
     const remaining = Math.max(0, day - streak.value);
-    if (remaining === 0) return locale.code === 'zh' ? '领取资格待确认' : locale.code === 'vi' ? 'Đang chờ xác nhận điều kiện' : 'Eligibility awaiting confirmation';
+    if (remaining === 0) return ({ zh: '领取资格待确认', en: 'Eligibility awaiting confirmation', vi: 'Đang chờ xác nhận điều kiện', id: 'Eligibility awaiting confirmation', ms: 'Eligibility awaiting confirmation', fil: 'Eligibility awaiting confirmation', ru: 'Eligibility awaiting confirmation', kk: 'Eligibility awaiting confirmation', uz: 'Eligibility awaiting confirmation' })[uiLocale(locale.code)];
     return fmt(t.value.daily.milestones.daysLeft, { n: remaining });
 }
 function formatTs(ts: number): string {

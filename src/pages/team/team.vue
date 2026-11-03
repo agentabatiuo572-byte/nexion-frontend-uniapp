@@ -53,7 +53,7 @@
 
         <!-- Rewards: one card per reward with its own accent and mini visual (P-41) -->
         <view>
-          <view class="team-section-head"><text class="team-section-title">{{ designCopy.rewardsSection }}</text><text class="team-section-meta">{{ locale.code === "zh" ? "本期" : locale.code === "vi" ? "Kỳ này" : "This period" }}</text></view>
+          <view class="team-section-head"><text class="team-section-title">{{ designCopy.rewardsSection }}</text><text class="team-section-meta">{{ periodLabel }}</text></view>
           <view ref="bentoEl" class="team-bento nx-viz-motion">
             <view class="nx-team-leaderboard-link team-bento__card nx-viz-press team-bento__card--wide team-bento__card--gold" role="link" tabindex="0" @click="go('/pages/team/leaderboard')" @keydown.enter.prevent="go('/pages/team/leaderboard')">
               <view class="team-bento__head"><view class="team-bento__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg></view><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
@@ -146,6 +146,7 @@ import { useApp } from "@/store/app";
 import { useDataVisibility } from '@/store/data-visibility';
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { uiLocale } from "@/i18n";
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -153,6 +154,7 @@ const app = useApp();
 const vrank = useVRank();
 const auditCopy = useAuditUiCopy();
 const locale = useLocaleStore();
+const periodLabel = computed(() => ({ zh: "本期", en: "This period", vi: "Kỳ này", id: "This period", ms: "This period", fil: "This period", ru: "This period", kk: "This period", uz: "This period" })[uiLocale(locale.code)]);
 const network = useNetwork();
 const commission = useCommission();
 type LedgerPresentation = Pick<TeamCommissionSnapshot["aggregate"], "totalUSDT" | "contributorCount" | "directUSDT" | "extendedUSDT" | "monthUSDT" | "monthNEX" | "unlockedUSDT" | "coolingUSDT">;
@@ -252,9 +254,17 @@ const rankGapText = computed(() => {
 const rankBars = computed(() => {
   const next = rankProgress.value.next;
   if (!rankReadable.value || !next) return [];
-  const short = locale.code === "zh" ? { selfComputePoints: "自购", directRefs: "好友", teamComputePoints: "团队" }
-    : locale.code === "vi" ? { selfComputePoints: "Cá nhân", directRefs: "Bạn bè", teamComputePoints: "Nhóm" }
-      : { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" };
+  const short = ({
+    zh: { selfComputePoints: "自购", directRefs: "好友", teamComputePoints: "团队" },
+    en: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+    vi: { selfComputePoints: "Cá nhân", directRefs: "Bạn bè", teamComputePoints: "Nhóm" },
+    id: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+    ms: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+    fil: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+    ru: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+    kk: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+    uz: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+  })[uiLocale(locale.code)];
   return rankProgress.value.rows.filter(row => row.tier === next.v).map(row => ({
     key: row.key,
     label: row.kind === "vDownlines" ? `V${row.vLevel}` : short[row.kind],

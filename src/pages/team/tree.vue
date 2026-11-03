@@ -81,6 +81,7 @@ import { useNetwork, type NetworkMember } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
 import { UNILEVEL_USDT } from "@/store/commission";
 import { apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
+import { uiLocale } from "@/i18n";
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -104,7 +105,7 @@ const direct = computed(() => members.value.filter((m) => m.layer === 1));
 const extended = computed(() => members.value.filter((m) => m.layer !== 1));
 // Local name search over the loaded roster; the section subtitles keep the full totals.
 const query = ref("");
-const searchCopy = computed(() => locale.code === "zh" ? "搜索成员" : locale.code === "vi" ? "Tìm thành viên" : "Search members");
+const searchCopy = computed(() => ({ zh: "搜索成员", en: "Search members", vi: "Tìm thành viên", id: "Search members", ms: "Search members", fil: "Search members", ru: "Search members", kk: "Search members", uz: "Search members" })[uiLocale(locale.code)]);
 const matchesQuery = (m: { name: string }) => !query.value.trim() || m.name.toLowerCase().includes(query.value.trim().toLowerCase());
 function onSearch(event: Event) {
   const detail = (event as unknown as { detail?: { value?: string } }).detail;

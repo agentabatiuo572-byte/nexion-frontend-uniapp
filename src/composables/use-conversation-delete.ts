@@ -5,11 +5,12 @@ import { useConversations } from '@/store/conversations';
 import { confirm, toast, useUI } from '@/store/ui';
 import { useLocaleStore } from '@/store/locale';
 import { conversationActionsCopy } from '@/i18n/conversation-actions';
+import { uiLocale } from '@/i18n';
 
 /** Both inbox surfaces use the same destructive action and confirmation. */
 export function useConversationDelete() {
   const store = useConversations(), app = useApp(), ui = useUI(), locale = useLocaleStore();
-  const copy = computed(() => conversationActionsCopy[locale.code === 'zh' || locale.code === 'vi' ? locale.code : 'en']);
+  const copy = computed(() => conversationActionsCopy[uiLocale(locale.code)]);
   const openedId = ref(''), pending = ref(false);
   const owner = `conversation-delete:${getCurrentInstance()!.uid}`;
   let revision = 0;
