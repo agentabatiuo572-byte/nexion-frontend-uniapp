@@ -1086,7 +1086,7 @@ export const ru: Messages = {
     dayOneTaskBindCard: "Привязать карту",
     dayOneTaskVisitEarn: "В «Заработок»",
     dayOneTaskVisitStore: "Открыть магазин",
-    dayOneTaskSeeRoi: "Доход UVELBox S1",
+    dayOneTaskSeeRoi: "Ожидаемый доход UVELBox S1",
     dayOneTaskSetupProfile: "Заполнить профиль",
     dayOneTaskInviteFriend: "Пригласить друга",
     dayOneCatWallet: "кошелёк",

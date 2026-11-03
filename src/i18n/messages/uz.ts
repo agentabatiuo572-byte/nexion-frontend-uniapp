@@ -1086,7 +1086,7 @@ export const uz: Messages = {
     dayOneTaskBindCard: "Kartani ulash",
     dayOneTaskVisitEarn: "Daromad boʻlimi",
     dayOneTaskVisitStore: "Doʻkonga kirish",
-    dayOneTaskSeeRoi: "S1 daromadi",
+    dayOneTaskSeeRoi: "S1 taxminiy daromadi",
     dayOneTaskSetupProfile: "Profilni sozlash",
     dayOneTaskInviteFriend: "Doʻst taklif qilish",
     dayOneCatWallet: "hamyon",
@@ -1842,7 +1842,7 @@ export const uz: Messages = {
     purchaseFundsGap: "Hamyoningizda ${amount} yetishmaydi. Toʻlovdan oldin hisobni toʻldiring.",
     purchaseConditions: {
       rank: "Jamoa darajasi",
-      activeDirect: "Faol taklif qilingan doʻstlar",
+      activeDirect: "Taklif etilib faollashtirilganlar",
       teamComputePoints: "Jamoa quvvati",
       lifetimeQuota: "Umumiy kvota (ishlatilgan / jami)",
       monthlyQuota: "Oylik kvota (ishlatilgan / jami)",
