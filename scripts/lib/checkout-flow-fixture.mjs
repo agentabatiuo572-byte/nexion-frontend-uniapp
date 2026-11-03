@@ -4,7 +4,6 @@ import {demoFixture} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh') {
-  state.checkoutNoPendingReservation = true;
   const pin = createPaymentPinFlowFixture();
   pin.state.loggedIn = true;
   pin.state.balance = state.walletBalance ?? 52800.64;
