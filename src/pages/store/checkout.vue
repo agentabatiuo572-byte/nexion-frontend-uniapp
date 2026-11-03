@@ -143,8 +143,7 @@
             <view v-if="(checkoutOnboardingRequired && !freeTrial.hasPendingConversion()) || (checkoutCapacityRequired && !hasTradein && !remoteCapacityGate.canConfirm(false))" class="checkout-note checkout-note--warning" role="status" data-testid="checkout-capacity-notice">
               <text>{{ checkoutCapacityMessage }}</text>
               <view class="checkout-capacity-actions">
-                <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
-                <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
+                <NxButton v-if="!checkoutOnboardingRequired" variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
                 <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
                 <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
               </view>
@@ -1002,13 +1001,11 @@ let interceptFired = false;
 let checkoutCapacityRead: Promise<boolean | undefined> | null = null;
 const remoteCapacityGate = reactive(new RemoteCapacityGate());
 const checkoutOnboardingRequired = ref(false);
-let checkoutSetupReturn = false;
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   interceptFired = false;
   tradeinAvailable.value = false;
   remoteCapacityGate.reset();
   checkoutOnboardingRequired.value = false;
-  checkoutSetupReturn = false;
   checkoutCapacityRead = null;
   checkoutWalletRefreshSequence += 1;
   checkoutWalletRefreshing.value = false;
@@ -1145,16 +1142,6 @@ async function retryCheckoutCapacity() {
   if (remoteCapacityGate.pending) { await checkoutCapacityRead; return; }
   interceptFired = false;
   await fireTradeinIntercept();
-}
-function openCheckoutSetup() {
-  if (!checkoutOnboardingRequired.value || freeTrial.hasPendingConversion() || !isCurrentCheckoutRoute(captureCheckoutRoute())) return;
-  checkoutSetupReturn = true;
-  // #ifdef H5
-  navTo("/pages/register/success?setup=1");
-  // #endif
-  // #ifndef H5
-  navTo("/pages/onboarding/estimator");
-  // #endif
 }
 const checkoutBackHref = computed(() => promotionRoute.value
   ? promotionStoreHref(promotionRoute.value.activityId,promotionRoute.value)
@@ -2390,10 +2377,7 @@ function reassertTradeinContext() {
 onShow(() => {
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
-  if (checkoutSetupReturn) {
-    checkoutSetupReturn = false;
-    if (checkoutRouteInitialized) void initializeCheckout(beginCheckoutRoute());
-  } else if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) void resumeServerOrder();
+  if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) void resumeServerOrder();
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。
   if (activeSession.value) {
