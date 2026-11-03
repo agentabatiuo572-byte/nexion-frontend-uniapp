@@ -142,7 +142,7 @@ const t = useT();
 import { useLocaleStore } from '@/store/locale';
 import { uiLocale } from "@/i18n";
 const locale = useLocaleStore();
-const emptyAchievements = computed(() => ({ zh: '暂时没有可参与的成就', en: 'No achievements available yet', vi: 'Hiện chưa có thành tích khả dụng', id: 'No achievements available yet', ms: 'No achievements available yet', fil: 'No achievements available yet', ru: 'No achievements available yet', kk: 'No achievements available yet', uz: 'No achievements available yet' })[uiLocale(locale.code)]);
+const emptyAchievements = computed(() => ({ zh: '暂时没有可参与的成就', en: 'No achievements available yet', vi: 'Hiện chưa có thành tích khả dụng', id: 'Belum ada pencapaian yang tersedia', ms: 'Belum ada pencapaian tersedia', fil: 'Wala pang available na achievement', ru: 'Доступных достижений пока нет', kk: 'Әзірге қолжетімді жетістік жоқ', uz: 'Hozircha yutuqlar yoʻq' })[uiLocale(locale.code)]);
 const w = computed(() => t.value.achievements);
 const app = useApp();
 const ach = useAchievements();

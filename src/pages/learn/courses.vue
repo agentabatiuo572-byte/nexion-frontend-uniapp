@@ -95,12 +95,12 @@ const pageCopy = computed(() => ({
   zh: { progress: "已学完 {done}/{total} 课", earned: "已获", allCourses: "全部课程", courseCount: "{n} 门", recommended: "推荐", questions: "{n} 道小测", reward: "奖励" },
   en: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
   vi: { progress: "Đã học {done}/{total} bài", earned: "Đã nhận", allCourses: "Tất cả bài học", courseCount: "{n} bài", recommended: "Đề xuất", questions: "{n} câu hỏi", reward: "Thưởng" },
-  id: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
-  ms: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
-  fil: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
-  ru: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
-  kk: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
-  uz: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },
+  id: { progress: "{done}/{total} kursus selesai", earned: "Diperoleh", allCourses: "Semua kursus", courseCount: "{n} kursus", recommended: "Disarankan", questions: "{n} soal kuis", reward: "Hadiah" },
+  ms: { progress: "{done}/{total} kursus selesai", earned: "Diperoleh", allCourses: "Semua kursus", courseCount: "{n} kursus", recommended: "Disyorkan", questions: "{n} soalan kuiz", reward: "Ganjaran" },
+  fil: { progress: "{done}/{total} kurso ang natapos", earned: "Nakuha", allCourses: "Lahat ng kurso", courseCount: "{n} kurso", recommended: "Mungkahi", questions: "{n} tanong sa quiz", reward: "Reward" },
+  ru: { progress: "Пройдено курсов: {done}/{total}", earned: "Получено", allCourses: "Все курсы", courseCount: "Курсов: {n}", recommended: "Советуем", questions: "Вопросов: {n}", reward: "Награда" },
+  kk: { progress: "Аяқталған курс: {done}/{total}", earned: "Алынды", allCourses: "Барлық курс", courseCount: "{n} курс", recommended: "Ұсынылған", questions: "{n} тест сұрағы", reward: "Сыйақы" },
+  uz: { progress: "{done}/{total} kurs tugatildi", earned: "Olindi", allCourses: "Barcha kurslar", courseCount: "{n} ta kurs", recommended: "Tavsiya", questions: "{n} ta test savoli", reward: "Mukofot" },
 }[uiLocale(locale.code)]));
 const progressLine = computed(() => overview.value ? fmt(pageCopy.value.progress, { done: overview.value.completedCourses, total: overview.value.totalCourses }) : "");
 const overviewProgress = computed(() => overview.value?.totalCourses ? Math.min(100, Math.max(0, overview.value.completedCourses / overview.value.totalCourses * 100)) : 0);

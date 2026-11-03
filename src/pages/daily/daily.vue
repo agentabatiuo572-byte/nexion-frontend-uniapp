@@ -575,7 +575,7 @@ const historyRows = computed(() => remoteApiEnabled
   : faucet.history.slice(0, 10));
 function daysLeftText(day: number): string {
     const remaining = Math.max(0, day - streak.value);
-    if (remaining === 0) return ({ zh: '领取资格待确认', en: 'Eligibility awaiting confirmation', vi: 'Đang chờ xác nhận điều kiện', id: 'Eligibility awaiting confirmation', ms: 'Eligibility awaiting confirmation', fil: 'Eligibility awaiting confirmation', ru: 'Eligibility awaiting confirmation', kk: 'Eligibility awaiting confirmation', uz: 'Eligibility awaiting confirmation' })[uiLocale(locale.code)];
+    if (remaining === 0) return ({ zh: '领取资格待确认', en: 'Eligibility awaiting confirmation', vi: 'Đang chờ xác nhận điều kiện', id: 'Kelayakan menunggu konfirmasi', ms: 'Kelayakan menunggu pengesahan', fil: 'Hinihintay makumpirma ang eligibility', ru: 'Право на награду ждёт подтверждения', kk: 'Алу құқығы расталуда', uz: 'Olish huquqi hali tasdiqlanmagan' })[uiLocale(locale.code)];
     return fmt(t.value.daily.milestones.daysLeft, { n: remaining });
 }
 function formatTs(ts: number): string {

@@ -48,8 +48,8 @@ function normalizedPublishedTagline(value: string): string {
 const PRO_PUBLISHED_TAGLINE = "中端主力·AI 推理 + 挖掘";
 const VIRGINIA_DATACENTER = "美国·弗吉尼亚";
 // zh keeps the published value itself; the zh slots only show translators the source.
-const VIRGINIA_DATACENTER_LABEL = { zh: "美国·弗吉尼亚", en: "United States · Virginia", vi: "Hoa Kỳ · Virginia", id: "United States · Virginia", ms: "United States · Virginia", fil: "United States · Virginia", ru: "United States · Virginia", kk: "United States · Virginia", uz: "United States · Virginia" };
-const PRO_TAGLINE_LABEL = { zh: "中端主力·AI 推理 + 挖掘", en: "Midrange mainstay · AI inference + mining", vi: "Dòng chủ lực tầm trung · Suy luận AI + khai thác", id: "Midrange mainstay · AI inference + mining", ms: "Midrange mainstay · AI inference + mining", fil: "Midrange mainstay · AI inference + mining", ru: "Midrange mainstay · AI inference + mining", kk: "Midrange mainstay · AI inference + mining", uz: "Midrange mainstay · AI inference + mining" };
+const VIRGINIA_DATACENTER_LABEL = { zh: "美国·弗吉尼亚", en: "United States · Virginia", vi: "Hoa Kỳ · Virginia", id: "Amerika Serikat · Virginia", ms: "Amerika Syarikat · Virginia", fil: "United States · Virginia", ru: "США · Вирджиния", kk: "АҚШ · Вирджиния", uz: "AQSh · Virjiniya" };
+const PRO_TAGLINE_LABEL = { zh: "中端主力·AI 推理 + 挖掘", en: "Midrange mainstay · AI inference + mining", vi: "Dòng chủ lực tầm trung · Suy luận AI + khai thác", id: "Andalan kelas menengah · inferensi AI + mining", ms: "Pilihan utama kelas pertengahan · inferens AI + perlombongan", fil: "Midrange na pangunahing model · AI inference + mining", ru: "Средний класс · AI-инференс + майнинг", kk: "Орта деңгейдің негізгісі · AI инференс + майнинг", uz: "Oʻrta sinf asosiy model · AI inference + mayning" };
 
 /** Translate only this published place label; a SKU's actual datacenter remains server-owned. */
 export function localizedDatacenterValue(value: string | null | undefined, locale: LocaleCode): string | null | undefined {
