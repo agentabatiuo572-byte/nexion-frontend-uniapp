@@ -191,12 +191,12 @@ const inviteStepText = computed(() => {
     zh: { pending: "还有 {n} 位好友未激活", pendingOne: "还有 {n} 位好友未激活", allActive: "邀请的好友已全部激活" },
     en: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
     vi: { pending: "Còn {n} người bạn chưa kích hoạt", pendingOne: "Còn {n} người bạn chưa kích hoạt", allActive: "Bạn bè đã mời đều đã kích hoạt" },
-    id: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
-    ms: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
-    fil: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
-    ru: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
-    kk: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
-    uz: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+    id: { pending: "{n} teman yang diundang belum aktif", pendingOne: "{n} teman yang diundang belum aktif", allActive: "Semua teman yang diundang sudah aktif" },
+    ms: { pending: "{n} rakan dijemput belum aktif", pendingOne: "{n} rakan dijemput belum aktif", allActive: "Semua rakan dijemput sudah aktif" },
+    fil: { pending: "{n} inimbitahang kaibigan ang hindi pa aktibo", pendingOne: "{n} inimbitahang kaibigan ang hindi pa aktibo", allActive: "Aktibo na lahat ng inimbitahan" },
+    ru: { pending: "Приглашённые друзья, ещё не прошедшие активацию: {n}", pendingOne: "Приглашённые друзья, ещё не прошедшие активацию: {n}", allActive: "Все приглашённые друзья прошли активацию" },
+    kk: { pending: "Шақырылған {n} дос әлі белсенді емес", pendingOne: "Шақырылған {n} дос әлі белсенді емес", allActive: "Шақырылған достардың бәрі белсенді" },
+    uz: { pending: "Taklif qilingan {n} doʻst hali faol emas", pendingOne: "Taklif qilingan {n} doʻst hali faol emas", allActive: "Taklif qilingan barcha doʻstlar faol" },
   })[uiLocale(locale.code)];
   return n > 0 ? fmt(n === 1 ? copy.pendingOne : copy.pending, { n }) : copy.allActive;
 });

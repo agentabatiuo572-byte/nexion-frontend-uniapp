@@ -176,12 +176,12 @@ function channelHint(key: ShareChannelKey): string {
     zh: { poster: "带二维码，可保存", copy: "好友打开即可注册" },
     en: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
     vi: { poster: "Có mã QR, lưu được", copy: "Bạn bè mở là đăng ký" },
-    id: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
-    ms: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
-    fil: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
-    ru: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
-    kk: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
-    uz: { poster: "With QR code, saveable", copy: "Friends sign up from it" },
+    id: { poster: "Kode QR, bisa disimpan", copy: "Teman bisa langsung daftar" },
+    ms: { poster: "Dengan kod QR, boleh disimpan", copy: "Pautan untuk rakan mendaftar" },
+    fil: { poster: "May QR code, puwedeng i-save", copy: "Dito makakapag-sign up ang kaibigan" },
+    ru: { poster: "С QR-кодом, можно сохранить", copy: "Друзья регистрируются по ней" },
+    kk: { poster: "QR-кодпен, сақтауға болады", copy: "Достар осы арқылы тіркеледі" },
+    uz: { poster: "QR kod bilan, saqlash mumkin", copy: "Doʻstlar roʻyxatdan oʻtadi" },
   })[uiLocale(locale.code)];
   return key === "poster" || key === "copy" ? hints[key] : "";
 }

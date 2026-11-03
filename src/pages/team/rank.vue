@@ -111,7 +111,7 @@ const previewData = computed(() => ({
 }));
 const prog = computed(() => teamRankProgress(previewData.value, rankDefs.value));
 const designCopy = computed(() => teamRedesignCopy(locale.code));
-const nextRankLabel = computed(() => ({ zh: "下一级", en: "Next", vi: "Hạng kế", id: "Next", ms: "Next", fil: "Next", ru: "Next", kk: "Next", uz: "Next" })[uiLocale(locale.code)]);
+const nextRankLabel = computed(() => ({ zh: "下一级", en: "Next", vi: "Hạng kế", id: "Berikutnya", ms: "Seterusnya", fil: "Susunod", ru: "Далее", kk: "Келесі", uz: "Keyingi" })[uiLocale(locale.code)]);
 const logicCopy = computed(() => teamLogicCopy(locale.code));
 const rankGapSummary = computed(() => [
   fmt(copy.value.remainingConditions, { n: prog.value.missing.length }),
@@ -171,7 +171,7 @@ const allConditions = computed(() => prog.value.rows
 
 const nextConditions = computed(() => allConditions.value.filter(row => row.tier === prog.value.next?.v));
 const inheritedConditions = computed(() => allConditions.value.filter(row => row.tier !== prog.value.next?.v));
-const rankReviewCopy = computed(() => ({ zh: { previous: "前序等级条件" }, en: { previous: "Earlier rank requirements" }, vi: { previous: "Điều kiện hạng trước" }, id: { previous: "Earlier rank requirements" }, ms: { previous: "Earlier rank requirements" }, fil: { previous: "Earlier rank requirements" }, ru: { previous: "Earlier rank requirements" }, kk: { previous: "Earlier rank requirements" }, uz: { previous: "Earlier rank requirements" } })[uiLocale(locale.code)]);
+const rankReviewCopy = computed(() => ({ zh: { previous: "前序等级条件" }, en: { previous: "Earlier rank requirements" }, vi: { previous: "Điều kiện hạng trước" }, id: { previous: "Syarat peringkat sebelumnya" }, ms: { previous: "Syarat pangkat terdahulu" }, fil: { previous: "Requirement ng naunang rank" }, ru: { previous: "Условия предыдущих рангов" }, kk: { previous: "Алдыңғы дәреже талаптары" }, uz: { previous: "Oldingi daraja shartlari" } })[uiLocale(locale.code)]);
 
 onMounted(() => {
   // Local rank data is not used in remote mode; the ladder and member progress arrive together.

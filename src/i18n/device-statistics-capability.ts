@@ -16,28 +16,28 @@ export const deviceStatisticsCapabilityCopy = {
     scope: "Có thể xem thu nhập hôm nay, tổng thu nhập và các tác vụ hoàn thành gần đây. Chưa có biểu đồ thu nhập theo ngày và tỷ lệ trực tuyến trong quá khứ.",
   },
   id: {
-    currentStatus: "Current status",
-    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+    currentStatus: "Status saat ini",
+    scope: "Pendapatan hari ini, total pendapatan, dan tugas yang baru selesai tersedia. Grafik pendapatan harian dan riwayat uptime belum tersedia.",
   },
   ms: {
-    currentStatus: "Current status",
-    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+    currentStatus: "Status semasa",
+    scope: "Pendapatan hari ini, jumlah pendapatan dan kerja yang baru selesai tersedia. Carta pendapatan harian dan sejarah kadar dalam talian belum ditawarkan.",
   },
   fil: {
-    currentStatus: "Current status",
-    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+    currentStatus: "Kasalukuyang status",
+    scope: "Available ang kita ngayon, kabuuang kita at mga kamakailang natapos na job. Wala pang chart ng kita kada araw at history ng online rate.",
   },
   ru: {
-    currentStatus: "Current status",
-    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+    currentStatus: "Текущий статус",
+    scope: "Доступны доход за сегодня, доход за всё время и недавно выполненные задачи. Графики дохода по дням и история доступности пока не предусмотрены.",
   },
   kk: {
-    currentStatus: "Current status",
-    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+    currentStatus: "Ағымдағы күй",
+    scope: "Бүгінгі табыс, жалпы табыс және соңғы аяқталған жұмыстар қолжетімді. Күндік табыс графигі мен онлайн көрсеткішінің тарихы әзірге жоқ.",
   },
   uz: {
-    currentStatus: "Current status",
-    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+    currentStatus: "Joriy holat",
+    scope: "Bugungi daromad, jami daromad va soʻnggi bajarilgan ishlarni koʻrish mumkin. Kunlik daromad grafiklari va onlayn vaqt ulushi tarixi hali mavjud emas.",
   },
 };
 

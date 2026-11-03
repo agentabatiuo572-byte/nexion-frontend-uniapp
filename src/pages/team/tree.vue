@@ -105,7 +105,7 @@ const direct = computed(() => members.value.filter((m) => m.layer === 1));
 const extended = computed(() => members.value.filter((m) => m.layer !== 1));
 // Local name search over the loaded roster; the section subtitles keep the full totals.
 const query = ref("");
-const searchCopy = computed(() => ({ zh: "搜索成员", en: "Search members", vi: "Tìm thành viên", id: "Search members", ms: "Search members", fil: "Search members", ru: "Search members", kk: "Search members", uz: "Search members" })[uiLocale(locale.code)]);
+const searchCopy = computed(() => ({ zh: "搜索成员", en: "Search members", vi: "Tìm thành viên", id: "Cari anggota", ms: "Cari ahli", fil: "Maghanap ng miyembro", ru: "Поиск участников", kk: "Мүшелерді іздеу", uz: "Aʼzolarni qidirish" })[uiLocale(locale.code)]);
 const matchesQuery = (m: { name: string }) => !query.value.trim() || m.name.toLowerCase().includes(query.value.trim().toLowerCase());
 function onSearch(event: Event) {
   const detail = (event as unknown as { detail?: { value?: string } }).detail;

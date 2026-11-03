@@ -154,7 +154,7 @@ const app = useApp();
 const vrank = useVRank();
 const auditCopy = useAuditUiCopy();
 const locale = useLocaleStore();
-const periodLabel = computed(() => ({ zh: "本期", en: "This period", vi: "Kỳ này", id: "This period", ms: "This period", fil: "This period", ru: "This period", kk: "This period", uz: "This period" })[uiLocale(locale.code)]);
+const periodLabel = computed(() => ({ zh: "本期", en: "This period", vi: "Kỳ này", id: "Periode ini", ms: "Tempoh ini", fil: "Period na ito", ru: "Этот период", kk: "Осы кезең", uz: "Shu davr" })[uiLocale(locale.code)]);
 const network = useNetwork();
 const commission = useCommission();
 type LedgerPresentation = Pick<TeamCommissionSnapshot["aggregate"], "totalUSDT" | "contributorCount" | "directUSDT" | "extendedUSDT" | "monthUSDT" | "monthNEX" | "unlockedUSDT" | "coolingUSDT">;
@@ -258,12 +258,12 @@ const rankBars = computed(() => {
     zh: { selfComputePoints: "自购", directRefs: "好友", teamComputePoints: "团队" },
     en: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
     vi: { selfComputePoints: "Cá nhân", directRefs: "Bạn bè", teamComputePoints: "Nhóm" },
-    id: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
-    ms: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
-    fil: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
-    ru: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
-    kk: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
-    uz: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
+    id: { selfComputePoints: "Beli sendiri", directRefs: "Teman", teamComputePoints: "Tim" },
+    ms: { selfComputePoints: "Sendiri", directRefs: "Rakan", teamComputePoints: "Pasukan" },
+    fil: { selfComputePoints: "Sarili", directRefs: "Kaibigan", teamComputePoints: "Team" },
+    ru: { selfComputePoints: "Свои покупки", directRefs: "Друзья", teamComputePoints: "Команда" },
+    kk: { selfComputePoints: "Жеке", directRefs: "Достар", teamComputePoints: "Команда" },
+    uz: { selfComputePoints: "Shaxsiy", directRefs: "Doʻstlar", teamComputePoints: "Jamoa" },
   })[uiLocale(locale.code)];
   return rankProgress.value.rows.filter(row => row.tier === next.v).map(row => ({
     key: row.key,

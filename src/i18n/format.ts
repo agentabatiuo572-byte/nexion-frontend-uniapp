@@ -31,8 +31,8 @@ export function fmtMoney(value: number | null | undefined, detail = false): stri
   return `${value < 0 ? "−" : ""}$${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: detail ? 4 : 2 })}`;
 }
 
-const RATE_UNIT = { zh: "天", en: "day", vi: "ngày", id: "day", ms: "day", fil: "day", ru: "day", kk: "day", uz: "day" };
-const JUST_NOW = { zh: "刚刚", en: "Just now", vi: "Vừa xong", id: "Just now", ms: "Just now", fil: "Just now", ru: "Just now", kk: "Just now", uz: "Just now" };
+const RATE_UNIT = { zh: "天", en: "day", vi: "ngày", id: "hari", ms: "hari", fil: "araw", ru: "день", kk: "күн", uz: "kun" };
+const JUST_NOW = { zh: "刚刚", en: "Just now", vi: "Vừa xong", id: "Baru saja", ms: "Baru sahaja", fil: "Ngayon lang", ru: "Только что", kk: "Жаңа ғана", uz: "Hozirgina" };
 
 export function fmtRate(value: number | null | undefined, locale: string = "en"): string {
   return `${fmtMoney(value)}/${RATE_UNIT[uiLocale(locale)]}`;

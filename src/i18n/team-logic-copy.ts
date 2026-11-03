@@ -14,28 +14,28 @@ const COPY = {
     posterYieldCap: 'THU NHẬP HÔM NAY', eventAt: 'Thời gian phát sinh', settledAt: 'Thời gian ghi nhận', expectedUnlockAt: 'Dự kiến khả dụng', dateUnavailable: 'Chưa cung cấp',
   },
   id: {
-    discardDraft: 'Discard draft', unknownConditions: '{n} requirements awaiting confirmation', unknownProgress: 'Current progress awaiting confirmation',
-    posterYieldCap: "TODAY'S EARNINGS", eventAt: 'Occurred at', settledAt: 'Settled at', expectedUnlockAt: 'Expected availability', dateUnavailable: 'Not provided',
+    discardDraft: 'Buang draf', unknownConditions: '{n} syarat menunggu konfirmasi', unknownProgress: 'Progres saat ini menunggu konfirmasi',
+    posterYieldCap: "PENDAPATAN HARI INI", eventAt: 'Waktu kejadian', settledAt: 'Dibayarkan pada', expectedUnlockAt: 'Est. waktu tersedia', dateUnavailable: 'Tidak tersedia',
   },
   ms: {
-    discardDraft: 'Discard draft', unknownConditions: '{n} requirements awaiting confirmation', unknownProgress: 'Current progress awaiting confirmation',
-    posterYieldCap: "TODAY'S EARNINGS", eventAt: 'Occurred at', settledAt: 'Settled at', expectedUnlockAt: 'Expected availability', dateUnavailable: 'Not provided',
+    discardDraft: 'Buang draf', unknownConditions: '{n} syarat menunggu pengesahan', unknownProgress: 'Kemajuan semasa menunggu pengesahan',
+    posterYieldCap: "PENDAPATAN HARI INI", eventAt: 'Berlaku pada', settledAt: 'Dibayar pada', expectedUnlockAt: 'Dijangka tersedia', dateUnavailable: 'Tidak diberikan',
   },
   fil: {
-    discardDraft: 'Discard draft', unknownConditions: '{n} requirements awaiting confirmation', unknownProgress: 'Current progress awaiting confirmation',
-    posterYieldCap: "TODAY'S EARNINGS", eventAt: 'Occurred at', settledAt: 'Settled at', expectedUnlockAt: 'Expected availability', dateUnavailable: 'Not provided',
+    discardDraft: 'Itapon ang draft', unknownConditions: '{n} requirement ang hinihintay makumpirma', unknownProgress: 'Hinihintay makumpirma ang progreso',
+    posterYieldCap: "KITA NGAYON", eventAt: 'Nangyari noong', settledAt: 'Naibigay noong', expectedUnlockAt: 'Inaasahang availability', dateUnavailable: 'Walang petsa',
   },
   ru: {
-    discardDraft: 'Discard draft', unknownConditions: '{n} requirements awaiting confirmation', unknownProgress: 'Current progress awaiting confirmation',
-    posterYieldCap: "TODAY'S EARNINGS", eventAt: 'Occurred at', settledAt: 'Settled at', expectedUnlockAt: 'Expected availability', dateUnavailable: 'Not provided',
+    discardDraft: 'Удалить черновик', unknownConditions: 'Условий без подтверждения: {n}', unknownProgress: 'Прогресс ждёт подтверждения',
+    posterYieldCap: "ДОХОД ЗА СЕГОДНЯ", eventAt: 'Время события', settledAt: 'Выплачено', expectedUnlockAt: 'Ориентировочно доступно', dateUnavailable: 'Нет данных',
   },
   kk: {
-    discardDraft: 'Discard draft', unknownConditions: '{n} requirements awaiting confirmation', unknownProgress: 'Current progress awaiting confirmation',
-    posterYieldCap: "TODAY'S EARNINGS", eventAt: 'Occurred at', settledAt: 'Settled at', expectedUnlockAt: 'Expected availability', dateUnavailable: 'Not provided',
+    discardDraft: 'Нобайды жою', unknownConditions: 'Расталуды күтетін талаптар: {n}', unknownProgress: 'Ағымдағы барыс расталуда',
+    posterYieldCap: "БҮГІНГІ ТАБЫС", eventAt: 'Болған уақыты', settledAt: 'Төленген уақыты', expectedUnlockAt: 'Болжамды қолжетімді уақыты', dateUnavailable: 'Көрсетілмеген',
   },
   uz: {
-    discardDraft: 'Discard draft', unknownConditions: '{n} requirements awaiting confirmation', unknownProgress: 'Current progress awaiting confirmation',
-    posterYieldCap: "TODAY'S EARNINGS", eventAt: 'Occurred at', settledAt: 'Settled at', expectedUnlockAt: 'Expected availability', dateUnavailable: 'Not provided',
+    discardDraft: 'Qoralamani oʻchirish', unknownConditions: '{n} ta shart hali tasdiqlanmagan', unknownProgress: 'Bajarilish holati hali tasdiqlanmagan',
+    posterYieldCap: "BUGUNGI DAROMAD", eventAt: 'Sodir boʻlgan vaqt', settledAt: 'Toʻlangan vaqt', expectedUnlockAt: 'Taxminiy ochilish vaqti', dateUnavailable: 'Koʻrsatilmagan',
   },
 };
 export function teamLogicCopy(locale: string) {

@@ -132,12 +132,12 @@ const binaryCopy = computed(() => ({
   zh: { rules: '玩法说明', contributions: '本月两组订单额', leadingMembers: '各组领先成员', leads: '领先' },
   en: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
   vi: { rules: 'Cách nhận thưởng', contributions: 'Doanh số hai nhóm tháng này', leadingMembers: 'Thành viên dẫn đầu mỗi nhóm', leads: ' dẫn đầu' },
-  id: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
-  ms: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
-  fil: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
-  ru: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
-  kk: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
-  uz: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+  id: { rules: 'Cara kerja', contributions: 'Volume pesanan kedua grup bulan ini', leadingMembers: 'Anggota teratas per grup', leads: ' #1' },
+  ms: { rules: 'Cara ia berfungsi', contributions: 'Nilai pesanan bulan ini', leadingMembers: 'Ahli teratas ikut kumpulan', leads: ' #1' },
+  fil: { rules: 'Paano ito gumagana', contributions: 'Benta ngayong buwan', leadingMembers: 'Nangungunang miyembro bawat grupo', leads: ' · angat' },
+  ru: { rules: 'Как это работает', contributions: 'Объём заказов групп за месяц', leadingMembers: 'Лидеры групп', leads: ': топ' },
+  kk: { rules: 'Түсіндірме', contributions: 'Айлық тапсырыс сомасы', leadingMembers: 'Топтағы үздік мүшелер', leads: ' үздігі' },
+  uz: { rules: 'Qanday ishlaydi', contributions: 'Shu oydagi guruh buyurtmalari', leadingMembers: 'Guruhlar boʻyicha yetakchilar', leads: ' lideri' },
 })[uiLocale(locale.code)]);
 
 const displayEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
