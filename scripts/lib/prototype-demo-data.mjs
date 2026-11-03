@@ -31,7 +31,7 @@ export const demoDefaults = {trialQuoteState:'default',computeState:'app',checko
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
   promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU · 首页横幅与购机活动）'],['phone-gift','手机赠品：买 S1 送 iphone15 / 邀请礼送 iphone15 / 组合礼 S1 规则送 iphone15']],
-  promoEdgeState:[['normal','常规'],['referral-progress-error','推荐活动进度读取失败（配合手机赠品）'],['exclusive-voucher','自动选中的活动立减 100 · 不与代金券叠加（配合手机赠品）']],
+  promoEdgeState:[['normal','常规'],['referral-progress-error','推荐活动进度读取失败（配合手机赠品）'],['exclusive-voucher','自动选中的手机赠品活动立减 100 · 不与代金券叠加（配合手机赠品）']],
   downloadState:[['unavailable','下载入口未发布'],['published','iOS / Android / 官网入口（示例链接）']],
   ...authDemoOptions,
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换'],['capacity-error','容量读取失败'],['setup-required','需完成初始设置']],
@@ -352,8 +352,9 @@ export function demoFixture(url,locale,state,request) {
     const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity:items.reduce((sum,item)=>sum+item.quantity,0),items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:input.activityId?1:null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
     if(input.activityId){const activity=demoFixture(new URL('/api/promotions/'+input.activityId,url.origin),locale,state,request);for(const line of items){const rule=activity.rewardRules?.find(r=>r.productNo===line.productNo);if(rule){const {disclosure,...reward}=rule.buyerReward;quote.expectedRewards.push({lineId:line.lineId,activityId:activity.activityId,version:activity.version,ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});}}}
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
-    // exclusive-voucher: an applied campaign takes 100 off and the server drops the voucher instead of stacking it.
-    const exclusivePromotion=state.promoEdgeState==='exclusive-voucher'&&!!input.activityId;if(exclusivePromotion){quote.voucherId=null;quote.promotionDiscountUsdt='100.00';}
+    // exclusive-voucher: the auto-selected phone-gift campaign (demo-promo-0) takes 100 off and the server drops the voucher instead of stacking it.
+    // Only that campaign: a fixed 100 off a cheaper campaign line (Cloud Share 19.90) would quote a negative amount.
+    const exclusivePromotion=state.promoEdgeState==='exclusive-voucher'&&input.activityId==='demo-promo-0';if(exclusivePromotion){quote.voucherId=null;quote.promotionDiscountUsdt='100.00';}
     let remaining=bundleDiscount+(exclusivePromotion?100:voucherDiscount(state,input.voucherId,Number(subtotal)-bundleDiscount));quote.discountUsdt=remaining.toFixed(2);quote.amountUsdt=(Number(subtotal)-remaining).toFixed(2);
     for(const line of items){const discount=Math.min(remaining,Number(line.subtotalUsdt));line.discountUsdt=discount.toFixed(2);line.payableUsdt=(Number(line.subtotalUsdt)-discount).toFixed(2);remaining-=discount;}
     if(!demoOrderFitsCapacity(url,locale,state,products,items)){
