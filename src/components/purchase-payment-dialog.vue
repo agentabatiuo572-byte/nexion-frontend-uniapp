@@ -257,8 +257,8 @@ const walletEnough = computed(() => Number(s.amount) === 0 || balanceKnown.value
 const shortfall = computed(() => balanceKnown.value ? Math.max(0, Number(s.amount) - app.user.usdtBalance) : 0);
 const usdtAvailable = computed(() => payment.available('CREGIS_USDT_BSC') || payment.available('CREGIS_USDT_ERC20'));
 const networks = computed(() => [
-  { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
   { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
+  { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
 ].filter(tab => payment.available(tab.id)));
 const sheetTitle = computed(() => s.step === 'network' ? copy.value.networkTitle : s.step === 'bank' ? copy.value.bankTitle : copy.value.title);
 const rounded = computed(() => !!s.quote?.roundingAdjustmentUsdt && Number(s.quote.roundingAdjustmentUsdt) !== 0);
