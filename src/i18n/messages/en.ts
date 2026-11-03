@@ -311,7 +311,6 @@ export const en = {
     errorOtpSendUnavailable: "The verification code has not been sent. Please try again later.",
     errorServiceUnavailable: "We couldn't verify the account right now. Please try again.",
 
-sandboxCodeHint: "Demo code: {code}. No SMS will be sent.",
 },
   // Region-policy refusals. The four keys are the four GeoPolicyErrorKind values
   // declared in the geo-policy-error module — this namespace IS the GeoPolicyCopy
@@ -550,7 +549,6 @@ sandboxSponsorEnvironmentMismatch: "This invitation code can't be used. Check it
     onGridOnline: "online",
     networkPulseTitle: "Network pulse",
     networkLive: "live",
-    networkPublishedScope: "Published scale estimates · not live connections",
     networkGlobalGrid: "Global grid · live",
     networkMembers: "Members",
     networkDevices: "Devices",
@@ -770,8 +768,6 @@ sandboxSponsorEnvironmentMismatch: "This invitation code can't be used. Check it
     liveFeedEmpty: "No task activity available.",
 
 quickMissionsActive: "5 active",
-sandboxQuoteLedgerTitle: "Sample task quotes",
-sandboxQuoteNoCredit: "Demo data · Not credited to balance",
 trustReserve: "No verifiable reserve information available.",
 },
   earn: {
@@ -2003,8 +1999,6 @@ storeHint: "Browse devices in the store",
     configUnavailableBody: "Check your network connection and try again.",
     configRetryCta: "Reload",
 
-sandboxHoldCta: "Connection unavailable",
-sandboxHoldBody: "Demo mode cannot connect a real computer. You can view download and connection instructions.",
 },
   // Voucher (代金券) — claim popup + fallback banner + checkout redemption.
   voucher: {
@@ -2485,8 +2479,6 @@ summerActivityName: "Summer Activity",
     pageFooter: "Fully managed · zero shipping",
 
 specUptimeValue: "99.9%",
-coSandboxWallet: "Demo wallet",
-coHintSandboxWallet: "Demo payment · No real funds involved",
   shareDailyEstimateNote: "USDT is estimated from the current price, quantity and annual reward rate. Actual payouts may differ.",
     shareFlexibleDescription: "Buy computing shares directly for more flexibility.",
     cardEstimateNote: "Estimates only; actual payouts may differ.",
@@ -2571,7 +2563,6 @@ summaryView: "View team",
 summaryLoading: "Loading team members…",
 summaryUnavailable: "Team members couldn't load. Please try again.",
 rankBenefits: "View rank benefits",
-sandboxBanner: "Demo mode · Sample rewards",
 },
   wallet: {
     loadingTransactions: "Loading transaction history…",
@@ -3923,9 +3914,6 @@ earningsMilestone: "Earnings milestone ${threshold}",
     loadMore: "Load more",
     retry: "Retry",
 
-sandboxPayCta: "Continue demo payment",
-sandboxPayBusy: "Confirming demo payment…",
-sandboxPayHint: "Demo payments use no real funds. Check the order status after completion.",
   closeReasons: {
       USER_CANCELLED: "You cancelled the order",
       PAYMENT_TIMEOUT: "Not paid in time",
@@ -4138,7 +4126,6 @@ sandboxPayHint: "Demo payments use no real funds. Check the order status after c
   globe: {
     title: "Global Network",
     back: "Back",
-    headline: "UVEL network overview",
     activeNodes: "Active nodes",
     activeJobs: "Jobs in flight",
     jobsPerHour: "Jobs/hr",
@@ -4151,7 +4138,6 @@ sandboxPayHint: "Demo payments use no real funds. Check the order status after c
     centerNewYork: "New York",
     centerSanJose: "San Jose",
     superComputeCenter: "Supercomputing center",
-    simulationHint: "Nodes, tasks and latency are simulated, not live telemetry.",
     youAre: "Your location",
     regionAsia: "Asia-Pacific",
     regionEurope: "Europe",
@@ -4162,7 +4148,6 @@ sandboxPayHint: "Demo payments use no real funds. Check the order status after c
     regionDevices: "{n} devices",
     regionJobs: "{n} jobs / hour",
     regionLatency: "Avg latency {n}ms",
-    legend: "Dots and pulses are illustrative · see region details for actual load",
     yourNodeBadge: "You",
     regionProjectionLoadingTitle: "Loading regional network",
     regionProjectionLoadingDesc: "Loading active node and task distribution.",
@@ -5323,7 +5308,6 @@ openseaLine: "View on OpenSea · floor",
     heroSub: "See eligibility, payout times and reward records.",
     currentRulesTitle: "Current rules",
     currentRules: "Reach V{rank} to take part. Rewards are subject to actual payout.",
-    localRules: "Local preview is for interface demonstration only and is not a payout rule.",
     nextPayout: "Next payout: {time}",
     s1Title: "What is the team incentive pool?",
     s1Para1:
@@ -6115,7 +6099,6 @@ openSeaErrorPool: {
       "UVT is the UVEL platform token. Exchange it for USDT or use it to cover withdrawal fees.",
     publishedDataVersion: "Published data · {version}",
     activeAiClientsLabel: "Active AI clients",
-    activeAiClientsNotice: "This statistic comes from the current published content; it is not a real-time count.",
     s1Title: "UVT vs USDT — what's the difference?",
     s1Para1:
       "Your wallet holds two kinds of money. USDT is a stablecoin pegged to the US dollar — predictable, used for payments and withdrawals. UVT is UVEL's native platform token — variable price, used to exchange into USDT and to offset USDT withdrawal fees.",
@@ -6780,7 +6763,6 @@ openSeaErrorPool: {
     reasonNewAddressAge: "Security check in progress",
     startFailed: "Something went wrong. Please try again.",
 
-sandboxMockNotice: "Demo mode · No real transfers will be made",
 },
   learning: {
     centerTitle: "Learning center",
@@ -6842,9 +6824,7 @@ phonePolicy: {
 publicCopy: {
     // Phone policy uses the same keys on APP and H5.
     memberIdle: "Inactive",
-    experienceDepositCredited: "Demo deposit credited: {amount} USDT",
     orderWaitingSlot: "Waiting for an available running-device place",
-    experienceMode: "Demo mode · No real funds involved",
     operationUnconfirmed: "Unable to confirm the result. Refresh to check before retrying.",
     accountDeletionBlocked: "Account deletion is unavailable. Contact support for help.",
     helpTitle: "Help",

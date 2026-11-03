@@ -301,7 +301,6 @@ export const zh: Messages = {
     errorOtpSendUnavailable: "验证码暂未发送，请稍后重试。",
     errorServiceUnavailable: "暂时无法确认账号状态,请重试。",
 
-sandboxCodeHint: "体验验证码：{code}，不会发送短信。",
 },
   geoPolicy: {
     blocked: "当前地区暂未开放服务，请联系客服。",
@@ -534,7 +533,6 @@ sandboxSponsorEnvironmentMismatch: "该邀请码不可用,请核对后重试",
     onGridOnline: "在线",
     networkPulseTitle: "网络脉搏",
     networkLive: "实时",
-    networkPublishedScope: "公开规模估算 · 非实时接入统计",
     networkGlobalGrid: "全球网格 · 实时",
     networkMembers: "注册用户",
     networkDevices: "在线设备",
@@ -713,8 +711,6 @@ sandboxSponsorEnvironmentMismatch: "该邀请码不可用,请核对后重试",
     liveFeedEmpty: "暂无任务动态。",
 
 quickMissionsActive: "5 个进行",
-sandboxQuoteLedgerTitle: "任务报价示例",
-sandboxQuoteNoCredit: "演示数据 · 不计入余额",
 trustReserve: "暂无可核验的储备资料。",
 },
   earn: {
@@ -1941,8 +1937,6 @@ storeHint: "前往商店选购设备",
     configUnavailableBody: "请检查网络连接后重试。",
     configRetryCta: "重新读取",
 
-sandboxHoldCta: "暂不可连接",
-sandboxHoldBody: "体验模式暂不支持连接真实电脑，可先查看下载和连接说明。",
 },
   // 代金券 —— 领取弹窗 + 回退 banner + 结算抵扣。
   voucher: {
@@ -2417,8 +2411,6 @@ summerActivityName: "夏日活动",
     pageFooter: "全程托管 · 零物流",
 
 specUptimeValue: "99.9%",
-coSandboxWallet: "体验钱包",
-coHintSandboxWallet: "体验支付 · 不涉及真实资金",
   shareDailyEstimateNote: "USDT 按当前价格、份数及参考年奖励率折算，以实际到账为准。",
     shareFlexibleDescription: "直接购买算力份额，更加灵活。",
     cardEstimateNote: "预估值，以实际到账为准。",
@@ -2503,7 +2495,6 @@ summaryView: "查看团队",
 summaryLoading: "正在读取团队成员…",
 summaryUnavailable: "团队成员暂时无法加载，请重试。",
 rankBenefits: "查看等级权益",
-sandboxBanner: "体验模式 · 奖励仅供演示",
 },
   wallet: {
     loadingTransactions: "正在加载交易记录…",
@@ -3821,9 +3812,6 @@ earningsMilestone: "收益里程碑 ${threshold}",
     loadMore: "加载更多",
     retry: "重试",
 
-sandboxPayCta: "继续体验支付",
-sandboxPayBusy: "正在确认体验支付…",
-sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状态。",
   closeReasons: {
       USER_CANCELLED: "你已取消订单",
       PAYMENT_TIMEOUT: "超时未支付",
@@ -4030,7 +4018,6 @@ sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状
   globe: {
     title: "全球网络",
     back: "返回",
-    headline: "UVEL 网络示意",
     activeNodes: "在线节点",
     activeJobs: "进行中任务",
     jobsPerHour: "任务/小时",
@@ -4043,7 +4030,6 @@ sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状
     centerNewYork: "纽约",
     centerSanJose: "圣何塞",
     superComputeCenter: "超级算力中心",
-    simulationHint: "节点、任务与延迟均为模拟展示，不代表实时运行数据。",
     youAre: "你的位置",
     regionAsia: "亚太",
     regionEurope: "欧洲",
@@ -4054,7 +4040,6 @@ sandboxPayHint: "体验支付不涉及真实资金，完成后可查看订单状
     regionDevices: "{n} 台设备",
     regionJobs: "{n} 任务/小时",
     regionLatency: "平均延迟 {n}ms",
-    legend: "点阵与脉冲仅作示意 · 实际负载见区域详情",
     yourNodeBadge: "你",
     regionProjectionLoadingTitle: "正在读取区域网络",
     regionProjectionLoadingDesc: "正在加载在线节点与任务分布。",
@@ -5181,7 +5166,6 @@ openseaLine: "在 OpenSea 查看 · 地板价",
     heroSub: "查看参与资格、发放时间和奖励记录。",
     currentRulesTitle: "当前规则",
     currentRules: "达到 V{rank} 即可参与，奖励以实际发放为准。",
-    localRules: "本地演示仅用于界面预览，不代表发放规则。",
     nextPayout: "下次发放时间：{time}",
     s1Title: "什么是团队激励池？",
     s1Para1:
@@ -5959,7 +5943,6 @@ openSeaErrorPool: {
       "UVT 是 UVEL 平台代币，可兑换 USDT 或抵扣提现手续费。",
     publishedDataVersion: "发布版数据 · {version}",
     activeAiClientsLabel: "活跃AI客户端",
-    activeAiClientsNotice: "此数值来自当前发布内容，并非实时统计。",
     s1Title: "UVT 和 USDT 有什么区别?",
     s1Para1:
       "你的钱包里有两种钱。USDT 是锚定美元的稳定币——价格可预测,用于支付和提现。UVT 是 UVEL 的原生平台代币——价格浮动,用于兑换成 USDT 和抵扣 USDT 提现手续费。",
@@ -6615,7 +6598,6 @@ openSeaErrorPool: {
     reasonNewAddressAge: "安全确认中",
     startFailed: "操作失败,请稍后重试",
 
-sandboxMockNotice: "体验模式 · 不会发起真实转账",
 },
   learning: {
     centerTitle: "教程中心",
@@ -6675,9 +6657,7 @@ phonePolicy: {
 publicCopy: {
     // Phone policy uses the same keys on APP and H5.
     memberIdle: "暂不活跃",
-    experienceDepositCredited: "体验充值已到账：{amount} USDT",
     orderWaitingSlot: "待有可用运行设备名额后开通",
-    experienceMode: "体验模式 · 不涉及真实资金",
     operationUnconfirmed: "暂时无法确认操作结果，请刷新查看后重试。",
     accountDeletionBlocked: "暂时无法注销账号，请联系客服核实。",
     helpTitle: "使用帮助",

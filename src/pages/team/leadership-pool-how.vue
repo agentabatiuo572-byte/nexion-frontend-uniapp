@@ -16,7 +16,7 @@
           <template #icon>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
           </template>
-          <text class="block" :style="bodyStyle">{{ currentRulesText }}</text>
+          <text v-if="currentRulesText" class="block" :style="bodyStyle">{{ currentRulesText }}</text>
           <text v-if="nextPayoutText" class="block" :style="{ ...bodyStyle, marginTop: '10px' }">{{ nextPayoutText }}</text>
         </HowSection>
 
@@ -62,7 +62,7 @@ let mounted = true;
 const facts = computed(() => remotePool.value ? leadershipHowFacts(remotePool.value) : null);
 const currentRulesText = computed(() => facts.value
   ? fmt(w.value.currentRules, { rank: facts.value.unlockRank })
-  : w.value.localRules);
+  : "");
 const nextPayoutText = computed(() => {
   if (!facts.value) return "";
   const timestamp = facts.value.nextPayoutAt ? new Date(facts.value.nextPayoutAt).getTime() : NaN;
