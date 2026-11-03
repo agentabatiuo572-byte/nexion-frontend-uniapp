@@ -53,7 +53,7 @@ const copy = {
     rules: {
       r3Label: "Persentase hadiah paket baru bisa berubah",
       r3Body: "Stake baru memakai paket yang tersedia saat itu. Stake yang sudah berjalan tetap dihitung dengan persentase hadiah, jangka waktu, dan persentase biaya buka kunci lebih awal yang berlaku saat dimulai.",
-      s3Step3Title: "Klaim saat jatuh tempo", faqQ3: "Bagaimana jika belum diklaim saat jatuh tempo?",
+      s3Step3Title: "Klaim di akhir masa kunci", faqQ3: "Bagaimana jika belum diklaim saat masa kunci berakhir?",
     },
   },
   ms: {
@@ -79,7 +79,7 @@ const copy = {
     rules: {
       r3Label: "Puwedeng magbago ang rate ng bagong plan",
       r3Body: "Sa bagong stake, ang plan na available sa panahong iyon ang gagamitin. Sa kasalukuyang stake, ang rate, term at singil sa maagang pag-unlock noong nagsimula ito ang patuloy na gagamitin.",
-      s3Step3Title: "I-claim sa maturity", faqQ3: "Paano kung hindi ako mag-claim sa maturity?",
+      s3Step3Title: "I-claim pagtapos ng lock", faqQ3: "Paano kung hindi ako mag-claim pagtapos ng lock?",
     },
   },
   ru: {
