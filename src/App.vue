@@ -1282,10 +1282,13 @@ onPageNotFound(() => { void navReset({ url: "/pages/index/index" }); });
 // #ifdef H5
 // onPageNotFound runs only at launch; an old link pasted into the open tab changes just the hash.
 window.addEventListener("hashchange", () => {
-  // uni's H5 router matches paths case-insensitively, so `/pages/STORE/store` is the registered Store page.
-  const route = normalizeRoute(window.location.hash).toLowerCase();
-  const routes = (window as unknown as { __uniRoutes: { meta: { route: string } }[] }).__uniRoutes;
-  if (route && !routes.some((page) => page.meta.route.toLowerCase() === route)) void navReset({ url: "/pages/index/index" });
+  // Match the way uni's Vue Router does: the raw hash path up to `?`/`#`, case-insensitive, one optional
+  // trailing slash, no decoding or slash collapsing. `/pages/STORE/store` opens the Store; `/pages/%73tore/store` does not.
+  const hash = window.location.hash.slice(1).split(/[?#]/, 1)[0];
+  const path = (hash.startsWith("/") ? hash : `/${hash}`).replace(/\/$/, "").toLowerCase();
+  const routes = (window as unknown as { __uniRoutes: { path: string; alias?: string }[] }).__uniRoutes;
+  const matches = (routePath?: string) => routePath !== undefined && routePath.replace(/\/$/, "").toLowerCase() === path;
+  if (!routes.some((page) => matches(page.path) || matches(page.alias))) void navReset({ url: "/pages/index/index" });
 });
 // #endif
 onShow(() => {
