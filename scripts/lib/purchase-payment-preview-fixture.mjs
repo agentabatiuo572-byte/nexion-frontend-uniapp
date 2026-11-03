@@ -41,6 +41,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (scenario === 'expired') { settle(intent.orderNo, 'expired', intent); return Object.assign(intent, {status: 'EXPIRED', reason: 'PAYMENT_TIMEOUT'}); }
     if (scenario === 'bank-failed' && bank) return Object.assign(intent, {status: 'EXPIRED', reason: 'PAYMENT_FAILED'});
     if (scenario === 'mismatch') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_AMOUNT_MISMATCH'});
+    // Funds paid at or after the order deadline go to review (PurchasePaymentService.arrivalReason: MANUAL_REVIEW /
+    // PAYMENT_LATE_REVIEW, which delivery skips). The preview closes the order at its deadline, so funds whose delivery
+    // would land after it are treated the same: review, never activation.
+    if (intent.orderDeadline !== undefined && intent.createdAt + DELIVER_AFTER >= intent.orderDeadline)
+      return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_LATE_REVIEW'});
     if (age < DELIVER_AFTER) return Object.assign(intent, {status: 'FUNDS_CONFIRMED'});
     if (scenario === 'delivery-failed') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
     // Non-order fixtures cover open, unknown and rejected commands. Their
@@ -61,7 +66,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }
-  const view = intent => { const {createdAt, orderNo, origin, ...row} = advance(intent); return row; };
+  const view = intent => { const {createdAt, orderNo, orderDeadline, origin, ...row} = advance(intent); return row; };
   function paymentCommand(kind, key) {
     sync();
     const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
@@ -121,7 +126,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: new Date(expiresAt).toISOString(),
           paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
           address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
-          createdAt: Date.now(), orderNo: source.orderNo, origin: url.origin};
+          createdAt: Date.now(), orderNo: source.orderNo, orderDeadline: source.orderNo ? Number(source.expiresAt) : undefined, origin: url.origin};
         intents.set(intentNo, intent);
       }
       return {status: 200, message: 'OK', data: view(intent)};
