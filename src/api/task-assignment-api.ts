@@ -112,6 +112,7 @@ export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   rewardNex: number;
   earningStatus: string;
   completedAt: number;
+  settledAt?: number | null;
 }
 
 export interface CanonicalComputeReceiptPage {
@@ -367,6 +368,8 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
   const startedAt = timestamp(source.startedAt) as number;
   const completedAt = timestamp(source.completedAt) as number;
   const settledAt = timestamp(source.settledAt, true);
+  const verified = source.postingTimeVerified;
+  if (verified !== undefined && verified !== (settledAt !== null)) return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   const durationSec = integer(source.durationSec);
   if (completedAt < startedAt) return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   return {
@@ -389,9 +392,8 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
     proofHash,
     startedAt,
     completedAt,
-    // The legacy detail constructor copies completedAt into settledAt. It does
-    // not establish a posting time; Task Center can supply the v2 projection.
-    settledAt: metadata.executionMode !== "SIMULATED" && settledAt === completedAt ? null : settledAt,
+    // Older model details repeated completion time even without a wallet posting.
+    settledAt: verified === undefined && metadata.executionMode !== "SIMULATED" && settledAt === completedAt ? null : settledAt,
     durationSec,
     ...metadata,
     ...proof,
@@ -417,6 +419,7 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
     rewardNex: decimal(source.rewardNex),
     earningStatus,
     completedAt: timestamp(source.completedAt) as number,
+    settledAt: timestamp(source.settledAt, true),
     ...executionMetadata(source),
   };
 }
