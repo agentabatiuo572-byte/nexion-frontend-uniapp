@@ -1086,7 +1086,7 @@ export const kk: Messages = {
     dayOneTaskBindCard: "Карта байланыстыру",
     dayOneTaskVisitEarn: "Табысқа өту",
     dayOneTaskVisitStore: "Дүкенге өту",
-    dayOneTaskSeeRoi: "S1 болжамды табысын қарау",
+    dayOneTaskSeeRoi: "S1 болжамды табысы",
     dayOneTaskSetupProfile: "Профильді толтыру",
     dayOneTaskInviteFriend: "Дос шақыру",
     dayOneCatWallet: "әмиян",

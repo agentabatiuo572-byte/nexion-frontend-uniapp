@@ -1086,7 +1086,7 @@ export const fil: Messages = {
     dayOneTaskBindCard: "I-link ang card",
     dayOneTaskVisitEarn: "Buksan ang Kumita",
     dayOneTaskVisitStore: "Buksan ang Store",
-    dayOneTaskSeeRoi: "Alamin ang tantiyang kita ng S1",
+    dayOneTaskSeeRoi: "Tantiyang kita ng S1",
     dayOneTaskSetupProfile: "I-set up ang profile",
     dayOneTaskInviteFriend: "Mag-imbita ng kaibigan",
     dayOneCatWallet: "wallet",
