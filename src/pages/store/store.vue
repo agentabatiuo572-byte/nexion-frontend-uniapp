@@ -32,7 +32,7 @@
       </template>
 
       <view v-if="publicOnly" class="promotion" data-testid="promotion-public-store">
-        <template v-if="activity"><PromotionProduct v-for="productNo in activity.productNos" :key="productNo" :activity="activity" :product-no="productNo" public-only /></template>
+        <template v-if="activity"><PromotionProduct v-for="productNo in landingProductNos(activity)" :key="productNo" :activity="activity" :product-no="productNo" public-only /></template>
         <view v-if="activity||voucherContext.voucherId" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionStoreHref(activityId,voucherContext)))"><text>{{ t.promotion.signIn }}</text></view>
       </view>
       <template v-else>
@@ -142,6 +142,7 @@ import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
 import { behaviorTracker, createStoreViewEvent } from "@/services/behavior-analytics";
+import { landingProductNos } from "@/lib/promotion-landing";
 
 const t = useT();
 const auditCopy = useAuditUiCopy(), voucher = useVoucher(), comingSoonOpen = ref(false);
