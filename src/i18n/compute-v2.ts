@@ -3,10 +3,7 @@ import { useLocaleStore } from "@/store/locale";
 
 export const computeV2Copy = {
   zh: {
-    completedAt: "完成时间",
     accountBatchHint: "包含账号所有设备的收益。",
-    historyHint: "最近 {n} 笔，点击查看任务与结算详情。",
-    ruleCycle: "按规则结算，未执行模型",
     stopNow: "立即停止（未完成任务不发收益）", stopDescription: "{name} 有进行中的任务，请选择停用方式。", stopping: "正在停止，任务收益确认后将完成停用。",
     taskReceipt: "任务凭证", emptyReceipts: "暂无任务凭证", receiptsHint: "任务完成并入账后，可在这里查看凭证。", confirming: "收益确认中", running: "运行中", duration: "任务时长", reward: "本次收益",
     title: "算力结算", pending: "待结算收益", pendingHint: "已确认待入账，暂不可提现或消费。", unknown: "—",
@@ -14,10 +11,7 @@ export const computeV2Copy = {
     statuses: { CLAIMED: "已领取", QUEUED: "排队中", RUNNING: "计算中", VERIFYING: "校验中", RECOVERING: "恢复中", PAUSED: "已暂停", COMPLETED: "已完成", FAILED: "执行失败", CANCELLED: "已取消", NONE: "无待结算收益", PENDING: "待结算", POSTED: "已入账", BLOCKED: "结算挂起" },
   },
   en: {
-    completedAt: "Completed at",
     accountBatchHint: "Includes earnings from all account devices.",
-    historyHint: "Latest {n} tasks. Select one for task and settlement details.",
-    ruleCycle: "Rule-based settlement; no model execution",
     stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
     taskReceipt: "Task receipt", emptyReceipts: "No task receipts yet", receiptsHint: "Receipts appear after tasks complete and earnings are posted.", confirming: "Confirming earnings", running: "Running", duration: "Task duration", reward: "Task reward",
     title: "Compute settlement", pending: "Pending earnings", pendingHint: "Confirmed and awaiting posting. Unavailable for spending or withdrawal.", unknown: "—",
@@ -25,10 +19,7 @@ export const computeV2Copy = {
     statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
   },
   vi: {
-    completedAt: "Hoàn thành lúc",
     accountBatchHint: "Bao gồm thu nhập từ mọi thiết bị trong tài khoản.",
-    historyHint: "{n} tác vụ gần nhất. Chọn để xem chi tiết và quyết toán.",
-    ruleCycle: "Quyết toán theo quy tắc, không chạy mô hình",
     stopNow: "Dừng ngay (tác vụ chưa xong không nhận thưởng)", stopDescription: "{name} đang có tác vụ. Chọn thời điểm ngừng kích hoạt.", stopping: "Đang dừng. Thiết bị sẽ ngừng kích hoạt sau khi xác nhận thu nhập đã hoàn thành.",
     taskReceipt: "Biên nhận tác vụ", emptyReceipts: "Chưa có biên nhận tác vụ", receiptsHint: "Biên nhận xuất hiện sau khi tác vụ hoàn thành và thu nhập được ghi có.", confirming: "Đang xác nhận thu nhập", running: "Đang chạy", duration: "Thời lượng tác vụ", reward: "Thu nhập tác vụ",
     title: "Quyết toán tính toán", pending: "Thu nhập chờ quyết toán", pendingHint: "Đã xác nhận, đang chờ ghi có. Chưa thể rút hoặc chi tiêu.", unknown: "—",
