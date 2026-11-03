@@ -231,8 +231,8 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/wallet/usdt-guide            如何获取 USDT(新手指引)
 /me/wallet/exchange              NEX↔USDT 兑换
 /me/wallet/exchange/how-it-works 兑换玩法说明页
-/me/wallet/repurchase            锁定计划(已下线,跳转「我的」)
-/me/wallet/repurchase/how-it-works 锁定计划玩法说明页(已下线,跳转「我的」)
+/me/wallet/repurchase            锁定计划(已删除,旧链接跳转「我的」)
+/me/wallet/repurchase/how-it-works 锁定计划玩法说明页(已删除,旧链接跳转「我的」)
 /me/wallet/bills                 账单流水
 /me/wallet/cards                 我的银行卡(saved-cards 列表)
 /me/wallet/cards/new             绑定银行卡(可带 returnTo)
@@ -2789,49 +2789,11 @@ NEX↔USDT 兑换确认必须展示 from/to amount、rate、fee、KYC/cap 状态
 
 i18n keys 在 `exchangeHowItWorks.*` namespace ~35 keys。
 
-### 9.5 锁定计划 `/me/wallet/repurchase`（页面已下线）
+### 9.5 锁定计划（已删除）
 
-**现状（2026-11-04 按代码核对）**：锁定计划页和玩法说明页已于 2026-10-28 从 `pages.json` 移除（提交 55075a49）。`/me/wallet/repurchase`、`/me/wallet/repurchase/how-it-works` 及对应 uni 路由统一跳转到「我的」，用户进不去；页面代码和 `repurchase.*`、`repurchaseHowItWorks.*` 词条仍保留。下面记录页面恢复时使用的文案口径：用户端统一叫「锁定计划 / Lock Plan / Gói khóa USDT」，用锁定金额、锁定奖励、参考年奖励率、提前解锁，不出现复投、本金、利息、年化/APY、赎回、复利等说法。
+2026-11-04 按用户决定删除。锁定计划页 `wallet-repurchase.vue`、玩法说明页 `wallet-repurchase-how.vue`，以及只为它们服务的组件、store、接口封装（`repurchase-row`、`store/repurchase`、`api/repurchase-api`、`repurchase-runtime-policy`）、玩法说明内容键 `wallet-repurchase-how` 和九种语言的 `repurchase.*`、`repurchaseHowItWorks.*` 词条已一并移除。两页自 2026-10-28（55075a49）起就不在 `pages.json` 中，用户可见内容不变。
 
-#### 9.5.1 目的
-
-用户把 USDT 锁定 90 天，同时获得锁定奖励、成员成长奖励倍率和 Genesis 抽奖券。
-
-#### 9.5.2 UI
-
-- 标题与 Hero：`锁定计划`（en `Lock Plan`，vi `Gói khóa USDT`）
-- 3 项奖励：接后端时为 `参考年奖励率 {apy}% · {days} 天`、`成员成长奖励 ×{multiplier}`、`每笔 {tickets} 张 Genesis 抽奖券`；未接后端时为 `参考年奖励率 35% · 90 天`、`成员成长奖励 ×1.5`、`Genesis 抽奖券`
-- 金额输入（`锁定金额`）+ presets（$100 / 200 / 500 / 1000）；接后端时显示 `最低锁定金额：{amount} USDT`，低于门槛提示「金额低于最低锁定金额，请至少输入 {amount} USDT。」
-- `{days} 天后` 预测：`锁定金额` / `锁定奖励（参考年奖励率 {apy}% · {days} 天）` / `解锁可提现`
-- CTA：`锁定 ${amount}`；下方提示「资金锁定 90 天 · 提前解锁扣除锁定金额的 15%。」
-- 订单列表：`我的锁定计划`，空状态「暂无锁定计划」；到期操作「领取锁定金额及奖励」，到期前「提前解锁」，状态含「已提前解锁」；领取与提前解锁确认里的金额均写「预计…，最终金额以实际到账为准」
-- 暂停：「锁定计划暂未开放，请稍后再试。」；不可用：「锁定计划暂不可用」
-
-#### 9.5.3 业务逻辑
-
-提交 → `debitBalance(amount)` + `stake(amount, 90)` → 90 天锁定到 staking vault，并发放成员成长奖励 ×1.5 倍率与 Genesis 抽奖券。
-
-§9.5.2 页内入口 `规则介绍` 链 `/me/wallet/repurchase/how-it-works`。
-
-#### 9.5.3a 锁定确认与写入
-
-确认标题「确认锁定计划」，正文：「锁定 ${amount} USDT，共 {days} 天，确认后立即扣减可用余额。提前解锁扣除锁定金额的 {penalty}%，锁定奖励及抽奖券不发放。」确认后写入 repurchase event、wallet bill 与 active stake/cap 变化。结果待确认时提示「锁定计划结果待确认」，核对只查询上一笔状态，确认前不新建锁定计划。
-
-#### 9.5.4 玩法说明页 `/me/wallet/repurchase/how-it-works`
-
-接后端时显示后台发布的正文（content-key `wallet-repurchase-how`）；未接后端时的本地页面结构：
-
-1. 返回 `/me/wallet/repurchase`，标题沿用 `锁定计划`
-2. Hero：标签 `锁定计划`，大标题「锁仓 USDT 90 天——一次获得 3 重奖励。」，副文说明可能包含的奖励，并提示参与前核对适用条件与提前解锁扣款
-3. §1 什么是锁定计划？（普通质押的增强版，锁定 90 天同时获得 3 项奖励；这是给把资金留在平台、不立即提现的用户的奖励。不做复利或收益增长类比）
-4. §2 一笔存款 3 重奖励：
-   - ⚡ 参考年奖励率 35% · 90 天锁定奖励
-   - 🎟 Genesis 抽奖券（每月开奖，中奖 ~$5,000 NFT）
-   - 📈 成员成长奖励倍率 ×1.5（锁定期间你邀请的好友升到新 V 级时生效）
-5. §3 3 步开启锁定计划（选金额 / 查看明细 / 锁仓 90 天）+ 提示框「提前解锁成本」（扣除锁定金额的 15%，已累计的锁定奖励和抽奖券都不发放）
-6. §4 举例：锁定 $1,000.00 — 锁定金额 $1,000.00 / ×1.5 倍率 / 1 张抽奖券 → 第 90 天预计可领 $1,300.00+
-7. §5 常见问题 3 问（为什么选锁定计划而不是普通 90 天质押 / 可以用 UVT 余额参与锁定计划吗 / Genesis 抽奖怎么开）
-8. 底部按钮「明白了 · 立即锁定」回 `/me/wallet/repurchase`
+旧路由 `/me/wallet/repurchase`、`/me/wallet/repurchase/how-it-works` 及对应 uni 路由仍跳转「我的」（`src/lib/route.ts`），因为服务端下发的活动链接和周任务跳转仍可能指向 `/pages/me/wallet-repurchase`。
 
 ### 9.6 Staking 4 档质押(USDT 锁仓)`/staking`
 
