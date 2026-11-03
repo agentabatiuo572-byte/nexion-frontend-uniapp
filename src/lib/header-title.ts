@@ -38,7 +38,6 @@ const ROUTE_TITLE_KEY: Record<string, HeaderTitleKey> = {
   "pages/me/wallet-exchange": "meWalletExchange",
   "pages/me/wallet-bills": "meWalletBills",
   "pages/me/wallet-nex": "meWalletNex",
-  "pages/me/wallet-repurchase": "meWalletRepurchase",
   "pages/me/profile": "meProfile",
   "pages/me/security": "meSecurity",
   "pages/me/help": "meHelp",
@@ -85,7 +84,6 @@ const HOW_IT_WORKS_PARENT: Record<string, string> = {
   "pages/team/commissions-how": "pages/team/commissions",
   "pages/team/leadership-pool-how": "pages/team/leadership-pool",
   "pages/me/wallet-exchange-how": "pages/me/wallet-exchange",
-  "pages/me/wallet-repurchase-how": "pages/me/wallet-repurchase",
 };
 
 export interface ResolvedTitle {

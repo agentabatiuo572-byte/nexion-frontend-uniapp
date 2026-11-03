@@ -6,7 +6,6 @@ import { matchesRuntimeProvenance } from "./runtime-provenance";
 export const HOW_CONTENT_KEYS = [
   "genesis-how",
   "wallet-exchange-how",
-  "wallet-repurchase-how",
   "team-binary-how",
   "team-commissions-how",
   "team-unilevel-how",

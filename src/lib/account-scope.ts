@@ -38,7 +38,6 @@ import { useGenesisPoints } from "@/store/genesis-points";
 import { useNetworkRank } from "@/store/network-rank";
 import { bindEarningsReleaseAccount } from "@/store/earning-release";
 import { useReferralReward } from "@/store/referral-reward";
-import { useRepurchase } from "@/store/repurchase";
 import { useNetwork } from "@/store/network";
 import { prepareProductCatalog } from "@/store/product-catalog";
 import { prepareServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
@@ -120,7 +119,6 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useWeeklyQuest().bindAccount(accountKey);
   useReferralReward().bindAccount(accountKey);
   useNetwork().bindAccount(accountKey);
-  useRepurchase().bindAccount(accountKey);
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
   useGenesisPoints().bindAccount(accountKey);
   useNetworkRank().bindAccount(accountKey);
