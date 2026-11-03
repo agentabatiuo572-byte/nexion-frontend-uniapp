@@ -336,6 +336,24 @@ async function loadQuote(){
       let result:Quote;
       let selectedId:string|null=voucherId.value;
       let activityId=props.activityId||null;
+      // Quotes each usable voucher against the same request and keeps the cheapest eligible one; null means the read went stale.
+      const pickVoucher=async(base:Quote,activity:string|null,autoSelectPromotion=true)=>{
+        let best=base,id:string|null=null;
+        for(const option of eligibleVouchers(Number(base.subtotalUsdt))){
+          try{
+            const candidate=await promotionApi.quote(requestedItems,activity,option.def.id,autoSelectPromotion);
+            if(!readCurrent(generation))return null;
+            if(candidate.eligibility==='ELIGIBLE'&&(best.eligibility!=='ELIGIBLE'||Number(candidate.amountUsdt)<Number(best.amountUsdt))){
+              best=candidate;id=option.def.id;
+            }
+          }catch(cause){
+            if(!readCurrent(generation))return null;
+            // A rejected coupon can be skipped; an unavailable quote cannot be charged.
+            if(asApiError(cause).kind!=='business')throw cause;
+          }
+        }
+        return {quote:best,voucherId:id};
+      };
       if(eventVoucherId){
         eventVoucherStatus.value='loading';
         const refreshed=await voucher.refreshRemote();if(!readCurrent(generation))return;
@@ -362,29 +380,24 @@ async function loadQuote(){
         if(!manualVoucher()&&requestedItems.length===1){
           if(!await voucher.refreshRemote())throw new Error('VOUCHER_CATALOG_UNAVAILABLE');
           if(!readCurrent(generation))return;
-          for(const option of eligibleVouchers(Number(result.subtotalUsdt))){
-            try{
-              const candidate=await promotionApi.quote(requestedItems,props.activityId||null,option.def.id);
-              if(!readCurrent(generation))return;
-              if(candidate.eligibility==='ELIGIBLE'&&(result.eligibility!=='ELIGIBLE'||Number(candidate.amountUsdt)<Number(result.amountUsdt))){
-                result=candidate;selectedId=option.def.id;
-              }
-            }catch(cause){
-              if(!readCurrent(generation))return;
-              // A rejected coupon can be skipped; an unavailable quote cannot be charged.
-              if(asApiError(cause).kind!=='business')throw cause;
-            }
-          }
+          const picked=await pickVoucher(result,props.activityId||null);if(!picked)return;
+          result=picked.quote;selectedId=picked.voucherId;
         }
       }
       if(!readCurrent(generation)||inputKey!==quotePresentationKey())return;
       // Lite never gives a phone. A campaign the server chose by itself gives way to an ordinary quote
-      // (same items and voucher) for the user to confirm; an explicitly chosen phone-gift campaign is
+      // (same items) for the user to confirm; an explicitly chosen phone-gift campaign is
       // refused like a phone SKU selection. Rewards are never edited out of a server quote.
       const givesPhone=(q:typeof result)=>q.expectedRewards.some(row=>row.reward.type==='DEVICE'&&!isLiteProduct(getProduct(row.reward.giftProductNo)??{id:row.reward.giftProductNo}));
       if(givesPhone(result)&&!eventVoucherId&&!props.activityId){
-        result=await promotionApi.quote(requestedItems,null,selectedId,false);
+        // A chosen voucher stays; otherwise the vouchers are weighed again, since one that lost to the campaign may now be best.
+        const autoVoucher=!manualVoucher()&&requestedItems.length===1;
+        result=await promotionApi.quote(requestedItems,null,autoVoucher?null:selectedId,false);
         if(!readCurrent(generation)||inputKey!==quotePresentationKey())return;
+        if(autoVoucher){
+          const picked=await pickVoucher(result,null,false);if(!picked||inputKey!==quotePresentationKey())return;
+          result=picked.quote;selectedId=picked.voucherId;
+        }
       }
       if(result.items.length!==requestedItems.length||requestedItems.some(item=>!result.items.some(line=>line.productNo===item.productNo&&line.quantity===item.quantity)))throw new Error('QUOTE_INPUT_CHANGED');
       if(givesPhone(result))throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
