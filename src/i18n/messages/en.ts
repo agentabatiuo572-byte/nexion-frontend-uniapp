@@ -610,7 +610,7 @@ export const en = {
     networkMembersSub: "+{n}% /mo",
     networkDevicesSub: "running jobs",
     networkRankUnranked: "No rank",
-    networkRankTipRanked: "Network rank is calculated by the server. It is for reference and does not affect earnings or rewards.",
+    networkRankTipRanked: "Estimated from your bound phone's effective compute. For reference only; it does not affect earnings or rewards.",
     networkRankTipUnranked: "The phone bound to your account has no eligible compute power for ranking yet.",
     networkStatUpdating: "Updating",
     networkStatRetry: "Retry",
