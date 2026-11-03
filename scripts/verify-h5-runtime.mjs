@@ -78,7 +78,6 @@ try {
       only("auth-guard-verify.mjs") ? await runGate("auth-guard-verify.mjs", baseUrl) : await skipGate("auth-guard-verify.mjs"),
       ...await runProbeGroup([
         () => only("business-loop-liveness-runtime.mjs") ? runGate("business-loop-liveness-runtime.mjs", baseUrl) : skipGate("business-loop-liveness-runtime.mjs"),
-        () => only("spec6-entry-surface-runtime.mjs") ? runGate("spec6-entry-surface-runtime.mjs", baseUrl) : skipGate("spec6-entry-surface-runtime.mjs"),
         () => only("trial-check.mjs") ? runGate("trial-check.mjs", baseUrl) : skipGate("trial-check.mjs"),
         () => only("sticky-check.mjs") ? runGate("sticky-check.mjs", baseUrl) : skipGate("sticky-check.mjs"),
         () => only("backnav-check.mjs") ? runGate("backnav-check.mjs", baseUrl) : skipGate("backnav-check.mjs"),

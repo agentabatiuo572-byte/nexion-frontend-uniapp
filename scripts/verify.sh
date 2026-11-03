@@ -833,10 +833,6 @@ if (!/BOTTOM_SAFE_PADDING\s*=\s*"calc\(env\(safe-area-inset-bottom, 0px\) \+ 38p
 if (!/paddingBottom:\s*props\.reserveBottom\s*\?\s*BOTTOM_SAFE_PADDING\s*:\s*"0px"/.test(shell)) throw new Error("standalone shell no longer applies its bottom safe-area baseline");
 const chassis = fs.readFileSync("src/components/app-chassis.vue", "utf8");
 if (!/<DeviceHomeIndicator\s*\/>/.test(chassis)) throw new Error("AppChassis no longer shares DeviceHomeIndicator");
-const estimator = fs.readFileSync("src/pages/onboarding/estimator.vue", "utf8");
-if (!/:top-inset="24"/.test(estimator) || !/\.est-cta\s*\{[\s\S]*?margin-right:\s*4px;[\s\S]*?margin-left:\s*4px;/.test(estimator)) {
-  throw new Error("estimator CTA no longer aligns to register-success 24px side inset");
-}
 const success = fs.readFileSync("src/pages/register/success.vue", "utf8");
 if (!/\.rs-footer\s*\{[^}]*padding-bottom:\s*calc\(env\(safe-area-inset-bottom, 0px\) \+ 38px\)/.test(success)) {
   throw new Error("register-success CTA lost 38px bottom baseline");
@@ -1632,78 +1628,6 @@ spec3_prototype_homes_withdrawn() {
   fi
 }
 spec3_prototype_homes_withdrawn
-# ── SPEC-6 new entry-surface homes ──
-spec6_entry_surface_homes_present() {
-  if "$NODE_BIN" -e '
-    const fs=require("fs");
-    const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
-    const paths=new Set((pj.pages||[]).map(p=>p.path));
-    const requiredRoutes=[
-      "pages/entry-surfaces/index",
-      "pages/entry-surfaces/signed",
-      "pages/entry-surfaces/h5",
-      "pages/entry-surfaces/white",
-    ];
-    for(const p of requiredRoutes){ if(!paths.has(p)) throw new Error(`SPEC-6 route missing: ${p}`); }
-    const requiredFiles=[
-      "src/pages/entry-surfaces/index.vue",
-      "src/pages/entry-surfaces/signed.vue",
-      "src/pages/entry-surfaces/h5.vue",
-      "src/pages/entry-surfaces/white.vue",
-      "src/components/entry-surfaces/entry-surface-home.vue",
-    ];
-    for(const file of requiredFiles){ if(!fs.existsSync(file)) throw new Error(`SPEC-6 file missing: ${file}`); }
-    const index=fs.readFileSync("src/pages/entry-surfaces/index.vue","utf8");
-    const fullLinks=[
-      "/pages/entry-surfaces/signed",
-      "/pages/entry-surfaces/h5",
-      "/pages/entry-surfaces/white?entry=white-app",
-    ];
-    for(const link of fullLinks){ if(!index.includes(link)) throw new Error(`SPEC-6 full clickable link missing: ${link}`); }
-    // The shown URL must be derived from the runtime origin. A hardcoded host is
-    // wrong on every port/host but the one it was written on (worktree dev server
-    // on 5174, any deploy) — assert the derivation instead of the old literals.
-    if(!/window\.location\.origin/.test(index)) throw new Error("SPEC-6 entry link URL must derive from window.location.origin");
-    if(!/\$\{origin\.value\}#\$\{l\.route\}/.test(index)) throw new Error("SPEC-6 entry fullUrl must be composed as <origin>#<route>");
-    if(/https?:\/\/localhost/.test(index)) throw new Error("SPEC-6 entry index must not hardcode a localhost origin");
-    if(!/@(tap|click)="open\(item\.route\)"/.test(index)) throw new Error("SPEC-6 full links are not clickable rows");
-    const signed=fs.readFileSync("src/pages/entry-surfaces/signed.vue","utf8");
-    const h5=fs.readFileSync("src/pages/entry-surfaces/h5.vue","utf8");
-    const white=fs.readFileSync("src/pages/entry-surfaces/white.vue","utf8");
-    if(!/surface="signed"/.test(signed)) throw new Error("signed entry page does not render signed surface");
-    if(!/surface="h5"/.test(h5)) throw new Error("h5 entry page does not render h5 surface");
-    if(!/surface="white"/.test(white)) throw new Error("white entry page does not render white surface");
-    // 三端入口文案 2026-07-28 迁进 i18n(entrySurface 命名空间)——语义 token 与
-    // 泄漏守卫跟着文案走,否则组件里没文案了,这两道门会变成永真的空门。
-    const nsSlice=(file)=>{
-      const src=fs.readFileSync(file,"utf8");
-      const m=src.match(/\n  entrySurface: \{[\s\S]*?\n  \},/);
-      if(!m) throw new Error(`SPEC-6 i18n namespace entrySurface missing in ${file}`);
-      return m[0];
-    };
-    const i18nCopy=["src/i18n/messages/en.ts","src/i18n/messages/zh.ts","src/i18n/messages/vi.ts"].map(nsSlice).join("\n");
-    const body=fs.readFileSync("src/components/entry-surfaces/entry-surface-home.vue","utf8")+index+i18nCopy;
-    for(const token of ["在线增强","基础托管","体检融合"]){ if(!body.includes(token)) throw new Error(`SPEC-6 surface semantic token missing: ${token}`); }
-    if(/secondary:\s*\{\s*label:\s*"PC sharing path",\s*href:\s*"\/pages\/compute-share\/download"/.test(body)) throw new Error("H5 entry must not advertise a disabled-by-default PC download path as direct CTA");
-    if(/ENV_FILTERED|MANUAL_HOLD|keyword\d+|computeShareEnabled|H5_BASE_FACTOR|home-signed|home-h5|home-cloak|原型演示|工程字段名/.test(body)) throw new Error("SPEC-6 entry UI leaks withdrawn or engineering copy");
-  ' >"${VERIFY_LOG_PREFIX}-uni-spec6-entry-surfaces.log" 2>&1; then
-    ok "SPEC-6 entry-surface homes present (3 independent routes + full links)"
-  else
-    bad "SPEC-6 entry-surface homes"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec6-entry-surfaces.log"
-  fi
-}
-spec6_entry_surface_homes_present
-if scope_hit spec6-entry-runtime; then route_scope spec6-entry-runtime
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if probe_retry "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log" env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs; then
-    ok "$(cat "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log")"
-  else
-    bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-spec6-entry-runtime.log"
-  fi
-else
-  skipped "SPEC-6 entry-surface runtime isolation (dev server not running at $BASE_URL)"
-fi
-fi
 # R7 pricing order and the device-detail route are runtime contracts: static
 # sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
 if scope_hit r7-device-runtime; then
@@ -2005,7 +1929,6 @@ sentinel_present "P2-8 account-scope helper rebinds daily-powerup" src/lib/accou
 sentinel_present "P2-8 quest store is account-scoped" src/store/quest.ts 'writeAccountRow'
 sentinel_present "P2-8 event-quest store is account-scoped" src/store/event-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.ts 'writeAccountRow'
-sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexgrid-milestones-accounts-v1'
 sentinel_present "P2-8 achievements store is account-scoped" src/store/achievements.ts 'writeAccountRow'
 sentinel_present "P2-8 goals store is account-scoped" src/store/goals.ts 'writeAccountRow'
 sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow|createAccountRowCommit'

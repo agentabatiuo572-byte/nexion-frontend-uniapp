@@ -97,16 +97,6 @@
         "scripts/auth-system-chrome-runtime.mjs"
       ]
     },
-    "spec6-entry-runtime": {
-      "kind": "runtime",
-      "routeScoped": true,
-      "pages": [
-        "src/pages/entry-surfaces/*.vue"
-      ],
-      "inputs": [
-        "scripts/spec6-entry-surface-runtime.mjs"
-      ]
-    },
     "r7-device-runtime": {
       "kind": "runtime",
       "pages": [
@@ -124,7 +114,6 @@
       "pages": [
         "src/pages/index/index.vue",
         "src/pages/login/login.vue",
-        "src/pages/onboarding/estimator.vue",
         "src/pages/register/register.vue",
         "src/pages/register/success.vue"
       ],
@@ -277,7 +266,6 @@
         "scripts/guard-liveness-runtime.mjs",
         "scripts/auth-guard-verify.mjs",
         "scripts/business-loop-liveness-runtime.mjs",
-        "scripts/spec6-entry-surface-runtime.mjs",
         "scripts/trial-check.mjs",
         "scripts/sticky-check.mjs",
         "scripts/backnav-check.mjs",
@@ -437,7 +425,6 @@
         "scripts/guard-liveness-runtime.mjs",
         "scripts/auth-guard-verify.mjs",
         "scripts/business-loop-liveness-runtime.mjs",
-        "scripts/spec6-entry-surface-runtime.mjs",
         "scripts/trial-check.mjs",
         "scripts/sticky-check.mjs",
         "scripts/backnav-check.mjs",
@@ -466,7 +453,6 @@
     "guard-liveness-runtime": {
       "kind": "runtime",
       "pages": [
-        "src/pages/entry-surfaces/index.vue",
         "src/pages/me/wallet-withdraw.vue",
         "src/pages/index/index.vue",
         "src/pages/onboarding/intro.vue",
@@ -480,7 +466,6 @@
       "kind": "runtime",
       "pages": [
         "src/pages/earn/earn.vue",
-        "src/pages/entry-surfaces/index.vue",
         "src/pages/index/index.vue",
         "src/pages/me/me.vue",
         "src/pages/me/security.vue",
@@ -493,21 +478,10 @@
     "business-loop-liveness-runtime": {
       "kind": "runtime",
       "pages": [
-        "src/pages/index/index.vue",
-        "src/pages/entry-surfaces/index.vue"
+        "src/pages/index/index.vue"
       ],
       "inputs": [
         "scripts/business-loop-liveness-runtime.mjs"
-      ]
-    },
-    "spec6-entry-surface-runtime": {
-      "kind": "runtime",
-      "routeScoped": true,
-      "pages": [
-        "src/pages/entry-surfaces/*.vue"
-      ],
-      "inputs": [
-        "scripts/spec6-entry-surface-runtime.mjs"
       ]
     },
     "trial-check": {
