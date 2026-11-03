@@ -113,23 +113,22 @@ function genesisPublic(now) {
     marketStats:{floorUsdt:null,volume24hUsdt:null,owners:null,floorDeltaPct:null,lastSaleUsdt:null}};
 }
 
-function demoPhysicalSlots(url,locale,state,products,excludeOrderNo) {
-  const fleet=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
-  const active=fleet.devices.filter(device=>device.activatedAt!==null
-    &&['ACTIVE','ONLINE','BUSY','RUNNING','OFFLINE'].includes(device.status)).length;
-  // Static demoOrders() rows illustrate order states. Only actual session orders reserve slots.
-  const reserved=(state.createdOrders||[])
-    .filter(order=>order.orderNo!==excludeOrderNo&&(state.checkoutNoPendingReservation?['paid','provisioning']:['placed','paid','provisioning']).includes(order.canonicalStatus))
-    .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
-  return {used:active+reserved,cap:fleet.slotCap};
-}
+// One slot rule for every fixture read and command (PRD §5.6 / §9.11; backend fleet read and trade-in capacity
+// quote): occupied = activated formal devices + slots held by orders awaiting a device + one effective trial
+// (ACTIVE/GRACE). The fleet read reports it as slotsUsed; everything else reads that count back.
+const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
+  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false).state)?1:0;
+// Static demoOrders() rows illustrate order states. Only actual session orders reserve slots.
+const demoOrderSlots=(state,orderNo)=>(state.createdOrders||[])
+  .filter(order=>(orderNo===undefined||order.orderNo===orderNo)&&(state.checkoutNoPendingReservation?['paid','provisioning']:['placed','paid','provisioning']).includes(order.canonicalStatus))
+  .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
+const demoFleet=(url,locale,state)=>demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
 
 function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
   const requested=lines.reduce((count,line)=>count+line.quantity,0);
-  const trial=trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false);
-  const capacity=demoPhysicalSlots(url,locale,state,products,excludeOrderNo);
-  const trialSlots=['ACTIVE','GRACE'].includes(trial.state)?1:0;
-  return capacity.used+trialSlots+requested<=capacity.cap;
+  const fleet=demoFleet(url,locale,state);
+  // Paying an existing order reuses the slots it already holds.
+  return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(state,excludeOrderNo):0)+requested<=fleet.slotCap;
 }
 
 // Detail-page live activity (PRD §7.2.2; the backend follows the same rule, uvel-docs B24). Derived from
@@ -175,8 +174,8 @@ export function demoFixture(url,locale,state,request) {
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   if(pathname.startsWith('/api/trial/')) {
-    const capacity=demoPhysicalSlots(url,locale,state,products);
-    return trialDemo(url,locale,state,request,capacity.used>=capacity.cap);
+    const fleet=demoFleet(url,locale,state);
+    return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap);
   }
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
   const remember=(operation,targetId,response,order)=>{
@@ -307,8 +306,10 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/app/trade-in/capacity-quote'){
     const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo)||products[0],data=structuredClone(base());
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
-    if(pathname.endsWith('capacity-quote'))Object.assign(data,{activeDevices:2,payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
-    if(state.checkoutState==='replace')Object.assign(data,{decision:'REPLACE_REQUIRED',maxActiveDevices:2,sourceDeviceId:41,sourceDeviceName:'UVELBox S1'});
+    const fleet=demoFleet(url,locale,state),active=fleet.devices.filter(device=>device.activatedAt!==null),full=fleet.slotsUsed>=fleet.slotCap;
+    Object.assign(data,{decision:full?(active.length?'REPLACE_REQUIRED':'NO_ACTIVE_DEVICE'):'CAPACITY_AVAILABLE',activeDevices:active.length,maxActiveDevices:fleet.slotCap,
+      sourceDeviceId:full?active[0]?.id??null:null,sourceDeviceName:full?active[0]?.name??null:null,
+      payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
     return data;
   }
   if(pathname==='/api/orders/quote') {
@@ -502,6 +503,8 @@ export function demoFixture(url,locale,state,request) {
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:empty?0:3,activeMembers:empty?0:6,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
   }
   if(pathname==='/api/devices/earnings') {
+    // Read the trial first: a converted trial books its order, which then lists as a device below.
+    const trialSlotCount=demoTrialSlots(url,locale,state);
     const data=base();data.walletUsdt=empty?0:state.paymentState==='low-balance'?820.64:state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
     if(state.checkoutState==='replace')data.slotCap=2;
     data.devices=empty?[]:data.devices.concat({...data.devices[0],id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}).map(device=>({...device,runtimeStatus:'ONLINE'}));
@@ -519,15 +522,17 @@ export function demoFixture(url,locale,state,request) {
       const clone=(id,code,name,daily,paid,extra)=>({...data.devices[0],id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
       if(state.fleetState==='inventory')data.devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       if(state.fleetState==='full'){
-        // Full = every slot occupied, counting an effective trial's reservation (PRD §5.6): fill the rest with formal devices.
-        const trialSlots=state.trialState!=='read-error'&&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false).state)?1:0;
-        const free=data.slotCap-trialSlots-data.devices.filter(device=>device.activatedAt!==null).length;
+        // Full = every slot occupied: formal devices fill whatever the trial and pending orders leave free.
+        const free=data.slotCap-trialSlotCount-demoOrderSlots(state)-data.devices.filter(device=>device.activatedAt!==null).length;
         data.devices.push(...[clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),clone(46,'CLOUD-SHARE','Cloud Share',0.6,19.9,{todayEarningsUsdt:.2}),clone(48,'STELLARBOX-S1','UVELBox S1',6.2,1299,{todayEarningsUsdt:2.3})].slice(0,Math.max(0,free)));
         data.devices.push(clone(47,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       }
       if(state.fleetState==='none')data.devices=[];
-      if(state.fleetState==='reserved'){const trialSlots=['active','final-day','grace'].includes(state.trialState)?1:0;data.slotsUsed=data.devices.filter(d=>d.activatedAt!==null).length+trialSlots+1;data.reservedSlotCount=1;data.trialSlotCount=trialSlots;}
     }
+    // A slot held for provisioning (fleetState=reserved) counts like a pending order's slot.
+    data.reservedSlotCount=demoOrderSlots(state)+(!empty&&state.fleetState==='reserved'?1:0);
+    data.trialSlotCount=trialSlotCount;
+    data.slotsUsed=data.devices.filter(device=>device.activatedAt!==null).length+data.reservedSlotCount+trialSlotCount;
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
