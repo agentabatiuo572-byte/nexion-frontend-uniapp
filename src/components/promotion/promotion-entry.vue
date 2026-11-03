@@ -105,7 +105,7 @@ import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { promotionMachineSlots } from '@/components/catalog-machine-image';
 import { readHomePromotions } from '@/store/home-promotions';
 import { landingCopy } from '@/i18n/promotion-landing';
-import { landingKind,landingProductImage,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
+import { landingKind,landingProductImage,landingProductName,litePromotion,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
 const props=withDefaults(defineProps<{mode?:'home'|'events';activities?:PublicPromotion[];active?:boolean}>(),{mode:'home',active:true});
 const app=useApp(),locale=useLocaleStore(),theme=useTheme(),t=useT();
 const landing=computed(()=>landingCopy(locale.code));
@@ -122,6 +122,8 @@ function activityKind(activity:PublicPromotion):'gift'|'coupon'|'spark'|'plain' 
   if(rewards.some(reward=>reward.type==='DISCOUNT_USDT'))return 'coupon';
   return rewards.length?'spark':'plain';
 }
+// Lite: campaign cards show only non-phone products and rules; phone-only offers are hidden.
+function liteActive(activities:PublicPromotion[]){return activities.filter(isPromotionActive).flatMap(activity=>litePromotion(activity)??[]);}
 function activityArt(activity:PublicPromotion){const kind=activityKind(activity);return kind==='plain'?'spark':kind;}
 function promoSlots(activity:PublicPromotion) {
   void app.accountKey;void app.accountBindingEpoch;void productCatalogState.revision;
@@ -175,7 +177,7 @@ async function load(reset:boolean,preserveImages=false){
   // Join a shared read already in flight; otherwise explicitly revalidate the catalog.
   const catalogRead=reset&&remoteApiEnabled&&sessionVault.read()
     ?preserveImages?revalidateProductCatalog():refreshProductCatalog(productCatalogState.status!=='loading'):Promise.resolve();
-  if(props.activities!==undefined){fence.invalidate();items.value=props.activities.filter(isPromotionActive);listRead.value=true;cursor.value=null;hasMore.value=false;activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));status.value='ready';await catalogRead;return;}
+  if(props.activities!==undefined){fence.invalidate();items.value=liteActive(props.activities);listRead.value=true;cursor.value=null;hasMore.value=false;activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));status.value='ready';await catalogRead;return;}
   const ticket=fence.next(),identity=`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
   pendingTicket=ticket;
   status.value='loading';
@@ -186,7 +188,7 @@ async function load(reset:boolean,preserveImages=false){
     const [page]=await Promise.all([read,catalogRead]);
     if(!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`)return;
     const rows=reset?[]:items.value;
-    items.value=[...new Map([...rows,...page.items.filter(isPromotionActive)].map(item=>[item.activityId,item])).values()];
+    items.value=[...new Map([...rows,...liteActive(page.items)].map(item=>[item.activityId,item])).values()];
     activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));
     cursor.value=page.nextCursor;hasMore.value=page.hasMore;status.value='ready';
     listRead.value=true;

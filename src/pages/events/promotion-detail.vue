@@ -228,7 +228,7 @@ import { navReplace, navTo, takeNavigationQuery } from '@/lib/route';
 import { displayDeadline, localized } from '@/lib/promotion-display';
 import { formatDisplayDateTime, formatDisplayTime } from '@/lib/display-date';
 import { createPromotionReadFence, isPromotionActive, promotionDetailHref, promotionDisclosures, promotionStoreHref } from '@/lib/promotion-entry';
-import { landingKind, landingProduct, landingProductImage, landingProductNos, landingProductName, promotionLandingHref, promotionRemaining, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
+import { landingKind, landingProduct, landingProductImage, landingProductName, litePromotion, promotionLandingHref, promotionRemaining, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
 import { productCopy } from '@/lib/product-copy';
 import { getProductMedia } from '@/lib/product-media';
 
@@ -383,7 +383,7 @@ const countdown = computed(() => {
 const products = computed(() => {
   const a = activity.value;
   if (!a) return [];
-  return landingProductNos(a).map(sku => {
+  return a.productNos.map(sku => {
     const product = landingProduct(sku), r = a.rewardRules.find(item => item.productNo === sku) ?? a.rewardRules[0];
     const parts = r ? rewardParts(a, r.buyerReward) : null;
     const tag = !parts ? '' : parts.asset === 'DISCOUNT' ? partsText(parts) : fmt(kind.value === 'first' ? c.value.firstTag : c.value.repurchaseTag, { reward: partsText(parts) });
@@ -426,18 +426,14 @@ const bar = computed<Bar | null>(() => {
     if (k !== 'repurchase') return { wide: true, label: copy.otherOffers, variant: 'neutral', href: '/pages/events/events' };
     return firstOfferId.value ? { hint: copy.firstHint, label: copy.seeFirst, variant: 'primary', href: promotionLandingHref(firstOfferId.value) } : { wide: true, label: copy.goStore, variant: 'primary', href: promotionStoreHref() };
   }
-  // Lite: an offer with only phone products has nothing to buy on the web.
-  const productNos = landingProductNos(a);
-  if (!productNos.length) return { wide: true, label: copy.otherOffers, variant: 'neutral', href: '/pages/events/events' };
   if (signInNeeded.value) return { label: copy.signInBuy, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) };
-  return { label: k === 'gift' ? copy.buyNow : k === 'first' ? copy.firstOrder : copy.addNow, variant: 'primary', href: productNos.length === 1 ? promotionDetailHref(productNos[0], a.activityId) : promotionStoreHref(a.activityId) };
+  return { label: k === 'gift' ? copy.buyNow : k === 'first' ? copy.firstOrder : copy.addNow, variant: 'primary', href: a.productNos.length === 1 ? promotionDetailHref(a.productNos[0], a.activityId) : promotionStoreHref(a.activityId) };
 });
 // One product shows its name and price; first purchase and multi-product offers lead with the reward.
 const barSummary = computed(() => {
   const a = activity.value, parts = rulePartsOf();
   if (!a || !parts) return null;
-  const productNos = landingProductNos(a);
-  const product = kind.value !== 'first' && productNos.length === 1 ? landingProduct(productNos[0]) : undefined;
+  const product = kind.value !== 'first' && a.productNos.length === 1 ? landingProduct(a.productNos[0]) : undefined;
   if (product) return { label: product.name, price: priceText(product.price), amount: '', unit: '', uvt: false };
   const device = parts.asset === 'DEVICE';
   const label = parts.asset === 'DISCOUNT' ? t.value.promotion.orderDiscount : kind.value === 'first' ? c.value.firstReward : c.value.rewardLabel;
@@ -457,7 +453,10 @@ async function load() {
     const [item] = await Promise.all([promotionApi.get(activityId, signedIn), catalogRead]);
     if (!fence.current(ticket) || identity !== readIdentity()) return;
     if (!landingKind(item)) { void navReplace(promotionStoreHref(activityId)); return; }
-    activity.value = item; readAt.value = Date.now(); now.value = readAt.value; status.value = 'ready';
+    // Lite: phone products and their rules never appear; a phone-only offer is not shown on the web.
+    const lite = litePromotion(item);
+    if (!lite) { void navReplace('/pages/events/events'); return; }
+    activity.value = lite; readAt.value = Date.now(); now.value = readAt.value; status.value = 'ready';
     if (item.template === 'REPURCHASE' && item.state === 'ACTIVE' && item.eligibility === 'INELIGIBLE') readFirstOffer(ticket, identity, signedIn);
   } catch (cause) {
     if (!fence.current(ticket) || identity !== readIdentity()) return;
@@ -468,7 +467,7 @@ async function load() {
 }
 function readFirstOffer(ticket: number, identity: string, signedIn: boolean) {
   promotionApi.list({ limit: 20 }, signedIn).then(page => {
-    if (fence.current(ticket) && identity === readIdentity()) firstOfferId.value = page.items.find(item => item.template === 'FIRST_PURCHASE' && isPromotionActive(item))?.activityId ?? null;
+    if (fence.current(ticket) && identity === readIdentity()) firstOfferId.value = page.items.find(item => item.template === 'FIRST_PURCHASE' && isPromotionActive(item) && litePromotion(item))?.activityId ?? null;
   }, () => { /* Without the offer list the store stays the next step. */ });
 }
 function retry() { void load(); }
