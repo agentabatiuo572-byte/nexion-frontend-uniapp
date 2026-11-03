@@ -2,6 +2,12 @@ import { computed } from "vue";
 import { en, type Messages } from "./messages/en";
 import { vi } from "./messages/vi";
 import { zh } from "./messages/zh";
+import { id } from "./messages/id";
+import { ms } from "./messages/ms";
+import { fil } from "./messages/fil";
+import { ru } from "./messages/ru";
+import { kk } from "./messages/kk";
+import { uz } from "./messages/uz";
 import type { LocaleCode } from "./index";
 import { useLocaleStore } from "@/store/locale";
 import { useI18nRuntime } from "@/store/i18n-runtime";
@@ -14,6 +20,12 @@ export const DICTS: Partial<Record<LocaleCode, Messages>> = {
   en,
   vi,
   zh,
+  id,
+  ms,
+  fil,
+  ru,
+  kk,
+  uz,
 };
 
 function applyRuntimeMessages<T>(bundled: T, runtime: Readonly<Record<string, string>>, path = ""): T {

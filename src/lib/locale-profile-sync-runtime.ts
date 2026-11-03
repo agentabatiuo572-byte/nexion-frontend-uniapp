@@ -3,7 +3,7 @@ import { useApp } from "@/store/app";
 import { useLocaleStore } from "@/store/locale";
 import { ref } from "vue";
 import { canHydrateProfileLocale, trackProfileLocaleHydration } from "./locale-profile-hydration";
-import type { LocaleCode } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
 import { createLocaleProfileSync, type LocaleProfileScope } from "./locale-profile-sync";
 
 function currentScope(): LocaleProfileScope | null {
@@ -78,7 +78,9 @@ export function hydrateCurrentProfileLocale(registrationLocale?: LocaleCode): vo
   }
   const hydration = profileApi.profile().then((profile) => {
     if (!canHydrateProfileLocale(scope, currentScope(), explicitRevision, locale.explicitRevision)) return;
-    locale.applyServerLocale(profile.language);
+    // The account stores a device-only language (ru, kk…) as its English projection. An explicit
+    // choice on this device that projects to the saved language is that same preference.
+    locale.applyServerLocale(locale.userSet && serverLanguage(locale.code) === profile.language ? locale.code : profile.language);
     hydrationFailed = false;
   }).catch(() => {
     if (canHydrateProfileLocale(scope, currentScope(), explicitRevision, locale.explicitRevision)) {

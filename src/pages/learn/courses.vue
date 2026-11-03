@@ -81,6 +81,7 @@ import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-ap
 import { createLearningPageFenceReader, type LearningPageFence } from "./learning-page-fence";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import type { LearningCourse, LearningOverview } from "@/api/learning-api";
+import { serverLanguage } from "@/i18n";
 // 存 key 而不是译好的串:译文一旦快照进 ref 就不再跟随语言(uni 复用页面实例时,
 // 上一次访问用的语言会留在错误提示上 —— 实景走查实测:zh 下重试按钮是中文、正文还是英文)。
 type LearningError = "" | "centerOffline" | "centerGeoUnresolved" | "centerUnavailable";
@@ -89,7 +90,7 @@ const recommendationCopy = computed(() => learningRecommendationCopy[language.va
 const t = useT(); const locale = useLocaleStore(); const app = useApp(); const overview = ref<LearningOverview | null>(null); const loading = ref(true); const error = ref<LearningError>("");
 const errorText = computed(() => error.value ? t.value.learning[error.value] : "");
 const featuredCourse = computed(() => selectRecommendedCourse(overview.value?.courses ?? []));
-const language = computed(() => locale.code === "zh" || locale.code === "vi" ? locale.code : "en");
+const language = computed(() => serverLanguage(locale.code));
 const pageCopy = computed(() => ({
   zh: { progress: "已学完 {done}/{total} 课", earned: "已获", allCourses: "全部课程", courseCount: "{n} 门", recommended: "推荐", questions: "{n} 道小测", reward: "奖励" },
   en: { progress: "{done}/{total} courses completed", earned: "Earned", allCourses: "All courses", courseCount: "{n} courses", recommended: "Suggested", questions: "{n} quiz questions", reward: "Reward" },

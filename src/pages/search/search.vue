@@ -131,6 +131,7 @@ import { resolveSearchResultState, type SearchRemoteStatus } from "@/lib/search-
 import { beginNavigationAttempt, completeNavigationAttempt } from "@/lib/navigation-attempt";
 import { fmt } from "@/i18n/format";
 import { searchCopyFor } from "./search-copy";
+import { serverLanguage } from "@/i18n";
 
 type Group = "route" | "device" | "product" | "member" | "faq" | "help";
 interface Hit {
@@ -166,7 +167,7 @@ async function refreshPublishedFaqs(force = false): Promise<void> {
   publishedFaqs.value = [];
   publishedFaqStatus.value = "loading";
   try {
-    const items = await readPublishedFaqs(language, isCurrent, force);
+    const items = await readPublishedFaqs(serverLanguage(language), isCurrent, force);
     if (!isCurrent()) return;
     publishedFaqs.value = items;
     publishedFaqStatus.value = "ready";

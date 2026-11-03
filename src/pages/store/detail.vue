@@ -286,11 +286,12 @@ import { purchaseEligibilityUnlockHref, resolvePurchaseEligibilityMessage } from
 import type { TrustLocale } from "@/api/trust-section-api";
 import { trustNumberedRows } from "@/lib/trust-fields";
 import { usePublishedTrust } from "@/composables/use-published-trust";
+import { serverLanguage } from "@/i18n";
 
 const t = useT();
 const locale = useLocaleStore();
 const phase = useProductPhase();
-const trustLanguage = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
+const trustLanguage = computed<TrustLocale>(() => serverLanguage(locale.code));
 const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = usePublishedTrust();
 function refreshTrustMaterial() { if (trustStatus.value === 'error') void refreshTrust(true); }
 

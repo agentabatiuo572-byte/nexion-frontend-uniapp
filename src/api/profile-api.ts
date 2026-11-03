@@ -1,6 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import type { LocaleCode } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
 
 export interface ProfileApi {
   profile(): Promise<ProfileProjection>;
@@ -47,7 +47,7 @@ function key(value: string): string {
   return normalized;
 }
 
-const PROFILE_LANGUAGES = new Set<LocaleCode>(["en", "vi", "zh", "ja", "ko", "ru", "es", "pt", "ar", "de", "fr"]);
+const PROFILE_LANGUAGES = new Set<LocaleCode>(["en", "vi", "zh", "ja", "ko", "ru", "es", "pt", "ar", "de", "fr", "kk", "uz", "id", "ms", "fil"]);
 
 function isProfileLanguage(value: unknown): value is LocaleCode {
   return typeof value === "string" && PROFILE_LANGUAGES.has(value as LocaleCode);
@@ -122,7 +122,8 @@ export function createProfileApi(client: ApiClient): ProfileApi {
       return row.nickname;
     },
     updateLanguage: async (nextLanguage) => {
-      const expected = language(nextLanguage);
+      // The account stores zh/en/vi only; other interface languages are saved as English.
+      const expected = serverLanguage(language(nextLanguage));
       const row = record(await client.request({
         method: "PUT",
         path: "/api/app/profile/language",

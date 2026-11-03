@@ -131,6 +131,7 @@ import { canAcknowledgeRiskDisclosure, canCompleteRiskDisclosureReadingFromScrol
 import { toast } from "@/store/ui";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { safeReturnTo } from "@/routing/safe-return-to";
+import { serverLanguage } from "@/i18n";
 
 const SCROLL_THRESHOLD_PX = 24;
 
@@ -148,7 +149,7 @@ const loadError = computed(() => !risk.error || disclosure.value ? "" : risk.jur
   : risk.publicationUnavailable ? w.value.publicationUnavailable : w.value.loadErrorRegion);
 const canRetryLoad = computed(() => !risk.jurisdictionUnmapped);
 const displayLanguage = computed(() => disclosure.value
-  ? resolveRiskDisclosureDisplayLanguage(locale.code, disclosure.value.languageScope)
+  ? resolveRiskDisclosureDisplayLanguage(serverLanguage(locale.code), disclosure.value.languageScope)
   : null);
 const languageFallback = computed(() => displayLanguage.value?.fallback ?? false);
 const disclosureContext = computed(() => disclosure.value ? fmt(w.value.publishedContext, {

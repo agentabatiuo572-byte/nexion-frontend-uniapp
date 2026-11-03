@@ -6,13 +6,14 @@ import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useLocaleStore } from "@/store/locale";
+import { serverLanguage } from "@/i18n";
 
 /** Localized exact-version names; historical source references stay on the bill. */
 export function useCourseRewardTitles() {
   const app = useApp();
   const auth = useAuth();
   const locale = useLocaleStore();
-  const language = computed(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code : "zh");
+  const language = computed(() => serverLanguage(locale.code));
   const ready = computed(() => binarySessionReady({
     remote: remoteApiEnabled,
     authenticated: auth.isAuthenticated,
