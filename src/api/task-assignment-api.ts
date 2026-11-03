@@ -97,7 +97,6 @@ export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   receiptHash?: string;
   startedAt: number;
   completedAt: number;
-  /** Null when the backend has not supplied an actual posting time. */
   settledAt: number | null;
   durationSec: number;
   source: "server";
