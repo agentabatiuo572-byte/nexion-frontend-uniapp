@@ -132,6 +132,7 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDate } from "@/lib/trial-date";
 import { useCommission, type CommissionEvent, type CommissionKind } from "@/store/commission";
 import { apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
+import { uiLocale } from "@/i18n";
 
 const t = useT();
 const commission = useCommission();
@@ -195,14 +196,26 @@ const monthAmount = computed(() => {
   return text.startsWith('$') && dot > 0 ? { currency: '$', integer: text.slice(1, dot), fraction: text.slice(dot + 1) } : { currency: '', integer: text, fraction: '' };
 });
 // "Today" or the weekday beside each local date; weekday names avoid Intl so they survive without it.
+// The newer languages use CLDR 48 short weekday names.
+const DAY_LABEL_TODAY = { zh: "今天", en: "Today", vi: "Hôm nay", id: "Today", ms: "Today", fil: "Today", ru: "Today", kk: "Today", uz: "Today" };
+const DAY_LABEL_WEEKDAYS = {
+  zh: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
+  en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  vi: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
+  id: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
+  ms: ["Ahd", "Isn", "Sel", "Rab", "Kha", "Jum", "Sab"],
+  fil: ["Lin", "Lun", "Mar", "Miy", "Huw", "Biy", "Sab"],
+  ru: ["вс", "пн", "вт", "ср", "чт", "пт", "сб"],
+  kk: ["жс", "дс", "сс", "ср", "бс", "жм", "сб"],
+  uz: ["Yak", "Dush", "Sesh", "Chor", "Pay", "Jum", "Shan"],
+};
 function dayLabel(ts: number): string {
   const date = formatTrialDate(ts, dateLocale()), at = new Date(ts);
   if (typeof ts !== "number" || !Number.isFinite(ts) || !Number.isFinite(at.getTime())) return date;
   const now = new Date();
   if (at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth() && at.getDate() === now.getDate())
-    return `${locale.code === "zh" ? "今天" : locale.code === "vi" ? "Hôm nay" : "Today"} · ${date}`;
-  const days = locale.code === "zh" ? ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] : locale.code === "vi" ? ["CN", "T2", "T3", "T4", "T5", "T6", "T7"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return `${date} · ${days[at.getDay()]}`;
+    return `${DAY_LABEL_TODAY[uiLocale(locale.code)]} · ${date}`;
+  return `${date} · ${DAY_LABEL_WEEKDAYS[uiLocale(locale.code)][at.getDay()]}`;
 }
 // Records group under their local date; the formatter falls back safely without Intl.
 const eventDays = computed(() => {

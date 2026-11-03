@@ -1,5 +1,8 @@
+import type { UiLocale } from "@/i18n";
+import { formatDateParts } from "@/lib/display-date";
+
 export interface ConversationTimeOptions {
-  locale: "zh" | "en" | "vi";
+  locale: UiLocale;
   now: number;
   timeZone?: string;
 }
@@ -20,16 +23,17 @@ const MINUTE = 60_000;
 const DAY = 86_400_000;
 export const CONVERSATION_TIME_GROUP_GAP_MS = DAY;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// Weekday names of the newer languages are CLDR 48 stand-alone forms, capitalised to start the label.
 const COPY = {
   zh: { today: "今天", yesterday: "昨天", weekdays: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"] },
   en: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
   vi: { today: "Hôm nay", yesterday: "Hôm qua", weekdays: ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"] },
-  id: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
-  ms: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
-  fil: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
-  ru: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
-  kk: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
-  uz: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+  id: { today: "Today", yesterday: "Yesterday", weekdays: ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] },
+  ms: { today: "Today", yesterday: "Yesterday", weekdays: ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"] },
+  fil: { today: "Today", yesterday: "Yesterday", weekdays: ["Linggo", "Lunes", "Martes", "Miyerkules", "Huwebes", "Biyernes", "Sabado"] },
+  ru: { today: "Today", yesterday: "Yesterday", weekdays: ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"] },
+  kk: { today: "Today", yesterday: "Yesterday", weekdays: ["Жексенбі", "Дүйсенбі", "Сейсенбі", "Сәрсенбі", "Бейсенбі", "Жұма", "Сенбі"] },
+  uz: { today: "Today", yesterday: "Yesterday", weekdays: ["Yakshanba", "Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba"] },
 };
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -88,6 +92,7 @@ function dateLabel(value: CalendarTime, locale: ConversationTimeOptions["locale"
   const { year, month, day } = value;
   if (locale === "zh") return `${year}/${pad(month)}/${pad(day)}`;
   if (locale === "vi") return `${pad(day)}/${pad(month)}/${year}`;
+  if (locale !== "en") return formatDateParts(year, month, day, locale);
   return `${MONTHS[month - 1]} ${day}, ${year}`;
 }
 

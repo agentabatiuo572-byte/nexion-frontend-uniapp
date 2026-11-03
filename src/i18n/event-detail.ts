@@ -44,7 +44,7 @@ export const eventDetailCopy = {
     eligibility: { DISABLED: "Event not open", NOT_STARTED: "Event has not started", ENDED: "Event ended", NOT_ELIGIBLE: "Participation requirements not met", IN_PROGRESS: "Event in progress", READY: "Ready to claim", CLAIMED: "Reward claimed", VOUCHER_UNAVAILABLE: "Voucher unavailable", VOUCHER_NOT_STARTED: "Voucher not yet valid", VOUCHER_EXPIRED: "Voucher expired", VOUCHER_ALREADY_USED: "Voucher already used", VOUCHER_EXHAUSTED: "Voucher fully claimed" },
     rulesUnavailable: "Participation rules are unavailable. Please retry.",
     labels: { description: "Description", terms: "Terms", targetInvites: "Qualified friends needed", windowDays: "Participation window", giftQuantity: "Gift device quantity", minRank: "Minimum rank", rewardNex: "UVT reward", streakSavers: "Streak savers", minNex: "Minimum UVT holding", holdDays: "Consecutive holding days", poolUsdt: "USDT prize pool", multiplier: "Check-in reward multiplier", weekdays: "Active weekdays", timeZone: "Event time zone", thresholdUsdt: "Reinvestment per tier (USDT)", ticketsPerThreshold: "Genesis tickets per tier", extraGenesisTickets: "Extra Genesis tickets", regions: "Participating regions" },
-    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    weekdays: ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"],
   },
   ms: {
     voucherTerms: "One claim per account, for one order of a single model. Multiple units are allowed. Eligible Pro purchases can stack the upgrade offer.",
@@ -53,7 +53,7 @@ export const eventDetailCopy = {
     eligibility: { DISABLED: "Event not open", NOT_STARTED: "Event has not started", ENDED: "Event ended", NOT_ELIGIBLE: "Participation requirements not met", IN_PROGRESS: "Event in progress", READY: "Ready to claim", CLAIMED: "Reward claimed", VOUCHER_UNAVAILABLE: "Voucher unavailable", VOUCHER_NOT_STARTED: "Voucher not yet valid", VOUCHER_EXPIRED: "Voucher expired", VOUCHER_ALREADY_USED: "Voucher already used", VOUCHER_EXHAUSTED: "Voucher fully claimed" },
     rulesUnavailable: "Participation rules are unavailable. Please retry.",
     labels: { description: "Description", terms: "Terms", targetInvites: "Qualified friends needed", windowDays: "Participation window", giftQuantity: "Gift device quantity", minRank: "Minimum rank", rewardNex: "UVT reward", streakSavers: "Streak savers", minNex: "Minimum UVT holding", holdDays: "Consecutive holding days", poolUsdt: "USDT prize pool", multiplier: "Check-in reward multiplier", weekdays: "Active weekdays", timeZone: "Event time zone", thresholdUsdt: "Reinvestment per tier (USDT)", ticketsPerThreshold: "Genesis tickets per tier", extraGenesisTickets: "Extra Genesis tickets", regions: "Participating regions" },
-    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    weekdays: ["Isn", "Sel", "Rab", "Kha", "Jum", "Sab", "Ahd"],
   },
   fil: {
     voucherTerms: "One claim per account, for one order of a single model. Multiple units are allowed. Eligible Pro purchases can stack the upgrade offer.",
@@ -62,7 +62,7 @@ export const eventDetailCopy = {
     eligibility: { DISABLED: "Event not open", NOT_STARTED: "Event has not started", ENDED: "Event ended", NOT_ELIGIBLE: "Participation requirements not met", IN_PROGRESS: "Event in progress", READY: "Ready to claim", CLAIMED: "Reward claimed", VOUCHER_UNAVAILABLE: "Voucher unavailable", VOUCHER_NOT_STARTED: "Voucher not yet valid", VOUCHER_EXPIRED: "Voucher expired", VOUCHER_ALREADY_USED: "Voucher already used", VOUCHER_EXHAUSTED: "Voucher fully claimed" },
     rulesUnavailable: "Participation rules are unavailable. Please retry.",
     labels: { description: "Description", terms: "Terms", targetInvites: "Qualified friends needed", windowDays: "Participation window", giftQuantity: "Gift device quantity", minRank: "Minimum rank", rewardNex: "UVT reward", streakSavers: "Streak savers", minNex: "Minimum UVT holding", holdDays: "Consecutive holding days", poolUsdt: "USDT prize pool", multiplier: "Check-in reward multiplier", weekdays: "Active weekdays", timeZone: "Event time zone", thresholdUsdt: "Reinvestment per tier (USDT)", ticketsPerThreshold: "Genesis tickets per tier", extraGenesisTickets: "Extra Genesis tickets", regions: "Participating regions" },
-    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    weekdays: ["Lun", "Mar", "Miy", "Huw", "Biy", "Sab", "Lin"],
   },
   ru: {
     voucherTerms: "One claim per account, for one order of a single model. Multiple units are allowed. Eligible Pro purchases can stack the upgrade offer.",
@@ -71,7 +71,7 @@ export const eventDetailCopy = {
     eligibility: { DISABLED: "Event not open", NOT_STARTED: "Event has not started", ENDED: "Event ended", NOT_ELIGIBLE: "Participation requirements not met", IN_PROGRESS: "Event in progress", READY: "Ready to claim", CLAIMED: "Reward claimed", VOUCHER_UNAVAILABLE: "Voucher unavailable", VOUCHER_NOT_STARTED: "Voucher not yet valid", VOUCHER_EXPIRED: "Voucher expired", VOUCHER_ALREADY_USED: "Voucher already used", VOUCHER_EXHAUSTED: "Voucher fully claimed" },
     rulesUnavailable: "Participation rules are unavailable. Please retry.",
     labels: { description: "Description", terms: "Terms", targetInvites: "Qualified friends needed", windowDays: "Participation window", giftQuantity: "Gift device quantity", minRank: "Minimum rank", rewardNex: "UVT reward", streakSavers: "Streak savers", minNex: "Minimum UVT holding", holdDays: "Consecutive holding days", poolUsdt: "USDT prize pool", multiplier: "Check-in reward multiplier", weekdays: "Active weekdays", timeZone: "Event time zone", thresholdUsdt: "Reinvestment per tier (USDT)", ticketsPerThreshold: "Genesis tickets per tier", extraGenesisTickets: "Extra Genesis tickets", regions: "Participating regions" },
-    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    weekdays: ["пн", "вт", "ср", "чт", "пт", "сб", "вс"],
   },
   kk: {
     voucherTerms: "One claim per account, for one order of a single model. Multiple units are allowed. Eligible Pro purchases can stack the upgrade offer.",
@@ -80,7 +80,7 @@ export const eventDetailCopy = {
     eligibility: { DISABLED: "Event not open", NOT_STARTED: "Event has not started", ENDED: "Event ended", NOT_ELIGIBLE: "Participation requirements not met", IN_PROGRESS: "Event in progress", READY: "Ready to claim", CLAIMED: "Reward claimed", VOUCHER_UNAVAILABLE: "Voucher unavailable", VOUCHER_NOT_STARTED: "Voucher not yet valid", VOUCHER_EXPIRED: "Voucher expired", VOUCHER_ALREADY_USED: "Voucher already used", VOUCHER_EXHAUSTED: "Voucher fully claimed" },
     rulesUnavailable: "Participation rules are unavailable. Please retry.",
     labels: { description: "Description", terms: "Terms", targetInvites: "Qualified friends needed", windowDays: "Participation window", giftQuantity: "Gift device quantity", minRank: "Minimum rank", rewardNex: "UVT reward", streakSavers: "Streak savers", minNex: "Minimum UVT holding", holdDays: "Consecutive holding days", poolUsdt: "USDT prize pool", multiplier: "Check-in reward multiplier", weekdays: "Active weekdays", timeZone: "Event time zone", thresholdUsdt: "Reinvestment per tier (USDT)", ticketsPerThreshold: "Genesis tickets per tier", extraGenesisTickets: "Extra Genesis tickets", regions: "Participating regions" },
-    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    weekdays: ["дс", "сс", "ср", "бс", "жм", "сб", "жс"],
   },
   uz: {
     voucherTerms: "One claim per account, for one order of a single model. Multiple units are allowed. Eligible Pro purchases can stack the upgrade offer.",
@@ -89,6 +89,6 @@ export const eventDetailCopy = {
     eligibility: { DISABLED: "Event not open", NOT_STARTED: "Event has not started", ENDED: "Event ended", NOT_ELIGIBLE: "Participation requirements not met", IN_PROGRESS: "Event in progress", READY: "Ready to claim", CLAIMED: "Reward claimed", VOUCHER_UNAVAILABLE: "Voucher unavailable", VOUCHER_NOT_STARTED: "Voucher not yet valid", VOUCHER_EXPIRED: "Voucher expired", VOUCHER_ALREADY_USED: "Voucher already used", VOUCHER_EXHAUSTED: "Voucher fully claimed" },
     rulesUnavailable: "Participation rules are unavailable. Please retry.",
     labels: { description: "Description", terms: "Terms", targetInvites: "Qualified friends needed", windowDays: "Participation window", giftQuantity: "Gift device quantity", minRank: "Minimum rank", rewardNex: "UVT reward", streakSavers: "Streak savers", minNex: "Minimum UVT holding", holdDays: "Consecutive holding days", poolUsdt: "USDT prize pool", multiplier: "Check-in reward multiplier", weekdays: "Active weekdays", timeZone: "Event time zone", thresholdUsdt: "Reinvestment per tier (USDT)", ticketsPerThreshold: "Genesis tickets per tier", extraGenesisTickets: "Extra Genesis tickets", regions: "Participating regions" },
-    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    weekdays: ["Dush", "Sesh", "Chor", "Pay", "Jum", "Shan", "Yak"],
   },
 };
