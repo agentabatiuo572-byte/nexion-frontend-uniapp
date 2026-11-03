@@ -18,11 +18,13 @@ export function auxiliaryDemo(url,locale,state,request) {
     const totals={amountUSDT:empty?0:3.5,amountNEX:empty?0:11.71875,count:events.length},zero={amountUSDT:0,amountNEX:0,count:0};
     return {...proof,serverCanonical:true,period:url.searchParams.get('period')||'month',page:Number(url.searchParams.get('page')||1),pageSize:Number(url.searchParams.get('pageSize')||20),totalRows:events.length,events,split:{purchase:kind==='direct_purchase'?totals:zero,deviceEarning:kind==='direct_device_earning'?totals:zero},generatedAt:iso,snapshotAt:url.searchParams.get('snapshotAt')||iso};
   }
-  // The prototype models the v1 assignment protocol only; a 404 lets the App fall back to it.
-  if(p==='/api/tasks/v2/assignments')throw Object.assign(new Error('NOT_FOUND'),{status:404});
-  if(p==='/api/tasks/assignments') {
-    const task=(id,status,taskClass)=>({...proof,serverCanonical:true,taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:text('图像生成','Image generation','Tạo hình ảnh'),taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:2.34,requiredSeconds:600,startedAt:new Date(now-(status==='RUNNING'?300000:4200000)).toISOString(),completableAt:new Date(now+(status==='RUNNING'?300000:-3600000)).toISOString(),completedAt:status==='COMPLETED'?new Date(now-3600000).toISOString():null,receiptNo:status==='COMPLETED'?'DEMO-RECEIPT-1':null,proofNonce:null,proofExpiresAt:null});
-    return {...proof,serverCanonical:true,serverNow:iso,devices:empty?[]:[{deviceId:41,instanceNo:'REVIEW-S1',deviceType:'GPU',lockUntil:null,currentTask:task(4,'RUNNING','IG'),recentTasks:[task(1,'COMPLETED','IG')]}]};
+  // Like the backend, v2 is the v1 read plus settlement fields and the unposted totals; with no devices it is 404.
+  if(p==='/api/tasks/v2/assignments'&&empty)throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
+  if(p==='/api/tasks/assignments'||p==='/api/tasks/v2/assignments') {
+    const v2=p.includes('/v2/'),posted=new Date(now-3000000).toISOString();
+    const task=(id,status,taskClass)=>({...proof,serverCanonical:true,...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,settlementStatus:status==='COMPLETED'?'POSTED':'NONE',settlementBatchNo:status==='COMPLETED'?'DEMO-BATCH-1':null,settledAt:status==='COMPLETED'?posted:null}),taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:text('图像生成','Image generation','Tạo hình ảnh'),taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:2.34,requiredSeconds:600,startedAt:new Date(now-(status==='RUNNING'?300000:4200000)).toISOString(),completableAt:new Date(now+(status==='RUNNING'?300000:-3600000)).toISOString(),completedAt:status==='COMPLETED'?new Date(now-3600000).toISOString():null,receiptNo:status==='COMPLETED'?'DEMO-RECEIPT-1':null,proofNonce:null,proofExpiresAt:null});
+    return {...proof,serverCanonical:true,serverNow:iso,devices:empty?[]:[{deviceId:41,instanceNo:'REVIEW-S1',deviceType:'GPU',lockUntil:null,currentTask:task(4,'RUNNING','IG'),recentTasks:[task(1,'COMPLETED','IG')],...(v2&&{recoveryPending:false,recoveryReason:null})}],
+      ...(v2&&{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]})};
   }
   // P-62 Task Center: one posted settlement batch so the "Settlement batch" entry can be previewed.
   if(p==='/api/tasks/v2/settlements'||p==='/api/tasks/v2/settlements/DEMO-BATCH-1') {
