@@ -240,6 +240,7 @@ function voucherCondition(def:VoucherDef):string {
   return [scope,fmt(p.value.voucherMinimum,{amount:formatAmount(def.minPurchaseUSD??0)}),def.endAt?p.value.deadline+' · '+displayDeadline(new Date(def.endAt).toISOString(),locale.code):''].filter(Boolean).join(' · ');
 }
 const selection=ref(props.items.map(({productNo,quantity})=>({productNo,quantity})));
+// Lite gates fresh purchases only; an explicit retry of the frozen original command keeps its own items and key.
 const liteSelectionAllowed=computed(()=>selection.value.every(item=>isLiteProduct(getProduct(item.productNo)??{id:item.productNo})));
 const keepRecoveryTarget=ref<string|null>(null),keepRecoveryReadError=ref(false),tradein=useTradeinSheet();
 function recoverKeepBeforeNewPurchase(reopen=false):boolean {
@@ -305,7 +306,7 @@ async function loadOrderClock(){
   const fleet=await deviceE3Api.fleet();if(!current()||generation!==clockGeneration)return;
   orderClock={serverNow:fleet.serverNow,at:sampledAt};updateClock();
 }
-const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!unknown.value&&!keepRecoveryTarget.value&&liteSelectionAllowed.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
+const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!unknown.value&&!keepRecoveryTarget.value&&(liteSelectionAllowed.value||session.retryOriginal)&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
 const canPay=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
@@ -593,7 +594,7 @@ function show(){
 }
 watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible.value&&current())show();}});
 const footer = computed(() => {
-  if (loading.value || !auth.isAuthenticated || unknown.value || keepRecoveryTarget.value || (!order.value&&!liteSelectionAllowed.value)) return null;
+  if (loading.value || !auth.isAuthenticated || unknown.value || keepRecoveryTarget.value || (!order.value&&!liteSelectionAllowed.value&&!session.retryOriginal)) return null;
   const rawAmount = order.value?.amountUsdt ?? displayQuote.value?.amountUsdt;
   const currency='USD' as const,amount=formatCheckoutReviewAmount(rawAmount,currency,{unit:true}),amountValue=rawAmount;
   if (order.value?.paymentStatus === 'PENDING') return { amount, amountValue, currency, label: p.value.pay, disabled: rawAmount==null||!canPay.value||leaving.value||paymentConfirming.value||paymentEntryChecking.value, action: pay };
