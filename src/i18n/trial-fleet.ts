@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 export const trialFleetCopy = {
   zh: {
@@ -26,9 +27,57 @@ export const trialFleetCopy = {
     unknown: "Chưa tải được trạng thái dùng thử", loading: "Đang cập nhật lượt dùng thử", retry: "Thử lại", creditNote: "Khoản khấu trừ chỉ dùng để mua thiết bị, không thể rút trực tiếp.",
     slotsUnknown: "Chưa tải được sức chứa thiết bị. Vui lòng tải lại và thử lại.", slotsChecking: "Đang kiểm tra sức chứa thiết bị. Vui lòng đợi.", cancelBusy: "Đang hủy dùng thử", cancel: "Hủy dùng thử",
   },
+  id: {
+    imageBadge: "Trial", statusUnknown: "Status unknown",
+    longRemaining: '{days}d {hours}h',
+    grace: "Trial stopped · credit available", remaining: "Remaining", creditRemaining: "Credit expires in",
+    availableCredit: "Available credit", estimate: "Estimated trial credit", details: "Trial details", detailsAction: "Details", buyEarly: "Buy early", buy: "Buy with credit",
+    unknown: "Trial status unavailable", loading: "Updating trial status", retry: "Retry", creditNote: "Credit applies to a device purchase and cannot be withdrawn directly.",
+    slotsUnknown: "Device capacity is unavailable. Refresh and try again.", slotsChecking: "Checking device capacity. Please wait.", cancelBusy: "Cancelling trial", cancel: "Cancel trial",
+  },
+  ms: {
+    imageBadge: "Trial", statusUnknown: "Status unknown",
+    longRemaining: '{days}d {hours}h',
+    grace: "Trial stopped · credit available", remaining: "Remaining", creditRemaining: "Credit expires in",
+    availableCredit: "Available credit", estimate: "Estimated trial credit", details: "Trial details", detailsAction: "Details", buyEarly: "Buy early", buy: "Buy with credit",
+    unknown: "Trial status unavailable", loading: "Updating trial status", retry: "Retry", creditNote: "Credit applies to a device purchase and cannot be withdrawn directly.",
+    slotsUnknown: "Device capacity is unavailable. Refresh and try again.", slotsChecking: "Checking device capacity. Please wait.", cancelBusy: "Cancelling trial", cancel: "Cancel trial",
+  },
+  fil: {
+    imageBadge: "Trial", statusUnknown: "Status unknown",
+    longRemaining: '{days}d {hours}h',
+    grace: "Trial stopped · credit available", remaining: "Remaining", creditRemaining: "Credit expires in",
+    availableCredit: "Available credit", estimate: "Estimated trial credit", details: "Trial details", detailsAction: "Details", buyEarly: "Buy early", buy: "Buy with credit",
+    unknown: "Trial status unavailable", loading: "Updating trial status", retry: "Retry", creditNote: "Credit applies to a device purchase and cannot be withdrawn directly.",
+    slotsUnknown: "Device capacity is unavailable. Refresh and try again.", slotsChecking: "Checking device capacity. Please wait.", cancelBusy: "Cancelling trial", cancel: "Cancel trial",
+  },
+  ru: {
+    imageBadge: "Trial", statusUnknown: "Status unknown",
+    longRemaining: '{days}d {hours}h',
+    grace: "Trial stopped · credit available", remaining: "Remaining", creditRemaining: "Credit expires in",
+    availableCredit: "Available credit", estimate: "Estimated trial credit", details: "Trial details", detailsAction: "Details", buyEarly: "Buy early", buy: "Buy with credit",
+    unknown: "Trial status unavailable", loading: "Updating trial status", retry: "Retry", creditNote: "Credit applies to a device purchase and cannot be withdrawn directly.",
+    slotsUnknown: "Device capacity is unavailable. Refresh and try again.", slotsChecking: "Checking device capacity. Please wait.", cancelBusy: "Cancelling trial", cancel: "Cancel trial",
+  },
+  kk: {
+    imageBadge: "Trial", statusUnknown: "Status unknown",
+    longRemaining: '{days}d {hours}h',
+    grace: "Trial stopped · credit available", remaining: "Remaining", creditRemaining: "Credit expires in",
+    availableCredit: "Available credit", estimate: "Estimated trial credit", details: "Trial details", detailsAction: "Details", buyEarly: "Buy early", buy: "Buy with credit",
+    unknown: "Trial status unavailable", loading: "Updating trial status", retry: "Retry", creditNote: "Credit applies to a device purchase and cannot be withdrawn directly.",
+    slotsUnknown: "Device capacity is unavailable. Refresh and try again.", slotsChecking: "Checking device capacity. Please wait.", cancelBusy: "Cancelling trial", cancel: "Cancel trial",
+  },
+  uz: {
+    imageBadge: "Trial", statusUnknown: "Status unknown",
+    longRemaining: '{days}d {hours}h',
+    grace: "Trial stopped · credit available", remaining: "Remaining", creditRemaining: "Credit expires in",
+    availableCredit: "Available credit", estimate: "Estimated trial credit", details: "Trial details", detailsAction: "Details", buyEarly: "Buy early", buy: "Buy with credit",
+    unknown: "Trial status unavailable", loading: "Updating trial status", retry: "Retry", creditNote: "Credit applies to a device purchase and cannot be withdrawn directly.",
+    slotsUnknown: "Device capacity is unavailable. Refresh and try again.", slotsChecking: "Checking device capacity. Please wait.", cancelBusy: "Cancelling trial", cancel: "Cancel trial",
+  },
 };
 
 export function useTrialFleetCopy() {
   const locale = useLocaleStore();
-  return computed(() => trialFleetCopy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+  return computed(() => trialFleetCopy[uiLocale(locale.code)]);
 }

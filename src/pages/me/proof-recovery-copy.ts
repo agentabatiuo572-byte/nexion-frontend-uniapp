@@ -1,3 +1,4 @@
+import { uiLocale } from "@/i18n";
 const copy = {
   zh: {
     loading: "正在加载证明资料",
@@ -23,8 +24,56 @@ const copy = {
     linkUnavailable: "Liên kết chia sẻ chưa khả dụng",
     linkUnavailableHint: "Tải lại thông tin trước khi sao chép, chia sẻ hoặc lưu thẻ.",
   },
+  id: {
+    loading: "Loading proof details",
+    loadingHint: "Once loaded, you can copy the link, share or save your card.",
+    unavailable: "Proof details could not be loaded",
+    unavailableHint: "Retry loading the details to continue sharing.",
+    linkUnavailable: "Sharing link is unavailable",
+    linkUnavailableHint: "Reload the details before copying, sharing or saving your card.",
+  },
+  ms: {
+    loading: "Loading proof details",
+    loadingHint: "Once loaded, you can copy the link, share or save your card.",
+    unavailable: "Proof details could not be loaded",
+    unavailableHint: "Retry loading the details to continue sharing.",
+    linkUnavailable: "Sharing link is unavailable",
+    linkUnavailableHint: "Reload the details before copying, sharing or saving your card.",
+  },
+  fil: {
+    loading: "Loading proof details",
+    loadingHint: "Once loaded, you can copy the link, share or save your card.",
+    unavailable: "Proof details could not be loaded",
+    unavailableHint: "Retry loading the details to continue sharing.",
+    linkUnavailable: "Sharing link is unavailable",
+    linkUnavailableHint: "Reload the details before copying, sharing or saving your card.",
+  },
+  ru: {
+    loading: "Loading proof details",
+    loadingHint: "Once loaded, you can copy the link, share or save your card.",
+    unavailable: "Proof details could not be loaded",
+    unavailableHint: "Retry loading the details to continue sharing.",
+    linkUnavailable: "Sharing link is unavailable",
+    linkUnavailableHint: "Reload the details before copying, sharing or saving your card.",
+  },
+  kk: {
+    loading: "Loading proof details",
+    loadingHint: "Once loaded, you can copy the link, share or save your card.",
+    unavailable: "Proof details could not be loaded",
+    unavailableHint: "Retry loading the details to continue sharing.",
+    linkUnavailable: "Sharing link is unavailable",
+    linkUnavailableHint: "Reload the details before copying, sharing or saving your card.",
+  },
+  uz: {
+    loading: "Loading proof details",
+    loadingHint: "Once loaded, you can copy the link, share or save your card.",
+    unavailable: "Proof details could not be loaded",
+    unavailableHint: "Retry loading the details to continue sharing.",
+    linkUnavailable: "Sharing link is unavailable",
+    linkUnavailableHint: "Reload the details before copying, sharing or saving your card.",
+  },
 };
 
 export function proofRecoveryCopyFor(locale: string) {
-  return copy[locale === "zh" || locale === "vi" ? locale : "en"];
+  return copy[uiLocale(locale)];
 }

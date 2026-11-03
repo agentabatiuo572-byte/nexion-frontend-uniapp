@@ -1,3 +1,4 @@
+import { uiLocale } from "@/i18n";
 const copy = {
   zh: {
     learn: "了解创世节点",
@@ -17,8 +18,44 @@ const copy = {
     holderIntro: "Tìm hiểu quyền lợi và rủi ro. Nếu đã mua nút, bạn có thể xem thông tin sở hữu tại đây.",
     trust: "Tin cậy và công bố",
   },
+  id: {
+    learn: "About Genesis nodes",
+    empty: "Explore Genesis nodes, trading rules and risk disclosures.",
+    holderIntro: "Explore node benefits and risks. If you have purchased nodes, view your holdings here.",
+    trust: "Trust and disclosures",
+  },
+  ms: {
+    learn: "About Genesis nodes",
+    empty: "Explore Genesis nodes, trading rules and risk disclosures.",
+    holderIntro: "Explore node benefits and risks. If you have purchased nodes, view your holdings here.",
+    trust: "Trust and disclosures",
+  },
+  fil: {
+    learn: "About Genesis nodes",
+    empty: "Explore Genesis nodes, trading rules and risk disclosures.",
+    holderIntro: "Explore node benefits and risks. If you have purchased nodes, view your holdings here.",
+    trust: "Trust and disclosures",
+  },
+  ru: {
+    learn: "About Genesis nodes",
+    empty: "Explore Genesis nodes, trading rules and risk disclosures.",
+    holderIntro: "Explore node benefits and risks. If you have purchased nodes, view your holdings here.",
+    trust: "Trust and disclosures",
+  },
+  kk: {
+    learn: "About Genesis nodes",
+    empty: "Explore Genesis nodes, trading rules and risk disclosures.",
+    holderIntro: "Explore node benefits and risks. If you have purchased nodes, view your holdings here.",
+    trust: "Trust and disclosures",
+  },
+  uz: {
+    learn: "About Genesis nodes",
+    empty: "Explore Genesis nodes, trading rules and risk disclosures.",
+    holderIntro: "Explore node benefits and risks. If you have purchased nodes, view your holdings here.",
+    trust: "Trust and disclosures",
+  },
 };
 
 export function genesisConsumerCopyFor(locale: string) {
-  return copy[locale === "zh" || locale === "vi" ? locale : "en"];
+  return copy[uiLocale(locale)];
 }

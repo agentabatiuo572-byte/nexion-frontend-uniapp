@@ -59,7 +59,7 @@ import NxSection from "@/components/ui/nx-section.vue";
 
 const t = useT();
 const locale = useLocaleStore();
-const center = computed(() => trustCenterCopy(locale.code === "zh" || locale.code === "vi" ? locale.code : "en"));
+const center = computed(() => trustCenterCopy(locale.code));
 const { documents, status, refresh } = useTrustDocuments();
 const profile = computed(() => documents.value?.profile ?? null);
 const goTrust = () => navTo("/pages/trust/trust");

@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 export const deviceStatisticsCapabilityCopy = {
   zh: {
@@ -14,9 +15,33 @@ export const deviceStatisticsCapabilityCopy = {
     currentStatus: "Trạng thái hiện tại",
     scope: "Có thể xem thu nhập hôm nay, tổng thu nhập và các tác vụ hoàn thành gần đây. Chưa có biểu đồ thu nhập theo ngày và tỷ lệ trực tuyến trong quá khứ.",
   },
+  id: {
+    currentStatus: "Current status",
+    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+  },
+  ms: {
+    currentStatus: "Current status",
+    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+  },
+  fil: {
+    currentStatus: "Current status",
+    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+  },
+  ru: {
+    currentStatus: "Current status",
+    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+  },
+  kk: {
+    currentStatus: "Current status",
+    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+  },
+  uz: {
+    currentStatus: "Current status",
+    scope: "Today's earnings, total earnings and recent completed jobs are available. Daily earnings charts and historical online rates are not offered yet.",
+  },
 };
 
 export function useDeviceStatisticsCapabilityCopy() {
   const locale = useLocaleStore();
-  return computed(() => deviceStatisticsCapabilityCopy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+  return computed(() => deviceStatisticsCapabilityCopy[uiLocale(locale.code)]);
 }

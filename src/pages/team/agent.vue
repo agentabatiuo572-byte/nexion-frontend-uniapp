@@ -209,6 +209,7 @@ import {
   type AmbassadorAgentFormState,
   type TeamP31718Request,
 } from "@/lib/team-p3-17-18-request-scope";
+import { uiLocale } from "@/i18n";
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -313,7 +314,7 @@ const latestApplication = ref<AmbassadorApplication>({ applicationId: null, stat
 const applications = ref<AmbassadorApplication[]>([]);
 
 const applicationStatusText = (application: AmbassadorApplication) => t.value.agent.applicationStatuses[application.status];
-const applicationIdLabel = computed(() => locale.code === 'zh' ? '申请编号' : locale.code === 'vi' ? 'Mã đơn đề nghị' : 'Application ID');
+const applicationIdLabel = computed(() => ({ zh: '申请编号', en: 'Application ID', vi: 'Mã đơn đề nghị', id: 'Application ID', ms: 'Application ID', fil: 'Application ID', ru: 'Application ID', kk: 'Application ID', uz: 'Application ID' })[uiLocale(locale.code)]);
 // This is a submitted budget, not a two-decimal balance overview. Keep every
 // accepted decimal from the contract, and never feed this display into commands.
 function applicationBudget(value: number | null): string {

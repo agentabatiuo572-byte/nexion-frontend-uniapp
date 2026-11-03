@@ -1,3 +1,4 @@
+import { uiLocale } from "@/i18n";
 const COPY = {
   zh: {
     title: '邀请榜', points: '算力点', gap: '距上一名还差 {points}',
@@ -17,8 +18,44 @@ const COPY = {
     note: 'Xếp hạng theo điểm tính toán trong kỳ đã chọn. Thưởng bảng xếp hạng được chi trả sau khi kỳ kết thúc, theo số tiền thực nhận.',
     noteAll: 'Xếp hạng theo tổng điểm tính toán tích lũy.',
   },
+  id: {
+    title: 'Invite leaderboard', points: 'Compute points', gap: '{points} behind the next rank',
+    unavailable: 'Compute ranking is currently unavailable',
+    note: 'Ranked by compute points for the selected period. Leaderboard rewards are paid after the period ends, subject to actual payout.',
+    noteAll: 'Ranked by all-time compute points.',
+  },
+  ms: {
+    title: 'Invite leaderboard', points: 'Compute points', gap: '{points} behind the next rank',
+    unavailable: 'Compute ranking is currently unavailable',
+    note: 'Ranked by compute points for the selected period. Leaderboard rewards are paid after the period ends, subject to actual payout.',
+    noteAll: 'Ranked by all-time compute points.',
+  },
+  fil: {
+    title: 'Invite leaderboard', points: 'Compute points', gap: '{points} behind the next rank',
+    unavailable: 'Compute ranking is currently unavailable',
+    note: 'Ranked by compute points for the selected period. Leaderboard rewards are paid after the period ends, subject to actual payout.',
+    noteAll: 'Ranked by all-time compute points.',
+  },
+  ru: {
+    title: 'Invite leaderboard', points: 'Compute points', gap: '{points} behind the next rank',
+    unavailable: 'Compute ranking is currently unavailable',
+    note: 'Ranked by compute points for the selected period. Leaderboard rewards are paid after the period ends, subject to actual payout.',
+    noteAll: 'Ranked by all-time compute points.',
+  },
+  kk: {
+    title: 'Invite leaderboard', points: 'Compute points', gap: '{points} behind the next rank',
+    unavailable: 'Compute ranking is currently unavailable',
+    note: 'Ranked by compute points for the selected period. Leaderboard rewards are paid after the period ends, subject to actual payout.',
+    noteAll: 'Ranked by all-time compute points.',
+  },
+  uz: {
+    title: 'Invite leaderboard', points: 'Compute points', gap: '{points} behind the next rank',
+    unavailable: 'Compute ranking is currently unavailable',
+    note: 'Ranked by compute points for the selected period. Leaderboard rewards are paid after the period ends, subject to actual payout.',
+    noteAll: 'Ranked by all-time compute points.',
+  },
 };
 
 export function leaderboardPointsCopy(locale: string) {
-  return COPY[locale.split('-')[0] as keyof typeof COPY] ?? COPY.en;
+  return COPY[uiLocale(locale.split('-')[0])];
 }

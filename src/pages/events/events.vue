@@ -44,7 +44,7 @@
         <GlassSegments :label="t.events.categoryGroupLabel" v-model="tab" :options="tabOptions" layout="scroll"  />
 
         <!-- Event list -->
-        <view v-if="remoteEventsLoading && filtered.length === 0" class="space-y-2.5" aria-busy="true" role="status" :aria-label="locale.code === 'zh' ? '加载中' : locale.code === 'vi' ? 'Đang tải' : 'Loading'">
+        <view v-if="remoteEventsLoading && filtered.length === 0" class="space-y-2.5" aria-busy="true" role="status" :aria-label="loadingLabel">
           <view v-for="row in 3" :key="row" class="nx-glass-card" style="height: 132px; padding: 18px">
             <view style="width: 58%; height: 18px; border-radius: 6px; background: var(--v5-surface-3)" />
             <view style="width: 86%; height: 12px; margin-top: 16px; border-radius: 4px; background: var(--v5-surface-2)" />
@@ -140,7 +140,8 @@ const app = useApp();
 const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const language = computed(() => locale.code);
-const raffleCopy = computed(() => genesisRaffleCopy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+const raffleCopy = computed(() => genesisRaffleCopy[uiLocale(locale.code)]);
+const loadingLabel = computed(() => ({ zh: "加载中", en: "Loading", vi: "Đang tải", id: "Loading", ms: "Loading", fil: "Loading", ru: "Loading", kk: "Loading", uz: "Loading" })[uiLocale(locale.code)]);
 
 const tab = ref<TabId>("ongoing");
 const remoteEvents = ref<CanonicalEvent[]>([]);
@@ -437,5 +438,6 @@ const emptyStyle: CSSProperties = {
 };
 
 import GlassSegments from "@/components/glass-segments.vue";
+import { uiLocale } from "@/i18n";
 const tabOptions = computed(() => TABS.map(value => ({ value, label: t.value.events.tabs[value] })));
 </script>

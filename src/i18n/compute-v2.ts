@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 export const computeV2Copy = {
   zh: {
@@ -26,9 +27,57 @@ export const computeV2Copy = {
     frozenReward: "Phần thưởng đã chốt", estimated: "Thời lượng dự kiến", actual: "Thời gian chạy thực tế", seconds: "giây", batch: "Lô quyết toán", tasks: "tác vụ", details: "Chi tiết tác vụ", close: "Đóng", retry: "Thử lại", more: "Tải thêm", empty: "Chưa có lô quyết toán", loading: "Đang tải…", unavailable: "Không thể đọc quyết toán. Vui lòng thử lại.", configVersion: "Phiên bản cấu hình", receipt: "Biên nhận tính toán", window: "Khoảng hoàn thành", postedAt: "Thời điểm ghi có",
     statuses: { CLAIMED: "Đã nhận", QUEUED: "Đang chờ", RUNNING: "Đang chạy", VERIFYING: "Đang xác minh", RECOVERING: "Đang khôi phục", PAUSED: "Tạm dừng", COMPLETED: "Hoàn thành", FAILED: "Thất bại", CANCELLED: "Đã hủy", NONE: "Không có thu nhập chờ quyết toán", PENDING: "Chờ quyết toán", POSTED: "Đã ghi có", BLOCKED: "Tạm giữ quyết toán" },
   },
+  id: {
+    accountBatchHint: "Includes earnings from all account devices.",
+    stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
+    taskReceipt: "Task receipt", emptyReceipts: "No task receipts yet", receiptsHint: "Receipts appear after tasks complete and earnings are posted.", confirming: "Confirming earnings", running: "Running", duration: "Task duration", reward: "Task reward",
+    title: "Compute settlement", pending: "Pending earnings", pendingHint: "Confirmed and awaiting posting. Unavailable for spending or withdrawal.", unknown: "—",
+    frozenReward: "Frozen reward", estimated: "Estimated duration", actual: "Actual runtime", seconds: "sec", batch: "Settlement batch", tasks: "tasks", details: "Task details", close: "Close", retry: "Retry", more: "Load more", empty: "No settlement batches yet", loading: "Loading…", unavailable: "Unable to read settlements. Please retry.", configVersion: "Configuration version", receipt: "Compute receipt", window: "Completion window", postedAt: "Posted at",
+    statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
+  },
+  ms: {
+    accountBatchHint: "Includes earnings from all account devices.",
+    stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
+    taskReceipt: "Task receipt", emptyReceipts: "No task receipts yet", receiptsHint: "Receipts appear after tasks complete and earnings are posted.", confirming: "Confirming earnings", running: "Running", duration: "Task duration", reward: "Task reward",
+    title: "Compute settlement", pending: "Pending earnings", pendingHint: "Confirmed and awaiting posting. Unavailable for spending or withdrawal.", unknown: "—",
+    frozenReward: "Frozen reward", estimated: "Estimated duration", actual: "Actual runtime", seconds: "sec", batch: "Settlement batch", tasks: "tasks", details: "Task details", close: "Close", retry: "Retry", more: "Load more", empty: "No settlement batches yet", loading: "Loading…", unavailable: "Unable to read settlements. Please retry.", configVersion: "Configuration version", receipt: "Compute receipt", window: "Completion window", postedAt: "Posted at",
+    statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
+  },
+  fil: {
+    accountBatchHint: "Includes earnings from all account devices.",
+    stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
+    taskReceipt: "Task receipt", emptyReceipts: "No task receipts yet", receiptsHint: "Receipts appear after tasks complete and earnings are posted.", confirming: "Confirming earnings", running: "Running", duration: "Task duration", reward: "Task reward",
+    title: "Compute settlement", pending: "Pending earnings", pendingHint: "Confirmed and awaiting posting. Unavailable for spending or withdrawal.", unknown: "—",
+    frozenReward: "Frozen reward", estimated: "Estimated duration", actual: "Actual runtime", seconds: "sec", batch: "Settlement batch", tasks: "tasks", details: "Task details", close: "Close", retry: "Retry", more: "Load more", empty: "No settlement batches yet", loading: "Loading…", unavailable: "Unable to read settlements. Please retry.", configVersion: "Configuration version", receipt: "Compute receipt", window: "Completion window", postedAt: "Posted at",
+    statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
+  },
+  ru: {
+    accountBatchHint: "Includes earnings from all account devices.",
+    stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
+    taskReceipt: "Task receipt", emptyReceipts: "No task receipts yet", receiptsHint: "Receipts appear after tasks complete and earnings are posted.", confirming: "Confirming earnings", running: "Running", duration: "Task duration", reward: "Task reward",
+    title: "Compute settlement", pending: "Pending earnings", pendingHint: "Confirmed and awaiting posting. Unavailable for spending or withdrawal.", unknown: "—",
+    frozenReward: "Frozen reward", estimated: "Estimated duration", actual: "Actual runtime", seconds: "sec", batch: "Settlement batch", tasks: "tasks", details: "Task details", close: "Close", retry: "Retry", more: "Load more", empty: "No settlement batches yet", loading: "Loading…", unavailable: "Unable to read settlements. Please retry.", configVersion: "Configuration version", receipt: "Compute receipt", window: "Completion window", postedAt: "Posted at",
+    statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
+  },
+  kk: {
+    accountBatchHint: "Includes earnings from all account devices.",
+    stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
+    taskReceipt: "Task receipt", emptyReceipts: "No task receipts yet", receiptsHint: "Receipts appear after tasks complete and earnings are posted.", confirming: "Confirming earnings", running: "Running", duration: "Task duration", reward: "Task reward",
+    title: "Compute settlement", pending: "Pending earnings", pendingHint: "Confirmed and awaiting posting. Unavailable for spending or withdrawal.", unknown: "—",
+    frozenReward: "Frozen reward", estimated: "Estimated duration", actual: "Actual runtime", seconds: "sec", batch: "Settlement batch", tasks: "tasks", details: "Task details", close: "Close", retry: "Retry", more: "Load more", empty: "No settlement batches yet", loading: "Loading…", unavailable: "Unable to read settlements. Please retry.", configVersion: "Configuration version", receipt: "Compute receipt", window: "Completion window", postedAt: "Posted at",
+    statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
+  },
+  uz: {
+    accountBatchHint: "Includes earnings from all account devices.",
+    stopNow: "Stop now (no reward for the unfinished task)", stopDescription: "{name} has a task in progress. Choose when to deactivate.", stopping: "Stopping. Deactivation follows confirmation of completed earnings.",
+    taskReceipt: "Task receipt", emptyReceipts: "No task receipts yet", receiptsHint: "Receipts appear after tasks complete and earnings are posted.", confirming: "Confirming earnings", running: "Running", duration: "Task duration", reward: "Task reward",
+    title: "Compute settlement", pending: "Pending earnings", pendingHint: "Confirmed and awaiting posting. Unavailable for spending or withdrawal.", unknown: "—",
+    frozenReward: "Frozen reward", estimated: "Estimated duration", actual: "Actual runtime", seconds: "sec", batch: "Settlement batch", tasks: "tasks", details: "Task details", close: "Close", retry: "Retry", more: "Load more", empty: "No settlement batches yet", loading: "Loading…", unavailable: "Unable to read settlements. Please retry.", configVersion: "Configuration version", receipt: "Compute receipt", window: "Completion window", postedAt: "Posted at",
+    statuses: { CLAIMED: "Claimed", QUEUED: "Queued", RUNNING: "Running", VERIFYING: "Verifying", RECOVERING: "Recovering", PAUSED: "Paused", COMPLETED: "Completed", FAILED: "Failed", CANCELLED: "Cancelled", NONE: "No pending earnings", PENDING: "Pending settlement", POSTED: "Posted", BLOCKED: "Settlement blocked" },
+  },
 };
 
 export function useComputeV2Copy() {
   const locale = useLocaleStore();
-  return computed(() => computeV2Copy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+  return computed(() => computeV2Copy[uiLocale(locale.code)]);
 }

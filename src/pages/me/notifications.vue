@@ -78,13 +78,14 @@ import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { isDirectNotificationSummary } from "@/lib/notification-summary";
 import { notificationActionsCopy } from "@/i18n/notification-actions";
 import { confirm, useUI } from "@/store/ui";
+import { uiLocale } from "@/i18n";
 
 const t = useT();
 const locale = useLocaleStore();
 const notifs = useNotifications();
 const app = useApp();
 const ui = useUI();
-const actionCopy = computed(() => notificationActionsCopy[locale.code === 'zh' || locale.code === 'vi' ? locale.code : 'en']);
+const actionCopy = computed(() => notificationActionsCopy[uiLocale(locale.code)]);
 const clearingRead = ref(false);
 const confirmOwner = `notification-center:${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let pageGeneration = 0;
