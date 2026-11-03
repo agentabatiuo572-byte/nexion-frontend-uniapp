@@ -8,7 +8,7 @@ export interface YieldAmount {
 }
 
 export interface StoreYieldLadderRow {
-  id: "phone" | "entry" | "pro" | "rack";
+  id: "phone" | "entry" | "pro" | "proV2" | "rack" | "rackP2";
   amount: YieldAmount | null;
   widthPct: number;
 }
@@ -33,7 +33,9 @@ export interface StoreYieldCatalogProof {
 const LADDER_PRODUCT_IDS = {
   entry: "stellarbox-s1",
   pro: "stellarbox-pro",
+  proV2: "stellarbox-pro-v2",
   rack: "stellarrack-p1",
+  rackP2: "stellarrack-p2",
 } as const;
 
 function productAmount(products: readonly Product[], productId: string): YieldAmount | null {
@@ -55,13 +57,15 @@ export function buildStoreYieldAuthority(
   const phone = typicalPhone ? { usd: typicalPhone.baseRateUsdt, nex: typicalPhone.baseRateNex } : null;
   const entry = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.entry);
   const pro = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.pro);
+  const proV2 = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.proV2);
   const rack = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.rack);
+  const rackP2 = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.rackP2);
   const complete = [phone, entry, pro, rack].every((amount) => amount !== null);
   const multiplier = phone && entry && phone.usd > 0 ? Math.round(entry.usd / phone.usd) : null;
-  const maximum = Math.max(0, ...[phone, entry, pro, rack].map((amount) => amount?.usd ?? 0));
   const rows: Array<[StoreYieldLadderRow["id"], YieldAmount | null]> = [
-    ["phone", phone], ["entry", entry], ["pro", pro], ["rack", rack],
+    ["phone", phone], ["entry", entry], ["pro", pro], ["proV2", proV2], ["rack", rack], ["rackP2", rackP2],
   ];
+  const maximum = Math.max(0, ...rows.map(([, amount]) => amount?.usd ?? 0));
   return {
     phone, entry, pro, rack, multiplier, complete,
     ladder: rows.map(([id, amount]) => ({

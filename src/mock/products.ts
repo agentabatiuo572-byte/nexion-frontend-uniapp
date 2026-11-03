@@ -57,6 +57,8 @@ export interface Product {
   /** E1 reference annual range for SHARE; this is not a settlement guarantee. */
   shareYieldMin?: number;
   shareYieldMax?: number;
+  /** Compute points one unit adds to the team (nx_product.compute_points); undefined until the server sends it. */
+  computePoints?: number;
   price: number;
   monthlyPrice?: number;
   installMonths?: number;
