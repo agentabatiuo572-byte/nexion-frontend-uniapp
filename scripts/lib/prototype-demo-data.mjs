@@ -177,18 +177,18 @@ const demoOrderSlots=(orders,orderNo)=>orders
   .filter(order=>(orderNo===undefined||order.orderNo===orderNo)&&['paid','provisioning'].includes(order.canonicalStatus))
   .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
 // Preview design rule. SCENARIO knobs (fleetState, checkoutState with its two-slot replace cap, trialState and
-// benefitState presets, entering or leaving dataState=empty or paymentState=low-balance / urgent, and Lite's
-// scopeState, whose mixed scope owns a hidden phone) start a fresh, coherent scenario: the preview server clears every
-// record the old scenario owns (session orders, purchases, trade-ins, stopped devices, trial, command receipts and
-// payment intents on the server, the App's order/payment recovery rows in the browser), and the next read seeds the
-// devices here. A write is applied only in the scenario it started in, and only from a page of that scenario.
-// dataState=empty is the empty account the empty pages are reviewed with: no devices (hidden phones included), no
-// sample orders, no top-ups and an empty wallet (balance 0, so wallet payments are refused for funds), the trial as its
-// own knobs say. paymentState=low-balance is an account whose wallet holds 820.64 USDT; paymentState=urgent seeds the
-// unpaid sample close to its deadline. PRESENTATION knobs (machineImageState: artwork only; dataState loading/error;
-// the other external payment results; Lite's computeState, whose tasks follow the fleet) only change what a read shows
-// or how a payment proceeds; they never change a fact. Other Lite knobs (setupGateState, promoState, promoEdgeState,
-// ...) own no devices or orders and keep the scenario.
+// benefitState presets, entering or leaving dataState=empty or paymentState=low-balance / urgent, Lite's scopeState,
+// whose mixed scope owns a hidden phone, and Lite's computeState, whose compute modes own a Cloud Share) start a fresh,
+// coherent scenario: the preview server clears every record the old scenario owns (session orders, purchases,
+// trade-ins, stopped devices, compute history, trial, command receipts and payment intents on the server, the App's
+// order/payment recovery rows in the browser), and the next read seeds the devices here. A write is applied only in the
+// scenario it started in, and only from a page of that scenario. dataState=empty is the empty account the empty pages
+// are reviewed with: no devices (hidden phones included), no sample orders, no top-ups and an empty wallet (balance 0,
+// so wallet payments are refused for funds), the trial as its own knobs say. paymentState=low-balance is an account
+// whose wallet holds 820.64 USDT; paymentState=urgent seeds the unpaid sample close to its deadline. PRESENTATION knobs
+// (machineImageState: artwork only; dataState loading/error; the other external payment results) only change what a
+// read shows or how a payment proceeds; they never change a fact. Other Lite knobs (setupGateState, promoState,
+// promoEdgeState, ...) own no devices or orders and keep the scenario.
 // After seeding, only lifecycle events change the fleet: purchases and deliveries, conversions, trade-ins and the
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
 // full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
@@ -202,7 +202,12 @@ function demoSeedFleet(state,template,cap,occupied,retired) {
   // source). Ids are unique under any knob combination: phones 43 / 52, fillers 44–50, the idle Rack 51.
   const phones=state.fleetState==='phone-history'?[clone(43,'PHONE','Demo PHONE',1,0,{deviceType:'PHONE'}),clone(52,'MOBILE','Demo MOBILE',1,0,{deviceType:'MOBILE'})]
     :state.scopeState==='mixed'?[{...template,id:43,instanceNo:'DEMO-PHONE',name:'Phone',deviceType:'PHONE',productCode:'PHONE',dailyUsdt:0.1,dailyNex:0,todayEarningsUsdt:0,todayEarningsNex:0,actualPaidUsdt:0}]:[];
-  let devices=state.fleetState==='none'?[]:[template,...phones,{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}];
+  // Device 42 is the account's second device. Lite's compute modes (computeState other than app) review a Cloud Share
+  // reward cycle, so in those scenarios the account owns a Cloud Share there from the start (its kind, catalog price and
+  // trade-in facts agree); the App mode owns a UVELBox Pro.
+  const second=(state.computeState??'app')==='app'?{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}
+    :clone(42,'CLOUD-SHARE','Cloud Share',0.6,19.9,{instanceNo:'DEMO-CLOUD',deviceType:'CLOUD',dailyNex:0,todayEarningsUsdt:.2,todayEarningsNex:0});
+  let devices=state.fleetState==='none'?[]:[template,...phones,second];
   if(state.fleetState==='inventory')devices.push(clone(51,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   devices=devices.filter(live);
   if(state.fleetState==='full'||state.trialState==='capacity-full'||state.checkoutState==='replace'){
@@ -693,8 +698,6 @@ export function demoFixture(url,locale,state,request) {
     const facts=demoFleetFacts(url,locale,state);
     const data=base();data.walletUsdt=state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
     Object.assign(data,facts);
-    // Presentation only: Lite compute scenarios show device 42 as their Cloud Share cycle.
-    if((state.computeState??'app')!=='app')Object.assign(data.devices.find(device=>device.id===42)??{},{instanceNo:'DEMO-CLOUD',name:'Cloud Share',productCode:'CLOUD-SHARE',deviceType:'CLOUD'});
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
