@@ -22,21 +22,7 @@
       </view>
       <view class="nx-header__center" />
       <view class="nx-header__r">
-        <template v-if="activeTab === 'me'">
-          <!-- #ifdef APP-PLUS -->
-          <InviteScanEntry icon-only :label="t.me.shortcutLabels.scan" data-header-action="scan">
-            <LiquidGlass :radius="22" tone="control" backdrop=".nx-page-enter" />
-            <view class="nx-header-scan-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3m0 8v3a2 2 0 0 1-2 2h-3m-8 0H5a2 2 0 0 1-2-2v-3M3 12h18" /></svg></view>
-          </InviteScanEntry>
-          <!-- #endif -->
-          <!-- #ifndef APP-PLUS -->
-          <view class="nx-icon-btn nx-design-glass" data-header-action="scan" role="button" tabindex="0" :aria-label="t.me.shortcutLabels.scan" @click="toast.info(t.me.scanAppOnly)" @keydown.enter.prevent="toast.info(t.me.scanAppOnly)" @keydown.space.prevent="toast.info(t.me.scanAppOnly)">
-            <LiquidGlass :radius="22" tone="control" backdrop=".nx-page-enter" />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3m0 8v3a2 2 0 0 1-2 2h-3m-8 0H5a2 2 0 0 1-2-2v-3M3 12h18" /></svg>
-          </view>
-          <!-- #endif -->
-        </template>
-        <view v-else class="nx-icon-btn nx-design-glass" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch"  @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
+        <view v-if="activeTab !== 'me'" class="nx-icon-btn nx-design-glass" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch"  @keydown.enter.prevent="onKeyboardActivate($event, goSearch)" @keydown.space.prevent="onKeyboardActivate($event, goSearch)">
           <LiquidGlass :radius="22" tone="control" backdrop=".nx-page-enter" />
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         </view>
@@ -166,13 +152,9 @@ import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-gl
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties, getCurrentInstance } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
-// #ifdef APP-PLUS
-import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
-// #endif
 import GlobalUi from "@/components/global-ui.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { taskCenterReceiptKey, type OpenTaskReceipt } from "@/store/receipts";
-import { toast } from "@/store/ui";
 import SupportBubble from "@/components/support/support-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
 import SlotActionSheet from "@/components/slot-action-sheet.vue";
@@ -1016,7 +998,6 @@ export default chassisView;
 .nx-header__r { gap:8px;padding:0; }
 .nx-icon-btn { isolation:isolate;border-radius:50%; }
 .nx-icon-btn > svg { position:relative;z-index:1; }
-.nx-header-scan-icon { position:relative;z-index:1;display:flex;align-items:center;justify-content:center; }
 @media (max-width:374px) {
   .nx-header__l { width:124px; height:43px; }
 }
