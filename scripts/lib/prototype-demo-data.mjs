@@ -101,11 +101,17 @@ export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
 }
 
 const orderStates={placed:['PENDING','PENDING_PAYMENT','WAITING_PAYMENT'],paid:['PAID','PAID','WAITING_PROVISIONING'],provisioning:['PAID','PROCESSING','PROVISIONING'],activated:['PAID','COMPLETED','ACTIVATED'],payment_failed:['FAILED','PAYMENT_FAILED','WAITING_PAYMENT'],expired:['EXPIRED','EXPIRED','WAITING_PAYMENT'],provisioning_failed:['PAID','PROVISIONING_FAILED','PROVISIONING_FAILED'],refunded:['REFUNDED','REFUNDED','REFUNDED'],chargeback:['CHARGEBACK','CHARGEBACK','DEACTIVATED'],cancelled:['CANCELLED','CANCELLED','WAITING_PAYMENT']};
+// Sample times are facts of the scenario: fixed when it is seeded, not regenerated per read. Like the backend's
+// pending-order TTL, an unpaid order may be paid for 30 minutes after it is placed; the placed sample (001) is placed
+// as the scenario starts.
+const paymentWindow=30*60000;
 function demoOrders(products,state,now) {
+  const at=state.sampleOrdersAt??=now;
   return Object.entries(orderStates).map(([original,statuses],i)=>{
     const orderNo='DEMO-ORDER-'+String(i+1).padStart(3,'0'),canonicalStatus=state.orderStatuses?.[orderNo]||original;
     const [paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus],product=products[i%products.length];
-    return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt:now-(i+1)*day,expiresAt:canonicalStatus==='placed'?now+15*60000:canonicalStatus==='expired'?now-day:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?now-i*day:null,activatedAt:canonicalStatus==='activated'?now-3600000:null,refundedAt:canonicalStatus==='refunded'?now-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:original==='activated'?41:null,targetDeviceInstanceNo:original==='activated'?'REVIEW-S1':null,itemCount:1,
+    const placedAt=original==='placed'?at:at-(i+1)*day;
+    return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?at-i*day:null,activatedAt:canonicalStatus==='activated'?at-3600000:null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:original==='activated'?41:null,targetDeviceInstanceNo:original==='activated'?'REVIEW-S1':null,itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}]};
   });
 }
@@ -146,13 +152,16 @@ const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
 // two-slot cap keeps one of them (002), leaving a slot for a device, the trial or its conversion. The activated
 // sample (004) is the order of seeded device 41 and is listed only while the seed holds that device. A sample paid
 // in this session is adopted into createdOrders by the checkout or payment fixture and listed once. The empty
-// account (dataState=empty) has no sample rows, only what this session creates.
+// account (dataState=empty) has no sample rows, only what this session creates. An unpaid sample whose payment window
+// has ended reads as expired, as the server's deadline task (modelled for session orders by the checkout fixture)
+// leaves it.
 function demoScenarioOrders(products,state,now,withDevice41Order) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
   return [...own,...demoOrders(products,state,now).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
     &&(state.checkoutState!=='replace'||order.orderNo!=='DEMO-ORDER-003')
-    &&(withDevice41Order||order.orderNo!=='DEMO-ORDER-004'))];
+    &&(withDevice41Order||order.orderNo!=='DEMO-ORDER-004'))
+    .map(order=>order.canonicalStatus==='placed'&&order.expiresAt<=now?{...order,canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'}:order)];
 }
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
