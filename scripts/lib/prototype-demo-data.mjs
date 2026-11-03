@@ -146,6 +146,8 @@ export function demoFixture(url,locale,state,request) {
     // Verified aggregates feed the trust centre's platform figures; the empty fixture has none.
     const aggregate=(value,kind)=>({value,definition:'Preview figure',kind});
     config.publicStats.verified=empty?null:{activeAccounts:aggregate(8642,'COUNT'),registeredAccounts:aggregate(12480,'COUNT'),installedDevices:aggregate(3315,'COUNT'),onlineDevices:aggregate(2968,'COUNT'),completedPayoutUsdt:aggregate(1284650.5,'SUM'),capturedAt:new Date(demoStartedAt).toISOString()};
+    // The H9 default globe simulation (backend GlobeDisplayConfig.defaults); the empty data state leaves it unpublished.
+    if(!empty)config.publicStats.globeDisplay={intervalMs:5400,nodeJitterPct:.4,activeJobsMinPct:8,activeJobsMaxPct:14,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:[['sg',236000,18],['jp',253000,22],['vn',163000,26],['uk',249000,16],['fr',208000,20],['de',217000,14],['us-ny',316000,24],['us-sj',284000,17]].map(([id,nodes,latencyMs])=>({id,nodes,latencyMs}))};
     if(empty){delete config.publicStats.registeredUsersBase;config.publicStats.networkPulse=null;}
     return withDemoShareChannels(config,state);
   }
@@ -166,6 +168,8 @@ export function demoFixture(url,locale,state,request) {
   const risk=riskDemo(url,locale,state,request);if(risk!==undefined)return risk;
   if(pathname==='/api/app/home/overview') {
     const overview=structuredClone(base());
+    // Same demo clients as the App preview; the server row carries gpus, which the card does not show.
+    if(!empty)overview.onGrid={...overview.onGrid,clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}]};
     overview.earningsLedger=empty?[]:[['DEMO-EARNING-1','Demo Studio','SDXL',2.34],['DEMO-EARNING-2','Demo Lab','Llama',.00032],['DEMO-EARNING-3','Demo Lab','Whisper',.00005]].map(([id,client,model,rewardUsdt],index)=>({id,client,model,rewardUsdt,completedAt:new Date(now-(index+1)*600000).toISOString(),synthetic:false}));
     return overview;
   }
