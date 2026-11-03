@@ -20,12 +20,16 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
   let epoch = state.scenarioEpoch;
   const sync = () => { if (epoch !== state.scenarioEpoch) { epoch = state.scenarioEpoch; quotes.clear(); intents.clear(); } };
+  // A state sample is adopted into the account's writable orders first, so its payment and delivery facts are kept
+  // as delivered (paid total with fees, channel, payment number, times) instead of being regenerated on the next read.
   function settle(orderNo, status, intent) {
     if (!orderNo) return;
-    state.orderStatuses ||= {};
-    state.orderStatuses[orderNo] = status;
-    const order = state.createdOrders?.find(row => row.orderNo === orderNo);
-    if (!order) return;
+    let order = state.createdOrders?.find(row => row.orderNo === orderNo);
+    if (!order) {
+      order = ordersOf(intent.origin).find(row => row.orderNo === orderNo);
+      if (!order) return;
+      (state.createdOrders ||= []).push(order);
+    }
     if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: Date.now(), activatedAt: Date.now()});
     else Object.assign(order, {canonicalStatus: 'expired', paymentStatus: 'EXPIRED', orderStatus: 'EXPIRED', activationStatus: 'WAITING_PAYMENT', closeReasonCode: 'PAYMENT_TIMEOUT'});
   }
