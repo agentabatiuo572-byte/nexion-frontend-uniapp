@@ -30,7 +30,7 @@
         <view class="trial-hero trial-rise">
           <view class="trial-hero__top">
             <NxTag :tone="isGrace ? 'warning' : 'brand'">{{ ribbon }}</NxTag>
-            <view v-if="!isGrace" class="trial-online"><view class="trial-online__dot trial-detail__online" /><text>Online</text></view>
+            <view v-if="!isGrace" class="trial-online"><view class="trial-online__dot trial-detail__online" /><text>{{ t.earn.online }}</text></view>
           </view>
           <view class="trial-ring">
             <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true">
@@ -358,7 +358,7 @@ const countdownText = computed(() => {
   const ms = remainingMsValue.value;
   if (ms >= 86_400_000) {
     const minutes = Math.ceil(ms / 60_000);
-    return `${Math.floor(minutes / 1440)}d ${Math.floor(minutes % 1440 / 60)}h:${String(minutes % 60).padStart(2, "0")}`;
+    return fmt(detail.value.countdownDays, { days: Math.floor(minutes / 1440), hours: Math.floor(minutes % 1440 / 60), minutes: String(minutes % 60).padStart(2, "0") });
   }
   const seconds = Math.floor(ms / 1000);
   return [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60].map(v => String(v).padStart(2, "0")).join(":");
