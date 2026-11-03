@@ -3734,9 +3734,11 @@ sequenceDiagram
 
 #### 11.5.1 任务与计算凭证 `/me/receipts`
 
+计算收据详情和历史摘要的 `settledAt` 读取服务端实际入账时间。新详情有 `postingTimeVerified` 时，同一秒完成和入账也可按实际入账时间读取。没有入账事实时返回空值，详情沿用已有的完成时间兜底。旧后端普通模型详情重复完成时间时按未知处理，摘要的 `completedAt` 继续表示完成时间。
+
 列表和详情读取服务端 `/api/tasks/receipts`，展示真实任务号、名称、设备、起止时间、实际时长、六位 USDT/UVT 收益，以及服务端已明确提供的入账时间。保留 Lite 凭证模板。`SIMULATED` 为任务周期凭证；`RULE_CYCLE` 携带规则结算元数据；`executionMode`、`proofKind`、`modelExecuted` 保持原始事实，不能把未执行模型的收益说成推理证明。空模型或空 proofHash 不生成假值，有 proofHash 时才提供复制。
 
-Lite 凭证历史与账单一样属于账号资金记录，完整展示所有设备（含 PHONE、MOBILE）的任务/周期收益。列表、total 与游标均保留服务器口径，不为排除手机逐条读取详情。当前 `AppComputeReceiptSummaryView` 不提供入账时间，列表统一明确标注「完成时间 / Completed at / Hoàn thành lúc」。非模拟凭证详情当前可能将完成时间回填为 settledAt，这个已知兜底值不能展示为入账时间；详情改标完成时间，入账状态与时间含义分开。周期凭证实际提供的入账时间仍按原规则展示；任务中心仍使用 v2 任务投影的真实入账时间（§6.3）。历史 v2 凭证的真实入账时间等待后台投影 allocation posting time，不依赖列表中不存在的字段补正。接口失败展示错误/重试，不静默丢记录。任务中心只在已入账且有凭证号时打开详情。
+Lite 凭证历史与账单都属于账号资金记录，展示所有设备（含 PHONE、MOBILE）的任务和周期收益。列表、total 与游标使用服务器口径，时间一栏标注「完成时间 / Completed at / Hoàn thành lúc」。周期凭证与 v2 任务中心可以读取各自的实际入账时间（§6.3）。接口失败时显示错误并允许重试。任务中心只在已入账且有凭证号时打开详情。
 
 #### 11.5.2 Proof of Contribution 分享卡 `/me/proof`
 
