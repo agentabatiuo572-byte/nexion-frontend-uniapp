@@ -30,11 +30,14 @@ export function landingProduct(sku: string) {
 export function landingProductNos(activity: Pick<PublicPromotion, 'productNos'>): string[] {
   return activity.productNos.filter(sku => isLiteProduct(landingProduct(sku) ?? { id: sku }));
 }
-/** Lite presentation of a campaign: phone products and their rules are dropped (explicit identity). A campaign
+/** Lite presentation of a campaign: phone products and rules that sell or give a phone are dropped (explicit identity). A campaign
  *  whose products or rules were all phones returns null and is not shown on the web. */
 export function litePromotion<T extends Pick<PublicPromotion, 'productNos' | 'rewardRules' | 'bannerImageUrl'>>(activity: T): T | null {
   const productNos = landingProductNos(activity);
-  const rewardRules = activity.rewardRules.filter(rule => isLiteProduct(landingProduct(rule.productNo) ?? { id: rule.productNo }));
+  const lite = (sku: string) => isLiteProduct(landingProduct(sku) ?? { id: sku });
+  // A rule that gives a phone as its gift is a phone rule too.
+  const rewardRules = activity.rewardRules.filter(rule => lite(rule.productNo)
+    && [rule.buyerReward, rule.inviterReward].every(reward => reward?.type !== 'DEVICE' || lite(reward.giftProductNo)));
   if ((activity.productNos.length && !productNos.length) || (activity.rewardRules.length && !rewardRules.length)) return null;
   // The operator banner may picture the dropped phone offer, so a trimmed campaign uses the product and reward cards.
   return productNos.length === activity.productNos.length && rewardRules.length === activity.rewardRules.length

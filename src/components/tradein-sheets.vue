@@ -624,7 +624,8 @@ const choiceSources = computed(() => {
   if (s.kind !== "choice") return [];
   return s.tradeInSources
     .map((id) => app.devices.find((d) => d.id === id))
-    .filter((d): d is Device => !!d)
+    // Lite never lists phones, even when the server offers one as a source.
+    .filter((d): d is Device => !!d && d.kind !== "phone")
     .map((d) => ({
       id: d.id,
       label: remoteApiEnabled
