@@ -28,7 +28,7 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="margin-left: 4px">{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</text>
           </text>
-          <text class="nx-receipt-line" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ receiptStatus }} · {{ fmtDate(receipt.settledAt) }}</text>
+          <text class="nx-receipt-line" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ receiptStatus }} · {{ receiptTime }}</text>
         </view>
       </view>
 
@@ -208,6 +208,13 @@ const receiptStatus = computed(() => {
   if (/^(PENDING|PROCESSING)$/.test(status)) return copy.value.pending;
   if (/^(FAILED|REJECTED)$/.test(status)) return copy.value.failed;
   return copy.value.unknown;
+});
+// A detail whose settledAt only copied completedAt has no posting time; show the completion time instead.
+const receiptTime = computed(() => {
+  const r = props.receipt;
+  if (!r) return "";
+  if (!isCanonicalComputeReceipt(r)) return fmtDate(r.settledAt);
+  return r.settledAt === null ? `${fieldLabel("completed_at")} ${fmtDate(r.completedAt)}` : fmtDate(r.settledAt);
 });
 const summaryAmount = computed(() => {
   const r = props.receipt;
