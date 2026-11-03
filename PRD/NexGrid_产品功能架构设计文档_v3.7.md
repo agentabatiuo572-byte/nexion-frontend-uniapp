@@ -1458,23 +1458,26 @@ Cloud Share variant:Cloud Share 现为**入门级日产出设备**(非份额 / �
 | 月柱值 cumulative[i] | `daily × 30 × (i + 1)`, i ∈ [0, 11] |
 | breakEvenMonth | `ceil(paybackDays / 30)` |
 
-#### 7.2.2 LiveSocialProof
+#### 7.2.2 LiveSocialProof 实时购买动态
 
-Price box 之后的紧迫感 strip(Sprint A-1 / B.1)。**目的**:让产品页正中位置(用户已被 Price + ROI 钩住准备决策)出现"别人正在买"的实时社会证明,把"是否买"的犹豫期压到最短。
+商品详情页主图左下角的购买动态字幕。**目的**：用户看商品时感到「有人在看、有人在买」，缩短犹豫期。
 
-**布局**:顶部 dot 脉冲 + `ACTIVITY RIGHT NOW` 标签,下方 3 列,每列 Stat 组件:
+**展示**：主图左下角浮层，文字无底色，同时可见 3 行（行高 22px），列表首尾相接匀速向上滚动（每行约 2 秒），上下边缘渐隐。字幕不在视口内时暂停滚动，系统开启「减少动态」时不滚动。每行为色点 + 数字 + 标签。
 
-| 列 | 图标 | 数值公式 | jitter |
-|---|---|---|---|
-| Viewing | Eye | `24 + FNV-1a(productId) % 92`(24-115 区间) | 客户端 12s ±5 |
-| Sold · 24h | ShoppingBag | `max(8, product.sold × 0.024)` | 30% 概率每 12s +1 |
-| Sold · 30m | Clock(+ ⚡ HOT 标) | `max(1, sold24h × 0.022)` | 6% 概率每 12s +1 |
+**内容**（读 `GET /api/storefront/products/{productNo}/social-proof?windowDays=30`）：
 
-**库存告警条**(stock < 50)— 卡底加一行 strip:`Only N units left at this price · restock unconfirmed` + dot 脉冲。
+- 返回 `liveActivity` 时显示三行：「N 在看」「N 24h 售出」「N 30 分钟售出 ⚡」。
+- 未返回 `liveActivity` 时显示「N 已售 · 30 天」「N 累计已售」，库存少于 50 时加「N 台剩余」。
 
-**SSR 安全**:基线由 FNV-1a hash(productId)+ mulberry32 PRNG 派生,SSR baseline = client baseline 完全一致,避免 hydration mismatch。客户端 mount 后才 setInterval jitter。
+**实时数据为模拟数据（2026-11-03）**：上线后同样显示，由后端按以下规则生成并放在 `liveActivity` 下发（uvel-docs 后端待办 B24），本地预览夹具按同一规则（参考实现为 `scripts/lib/prototype-demo-data.mjs` 的 `demoLiveActivity`，精确算法、哈希和对照样例见 B24）。数值由商品编号和当前时间决定：同一商品同一时刻，所有用户、每次刷新读到的数相同，数值随时间连续变化，不在每次刷新时重新随机。
 
-**i18n**:`store.liveProof.{label/viewingLabel/sold24hLabel/sold30mLabel/stockWarning}`(en + zh 镜像)。
+- **销量**：日均售出 = 1.2 × √累计已售（累计已售即商品 `sold_count`，与详情页「累计已售」同一个数）。每分钟独立判定是否产生一笔模拟成交，概率 = 日均售出 ÷ 1440，由商品编号和分钟序号的哈希决定。「24h 售出」= 最近 1440 分钟内的成交数，不超过累计已售。「30 分钟售出」= 最近 30 分钟内的成交数，24h 内有成交时至少为 1。累计已售为 0 时两项都是 0。两项只在一笔成交进入或滑出时间窗时 ±1。
+- **在看**：基准 = 12 + 0.8 × 日均售出 + 0–20（按商品固定），叠加两条平滑曲线后取整，最少 3 人。慢曲线每 150 秒换一个目标，幅度为基准的 ±25%；快曲线每 15 秒换一个目标，幅度 ±1.5 人。两条曲线在目标之间缓入缓出过渡。
+- **效果**：在看几十人时，每 4 秒刷新变化 0–2 人；在看上百人时单次约变化 2%（累计已售 5 万、在看约 240 人时偶尔 4–5 人）。累计已售 42–107 时，在看约 15–50 人，24h 售出约 6–20，30 分钟售出多为 1。累计已售约 5,000 时，在看约 70–125 人，24h 售出约 85 上下，30 分钟售出 1–5。
+
+**刷新**：字幕在视口内时每 4 秒静默读取一次，上一次返回带 `liveActivity`（或尚未读到）时才继续轮询，同作用域请求不重叠。离开详情页（页面 onHide）或字幕滚出视口后停止。明确的临时网络或服务故障保留当前快照；首次读取失败显示「购买动态暂不可用」，下次可见读取可恢复；认证或权限失效时清空。切换账号或商品后不显示旧响应。
+
+**i18n**：`store.liveProof.{viewingLabel,sold24hLabel,sold30mLabel,cumulativeSalesLabel,stockShortLabel,unavailableLabel}`、`store.soldLabel`、`store.detPaybackDays`（中、英、越）。
 
 ### 7.3 结账流程 `/store/checkout`
 
