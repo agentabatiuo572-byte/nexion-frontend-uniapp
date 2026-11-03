@@ -52,7 +52,8 @@ export function computeDemo(url, locale, state, request) {
   if (path.startsWith('/api/tasks/receipts/')) return receipts.find(row => row.receiptNo === decodeURIComponent(path.split('/').pop()));
   if (path === '/api/tasks/simulated/stop' && request.method() === 'POST') {
     const { deviceId, expectedVersion } = request.postDataJSON();
-    if (!devices.includes(deviceId) || expectedVersion !== 1) throw Object.assign(new Error('DEVICE_VERSION_CONFLICT'), { status: 409 });
+    // expectedVersion is optional (decision 3: the App omits it); a stated version must still match.
+    if (!devices.includes(deviceId) || (expectedVersion != null && expectedVersion !== 1)) throw Object.assign(new Error('DEVICE_VERSION_CONFLICT'), { status: 409 });
     state.stoppedDevices ??= []; state.stoppedDevices.push(deviceId);
     return { deviceId, simulationState: 'STOPPED' };
   }
