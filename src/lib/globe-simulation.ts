@@ -10,18 +10,20 @@ export const GLOBE_CENTERS = [
   { id: "us-sj", nameKey: "centerSanJose", lat: 37.34, lon: -121.89 },
 ] as const;
 export type GlobeDisplayConfig = {
-  intervalMs: number; nodeJitterPct: number; activeJobsMinPct: number; activeJobsMaxPct: number;
-  throughputMin: number; throughputMax: number; latencyJitterMs: number;
-  /** `sharePct` (B22): percent of the totals for this center, all eight sum to 100. Absent: `nodes` are relative weights. */
-  centers: { id: string; nodes: number; latencyMs: number; sharePct?: number }[];
+  intervalMs: number; throughputMin: number; throughputMax: number; latencyJitterMs: number;
+  /** Relative share of the totals: `sharePct` (B22) when sent, otherwise the old per-center `nodes`. */
+  centers: { id: string; weight: number; latencyMs: number }[];
 };
 
-/** One boundary for the optional H9 projection. Invalid input leaves this module unavailable. */
+/**
+ * One boundary for the optional H9 projection. Invalid input leaves this module unavailable.
+ * Two shapes: B22 sends `sharePct` on every center (0–100, summing to 100) and may omit `nodes` and the
+ * retired nodeJitterPct / activeJobsMinPct / activeJobsMaxPct; the old shape has no `sharePct` and uses `nodes` as weights.
+ */
 export function parseGlobeDisplay(value: unknown): GlobeDisplayConfig | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const raw = value as Record<string, unknown>;
-  const limits = { intervalMs: [1000, 86400000], nodeJitterPct: [0, 100], activeJobsMinPct: [0, 100],
-    activeJobsMaxPct: [0, 100], throughputMin: [0, 10000], throughputMax: [0, 10000], latencyJitterMs: [0, 60000] };
+  const limits = { intervalMs: [1000, 86400000], throughputMin: [0, 10000], throughputMax: [0, 10000], latencyJitterMs: [0, 60000] };
   for (const [key, [min, max]] of Object.entries(limits)) {
     const number = raw[key];
     if (typeof number !== "number" || !Number.isFinite(number) || number < min || number > max) return undefined;
@@ -29,25 +31,31 @@ export function parseGlobeDisplay(value: unknown): GlobeDisplayConfig | undefine
     if ((mantissa.split('.')[1]?.length ?? 0) - Number(exponent) > 6) return undefined;
   }
   if (!Number.isInteger(raw.intervalMs) || !Number.isInteger(raw.latencyJitterMs)
-      || (raw.activeJobsMinPct as number) > (raw.activeJobsMaxPct as number)
       || (raw.throughputMin as number) > (raw.throughputMax as number)
       || !Array.isArray(raw.centers) || raw.centers.length !== GLOBE_CENTERS.length) return undefined;
-  const seen = new Set<string>();
+  const rows: Record<string, unknown>[] = [];
   for (const row of raw.centers) {
     if (!row || typeof row !== "object" || Array.isArray(row)) return undefined;
     const center = row as Record<string, unknown>;
-    if (typeof center.id !== "string" || !GLOBE_CENTERS.some(meta => meta.id === center.id) || seen.has(center.id)
-        || typeof center.nodes !== "number" || !Number.isInteger(center.nodes) || center.nodes < 0 || center.nodes > 100000000
+    if (typeof center.id !== "string" || !GLOBE_CENTERS.some(meta => meta.id === center.id) || rows.some(seen => seen.id === center.id)
         || typeof center.latencyMs !== "number" || !Number.isInteger(center.latencyMs) || center.latencyMs < 0 || center.latencyMs > 60000) return undefined;
-    seen.add(center.id);
+    rows.push(center);
   }
-  const centers = raw.centers as GlobeDisplayConfig["centers"];
-  const shares = centers.map(center => center.sharePct);
-  if (shares.every(share => share === undefined)) {
-    if (centers.every(center => center.nodes === 0)) return undefined;
-  } else if (shares.some(share => typeof share !== "number" || !Number.isFinite(share) || share < 0 || share > 100)
-      || Math.abs((shares as number[]).reduce((sum, share) => sum + share, 0) - 100) > 1e-6) return undefined;
-  return raw as GlobeDisplayConfig;
+  let weights: number[];
+  if (rows.every(center => center.sharePct === undefined)) {
+    weights = rows.map(center => center.nodes as number);
+    if (weights.some(nodes => typeof nodes !== "number" || !Number.isInteger(nodes) || nodes < 0 || nodes > 100000000)
+        || weights.every(nodes => nodes === 0)) return undefined;
+  } else {
+    weights = rows.map(center => center.sharePct as number);
+    if (weights.some(share => typeof share !== "number" || !Number.isFinite(share) || share < 0 || share > 100)
+        || Math.abs(weights.reduce((sum, share) => sum + share, 0) - 100) > 1e-6) return undefined;
+  }
+  return {
+    intervalMs: raw.intervalMs as number, throughputMin: raw.throughputMin as number,
+    throughputMax: raw.throughputMax as number, latencyJitterMs: raw.latencyJitterMs as number,
+    centers: rows.map((center, i) => ({ id: center.id as string, weight: weights[i], latencyMs: center.latencyMs as number })),
+  };
 }
 function noise(seed: number, slot: number): number {
   let value = Math.imul((slot | 0) ^ seed, 0x45d9f3b);
@@ -74,7 +82,7 @@ export function globeSimulation(step: number, config: GlobeDisplayConfig | undef
   if (!config || onlineTotal === null || jobsTotal === null) return null;
   const tick = Number.isFinite(step) ? Math.max(0, Math.floor(step)) : 0;
   const configured = GLOBE_CENTERS.map(center => config.centers.find(row => row.id === center.id)!);
-  const weights = configured.map(row => row.sharePct ?? row.nodes);
+  const weights = configured.map(row => row.weight);
   const online = splitByWeights(onlineTotal, weights), jobs = splitByWeights(jobsTotal, weights);
   const regions = GLOBE_CENTERS.map((center, i) => {
     const seed = (i + 1) * 101;
