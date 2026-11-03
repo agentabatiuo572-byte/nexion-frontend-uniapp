@@ -43,6 +43,7 @@ export const demoOptions = {
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
   stakingState:[['enabled','正常开放'],['delisted','功能下架'],['error','质押读取失败（其他正常）']],
+  stakingOpenState:[['unmodeled','开仓未配置（演示拒绝）'],['disclosure','开仓拒绝·需风险确认（HTTP 200 / code 409）']],
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
   bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],

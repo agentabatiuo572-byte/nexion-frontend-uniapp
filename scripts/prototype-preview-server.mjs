@@ -83,6 +83,8 @@ const server=http.createServer(async(req,res)=>{
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);
       const realtimeTicket=req.method==='POST'&&url.pathname==='/api/app/support/realtime-ticket';
       const trialWrite=req.method==='POST'&&/^\/api\/trial\/(start|cancel|convert)$/.test(url.pathname);
+      // AppStakingService.open refuses an unacknowledged risk disclosure before recording the command.
+      if(req.method==='POST'&&url.pathname==='/api/stakes'&&state.stakingOpenState==='disclosure')return sendJson(res,{code:409,message:'RISK_DISCLOSURE_ACK_REQUIRED',data:null});
       const conversationDelete=req.method==='DELETE'&&/^\/api\/app\/support\/conversations\/DEMO-SUPPORT-\d+$/.test(url.pathname);
       if(req.method!=='GET'&&!realtimeTicket&&!trialWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!modeledBankWrite&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
       const businessRead=req.method==='GET'&&/^\/api\/(config\/(platform|v-rank|exchange|repurchase|staking|commission)|store\/(catalog|purchase-eligibility)|team\/(rank|binary)|app\/(team|payments|deposits|home\/overview|proof|network|security|support|developer)|content\/(learning|trust|how-it-works)|quests\/state|events|points\/state|devices\/earnings|exchange|repurchase|withdrawals|payout-addresses|deposits|notifications|goals|promotions|promotion-rewards|tasks|payment-methods|developer|public\/referrals|legal\/(privacy|risk)|staking|stakes)/.test(url.pathname);
