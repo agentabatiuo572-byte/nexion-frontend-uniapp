@@ -311,8 +311,10 @@ async function submit() {
         const title = cause.reason === "insufficient" ? t.value.stakingV3.toast.insufficient
           : cause.reason === "minimum" ? t.value.stakingV3.toast.minAmount
           : cause.reason === "unavailable" ? t.value.staking.remoteUnavailableClosed
+          : cause.reason === "disclosure" ? t.value.stakingV3.sheet.disclosureRejectedTitle
           : t.value.stakingV3.sheet.failedTitle;
-        toast.error(title, cause.retired ? undefined : t.value.stakingV3.sheet.checkPrevious);
+        toast.error(title, !cause.retired ? t.value.stakingV3.sheet.checkPrevious
+          : cause.reason === "disclosure" ? t.value.stakingV3.sheet.disclosureRejectedHint : undefined);
         return;
       }
       toast.error(unsent ? t.value.staking.remoteUnavailableClosed : t.value.stakingV3.toast.openFailedTitle);
