@@ -145,10 +145,11 @@ const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
 // samples hold slots, so they appear only in fleetState=reserved, where they are its reservations; replace's
 // two-slot cap keeps one of them (002), leaving a slot for a device, the trial or its conversion. The activated
 // sample (004) is the order of seeded device 41 and is listed only while the seed holds that device. A sample paid
-// in this session is adopted into createdOrders by the checkout fixture and listed once.
+// in this session is adopted into createdOrders by the checkout or payment fixture and listed once. The empty
+// account (dataState=empty) has no sample rows, only what this session creates.
 function demoScenarioOrders(products,state,now,withDevice41Order) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
-  return [...own,...demoOrders(products,state,now).filter(order=>!ids.has(order.orderNo)
+  return [...own,...demoOrders(products,state,now).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
     &&(state.checkoutState!=='replace'||order.orderNo!=='DEMO-ORDER-003')
     &&(withDevice41Order||order.orderNo!=='DEMO-ORDER-004'))];
@@ -163,11 +164,15 @@ const demoOrderSlots=(orders,orderNo)=>orders
   .filter(order=>(orderNo===undefined||order.orderNo===orderNo)&&['paid','provisioning'].includes(order.canonicalStatus))
   .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
 // Preview design rule. SCENARIO knobs (fleetState, checkoutState with its two-slot replace cap, trialState and
-// benefitState presets, and Lite's scopeState, whose mixed scope owns a hidden phone) start a fresh, coherent
-// scenario: the preview server clears the old scenario's session orders, purchases, trade-ins, stopped devices,
-// trial and payment intents, and the next read seeds the devices here. PRESENTATION knobs (machineImageState,
-// dataState=empty, Lite's computeState) only change what a read shows; they never reseed or change occupancy.
-// Other Lite knobs (setupGateState, promoState, promoEdgeState, ...) own no devices or orders and keep the scenario.
+// benefitState presets, entering or leaving dataState=empty, and Lite's scopeState, whose mixed scope owns a hidden
+// phone) start a fresh, coherent scenario: the preview server clears every record the old scenario owns (session
+// orders, purchases, trade-ins, stopped devices, trial, command receipts and payment intents on the server, the App's
+// order/payment recovery rows in the browser), and the next read seeds the devices here. A write is applied only in
+// the scenario it started in. dataState=empty is the empty account the empty pages are reviewed with: no devices
+// (hidden phones included) and no sample orders, the trial as its own knobs say. PRESENTATION knobs
+// (machineImageState, dataState loading/error, Lite's computeState) only change what a read shows; they never reseed
+// or change occupancy. Other Lite knobs (setupGateState, promoState, promoEdgeState, ...) own no devices or orders and
+// keep the scenario.
 // After seeding, only lifecycle events change the fleet: purchases and deliveries, conversions, trade-ins and the
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
 // full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
@@ -175,6 +180,7 @@ const demoOrderSlots=(orders,orderNo)=>orders
 function demoSeedFleet(state,template,cap,occupied,retired) {
   const clone=(id,code,name,daily,paid,extra)=>({...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
   const live=device=>!retired.includes(device.id);
+  if(state.dataState==='empty')return [];
   // Lite's hidden phones are owned devices of the scenario: seeded here and holding slots like any activated device.
   // They follow device 41, so a two-slot seed keeps one while a visible device stays first (the trade-in quote's
   // source). Ids are unique under any knob combination: phones 43 / 52, fillers 44–50, the idle Rack 51.
@@ -442,7 +448,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);
   if(pathname==='/api/genesis/account') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:{...authority,series:null,sale:null,eligibility:null,marketEnabled:false,emissionOpen:false,holdings:[],emissions:[],orders:[],walletBalanceUsdt:5280};
   if(pathname==='/api/genesis/eligibility') return {...authority,eligible:false,reasons:['SALE_NOT_OPEN'],ownedCount:0,maxPerUser:2,remainingCap:2,minAccountAgeDays:0,accountAgeDays:42,status:'NOT_ELIGIBLE',reservedAllocation:null,reservedAllocationUnit:'UVT',priorityRank:null,priorityTier:'NONE',qualificationReasonCodes:['NO_ACTIVE_HOLDINGS'],policyVersion:null,effectiveAt:null,asOf:iso,serverTime:iso,provenance:{source:'nx_genesis_holding+nx_config_item',environment:'PRODUCTION',runId:''},halted:false};
-  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:empty?[]:demoAccountOrders(url,locale,state,now),nextCursor:null};
+  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:demoAccountOrders(url,locale,state,now),nextCursor:null};
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
     const lines=quote?.items||input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))||[{productNo:input.productNo,quantity:input.quantity}],product=products.find(p=>p.id===lines[0].productNo);
@@ -674,8 +680,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/devices/earnings') {
     const facts=demoFleetFacts(url,locale,state);
     const data=base();data.walletUsdt=empty?0:state.paymentState==='low-balance'?820.64:state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
-    // dataState=empty only hides the fleet; the facts behind every capacity decision stay as they are.
-    Object.assign(data,empty?{...facts,devices:[],reservedSlotCount:0,slotsUsed:facts.trialSlotCount}:facts);
+    Object.assign(data,facts);
     // Presentation only: Lite compute scenarios show device 42 as their Cloud Share cycle; the image knob may swap it.
     if((state.computeState??'app')!=='app')Object.assign(data.devices.find(device=>device.id===42)??{},{instanceNo:'DEMO-CLOUD',name:'Cloud Share',productCode:'CLOUD-SHARE',deviceType:'CLOUD'});
     if(state.machineImageState==='alternate')Object.assign(data.devices.find(device=>device.id===42)??{},{instanceNo:'DEMO-RACK',name:'UVELRack P1',productCode:'STELLARRACK-P1',dailyUsdt:45,dailyNex:30,actualPaidUsdt:12999});
