@@ -255,7 +255,7 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/team/binary')return {...authority,source:'server',runId:null,asOfDate:iso.slice(0,10),trackA:empty?0:2800,trackB:empty?0:2400,trackAMembers:empty?0:4,trackBMembers:empty?0:4,autoPlacedMembers:0,matchRate:.1,threshold:1000,dailyCap:5000,periodCap:150000,estimatedAmountUsdt:empty?0:240,settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason:empty?'BOTH_TRACKS_BELOW_THRESHOLD':'',recentMatches:empty?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'unlocked',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
-  if(pathname==='/auth/users/oauth/provider/linked')return ['GOOGLE'];
+  if(pathname==='/auth/users/oauth/provider/linked')return [...new Set(['GOOGLE',...(state.linkedProviders??[])])];
   if(state.scopeState==='mixed') products.push({...products[0],id:'phone-basic',name:localized(locale,'手机算力设备','Phone compute device','Thiết bị điện thoại'),price:99});
   if(state.scopeState==='review') {
     products.find(p=>p.id==='stellarbox-pro').name='Mobile GPU Server';

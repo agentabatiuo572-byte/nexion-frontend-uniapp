@@ -24,6 +24,8 @@ function png(width,height,pixel) {
 const background=png(300,150,(x,y)=>x>=150&&x<190&&y>=55&&y<95?[15,20,30]:[40+Math.floor(x/5),65+Math.floor(y/4),100]);
 const piece=png(40,40,()=>[198,255,58]);
 
+const MODELLED_AUTH=/^\/auth\/users\/(refresh|logout|session\/discard|login|register|login\/attempts\/[^/]+\/recover|(register|login|password-reset)\/otp\/(send|verify|complete)|oauth\/provider\/(available|start|authorize\/[^/]+|preview-approve|status|complete|link))$/;
+
 export function createAuthDemo(state) {
   const flows=new Map(),challenges=new Map(),tickets=new Set(),otps=new Map(),attempts=new Map();
   let savedAttemptSeeded=false;
@@ -49,7 +51,9 @@ export function createAuthDemo(state) {
       return attempt;
     },
     reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();delete state.authUser;delete state.captchaInvalidReturned;},
-    handles(path){return path.startsWith('/auth/users/')||path.startsWith('/api/auth/captcha/')||['/api/app/security/phone/challenge','/api/app/security/phone','/api/app/security/two-factor/challenge','/api/app/security/two-factor'].includes(path);},
+    // Only the paths modelled below; any other /auth/users/* request (e.g. the linked-provider read) falls
+    // through to the App fixture instead of being answered AUTH_PREVIEW_NOT_MODELLED.
+    handles(path){return MODELLED_AUTH.test(path)||path.startsWith('/api/auth/captcha/')||['/api/app/security/phone/challenge','/api/app/security/phone','/api/app/security/two-factor/challenge','/api/app/security/two-factor'].includes(path);},
     handle(url,method,headers,body) {
       const path=url.pathname;
       if(method==='POST'&&path!=='/auth/users/refresh') {
@@ -92,7 +96,7 @@ export function createAuthDemo(state) {
       if(path.endsWith('/oauth/provider/available'))return ok(['GOOGLE','APPLE','TELEGRAM']);
       if(path.endsWith('/oauth/provider/start')) {
         const flowId='OIDC-'+randomBytes(16).toString('hex'),flowKey=randomBytes(32).toString('base64url'),receipt=randomBytes(32).toString('base64url'),browserState=randomBytes(32).toString('base64url');
-        flows.set(flowId,{flowId,flowKey,receipt,browserState,provider:body.provider,sponsorCode:body.sponsorCode,approved:false});
+        flows.set(flowId,{flowId,flowKey,receipt,browserState,provider:body.provider,intent:body.intent==='LINK'?'LINK':'LOGIN',sponsorCode:body.sponsorCode,approved:false});
         return ok({flowId,flowKey,expiresInSec:600,authorizationUrl:url.origin+'/auth/users/oauth/provider/authorize/'+browserState});
       }
       if(path.includes('/oauth/provider/authorize/')) {
@@ -101,9 +105,17 @@ export function createAuthDemo(state) {
         return {status:200,html:`<!doctype html><meta charset="utf-8"><title>Mock ${flow.provider}</title><h1>Mock ${flow.provider}</h1><p>Local preview authorization only.</p><button id="approve">Approve</button><script>document.getElementById('approve').onclick=async()=>{await fetch('/auth/users/oauth/provider/preview-approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({flowId:${JSON.stringify(flow.flowId)}})});window.opener.postMessage(${JSON.stringify({type:'uvel-oauth',flowId:flow.flowId,receipt:flow.receipt})},${JSON.stringify(url.origin)});};</script>`};
       }
       if(path.endsWith('/oauth/provider/preview-approve')) {const flow=flows.get(body.flowId);if(!flow)return fail(404,'OAUTH_FLOW_INVALID');flow.approved=true;return ok(null);}
+      if(path.endsWith('/oauth/provider/link')) {
+        // Account linking is its own intent: it never signs in, and adds the provider to the App fixture's linked list.
+        const flow=flows.get(body.flowId);
+        if(!flow||flow.intent!=='LINK'||flow.flowKey!==body.flowKey||!flow.approved||body.receipt!==flow.receipt)return fail(422,'OAUTH_FLOW_INVALID');
+        if(typeof body.password!=='string'||!body.password)return fail(422,'USER_PASSWORD_INVALID');
+        flows.delete(flow.flowId);state.linkedProviders=[...new Set([...(state.linkedProviders??[]),flow.provider])];
+        return ok(null);
+      }
       if(path.endsWith('/oauth/provider/status')||path.endsWith('/oauth/provider/complete')) {
         const flow=flows.get(body.flowId);
-        if(!flow||flow.flowKey!==body.flowKey)return fail(422,'OAUTH_FLOW_INVALID');
+        if(!flow||flow.flowKey!==body.flowKey||(path.endsWith('/complete')&&flow.intent==='LINK'))return fail(422,'OAUTH_FLOW_INVALID');
         const verified=flow.approved&&body.receipt===flow.receipt;
         if(path.endsWith('/status'))return ok({status:verified?'VERIFIED':'PENDING',provider:flow.provider,displayName:verified?'Preview identity':null});
         if(flow.expired) {
