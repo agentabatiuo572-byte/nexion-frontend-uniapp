@@ -172,7 +172,7 @@ function performNavBack(fallbackHref?: string): void {
     reportNavigationFailure();
     return;
   }
-  if (fallbackHref) {
+  if (fallbackHref && !isLiteNativeRoute(toUniRoute(fallbackHref).url)) {
     const { url } = toUniRoute(fallbackHref);
     uni.reLaunch({ url, fail: () => void navReplace(fallbackHref) });
     return;
