@@ -120,15 +120,22 @@ function genesisPublic(now) {
 // (ACTIVE/GRACE) <= cap. demoFleetFacts computes it from the retained state; reads and commands all use it.
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
   &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false).state)?1:0;
-// The account's one order list: session orders plus the state-sample rows that belong to the scenario. The paid
-// (002) and provisioning (003) samples hold slots, so they appear only in fleetState=reserved, where they are its
-// reservations; the activated sample (004) is the order of seeded device 41. A sample paid in this session is
-// adopted into createdOrders by the checkout fixture and listed once.
-export function demoAccountOrders(products,state,now=Date.now()) {
+// Session orders plus the state-sample rows that belong to the scenario. The paid (002) and provisioning (003)
+// samples hold slots, so they appear only in fleetState=reserved, where they are its reservations; replace's
+// two-slot cap keeps one of them (002), leaving a slot for a device, the trial or its conversion. The activated
+// sample (004) is the order of seeded device 41 and is listed only while the seed holds that device. A sample paid
+// in this session is adopted into createdOrders by the checkout fixture and listed once.
+function demoScenarioOrders(products,state,now,withDevice41Order) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
   return [...own,...demoOrders(products,state,now).filter(order=>!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
-    &&(state.fleetState!=='none'||order.orderNo!=='DEMO-ORDER-004'))];
+    &&(state.checkoutState!=='replace'||order.orderNo!=='DEMO-ORDER-003')
+    &&(withDevice41Order||order.orderNo!=='DEMO-ORDER-004'))];
+}
+// The account's one order list, used by the order list, wallet pay, external payments and notifications.
+export function demoAccountOrders(url,locale,state,now=Date.now()) {
+  if(!state.fleetSeed)demoFleetFacts(url,locale,state);
+  return demoScenarioOrders(demoProducts(state,url.origin,locale),state,now,state.fleetSeed.some(device=>device.id===41));
 }
 // Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.
 const demoOrderSlots=(orders,orderNo)=>orders
@@ -162,11 +169,10 @@ function demoSeedFleet(state,template,cap,occupied,retired) {
 export function demoFleetFacts(url,locale,state) {
   // Read the trial first: a converted trial books its order, which then lists as a device below.
   const trialSlotCount=demoTrialSlots(url,locale,state);
-  const products=demoProducts(state,url.origin,locale),orders=demoAccountOrders(products,state);
+  const now=Date.now(),products=demoProducts(state,url.origin,locale),orders=demoScenarioOrders(products,state,now,false);
   const template={...reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'}).devices[0],runtimeStatus:'ONLINE'};
   const slotCap=state.checkoutState==='replace'?2:6,retired=state.retiredDeviceIds||[],session=[];
-  // DEMO-ORDER-004 is the seeded device's own order, not a new device.
-  for(const order of orders)if(order.orderNo!=='DEMO-ORDER-004'&&['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
+  for(const order of orders)if(['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
     const product=products.find(p=>p.id===line.sku),instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
     state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
     if(retired.includes(state.deviceIds[instanceNo]))continue;
@@ -183,7 +189,7 @@ export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrd
   const requested=lines.reduce((count,line)=>count+line.quantity,0);
   const fleet=demoFleetFacts(url,locale,state);
   // Paying an existing order reuses the slots it already holds.
-  return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(demoAccountOrders(products??demoProducts(state,url.origin,locale),state),excludeOrderNo):0)+requested<=fleet.slotCap;
+  return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(demoScenarioOrders(products??demoProducts(state,url.origin,locale),state,Date.now(),false),excludeOrderNo):0)+requested<=fleet.slotCap;
 }
 
 // Detail-page live activity (PRD §7.2.2; the backend follows the same rule, uvel-docs B24). Derived from
@@ -389,7 +395,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);
   if(pathname==='/api/genesis/account') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:{...authority,series:null,sale:null,eligibility:null,marketEnabled:false,emissionOpen:false,holdings:[],emissions:[],orders:[],walletBalanceUsdt:5280};
   if(pathname==='/api/genesis/eligibility') return {...authority,eligible:false,reasons:['SALE_NOT_OPEN'],ownedCount:0,maxPerUser:2,remainingCap:2,minAccountAgeDays:0,accountAgeDays:42,status:'NOT_ELIGIBLE',reservedAllocation:null,reservedAllocationUnit:'UVT',priorityRank:null,priorityTier:'NONE',qualificationReasonCodes:['NO_ACTIVE_HOLDINGS'],policyVersion:null,effectiveAt:null,asOf:iso,serverTime:iso,provenance:{source:'nx_genesis_holding+nx_config_item',environment:'PRODUCTION',runId:''},halted:false};
-  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:empty?[]:demoAccountOrders(products,state,now),nextCursor:null};
+  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:empty?[]:demoAccountOrders(url,locale,state,now),nextCursor:null};
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
     const lines=quote?.items||input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))||[{productNo:input.productNo,quantity:input.quantity}],product=products.find(p=>p.id===lines[0].productNo);
@@ -407,7 +413,7 @@ export function demoFixture(url,locale,state,request) {
   }
   const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
   if(orderAction){
-    const [,orderNo,action]=orderAction,order=demoAccountOrders(products,state,now).find(o=>o.orderNo===orderNo);
+    const [,orderNo,action]=orderAction,order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);
     if(!order) return {};
     const replay=order.paymentStatus==='PAID';
     if(action==='pay'&&!['PENDING','PAID'].includes(order.paymentStatus)||action==='cancel'&&order.paymentStatus==='PAID')throw new Error('Demo order action unavailable');
@@ -581,7 +587,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/notifications') {
     if(empty) return {items:[],nextCursor:null,unread:0,actionableUnread:0};
     const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices[0];
-    const orders=demoAccountOrders(products,state,now),order=orders.find(item=>item.orderNo==='DEMO-ORDER-002')??orders.find(item=>item.paymentStatus==='PAID');
+    const orders=demoAccountOrders(url,locale,state,now),order=orders.find(item=>item.orderNo==='DEMO-ORDER-002')??orders.find(item=>item.paymentStatus==='PAID');
     const visibleItems=demoNotifications(locale,state,now,device,order);
     return {items:visibleItems,nextCursor:null,unread:visibleItems.filter(item=>item.readAt===null).length,actionableUnread:visibleItems.filter(item=>item.readAt===null&&item.kind!=='marketing').length};
   }
