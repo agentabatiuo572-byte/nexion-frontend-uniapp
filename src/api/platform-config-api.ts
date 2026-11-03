@@ -364,6 +364,9 @@ function parsePublicStats(value: unknown): PublicStatsConfig {
     // A server from the first cadence release sends one fixed step; read it as min = max.
     registeredUsersTickStepMin: optionalNumber(estimateValues.registeredUsersTickStepMin ?? estimateValues.registeredUsersTickStep),
     registeredUsersTickStepMax: optionalNumber(estimateValues.registeredUsersTickStepMax ?? estimateValues.registeredUsersTickStep),
+    // Display-only base added to real active jobs; anything but a non-negative safe integer means unpublished.
+    activeJobsBase: Number.isSafeInteger(estimateValues.activeJobsBase) && (estimateValues.activeJobsBase as number) >= 0
+      ? estimateValues.activeJobsBase as number : null,
     realUserCount,
     virtualUserCount: -1,
     hashratePercentileTable: [],

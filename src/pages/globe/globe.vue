@@ -209,6 +209,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useConfig } from "@/store/config";
+import { useApp } from "@/store/app";
+import { remoteApiEnabled } from "@/api/runtime";
+import { networkPopulationBand } from "@/lib/platform-stats";
 // #ifdef APP-PLUS
 import NativeSvg from "@/components/native-svg.vue";
 // #endif
@@ -228,6 +231,7 @@ import { globeSimulation, GLOBE_CENTERS } from "@/lib/globe-simulation";
 
 const t = useT();
 const cfg = useConfig();
+const app = useApp();
 // #ifndef APP-PLUS
 const motionAllowed = useIntroMotion();
 // #endif
@@ -242,7 +246,9 @@ const pulseTick = ref(0);
 const simulationNow = ref(Date.now());
 let pulseTimer = 0;
 const globeSettings = computed(() => cfg.config.publicStats.globeDisplay);
-const simulatedStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0, globeSettings.value));
+// Totals are the home online-devices figure and the Earn task centre's job count; H9 only splits them.
+const simulatedStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0,
+  globeSettings.value, cfg.config.networkPulse?.onlineDevices ?? null, app.activeJobsDisplay));
 const activeNodesText = computed(() => simulatedStats.value?.nodes.toLocaleString() ?? '—');
 const activeJobsText = computed(() => simulatedStats.value?.jobs.toLocaleString() ?? '—');
 // Display offsets separate nearby centers; leader lines preserve geographic anchors.
@@ -256,7 +262,7 @@ const regions = computed<GlobeRegion[]>(() => GLOBE_CENTERS.map(center => {
   cx: mapPositions[center.id] ? mapPositions[center.id][0] / W : (center.lon + 180) / 360,
   cy: mapPositions[center.id] ? mapPositions[center.id][1] / H : (90 - center.lat) / 180,
   anchorX: (center.lon + 180) / 360, anchorY: (90 - center.lat) / 180,
-  devices: metrics?.nodes ?? null, activeJobs: metrics?.activeJobs ?? null, jobsPerHour: metrics?.jobsPerHour ?? null,
+  devices: metrics?.onlineNodes ?? null, activeJobs: metrics?.activeJobs ?? null, jobsPerHour: metrics?.jobsPerHour ?? null,
   avgLatencyMs: metrics?.avgLatencyMs ?? null, isYou: center.id === "sg",
 }; }));
 const selected = computed<GlobeRegion | null>({
@@ -300,7 +306,7 @@ function nativeNodeStyle(r: GlobeRegion): CSSProperties {
 // #endif
 
 function regionName(r: GlobeRegion): string { return r.displayName; }
-function regionNodeDisplay(r: GlobeRegion): string { return r.devices === null ? '—' : `${(r.devices / 10000).toFixed(1)}W+`; }
+function regionNodeDisplay(r: GlobeRegion): string { return r.devices === null ? '—' : networkPopulationBand(r.devices); }
 onMounted(() => {
   watch(() => globeSettings.value?.intervalMs, interval => {
     if (pulseTimer) clearInterval(pulseTimer);
@@ -315,6 +321,11 @@ onShow(() => {
   pageActive = true;
   simulationNow.value = Date.now();
   void cfg.revalidate();
+  // Same reads as the Earn page, so the job total matches its task centre.
+  if (remoteApiEnabled) {
+    void app.ensureRemoteFleet().catch(() => undefined);
+    void app.ensureHomeTruth().catch(() => undefined);
+  }
 });
 onHide(() => { pageActive = false; selected.value = null; });
 onUnmounted(() => { if (pulseTimer) clearInterval(pulseTimer); });

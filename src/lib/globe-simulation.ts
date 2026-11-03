@@ -1,4 +1,4 @@
-/** Geographic metadata only; every displayed metric and its variation comes from H9. */
+/** Geographic metadata only; totals come from the home figures and the split, latency and drift from H9. */
 export const GLOBE_CENTERS = [
   { id: "sg", nameKey: "centerSingapore", lat: 1.35, lon: 103.82 },
   { id: "jp", nameKey: "centerTokyo", lat: 35.68, lon: 139.69 },
@@ -12,7 +12,8 @@ export const GLOBE_CENTERS = [
 export type GlobeDisplayConfig = {
   intervalMs: number; nodeJitterPct: number; activeJobsMinPct: number; activeJobsMaxPct: number;
   throughputMin: number; throughputMax: number; latencyJitterMs: number;
-  centers: { id: string; nodes: number; latencyMs: number }[];
+  /** `sharePct` (B22): percent of the totals for this center, all eight sum to 100. Absent: `nodes` are relative weights. */
+  centers: { id: string; nodes: number; latencyMs: number; sharePct?: number }[];
 };
 
 /** One boundary for the optional H9 projection. Invalid input leaves this module unavailable. */
@@ -40,6 +41,12 @@ export function parseGlobeDisplay(value: unknown): GlobeDisplayConfig | undefine
         || typeof center.latencyMs !== "number" || !Number.isInteger(center.latencyMs) || center.latencyMs < 0 || center.latencyMs > 60000) return undefined;
     seen.add(center.id);
   }
+  const centers = raw.centers as GlobeDisplayConfig["centers"];
+  const shares = centers.map(center => center.sharePct);
+  if (shares.every(share => share === undefined)) {
+    if (centers.every(center => center.nodes === 0)) return undefined;
+  } else if (shares.some(share => typeof share !== "number" || !Number.isFinite(share) || share < 0 || share > 100)
+      || Math.abs((shares as number[]).reduce((sum, share) => sum + share, 0) - 100) > 1e-6) return undefined;
   return raw as GlobeDisplayConfig;
 }
 function noise(seed: number, slot: number): number {
@@ -53,19 +60,29 @@ function drift(seed: number, step: number): number {
   const weight = fraction * fraction * (3 - 2 * fraction);
   return noise(seed, slot) * (1 - weight) + noise(seed, slot + 1) * weight;
 }
-export function globeSimulation(step: number, config: GlobeDisplayConfig | undefined) {
-  if (!config) return null;
+// Largest-remainder rounding: the integer parts always add up exactly to `total`.
+function splitByWeights(total: number, weights: number[]): number[] {
+  const sum = weights.reduce((acc, weight) => acc + weight, 0);
+  const exact = weights.map(weight => total * weight / sum);
+  const parts = exact.map(Math.floor);
+  const order = exact.map((_, i) => i).sort((a, b) => (exact[b] - parts[b]) - (exact[a] - parts[a]) || a - b);
+  for (let k = 0, left = total - parts.reduce((acc, part) => acc + part, 0); k < left; k += 1) parts[order[k]] += 1;
+  return parts;
+}
+/** `onlineTotal` is the home online-devices figure and `jobsTotal` the Earn task centre's job count; null shows placeholders. */
+export function globeSimulation(step: number, config: GlobeDisplayConfig | undefined, onlineTotal: number | null, jobsTotal: number | null) {
+  if (!config || onlineTotal === null || jobsTotal === null) return null;
   const tick = Number.isFinite(step) ? Math.max(0, Math.floor(step)) : 0;
+  const configured = GLOBE_CENTERS.map(center => config.centers.find(row => row.id === center.id)!);
+  const weights = configured.map(row => row.sharePct ?? row.nodes);
+  const online = splitByWeights(onlineTotal, weights), jobs = splitByWeights(jobsTotal, weights);
   const regions = GLOBE_CENTERS.map((center, i) => {
     const seed = (i + 1) * 101;
-    const configured = config.centers.find(row => row.id === center.id)!;
-    const onlineNodes = configured.nodes + Math.round(configured.nodes * config.nodeJitterPct / 100 * drift(seed, tick));
-    const activeJobs = Math.round(onlineNodes * (config.activeJobsMinPct + (config.activeJobsMaxPct - config.activeJobsMinPct) * drift(seed + 17, tick)) / 100);
-    return { ...center, nodes: configured.nodes, onlineNodes, activeJobs,
+    const onlineNodes = online[i], activeJobs = jobs[i];
+    return { ...center, onlineNodes, activeJobs,
       jobsPerHour: Math.round(activeJobs * (config.throughputMin + (config.throughputMax - config.throughputMin) * drift(seed + 29, tick))),
-      avgLatencyMs: Math.round(configured.latencyMs + config.latencyJitterMs * drift(seed + 43, tick)),
+      avgLatencyMs: Math.round(configured[i].latencyMs + config.latencyJitterMs * drift(seed + 43, tick)),
     };
   });
-  return { regions, nodes: regions.reduce((sum, row) => sum + row.onlineNodes, 0),
-    jobs: regions.reduce((sum, row) => sum + row.activeJobs, 0) };
+  return { regions, nodes: onlineTotal, jobs: jobsTotal };
 }
