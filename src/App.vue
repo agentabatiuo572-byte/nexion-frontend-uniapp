@@ -1279,6 +1279,14 @@ onLaunch(() => {
 // Lite registers no phone-setup or review-surface pages; an old link or a
 // refresh on any unregistered page lands on Home instead of a blank page.
 onPageNotFound(() => { void navReset({ url: "/pages/index/index" }); });
+// #ifdef H5
+// onPageNotFound runs only at launch; an old link pasted into the open tab changes just the hash.
+window.addEventListener("hashchange", () => {
+  const route = normalizeRoute(window.location.hash);
+  const routes = (window as unknown as { __uniRoutes: { meta: { route: string } }[] }).__uniRoutes;
+  if (route && !routes.some((page) => page.meta.route === route)) void navReset({ url: "/pages/index/index" });
+});
+// #endif
 onShow(() => {
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
