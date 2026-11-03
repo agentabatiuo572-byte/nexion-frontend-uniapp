@@ -4,6 +4,7 @@ import { useLocaleStore } from '@/store/locale';
 /** P-59 free-trial detail page (/pages/me/trial): strings only this page uses. */
 export const trialDetailCopy = {
   zh: {
+    countdownDays: "{days}天 {hours}:{minutes}",
     remaining: '剩余', keptLabel: '收益保留', keptUntil: '{time} 到期',
     graceAmountLabel: '试用收益', withdrawAfterBuy: '购机后可提现',
     earlyTag: '试用期专享', earlyTitle: '留下这台 {device}，额外立减 {amount}',
@@ -17,6 +18,7 @@ export const trialDetailCopy = {
     rulesBeforeNoCap: '购买前，试用抵扣金仅用于抵扣购机款。',
   },
   en: {
+    countdownDays: "{days}d {hours}:{minutes}",
     remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
     graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy',
     earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}',
@@ -30,6 +32,7 @@ export const trialDetailCopy = {
     rulesBeforeNoCap: 'Before purchase, trial credit only offsets the device price.',
   },
   vi: {
+    countdownDays: "{days} ngày {hours}:{minutes}",
     remaining: 'Còn lại', keptLabel: 'Thu nhập được giữ thêm', keptUntil: 'Hết hạn {time}',
     graceAmountLabel: 'Thu nhập dùng thử', withdrawAfterBuy: 'Có thể rút sau khi mua máy',
     earlyTag: 'Ưu đãi dùng thử', earlyTitle: 'Giữ lại {device} này, giảm thêm {amount}',
