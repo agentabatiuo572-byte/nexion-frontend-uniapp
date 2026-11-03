@@ -1282,9 +1282,10 @@ onPageNotFound(() => { void navReset({ url: "/pages/index/index" }); });
 // #ifdef H5
 // onPageNotFound runs only at launch; an old link pasted into the open tab changes just the hash.
 window.addEventListener("hashchange", () => {
-  const route = normalizeRoute(window.location.hash);
+  // uni's H5 router matches paths case-insensitively, so `/pages/STORE/store` is the registered Store page.
+  const route = normalizeRoute(window.location.hash).toLowerCase();
   const routes = (window as unknown as { __uniRoutes: { meta: { route: string } }[] }).__uniRoutes;
-  if (route && !routes.some((page) => page.meta.route === route)) void navReset({ url: "/pages/index/index" });
+  if (route && !routes.some((page) => page.meta.route.toLowerCase() === route)) void navReset({ url: "/pages/index/index" });
 });
 // #endif
 onShow(() => {
