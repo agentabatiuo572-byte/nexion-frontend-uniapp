@@ -226,7 +226,7 @@ import { fmt, fmtMoney } from '@/i18n/format';
 import { landingCopy } from '@/i18n/promotion-landing';
 import { navReplace, navTo, takeNavigationQuery } from '@/lib/route';
 import { displayDeadline, localized } from '@/lib/promotion-display';
-import { formatDisplayDateTime, formatDisplayTime } from '@/lib/display-date';
+import { formatDayMonth, formatDisplayDateTime, formatDisplayTime } from '@/lib/display-date';
 import { createPromotionReadFence, isPromotionActive, promotionDetailHref, promotionDisclosures, promotionStoreHref } from '@/lib/promotion-entry';
 import { landingKind, landingProduct, landingProductImage, landingProductName, promotionLandingHref, promotionRemaining, promotionTermsRules, promotionTermsText, rewardParts, rewardPartsText, type RewardParts } from '@/lib/promotion-landing';
 import { productCopy } from '@/lib/product-copy';
@@ -265,6 +265,7 @@ function shortStart(value: string): string {
   const date = new Date(Date.parse(value)), time = formatDisplayTime(value, false, 0), two = (part: number) => String(part).padStart(2, '0');
   if (locale.code === 'zh') return `${two(date.getUTCMonth() + 1)}/${two(date.getUTCDate())} ${time} UTC`;
   if (locale.code === 'vi') return `${two(date.getUTCDate())}/${two(date.getUTCMonth() + 1)} ${time} UTC`;
+  if (locale.code !== 'en') return `${formatDayMonth(date.getUTCMonth() + 1, date.getUTCDate(), locale.code, true)} ${time} UTC`;
   return `${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date)} ${time} UTC`;
 }
 

@@ -188,6 +188,7 @@ import { useConversationEntrance } from './conversation-entrance';
 import { conversationScrollChange, preservedConversationTop } from './conversation-scroll';
 import { buildConversationTimeGroups, formatConversationTime, type ConversationTimeOptions } from './conversation-time';
 import { bubbleViewportPosition, bubbleFill, compactMessageGroups, composerReflection, type ConversationRect } from './conversation-bubble-layout';
+import { uiLocale } from "@/i18n";
 
 const props = defineProps<{
   messages: ThreadMsg[];
@@ -264,7 +265,7 @@ onHide(stopClock);
 onScopeDispose(stopClock);
 const timeOptions = computed<ConversationTimeOptions>(() => {
   const language = props.timeLocale ?? 'zh';
-  return { locale: language === 'zh' || language === 'vi' ? language : 'en' as const, now: clockNow.value };
+  return { locale: uiLocale(language), now: clockNow.value };
 });
 const timeGroups = computed(() => buildConversationTimeGroups(props.messages, timeOptions.value));
 const messageTimes = computed(() => Object.fromEntries(props.messages.map(message => [message.id, formatConversationTime(message.timestamp, timeOptions.value)])));

@@ -47,6 +47,8 @@ import{computed,ref,watch,onBeforeUnmount}from'vue';import{promotionApi,remoteAp
 import { onHide,onShow } from '@/composables/use-tab-page-lifecycle';
 import { useDataVisibility } from '@/store/data-visibility';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
+import { uiLocale } from '@/i18n';
+import { formatDayMonth } from '@/lib/display-date';
 import NxButton from '@/components/ui/nx-button.vue';
 import PromotionTerms from './promotion-terms.vue';
 import NxSheet from '@/components/ui/nx-sheet.vue';
@@ -60,7 +62,8 @@ const visibility=useDataVisibility();
 const copy=computed(()=>teamRedesignCopy(locale.code)),expandedActivity=ref<string|null>(null);
 const termsActivity=ref<PublicPromotion|null>(null);
 // A short end-date chip from the activity's own window.
-function deadlineText(activity:PublicPromotion){const end=new Date(activity.endsAt);if(Number.isNaN(end.getTime()))return'';const m=end.getMonth()+1,d=end.getDate();return locale.code==='zh'?`${m}/${d} 截止`:locale.code==='vi'?`Hết hạn ${d}/${m}`:`Ends ${m}/${d}`;}
+const deadlineCopy={zh:'{date} 截止',en:'Ends {date}',vi:'Hết hạn {date}',id:'Ends {date}',ms:'Ends {date}',fil:'Ends {date}',ru:'Ends {date}',kk:'Ends {date}',uz:'Ends {date}'};
+function deadlineText(activity:PublicPromotion){const end=new Date(activity.endsAt);if(Number.isNaN(end.getTime()))return'';return deadlineCopy[uiLocale(locale.code)].replace('{date}',formatDayMonth(end.getMonth()+1,end.getDate(),locale.code));}
 const progressBusy=ref<Record<string,boolean>>({}),progressErrors=ref<Record<string,boolean>>({});
 const imageRefresh=ref<Record<string,number>>({});
 let progressTimer:ReturnType<typeof setInterval>|undefined;

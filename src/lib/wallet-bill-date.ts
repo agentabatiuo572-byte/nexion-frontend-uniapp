@@ -1,9 +1,20 @@
-import { formatDisplayDateTime } from "./display-date";
+import { formatDateParts, formatDayMonth, formatDisplayDateTime } from "./display-date";
 
 const EN_MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+// CLDR 48 month and weekday names (Intl in Node 24), stored because native Android can
+// ignore Intl. Both start a label here, so they are capitalised.
+const CLDR_NAMES: Record<string, { monthYear: string; months: string[]; weekdays: string[] }> = {
+  id: { monthYear: "{month} {year}", months: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"], weekdays: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"] },
+  ms: { monthYear: "{month} {year}", months: ["Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober", "November", "Disember"], weekdays: ["Ahd", "Isn", "Sel", "Rab", "Kha", "Jum", "Sab"] },
+  fil: { monthYear: "{month} {year}", months: ["Enero", "Pebrero", "Marso", "Abril", "Mayo", "Hunyo", "Hulyo", "Agosto", "Setyembre", "Oktubre", "Nobyembre", "Disyembre"], weekdays: ["Lin", "Lun", "Mar", "Miy", "Huw", "Biy", "Sab"] },
+  ru: { monthYear: "{month} {year} г.", months: ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"], weekdays: ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"] },
+  kk: { monthYear: "{year} ж. {month}", months: ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым", "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"], weekdays: ["Жс", "Дс", "Сс", "Ср", "Бс", "Жм", "Сб"] },
+  uz: { monthYear: "{month}, {year}", months: ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"], weekdays: ["Yak", "Dush", "Sesh", "Chor", "Pay", "Jum", "Shan"] },
+};
+const cldrNames = (locale: string) => CLDR_NAMES[locale.split("-")[0]];
 
 // Native Android can ignore toLocaleString's locale and options, returning Date.toString().
 // Use local calendar fields so the group and row remain consistent with the device time zone.
@@ -21,6 +32,8 @@ export function walletBillMonthLabel(ts: number, locale: string): string {
   const month = date.getMonth() + 1;
   if (locale.startsWith("vi")) return `tháng ${month} năm ${year}`;
   if (locale.startsWith("zh")) return `${year}/${String(month).padStart(2, "0")}`;
+  const names = cldrNames(locale);
+  if (names) return names.monthYear.replace("{month}", names.months[month - 1]).replace("{year}", String(year));
   return `${EN_MONTHS[month - 1]} ${year}`;
 }
 
@@ -50,7 +63,11 @@ export function walletBillDayLabel(ts: number, locale: string, now: number, word
   const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
   const relative = key === walletBillDayKey(now) ? words.today : key === walletBillDayKey(yesterday.getTime()) ? words.yesterday : "";
   const sameYear = date.getFullYear() === new Date(now).getFullYear();
-  const month = date.getMonth() + 1, day = date.getDate();
+  const month = date.getMonth() + 1, day = date.getDate(), names = cldrNames(locale);
+  if (names) {
+    const dayText = sameYear ? formatDayMonth(month, day, locale, true) : formatDateParts(date.getFullYear(), month, day, locale);
+    return `${relative || names.weekdays[date.getDay()]} · ${dayText}`;
+  }
   const dayText = locale.startsWith("zh") ? `${sameYear ? "" : `${date.getFullYear()}年`}${month}月${day}日`
     : locale.startsWith("vi") ? `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}${sameYear ? "" : `/${date.getFullYear()}`}`
       : `${EN_SHORT_MONTHS[month - 1]} ${day}${sameYear ? "" : `, ${date.getFullYear()}`}`;
@@ -73,5 +90,5 @@ export function walletBillShortTime(ts: number, locale: string, now: number, yes
   if (key === walletBillDayKey(now)) return clock;
   if (key === walletBillDayKey(previous.getTime())) return yesterday;
   const date = new Date(ts), day = date.getDate(), month = date.getMonth() + 1;
-  return `${locale.startsWith("vi") ? `${day}/${month}` : `${month}/${day}`} ${clock}`;
+  return `${formatDayMonth(month, day, locale)} ${clock}`;
 }
