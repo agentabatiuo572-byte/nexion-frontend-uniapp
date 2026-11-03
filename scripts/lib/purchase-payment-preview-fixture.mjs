@@ -120,9 +120,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!source || !key) return {status: 409, message: 'PURCHASE_PAYMENT_QUOTE_EXPIRED', data: null};
       let intent = [...intents.values()].find(row => row.commandKey === key && row.paymentQuoteId === source.quote.paymentQuoteId);
       if (!intent) {
-        const intentNo = `PPI-PREVIEW-${++sequence}`, urgent = state.paymentState === 'urgent';
-        // The intent closes with the order (design: one 30-minute deadline).
-        const expiresAt = urgent ? Date.now() + 4 * 60000 + 50000 : Number(source.expiresAt) || Date.now() + 15 * 60000;
+        const intentNo = `PPI-PREVIEW-${++sequence}`;
+        // The intent closes with the order (design: one 30-minute deadline; urgency is an order placed earlier).
+        const expiresAt = Number(source.expiresAt) || Date.now() + 15 * 60000;
         intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: new Date(expiresAt).toISOString(),
           paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
           address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
