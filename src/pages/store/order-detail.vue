@@ -563,7 +563,12 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
     }
   } catch {
     if (isCurrentDetailScope(scope)) {orderCommandUnavailable.value=true;toast.warn(recoveryCopy.value.paymentPending);}
-  } finally { orderCommandQuerying.value=false; }
+  } finally {
+    orderCommandQuerying.value=false;
+    // A list deep link can finish its order read while the original command is
+    // still being recovered. Consume that completed read once the lock clears.
+    if (autoPayRequested.value && pendingPaymentReadScope && isCurrentDetailScope(pendingPaymentReadScope)) void requestPendingPayment(true);
+  }
 }
 const pendingOrderActionsVisible = computed(() => order.value?.status === "placed" && !order.value.promotionQuoteId && !walletPaymentConfirmed.value);
 // Any state with a next action gets the bottom action bar.
