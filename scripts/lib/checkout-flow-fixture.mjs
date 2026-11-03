@@ -11,10 +11,14 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const ok = data => ({status:200,message:'OK',data});
   const external = createPurchasePaymentPreviewFixture(state, locale);
   const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || external.handles(path);
-  // A reset or scenario change starts a fresh account: replayed receipts and PIN-held orders belong to the old one.
+  // A reset or scenario change starts a fresh account: replayed receipts, PIN-held orders and payment command
+  // receipts belong to the old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
   function handle(url, request) {
-    if (epoch !== state.scenarioEpoch) { epoch = state.scenarioEpoch; receipts.clear(); pin.orders.clear(); pin.state.balance = state.walletBalance ?? 52800.64; }
+    if (epoch !== state.scenarioEpoch) {
+      epoch = state.scenarioEpoch; receipts.clear(); pin.orders.clear(); pin.state.balance = state.walletBalance ?? 52800.64;
+      for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
+    }
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
     if (paymentCommand) {

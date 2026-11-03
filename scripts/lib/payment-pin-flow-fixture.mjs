@@ -118,5 +118,5 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     if(path==='/api/trial/state'||path==='/api/trial/eligibility')return ok({...data,canStart:false,reason:'used',state:'ELIGIBLE',version:1});
     return ok(data??{});
   }
-  return {handle,state,orders};
+  return {handle,state,orders,commands};
 }
