@@ -1928,7 +1928,6 @@ export const kk: Messages = {
       regional: "Өңірлер жарысы",
       boost: "Бонус күшейткіші",
       seasonal: "Маусымдық",
-      holding: "Иелерге сыйақы",
       onboarding: "Жаңа қатысушы",
     },
     tabs: {

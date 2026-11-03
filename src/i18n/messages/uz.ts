@@ -1928,7 +1928,6 @@ export const uz: Messages = {
       regional: "Hududlar bellashuvi",
       boost: "Bonus aksiyasi",
       seasonal: "Mavsumiy",
-      holding: "Egalar mukofoti",
       onboarding: "Yangi foydalanuvchi",
     },
     tabs: {
