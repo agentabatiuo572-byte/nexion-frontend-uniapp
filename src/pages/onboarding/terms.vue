@@ -2,7 +2,7 @@
   Terms of Service — onboarding legal page reached from intro's "Terms" link.
   Chassis-less top-level page (like intro / login / register): fixed full-screen
   scrollable dark surface, own sticky back header (no tab chrome). Content is a
-  10-section numbered agreement, fully i18n-driven (terms namespace, en/zh
+  7-section numbered agreement, fully i18n-driven (terms namespace, en/zh
   mirror), believable real-platform tone (no meta / reverse-education copy).
   Opened via navigateTo from intro, Me, or the post-login terms gate; back is
   stack-aware and preserves a validated internal return destination.
@@ -152,9 +152,6 @@ const blocks = computed(() => {
     { n: 5, title: w.s5Title, body: w.s5Body },
     { n: 6, title: w.s6Title, body: w.s6Body },
     { n: 7, title: w.s7Title, body: w.s7Body },
-    { n: 8, title: w.s8Title, body: w.s8Body },
-    { n: 9, title: w.s9Title, body: w.s9Body },
-    { n: 10, title: w.s10Title, body: w.s10Body },
   ];
 });
 

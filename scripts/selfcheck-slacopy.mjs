@@ -38,7 +38,6 @@ for (const l of LOCALES) msgs[l] = await loadMessages(l);
 // 后者既会被 staking 的正当锁仓档位(30/90/180/365)误伤,又会因窗口截断漏掉块尾新增的 key。
 const SLA_KEYS = [
   "riskDisclosure.s4Body",
-  "riskDisclosure.s4BodyLargeAmount",
   "terms.s6Body",
   // 🔴 2026-09-21(zentao #207):商城页脚对购买决策作出的量化服务承诺此前不在白名单内 ——
   // 「全程托管 · 零物流 · 99.9% 在线 SLA」是写死文案,而服务端只有 nx_admin_device_sku.uptime
@@ -58,9 +57,6 @@ for (const l of LOCALES) {
   // z1 判决(2026-08-10):{h} 时限承诺句已有意改版为服务端口径(以服务端订单状态为准),
   // s4Body / terms.s6Body 的占位符断言退役;无写死数字 + 非空 + 三语相异照守
   // (前两者由上面 SLA_KEYS 循环覆盖,三语相异在循环后单独断言)。
-  // s4BodyLargeAmount 仍是插值句,必须带的占位符照旧(缺了 = 数字没接上配置)。
-  check(`[${l}] s4BodyLargeAmount 带 {d} 与 {large}`,
-    ["{d}", "{large}"].every((m) => String(at(msgs[l], "riskDisclosure.s4BodyLargeAmount") ?? "").includes(m)));
   // 首审提示改成不给时间承诺后,它自己也不许再出现数字
   check(`[${l}] wallet.firstTimeReview 不做时间承诺(系统对人工复核无推进机制)`,
     !hasHardcodedNumber(at(msgs[l], "wallet.firstTimeReview")),

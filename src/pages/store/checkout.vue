@@ -435,17 +435,17 @@ const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const paymentBlocked = ref('');
 const hasOriginalCheckout = computed(() => !!createdCheckoutOrder.value || !!pendingCheckoutCreate.value);
 const purchasePolicyOpen = ref(false);
-function openCheckoutLegal(kind: 'aftersales' | 'terms' | 'risk') {
+function openCheckoutLegal(kind: 'aftersales' | 'terms') {
   if (kind === 'aftersales') purchasePolicyOpen.value = true;
-  else navTo(kind === 'terms' ? '/pages/onboarding/terms' : '/pages/me/risk-disclosure');
+  else navTo('/pages/onboarding/terms');
 }
 // Reuse the published store FAQ verbatim; this sheet introduces no refund or
 // warranty promises. Reward-specific recovery terms remain in PromotionTerms.
 const policyCopy = computed(() => locale.code === 'zh'
-  ? { entry:'购买、退款与售后说明', deviceScope:'设备商品（不含 Cloud Share）：', review:'请在付款前阅读用户协议及风险提示，确认所选商品的购买与售后条件。', rewards:'活动奖励的退款与回收条件，请查看结算页的「活动说明」。' }
+  ? { entry:'购买、退款与售后说明', deviceScope:'设备商品（不含 Cloud Share）：', review:'付款前请阅读服务条款和风险提示书，确认所选商品的购买与售后条件。', rewards:'活动奖励的退款与回收条件，请查看结算页的「活动说明」。' }
   : locale.code === 'vi'
-    ? { entry:'Mua hàng, hoàn tiền và hậu mãi', deviceScope:'Thiết bị (không gồm Cloud Share): ', review:'Trước khi thanh toán, hãy đọc thỏa thuận người dùng và thông tin rủi ro, đồng thời xác nhận điều kiện mua hàng và hậu mãi của sản phẩm đã chọn.', rewards:'Xem điều khoản ưu đãi tại trang thanh toán để biết cách xử lý và thu hồi phần thưởng khi hoàn tiền.' }
-    : { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the user agreement and risk disclosure and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' });
+    ? { entry:'Mua hàng, hoàn tiền và hậu mãi', deviceScope:'Thiết bị (không gồm Cloud Share): ', review:'Trước khi thanh toán, vui lòng đọc Điều khoản dịch vụ và Công bố rủi ro, đồng thời xác nhận điều kiện mua hàng, hậu mãi của sản phẩm đã chọn.', rewards:'Xem điều khoản ưu đãi tại trang thanh toán để biết cách xử lý và thu hồi phần thưởng khi hoàn tiền.' }
+    : { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' });
 const reviewCopy = computed(()=>commerceCopy(locale.code));
 const legalCopy = computed(() => locale.code === 'zh'
   ? { before: '支付前请阅读', join: '及', end: '。' }
