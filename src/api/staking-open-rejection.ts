@@ -1,11 +1,13 @@
 import { ApiError } from "./errors";
 
-export type StakingOpenRejectionReason = "insufficient" | "minimum" | "unavailable" | "invalid";
+export type StakingOpenRejectionReason = "insufficient" | "minimum" | "unavailable" | "invalid" | "disclosure";
 
 // These OPEN refusals either precede the debit or roll back the entire OPEN.
 // HTTP conflicts and business
 // errors outside this exact contract remain unknown, including idempotency errors.
 const refusals: Record<string, { code: number; reason: StakingOpenRejectionReason }> = {
+  // AppStakingService.open rejects before executeOnce records this fresh command.
+  RISK_DISCLOSURE_ACK_REQUIRED: { code: 409, reason: "disclosure" },
   STAKING_WALLET_INSUFFICIENT: { code: 409, reason: "insufficient" },
   STAKING_POOL_NOT_ACTIVE: { code: 409, reason: "unavailable" },
   STAKING_POOL_KILLED: { code: 409, reason: "unavailable" },
