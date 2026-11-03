@@ -5535,7 +5535,7 @@ export const fil: Messages = {
     actionGenesis: "Genesis",
     swipeRead: "Nabasa",
     swipeDelete: "I-delete",
-    drawerTitle: "Mga mensahe",
+    drawerTitle: "Mensahe",
     unreadCount: "{n} bago",
     allCaughtUp: "Nabasa mo na lahat",
     unreadUnavailable: "-",
