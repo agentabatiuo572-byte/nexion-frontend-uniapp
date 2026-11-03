@@ -844,29 +844,30 @@ Persist 字段 `userSet: boolean`:false 时允许 auto-detect 覆盖;一旦用�
 **入口**:
 - intro 启动页脚注「继续即表示你同意 服务条款」的「服务条款」(§4.7.1)
 - 注册页底部脚注「创建账号即表示同意服务条款和隐私政策」的「服务条款」(§4.1)
+- 结算页底部「售后说明 | 服务条款」与售后说明弹层里的「服务条款」(§7.3)
+- 信任中心「规则与资料」的「服务条款」(§11.3)
 
-两处均以 `navigateTo` 进入,保留来源页于栈中;页面返回(顶部 back chevron / 底部「我已了解」)以 `navigateBack` 回到来源页,冷启动无历史时 fallback `reLaunch` 回 intro。「隐私政策」无独立页,保持占位文本(不做空链接)。
+页面返回(顶部 back chevron / 底部「我已了解」)回到来源页,冷启动无历史时 fallback 回 intro。隐私政策为独立页 `/onboarding/privacy`。
 
-**结构**:顶部返回头(back chevron + 品牌行)+ 生效日 eyebrow + 标题 + 引言 + 10 编号条款段 + 风险披露交叉链接 + 合规主体 footer + 底部「我已了解」按钮。
+**结构**:顶部返回头 + 生效日与版本 eyebrow + 标题 + 摘要 + 7 编号条款段 + 风险披露交叉链接 + 底部「我已了解」按钮。
 
-**10 条款段**(每段标题 + 正文,i18n `terms.s1Title/s1Body … s10Title/s10Body`):
+**内容来源**:正文读服务端已发布版本 `GET /api/legal/terms/current`(标题、摘要、按 sortOrder 排序的章节);未接远端(`remoteApiEnabled=false`)时用 i18n `terms.heroTitle/heroSubtitle/s1Title/s1Body … s7Title/s7Body` 兜底。本地预览夹具与兜底文案同为下列新版条款(2026-11-03,取代原 10 段条款与「服务条款 · 演示」样例)。
+
+**7 条款段**(章节 key 与 sortOrder:account 10 / service 20 / purchase 30 / earnings 40 / wallet 50 / conduct 60 / updates 70):
 
 | # | 主题 |
 |---|---|
-| 01 | 接受与资格(年满 18 · 非 OFAC 制裁辖区) |
-| 02 | NexGrid 服务(智能合约算力市场 · 不保证任务量 / 定价 / 需求) |
-| 03 | 账户与安全(登录凭据 / 2FA / 钱包私钥自管) |
-| 04 | 硬件购买与运行(激活即终成交 · 随使用逐步折旧 · trade-in 折抵剩余效能) |
-| 05 | 收益、奖励与 NEX 代币(收益为预测非承诺 · 代币市场风险 · 量力而行) |
-| 06 | 钱包、提现与合规(30 天结算 · 贡献分清算 · 累计 $100 触发 KYC · 隔离储备 · KYT 监控) |
-| 07 | 推荐与网络奖励(由平台利润支付非好友充值 · 禁垃圾 / 虚假 / 大规模拉人) |
-| 08 | 禁止行为(洗钱 / 操纵代币市场 / 规避 KYC / 多账户刷量 / 篡改网络 / 干扰他人设备) |
-| 09 | 费用、税费与变更(逐笔披露 · 自负税费 · 变更应用内通知后继续使用视为接受) |
-| 10 | 免责、责任与适用法律(按现状无保证收益 · 责任上限为前三月费用 · 具约束力仲裁) |
+| 01 | 账户与安全(年满 18 周岁 · 真实信息 · 妥善保管密码、验证码和支付密码) |
+| 02 | 服务内容(设备购买、算力任务、钱包等 · 以 App 内当前显示为准) |
+| 03 | 购买与售后(下单前确认商品、价格和费用 · 以结算页「售后说明」为准) |
+| 04 | 收益与奖励(收益为预估,以实际到账为准,平台不承诺收益) |
+| 05 | 钱包与提现(核对收款信息、金额和手续费 · 链上转账确认后不可撤回) |
+| 06 | 禁止行为(欺诈、多账户刷奖励、攻击或干扰平台) |
+| 07 | 条款更新与联系(重大变更 App 内通知 · 客服或 staff@uvel.ai) |
 
-风险披露交叉链接 →「平台风险披露」`/me/risk-disclosure?return=/onboarding/intro`(§11.4a)。footer 合规主体:NexGrid Compliance Authority · FinCEN MSB# · MiCA-aligned · legal@nexgrid.io。
+摘要:「本条款适用于 UVEL AI LTD 运营的 UVEL 服务。注册或使用即表示你同意以下内容。」(英、越同步)。
 
-i18n namespace `terms`(en/zh 镜像);无后端,纯客户端展示页。真后台对接时条款正文应可由 `GET /admin/legal/terms?locale=&jurisdiction=` 下发,对标 §11.4a risk-disclosure 的「监管改条款当天可改」能力。
+风险披露交叉链接 →「另见:平台风险披露」`/me/risk-disclosure?return=<条款页>&country=VN`(§11.4a)。
 
 #### 4.7.6 登录态路由守卫(Auth Guard)
 
@@ -1505,6 +1506,8 @@ Price box 之后的紧迫感 strip(Sprint A-1 / B.1)。**目的**:让产品页�
 ### 7.3 结账流程 `/store/checkout`
 
 确认订单页的设备缩略图容器保持透明，不叠加灰色渐变底板或底部光晕；设备图片直接呈现在订单卡片上。
+
+**底部说明入口（2026-11-03）**：确认订单页底部「支付前请阅读以下说明」下只有「售后说明 | 服务条款」两个链接，整组居中，分隔线两侧间距相等（原为「售后说明 | 服务条款 | 风险提示」三项）。「售后说明」打开「购买、退款与售后说明」弹层，「服务条款」进入 §4.7.5。弹层沿用商城 FAQ 的退款、部署与需求说明，末句为「付款前请阅读服务条款和风险提示书，确认所选商品的购买与售后条件。」（英、越同步），底部保留「服务条款」和「风险提示书」两个链接，风险提示书只从这里进入（§11.4a）。
 
 **正式 App/H5 普通数量报价（2026-10-26）**：普通硬件及 Cloud Share 的同 SKU 多件购买、不同 SKU 组合购买复用统一报价和现有订单流程，不要求命中促销。服务端报价支持单 SKU 数量 1–100、最多 8 种 SKU 且整单总数量不超过 100；前端现有普通入口仍保留 1–6 的选择范围，不据服务端上限扩大控件。没有显式活动时，购买资格、当前商品价格、数量与所选券均确认有效的普通报价可继续订单确认；未匹配活动不生成或承诺奖励。默认自动匹配活动保持，明确选定但不可用或不合格的活动不回退普通购买，无效券、资格拒绝和事实不可读仍阻断。客户端不把 `INELIGIBLE` 或 `UNKNOWN` 改判为可购，数量变化或报价失效须重新读取。
 
@@ -3916,37 +3919,33 @@ sequenceDiagram
 
 24 个成就分类(First / Earnings / Social / Loyalty / Hardware),每解锁触发弹窗 + 可领取 USDT/NEX 奖励。
 
-### 11.4a 风险提示书 `/me/risk-disclosure`(Sprint A-1 / A.3)
+### 11.4a 风险提示书 `/me/risk-disclosure`
 
-合规剧场关键件 — 真实加密交易所 ToS 风格强制阅读 + 双 gate 确认(scroll-to-bottom + checkbox)。首次提现 / 首次 staking 锁仓前拦截;常驻入口在个人中心「帮助与支持」分组。
+强制阅读的平台风险说明,正文由运营在后台(PC I5)按地区发布;后端在没有已发布版本时写入一份默认版本(只插入,运营发布新版本即替换)。
 
-**Store**:`lib/store/risk-disclosure.ts` — `useRiskDisclosure` zustand persist(`nexgrid-risk-disclosure-v1`),`{ accepted, acceptedAt, accept, reset }`。
+**入口**:结算页「购买、退款与售后说明」弹层的「风险提示书」(§7.3)、信任中心「规则与资料」的「风险披露」(§11.3)、服务条款页「另见:平台风险披露」(§4.7.5,未登录可读)。个人中心不设入口;提现与质押不再在提交前拦截。
+
+**数据**:Store `src/store/risk-disclosure.ts`(`useRiskDisclosure`,随账号切换重绑)。已登录读 `GET /api/legal/risk-disclosure/current`,未登录(带 `country`)读 `GET /api/legal/risk-disclosure/public/current`;确认写 `POST /api/legal/risk-disclosure/acknowledgment`,是否已确认以服务端返回为准。章节按当前语言显示已发布原文,缺该语言时显示可用语言并提示。
 
 **页面结构**:
-1. iOS nav back + 标题 `Platform risk disclosure`
-2. **Hero**(AlertTriangle):`REQUIRED READING` 标签 + `Read this before staking, locking, or withdrawing.` + 副文
-3. **7 章节**(每章 mono 编号 01-07 + 标题 + body):
-   - 01 收益预估只是预测,不是承诺(±15% 周波动)
-   - 02 任务产能节奏(月 1-3 −4% / 4-8 −6% / 9-12 −23.7% / floor 22%)
-   - 03 NEX 代币市场风险(±20% 日 / 非 FDIC 保险)
-   - 04 提现窗口 + 合规审查(30d / 45d enhanced / 无 NEX 抵扣时按惩罚费率收手续费)
-   - 05 Staking 锁仓不可撤销(提前赎回扣全息 + 5-15% 本金)
-   - 06 网络经济 + 推荐人激励(平台利润支付 / 反垃圾推广)
-   - 07 托管 / KYC / 监管管辖(FinCEN MSB / MiCA / Chainalysis / PwC 季度审计)
-4. **Bottom sentinel + IntersectionObserver**(`rootMargin -24px`)— 工作在 iOS chassis 内部 scroll 容器
-5. **未滚到底 banner**:`ArrowDown` + `Please scroll through all sections before acknowledging`
-6. **Acknowledge section**:
-   - Checkbox(scrolledToBottom 才能勾)+ `I have read the 7 sections above and understand...` 完整 acknowledgement label
-   - Accept CTA(全宽):双 gate 满足才 enable;已接受时变 `Acknowledged` + ShieldCheck 不可点
-7. **Footer disclaimer**:`Acknowledgment is logged with timestamp. Re-reading available anytime via Me → Risk disclosure.`
+1. 顶部返回头 + 标题
+2. Hero:「必读文档」标签 + 标题 + 副文 + 地区 · 版本 · 生效日期
+3. 7 章节(编号 01-07 由页面生成 + 标题 + 正文)
+4. 未滚到底时显示「请滚动浏览所有章节后再确认」
+5. 确认区:滚到底后才能勾选已阅读;勾选且阅读满 `minimumReadingSeconds` 秒(按钮显示剩余秒数)后「我已知悉 — 继续」可点;确认后回到来源页,已确认时显示「已确认」
 
-**双 gate**:`canAccept = scrolledToBottom && checked && !accepted`。
+**默认版本 7 章(2026-11-03,中/英/越)**:
+| # | 中文标题 | 要点 |
+|---|---|---|
+| 01 | 收益为预估，不构成承诺 | 以到账记录为准,可能低于预估或无收益 |
+| 02 | 设备产出会变化 | 任务供给、在线时长、网络电力维护影响产出;产能随使用时长下降;手机受机型、电量和系统限制 |
+| 03 | UVT 价格波动 | 价格和流动性可能大幅波动,可能暂时无法交易 |
+| 04 | 购买、退款与活动 | 设备一般不退款可置换;退款时相关奖励可能收回 |
+| 05 | 充值与提现 | 转错网络或地址可能无法找回;链上确认后不可撤回;提现可能需安全确认 |
+| 06 | 推荐与团队奖励 | 依当期规则,不保证持续;虚假账户等获得的奖励作废 |
+| 07 | 账户安全与服务变更 | 保管密码与验证码;为安全或合规可能暂停部分功能;变更在 App 内通知 |
 
-**i18n**:`riskDisclosure.*` namespace ~25 keys(en + zh 镜像)。
-
-**集成点**(`useRiskDisclosure().accepted === false` 时拦截):
-- `/me/wallet/withdraw` handleSubmit 前置守卫(§9.3.4a)
-- 后续 Sprint:`/staking` lock CTA 同理
+页面只渲染后台返回的章节;未连接后台时显示加载失败,不显示本地文案。本地预览夹具(`/api/legal/risk-disclosure/current`、`/public/current`)使用此默认文本,取代原「演示说明 … 原型演示资料」样例;i18n `riskDisclosure.s1Title/s1Body … s7Title/s7Body` 同步为此文本,当前不参与渲染;原 `riskDisclosure.s4BodyLargeAmount` 已删除。
 
 ### 11.5 推理收据 `/me/receipts` + `/me/proof`
 

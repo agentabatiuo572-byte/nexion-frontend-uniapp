@@ -38,14 +38,6 @@ describe("repurchase page names one product", () => {
     expect(messages.repurchase.lockedNotice).toMatch(/90|锁|lock|khóa/i);
   });
 
-  it.each(LOCALES)("%s keeps token buyback distinct from the re-investment product", ({ messages }) => {
-    // Protect the meaning at its actual keys, without pinning an obsolete fee/burn claim.
-    for (const text of [messages.riskDisclosure.s3Body]) {
-      expect(text).toMatch(/回购|buyback|mua lại/i);
-      expect(text).not.toMatch(/复投|re-invest|tái đầu tư/i);
-    }
-  });
-
   it.each(LOCALES)("%s keeps token disclosure tied to published records without a fixed burn claim", ({ messages }) => {
     const disclosure = messages.nexHowItWorks.s4BurnBody;
     expect(disclosure).toMatch(/已发布规则|published rules|quy tắc đã công bố/i);
