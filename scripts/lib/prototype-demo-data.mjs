@@ -519,7 +519,7 @@ export function demoFixture(url,locale,state,request) {
       const clone=(id,code,name,daily,paid,extra)=>({...data.devices[0],id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
       if(state.fleetState==='inventory')data.devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       if(state.fleetState==='full'){
-        data.devices.push(clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),clone(46,'CLOUD-SHARE','Cloud Share',0.6,19.9,{todayEarningsUsdt:.2}));
+        data.devices.push(clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),clone(46,'CLOUD-SHARE','Cloud Share',0.6,19.9,{todayEarningsUsdt:.2}),clone(48,'STELLARBOX-S1','UVELBox S1',6.2,1299,{todayEarningsUsdt:2.3}));
         data.devices.push(clone(47,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       }
       if(state.fleetState==='none')data.devices=[];

@@ -9,9 +9,10 @@ export function demoNotifications(locale, state, now, device, order) {
     return date.getTime();
   };
   const rows = [
-    { id: 901, kind: 'device', title: text('设备已开始运行', 'Device is running', 'Thiết bị đang chạy'),
+    // fleetState=none has no device to announce.
+    ...(device ? [{ id: 901, kind: 'device', title: text('设备已开始运行', 'Device is running', 'Thiết bị đang chạy'),
       body: text(`设备 ${device.instanceNo} 已上线，可查看运行状态与收益。`, `Device ${device.instanceNo} is online. View its status and earnings.`, `Thiết bị ${device.instanceNo} đã trực tuyến. Xem trạng thái và thu nhập.`),
-      ctaHref: `/pages/earn/device-detail?id=${encodeURIComponent(device.id)}`, createdAt: at(3) },
+      ctaHref: `/pages/earn/device-detail?id=${encodeURIComponent(device.id)}`, createdAt: at(3) }] : []),
     { id: 902, kind: 'order', title: text('订单支付成功', 'Payment successful', 'Thanh toán thành công'),
       body: text(`订单 ${order.orderNo} 已支付 ${order.amountUsdt} USDT，可查看开通进度。`, `Order ${order.orderNo}: ${order.amountUsdt} USDT paid. View activation progress.`, `Đơn ${order.orderNo}: đã thanh toán ${order.amountUsdt} USDT. Xem tiến độ kích hoạt.`),
       ctaHref: `/pages/store/order-detail?id=${encodeURIComponent(order.orderNo)}`, createdAt: at(2) },
