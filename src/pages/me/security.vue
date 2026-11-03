@@ -35,7 +35,7 @@
       </view>
 
       <view v-if="remoteApiEnabled" class="mx-4 security-providers"><ThirdPartyAuth :key="app.accountKey + ':' + app.accountBindingEpoch" intent="LINK" sheet :disabled="securityBusy || !remoteSecurity" @busy="oauthBusy = $event" /></view>
-      <view v-if="phoneMissing" class="mx-4 nx-glass-card" style="padding: var(--v5-space-4); margin-bottom: 16px" role="status">
+      <view v-if="phoneBound === false" class="mx-4 nx-glass-card" style="padding: var(--v5-space-4); margin-bottom: 16px" role="status">
         <text class="block">{{ t.security.phoneBindingRequired }}</text>
         <view role="button" tabindex="0" style="min-height: 44px; color: var(--v5-brand); display: flex; align-items: center" @click="navTo('/pages/me/phone-binding')">{{ t.security.phoneBindingTitle }} →</view>
       </view>
@@ -70,7 +70,7 @@
       </view>
 
 
-      <view v-if="remoteApiEnabled && !phoneMissing" class="nx-glass-card mx-4 security-phone" :style="[cardStyle, groupGap]">
+      <view v-if="phoneBound === true" class="nx-glass-card mx-4 security-phone" :style="[cardStyle, groupGap]">
         <view class="flex items-center active:opacity-90" :style="rowStyle" role="button" tabindex="0"
           :aria-expanded="phoneEditing ? 'true' : 'false'" @click="phoneEditing = !phoneEditing">
           <view class="security-phone-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></view><view class="flex-1 min-w-0">
@@ -275,7 +275,14 @@ const securityLocale = useLocaleStore();
 let securityEnvironmentInvalidated = false;
 watch(() => apiRuntimeConfig?.environment, () => { securityEnvironmentInvalidated = true; clearSecurityAccountState(); }, { flush: 'sync' });
 watch(() => securityLocale.code, () => { clearSecurityAccountState(); refreshSecurityForCurrentAccount(); }, { flush: 'sync' });
-const phoneMissing = ref(remoteApiEnabled && !!sessionVault.read() && !sessionVault.read()!.user.phone);
+// Unknown (null) until there is a session: after an H5 reload it is restored after the page shows, then the
+// account watch below reads it again. Neither the binding prompt nor the change-phone entry shows while unknown.
+const phoneBound = ref<boolean | null>(null);
+function readPhoneBinding() {
+  const session = remoteApiEnabled ? sessionVault.read() : null;
+  phoneBound.value = session ? !!session.user.phone : null;
+}
+readPhoneBinding();
 const phonePolicy = ref<PhoneNumberChangePolicy | null>(null);
 const phoneEditing = ref(false);
 const showPhoneCountries = ref(false);
@@ -534,7 +541,7 @@ async function confirmPhoneChange() {
 
 onShow(() => {
   securityPageVisible = true;
-  phoneMissing.value = remoteApiEnabled && !!sessionVault.read() && !sessionVault.read()!.user.phone;
+  readPhoneBinding();
   refreshSecurityForCurrentAccount();
 });
 onHide(() => {
@@ -546,6 +553,7 @@ onUnmounted(() => {
   clearSecurityAccountState();
 });
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => auth.accountId], () => {
+  readPhoneBinding();
   clearSecurityAccountState();
   refreshSecurityForCurrentAccount();
 }, { flush: "sync" });
