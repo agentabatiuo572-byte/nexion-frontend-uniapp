@@ -1081,7 +1081,7 @@ export const id: Messages = {
     dayOneTaskBindCard: "Tautkan kartu bank",
     dayOneTaskVisitEarn: "Buka Pendapatan",
     dayOneTaskVisitStore: "Buka Toko",
-    dayOneTaskSeeRoi: "Lihat perkiraan pendapatan S1",
+    dayOneTaskSeeRoi: "Perkiraan pendapatan S1",
     dayOneTaskSetupProfile: "Lengkapi profil",
     dayOneTaskInviteFriend: "Undang teman",
     dayOneCatWallet: "dompet",
