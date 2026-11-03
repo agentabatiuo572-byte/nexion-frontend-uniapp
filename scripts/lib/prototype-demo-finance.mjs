@@ -19,7 +19,8 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/app/deposits/vietqr/intents") {
     // Prototype-only hosted bank order: paying (link created) or credited. The link is never followed in previews.
     const created = now - 28 * 1000, paying = state.topupState === "paying", credited = state.topupState === "credited";
-    if (!paying && !credited) return { items: [] };
+    // The empty account has no top-ups at all: its lists stay empty like its deposits and receipts.
+    if (empty || (!paying && !credited)) return { items: [] };
     return { items: [{ intentNo: "VQR-DEMO-P44", usdtAmount: 500, fxRate: 25000, vndAmount: 12500000, status: credited ? "credited" : "awaiting_payment",
       expiresAt: new Date(created + 15 * 60000).toISOString(), createdAt: new Date(created).toISOString(), creditedUsdt: credited ? 500 : 0, feeVnd: 0, feeUsdt: 0, version: credited ? 3 : 1,
       paymentMode: "hosted", providerStatus: "created", ...(paying ? { paymentUrl: "https://api.hdpayadmin.com/pay/demo-preview-only" } : { matchedAt: new Date(now - 60000).toISOString() }) }] };
