@@ -60,6 +60,8 @@ const server=http.createServer(async(req,res)=>{
         // account (dataState=empty) is one too. Presentation knobs keep them.
         const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty;
         if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
+        // The empty account's wallet holds nothing: a fact every wallet payment checks, not only a 0 on screen.
+        if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
