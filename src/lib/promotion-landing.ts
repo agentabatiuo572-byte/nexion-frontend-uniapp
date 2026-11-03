@@ -4,6 +4,7 @@ import { fmt } from '@/i18n/format';
 import { sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
 import { getProductMedia } from '@/lib/product-media';
+import { isLiteProduct } from '@/lib/lite-scope';
 import { productCatalogState } from '@/store/product-catalog';
 import { displayDeadline, localized, rewardAmount, rewardSummary } from './promotion-display';
 
@@ -24,6 +25,10 @@ function catalogReady(): boolean {
 }
 export function landingProduct(sku: string) {
   return catalogReady() ? getProduct(sku) : undefined;
+}
+/** Lite never offers a phone for a new purchase; identity is the catalog product or, without a session, the SKU. */
+export function landingProductNos(activity: Pick<PublicPromotion, 'productNos'>): string[] {
+  return activity.productNos.filter(sku => isLiteProduct(landingProduct(sku) ?? { id: sku }));
 }
 export function landingProductImage(sku: string): string | undefined {
   return catalogReady() ? getProduct(sku)?.imageUrl : getProductMedia(sku)?.src;
