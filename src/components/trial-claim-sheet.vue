@@ -12,7 +12,7 @@
           </view>
         </view>
       </view>
-      <view class="tcs-close" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="hide">
+      <view class="tcs-close" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
@@ -39,11 +39,11 @@
 
       <view class="tcs-ctas">
         <template v-if="activated">
-          <view class="tcs-claim" role="button" tabindex="0" :aria-label="copy.viewDevices" @click.stop="goDevices"><text class="tcs-claim-t">{{ copy.viewDevices }}</text></view>
-          <view class="tcs-secondary" role="button" tabindex="0" :aria-label="copy.buyEarly" @click.stop="goTrial"><text>{{ copy.buyEarly }}</text></view>
+          <view class="tcs-claim" role="button" tabindex="0" :aria-label="copy.viewDevices" @click.stop="goDevices" @keydown.enter.stop.prevent="goDevices" @keydown.space.stop.prevent="goDevices"><text class="tcs-claim-t">{{ copy.viewDevices }}</text></view>
+          <view class="tcs-secondary" role="button" tabindex="0" :aria-label="copy.buyEarly" @click.stop="goTrial" @keydown.enter.stop.prevent="goTrial" @keydown.space.stop.prevent="goTrial"><text>{{ copy.buyEarly }}</text></view>
         </template>
-        <view v-else class="tcs-claim" :class="{ 'tcs-claim--busy': claiming }" role="button" :tabindex="claiming ? -1 : 0" :aria-label="claimCtaLabel" :aria-disabled="claiming ? 'true' : 'false'" :aria-busy="claiming ? 'true' : 'false'" @click.stop="onClaim"><text class="tcs-claim-t">{{ claimCtaLabel }}</text></view>
-        <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
+        <view v-else class="tcs-claim" :class="{ 'tcs-claim--busy': claiming }" role="button" :tabindex="claiming ? -1 : 0" :aria-label="claimCtaLabel" :aria-disabled="claiming ? 'true' : 'false'" :aria-busy="claiming ? 'true' : 'false'" @click.stop="onClaim" @keydown.enter.stop.prevent="onClaim" @keydown.space.stop.prevent="onClaim"><text class="tcs-claim-t">{{ claimCtaLabel }}</text></view>
+        <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
       </view>
     </view>
   </view>
