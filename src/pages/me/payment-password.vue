@@ -68,7 +68,7 @@ const lockMessage = computed(() => {
 });
 const canSave = computed(() => complete.value && !validation.value && !ui.busy && !state.value?.lockedUntil && !ui.pendingOperation);
 function clear() { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; }
-async function load() { loading.value = true; ui.changeError = ""; await pin.refreshStatus(); if (active) { loading.value = false; await pin.resumePending(); } }
+async function load() { loading.value = true; ui.changeError = ""; if (!sessionVault.read()) return; await pin.refreshStatus(); if (active) { loading.value = false; await pin.resumePending(); } }
 async function setup() { if (await pin.setup()) { toast.success(t.value.paymentPin.setupSuccess); navTo("/me"); } else await load(); }
 async function recover() { if (ui.busy) return; clear(); if (await pin.recover()) { toast.success(t.value.paymentPin.resetSuccess); navTo("/me"); } else await load(); }
 async function save() {
@@ -85,7 +85,8 @@ watch(() => ui.completedRevision, () => {
     submitted = false; clear(); toast.success(t.value.paymentPin.changeSuccess); navTo("/me");
   }
 });
-const unsubscribe = sessionVault.subscribe?.((_previous, _next, continuation) => { if (!continuation) { clear(); submitted = false; } });
+// After an H5 reload the session is restored after the page shows: load() waits for it and reads here.
+const unsubscribe = sessionVault.subscribe?.((_previous, next, continuation) => { if (!continuation) { clear(); submitted = false; if (next && active) void load(); } });
 function hide() { active = false; clear(); }
 function visibility() { if (typeof document !== "undefined" && document.hidden) hide(); }
 onShow(() => { active = true; void load(); }); onHide(hide); onUnload(hide);
