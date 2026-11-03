@@ -52,14 +52,15 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/state') {
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
-        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasLow=state.paymentState==='low-balance';
+        const accountPayment=value=>['low-balance','urgent'].includes(value)?value:'';
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState);
         if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
-        // account (dataState=empty) or the low-balance account (paymentState=low-balance) is one too. Presentation
-        // knobs keep them.
-        const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty||(state.paymentState==='low-balance')!==wasLow;
+        // account (dataState=empty), the low-balance account or the near-deadline sample (paymentState=low-balance /
+        // urgent) is one too. Presentation knobs keep them.
+        const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
         if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
         // checks, not only numbers on screen.
