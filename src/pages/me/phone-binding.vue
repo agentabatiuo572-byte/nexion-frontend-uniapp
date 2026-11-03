@@ -11,14 +11,14 @@
               @keydown.space.prevent="showCountries = true">{{ countryCode }} ▾</view>
             <input v-model="phone" type="number" inputmode="numeric" maxlength="15" :placeholder="t.register.phonePlaceholder" :aria-label="t.register.phonePlaceholder" />
           </view>
-          <view class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validPhone || resendLeft > 0" @click="sendCode()" @keydown.enter.prevent="sendCode()">
+          <view class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validPhone || resendLeft > 0" @click="sendCode()" @keydown.enter.prevent="sendCode()" @keydown.space.prevent="sendCode()">
             {{ resendLeft > 0 ? `${t.security.phoneBindingResend} ${resendLeft}s` : t.addrRebind.otpSendCta }}
           </view>
           <input v-if="challengeNo" v-model="code" class="phone-binding-input" type="number" inputmode="numeric" maxlength="6" :placeholder="t.addrRebind.otpPlaceholder" :aria-label="t.addrRebind.otpPlaceholder" />
-          <view v-if="challengeNo" class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validCode" @click="submit" @keydown.enter.prevent="submit">{{ t.security.phoneBindingConfirm }}</view>
+          <view v-if="challengeNo" class="phone-binding-action" role="button" tabindex="0" :aria-disabled="busy || !validCode" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit">{{ t.security.phoneBindingConfirm }}</view>
           <text v-if="error" class="phone-binding-error" role="alert">{{ error }}</text>
         </template>
-        <view v-else-if="bound" class="phone-binding-action" role="button" tabindex="0" @click="navTo('/pages/me/security')" @keydown.enter.prevent="navTo('/pages/me/security')">{{ t.security.back }}</view>
+        <view v-else-if="bound" class="phone-binding-action" role="button" tabindex="0" @click="navTo('/pages/me/security')" @keydown.enter.prevent="navTo('/pages/me/security')" @keydown.space.prevent="navTo('/pages/me/security')">{{ t.security.back }}</view>
       </view>
       <ServerCaptchaSlider v-if="showCaptcha" :phone="`${countryCode}${phone}`" scene="REGISTER" @success="onCaptchaSuccess" @close="showCaptcha = false" />
     </view>
