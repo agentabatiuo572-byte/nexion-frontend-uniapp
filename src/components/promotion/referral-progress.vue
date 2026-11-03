@@ -39,7 +39,8 @@
     <!-- Lite: a referral offer whose rules all give a phone is not advertised; the user's earned rewards from it stay readable. -->
     <view v-for="activity in earnedRecords" :key="'records:'+activity.activityId" class="referral-activity referral-records" :data-activity-id="activity.activityId">
       <text class="referral-activity-title">{{ copy.myGifts }}</text>
-      <RewardRows :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
+      <RewardRows v-if="progress[activity.activityId]" :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
+      <view v-else class="nx-inline-recovery"><text class="promotion-copy nx-inline-recovery__copy" role="alert">{{ t.promotion.error }}</text><NxButton class="referral-retry nx-inline-recovery__action" variant="text" size="medium" :busy="progressBusy[activity.activityId]" :label="t.promotion.retry" @click="loadProgress(activity.activityId)" /></view>
     </view>
     <view v-if="error" class="referral-recovery nx-inline-recovery"><text class="promotion-copy nx-inline-recovery__copy" role="alert">{{ t.promotion.error }}</text><NxButton class="referral-retry nx-inline-recovery__action" variant="text" size="medium" :busy="loading" :label="t.promotion.retry" @click="loadActivities(true)"><text>{{ t.promotion.retry }}</text><text aria-hidden="true">→</text></NxButton></view>
     <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text><text aria-hidden="true">→</text></NxButton>
@@ -66,7 +67,8 @@ const visibility=useDataVisibility();
 const copy=computed(()=>teamRedesignCopy(locale.code)),expandedActivity=ref<string|null>(null);
 const termsActivity=ref<PublicPromotion|null>(null);
 const recordActivities=ref<PublicPromotion[]>([]);
-const earnedRecords=computed(()=>recordActivities.value.filter(p=>progress.value[p.activityId]?.ownRewards.length));
+// A failed first read has no records to show yet, so its section carries the error and a retry instead.
+const earnedRecords=computed(()=>recordActivities.value.filter(p=>progress.value[p.activityId]?.ownRewards.length||(!progress.value[p.activityId]&&progressErrors.value[p.activityId])));
 // A short end-date chip from the activity's own window.
 function deadlineText(activity:PublicPromotion){const end=new Date(activity.endsAt);if(Number.isNaN(end.getTime()))return'';const m=end.getMonth()+1,d=end.getDate();return locale.code==='zh'?`${m}/${d} 截止`:locale.code==='vi'?`Hết hạn ${d}/${m}`:`Ends ${m}/${d}`;}
 const progressBusy=ref<Record<string,boolean>>({}),progressErrors=ref<Record<string,boolean>>({});
