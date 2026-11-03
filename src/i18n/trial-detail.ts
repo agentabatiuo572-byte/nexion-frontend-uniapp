@@ -47,7 +47,7 @@ export const trialDetailCopy = {
     rulesBeforeNoCap: 'Trước khi mua, tiền khấu trừ dùng thử chỉ dùng để trừ vào giá máy.',
   },
   id: {
-    countdownDays: "{days}d {hours}:{minutes}",
+    countdownDays: "{days} hr {hours}:{minutes}",
     remaining: 'Sisa waktu', keptLabel: 'Pendapatan disimpan selama', keptUntil: 'Kedaluwarsa {time}',
     graceAmountLabel: 'Pendapatan uji coba', withdrawAfterBuy: 'Bisa ditarik setelah membeli',
     earlyTag: 'Khusus masa uji coba', earlyTitle: 'Miliki {device} ini dan hemat ekstra {amount}',
@@ -61,7 +61,7 @@ export const trialDetailCopy = {
     rulesBeforeNoCap: 'Sebelum pembelian, kredit uji coba hanya memotong harga perangkat.',
   },
   ms: {
-    countdownDays: "{days}d {hours}:{minutes}",
+    countdownDays: "{days} hari {hours}:{minutes}",
     remaining: 'Tamat dalam', keptLabel: 'Pendapatan disimpan selama', keptUntil: 'Luput {time}',
     graceAmountLabel: 'Pendapatan percubaan', withdrawAfterBuy: 'Boleh dikeluarkan selepas beli',
     earlyTag: 'Tawaran khas percubaan', earlyTitle: 'Simpan {device} ini dan jimat {amount} lagi',
@@ -89,7 +89,7 @@ export const trialDetailCopy = {
     rulesBeforeNoCap: 'Bago bumili, pambawas lang sa presyo ng device ang credit sa trial.',
   },
   ru: {
-    countdownDays: "{days}d {hours}:{minutes}",
+    countdownDays: "{days} дн. {hours}:{minutes}",
     remaining: 'Осталось', keptLabel: 'Доход сохранится', keptUntil: 'До {time}',
     graceAmountLabel: 'Доход за пробный период', withdrawAfterBuy: 'Вывод после покупки',
     earlyTag: 'Только в пробный период', earlyTitle: 'Оставьте устройство {device}: доп. скидка {amount}',
@@ -103,7 +103,7 @@ export const trialDetailCopy = {
     rulesBeforeNoCap: 'До покупки пробный бонус можно использовать только для скидки на устройство.',
   },
   kk: {
-    countdownDays: "{days}d {hours}:{minutes}",
+    countdownDays: "{days} күн {hours}:{minutes}",
     remaining: 'Аяқталуына', keptLabel: 'Табыс сақталады:', keptUntil: 'Аяқталуы: {time}',
     graceAmountLabel: 'Сынақ табысы', withdrawAfterBuy: 'Сатып алғанда шығаруға болады',
     earlyTag: 'Тек сынақ кезінде', earlyTitle: 'Осы {device} құрылғысын сатып алып, қосымша {amount} үнемдеңіз',
@@ -117,7 +117,7 @@ export const trialDetailCopy = {
     rulesBeforeNoCap: 'Сатып алғанға дейін сынақ бонусы тек құрылғы бағасын азайтуға жұмсалады.',
   },
   uz: {
-    countdownDays: "{days}d {hours}:{minutes}",
+    countdownDays: "{days} kun {hours}:{minutes}",
     remaining: 'Tugashiga', keptLabel: 'Daromad saqlanadi', keptUntil: 'Muddati: {time}',
     graceAmountLabel: 'Sinov daromadi', withdrawAfterBuy: 'Xariddan keyin yechish mumkin',
     earlyTag: 'Faqat sinovda', earlyTitle: '{device}ni qoldiring va qoʻshimcha {amount} tejang',
