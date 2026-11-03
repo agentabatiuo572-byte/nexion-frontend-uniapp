@@ -42,6 +42,21 @@ const DAY_ONE_TITLE_KEYS = new Map<string, keyof Messages["home"]>([
   ["invite_friend", "dayOneTaskInviteFriend"],
 ]);
 
+// Server default names from before the 2026-11-04 copy rewrite. Snapshots may still carry them, so
+// they stay a match base next to the current zh default; only these exact names get the new copy.
+const LEGACY_DEFAULT_NAMES: Readonly<Record<string, string>> = {
+  "home.dayOneTaskSeeRoi": "查看 UVELBox S1 ROI",
+  "weeklyQuest.tier1_subscribe_premium_title": "复投加速 · 把余额再锁一轮",
+  "weeklyQuest.tier2_reinvest_title": "复投 $100.00 到网络",
+  "weeklyQuest.tier2_genesis_browse_title": "看 Genesis 二级市场",
+};
+
+function isDefaultName(name: string, id: string, current: unknown): boolean {
+  const legacy = LEGACY_DEFAULT_NAMES[id];
+  return (typeof current === "string" && name === platformDisplayText(current))
+    || (legacy !== undefined && name === platformDisplayText(legacy));
+}
+
 /** Localize exact frozen defaults at display time, preserving authored snapshot names. */
 export function dayOneQuestDisplayName(
   quest: Pick<CanonicalQuest, "questCode" | "name" | "layer">,
@@ -49,14 +64,14 @@ export function dayOneQuestDisplayName(
   t: Messages,
 ): string {
   const name = platformDisplayText(quest.name);
-  if (locale === "zh" || quest.layer !== "DAY_ONE") return name;
+  if (quest.layer !== "DAY_ONE") return name;
   const key = DAY_ONE_TITLE_KEYS.get(quest.questCode);
   if (!key) return name;
+  // zh shows the server name unless it is a legacy default the copy rewrite replaced.
+  if (locale === "zh" && !(`home.${key}` in LEGACY_DEFAULT_NAMES)) return name;
   const translated = t.home[key];
-  const fallback = zh.home[key];
   return typeof translated === "string" && translated.trim().length > 0
-    && typeof fallback === "string"
-    && name === platformDisplayText(fallback)
+    && isDefaultName(name, `home.${key}`, zh.home[key])
     ? translated
     : name;
 }
@@ -68,15 +83,14 @@ export function weeklyQuestDisplayName(
   t: Messages,
 ): string {
   const name = platformDisplayText(quest.name);
-  if (locale === "zh") return name;
   const match = /^weekly_t([12])_([a-z0-9_]+)$/.exec(quest.questCode);
   if (!match) return name;
   const key = `tier${match[1]}_${match[2]}_title` as keyof Messages["weeklyQuest"];
+  // zh shows the server name unless it is a legacy default the copy rewrite replaced.
+  if (locale === "zh" && !(`weeklyQuest.${key}` in LEGACY_DEFAULT_NAMES)) return name;
   const translated = t.weeklyQuest[key];
-  const fallback = zh.weeklyQuest[key];
   return typeof translated === "string"
-    && typeof fallback === "string"
-    && name === platformDisplayText(fallback)
+    && isDefaultName(name, `weeklyQuest.${key}`, zh.weeklyQuest[key])
     ? translated
     : name;
 }
