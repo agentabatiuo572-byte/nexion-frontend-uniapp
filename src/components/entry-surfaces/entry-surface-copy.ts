@@ -234,7 +234,7 @@ const copy = {
       },
       white: {
         linkLabel: "Pamamahala ng account", summary: "Tingnan ang buod ng account at seguridad ng pag-log in",
-        kicker: "Account at seguridad", title: "Pamahalaan ang account",
+        kicker: "Account at seguridad", title: "Ang account mo",
         body: "Tingnan ang buod ng account mo sa Home, o pamahalaan ang paraan ng pag-log in at mga device sa setting ng seguridad.",
         primaryLabel: "Buksan ang Home", secondaryLabel: "Pag-log in at seguridad",
         steps: [
