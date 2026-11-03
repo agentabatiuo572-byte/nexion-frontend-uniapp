@@ -1,5 +1,11 @@
 // Isolated preview records; routes resolve to the same fixture's orders/devices.
 export function demoNotifications(locale, state, now, device, order) {
+  // Payment text shows two decimals (decimal HALF_UP), like the App's payment copy; the order keeps full precision.
+  const usdt = value => {
+    const [whole, fraction = ''] = String(value).split('.');
+    const cents = BigInt(whole) * 100n + BigInt((fraction + '00').slice(0, 2)) + (fraction[2] >= '5' ? 1n : 0n);
+    return `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
+  };
   const text = (zh, en, vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
   const at = (days, hour = 12) => {
     if (!days) return now;
@@ -15,7 +21,7 @@ export function demoNotifications(locale, state, now, device, order) {
       ctaHref: `/pages/earn/device-detail?id=${encodeURIComponent(device.id)}`, createdAt: at(3) }] : []),
     // Only a paid order of this account is announced.
     ...(order ? [{ id: 902, kind: 'order', title: text('订单支付成功', 'Payment successful', 'Thanh toán thành công'),
-      body: text(`订单 ${order.orderNo} 已支付 ${order.amountUsdt} USDT，可查看开通进度。`, `Order ${order.orderNo}: ${order.amountUsdt} USDT paid. View activation progress.`, `Đơn ${order.orderNo}: đã thanh toán ${order.amountUsdt} USDT. Xem tiến độ kích hoạt.`),
+      body: text(`订单 ${order.orderNo} 已支付 ${usdt(order.amountUsdt)} USDT，可查看开通进度。`, `Order ${order.orderNo}: ${usdt(order.amountUsdt)} USDT paid. View activation progress.`, `Đơn ${order.orderNo}: đã thanh toán ${usdt(order.amountUsdt)} USDT. Xem tiến độ kích hoạt.`),
       ctaHref: `/pages/store/order-detail?id=${encodeURIComponent(order.orderNo)}`, createdAt: at(2) }] : []),
     { id: 903, kind: 'reward', title: text('新手任务进度', 'Newcomer tasks', 'Nhiệm vụ thành viên mới'),
       body: text('查看新手任务进度。', 'View newcomer tasks.', 'Xem nhiệm vụ mới.'), ctaHref: '/pages/missions/missions', createdAt: at(1) },
