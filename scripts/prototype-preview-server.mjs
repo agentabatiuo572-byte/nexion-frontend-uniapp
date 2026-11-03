@@ -18,6 +18,7 @@ const authDemo=createAuthDemo(state);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
+let scenarioEpoch=0;
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
 // Keep trial wallet authorization available when the full checkout fixture is disabled.
 const trialPin=createPaymentPinFlowFixture();
@@ -54,9 +55,11 @@ const server=http.createServer(async(req,res)=>{
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.authState)delete state.scopeCalls;
         if(update.stakingOpenState){delete state.stakingAttempts;delete state.stakingStatusReads;}
-        // A scenario change seeds the fleet again on its next read (reset clears the whole state). Lite's compute and
-        // scope scenarios change the seeded devices too (Cloud Share device 42, hidden phones).
-        if(['fleetState','checkoutState','trialState','benefitState','machineImageState','computeState','scopeState'].some(key=>key in update))delete state.fleetSeed;
+        // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
+        // trade-ins, trial and payment intents go, and the next read seeds the fleet. Presentation knobs keep them.
+        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','scopeState'].some(key=>key in update);
+        if(scenarioChange)for(const key of ['fleetSeed','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
+        if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}
@@ -65,9 +68,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.eventState)for(const key of ['eventStatuses','reminders','spun','spinHistory','raffleEntries'])delete state[key];
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         if(update.promotionTiming)state.promotionTimingAt=Date.now();
-        if(update.computeState||update.fleetState)delete state.stoppedDevices;
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
-        if(update.trialState||update.benefitState){if(state.trialOrderNo)state.createdOrders=(state.createdOrders||[]).filter(order=>order.orderNo!==state.trialOrderNo);for(const key of ['trialRow','trialCommands','trialStartFailed','trialOrderNo'])delete state[key];}
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         realtime.stateChanged(update);
