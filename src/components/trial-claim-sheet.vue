@@ -147,7 +147,10 @@ async function onClaim() {
   const r = await freeTrial.start();
   if (requestedSequence !== claimSequence) return;
   claiming.value = false;
-  if (requestedEpoch !== app.accountBindingEpoch || !sheet.open) return;
+  if (requestedEpoch !== app.accountBindingEpoch) return;
+  // A confirmed claim holds a slot even if the sheet was closed meanwhile; the count must follow it.
+  if (r.ok && remoteApiEnabled) void app.refreshRemoteFleet();
+  if (!sheet.open) return;
   if (!r.ok) {
     claimErrorReason.value = r.reason;
     claimError.value = true; // inline error + retry CTA, stay in the sheet
@@ -157,7 +160,6 @@ async function onClaim() {
   claimErrorReason.value = undefined;
   // start() only resolves ok after the authoritative state readback succeeds.
   activated.value = true;
-  if (remoteApiEnabled) void app.refreshRemoteFleet();
 }
 
 watch(() => app.accountBindingEpoch, () => {
