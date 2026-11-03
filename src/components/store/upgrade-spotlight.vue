@@ -30,14 +30,21 @@ import { fmtMoney } from '@/i18n/format';
 import { navTo } from '@/lib/route';
 import NxButton from '@/components/ui/nx-button.vue';
 import type { DeviceKind } from '@/store/types';
+import { uiLocale } from '@/i18n';
 const props = defineProps<{ base: { kind: DeviceKind; name: string; baseRate: number }; baseImageUrl?: string | null; target: { id: string; name: string; imageUrl?: string | null; dailyEarn: number } }>();
 const copy = useAuditUiCopy(), t = useT();
 const locale = useLocaleStore();
-const comparisonCopy = computed(() => locale.code === 'zh'
-  ? { current: '现在 · 预估', upgraded: '升级后 · 预估' }
-  : locale.code === 'vi'
-    ? { current: 'Hiện tại · ước tính', upgraded: 'Sau nâng cấp · ước tính' }
-    : { current: 'Now · estimated', upgraded: 'After upgrade · estimated' });
+const comparisonCopy = computed(() => ({
+  zh: { current: '现在 · 预估', upgraded: '升级后 · 预估' },
+  en: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+  vi: { current: 'Hiện tại · ước tính', upgraded: 'Sau nâng cấp · ước tính' },
+  id: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+  ms: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+  fil: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+  ru: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+  kk: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+  uz: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+})[uiLocale(locale.code)]);
 const baseReady = ref(false), targetReady = ref(false);
 const baseRefreshKey = ref(0), targetRefreshKey = ref(0);
 const app = useApp();

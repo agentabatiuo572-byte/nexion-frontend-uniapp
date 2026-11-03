@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 export const remainderUiCopy = {
   zh: {
@@ -38,9 +39,81 @@ export const remainderUiCopy = {
     genesisSupply: "Tổng cộng {n} suất · bán hết là dừng",
     listingMinutes: "{n} phút", listingHours: "{n} giờ", listingDays: "{n} ngày",
   },
+  id: {
+    earnWays: {
+      phoneTitle: "Phone compute", phoneBody: "Compute on Android.", phoneAction: "Set up phone", phoneReadOnly: "Phone status",
+      stakingBody: "Terms and early exit rules.",
+      gpuTitle: "Share GPU power", gpuBody: "Idle GPU · 1 slot", gpuAction: "How to connect",
+    },
+    phoneTitle: "Phone compute", phoneBody: "Connect and calibrate your phone in the Android app to run compute jobs.",
+    phoneAction: "Set up phone compute", phoneReadOnly: "View phone status", downloadApp: "Download app",
+    stakingTitle: "Staking", stakingBody: "View available terms, estimated returns and early exit rules.", stakingAction: "View staking",
+    genesisSupply: "{n} seats in total · while they last",
+    listingMinutes: "{n} minutes", listingMinute: "1 minute", listingHours: "{n} hours", listingHour: "1 hour", listingDays: "{n} days", listingDay: "1 day",
+  },
+  ms: {
+    earnWays: {
+      phoneTitle: "Phone compute", phoneBody: "Compute on Android.", phoneAction: "Set up phone", phoneReadOnly: "Phone status",
+      stakingBody: "Terms and early exit rules.",
+      gpuTitle: "Share GPU power", gpuBody: "Idle GPU · 1 slot", gpuAction: "How to connect",
+    },
+    phoneTitle: "Phone compute", phoneBody: "Connect and calibrate your phone in the Android app to run compute jobs.",
+    phoneAction: "Set up phone compute", phoneReadOnly: "View phone status", downloadApp: "Download app",
+    stakingTitle: "Staking", stakingBody: "View available terms, estimated returns and early exit rules.", stakingAction: "View staking",
+    genesisSupply: "{n} seats in total · while they last",
+    listingMinutes: "{n} minutes", listingMinute: "1 minute", listingHours: "{n} hours", listingHour: "1 hour", listingDays: "{n} days", listingDay: "1 day",
+  },
+  fil: {
+    earnWays: {
+      phoneTitle: "Phone compute", phoneBody: "Compute on Android.", phoneAction: "Set up phone", phoneReadOnly: "Phone status",
+      stakingBody: "Terms and early exit rules.",
+      gpuTitle: "Share GPU power", gpuBody: "Idle GPU · 1 slot", gpuAction: "How to connect",
+    },
+    phoneTitle: "Phone compute", phoneBody: "Connect and calibrate your phone in the Android app to run compute jobs.",
+    phoneAction: "Set up phone compute", phoneReadOnly: "View phone status", downloadApp: "Download app",
+    stakingTitle: "Staking", stakingBody: "View available terms, estimated returns and early exit rules.", stakingAction: "View staking",
+    genesisSupply: "{n} seats in total · while they last",
+    listingMinutes: "{n} minutes", listingMinute: "1 minute", listingHours: "{n} hours", listingHour: "1 hour", listingDays: "{n} days", listingDay: "1 day",
+  },
+  ru: {
+    earnWays: {
+      phoneTitle: "Phone compute", phoneBody: "Compute on Android.", phoneAction: "Set up phone", phoneReadOnly: "Phone status",
+      stakingBody: "Terms and early exit rules.",
+      gpuTitle: "Share GPU power", gpuBody: "Idle GPU · 1 slot", gpuAction: "How to connect",
+    },
+    phoneTitle: "Phone compute", phoneBody: "Connect and calibrate your phone in the Android app to run compute jobs.",
+    phoneAction: "Set up phone compute", phoneReadOnly: "View phone status", downloadApp: "Download app",
+    stakingTitle: "Staking", stakingBody: "View available terms, estimated returns and early exit rules.", stakingAction: "View staking",
+    genesisSupply: "{n} seats in total · while they last",
+    listingMinutes: "{n} minutes", listingMinute: "1 minute", listingHours: "{n} hours", listingHour: "1 hour", listingDays: "{n} days", listingDay: "1 day",
+  },
+  kk: {
+    earnWays: {
+      phoneTitle: "Phone compute", phoneBody: "Compute on Android.", phoneAction: "Set up phone", phoneReadOnly: "Phone status",
+      stakingBody: "Terms and early exit rules.",
+      gpuTitle: "Share GPU power", gpuBody: "Idle GPU · 1 slot", gpuAction: "How to connect",
+    },
+    phoneTitle: "Phone compute", phoneBody: "Connect and calibrate your phone in the Android app to run compute jobs.",
+    phoneAction: "Set up phone compute", phoneReadOnly: "View phone status", downloadApp: "Download app",
+    stakingTitle: "Staking", stakingBody: "View available terms, estimated returns and early exit rules.", stakingAction: "View staking",
+    genesisSupply: "{n} seats in total · while they last",
+    listingMinutes: "{n} minutes", listingMinute: "1 minute", listingHours: "{n} hours", listingHour: "1 hour", listingDays: "{n} days", listingDay: "1 day",
+  },
+  uz: {
+    earnWays: {
+      phoneTitle: "Phone compute", phoneBody: "Compute on Android.", phoneAction: "Set up phone", phoneReadOnly: "Phone status",
+      stakingBody: "Terms and early exit rules.",
+      gpuTitle: "Share GPU power", gpuBody: "Idle GPU · 1 slot", gpuAction: "How to connect",
+    },
+    phoneTitle: "Phone compute", phoneBody: "Connect and calibrate your phone in the Android app to run compute jobs.",
+    phoneAction: "Set up phone compute", phoneReadOnly: "View phone status", downloadApp: "Download app",
+    stakingTitle: "Staking", stakingBody: "View available terms, estimated returns and early exit rules.", stakingAction: "View staking",
+    genesisSupply: "{n} seats in total · while they last",
+    listingMinutes: "{n} minutes", listingMinute: "1 minute", listingHours: "{n} hours", listingHour: "1 hour", listingDays: "{n} days", listingDay: "1 day",
+  },
 };
 
 export function useRemainderUiCopy() {
   const locale = useLocaleStore();
-  return computed(() => remainderUiCopy[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"]);
+  return computed(() => remainderUiCopy[uiLocale(locale.code)]);
 }

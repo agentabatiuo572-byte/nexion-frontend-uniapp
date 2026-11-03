@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 const copy = {
   zh: {
@@ -23,8 +24,50 @@ const copy = {
     addressUnavailable: "Chưa thể tải thông tin địa chỉ. Không thể xác nhận địa chỉ hiện tại và thời gian bảo vệ. Vui lòng thử lại.",
     retry: "Thử lại",
   },
+  id: {
+    bankFooter: "Use your own account. Changes are blocked during a withdrawal. Unsaved details are cleared when you leave.",
+    bankRules: "Linking and account change rules",
+    addressLoading: "Loading address and protection period…",
+    addressUnavailable: "Address details are unavailable. The current address and protection period cannot be confirmed. Please retry.",
+    retry: "Retry",
+  },
+  ms: {
+    bankFooter: "Use your own account. Changes are blocked during a withdrawal. Unsaved details are cleared when you leave.",
+    bankRules: "Linking and account change rules",
+    addressLoading: "Loading address and protection period…",
+    addressUnavailable: "Address details are unavailable. The current address and protection period cannot be confirmed. Please retry.",
+    retry: "Retry",
+  },
+  fil: {
+    bankFooter: "Use your own account. Changes are blocked during a withdrawal. Unsaved details are cleared when you leave.",
+    bankRules: "Linking and account change rules",
+    addressLoading: "Loading address and protection period…",
+    addressUnavailable: "Address details are unavailable. The current address and protection period cannot be confirmed. Please retry.",
+    retry: "Retry",
+  },
+  ru: {
+    bankFooter: "Use your own account. Changes are blocked during a withdrawal. Unsaved details are cleared when you leave.",
+    bankRules: "Linking and account change rules",
+    addressLoading: "Loading address and protection period…",
+    addressUnavailable: "Address details are unavailable. The current address and protection period cannot be confirmed. Please retry.",
+    retry: "Retry",
+  },
+  kk: {
+    bankFooter: "Use your own account. Changes are blocked during a withdrawal. Unsaved details are cleared when you leave.",
+    bankRules: "Linking and account change rules",
+    addressLoading: "Loading address and protection period…",
+    addressUnavailable: "Address details are unavailable. The current address and protection period cannot be confirmed. Please retry.",
+    retry: "Retry",
+  },
+  uz: {
+    bankFooter: "Use your own account. Changes are blocked during a withdrawal. Unsaved details are cleared when you leave.",
+    bankRules: "Linking and account change rules",
+    addressLoading: "Loading address and protection period…",
+    addressUnavailable: "Address details are unavailable. The current address and protection period cannot be confirmed. Please retry.",
+    retry: "Retry",
+  },
 };
-export function financeReviewCopy(locale: string) { return copy[locale === "zh" || locale === "vi" ? locale : "en"]; }
+export function financeReviewCopy(locale: string) { return copy[uiLocale(locale)]; }
 export function useFinanceReviewCopy() {
   const locale = useLocaleStore();
   return computed(() => financeReviewCopy(locale.code));

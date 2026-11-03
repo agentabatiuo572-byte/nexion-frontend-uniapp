@@ -24,6 +24,12 @@ const COPY = {
   zh: { today: "今天", yesterday: "昨天", weekdays: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"] },
   en: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
   vi: { today: "Hôm nay", yesterday: "Hôm qua", weekdays: ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"] },
+  id: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+  ms: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+  fil: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+  ru: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+  kk: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+  uz: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
 };
 const pad = (value: number) => String(value).padStart(2, "0");
 

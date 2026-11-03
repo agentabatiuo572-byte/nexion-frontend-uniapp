@@ -83,9 +83,10 @@ import { onShow } from "@dcloudio/uni-app";
 import { nativePushPermission, nativePushRegistrationUnavailable, openNativePushSettings, requestNativePushPermission, refreshNativePush } from "@/services/native-push";
 import { nativePushCopy } from "@/i18n/native-push";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 const pushLocale = useLocaleStore();
 const pushSettingsFailed = ref(false);
-const pushCopy = computed(() => nativePushCopy[pushLocale.code === 'zh' || pushLocale.code === 'vi' ? pushLocale.code : 'en']);
+const pushCopy = computed(() => nativePushCopy[uiLocale(pushLocale.code)]);
 function managePushPermission() {
   pushSettingsFailed.value = false;
   if (nativePushPermission.value === 'unknown') void requestNativePushPermission();

@@ -111,6 +111,7 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import { navTo } from "@/lib/route";
+import { uiLocale } from "@/i18n";
 
 const DIRECT_COLOR = "var(--v5-brand)";
 const EXTENDED_COLOR = "var(--v5-ink-2)";
@@ -203,9 +204,9 @@ const orbitDots = computed(() => {
 });
 const ringSplitText = computed(() => {
   const direct = directCount.value, team = members.value.length - direct;
-  return locale.code === "zh" ? `内圈直接邀请 ${direct} · 外圈团队 ${team}` : locale.code === "vi" ? `Vòng trong: mời trực tiếp ${direct} · Vòng ngoài: đội ${team}` : `Inner: direct ${direct} · Outer: team ${team}`;
+  return fmt(({ zh: "内圈直接邀请 {direct} · 外圈团队 {team}", en: "Inner: direct {direct} · Outer: team {team}", vi: "Vòng trong: mời trực tiếp {direct} · Vòng ngoài: đội {team}", id: "Inner: direct {direct} · Outer: team {team}", ms: "Inner: direct {direct} · Outer: team {team}", fil: "Inner: direct {direct} · Outer: team {team}", ru: "Inner: direct {direct} · Outer: team {team}", kk: "Inner: direct {direct} · Outer: team {team}", uz: "Inner: direct {direct} · Outer: team {team}" })[uiLocale(locale.code)], { direct, team });
 });
-const peopleUnit = computed(() => locale.code === "zh" ? "人" : locale.code === "vi" ? "thành viên" : "members");
+const peopleUnit = computed(() => ({ zh: "人", en: "members", vi: "thành viên", id: "members", ms: "members", fil: "members", ru: "members", kk: "members", uz: "members" })[uiLocale(locale.code)]);
 const monthPointsLabel = computed(() => locale.code === "zh" ? "本月算力点" : t.value.network.monthVolume);
 const memberStatusCounts = computed(() => (["active", "idle", "offline"] as const).map(status => ({
   status, label: networkReauditCopy(locale.code)[status], count: members.value.filter(member => member.status === status).length,

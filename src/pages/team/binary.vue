@@ -116,6 +116,7 @@ import { createScopedReadCoalescer } from "@/lib/binary-read-coalescer";
 import { captureRuntimeRevision } from "@/api/order-api";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
+import { uiLocale } from "@/i18n";
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -131,7 +132,13 @@ const binaryCopy = computed(() => ({
   zh: { rules: '玩法说明', contributions: '本月两组订单额', leadingMembers: '各组领先成员', leads: '领先' },
   en: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
   vi: { rules: 'Cách nhận thưởng', contributions: 'Doanh số hai nhóm tháng này', leadingMembers: 'Thành viên dẫn đầu mỗi nhóm', leads: ' dẫn đầu' },
-})[locale.code === 'zh' ? 'zh' : locale.code === 'vi' ? 'vi' : 'en']);
+  id: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+  ms: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+  fil: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+  ru: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+  kk: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+  uz: { rules: 'How it works', contributions: 'This month’s group volume', leadingMembers: 'Top members by group', leads: ' lead' },
+})[uiLocale(locale.code)]);
 
 const displayEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
 let environmentInvalidated = false;

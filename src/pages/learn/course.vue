@@ -116,7 +116,7 @@ import { createLearningPageFenceReader, type LearningPageFence } from "./learnin
 import { createLearningCourseStartLoadCoalescer, loadPublishedCourseWithStart, type LearningCourseStartFailure } from "./learning-course-start";
 import { observationRecoveryRoute } from "@/lib/day-one-observation-recovery";
 import { initialQuizAnswers, quizOptionTabIndex, learningAttemptRecoveryAction, learningResultDetails, matchingCourseResult, matchingReceiptResult, validAnswersForCourse } from "./learning-result-details";
-import { serverLanguage } from "@/i18n";
+import { uiLocale, serverLanguage } from "@/i18n";
 
 // 存 key 不存译文：译好的串快照进 ref 后不再跟随语言（见 courses.vue 同处注释）。
 type CourseError = "" | "courseOffline" | "courseIdMissing" | "courseUnavailable" | "courseUpdated" | "submitUnconfirmed";
@@ -229,7 +229,7 @@ function selectAnswer(questionIndex: number, optionIndex: number) {
   if (!question || !Number.isSafeInteger(optionIndex) || optionIndex < 0 || optionIndex >= question.options.length) return;
   answers.value[questionIndex] = optionIndex;
 }
-const retryQuizLabel = computed(() => ({zh:'重新作答',en:'Try quiz again',vi:'Làm lại bài kiểm tra'}[language.value]));
+const retryQuizLabel = computed(() => ({zh:'重新作答',en:'Try quiz again',vi:'Làm lại bài kiểm tra',id:'Try quiz again',ms:'Try quiz again',fil:'Try quiz again',ru:'Try quiz again',kk:'Try quiz again',uz:'Try quiz again'}[uiLocale(locale.code)]));
 function restartQuiz() {
   if (!course.value || interactionLocked.value || loading.value || serverCompleted.value) return;
   answers.value = initialQuizAnswers(course.value);
@@ -587,7 +587,13 @@ const completionCopy = computed(() => ({
   zh: { quizPassed: "测验通过", progress: "已学完 {done}/{total} 课", credited: "+{n} UVT 已到账", questions: "{n} 道小测", reward: "奖励", startNext: "开始下一课", backToCenter: "返回教程中心", nextLoading: "正在读取下一课…", nextUnavailable: "下一课暂不可用，请重试。" },
   en: { quizPassed: "Quiz passed", progress: "{done}/{total} courses completed", credited: "+{n} UVT credited", questions: "{n} quiz questions", reward: "Reward", startNext: "Start next course", backToCenter: "Back to learning center", nextLoading: "Loading next course…", nextUnavailable: "The next course is unavailable. Please retry." },
   vi: { quizPassed: "Đã vượt qua bài kiểm tra", progress: "Đã học {done}/{total} bài", credited: "Đã nhận +{n} UVT", questions: "{n} câu hỏi", reward: "Thưởng", startNext: "Bắt đầu bài tiếp theo", backToCenter: "Về trung tâm học tập", nextLoading: "Đang tải bài tiếp theo…", nextUnavailable: "Chưa tải được bài tiếp theo. Vui lòng thử lại." },
-}[language.value]));
+  id: { quizPassed: "Quiz passed", progress: "{done}/{total} courses completed", credited: "+{n} UVT credited", questions: "{n} quiz questions", reward: "Reward", startNext: "Start next course", backToCenter: "Back to learning center", nextLoading: "Loading next course…", nextUnavailable: "The next course is unavailable. Please retry." },
+  ms: { quizPassed: "Quiz passed", progress: "{done}/{total} courses completed", credited: "+{n} UVT credited", questions: "{n} quiz questions", reward: "Reward", startNext: "Start next course", backToCenter: "Back to learning center", nextLoading: "Loading next course…", nextUnavailable: "The next course is unavailable. Please retry." },
+  fil: { quizPassed: "Quiz passed", progress: "{done}/{total} courses completed", credited: "+{n} UVT credited", questions: "{n} quiz questions", reward: "Reward", startNext: "Start next course", backToCenter: "Back to learning center", nextLoading: "Loading next course…", nextUnavailable: "The next course is unavailable. Please retry." },
+  ru: { quizPassed: "Quiz passed", progress: "{done}/{total} courses completed", credited: "+{n} UVT credited", questions: "{n} quiz questions", reward: "Reward", startNext: "Start next course", backToCenter: "Back to learning center", nextLoading: "Loading next course…", nextUnavailable: "The next course is unavailable. Please retry." },
+  kk: { quizPassed: "Quiz passed", progress: "{done}/{total} courses completed", credited: "+{n} UVT credited", questions: "{n} quiz questions", reward: "Reward", startNext: "Start next course", backToCenter: "Back to learning center", nextLoading: "Loading next course…", nextUnavailable: "The next course is unavailable. Please retry." },
+  uz: { quizPassed: "Quiz passed", progress: "{done}/{total} courses completed", credited: "+{n} UVT credited", questions: "{n} quiz questions", reward: "Reward", startNext: "Start next course", backToCenter: "Back to learning center", nextLoading: "Loading next course…", nextUnavailable: "The next course is unavailable. Please retry." },
+}[uiLocale(locale.code)]));
 const completionSummary = computed(() => {
   const progress = nextOverview.value ? fmt(completionCopy.value.progress, { done: nextOverview.value.completedCourses, total: nextOverview.value.totalCourses }) : "";
   return [displayCourse.value?.questions.length ? scoreLine.value : "", progress].filter(Boolean).join(" · ") || t.value.learning.resultPassed;

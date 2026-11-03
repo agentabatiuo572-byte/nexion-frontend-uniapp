@@ -15,11 +15,12 @@ import { teamRedesignCopy } from '@/i18n/team-redesign';
 import TeamArt from './team-art.vue';
 import NxButton from '@/components/ui/nx-button.vue';
 import { useDataVisibility } from '@/store/data-visibility';
+import { uiLocale } from '@/i18n';
 const props=defineProps<{status:'idle'|'loading'|'ready'|'error'; total:number; direct:number; hasSnapshot?:boolean;transientFailure?:boolean}>();
 const emit=defineEmits<{(event:'invite'):void;(event:'open'):void;(event:'retry'):void}>();
 const t=useT(), locale=useLocaleStore(), copy=computed(()=>teamRedesignCopy(locale.code));
 const visibility=useDataVisibility();
-const teamLabel=computed(()=>locale.code==='zh'?'团队':locale.code==='vi'?'Nhóm':'Team');
+const teamLabel=computed(()=>({zh:'团队',en:'Team',vi:'Nhóm',id:'Team',ms:'Team',fil:'Team',ru:'Team',kk:'Team',uz:'Team'})[uiLocale(locale.code)]);
 const canOpen=computed(()=>props.status==='ready' && props.total>0);
 const readable=computed(()=>props.status==='ready'||(props.hasSnapshot&&(props.status==='loading'||(props.status==='error'&&props.transientFailure))));
 // Size the rendered text so masking also conceals the original digit count.

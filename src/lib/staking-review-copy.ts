@@ -1,10 +1,11 @@
 import { computed } from "vue";
 import { useLocaleStore } from "@/store/locale";
+import { uiLocale } from "@/i18n";
 
 // Kept local to staking so concurrent dictionary changes remain independent.
 const copy = {
   en: {
-    days: (n: number) => `${n} days`,
+    days: "{n} days",
     loading: "Loading…",
     unavailable: "Staking info could not load. Please try again later.",
     stale: "Refresh failed. Showing the last data; refresh before making changes.",
@@ -17,7 +18,7 @@ const copy = {
     },
   },
   zh: {
-    days: (n: number) => `${n} 天`,
+    days: "{n} 天",
     loading: "正在加载…",
     unavailable: "质押信息加载失败，请稍后重试。",
     stale: "刷新失败，以下是上次的数据，操作前请先刷新。",
@@ -30,7 +31,7 @@ const copy = {
     },
   },
   vi: {
-    days: (n: number) => `${n} ngày`,
+    days: "{n} ngày",
     loading: "Đang tải…",
     unavailable: "Không tải được thông tin staking. Vui lòng thử lại sau.",
     stale: "Làm mới thất bại. Đang hiển thị dữ liệu lần trước; vui lòng làm mới trước khi thao tác.",
@@ -42,10 +43,89 @@ const copy = {
       s3Step3Title: "Nhận khi đáo hạn", faqQ3: "Nếu chưa nhận khi đáo hạn thì sao?",
     },
   },
+  id: {
+    days: "{n} days",
+    loading: "Loading…",
+    unavailable: "Staking info could not load. Please try again later.",
+    stale: "Refresh failed. Showing the last data; refresh before making changes.",
+    retry: "Retry", empty: "No stakes yet", emptyDetail: "Choose a plan above to start staking.",
+    rateNotice: "Rates for new plans may change. Existing stakes keep their recorded rate.",
+    rules: {
+      r3Label: "Rates for new plans may change",
+      r3Body: "New stakes use the plan available at the time. Existing stakes keep the rate, term and early unlock charge they started with.",
+      s3Step3Title: "Claim at maturity", faqQ3: "What if I do not claim at maturity?",
+    },
+  },
+  ms: {
+    days: "{n} days",
+    loading: "Loading…",
+    unavailable: "Staking info could not load. Please try again later.",
+    stale: "Refresh failed. Showing the last data; refresh before making changes.",
+    retry: "Retry", empty: "No stakes yet", emptyDetail: "Choose a plan above to start staking.",
+    rateNotice: "Rates for new plans may change. Existing stakes keep their recorded rate.",
+    rules: {
+      r3Label: "Rates for new plans may change",
+      r3Body: "New stakes use the plan available at the time. Existing stakes keep the rate, term and early unlock charge they started with.",
+      s3Step3Title: "Claim at maturity", faqQ3: "What if I do not claim at maturity?",
+    },
+  },
+  fil: {
+    days: "{n} days",
+    loading: "Loading…",
+    unavailable: "Staking info could not load. Please try again later.",
+    stale: "Refresh failed. Showing the last data; refresh before making changes.",
+    retry: "Retry", empty: "No stakes yet", emptyDetail: "Choose a plan above to start staking.",
+    rateNotice: "Rates for new plans may change. Existing stakes keep their recorded rate.",
+    rules: {
+      r3Label: "Rates for new plans may change",
+      r3Body: "New stakes use the plan available at the time. Existing stakes keep the rate, term and early unlock charge they started with.",
+      s3Step3Title: "Claim at maturity", faqQ3: "What if I do not claim at maturity?",
+    },
+  },
+  ru: {
+    days: "{n} days",
+    loading: "Loading…",
+    unavailable: "Staking info could not load. Please try again later.",
+    stale: "Refresh failed. Showing the last data; refresh before making changes.",
+    retry: "Retry", empty: "No stakes yet", emptyDetail: "Choose a plan above to start staking.",
+    rateNotice: "Rates for new plans may change. Existing stakes keep their recorded rate.",
+    rules: {
+      r3Label: "Rates for new plans may change",
+      r3Body: "New stakes use the plan available at the time. Existing stakes keep the rate, term and early unlock charge they started with.",
+      s3Step3Title: "Claim at maturity", faqQ3: "What if I do not claim at maturity?",
+    },
+  },
+  kk: {
+    days: "{n} days",
+    loading: "Loading…",
+    unavailable: "Staking info could not load. Please try again later.",
+    stale: "Refresh failed. Showing the last data; refresh before making changes.",
+    retry: "Retry", empty: "No stakes yet", emptyDetail: "Choose a plan above to start staking.",
+    rateNotice: "Rates for new plans may change. Existing stakes keep their recorded rate.",
+    rules: {
+      r3Label: "Rates for new plans may change",
+      r3Body: "New stakes use the plan available at the time. Existing stakes keep the rate, term and early unlock charge they started with.",
+      s3Step3Title: "Claim at maturity", faqQ3: "What if I do not claim at maturity?",
+    },
+  },
+  uz: {
+    days: "{n} days",
+    loading: "Loading…",
+    unavailable: "Staking info could not load. Please try again later.",
+    stale: "Refresh failed. Showing the last data; refresh before making changes.",
+    retry: "Retry", empty: "No stakes yet", emptyDetail: "Choose a plan above to start staking.",
+    rateNotice: "Rates for new plans may change. Existing stakes keep their recorded rate.",
+    rules: {
+      r3Label: "Rates for new plans may change",
+      r3Body: "New stakes use the plan available at the time. Existing stakes keep the rate, term and early unlock charge they started with.",
+      s3Step3Title: "Claim at maturity", faqQ3: "What if I do not claim at maturity?",
+    },
+  },
 };
 
 export function stakingReviewCopy(locale: string) {
-  return copy[locale === "zh" || locale === "vi" ? locale : "en"];
+  const selected = copy[uiLocale(locale)];
+  return { ...selected, days: (n: number) => selected.days.replace("{n}", String(n)) };
 }
 
 export function useStakingReviewCopy() {

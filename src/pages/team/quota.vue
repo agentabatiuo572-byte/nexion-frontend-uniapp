@@ -76,6 +76,7 @@ import { useApp } from "@/store/app";
 import { isCurrentTeamP31718Request, type TeamP31718Request } from "@/lib/team-p3-17-18-request-scope";
 import { isAnnualizedQuotaPerk } from "@/lib/quota-perk";
 import { useScrollGrowProgress, VIZ_RING_TRANSITION } from "@/composables/use-scroll-grow-progress";
+import { uiLocale } from "@/i18n";
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -186,9 +187,18 @@ const inviteStepText = computed(() => {
   const total = directInvites.value;
   if (visibility.hidden || typeof total !== "number" || total <= 0 || (remoteApiEnabled && !remoteSnapshot.value)) return "";
   const n = Math.max(0, total - activeDirect.value);
-  if (locale.code === "zh") return n > 0 ? `还有 ${n} 位好友未激活` : "邀请的好友已全部激活";
-  if (locale.code === "vi") return n > 0 ? `Còn ${n} người bạn chưa kích hoạt` : "Bạn bè đã mời đều đã kích hoạt";
-  return n > 0 ? `${n} invited ${n === 1 ? "friend is" : "friends are"} not active yet` : "All invited friends are active";
+  const copy = ({
+    zh: { pending: "还有 {n} 位好友未激活", pendingOne: "还有 {n} 位好友未激活", allActive: "邀请的好友已全部激活" },
+    en: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+    vi: { pending: "Còn {n} người bạn chưa kích hoạt", pendingOne: "Còn {n} người bạn chưa kích hoạt", allActive: "Bạn bè đã mời đều đã kích hoạt" },
+    id: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+    ms: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+    fil: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+    ru: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+    kk: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+    uz: { pending: "{n} invited friends are not active yet", pendingOne: "{n} invited friend is not active yet", allActive: "All invited friends are active" },
+  })[uiLocale(locale.code)];
+  return n > 0 ? fmt(n === 1 ? copy.pendingOne : copy.pending, { n }) : copy.allActive;
 });
 const activeDirectText = computed(() => remoteApiEnabled && !remoteSnapshot.value ? "—" : String(activeDirect.value));
 

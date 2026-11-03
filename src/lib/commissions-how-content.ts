@@ -5,6 +5,7 @@ import type { CommissionGuideRates, CommissionGuideRules } from "@/api/commissio
 import type { DirectReferralPolicy, DirectReferralRule } from "@/api/direct-referral-api";
 import type { CanonicalVRankRow } from "@/api/v-rank-api";
 import { formatHowNumber } from "./rank-how-content";
+import { uiLocale } from "@/i18n";
 
 export interface CommissionsHowSnapshot { document: HowContentDocument; rates?: CommissionGuideRates; directPolicy: DirectReferralPolicy; guide: CommissionGuideRules; ranks: CanonicalVRankRow[] }
 // Keep public settlement facts; current direct policy values come from the server.
@@ -42,14 +43,79 @@ const COPY = {
     noTotal: "Không phải tổng thu nhập", pendingAmount: "Chờ chi trả", unknownAmount: "—", base: "Cơ sở đơn hàng giả định", configured: "Mức thưởng theo quy tắc", notOpen: "Chưa mở", notConfigured: "Tạm thời chưa khả dụng",
     purchase: "Bạn bè mua hàng", deviceEarning: "Thu nhập thiết bị của bạn bè", totalRate: "Tổng thưởng", split: "Phân chia thưởng", directOnly: "Chỉ dành cho bạn bè bạn đã mời; nền tảng chi trả thêm và không làm giảm thu nhập của bạn bè", priceUnavailable: "Chưa lấy được giá UVT; sẽ được ghi nhận sau",
   },
+  id: {
+    purchaseBudget: "Friend purchase reward rate", purchaseReplacement: "The UVT share already includes this purchase's extra UVT reward; it isn't paid twice", purchaseOriginal: "Friend and team purchase rewards are paid under the current rules", networkPurchase: "Team purchase rewards include extra UVT and are subject to actual payout", deviceScope: "Friend device earnings rewards go only to the inviter, are paid extra by the platform, and don't reduce your friends' earnings",
+    loading: "Loading…", unavailable: "This guide couldn't load. Please reload.", missing: "Rules couldn't load", none: "No rewards to display", retry: "Reload",
+    days: "days", settlementPeriod: "Payout period", minRank: "entry rank",
+    daily: "daily", weekly: "weekly", monthly: "monthly", paused: "paused", unpaused: "paying normally",
+    hold: "Team incentive pool payouts aren't open yet", unsupported: "Not open yet", supported: "Subject to actual payout",
+    network: "Team rewards are subject to actual payout.", records: "Rewards are subject to actual payout.", cultivation: "Friend rank-up rewards are subject to actual payout.",
+    exampleScope: "These amounts are illustrations, not personal earnings. Hypothetical order base:", exampleNetwork: "Team reward illustration", exampleCultivation: "Friend rank-up reward illustration, not a personal payment",
+    noTotal: "Not an earnings total", pendingAmount: "To be paid", unknownAmount: "—", base: "Hypothetical order base", configured: "Reward amount under the rules", notOpen: "Not available", notConfigured: "Temporarily unavailable",
+    purchase: "Friend purchases", deviceEarning: "Friends' device earnings", totalRate: "Total reward", split: "Reward split", directOnly: "Friends you invited only; paid extra by the platform without reducing your friends' earnings", priceUnavailable: "UVT price unavailable; it will be added later",
+  },
+  ms: {
+    purchaseBudget: "Friend purchase reward rate", purchaseReplacement: "The UVT share already includes this purchase's extra UVT reward; it isn't paid twice", purchaseOriginal: "Friend and team purchase rewards are paid under the current rules", networkPurchase: "Team purchase rewards include extra UVT and are subject to actual payout", deviceScope: "Friend device earnings rewards go only to the inviter, are paid extra by the platform, and don't reduce your friends' earnings",
+    loading: "Loading…", unavailable: "This guide couldn't load. Please reload.", missing: "Rules couldn't load", none: "No rewards to display", retry: "Reload",
+    days: "days", settlementPeriod: "Payout period", minRank: "entry rank",
+    daily: "daily", weekly: "weekly", monthly: "monthly", paused: "paused", unpaused: "paying normally",
+    hold: "Team incentive pool payouts aren't open yet", unsupported: "Not open yet", supported: "Subject to actual payout",
+    network: "Team rewards are subject to actual payout.", records: "Rewards are subject to actual payout.", cultivation: "Friend rank-up rewards are subject to actual payout.",
+    exampleScope: "These amounts are illustrations, not personal earnings. Hypothetical order base:", exampleNetwork: "Team reward illustration", exampleCultivation: "Friend rank-up reward illustration, not a personal payment",
+    noTotal: "Not an earnings total", pendingAmount: "To be paid", unknownAmount: "—", base: "Hypothetical order base", configured: "Reward amount under the rules", notOpen: "Not available", notConfigured: "Temporarily unavailable",
+    purchase: "Friend purchases", deviceEarning: "Friends' device earnings", totalRate: "Total reward", split: "Reward split", directOnly: "Friends you invited only; paid extra by the platform without reducing your friends' earnings", priceUnavailable: "UVT price unavailable; it will be added later",
+  },
+  fil: {
+    purchaseBudget: "Friend purchase reward rate", purchaseReplacement: "The UVT share already includes this purchase's extra UVT reward; it isn't paid twice", purchaseOriginal: "Friend and team purchase rewards are paid under the current rules", networkPurchase: "Team purchase rewards include extra UVT and are subject to actual payout", deviceScope: "Friend device earnings rewards go only to the inviter, are paid extra by the platform, and don't reduce your friends' earnings",
+    loading: "Loading…", unavailable: "This guide couldn't load. Please reload.", missing: "Rules couldn't load", none: "No rewards to display", retry: "Reload",
+    days: "days", settlementPeriod: "Payout period", minRank: "entry rank",
+    daily: "daily", weekly: "weekly", monthly: "monthly", paused: "paused", unpaused: "paying normally",
+    hold: "Team incentive pool payouts aren't open yet", unsupported: "Not open yet", supported: "Subject to actual payout",
+    network: "Team rewards are subject to actual payout.", records: "Rewards are subject to actual payout.", cultivation: "Friend rank-up rewards are subject to actual payout.",
+    exampleScope: "These amounts are illustrations, not personal earnings. Hypothetical order base:", exampleNetwork: "Team reward illustration", exampleCultivation: "Friend rank-up reward illustration, not a personal payment",
+    noTotal: "Not an earnings total", pendingAmount: "To be paid", unknownAmount: "—", base: "Hypothetical order base", configured: "Reward amount under the rules", notOpen: "Not available", notConfigured: "Temporarily unavailable",
+    purchase: "Friend purchases", deviceEarning: "Friends' device earnings", totalRate: "Total reward", split: "Reward split", directOnly: "Friends you invited only; paid extra by the platform without reducing your friends' earnings", priceUnavailable: "UVT price unavailable; it will be added later",
+  },
+  ru: {
+    purchaseBudget: "Friend purchase reward rate", purchaseReplacement: "The UVT share already includes this purchase's extra UVT reward; it isn't paid twice", purchaseOriginal: "Friend and team purchase rewards are paid under the current rules", networkPurchase: "Team purchase rewards include extra UVT and are subject to actual payout", deviceScope: "Friend device earnings rewards go only to the inviter, are paid extra by the platform, and don't reduce your friends' earnings",
+    loading: "Loading…", unavailable: "This guide couldn't load. Please reload.", missing: "Rules couldn't load", none: "No rewards to display", retry: "Reload",
+    days: "days", settlementPeriod: "Payout period", minRank: "entry rank",
+    daily: "daily", weekly: "weekly", monthly: "monthly", paused: "paused", unpaused: "paying normally",
+    hold: "Team incentive pool payouts aren't open yet", unsupported: "Not open yet", supported: "Subject to actual payout",
+    network: "Team rewards are subject to actual payout.", records: "Rewards are subject to actual payout.", cultivation: "Friend rank-up rewards are subject to actual payout.",
+    exampleScope: "These amounts are illustrations, not personal earnings. Hypothetical order base:", exampleNetwork: "Team reward illustration", exampleCultivation: "Friend rank-up reward illustration, not a personal payment",
+    noTotal: "Not an earnings total", pendingAmount: "To be paid", unknownAmount: "—", base: "Hypothetical order base", configured: "Reward amount under the rules", notOpen: "Not available", notConfigured: "Temporarily unavailable",
+    purchase: "Friend purchases", deviceEarning: "Friends' device earnings", totalRate: "Total reward", split: "Reward split", directOnly: "Friends you invited only; paid extra by the platform without reducing your friends' earnings", priceUnavailable: "UVT price unavailable; it will be added later",
+  },
+  kk: {
+    purchaseBudget: "Friend purchase reward rate", purchaseReplacement: "The UVT share already includes this purchase's extra UVT reward; it isn't paid twice", purchaseOriginal: "Friend and team purchase rewards are paid under the current rules", networkPurchase: "Team purchase rewards include extra UVT and are subject to actual payout", deviceScope: "Friend device earnings rewards go only to the inviter, are paid extra by the platform, and don't reduce your friends' earnings",
+    loading: "Loading…", unavailable: "This guide couldn't load. Please reload.", missing: "Rules couldn't load", none: "No rewards to display", retry: "Reload",
+    days: "days", settlementPeriod: "Payout period", minRank: "entry rank",
+    daily: "daily", weekly: "weekly", monthly: "monthly", paused: "paused", unpaused: "paying normally",
+    hold: "Team incentive pool payouts aren't open yet", unsupported: "Not open yet", supported: "Subject to actual payout",
+    network: "Team rewards are subject to actual payout.", records: "Rewards are subject to actual payout.", cultivation: "Friend rank-up rewards are subject to actual payout.",
+    exampleScope: "These amounts are illustrations, not personal earnings. Hypothetical order base:", exampleNetwork: "Team reward illustration", exampleCultivation: "Friend rank-up reward illustration, not a personal payment",
+    noTotal: "Not an earnings total", pendingAmount: "To be paid", unknownAmount: "—", base: "Hypothetical order base", configured: "Reward amount under the rules", notOpen: "Not available", notConfigured: "Temporarily unavailable",
+    purchase: "Friend purchases", deviceEarning: "Friends' device earnings", totalRate: "Total reward", split: "Reward split", directOnly: "Friends you invited only; paid extra by the platform without reducing your friends' earnings", priceUnavailable: "UVT price unavailable; it will be added later",
+  },
+  uz: {
+    purchaseBudget: "Friend purchase reward rate", purchaseReplacement: "The UVT share already includes this purchase's extra UVT reward; it isn't paid twice", purchaseOriginal: "Friend and team purchase rewards are paid under the current rules", networkPurchase: "Team purchase rewards include extra UVT and are subject to actual payout", deviceScope: "Friend device earnings rewards go only to the inviter, are paid extra by the platform, and don't reduce your friends' earnings",
+    loading: "Loading…", unavailable: "This guide couldn't load. Please reload.", missing: "Rules couldn't load", none: "No rewards to display", retry: "Reload",
+    days: "days", settlementPeriod: "Payout period", minRank: "entry rank",
+    daily: "daily", weekly: "weekly", monthly: "monthly", paused: "paused", unpaused: "paying normally",
+    hold: "Team incentive pool payouts aren't open yet", unsupported: "Not open yet", supported: "Subject to actual payout",
+    network: "Team rewards are subject to actual payout.", records: "Rewards are subject to actual payout.", cultivation: "Friend rank-up rewards are subject to actual payout.",
+    exampleScope: "These amounts are illustrations, not personal earnings. Hypothetical order base:", exampleNetwork: "Team reward illustration", exampleCultivation: "Friend rank-up reward illustration, not a personal payment",
+    noTotal: "Not an earnings total", pendingAmount: "To be paid", unknownAmount: "—", base: "Hypothetical order base", configured: "Reward amount under the rules", notOpen: "Not available", notConfigured: "Temporarily unavailable",
+    purchase: "Friend purchases", deviceEarning: "Friends' device earnings", totalRate: "Total reward", split: "Reward split", directOnly: "Friends you invited only; paid extra by the platform without reducing your friends' earnings", priceUnavailable: "UVT price unavailable; it will be added later",
+  },
 };
 
 export const COMMISSIONS_HOW_SLOTS = ["hero", "overview", "channels", "network", "binary", "peer", "cultivation", "leadership", "genesis", "lifecycle", "cooling", "unlocked", "withdrawn", "cooling-note", "example", "example-day", "example-network", "example-cultivation", "example-peer", "example-leadership", "example-total", "example-note", "faq", "faq-order", "faq-withdraw", "faq-reversal", "faq-cultivation", "footer"];
 
 
 export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | null, locale: string) {
-  const language = locale.split("-")[0] as keyof typeof COPY;
-  const copy = COPY[language] ?? COPY.en;
+  const copy = COPY[uiLocale(locale.split("-")[0])];
   const number = (value: number) => formatHowNumber(value, locale);
   const money = (value: number, currency = "USDT") => `${formatAmount(value)} ${currency}`;
   const tokens: Record<string, string> = {};

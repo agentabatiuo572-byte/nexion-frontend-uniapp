@@ -1,3 +1,5 @@
+import type { UiLocale } from "@/i18n";
+
 interface StakeAlternativeCopy {
   label: string;
   basis: string;
@@ -8,7 +10,7 @@ interface StakeAlternativeCopy {
   rules: string;
 }
 
-export const stakeAlternativeCopy: Record<"zh" | "en" | "vi", StakeAlternativeCopy> = {
+export const stakeAlternativeCopy: Record<UiLocale, StakeAlternativeCopy> = {
   zh: {
     label: "暂时不用？可以先质押",
     basis: "按输入的 {amount} USDT 查看各期限的预计奖励。",
@@ -35,5 +37,59 @@ export const stakeAlternativeCopy: Record<"zh" | "en" | "vi", StakeAlternativeCo
     assumptions: "Ước tính theo tỷ lệ tham khảo hiện tại. Phần thưởng thực tế có thể khác.",
     lockup: "Tiền staking được khóa trong suốt kỳ hạn. Mở khóa sớm có thể phát sinh khoản khấu trừ. Xem chi tiết tại trang staking.",
     rules: "Xem chi tiết staking",
+  },
+  id: {
+    label: "Not using it yet? Consider staking",
+    basis: "Estimated rewards by term for the {amount} USDT you entered.",
+    term: "{days} days · Est. annual reward rate {rate}%",
+    estimate: "Est. reward {amount} USDT",
+    assumptions: "Estimated at the current reference rate. Actual rewards may differ.",
+    lockup: "Staked funds are locked for the term. Unlocking early may incur a charge. See the staking page for details.",
+    rules: "View staking details",
+  },
+  ms: {
+    label: "Not using it yet? Consider staking",
+    basis: "Estimated rewards by term for the {amount} USDT you entered.",
+    term: "{days} days · Est. annual reward rate {rate}%",
+    estimate: "Est. reward {amount} USDT",
+    assumptions: "Estimated at the current reference rate. Actual rewards may differ.",
+    lockup: "Staked funds are locked for the term. Unlocking early may incur a charge. See the staking page for details.",
+    rules: "View staking details",
+  },
+  fil: {
+    label: "Not using it yet? Consider staking",
+    basis: "Estimated rewards by term for the {amount} USDT you entered.",
+    term: "{days} days · Est. annual reward rate {rate}%",
+    estimate: "Est. reward {amount} USDT",
+    assumptions: "Estimated at the current reference rate. Actual rewards may differ.",
+    lockup: "Staked funds are locked for the term. Unlocking early may incur a charge. See the staking page for details.",
+    rules: "View staking details",
+  },
+  ru: {
+    label: "Not using it yet? Consider staking",
+    basis: "Estimated rewards by term for the {amount} USDT you entered.",
+    term: "{days} days · Est. annual reward rate {rate}%",
+    estimate: "Est. reward {amount} USDT",
+    assumptions: "Estimated at the current reference rate. Actual rewards may differ.",
+    lockup: "Staked funds are locked for the term. Unlocking early may incur a charge. See the staking page for details.",
+    rules: "View staking details",
+  },
+  kk: {
+    label: "Not using it yet? Consider staking",
+    basis: "Estimated rewards by term for the {amount} USDT you entered.",
+    term: "{days} days · Est. annual reward rate {rate}%",
+    estimate: "Est. reward {amount} USDT",
+    assumptions: "Estimated at the current reference rate. Actual rewards may differ.",
+    lockup: "Staked funds are locked for the term. Unlocking early may incur a charge. See the staking page for details.",
+    rules: "View staking details",
+  },
+  uz: {
+    label: "Not using it yet? Consider staking",
+    basis: "Estimated rewards by term for the {amount} USDT you entered.",
+    term: "{days} days · Est. annual reward rate {rate}%",
+    estimate: "Est. reward {amount} USDT",
+    assumptions: "Estimated at the current reference rate. Actual rewards may differ.",
+    lockup: "Staked funds are locked for the term. Unlocking early may incur a charge. See the staking page for details.",
+    rules: "View staking details",
   },
 };

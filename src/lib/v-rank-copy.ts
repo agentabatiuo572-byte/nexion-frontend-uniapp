@@ -11,7 +11,7 @@ import { computePointsCopy, formatComputePoints } from "@/i18n/compute-points";
 // 缺口结构定义在 store(`@/store/v-rank` 的 `RankGap`),措辞在这里 —— 与 product-copy.ts /
 // device-copy.ts 同一分层约定。
 import type { Messages } from "@/i18n/messages/en";
-import type { LocaleCode } from "@/i18n";
+import { uiLocale, type LocaleCode } from "@/i18n";
 import type { RankGap, VRankDef } from "@/store/v-rank";
 import { fmt } from "@/i18n/format";
 import { formatHowNumber } from "./rank-how-content";
@@ -32,10 +32,40 @@ const CULTIVATION_COPY = {
     trigger: "Khi bạn bè đạt V{n}, bạn có thể nhận {amount}.",
     recipient: "Phần thưởng dành cho người đã mời người bạn đó.",
   },
+  id: {
+    title: "Friend rank-up reward",
+    trigger: "When a friend reaches V{n}, you can earn {amount}.",
+    recipient: "The reward goes to the person who invited that friend.",
+  },
+  ms: {
+    title: "Friend rank-up reward",
+    trigger: "When a friend reaches V{n}, you can earn {amount}.",
+    recipient: "The reward goes to the person who invited that friend.",
+  },
+  fil: {
+    title: "Friend rank-up reward",
+    trigger: "When a friend reaches V{n}, you can earn {amount}.",
+    recipient: "The reward goes to the person who invited that friend.",
+  },
+  ru: {
+    title: "Friend rank-up reward",
+    trigger: "When a friend reaches V{n}, you can earn {amount}.",
+    recipient: "The reward goes to the person who invited that friend.",
+  },
+  kk: {
+    title: "Friend rank-up reward",
+    trigger: "When a friend reaches V{n}, you can earn {amount}.",
+    recipient: "The reward goes to the person who invited that friend.",
+  },
+  uz: {
+    title: "Friend rank-up reward",
+    trigger: "When a friend reaches V{n}, you can earn {amount}.",
+    recipient: "The reward goes to the person who invited that friend.",
+  },
 };
 
 export function rankCultivationCopy(locale: string) {
-  return CULTIVATION_COPY[locale.split("-")[0] as keyof typeof CULTIVATION_COPY] ?? CULTIVATION_COPY.en;
+  return CULTIVATION_COPY[uiLocale(locale.split("-")[0])];
 }
 
 /**

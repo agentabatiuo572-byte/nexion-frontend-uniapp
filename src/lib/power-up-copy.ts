@@ -1,3 +1,4 @@
+import { uiLocale } from "@/i18n";
 const routeBadgeNames: Record<string, readonly [string, string]> = {
   ROYALTY_BOOST: ['团队成长徽章', 'teamGrowthBadge'],
   STREAK_BADGE: ['连续签到徽章', 'checkInStreakBadge'],
@@ -18,6 +19,6 @@ export function powerUpEffectText(effectType: string, rawValue: string | number,
   const value = Number(rawValue);
   if (!Number.isFinite(value) || value < 0) return '';
   if (effectType !== 'CHECKIN_MULTIPLIER') return '';
-  const copy = locale === 'zh' ? '签到奖励 × {n}，断签后失效' : locale === 'vi' ? 'Thưởng điểm danh × {n}, mất khi đứt chuỗi' : 'Check-in reward × {n}, ends if your streak breaks';
+  const copy = ({ zh: '签到奖励 × {n}，断签后失效', en: 'Check-in reward × {n}, ends if your streak breaks', vi: 'Thưởng điểm danh × {n}, mất khi đứt chuỗi', id: 'Check-in reward × {n}, ends if your streak breaks', ms: 'Check-in reward × {n}, ends if your streak breaks', fil: 'Check-in reward × {n}, ends if your streak breaks', ru: 'Check-in reward × {n}, ends if your streak breaks', kk: 'Check-in reward × {n}, ends if your streak breaks', uz: 'Check-in reward × {n}, ends if your streak breaks' })[uiLocale(locale)];
   return copy.replace('{n}', String(value));
 }

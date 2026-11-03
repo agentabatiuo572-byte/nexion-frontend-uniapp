@@ -1,3 +1,4 @@
+import { uiLocale } from "@/i18n";
 export function continuityCopy(language: string) {
   return ({
     zh: {
@@ -15,5 +16,35 @@ export function continuityCopy(language: string) {
       trustRefreshFailed: 'Không thể cập nhật thông tin. Nội dung đã tải trước đó vẫn được hiển thị. Vui lòng thử lại.',
       tomorrowBaseReward: 'Thưởng điểm danh cơ bản ngày mai: +{n} UVT',
     },
-  })[language === 'zh' || language === 'vi' ? language : 'en'];
+    id: {
+      trustRefreshing: 'Updating information. Previously loaded content is shown.',
+      trustRefreshFailed: 'Could not update information. Previously loaded content is shown. Please retry.',
+      tomorrowBaseReward: 'Tomorrow’s base check-in reward: +{n} UVT',
+    },
+    ms: {
+      trustRefreshing: 'Updating information. Previously loaded content is shown.',
+      trustRefreshFailed: 'Could not update information. Previously loaded content is shown. Please retry.',
+      tomorrowBaseReward: 'Tomorrow’s base check-in reward: +{n} UVT',
+    },
+    fil: {
+      trustRefreshing: 'Updating information. Previously loaded content is shown.',
+      trustRefreshFailed: 'Could not update information. Previously loaded content is shown. Please retry.',
+      tomorrowBaseReward: 'Tomorrow’s base check-in reward: +{n} UVT',
+    },
+    ru: {
+      trustRefreshing: 'Updating information. Previously loaded content is shown.',
+      trustRefreshFailed: 'Could not update information. Previously loaded content is shown. Please retry.',
+      tomorrowBaseReward: 'Tomorrow’s base check-in reward: +{n} UVT',
+    },
+    kk: {
+      trustRefreshing: 'Updating information. Previously loaded content is shown.',
+      trustRefreshFailed: 'Could not update information. Previously loaded content is shown. Please retry.',
+      tomorrowBaseReward: 'Tomorrow’s base check-in reward: +{n} UVT',
+    },
+    uz: {
+      trustRefreshing: 'Updating information. Previously loaded content is shown.',
+      trustRefreshFailed: 'Could not update information. Previously loaded content is shown. Please retry.',
+      tomorrowBaseReward: 'Tomorrow’s base check-in reward: +{n} UVT',
+    },
+  })[uiLocale(language)];
 }
