@@ -1380,7 +1380,7 @@ flowchart TD
 > **商品卡不展示回本天数 / 年化 / 首年净利**——避免在卡片层引导用户自行算年化(数字可信不自曝,§13.1)。回本 / 年化 / 首年净利等 ROI 派生值仅在商品详情页(§7.2)与结账页展示。
 
 **卡片元素**:
-- 产品渲染图(datacenter 风,4U 服务器内部 4 张 NVIDIA-style 显卡可见)+ Best Seller / Trending badge + 库存告警(<50 时显示 `NN LEFT`)
+- 商品主图(目录 `imageUrl`)+ Best Seller / Trending badge + 库存告警(<50 时显示 `NN LEFT`)。主图套图(2026-11-03 P-66)统一为同一透明圆盘底座、同一机位,机身体积按档位递进:Box S1 < Box Pro < Box Pro v2 < Rack P1 < Rack P2;Cloud Share 为单个算力模块。
 - 标题 + 副标 + GPU · VRAM 规格小行
 - 上述 4 行 ROI hero metric
 - 评分行(⭐ X.X · N reviews · N sold)
@@ -1410,7 +1410,7 @@ flowchart TD
 5. **硬件规格** / **AI 性能**:见本节开头「硬件规格、AI 性能与相关资料」。
 6. **信任资料**:合作方与本商品相关资料。
 7. **FAQ**。
-8. **底部固定购买栏**:价格、数量步进和「立即购买」;资格与配额状态见上方「当前资格交互」。
+8. **底部固定购买栏**:价格、预估每日收益(硬件)、数量步进和「立即购买」;资格与配额状态见上方「当前资格交互」。
 
 Cloud Share variant:Cloud Share 是数字份额(`productType=SHARE`,`inventoryMode=UNLIMITED`,不占实物库存)。详情页不显示预估收益两格,改为「预估每日收益」卡:USDT 日收益按当前价格、所选份数与目录参考年奖励率区间(`shareYieldMin`–`shareYieldMax`)折算成区间,另列 UVT 日收益和「参考年奖励率」,附「以实际到账为准」说明;不显示本周剩余。走立即购买流程。
 
