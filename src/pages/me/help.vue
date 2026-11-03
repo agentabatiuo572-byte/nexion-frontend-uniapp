@@ -137,7 +137,8 @@ const faqLoadError = ref(false);
 let faqRequestGeneration = 0;
 let faqDisplayScope = "";
 const canLoadMoreFaqs = computed(() => faqs.value.length < faqTotal.value);
-const requestedFaqLanguage = computed(() => locale.code === "zh" ? "zh-CN" : locale.code === "vi" ? "vi-VN" : "en-US");
+// FAQs are published in zh/en/vi; any other interface language reads them in English and sees the note.
+const requestedFaqLanguage = computed(() => locale.code === "zh" ? "zh-CN" : locale.code === "vi" ? "vi-VN" : locale.code === "en" ? "en-US" : locale.code);
 const faqLanguageFallback = computed(() => faqs.value.length > 0
   && faqs.value.some((faq) => faq.language.toLowerCase() !== requestedFaqLanguage.value.toLowerCase()));
 

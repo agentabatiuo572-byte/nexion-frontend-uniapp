@@ -151,7 +151,8 @@ const canRetryLoad = computed(() => !risk.jurisdictionUnmapped);
 const displayLanguage = computed(() => disclosure.value
   ? resolveRiskDisclosureDisplayLanguage(serverLanguage(locale.code), disclosure.value.languageScope)
   : null);
-const languageFallback = computed(() => displayLanguage.value?.fallback ?? false);
+// The note compares with the interface language: id/ms/fil/ru/kk/uz always read a zh/en/vi publication.
+const languageFallback = computed(() => (displayLanguage.value?.fallback ?? false) || (!!displayLanguage.value && displayLanguage.value.language !== locale.code));
 const disclosureContext = computed(() => disclosure.value ? fmt(w.value.publishedContext, {
   jurisdiction: disclosure.value.jurisdiction === "CN" ? w.value.mainlandChina : disclosure.value.jurisdictionName,
   version: disclosure.value.version,
