@@ -78,7 +78,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       {paymentMethod: 'CREGIS_USDT_ERC20', configured: state.paymentState !== 'erc20-off'}]}};
     if (path === `${base}-quotes` && method === 'POST') {
       const body = request.postDataJSON(), order = ordersOf(url.origin).find(row => row.orderNo === body.payload?.orderNo);
-      if (!commandKinds[body.kind] || (body.kind === 'ORDER_PAY' ? !order : body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
+      // Like PurchasePaymentService.quote: an order payment is quoted only for an existing unpaid order; an expired
+      // one has already been closed by the deadline task, so it is not payable either.
+      if (body.kind === 'ORDER_PAY' && !order) return {status: 404, message: 'ORDER_NOT_FOUND', data: null};
+      if (body.kind === 'ORDER_PAY' && (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT')) return {status: 409, message: 'ORDER_NOT_PAYABLE', data: null};
+      if (!commandKinds[body.kind] || (body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : body.kind !== 'ORDER_PAY' && !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
       if (body.paymentMethod === 'CREGIS_USDT_ERC20' && state.paymentState === 'erc20-off') return {status: 503, message: 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED', data: null};
       const bank = body.paymentMethod === 'HDPAY_BANK', erc20 = body.paymentMethod === 'CREGIS_USDT_ERC20';
       const trial = body.kind === 'TRIAL_CONVERT'
