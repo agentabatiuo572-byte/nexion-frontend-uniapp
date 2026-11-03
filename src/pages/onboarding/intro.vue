@@ -102,18 +102,7 @@
         <text class="intro-title">{{ t.intro.title1 }}</text>
         <text class="intro-sub">{{ t.intro.subtitleLine1 }}</text>
 
-        <view class="intro-stats anim-stats">
-          <view class="stat-item">
-            <view class="stat-dot" />
-            <text class="stat-num">{{ fmtNum(visibleDevices) }}</text>
-            <text class="stat-label">{{ t.intro.statsDevices }}</text>
-          </view>
-          <view v-if="visiblePaid !== null" class="stat-sep" />
-          <view v-if="visiblePaid !== null" class="stat-item">
-            <text class="stat-num stat-num--brand">{{ visiblePaid === null ? t.intro.publicStatsUnavailable : `$${formatAmount(visiblePaid)}` }}</text>
-            <text class="stat-label">{{ t.intro.statsPaidTotal }}</text>
-          </view>
-        </view>
+        <HomeDisplayStats class="anim-stats" :active="statsActive" />
       </view>
 
       <view class="intro-cta anim-cta">
@@ -170,18 +159,16 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import HomeDisplayStats from "@/components/home/home-display-stats.vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import { navReset, navTo } from "@/lib/route";
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import { useT } from "@/i18n/use-t";
 import { LOCALES, type LocaleCode } from "@/i18n";
 import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { paidCumulativeNow } from "@/lib/platform-stats";
-import { useConfig } from "@/store/config";
-import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -194,34 +181,9 @@ function pick(code: LocaleCode) {
   langOpen.value = false;
 }
 useDialogA11y(computed(() => langOpen.value), ".intro-lang-root", closeLang);
-const cfg = useConfig();
-const fleetNow = () => {
-  return cfg.syncFailed ? null : cfg.config.verifiedStats?.onlineDevices.value ?? null;
-};
-// 🔴 累计支付**不跟配置走**(第二次结构反思·族B,R2 审计 C5):它是时间积分,背着历史 ——
-//   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
-//   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。
-//   速率类($/sec、日产、月付)跟配置走是对的 —— 它们是「现在」,不背历史。
-// No public payout projection exists. Private purchase totals are not payouts;
-// omit this unsupported metric rather than expose an account-dependent amount.
-// 🔴 远程模式下的「累计已发放」只能是可核验的提现完成额(zentao #59):
-//   此前这里是 `null`(直接隐藏),服务端也没有对应聚合。现在读 verified 聚合;
-//   沙箱/旧后端没有该聚合 → 继续不显示,绝不用配置值编造一个财务事实。
-const paidNow = () => {
-  if (!remoteApiEnabled) return paidCumulativeNow();
-  const v = cfg.syncFailed ? null : cfg.config.verifiedStats;
-  return v ? v.completedPayoutUsdt.value : null;
-};
-const paid = ref(paidNow());
-const visiblePaid = computed(() => remoteApiEnabled ? paidNow() : paid.value);
-// Intro is public and often shown before a user session exists. Its public
-// device count comes from the verified server aggregate.
-const devices = ref(fleetNow());
-const visibleDevices = computed(() => remoteApiEnabled ? fleetNow() : devices.value);
-
-function fmtNum(n: number | null): string {
-  return n === null ? "—" : n.toLocaleString("en-US");
-}
+const statsActive = ref(true);
+onShow(() => { statsActive.value = true; });
+onHide(() => { statsActive.value = false; });
 
 // Deterministic PRNG (SSR-safe in the prototype; here just keeps positions stable).
 function mulberry32(seed: number) {
@@ -251,22 +213,6 @@ const satellites = [
   { x: 12, y: 120 },
 ];
 const orbitPath = "M 120 12 A 108 108 0 1 1 119.999 12 Z";
-
-let timer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  timer = setInterval(() => {
-    // Recompute from the time anchor (~$14/1.8s) instead of accumulating random
-    // steps, so a reload can never show a smaller total than a longer session.
-    paid.value = paidNow();
-    // BUG #59: the published fleet figure is an operator-owned aggregate, not a
-    // live measurement. It must not drift while the page is open — a wobbling
-    // number reads as a real-time feed. Display the configured value verbatim.
-    devices.value = fleetNow();
-  }, 1800);
-});
-onUnmounted(() => {
-  if (timer) clearInterval(timer);
-});
 
 function goRegister() {
   navReset({ url: "/pages/register/register", fail: () => {} });
@@ -500,59 +446,6 @@ function goPrivacy() {
   color: var(--v5-ink-3);
   padding: 0 16px;
 }
-.intro-stats {
-  margin-top: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 6px 14px;
-  border-radius: 9999px;
-  /* 🔴 此前写死 rgba(15,15,15,0.8) —— 浅色主题下是**深色药丸**,而里面的数字走
-     --v5-ink(浅色档=近黑),等于深底压深字,主人实测「人眼根本看不清」。
-     改走 surface 档:浅色是白药丸配近黑字,暗色是深色药丸配浅字,两边都读得出。
-     不加 border:《03》§3 要求带填充的容器零描边,层级靠 surface 微差色 ——
-     --v5-surface 压在 --v5-bg 上本身就是一档可读色差。(我加过一次 border,被 zero-border 门当场逮住)
-     🔴 注释里也别写色号:verify 那道「no hardcoded hex」哨兵扫**全文**(含注释),
-     我就是在这行写了页面底色的十六进制被它逮住。描述颜色一律用 token 名 ——
-     被点名的只是若干个有 token 对应的色号,但写 token 名本来就更准(值会变,角色不变)。 */
-  background: color-mix(in srgb, var(--v5-surface) 80%, transparent);
-  backdrop-filter: blur(12px);
-}
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.stat-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: var(--v5-brand);
-  animation: intro-pulse 1.6s ease-in-out infinite;
-}
-.stat-num {
-  font-family: var(--font-v5);
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--v5-ink);
-}
-.stat-num--brand {
-  color: var(--v5-brand);
-}
-.stat-label {
-  font-size: 12px;
-  color: var(--v5-ink-3);
-}
-.stat-sep {
-  width: 2px;
-  height: 2px;
-  border-radius: 9999px;
-  background: var(--v5-surface-3);
-}
-
 .intro-cta {
   padding-top: 40px;
   padding-bottom: 0;
@@ -609,6 +502,18 @@ function goPrivacy() {
 .anim-orb {
   animation: intro-scale-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+/* Keep the published figures on one line on narrow phones. */
+@media (max-width: 374px) {
+  .intro-hero :deep(.home-display-stats) {
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-top: 12px;
+    padding: 7px 10px;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .intro-hero :deep(.home-display-item) { gap: 4px; }
+}
 .anim-hero {
   animation: intro-fade-up 0.6s ease 0.5s both;
 }
@@ -629,9 +534,5 @@ function goPrivacy() {
 @keyframes intro-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-@keyframes intro-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
 }
 </style>

@@ -128,6 +128,13 @@ export function demoFixture(url,locale,state,request) {
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
   if(request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  // Published home display feed for the intro stats: one sample per second for two minutes.
+  if(pathname==='/api/config/home-display'&&!empty){
+    const startAt=Math.floor(now/1000)*1000,elapsed=Math.max(0,Math.floor((startAt-demoStartedAt)/1000));
+    const seconds=Array.from({length:121},(_,offset)=>elapsed+offset);
+    return {enabled:true,startAt,serverNow:now,validUntil:startAt+120_000,sequence:elapsed,
+      online:seconds.map(t=>2968+Math.floor(t/45)),paidCents:seconds.map(t=>128465050+t*160+Math.floor(t/3)*29)};
+  }
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     if(state.downloadState==='published') Object.assign(config.share.appDownload,{source:'official',officialUrl:'https://example.com/uvel',iosUrl:'https://example.com/uvel/ios',androidUrl:'https://example.com/uvel/android',version:'preview',releaseNotes:{zh:'本地预览示例链接',en:'Local preview example links'}});
