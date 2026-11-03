@@ -3584,7 +3584,7 @@ export const ms: Messages = {
       newcomerReward: "Hadiah alu-aluan",
       inviterReward: "Ganjaran penjemput",
       referralReward: "Ganjaran jemputan",
-      earn: "Pendapatan masuk",
+      earn: "Pendapatan",
       refer: "Ganjaran jemputan dikreditkan",
       referDebit: "Ganjaran jemputan ditarik balik",
       referNeutral: "Ganjaran jemputan",

@@ -2147,7 +2147,7 @@ export const ru: Messages = {
     countdownStart: "Начало {date}",
     countdownEnd: "Купить до {date}",
     countdownDateEmpty: "—",
-    idleTitleNew: "Попробуйте UVELBox S1 бесплатно",
+    idleTitleNew: "UVELBox S1 бесплатно",
     idleBody: "Бесплатно {n} дн. · без оплаты",
     idleCta: "Попробовать",
     endedTitle: "Пробный период завершён",
@@ -4311,7 +4311,7 @@ export const ru: Messages = {
     viewMarketplace: "Рынок перепродажи →",
     agoLabel: "{t} назад",
     heroCrown: "Основатель",
-    heroTitle: "Места Genesis ограничены",
+    heroTitle: "Лимит мест Genesis",
     heroDisc: "Разблокировка UVT — по опубликованному графику",
     tier: {
       title: "Цена покупки",
