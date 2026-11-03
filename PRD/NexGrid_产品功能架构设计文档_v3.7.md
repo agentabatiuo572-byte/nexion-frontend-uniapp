@@ -4199,14 +4199,14 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 ### 11.10 活动中心 `/events`
 
-> **2026-10-25 现行裁定**：以下历史“4 trackable + 6 decorative”、本地领奖和示例奖励不再是执行依据。全部十项活动均按[首页与活动规则 §4–5](UVEL_首页信任与活动规则_20261025.md)实现真实条件与权益，PC 配置完整后启用；新增独立创世抽奖，奖励、票据、结算与失败恢复均由服务端执行。
+> **2026-11-04 现行裁定**：按产品决定移除 `holding` 持币活动（原 NEX Holders Share），后端同步删除该类型及钱包余额变化触发。保留的九项活动按[首页与活动规则 §4–5](UVEL_首页信任与活动规则_20261025.md)执行真实条件与权益，PC 配置完整后启用；独立创世抽奖、奖励、票据、结算与失败恢复均由服务端执行。
 
 #### 11.10.1 目的
 
-集中展示限时折扣 / 邀请挑战 / 抽奖转盘 / 区域 PK / 奖励翻倍周 / 节日活动 / 持币空投 / 新人加速 等促销活动,
+集中展示限时折扣 / 邀请挑战 / 抽奖转盘 / 区域 PK / 奖励翻倍周 / 节日活动 / 新人加速 等促销活动,
 形成持续的"周期性流量回访点",每个活动卡都是一个独立的 conversion hook(折扣 → 商城 / 邀请挑战 → InviteEarnCard / 抽奖 → 转盘 page 等)。
 
-**Long-tail Task System Layer 4**:trackable 类活动接入真任务化引擎 — progress 来自真实平台状态(`evaluateEventProgress`),Join / Claim 通过 `useEventQuest` 持久化,完成时直接 `creditNex` + `useAchievements.unlock` 写入余额 / 解锁勋章(参 §11.13)。
+**活动业务状态**：进度、参与、领取和真实奖励均来自服务端，客户端不本地计算资格或写入余额。
 
 #### 11.10.2 页面结构(自上而下 4 段)
 
@@ -4218,11 +4218,13 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 3. **活动卡列表**(Hero 之外的活动):
    - 每卡 grid:emoji icon + 主体(类型 chip + ribbon + `You're in` 标记 + 标题 + 副标 + 奖励 chip + 倒计时 / 开始时间 / Ended 状态 + 可选进度条)
-   - Ended 状态卡片不可点
+   - Ended 状态可查看历史，不可新参与或领奖
 
 4. **Footer note**:`Events run on UTC time. Rewards are credited automatically to your USDT / NEX balance unless otherwise noted.`
 
 #### 11.10.3 活动类型(EventKind)
+
+支持以下七种类型；类型、三语标签、玩法说明和图标均不再包含持币活动。列表遇到非空未知类型时跳过该行（含旧 `holding`），其余有效活动正常显示；缺失类型或已支持类型的数据错误仍报协议错误。直接进入未知类型详情沿用“活动暂不可用”错误态，不保留兼容玩法。
 
 | EventKind | 标签 | 典型示例 |
 |---|---|---|
@@ -4232,7 +4234,6 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 | `regional`  | Regional PK    | LatAm vs SEA vs EU $20K |
 | `boost`     | Bonus Boost    | Weekend Double NEX / Re-invest 2× |
 | `seasonal`  | Seasonal       | Black Friday 20% OFF |
-| `holding`   | Holders Reward | Hold ≥ 1,000 NEX → share $5K |
 | `onboarding`| New Pilot      | First-Week +200 NEX + 1 Saver |
 
 #### 11.10.4 状态机
@@ -4243,37 +4244,17 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 | upcoming | `Starts in X` | Notify-me CTA |
 | ended    | `Ended` 副字 | 可点查看历史 |
 
-#### 11.10.5 默认初始数据
+#### 11.10.5 活动数据
 
-10 个 mock(8 ongoing + 1 upcoming + 1 ended),硬编码在 `lib/mock/events.ts`。
-每个 event 字段:`id / kind / status / title / subtitle / ribbon / emoji / tint / reward / progress / countdown / startsIn / joined / ctaLabel / href / featured`。
+正式列表读取 `GET /api/events` 的服务端活动及当前用户状态，不从本地 mock 补全。`src/mock/events.ts` 仅保留六项展示样例（五项 ongoing、一项 upcoming），不含持币活动；原型预览夹具同样不提供该活动。
 
-#### 11.10.6 真任务化引擎(Trackable vs Decorative)
+#### 11.10.6 参与条件与奖励
 
-Events 分两大类:
+服务端按每项活动已配置的玩法、有效期和预算，结合订单、有效直推、账号等级等真实事实返回资格、进度和奖励。升级优惠、邀请赠机、新手奖励、区域竞赛等均遵循现行活动规则；不再使用原型 `evaluateEventProgress` 或示例 UVT 奖励替代真实权益。
 
-| 类别 | 行为 | 例子 |
-|---|---|---|
-| **Trackable** | 接 `evaluateEventProgress(ev.id, ctx)`,progress 由真实平台状态派发;支持 Join(持久化到 `useEventQuest.joined`)+ Claim(`creditNex` + `unlockAchievement`) | `evt-pro-upgrade-7d` / `evt-refer-5-get-pro` / `evt-onboarding-7d` / `evt-nex-holders-share` |
-| **Decorative** | 系统级 boost / 抽奖 / 区域 PK / 节日营销 — 不需要 opt-in,progress 装饰性(用 events.ts hardcode 或不显示);Action row 渲染 `ev.ctaLabel` 链接跳 `ev.href` | `evt-weekend-double-nex` / `evt-reinvest-2x` / `evt-spring-spin` / `evt-regional-pk` / `evt-black-friday` / `evt-anniversary-spin` |
+#### 11.10.7 活动操作
 
-**Trackable evaluator 映射**(`lib/mock/event-progress.ts`):
-
-| Event ID | 评估字段 | Target | 奖励 NEX | Badge ID |
-|---|---|---|---|---|
-| `evt-pro-upgrade-7d`   | `ctx.ownsProOrHigher`(buy Pro / Rack 一台) | 1 | 2,000 | `flash_upgrader` |
-| `evt-refer-5-get-pro`  | `ctx.directInviteCount`(直推数,clamp ≤ 5) | 5 | 5,000 | `team_champion` |
-| `evt-onboarding-7d`    | `ctx.vRank`(within 7d of joinedAt)— 4 步达到 V2 | 4 | 200 | `fast_pilot` |
-| `evt-nex-holders-share`| `ctx.nexBalance`(clamp ≤ 1,000) | 1,000 | 500 | `diamond_hands` |
-
-**EventProgressContext**(`lib/mock/event-progress.ts`):extends `ChallengeProgressContext`(参 §12.10 月度挑战 context)+ 3 extra fields(`vRank` / `joinedAt` / `nexBalance`)。统一构建于 `lib/hooks/use-event-progress-context.ts`,Events 页 + Missions 页 + Nova push triggers(代码 `StellaTriggers`)共享。
-
-#### 11.10.7 行为(Trackable Event)
-
-- **未 join + 未 done**(ongoing):卡底渲染 `Join now` / 原 `ev.ctaLabel` 实心 button → `useEventQuest.join(id)` + toast `Joined «{title}»`
-- **已 join + 未 done**:卡底 outline link `View progress →` 跳 `ev.href`(默认 `#`,或 trackable event 关联的路由如 `/team` for refer-5)
-- **done + 未 claimed**:卡底实心 button `Claim +N NEX`(主题色)→ `creditNex(EVENT_REWARD_NEX[id])` + `useAchievements.unlock(EVENT_BADGE_ID[id])` + `useEventQuest.claim(id)` + toast `+N NEX credited`
-- **已 claimed**:卡底灰 Lock label `Claimed`,无操作
+参与、领奖及提醒均经正式活动接口，成功后重读当前用户状态。奖励类型和金额以回执为准，不本地增加余额或解锁勋章。关闭、未开始、已结束或不符合资格时不能参与；已结束活动可查看本人真实结果。转盘与独立创世抽奖沿用各自的次数、票据和回执规则。
 
 #### 11.10.8 入口
 
