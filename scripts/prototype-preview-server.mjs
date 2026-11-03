@@ -52,16 +52,19 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/state') {
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
-        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty';
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasLow=state.paymentState==='low-balance';
         if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
-        // account (dataState=empty) is one too. Presentation knobs keep them.
-        const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty;
+        // account (dataState=empty) or the low-balance account (paymentState=low-balance) is one too. Presentation
+        // knobs keep them.
+        const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty||(state.paymentState==='low-balance')!==wasLow;
         if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
-        // The empty account's wallet holds nothing: a fact every wallet payment checks, not only a 0 on screen.
+        // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
+        // checks, not only numbers on screen.
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
+        else if(scenarioChange&&state.paymentState==='low-balance')state.walletBalance=820.64;
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
