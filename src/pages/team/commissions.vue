@@ -197,7 +197,7 @@ const monthAmount = computed(() => {
 });
 // "Today" or the weekday beside each local date; weekday names avoid Intl so they survive without it.
 // The newer languages use CLDR 48 short weekday names.
-const DAY_LABEL_TODAY = { zh: "今天", en: "Today", vi: "Hôm nay", id: "Today", ms: "Today", fil: "Today", ru: "Today", kk: "Today", uz: "Today" };
+const DAY_LABEL_TODAY = { zh: "今天", en: "Today", vi: "Hôm nay", id: "Hari ini", ms: "Hari ini", fil: "Ngayon", ru: "Сегодня", kk: "Бүгін", uz: "Bugun" };
 const DAY_LABEL_WEEKDAYS = {
   zh: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
   en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],

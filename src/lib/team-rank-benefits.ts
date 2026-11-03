@@ -20,5 +20,5 @@ export function increasedRankBenefitKeys(current: RankBenefits | null | undefine
 }
 
 export function rankBenefitIncreaseHeading(locale: string): string {
-  return ({ zh: '新增／提升权益', en: 'New or improved benefits', vi: 'Quyền lợi mới hoặc nâng cao', id: 'New or improved benefits', ms: 'New or improved benefits', fil: 'New or improved benefits', ru: 'New or improved benefits', kk: 'New or improved benefits', uz: 'New or improved benefits' })[uiLocale(locale)];
+  return ({ zh: '新增／提升权益', en: 'New or improved benefits', vi: 'Quyền lợi mới hoặc nâng cao', id: 'Manfaat baru atau yang ditingkatkan', ms: 'Manfaat baharu atau dipertingkat', fil: 'Bago o pinahusay na benepisyo', ru: 'Новые и улучшенные привилегии', kk: 'Жаңа не жақсартылған артықшылықтар', uz: 'Yangi yoki kengaygan imtiyozlar' })[uiLocale(locale)];
 }

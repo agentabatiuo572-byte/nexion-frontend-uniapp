@@ -28,12 +28,12 @@ const COPY = {
   zh: { today: "今天", yesterday: "昨天", weekdays: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"] },
   en: { today: "Today", yesterday: "Yesterday", weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
   vi: { today: "Hôm nay", yesterday: "Hôm qua", weekdays: ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"] },
-  id: { today: "Today", yesterday: "Yesterday", weekdays: ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] },
-  ms: { today: "Today", yesterday: "Yesterday", weekdays: ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"] },
-  fil: { today: "Today", yesterday: "Yesterday", weekdays: ["Linggo", "Lunes", "Martes", "Miyerkules", "Huwebes", "Biyernes", "Sabado"] },
-  ru: { today: "Today", yesterday: "Yesterday", weekdays: ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"] },
-  kk: { today: "Today", yesterday: "Yesterday", weekdays: ["Жексенбі", "Дүйсенбі", "Сейсенбі", "Сәрсенбі", "Бейсенбі", "Жұма", "Сенбі"] },
-  uz: { today: "Today", yesterday: "Yesterday", weekdays: ["Yakshanba", "Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba"] },
+  id: { today: "Hari ini", yesterday: "Kemarin", weekdays: ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] },
+  ms: { today: "Hari ini", yesterday: "Semalam", weekdays: ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"] },
+  fil: { today: "Ngayon", yesterday: "Kahapon", weekdays: ["Linggo", "Lunes", "Martes", "Miyerkules", "Huwebes", "Biyernes", "Sabado"] },
+  ru: { today: "Сегодня", yesterday: "Вчера", weekdays: ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"] },
+  kk: { today: "Бүгін", yesterday: "Кеше", weekdays: ["Жексенбі", "Дүйсенбі", "Сейсенбі", "Сәрсенбі", "Бейсенбі", "Жұма", "Сенбі"] },
+  uz: { today: "Bugun", yesterday: "Kecha", weekdays: ["Yakshanba", "Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba"] },
 };
 const pad = (value: number) => String(value).padStart(2, "0");
 

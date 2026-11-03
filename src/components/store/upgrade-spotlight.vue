@@ -38,12 +38,12 @@ const comparisonCopy = computed(() => ({
   zh: { current: '现在 · 预估', upgraded: '升级后 · 预估' },
   en: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
   vi: { current: 'Hiện tại · ước tính', upgraded: 'Sau nâng cấp · ước tính' },
-  id: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
-  ms: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
-  fil: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
-  ru: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
-  kk: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
-  uz: { current: 'Now · estimated', upgraded: 'After upgrade · estimated' },
+  id: { current: 'Sekarang · perkiraan', upgraded: 'Setelah upgrade · perkiraan' },
+  ms: { current: 'Kini · anggaran', upgraded: 'Selepas naik taraf · angg.' },
+  fil: { current: 'Ngayon · tantiya', upgraded: 'Pag-upgrade · tantiya' },
+  ru: { current: 'Сейчас · оценка', upgraded: 'После улучшения · оценка' },
+  kk: { current: 'Қазір · болжам', upgraded: 'Жақсартудан кейін · болжам' },
+  uz: { current: 'Hozir · taxminan', upgraded: 'Yangilagach · taxminan' },
 })[uiLocale(locale.code)]);
 const baseReady = ref(false), targetReady = ref(false);
 const baseRefreshKey = ref(0), targetRefreshKey = ref(0);

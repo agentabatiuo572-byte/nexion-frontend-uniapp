@@ -381,24 +381,24 @@ const policyCopy = computed(() => ({
   zh: { entry:'购买、退款与售后说明', deviceScope:'设备商品（不含 Cloud Share）：', review:'付款前请阅读服务条款和风险提示书，确认所选商品的购买与售后条件。', rewards:'活动奖励的退款与回收条件，请查看结算页的「活动说明」。' },
   en: { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' },
   vi: { entry:'Mua hàng, hoàn tiền và hậu mãi', deviceScope:'Thiết bị (không gồm Cloud Share): ', review:'Trước khi thanh toán, vui lòng đọc Điều khoản dịch vụ và Công bố rủi ro, đồng thời xác nhận điều kiện mua hàng, hậu mãi của sản phẩm đã chọn.', rewards:'Xem điều khoản ưu đãi tại trang thanh toán để biết cách xử lý và thu hồi phần thưởng khi hoàn tiền.' },
-  id: { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' },
-  ms: { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' },
-  fil: { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' },
-  ru: { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' },
-  kk: { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' },
-  uz: { entry:'Purchase, refund and after-sales information', deviceScope:'Devices (excluding Cloud Share): ', review:'Before paying, read the terms of service and risk disclosure, and confirm the purchase and after-sales conditions for your selected products.', rewards:'See the offer terms on checkout for reward refund and recovery conditions.' },
+  id: { entry:'Info pembelian, pengembalian dana, dan purnajual', deviceScope:'Perangkat (tidak termasuk Cloud Share): ', review:'Sebelum membayar, baca ketentuan layanan dan pengungkapan risiko, serta pastikan syarat pembelian dan purnajual produk yang Anda pilih.', rewards:'Lihat ketentuan promo di halaman checkout untuk syarat pengembalian dana dan penarikan kembali hadiah.' },
+  ms: { entry:'Maklumat pembelian, bayaran balik dan selepas jualan', deviceScope:'Peranti (tidak termasuk Cloud Share): ', review:'Sebelum membayar, baca terma perkhidmatan dan pendedahan risiko, dan sahkan syarat pembelian serta selepas jualan bagi produk yang dipilih.', rewards:'Lihat terma tawaran di halaman pembayaran untuk syarat bayaran balik dan penarikan balik ganjaran.' },
+  fil: { entry:'Impormasyon sa pagbili, refund at after-sales', deviceScope:'Device (hindi kasama ang Cloud Share): ', review:'Bago magbayad, basahin ang tuntunin ng serbisyo at paalala sa panganib, at kumpirmahin ang kondisyon sa pagbili at after-sales ng mga napili mong produkto.', rewards:'Tingnan ang terms ng offer sa checkout para sa kondisyon ng refund at pagbawi ng reward.' },
+  ru: { entry:'Покупка, возврат и обслуживание', deviceScope:'Устройства (кроме Cloud Share): ', review:'Перед оплатой прочитайте условия использования и информацию о рисках и проверьте условия покупки и обслуживания для выбранных товаров.', rewards:'Условия возврата и отзыва наград — в «Условиях акции» при оформлении.' },
+  kk: { entry:'Сатып алу, ақшаны қайтару және сатудан кейінгі қызмет туралы', deviceScope:'Құрылғылар (Cloud Share-ден басқа): ', review:'Төлемес бұрын қызмет шарттары мен тәуекелдер туралы ақпаратты оқып, таңдалған тауарларды сатып алу және сатудан кейінгі қызмет шарттарын растаңыз.', rewards:'Сыйақыны қайтару және кері алу шарттарын рәсімдеу бетіндегі акция шарттарынан қараңыз.' },
+  uz: { entry:'Xarid, pul qaytarish va xariddan keyingi xizmat haqida', deviceScope:'Qurilmalar (Cloud Sharedan tashqari): ', review:'Toʻlashdan oldin xizmat shartlari va xatarlar haqidagi maʼlumotni oʻqing hamda tanlangan mahsulotlarning xarid va xariddan keyingi xizmat shartlarini tasdiqlang.', rewards:'Mukofotlarni qaytarish va qaytarib olish shartlarini toʻlov sahifasidagi aksiya shartlarida koʻring.' },
 })[uiLocale(locale.code)]);
 const reviewCopy = computed(()=>commerceCopy(locale.code));
 const legalCopy = computed(() => ({
   zh: { before: '支付前请阅读', join: '及', end: '。' },
   en: { before: 'Before paying, review ', join: ' and ', end: '.' },
   vi: { before: 'Trước khi thanh toán, hãy đọc ', join: ' và ', end: '.' },
-  id: { before: 'Before paying, review ', join: ' and ', end: '.' },
-  ms: { before: 'Before paying, review ', join: ' and ', end: '.' },
-  fil: { before: 'Before paying, review ', join: ' and ', end: '.' },
-  ru: { before: 'Before paying, review ', join: ' and ', end: '.' },
-  kk: { before: 'Before paying, review ', join: ' and ', end: '.' },
-  uz: { before: 'Before paying, review ', join: ' and ', end: '.' },
+  id: { before: 'Sebelum membayar, baca ', join: ' dan ', end: '.' },
+  ms: { before: 'Sebelum membayar, semak ', join: ' dan ', end: '.' },
+  fil: { before: 'Bago magbayad, basahin ang ', join: ' at ', end: '.' },
+  ru: { before: 'Перед оплатой прочитайте: ', join: ' и ', end: '.' },
+  kk: { before: 'Төлемес бұрын оқыңыз: ', join: ' және ', end: '.' },
+  uz: { before: 'Toʻlashdan oldin oʻqing: ', join: ' va ', end: '.' },
 })[uiLocale(locale.code)]);
 const app = useApp();
 const promotionRoute=ref<({activityId:string;items:PromotionItem[];orderNo?:string}&VoucherEntryContext)|null>(null);

@@ -290,7 +290,7 @@ import { uiLocale, serverLanguage } from "@/i18n";
 
 const t = useT();
 const locale = useLocaleStore();
-const estimateLabel = computed(() => ({ zh: '预估', en: 'Est.', vi: 'Ước tính', id: 'Est.', ms: 'Est.', fil: 'Est.', ru: 'Est.', kk: 'Est.', uz: 'Est.' })[uiLocale(locale.code)]);
+const estimateLabel = computed(() => ({ zh: '预估', en: 'Est.', vi: 'Ước tính', id: 'Est.', ms: 'Angg.', fil: 'Tantiya', ru: '≈', kk: 'Болж.', uz: 'Taxm.' })[uiLocale(locale.code)]);
 const phase = useProductPhase();
 const trustLanguage = computed<TrustLocale>(() => serverLanguage(locale.code));
 const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = usePublishedTrust();

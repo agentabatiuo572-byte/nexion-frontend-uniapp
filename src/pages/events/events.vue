@@ -141,7 +141,7 @@ const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const language = computed(() => locale.code);
 const raffleCopy = computed(() => genesisRaffleCopy[uiLocale(locale.code)]);
-const loadingLabel = computed(() => ({ zh: "加载中", en: "Loading", vi: "Đang tải", id: "Loading", ms: "Loading", fil: "Loading", ru: "Loading", kk: "Loading", uz: "Loading" })[uiLocale(locale.code)]);
+const loadingLabel = computed(() => ({ zh: "加载中", en: "Loading", vi: "Đang tải", id: "Memuat", ms: "Memuatkan", fil: "Naglo-load", ru: "Загрузка", kk: "Жүктелуде", uz: "Yuklanmoqda" })[uiLocale(locale.code)]);
 
 const tab = ref<TabId>("ongoing");
 const remoteEvents = ref<CanonicalEvent[]>([]);

@@ -19,6 +19,6 @@ export function powerUpEffectText(effectType: string, rawValue: string | number,
   const value = Number(rawValue);
   if (!Number.isFinite(value) || value < 0) return '';
   if (effectType !== 'CHECKIN_MULTIPLIER') return '';
-  const copy = ({ zh: '签到奖励 × {n}，断签后失效', en: 'Check-in reward × {n}, ends if your streak breaks', vi: 'Thưởng điểm danh × {n}, mất khi đứt chuỗi', id: 'Check-in reward × {n}, ends if your streak breaks', ms: 'Check-in reward × {n}, ends if your streak breaks', fil: 'Check-in reward × {n}, ends if your streak breaks', ru: 'Check-in reward × {n}, ends if your streak breaks', kk: 'Check-in reward × {n}, ends if your streak breaks', uz: 'Check-in reward × {n}, ends if your streak breaks' })[uiLocale(locale)];
+  const copy = ({ zh: '签到奖励 × {n}，断签后失效', en: 'Check-in reward × {n}, ends if your streak breaks', vi: 'Thưởng điểm danh × {n}, mất khi đứt chuỗi', id: 'Hadiah check-in × {n}, berakhir jika check-in beruntun terputus', ms: 'Ganjaran daftar masuk × {n}, tamat jika rentetan terputus', fil: 'Reward sa check-in × {n}, mawawala kapag naputol ang streak', ru: 'Награда за отметку × {n}, сгорает при прерывании серии', kk: 'Белгі сыйақысы × {n}, серия үзілсе, тоқтайды', uz: 'Belgilanish mukofoti × {n}, seriya uzilsa tugaydi' })[uiLocale(locale)];
   return copy.replace('{n}', String(value));
 }
