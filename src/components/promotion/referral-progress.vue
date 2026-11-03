@@ -1,6 +1,6 @@
 <template>
   <text v-if="loading && listRead && !activities.length" class="referral-refresh-status" role="status" aria-live="polite">{{ t.promotion.loading }}</text>
-  <view v-if="(loading && !listRead) || activities.length || error || hasMore" class="promotion referral-progress" data-testid="referral-progress">
+  <view v-if="(loading && !listRead) || activities.length || earnedRecords.length || error || hasMore" class="promotion referral-progress" data-testid="referral-progress">
     <text v-if="loading && !listRead && !activities.length" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
     <view v-for="activity in activities" :key="activity.activityId" class="referral-activity" :data-activity-id="activity.activityId">
       <view class="referral-meta">
@@ -36,6 +36,11 @@
         </view>
       </NxSheet>
     </view>
+    <!-- Lite: a referral offer whose rules all give a phone is not advertised; the user's earned rewards from it stay readable. -->
+    <view v-for="activity in earnedRecords" :key="'records:'+activity.activityId" class="referral-activity referral-records" :data-activity-id="activity.activityId">
+      <text class="referral-activity-title">{{ copy.myGifts }}</text>
+      <RewardRows :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
+    </view>
     <view v-if="error" class="referral-recovery nx-inline-recovery"><text class="promotion-copy nx-inline-recovery__copy" role="alert">{{ t.promotion.error }}</text><NxButton class="referral-retry nx-inline-recovery__action" variant="text" size="medium" :busy="loading" :label="t.promotion.retry" @click="loadActivities(true)"><text>{{ t.promotion.retry }}</text><text aria-hidden="true">→</text></NxButton></view>
     <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text><text aria-hidden="true">→</text></NxButton>
     <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="localized(termsActivity?.terms,locale.code)" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
@@ -60,6 +65,8 @@ const emit=defineEmits<{(e:'share'):void}>(),t=useT(),app=useApp(),auth=useAuth(
 const visibility=useDataVisibility();
 const copy=computed(()=>teamRedesignCopy(locale.code)),expandedActivity=ref<string|null>(null);
 const termsActivity=ref<PublicPromotion|null>(null);
+const recordActivities=ref<PublicPromotion[]>([]);
+const earnedRecords=computed(()=>recordActivities.value.filter(p=>progress.value[p.activityId]?.ownRewards.length));
 // A short end-date chip from the activity's own window.
 function deadlineText(activity:PublicPromotion){const end=new Date(activity.endsAt);if(Number.isNaN(end.getTime()))return'';const m=end.getMonth()+1,d=end.getDate();return locale.code==='zh'?`${m}/${d} 截止`:locale.code==='vi'?`Hết hạn ${d}/${m}`:`Ends ${m}/${d}`;}
 const progressBusy=ref<Record<string,boolean>>({}),progressErrors=ref<Record<string,boolean>>({});
@@ -71,7 +78,7 @@ function startProgressUpdates(){
   if(!visible||!auth.isAuthenticated||!remoteApiEnabled)return;
   progressTimer=setInterval(()=>{
     if(!visible||loading.value||(typeof document!=='undefined'&&document.hidden))return;
-    for(const activity of activities.value)void loadProgress(activity.activityId);
+    for(const activity of [...activities.value,...recordActivities.value])void loadProgress(activity.activityId);
   },30_000);
 }
 function referralImageProps(activity:PublicPromotion){
@@ -85,7 +92,7 @@ function qualifyingCount(id:string){return progressErrors.value[id]?'-':progress
 function showProgress(id:string){if(!visible||progressBusy.value[id]||!auth.isAuthenticated)return;expandedActivity.value=expandedActivity.value===id?null:id;if(expandedActivity.value)void loadProgress(id,true);}
 function currentRead(){const request=generation,account=app.accountKey,epoch=app.accountBindingEpoch,authenticated=auth.isAuthenticated,language=locale.code,readScope=passiveTabReadScope();return()=>alive&&visible&&request===generation&&account===app.accountKey&&epoch===app.accountBindingEpoch&&authenticated===auth.isAuthenticated&&language===locale.code&&readScope===passiveTabReadScope();}
 function clearRead(preserveExpanded=true){
-  generation++;activities.value=[];progress.value={};progressBusy.value={};progressErrors.value={};imageRefresh.value={};termsActivity.value=null;
+  generation++;activities.value=[];recordActivities.value=[];progress.value={};progressBusy.value={};progressErrors.value={};imageRefresh.value={};termsActivity.value=null;
   if(!preserveExpanded)expandedActivity.value=null;
   cursor=null;hasMore.value=false;error.value=false;loading.value=false;listRead.value=false;
 }
@@ -103,13 +110,17 @@ async function loadActivities(reset=false,passive=false){
     listRead.value=true;error.value=false;
     const returnedIds=new Set(page.items.map(p=>p.activityId));
     const previous=reset?[]:activities.value.filter(p=>!returnedIds.has(p.activityId));
-    activities.value=[...new Map([...previous,...page.items.flatMap(p=>p.template==='DIRECT_REFERRAL'&&isPromotionActive(p)?litePromotion(p)??[]:[])].map(activity=>[activity.activityId,activity])).values()];
+    const previousRecords=reset?[]:recordActivities.value.filter(p=>!returnedIds.has(p.activityId));
+    const referrals=page.items.filter(p=>p.template==='DIRECT_REFERRAL'&&isPromotionActive(p));
+    const unique=(list:PublicPromotion[])=>[...new Map(list.map(activity=>[activity.activityId,activity])).values()];
+    activities.value=unique([...previous,...referrals.flatMap(p=>litePromotion(p)??[])]);
+    recordActivities.value=unique([...previousRecords,...referrals.filter(p=>!litePromotion(p))]);
     cursor=page.nextCursor;hasMore.value=page.hasMore;
     if(expandedActivity.value&&!activities.value.some(p=>p.activityId===expandedActivity.value)&&!hasMore.value)expandedActivity.value=null;
-    const ids=new Set(activities.value.map(p=>p.activityId));
+    const ids=new Set([...activities.value,...recordActivities.value].map(p=>p.activityId));
     progress.value=Object.fromEntries(Object.entries(progress.value).filter(([id])=>ids.has(id)));
     progressErrors.value=Object.fromEntries(Object.entries(progressErrors.value).filter(([id])=>ids.has(id)));
-    if(auth.isAuthenticated)await Promise.all(activities.value.map(p=>loadProgress(p.activityId,false,passive)));
+    if(auth.isAuthenticated)await Promise.all([...activities.value,...recordActivities.value].map(p=>loadProgress(p.activityId,false,passive)));
   }catch{if(current())error.value=true;}finally{if(current())loading.value=false;}
 }
 async function loadProgress(id:string,refreshImage=false,passive=false){
