@@ -15,7 +15,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   let sequence = 0;
   const handles = path => path.startsWith(base);
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
-  // The account's one order list (not the dataState=empty display projection).
+  // The account's one order list.
   const ordersOf = origin => demoAccountOrders(new URL(origin), locale(), state);
   // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
   let epoch = state.scenarioEpoch;

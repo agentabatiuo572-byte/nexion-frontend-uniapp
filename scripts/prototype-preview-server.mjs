@@ -52,12 +52,13 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/state') {
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
-        const update=JSON.parse(body||'{}');
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty';
         if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
-        // trade-ins, trial and payment intents go, and the next read seeds the fleet. Presentation knobs keep them.
-        const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update);
+        // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
+        // account (dataState=empty) is one too. Presentation knobs keep them.
+        const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty;
         if(scenarioChange)for(const key of ['fleetSeed','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
