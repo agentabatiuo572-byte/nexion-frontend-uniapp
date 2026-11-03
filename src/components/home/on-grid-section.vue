@@ -1,7 +1,7 @@
 <!--
   OnGridSection — ZONE 2 "what the network is computing now" (ported from
   mission-control.tsx OnGridSection). Header (On UVEL grid · now · Map) + 3
-  client rows (company badge · company · model·city · GPUs) + live footer. The formal
+  client rows (company badge · company · model·city) + live footer. The formal
   App reads client rows from Java Home and display metrics from H9.
 -->
 <template>
@@ -16,7 +16,7 @@
         v-for="(c, i) in gridClients"
         :key="c.id"
         class="grid items-center gap-3 px-4 py-2.5"
-        :style="{ gridTemplateColumns: '32px 1fr auto', borderBottom: i < gridClients.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
+        :style="{ gridTemplateColumns: '32px 1fr', borderBottom: i < gridClients.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
       >
         <view class="grid place-items-center" style="width: 30px; height: 30px; border-radius: 8px; background: var(--v5-brand-soft)">
           <text :style="{ color: c.color, fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '12px' }">{{ companyInitial(c.name) }}</text>
@@ -25,7 +25,6 @@
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink); letter-spacing: -0.008em">{{ c.name ?? "—" }}</text>
           <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.model ?? "—" }} <text style="color: var(--v5-ink-4)">· {{ c.city ?? "—" }}</text></text>
         </view>
-        <text class="font-mono-tabular tabular-nums text-right whitespace-nowrap" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ gpusText(i) }}</text>
       </view>
       <!-- H9 在线数与已发放批次独立降级、独立重读；客户仍读 Home canonical 投影。 -->
       <view
@@ -55,7 +54,6 @@ import { formatAmount } from "@/lib/amount-display";
 import { networkPopulationBand } from "@/lib/platform-stats";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { apiClient } from "@/api/runtime";
@@ -109,10 +107,6 @@ const activeDevicesText = computed(() => {
   return devicesBad.value ? "-" : networkPopulationBand(cfg.config.networkPulse!.onlineDevices!);
 });
 
-function gpusText(i: number) {
-  const value = gridClients.value[i]?.gpus ?? null;
-  return value === null ? "—" : fmt(t.value.home.onGridGpus, { n: value });
-}
 function companyInitial(value: string | null) {
   return value?.trim().charAt(0).toUpperCase() || "—";
 }

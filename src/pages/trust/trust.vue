@@ -64,10 +64,10 @@
         </view>
 
         <template v-else>
-          <template v-if="financialSection && financialMetrics.length">
+          <template v-if="financialSection">
             <SectionHeader :label="sectionLabel(sectionKey.financials)" />
             <view class="nx-glass-card grid grid-cols-2" :style="gridCardStyle">
-              <view v-for="metric in financialMetrics" :key="metric.key" :style="metricStyle">
+              <view v-for="metric in financialMetrics" :key="metric.key" :style="metric.key === 'paidOut' ? paidMetricStyle : metricStyle">
                 <text class="block" :style="labelStyle">{{ metric.label }}</text>
                 <view class="flex items-baseline" style="gap: 6px; margin-top: 4px">
                   <text :style="metricValueStyle">{{ metric.value }}</text>
@@ -114,7 +114,6 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -126,17 +125,16 @@ import { useT } from "@/i18n/use-t";
 import { trustCenterCopy } from "@/i18n/trust-center";
 import { useTrustDocuments } from "@/composables/use-trust-documents";
 import { useLocaleStore } from "@/store/locale";
-import { useConfig } from "@/store/config";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
 import { localizedTrustFieldValue, trustNumberedRows } from "@/lib/trust-fields";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
+import { usePublishedNetworkStats } from "@/composables/use-published-network-stats";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
-const cfg = useConfig();
 const tr = computed(() => t.value.trust);
 const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
@@ -169,17 +167,13 @@ const auditSection = computed(() => section(sectionKey.auditsReserves));
 
 const narrativeHero = computed(() => localizedTrustFieldValue(narrativeSection.value?.fields ?? [], "hero", language.value) ?? "");
 const narrativeSubhero = computed(() => localizedTrustFieldValue(narrativeSection.value?.fields ?? [], "subhero", language.value) ?? "");
-const verified = computed(() => cfg.syncFailed ? null : cfg.config.verifiedStats);
-const activeDevicesText = computed(() => verified.value?.onlineDevices.value.toLocaleString("en-US") ?? "—");
-const financialMetrics = computed(() => {
-  const v = verified.value;
-  if (!v) return [];
-  return [
-    { key: "activeAccountsValue", label: tr.value.activeAccounts, value: v.activeAccounts.value.toLocaleString("en-US"), delta: null },
-    { key: "devicesOnlineValue", label: tr.value.activeNodes, value: v.onlineDevices.value.toLocaleString("en-US"), delta: null },
-    { key: "payoutsProcessedValue", label: tr.value.completedPayouts, value: formatAmount(v.completedPayoutUsdt.value), delta: null },
-  ];
-});
+// Published figures, matching the home network snapshot card; never real aggregates.
+const published = usePublishedNetworkStats();
+const financialMetrics = computed(() => [
+  { key: "registeredUsers", label: t.value.home.networkMembers, value: published.registered.value, delta: null },
+  { key: "onlineDevices", label: t.value.home.networkDevices, value: published.online.value, delta: null },
+  { key: "paidOut", label: t.value.home.networkPaidOut, value: published.paidOut.value, delta: null },
+]);
 const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url"] as const, language.value));
 const verifiedAuditRows = computed(() => auditRows.value.filter((row) => safeHref(row.Url)));
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
@@ -305,6 +299,8 @@ const heroStatsStyle: CSSProperties = { marginTop: "14px", paddingTop: "12px", b
 const stateCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", padding: "16px", borderRadius: "var(--nx-glass-radius)", background: "var(--nx-glass-fill)" };
 const gridCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", borderRadius: "var(--nx-glass-radius)", overflow: "hidden", background: "var(--nx-glass-fill)" };
 const metricStyle: CSSProperties = { padding: "14px", borderRight: "1px solid var(--v5-border)", borderBottom: "1px solid var(--v5-border)" };
+// The paid-out amount takes a full row so it never breaks mid-number at 320px.
+const paidMetricStyle: CSSProperties = { ...metricStyle, gridColumn: "1 / -1", borderRight: "none" };
 const labelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const metricValueStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)" };
 const deltaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-success)" };

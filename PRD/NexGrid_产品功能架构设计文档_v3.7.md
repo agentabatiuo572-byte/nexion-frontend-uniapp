@@ -388,18 +388,16 @@ Lite 手机号注册完成（含保存的手机号注册尝试恢复），或第
 
 | 元素 | 内容 |
 |---|---|
-| Sponsor 卡 | 从 code hash 映射的固定 sponsor(姓名 + 头像 + V 级 + 城市 + 下线数) |
-| Welcome Gift hero | `$5 USDT + 20 NEX` 大字 |
-| Perks 列表 | 4 项($5+20 gift / 第一天赚钱 / 24/7 active / sponsor mentorship) |
-| 社会证明 | 41,286 new joiners · 47 countries · $20.5M paid out(月发放 = 平台日发放锚 $682,368 × 30;新增人数为用户口径,不复用设备锚数字) |
-| Partner wall | NVIDIA / Intel / AMD / OpenRouter / OPPO / TechCrunch |
-| Trust badges | SOC 2 Type II / ISO 27001 / GDPR · MSB / CertiK audited |
-| CTA(主) | "Claim my $5 + 20 NEX" → `/register?ref=CODE` |
-| CTA(次) | "Sign in" → `/login?ref=CODE` |
+| Sponsor 卡 | 公开邀请预览接口返回的邀请人展示名(已打码)、首字头像与 V 级;预览成功后才显示 |
+| 欢迎礼包 | 新人礼开启时显示 `rewards` 配置的 USDT + UVT 金额;关闭时整块隐藏 |
+| 权益列表 | 注册礼包(礼包开启时)/ 安装手机 App，完成校准与激活即可开启手机算力 / 24/7 处理全球 AI 任务 / 邀请人帮你上手(邀请人为用户时) |
+| 网络脉搏(2026-11-03) | 与首页网络脉搏卡(§5.12)同源同格式:「注册用户」为注册用户估算值、「在线设备」为 H9 `networkPulse.onlineDevices`,均按人口档显示(如 1.2W+、3.2K+);「累计已发放」读首页展示批次 `/api/config/home-display`,以千分位金额显示并在页面可见时逐秒更新。两项人数并排,累计已发放独占一行。不显示真实平台聚合、来源或统计时刻;单项不可用时显示 `-` |
+| CTA(主) | 预览成功时「领取我的 $X + Y UVT」(礼包关闭时「使用邀请码加入 UVEL」)→ `/register?ref=CODE`;码不可用时退为普通「创建账号」 |
+| CTA(次) | 「已有账号? 登录」→ `/login?ref=CODE` |
 
 **状态变体与归因暂存**:
 - 码格式预检:`NEXGRID-XXXX`(大小写不敏感;服务端权威校验与反作弊另行,§4.3.5)。缺失 / 非法码 → 隐藏 Sponsor 卡与 `REF/CODE` 徽章,其余内容照常(通用落地,不阻断注册;注册页邀请码回到可手输)。
-- 本机已登录 → 顶部提示条「你已注册,邀请链接对新用户有效,新人礼每账号仅一次」,隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 NexGrid」(不重复发礼)。
+- 本机已登录 → 顶部提示条「你已注册 UVEL。邀请链接对新用户有效,新人礼每账号仅一次。」(礼包关闭时「你已注册 UVEL。邀请码与分享链接仍可正常使用。」),隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 UVEL」(不重复发礼)。
 - **pendingRefCode(归因暂存)**:合法码到达落地页即写入本地暂存;访客当场不注册、此后从任意入口进注册页仍自动带码并锁定(§4.1)。注册前新码 last-touch 覆盖;绑定发生即清除;已绑定设备忽略新码(first-wins,§4.3.2)。
 - 生产短链 `{share.baseUrl}CODE`(§13.3)由服务端 302 至本页;`share.baseUrl` 未配置(开发 / 演示)时分享链接回退当前站点地址直连本页,扫码当场可达。
 
@@ -943,7 +941,7 @@ H5 Lite 保留现有双列设备模板，展示已激活的硬件和 Cloud Share
 
 标题「UVEL 网格实时」,右侧「地图 →」进入全球网络页。
 
-客户行读取 Home 公开投影 `onGrid.clients`:客户首字母标 + 客户名 + 模型 · 城市,右侧 GPU 数;无数据时不补行。
+客户行读取 Home 公开投影 `onGrid.clients`:客户首字母标 + 客户名 + 模型 · 城市;自 2026-11-03 起不再显示每个客户的 GPU 数量(与 App 一致)。无数据时不补行。
 
 底部两项与 App 一致(H5 Lite 2026-11-03),不读取 Home 统计的真实在线设备数和每秒金额:
 - 左侧在线数:读取 H9 公开投影 `networkPulse.onlineDevices`,按与网络脉搏相同的区间显示(如 `3.2K+ 在线`)。
@@ -1034,6 +1032,7 @@ H5 Lite 与 App 首页网络快照一致(2026-11-03):标题「网络脉搏」,�
 - 你的排名:服务端账号排名(`/api/app/network/rank`),未上榜显示「未上榜」;点按弹出排名说明。排名受数据可见性开关遮挡。
 - 三项都可用时才显示整卡;注册用户估算参数缺失或无效、在线设备缺失、配置同步失败或排名读取失败时整卡隐藏,不用其他口径代替。
 - 不读取 `verifiedStats`,不显示「更新于」时间、走势折线、每秒发放或今日发放。
+- 同源展示(2026-11-03):信任中心(§11.3)与邀请落地页(§4.3.1)的注册用户、在线设备与本卡同源同格式,并加一项「累计已发放」(读 `/api/config/home-display`,千分位金额);这些页面不再显示真实平台聚合,单项不可用时显示 `-`。
 
 ### 5.13 设备对比卡(Math Card)
 
@@ -3662,29 +3661,18 @@ Lite 的硬件和 Cloud Share 库存管理入口，不展示手机设备（PHONE
 
 ### 11.3 信任中心 `/trust`
 
-14 个 section 集中展示合规与信任标识。
+(2026-11-03 按 H5 Lite 现行页面更正;原 14 个 section 的原型描述——TVL、投资方、媒体、季度财报、NEX 客户消费榜、上市交易所、漏洞赏金等——不再展示。)
 
-| Section | 内容 |
-|---|---|
-| Hero | "Hardware-backed compute · Verifiable execution" + TVL $847M + Active nodes 287K |
-| Compliance badges | SOC 2 Type II / ISO 27001 / GDPR / HIPAA / FinCEN MSB / Chainalysis KYT |
-| Audits & reserves | CertiK 智能合约审计 PDF + Etherscan reserve proof + Trail of Bits quarterly attestation |
-| Trusted by | NVIDIA / Intel / AMD + 5 客户 logo |
-| Backed by | a16z crypto / Sequoia / Pantera / Polychain / Multicoin / Coinbase Ventures |
-| **Leadership team** | 5 行 C-suite,LinkedIn 风格(首字母头像 + 名 + 角色 + ex-公司 + `in` 外链 chip)。Section header suffix `verified on LinkedIn`。整行 `<a href="#">` 占位 |
-| In the press | TechCrunch / CoinDesk / Forbes / The Block 4 篇报道 |
-| **Q2 2026 financials** | 顶部 strip(文件图标 + 标题 + `Download PDF →` 占位链接)+ 2×2 KPI grid(MRR $4.87M +22% / Active 184,206 +38% / Devices 27,150 +12% / Payouts $47.0M +27%)+ footnote `Selected metrics · Full audited report ships to investors quarterly`。Section header suffix `audited by PwC`。季度取**已收官季**(季中不得标 audited);Payouts 为按增长曲线积分、收口于日发放锚的季总量;Devices 为季末快照,低于当前在线锚形成延续增长轨迹 |
-| **NEX backed by AI demand** | hero(`Every NEX is minted only when AI inference completes` + `30% 平台手续费回购销毁`)+ 3 列 stats(`$X.XXM 24h volume` / `$XXXM FDV` / `X.XXB Circulating`)+ 3 行 top AI 客户 NEX 月度消费 ranking(Helix Labs / Mosaic Studios / Echo Earbuds)+ footer `View all 1,247 active AI clients →` |
-| $NEX listings | PancakeSwap / Uniswap / CoinGecko / CoinMarketCap "Live",Binance / Coinbase "审核中" |
-| Bug bounty | $50,000 per critical · HackerOne · 24h triage SLA |
-| KYC & AML | Jumio / Sumsub / Chainalysis / Elliptic / ComplyAdvantage |
-| Footer | compliance@nexgrid.ai |
+页面自上而下:
 
-**Sprint A-1 / A.2 新增**:Leadership team + Q3 2026 financials 两 section 在 Investors → Press → NEX anchor 链条中插入(Leadership 在 Investors 后 Press 前;Q3 在 Press 后 NEX anchor 前),进一步强化"真实 fintech / Web3 公司"信号。所有 PDF / LinkedIn 链接均为占位 `href="#"`,纯视觉剧场。
+- **主体卡**:运营主体、公司法定名称、标题与副标题;信任中心资料接口读到时再显示资质标签与公司事实(注册地、DOS ID、授权资本、注册地址)。
+- **资质与登记**:来自信任中心资料接口的公司注册、FinCEN MSB、EIN 三张卡,含登记号、官网查询链接与「查看」文件入口;读取中显示加载提示,失败显示错误与重试。白皮书已发布时显示白皮书卡,进入白皮书页。
+- **I4 发布内容**:读取中显示加载提示,失败或离线显示错误(远程模式可重试)。读到后按已发布的 section 显示:
+  - 「财务披露」(I4 已发布 financials section 时):显示平台运行数字,与首页网络脉搏卡(§5.12)同源同格式(2026-11-03)——「注册用户」「在线设备」按人口档显示(如 1.2W+、3.2K+),「累计已发放」为 `/api/config/home-display` 展示批次的千分位金额,页面可见时逐秒更新、独占一行。不显示活跃账户、真实在线设备或已完成提现等真实平台聚合,也不显示来源或统计时刻;单项不可用时显示 `-`。
+  - 审计与储备:只列有有效链接的资料行。
+  - 管理团队:只列有有效链接的成员(首字头像、姓名、职位、过往经历)。
 
-**NEX 价值锚叙事目的**:为平台代币提供"工作量证明"语义 — NEX 不是凭空铸造,而是 AI 推理完成才 mint;暗示 buyback 机制(30% 平台手续费回购);列出 top 客户月度 NEX 消费量,放大"1,247 家客户真实需求"的可信度。数据源:`useMarket.volume24hUSDT / circulating` 计算 FDV;客户消费量来自 §9.5 AI 客户清单关联。
-
-`NEX backed by AI demand` section 内嵌 entry chip `📖 What is NEX? Learn more →` 链 `/trust/nex`。
+所有资料缺失时不编造、不以占位链接代替。
 
 #### 11.3.1 NEX 代币说明页 `/trust/nex`
 

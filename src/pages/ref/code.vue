@@ -97,13 +97,13 @@
       <view class="nx-glass-card" :style="proofCardStyle">
         <view class="flex items-center" :style="proofHeadStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text>{{ t.ref.platformTotals }}</text>
+          <text>{{ t.home.networkPulseTitle }}</text>
         </view>
-        <view class="grid grid-cols-2 text-center" style="gap: 8px">
-          <Stat :label="t.ref.newJoiners" :value="joinersText" tint="var(--v5-brand)" />
-          <Stat :label="t.ref.paidOut" :value="paidOutText" tint="var(--v5-warning)" />
+        <view class="grid grid-cols-2 text-center" style="gap: 12px 8px">
+          <Stat :label="t.home.networkMembers" :value="published.registered.value" tint="var(--v5-brand)" />
+          <Stat :label="t.home.networkDevices" :value="published.online.value" tint="var(--v5-tech-cyan-ink)" />
+          <Stat :label="t.home.networkPaidOut" :value="published.paidOut.value" tint="var(--v5-warning)" style="grid-column: span 2" />
         </view>
-        <text v-if="!verified" class="block" :style="proofScopeStyle">{{ t.ref.unavailableScope }}</text>
       </view>
 
       <!-- Footer -->
@@ -139,6 +139,7 @@ import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/
 import { ApiError } from "@/api/errors";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { useConfig } from "@/store/config";
+import { usePublishedNetworkStats } from "@/composables/use-published-network-stats";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 import { visibleReferralGift } from "@/lib/referral-reward-gate";
@@ -152,26 +153,8 @@ const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 const remotePreview = ref<PublicSponsorPreview | null>(null);
 const remotePreviewState = ref<ReferralPreviewState>("idle");
-const proofScopeStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.4, color: "var(--v5-ink-4)" };
-// 🔴 对外财务事实只能来自可核验聚合(zentao #59)。
-//   此前「已付」= 运营配置的设备数 × 公布档位 × 30,「本月新增」= 配置基数 × 配置增速 ——
-//   两者都是把人工配置当实测对外发布。现在:
-//     · 有 verified 聚合时,读真实提现完成额与真实注册账号数,并标注来源与统计时刻;
-//     · 没有(沙箱/旧后端)时显示「—」,不再用配置值编造一个看起来像事实的数字。
-const verified = computed(() => cfg.syncFailed ? null : cfg.config.verifiedStats);
-const paidOutText = computed(() => {
-  const v = verified.value;
-  if (cfg.syncFailed || !v) return "—";
-  const amount = v.completedPayoutUsdt.value;
-  return amount >= 1_000_000
-    ? `${formatAmount(amount / 1_000_000)}M`
-    : formatAmount(amount);
-});
-const joinersText = computed(() => {
-  const v = verified.value;
-  if (cfg.syncFailed || !v) return "—";
-  return v.registeredAccounts.value.toLocaleString("en-US");
-});
+// Social proof uses the published figures of the home network snapshot card, never real aggregates.
+const published = usePublishedNetworkStats();
 const auth = useAuth();
 const sponsorship = remoteApiEnabled ? null : useSponsorship();
 const rewardEnabled = computed(() => cfg.config.rewards.enabled);
