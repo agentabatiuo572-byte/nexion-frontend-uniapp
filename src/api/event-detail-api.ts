@@ -32,6 +32,8 @@ function nonnegative(value: unknown): number {
 }
 export function parseEventDetail(value: unknown): EventDetail {
   const row = record(value);
+  const event = parseEvent(row.event);
+  if (!event) throw new ApiError({ kind: "protocol", message: "EVENT_DETAIL_INVALID" });
   let voucher:EventVoucher|null|undefined;
   if(row.voucher!=null){
     const v=record(row.voucher);
@@ -47,7 +49,7 @@ export function parseEventDetail(value: unknown): EventDetail {
     || !["AVAILABLE", "JOINED", "CLAIMABLE", "CLAIMED"].includes(row.userStatus)
     || !Array.isArray(row.rewards) || !Array.isArray(row.results)) throw new ApiError({ kind: "protocol", message: "EVENT_DETAIL_INVALID" });
   return {
-    event: parseEvent(row.event), rules: record(row.rules), enabled: row.enabled, eligible: row.eligible,
+    event, rules: record(row.rules), enabled: row.enabled, eligible: row.eligible,
     eligibilityReason: row.eligibilityReason, userStatus: row.userStatus,
     ...(voucher!==undefined?{voucher}:{}),
     ...(Array.isArray(row.claimKeys) && row.claimKeys.every((key: unknown) => typeof key === "string" && key) ? { claimKeys: row.claimKeys } : {}),
