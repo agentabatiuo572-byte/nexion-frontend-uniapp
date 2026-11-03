@@ -2,6 +2,7 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import type { ApiEnvironment } from "./runtime-config";
 import { matchesRuntimeProvenance } from "./runtime-provenance";
+import { serverLanguage } from "@/i18n";
 
 export interface RankHowPolicySection { id: string; title: string; body: string; order: number }
 export interface RankHowRules {
@@ -36,5 +37,5 @@ function parse(value: unknown, mode: ApiEnvironment): RankHowPolicy {
 }
 export interface RankHowPolicyApi { published(locale: string): Promise<RankHowPolicy> }
 export function createRankHowPolicyApi(client: ApiClient, mode: ApiEnvironment = "prod"): RankHowPolicyApi {
-  return { published: async (locale) => parse(await client.request<unknown>({ method: "GET", path: `/api/config/v-rank-policy?locale=${encodeURIComponent(locale)}`, authenticated: false }), mode) };
+  return { published: async (locale) => parse(await client.request<unknown>({ method: "GET", path: `/api/config/v-rank-policy?locale=${encodeURIComponent(serverLanguage(locale))}`, authenticated: false }), mode) };
 }
