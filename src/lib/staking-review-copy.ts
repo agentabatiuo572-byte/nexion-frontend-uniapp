@@ -14,7 +14,7 @@ const copy = {
     rules: {
       r3Label: "Rates for new plans may change",
       r3Body: "New stakes use the plan available at the time. Existing stakes keep the rate, term and early unlock charge they started with.",
-      s3Step3Title: "Claim at maturity", faqQ3: "What if I do not claim at maturity?",
+      s3Step3Title: "Claim at lock end", faqQ3: "What if I do not claim when the lock ends?",
     },
   },
   zh: {
@@ -40,7 +40,7 @@ const copy = {
     rules: {
       r3Label: "Tỷ lệ thưởng của gói mới có thể thay đổi",
       r3Body: "Khoản staking mới áp dụng gói tại thời điểm tham gia. Các khoản đang staking giữ nguyên tỷ lệ thưởng, kỳ hạn và phí mở khóa sớm như lúc bắt đầu.",
-      s3Step3Title: "Nhận khi đáo hạn", faqQ3: "Nếu chưa nhận khi đáo hạn thì sao?",
+      s3Step3Title: "Nhận khi hết thời gian khóa", faqQ3: "Nếu chưa nhận khi hết thời gian khóa thì sao?",
     },
   },
   id: {
