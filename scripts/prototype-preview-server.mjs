@@ -95,8 +95,8 @@ const server=http.createServer(async(req,res)=>{
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
         // account (dataState=empty), the low-balance account or the near-deadline sample (paymentState=low-balance /
         // urgent) is one too. Presentation knobs keep them.
-        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','scopeState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
-        if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
+        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','scopeState','computeState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
+        if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
         // checks, not only numbers on screen.
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
