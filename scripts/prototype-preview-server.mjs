@@ -31,15 +31,39 @@ await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.t
 const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{code:'zh',userSet:true}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
-// account and stay. Each page load drops them, before the App starts, when the scenario or this server run changed.
+// account and stay.
 const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-convert-accounts-v1'];
 const serverRun=Date.now().toString(36);
-const scenarioSeed=()=>'<script>(()=>{const scenario='+JSON.stringify(serverRun+':'+(state.scenarioEpoch??0))+";if(localStorage.getItem('uvel-preview-scenario')===scenario)return;for(const key of "+JSON.stringify(scenarioStorageKeys)+")localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);})();</script>";
+// The scenario a page or a reply belongs to: this server run and its scenario epoch.
+const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
+// Runs in every App page before the App starts (design rule at demoSeedFleet). It drops the records of another
+// scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
+// another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
+function previewScenarioPage(scenario,keys){
+  if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
+  const follow=value=>{if(value&&value!==scenario)location.reload();};
+  addEventListener('storage',event=>{if(event.key==='uvel-preview-scenario')follow(event.newValue);});
+  const local=target=>{try{return new URL(target,location.href).origin===location.origin;}catch{return false;}};
+  const {open,send}=XMLHttpRequest.prototype;
+  XMLHttpRequest.prototype.open=function(method,target,...rest){this.previewLocal=local(target);return open.call(this,method,target,...rest);};
+  XMLHttpRequest.prototype.send=function(body){
+    if(this.previewLocal){this.setRequestHeader('X-Preview-Scenario',scenario);this.addEventListener('loadend',()=>follow(this.getResponseHeader('X-Preview-Scenario')));}
+    return send.call(this,body);
+  };
+  const nativeFetch=window.fetch;
+  window.fetch=function(input,init){
+    if(!local(input instanceof Request?input.url:String(input)))return nativeFetch.call(this,input,init);
+    const headers=new Headers(init?.headers??(input instanceof Request?input.headers:undefined));headers.set('X-Preview-Scenario',scenario);
+    return nativeFetch.call(this,input,{...init,headers}).then(response=>{follow(response.headers.get('X-Preview-Scenario'));return response;});
+  };
+}
+const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');</script>';
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
-const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json']});res.end(JSON.stringify(value));};
+const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
 const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
 const server=http.createServer(async(req,res)=>{
-  // A write belongs to the scenario it started in: one whose body arrives after a scenario change is refused.
+  // A write belongs to the scenario it started in: one whose body arrives after a scenario change is refused, and so
+  // is any request from a page of another scenario (checked below).
   const startedIn=state.scenarioEpoch;
   const staleWrite=()=>req.method!=='GET'&&state.scenarioEpoch!==startedIn;
   const refuseStale=()=>sendJson(res,{code:409,message:'演示场景已切换，此操作未执行，请刷新页面',data:null},409);
@@ -114,6 +138,8 @@ const server=http.createServer(async(req,res)=>{
       return sendJson(res,response.body,response.status);
     }
     if(/^\/(api|auth)\//.test(url.pathname)) {
+      const page=req.headers['x-preview-scenario'];
+      if(page&&page!==scenarioId())return refuseStale();
       // B12 handoff: this rejection precedes command recording and all money writes.
       if(req.method==='POST'&&url.pathname==='/api/stakes'&&state.stakingOpenState!=='readonly') {
         let raw='';for await(const chunk of req)raw+=chunk;
@@ -160,7 +186,7 @@ const server=http.createServer(async(req,res)=>{
       if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
       for(const route of [...routes].reverse()) {
         if(route.matcher!=='**/*'&&!route.matcher(url))continue;
-        await route.handler({request:()=>({url:()=>url.href,method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>JSON.parse(body||'{}')}),fulfill:async response=>{res.writeHead(response.status||200,{'Content-Type':response.contentType||mime['.json']});res.end(response.body);},continue:async()=>{}});
+        await route.handler({request:()=>({url:()=>url.href,method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>JSON.parse(body||'{}')}),fulfill:async response=>{res.writeHead(response.status||200,{'Content-Type':response.contentType||mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(response.body);},continue:async()=>{}});
         if(res.writableEnded)return;
       }
       return sendJson(res,{code:404,message:'暂无演示内容',data:null},404);
