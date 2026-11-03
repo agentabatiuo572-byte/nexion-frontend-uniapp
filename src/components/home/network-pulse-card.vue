@@ -1,6 +1,6 @@
 <!--
   NetworkPulseCard — ZONE 2 global-grid metrics(规格 FEAT-HOME02)。
-  三格:注册用户 / 在线设备 / 设备排名。
+  Lite 两格:注册用户 / 在线设备(不含按绑定手机算力的个人排名)。
 -->
 <template>
   <NxSection v-if="compactView && compactAvailable" :title="t.home.networkPulseTitle" :action="copy.details" action-icon-only @action="navTo('/pages/globe/globe')" data-home-section="network">
@@ -20,7 +20,7 @@
 
     <view class="nx-glass-card" style="background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); border-radius: var(--nx-glass-radius); overflow: hidden">
 
-      <view class="grid grid-cols-3">
+      <view class="grid grid-cols-2">
         <view
           v-for="(m, i) in metrics"
           :key="m.k"
@@ -68,40 +68,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 const props = defineProps<{compactView?:boolean;estimated?:boolean;registeredDisplay?:number|null}>();
 const copy = useAuditUiCopy();
 import { useT } from "@/i18n/use-t";
-import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
-import { useNetworkRank } from "@/store/network-rank";
-import { useDataVisibility } from "@/store/data-visibility";
-import { remoteApiEnabled } from "@/api/runtime";
 import { compactNumber as compact, networkPopulationBand } from "@/lib/platform-stats";
-import { confirm } from "@/store/ui";
 import { navTo } from "@/lib/route";
 
 const t = useT();
-const app = useApp();
 const cfg = useConfig();
-const remoteRank = useNetworkRank();
-const visibility = useDataVisibility();
-function refreshRankMoment() {
-  if (remoteApiEnabled) void remoteRank.ensure();
-}
-onMounted(refreshRankMoment);
-watch(() => app.accountKey, (accountKey) => {
-  if (!remoteApiEnabled) return;
-  // Defensive rebind for direct session restore/account mutations; the central
-  // account scope also binds this store, and the epoch makes duplicate binds safe.
-  remoteRank.bindAccount(accountKey);
-  refreshRankMoment();
-});
-watch(() => cfg.loading, (l, was) => {
-  if (was && !l) refreshRankMoment();
-});
 
 // 🔴 骨架防闪的真机制(R2 审计后改):**有活数据的格永不切骨架**(stale-while-revalidate,
 //   下拉链 await 900ms 后 load 600ms,600>300 恒成立,纯时长防抖必被击穿)。
@@ -119,36 +97,15 @@ watch(() => cfg.loading, (l) => {
 });
 onUnmounted(() => { if (skeletonTimer !== null) clearTimeout(skeletonTimer); }); // R3 P2 卫生债
 
-// Only the current bound phone participates; no account-total or local fallback.
-const rank = computed(() => {
-  if (!remoteApiEnabled) return { kind: "unavailable" } as const;
-  if (remoteRank.snapshot === null) return { kind: "unavailable" } as const;
-  const snapshot = remoteRank.snapshot;
-  return snapshot.state === "ranked"
-    ? { kind: "ranked", rank: snapshot.currentRank! } as const
-    : { kind: snapshot.state };
-});
-// This optional home summary is shown only when all three cells are usable.
-// The full card retains its existing explanations and retry controls.
+// Lite: no personal rank cell. The App ranks the bound phone's compute, which the web does not run (rule 1);
+// the summary shows the two shared network figures and appears when both are usable.
 const compactAvailable = computed(() => {
   const members = props.estimated ? props.registeredDisplay : cfg.config.networkPulse?.registeredUsers;
   const devices = cfg.config.networkPulse?.onlineDevices;
-  const currentRank = rank.value;
-  return !cfg.syncFailed && remoteRank.status !== 'error'
+  return !cfg.syncFailed
     && typeof members === 'number' && Number.isSafeInteger(members) && members >= 0
-    && typeof devices === 'number' && Number.isSafeInteger(devices) && devices >= 0
-    && (currentRank.kind === 'unranked'
-      || (currentRank.kind === 'ranked' && Number.isSafeInteger(currentRank.rank) && currentRank.rank > 0));
+    && typeof devices === 'number' && Number.isSafeInteger(devices) && devices >= 0;
 });
-function explainRank() {
-  const state = rank.value.kind;
-  const status = state === "unranked" ? t.value.home.networkRankTipUnranked
-    : state === "disabled" ? t.value.home.networkRankDisabled
-    : state === "unavailable" ? t.value.home.networkRankUnavailable : "";
-  void confirm({ title: t.value.home.networkYourRank,
-    message: [status, t.value.home.networkRankTipRanked].filter(Boolean).join("\n\n"),
-    hideCancel: true, icon: "info" });
-}
 
 interface Cell {
   k: string;
@@ -194,29 +151,13 @@ const metrics = computed<Cell[]>(() => {
   const members = displayCell(t.value.home.networkMembers, memberValue, "var(--v5-brand)");
   const devices = displayCell(t.value.home.networkDevices, pulse?.onlineDevices, "var(--v5-tech-cyan-ink)");
 
-  const r = rank.value;
-  const retainedRank = remoteRank.status === "error" && remoteRank.snapshot !== null;
-  const rankCell: Cell = {
-    k: t.value.home.networkYourRank,
-    v: r.kind === "ranked" ? visibility.mask(`#${compact(r.rank)}`)
-      : r.kind === "unranked" ? t.value.home.networkRankUnranked : "-",
-    vSize: r.kind === "ranked" ? "20px" : "12px",
-    tone: r.kind === "ranked" ? "var(--v5-brand)" : "var(--v5-ink-3)",
-    sub: retainedRank ? t.value.home.networkStale
-      : r.kind === "unavailable" ? t.value.home.networkStatRetry : t.value.home.networkRankExplanation,
-    subTone: "var(--v5-tech-cyan-ink)",
-    skeleton: remoteApiEnabled && remoteRank.status === "loading" && remoteRank.snapshot === null,
-    tap: explainRank,
-    subTap: r.kind === "unavailable" || retainedRank ? () => { void remoteRank.refresh(); } : undefined,
-  };
-
-  return [members, devices, rankCell];
+  return [members, devices];
 });
 
 
 </script>
 <style scoped>
-.network-compact {position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:16px 0;border-radius:22px;border:1px solid var(--v5-border);background:var(--v5-surface);}
+.network-compact {position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:16px 0;border-radius:22px;border:1px solid var(--v5-border);background:var(--v5-surface);}
 .network-compact::before {content:'';position:absolute;inset:0;background-image:radial-gradient(color-mix(in srgb,var(--v5-brand) 10%,transparent) 1px,transparent 1.2px);background-size:10px 10px;mask-image:radial-gradient(80% 120% at 70% 50%,#000,transparent 75%);pointer-events:none;}
 .network-compact__cell {position:relative;min-width:0;padding:0 14px;border-left:1px solid var(--v5-border);}
 .network-compact__cell:first-child {border:0;padding-left:16px;}
