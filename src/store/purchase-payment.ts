@@ -137,7 +137,8 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
 function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
-  const network: ExternalPaymentMethod = state.method === 'CREGIS_USDT_ERC20' || !available('CREGIS_USDT_BSC') && available('CREGIS_USDT_ERC20') ? 'CREGIS_USDT_ERC20' : 'CREGIS_USDT_BSC';
+  // ERC20 is the default network; BEP20 only when ERC20 is not configured.
+  const network: ExternalPaymentMethod = !available('CREGIS_USDT_ERC20') && available('CREGIS_USDT_BSC') ? 'CREGIS_USDT_BSC' : 'CREGIS_USDT_ERC20';
   void select(network, 'network');
 }
 /** 前往付款: a short deadline warns first, then the pre-payment reminder; the intent is created only after the reminder. */
