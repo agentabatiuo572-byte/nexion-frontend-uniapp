@@ -57,6 +57,7 @@ export function useVisibleInterval(tick: () => void, delay: number) {
   const stop = () => { if (timer !== undefined) clearInterval(timer); timer = undefined; };
   const start = () => { tick(); if (timer === undefined) timer = setInterval(tick, delay); };
   if (inject(TAB_LIFECYCLE, null)) { onShow(start); onHide(stop); }
-  else onMounted(start);
+  // Ordinary H5 pages: the clock follows the visible page.
+  else { onShow(start); onHide(stop); onMounted(start); }
   onBeforeUnmount(stop);
 }
