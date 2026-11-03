@@ -5068,7 +5068,7 @@ export const id: Messages = {
         rule: "Spanduk / brosur / kartu nama",
       },
       dev: {
-        title: "SDK / dukungan dev",
+        title: "Dukungan SDK",
         rule: "Integrasi khusus untuk pelanggan utama",
       },
     },
