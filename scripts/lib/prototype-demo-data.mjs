@@ -178,10 +178,10 @@ const demoOrderSlots=(orders,orderNo)=>orders
 // orders, purchases, trade-ins, stopped devices, trial, command receipts and payment intents on the server, the App's
 // order/payment recovery rows in the browser), and the next read seeds the devices here. A write is applied only in
 // the scenario it started in. dataState=empty is the empty account the empty pages are reviewed with: no devices
-// (hidden phones included) and no sample orders, the trial as its own knobs say. PRESENTATION knobs
-// (machineImageState, dataState loading/error, Lite's computeState) only change what a read shows; they never reseed
-// or change occupancy. Other Lite knobs (setupGateState, promoState, promoEdgeState, ...) own no devices or orders and
-// keep the scenario.
+// (hidden phones included), no sample orders and an empty wallet (balance 0, so wallet payments are refused for
+// funds), the trial as its own knobs say. PRESENTATION knobs (machineImageState, dataState loading/error, Lite's
+// computeState) only change what a read shows; they never reseed or change occupancy. Other Lite knobs
+// (setupGateState, promoState, promoEdgeState, ...) own no devices or orders and keep the scenario.
 // After seeding, only lifecycle events change the fleet: purchases and deliveries, conversions, trade-ins and the
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
 // full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
@@ -407,7 +407,7 @@ export function demoFixture(url,locale,state,request) {
     // Settles like the server: debit the payable, retire the old device, and put the new one in its place.
     const input=request.postDataJSON(),quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo),product=products.find(p=>p.id===quote.targetProductNo);
     if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
-    if(!quote.sufficientFunds)throw new Error('Insufficient demo balance');
+    if(!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
     state.walletBalance=Math.round((quote.walletBalanceUsdt-quote.payableUsdt)*100)/100;
     (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
@@ -480,7 +480,7 @@ export function demoFixture(url,locale,state,request) {
     const replay=order.paymentStatus==='PAID';
     if(action==='pay'&&!['PENDING','PAID'].includes(order.paymentStatus)||action==='cancel'&&order.paymentStatus==='PAID')throw new Error('Demo order action unavailable');
     if(action==='pay'&&!replay&&!demoOrderFitsCapacity(url,locale,state,products,order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
-    if(action==='pay'&&!replay){if(Number(order.amountUsdt)>(state.walletBalance??52800.64))throw new Error('Insufficient demo balance');state.walletBalance=(state.walletBalance??52800.64)-Number(order.amountUsdt);}
+    if(action==='pay'&&!replay){if(Number(order.amountUsdt)>(state.walletBalance??52800.64))refuse('ORDER_WALLET_INSUFFICIENT');state.walletBalance=(state.walletBalance??52800.64)-Number(order.amountUsdt);}
     state.orderStatuses||={};state.orderStatuses[orderNo]=action==='pay'?'activated':'cancelled';
     const canonicalStatus=state.orderStatuses[orderNo],[paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus];
     if(state.createdOrders?.includes(order))Object.assign(order,{canonicalStatus,paymentStatus,orderStatus,activationStatus,paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',paidAt:action==='pay'?now:null,activatedAt:action==='pay'?now:null});
