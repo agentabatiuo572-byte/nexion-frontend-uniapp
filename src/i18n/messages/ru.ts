@@ -1933,7 +1933,6 @@ export const ru: Messages = {
       regional: "Битва регионов",
       boost: "Повышенные награды",
       seasonal: "Сезонная",
-      holding: "Для держателей",
       onboarding: "Старт новичка",
     },
     tabs: {

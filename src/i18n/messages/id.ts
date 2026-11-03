@@ -1933,7 +1933,6 @@ export const id: Messages = {
       regional: "Adu wilayah",
       boost: "Bonus boost",
       seasonal: "Musiman",
-      holding: "Hadiah pemegang",
       onboarding: "Pengguna baru",
     },
     tabs: {
