@@ -2722,7 +2722,7 @@ i18n keys 在 `repurchaseHowItWorks.*` namespace ~40 keys。
 
 #### 9.6.2a 开仓确认与写入
 
-Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则、预计收益和最低金额。确认后提交服务器开仓指令并读取仓位与账单；用户端展示值必须与后台 G1 参数源一致。App `95641b63` 的行为移植到 Lite：不再调用风险披露 `checkGate`，也不因 `RISK_DISCLOSURE_ACK_REQUIRED` 跳页；保留指令租约、账号 / epoch / 弹层守卫和错误映射。B12 前若当前账号拥有的新开仓请求收到准确的 `RISK_DISCLOSURE_ACK_REQUIRED`（code 409，HTTP 409 或成功 HTTP 下的业务拒绝），因 `AppStakingService.open` 在 `executeOnce` 之前返回，按确定未扣款处理并仅退役该请求的准确 intent；提示用户本次未扣款、联系客服后重试，不跳转风险页。普通 `NOT_FOUND`、旧请求恢复、未知错误和其他账号请求均不据此退役；本地退役失败继续核对原请求。
+Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则、预计收益和最低金额。确认后提交服务器开仓指令并读取仓位与账单；用户端展示值必须与后台 G1 参数源一致。App `95641b63` 的行为移植到 Lite：不再调用风险披露 `checkGate`，也不因 `RISK_DISCLOSURE_ACK_REQUIRED` 跳页；保留指令租约、账号 / epoch / 弹层守卫和错误映射。B12 前若当前账号拥有的新开仓请求收到准确的 `RISK_DISCLOSURE_ACK_REQUIRED`（code 409，HTTP 409 或成功 HTTP 下的业务拒绝），因 `AppStakingService.open` 在 `executeOnce` 之前返回，按确定未扣款处理并仅退役该请求的准确 intent；提示「暂时无法质押」「本次未扣款。账户仍需完成风险确认，请联系客服后重试。」（英文、越南语同步），不显示「上一笔质押未完成 / 核对上一笔」，不跳转风险页，用户可再次提交（2026-11-03 BUG-086：追平合并曾丢失这条提示，此时显示「上一笔质押未完成」）。普通 `NOT_FOUND`、旧请求恢复、未知错误和其他账号请求均不据此退役；本地退役失败继续核对原请求。
 
 #### 9.6.3 玩法说明页 `/staking/how-it-works`
 
