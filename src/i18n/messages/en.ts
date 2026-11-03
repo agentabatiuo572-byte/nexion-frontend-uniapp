@@ -1465,7 +1465,6 @@ trustReserve: "No verifiable reserve information available.",
       regional: "Regional PK",
       boost: "Bonus Boost",
       seasonal: "Seasonal",
-      holding: "Holders Reward",
       onboarding: "New Pilot",
     },
     tabs: {

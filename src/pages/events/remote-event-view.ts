@@ -21,7 +21,6 @@ const TINT_BY_KIND: Record<CanonicalEvent["kind"], string> = {
   regional: "#FB7185",
   boost: "#86EFAC",
   seasonal: "#F9A8D4",
-  holding: "#93C5FD",
   onboarding: "#FDE68A",
 };
 
