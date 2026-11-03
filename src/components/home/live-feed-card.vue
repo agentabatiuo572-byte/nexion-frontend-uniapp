@@ -17,7 +17,7 @@
       <GlassSegments
         v-model="tab"
         class="nx-home-feed-tabs"
-        :class="{ 'nx-home-feed-tabs--vi': localeStore.code === 'vi' }"
+        :class="{ 'nx-home-feed-tabs--long': localeStore.code !== 'zh' && localeStore.code !== 'en' }"
         :options="feedTabOptions"
         :label="`${t.home.liveFeedTabActivity} / ${t.home.liveFeedTabEarnings}`"
         @keydown.up.stop.prevent="activateAdjacentTab(tab, -1)"
@@ -209,7 +209,8 @@ function goAll() {
 .nx-home-feed-tabs :deep(.nx-glass-option) { min-height:22px;padding:0; }
 .nx-home-feed-tabs :deep(.nx-glass-option::after) { content:"";position:absolute;inset:-11px 0; }
 .nx-home-feed-tabs :deep(.nx-glass-option__label) { font-size:10px;font-weight:600;line-height:12px;white-space:nowrap; }
-.nx-home-feed-tabs--vi :deep(.nx-glass-option__label) { font-size:9px;letter-spacing:-.4px; }
+/* Vietnamese and the other long languages: both labels must fit the 90px switch. */
+.nx-home-feed-tabs--long :deep(.nx-glass-option__label) { font-size:9px;letter-spacing:-.4px; }
 /* Feed rows (also rendered by the running-task and income children). One height for every row. */
 .nx-home-live-feed :deep(.nx-feed-row) { position:relative;display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:var(--ui-space-inline);box-sizing:border-box;min-height:63px;padding:var(--ui-space-inline) 0; }
 /* Every row (and the empty state) carries its own top divider, so the first row is no taller than the rest. */
