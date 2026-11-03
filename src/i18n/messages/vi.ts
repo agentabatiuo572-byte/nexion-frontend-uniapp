@@ -9,6 +9,7 @@ export const vi: Messages = {
   paymentPin: paymentPinVI,
   coreReview: coreReviewCopy.vi,
   thirdParty: {
+    restartExpired: "Ủy quyền đã hết hạn, bạn chưa đăng nhập. Hãy thử lại hoặc đăng nhập bằng số điện thoại.",
     signInTitle: "Đăng nhập bằng",
     linkTitle: "Tài khoản đăng nhập liên kết",
     unavailable: "Đăng nhập bên thứ ba hiện không khả dụng.",
