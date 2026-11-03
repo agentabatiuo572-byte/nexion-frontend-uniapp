@@ -6,7 +6,7 @@ import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
 import { reportNativeSessionStage, reportNativeSessionTiming } from "@/api/native-session-storage";
 import { watch } from "vue";
-import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
+import { onLaunch, onShow, onHide, onPageNotFound } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
 import { useConversations } from '@/store/conversations';
 import { useMessageDrawer } from "@/store/message-drawer";
@@ -1276,6 +1276,9 @@ onLaunch(() => {
   }
   scheduleAccountSessionBootstrap();
 });
+// Lite registers no phone-setup or review-surface pages; an old link or a
+// refresh on any unregistered page lands on Home instead of a blank page.
+onPageNotFound(() => { void navReset({ url: "/pages/index/index" }); });
 onShow(() => {
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
