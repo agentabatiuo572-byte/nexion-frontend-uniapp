@@ -43,6 +43,8 @@ const server=http.createServer(async(req,res)=>{
         const update=JSON.parse(body||'{}');
         if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
+        // A scenario change seeds the fleet again on its next read (reset clears the whole state).
+        if(['fleetState','checkoutState','trialState','benefitState','machineImageState'].some(key=>key in update))delete state.fleetSeed;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}
