@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoFixture,demoOrderFitsCapacity,demoProducts} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoFixture,demoOrderFitsCapacity} from './prototype-demo-data.mjs';
 
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
@@ -16,7 +16,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const handles = path => path.startsWith(base);
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   // The account's one order list (not the dataState=empty display projection).
-  const ordersOf = origin => demoAccountOrders(demoProducts(state, origin, locale()), state);
+  const ordersOf = origin => demoAccountOrders(new URL(origin), locale(), state);
   // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
   let epoch = state.scenarioEpoch;
   const sync = () => { if (epoch !== state.scenarioEpoch) { epoch = state.scenarioEpoch; quotes.clear(); intents.clear(); } };
