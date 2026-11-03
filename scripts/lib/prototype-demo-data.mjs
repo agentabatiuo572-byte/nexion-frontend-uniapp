@@ -30,7 +30,7 @@ const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null
 export const demoDefaults = {trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
-  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU）']],
+  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU · 首页横幅与购机活动）']],
   downloadState:[['unavailable','下载入口未发布'],['published','iOS / Android / 官网入口（示例链接）']],
   ...authDemoOptions,
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换'],['capacity-error','容量读取失败'],['setup-required','需完成初始设置']],
@@ -401,6 +401,11 @@ export function demoFixture(url,locale,state,request) {
       // Like PromotionPublicService, an offer that is not running is never eligible.
       if(item.state!=='ACTIVE')item.eligibility='INELIGIBLE';
       if(state.machineImageState==='banner'&&item.state==='ACTIVE')item.bannerImageUrl=`/api/promotions/${item.activityId}/banner/${item.version}`;
+      // Lite phone campaigns: offer 0 sells only iphone15 (hidden on the web), offer 4 leads with an iphone15 rule.
+      if(state.promoState==='phone'&&(i===0||i===4)){
+        const phoneRule={...structuredClone(item.rewardRules[0]),ruleId:'demo-rule-phone-'+i,productNo:'iphone15'};
+        item.productNos=i===0?['iphone15']:['iphone15',...item.productNos];item.rewardRules=i===0?[phoneRule]:[phoneRule,...item.rewardRules];
+      }
       return item;
     });
     if(pathname!=='/api/promotions') return items.find(item=>item.activityId===pathname.split('/').pop())||{};
