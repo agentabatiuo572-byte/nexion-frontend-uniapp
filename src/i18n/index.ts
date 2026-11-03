@@ -26,7 +26,7 @@ export interface LocaleEntry {
   flag: string;
 }
 
-export const LOCALES: LocaleEntry[] = [
+const LOCALE_REGISTRY: LocaleEntry[] = [
   { code: "zh", nativeName: "中文", englishName: "Chinese", region: "China", priority: 0, isRTL: false, flag: "🇨🇳" },
   { code: "en", nativeName: "English",   englishName: "English",              region: "Global",              priority: 0, isRTL: false, flag: "🌐" },
   { code: "vi", nativeName: "Tiếng Việt", englishName: "Vietnamese",           region: "Vietnam",             priority: 0, isRTL: false, flag: "🇻🇳" },
@@ -37,6 +37,12 @@ export const LOCALES: LocaleEntry[] = [
   { code: "kk", nativeName: "Қазақ тілі", englishName: "Kazakh", region: "Kazakhstan", priority: 0, isRTL: false, flag: "🇰🇿" },
   { code: "uz", nativeName: "Oʻzbekcha", englishName: "Uzbek", region: "Uzbekistan", priority: 0, isRTL: false, flag: "🇺🇿" },
 ];
+
+// Interface languages offered to users. Removing a code hides that language from users; its translations stay.
+const LAUNCHED_LOCALES: readonly LocaleCode[] = ["zh", "en", "vi", "id", "ms", "fil", "ru", "kk", "uz"];
+
+/** Launched languages in registry order: the pickers list these, and only these are stored, restored or applied. */
+export const LOCALES: LocaleEntry[] = LOCALE_REGISTRY.filter((locale) => LAUNCHED_LOCALES.includes(locale.code));
 
 /** Interface languages with a bundled dictionary. Frontend-owned copy keeps one slot per language. */
 export type UiLocale = "zh" | "en" | "vi" | "id" | "ms" | "fil" | "ru" | "kk" | "uz";
