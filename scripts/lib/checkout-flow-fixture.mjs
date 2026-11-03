@@ -6,17 +6,16 @@ import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fi
 export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const pin = createPaymentPinFlowFixture();
   pin.state.loggedIn = true;
-  pin.state.balance = state.walletBalance ?? 52800.64;
   const receipts = new Map();
   const ok = data => ({status:200,message:'OK',data});
   const external = createPurchasePaymentPreviewFixture(state, locale);
   const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || external.handles(path);
-  // A reset or scenario change starts a fresh account: replayed receipts, PIN-held orders and payment command
-  // receipts belong to the old one. The PIN's own setup/change commands belong to the credential, which stays.
+  // A reset or scenario change starts a fresh account: replayed receipts and payment command receipts belong to the
+  // old one. The PIN's own setup/change commands belong to the credential, which stays.
   let epoch = state.scenarioEpoch;
   function handle(url, request) {
     if (epoch !== state.scenarioEpoch) {
-      epoch = state.scenarioEpoch; receipts.clear(); pin.orders.clear(); pin.state.balance = state.walletBalance ?? 52800.64;
+      epoch = state.scenarioEpoch; receipts.clear();
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
@@ -38,8 +37,6 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     if (['/api/orders','/api/orders/bundle'].includes(path) && method === 'POST') {
       if (receipts.has(path+key)) return ok(receipts.get(path+key));
       const result = demoFixture(url,locale(),state,request);
-      const order = state.createdOrders.find(item => item.orderNo === result.orderNo);
-      pin.orders.set(order.orderNo,order);
       receipts.set(path+key,result);
       return ok(result);
     }
@@ -52,28 +49,30 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         order = demoFixture(new URL('/api/orders',url.origin),locale(),state,{...request,method:()=> 'GET'}).orders.find(item=>item.orderNo===orderNo);
         if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
       }
-      // A sample row is adopted into the writable store only once a pay is authorized; a cancellation (settled by
-      // the commerce fixture through its order status) or a refused command leaves the account's orders untouched.
+      // A sample row is adopted into the writable store only for a pay that commerce settles; a cancellation (settled
+      // by the commerce fixture through its order status) or a refused command leaves the account's orders untouched.
       if (action[2] === 'cancel') return ok(demoFixture(url,locale(),state,request));
+      // Like AppPaymentPasswordService: a command key answers the outcome recorded for it.
+      const command = 'order-pay:' + key, recorded = key && pin.commands.get(command);
+      if (recorded) return recorded.status === 'SUCCEEDED' ? ok(recorded.receipt) : {status:recorded.code,message:recorded.message,data:null};
       if (!['PENDING','PAID'].includes(order.paymentStatus)) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
-      pin.orders.set(orderNo,order);
-      const before = structuredClone(order), beforeBalance = pin.state.balance, beforeWrites = pin.state.payWrites;
-      const authorization = pin.handle(url,request);
+      // The PIN fixture only verifies the password. The commerce fixture authorizes the funds against the account's
+      // one wallet balance and settles stock, capacity, receipt and fleet; the command is recorded only after it.
+      const authorization = pin.authorize(request.postDataJSON());
       if (authorization.status !== 200) return authorization;
       if (sample) { state.createdOrders ??= []; state.createdOrders.push(order); }
-      // The PIN fixture validates and records the original authorization; the
-      // existing commerce fixture owns stock/capacity/receipt/fleet semantics.
-      Object.assign(order,before);
-      state.walletBalance = beforeBalance;
       let settled;
       try { settled = demoFixture(url,locale(),state,request); }
       catch (error) {
-        pin.state.balance=beforeBalance;pin.state.payWrites=beforeWrites;Object.assign(order,before);
-        return {status:error.status??409,message:error.message,data:null};
+        if (sample) state.createdOrders.splice(state.createdOrders.indexOf(order),1);
+        const refusal = {status:error.status??409,message:error.message,data:null};
+        if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
+        return refusal;
       }
-      pin.state.balance=state.walletBalance;
       Object.assign(order,{paymentNo:settled.paymentNo,targetDeviceId:order.targetDeviceId??90301,targetDeviceInstanceNo:order.targetDeviceInstanceNo??orderNo+'-0-0'});
-      return {...ok(settled),drop:authorization.drop};
+      if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
+      pin.state.payWrites++;
+      return {...ok(settled),drop:pin.state.dropNextPayment?(pin.state.dropNextPayment=false,true):false};
     }
     return ok(demoFixture(url,locale(),state,request));
   }
