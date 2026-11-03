@@ -227,12 +227,12 @@ const wheelUnits = {
   zh: { points: "积分", coupon: "券" },
   en: { points: "pts", coupon: "coupon" },
   vi: { points: "điểm", coupon: "phiếu" },
-  id: { points: "pts", coupon: "coupon" },
-  ms: { points: "pts", coupon: "coupon" },
+  id: { points: "poin", coupon: "voucher" },
+  ms: { points: "mata", coupon: "baucar" },
   fil: { points: "pts", coupon: "coupon" },
-  ru: { points: "pts", coupon: "coupon" },
-  kk: { points: "pts", coupon: "coupon" },
-  uz: { points: "pts", coupon: "coupon" },
+  ru: { points: "очк.", coupon: "купон" },
+  kk: { points: "ұпай", coupon: "купон" },
+  uz: { points: "ball", coupon: "kupon" },
 };
 function wheelLabel(sp: Pick<SpinPrize, "kind" | "amount">): string[] {
   const units = wheelUnits[uiLocale(locale.code)];

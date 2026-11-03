@@ -20,7 +20,7 @@ const props=defineProps<{status:'idle'|'loading'|'ready'|'error'; total:number; 
 const emit=defineEmits<{(event:'invite'):void;(event:'open'):void;(event:'retry'):void}>();
 const t=useT(), locale=useLocaleStore(), copy=computed(()=>teamRedesignCopy(locale.code));
 const visibility=useDataVisibility();
-const teamLabel=computed(()=>({zh:'团队',en:'Team',vi:'Nhóm',id:'Team',ms:'Team',fil:'Team',ru:'Team',kk:'Team',uz:'Team'})[uiLocale(locale.code)]);
+const teamLabel=computed(()=>({zh:'团队',en:'Team',vi:'Nhóm',id:'Tim',ms:'Pasukan',fil:'Team',ru:'Команда',kk:'Команда',uz:'Jamoa'})[uiLocale(locale.code)]);
 const canOpen=computed(()=>props.status==='ready' && props.total>0);
 const readable=computed(()=>props.status==='ready'||(props.hasSnapshot&&(props.status==='loading'||(props.status==='error'&&props.transientFailure))));
 // Size the rendered text so masking also conceals the original digit count.

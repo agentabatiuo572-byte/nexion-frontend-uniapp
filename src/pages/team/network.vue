@@ -204,9 +204,9 @@ const orbitDots = computed(() => {
 });
 const ringSplitText = computed(() => {
   const direct = directCount.value, team = members.value.length - direct;
-  return fmt(({ zh: "内圈直接邀请 {direct} · 外圈团队 {team}", en: "Inner: direct {direct} · Outer: team {team}", vi: "Vòng trong: mời trực tiếp {direct} · Vòng ngoài: đội {team}", id: "Inner: direct {direct} · Outer: team {team}", ms: "Inner: direct {direct} · Outer: team {team}", fil: "Inner: direct {direct} · Outer: team {team}", ru: "Inner: direct {direct} · Outer: team {team}", kk: "Inner: direct {direct} · Outer: team {team}", uz: "Inner: direct {direct} · Outer: team {team}" })[uiLocale(locale.code)], { direct, team });
+  return fmt(({ zh: "内圈直接邀请 {direct} · 外圈团队 {team}", en: "Inner: direct {direct} · Outer: team {team}", vi: "Vòng trong: mời trực tiếp {direct} · Vòng ngoài: đội {team}", id: "Dalam: {direct} teman Anda · Luar: {team} anggota tim", ms: "Dalam: rakan dijemput {direct} · Luar: pasukan {team}", fil: "Loob: {direct} inimbita · Labas: {team} iba", ru: "Внутренний круг: друзья {direct} · внешний: команда {team}", kk: "Ішкі: сіз шақырған {direct} · Сыртқы: команда {team}", uz: "Ichki: doʻstlar {direct} · Tashqi: jamoa {team}" })[uiLocale(locale.code)], { direct, team });
 });
-const peopleUnit = computed(() => ({ zh: "人", en: "members", vi: "thành viên", id: "members", ms: "members", fil: "members", ru: "members", kk: "members", uz: "members" })[uiLocale(locale.code)]);
+const peopleUnit = computed(() => ({ zh: "人", en: "members", vi: "thành viên", id: "anggota", ms: "ahli", fil: "miyembro", ru: "чел.", kk: "мүше", uz: "aʼzo" })[uiLocale(locale.code)]);
 const monthPointsLabel = computed(() => locale.code === "zh" ? "本月算力点" : t.value.network.monthVolume);
 const memberStatusCounts = computed(() => (["active", "idle", "offline"] as const).map(status => ({
   status, label: networkReauditCopy(locale.code)[status], count: members.value.filter(member => member.status === status).length,

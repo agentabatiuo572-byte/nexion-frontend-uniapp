@@ -72,7 +72,7 @@ const recordActivities=ref<PublicPromotion[]>([]);
 // A failed first read has no records to show yet, so its section carries the error and a retry instead.
 const earnedRecords=computed(()=>recordActivities.value.filter(p=>progress.value[p.activityId]?.ownRewards.length||(!progress.value[p.activityId]&&progressErrors.value[p.activityId])));
 // A short end-date chip from the activity's own window.
-const deadlineCopy={zh:'{date} 截止',en:'Ends {date}',vi:'Hết hạn {date}',id:'Ends {date}',ms:'Ends {date}',fil:'Ends {date}',ru:'Ends {date}',kk:'Ends {date}',uz:'Ends {date}'};
+const deadlineCopy={zh:'{date} 截止',en:'Ends {date}',vi:'Hết hạn {date}',id:'Berakhir {date}',ms:'Tamat {date}',fil:'Hanggang {date}',ru:'До {date}',kk:'Аяқталуы: {date}',uz:'Tugaydi: {date}'};
 function deadlineText(activity:PublicPromotion){const end=new Date(activity.endsAt);if(Number.isNaN(end.getTime()))return'';return deadlineCopy[uiLocale(locale.code)].replace('{date}',formatDayMonth(end.getMonth()+1,end.getDate(),locale.code));}
 const progressBusy=ref<Record<string,boolean>>({}),progressErrors=ref<Record<string,boolean>>({});
 const imageRefresh=ref<Record<string,number>>({});

@@ -29,12 +29,12 @@ const copy = {
   zh: { hide: "隐藏资产、收益、算力和团队统计", show: "显示资产、收益、算力和团队统计" },
   en: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
   vi: { hide: "Ẩn tài sản, thu nhập, sức mạnh tính toán và thống kê nhóm", show: "Hiện tài sản, thu nhập, sức mạnh tính toán và thống kê nhóm" },
-  id: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
-  ms: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
-  fil: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
-  ru: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
-  kk: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
-  uz: { hide: "Hide assets, earnings, compute and team statistics", show: "Show assets, earnings, compute and team statistics" },
+  id: { hide: "Sembunyikan aset, pendapatan, komputasi, dan statistik tim", show: "Tampilkan aset, pendapatan, komputasi, dan statistik tim" },
+  ms: { hide: "Sembunyikan aset, pendapatan, pengkomputeran dan statistik pasukan", show: "Tunjukkan aset, pendapatan, pengkomputeran dan statistik pasukan" },
+  fil: { hide: "Itago ang asset, kita, compute at stats ng team", show: "Ipakita ang asset, kita, compute at stats ng team" },
+  ru: { hide: "Скрыть активы, доход, мощность и статистику команды", show: "Показать активы, доход, мощность и статистику команды" },
+  kk: { hide: "Активтерді, табысты, есептеу қуатын және команда статистикасын жасыру", show: "Активтерді, табысты, есептеу қуатын және команда статистикасын көрсету" },
+  uz: { hide: "Aktivlar, daromad, quvvat va jamoa statistikasini yashirish", show: "Aktivlar, daromad, quvvat va jamoa statistikasini koʻrsatish" },
 };
 const label = computed(() => {
   const text = copy[uiLocale(locale.code)];

@@ -314,7 +314,7 @@ const latestApplication = ref<AmbassadorApplication>({ applicationId: null, stat
 const applications = ref<AmbassadorApplication[]>([]);
 
 const applicationStatusText = (application: AmbassadorApplication) => t.value.agent.applicationStatuses[application.status];
-const applicationIdLabel = computed(() => ({ zh: '申请编号', en: 'Application ID', vi: 'Mã đơn đề nghị', id: 'Application ID', ms: 'Application ID', fil: 'Application ID', ru: 'Application ID', kk: 'Application ID', uz: 'Application ID' })[uiLocale(locale.code)]);
+const applicationIdLabel = computed(() => ({ zh: '申请编号', en: 'Application ID', vi: 'Mã đơn đề nghị', id: 'ID pengajuan', ms: 'ID permohonan', fil: 'ID ng application', ru: 'Номер заявки', kk: 'Өтінім ID', uz: 'Ariza raqami' })[uiLocale(locale.code)]);
 // This is a submitted budget, not a two-decimal balance overview. Keep every
 // accepted decimal from the contract, and never feed this display into commands.
 function applicationBudget(value: number | null): string {
