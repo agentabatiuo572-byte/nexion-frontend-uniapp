@@ -25,7 +25,7 @@ const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-export const demoDefaults = {trialQuoteState:"default",computeState:"cycles",fleetState:"normal",checkoutState:'ordinary',paymentState:'delivered',topupState:'form',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',stakingOpenState:'readonly',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {trialQuoteState:"default",computeState:"cycles",fleetState:"normal",checkoutState:'ordinary',paymentState:'delivered',topupState:'form',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',...authDemoDefaults,trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',stakingOpenState:'readonly',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
   promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU）']],
@@ -56,6 +56,8 @@ export const demoOptions = {
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
   streakState:[['normal','连续签到'],['broken','断签·可使用复活卡']],
   ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
+  jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
+  globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）']],
 };
 const skuDefinitions = [
   ['stellarbox-s1','UVELBox S1','Entry',1299,6.2,3,'4 × RTX 4090','96 GB',1200],
@@ -142,12 +144,16 @@ export function demoFixture(url,locale,state,request) {
     if(state.stakingState==='legacy')delete config.featureFlags.stakingVisible;
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
-    Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0});
+    Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0,activeJobsBase:state.jobsBaseState==='published'?1000:null});
     // Verified aggregates feed the trust centre's platform figures; the empty fixture has none.
     const aggregate=(value,kind)=>({value,definition:'Preview figure',kind});
     config.publicStats.verified=empty?null:{activeAccounts:aggregate(8642,'COUNT'),registeredAccounts:aggregate(12480,'COUNT'),installedDevices:aggregate(3315,'COUNT'),onlineDevices:aggregate(2968,'COUNT'),completedPayoutUsdt:aggregate(1284650.5,'SUM'),capturedAt:new Date(demoStartedAt).toISOString()};
-    // The H9 default globe simulation (backend GlobeDisplayConfig.defaults); the empty data state leaves it unpublished.
-    if(!empty)config.publicStats.globeDisplay={intervalMs:5400,nodeJitterPct:.4,activeJobsMinPct:8,activeJobsMaxPct:14,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:[['sg',236000,18],['jp',253000,22],['vn',163000,26],['uk',249000,16],['fr',208000,20],['de',217000,14],['us-ny',316000,24],['us-sj',284000,17]].map(([id,nodes,latencyMs])=>({id,nodes,latencyMs}))};
+    // The H9 globe split and drift; totals come from networkPulse.onlineDevices and the task-centre job count.
+    // Old shape: nodes as weights plus the retired jitter/ratio fields. B22 shape: sharePct only. The empty data state leaves it unpublished.
+    const globeCenters=[['sg',236000,18,12.5],['jp',253000,22,13],['vn',163000,26,8.5],['uk',249000,16,12],['fr',208000,20,10],['de',217000,14,11],['us-ny',316000,24,17],['us-sj',284000,17,16]];
+    if(!empty)config.publicStats.globeDisplay=state.globeShareState==='nodes'
+      ?{intervalMs:5400,nodeJitterPct:.4,activeJobsMinPct:8,activeJobsMaxPct:14,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:globeCenters.map(([id,nodes,latencyMs])=>({id,nodes,latencyMs}))}
+      :{intervalMs:5400,throughputMin:2.2,throughputMax:3.8,latencyJitterMs:6,centers:globeCenters.map(([id,,latencyMs,sharePct],i)=>({id,latencyMs,sharePct:state.globeShareState==='invalid'&&i===0?sharePct-10:sharePct}))};
     if(empty){delete config.publicStats.registeredUsersBase;config.publicStats.networkPulse=null;}
     return withDemoShareChannels(config,state);
   }
