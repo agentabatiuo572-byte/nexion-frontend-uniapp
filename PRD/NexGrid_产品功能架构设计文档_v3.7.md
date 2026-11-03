@@ -231,8 +231,8 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/wallet/usdt-guide            如何获取 USDT(新手指引)
 /me/wallet/exchange              NEX↔USDT 兑换
 /me/wallet/exchange/how-it-works 兑换玩法说明页
-/me/wallet/repurchase            复投
-/me/wallet/repurchase/how-it-works 复投玩法说明页
+/me/wallet/repurchase            锁定计划(已下线,跳转「我的」)
+/me/wallet/repurchase/how-it-works 锁定计划玩法说明页(已下线,跳转「我的」)
 /me/wallet/bills                 账单流水
 /me/wallet/cards                 我的银行卡(saved-cards 列表)
 /me/wallet/cards/new             绑定银行卡(可带 returnTo)
@@ -423,7 +423,7 @@ Lite 手机号注册完成（含保存的手机号注册尝试恢复），或第
 **业务规则**:
 - 注册完成时:`sponsorship.bind(code)` 写入 sponsorCode + sponsor 信息
 - 立即 `claimGift()` → 礼包按账户注册风险评估**分桶入账**:风险簇 clear 直入可提余额;命中多账户风险簇(watch/frozen)则进「审核中 / 锁定」桶,不直入可提(详见 §4.3.5)
-- 直入可提时显示庆祝 toast(`+$5 + 20 NEX welcome gift · Sponsored by …`);进审核桶时显示「新人奖励待审核」提示
+- 直入可提时显示庆祝 toast,有邀请人时副文为「来自 {name} 的邀请」(en `Invited by {name}`);进审核桶时显示「新人奖励待审核」提示
 - 礼包金额由平台配置 `rewards.welcomeGift.{usdtAmount,nexAmount}` 决定(默认 $5 + 20 NEX,后台可调),前端展示与入账同源派生
 - **首次绑定生效,后续 URL ?ref 不可覆盖**
 - 每个账号 welcome gift **仅一次**
@@ -2069,71 +2069,19 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 #### 8.4.4 玩法说明页 `/team/binary/how-it-works`
 
-**目的**:面向首次接触双轨机制的新用户的零基础说明页,从"你做什么"到"系统怎么算"再到"具体例子"递进,降低参与门槛。
+**目的**：一页讲清团队平衡奖励怎么来：团队分 A 组 / B 组，按较小一组的订单额发放，以实际发放为准。用户端统一叫「团队平衡奖励 / Team Balance Reward / Thưởng cân bằng nhóm」、「A 组 / B 组」、「自动分组」，不出现轨道、双轨、网络伙伴、推荐位、placement 等说法（术语对照见 APP-COPY-AUDIT 第二节，2026-10-29 用户确认）。
 
-**用户端命名映射**(对照内部代码 / 后台术语):
+**页面结构**（2026-11-04 按代码核对）：
 
-| 内部 / 后台 | 用户端展示 |
-|---|---|
-| binary 双轨 | Dual-Track Growth Program / 双轨成长奖励计划 |
-| match Balance Match | Balance Match Bonus / 平衡匹配奖励 |
-| left wing → "left" enum | Track A / A 轨道 |
-| right wing → "right" enum | Track B / B 轨道 |
-| 强制平衡 / 阻塞 | Both tracks must be active / 双轨均需达到激活门槛 |
-| spillover(内部字段 isSpillover) | Auto-placement / 自动分配 |
-| upline | Network partner / 网络伙伴 |
-| downline | Track member / 轨道成员 |
-| 日上限 / 阻塞归零 | Daily payout cap ensures fair distribution / below qualifying threshold |
-
-文风对标 Apple Affiliate / Airbnb Superhost / Uber Driver onboarding 等正规商业奖励计划。
-
-**页面结构**(自上而下):
-
-1. **iOS nav**:back chevron → `/team/binary`,标题 `How it works`
-
-2. **Hero**:
-   - 顶部 `DUAL-TRACK GROWTH PROGRAM` 标签
-   - 大标题:`You grow two teams side by side. When both grow, you earn.`
-   - 副文:简短说明这是奖励均衡持续推荐的计划,不是单边猛冲
-
-3. **§1 What is the Dual-Track Program?**(2 段)
-   - 第 1 段:推荐网络分 Track A / Track B 两条独立轨道,每个邀请的人加入一条
-   - 第 2 段:系统按两轨较小者的月度活动发奖,鼓励两轨平衡
-
-4. **§2 Picture it like this**(SVG 树状图)
-   - SVG:中心 `YOU` 节点 + Track A 圆 + Track B 圆 + 各 3 子节点小圆点 + 连接线
-   - 下方 2 列示例数字卡:`Track A $3,000/mo` / `Track B $2,000/mo`
-
-5. **§3 How your team grows (3 steps)**(圆点序号 1-3 stack)
-   - Step 1 You invite someone — 选择放 Track A / Track B,placement 永久锁定
-   - Step 2 They invite others — 新邀请自动加入同一轨道
-   - Step 3 Auto-placement assistance — 网络伙伴推荐位填满后新成员下沉到你的轨道下游("your network partner helps your team grow")
-
-6. **§4 How your reward is calculated**
-   - 介绍段:系统月底取两轨总活动 × 较小数 × 10% = Balance Match Bonus
-   - 内嵌计算 box(双数字 + 分隔线 + `Smaller track $2,000 × 10% = $200` 大字)
-   - 资格 chip:`Both tracks need at least $1,000/month to qualify`
-   - 白话段:不需要相等,但都得"活着",keep inviting smaller track
-
-7. **§5 A real example: meet Sarah**(3 月 timeline 卡 stack)
-   - Month 1:Tom (Track A) + Alex (Track B) 各小额订单 → 两轨未过门槛 → bonus $0(`· below qualifying threshold` tag)
-   - Month 2:Tom + Alex 各邀请 2 人买 NexGridBox S1 → A $2,600 / B $2,200 → bonus $220
-   - Month 3(高亮卡):A $4,500 / B $2,400 → bonus $240(按较小一轨)
-   - 💡 takeaway 卡:`The slower track sets your reward. Invest in both.`
-
-8. **§6 Common questions**(5 FAQ 行,纯展开列表)
-   - Q1 能否选 track?A1 可以,首次签约时选,placement 之后锁定
-   - Q2 一轨没人怎么办?A2 继续邀请该轨或等网络伙伴自动分配;两轨 < $1,000 无 bonus
-   - Q3 多久结算?A3 按平台配置的结算周期(默认每月),按周期统计两轨累计算力额、于下一周期初支付(§8.4.1.2)
-   - Q4 不邀请也赚吗?A4 可以,Balance Match Bonus 只是 channel 之一,设备产出 / 直推奖照常
-   - Q5 未匹配的算力额会保留吗?A5 取决于沉淀处置策略(§8.4.1.2):每月清零 / 每次对碰清零 → 不结转;转结 → 累积到下一周期
-
-9. **底部 footer**:全宽 CTA `Got it · see my Dual-Track →` 链 `/team/binary`
-
-**实现约束**:
-- "use client" + useT(),完全静态展示,无 store 订阅(零状态)
-- SVG 树状图:程序生成,viewBox 自适应,不依赖外部图片
-- i18n keys:`binaryHowItWorks.*` namespace(en + zh 双语镜像),含结算频率 FAQ 与沉淀处置 FAQ(`residualFaq` 按策略派生);结算周期 / 周期标签 label map 在 `binary.*` namespace(`settlePeriodLabel` / `periodEstimateLabel` / `periodUnitLabel`)
+1. 标题 `团队平衡奖励 · 玩法说明`，返回 `/team/binary`。
+2. **接后端时**：显示后台发布的正文（content-key `team-binary-how`），Hero 标签「团队平衡奖励」，底部按钮「查看我的两组」。
+3. **未接后端时**（本地兜底）：
+   - Hero：「两组越均衡，奖励越多」/「奖励看较小一组的订单额，以实际发放为准。」，附按主题阅读目录。
+   - 奖励怎么来：「你的团队成员分在 A、B 两组。两组都有订单时，按较小一组的订单额发放奖励。」+「部分成员会自动分到 A 组或 B 组。」
+   - 发放说明：「订单额按已确认订单统计，奖励以实际发放为准。」，下方明示发布说明暂不可用（不展示比例、门槛等未发布的规则数值）。
+   - 常见问题 3 问：新成员会分到哪一组？（答：部分成员会自动分到 A 组或 B 组）/ 一组没有订单怎么办？（答：至少一组订单额暂未达标，邀请好友可尽快达标）/ 多久发放一次？（答：发布说明暂不可用，请重试）。
+   - 底部按钮「查看我的两组」回 `/team/binary`。
+4. 已删除的旧本地文案（2026-11-04）：选择 A/B 轨道并永久锁定、轨道向下生长、自动分配协助、两条轨道按周期统计、较大轨转结、「完全不邀请也能赚」等说明；这些词条在页面上早已不再引用，现从九种语言中移除。
 
 ### 8.5 全球领导奖池 `/team/leadership-pool`
 
@@ -2191,17 +2139,17 @@ flowchart TD
 | 直属购买分成 | 直接成员实付设备订单 | 由当笔政策决定等待期 | USDT + NEX，同一结算组 |
 | 直属设备收益分成 | 直接成员真实已入账设备凭证 | 由当笔政策决定等待期 | USDT + NEX，同一结算组 |
 | 网络购买奖励 | 网络成员实付设备订单 | 原七层冷却规则 | L2–L7保留原USDT及额外NEX；历史原账保留 |
-| 平衡匹配(Balance Match) | 双轨对碰条件满足 | 每日 | USDT,30 天冷却 |
+| 团队平衡奖励(binary) | A、B 两组均有合格订单 | 每日 | USDT,30 天冷却 |
 | Peer | 保留配置参数；当前能力未开放、未发放 | 不作发放承诺 | USDT |
 | Cultivation | 直接推荐人按下属晋升有效等级的发布配置获得奖励 | 按实际结算状态 | UVT（协议 NEX） |
 | Leadership | 领导池周分红 | 每周 | USDT(V3+ 解锁) |
 | Genesis | 创世节点持有人排放 | 上所后 | $NEX(创世持有人,vesting 释放) |
 
-列表支持直属购买、网络购买、直属设备收益、对碰、平级、培育、领导池、创世八类筛选和服务端账项汇总。总佣金两币同组计两条账项，不称成员或奖励组数；网络版税页按来源组同时展示两币。状态包含等待计算/冷却/已到账/已支取/冻结/撤销/拒绝/待追回；待追回两币金额不能作为可提现收益。
+列表按奖励类型筛选（2026-11-04 按代码核对，`commission-filter-copy.ts`）：全部、邀请购机、邀请设备收益、团队购机、团队平衡、协作奖励、成员成长、团队激励、创世节点、晋升奖励、其他（en：All / Referral purchase / Referral earnings / Team purchase / Team balance / Collaboration / Member growth / Team incentive / Genesis node / Rank reward / Other），并有服务端账项汇总。总佣金两币同组计两条账项，不称成员或奖励组数；网络版税页按来源组同时展示两币。状态包含等待计算/冷却/已到账/已支取/冻结/撤销/拒绝/待追回；待追回两币金额不能作为可提现收益。
 
 **Commission row layer chip 二分类显示**:Row 内紧跟 `sourceUserName` 显示来源 chip,基于数学层 `e.layer` 字段二分类:
-- `layer === 1` → **直推**(`commissions.directBadge`)
-- `layer >= 2` → **扩展**(`commissions.extendedBadge`)
+- `layer === 1` → **好友**(`commissions.directBadge`，en `Friend`)
+- `layer >= 2` → **团队**(`commissions.extendedBadge`，en `Team`)
 
 层级标签区分购买的直属/网络来源；设备分成只认服务端真实直属来源，不按客户端月算力额推算。
 
@@ -2640,51 +2588,49 @@ NEX↔USDT 兑换确认必须展示 from/to amount、rate、fee、KYC/cap 状态
 
 i18n keys 在 `exchangeHowItWorks.*` namespace ~35 keys。
 
-### 9.5 复投激励 `/me/wallet/repurchase`
+### 9.5 锁定计划 `/me/wallet/repurchase`（页面已下线）
+
+**现状（2026-11-04 按代码核对）**：锁定计划页和玩法说明页已于 2026-10-28 从 `pages.json` 移除（提交 55075a49）。`/me/wallet/repurchase`、`/me/wallet/repurchase/how-it-works` 及对应 uni 路由统一跳转到「我的」，用户进不去；页面代码和 `repurchase.*`、`repurchaseHowItWorks.*` 词条仍保留。下面记录页面恢复时使用的文案口径：用户端统一叫「锁定计划 / Lock Plan / Gói khóa USDT」，用锁定金额、锁定奖励、参考年奖励率、提前解锁，不出现复投、本金、利息、年化/APY、赎回、复利等说法。
 
 #### 9.5.1 目的
 
-引导用户把已到账的 USDT 重新投入资金,以更深的锁仓换取更高的复合收益。
+用户把 USDT 锁定 90 天，同时获得锁定奖励、成员成长奖励倍率和 Genesis 抽奖券。
 
 #### 9.5.2 UI
 
-- Hero:`Lock USDT for 90 days · earn 3 things at once`
-- 3 项 benefits:
-  - `35% APY · 90 days`
-  - `Cultivation ×1.5`
-  - `Genesis lottery ticket`
-- 金额输入 + presets($100 / 200 / 500 / 1000)
-- 90 天后预测:本金 + 利息 + 解锁可提现总额
-- CTA:`Re-invest $X`
+- 标题与 Hero：`锁定计划`（en `Lock Plan`，vi `Gói khóa USDT`）
+- 3 项奖励：接后端时为 `参考年奖励率 {apy}% · {days} 天`、`成员成长奖励 ×{multiplier}`、`每笔 {tickets} 张 Genesis 抽奖券`；未接后端时为 `参考年奖励率 35% · 90 天`、`成员成长奖励 ×1.5`、`Genesis 抽奖券`
+- 金额输入（`锁定金额`）+ presets（$100 / 200 / 500 / 1000）；接后端时显示 `最低锁定金额：{amount} USDT`，低于门槛提示「金额低于最低锁定金额，请至少输入 {amount} USDT。」
+- `{days} 天后` 预测：`锁定金额` / `锁定奖励（参考年奖励率 {apy}% · {days} 天）` / `解锁可提现`
+- CTA：`锁定 ${amount}`；下方提示「资金锁定 90 天 · 提前解锁扣除锁定金额的 15%。」
+- 订单列表：`我的锁定计划`，空状态「暂无锁定计划」；到期操作「领取锁定金额及奖励」，到期前「提前解锁」，状态含「已提前解锁」；领取与提前解锁确认里的金额均写「预计…，最终金额以实际到账为准」
+- 暂停：「锁定计划暂未开放，请稍后再试。」；不可用：「锁定计划暂不可用」
 
 #### 9.5.3 业务逻辑
 
-提交 → `debitBalance(amount)` + `stake(amount, 90)` → 90 天锁仓到 staking vault,并发放培育奖 ×1.5 倍率与 Genesis 抽奖券。
+提交 → `debitBalance(amount)` + `stake(amount, 90)` → 90 天锁定到 staking vault，并发放成员成长奖励 ×1.5 倍率与 Genesis 抽奖券。
 
-§9.5.2 header 之下 entry chip `📖 New here? Learn how Re-invest works →` 链 `/me/wallet/repurchase/how-it-works`。
+§9.5.2 页内入口 `规则介绍` 链 `/me/wallet/repurchase/how-it-works`。
 
-#### 9.5.3a 复投确认与写入
+#### 9.5.3a 锁定确认与写入
 
-复投确认必须展示复投金额、进入 stake/cap 的影响与账单摘要。确认后写入 repurchase event、wallet bill 与 active stake/cap 变化。
+确认标题「确认锁定计划」，正文：「锁定 ${amount} USDT，共 {days} 天，确认后立即扣减可用余额。提前解锁扣除锁定金额的 {penalty}%，锁定奖励及抽奖券不发放。」确认后写入 repurchase event、wallet bill 与 active stake/cap 变化。结果待确认时提示「锁定计划结果待确认」，核对只查询上一笔状态，确认前不新建锁定计划。
 
 #### 9.5.4 玩法说明页 `/me/wallet/repurchase/how-it-works`
 
-零基础说明页,文风强调"3 重奖励一次叠加"以解释复投增益的独特价值。
+接后端时显示后台发布的正文（content-key `wallet-repurchase-how`）；未接后端时的本地页面结构：
 
-**页面结构**:
-1. iOS nav back + 标题 `How Re-invest works`
-2. Hero + 标签 `RE-INVEST BOOST` + 大标题 `Lock USDT for 90 days — earn 3 things at once.`
-3. §1 What is Re-invest Boost?(2 段:强化版 90 天质押 + 复利效应类比)
-4. §2 一笔存款 3 重奖励 IconRow:
-   - ⚡ 35% APY · 90 天质押利息
-   - 🎟 Genesis 抽奖券(每月开奖,中奖 ~$5,000 NFT)
-   - 📈 培育奖倍率 ×1.5
-5. §3 操作 3 步(选金额 / 查看明细 / 锁仓 90 天)+ CalloutBox `💡 Early withdrawal cost`(罚本金 15% + 利息/券全 forfeit)
-6. §4 Worked example: 复投 $1,000 — 卡显示本金 $1,000 / ×1.5 倍率 / 1 张抽奖券 → 第 90 天总回报 $1,300+
-7. §5 FAQ 4 问(为什么用复投而不是普通质押 / NEX 能否复投 / 抽奖券何时发 / Genesis 抽奖怎么开)
-8. 底部 CTA 回 `/me/wallet/repurchase`
-
-i18n keys 在 `repurchaseHowItWorks.*` namespace ~40 keys。
+1. 返回 `/me/wallet/repurchase`，标题沿用 `锁定计划`
+2. Hero：标签 `锁定计划`，大标题「锁仓 USDT 90 天——一次获得 3 重奖励。」，副文说明可能包含的奖励，并提示参与前核对适用条件与提前解锁扣款
+3. §1 什么是锁定计划？（普通质押的增强版，锁定 90 天同时获得 3 项奖励；这是给把资金留在平台、不立即提现的用户的奖励。不做复利或收益增长类比）
+4. §2 一笔存款 3 重奖励：
+   - ⚡ 参考年奖励率 35% · 90 天锁定奖励
+   - 🎟 Genesis 抽奖券（每月开奖，中奖 ~$5,000 NFT）
+   - 📈 成员成长奖励倍率 ×1.5（锁定期间你邀请的好友升到新 V 级时生效）
+5. §3 3 步开启锁定计划（选金额 / 查看明细 / 锁仓 90 天）+ 提示框「提前解锁成本」（扣除锁定金额的 15%，已累计的锁定奖励和抽奖券都不发放）
+6. §4 举例：锁定 $1,000.00 — 锁定金额 $1,000.00 / ×1.5 倍率 / 1 张抽奖券 → 第 90 天预计可领 $1,300.00+
+7. §5 常见问题 3 问（为什么选锁定计划而不是普通 90 天质押 / 可以用 UVT 余额参与锁定计划吗 / Genesis 抽奖怎么开）
+8. 底部按钮「明白了 · 立即锁定」回 `/me/wallet/repurchase`
 
 ### 9.6 Staking 质押(USDT 锁仓)`/staking`
 
