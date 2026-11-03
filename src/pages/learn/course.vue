@@ -116,6 +116,7 @@ import { createLearningPageFenceReader, type LearningPageFence } from "./learnin
 import { createLearningCourseStartLoadCoalescer, loadPublishedCourseWithStart, type LearningCourseStartFailure } from "./learning-course-start";
 import { observationRecoveryRoute } from "@/lib/day-one-observation-recovery";
 import { initialQuizAnswers, quizOptionTabIndex, learningAttemptRecoveryAction, learningResultDetails, matchingCourseResult, matchingReceiptResult, validAnswersForCourse } from "./learning-result-details";
+import { serverLanguage } from "@/i18n";
 
 // 存 key 不存译文：译好的串快照进 ref 后不再跟随语言（见 courses.vue 同处注释）。
 type CourseError = "" | "courseOffline" | "courseIdMissing" | "courseUnavailable" | "courseUpdated" | "submitUnconfirmed";
@@ -169,7 +170,7 @@ const canSubmit = computed(() => !!course.value
   && (!course.value.questions.length || (pendingAttempt.value
     ? pendingAnswersValid.value && ["ABSENT", "FAILED"].includes(String(pendingReceiptStatus.value))
     : allAnswered.value)));
-const language = computed(() => locale.code === "zh" || locale.code === "vi" ? locale.code : "en");
+const language = computed(() => serverLanguage(locale.code));
 const versionLine = computed(() => displayCourse.value
   ? fmt(t.value.learning.courseVersionMeta, { version: displayCourse.value.version, nex: formatAmount(displayCourse.value.rewardNex) })
   : "");

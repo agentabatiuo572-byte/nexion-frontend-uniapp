@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import type { LocaleCode } from "@/i18n";
+import { serverLanguage, type LocaleCode } from "@/i18n";
 import type { ManagedCopyDelivery } from "@/api/content-copy-api";
 import { contentCopyApi, remoteApiEnabled } from "@/api/runtime";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
@@ -51,9 +51,7 @@ export const useContentCopy = defineStore("content-copy", () => {
   function localized(positionKey: string, locale: LocaleCode): string | null {
     const copy = deliveries.value[positionKey];
     if (!copy) return null;
-    if (locale === "zh") return copy.zh;
-    if (locale === "vi") return copy.vi;
-    return copy.en;
+    return copy[serverLanguage(locale)];
   }
 
   const assignedExperimentIds = computed(() => Array.from(new Set(

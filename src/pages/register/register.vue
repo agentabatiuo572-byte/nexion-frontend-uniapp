@@ -205,6 +205,7 @@ import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useConfig } from "@/store/config";
 import { fmt } from "@/i18n/format";
+import { serverLanguage } from "@/i18n";
 import { evaluateRegistration, commitRegistration, type RegistrationAssessment } from "@/store/risk-cluster";
 import { pickSponsor, type SponsorMeta } from "@/mock/sponsors";
 import { toast } from "@/store/ui";
@@ -815,7 +816,7 @@ async function finish() {
       code: codeStr.value,
       password: password.value,
       sponsorCode: currentSponsorCode(),
-      language: useLocaleStore().code,
+      language: serverLanguage(useLocaleStore().code),
     };
     completing.value = true;
     const registration = await registerAndLogin(authApi, registrationRequest,

@@ -13,8 +13,8 @@
         <text v-if="detail.event.kind==='seasonal'&&detail.rules.voucherId" class="event-copy">{{ copy.voucherTerms }}</text>
         <text class="event-status" role="status">{{ copy.eligibility[detail.eligibilityReason] }}</text>
         <text v-if="detail.reminderSubscribed" class="event-copy" role="status">{{ reminderCopy.subscribed }}</text>
-        <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, language) }}</text></view>
-        <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, language) }}</text></view>
+        <view v-if="detail.event.startsAt" class="event-row"><text>{{ copy.start }}</text><text>{{ displayDeadline(detail.event.startsAt, locale.code) }}</text></view>
+        <view v-if="detail.event.endsAt" class="event-row"><text>{{ copy.end }}</text><text>{{ displayDeadline(detail.event.endsAt, locale.code) }}</text></view>
       </view>
       <view v-if="detail.rewards.length" class="nx-glass-card event-section">
         <text class="event-heading">{{ copy.rewards }}</text>
@@ -73,9 +73,10 @@ import { displayDeadline } from "@/lib/promotion-display";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd } from "@/lib/usd-display";
 import { eventDetailAction, eventDetailRules, eventDetailReward, eventClaimCommandKey, eventDetailHref } from "./event-detail-display";
+import { serverLanguage } from "@/i18n";
 
 const app = useApp(), locale = useLocaleStore(), api = createEventDetailApi(apiClient);
-const language = computed(() => locale.code === "zh" || locale.code === "vi" ? locale.code : "en");
+const language = computed(() => serverLanguage(locale.code));
 const copy = computed(() => eventDetailCopy[language.value]);
 const reminderCopy = computed(() => eventReminderCopy[language.value]);
 const detail = ref<EventDetail | null>(null), loading = ref(true), error = ref(false), busy = ref(false), commandError = ref(false);

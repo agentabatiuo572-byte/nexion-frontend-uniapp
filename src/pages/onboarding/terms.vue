@@ -100,7 +100,7 @@ import { useT } from "@/i18n/use-t";
 import { navBack, navTo } from "@/lib/route";
 import { legalTermsApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useLocaleStore } from "@/store/locale";
-import { LOCALES, type LocaleCode } from "@/i18n";
+import { serverLanguage, LOCALES, type LocaleCode } from "@/i18n";
 import type { LegalTermsCurrent } from "@/api/legal-terms-api";
 import {
   buildLegalTermsRoute,
@@ -191,11 +191,12 @@ async function loadTerms(retryRotation = true) {
   if (!remoteApiEnabled || !termsPageVisible) return;
   // A duplicate retry for the same language must share the in-flight read. A
   // language switch intentionally starts a fresh request so the new gate can
-  // replace the previous locale without waiting for it to settle.
-  if (loadingTerms.value && termsRequests.isLatestLocale(locale.code)) return;
+  // replace the previous locale without waiting for it to settle. Terms are
+  // published in zh/en/vi; other interface languages read the English document.
+  if (loadingTerms.value && termsRequests.isLatestLocale(serverLanguage(locale.code))) return;
   confirmationGeneration += 1;
   confirming.value = false;
-  const request = termsRequests.start(locale.code);
+  const request = termsRequests.start(serverLanguage(locale.code));
   loadingTerms.value = true;
   loaded.value = false;
   loadErrorKey.value = null;
@@ -209,14 +210,14 @@ async function loadTerms(retryRotation = true) {
     if (requestFence) {
       const hydration = pendingProfileLocaleHydration({ accountId: `user:${requestFence.userId}`, revision: requestFence.sessionRevision ?? 0 });
       if (hydration) await hydration;
-      if (!termsRequests.isCurrent(request, locale.code) || !termsPageVisible) return;
+      if (!termsRequests.isCurrent(request, serverLanguage(locale.code)) || !termsPageVisible) return;
       if (!sameLegalTermsSession(requestFence, currentSessionFence())) throw new Error("LEGAL_TERMS_SESSION_CHANGED");
     }
     const snapshot = await legalTermsApi.current(request.locale, "GLOBAL", authenticated);
-    if (!termsRequests.isCurrent(request, locale.code, snapshot.requestedLocale)) {
+    if (!termsRequests.isCurrent(request, serverLanguage(locale.code), snapshot.requestedLocale)) {
       // A current response that claims a different requested locale is not an
       // acknowledgement for this screen. Keep the gate closed and retryable.
-      if (termsRequests.isCurrent(request, locale.code)) loadErrorKey.value = "loadFailed";
+      if (termsRequests.isCurrent(request, serverLanguage(locale.code))) loadErrorKey.value = "loadFailed";
       return;
     }
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
@@ -236,7 +237,7 @@ async function loadTerms(retryRotation = true) {
     }
     serverTerms.value = snapshot;
   } catch (error) {
-    if (!termsRequests.isCurrent(request, locale.code)) return;
+    if (!termsRequests.isCurrent(request, serverLanguage(locale.code))) return;
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
       if (retryRotation && isCurrentRefreshContinuation(requestFence)) {
         loadingTerms.value = false;
@@ -250,7 +251,7 @@ async function loadTerms(retryRotation = true) {
     serverTerms.value = null;
     loadErrorKey.value = isProfileLocaleHydrationError(error) ? "languageSyncFailed" : "loadFailed";
   } finally {
-    if (termsRequests.isCurrent(request, locale.code)) {
+    if (termsRequests.isCurrent(request, serverLanguage(locale.code))) {
       loaded.value = true;
       loadingTerms.value = false;
     }
