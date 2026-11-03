@@ -755,7 +755,7 @@ export const vi: Messages = {
     dayOneTaskBindCard: "Link bank card",
     dayOneTaskVisitEarn: "Visit Earn",
     dayOneTaskVisitStore: "Visit Store",
-    dayOneTaskSeeRoi: "Xem thu nhập dự kiến của S1",
+    dayOneTaskSeeRoi: "Thu nhập dự kiến S1",
     dayOneTaskSetupProfile: "Set up profile",
     dayOneTaskInviteFriend: "Invite a friend",
     dayOneCatWallet: "ví",
