@@ -608,7 +608,7 @@ export const vi: Messages = {
     //   Chưa có hạng 127.8 / Không hạng 110.0 / Chưa hạng 101.1),故保留最地道的标准说法,
     //   由接线方对「未上榜整态降档」渲染:≤12px 时 "Chưa xếp hạng" = 83.5px 才放得下。
     networkRankUnranked: "Chưa xếp hạng",
-    networkRankTipRanked: "Máy chủ tính thứ hạng mạng lưới. Thứ hạng chỉ để tham khảo, không ảnh hưởng đến thu nhập hay phần thưởng.",
+    networkRankTipRanked: "Ước tính theo sức mạnh tính toán hiệu dụng của điện thoại đã liên kết. Chỉ để tham khảo, không ảnh hưởng thu nhập hay phần thưởng.",
     networkRankTipUnranked: "Điện thoại liên kết với tài khoản chưa có sức mạnh tính toán đủ điều kiện để xếp hạng.",
     // 值槽 89.3px@20px 放不下 "Đang cập nhật"(实测 135.0px),换 "Đang tải" = 78.5px。
     networkStatUpdating: "Đang tải",

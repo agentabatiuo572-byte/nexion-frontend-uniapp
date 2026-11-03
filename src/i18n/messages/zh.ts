@@ -594,7 +594,7 @@ export const zh: Messages = {
     networkMembersSub: "每月 +{n}%",
     networkDevicesSub: "正在跑任务",
     networkRankUnranked: "未上榜",
-    networkRankTipRanked: "服务器计算的网络排名，仅供参考，不影响收益或奖励。",
+    networkRankTipRanked: "按当前绑定手机的有效算力估算排名，仅供参考，不影响收益或奖励。",
     networkRankTipUnranked: "当前绑定手机尚无可用于排名的有效算力。",
     // 值槽 89.3px@20px 放不下「数据更新中」(实测 98.6px),缩到「更新中」= 59.2px。
     networkStatUpdating: "更新中",
