@@ -34,7 +34,7 @@ export const demoOptions = {
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（重试原消息）'],['timeout','确认超时（15 秒转待确认）']],
   messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['author-photo','客服带本人头像'],['recommendations','商品与链接推荐'],['agent-switch','客服已切换提示（有名字/无名字）'],['welcome-unassigned','刚注册 · 未分配客服 · 欢迎语未读'],['welcome-assigned','刚注册 · 已有专属客服 · 欢迎语未读'],['read','会话全部已读']],
-  machineImageState:[['normal','原活动机型'],['alternate','后台换机型（Pro 赠 S1）'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
+  machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 售罄'],['restricted','购买条件未满足']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
@@ -449,10 +449,6 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
     const sample=base('/api/promotions').items[0];
     const configs=[['SKU_GIFT','买 S1，送 Cloud Share','Buy S1, get Cloud Share','Mua S1, tặng Cloud Share','stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
-    if(state.machineImageState==='alternate'){
-      configs[0]=['SKU_GIFT','买 Pro，送 S1','Buy Pro, get S1','Mua Pro, tặng S1','stellarbox-pro'];
-      configs[2][4]='stellarrack-p1';
-    }
     const items=empty||state.eventState==='empty'?[]:configs.map(([template,zh,en,vi,productNo],i)=>{
       const item=structuredClone(sample);item.activityId='demo-promo-'+i;item.template=template;item.title={zh,en,vi};item.productNos=template==='MULTI_PRODUCT'?['stellarbox-pro','stellarrack-p1','stellarbox-s1']:[productNo];item.placement=[0,1,4].includes(i)?'home.purchase-promotion':null;
       item.rewardRules[0].productNo=productNo;item.rewardRules[0].ruleId='demo-rule-'+i;
@@ -462,8 +458,8 @@ export function demoFixture(url,locale,state,request) {
       if(i>0)item.endsAt=new Date(now+6*day-19*60000).toISOString();
       if(i===0){
         item.startsAt=new Date(now-2*day).toISOString();item.endsAt=new Date(now+28*day-60*60000).toISOString();
-        const alternate=state.machineImageState==='alternate',giftName=alternate?'UVELBox S1':'Cloud Share';
-        const reward=item.rewardRules[0].buyerReward;reward.giftProductNo=alternate?'stellarbox-s1':'cloud-share';reward.quantity=1;
+        const giftName='Cloud Share';
+        const reward=item.rewardRules[0].buyerReward;reward.giftProductNo='cloud-share';reward.quantity=1;
         reward.disclosure.deviceName=giftName;
         reward.disclosure.benefitDescription={zh:'送 '+giftName+' 1 份',en:'Get 1 '+giftName,vi:'Tặng 1 '+giftName};
         reward.disclosure.terms={zh:'订单付款完成后，赠品发放到你的设备仓库。',en:'Once the order is paid, the gift is added to your device inventory.',vi:'Sau khi đơn hàng được thanh toán, quà tặng sẽ vào kho thiết bị của bạn.'};
