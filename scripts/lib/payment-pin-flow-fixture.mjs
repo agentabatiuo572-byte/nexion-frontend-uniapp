@@ -21,6 +21,16 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     if(state.attempts===0)state.lockedUntil=new Date(now()+30000).toISOString();
     return state.lockedUntil===null?'PAYMENT_PASSWORD_INCORRECT':'PAYMENT_PASSWORD_LOCKED';
   };
+  // Verifies a payment password for one payment; the caller settles the payment and records its command.
+  const authorize=body=>{
+    const current=pinState();
+    if(!current.configured)return fail(409,'PAYMENT_PASSWORD_NOT_CONFIGURED',current);
+    if(current.lockedUntil!==null)return fail(423,'PAYMENT_PASSWORD_LOCKED',current);
+    if(body.credentialVersion!==state.version)return fail(409,'PAYMENT_PASSWORD_VERSION_CONFLICT',current);
+    if(body.paymentPassword!==state.password)return fail(422,wrongPassword(),pinState());
+    state.attempts=5;
+    return ok(current);
+  };
   const session=()=>({accessToken:'payment-flow-fixture',refreshToken:null,tokenType:'Bearer',user:{userId:90211,countryCode:'+86',phone:'13800138001',nickname:'Frontend acceptance',onboardingComplete:true}});
   function handle(url, request) {
     const method=request.method(), body=request.postDataJSON?.()??{}, path=url.pathname, key=request.headers()['idempotency-key'];
@@ -91,12 +101,8 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     if(pay&&method==='POST'){
       const order=orders.get(decodeURIComponent(pay[1]));if(!order)return fail(404,'ORDER_NOT_FOUND');
       if(order.paymentStatus==='PAID')return ok(order);
-      const current=pinState();
-      if(!current.configured)return fail(409,'PAYMENT_PASSWORD_NOT_CONFIGURED',current);
-      if(current.lockedUntil!==null)return fail(423,'PAYMENT_PASSWORD_LOCKED',current);
-      if(body.credentialVersion!==state.version)return fail(409,'PAYMENT_PASSWORD_VERSION_CONFLICT',current);
-      if(body.paymentPassword!==state.password)return fail(422,wrongPassword(),pinState());
-      state.attempts=5;
+      const authorization=authorize(body);
+      if(authorization.status!==200)return authorization;
       state.payWrites++;state.balance-=Number(order.amountUsdt);
       Object.assign(order,{paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paidAt:Date.now(),activatedAt:Date.now(),targetDeviceId:90301,targetDeviceInstanceNo:'PIN-FLOW-DEVICE',paymentNo:'PIN-FLOW-PAYMENT'});
       commands.set('order-pay:'+key,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,receipt:order});
@@ -118,5 +124,5 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     if(path==='/api/trial/state'||path==='/api/trial/eligibility')return ok({...data,canStart:false,reason:'used',state:'ELIGIBLE',version:1});
     return ok(data??{});
   }
-  return {handle,state,orders,commands};
+  return {handle,authorize,state,orders,commands};
 }
