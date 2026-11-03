@@ -17,6 +17,8 @@ import { mountSpec7DevBridge } from "@/lib/spec7-dev-bridge";
 import { mountAuthOtpDevBridge } from "@/store/auth-otp";
 import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
+import { useConfig } from "@/store/config";
+import { serverLanguage } from "@/i18n";
 import { syncExplicitProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { installH5PageReadActivation, installNativePageReadActivation, type PageReadRouter } from "@/lib/page-read-activation";
 import { notifyPageActivation } from "@/lib/passive-read-window";
@@ -91,6 +93,12 @@ export function createApp() {
     void runtimeI18n.refresh(next);
   });
   watch(() => locale.explicitRevision, () => syncExplicitProfileLocale(locale.code), { flush: "sync" });
+  // A loaded platform config that switches off the current language shows its server projection (en).
+  // The account already stores en for it and this is not an explicit choice, so nothing is written.
+  const platformConfig = useConfig(pinia);
+  watch(() => [locale.code, platformConfig.offeredLocales] as const, ([code, offered]) => {
+    if (!offered.some((entry) => entry.code === code)) locale.applyServerLocale(serverLanguage(code));
+  });
   if (import.meta.env.DEV) {
     // DEV-only: SPEC-7 演示桥(模拟后台处置下发)。
     mountSpec7DevBridge();
