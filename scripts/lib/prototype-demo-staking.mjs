@@ -11,7 +11,7 @@ const proof = {
   sourceEnvironment: "PRODUCTION", runId: "", serverCanonical: true,
 };
 
-export function createStakingDemoFixture({ empty = false, now = Date.now() } = {}) {
+export function createStakingDemoFixture({ empty = false, now = Date.now(), wallet } = {}) {
   return {
     pools: {
       ...proof,
@@ -22,7 +22,7 @@ export function createStakingDemoFixture({ empty = false, now = Date.now() } = {
       })),
     },
     snapshot: {
-      ...proof, walletBalanceUsdt: empty ? 0 : 1000,
+      ...proof, walletBalanceUsdt: empty ? 0 : wallet,
       serverTime: new Date(now).toISOString(),
       positions: empty ? [] : [{
         positionNo: "AUDIT-READONLY-001", tierKey: "usdt30d",
@@ -41,7 +41,8 @@ export function stakingDemo(url, state, request) {
   if (request.method() !== "GET") return undefined;
   if (url.pathname !== "/api/config/staking/pools" && url.pathname !== "/api/stakes") return undefined;
   if (state.stakingState === "error") throw Object.assign(new Error("DEMO_STAKING_READ_UNAVAILABLE"), { status: 503 });
-  const fixture = createStakingDemoFixture({ empty: state.dataState === "empty", now: state.stakingNow });
+  // The stake sheet's balance is the account's wallet fact, the one every other wallet read and payment uses.
+  const fixture = createStakingDemoFixture({ empty: state.dataState === "empty", now: state.stakingNow, wallet: state.walletBalance ?? 52800.64 });
   if (url.pathname === "/api/config/staking/pools") return fixture.pools;
   const pageNum = Math.max(1, Number(url.searchParams.get("pageNum") || 1));
   const pageSize = Math.max(1, Number(url.searchParams.get("pageSize") || 50));
