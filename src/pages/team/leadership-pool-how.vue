@@ -49,7 +49,6 @@
           </view>
           <text v-else class="block" :style="bodyStyle">{{ remotePool ? w.noVoteRows : '—' }}</text>
           <text class="block pool-how-note">{{ auditCopy.poolFactsHint }}</text>
-          <text class="block pool-how-note">{{ auditCopy.poolRulesPending }}</text>
         </HowSection>
 
         <view class="mx-4 mt-6">
