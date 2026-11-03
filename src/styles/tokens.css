@@ -228,7 +228,7 @@
   --font-jet-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* v5 font stack — for use in inline style fontFamily. General Sans draws digits and
-     numeric symbols ("UVEL Figures", DS-26), Inter draws Latin and Vietnamese (DS-25),
+     numeric symbols ("UVEL Figures", DS-26), Inter draws Latin, Vietnamese and Cyrillic (DS-25),
      CJK falls through to the system fonts. */
   --font-v5: var(--font-display);
   /* Two numeric roles (DS-27): main amounts use Montserrat digits over the UI stack,
