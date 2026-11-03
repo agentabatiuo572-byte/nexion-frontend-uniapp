@@ -84,7 +84,8 @@ function demoOrders(products,state,now) {
   return Object.entries(orderStates).map(([original,statuses],i)=>{
     const orderNo='DEMO-ORDER-'+String(i+1).padStart(3,'0'),canonicalStatus=state.orderStatuses?.[orderNo]||original;
     const [paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus],product=products[i%products.length];
-    return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt:now-(i+1)*day,expiresAt:canonicalStatus==='placed'?now+15*60000:canonicalStatus==='expired'?now-day:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?now-i*day:null,activatedAt:canonicalStatus==='activated'?now-3600000:null,refundedAt:canonicalStatus==='refunded'?now-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:canonicalStatus==='activated'?41:null,targetDeviceInstanceNo:canonicalStatus==='activated'?'REVIEW-S1':null,itemCount:1};
+    return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt:now-(i+1)*day,expiresAt:canonicalStatus==='placed'?now+15*60000:canonicalStatus==='expired'?now-day:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?now-i*day:null,activatedAt:canonicalStatus==='activated'?now-3600000:null,refundedAt:canonicalStatus==='refunded'?now-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:original==='activated'?41:null,targetDeviceInstanceNo:original==='activated'?'REVIEW-S1':null,itemCount:1,
+      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}]};
   });
 }
 
@@ -115,44 +116,74 @@ function genesisPublic(now) {
 }
 
 // One slot rule for every fixture read and command (PRD §5.6 / §9.11; backend fleet read and trade-in capacity
-// quote): occupied = activated formal devices + slots held by orders awaiting a device + one effective trial
-// (ACTIVE/GRACE). The fleet read reports it as slotsUsed; everything else reads that count back.
+// quote): occupied = activated formal devices + slots held by paid orders awaiting a device + one effective trial
+// (ACTIVE/GRACE) <= cap. demoFleetFacts computes it from the retained state; reads and commands all use it.
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
   &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false).state)?1:0;
-// Static demoOrders() rows illustrate order states. Only actual session orders reserve slots, and only once paid:
-// like AppOrderCommandService, a new unpaid ("placed") order owns no slot.
-const demoOrderSlots=(state,orderNo)=>(state.createdOrders||[])
+// The account's one order list: session orders plus the state-sample rows that belong to the scenario. The paid
+// (002) and provisioning (003) samples hold slots, so they appear only in fleetState=reserved, where they are its
+// reservations; the activated sample (004) is the order of seeded device 41. A sample paid in this session is
+// adopted into createdOrders by the checkout fixture and listed once.
+export function demoAccountOrders(products,state,now=Date.now()) {
+  const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
+  return [...own,...demoOrders(products,state,now).filter(order=>!ids.has(order.orderNo)
+    &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
+    &&(state.fleetState!=='none'||order.orderNo!=='DEMO-ORDER-004'))];
+}
+// Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.
+const demoOrderSlots=(orders,orderNo)=>orders
   .filter(order=>(orderNo===undefined||order.orderNo===orderNo)&&['paid','provisioning'].includes(order.canonicalStatus))
   .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
-// Scenario devices are seeded once, on the first fleet read after a reset or a scenario change (the preview server
-// drops state.fleetSeed then); afterwards only lifecycle events change the fleet: purchases, conversions and
-// trade-ins add or retire devices and the trial ends on its own, so a freed slot stays free. full, the trial's
-// capacity-full preset and replace's two-slot cap seed exactly full: formal devices fill what is already occupied
-// by the trial, paid orders and session devices.
-function demoSeedFleet(state,template,cap,occupied) {
+// Preview design rule. SCENARIO knobs (fleetState, checkoutState with its two-slot replace cap, trialState and
+// benefitState presets) start a fresh, coherent scenario: the preview server clears the old scenario's session
+// orders, purchases, trade-ins, trial and payment intents, and the next read seeds the devices here. PRESENTATION
+// knobs (machineImageState, dataState=empty) only change what a read shows; they never reseed or change occupancy.
+// After seeding, only lifecycle events change the fleet: purchases and deliveries, conversions, trade-ins and the
+// trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
+// full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
+// Nothing ever exceeds the cap and the cap is never raised.
+function demoSeedFleet(state,template,cap,occupied,retired) {
   const clone=(id,code,name,daily,paid,extra)=>({...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
-  const owned=[template,{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}];
-  if(state.machineImageState==='alternate')Object.assign(owned[1],{instanceNo:'DEMO-RACK',name:'UVELRack P1',productCode:'STELLARRACK-P1',dailyUsdt:45,dailyNex:30,actualPaidUsdt:12999});
-  let devices=state.fleetState==='none'?[]:owned;
+  const live=device=>!retired.includes(device.id);
+  let devices=state.fleetState==='none'?[]:[template,{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}];
   if(state.fleetState==='inventory')devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
-  const reserved=state.fleetState==='reserved'?1:0;
+  devices=devices.filter(live);
   if(state.fleetState==='full'||state.trialState==='capacity-full'||state.checkoutState==='replace'){
     const fillers=[clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),
       clone(46,'CLOUD-SHARE','Cloud Share',0.6,19.9,{todayEarningsUsdt:.2}),clone(48,'STELLARBOX-S1','UVELBox S1',6.2,1299,{todayEarningsUsdt:2.3}),
-      clone(49,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{todayEarningsUsdt:7.6}),clone(50,'STELLARBOX-S1','UVELBox S1',6.2,1299,{todayEarningsUsdt:2.1})];
-    const active=[...devices.filter(device=>device.activatedAt!==null),...fillers].slice(0,Math.max(0,cap-reserved-occupied));
+      clone(49,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{todayEarningsUsdt:7.6}),clone(50,'STELLARBOX-S1','UVELBox S1',6.2,1299,{todayEarningsUsdt:2.1})].filter(live);
+    const active=[...devices.filter(device=>device.activatedAt!==null),...fillers].slice(0,Math.max(0,cap-occupied));
     devices=[...active,...devices.filter(device=>device.activatedAt===null)];
     if(state.fleetState==='full')devices.push(clone(47,'STELLARBOX-PRO','UVELBox Pro',22.4,4999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   }
-  return {devices,reserved};
+  return devices;
 }
-const demoFleet=(url,locale,state)=>demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
+// The authoritative fleet from the retained state, independent of presentation knobs.
+export function demoFleetFacts(url,locale,state) {
+  // Read the trial first: a converted trial books its order, which then lists as a device below.
+  const trialSlotCount=demoTrialSlots(url,locale,state);
+  const products=demoProducts(state,url.origin,locale),orders=demoAccountOrders(products,state);
+  const template={...reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'}).devices[0],runtimeStatus:'ONLINE'};
+  const slotCap=state.checkoutState==='replace'?2:6,retired=state.retiredDeviceIds||[],session=[];
+  // DEMO-ORDER-004 is the seeded device's own order, not a new device.
+  for(const order of orders)if(order.orderNo!=='DEMO-ORDER-004'&&['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
+    const product=products.find(p=>p.id===line.sku),instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
+    state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
+    if(retired.includes(state.deviceIds[instanceNo]))continue;
+    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name:product.name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:tradein?Number(order.amountUsdt):product.price,
+      ...(tradein&&{cumulativeOutputUsdt:0}),...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
+  }
+  const reservedSlotCount=demoOrderSlots(orders);
+  state.fleetSeed??=demoSeedFleet(state,template,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
+  const devices=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
+  return {devices,slotCap,reservedSlotCount,trialSlotCount,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
+}
 
 export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
   const requested=lines.reduce((count,line)=>count+line.quantity,0);
-  const fleet=demoFleet(url,locale,state);
+  const fleet=demoFleetFacts(url,locale,state);
   // Paying an existing order reuses the slots it already holds.
-  return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(state,excludeOrderNo):0)+requested<=fleet.slotCap;
+  return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(demoAccountOrders(products??demoProducts(state,url.origin,locale),state),excludeOrderNo):0)+requested<=fleet.slotCap;
 }
 
 // Detail-page live activity (PRD §7.2.2; the backend follows the same rule, uvel-docs B24). Derived from
@@ -198,7 +229,7 @@ export function demoFixture(url,locale,state,request) {
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   if(pathname.startsWith('/api/trial/')) {
-    const fleet=demoFleet(url,locale,state);
+    const fleet=demoFleetFacts(url,locale,state);
     return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap);
   }
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
@@ -330,7 +361,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/app/trade-in/capacity-quote'){
     const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo)||products[0],data=structuredClone(base());
     Object.assign(data,{targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,targetPriceUsdt:product.price});
-    const fleet=demoFleet(url,locale,state),active=fleet.devices.filter(device=>device.activatedAt!==null),full=fleet.slotsUsed>=fleet.slotCap;
+    const fleet=demoFleetFacts(url,locale,state),active=fleet.devices.filter(device=>device.activatedAt!==null),full=fleet.slotsUsed>=fleet.slotCap;
     Object.assign(data,{decision:full?(active.length?'REPLACE_REQUIRED':'NO_ACTIVE_DEVICE'):'CAPACITY_AVAILABLE',activeDevices:active.length,maxActiveDevices:fleet.slotCap,
       sourceDeviceId:full?active[0]?.id??null:null,sourceDeviceName:full?active[0]?.name??null:null,
       payableUsdt:product.price,walletBalanceUsdt:state.walletBalance??52800.64,sufficientFunds:(state.walletBalance??52800.64)>=product.price});
@@ -358,7 +389,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/genesis/state') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:genesisPublic(now);
   if(pathname==='/api/genesis/account') return url.searchParams.has('history')?{...authority,items:[],nextCursor:null}:{...authority,series:null,sale:null,eligibility:null,marketEnabled:false,emissionOpen:false,holdings:[],emissions:[],orders:[],walletBalanceUsdt:5280};
   if(pathname==='/api/genesis/eligibility') return {...authority,eligible:false,reasons:['SALE_NOT_OPEN'],ownedCount:0,maxPerUser:2,remainingCap:2,minAccountAgeDays:0,accountAgeDays:42,status:'NOT_ELIGIBLE',reservedAllocation:null,reservedAllocationUnit:'UVT',priorityRank:null,priorityTier:'NONE',qualificationReasonCodes:['NO_ACTIVE_HOLDINGS'],policyVersion:null,effectiveAt:null,asOf:iso,serverTime:iso,provenance:{source:'nx_genesis_holding+nx_config_item',environment:'PRODUCTION',runId:''},halted:false};
-  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:empty?[]:[...(state.createdOrders||[]),...demoOrders(products,state,now)],nextCursor:null};
+  if(pathname==='/api/orders'&&(!request?.method||request.method()==='GET')) return {...authority,runId:null,source:'server',orders:empty?[]:demoAccountOrders(products,state,now),nextCursor:null};
   if(['/api/orders','/api/orders/bundle'].includes(pathname)&&request.method()==='POST'){
     const input=request.postDataJSON(),quote=state.quotes?.[input.promotionQuoteId];
     const lines=quote?.items||input.items||input.productNos?.map(productNo=>({productNo,quantity:1}))||[{productNo:input.productNo,quantity:input.quantity}],product=products.find(p=>p.id===lines[0].productNo);
@@ -376,11 +407,11 @@ export function demoFixture(url,locale,state,request) {
   }
   const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
   if(orderAction){
-    const [,orderNo,action]=orderAction,order=[...(state.createdOrders||[]),...demoOrders(products,state,now)].find(o=>o.orderNo===orderNo);
+    const [,orderNo,action]=orderAction,order=demoAccountOrders(products,state,now).find(o=>o.orderNo===orderNo);
     if(!order) return {};
     const replay=order.paymentStatus==='PAID';
     if(action==='pay'&&!['PENDING','PAID'].includes(order.paymentStatus)||action==='cancel'&&order.paymentStatus==='PAID')throw new Error('Demo order action unavailable');
-    if(action==='pay'&&!replay&&state.createdOrders?.includes(order)&&!demoOrderFitsCapacity(url,locale,state,products,order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
+    if(action==='pay'&&!replay&&!demoOrderFitsCapacity(url,locale,state,products,order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
     if(action==='pay'&&!replay){if(Number(order.amountUsdt)>(state.walletBalance??52800.64))throw new Error('Insufficient demo balance');state.walletBalance=(state.walletBalance??52800.64)-Number(order.amountUsdt);}
     state.orderStatuses||={};state.orderStatuses[orderNo]=action==='pay'?'activated':'cancelled';
     const canonicalStatus=state.orderStatuses[orderNo],[paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus];
@@ -527,23 +558,11 @@ export function demoFixture(url,locale,state,request) {
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:empty?0:3,activeMembers:empty?0:6,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
   }
   if(pathname==='/api/devices/earnings') {
-    // Read the trial first: a converted trial books its order, which then lists as a device below.
-    const trialSlotCount=demoTrialSlots(url,locale,state);
+    const facts=demoFleetFacts(url,locale,state);
     const data=base();data.walletUsdt=empty?0:state.paymentState==='low-balance'?820.64:state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
-    if(state.checkoutState==='replace')data.slotCap=2;
-    const template={...data.devices[0],runtimeStatus:'ONLINE'},session=[];
-    for(const order of state.createdOrders||[])if(['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
-      const product=products.find(p=>p.id===line.sku),instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
-      state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
-      session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name:product.name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:tradein?Number(order.amountUsdt):product.price,
-        ...(tradein&&{cumulativeOutputUsdt:0}),...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
-    }
-    state.fleetSeed??=demoSeedFleet(state,template,data.slotCap,trialSlotCount+demoOrderSlots(state)+session.filter(device=>device.activatedAt!==null).length);
-    // Traded-in devices leave the fleet.
-    data.devices=empty?[]:[...structuredClone(state.fleetSeed.devices),...session].filter(device=>!state.retiredDeviceIds?.includes(device.id));
-    data.reservedSlotCount=demoOrderSlots(state)+(empty?0:state.fleetSeed.reserved);
-    data.trialSlotCount=trialSlotCount;
-    data.slotsUsed=data.devices.filter(device=>device.activatedAt!==null).length+data.reservedSlotCount+trialSlotCount;
+    // dataState=empty only hides the fleet; the facts behind every capacity decision stay as they are.
+    Object.assign(data,empty?{...facts,devices:[],reservedSlotCount:0,slotsUsed:facts.trialSlotCount}:facts);
+    if(state.machineImageState==='alternate')Object.assign(data.devices.find(device=>device.id===42)??{},{instanceNo:'DEMO-RACK',name:'UVELRack P1',productCode:'STELLARRACK-P1',dailyUsdt:45,dailyNex:30,actualPaidUsdt:12999});
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
@@ -562,7 +581,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/notifications') {
     if(empty) return {items:[],nextCursor:null,unread:0,actionableUnread:0};
     const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices[0];
-    const order=demoOrders(products,state,now).find(item=>item.orderNo==='DEMO-ORDER-002');
+    const orders=demoAccountOrders(products,state,now),order=orders.find(item=>item.orderNo==='DEMO-ORDER-002')??orders.find(item=>item.paymentStatus==='PAID');
     const visibleItems=demoNotifications(locale,state,now,device,order);
     return {items:visibleItems,nextCursor:null,unread:visibleItems.filter(item=>item.readAt===null).length,actionableUnread:visibleItems.filter(item=>item.readAt===null&&item.kind!=='marketing').length};
   }

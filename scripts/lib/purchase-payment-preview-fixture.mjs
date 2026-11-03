@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoFixture,demoOrderFitsCapacity} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoFixture,demoOrderFitsCapacity,demoProducts} from './prototype-demo-data.mjs';
 
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
@@ -15,7 +15,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   let sequence = 0;
   const handles = path => path.startsWith(base);
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
-  const ordersOf = (url, request) => demoFixture(new URL('/api/orders', url.origin), locale(), state, {...request, method: () => 'GET'}).orders;
+  // The account's one order list (not the dataState=empty display projection).
+  const ordersOf = origin => demoAccountOrders(demoProducts(state, origin, locale()), state);
+  // A reset or scenario change starts a fresh account; the old scenario's quotes and intents go with it.
+  let epoch = state.scenarioEpoch;
+  const sync = () => { if (epoch !== state.scenarioEpoch) { epoch = state.scenarioEpoch; quotes.clear(); intents.clear(); } };
   function settle(orderNo, status, intent) {
     if (!orderNo) return;
     state.orderStatuses ||= {};
@@ -38,10 +42,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     // Non-order fixtures cover open, unknown and rejected commands. Their
     // business delivery/fleet mutation is not simulated here.
     if (intent.kind !== 'ORDER_PAY') throw Object.assign(new Error('PURCHASE_PAYMENT_DELIVERY_NOT_MODELED'), {status:503});
-    const order = state.createdOrders?.find(row => row.orderNo === intent.orderNo);
+    const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
+    // Delivery needs the order; funds for an order that cannot be found never become a success.
+    if (!order) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
     // Like AppOrderCommandService.prepare inside delivery: an unpaid order holds no slot, so paid funds that no
     // longer fit the slots go to manual review with the capacity code instead of activating over the cap.
-    if (order && !demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
+    if (!demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
       order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity})), intent.orderNo))
       return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CAPACITY_REPLACEMENT_REQUIRED'});
     settle(intent.orderNo, 'activated', intent);
@@ -53,6 +59,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   const view = intent => { const {createdAt, orderNo, origin, ...row} = advance(intent); return row; };
   function paymentCommand(kind, key) {
+    sync();
     const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
     if (!intent) return null;
     if (state.paymentState === 'read-error') throw Object.assign(new Error('PAYMENT_COMMAND_READ_UNAVAILABLE'), {status:503});
@@ -60,12 +67,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return {kind,commandKey:key,status:intent.status==='DELIVERED'?'SUCCEEDED':intent.status==='EXPIRED'?'REJECTED':'PROCESSING',canResumeSameKey:false,...(intent.receipt?{receipt:intent.receipt}:{})};
   }
   function handle(url, request) {
+    sync();
     const path = url.pathname, method = request.method();
     if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: [
       {paymentMethod: 'HDPAY_BANK', configured: state.paymentState !== 'bank-off'}, {paymentMethod: 'CREGIS_USDT_BSC', configured: true},
       {paymentMethod: 'CREGIS_USDT_ERC20', configured: state.paymentState !== 'erc20-off'}]}};
     if (path === `${base}-quotes` && method === 'POST') {
-      const body = request.postDataJSON(), order = ordersOf(url, request).find(row => row.orderNo === body.payload?.orderNo);
+      const body = request.postDataJSON(), order = ordersOf(url.origin).find(row => row.orderNo === body.payload?.orderNo);
       if (!commandKinds[body.kind] || (body.kind === 'ORDER_PAY' ? !order : body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
       if (body.paymentMethod === 'CREGIS_USDT_ERC20' && state.paymentState === 'erc20-off') return {status: 503, message: 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED', data: null};
       const bank = body.paymentMethod === 'HDPAY_BANK', erc20 = body.paymentMethod === 'CREGIS_USDT_ERC20';
