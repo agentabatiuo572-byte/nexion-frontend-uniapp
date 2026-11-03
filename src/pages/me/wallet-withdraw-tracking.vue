@@ -255,7 +255,9 @@ watch(
     trackedWithdrawal.value = null;
     storeRowAtTrackedRead.value = null;
     trackedWithdrawalRead.invalidate();
-    if (trackingPageVisible) refreshTrackedWithdrawal();
+    if (!trackingPageVisible) return;
+    refreshTrackedWithdrawal();
+    void loadWithdrawalPolicy();
   },
 );
 
@@ -327,6 +329,8 @@ async function loadWithdrawalPolicy(): Promise<void> {
   // 🔴 在途守卫:抄提现页那份 loader 时我漏抄了它。onShow 与 onMounted 首次进入会各触发一次,
   // App 端每次回前台再叠一次 —— 没有守卫就会重复发请求,且**后到的响应覆盖先到的**。
   if (withdrawalPolicyLoading.value) return;
+  // After an H5 reload the session is restored after the page shows; the account watch above reads it then.
+  if (remoteApiEnabled && !sessionVault.read()) return;
   withdrawalPolicyLoading.value = true;
   try {
     withdrawalPolicy.value = await withdrawalApi.policy();
