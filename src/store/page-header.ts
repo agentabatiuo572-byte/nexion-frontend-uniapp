@@ -17,8 +17,6 @@ export interface PageHeaderPayload {
   subtitle?: string;
   /** Logical/route href for the back button, mapped via navTo (P-046). */
   backHref: string;
-  /** A page may finish its pending business action before leaving. */
-  onBack?: () => void;
 }
 
 export const usePageHeader = defineStore("pageHeader", () => {

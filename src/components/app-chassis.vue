@@ -550,7 +550,6 @@ const isHome = computed(() => activeTab.value === "home");
 const navHeader = computed(() => (isTabRoute.value ? null : pageHeader.header));
 const navHeaderH = computed(() => (navHeader.value ? (navHeader.value.subtitle ? 56 : 44) : 0));
 function navBack() {
-  if (navHeader.value?.onBack) { navHeader.value.onBack(); return; }
   // Stack-aware back: pop real history (restores prev page + scroll), else fall
   // back to the declared backHref. navigateBack alone no-ops on cold-open (P-054).
   navBackTo(navHeader.value?.backHref);

@@ -319,7 +319,6 @@ const results = computed<Hit[]>(() => {
     }
   }
   for (const f of remoteApiEnabled ? [] : FAQ) {
-    if (f.key === "staking" && !config.isEnabled("stakingVisible")) continue;
     const c = faqCopy[f.key];
     if (c.label.toLowerCase().includes(query) || c.sub.toLowerCase().includes(query)) {
       out.push({ group: "faq", label: c.label, sublabel: c.sub, href: f.href });
