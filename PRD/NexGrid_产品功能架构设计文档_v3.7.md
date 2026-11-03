@@ -1413,7 +1413,7 @@ flowchart TD
 > **商品卡不展示回本天数 / 年化 / 首年净利**——避免在卡片层引导用户自行算年化(数字可信不自曝,§13.1)。回本 / 年化 / 首年净利等 ROI 派生值仅在商品详情页(§7.2)与结账页展示。
 
 **卡片元素**:
-- 产品渲染图(datacenter 风,4U 服务器内部 4 张 NVIDIA-style 显卡可见)+ Best Seller / Trending badge + 库存告警(<50 时显示 `NN LEFT`)
+- 商品主图(目录 `imageUrl`)+ Best Seller / Trending badge + 库存告警(<50 时显示 `NN LEFT`)。主图套图(2026-11-03 P-66)统一为同一透明圆盘底座、同一机位,机身体积按档位递进:Box S1 < Box Pro < Box Pro v2 < Rack P1 < Rack P2;Cloud Share 为单个算力模块。
 - 标题 + 副标 + GPU · VRAM 规格小行
 - 上述 4 行 ROI hero metric
 - 评分行(⭐ X.X · N reviews · N sold)
@@ -1439,7 +1439,7 @@ flowchart TD
    - **团队算力点(2026-11-03 P-66)**:销售数据正下方一行安静提示「[三节点图标] 每台为团队增加 12,990 算力点」(Cloud Share 为「每份…」;英文 `Each unit/share adds {n} compute pts to your team`,越南语 `Mỗi máy/phần cộng {n} điểm tính toán cho nhóm`)。数值读目录 `computePoints`(单件计入团队的算力点,与后端 `nx_product.compute_points` 同值),按语言千分位(越南语用「.」),数字用统计数字字体、ink-2 色,其余 12px 正文 ink-3 色;无分隔线、无强调色、不可点击。仅商品详情显示,商品卡和结算页不显示;`computePoints` 缺失、null 或为 0 时整行隐藏;不受「隐藏数据」眼睛遮盖(商品信息,非个人数据);窄屏可折成两行,不得溢出。目录下发该字段前(后端待办 B24)此行不显示。
 2. **活动 / 代金券提示**:从活动或代金券入口进入时,在 Hero 下方显示活动状态或代金券条款。
 3. **Cloud Share 收益卡**(仅 Cloud Share):见下方 Cloud Share variant。
-4. **vs-phone strip**(仅硬件,用户有已激活手机时):`你的手机 $X/天 ↔ $Y/天` + chip `预估 NNN×`,倍数 = 本商品日产 / 该手机日产,向下取 1 位小数;没有已激活手机时整条不显示(本地 mock 用典型 T3 档)。
+4. **vs-phone strip**(仅硬件,用户有已激活手机时):`你的手机 $X/天 ↔ $Y/天` + chip `预估 NNN×`,倍数 = 本商品日产 / 该手机日产,向下取 1 位小数;没有已激活手机时整条不显示。
 5. **预估收益**(仅硬件,非活动入口):「预估每日收益」「预估每月」两格,来自当前目录日产;不显示回本天数、年化或首年净利。
 6. **硬件规格** / **AI 性能**:见本节开头「硬件规格、AI 性能与相关资料」。
 7. **信任资料**:合作方与本商品相关资料。
