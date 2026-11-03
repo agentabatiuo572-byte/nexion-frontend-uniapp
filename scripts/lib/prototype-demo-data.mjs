@@ -152,23 +152,25 @@ const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
 // Session orders plus the state-sample rows that belong to the scenario. The paid (002) and provisioning (003)
 // samples hold slots, so they appear only in fleetState=reserved, where they are its reservations; replace's
 // two-slot cap keeps one of them (002), leaving a slot for a device, the trial or its conversion. The activated
-// sample (004) is the order of seeded device 41 and is listed only while the seed holds that device. A sample paid
+// sample (004) is the order of seeded device 41 and is listed only while the seed holds that device, on that device's
+// timeline: paid and activated when the device was, placed 3 minutes before. A sample paid
 // in this session is adopted into createdOrders by the checkout or payment fixture and listed once. The empty
 // account (dataState=empty) has no sample rows, only what this session creates. An unpaid sample whose payment window
 // has ended reads as expired, as the server's deadline task (modelled for session orders by the checkout fixture)
 // leaves it.
-function demoScenarioOrders(products,state,now,withDevice41Order) {
+function demoScenarioOrders(products,state,now,device41) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
   return [...own,...demoOrders(products,state,now).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
     &&(state.checkoutState!=='replace'||order.orderNo!=='DEMO-ORDER-003')
-    &&(withDevice41Order||order.orderNo!=='DEMO-ORDER-004'))
+    &&(device41||order.orderNo!=='DEMO-ORDER-004'))
+    .map(order=>order.orderNo==='DEMO-ORDER-004'?{...order,placedAt:device41.activatedAt-samplePaidAfter,paidAt:device41.activatedAt,activatedAt:device41.activatedAt}:order)
     .map(order=>order.canonicalStatus==='placed'&&order.expiresAt<=now?{...order,canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'}:order)];
 }
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
   if(!state.fleetSeed)demoFleetFacts(url,locale,state);
-  return demoScenarioOrders(demoProducts(state,url.origin,locale),state,now,state.fleetSeed.some(device=>device.id===41));
+  return demoScenarioOrders(demoProducts(state,url.origin,locale),state,now,state.fleetSeed.find(device=>device.id===41));
 }
 // Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.
 const demoOrderSlots=(orders,orderNo)=>orders
