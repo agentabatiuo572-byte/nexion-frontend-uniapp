@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { navTo } from "@/lib/route";
+import { isStakingVisibilityRoute, navTo } from "@/lib/route";
 import { computed, ref, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -112,6 +112,7 @@ const localPowerUps = computed<PowerUp[]>(() => [
   { id: "genesis_whitelist", threshold: 60, code: "GENESIS_ALLOWLIST", effectType: "ROUTE_BADGE", href: "/pages/genesis/genesis", labelText: w.value.genesisEligibilityEntry, descText: "" },
 ]);
 
+// Hidden staking also hides perks whose target is a staking page (e.g. STAKING_APY → /wallet/staking).
 const powerUps = computed<PowerUp[]>(() => (remoteApiEnabled
   ? (factsVisible.value ? faucet.remotePowerUps : []).map((item) => ({
       id: item.powerUpCode.toLowerCase() as StreakPowerUpId,
@@ -122,7 +123,8 @@ const powerUps = computed<PowerUp[]>(() => (remoteApiEnabled
       // 服务端的可用性判定是权威:它读的是各域自己的读模型,比客户端本地推断更准。
       serverBusinessAvailable: item.businessAvailable,
     }))
-  : localPowerUps.value).filter((item) => config.isEnabled("stakingVisible") || item.id !== "staking_boost"));
+  : localPowerUps.value).filter((item) => config.isEnabled("stakingVisible")
+    || (item.id !== "staking_boost" && !isStakingVisibilityRoute(canonicalPowerUpTarget(item.href) ?? item.href))));
 
 const streak = computed(() => faucet.signInStreak);
 
