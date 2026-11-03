@@ -50,6 +50,7 @@
 </template>
 <script setup lang="ts">
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import { getProductMedia } from "@/lib/product-media";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
@@ -156,6 +157,7 @@ async function onClaim() {
   claimErrorReason.value = undefined;
   // start() only resolves ok after the authoritative state readback succeeds.
   activated.value = true;
+  if (remoteApiEnabled) void app.refreshRemoteFleet();
 }
 
 watch(() => app.accountBindingEpoch, () => {

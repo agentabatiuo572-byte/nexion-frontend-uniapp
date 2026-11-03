@@ -384,7 +384,10 @@ async function handleCancelTrial() {
       || !trialPresentation.actionsReady.value || trial.status !== "active") return;
     const result = await trial.cancel();
     if (accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch) return;
-    if (result.ok) toast.info(t.value.trial.toastCancelled);
+    if (result.ok) {
+      toast.info(t.value.trial.toastCancelled);
+      if (remoteApiEnabled) void app.refreshRemoteFleet();
+    }
     else toast.warn(t.value.trial.cancelError);
   } finally {
     cancelTrialBusy.value = false;
