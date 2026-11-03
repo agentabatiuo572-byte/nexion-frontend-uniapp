@@ -3,7 +3,7 @@
     <view v-if="app.remoteComputeProtocolVersion === 2 || pendingAvailable">
     <text class="block" style="font-weight:600">{{ copy.pending }}</text>
     <template v-if="assignmentsReady && app.remotePendingEarned">
-      <text v-for="row in app.remotePendingEarned" :key="row.asset" class="block font-mono-tabular">{{ visibility.mask(formatAmount(row.amount)) }} {{ row.asset === 'NEX' ? 'UVT' : row.asset }} · {{ visibility.mask(row.taskCount) }} {{ copy.tasks }}</text>
+      <text v-for="row in app.remotePendingEarned" :key="row.asset" class="block font-mono-tabular">{{ visibility.mask(formatAmount(row.amount, 6)) }} {{ row.asset === 'NEX' ? 'UVT' : row.asset }} · {{ visibility.mask(row.taskCount) }} {{ copy.tasks }}</text>
     </template>
     <text v-else class="block">{{ copy.unknown }}</text>
     <text class="block" style="color:var(--v5-ink-3);margin-top:4px">{{ copy.pendingHint }}</text>
@@ -14,7 +14,7 @@
     <text v-else-if="!error && !batches.length" class="block">{{ copy.empty }}</text>
     <view v-for="batch in batches" :key="batch.batchNo" class="compute-settlements__row" role="button" tabindex="0" @click="openBatch(batch.batchNo)" @keydown.enter.stop.prevent="openBatch(batch.batchNo)" @keydown.space.stop.prevent="openBatch(batch.batchNo)">
       <text class="block">#{{ visibility.mask(batch.batchNo) }} · {{ copy.statuses[batch.status] }}</text>
-      <text class="block font-mono-tabular">{{ visibility.mask(formatAmount(batch.amount)) }} {{ batch.asset === 'NEX' ? 'UVT' : batch.asset }} · {{ visibility.mask(batch.taskCount) }} {{ copy.tasks }}</text>
+      <text class="block font-mono-tabular">{{ visibility.mask(formatAmount(batch.amount, 6)) }} {{ batch.asset === 'NEX' ? 'UVT' : batch.asset }} · {{ visibility.mask(batch.taskCount) }} {{ copy.tasks }}</text>
       <text class="block" style="color:var(--v5-ink-3)">{{ copy.window }} {{ date(batch.windowStart) }} – {{ date(batch.windowEnd) }}</text>
     </view>
     <view v-if="nextCursor" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="load(true)" @keydown.enter.stop.prevent="load(true)" @keydown.space.stop.prevent="load(true)" style="padding:12px 0;color:var(--v5-brand)"><text>{{ copy.more }}</text></view>
@@ -22,9 +22,9 @@
     <text v-if="detailError" class="block" role="alert" style="color:var(--v5-danger)">{{ copy.unavailable }}</text>
     <view v-if="detail" class="compute-settlements__detail">
       <view class="flex items-center justify-between"><text>{{ copy.batch }} #{{ visibility.mask(detail.batchNo) }}</text><view role="button" tabindex="0" @click="detail = null" @keydown.enter.stop.prevent="detail = null" @keydown.space.stop.prevent="detail = null"><text style="color:var(--v5-brand)">{{ copy.close }}</text></view></view>
-      <text class="block">{{ copy.statuses[detail.status] }} · {{ visibility.mask(formatAmount(detail.amount)) }} {{ detail.asset === 'NEX' ? 'UVT' : detail.asset }}</text>
+      <text class="block">{{ copy.statuses[detail.status] }} · {{ visibility.mask(formatAmount(detail.amount, 6)) }} {{ detail.asset === 'NEX' ? 'UVT' : detail.asset }}</text>
       <text class="block">{{ copy.postedAt }} {{ detail.postedAt == null ? copy.unknown : date(detail.postedAt) }}</text>
-      <view v-for="item in detail.items" :key="item.taskNo" class="compute-settlements__row"><text class="block">#{{ visibility.mask(item.taskNo) }} · {{ item.taskType }}</text><text class="block font-mono-tabular">{{ visibility.mask(formatAmount(item.amount)) }} {{ detail.asset === 'NEX' ? 'UVT' : detail.asset }} · {{ date(item.completedAt) }}</text><text v-if="item.receiptNo" class="block">{{ copy.receipt }} #{{ visibility.mask(item.receiptNo) }}</text></view>
+      <view v-for="item in detail.items" :key="item.taskNo" class="compute-settlements__row"><text class="block">#{{ visibility.mask(item.taskNo) }} · {{ item.taskType }}</text><text class="block font-mono-tabular">{{ visibility.mask(formatAmount(item.amount, 6)) }} {{ detail.asset === 'NEX' ? 'UVT' : detail.asset }} · {{ date(item.completedAt) }}</text><text v-if="item.receiptNo" class="block">{{ copy.receipt }} #{{ visibility.mask(item.receiptNo) }}</text></view>
     </view>
   </view>
 </template>

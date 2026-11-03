@@ -121,7 +121,7 @@ const taskRewardLine = computed(() => {
   if (tk.executionMode === "SIMULATED") return formatTaskReward(tk, true);
   return fmt(t.value.deactivateSheet.taskRewardLine, {
     client: tk.client,
-    amount: formatAmount(tk.reward),
+    amount: formatAmount(tk.reward, 6),
   });
 });
 
