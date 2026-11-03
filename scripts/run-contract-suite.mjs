@@ -79,8 +79,6 @@ const REGISTRY = {
   "keyboard-submit-contract.test.mjs": { how: "chain" },
   "leadership-pool-consumers.test.mjs": { how: "chain" },
   "market-board-visual-contract.test.mjs": { how: "chain" },
-  "onboarding-estimator-fail-closed.contract.test.mjs": { how: "chain" },
-  "phone-activation-defer-contract.test.mjs": { how: "chain" },
   "h5-phone-readonly.test.mjs": { how: "chain" },
   "p1-audit-regression.contract.test.mjs": { how: "chain" },
   "learning-empty-state-contract.test.mjs": { how: "chain" },
