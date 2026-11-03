@@ -435,7 +435,7 @@ function sectionHeading(section: DescSection): string {
 }
 
 function fmtDuration(sec: number): string {
-  const units = receiptLocale.value === 'zh' ? ['分', '秒'] : receiptLocale.value === 'vi' ? ['phút', 'giây'] : ['min', 'sec'];
+  const units = ({ zh: ['分', '秒'], en: ['min', 'sec'], vi: ['phút', 'giây'], id: ['min', 'sec'], ms: ['min', 'sec'], fil: ['min', 'sec'], ru: ['min', 'sec'], kk: ['min', 'sec'], uz: ['min', 'sec'] })[receiptLocale.value];
   if (sec < 60) return `${sec} ${units[1]}`;
   const m = Math.floor(sec / 60);
   const s = sec % 60;
