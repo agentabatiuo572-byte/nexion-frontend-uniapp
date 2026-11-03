@@ -1413,7 +1413,7 @@ flowchart TD
 > **商品卡不展示回本天数 / 年化 / 首年净利**——避免在卡片层引导用户自行算年化(数字可信不自曝,§13.1)。回本 / 年化 / 首年净利等 ROI 派生值仅在商品详情页(§7.2)与结账页展示。
 
 **卡片元素**:
-- 商品主图(目录 `imageUrl`)+ Best Seller / Trending badge + 库存告警(<50 时显示 `NN LEFT`)。主图套图(2026-11-03 P-66)统一为同一透明圆盘底座、同一机位,机身体积按档位递进:Box S1 < Box Pro < Box Pro v2 < Rack P1 < Rack P2;Cloud Share 为单个算力模块。
+- 商品主图(目录 `imageUrl`)+ Best Seller / Trending badge + 库存告警(<50 时显示 `NN LEFT`)。主图套图(2026-11-03 P-66)统一为同一透明圆盘底座、同一机位,机身体积按档位递进:Box S1 < Box Pro < Box Pro v2 < Rack P1 < Rack P2;Box Pro v2 与 Box Pro 的区别是三列格栅、顶部柠檬绿灯条、石墨黑机身且更大;Cloud Share 为从半透明整机中抽出的一片算力模块,表达「整体中分出的一份」。
 - 标题 + 副标 + GPU · VRAM 规格小行
 - 上述 4 行 ROI hero metric
 - 评分行(⭐ X.X · N reviews · N sold)
