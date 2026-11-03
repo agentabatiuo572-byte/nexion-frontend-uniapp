@@ -12,7 +12,7 @@ const sources = import.meta.glob([
   "../pages/me/wallet-withdraw.vue",
   "../pages/me/language.vue",
   "../pages/me/security.vue",
-  "../pages/me/wallet.vue",
+  "./me/wallet-overview.vue",
   "../pages/team/team.vue",
   "../pages/compute-share/download.vue",
   "../pages/learn/course.vue",
@@ -69,18 +69,24 @@ describe("accessibility remediation contracts", () => {
     expect(language).toContain('@keydown.space.prevent="goAccount"');
 
     const security = read("../pages/me/security.vue");
-    expect(security).toContain('@keydown.space.prevent="editingPwd = !editingPwd"');
-    expect(security).toContain('@keydown.enter.prevent="submitPasswordChange"');
-    expect(security).toContain('@keydown.space.prevent="handleRevoke(s)"');
-    expect(security).toContain('@keydown.enter.prevent="handleRevokeAll"');
-    expect(security).toContain('@keydown.space.prevent="handleDeleteAccount"');
-    expect(security).toContain('@keydown.enter.prevent="handleCancelAccountDeletion"');
+    // Semantic role + tabindex is the shared keyboard activation contract.
+    for (const action of ['editingPwd = !editingPwd', 'openDeletionSheet', 'handleRevoke(s)', 'handleRevokeAll', 'handleCancelAccountDeletion']) {
+      const clickAt = security.indexOf('@click="' + action + '"');
+      expect(clickAt).toBeGreaterThan(-1);
+      const target = security.slice(security.lastIndexOf('<view', clickAt), clickAt);
+      expect(target).toContain('role="button"');
+      expect(target).toMatch(/:?tabindex=/);
+    }
+    expect(security).toContain('<NxSheet :open="editingPwd"');
+    expect(security).toContain('@click="submitPasswordChange"');
+    expect(security).toContain('@click="handleDeleteAccount"');
+    expect(security).not.toMatch(/@keydown\.(enter|space)/);
   });
 
   it("uses the shared semantic activation contract on wallet, team, download, learning and developer actions", () => {
-    const wallet = read("../pages/me/wallet.vue");
-    expect(wallet).toContain('role="button" tabindex="0" :aria-label="t.wallet.nexBalance"');
-    expect(wallet).toContain('role="button" tabindex="0" :aria-label="t.wallet.topUp"');
+    const wallet = read("./me/wallet-overview.vue");
+    expect(wallet).toContain('data-wallet-metric="reviewing" role="button" tabindex="0"');
+    expect(wallet).toContain('data-wallet-metric="locked" role="button" tabindex="0"');
 
     const team = read("../pages/team/team.vue");
     expect(team).toMatch(/<view[^>]*class="[^"]*nx-team-rank-link[^"]*"[^>]*role="link" tabindex="0"[^>]*@click="go\('\/pages\/team\/rank'\)"/);
@@ -89,8 +95,8 @@ describe("accessibility remediation contracts", () => {
     expect(read("../pages/compute-share/download.vue")).toContain('role="status"');
 
     const course = read("../pages/learn/course.vue");
-    expect(course).toContain('role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses" @keydown.enter.prevent="onKeyboardActivate($event, backToCourses)" @keydown.space.prevent="onKeyboardActivate($event, backToCourses)"');
-    expect(course).toContain('role="button" tabindex="0" :aria-label="t.ui.retry" @click="load" @keydown.enter.prevent="onKeyboardActivate($event, load)" @keydown.space.prevent="onKeyboardActivate($event, load)"');
+    expect(course).toContain('role="button" tabindex="0" :aria-label="t.learning.centerTitle" @click="backToCourses"');
+    expect(course).toContain('role="button" tabindex="0" :aria-label="t.ui.retry" @click="load"');
     // Each question accepts exactly one answer, so the options are radios inside a
     // named radiogroup — aria-pressed would read as a multi-select toggle.
     expect(course).toContain('role="radiogroup" :aria-label="question.question"');
@@ -105,7 +111,14 @@ describe("accessibility remediation contracts", () => {
     expect(segments).toContain('@keydown="onKeydown($event, option)"');
     expect(segments).toContain('choose(target, "arrow")');
     expect(segments).toContain('?.focus()');
-    expect(developer).toContain('role="button" tabindex="0" :aria-label="t.developer.formSubmit"');
+    const submit = developer.match(/<view\b[^>]*:aria-label="t\.developer\.formSubmit"[^>]*>/)?.[0] ?? "";
+    expect(submit).toContain('role="button"');
+    expect(submit).toContain(':tabindex="submitting || !canSubmitAccessRequest ? -1 : 0"');
+    expect(submit).toContain(':aria-disabled="submitting || !canSubmitAccessRequest ? \'true\' : \'false\'"');
+    expect(submit).toContain(':aria-busy="submitting ? \'true\' : \'false\'"');
+    expect(submit).toContain('@click="submitRequest"');
+    expect(submit).toContain('@keydown.enter.prevent="submitRequest"');
+    expect(submit).toContain('@keydown.space.prevent="submitRequest"');
 
     const proof = read("../pages/me/proof.vue");
     expect(proof).toContain('@keydown.enter.stop.prevent="refreshRemoteProof"');

@@ -65,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, watch, onMounted, onUnmounted } from "vue";
 import { useMilestones } from "@/store/milestones";
@@ -90,7 +91,10 @@ const t = useT();
 function readRoute(): string {
   try {
     const ps = getCurrentPages();
-    const route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    let route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    // #ifdef APP-PLUS
+    route = logicalNativePage(ps[ps.length - 1]).route;
+    // #endif
     if (route) return route;
   } catch {
     // fall through to H5 hash fallback
@@ -266,6 +270,8 @@ useDialogA11y(computed(() => m.active !== null), ".ms-overlay", () => m.dismiss(
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  padding: var(--nx-overlay-top) 0 var(--nx-overlay-bottom);
   overflow: hidden;
 }
 
@@ -331,9 +337,12 @@ useDialogA11y(computed(() => m.active !== null), ".ms-overlay", () => m.dismiss(
   position: relative;
   width: 88%;
   max-width: 300px;
+  max-height: 100%;
+  box-sizing: border-box;
 
   padding: 20px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--nx-glass-fill);
 
   animation: ms-card-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -369,6 +378,7 @@ useDialogA11y(computed(() => m.active !== null), ".ms-overlay", () => m.dismiss(
   line-height: 1;
   color: var(--v5-brand);
   font-variant-numeric: tabular-nums;
+  font-family: var(--font-amount);
 }
 .ms-title {
   margin-top: 6px;

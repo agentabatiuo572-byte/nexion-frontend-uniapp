@@ -3,53 +3,52 @@
   Progress hero + categorized list with unlock state, reward + claim button.
   Unlock conditions auto-evaluate on mount against live app store. Cross-store
   claim orchestration 走 postMoneyBills 收口点(资金与账单同生共死),仍在 handler 里。
-  Wrapped in <AppChassis active="me">.
+  Wrapped in <NxPageContent :embedded="embedded" active="me">.
 -->
 <template>
-  <AppChassis active="me">
-    <view style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/me" />
+  <NxPageContent :embedded="embedded" active="me">
+    <view class="growth-achievements" style="padding-bottom: 24px">
+      <SubPageHeader v-if="!embedded" back="/pages/me/me" />
 
-      <!-- Progress hero -->
-      <view class="mx-4" :style="heroStyle">
-        <view class="flex items-center" style="gap: 12px">
-          <view class="grid place-items-center" :style="heroIconBoxStyle">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526" /><circle cx="12" cy="8" r="6" /></svg>
-          </view>
-          <view style="flex: 1">
-            <text class="block" :style="heroLabelStyle">{{ w.progress }}</text>
-            <view class="flex items-baseline" style="gap: 4px">
-              <text :style="heroCountStyle">{{ unlocked ?? "—" }}</text>
-              <text :style="heroTotalStyle">/ {{ total === null ? "—" : total }}</text>
-            </view>
-          </view>
-          <text :style="heroPctStyle">{{ percentLabel }}</text>
-        </view>
-        <view :style="barTrackStyle">
-          <view :style="barFillStyle" />
-        </view>
+      <view v-if="total !== 0" class="achievement-summary mx-4">
+        <GrowthProgress ring :size="82" :stroke="9" :value="percent" :label="percentLabel"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="1.8"><circle cx="12" cy="9" r="6" /><path d="m8 14-2 7 6-3 6 3-2-7" /></svg></GrowthProgress>
+        <view><text class="block" :style="heroLabelStyle">{{ w.progress }}</text><view class="achievement-summary__count">{{ unlocked ?? '—' }} <text>/ {{ total === null ? '—' : total }}</text></view><text class="block" :style="heroLabelStyle">{{ percent === null ? '—' : fmt(t.growthUi.achievementCompleted, {n:percent}) }}</text></view>
       </view>
 
       <!-- Real-backend milestones. Remote mode never derives rewards from mock stores. -->
-      <view v-if="remoteApiEnabled" style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
+      <view v-if="remoteApiEnabled" style="margin-top: var(--v5-space-8); display: flex; flex-direction: column; gap: var(--v5-space-8)">
         <view v-if="remoteLoading && !remoteSnapshot" class="nx-glass-card mx-4" :style="listStyle">
-          <text class="block" style="padding: 18px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteLoading }}</text>
+          <text class="block" style="padding: 18px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ w.remoteLoading }}</text>
         </view>
         <view v-else-if="remoteError" class="nx-glass-card mx-4" :style="listStyle">
-          <text class="block" style="padding: 18px 18px 6px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteUnavailable }}</text>
+          <text class="block" style="padding: 18px 18px 6px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ w.remoteUnavailable }}</text>
           <view class="active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" :aria-label="w.retry" @click="refreshRemote">
             <text>{{ w.retry }}</text>
           </view>
         </view>
         <template v-if="remoteSnapshot">
+          <view v-if="!remoteGroups.length && !remoteError" class="mx-4" style="padding:var(--v5-space-6) 0;color:var(--v5-ink-3)" role="status">
+            <text class="block">{{ emptyAchievements }}</text>
+            <view role="button" tabindex="0" :style="retryBtnStyle" @click="refreshRemote"><text>{{ w.retry }}</text></view>
+          </view>
           <view v-for="grp in remoteGroups" :key="grp.key" class="mx-4">
             <text class="block" :style="catHeadStyle">{{ grp.label }}</text>
-            <view class="nx-glass-card" :style="listStyle">
+            <view v-if="grp.key === 'daily' && remoteSnapshot.dailyMilestones.length" class="achievement-track">
+              <text class="block achievement-track__caption">{{ t.growthUi.streakPrefix }} <text class="nx-num-metric achievement-streak">{{ remoteSnapshot.streak.currentStreak }}</text> {{ t.growthUi.streakSuffix }}</text>
+              <view class="achievement-track__rail">
+                <GrowthProgress class="achievement-track__bar" :value="dailyTrackPct" :label="w.serverDailyMilestones" />
+                <view v-for="(milestone, mi) in remoteSnapshot.dailyMilestones" :key="milestone.milestoneId" class="achievement-node" :class="{'achievement-node--current': mi === currentDailyIndex, 'achievement-node--done': milestone.status !== 'LOCKED'}" :style="{left: remoteSnapshot.dailyMilestones.length === 4 ? ['24%', '50%', '75%', 'calc(100% - 8px)'][mi] : `${remoteSnapshot.dailyMilestones.length === 1 ? 50 : (mi + 1) / remoteSnapshot.dailyMilestones.length * 100}%`}">
+                  <view class="achievement-node__dot" />
+                  <view v-if="milestone.status !== 'LOCKED' || mi === currentDailyIndex" class="achievement-node__label"><text>{{ fmt(t.growthUi.milestoneDay, {n:milestone.milestoneDay}) }}</text><text class="achievement-node__reward">{{ dailyMilestoneRewardText(milestone, dailyRewardLabels(t.daily.milestones)) }}</text><NxButton v-if="milestone.status === 'CLAIMABLE'" variant="brand" size="small" :disabled="!!remoteBusy" :label="w.claim" @click="claimRemote(grp.rows[mi])" /></view>
+                </view>
+              </view>
+            </view>
+            <view v-else class="nx-glass-card" :class="{'achievement-badges': grp.key === 'badges'}" :style="listStyle">
               <view
                 v-for="(row, i) in grp.rows"
                 :key="row.key"
-                class="flex items-center"
-                :style="rowStyle(i !== 0)"
+                class="achievement-row flex items-center" :class="{'achievement-row--badge': grp.key === 'badges', 'achievement-row--locked': row.status === 'LOCKED', 'achievement-row--ready': row.status === 'CLAIMABLE'}"
+                :style="[grp.key === 'badges' ? {} : rowStyle(i !== 0), {'--ui-growth-delay': Math.min(i * 60, 480) + 'ms'}]"
               >
                 <view class="grid place-items-center shrink-0" :style="remoteIconBoxStyle(row.status)">
                   <view v-html="iconSvg(row.iconId, row.status === 'LOCKED' ? 'var(--v5-ink-4)' : 'var(--v5-brand)')" />
@@ -59,21 +58,10 @@
                   <text class="block" :style="aDescStyle(row.status !== 'LOCKED')">{{ row.description }}</text>
                 </view>
                 <view class="text-right shrink-0">
-                  <text class="block" :style="rewardStyle(row.status !== 'LOCKED')">{{ row.reward }}</text>
-                  <view
-                    v-if="row.status === 'CLAIMABLE'"
-                    class="active:opacity-80"
-                    :style="claimBtnStyle(false)"
-                    role="button"
-                    tabindex="0"
-                    :aria-disabled="remoteBusy ? 'true' : 'false'"
-                    :aria-label="w.claim"
-                    @click="claimRemote(row)"
-                  >
-                    <text>{{ remoteBusy === row.key ? w.claiming : w.claim }}</text>
-                  </view>
-                  <text v-else class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4)">
-                    {{ row.status === 'LOCKED' ? w.lockedStatus : w.claimed }}
+                  <text v-if="row.status !== 'CLAIMABLE'" class="block" :style="rewardStyle(row.status !== 'LOCKED')">{{ row.reward }}</text>
+                  <NxButton v-if="row.status === 'CLAIMABLE'" variant="brand" size="small" :disabled="!!remoteBusy" :label="remoteBusy === row.key ? w.claiming : `${w.claim} ${row.reward}`" @click="claimRemote(row)" />
+                  <text v-else-if="row.status !== 'LOCKED'" class="block" style="margin-top: 2px; font-size: 12px; color: var(--v5-ink-3)">
+                    {{ w.claimed }}
                   </text>
                 </view>
               </view>
@@ -83,7 +71,7 @@
       </view>
 
       <!-- Local prototype achievements stay available only in mock mode. -->
-      <view v-else style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
+      <view v-else style="margin-top: var(--v5-space-8); display: flex; flex-direction: column; gap: var(--v5-space-8)">
         <view v-for="grp in groups" :key="grp.cat" class="mx-4">
           <text class="block" :style="catHeadStyle">{{ catLabel(grp.cat) }}</text>
           <view class="nx-glass-card" :style="listStyle">
@@ -102,7 +90,7 @@
                   <svg v-if="!isUnlocked(a.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                 </view>
                 <text class="block" :style="aDescStyle(isUnlocked(a.id))">{{ desc(a) }}</text>
-                <text v-if="isUnlocked(a.id)" class="block" :style="aWhenStyle">{{ w.unlockedAt }} · {{ relativeWhen(recOf(a.id)!.unlockedAt) }}</text>
+                <text v-if="isUnlocked(a.id)" class="block" :style="aWhenStyle">{{ w.unlockedAt }} · {{ formatDisplayDateTime(recOf(a.id)!.unlockedAt, locale.code) }}</text>
               </view>
               <view class="text-right shrink-0">
                 <text class="block" :style="rewardStyle(isUnlocked(a.id))">{{ rewardLabel(a) }}</text>
@@ -112,7 +100,7 @@
                   :style="claimBtnStyle(isClaimed(a.id))"
                   @click="handleClaim(a.id)"
                 >
-                  <view v-if="isClaimed(a.id)" class="flex items-center" style="gap: 4px">
+                  <view v-if="isClaimed(a.id)" class="flex items-center" style="gap: var(--v5-space-1)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                     <text>{{ w.claimed }}</text>
                   </view>
@@ -124,18 +112,22 @@
         </view>
       </view>
     </view>
-  </AppChassis>
+  </NxPageContent>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
+const { embedded = false } = defineProps<{ embedded?: boolean }>();
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
+import { onMounted, computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
-import AppChassis from "@/components/app-chassis.vue";
+import GrowthProgress from "@/components/ui/growth-progress.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxPageContent from "@/components/ui/nx-page-content.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { dailyMilestoneRewardText, dailyRewardLabels } from "@/pages/daily/daily-reward-view";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { formatDisplayDateTime } from "@/lib/display-date";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
@@ -147,6 +139,9 @@ import type { BadgeAchievementStatus, DailySnapshot, DailyMilestoneStatus, Earni
 import { readAchievementsForCurrentSession, type AchievementRemoteReadFailure } from "./achievements-remote-read";
 
 const t = useT();
+import { useLocaleStore } from '@/store/locale';
+const locale = useLocaleStore();
+const emptyAchievements = computed(() => locale.code === 'zh' ? '暂时没有可参与的成就' : locale.code === 'vi' ? 'Hiện chưa có thành tích khả dụng' : 'No achievements available yet');
 const w = computed(() => t.value.achievements);
 const app = useApp();
 const ach = useAchievements();
@@ -198,6 +193,13 @@ const CAT_COLOR: Record<AchievementCategory, string> = {
 };
 
 const ICON_SVG: Record<string, string> = {
+  flame: `<path d="M5 12.5 10 17 19 7.5" />`,
+  calendar: `<rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />`,
+  cpu: `<rect x="4" y="4" width="16" height="12" rx="2" /><path d="M8 20h8M12 16v4" />`,
+  book: `<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2Zm20 0h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z" />`,
+  users: `<circle cx="9" cy="8" r="4" /><path d="M2 21a7 7 0 0 1 14 0M19 8v6M22 11h-6" />`,
+  zap: `<path d="m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4Z" />`,
+
   first_contribution: `<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />`,
   first_dollar: `<line x1="12" x2="12" y1="2" y2="22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />`,
   power_user: `<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" />`,
@@ -244,6 +246,11 @@ async function refreshRemote() {
   remoteLoading.value = false;
 }
 
+onMounted(() => {
+  if (!embedded) return;
+  pageVisible = true;
+  if (remoteApiEnabled) void refreshRemote(); else evaluate();
+});
 onShow(() => {
   if (disposed) return;
   pageVisible = true;
@@ -279,7 +286,7 @@ const remoteGroups = computed(() => {
     kind: "earning",
     id: row.milestoneId,
     label: `${w.value.earningMilestone} ${formatAmount(row.thresholdUsdt)}`,
-    description: `${w.value.lifetimeEarnings}: ${formatAmount(row.lifetimeEarningsUsdt)}`,
+    description: `${w.value.lifetimeEarnings} ${formatAmount(row.lifetimeEarningsUsdt)}`,
     reward: `+${formatAmount(row.rewardNex)} UVT`,
     status: row.status,
     iconId: "first_dollar",
@@ -306,6 +313,26 @@ const groups = computed(() => {
   return cats
     .map((cat) => ({ cat, list: ACHIEVEMENTS.filter((a) => a.category === cat) }))
     .filter((g) => g.list.length > 0);
+});
+
+const currentDailyIndex = computed(() => {
+  const rows = remoteSnapshot.value?.dailyMilestones ?? [];
+  const claimable = rows.findIndex(row => row.status === 'CLAIMABLE');
+  if (claimable >= 0) return claimable;
+  return rows.findIndex(row => row.status === 'LOCKED');
+});
+const dailyTrackPct = computed(() => {
+  const snapshot = remoteSnapshot.value;
+  if (!snapshot || !snapshot.dailyMilestones.length) return 0;
+  const rows = snapshot.dailyMilestones;
+  // Track positions reflect the actual operator-configured milestone days.
+  const current = snapshot.streak.currentStreak;
+  if (rows.length === 1) return Math.min(100, current / rows[0].milestoneDay * 100);
+  const next = rows.findIndex(row => row.milestoneDay > current);
+  if (next < 0) return 100;
+  if (next === 0) return current / rows[0].milestoneDay / rows.length * 100;
+  const before = rows[next - 1].milestoneDay, after = rows[next].milestoneDay;
+  return ((next + (current - before) / (after - before)) / rows.length) * 100;
 });
 
 const unlocked = computed<number | null>(() => remoteApiEnabled
@@ -406,14 +433,6 @@ function rewardLabel(a: AchievementDef): string {
   if (a.rewardUsdt) return `+${formatAmount(a.rewardUsdt)}`;
   return "VIP badge";
 }
-function relativeWhen(ms: number): string {
-  const diff = Date.now() - ms;
-  if (diff < 60_000) return w.value.unlockedJustNow;
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`;
-  return `${Math.floor(diff / 86400_000)}d ago`;
-}
-
 function handleClaim(id: string) {
   const def = ACHIEVEMENTS.find((a) => a.id === id);
   if (!def) return;
@@ -428,7 +447,7 @@ function handleClaim(id: string) {
   // 消费掉,发钱失败就 return —— 成就标记已置、奖归零且**再也领不了**(成就是一次性的)。
   // ref 本来就是成就 id(天然稳定),换成幂等出口后重放不会重复发。
   const drafts: ReceiptDraft[] = [];
-  if (def.rewardNex) drafts.push({ type: "achievement", symbol: "NEX", amount: def.rewardNex, status: "posted", memo: `Achievement · ${name}`, ref: id });
+  if (def.rewardNex) drafts.push({ type: "achievement", symbol: "UVT", amount: def.rewardNex, status: "posted", memo: `Achievement · ${name}`, ref: id });
   if (def.rewardUsdt) drafts.push({ type: "achievement", symbol: "USDT", amount: def.rewardUsdt, status: "posted", memo: `Achievement · ${name}`, ref: id });
   if (drafts.length && postMoneyBillsOnce(drafts) !== "ok") return;
   if (!ach.claim(id)) return; // 消费失败:钱已幂等落定,下次重试命中同一 ref 不会再发
@@ -439,12 +458,12 @@ function handleClaim(id: string) {
 // dropped). Warning icon tint box + progress bar kept. 2px inset aligns with the
 // category labels + badge lists below.
 const heroStyle: CSSProperties = { padding: "0 2px" };
-const heroIconBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "16px", background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" };
+const heroIconBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "var(--v5-radius-m)", background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" };
 const heroLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const heroCountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)" };
-const heroTotalStyle: CSSProperties = { fontSize: "15px", color: "var(--v5-ink-4)" };
+const heroTotalStyle: CSSProperties = { fontSize: "var(--ui-type-body)", color: "var(--v5-ink-4)" };
 const heroPctStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-brand)" };
-const barTrackStyle: CSSProperties = { marginTop: "12px", height: "8px", borderRadius: "999px", background: "var(--v5-surface-2)", overflow: "hidden" };
+const barTrackStyle: CSSProperties = { marginTop: "12px", height: "8px", borderRadius: "var(--v5-radius-full)", background: "var(--v5-surface-2)", overflow: "hidden" };
 const barFillStyle = computed<CSSProperties>(() => ({
   height: "100%",
   width: percent.value === null ? "0%" : `${percent.value}%`,
@@ -452,10 +471,10 @@ const barFillStyle = computed<CSSProperties>(() => ({
   transition: "width 700ms ease",
 }));
 const catHeadStyle: CSSProperties = {
-  padding: "0 2px",
+  padding: "0 4px",
   marginBottom: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-section)",
   fontWeight: 600,
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
@@ -473,16 +492,16 @@ function remoteIconBoxStyle(status: RemoteStatus): CSSProperties {
   return {
     width: "40px",
     height: "40px",
-    borderRadius: "12px",
-    background: status === "LOCKED" ? "var(--v5-surface-3)" : "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
-    opacity: status === "LOCKED" ? 0.5 : 1,
+    borderRadius: "var(--v5-radius-s)",
+    background: status === "LOCKED" ? "var(--v5-surface-3)" : "var(--v5-brand-soft)",
+    opacity: 1,
   };
 }
 // Badge list keeps a filled tile identity (achievement/badge semantic, de-card
 // white-list) — the single visual difference is the fill; outer border dropped.
-const listStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
+const listStyle: CSSProperties = {
+  background: "var(--v5-surface)",
+  borderRadius: "var(--ui-radius-surface)",
   overflow: "hidden",
 };
 function rowStyle(divider: boolean): CSSProperties {
@@ -497,7 +516,7 @@ function iconBoxStyle(a: AchievementDef, cat: AchievementCategory): CSSPropertie
   return {
     width: "40px",
     height: "40px",
-    borderRadius: "12px",
+    borderRadius: "var(--v5-radius-s)",
     // 未解锁态原用 --v5-surface,与所在卡片同色 → 图标框整个隐形(双主题)。
     // 改 surface-3(同 security.vue 关闭态图标框的既有惯例);叠加下面的 opacity .5 后
     // 对卡片仍有 ΔE≈4.5,弱而可见 —— 未解锁本就该弱,但不该没有。
@@ -506,14 +525,14 @@ function iconBoxStyle(a: AchievementDef, cat: AchievementCategory): CSSPropertie
   };
 }
 function aLabelStyle(ul: boolean): CSSProperties {
-  return { fontSize: "13px", fontWeight: 600, color: ul ? "color-mix(in srgb, var(--v5-ink) 95%, transparent)" : "var(--v5-ink-4)" };
+  return { fontSize: "15px", fontWeight: 500, color: "var(--v5-ink)" };
 }
 function aDescStyle(ul: boolean): CSSProperties {
-  return { fontSize: "12px", marginTop: "2px", lineHeight: 1.375, color: ul ? "var(--v5-ink-3)" : "var(--v5-ink-4)" };
+  return { fontSize: "12px", marginTop: "2px", lineHeight: 1.375, color: "var(--v5-ink-3)" };
 }
-const aWhenStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px" };
+const aWhenStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px", lineHeight: 1.5, whiteSpace: "normal", overflowWrap: "anywhere" };
 function rewardStyle(ul: boolean): CSSProperties {
-  return { fontSize: "12px", fontWeight: 500, color: ul ? "var(--v5-brand)" : "var(--v5-ink-4)" };
+  return { fontFamily: "var(--font-metric)", fontSize: "13px", fontWeight: 500, color: ul ? "var(--v5-nex-ink)" : "var(--v5-ink-3)" };
 }
 function claimBtnStyle(claimed: boolean): CSSProperties {
   return {
@@ -534,3 +553,35 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
 
 
 </script>
+
+<style scoped>
+.achievement-summary { display:flex; align-items:center; gap:18px; padding:18px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); margin-top:var(--v5-space-3); }.achievement-summary__count { font:500 32px/38px var(--font-metric); letter-spacing:-.02em; }.achievement-summary__count text { font-size:16px; color:var(--v5-ink-3); }
+.achievement-track { padding:18px 24px 14px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }.achievement-track__caption { font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.achievement-track__rail { position:relative; height:90px; margin:var(--v5-space-4) 8px 0; }.achievement-track__bar { position:absolute; left:0; right:0; top:7px; height:4px; }
+.achievement-node { position:absolute; top:0; width:18px; height:18px; margin-left:-9px; display:grid; place-items:center; border-radius:50%; }.achievement-node__dot { width:8px; height:8px; border-radius:50%; background:var(--v5-ink-4); }.achievement-node--done .achievement-node__dot { background:var(--v5-brand); }.achievement-node--current { box-shadow:inset 0 0 0 2px var(--v5-brand); background:var(--v5-brand-soft); }.achievement-node--current .achievement-node__dot { background:var(--v5-brand); animation: achievement-pulse 2s ease-in-out infinite; }
+.achievement-node__label { position:absolute; top:24px; left:50%; transform:translateX(-50%); text-align:center; width:100px; font:500 12px/16px var(--font-v5); color:var(--v5-brand); }.achievement-node:last-child .achievement-node__label { transform:translateX(-85%); }.achievement-node__reward { display:block; font:500 11px/14px var(--font-metric); color:var(--v5-nex); }
+.achievement-row--ready { position:relative; overflow:hidden; background:color-mix(in srgb,var(--v5-brand) 8%,transparent); }.achievement-row--ready::before { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(105deg,transparent,color-mix(in srgb,var(--v5-brand) 16%,transparent),transparent); animation:achievement-sheen 800ms ease-out both; }.achievement-row--locked { opacity:.55; }
+.achievement-badges { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--v5-space-2); background:transparent !important; box-shadow:none !important; }
+.achievement-row--badge { display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 6px 12px; border-radius:18px; background:var(--v5-surface); text-align:center; animation:nx-viz-pop 420ms cubic-bezier(.2,1.4,.4,1) var(--ui-growth-delay) both; }.achievement-row--badge.achievement-row--locked { border:1.5px dashed var(--v5-border-strong); background:transparent; }.achievement-row--badge > view { flex:none !important; }.achievement-row--badge > view:first-child {width:44px !important;height:44px !important;border-radius:50% !important;}.achievement-row--badge > view:last-child { text-align:center; }.achievement-row--badge > view:nth-child(2) > text:first-child { font:500 13px/18px var(--font-v5) !important; }.achievement-row--badge > view:nth-child(2) > text:nth-child(2), .achievement-row--badge > view:last-child > text:nth-child(2) { display:none; }
+@keyframes achievement-pulse { 50% {transform:scale(.7); opacity:.5;} } @keyframes achievement-sheen { from {transform:translateX(-100%);} to {transform:translateX(100%);} }
+@media (prefers-reduced-motion:reduce) { .achievement-row--badge,.achievement-node__dot,.achievement-row--ready::before {animation:none !important;} }
+
+/* Approved growth board geometry and material. */
+ .achievement-track { padding:18px 16px 14px; min-height:117.5px; box-sizing:border-box; }.achievement-track__rail { height:56px; margin-top:10px; }
+.achievement-streak { font-weight:600; color:var(--v5-ink); }.achievement-row:not(.achievement-row--badge) { min-height:60px; padding:8px 16px !important; box-sizing:border-box; }
+.achievement-row--locked { opacity:.55; }.achievement-row--badge { padding:14px 6px 12px; min-height:115px; box-sizing:border-box; }
+.achievement-row--badge > view:first-child { box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-brand) 40%,transparent); }
+.achievement-row--badge.achievement-row--locked > view:first-child { box-shadow:none; }
+.achievement-row--badge > view:last-child > text:first-child { font:500 11px/14px var(--font-metric) !important; color:var(--v5-success-ink) !important; }
+.achievement-row--badge.achievement-row--locked > view:last-child > text:first-child { color:var(--v5-ink-4) !important; }
+.achievement-row :deep(.nx-button--brand > .nx-button__surface), .achievement-node :deep(.nx-button--brand > .nx-button__surface) { --ui-button-ink:var(--v5-ink) !important; }
+
+.achievement-row--badge.achievement-row--locked {opacity:1;}.achievement-row--badge.achievement-row--locked > view:nth-child(2) > text:first-child {color:var(--v5-ink-3) !important;}
+
+.achievement-track__rail { margin:12px 0 0; height:50px; }
+.achievement-track__bar { left:8px; right:8px; }
+.achievement-summary { min-height:120px; box-sizing:border-box; }
+.achievement-summary > view:last-child { transform:translate(2px,2.5px); }
+.achievement-summary > view:last-child > text:last-child { margin-top:4px; }
+.achievement-row--badge:not(.achievement-row--locked) > view:first-child { background:var(--v5-brand-soft)!important; }
+
+</style>

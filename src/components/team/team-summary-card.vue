@@ -1,57 +1,56 @@
 <template>
-  <view class="nx-glass-card team-summary" data-testid="team-summary" :aria-busy="status === 'idle' || status === 'loading'">
-    <view class="team-summary__header">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <text class="team-summary__title">{{ t.team.summaryTitle }}</text>
-      <view v-if="status === 'ready' && total > 0" class="team-summary__arrow" role="link" tabindex="0" :aria-label="t.team.summaryView" @click="$emit('open')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
-      </view>
-    </view>
-    <text class="team-summary__tagline">{{ t.team.inviteTagline }}</text>
-    <template v-if="status === 'ready' && total > 0">
-      <view class="team-summary__metrics">
-        <view><text class="team-summary__number">{{ total }}</text><text class="team-summary__label">{{ t.team.summaryMembers }}</text></view>
-        <view><text class="team-summary__number">{{ direct }}</text><text class="team-summary__label">{{ t.team.summaryDirect }}</text></view>
-      </view>
-      <view class="team-summary__cta" role="link" tabindex="0" @click="$emit('open')"><text>{{ t.team.summaryView }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></view>
-    </template>
-    <template v-else-if="status === 'ready'">
-      <view class="team-summary__empty">
-        <svg width="84" height="72" viewBox="0 0 84 72" fill="none" stroke="var(--v5-ink-3)" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="42" cy="25" r="10"/><circle cx="17" cy="34" r="8"/><circle cx="67" cy="34" r="8"/><path d="M25 66V56a17 17 0 0 1 34 0v10M5 66v-8a12 12 0 0 1 17-11M79 66v-8a12 12 0 0 0-17-11M42 3v5M18 8l4 5M66 8l-4 5"/></svg>
-        <text class="team-summary__empty-title">{{ t.team.summaryEmpty }}</text>
-      </view>
-      <view class="team-summary__cta" role="button" tabindex="0" @click="$emit('invite')"><text>{{ t.team.summaryInvite }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></view>
-    </template>
-    <view v-else class="team-summary__status" role="status">
-      <text>{{ status === 'error' ? t.team.summaryUnavailable : t.team.summaryLoading }}</text>
-      <view v-if="status === 'error'" class="team-summary__retry" role="button" tabindex="0" @click="$emit('retry')"><text>{{ t.network.retry }}</text></view>
-    </view>
+  <view class="team-summary nx-viz-press" data-testid="team-summary" :role="canOpen ? 'link' : undefined" :tabindex="canOpen ? 0 : undefined" :aria-label="canOpen ? t.team.summaryView : undefined" :aria-busy="status === 'idle' || status === 'loading'" @click="open" @keydown.enter.prevent="open">
+    <view class="team-summary__header"><text class="team-summary__title">{{ copy.myTeam }}</text><text class="team-summary__arrow" :style="{ visibility: canOpen ? 'visible' : 'hidden' }" aria-hidden="true">›</text></view>
+    <view class="team-summary__body" :class="{ 'team-summary__body--long-count': readable && !visibility.hidden && String(total).length > 6 }"><TeamArt kind="members" :size="56" /><view class="team-summary__metrics"><text class="team-summary__number" :style="{ '--team-summary-count-units': countUnits }">{{ totalText }}</text><text class="team-summary__label">{{ copy.peopleUnit }}</text></view></view>
+    <view class="team-summary__direct"><text>{{ copy.directInvited }}</text><text>{{ visibility.mask(readable ? direct : '—') }}</text><text v-if="readable && total > direct" class="team-summary__team">{{ teamLabel }} <text>{{ visibility.mask(total - direct) }}</text></text></view>
+    <view v-if="readable && !total && status !== 'error'" class="team-summary__empty"><text v-if="!visibility.hidden">{{ t.team.summaryEmpty }}</text><NxButton class="team-summary__action" :label="copy.inviteFriends" variant="secondary" size="medium" @click="$emit('invite')" /></view>
+    <view v-else-if="status === 'error'" class="team-summary__status" role="status"><text>{{ t.team.summaryUnavailable }}</text><NxButton v-if="status === 'error'" class="team-summary__action" :label="t.network.retry" variant="text" size="medium" @click="$emit('retry')" /></view>
   </view>
 </template>
-
 <script setup lang="ts">
-import { useT } from "@/i18n/use-t";
-defineProps<{ status: "idle" | "loading" | "ready" | "error"; total: number; direct: number }>();
-defineEmits<{ (event: "invite"): void; (event: "open"): void; (event: "retry"): void }>();
-const t = useT();
+import { computed } from 'vue';
+import { useT } from '@/i18n/use-t';
+import { useLocaleStore } from '@/store/locale';
+import { teamRedesignCopy } from '@/i18n/team-redesign';
+import TeamArt from './team-art.vue';
+import NxButton from '@/components/ui/nx-button.vue';
+import { useDataVisibility } from '@/store/data-visibility';
+const props=defineProps<{status:'idle'|'loading'|'ready'|'error'; total:number; direct:number; hasSnapshot?:boolean;transientFailure?:boolean}>();
+const emit=defineEmits<{(event:'invite'):void;(event:'open'):void;(event:'retry'):void}>();
+const t=useT(), locale=useLocaleStore(), copy=computed(()=>teamRedesignCopy(locale.code));
+const visibility=useDataVisibility();
+const teamLabel=computed(()=>locale.code==='zh'?'团队':locale.code==='vi'?'Nhóm':'Team');
+const canOpen=computed(()=>props.status==='ready' && props.total>0);
+const readable=computed(()=>props.status==='ready'||(props.hasSnapshot&&(props.status==='loading'||(props.status==='error'&&props.transientFailure))));
+// Size the rendered text so masking also conceals the original digit count.
+const totalText=computed(()=>visibility.mask(readable.value ? props.total : '—'));
+const countUnits=computed(()=>Math.max(1, totalText.value.length * .7));
+function open(){if(canOpen.value)emit('open');}
 </script>
-
 <style scoped>
-.team-summary { padding: 20px; }
-.team-summary__header { display: flex; align-items: center; gap: 12px; }
-.team-summary__title { font-size: 20px; font-weight: 600; }
-.team-summary__arrow { display: grid; place-items: center; min-width: 44px; min-height: 44px; margin: -8px -10px -8px auto; }
-.team-summary__tagline { display: block; margin-top: 10px; font-size: 13px; line-height: 1.5; color: var(--v5-ink-3); }
-.team-summary__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 24px 0; }
-.team-summary__metrics > view { min-width: 0; }
-.team-summary__metrics > view + view { border-left: 1px solid var(--v5-border); padding-left: 24px; }
-.team-summary__number { display: block; font-size: clamp(18px, 6vw, 30px); line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.team-summary__label { display: block; margin-top: 6px; font-size: 13px; color: var(--v5-ink-3); }
-.team-summary__cta { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; padding: 10px 14px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font-size: 15px; font-weight: 600; }
-.team-summary__cta:active, .team-summary__retry:active, .team-summary__arrow:active { opacity: .75; }
-.team-summary__empty { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 26px 0; }
-.team-summary__empty-title { font-size: 20px; font-weight: 500; }
-.team-summary__status { display: flex; flex-direction: column; gap: 16px; padding: 26px 0 4px; color: var(--v5-ink-3); font-size: 13px; line-height: 1.5; }
-.team-summary__retry { min-height: 44px; display: grid; place-items: center; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); }
-.team-summary [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.team-summary { container: team-summary / inline-size; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); color: var(--v5-ink); border-radius: 24px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--ui-device-ink) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.team-summary__header { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; min-height: 24px; gap: 4px; }
+.team-summary__title { min-width: 0; overflow-wrap: anywhere; font: 600 14px/20px var(--font-v5); }
+.team-summary__arrow { flex: none; font-size: 18px; color: var(--v5-ink-4); }
+.team-summary__body { --team-art-size: 64px; display: flex; flex-direction: column; flex: 1; justify-content: flex-end; }
+.team-summary__body :deep(.team-art) { position: absolute; top: 30px; right: -10px; opacity: .9; pointer-events: none; }
+.team-summary__metrics { position: relative; container-type: inline-size; display: flex; align-items: baseline; gap: 4px; width: 100%; min-width: 0; }
+.team-summary__number { display: block; max-width: 100%; font: 600 32px/36px var(--font-metric); font-size: clamp(18px, calc(100cqi / var(--team-summary-count-units)), 32px); font-variant-numeric: tabular-nums; white-space: nowrap; overflow-x: auto; }
+.team-summary__label { flex: none; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
+.team-summary__direct { position: relative; display: flex; flex-wrap: wrap; gap: 0 6px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.team-summary__direct > text { min-width: 0; overflow-wrap: anywhere; }
+.team-summary__team { margin-left: 4px; }
+.team-summary__team > text { color: var(--v5-ink); font: 600 12px/16px var(--font-metric); }
+.team-summary__direct > text:nth-child(2) { max-width: 100%; white-space: nowrap; overflow-x: auto; color: var(--ui-device-ink); font: 600 12px/16px var(--font-metric); }
+.team-summary__number,.team-summary__direct > text:last-child { overflow-y: hidden; scrollbar-width: none; }
+.team-summary__number::-webkit-scrollbar,.team-summary__direct > text:last-child::-webkit-scrollbar { display: none; }
+.team-summary__empty,.team-summary__status { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.team-summary__action { max-width: 100%; }
+.team-summary__status .team-summary__action { font: 600 13px/20px var(--font-v5); }
+.team-summary[role='link'] { cursor: pointer; }
+.team-summary:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+/* Content-box widths: the art grows with the card; a very long count drops below it. */
+@container team-summary (min-width: 110px) { .team-summary__body { --team-art-size: 72px; } }
+@container team-summary (min-width: 140px) { .team-summary__body { --team-art-size: 88px; } .team-summary__body--long-count :deep(.team-art) { opacity: .35; } }
+@container team-summary (min-width: 260px) { .team-summary__body { --team-art-size: 104px; } }
 </style>

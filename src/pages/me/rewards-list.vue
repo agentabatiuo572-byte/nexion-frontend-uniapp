@@ -16,7 +16,7 @@
   cursor pagination; the mock slices the local ledger). Wrapped in <AppChassis>.
 -->
 <template>
-  <AppChassis active="me">
+  <AppChassis active="me" :scroll-load-key="`${cat}:${app.accountBindingEpoch}`" @scroll-load-more="scrollPager.loadMoreManually()">
     <view style="color: var(--v5-ink); padding-bottom: 24px">
       <SubPageHeader back="/pages/me/rewards" :title="pageTitle" />
 
@@ -28,7 +28,7 @@
         <template v-else>
           <view v-if="voucherReadError" class="flex items-center justify-between" :style="remoteErrorStyle">
             <text>{{ t.authOtp.errorServiceUnavailable }}</text>
-            <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="retryVouchers"><text>{{ t.ui.retry }}</text></view>
+            <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="retryVouchers"><text>{{ t.ui.retry }}</text></view>
           </view>
           <!-- An empty voucher wallet is a definite conclusion only after its current remote read. -->
           <EmptyState v-if="voucherKnownEmpty" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
@@ -51,12 +51,9 @@
                 <view class="flex-1 min-w-0">
                   <text class="block truncate" :style="ticketNameStyle">{{ v.name }}</text>
                   <text class="block truncate" :style="rowSubStyle">{{ scopeText(v) }}</text>
-                  <text class="block truncate" :style="rowSubTightStyle">{{ expiryText(v) }}</text>
+                  <text class="block" :style="rowSubTightStyle">{{ expiryText(v) }}</text>
                 </view>
-                <view class="shrink-0 inline-flex items-center active:opacity-80" :style="useBtnStyle" role="button" tabindex="0" :aria-label="t.rewards.useCta" @click="onUse(v)">
-                  <text class="vcs-cta-t" :style="useBtnTextStyle">{{ t.rewards.useCta }}</text>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 3px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                </view>
+                <NxButton class="shrink-0" variant="brand" size="small" :label="t.rewards.useCta" @click="onUse(v)" />
               </view>
             </view>
           </view>
@@ -89,31 +86,37 @@
 
       <!-- ── USDT / NEX reward records (paginated) ── -->
       <template v-else>
+        <view class="reward-list-summary"><text class="block">{{ pageTitle }}</text><view class="reward-list-summary__amount"><text><template v-if="categoryTotal !== null"><text v-if="symbol === 'USDT'" class="amount-cur">$</text>{{ formatAmount(categoryTotal).split('.')[0] }}<text class="amount-dec">{{ '.' + formatAmount(categoryTotal).split('.')[1] }}</text></template><template v-else>—</template></text><text class="reward-list-summary__unit">{{ platformDisplayText(symbol) }}</text></view><text class="block reward-list-summary__note">{{ symbol === 'USDT' ? t.rewards.catUsdtDesc : t.rewards.catNexDesc }}</text></view>
         <view v-if="initialError" class="flex items-center justify-between" :style="remoteErrorStyle">
           <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
+          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
         </view>
         <view v-else-if="initialLoading" :style="loadingStyle"><text>…</text></view>
         <EmptyState v-else-if="records.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="fmt(t.empty.rewardsTokenDesc, { asset: platformDisplayText(symbol) })" />
 
-        <view v-else :style="recordListStyle">
-          <view v-for="(b, i) in visibleRecords" :key="b.id" class="flex items-center" :style="recordRowStyle(i)">
+        <view v-else>
+          <view v-for="group in recordGroups" :key="group.month">
+          <text class="reward-month">{{ group.month }}</text>
+          <view :style="recordListStyle">
+          <view v-for="(b, i) in group.rows" :key="b.id" class="flex items-center" :style="recordRowStyle(i, group.rows.length)">
             <view class="grid place-items-center shrink-0" :style="vIconStyle(false)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
+              <svg width="18.5" height="18.5" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
             </view>
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="rowTitleStyle">{{ rewardTypeLabel(b.type) }}</text>
               <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
               <text v-else :class="b.memoKey === 'learningReward' ? 'block' : 'block truncate'" :style="rowSubStyle">{{ b.memo }}</text>
-              <text v-if="courseRewardId(b)" class="block active:opacity-70" style="color: var(--v5-brand); font-size: 12px; margin-top: 4px" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)" @keydown.enter.prevent="onKeyboardActivate($event, () => openCourseReward(b))">{{ t.rewards.courseDetail }} ›</text>
-              <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: 4px" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)" @keydown.enter.prevent="onKeyboardActivate($event, () => toggleSourceRef(b.id))" @keydown.space.prevent="onKeyboardActivate($event, () => toggleSourceRef(b.id))">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
+              <text v-if="courseRewardId(b)" class="block active:opacity-70" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }} ›</text>
+              <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: var(--v5-space-1)" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
               <text v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward'" class="block" style="color: var(--v5-ink-3); font-size: 12px; overflow-wrap: anywhere">{{ b.ref }}</text>
             </view>
-            <view class="text-right shrink-0" style="margin-left: 8px">
-              <text class="block tabular-nums" :style="rewardAmountStyle">{{ (b.amountExact === undefined ? Math.sign(b.amount) === -1 : b.amountExact.startsWith('-')) ? '' : '+' }}{{ formatAmount(b.amountExact ?? b.amount) }} {{ platformDisplayText(b.symbol) }}</text>
-              <text class="block" :style="rowDateStyle">{{ rewardStatusLabel(b.status) }}</text>
+            <view class="text-right shrink-0" style="margin-left: var(--v5-space-2)">
+              <text class="block tabular-nums" :style="rewardAmountStyle(b)" :aria-label="`${rewardAmountText(b)} ${platformDisplayText(b.symbol)}`">{{ rewardAmountText(b) }}</text>
+              <text class="block reward-record-status" :style="[rowDateStyle, {color:b.status === 'posted' ? 'var(--v5-success-ink)' : 'var(--v5-ink-3)'}]">{{ rewardStatusLabel(b.status) }}</text>
               <text class="block" :style="rowDateStyle">{{ shortDate(b.ts) }}</text>
             </view>
+          </view>
+          </view>
           </view>
         </view>
 
@@ -124,11 +127,11 @@
         <view v-if="fundsServerEnabled && activePager.loadingMore" :style="loadingStyle" aria-live="polite" aria-busy="true"><text>…</text></view>
         <view v-if="refreshErrorWithRows" class="flex items-center justify-between" :style="remoteErrorStyle">
           <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
+          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
         </view>
         <view v-else-if="appendError" class="flex items-center justify-between" :style="remoteErrorStyle">
           <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" role="button" tabindex="0" @click="loadMoreRecords"><text>{{ t.store.catalogRetry }}</text></view>
+          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="loadMoreRecords"><text>{{ t.store.catalogRetry }}</text></view>
         </view>
         <view v-if="showManualLoadMore" class="inline-flex items-center active:opacity-70" :style="manualLoadMoreStyle" role="button" tabindex="0" @click="loadMoreRecords"><text>{{ t.receipt.loadMore }}</text></view>
       </template>
@@ -137,9 +140,12 @@
 </template>
 
 <script setup lang="ts">
+import NxButton from "@/components/ui/nx-button.vue";
+import { formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
 import { formatAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
 import { computed, ref, watch, watchEffect, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -147,7 +153,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import PromotionRewardList from "@/components/promotion/promotion-reward-list.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
 import { useVoucher } from "@/store/voucher";
@@ -203,7 +209,7 @@ onLoad((options) => {
 
 const pageTitle = computed(() =>
   cat.value === "promotion" ? t.value.promotion.rewardCategory
-    : cat.value === "usdt" ? t.value.rewards.catUsdt : cat.value === "nex" ? t.value.rewards.catNex : t.value.rewards.catVouchers,
+    : cat.value === "usdt" ? t.value.rewards.catUsdt : cat.value === "uvt" ? t.value.rewards.catNex : t.value.rewards.catVouchers,
 );
 
 // ── vouchers ──
@@ -218,10 +224,10 @@ const voucherKnownEmpty = computed(() => (!remoteApiEnabled || voucher.remoteSta
 function retryVouchers() { void voucher.refreshRemote(); }
 
 // ── reward records (per-symbol, newest-first from the ledger) ──
-const symbol = computed(() => (cat.value === "nex" ? "NEX" : "USDT"));
+const symbol = computed(() => (cat.value === "uvt" ? "UVT" : "USDT"));
 const usdtRewardsPager = bills.getLedger({ asset: "USDT", category: "REWARD" });
-const nexRewardsPager = bills.getLedger({ asset: "NEX", category: "REWARD" });
-const activePager = computed(() => cat.value === "nex" ? nexRewardsPager : usdtRewardsPager);
+const nexRewardsPager = bills.getLedger({ asset: "UVT", category: "REWARD" });
+const activePager = computed(() => cat.value === "uvt" ? nexRewardsPager : usdtRewardsPager);
 const records = computed(() => fundsServerEnabled
   ? activePager.value.rows
   : bills.bills.filter((b) => isRewardBill(b) && b.symbol === symbol.value));
@@ -239,12 +245,12 @@ const appendError = computed(() => fundsServerEnabled && activePager.value.statu
 const showManualLoadMore = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore && !appendError.value && !refreshErrorWithRows.value);
 
 async function refreshRecords() {
-  if (!fundsServerEnabled || (cat.value !== "usdt" && cat.value !== "nex")) return;
+  if (!fundsServerEnabled || (cat.value !== "usdt" && cat.value !== "uvt")) return;
   if (!remoteSessionReady.value) return;
   try { await activePager.value.refresh(); } catch { /* the pager retains rows and exposes the error */ }
 }
 async function loadMoreRecords() {
-  if (cat.value !== "usdt" && cat.value !== "nex") return;
+  if (cat.value !== "usdt" && cat.value !== "uvt") return;
   if (fundsServerEnabled) {
     try { await activePager.value.loadMore(); } catch { /* keep loaded rows visible for retry */ }
     return;
@@ -262,8 +268,8 @@ watch(remoteSessionReady, (ready, wasReady) => {
   void refreshRecords();
   if (cat.value === "voucher") retryVouchers();
 });
-useManualScrollLoadMore(scrollAnchor, {
-  enabled: () => fundsServerEnabled && (cat.value === "usdt" || cat.value === "nex") && !activePager.value.error,
+const scrollPager = useManualScrollLoadMore(scrollAnchor, {
+  enabled: () => fundsServerEnabled && (cat.value === "usdt" || cat.value === "uvt") && !activePager.value.error,
   hasMore: () => activePager.value.hasMore,
   loading: () => activePager.value.loadingMore || activePager.value.status === "loading",
   loadMore: loadMoreRecords,
@@ -273,21 +279,16 @@ useManualScrollLoadMore(scrollAnchor, {
 // receipts.vue: watchEffect re-checks on every dependency change.
 const { elRef: loadMoreSentinel, inView: loadMoreInView } = useScrollGrowProgress({ threshold: 0 });
 watchEffect(() => {
-  if (!fundsServerEnabled && (cat.value === "usdt" || cat.value === "nex") && loadMoreInView.value && hasMore.value) {
+  if (!fundsServerEnabled && (cat.value === "usdt" || cat.value === "uvt") && loadMoreInView.value && hasMore.value) {
     visibleCount.value = Math.min(records.value.length, visibleCount.value + PAGE_SIZE);
   }
 });
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
 function formatDate(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  return formatDisplayDate(ms, dateLocale());
 }
 function shortDate(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  return formatDisplayDate(ms, dateLocale());
 }
 // Ticket stub — the denomination alone, big ("$50" / "8%"); the word ("立减"/
 // "折扣"/"OFF") drops to the small label line below it.
@@ -336,7 +337,7 @@ function onUse(v: VoucherDef) {
 const secHeadStyle: CSSProperties = {
   margin: "22px 18px 12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-section)",
   fontWeight: 600,
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
@@ -352,7 +353,7 @@ function secHead(first: boolean): CSSProperties {
 const ticketStyle: CSSProperties = {
   margin: "0 16px 12px",
   background: "var(--v5-surface)",
-  borderRadius: "16px",
+  borderRadius: "var(--v5-radius-m)",
   overflow: "hidden",
   minHeight: "96px",
 };
@@ -360,7 +361,7 @@ function stubStyle(dim: boolean): CSSProperties {
   return {
     width: "104px",
     padding: "14px 8px",
-    background: dim ? "var(--v5-surface-2)" : "color-mix(in srgb, var(--v5-brand) 12%, transparent)",
+    background: dim ? "var(--v5-surface-2)" : "color-mix(in srgb, var(--v5-brand) 20%, transparent)",
   };
 }
 function stubValueStyle(dim: boolean): CSSProperties {
@@ -395,48 +396,77 @@ function notchStyle(top: boolean): CSSProperties {
     [top ? "top" : "bottom"]: "-7px",
     width: "14px",
     height: "14px",
-    borderRadius: "999px",
+    borderRadius: "var(--v5-radius-full)",
     background: "var(--v5-bg)",
   } as CSSProperties;
 }
-const ticketNameStyle: CSSProperties = { fontSize: "15px", fontWeight: 550, color: "var(--v5-ink)" };
-const ticketNameExpiredStyle: CSSProperties = { fontSize: "15px", fontWeight: 550, color: "var(--v5-ink-3)" };
+const ticketNameStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", fontWeight: 550, color: "var(--v5-ink)" };
+const ticketNameExpiredStyle: CSSProperties = { fontSize: "var(--ui-type-list-title)", fontWeight: 550, color: "var(--v5-ink-3)" };
+const recordGroups = computed(() => {
+  const groups: {month: string; rows: Bill[]}[] = [];
+  for (const bill of visibleRecords.value) {
+    const date = new Date(bill.ts);
+    const month = Number.isFinite(date.getTime()) ? `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}` : '—';
+    const previous = groups[groups.length - 1];
+    if (previous?.month === month) previous.rows.push(bill);
+    else groups.push({month, rows: [bill]});
+  }
+  return groups;
+});
 const recordListStyle: CSSProperties = {
-  margin: "2px 16px 0",
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
+  margin: "6px 16px 0",
+  padding: "0",
+  borderRadius: "var(--ui-radius-surface)",
+  overflow: "hidden",
+  background: "var(--v5-surface)",
 };
-function recordRowStyle(i: number): CSSProperties {
+function recordRowStyle(i: number, count = visibleRecords.value.length): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 0",
-    borderBottom: i < visibleRecords.value.length - 1 ? "1px solid var(--v5-border)" : "none",
+    padding: "10px 16px",
+    minHeight: "68px",
+    borderBottom: i < count - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }
 function vIconStyle(dim: boolean): CSSProperties {
   return {
-    width: "36px",
-    height: "36px",
+    width: "40px",
+    height: "40px",
     borderRadius: "10px",
     background: dim
       ? "var(--v5-surface-2)"
-      : "color-mix(in srgb, var(--v5-brand) 12%, transparent)",
+      : "color-mix(in srgb, var(--v5-brand) 20%, transparent)",
   };
 }
-const rowTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
+const rowTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 500, color: "var(--v5-ink)" };
 const rowSubStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
-const rewardAmountStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-brand)",
-};
+const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "12px", color: "var(--v5-ink-3)", overflowWrap: "anywhere" };
+const rowDateStyle: CSSProperties = { fontFamily: "var(--font-metric)", marginTop: "2px", fontSize: "12px", lineHeight: "16px", color: "var(--v5-ink-3)" };
+function rewardAmountText(bill: Bill): string {
+  return formatUsd(bill.amountExact ?? bill.amount, bill.symbol === 'USDT' ? 'detail' : 'overview', true).replace('$', '');
+}
+const categoryTotal = computed<number | null>(() => {
+  if (fundsServerEnabled) return bills.summaryStatus === 'ready' ? (symbol.value === 'USDT' ? bills.summary?.rewardsUsdt : bills.summary?.rewardsNex) ?? null : null;
+  return bills.bills.reduce((sum, bill) => isRewardBill(bill) && bill.symbol === symbol.value ? sum + bill.amount : sum, 0);
+});
+function rewardAmountSign(bill: Bill): -1 | 0 | 1 {
+  const raw = String(bill.amountExact ?? bill.amount).trim();
+  if (!/[1-9]/.test(raw.split(/[eE]/)[0])) return 0;
+  return raw.startsWith("-") ? -1 : 1;
+}
+function rewardAmountStyle(bill: Bill): CSSProperties {
+  const sign = rewardAmountSign(bill);
+  return {
+    fontFamily: "var(--font-metric)",
+    fontSize: "15px",
+    fontWeight: 600,
+    color: sign < 0 ? "var(--v5-brand-2-ink)" : sign > 0 ? "var(--v5-brand)" : "var(--v5-ink-2)",
+  };
+}
 const useBtnStyle: CSSProperties = {
-  minHeight: "30px",
+  minHeight: "44px",
   padding: "0 13px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-brand)",
 };
 const useBtnTextStyle: CSSProperties = {
@@ -447,7 +477,7 @@ const useBtnTextStyle: CSSProperties = {
 };
 const expiredBadgeStyle: CSSProperties = {
   padding: "3px 9px",
-  borderRadius: "999px",
+  borderRadius: "var(--v5-radius-full)",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-4)",
   fontSize: "12px",
@@ -456,14 +486,29 @@ const expiredBadgeStyle: CSSProperties = {
 const emptyStyle: CSSProperties = {
   margin: "0 16px",
   border: "1px dashed var(--v5-border-strong)",
-  borderRadius: "16px",
+  borderRadius: "var(--v5-radius-m)",
   padding: "32px",
   textAlign: "center",
 };
-const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)" };
 const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 };
-const remoteErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px 12px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)", color: "var(--v5-danger)", fontSize: "12px", gap: "12px" };
-const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
+const remoteErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px 12px", borderRadius: "var(--v5-radius-s)", background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)", color: "var(--v5-danger)", fontSize: "12px", gap: "12px" };
 const loadingStyle: CSSProperties = { margin: "0 16px", padding: "32px", textAlign: "center", color: "var(--v5-ink-3)" };
-const manualLoadMoreStyle: CSSProperties = { minHeight: "40px", margin: "8px 16px 0", padding: "0 14px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "12px" };
+const manualLoadMoreStyle: CSSProperties = { minHeight: "44px", margin: "8px 16px 0", padding: "0 14px", borderRadius: "var(--v5-radius-full)", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "12px" };
 </script>
+
+<style scoped>
+.reward-month { display:block; margin:28px 20px 8px; font:400 12px/16px var(--font-metric); color:var(--v5-ink-3); }
+.reward-list-summary { margin:var(--v5-space-1) 20px 0; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.reward-list-summary__amount { display:flex; align-items:baseline; gap:6px; margin-top:var(--v5-space-1); font:500 32px/40px var(--font-amount); color:var(--v5-ink); }.reward-list-summary__unit { font:500 12px/16px var(--font-v5); color:var(--v5-ink-3); }.reward-list-summary__note { margin-top:0; line-height:18px; }
+
+/* Approved growth board geometry and material. */
+ .amount-cur { font-size:.55em; color:var(--v5-ink-3); margin-right:2px; letter-spacing:0; }.amount-dec { color:var(--v5-ink-3); }
+.reward-month { font-family:var(--font-v5); }.reward-record-status { font-family:var(--font-v5) !important; text-align:right; }
+
+
+.reward-list-summary { margin-top:9px; }
+.reward-list-summary__amount { font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+
+.reward-list-summary__unit { letter-spacing:0; }
+
+</style>

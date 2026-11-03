@@ -1,3 +1,4 @@
+import * as displayDate from "@/lib/display-date";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error Node-only SFC contract; the application tsconfig omits Node globals.
 import { readFileSync } from "node:fs";
@@ -11,6 +12,7 @@ import { fmt } from "@/i18n/format";
 import { riskReasonLines, terminalReasonLine } from "@/lib/risk-reason-text";
 import * as trackingRead from "./wallet-withdraw-tracking-read";
 import { formatAmount } from "@/lib/amount-display";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
 
 const source = readFileSync(new URL("./wallet-withdraw-tracking.vue", import.meta.url), "utf8");
 const { descriptor } = parse(source, { filename: "wallet-withdraw-tracking.vue" });
@@ -26,8 +28,14 @@ function actualPage(dictionary: typeof zh | typeof en | typeof vi) {
     amount: 100, network: "USDT-TRC20", address: "T-example", submittedAt: now - 86_400_000,
     estimatedCompletion: now + 86_400_000, confirmedAt: now - 60_000, fee: { actualFeeUsd: 1 },
   });
+  const app = Vue.reactive({ accountKey: "user:7", accountBindingEpoch: 1, withdrawals: [withdrawal],
+    primaryWithdrawal: withdrawal as typeof withdrawal | null,
+    remoteWithdrawalListStatus: "ready" as "idle" | "loading" | "ready" | "error", remoteWithdrawalListHasSnapshot: true,
+    refreshRemoteWithdrawalList: async () => { app.remoteWithdrawalListStatus = "loading"; return true; },
+  });
   const imports: Record<string, unknown> = {
     "@/lib/amount-display": { formatAmount },
+    "@/lib/finance-amount-display": { formatFinanceAmount },
     vue: { ...Vue, onUnmounted: () => {} },
     "@dcloudio/uni-app": { onLoad: () => {}, onShow: () => {}, onHide: () => {} },
     "@/api/runtime": { remoteApiEnabled: true, sessionVault: { read: () => null, revision: () => 0 }, withdrawalApi: {} },
@@ -37,8 +45,8 @@ function actualPage(dictionary: typeof zh | typeof en | typeof vi) {
     "@/store/withdrawal-eligibility-core": { platformDayIndex: () => 1 },
     "@/store/withdrawal-eligibility": { dailyLimitStatus: () => ({ reached: false, resetAt: now + 86_400_000 }) },
     "@/i18n/use-t": { useT: () => Vue.ref(dictionary) },
-    "@/i18n/format": { fmt },
-    "@/store/app": { useApp: () => ({ accountKey: "user:7", accountBindingEpoch: 1, withdrawals: [withdrawal], primaryWithdrawal: withdrawal }) },
+    "@/lib/display-date": displayDate, "@/i18n/format": { fmt, dateLocale: () => dictionary === zh ? "zh" : dictionary === vi ? "vi" : "en" },
+    "@/store/app": { useApp: () => app },
     "@/lib/route": { navTo: () => {}, navReplace: async () => true },
     "@/lib/risk-reason-text": { riskReasonLines, terminalReasonLine },
     "./wallet-withdraw-tracking-read": trackingRead,
@@ -52,8 +60,32 @@ function actualPage(dictionary: typeof zh | typeof en | typeof vi) {
   new Function("require", "module", "exports", code)(require, module, module.exports);
   const scope = Vue.effectScope();
   const page = scope.run(() => module.exports.default.setup({}, { expose() {} }))!;
-  return { withdrawal, page, stop: () => scope.stop() };
+  return { withdrawal, page, app, stop: () => scope.stop() };
 }
+
+it("a no-id tracking page distinguishes loading, read failure and a confirmed empty list", () => {
+  const { app, page, stop } = actualPage(zh);
+  try {
+    app.primaryWithdrawal = null;
+    app.remoteWithdrawalListHasSnapshot = false;
+    app.remoteWithdrawalListStatus = "idle";
+    expect(page.trackingReadPending.value).toBe(true);
+    expect(page.trackingReadError.value).toBe(false);
+    app.remoteWithdrawalListStatus = "error";
+    expect(page.trackingReadPending.value).toBe(false);
+    expect(page.trackingReadError.value).toBe(true);
+    (page.retryTrackedWithdrawal as unknown as () => void)();
+    expect(app.remoteWithdrawalListStatus).toBe("loading");
+    expect(page.trackingReadPending.value).toBe(true);
+    app.remoteWithdrawalListStatus = "ready";
+    app.remoteWithdrawalListHasSnapshot = true;
+    expect(page.trackingReadPending.value).toBe(false);
+    expect(page.trackingReadError.value).toBe(false);
+    expect(page.wd.value).toBeNull();
+    app.remoteWithdrawalListStatus = "error";
+    expect(page.trackingReadError.value).toBe(true);
+  } finally { stop(); }
+});
 
 describe.each(Object.entries({ zh, en, vi }))("withdrawal tracking copy in %s", (_locale, dictionary) => {
   it.each(["freeze", "manual", "delay"])("replaces historical %s guidance after confirmed arrival", route => {

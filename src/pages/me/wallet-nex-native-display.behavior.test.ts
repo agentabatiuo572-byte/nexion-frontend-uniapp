@@ -10,7 +10,7 @@ import { formatTrialDateTime } from "@/lib/trial-date";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 import source from "./wallet-nex.vue?raw";
-import { formatAmount } from "@/lib/amount-display";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
 
 // Compile and mount the production page, replacing only its stores and host.
 const { descriptor } = parse(source, { filename: "wallet-nex.vue" });
@@ -46,9 +46,11 @@ const texts = (root: Host): string[] => [
 ];
 const unmounts: Array<() => void> = [];
 const timestamp = new Date(2026, 9, 3, 16, 34, 40).getTime();
-const bill = (amount = 3, ts = timestamp) => ({ id: "nex:1", amount, ts, symbol: "NEX", status: "settled", memo: "", memoKey: "mining" });
+const bill = (amount = 3, ts = timestamp) => ({ id: "nex:1", amount, ts, symbol: "UVT", status: "settled", memo: "", memoKey: "mining" });
 async function mount(translations = en) {
-  const app = Vue.reactive({ user: { nexBalance: 143 }, remoteFleetHasSnapshot: true, visibleDevices: [], refreshRemoteFleet: vi.fn(async () => {}) });
+  const app = Vue.reactive({ accountKey: "user:wallet-fixture", accountBindingEpoch: 1, user: { nexBalance: 143 }, remoteFleetHasSnapshot: true, visibleDevices: [], refreshRemoteFleet: vi.fn(async () => {}) });
+  const locale = Vue.reactive({ code: translations === zh ? "zh" : translations === vietnamese ? "vi" : "en" });
+  const apiRuntimeConfig = Vue.reactive({ environment: "dev", baseUrl: "https://test.example" });
   const market = Vue.reactive({
     nexPriceUSDT: 0.124, costBasis: 0.085, change24hPct: 0, change24hAvailable: true,
     klineHourly: [], remoteReady: true, remoteError: null as string | null,
@@ -61,8 +63,8 @@ async function mount(translations = en) {
   const chassis = { setup: (_props: unknown, { slots }: { slots: Vue.Slots }) => () => Vue.h("view", slots.default?.()) };
   const empty = { render: () => null };
   const modules: Record<string, unknown> = {
-    "@/lib/amount-display": { formatAmount },
-    vue: Vue, "@dcloudio/uni-app": { onShow: () => {} },
+    "@/lib/finance-amount-display": { formatFinanceAmount },
+    vue: Vue, "@dcloudio/uni-app": { onShow: () => {}, onHide: () => {} },
     "@/components/app-chassis.vue": { default: chassis },
     "@/components/sub-page-header.vue": { default: empty },
     "@/components/empty-state.vue": { default: empty },
@@ -75,7 +77,8 @@ async function mount(translations = en) {
     "@/lib/remote-authority-display": { remoteAuthorityStatus },
     "@/store/app": { useApp: () => app }, "@/store/market": { useMarket: () => market },
     "@/store/bills": { useBills: () => bills }, "@/store/commission": { useCommission: () => ({ events: [] }) },
-    "@/api/runtime": { remoteApiEnabled: true },
+    "@/store/locale": { useLocaleStore: () => locale },
+    "@/api/runtime": { remoteApiEnabled: true, apiRuntimeConfig },
   };
   const exports = { default: {} as Component };
   new Function("require", "exports", code)((id: string) => {
@@ -100,7 +103,7 @@ afterEach(() => {
 });
 
 describe("mounted NEX wallet Android display", () => {
-  it.each([[1.005, "1.01"], [2.675, "2.68"], [0.145, "0.15"], [999.995, "1000.00"]] as const)(
+  it.each([[1.005, "1.01"], [2.675, "2.68"], [0.145, "0.15"], [999.995, "1,000.00"], [1280, "1,280.00"]] as const)(
     "rounds balance, valuation and activity at half cents without Intl or input changes: %s", async (amount, expected) => {
       vi.stubGlobal("Intl", undefined);
       const s = await mount();
@@ -109,36 +112,36 @@ describe("mounted NEX wallet Android display", () => {
       s.market.costBasis = 1.005;
       s.bills.summary.recentNexBills = [bill(amount)];
       await Vue.nextTick();
-      expect(s.text()).toEqual(expect.arrayContaining([expected, `${expected} NEX`, `≈ $${expected}`, `$${expected}`, `+${expected} NEX`, "$1.005"]));
+      expect(s.text()).toEqual(expect.arrayContaining([expected, `${expected} UVT`, `≈ $${expected}`, `$${expected}`, `+${expected} UVT`]));
+      // The platform-baseline gain block is gone (APP-COPY-AUDIT D3): no cost basis or gain percentage.
+      expect(s.text()).not.toContain("$1.005");
       expect(s.app.user.nexBalance).toBe(amount);
       expect(s.bills.summary.recentNexBills[0].amount).toBe(amount);
       expect(s.market.costBasis).toBe(1.005);
       expect(Number.prototype.toLocaleString).not.toHaveBeenCalled();
     });
 
-  it("rounds the observed balance, valuation, baseline estimate and activity without changing their inputs", async () => {
+  it("rounds the observed balance, valuation and activity without changing their inputs", async () => {
     const s = await mount();
     expect(s.text()).toEqual(expect.arrayContaining([
-      "143.00", "143.00 NEX", "≈ $17.73", "$17.73", "$0.085", "$12.16",
-      "+$5.58 (+45.9%)", "+3.00 NEX", "≈ $0.37",
+      "143.00", "143.00 UVT", "≈ $17.73", "$17.73", "+3.00 UVT", "≈ $0.37",
     ]));
+    expect(s.text().some(item => /\([+-]?\d+(?:\.\d+)?%\)/.test(item))).toBe(false);
     expect(s.app.user.nexBalance).toBe(143); expect(s.market.nexPriceUSDT).toBe(0.124);
     expect(s.market.costBasis).toBe(0.085); expect(s.bills.summary.recentNexBills[0].amount).toBe(3);
     expect(Number.prototype.toLocaleString).not.toHaveBeenCalled();
   });
 
-  it("preserves two decimals and negative amounts while retaining the grouped three-decimal cost rate", async () => {
+  it("preserves two decimals and negative amounts", async () => {
     const s = await mount();
     s.app.user.nexBalance = 1234567.891; s.market.nexPriceUSDT = 2; s.market.costBasis = 1;
     s.bills.summary.todayNexEarn = -2345.678; s.bills.summary.pendingNex = 9876.543;
     s.bills.summary.recentNexBills = [bill(-1234.56789)];
     await Vue.nextTick();
     expect(s.text()).toEqual(expect.arrayContaining([
-      "1234567.89", "1234567.89 NEX", "≈ $2469135.78", "$1234567.89", "$1.000",
-      "+$1234567.89 (+100.0%)", "-2345.68 NEX", "9876.54 NEX", "-1234.57 NEX", "≈ $-2469.14",
+      "1,234,567.89", "1,234,567.89 UVT", "≈ $2,469,135.78", "$2,469,135.78",
+      "-2,345.68 UVT", "9,876.54 UVT", "-1,234.57 UVT", "≈ $-2,469.14",
     ]));
-    s.market.costBasis = 1234.567; await Vue.nextTick();
-    expect(s.text()).toContain("$1,234.567");
     expect(s.app.user.nexBalance).toBe(1234567.891);
     expect(s.bills.summary.recentNexBills[0].amount).toBe(-1234.56789);
   });
@@ -146,9 +149,9 @@ describe("mounted NEX wallet Android display", () => {
   it("keeps confirmed zero and negative estimates readable with their existing signs", async () => {
     const s = await mount(); s.app.user.nexBalance = 0; s.bills.summary.recentNexBills = [bill(0)];
     await Vue.nextTick();
-    expect(s.text()).toEqual(expect.arrayContaining(["0.00", "0.00 NEX", "+0.00 NEX", "≈ $0.00", "$0.00", "+$0.00 (+0.0%)"]));
+    expect(s.text()).toEqual(expect.arrayContaining(["0.00", "0.00 UVT", "+0.00 UVT", "≈ $0.00", "$0.00"]));
     s.app.user.nexBalance = 2; s.market.nexPriceUSDT = 1; s.market.costBasis = 2;
-    await Vue.nextTick(); expect(s.text()).toContain("$-2.00 (-50.0%)");
+    await Vue.nextTick(); expect(s.text()).not.toContain("$-2.00 (-50.0%)");
   });
 
   it("retains balance and quote authority gates through snapshot changes", async () => {
@@ -156,7 +159,7 @@ describe("mounted NEX wallet Android display", () => {
     expect(s.text()).toContain("—"); expect(s.text()).not.toContain("143.00");
     s.app.remoteFleetHasSnapshot = true; s.market.remoteReady = false; s.market.remoteError = "offline";
     await Vue.nextTick();
-    expect(s.text()).toContain("143.00"); expect(s.text()).toContain("+3.00 NEX");
+    expect(s.text()).toContain("143.00"); expect(s.text()).toContain("+3.00 UVT");
     expect(s.text()).toContain("≈ —"); expect(s.text()).not.toContain("≈ $17.73");
   });
 
@@ -166,13 +169,13 @@ describe("mounted NEX wallet Android display", () => {
     s.bills.summary.todayNexEarn = amount; s.bills.summary.pendingNex = amount;
     s.bills.summary.recentNexBills = [bill(amount)]; await Vue.nextTick();
     expect(s.text()).toContain("—"); expect(s.text()).toContain("≈ —");
-    expect(s.text()).toContain("— NEX");
+    expect(s.text()).toContain("— UVT");
     expect(s.wholeText()).not.toMatch(/NaN|Infinity|\$—|\+—/);
   });
 
   it.each([["en", en], ["zh", zh], ["vi", vietnamese]] as const)("renders activity in device-local time despite the %s locale fallback", async (_locale, translations) => {
     const s = await mount(translations);
-    expect(s.text()).toContain("2026-10-03 16:34:40");
+    expect(s.text()).toContain("Oct 3, 2026 16:34:40");
     expect(s.wholeText()).not.toContain("GMT");
     expect(Date.prototype.toLocaleString).not.toHaveBeenCalled();
     expect(s.bills.summary.recentNexBills[0].ts).toBe(timestamp);
@@ -180,7 +183,7 @@ describe("mounted NEX wallet Android display", () => {
 
   it.each([NaN, Infinity, -Infinity, 9e15])("uses a neutral activity time for invalid timestamp %s", async ts => {
     const s = await mount(); s.bills.summary.recentNexBills = [bill(3, ts)]; await Vue.nextTick();
-    expect(s.text()).toContain("—"); expect(s.text()).toContain("+3.00 NEX");
+    expect(s.text()).toContain("—"); expect(s.text()).toContain("+3.00 UVT");
     expect(s.wholeText()).not.toMatch(/Invalid Date|NaN|Infinity/);
     expect(s.bills.summary.recentNexBills[0].ts).toBe(ts);
   });

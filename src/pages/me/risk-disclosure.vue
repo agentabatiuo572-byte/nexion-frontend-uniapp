@@ -1,6 +1,6 @@
 <!--
   Platform risk disclosure (ported from Nexion-prototype/app/(main)/me/risk-disclosure/page.tsx).
-  Required reading before first withdrawal / staking lock. The accept button gates
+  Opened from the sign-up terms, checkout policy links and the trust centre. The accept button gates
   on (a) scroll-to-bottom (uni-app scrolltolower plus a P-019-safe sentinel)
   and (b) an explicit checkbox tick.
   Acceptance persists via the risk-disclosure
@@ -8,9 +8,10 @@
 -->
 <template>
   <AppChassis active="me">
-    <scroll-view :key="nativeScrollSurface.key" scroll-y :scroll-top="scrollTop" style="height: 100vh" :onScroll="nativeScrollSurface.events.scroll" :onScrolltolower="nativeScrollSurface.events.scrolltolower">
-    <view style="padding-bottom: 32px">
-      <SubPageHeader :back="returnTo" pill />
+    <template #pageFixed="{ top }">
+    <scroll-view :key="nativeScrollSurface.key" class="risk-scroll-surface" :class="{ 'risk-scroll-surface--scrolled': scrollTop > 12 }" scroll-y :show-scrollbar="false" :scroll-top="scrollTop" :onScroll="nativeScrollSurface.events.scroll" :onScrolltolower="nativeScrollSurface.events.scrolltolower">
+    <view :style="{ paddingTop: top + 'px', paddingBottom: '40px' }">
+      <SubPageHeader :back="returnTo" />
 
       <!-- Hero -->
       <view class="nx-glass-card mx-4" :style="heroStyle">
@@ -73,7 +74,7 @@
         <!-- 反馈走 scale:同 P-058,inline style 里已有 opacity(未读完时 0.55),写 opacity 反馈会被压掉 -->
         <view
           class="flex items-start active:scale-[0.98] transition-transform"
-          :style="{ gap: '10px', opacity: scrolledToBottom && !accepted ? 1 : 0.55 }"
+          :style="{ gap: '10px', minHeight: '44px', alignItems: 'center', opacity: scrolledToBottom && !accepted ? 1 : 0.55 }"
           role="checkbox"
           tabindex="0"
           :aria-checked="checked || accepted"
@@ -103,12 +104,14 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
             <text>{{ w.alreadyAcceptedCta }}</text>
           </template>
-          <text v-else>{{ w.acceptCta }}</text>
+          <text v-else>{{ readingSecondsRemaining > 0 ? fmt(w.minimumReadingWait, { n: readingSecondsRemaining }) : w.acceptCta }}</text>
         </view>
-        <text class="block text-center" :style="disclaimerStyle">{{ disclaimerText }}</text>
+        <text v-if="risk.error && disclosure && !accepted" class="block text-center" :style="hintTextStyle" role="alert">{{ w.acknowledgmentError }}</text>
+        <text class="block text-center" :style="disclaimerStyle">{{ w.disclaimer }}</text>
       </view>
     </view>
     </scroll-view>
+    </template>
   </AppChassis>
 </template>
 
@@ -122,6 +125,7 @@ import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { platformDisplayText } from "@/lib/brand-copy";
+import { formatLegalEffectiveDate } from "@/lib/legal-effective-date";
 import { resolveRiskDisclosureDisplayLanguage, riskDisclosureChapterCopy } from "@/lib/risk-disclosure-language";
 import { canAcknowledgeRiskDisclosure, canCompleteRiskDisclosureReadingFromScrollEvent, EMPTY_RISK_DISCLOSURE_READING_STATE, riskDisclosureDocumentIdentity, updateRiskDisclosureReadingState } from "@/lib/risk-disclosure-reading-gate";
 import { toast } from "@/store/ui";
@@ -135,14 +139,11 @@ const locale = useLocaleStore();
 const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
-// BUG 180: 「我的」 tab name comes from the locale dictionary, not from a copy
-// string that hardcoded "Me" into the zh/vi body. One template, three locales.
-const disclaimerText = computed(() => fmt(w.value.disclaimer, { tab: t.value.tabs.me }));
 const disclosure = computed(() => risk.current);
 // BUG #60: an unprovisioned/ambiguous region mapping is a configuration fact, not a
 // transient failure. Telling the user to retry (and offering the retry CTA) hides the
 // real, diagnosable cause behind a network-style message.
-const loadError = computed(() => !risk.error ? "" : risk.jurisdictionUnmapped
+const loadError = computed(() => !risk.error || disclosure.value ? "" : risk.jurisdictionUnmapped
   ? w.value.jurisdictionUnmapped
   : risk.publicationUnavailable ? w.value.publicationUnavailable : w.value.loadErrorRegion);
 const canRetryLoad = computed(() => !risk.jurisdictionUnmapped);
@@ -153,7 +154,7 @@ const languageFallback = computed(() => displayLanguage.value?.fallback ?? false
 const disclosureContext = computed(() => disclosure.value ? fmt(w.value.publishedContext, {
   jurisdiction: disclosure.value.jurisdiction === "CN" ? w.value.mainlandChina : disclosure.value.jurisdictionName,
   version: disclosure.value.version,
-  effectiveDate: disclosure.value.effectiveDate,
+  effectiveDate: formatLegalEffectiveDate(disclosure.value.effectiveDate, locale.code),
 }) : "");
 const documentIdentity = computed(() => riskDisclosureDocumentIdentity(disclosure.value));
 
@@ -179,6 +180,26 @@ let pageActive = true;
 let pageGeneration = 0;
 let nativeGeneration = 0;
 const nativeScrollSurface = ref(createNativeScrollSurface(null));
+const readingSecondsRemaining = ref(0);
+let readingTimer: ReturnType<typeof setInterval> | null = null;
+
+function stopReadingClock() {
+  if (readingTimer !== null) clearInterval(readingTimer);
+  readingTimer = null;
+}
+function resetReadingClock() {
+  stopReadingClock();
+  // Count from receipt of this exact token; the server remains the authority.
+  // A hidden or replaced document must not leave a running page timer behind.
+  readingSecondsRemaining.value = disclosure.value?.acknowledgmentToken && !accepted.value
+    ? disclosure.value.minimumReadingSeconds : 0;
+  if (!pageActive || disposed || readingSecondsRemaining.value <= 0) return;
+  const readyAt = Date.now() + readingSecondsRemaining.value * 1000;
+  readingTimer = setInterval(() => {
+    readingSecondsRemaining.value = Math.max(0, Math.ceil((readyAt - Date.now()) / 1000));
+    if (readingSecondsRemaining.value === 0) stopReadingClock();
+  }, 250);
+}
 
 function createNativeScrollSurface(identity: string | null) {
   const generation = ++nativeGeneration;
@@ -268,6 +289,7 @@ watch(documentIdentity, (nextIdentity, previousIdentity) => {
     selectedBlock: selectedBlock.value,
   }));
   readingIdentity.value = nextIdentity;
+  resetReadingClock();
   if (pageActive) void armReading(nextIdentity, generation);
 }, { flush: "sync" });
 
@@ -276,6 +298,7 @@ onHide(() => {
   pageActive = false;
   pageGeneration += 1;
   nativeGeneration += 1;
+  stopReadingClock();
   stopBottomObserver();
   scrollEventIdentity.value = null;
   setReadingState();
@@ -290,6 +313,7 @@ onUnmounted(() => {
   pageActive = false;
   pageGeneration += 1;
   nativeGeneration += 1;
+  stopReadingClock();
   stopBottomObserver();
   scrollEventIdentity.value = null;
 });
@@ -304,7 +328,7 @@ function sectionSelectedLabel(n: number): string {
   return fmt(w.value.sectionSelected, { n: String(n).padStart(2, "0") });
 }
 
-const canAccept = computed(() => canAcknowledgeRiskDisclosure({
+const canAccept = computed(() => readingSecondsRemaining.value === 0 && canAcknowledgeRiskDisclosure({
   disclosure: disclosure.value,
   documentIdentity: documentIdentity.value,
   readingIdentity: readingIdentity.value,
@@ -359,6 +383,7 @@ async function reload() {
   const nativeKey = surface.identity === identity && surface.key === nativeGeneration
     ? surface.key : identity ? resetScrollSurface(identity) : nativeGeneration;
   await armReading(identity, nativeKey);
+  if (!disposed && pageActive && generation === pageGeneration) resetReadingClock();
 }
 
 // Spotlight hero (whitelist ≤1):零 border(《03》§3,C2 第二轮起中性边也删)——
@@ -401,8 +426,8 @@ const sectionsStyle: CSSProperties = {
 const blockNumStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-brand-2)" };
 // Unit title + paragraph body per the de-card typography ladder (body = ink-2,
 // never ink-3, at a legible 13.5/1.65 for a legal disclosure).
-const blockTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
-const blockBodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
+const blockTitleStyle: CSSProperties = { fontSize: "var(--ui-type-section)", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
+const blockBodyStyle: CSSProperties = { fontSize: "var(--ui-type-long-form)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-long-form-lh)" };
 // Selected section keeps a soft brand-2 read-tracking tint (no border — inner
 // blocks use soft fill, not a stroke); horizontal bleed reaches the gutter.
 function blockStyle(selected: boolean): CSSProperties {
@@ -442,7 +467,7 @@ const checkboxStyle = computed<CSSProperties>(() => ({
   background: checked.value || accepted.value ? "var(--v5-brand)" : "transparent",
   border: checked.value || accepted.value ? "1px solid var(--v5-brand)" : "1px solid var(--v5-border-strong)",
 }));
-const checkLabelStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
+const checkLabelStyle: CSSProperties = { fontSize: "var(--ui-type-long-form)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-long-form-lh)" };
 const acceptBtnStyle = computed<CSSProperties>(() => ({
   marginTop: "16px",
   width: "100%",
@@ -450,10 +475,22 @@ const acceptBtnStyle = computed<CSSProperties>(() => ({
   borderRadius: "999px",
   background: canAccept.value || accepted.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
   color: canAccept.value || accepted.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 600,
 }));
 const disclaimerStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.375 };
 
 
 </script>
+
+<style scoped>
+.risk-scroll-surface { position:absolute;inset:0;width:100%;height:100%; }
+.risk-scroll-surface,
+.risk-scroll-surface :deep(.uni-scroll-view) { scrollbar-width: none; -ms-overflow-style: none; }
+.risk-scroll-surface::-webkit-scrollbar,
+.risk-scroll-surface :deep(.uni-scroll-view::-webkit-scrollbar) { display: none; width: 0; height: 0; }
+.risk-scroll-surface--scrolled :deep(.spv-titlewrap) { opacity: 0; visibility: hidden; transform: translateY(-18px); }
+@media (prefers-reduced-motion: reduce) {
+  .risk-scroll-surface--scrolled :deep(.spv-titlewrap) { transform: none; }
+}
+</style>

@@ -1,3 +1,6 @@
+import { teamPrivacyFixture } from './team-privacy.test-support';
+import { computed } from "vue";
+import { createAmbassadorDraftCache, beginAmbassadorDraftSubmit, endAmbassadorDraftSubmit } from "@/lib/ambassador-draft-session";
 // @ts-expect-error Node is used only by the test runner.
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,10 +11,13 @@ import { isAmbassadorApplicationPending } from "@/api/ambassador-application-api
 import { zh } from "@/i18n/messages/zh";
 import { en } from "@/i18n/messages/en";
 import { vi as vietnamese } from "@/i18n/messages/vi";
+import { fmt } from "@/i18n/format";
 
 const source = readFileSync(new URL("./agent.vue", import.meta.url), "utf8");
 const implementation = source.match(/async function submit\(\) \{[\s\S]*?\n\}/)![0];
-const javascript = transpileModule(implementation, { compilerOptions: { target: 7 } }).outputText;
+const budgetImplementation = source.match(/function applicationBudget\([^\n]*\{[\s\S]*?\n\}/)?.[0];
+if (!budgetImplementation) throw new Error('Missing actual application budget display');
+const javascript = transpileModule(`${budgetImplementation}\n${implementation}`, { compilerOptions: { target: 7 } }).outputText;
 
 function scenario(parse = parseAmbassadorApplicationDraft, agent?: typeof en.agent) {
   const input = {
@@ -23,20 +29,23 @@ function scenario(parse = parseAmbassadorApplicationDraft, agent?: typeof en.age
   const toast = { error: vi.fn(), success: vi.fn() };
   const clear = vi.fn();
   const command = vi.fn().mockReturnValue("same-intent-key");
+  const draft = { value: createAmbassadorDraftCache().forAccount({ accountKey: "1058", accountEpoch: 1 }) };
   const dependencies = {
+    visibility: teamPrivacyFixture().visibility, draft, beginAmbassadorDraftSubmit, endAmbassadorDraftSubmit, agentMounted: true, pageReadState: { value: "ready" },
+    app: { accountKey: "1058", accountBindingEpoch: 1 }, refreshAgentPage: vi.fn(),
     ...input, unlocked: { value: true },
     parseAmbassadorApplicationDraft: parse,
-    t: { value: { agent: agent ?? { toastRemoteFailed: "Failed", submitUnconfirmedBody: "Retry", invalidFormTitle: "Invalid", invalidFormBody: "Check fields" } } },
+    t: { value: { agent: agent ?? { ...en.agent, toastRemoteFailed: "Failed", submitUnconfirmedBody: "Retry", invalidFormTitle: "Invalid", invalidFormBody: "Check fields" } } },
     toast, policy: { value: { buckets: [{ id: "venue", minBudgetUsdt: 1000, maxBudgetUsdt: 10000 }] } },
-    remoteApiEnabled: true, submitting: { value: false }, payloadIdentity: JSON.stringify,
-    invalidateAgentRequests: vi.fn(), captureAgentRequest: () => ({ accountKey: "1058" }),
+    remoteApiEnabled: true, submitting: computed(() => draft.value.pending !== null), payloadIdentity: JSON.stringify,
+    invalidateAgentRequests: vi.fn(), captureAgentRequest: () => ({ accountKey: "1058", accountEpoch: 1 }),
     acquireAmbassadorCommandKey: command, requestIsCurrent: () => true,
     ambassadorApplicationApi: api, latestApplication: { value: null },
     finishAmbassadorCommand: vi.fn(), refreshHistory: vi.fn().mockResolvedValue([]),
     refreshLatest: vi.fn().mockResolvedValue(receipt),
     ambassadorSubmitErrorRecovery, isSettledRejection, isAmbassadorApplicationPending,
     successfulAmbassadorApplicationState, clearAgentFormState: clear,
-    fmt: () => "Submitted", formatAmount: String,
+    fmt,
   };
   const submit = new Function(...Object.keys(dependencies), `${javascript}; return submit;`)(...Object.values(dependencies));
   return { submit, api, toast, clear, command, input, dependencies };
@@ -51,6 +60,7 @@ describe("ambassador native submission", () => {
     await state.submit();
     expect(state.api.submit).toHaveBeenCalledExactlyOnceWith({ eventDate: "2026-10-18", city: "UVEL-TEST-TEAM48-1058", budgetUsdt: 3000, bucket: "venue" }, "same-intent-key");
     expect(state.toast.success).toHaveBeenCalledOnce();
+    expect(state.toast.success.mock.calls[0][1]).toContain('3,000.00 USDT');
     expect(state.clear).toHaveBeenCalledOnce();
     expect(state.dependencies.latestApplication.value).toEqual({ applicationId: 598, status: "PENDING" });
     expect(state.dependencies.submitting.value).toBe(false);
@@ -129,3 +139,12 @@ describe("ambassador native submission", () => {
 });
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+it('privacy masks a success notification after an in-flight submit without masking the command amount', async () => {
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-17T07:15:33Z'));
+  const state = scenario();let finish!: (value: {applicationId:number;status:string}) => void;
+  state.api.submit.mockImplementationOnce(() => new Promise(resolve=>{finish=resolve;}));
+  const submission=state.submit();state.dependencies.visibility.hidden=true;finish({applicationId:598,status:'PENDING'});await submission;
+  expect(state.api.submit).toHaveBeenCalledExactlyOnceWith({eventDate:'2026-10-18',city:'UVEL-TEST-TEAM48-1058',budgetUsdt:3000,bucket:'venue'},'same-intent-key');
+  expect(state.toast.success.mock.calls[0][1]).toContain('••••');expect(state.toast.success.mock.calls[0][1]).not.toContain('3,000.00');
+});

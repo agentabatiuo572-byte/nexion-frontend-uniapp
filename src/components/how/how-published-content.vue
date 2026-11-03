@@ -1,23 +1,18 @@
 <template>
   <view>
     <SubPageHeader :back="back" />
-    <view v-if="loading" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status"><text>{{ t.howPublished.loading }}</text></view>
-    <view v-else-if="error" class="mx-4" style="padding: 28px 0;" role="alert">
-      <view style="padding: 14px; border-radius: 12px; background: var(--v5-surface-2); color: var(--v5-ink-2);">
-        <text class="block" style="font-size: 15px; font-weight: 600;">{{ t.howPublished.unavailableTitle }}</text>
-        <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3);">{{ t.howPublished.unavailableBody }}</text>
-        <view class="flex items-center justify-center" style="margin-top: 12px; min-height: 44px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand);" role="button" tabindex="0" @click="load">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
-    </view>
-    <view v-else-if="content" class="pb-8">
+    <view v-if="loading && !content" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status"><text>{{ t.howPublished.loading }}</text></view>
+    <view v-if="content" class="pb-8">
       <view v-if="languageFallback" class="mx-4" style="margin: 16px; padding: 14px; border-radius: 12px; background: var(--v5-surface-2);" role="status" aria-live="polite">
         <text class="block" :style="bodyStyle">{{ t.howPublished.languageFallback }}</text>
-        <view class="flex items-center justify-center" style="margin-top: 12px; height: 40px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand);" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
+        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
           <text>{{ t.ui.retry }}</text>
         </view>
       </view>
+      <!-- A page may render the accepted publication itself (scoped slot); loading, fallback and
+           failure stay here so every guide keeps the same acceptance and refresh boundary. -->
+      <slot v-if="$slots.default" :blocks="content.blocks" />
+      <template v-else>
       <HowHero :label="heroLabel(content.contentKey)" :title="content.blocks[0]?.title ?? heroLabel(content.contentKey)" :sub="content.blocks[0]?.body ?? ''" accent="purple" />
       <view v-if="content.blocks[0]?.items?.length" class="mx-4" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px">
         <view v-for="(item, itemIndex) in content.blocks[0].items" :key="itemIndex" style="display: flex; gap: 8px">
@@ -25,7 +20,7 @@
         </view>
       </view>
       <template v-for="(block, index) in content.blocks.slice(1)" :key="block.id">
-        <HowSection v-if="block.kind !== 'callout'" :title="block.title" :accent="index % 2 ? 'purple' : 'lemon'">
+        <HowSection v-if="block.kind !== 'callout'" :title="block.title" :accent="neutral ? 'neutral' : index % 2 ? 'purple' : 'lemon'">
           <text class="block" :style="bodyStyle">{{ block.body }}</text>
           <view v-if="block.items?.length" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
             <view v-for="item in block.items" :key="item" style="display: flex; gap: 8px">
@@ -33,8 +28,18 @@
             </view>
           </view>
         </HowSection>
-        <HowCalloutBox v-else class="mx-4" :title="block.title" :body="block.body" tone="purple" />
+        <HowCalloutBox v-else class="mx-4" :title="block.title" :body="block.body" :tone="neutral ? 'neutral' : 'purple'" />
       </template>
+      </template>
+    </view>
+    <view v-if="error" class="mx-4" style="padding: 28px 0;" role="alert" aria-live="polite">
+      <view style="padding: 14px; border-radius: 12px; background: var(--v5-surface-2); color: var(--v5-ink-2);">
+        <text class="block" style="font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight);">{{ t.howPublished.unavailableTitle }}</text>
+        <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3);">{{ t.howPublished.unavailableBody }}</text>
+        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
+          <text>{{ t.ui.retry }}</text>
+        </view>
+      </view>
     </view>
   </view>
 </template>
@@ -45,20 +50,21 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
 import HowCalloutBox from "@/components/how/how-callout-box.vue";
+import { ApiError } from "@/api/errors";
 import { howContentApi, remoteApiEnabled } from "@/api/runtime";
 import type { HowContentDocument, HowContentKey } from "@/api/how-content-api";
 import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { PublishedContentRequestFence } from "./p3-14-published-request-fence";
 
-const props = defineProps<{ contentKey: HowContentKey; back: string }>();
+const props = defineProps<{ contentKey: HowContentKey; back: string; neutral?: boolean }>();
 const emit = defineEmits<{ unavailable: [] }>();
 const locale = useLocaleStore();
 const t = useT();
 const content = ref<HowContentDocument | null>(null);
 const loading = ref(true);
 const error = ref(false);
-const bodyStyle = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
+const bodyStyle = { fontSize: "var(--ui-type-long-form)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-long-form-lh)" };
 const requestFence = new PublishedContentRequestFence();
 
 const languageFallback = computed(() => !!content.value
@@ -93,9 +99,9 @@ async function load() {
     if (props.contentKey === "team-unilevel-how" && (!next.blocks.some(block => block.id === "direct-referral-scope")
       || (next.schemaVersion === 2 && (next.templateId !== "unilevel-v2" || !next.blocks.some(block => block.id === "seven-layer-scope"))))) throw new Error("TEAM_PUBLICATION_REQUIRED");
     content.value = next;
-  } catch {
+  } catch (failure) {
     if (!requestFence.isCurrent(generation)) return;
-    content.value = null;
+    if (!(failure instanceof ApiError && failure.kind === "network")) content.value = null;
     error.value = true;
     emit("unavailable");
   } finally {
@@ -107,6 +113,9 @@ async function load() {
 watch(
   () => [props.contentKey, locale.code] as const,
   () => {
+    requestFence.invalidate();
+    content.value = null;
+    error.value = false;
     if (remoteApiEnabled) {
       void load();
       return;
@@ -116,7 +125,7 @@ watch(
     error.value = false;
     loading.value = false;
   },
-  { immediate: true },
+  { immediate: true, flush: "sync" },
 );
 onUnmounted(() => requestFence.invalidate());
 </script>

@@ -62,12 +62,12 @@
               @keydown.enter.stop.prevent="openRemoteComputeReceipt(r)" @keydown.space.stop.prevent="openRemoteComputeReceipt(r)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
-                <text class="block truncate" :style="rowSubStyle">{{ r.executionMode === 'SIMULATED' || r.executionMode === 'RULE_CYCLE' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}` }}</text>
+                <text class="block truncate" :style="rowTitleStyle">{{ r.displayReceiptNo || shortenHex(r.receiptNo, 7, 5) }}</text>
+                <text class="block truncate" :style="rowSubStyle">{{ receiptLine(r.executionMode === 'SIMULATED' ? (r.taskName || computeCopy.taskReceipt) : `${t.receipt.computeTitle} · ${r.model}`) }}</text>
               </view>
-              <view class="text-right shrink-0" style="margin-left: 8px">
-                <text class="block tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 6)} UVT` : `+$${formatAmount(r.rewardUsdt, 6)}` }}</text>
-                <text class="block" :style="rowDateStyle">{{ computeCopy.completedAt }} · {{ shortDate(r.completedAt) }}</text>
+              <view class="text-right shrink-0 min-w-0" style="margin-left: 8px; max-width: 42%">
+                <text class="block truncate tabular-nums" :style="remoteAmountStyle">{{ r.executionMode === 'SIMULATED' && r.rewardUsdt === 0 && r.rewardNex > 0 ? `+${formatAmount(r.rewardNex, 'full')} UVT` : `+$${formatAmount(r.rewardUsdt, 'full')}` }}</text>
+                <text class="block truncate" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
               </view>
             </view>
           </template>
@@ -79,7 +79,7 @@
               </view>
               <view class="text-right shrink-0" style="margin-left: 8px">
                 <text class="block tabular-nums" :style="remoteReceiptAmountStyle(r)">{{ remoteReceiptAmount(r) }}</text>
-                <text class="block" :style="rowDateStyle">{{ shortDate(Date.parse(r.createdAt)) }}</text>
+                <text class="block" :style="rowDateStyle">{{ shortDate(r.createdAt) }}</text>
               </view>
             </view>
           </template>
@@ -164,15 +164,17 @@
            first mount rather than missing it if this tab starts with 0 items. -->
       <view v-if="!remoteReceiptsMode" ref="loadMoreSentinel" style="height: 1px" />
 
-      <text v-if="!remoteReceiptsMode" class="block" :style="footerStyle">{{ t.receipt.footerNote }}</text>
 
-      <ReceiptModal :receipt="open" @close="open = null" />
     </view>
+    <template #pageFixed>
+      <ReceiptModal :receipt="open" @close="open = null" />
+    </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { useComputeV2Copy } from "@/i18n/compute-v2";
+import { displayTimestamp, formatDisplayDate, formatDisplayTime } from "@/lib/display-date";
+import { receiptLine } from "@/lib/receipt-line";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, ref, watchEffect, watch, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
@@ -182,14 +184,16 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import ReceiptCatIcon from "@/components/me/receipt-cat-icon.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { workloadLabel } from "@/lib/workload-label";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
+import { shortenHex } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
 import type { CanonicalComputeReceipt, CanonicalComputeReceiptSummary } from "@/api/task-assignment-api";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
 import { useDeposits, type ServerReceiptListItem } from "@/store/deposits";
 import { useApp } from "@/store/app";
 
@@ -283,7 +287,7 @@ function remoteReceiptAmountStyle(receipt: ServerReceiptListItem): CSSProperties
   const presentation = presentVietQrReceipt(receipt.status, receipt.creditedUsdt);
   return {
     ...remoteAmountStyle,
-    color: presentation.credited ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
+    color: presentation.credited ? "var(--v5-brand)" : "var(--v5-ink-3)",
   };
 }
 
@@ -574,14 +578,11 @@ function copySig(r: Receipt) {
 function rowAmount(r: Receipt): string {
   return r.category === "KY" ? `✓ ${formatAmount(r.netPaid)}` : `+${formatAmount(r.netPaid)}`;
 }
-function shortDate(ts: number): string {
-  const d = new Date(ts);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  if (sameDay) {
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+function shortDate(ts: number | string): string {
+  const timestamp = displayTimestamp(ts);
+  if (timestamp === null) return "—";
+  const sameDay = new Date(timestamp).toDateString() === new Date().toDateString();
+  return sameDay ? formatDisplayTime(timestamp) : formatDisplayDate(timestamp, dateLocale());
 }
 
 // ── styles ──
@@ -597,7 +598,7 @@ function remoteTabStyle(kind: RemoteReceiptKind): CSSProperties {
 }
 function remoteTabLabelStyle(kind: RemoteReceiptKind): CSSProperties {
   return {
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: 500,
     color: remoteReceiptKind.value === kind ? "var(--v5-brand)" : "var(--v5-ink-3)",
   };
@@ -630,7 +631,7 @@ const emptyStyle: CSSProperties = {
   padding: "32px",
   textAlign: "center",
 };
-const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)" };
 const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 // De-carded: transparent hairline group (earnings-ledger idiom). The surface +
@@ -660,7 +661,7 @@ function rowIconStyle(r: Receipt): CSSProperties {
   };
 }
 const rowTitleStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
@@ -670,7 +671,7 @@ function rowAmountStyle(r: Receipt): CSSProperties {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "13px",
     fontWeight: 600,
-    color: r.category === "KY" ? "var(--v5-brand-2)" : "var(--v5-brand)",
+    color: "var(--v5-brand)",
   };
 }
 const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
@@ -678,14 +679,7 @@ const remoteAmountStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "13px",
   fontWeight: 600,
-  color: "var(--v5-brand-2)",
-};
-const footerStyle: CSSProperties = {
-  margin: "16px 24px 24px",
-  textAlign: "center",
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-  lineHeight: 1.625,
+  color: "var(--v5-brand)",
 };
 
 import GlassSegments from "@/components/glass-segments.vue";

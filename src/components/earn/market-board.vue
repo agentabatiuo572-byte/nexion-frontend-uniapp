@@ -10,78 +10,71 @@
   tasks banner below it on /earn.
 -->
 <template>
-  <view class="nx-earn-market-board nx-glass-card mx-4 p-4">
-    <view class="flex items-center justify-between mb-2 px-0">
-      <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.market.title }}</text>
-      <view class="flex items-center gap-1" style="font-size: 12px; color: var(--v5-ink-3)">
-        <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 6px color-mix(in srgb, var(--v5-brand) 70%, transparent)" />
-        <text>{{ t.market.liveLabel }}</text>
-      </view>
+  <view class="nx-earn-market-board">
+    <view class="earn-market__head">
+      <text class="earn-market__title" role="heading" aria-level="2">{{ t.market.title }}</text>
+      <view v-if="!remoteApiEnabled || app.homeTruthStatus === 'ready'" class="earn-market__updated"><view class="earn-market__dot" aria-hidden="true" /><text>{{ t.market.liveLabel }}</text></view>
     </view>
-
-    <!-- Price Index -->
-    <view>
-      <text class="block" :style="sectionLabelStyle">{{ t.market.priceIndex }}</text>
-      <text v-if="!priceIndex.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
-      <view
-        v-for="(w, i) in priceIndex"
-        :key="w.code"
-        class="py-2.5"
-        :style="{ borderTop: i !== 0 ? '1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)' : 'none' }"
-      >
-        <view class="flex items-center gap-2.5">
-          <view class="flex-1 min-w-0">
-            <view class="flex items-baseline gap-1.5">
-              <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ workloadCopy(w).name }}</text>
-              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ workloadCopy(w).unit }}</text>
-            </view>
-            <text v-if="w.flagshipDelta !== null" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ t.market.flagshipRow }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagshipDelta.toFixed(1) }}%</text></text>
+    <view class="earn-market__card">
+      <!-- Price Index -->
+      <view class="earn-price-index" lang="en">
+        <text class="earn-market__caption">{{ en.market.priceIndex }}</text>
+        <text v-if="!priceIndex.length" class="earn-market__status">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
+        <view v-else class="earn-market__grid">
+          <view v-for="w in priceIndex" :key="w.code" class="earn-market__tile">
+            <text class="earn-market__name">{{ workloadCopy(w).name }}</text>
+            <text class="earn-market__unit">{{ workloadCopy(w).unit }}</text>
+            <text class="earn-market__price">{{ w.price === null ? "—" : formatUsd(w.price, 'detail') }}</text>
+            <text class="earn-market__delta" :style="{ color: arrowColor(w) }">{{ w.delta === null ? "—" : `${arrow(w)} ${Math.abs(w.delta).toFixed(1)}%` }}</text>
+            <text v-if="w.flagshipDelta !== null" class="earn-market__flagship">{{ en.market.flagshipRow }} <text class="earn-market__flagship-delta">{{ signedDelta(w.flagshipDelta) }}</text></text>
+            <view v-if="w.spark.length > 1" class="earn-market__spark"><svg data-native-svg class="earn-market-spark" width="100%" height="100%" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="sparkPoints(w.spark)" fill="none" :stroke="arrowColor(w)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" /></svg></view>
           </view>
-          <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2); width: 64px">{{ w.price === null ? "—" : `$${formatAmount(w.price)}` }}</text>
-          <text class="tabular-nums shrink-0 text-right" style="font-size: 12px; width: 48px" :style="{ color: arrowColor(w) }">{{ w.delta === null ? "—" : `${arrow(w)} ${Math.abs(w.delta).toFixed(1)}%` }}</text>
-          <svg v-if="w.spark.length" class="shrink-0" width="48" height="16" viewBox="0 0 48 16">
-            <polyline :points="sparkPoints(w.spark)" fill="none" :stroke="w.delta !== null && w.delta < -0.05 ? 'var(--v5-brand-2)' : 'var(--v5-brand)'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
-          </svg>
         </view>
       </view>
-    </view>
 
-    <!-- Device earnings ranking -->
-    <view class="mt-4 pt-4" style="border-top: 1px solid var(--v5-border)">
-      <text class="block" :style="sectionLabelStyle">{{ t.market.deviceRanking }}</text>
-      <text v-if="!deviceRankings.length" class="block py-2.5" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.uiChrome.unavailable }}</text>
-      <view
-        v-for="(d, i) in deviceRankings"
-        :key="d.rank"
-        class="flex items-center gap-3 py-2.5"
-        :class="d.kind ? 'active:opacity-70 transition-opacity' : ''"
-        :style="{ borderTop: i !== 0 ? '1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)' : 'none' }"
-        :role="d.kind ? 'link' : undefined"
-        :tabindex="d.kind ? 0 : undefined"
-        v-on="d.kind ? { click: () => d.kind && goDetail(d.kind) } : {}"
-      >
-        <view class="flex-1 min-w-0">
-          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name ?? t.market.yourPhone }}</text>
-          <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">#{{ d.rank }}<template v-if="d.bestFor"> · {{ d.bestFor }}</template></text>
+      <!-- Device earnings ranking -->
+      <view class="earn-market__rank">
+        <text class="earn-market__caption earn-market__caption--plain">{{ t.market.deviceRanking }}</text>
+        <text v-if="!deviceRankings.length" class="earn-market__status">{{ app.homeTruthStatus === 'idle' || app.homeTruthStatus === 'loading' ? t.home.networkStatUpdating : t.uiChrome.unavailable }}</text>
+        <view
+          v-for="d in deviceRankings"
+          :key="d.rank"
+          class="earn-ranking-row"
+          :class="{ 'earn-ranking-row--link': d.kind }"
+          :role="d.kind ? 'link' : undefined"
+          :tabindex="d.kind ? 0 : undefined"
+          @click="d.kind && goDetail(d.kind)"
+          @keydown.enter.stop.prevent="d.kind && goDetail(d.kind)"
+        >
+          <text class="earn-ranking-row__no">#{{ d.rank }}</text>
+          <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.kind ? getProductMedia(d.kind)?.src ?? null : null" />
+          <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text><text v-if="d.bestFor" class="earn-ranking-row__best">{{ d.bestFor }}</text></view>
+          <view class="earn-ranking-value">
+            <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
+            <view class="earn-ranking-value__track" aria-hidden="true"><view v-viz-inview class="earn-ranking-value__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
+          </view>
         </view>
-        <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning-ink)' }">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}/d` }}</text>
-        <svg v-if="d.kind" class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
+      <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="earn-market__retry" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()"><text>{{ t.uiChrome.unavailable }} · {{ t.ui.retry }}</text></view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
 import { navTo } from "@/lib/route";
 import { computed } from "vue";
-import type { CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import type { DeviceKind, TaskCategory } from "@/store/types";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
-import { nexGridBrandText } from "@/lib/brand-copy";
-import { marketWorkloadCopy } from "@/lib/workload-label";
+import { compactMarketUnit, marketWorkloadCopy } from "@/lib/workload-label";
+import { en } from "@/i18n/messages/en";
+import { getProductMedia } from "@/lib/product-media";
+import DeviceArt from "@/components/device-art.vue";
+
+const PHONE_ART = "/static/img/home-glass-20260928/phone.webp";
 
 interface WorkloadPrice {
   code: TaskCategory;
@@ -127,26 +120,40 @@ const DEVICE_RANKINGS: DeviceRanking[] = [
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
   ? (app.homeTruth?.marketBoard.workloads ?? []).map((row) => ({ code: row.code, name: row.name, unit: row.unit, price: row.price, delta: row.deltaPct, spark: row.sparkline ?? [], flagshipDelta: row.flagshipDeltaPct }))
   : PRICE_INDEX);
-const workloadCopy = (row: WorkloadPrice) => marketWorkloadCopy(t.value, row.code, row.name, row.unit);
+const workloadCopy = (row: WorkloadPrice) => {
+  const copy = marketWorkloadCopy(en, row.code, row.name, row.unit);
+  return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
+};
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share" && row.kind !== "phone").map((row) => ({ rank: row.rank, name: row.name ? nexGridBrandText(row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share" && row.kind !== "phone").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
 
 function arrow(w: WorkloadPrice): string {
   return w.delta !== null && w.delta > 0.05 ? "↑" : w.delta !== null && w.delta < -0.05 ? "↓" : "→";
 }
 function arrowColor(w: WorkloadPrice): string {
-  return w.delta !== null && w.delta > 0.05 ? "var(--v5-brand)" : w.delta !== null && w.delta < -0.05 ? "var(--v5-brand-2)" : "var(--v5-ink-4)";
+  return w.delta !== null && w.delta > 0.05 ? "var(--v5-success-ink)" : w.delta !== null && w.delta < -0.05 ? "var(--v5-danger)" : "var(--v5-ink-4)";
 }
+// Same thresholds as the workload delta: ↑ rising, ↓ falling, no arrow when flat.
+function signedDelta(delta: number): string {
+  const sign = delta > 0.05 ? "↑" : delta < -0.05 ? "↓" : "";
+  return `${sign}${Math.abs(delta).toFixed(1)}%`;
+}
+// Bars scale to the best tier; a non-zero tier always keeps a visible sliver.
+const rankMax = computed(() => Math.max(0, ...deviceRankings.value.map((row) => row.dailyEarn ?? 0)));
+function rankShare(row: DeviceRanking): number {
+  return row.dailyEarn && rankMax.value > 0 ? Math.max(3, row.dailyEarn / rankMax.value * 100) : 0;
+}
+// 7-point line in a 100×24 box, 3px top/bottom inset.
 function sparkPoints(data: number[]): string {
-  const w = 48;
-  const h = 16;
+  const w = 100;
+  const h = 24;
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
   const stepX = w / (data.length - 1);
   return data
-    .map((v, i) => `${(i * stepX).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`)
+    .map((v, i) => `${(i * stepX).toFixed(2)},${(h - 3 - ((v - min) / range) * (h - 6)).toFixed(2)}`)
     .join(" ");
 }
 
@@ -154,11 +161,53 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
   navTo(`/pages/store/detail?id=${kind}`);
 }
 
-const sectionLabelStyle: CSSProperties = {
-  padding: "0 0 8px",
-  fontSize: "12px",
-  letterSpacing: "0.16em",
-  textTransform: "uppercase",
-  color: "var(--v5-ink-3)",
-};
 </script>
+<style scoped>
+.nx-earn-market-board { margin: 0 16px; color: var(--v5-ink); }
+.earn-market__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 2px 8px; }
+.earn-market__title { font: 600 17px/24px var(--font-v5); color: var(--v5-ink); }
+.earn-market__updated { display: inline-flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
+.earn-market__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v5-success); }
+.earn-market__card { padding: 14px 14px 6px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .earn-market__card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+/* The board's caption line box sits 4.5px lower than its 14px line height. */
+.earn-market__caption { display: block; padding-top: 4.5px; font: 500 11px/14px var(--font-v5); letter-spacing: .04em; text-transform: uppercase; color: var(--v5-ink-3); }
+.earn-market__caption--plain { letter-spacing: 0; text-transform: none; }
+.earn-market__status { display: block; padding: 10px 0; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-market__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.earn-market__tile { display: flex; flex-direction: column; min-width: 0; padding: 10px 10px 8px; border-radius: 14px; background: var(--v5-surface-2); }
+[data-theme="light"] .earn-market__tile { background: var(--v5-bg); }
+.earn-market__name { font: 500 11px/14px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-market__unit { font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-market__price { margin-top: 8px; font: 500 15px/20px var(--font-metric); color: var(--v5-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.earn-market__delta { font: 500 11px/14px var(--font-metric); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.earn-market__flagship { margin-top: 2px; font: 500 11px/14px var(--font-v5); color: var(--v5-warning-ink); overflow-wrap: anywhere; }
+.earn-market__flagship-delta { font: 500 11px/14px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Sparklines sit on the tile floor so a taller tile (flagship line) keeps them aligned. The App draws the SVG
+   through NxNativeSvg (v-html), so the SVG's own style reaches it through :deep() on this real wrapper. */
+.earn-market__spark { height: 22px; margin-top: auto; padding-top: 6px; box-sizing: content-box; line-height: 0; }
+.earn-market__spark :deep(.earn-market-spark) { display: block; width: 100%; height: 100%; overflow: visible; }
+.earn-market__rank { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border); }
+.earn-ranking-row { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) 96px; align-items: center; gap: 8px; min-height: 44px; }
+.earn-ranking-row--link { cursor: pointer; }
+.earn-ranking-row--link:active { opacity: .7; }
+.earn-ranking-row--link:focus-visible, .earn-market__retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.earn-ranking-row__no { font: 500 12px/16px var(--font-metric); color: var(--v5-ink-3); }
+.earn-ranking-row__art { width: 28px; height: 24px; }
+.earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
+.earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-ranking-row__best { min-width: 0; font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
+.earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.earn-ranking-value__track { position: relative; width: 96px; height: 3px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.earn-ranking-value__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: color-mix(in srgb, var(--v5-tech-cyan) 60%, transparent); }
+.earn-market__retry { display: inline-flex; align-items: center; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
+@media (max-width: 374px) {
+  .earn-market__tile { padding: 10px 8px 8px; }
+  .earn-market__price { font-size: 13px; line-height: 18px; }
+}
+@media (max-width: 350px) {
+  .earn-ranking-row { grid-template-columns: 22px 28px minmax(0, 1fr) 84px; }
+  .earn-ranking-value__track { width: 84px; }
+}
+</style>

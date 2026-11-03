@@ -35,7 +35,6 @@ export function purchasePaymentUiFixture(origin, { balance = 0, pinMode = 'unava
       }
       if (url.pathname.startsWith(PIN)) {
         evidence.pinRequests.push({ method, path: url.pathname });
-        if (pinMode === 'flow') return route.continue();
         if (pinMode === 'unavailable') return json(route, { code: 503, message: 'PAYMENT_PASSWORD_UNAVAILABLE', data: null }, 503);
         return json(route, ok({ configured: true, credentialVersion: 1, lockedUntil: pinMode === 'locked' ? new Date(Date.now() + 900000).toISOString() : null,
           remainingAttempts: pinMode === 'locked' ? 0 : 5, serverTime: new Date().toISOString() }));
@@ -102,7 +101,6 @@ export function purchasePaymentUiFixture(origin, { balance = 0, pinMode = 'unava
         return route.fulfill({ response, json: body });
       }
       if (url.pathname === '/auth/users/logout') return json(route, ok({ loggedOut: true }));
-      if (url.pathname === '/api/promotion-rewards') return json(route, ok({ items: [], nextCursor: null, hasMore: false }));
       return route.continue();
     });
   }

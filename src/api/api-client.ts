@@ -1,9 +1,11 @@
 import { serverSessionContext, isUserSession, type ApiResult, type AuthSessionResponse } from "./contracts";
-import { ApiError, asApiError } from "./errors";
+import { ApiError, asApiError, parseRetryAfterMs } from "./errors";
 import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
 import { withSessionCookieLock } from "./session-cookie-lock";
 import { acquireRotationNonce, clearRotationNonce, discardRotationNonce } from "./session-rotation-nonce";
 import { reportNativeSessionStage } from "./native-session-storage";
+import { invalidatePassiveTabReads } from "@/lib/passive-read-window";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -21,6 +23,11 @@ export interface HttpResponse {
   status: number;
   data: unknown;
   headers: Record<string, string>;
+}
+
+function responseRetryAfterMs(response: HttpResponse): number | undefined {
+  const header = Object.entries(response.headers ?? {}).find(([name]) => name.toLowerCase() === 'retry-after');
+  return parseRetryAfterMs(header?.[1]);
 }
 
 export interface HttpTransport {
@@ -47,8 +54,6 @@ export interface HttpDownloadRequest {
 }
 
 export interface ApiRequest {
-  /** Secret-bearing wallet commands must ask again after authentication. */
-  retryAfterAuth?: boolean;
   path: string;
   method?: HttpMethod;
   body?: unknown;
@@ -62,6 +67,8 @@ export interface ApiRequest {
     code: number;
     message: string;
   }>;
+  /** A rejected secret-bearing command must ask the user again after authentication. */
+  retryAfterAuth?: boolean;
 }
 
 export interface ApiClient {
@@ -166,11 +173,30 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   const baseUrl = normalizeBaseUrl(options.baseUrl, options.allowInsecureHttp ?? true);
   const refreshCredentialMode = options.refreshCredentialMode ?? "token";
   let refreshInFlight: Promise<SessionSnapshot> | null = null;
+  const readCooldowns = new Map<string, { until: number; error: ApiError }>();
+  const cooldownKey = (request: HttpRequest) => JSON.stringify([request.url,
+    remoteAccountScope.snapshot(), options.vault.read()?.user.userId ?? null]);
+
+  function businessWrite(request: HttpRequest): boolean {
+    if (request.method === "GET") return false;
+    const path = request.url.slice(baseUrl.length).split("?")[0];
+    // These live POST reads/socket tickets do not change displayed business facts.
+    if (request.method === "POST" && ["/api/app/trade-in/eligibility", "/api/app/trade-in/quote",
+      "/api/app/support/realtime-ticket"].includes(path)) return false;
+    // Browsing observations and phone runtime reporting keep their own cadence.
+    return !/^\/api\/(?:app\/analytics\/events|tasks\/phone\/runtime|growth\/day-one\/page-observations|store\/products\/[^/]+\/detail-observation|genesis\/secondary-market\/observation|share\/event)(?:$|\/)/.test(path)
+      && !path.startsWith("/auth/");
+  }
 
   async function execute<T>(
     request: HttpRequest,
     acceptedResponses: ApiRequest["acceptedResponses"] = [],
   ): Promise<T> {
+    const key = request.method === "GET" ? cooldownKey(request) : null;
+    const cooldown = key ? readCooldowns.get(key) : undefined;
+    if (cooldown && Date.now() < cooldown.until) throw new ApiError({ ...cooldown.error,
+      message: cooldown.error.message, retryAfterMs: Math.max(0, cooldown.until - Date.now()) });
+    if (key) readCooldowns.delete(key);
     let response: HttpResponse;
     try {
       const send = () => options.transport.request(request);
@@ -188,6 +214,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       throw asApiError(error);
     }
 
+    const retryAfterMs = responseRetryAfterMs(response);
     const responseData = decodeTransportData(response.data);
     const envelope = isEnvelope(responseData) ? responseData : null;
     const explicitlyAccepted = !!envelope && acceptedResponses.some(
@@ -204,6 +231,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         status: response.status,
         code: envelope?.code,
         sessionEndedReason: endedReason,
+        retryAfterMs,
       });
     }
     if ((response.status < 200 || response.status >= 300) && !explicitlyAccepted) {
@@ -211,17 +239,20 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         && response.status === 422 && envelope?.code === 422 && envelope.message === "HDPAY_ORDER_CREATE_REJECTED"
         && envelope.data && typeof envelope.data === "object" && !Array.isArray(envelope.data)
         ? envelope.data as { providerReason?: unknown } : null;
-      throw new ApiError({
+      const failure = new ApiError({
         kind: "http",
         message: envelope?.message || `HTTP_${response.status}`,
         status: response.status,
         code: envelope?.code,
         retryable: response.status >= 500,
+        retryAfterMs,
         providerReason: typeof providerDenial?.providerReason === "string" ? providerDenial.providerReason : undefined,
       });
+      if (key && response.status === 429) readCooldowns.set(key, { until: Date.now() + (retryAfterMs ?? 30_000), error: failure });
+      throw failure;
     }
     if (!envelope) {
-      throw new ApiError({ kind: "protocol", message: "API_ENVELOPE_INVALID", status: response.status });
+      throw new ApiError({ kind: "protocol", message: "API_ENVELOPE_INVALID", status: response.status, retryAfterMs });
     }
     if (envelope.code !== 0 && !explicitlyAccepted) {
       throw new ApiError({
@@ -229,8 +260,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         message: envelope.message || "BUSINESS_ERROR",
         status: response.status,
         code: envelope.code,
+        retryAfterMs,
       });
     }
+    if (businessWrite(request)) invalidatePassiveTabReads();
     return envelope.data as T;
   }
 
@@ -537,12 +570,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   }
 
   async function executeResponse<T>(response: HttpResponse): Promise<T> {
+    const retryAfterMs = responseRetryAfterMs(response);
     const responseData = decodeTransportData(response.data);
     const envelope = isEnvelope(responseData) ? responseData : null;
     const sessionEndedReason = envelope?.data && typeof envelope.data === "object"
       ? (envelope.data as { sessionEndedReason?: string }).sessionEndedReason : undefined;
     if (authFailure(response.status, envelope?.code, envelope?.message) || ((response.status === 401 || response.status === 403) && sessionEndedReason)) {
-      throw new ApiError({ kind: "auth", message: envelope?.message || "AUTH_REQUIRED", status: response.status, code: envelope?.code, sessionEndedReason });
+      throw new ApiError({ kind: "auth", message: envelope?.message || "AUTH_REQUIRED", status: response.status, code: envelope?.code, sessionEndedReason, retryAfterMs });
     }
     if (response.status < 200 || response.status >= 300) {
       throw new ApiError({
@@ -551,11 +585,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         status: response.status,
         code: envelope?.code,
         retryable: response.status >= 500,
+        retryAfterMs,
       });
     }
-    if (!envelope) throw new ApiError({ kind: "protocol", message: "API_ENVELOPE_INVALID", status: response.status });
+    if (!envelope) throw new ApiError({ kind: "protocol", message: "API_ENVELOPE_INVALID", status: response.status, retryAfterMs });
     if (envelope.code !== 0) {
-      throw new ApiError({ kind: "business", message: envelope.message || "BUSINESS_ERROR", status: response.status, code: envelope.code });
+      throw new ApiError({ kind: "business", message: envelope.message || "BUSINESS_ERROR", status: response.status, code: envelope.code, retryAfterMs });
     }
     return envelope.data as T;
   }

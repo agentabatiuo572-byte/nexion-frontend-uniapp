@@ -8,7 +8,7 @@
   user, so a "track your shipment" line doesn't apply — see 更新日志 2026-07-08).
 -->
 <template>
-  <AppChassis active="store">
+  <AppChassis active="store" :scroll-load-key="`${statusFilter}:${app.accountBindingEpoch}`" @scroll-load-more="scrollPager.loadMoreManually()">
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
@@ -19,10 +19,9 @@
       <view v-if="orderPanels.showSourceOutage" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view v-for="source in unavailableOrderSources" :key="source.label" class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ source.label }} · {{ source.message }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
+          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
-
         </view>
       </view>
 
@@ -31,35 +30,40 @@
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
-      <view v-if="orderPanels.mainPresentation === 'list'" class="mx-4" style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
+      <GlassSegments v-if="orderPanels.mainPresentation === 'list'" v-model="statusFilter" :options="filterOptions" layout="scroll" selection="flat" semantics="radio" :label="t.orders.filterGroupLabel" class="orders-filters mx-4">
+        <template #option="{ option }"><text class="orders-filter__label">{{ option.label }}</text><text v-if="option.value === 'pending' && pendingCount > 0" class="orders-filter__badge">{{ pendingCount }}</text></template>
+      </GlassSegments>
+      <text v-if="orderPanels.mainPresentation === 'list' && filteredOrders.length === 0" class="orders-filter-empty">{{ t.orders.filterEmpty }}</text>
+      <!-- Order cards: machine art + status tag; the whole card opens the detail,
+           the pending row's own button goes straight to payment. -->
+      <view v-if="orderPanels.mainPresentation === 'list' && filteredOrders.length > 0" class="orders-list">
         <view
-          v-for="(o, i) in orderList"
+          v-for="o in filteredOrders"
           :key="o.id"
-          class="block active:scale-[0.98] transition-transform"
-          :style="orderRowStyle(i === orderList.length - 1)"
+          class="order-card"
+          :class="{ 'order-card--pending': o.kind === 'commerce' && o.status === 'placed' }"
           role="button"
           tabindex="0"
-          :aria-label="`${nexGridBrandText(o.productName)} ${o.id}`"
-          @click.stop="goOrder(o)"
+          :aria-label="`${commerceOrderTitle(o,locale.code)} ${o.id}${pendingCloseMinutes(o) ? ' · ' + fmt(t.orders.pendingCloseIn, { min: pendingCloseMinutes(o)! }) : ''}`"
+          @click="goOrder(o)"
         >
-          <view class="flex items-start" style="gap: 12px">
-            <view class="order-product-thumb shrink-0" aria-hidden="true">
-              <image v-if="orderImage(o)" class="order-product-image nx-home-art-float" :src="orderImage(o)" mode="aspectFit" />
-              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="badge(o.status).color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in badge(o.status).icon" :key="di" :d="d" /></svg>
+          <view class="order-card__row">
+            <view class="order-card__thumb" aria-hidden="true">
+              <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="orderImage(o)" :scope-key="o.id" />
+              <image v-else class="order-card__image nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
             </view>
-            <view class="flex-1 min-w-0">
-              <view class="flex items-center justify-between" style="gap: 8px">
-                <text class="truncate" style="font-size: 13px; font-weight: 600; color: color-mix(in srgb, var(--v5-ink) 95%, transparent)">{{ nexGridBrandText(o.productName) }}</text>
-                <text class="shrink-0" :style="statusChipStyle(o.status)">{{ badge(o.status).label }}</text>
+            <view class="order-card__info">
+              <view class="order-card__top">
+                <text class="order-card__title">{{ commerceOrderTitle(o,locale.code) }}</text>
+                <NxTag :tone="badge(o.status).tone" :label="badge(o.status).label" />
               </view>
-              <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
-              <text v-if="o.meta" class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ o.meta }}</text>
-              <view class="flex items-center justify-between" style="margin-top: 6px">
-                <text style="font-size: 12px; color: var(--v5-ink-4)">{{ dateText(o.placedAt) }}</text>
-                <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; font-weight: 600; color: var(--v5-ink)">${{ formatAmount(o.total) }}</text>
+              <text class="order-card__meta">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
+              <text v-if="o.meta" class="order-card__meta">{{ o.meta }}</text>
+              <view class="order-card__bottom">
+                <text class="order-card__date">{{ dateText(o.placedAt) }}</text>
+                <CheckoutAmount class="order-card__amount" :value="o.total" :currency="o.kind === 'commerce' && o.paidAt == null ? 'USD' : 'USDT'" />
               </view>
             </view>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 8px"><path d="m9 18 6-6-6-6" /></svg>
           </view>
           <view v-if="o.kind === 'commerce' && o.status === 'placed'" class="order-card__pending">
             <view v-if="pendingCloseMinutes(o)" class="order-card__countdown">
@@ -89,7 +93,7 @@
           <text>{{ t.orders.loadMore }}{{ orders.loadingMore ? '…' : '' }}</text>
         </view>
         <view v-if="remoteApiEnabled && genesis.orderPage.cursor" class="active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="genesis.orderPage.busy ? 'true' : 'false'" :aria-busy="genesis.orderPage.busy ? 'true' : 'false'" @click="!genesis.orderPage.busy && genesis.loadMoreGenesisOrders()">
-          <text>{{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}</text>
+          <text :class="{ 'order-read-retry-label': genesis.orderPage.error }">{{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}</text>
         </view>
       </view>
     </view>
@@ -97,20 +101,27 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { dateLocale, fmt } from "@/i18n/format";
+import { commerceOrderTitle } from "@/lib/commerce-review";
+import { useLocaleStore } from "@/store/locale";
+import { commerceAmount as formatAmount } from "@/lib/commerce-review";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { revalidateProductCatalog } from "@/store/product-catalog";
+import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
-import { fmt } from "@/i18n/format";
-import { useNow } from "@/composables/use-now";
+import GlassSegments from "@/components/glass-segments.vue";
+import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";
-import { nexGridBrandText } from "@/lib/brand-copy";
 import { useOrders, type Order, type OrderStatus } from "@/store/orders";
 import { useGenesis } from "@/store/genesis";
 import { genesisOrderListItems, type GenesisOrderListItem } from "@/lib/genesis-order-list";
 import { useSetPageHeader } from "@/composables/use-page-header";
+import { useNow } from "@/composables/use-now";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -119,8 +130,6 @@ import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
-import { refreshProductCatalog } from "@/store/product-catalog";
-import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
 import {
   createRemoteOrdersRefresh,
   isInitialOrderReadLoading,
@@ -130,6 +139,7 @@ import {
 } from "@/lib/remote-commerce-refresh";
 
 const t = useT();
+const locale = useLocaleStore();
 const app = useApp();
 const auth = useAuth();
 const orders = useOrders();
@@ -150,6 +160,15 @@ const orderList = computed<OrderListItem[]>(() => [
   ...orders.orders.map((order): CommerceOrderListItem => ({ ...order, kind: "commerce" })),
   ...genesisOrderListItems(genesis.remoteOrders, t.value.me.genesisNode, t.value.orders.quantity),
 ].sort((a, b) => b.placedAt - a.placedAt));
+// Status categories. "To pay" matches the home to-do count (placed or payment failed).
+function orderCategory(order: OrderListItem): Exclude<OrderFilter, "all"> {
+  if (order.kind === "genesis") return "done";
+  if (order.status === "placed" || order.status === "payment_failed") return "pending";
+  if (order.status === "paid" || order.status === "provisioning") return "active";
+  return order.status === "activated" || order.status === "inventory" ? "done" : "closed";
+}
+const filteredOrders = computed(() => statusFilter.value === "all" ? orderList.value : orderList.value.filter(order => orderCategory(order) === statusFilter.value));
+const pendingCount = computed(() => orderList.value.filter(order => orderCategory(order) === "pending").length);
 // Minutes left on an unpaid order's server deadline; null once it lapses or when unknown.
 const nowSeconds = useNow();
 function pendingCloseMinutes(order: OrderListItem): number | null {
@@ -157,6 +176,7 @@ function pendingCloseMinutes(order: OrderListItem): number | null {
   const left = order.expiresAt - nowSeconds.value * 1000;
   return left > 0 ? Math.ceil(left / 60000) : null;
 }
+const filterOptions = computed(() => ORDER_FILTERS.map(value => ({ value, label: t.value.orders.filters[value] })));
 const remoteOrderAvailability = ref<OrderSourceAvailability>("ready");
 const remoteOrdersRefreshing = ref(remoteApiEnabled);
 const remoteOrdersResolved = ref(false);
@@ -240,7 +260,7 @@ async function loadMoreOrders() {
   }
 }
 const scrollAnchor = ref<unknown>(null);
-useManualScrollLoadMore(scrollAnchor, {
+const scrollPager = useManualScrollLoadMore(scrollAnchor, {
   enabled: () => remoteApiEnabled && remoteSessionReady.value && ordersPageActive && !commerceOrdersUnavailable.value,
   hasMore: () => Boolean(orders.nextCursor),
   loading: () => remoteOrdersRefreshing.value || orders.loadingMore,
@@ -248,7 +268,7 @@ useManualScrollLoadMore(scrollAnchor, {
 });
 onShow(() => {
   ordersPageActive = true;
-  if (remoteSessionReady.value) void refreshProductCatalog();
+  if (remoteSessionReady.value) void revalidateProductCatalog();
   preserveOrdersOriginInH5();
   void refreshOrders();
 });
@@ -269,7 +289,7 @@ watch(() => app.accountBindingEpoch, () => {
 // onShow can land before the cookie restore binds the account. The deferred
 // read starts here instead, so the page never settles on an account-state error.
 watch(remoteSessionReady, (ready, wasReady) => {
-  if (ready && !wasReady && ordersPageActive) { void refreshProductCatalog(); void refreshOrders(); }
+  if (ready && !wasReady && ordersPageActive) { void revalidateProductCatalog(); void refreshOrders(); }
 });
 
 // A later catalog response clears the shared orders without rebinding the account.
@@ -289,10 +309,16 @@ const unsubscribeRuntimeRevision = subscribeRuntimeRevision(() => {
 });
 
 const ordersBackHref = ref("/store");
+type OrderFilter = "all" | "pending" | "active" | "done" | "closed";
+const ORDER_FILTERS: OrderFilter[] = ["all", "pending", "active", "done", "closed"];
+// The entry may preselect a category (the home to-do opens "pending").
+const statusFilter = ref<OrderFilter>("all");
 onLoad((options) => {
   const query = new URLSearchParams(takeNavigationQuery("/pages/store/orders"));
   const from = options?.from === "me" || options?.from === "store" ? options.from : query.get("from");
   ordersBackHref.value = from === "me" ? "/me" : "/store";
+  const status = options?.status ?? query.get("status");
+  if ((ORDER_FILTERS as string[]).includes(status ?? "")) statusFilter.value = status as OrderFilter;
   preserveOrdersOriginInH5();
 });
 
@@ -326,52 +352,53 @@ useSetPageHeader(() => ({
 // lucide outline paths per status (Clock / CheckCircle2 / Server / Cpu / XCircle)
 interface Badge {
   label: string;
-  color: string;
-  bg: string;
+  tone: "neutral" | "brand" | "success" | "warning" | "danger";
   icon: string[];
 }
+// Tones follow the shared NxTag mapping (design system 03 §3.8).
 function badge(status: OrderStatus): Badge {
   switch (status) {
-    case "inventory": return { label: t.value.orders.statusInventory, color: "var(--v5-brand)", bg: "var(--v5-surface-2)", icon: ["M4 4h16v16H4z", "M8 9h8"] };
     case "placed":
-      return { label: t.value.orders.statusPlaced, color: "var(--v5-ink-3)", bg: "var(--v5-surface-2)", icon: ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"] };
+      return { label: t.value.orders.statusPlaced, tone: "warning", icon: ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"] };
     case "paid":
-      return { label: t.value.orders.statusPaid, color: "var(--v5-brand)", bg: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", icon: ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "m9 11 3 3L22 4"] };
+      return { label: t.value.orders.statusPaid, tone: "brand", icon: ["M22 11.08V12a10 10 0 1 1-5.93-9.14", "m9 11 3 3L22 4"] };
     case "provisioning":
-      return { label: t.value.orders.statusProvisioning, color: "var(--v5-warning)", bg: "color-mix(in srgb, var(--v5-warning) 15%, transparent)", icon: ["M5 2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", "M5 14h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M6 6h.01", "M6 18h.01"] };
+      return { label: t.value.orders.statusProvisioning, tone: "brand", icon: ["M5 2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z", "M5 14h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M6 6h.01", "M6 18h.01"] };
+    case "inventory":
     case "activated":
-      return { label: t.value.orders.statusActivated, color: "var(--v5-brand)", bg: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", icon: ["M12 20v2", "M12 2v2", "M17 20v2", "M17 2v2", "M2 12h2", "M2 17h2", "M2 7h2", "M20 12h2", "M20 17h2", "M20 7h2", "M7 20v2", "M7 2v2", "M4 8h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M8 12h8"] };
+      return { label: status === "inventory" ? t.value.orders.statusInventory : t.value.orders.statusActivated, tone: "success", icon: ["M12 20v2", "M12 2v2", "M17 20v2", "M17 2v2", "M2 12h2", "M2 17h2", "M2 7h2", "M20 12h2", "M20 17h2", "M20 7h2", "M7 20v2", "M7 2v2", "M4 8h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M8 12h8"] };
     case "cancelled":
-      return { label: t.value.orders.cancelStatus, color: "var(--v5-brand-2)", bg: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)", icon: ["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z", "m15 9-6 6", "m9 9 6 6"] };
+      return { label: t.value.orders.cancelStatus, tone: "neutral", icon: ["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z", "m15 9-6 6", "m9 9 6 6"] };
     case "payment_failed":
     case "provisioning_failed":
-      return { label: t.value.orders.statusFailedShort, color: "var(--v5-danger)", bg: "color-mix(in srgb, var(--v5-danger) 15%, transparent)", icon: ["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z", "m15 9-6 6", "m9 9 6 6"] };
+      return { label: t.value.orders.statusFailedShort, tone: "danger", icon: ["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z", "m15 9-6 6", "m9 9 6 6"] };
     case "expired":
-      return { label: t.value.orders.statusExpired, color: "var(--v5-warning)", bg: "color-mix(in srgb, var(--v5-warning) 15%, transparent)", icon: ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"] };
+      return { label: t.value.orders.statusExpired, tone: "neutral", icon: ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"] };
     case "refunded":
-      return { label: t.value.orders.statusRefunded, color: "var(--v5-brand)", bg: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", icon: ["M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"] };
+      return { label: t.value.orders.statusRefunded, tone: "neutral", icon: ["M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"] };
     case "chargeback":
-      return { label: t.value.orders.statusChargeback, color: "var(--v5-danger)", bg: "color-mix(in srgb, var(--v5-danger) 15%, transparent)", icon: ["M12 2v12m0 4v4m-7-5 3 3m11-3-3 3"] };
+      return { label: t.value.orders.statusChargeback, tone: "danger", icon: ["M12 2v12m0 4v4m-7-5 3 3m11-3-3 3"] };
   }
 }
-
+// Use the same approved SKU main image as the storefront. A bundle shows its first line.
 function orderImage(order: OrderListItem): string | undefined {
-  return order.kind === "genesis" ? GENESIS_MEDIA.showcase : getOrderProductMedia(order.productId, order.lineItems)?.src;
+  if (order.kind === "genesis") return GENESIS_MEDIA.showcase;
+  return getOrderProductMedia(order.productId, order.lineItems)?.src;
 }
 
 function dateText(ts: number): string {
   return Number.isFinite(ts) && Number.isFinite(new Date(ts).getTime())
-    ? formatTrialDate(ts)
+    ? formatTrialDate(ts, dateLocale())
     : "—";
 }
 
 function goStore() {
   navTo("/store");
 }
+// The card always opens the detail; only the pending row's button asks it to open payment.
 function goOrder(order: OrderListItem) {
   navTo(order.kind === "genesis" ? "/pages/genesis/holder" : `/pages/store/order-detail?id=${encodeURIComponent(order.id)}&from=${ordersBackHref.value === "/me" ? "me" : "store"}`);
 }
-
 function goOrderPayment(order: OrderListItem) {
   navTo(`/pages/store/order-detail?id=${encodeURIComponent(order.id)}&from=${ordersBackHref.value === "/me" ? "me" : "store"}&pay=1`);
 }
@@ -380,14 +407,6 @@ const remoteErrorStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "10px 12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-};
-const retryBtnStyle: CSSProperties = {
-  minHeight: "32px",
-  padding: "0 10px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-ink)",
-  fontSize: "12px",
 };
 const loadMoreBtnStyle: CSSProperties = {
   minHeight: "44px",
@@ -416,39 +435,45 @@ const browseBtnStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
 };
-function orderRowStyle(isLast: boolean): CSSProperties {
-  return {
-    padding: "14px 0",
-    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
-  };
-}
-function iconBoxStyle(status: OrderStatus): CSSProperties {
-  return {
-    width: "40px",
-    height: "40px",
-    borderRadius: "12px",
-    background: badge(status).bg,
-  };
-}
-function statusChipStyle(status: OrderStatus): CSSProperties {
-  const b = badge(status);
-  return {
-    fontSize: "12px",
-    padding: "2px 6px",
-    borderRadius: "4px",
-    background: b.bg,
-    color: b.color,
-  };
-}
 </script>
 
 <style scoped>
-.order-product-thumb { position: relative; width: 72px; height: 72px; border-radius: 16px; display: grid; place-items: center; background: var(--v5-surface-2); overflow: hidden; }
-.order-product-image { width: 62px; height: 62px; }
-</style>
-
-<style scoped>
+/* Five-way status rail without a sliding selection pill: the selected label is ink 600, others ink-3.
+   Options grow to share the row; when long labels (vi/en on narrow screens) do not fit, the rail scrolls instead of overlapping. */
+.orders-filters { margin-bottom: 12px; padding: 0; gap: 0; background: transparent; box-shadow: none; }
+.orders-filters :deep(.nx-glass-indicator), .orders-filters :deep(.nx-glass-backdrop) { display: none; }
+.orders-filters :deep(.nx-glass-option) { flex: 1 0 auto; min-height: 44px; padding: 0 6px; background: transparent; color: var(--v5-ink-3); font-weight: 500; }
+.orders-filters :deep(.nx-glass-option--selected) { color: var(--v5-ink); font-weight: 500; background: transparent; }
+.orders-filter__label { white-space: nowrap; font-size: 13.5px; line-height: 18px; font-weight: inherit; color: inherit; }
+.orders-filter__badge { min-width: 18px; height: 18px; box-sizing: border-box; margin-left: 1px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); font: 600 11px/18px var(--font-v5); }
+/* Order cards (DS-28): solid surface, machine art as the anchor; the pending card adds one faint warning glow. */
+.orders-list { display: flex; flex-direction: column; gap: var(--ui-space-card-gap); margin: 0 16px; }
+.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-content-surface); cursor: pointer; transition: transform 160ms ease; }
+[data-theme="light"] .order-card { box-shadow: var(--v5-glass-shadow); }
+.order-card--pending { background: radial-gradient(220px 160px at 100% 0%, color-mix(in srgb, var(--v5-warning-ink) 9%, transparent), transparent 72%), var(--v5-content-surface); }
+.order-card:active { transform: scale(.98); }
+.order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.order-card__row { display: flex; gap: 14px; }
+.order-card__thumb { position: relative; flex: none; width: 72px; height: 72px; border-radius: 16px; background: var(--v5-surface-2); display: grid; place-items: center; overflow: hidden; }
+.order-card__thumb::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 7px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, #000 55%, transparent), transparent); }
+[data-theme="light"] .order-card__thumb::after { background: radial-gradient(closest-side, rgba(20,16,8,.16), transparent); }
+.order-card__image { position: relative; z-index: 1; width: 62px; height: 62px; }
+.order-card__info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* A long status tag moves under the title instead of squeezing it. */
+.order-card__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
+.order-card__title { flex: 1 1 96px; min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.order-card__meta { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+/* Narrow screens: the amount drops to its own right-aligned line instead of clipping. */
+.order-card__bottom { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: auto; }
+.order-card__date { color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.order-card__amount { margin-left: auto; color: var(--v5-ink); font-size: 18px; line-height: 24px; letter-spacing: -.01em; }
+.order-card__amount :deep(.checkout-amount__symbol) { font-size: 12px; }
+/* Unit per 01 §1.2: 12/16, 500, muted. */
+.order-card__amount :deep(.checkout-amount__unit) { font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
 .order-card__pending { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-top: 14px; padding-top: 2px; border-top: 1px solid var(--v5-border); }
-.order-card__countdown { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--v5-warning-ink); font: 400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 16px) var(--font-v5); }
+.order-card__countdown { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--v5-warning-ink); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .order-card__pay { flex: none; margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .order-card { transition: none; } .order-card:active { transform: none; } }
+.orders-filter-empty { display: block; padding: 32px 16px; text-align: center; color: var(--v5-ink-3); font: 400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.order-read-retry-label { font: 600 13px/20px var(--font-v5); }
 </style>

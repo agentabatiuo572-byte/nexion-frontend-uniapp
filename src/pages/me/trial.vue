@@ -118,7 +118,7 @@
             <text>{{ detail.rulesRow }}</text>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           </view>
-          <view class="trial-link" role="button" tabindex="0" :aria-label="detail.earnRow" @click="goEarn" @keydown.enter.stop.prevent="goEarn" @keydown.space.stop.prevent="goEarn" @keydown.enter.prevent="goEarn" @keydown.space.prevent="goEarn">
+          <view class="trial-link" role="button" tabindex="0" :aria-label="detail.earnRow" @click="goEarn" @keydown.enter.prevent="goEarn" @keydown.space.prevent="goEarn">
             <text>{{ detail.earnRow }}</text>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
           </view>
@@ -193,8 +193,8 @@
       <view v-if="!authorityScreenUnavailable" class="trial-bar" :class="{ 'trial-bar--pair': conversionRefunded }">
         <template v-if="isActiveCycle || (status === 'ended' && !claimVisible)">
           <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
-          <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" @keydown.enter.stop.prevent="retryCatalog" @keydown.space.stop.prevent="retryCatalog" /></view>
-          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialProductUnavailable && !trialCatalogLoading" :busy="trialCatalogLoading" @click="goCheckout" @keydown.enter.stop.prevent="goCheckout" @keydown.space.stop.prevent="goCheckout">
+          <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
+          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialProductUnavailable && !trialCatalogLoading" :busy="trialCatalogLoading" @click="goCheckout">
             <svg v-if="isActiveCycle" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
             <text>{{ trialBuyCtaText }}</text>
           </NxButton>
@@ -202,13 +202,13 @@
         <template v-else-if="claimVisible">
           <!-- Ineligible → concrete reason above the disabled CTA (异常2) -->
           <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
-          <NxButton class="trial-bar__main" variant="primary" :label="t.trial.idleCta" :disabled="!canStartNow" @click="claim" @keydown.enter.stop.prevent="claim" @keydown.space.stop.prevent="claim" />
+          <NxButton class="trial-bar__main" variant="primary" :label="t.trial.idleCta" :disabled="!canStartNow" @click="claim" />
         </template>
         <template v-else-if="conversionRefunded">
-          <NxButton v-if="freeTrial.authoritativeConversion?.orderNo" class="trial-bar__side" variant="secondary" :label="purchase.refundOrderCta" @click="goRefundedOrder" @keydown.enter.stop.prevent="goRefundedOrder" @keydown.space.stop.prevent="goRefundedOrder" />
-          <NxButton class="trial-bar__wide" variant="primary" :label="purchase.shopCta" @click="goStore" @keydown.enter.stop.prevent="goStore" @keydown.space.stop.prevent="goStore" />
+          <NxButton v-if="freeTrial.authoritativeConversion?.orderNo" class="trial-bar__side" variant="secondary" :label="purchase.refundOrderCta" @click="goRefundedOrder" />
+          <NxButton class="trial-bar__wide" variant="primary" :label="purchase.shopCta" @click="goStore" />
         </template>
-        <NxButton v-else class="trial-bar__main" variant="primary" :label="t.trial.convertedDevicesCta" @click="goDevices" @keydown.enter.stop.prevent="goDevices" @keydown.space.stop.prevent="goDevices" />
+        <NxButton v-else class="trial-bar__main" variant="primary" :label="t.trial.convertedDevicesCta" @click="goDevices" />
       </view>
     </template>
 
@@ -217,7 +217,7 @@
       <view class="trs-backdrop" role="button" tabindex="0" @click="rulesOpen = false" />
       <view class="nx-glass-sheet trs-panel" @click.stop>
         <view class="flex items-center justify-between">
-          <text style="font-family: var(--font-v5); font-size: var(--ui-type-section, 18px); font-weight: 600; color: var(--v5-ink)">{{ t.trial.rulesTitle }}</text>
+          <text style="font-family: var(--font-v5); font-size: var(--ui-type-section); font-weight: 600; color: var(--v5-ink)">{{ t.trial.rulesTitle }}</text>
           <view class="grid place-items-center active:opacity-70" style="width: 44px; height: 44px; border-radius: 999px; flex-shrink: 0" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="rulesOpen = false">
             <view class="rounded-full grid place-items-center" style="width: 36px; height: 36px; background: var(--v5-surface-2)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
@@ -227,7 +227,7 @@
         <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
           <view v-for="(line, i) in rulesLines" :key="i" class="flex items-start" style="gap: 8px">
             <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); margin-top: 6px; flex-shrink: 0" />
-            <text style="flex: 1; font-size: var(--ui-type-list-subtitle, 13px); color: var(--v5-ink-2); line-height: 1.625; text-wrap: pretty">{{ line }}</text>
+            <text style="flex: 1; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.625; text-wrap: pretty">{{ line }}</text>
           </view>
         </view>
         <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="rulesGotStyle" role="button" tabindex="0" :aria-label="t.trial.rulesGotCta" @click="rulesOpen = false">
@@ -272,7 +272,7 @@ const lifecycle = useTrialLifecycleCopy();
 const purchase = useTrialPurchaseCopy();
 const detail = useTrialDetailCopy();
 const authorityIncomplete = computed(() => (freeTrial.status === "active" || freeTrial.status === "grace")
-  && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null || freeTrial.authoritativeQuote === null));
+  && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null));
 const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || authorityIncomplete.value));
 // The 4s trial poll marks the authority loading while it re-reads; keep the confirmed page on screen
 // meanwhile instead of swapping in the read state. Actions still wait on authorityUnavailable.
@@ -366,7 +366,7 @@ const countdownText = computed(() => {
 const deadlineText = computed(() => {
   const at = isGrace.value ? freeTrial.graceEndsAt : freeTrial.expiresAt;
   if (at === null) return "";
-  return fmt(isGrace.value ? detail.value.keptUntil : purchase.value.heroTermUntil, { time: formatTrialDeadline(at) });
+  return fmt(isGrace.value ? detail.value.keptUntil : purchase.value.heroTermUntil, { time: formatTrialDeadline(at, dateLocale()) });
 });
 // Both counts follow the live source: a tick or quote re-read during the 900 ms entrance must not cut it short.
 const earnedShown = useCountUp(() => (isActiveCycle.value && !authorityScreenUnavailable.value ? shadowUSD.value : null), { follow: true });
@@ -500,7 +500,7 @@ const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", border
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
-useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.value = false; });
+useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.value = false; }, true);
 </script>
 
 <style scoped>
@@ -528,7 +528,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 /* ── Hero: status row, countdown ring with the device inside, remaining time ── */
 .trial-hero { align-self:stretch;display:flex;flex-direction:column;align-items:center;padding:0 16px; }
 .trial-hero__top { align-self:stretch;display:flex;align-items:center;justify-content:space-between;height:24px; }
-.trial-online { display:inline-flex;align-items:center;gap:6px;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5); }
+.trial-online { display:inline-flex;align-items:center;gap:6px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-online__dot { width:8px;height:8px;border-radius:50%;background:var(--v5-success); }
 .trial-ring { position:relative;flex:none;width:208px;height:208px;margin-top:12px; }
 .trial-ring--terminal { margin-top:0; }
@@ -543,36 +543,36 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-ring__badge { position:absolute;right:18px;bottom:18px;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--v5-surface-2);color:var(--v5-ink-3); }
 .trial-ring__check { position:absolute;right:14px;bottom:14px;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--v5-brand);color:var(--v5-on-brand);animation:trial-pop .5s cubic-bezier(.16,1,.3,1) .35s both; }
 .trial-countdown { display:flex;align-items:baseline;gap:8px;margin-top:12px; }
-.trial-countdown__label { color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle, 13px)/var(--ui-type-list-subtitle-lh, 20px) var(--font-v5); }
+.trial-countdown__label { color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .trial-countdown__value { font:500 22px/28px var(--font-jet-mono);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-state--grace .trial-countdown__value { color:var(--v5-warning-ink); }
-.trial-hero__deadline { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5); }
+.trial-hero__deadline { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 
 /* ── Accrued earnings ── */
 .trial-earned { display:flex;flex-direction:column;align-items:center;margin-top:24px;padding:0 16px;text-align:center; }
-.trial-earned__label { color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle, 13px)/var(--ui-type-list-subtitle-lh, 20px) var(--font-v5); }
+.trial-earned__label { color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .trial-earned__amount { display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:4px; }
-.trial-earned__value { font:600 44px/50px var(--font-amount, var(--font-jet-mono), monospace);font-variant-numeric:tabular-nums;letter-spacing:-0.024em;white-space:nowrap; }
+.trial-earned__value { font:600 44px/50px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.024em;white-space:nowrap; }
 .trial-earned__unit { color:var(--v5-ink-3);font:500 15px/20px var(--font-v5); }
 .trial-earned__uvt { margin-top:4px;color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
-.trial-earned__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5); }
+.trial-earned__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-dim { color:var(--v5-ink-3); }
 .trial-unit-small { font-size:12px;line-height:16px; }
 
 /* ── Quote ticket ── */
-.trial-ticket { align-self:stretch;margin:28px 16px 0;border-radius:var(--ui-radius-surface, 16px);background:var(--v5-surface);box-shadow:var(--v5-glass-shadow); }
+.trial-ticket { align-self:stretch;margin:28px 16px 0;border-radius:var(--ui-radius-surface);background:var(--v5-surface);box-shadow:var(--v5-glass-shadow); }
 .trial-ticket__body { padding:20px 20px 16px; }
 .trial-ticket .trial-ticket__tag { display:flex;width:fit-content;margin-bottom:10px; }
 .trial-ticket__tag-icon { display:inline-block;margin-right:4px;vertical-align:-2px; }
-.trial-ticket__title { display:block;font:var(--ui-type-card-title-weight, 600) var(--ui-type-card-title, 16px)/var(--ui-type-card-title-lh, 24px) var(--font-v5);text-wrap:pretty; }
-.trial-ticket__subtitle { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle, 13px)/var(--ui-type-list-subtitle-lh, 20px) var(--font-v5); }
+.trial-ticket__title { display:block;font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5);text-wrap:pretty; }
+.trial-ticket__subtitle { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .trial-ticket__estimate { font-size:12px;line-height:16px; }
 .trial-total { margin-top:16px;padding:14px 16px;border-radius:16px;background:var(--v5-surface-2); }
 :global([data-theme="light"] .trial-total) { background:var(--v5-bg); }
-.trial-total__breakdown { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
+.trial-total__breakdown { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
 .trial-total__line { display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;margin-top:6px; }
 .trial-total__label { font:500 13px/18px var(--font-v5); }
-.trial-total__value { color:var(--v5-brand);font:600 32px/38px var(--font-amount, var(--font-jet-mono), monospace);font-variant-numeric:tabular-nums;letter-spacing:-0.02em;white-space:nowrap; }
+.trial-total__value { color:var(--v5-brand);font:600 32px/38px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.02em;white-space:nowrap; }
 .trial-total__dec { opacity:.72; }
 .trial-total__unit { color:var(--v5-ink-3);font-weight:500; }
 .trial-total__uvt { color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
@@ -588,7 +588,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-sum__discount { flex:none;font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-sum__price { flex:none;display:inline-flex;align-items:baseline;gap:8px;white-space:nowrap; }
 .trial-sum__strike { color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums;text-decoration:line-through; }
-.trial-sum__amount { font:600 24px/30px var(--font-amount, var(--font-jet-mono), monospace);font-variant-numeric:tabular-nums;letter-spacing:-0.02em; }
+.trial-sum__amount { font:600 24px/30px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.02em; }
 .trial-sum__currency { color:var(--v5-ink-3);font-size:14px; }
 .trial-perf { position:relative;height:20px; }
 .trial-perf__notch { position:absolute;top:0;width:20px;height:20px;border-radius:50%;background:var(--v5-bg); }
@@ -596,18 +596,18 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-perf__notch--r { right:-10px; }
 .trial-perf__line { position:absolute;left:20px;right:20px;top:9px;border-top:1.5px dashed var(--v5-border-strong); }
 .trial-credit { padding:12px 20px 20px; }
-.trial-credit__label { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5); }
+.trial-credit__label { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-credit__row { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:6px; }
 .trial-credit__name { flex:1;min-width:0;color:var(--v5-ink-3);font:400 12px/16px var(--font-v5); }
 .trial-credit__value { flex:none;font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-credit__sep { color:var(--v5-ink-4); }
 .trial-credit__uvt { color:var(--v5-nex-ink); }
 .trial-legacy-row { margin-top:10px; }
-.trial-legacy-note { display:block;margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5);text-wrap:pretty; }
+.trial-legacy-note { display:block;margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-wrap:pretty; }
 
 /* ── Open list rows under the ticket ── */
 .trial-links { align-self:stretch;margin:20px 16px 0; }
-.trial-link { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 2px;border-top:1px solid var(--v5-border);font:400 var(--ui-type-list-title, 15px)/var(--ui-type-list-title-lh, 22px) var(--font-v5); }
+.trial-link { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 2px;border-top:1px solid var(--v5-border);font:400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .trial-link:active { opacity:.7; }
 .trial-link:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
 .trial-link > svg { flex:none; }
@@ -620,14 +620,14 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-slot .trial-slot__tag { position:absolute;left:50%;bottom:-12px;padding:0 10px;transform:translateX(-50%); }
 .trial-terminal-copy { display:flex;flex-direction:column;align-items:center;margin-top:28px;padding:0 24px;text-align:center; }
 .trial-terminal-copy--claim { margin-top:36px; }
-.trial-terminal-copy__title { font:var(--ui-type-hero-title-weight, 600) var(--ui-type-hero-title, 24px)/var(--ui-type-hero-title-lh, 32px) var(--font-v5);text-wrap:balance; }
-.trial-terminal-copy__body { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle, 13px)/var(--ui-type-list-subtitle-lh, 20px) var(--font-v5);text-wrap:pretty; }
-.trial-terminal-copy__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5);text-wrap:pretty; }
+.trial-terminal-copy__title { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);text-wrap:balance; }
+.trial-terminal-copy__body { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);text-wrap:pretty; }
+.trial-terminal-copy__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-wrap:pretty; }
 
 /* ── Bottom action bar (DS-30): the store purchase bar material ── */
-.trial-bar { position:absolute;left:0;right:0;bottom:0;z-index:36;display:flex;flex-direction:column;padding:12px 16px calc(30px + env(safe-area-inset-bottom));background:var(--v5-sticky-bar-bg, var(--v5-surface));box-shadow:inset 0 1px 0 var(--v5-sticky-bar-border, var(--v5-border));backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);animation:trial-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
+.trial-bar { position:absolute;left:0;right:0;bottom:0;z-index:36;display:flex;flex-direction:column;padding:12px 16px calc(30px + env(safe-area-inset-bottom));background:var(--v5-sticky-bar-bg);box-shadow:inset 0 1px 0 var(--v5-sticky-bar-border);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);animation:trial-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
 .trial-bar--pair { flex-direction:row;flex-wrap:wrap;gap:12px; }
-.trial-bar__note { margin:0 0 10px;color:var(--v5-ink-3);font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 18px) var(--font-v5);text-align:center;text-wrap:pretty; }
+.trial-bar__note { margin:0 0 10px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;text-wrap:pretty; }
 .trial-bar__retry { display:flex;justify-content:center;margin:-6px 0 4px; }
 /* In-flow twin of the bar: 12 top + 48 button + 30 bottom (+ safe area) + a 20px gap, less the 40px the chassis already pads. */
 .trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 16px calc(70px + env(safe-area-inset-bottom)); }
@@ -678,7 +678,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
   padding: 20px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
   box-sizing: border-box;
-  max-height: calc(100% - var(--nx-overlay-top, 0px));
+  max-height: calc(100% - var(--nx-overlay-top));
   overflow-y: auto;
   animation: trs-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);
 }

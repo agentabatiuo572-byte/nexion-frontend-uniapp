@@ -35,15 +35,17 @@ test("keyboard auth regression uses valid phones for the selectable country code
   assert.doesNotMatch(keyboardRuntime, /\+81|4155550123/);
 });
 
-test("four auth providers stay visible only in the development mock runtime", async () => {
-  const [login, register, providerGrid] = await Promise.all([
+test("development providers stay isolated and real sign-in uses configured providers", async () => {
+  const [login, register, providerGrid, thirdParty] = await Promise.all([
     read("src/pages/login/login.vue"),
     read("src/pages/register/register.vue"),
     read("src/components/auth-provider-grid.vue"),
+    read("src/components/third-party-auth.vue"),
   ]);
   for (const page of [login, register]) {
     assert.match(page, /AuthProviderGrid/);
     assert.match(page, /v-if="(?:!loginRecoveryPending && )?step === 1[^\"]*!remoteApiEnabled/);
+    assert.match(page, /<ThirdPartyAuth v-if="(?:!loginRecoveryPending && )?remoteApiEnabled && step === 1/);
     assert.match(page, /data-testid="auth-runtime-label"/);
     assert.doesNotMatch(page, /const oauth\s*=/);
     assert.doesNotMatch(page, /oauthDisplayLabel/);
@@ -53,7 +55,11 @@ test("four auth providers stay visible only in the development mock runtime", as
   }
   assert.doesNotMatch(providerGrid, /[·•]\s*Mock/);
   assert.doesNotMatch(providerGrid, /(?:stroke|fill)="white"/);
-  assert.match(providerGrid, /grid-template-columns:\s*repeat\(4/);
+  assert.match(providerGrid, /providers: \(\) => \["Passkey", "Google", "Apple", "Telegram"\]/);
+  assert.match(providerGrid, /grid-template-columns:\s*repeat\(auto-fit/);
+  assert.match(thirdParty, /const available = await api.available\(\)/);
+  assert.match(thirdParty, /:providers="labels"/);
+  assert.doesNotMatch(thirdParty, /Passkey/);
   assert.match(providerGrid, /focus-visible/);
 });
 
@@ -82,6 +88,6 @@ test("authentication failures are announced immediately to assistive technology"
     read("src/pages/register/register.vue"),
   ]);
   for (const page of [login, register]) {
-    assert.match(page, /v-if="error(?: && [^"]+)?"[^>]*role="alert"[^>]*aria-live="assertive"/);
+    assert.match(page, /v-if="error(?: && !\(loginRecoveryPending && error === t\.login\.unknownAttempt\))?"[^>]*role="alert"[^>]*aria-live="assertive"/);
   }
 });

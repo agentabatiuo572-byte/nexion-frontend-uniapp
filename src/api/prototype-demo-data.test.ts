@@ -1,11 +1,14 @@
 import { createProofApi } from "./proof-api";
+import { createStorefrontActivityApi } from './storefront-activity-api';
+import { createEarnConfigApi } from './earn-config-api';
 import { parseAppHomeOverview } from './app-home-api';
 import { createDirectReferralApi } from "./direct-referral-api";
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from './api-client';
 import { parseProductCatalogPayload } from './product-catalog-contract';
 import { createQuestApi } from './quest-api';
 import { createEventsApi } from './events-api';
+import { createEventDetailApi } from './event-detail-api';
 import { createGenesisApi } from './genesis-api';
 import { createPointsApi } from './points-api';
 import { createLearningApi } from './learning-api';
@@ -43,6 +46,7 @@ import { buildRankHowContent } from '../lib/rank-how-content';
 import { createTrustSectionApi } from './trust-section-api';
 import { createPromotionApi } from './promotion-api';
 import { createTeamInsightsApi } from './team-insights-api';
+import { createGenesisRaffleApi } from './genesis-raffle-api';
 import { createDeviceE3Api } from './device-e3-api';
 import { createMarketApi } from './market-api';
 import { createEarningsReleaseApi } from './earnings-release-api';
@@ -80,9 +84,22 @@ describe('prototype account readbacks', () => {
   it('provides settled micro-amount examples and a truly empty ledger', () => {
     const d = demo();
     const data = parseAppHomeOverview(d.get('/api/app/home/overview'));
-    expect(data.earningsLedger.map(row => row.rewardUsdt)).toEqual([2.34, .00032, .00005]);
+    expect(data.earningsLedger.slice(-3).map(row => row.rewardUsdt)).toEqual([2.34, .00032, .00005]);
+    expect(data.earningsLedger.slice(0, 6).every(row => row.id.startsWith('DEMO-SETTLE-'))).toBe(true);
     d.state.dataState = 'empty';
     expect(parseAppHomeOverview(d.get('/api/app/home/overview')).earningsLedger).toEqual([]);
+  });
+  it('settles a new earning every 20 seconds for the live feed', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-30T00:00:05Z'));
+      const d = demo(), ids = () => parseAppHomeOverview(d.get('/api/app/home/overview')).earningsLedger.map(row => row.id);
+      const before = ids();
+      vi.advanceTimersByTime(20_000);
+      const after = ids();
+      expect(after.filter(id => !before.includes(id))).toHaveLength(1);
+      expect(after[0]).not.toBe(before[0]);
+    } finally { vi.useRealTimers(); }
   });
   it('keeps the proof streak consistent with the check-in source', async () => {
     for (const patch of [{}, { checkedIn: true }, { streakState: 'broken' }, { streakState: 'broken', saverUsed: true }, { streakState: 'broken', saverUsed: true, checkedIn: true }]) {
@@ -93,31 +110,48 @@ describe('prototype account readbacks', () => {
   });
 });
 
+describe('restored storefront sales proof', () => {
+  it('supplies validated phone tiers for the phone comparison', async () => {
+    const result = await createEarnConfigApi(demo().client).phoneTiers();
+    expect(result.tiers).toHaveLength(5);
+    expect(result.tiers.find(row => row.tier === 3)?.baseRateUsdt).toBe(.06);
+  });
+  it('provides the requested sales window without changing demo state', async () => {
+    const d = demo();
+    const before = structuredClone(d.state);
+    const result = await createStorefrontActivityApi(d.client).socialProof('stellarbox-pro', 30);
+    expect(result).toMatchObject({ productName: 'UVELBox Pro', windowDays: 30, cumulativeSales: 55, windowSales: 18 });
+    expect(d.state).toEqual(before);
+    const empty = demo('zh', { dataState: 'empty' });
+    expect(await createStorefrontActivityApi(empty.client).socialProof('stellarbox-pro', 7))
+      .toMatchObject({ windowDays: 7, cumulativeSales: 0, windowSales: 0 });
+  });
+});
+
 describe('prototype team-guide publications', () => {
   const keys = ['team-unilevel-how', 'team-binary-how', 'team-commissions-how'] as const;
-  it.each(['zh', 'en', 'vi'])('publishes all three %s documents through the real parser with explicit demo scope', async locale => {
+  it.each(['zh', 'en', 'vi'])('publishes all three %s default documents through the real parser', async locale => {
     const d = demo('en');
     const before = structuredClone(d.state);
     for (const key of keys) {
       const document = await createHowContentApi(d.client).published(key, locale);
       expect(document).toMatchObject({ contentKey: key, locale, status: 'PUBLISHED', versionSource: 'ENTRY' });
       expect(document.blocks[0].id).toBe('hero');
-      expect(document.blocks[0].body).toMatch(/本地原型演示|Local prototype demo|nguyên mẫu cục bộ/);
       expect(new Set(document.blocks.map(block => block.id)).size).toBe(document.blocks.length);
-      expect(document.blocks.length).toBeGreaterThan(5);
+      expect(document.blocks.length).toBeGreaterThanOrEqual(4);
       expect(document.blocks.every(block => block.title.trim() && block.body.trim())).toBe(true);
+      const publicText = document.blocks.flatMap(block => [block.title, block.body, ...(block.items ?? [])]).join('\n');
+      expect(publicText).not.toMatch(/\bL\d+\b|层级|逐层|(?:奖励|收益|等级)深度|\blevels?\b|\bdepth\b|độ sâu|cấp (?:mời|nguồn|gián tiếp)/i);
       if (key !== 'team-commissions-how') {
-        expect(document.blocks.flatMap(block => [block.title, block.body, ...(block.items ?? [])]).join('\n')).not.toMatch(/\{[^{}]+\}/);
+        expect(publicText).not.toMatch(/\{[^{}]+\}/);
       }
       if (key === 'team-unilevel-how') {
         expect(document).toMatchObject({ schemaVersion: 2, templateId: 'unilevel-v2' });
         expect(document.blocks.map(block => block.id)).toEqual(expect.arrayContaining(['direct-referral-scope', 'seven-layer-scope']));
-        const depths = document.blocks.find(block => block.id === 'rank-depths')!;
-        const ranks = (await createVRankApi(d.client).ladder()).ranks.filter(rank => rank.visible);
-        expect(depths.items).toHaveLength(ranks.length);
-        ranks.forEach((rank, index) => expect(depths.items![index]).toContain(`V${rank.v}:`.replace(':', locale === 'zh' ? '：' : ':')));
-        expect(document.blocks.find(block => block.id === 'seven-layer-scope')!.body).toMatch(/L1.*L2/);
-        expect(document.blocks.find(block => block.id === 'unknown-network-rates')!.body).toMatch(/未提供|not supplied|Chưa cung cấp/);
+        // Default copy: purchase and device-earning rewards explained without layers, rates or caps.
+        expect(document.blocks.find(block => block.id === 'direct-referral-scope')!.body)
+          .toMatch(/不影响好友自己的收益|without reducing their earnings|không làm giảm thu nhập của họ/);
+        expect(publicText).not.toMatch(/\d+(?:[.,]\d+)?\s*%/);
       }
     }
     expect(d.state).toEqual(before);
@@ -141,9 +175,9 @@ describe('prototype team-guide publications', () => {
     }
     const network = view.section('network').body;
     for (const rate of ['10%', '60%', '40%', '5%', '70%', '30%']) expect(network).toContain(rate);
-    expect(network).toContain(view.copy.directOnly);
-    expect(view.section('faq-cultivation').body).toMatch(/没有推荐人时由晋升成员本人获得|If there is no referrer, the promoted member receives it|Nếu không có người giới thiệu, thành viên thăng hạng tự nhận/);
-    expect(view.section('overview').body).toMatch(/固定演示值|fixed demo value|giá trị minh họa cố định/);
+    expect(view.section('faq-cultivation').body).toMatch(/邀请这位好友的人|The person who invited that friend|Người đã mời người bạn đó/);
+    // Payout mechanics (caps, unmatched-volume handling) stay out of the public guide.
+    expect(view.section('binary').body).not.toMatch(/上限|清零|cap|reset|giới hạn|xóa/i);
     expect(view.amounts.network).toBe(view.copy.pendingAmount);
     expect(view.amounts.cultivation).toContain('10.00 UVT');
     expect(view.exampleTotal).toBe(view.copy.noTotal);
@@ -161,11 +195,9 @@ describe('prototype team-guide publications', () => {
     expect(guide.leadership).toMatchObject({ rate: pool.injectRate, minRank: pool.unlockRank, monthlyCap: 1000 });
     expect(guide.coolingDays).toBeNull();
     expect(Object.values(guide.network)).toEqual([null, null, null]);
-    const comparison = document.blocks.find(block => block.id === 'point-comparison')!;
-    expect(comparison.body).toMatch(/已确认订单金额|confirmed order amounts|số tiền đơn đã xác nhận/);
-    const amount = document.blocks.find(block => block.id === 'amount-and-rate')!.body;
-    expect(amount).toContain(`${binary.estimatedAmountUsdt} USDT`);
-    expect(comparison.items!.join(' ')).toContain(`${new Intl.NumberFormat(locale).format(binary.trackB)} USDT`);
+    // The default guide explains how to earn; live amounts stay on the reward page.
+    expect(document.blocks.find(block => block.id === 'how-to-earn')!.items).toHaveLength(3);
+    expect(JSON.stringify(document.blocks)).not.toContain(`${binary.estimatedAmountUsdt} USDT`);
   });
 
   it.each(['zh', 'en', 'vi'])('keeps %s empty-account publications readable without creating paid rewards', async locale => {
@@ -178,8 +210,7 @@ describe('prototype team-guide publications', () => {
     expect(view.incomplete).toBe(false);
     expect(directPolicy.configured).toBe(false);
     expect(view.amounts.network).toBe(view.copy.notConfigured);
-    expect((await createHowContentApi(d.client).published('team-binary-how', locale)).blocks.find(block => block.id === 'amount-and-rate')!.body).toContain('0 USDT');
-    expect((await createHowContentApi(d.client).published('team-unilevel-how', locale)).blocks.find(block => block.id === 'purchase-rule')!.body).toMatch(/未开放|unavailable|chưa mở/);
+    expect((await createHowContentApi(d.client).published('team-binary-how', locale)).blocks.length).toBeGreaterThan(0);
   });
 
   it('limits the new module to read-only guide routes and follows changed fixture facts', async () => {
@@ -196,11 +227,8 @@ describe('prototype team-guide publications', () => {
     expect(guide.binary.matchRate).toBe(.07125);
     const doc = teamGuidesDemo(new URL('http://prototype.invalid/api/content/how-it-works/team-binary-how?locale=en'), 'zh', request, read);
     expect(doc.locale).toBe('en');
-    expect(doc.blocks.find((block: { id: string }) => block.id === 'amount-and-rate').body).toContain('3.21 USDT');
-    expect(doc.blocks.find((block: { id: string }) => block.id === 'amount-and-rate').body).toContain('7.125%');
-    const purchase = teamGuidesDemo(new URL('http://prototype.invalid/api/content/how-it-works/team-unilevel-how?locale=en'), 'zh', request, read);
-    expect(purchase.blocks.find((block: { id: string }) => block.id === 'purchase-rule').body).toContain('12.5%');
-    expect(purchase.blocks.find((block: { id: string }) => block.id === 'purchase-rule').body).toContain('11-day');
+    // The default guides defer live rates to the reward pages instead of repeating them.
+    expect(JSON.stringify(doc.blocks)).not.toMatch(/7\.125%|3\.21 USDT/);
     const shouldNotRead = () => { throw new Error('Unrelated route read'); };
     expect(teamGuidesDemo(new URL('http://prototype.invalid/api/content/how-it-works/genesis-how'), 'en', request, shouldNotRead)).toBeUndefined();
     expect(teamGuidesDemo(new URL('http://prototype.invalid/api/config/commission/guide'), 'en', { method: () => 'POST' }, shouldNotRead)).toBeUndefined();
@@ -230,17 +258,18 @@ describe('isolated prototype data uses the real read contracts',()=>{
     expect((await createSupportApi(d.client).faqPage(locale)).items).toHaveLength(4);
     expect((await createTaskAssignmentApi(d.client,"prod").state()).devices[0].recentTasks[0].receiptNo).toBe('DEMO-RECEIPT-1');
     expect((await createNetworkRegionsApi(d.client).list()).regions).toHaveLength(3);
-    expect((await createDeveloperDocsApi(d.client).published(locale)).endpoints).toHaveLength(1);
+    // The developer docs sample mirrors the backend's shipped default publication.
+    expect((await createDeveloperDocsApi(d.client).published(locale)).endpoints).toHaveLength(6);
     expect((await createDeveloperAccessApi(d.client).latest())?.status).toBe('APPROVED');
     expect(await createDeveloperResourcesApi(d.client).listKeys()).toHaveLength(1);
     expect(await createDeveloperResourcesApi(d.client).listWebhooks()).toHaveLength(1);
     expect((await createAmbassadorApplicationApi(d.client).policy()).buckets).toHaveLength(4);
     expect((await createAmbassadorApplicationApi(d.client).latest()).status).toBe('NONE');
-    expect((await createPrivacyPolicyApi(d.client).current(locale)).sections).toHaveLength(2);
+    expect((await createPrivacyPolicyApi(d.client).current(locale)).sections).toHaveLength(9);
     expect((await createLegalTermsApi(d.client).current(locale,'GLOBAL')).provenance).toBe('prototype-sample');
     expect((await createRiskDisclosureApi(d.client).publicCurrent('GLOBAL')).chapters).toHaveLength(7);
     expect((await createRiskDisclosureApi(d.client).current()).acknowledgmentToken).toBeNull();
-    for(const key of ['wallet-exchange-how','wallet-repurchase-how'] as const)expect((await createHowContentApi(d.client).published(key,locale)).blocks).toHaveLength(3);
+    expect((await createHowContentApi(d.client).published('wallet-exchange-how',locale)).blocks).toHaveLength(4);expect((await createHowContentApi(d.client).published('wallet-repurchase-how',locale)).blocks).toHaveLength(4);
     expect((await createTaskAssignmentApi(d.client,"prod").receipt('DEMO-RECEIPT-1')).proofHash).toHaveLength(64);
     expect((await createPublicSponsorPreviewApi(d.client).preview('UVELDEMO')).gift.status).toBe('DISABLED');
   });
@@ -275,6 +304,18 @@ describe('isolated prototype data uses the real read contracts',()=>{
     expect(passed).toMatchObject({passed:true,completed:true,score:100,attempts:2,rewardGranted:true});
     expect(await api.course(id,'zh')).toMatchObject({completed:true,progress:100,lastScore:100,attempts:2});
     expect((await api.courses('zh')).completedCourses).toBe(1);
+  });
+  it('exposes precise raffle awards and enforces the same simulated time window on entry',async()=>{
+    const small=demo('zh',{raffleState:'small-usdt'}), smallApi=createGenesisRaffleApi(small.client);
+    const state=await smallApi.state();
+    expect(state.draws[0].prizes.map(row=>[row.rewardType,row.amount])).toEqual([['USDT','0.00032'],['USDT','0.00005']]);
+    expect(state.draws[2].myResults.map(row=>row.amount)).toEqual(['0.00032','0.00005']);
+    for(const mode of ['upcoming','ended']){
+      const closed=demo('zh',{raffleState:mode}), api=createGenesisRaffleApi(closed.client);
+      await api.state();
+      await expect(api.enter('demo-draw-0',1,'closed-'+mode)).rejects.toThrow('not accepting entries');
+      expect((await api.state()).availableTickets).toBe(3);
+    }
   });
   it('restores a broken streak and reads claimed earnings without repeating the reward',async()=>{
     const d=demo('zh',{streakState:'broken'}),api=createPointsApi(d.client);
@@ -345,7 +386,7 @@ describe('isolated prototype data uses the real read contracts',()=>{
     expect((await receipts.receipts()).items).toHaveLength(3);expect((await receipts.receipt('DEMO-RECEIPT-1')).rewardUsdt).toBe(2.34);
     expect((await createPaymentMethodApi(d.client).list())[0].last4).toBe('4242');
     expect(await createProfileApi(d.client).nicknameCandidates()).toHaveLength(6);
-    expect(await createProfileApi(d.client).profile()).toEqual({nickname:'Alex',avatarUrl:'',avatarRevision:'',language:'zh',changeIntervalDays:7,nicknameChangeAvailableAt:null,avatarChangeAvailableAt:null});
+    expect(await createProfileApi(d.client).profile()).toEqual({nickname:'Alex',avatarUrl:'http://127.0.0.1:5190/static/img/demo/profile-woman.jpg',avatarRevision:'demo-profile-woman',language:'zh',changeIntervalDays:7,nicknameChangeAvailableAt:null,avatarChangeAvailableAt:null});
     expect((await createPayoutAddressApi(d.client,'prod').list()).addresses).toHaveLength(1);
     const preferences=createNotificationPreferencesApi(d.client);expect((await preferences.get()).market).toBe(true);
     await preferences.patch({market:false});expect((await preferences.get()).market).toBe(false);
@@ -370,7 +411,19 @@ describe('isolated prototype data uses the real read contracts',()=>{
   it('loads fleet, device-specific checkout capacity, market and release balances',async()=>{
     const d=demo(),devices=createDeviceE3Api(d.client);
     expect((await devices.fleet()).devices).toHaveLength(2);
-    expect((await devices.tradeinConfig()).enabled).toBe(false);
+    expect((await devices.tradeinConfig()).enabled).toBe(true);
+    const eligibility=await devices.eligibility('stellarbox-pro');
+    expect(eligibility.sources.map(source=>[source.sourceDeviceId,source.reasonCode])).toEqual([[41,'OK'],[42,'TARGET_MUST_DIFFER']]);
+    expect(await devices.quote(41,'stellarbox-pro')).toMatchObject({creditRatePct:75,discountUsdt:974.25,payableUsdt:4024.75,targetDeviceStatus:'ACTIVE'});
+    const tradeinQuote=await devices.quote(41,'stellarbox-pro'),orderApi=createOrderApi(d.client);
+    const result=await devices.submit(41,'stellarbox-pro','demo-tradein',tradeinQuote);
+    expect(result).toMatchObject({sourceDeviceId:41,targetDeviceStatus:'ACTIVE',discountUsdt:974.25,walletDebitUsdt:4024.75});
+    expect(await devices.submit(41,'stellarbox-pro','demo-tradein',tradeinQuote)).toEqual(result);
+    const fleetAfter=(await devices.fleet()).devices;
+    expect(fleetAfter.map(device=>device.id)).not.toContain(41);
+    expect(fleetAfter.find(device=>device.id===result.targetDeviceId)).toMatchObject({productCode:'STELLARBOX-PRO',actualPaidUsdt:4024.75});
+    expect((await orderApi.list()).orders.find(order=>order.orderNo===result.orderNo)).toMatchObject({tradeinNo:result.tradeinNo,sourceDeviceId:41,
+      targetDeviceId:result.targetDeviceId,canonicalStatus:'activated',amountUsdt:4024.75,discountUsdt:974.25});
     expect((await devices.capacityQuote('stellarbox-pro')).targetPriceUsdt).toBe(4999);
     expect((await devices.capacityQuote('stellarbox-pro')).sufficientFunds).toBe(true);
     expect((await createMarketApi(d.client).fetch()).currentPrice).toBe(.128);
@@ -400,7 +453,7 @@ describe('isolated prototype data uses the real read contracts',()=>{
     expect(started.id).toBe(sent.id);
     expect(started.messages.at(-1)?.text).toBe('Demo order question');
     expect((await api.conversations()).items).toHaveLength(1);
-    expect((await createHowContentApi(d.client,'prod').published('genesis-how',locale)).blocks).toHaveLength(3);
+    expect((await createHowContentApi(d.client,'prod').published('genesis-how',locale)).blocks).toHaveLength(4);
   });
   it('keeps fleet identities unique and stable across consecutive multi-unit purchases',async()=>{
     const d=demo(),orders=createOrderApi(d.client),devices=createDeviceE3Api(d.client);
@@ -455,7 +508,7 @@ describe('isolated prototype data uses the real read contracts',()=>{
     const d=demo();d.get('/api/notifications/901/read',{},'POST');expect(d.get('/api/notifications').unread).toBe(2);
     expect(d.get('/api/notifications/902/actions',{},'POST').route).toBe('/pages/store/order-detail?id=DEMO-ORDER-002');
   });
-  it('reads team commissions, leaderboard, pools and all reward statuses',async()=>{
+  it('reads team commissions, leaderboard, pools, raffle and all reward statuses',async()=>{
     const d=demo(),team=createTeamInsightsApi(d.client);
     expect((await team.commissions()).events).toHaveLength(4);
     expect((await team.leaderboard('month')).rows).toHaveLength(5);
@@ -463,6 +516,8 @@ describe('isolated prototype data uses the real read contracts',()=>{
     expect((await team.unilevel('month',1,20,null,'direct')).events).toHaveLength(1);
     expect((await team.leadershipPool()).totalVotes).toBe(40);
     expect((await createPromotionApi(d.client).rewards()).items).toHaveLength(10);
+    const raffle=createGenesisRaffleApi(d.client);expect((await raffle.state()).draws).toHaveLength(3);
+    await raffle.enter('demo-draw-0',1,'demo-enter');expect((await raffle.state()).availableTickets).toBe(2);
   });
   it.each([false,true])('creates, pays and reads back a simulated purchase (bundle=%s)',async bundle=>{
     const d=demo(),api=createPromotionApi(d.client),orders=createOrderApi(d.client);
@@ -508,6 +563,7 @@ describe('isolated prototype data uses the real read contracts',()=>{
     const events=await createEventsApi(d.client).state(locale);
     expect(events.events).toHaveLength(6);
     expect(new Set(events.events.map(e=>e.kind)).size).toBe(6);
+    expect((await createEventDetailApi(d.client).detail('demo-invite',locale)).userStatus).toBe('JOINED');
     const daily=await createPointsApi(d.client).state();
     expect(daily.badgeAchievements).toHaveLength(6);expect(daily.dailyMilestones).toHaveLength(4);
     expect((await createTeamNetworkApi(d.client).snapshot()).members).toHaveLength(8);

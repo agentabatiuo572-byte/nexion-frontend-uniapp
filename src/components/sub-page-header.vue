@@ -1,6 +1,7 @@
 <!--
   SubPageHeader — sticky controls with independent round glass surfaces and a
-  bare title. The chassis view layer hides the title when content scrolls under
+  bare title. Blur the sampled scene before refraction so scrolling text cannot
+  compete with the navigation icons. The chassis view layer hides the title when content scrolls under
   it and restores it at the top. The row keeps its height and content spacing.
 
   The plain variant keeps the title bare and gives the back control its own
@@ -9,7 +10,7 @@
   bright under the controls.
 -->
 <template>
-  <view class="spv" :class="{ 'spv--plain': plain, 'spv--solid': solid }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', height: rowH + 'px' }">
+  <view class="spv" :class="{ 'spv--plain': plain, 'spv--design': design, 'spv--solid': solid }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', minHeight: rowH + 'px' }">
     <view
       class="spv-side spv-back"
       role="button"
@@ -19,8 +20,8 @@
 
       @keydown.enter.prevent="onKeyboardActivate($event, goBack)" @keydown.space.prevent="onKeyboardActivate($event, goBack)"
     >
-      <view class="spv-glass">
-        <LiquidGlass :radius="plain ? 22 : 18" tone="navigation" />
+      <view class="spv-glass nx-design-glass">
+        <LiquidGlass :radius="22" tone="navigation" :blur="8" />
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
     </view>
@@ -28,23 +29,30 @@
       <text v-if="displayTitle" class="spv-title">{{ displayTitle }}</text>
       <text v-if="subtitle" class="spv-sub">{{ subtitle }}</text>
     </view>
-    <view v-if="actionLabel && action" class="spv-action" role="button" tabindex="0" :aria-label="actionLabel" @click="action" @keydown.enter.prevent="onKeyboardActivate($event, action)" @keydown.space.prevent="onKeyboardActivate($event, action)">
-      <view class="spv-action-surface"><LiquidGlass :radius="18" /></view>
+    <!-- An icon action keeps the round glass control; its label is the accessible name. -->
+    <view v-if="actionLabel && action && $slots.actionIcon" class="spv-side spv-bell" role="button" tabindex="0" :aria-label="actionLabel" @click="action" @keydown.enter.prevent="onKeyboardActivate($event, action)" @keydown.space.prevent="onKeyboardActivate($event, action)">
+      <view class="spv-glass nx-design-glass">
+        <LiquidGlass :radius="22" tone="navigation" :blur="8" />
+        <slot name="actionIcon" />
+      </view>
+    </view>
+    <view v-else-if="actionLabel && action" class="spv-action" role="button" tabindex="0" :aria-label="actionLabel" @click="action" @keydown.enter.prevent="onKeyboardActivate($event, action)" @keydown.space.prevent="onKeyboardActivate($event, action)">
+      <view v-if="!design" class="spv-action-surface"><LiquidGlass :radius="18" :blur="8" /></view>
       <text>{{ actionLabel }}</text>
     </view>
-    <view v-else-if="!plain"
+    <view v-else-if="!plain && !design"
       class="spv-side spv-bell relative"
       role="button"
       tabindex="0"
-      :aria-label="unread > 0 ? t.notifs.drawerTitle + ' · ' + unread : t.notifs.drawerTitle"
+      :aria-label="unread !== null && unread > 0 ? t.notifs.drawerTitle + ' · ' + unread : unread === null ? t.notifs.drawerTitle + ' · ' + t.notifs.unreadUnavailable : t.notifs.drawerTitle"
       @click="goBell"
 
       @keydown.enter.prevent="onKeyboardActivate($event, goBell)" @keydown.space.prevent="onKeyboardActivate($event, goBell)"
     >
-      <view class="spv-glass">
-        <LiquidGlass :radius="18" tone="navigation" />
+      <view class="spv-glass nx-design-glass">
+        <LiquidGlass :radius="22" tone="navigation" :blur="8" />
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-        <view v-if="unread > 0" class="spv-belldot" />
+        <view v-if="unread !== null && unread > 0" class="spv-belldot" />
       </view>
     </view>
   </view>
@@ -59,15 +67,15 @@ import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
-const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void; plain?: boolean; solid?: boolean; actionLabel?: string; action?: () => void }>();
+const props = defineProps<{ back: string; title?: string; subtitle?: string; backAction?: () => void; plain?: boolean; design?: boolean; solid?: boolean; actionLabel?: string; action?: () => void }>();
 // 待支付浮动条在场时 chassis 让内容整体下让一带,并把同一个值 provide 下来:sticky 行钉在带的下沿,
 // 不与浮动条重叠(chassis 外渲染 / 无条时为 0)。
 const pendingBarInset = inject(PENDING_BAR_INSET_KEY, ref(0));
 
 const drawer = useMessageDrawer();
 const t = useT();
-const unread = computed(() => drawer.totalUnread);
-const rowH = computed(() => (props.subtitle ? 56 : 44));
+const unread = computed(() => drawer.actionableUnread);
+const rowH = computed(() => 56);
 
 // Current uni route — last entry in getCurrentPages() (same readRoute() pattern
 // as app-chassis.vue). Used to derive a route-based title when none is passed.
@@ -123,22 +131,21 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 </script>
 
 <style scoped>
+
 .spv {
   position: sticky;
   left: 0;
   right: 0;
   z-index: 50;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(72px, max-content) minmax(0, 1fr) minmax(72px, max-content);
   align-items: center;
-  gap: 8px;
-  padding: 0 2px;
-  /* Global header→content breathing (owner 2026-07-09: nav sat too close to
-     content across every sub-page). One place, all ~55 sub-pages; tab pages use
-     the chassis header so they're untouched. Pages must NOT add their own top
-     padding on top of this — reset to 0 when de-carding. */
-  margin: 0 12px 24px;
-  margin-bottom: 24px;
-  border-radius: 28px;
+  gap: 0;
+  padding: 6px;
+  box-sizing: border-box;
+  /* One shared spacing rule; only the individual controls carry glass. */
+  margin: 0 0 12px;
+  border-radius: 0;
 }
 .spv-side {
   position: relative;
@@ -154,24 +161,26 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 }
 .spv-glass {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   transition: transform 100ms cubic-bezier(.2,.8,.2,1);
 }
 .spv-side:active .spv-glass { transform: scale(.92); }
-.spv-glass > svg { position: relative; z-index: 1; }
-.spv--plain { display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px; border-radius: 0; padding: 0; }
+.spv-glass > svg, :slotted(svg) { position: relative; z-index: 1; }
+.spv-back { margin-left: 6px; }
+.spv-bell { justify-self: end; margin-right: 6px; }
+.spv--plain { border-radius: 0; }
 .spv--plain .spv-glass { width: 44px; height: 44px; }
 .spv--solid .spv-glass { background: var(--v5-surface-2); }
 .spv--solid .spv-glass > .nx-liquid-glass { display: none; }
-.spv--solid .spv-glass > svg { width: 20px; height: 20px; stroke: var(--v5-ink); }
+.spv--solid .spv-glass > svg { stroke: var(--v5-ink); }
 :global([data-theme="light"] .spv--solid .spv-glass) { background: var(--v5-surface); box-shadow: 0 2px 6px rgba(23,31,45,.12); }
-.spv-action { position: relative; z-index: 1; min-height: 44px; width: 92px; max-width: 100%; box-sizing: border-box; padding: 0 10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); font-size: 12px; font-weight: 500; line-height: 16px; border-radius: 22px; }
+.spv-action { position: relative; z-index: 1; min-height: 44px; min-width: 72px; max-width: 100%; box-sizing: border-box; margin-right: 6px; padding: 0 4px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); font-size: 14px; font-weight: 500; line-height: 18px; border-radius: 22px; text-align: center; }
 .spv-action-surface { position: absolute; inset: 4px 0; border-radius: 18px; pointer-events: none; }
-.spv-action > text { position: relative; z-index: 1; }
+.spv-action > text { position: relative; z-index: 1; white-space: nowrap; }
 .spv-action:active { opacity: .75; transform: scale(.98); }
 .spv-action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .spv-side:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; border-radius: 24px; }
@@ -187,35 +196,31 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   transition: transform 200ms cubic-bezier(.23,1,.32,1), opacity 200ms, visibility 0s;
 }
 .spv-titlewrap[data-hidden="true"] { transform: translateY(-18px); opacity: 0; visibility: hidden; transition-delay: 0s, 0s, 200ms; }
-@media (prefers-reduced-motion: reduce) { .spv-titlewrap { transition: none; } .spv-titlewrap[data-hidden="true"] { transform: none; } }
-/* 《02》14 档里没有「顶栏标题」专档(有 tab.label 给底部 Tab,顶栏没有)。
-   17px 是 iOS 导航栏惯例值,但不在合法集。两个候选:
-   · heading.h3 20/28 —— 标题语义对,但顶栏高度固定,要验放不放得下
-   · body.m 15/22 —— 布局零风险,可它是「正文」档,顶栏标题会掉到与正文同级
-   取 20:顶栏标题的职责是「我在哪一页」,层级必须高于正文;实测顶栏高度与溢出后确认。 */
+@media (prefers-reduced-motion: reduce) {
+  .spv-titlewrap, .spv-glass, .spv-action { transition: none; }
+  .spv-titlewrap[data-hidden="true"], .spv-side:active .spv-glass, .spv-action:active { transform: none; }
+}
+/* Sub-page nav title role (design system 10.1, 15/20 at the 390 band; 500 in the 14px bands). */
 .spv-title {
   max-width: 100%;
   font-family: var(--font-v5);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.014em;
+  font-size: var(--ui-type-nav-title);
+  font-weight: var(--ui-type-nav-title-weight);
+  letter-spacing: -0.01em;
   color: var(--v5-ink);
-  line-height: 28px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: var(--ui-type-nav-title-lh);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
-.spv--plain .spv-title { font-size: 20px; line-height: 22px; white-space: normal; overflow: visible; text-overflow: clip; }
-@media (max-width: 360px) { .spv--plain .spv-title { font-size: 15px; line-height: 20px; } }
+.spv-glass svg { width: 20px; height: 20px; }
 .spv-sub {
   max-width: 100%;
   margin-top: 2px;
   font-size: 12px;
   line-height: 1.2;
   color: var(--v5-ink-3);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .spv-belldot {
   position: absolute;
@@ -224,6 +229,15 @@ import LiquidGlass from "@/components/liquid-glass.vue";
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--v5-brand-2);
+  background: var(--ui-unread-badge);
 }
+</style>
+
+<style scoped>
+.spv--design { display:grid;grid-template-columns:minmax(72px,max-content) minmax(0,1fr) minmax(72px,max-content);gap:0;margin:0 0 12px;padding:6px;border-radius:0; }
+.spv--design .spv-back { margin-left:6px; }
+.spv--design .spv-glass { width:44px;height:44px;border-radius:50%; }
+.spv--design .spv-glass svg { width:20px;height:20px; }
+.spv-title:lang(zh) { letter-spacing: 0; }
+.spv--design .spv-action { min-width:72px;padding:0 4px;font-size:14px; }
 </style>

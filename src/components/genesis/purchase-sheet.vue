@@ -13,11 +13,11 @@
   <view v-if="open" class="nx-genesis-purchase-root" role="dialog" aria-modal="true" :aria-label="t.genesis.confirmTitle">
     <!-- Backdrop -->
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop nx-sheet-fade-in" @click="emitClose" />
     </transition>
     <!-- Panel -->
     <transition name="nx-sheet-slide">
-      <view v-if="open" class="nx-glass-sheet nx-sheet-panel" :style="panelStyle" @click.stop>
+      <view v-if="open" class="nx-glass-sheet nx-sheet-panel nx-sheet-slide-up" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="margin-bottom: 16px">
           <view>
@@ -89,8 +89,8 @@
       </view>
     </transition>
   </view>
-  <view v-if="showSuccess" class="nx-genesis-success fixed inset-0 grid place-items-center" style="z-index: 920; padding: 20px; background: var(--v5-bg-color-mask)" role="dialog" aria-modal="true" :aria-label="successTitle">
-    <view style="width: 100%; max-width: 360px; padding: 28px 22px; border-radius: 24px; background: var(--v5-surface); text-align: center; box-shadow: var(--v5-card-shadow-lift-strong)">
+  <view v-if="showSuccess" class="nx-genesis-success fixed inset-0 grid place-items-center" style="z-index: 920; box-sizing: border-box; padding: max(20px, var(--nx-overlay-top)) 20px var(--nx-overlay-bottom); background: var(--v5-bg-color-mask)" role="dialog" aria-modal="true" :aria-label="successTitle">
+    <view class="nx-genesis-success-card" style="width: 100%; max-width: 360px; box-sizing: border-box; max-height: calc(100vh - max(20px, var(--nx-overlay-top)) - var(--nx-overlay-bottom)); overflow-y: auto; overscroll-behavior: contain; padding: 28px 22px; border-radius: 24px; background: var(--v5-surface); text-align: center; box-shadow: var(--v5-card-shadow-lift-strong)">
       <text class="block" style="font-size: 26px; color: var(--v5-genesis-gold-on-dark)" aria-hidden="true">✦</text>
       <text class="block" style="margin-top: 10px; font-size: 20px; font-weight: 650; color: var(--v5-ink)">{{ successTitle }}</text>
       <text class="block" style="margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.genesis.purchaseSubtitle }}</text>
@@ -343,14 +343,14 @@ const titleStyle: CSSProperties = {
 const subtitleStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
 };
 const closeBtnStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "999px", color: "var(--v5-ink-3)" };
 const stepperWrapStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "16px", padding: "16px" };
 const stepperLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
   fontWeight: 500,
 };
@@ -383,7 +383,7 @@ const summaryStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "14px",
   padding: "16px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   display: "flex",
   flexDirection: "column",
   gap: "8px",
@@ -393,7 +393,7 @@ const rowLabelMutedStyle: CSSProperties = { color: "var(--v5-ink-4)" };
 const rowValStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   letterSpacing: "-0.005em",
   color: "var(--v5-ink)",
 };
@@ -442,7 +442,7 @@ const submitStyle = computed<CSSProperties>(() => ({
   color: purchasing.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   letterSpacing: "-0.005em",
 }));
 
@@ -461,6 +461,10 @@ const submitStyle = computed<CSSProperties>(() => ({
   backdrop-filter: blur(8px);
 }
 .nx-sheet-panel {
+  box-sizing: border-box;
+  max-height: calc(100vh - var(--nx-overlay-top));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   position: fixed;
   left: 0;
   right: 0;

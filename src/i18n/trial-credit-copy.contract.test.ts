@@ -15,15 +15,15 @@ function trialStoreCopy(messages: typeof en): string {
 describe("trial credit product language", () => {
   it.each(Object.entries({ zh, en, vi }))("preserves current trial consequences in %s", (_locale, messages) => {
     expect(messages.trial).not.toHaveProperty("legacyMigratedNote");
-    expect(messages.trial.cancelConfirmMsg).toContain("NEX");
+    expect(messages.trial.cancelConfirmMsg).toContain("UVT");
     expect(messages.trial.cancelConfirmMsg).not.toMatch(/无法再次领取|prevents this account|không thể nhận.*lần nữa/i);
-    expect(messages.trial.rulesAfter).toContain("NEX");
-    expect(messages.trial.rulesExpiry).toContain("NEX");
+    expect(messages.trial.rulesAfter).toContain("UVT");
+    expect(messages.trial.rulesExpiry).toContain("UVT");
     expect(messages.trial.rulesExpiry).not.toContain("{days}");
-    expect(messages.trial.endedDesc).toContain("NEX");
+    expect(messages.trial.endedDesc).toContain("UVT");
     expect(messages.trial.endedDesc).not.toContain("{time}");
     for (const message of [messages.trial.endedToast, messages.trial.urgencyGrace24h, messages.trial.urgencyGrace1h]) {
-      expect(message).toContain("NEX");
+      expect(message).toContain("UVT");
     }
     expect(messages.trial.urgencyGrace24h).toContain("${amount}");
     expect(messages.trial.urgencyGrace1h).toContain("${amount}");
@@ -64,12 +64,12 @@ describe("trial credit product language", () => {
     }
   });
 
-  it("names the visible Chinese trial value as trial credit, never cash-like trial earnings", () => {
+  it("uses the requested short hero label while retaining credit details elsewhere", () => {
     const copy = `${JSON.stringify(zh.trial)}\n${trialStoreCopy(zh)}`;
 
-    expect(zh.trial.heroEarnLabel).toBe("{days} 天预计抵扣金");
+    expect(zh.trial.heroEarnLabel).toBe("预计收益");
     expect(zh.trial.ghostSubtitle).toBe("UVELBox S1 试用抵扣金");
-    expect(copy).not.toMatch(/试用收益|预计收益|收益持续|收益停止|赚的钱|试用攒到|到手/);
+    expect(copy).not.toMatch(/试用收益|收益持续|收益停止|赚的钱|试用攒到|到手/);
   });
 
   it("keeps English and Vietnamese mirrors on the same non-cash trial-credit meaning", () => {

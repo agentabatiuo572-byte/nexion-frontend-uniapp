@@ -18,7 +18,7 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet" />
+      <SubPageHeader back="/pages/me/me" />
 
       <view :style="bodyStyle">
         <!-- Hero — de-carded: balance sits on the page floor, floor glow deleted. -->
@@ -44,9 +44,9 @@
             </view>
 
             <view class="inline-flex items-center active:opacity-80" :style="viewMarketStyle" role="link" tabindex="0" :aria-label="t.nexWallet.viewMarket" @click="goMarket">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
               <text style="margin: 0 4px">{{ t.nexWallet.viewMarket }}</text>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
         </view>
@@ -71,24 +71,9 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="breakdownLabelStyle">{{ br.label }}</text>
-                <text class="block truncate" :style="breakdownHintStyle">{{ br.hint }}</text>
+                <text v-if="br.hint" class="block truncate" :style="breakdownHintStyle">{{ br.hint }}</text>
               </view>
               <text class="font-mono-tabular tabular-nums" :style="breakdownValueStyle">{{ br.value }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- P&L -->
-        <view :style="cardStyle">
-          <view class="flex items-center justify-between">
-            <text :style="cardLabelStyle">{{ t.nexWallet.pnl.label }}</text>
-            <text class="tabular-nums" :style="pnlValueStyle">{{ pnlSummary }}</text>
-          </view>
-          <text class="block" :style="pnlCellLabelStyle" style="margin-top: 8px">{{ t.nexWallet.pnl.note }}</text>
-          <view class="grid grid-cols-3" style="margin-top: 12px; gap: 8px 12px">
-            <view v-for="cell in pnlCells" :key="cell.label">
-              <text class="block" :style="pnlCellLabelStyle">{{ cell.label }}</text>
-              <text class="block tabular-nums" :style="pnlCellValueStyle">{{ cell.value }}</text>
             </view>
           </view>
         </view>
@@ -114,14 +99,14 @@
             <text :style="cardLabelStyle">{{ t.nexWallet.activity.label }}</text>
             <view class="inline-flex items-center active:opacity-70" :style="viewAllStyle" role="link" tabindex="0" :aria-label="t.nexWallet.activity.viewAll" @click="goBills">
               <text>{{ t.nexWallet.activity.viewAll }}</text>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
           <view v-if="remoteApiEnabled && bills.summaryStatus === 'error'" :style="activityEmptyStyle">
             <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
             <view role="button" tabindex="0" class="inline-flex items-center active:opacity-70" :style="viewAllStyle" @click="refreshNexSummary"><text>{{ t.store.catalogRetry }}</text></view>
           </view>
-          <view v-else-if="remoteApiEnabled && bills.summaryStatus !== 'ready'" :style="activityEmptyStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
+          <view v-else-if="remoteApiEnabled && summaryForDisplay == null" :style="activityEmptyStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
           <EmptyState v-else-if="activity.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-else :style="activityListStyle">
             <view v-for="(a, i) in activity" :key="a.id" class="flex items-center" :style="activityRowStyle(i)">
@@ -141,16 +126,16 @@
           </view>
         </view>
 
-        <text class="block" :style="noteStyle">{{ t.nexWallet.note }}</text>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
-import { navReset, navTo } from "@/lib/route";
-import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { dateLocale } from "@/i18n/format";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { navTo } from "@/lib/route";
+import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -162,8 +147,9 @@ import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useApp } from "@/store/app";
 import { useMarket } from "@/store/market";
 import { useCommission } from "@/store/commission";
+import { useLocaleStore } from "@/store/locale";
 import { useBills } from "@/store/bills";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
 import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 
 const t = useT();
@@ -171,6 +157,15 @@ const app = useApp();
 const market = useMarket();
 const commission = useCommission();
 const bills = useBills();
+const locale = useLocaleStore();
+const summaryScope = computed(() => JSON.stringify([app.accountKey, app.accountBindingEpoch, locale.code]));
+const summaryReadScope = ref('');
+const summaryEnvironmentInvalidated = ref(false);
+watch(() => apiRuntimeConfig?.environment, () => { summaryEnvironmentInvalidated.value = true; }, { flush: 'sync' });
+watch([() => bills.summary, () => bills.summaryStatus], () => {
+  if (bills.summaryStatus === 'ready' && bills.summary) summaryReadScope.value = summaryScope.value;
+}, { immediate: true, flush: 'sync' });
+const summaryForDisplay = computed(() => !summaryEnvironmentInvalidated.value && bills.summaryStatus !== 'error' && summaryReadScope.value === summaryScope.value ? bills.summary : null);
 
 let priceTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
@@ -188,6 +183,7 @@ function refreshNexSummary() {
   void bills.refreshSummary().catch(() => undefined);
 }
 onShow(refreshNexSummary);
+watch(() => locale.code, refreshNexSummary);
 
 const nexBalance = computed(() => app.user.nexBalance);
 const balanceKnown = computed(() => !remoteApiEnabled || app.remoteFleetHasSnapshot);
@@ -207,20 +203,17 @@ const isUp = computed(() => change24h.value >= 0);
 // Remote mode uses the server's signed daily earn-ledger net, including pending entries.
 const todayNEX = computed<number | null>(() =>
   remoteApiEnabled
-    ? bills.summaryStatus !== "ready"
+    ? summaryForDisplay.value == null
       ? null
-      : bills.summary?.todayNexEarn ?? null
+      : summaryForDisplay.value?.todayNexEarn ?? null
     : app.visibleDevices.filter((d) => d.activatedAt !== null).reduce((s, d) => s + (d.todayEarningsNEX ?? 0), 0),
 );
 
-const totalSpent = computed(() => nexBalance.value * market.costBasis);
-const pnl = computed(() => usdValue.value - totalSpent.value);
-const pnlPct = computed(() => (totalSpent.value > 0 ? (pnl.value / totalSpent.value) * 100 : 0));
 
 const nexLedger = computed(() => {
-  if (!remoteApiEnabled || bills.summaryStatus !== "ready") return [];
-  return (bills.summary?.recentNexBills ?? [])
-    .filter((bill) => bill.symbol === "NEX" && bill.status !== "failed")
+  if (!remoteApiEnabled || summaryForDisplay.value == null) return [];
+  return (summaryForDisplay.value?.recentNexBills ?? [])
+    .filter((bill) => bill.symbol === "UVT" && bill.status !== "failed")
     .map((bill) => ({
       id: bill.id,
       ts: bill.ts,
@@ -231,8 +224,8 @@ const nexLedger = computed(() => {
 });
 const pendingNex = computed<number | null>(() => {
   if (!remoteApiEnabled) return 0;
-  if (bills.summaryStatus !== "ready") return null;
-  return bills.summary?.pendingNex ?? null;
+  if (summaryForDisplay.value == null) return null;
+  return summaryForDisplay.value?.pendingNex ?? null;
 });
 
 // NEX activity — mock uses the prototype fixture; remote uses the production
@@ -260,7 +253,7 @@ const activity = computed(() => {
 
 function fmtNum(n: number, dp = 2): string {
   if (!Number.isFinite(n)) return "—";
-  if (dp === 2) return formatAmount(n);
+  if (dp === 2) return formatFinanceAmount(n);
   // Android's Number locale fallback ignores fraction options; group only the integer.
   const [integer, fraction] = n.toFixed(dp).split(".");
   return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction === undefined ? "" : `.${fraction}`);
@@ -269,11 +262,11 @@ function fmtUSD(n: number): string {
   return Number.isFinite(n) ? `$${fmtNum(n)}` : "—";
 }
 function fmtActivityTime(timestamp: number): string {
-  return Number.isFinite(new Date(timestamp).getTime()) ? formatTrialDateTime(timestamp) : "—";
+  return Number.isFinite(new Date(timestamp).getTime()) ? formatTrialDateTime(timestamp, dateLocale()) : "—";
 }
 
 function goMarket() {
-  navReset({ url: "/pages/market/market", fail: () => {} });
+  navTo("/pages/market/market");
 }
 function goBills() {
   navTo("/pages/me/wallet-bills");
@@ -300,16 +293,7 @@ const quickCells = computed(() => [
 const breakdownRows = computed(() => [
   { label: t.value.nexWallet.breakdown.liquid, value: balanceKnown.value ? `${fmtNum(nexBalance.value, 2)} UVT` : "—", hint: valuationKnown.value ? fmtUSD(usdValue.value) : "—", tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
   { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `${Number.isFinite(todayNEX.value) && todayNEX.value >= 0 ? "+" : ""}${fmtNum(todayNEX.value, 2)} UVT`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
-  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} UVT`, hint: pendingNex.value === null ? "—" : t.value.nexWallet.breakdown.pendingHint, tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
-]);
-
-const pnlSummary = computed(() => valuationKnown.value && Number.isFinite(pnl.value) && Number.isFinite(pnlPct.value)
-  ? `${pnl.value >= 0 ? "+" : ""}${fmtUSD(pnl.value)} (${pnl.value >= 0 ? "+" : ""}${pnlPct.value.toFixed(1)}%)`
-  : "—");
-const pnlCells = computed(() => [
-  { label: t.value.nexWallet.pnl.costBasis, value: marketValueKnown.value && Number.isFinite(market.costBasis) && market.costBasis > 0 ? `$${fmtNum(market.costBasis, 3)}` : "—" },
-  { label: t.value.nexWallet.pnl.totalSpent, value: valuationKnown.value ? fmtUSD(totalSpent.value) : "—" },
-  { label: t.value.nexWallet.pnl.currentValue, value: valuationKnown.value ? fmtUSD(usdValue.value) : "—" },
+  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} UVT`, hint: "", tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
 const useTiles = computed(() => [
@@ -331,11 +315,11 @@ const heroStyle: CSSProperties = {
   padding: "0 2px",
 };
 const heroLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-ink-2)",
 };
 const heroNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -378,11 +362,11 @@ const viewMarketStyle: CSSProperties = {
   minHeight: "44px",
   padding: "0 10px",
   borderRadius: "8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.04em",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-ink-2)",
 };
 // Quick action cells — filled tiles, no border (single visual difference).
 const quickCellStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
@@ -441,25 +425,6 @@ function breakdownIconStyle(tint: string): CSSProperties {
 const breakdownLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
 const breakdownHintStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const breakdownValueStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
-const pnlValueStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "13px",
-  fontWeight: 600,
-  color: pnl.value >= 0 ? "var(--v5-success)" : "var(--v5-brand-2)",
-}));
-const pnlCellLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.04em",
-  color: "var(--v5-ink-4)",
-};
-const pnlCellValueStyle: CSSProperties = {
-  marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "13px",
-  color: "var(--v5-ink)",
-};
 // 所在区块已去卡,tile 直接坐在页面底上:原 surface-2 与页面底同色不可辨,改 L1 surface。
 const useTileStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)", padding: "12px", borderRadius: "var(--nx-glass-radius)", background: "var(--nx-glass-fill)" };
 const useTileLabelStyle: CSSProperties = {
@@ -481,7 +446,7 @@ const viewAllStyle: CSSProperties = {
   padding: "0 10px",
   borderRadius: "6px",
   fontSize: "12px",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-ink-2)",
   gap: "2px",
 };
 const activityEmptyStyle: CSSProperties = { padding: "24px 2px", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
@@ -500,7 +465,7 @@ function activityIconStyle(kind: string): CSSProperties {
     background: kind === "mining" ? "var(--v5-brand-soft)" : "var(--v5-success-soft)",
   };
 }
-const activityLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", color: "var(--v5-ink)" };
+const activityLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink)" };
 const activityTimeStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -517,13 +482,6 @@ const activityUsdStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
-};
-const noteStyle: CSSProperties = {
-  paddingTop: "4px",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.625,
-  textAlign: "center",
 };
 
 

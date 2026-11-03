@@ -1,5 +1,6 @@
 import { getProduct } from "@/mock/products";
-import { productCatalogState } from "@/store/product-catalog";
+import { productCatalogState, productCatalogPresentation, isProductCatalogDisplayCurrent } from "@/store/product-catalog";
+import { productTierCode } from "./product-image";
 
 const ROOT = "/static/img/products/uvel-v3";
 
@@ -7,8 +8,9 @@ const ROOT = "/static/img/products/uvel-v3";
 export function getProductMedia(id: string | null | undefined) {
   if (!id) return null;
   const product = productCatalogState.status === "ready" ? getProduct(id) ?? getProduct(id.toLowerCase()) : undefined;
-  const current = product;
-  return current?.imageUrl ? { src: current.imageUrl, tierCode: current.tier } : null;
+  const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products : undefined;
+  const current = product ?? display?.find(product => product.id.toLowerCase() === id.toLowerCase());
+  return current?.imageUrl ? { src: current.imageUrl, tierCode: productTierCode(current.id, current.tier) } : null;
 }
 
 /** Historical trade-in snapshots can append a quantity to the SKU. Artwork only; never rewrite order identity. */

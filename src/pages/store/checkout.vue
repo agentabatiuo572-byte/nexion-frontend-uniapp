@@ -1,32 +1,13 @@
-﻿<!--
-  Checkout — ported from Nexion-prototype/app/(main)/store/checkout/page.tsx.
-  Reads ?product=<id> (default stellarbox-s1) &/or ?id= via onLoad. Buy flow
-  state machine, top→bottom: stepper → AnimatePresence step card.
-
-  Remote checkout reviews the product, then opens the shared purchase-payment
-  flow. Orders, PIN authorization, external intents and delivery remain server
-  authoritative. The local prototype stepper is retained for offline mode.
-
-  Remote checkout reads trade-in eligibility and capacity on entry, then exposes
-  the matching choice or replacement action. Explicit selection opens its sheet;
-  an existing purchase command is recovered before offering a new purchase.
-  Cross-store composition (eligibility
-  reads app/v-rank/network) lives here at the page layer via the
-  useDeviceEligibility composable (stores never import each other, P-031/032).
-  Wrapped in <AppChassis active="store">; the back + "Checkout" title live in the
-  sticky chassis nav header via useSetPageHeader (mirrors the prototype's
-  <SetPageHeader backHref={`/store/${product.id}`}/>, where the chassis Header
-  fills in the route title headerTitles.storeCheckout).
--->
+<!-- Checkout review presentation. Transaction quotes, confirmation and recovery remain server-authoritative. -->
 <template>
   <AppChassis active="store">
-    <PromotionCheckout v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" />
-    <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
-         24px .spv gap, so the nav→content breathing is supplied here once. -->
-    <view v-else style="color: var(--v5-ink); padding-top: 24px">
-      <!-- Back + title now live in the sticky chassis nav header
-           (useSetPageHeader below) so they pin on scroll, mirroring the
-           prototype's <SetPageHeader>. -->
+    <template #pageTop><SubPageHeader class="checkout-header" design :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : auditCopy.review" /></template>
+    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId">
+      <template #review-footer>
+        <CheckoutLegal @navigate="openCheckoutLegal" />
+      </template>
+    </PromotionCheckout>
+    <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
       <view v-if="pendingCheckoutCreate && !createdCheckoutOrder && !paymentFlowBusy" class="checkout-exit-error" role="status">
         <text>{{ t.store.coRecoverOriginalOrder }}</text><NxButton :label="t.store.catalogRetry" :busy="checkoutLeaving" @click="recoverCheckoutCreation" />
@@ -39,41 +20,46 @@
         <text class="block" style="font-size:13px;color:var(--v5-ink-2);margin-bottom:var(--v5-space-3)">{{ t.tradein.recoveryPending }}</text>
         <NxButton :label="t.store.catalogRetry" :busy="remoteTradeinRecoveryBusy" @click="resumePendingRemoteTradein(captureCheckoutRoute(), true, true)" />
       </view>
-      <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: 20px">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogLoadingTitle }}</text>
+      <view v-else-if="catalogStatus === 'loading'" class="text-center" style="padding: var(--v5-space-5)">
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogLoadingTitle }}</text>
       </view>
 
-      <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: 20px">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogErrorTitle }}</text>
+      <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: var(--v5-space-5)">
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogErrorTitle }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text>{{ t.store.coBackToStore }}</text>
         </view>
       </view>
 
-      <view v-else-if="trialQuoteScreenUnavailable" class="text-center" role="status" style="padding:24px 16px">
-        <text class="block">{{ freeTrial.authorityStatus === 'loading' ? t.trial.entryChecking : t.trial.entryUnavailable }}</text>
+      <view v-else-if="trialQuoteScreenUnavailable" class="text-center" role="status" style="padding: var(--v5-space-6) var(--v5-space-4)">
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ freeTrial.authorityStatus === 'loading' ? t.trial.entryChecking : t.trial.entryUnavailable }}</text>
         <NxButton variant="secondary" :label="t.trial.entryRetry" :busy="freeTrial.authorityStatus === 'loading'" @click="freeTrial.refreshRemote(true)" />
       </view>
 
       <!-- Product not found -->
-      <view v-else-if="!product" class="text-center" style="padding: 20px">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
+      <view v-else-if="!product" class="text-center" style="padding: var(--v5-space-5)">
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.coProductNotFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text>{{ t.store.coBackToStore }}</text>
         </view>
       </view>
 
       <template v-else>
-        <!-- Stepper bars -->
-        <view v-if="!remoteApiEnabled" class="flex items-center" :style="stepperRowStyle">
-          <view v-for="(s, i) in stepLabels" :key="s.key" class="flex-1">
-            <view class="rounded-full overflow-hidden" style="height: 4px; background: var(--v5-surface-2)">
-              <view class="h-full" :style="stepFillStyle(i)" />
-            </view>
+        <view v-if="!remoteApiEnabled" class="checkout-steps" :aria-label="auditCopy.review">
+          <view v-for="(s, i) in stepLabels" :key="s.key" :aria-current="i === stepDisplay ? 'step' : undefined">
+            <view class="checkout-step-track"><view class="checkout-step-fill" :style="stepFillStyle(i)" /></view>
+            <text class="checkout-step-label" :class="{ 'checkout-step-label--active': i <= stepDisplay }">{{ i + 1 }} {{ s.label }}</text>
           </view>
         </view>
-        <view v-if="!remoteApiEnabled" class="flex justify-between" :style="stepLabelRowStyle">
-          <text v-for="(s, i) in stepLabels" :key="s.key" :style="{ color: i <= stepDisplay ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontSize: '12px' }">{{ s.label }}</text>
+
+        <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
+          <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="product.tagline" class="checkout-product-meta">{{ product.tagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
+          <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><view class="checkout-quantity-controls">
+            <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty">−</button>
+            <text class="checkout-quantity-value" aria-live="polite">1</text>
+            <view class="checkout-quantity-button" data-testid="checkout-quantity-increase" role="button" :tabindex="canIncreaseCheckoutQuantity() ? 0 : -1" :aria-disabled="!canIncreaseCheckoutQuantity()" :aria-label="t.uiChrome.increaseQty" @click.stop="increaseCheckoutQuantity" @keydown.enter.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)" @keydown.space.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)">+</view>
+          </view></view>
         </view>
 
         <!-- A receipt-only write is a recoverable post-order failure. Keep the
@@ -85,137 +71,88 @@
         <view v-if="receiptWriteFailure && !activeSession" class="nx-glass-card mx-4 rounded-2xl text-center nx-step-in" :style="receiptFailureCardStyle">
           <text class="block" :style="centerTitleStyle">{{ t.errors.billMissingTitle }}</text>
           <text class="block" style="margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.errors.billMissingMsg }}</text>
-          <view class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 16px" :aria-disabled="receiptRetrying" @click.stop="retryReceiptWrite">
+          <view class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: var(--v5-space-4)" :aria-disabled="receiptRetrying" @click.stop="retryReceiptWrite">
             <text>{{ receiptRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
           </view>
         </view>
 
-        <!-- === select-payment === -->
-        <view v-else-if="!remoteApiEnabled && step === 'select-payment'" class="nx-glass-card mx-4 rounded-2xl overflow-hidden nx-step-in" :style="surfaceCardStyle">
-          <view class="border-b" :style="payHeadStyle">
-            <view class="flex items-center justify-between">
-              <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
-              <text class="tabular-nums" :style="payTotalStyle">{{ trialConversionMode ? `${formatGroupedAmount(netPriceText)} USDT` : `$${netPriceText}` }}</text>
-            </view>
-            <!-- FEAT-TRIAL02: conversion credit chips (promo + accrued credit) -->
-            <view v-if="promoDiscount > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ promoRowLabel }} −{{ promoDiscountText }} USDT</text>
-            </view>
-            <view v-if="trialOffsetView.offsetUSD > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 7v5l3.5 2" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ t.store.coRowTrialOffset }} −{{ trialOffsetText }} USDT</text>
-            </view>
-            <view v-if="trialOffsetView.earlyDiscountUSD > 0" class="flex items-center" style="gap: 5px; margin-top: 6px" data-testid="checkout-trial-early-discount">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ earlyCopy.earlyDiscountLabel }} −{{ trialEarlyDiscountText }} USDT</text>
-            </view>
-            <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
-            <view v-if="hasVoucher" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
-              <text style="font-size: 12px; color: var(--v5-brand)">{{ t.voucher.checkoutRowLabel }} −${{ voucherDiscountText }}</text>
-            </view>
-            <view v-else-if="expiredVoucherForSku" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
-              <text style="font-size: 12px; color: var(--v5-ink-4)">{{ t.voucher.expiredNote }}</text>
-            </view>
-            <!-- FEAT-DEV02:旧机抵扣行 + 移除出口(移除即恢复原价);移除后给找回入口 -->
-            <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
-              <text class="flex-1" style="font-size: 12px; color: var(--v5-success)">{{ tradeinChipText }}</text>
-	              <text v-if="!remoteTradeinRecoveryRequired" style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" role="button" tabindex="0" @click="removeTradein"  @keydown.enter.prevent="onKeyboardActivate($event, removeTradein)" @keydown.space.prevent="onKeyboardActivate($event, removeTradein)">{{ t.tradein.checkoutRemove }}</text>
-            </view>
-            <view v-else-if="removedTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
-	              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" role="button" tabindex="0" @click="reAddTradein"  @keydown.enter.prevent="onKeyboardActivate($event, reAddTradein)" @keydown.space.prevent="onKeyboardActivate($event, reAddTradein)">{{ t.tradein.checkoutReAdd }}</text>
-            </view>
-          </view>
-          <view v-if="!remoteApiEnabled" style="padding: 12px">
-            <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); padding: 0 8px 8px">{{ t.store.coPaymentMethod }}</text>
-            <view
-              v-for="m in PAYMENT_METHODS"
-              :key="m.id"
-              class="w-full flex items-center rounded-xl border active:opacity-90"
-              :style="methodRowStyle(payment === m.id)"
-              role="button"
-              tabindex="0"
-              @click.stop="selectPayment(m.id)"
-            >
-              <view class="grid place-items-center shrink-0" :style="methodIconStyle(payment === m.id)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="payment === m.id ? 'var(--v5-brand)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="m.iconPath" /><template v-if="m.iconPath2"><path :d="m.iconPath2" /></template></svg>
+        <!-- Review uses the existing quote, redemption and explicit confirmation flow. -->
+        <template v-else-if="step === 'select-payment' || step === 'confirm'">
+          <view class="checkout-section">
+            <view class="checkout-section-heading"><text>{{ t.promotion.discount }}</text></view>
+            <view class="checkout-group">
+              <view class="checkout-option checkout-voucher" role="button" tabindex="0" :aria-expanded="voucherDetailsOpen" @click="voucherDetailsOpen = !voucherDetailsOpen" @keydown.enter.prevent="voucherDetailsOpen = !voucherDetailsOpen" @keydown.space.prevent="voucherDetailsOpen = !voucherDetailsOpen">
+                <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 0 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z" /><path d="M14 6v2m0 3v2m0 3v2" /></svg></view>
+                <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.voucher.checkoutRowLabel }}</text><text class="checkout-row-description">{{ remoteApiEnabled && trialConversionMode ? trialCopy.voucherUnavailable : hasVoucher ? auditCopy.autoApplyVoucher : !voucherAutomatic ? t.promotion.noVoucher : expiredVoucherForSku ? t.voucher.expiredNote : t.voucher.noneAvailable }}</text></view>
+                <text v-if="hasVoucher" class="checkout-discount">{{ reviewMoney(voucherDiscount, true) }}</text><svg class="checkout-chevron" :class="{ 'checkout-chevron--open': voucherDetailsOpen }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
               </view>
-              <view class="flex-1 min-w-0">
-                <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ m.label }}</text>
-                <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ m.hint }}</text>
+              <view v-if="voucherDetailsOpen" class="checkout-voucher-details">
+                <text v-if="voucherMatch" class="checkout-row-description checkout-voucher-match">{{ voucherMatch.def.name }}</text>
+                <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher">
+                  <view v-for="choice in [{ automatic: true, label: reviewCopy.automaticVoucher }, { automatic: false, label: t.promotion.noVoucher }]" :key="String(choice.automatic)" class="checkout-voucher-choice" role="radio" :aria-checked="voucherAutomatic === choice.automatic" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(choice.automatic)">
+                    <text class="checkout-voucher-choice__label">{{ choice.label }}</text>
+                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === choice.automatic }" aria-hidden="true"><svg v-if="voucherAutomatic === choice.automatic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7" /></svg></view>
+                  </view>
+                </view>
+                <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
               </view>
-              <svg v-if="payment === m.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M20 6 9 17l-5-5" /></svg>
+              <view v-if="promoDiscount > 0" class="checkout-option"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12v9h16v-9M2 7h20v5H2zM12 7v14M12 7C3 8 4 0 8 2c3 1 4 5 4 5s1-4 4-5c4-2 5 6-4 5" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ promoRowLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(promoDiscount, true) }}</text></view>
+              <view v-if="trialOffsetView.offsetUSD > 0" class="checkout-option"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ t.store.coRowTrialOffset }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.offsetUSD, true) }}</text></view>
+              <view v-if="trialOffsetView.earlyDiscountUSD > 0" class="checkout-option" data-testid="checkout-trial-early-discount"><view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg></view><view class="checkout-option-copy"><text class="checkout-row-title">{{ trialCopy.earlyDiscountLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.earlyDiscountUSD, true) }}</text></view>
+              <!-- Trade-in remains a separate, reversible action, never a payment switch. -->
+              <view v-if="hasTradein || removedTradein || tradeinAvailable" class="checkout-option checkout-tradein">
+                <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h13m1 12 4-4-4-4M21 16H8" /></svg></view>
+                <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-row-description">{{ tradeinChipText }}</text></view>
+                <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
+                <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" @click="reAddTradein" />
+              </view>
             </view>
           </view>
-          <view class="border-t" :style="payFootStyle">
-            <view v-if="capped" class="flex items-start rounded-lg" :style="cappedNoteStyle">
-              <text style="margin-top: 1px">⚠</text>
-              <text class="flex-1" style="margin-left: 6px">{{ slotsFullText }}</text>
-            </view>
-            <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="primaryBtnStyle" v-if="!remoteApiEnabled" role="button" tabindex="0" :aria-label="t.store.coContinue" @click.stop="goConfirm">
-              <text @click.stop="goConfirm">{{ t.store.coContinue }}</text>
-            </view>
-            <!-- Explicit exit before any commitment — ghost weight (conversion Cancel must
-                 stay visibly weaker than the primary CTA); goes back to the product. -->
-            <view class="w-full grid place-items-center active:opacity-70" :style="ghostCancelStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="cancelCheckout">
-              <text>{{ t.store.coCancel }}</text>
-            </view>
-          </view>
-        </view>
 
-        <!-- === confirm === -->
-        <view v-else-if="step === 'confirm' || (remoteApiEnabled && step === 'select-payment')" class="nx-glass-card mx-4 rounded-2xl nx-step-in" :style="confirmCardStyle">
-          <text class="block font-mono-tabular" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coReviewOrder }}</text>
-          <view style="margin-top: 12px">
-            <CheckoutRow :label="t.store.coRowProduct" :value="product.name" />
-            <CheckoutRow :label="t.store.coRowQuantity" value="1" />
-            <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowPayment" :value="paymentLabel" />
-            <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
-            <!-- Subtotal revealed when any deduction applies (to anchor the
-                 discount rows) or when a card fee applies. -->
-            <CheckoutRow v-if="hasVoucher || isCard || hasTradein || trialConversionMode" :label="t.store.coRowSubtotal" :value="trialConversionMode ? `${priceText} USDT` : `$${priceText}`" />
-            <CheckoutRow v-if="promoDiscount > 0" :label="promoRowLabel" :value="`−${promoDiscountText} USDT`" />
-            <CheckoutRow v-if="trialOffsetView.offsetUSD > 0" :label="t.store.coRowTrialOffset" :value="`−${trialOffsetText} USDT`" />
-            <CheckoutRow v-if="trialOffsetView.earlyDiscountUSD > 0" :label="earlyCopy.earlyDiscountLabel" :value="`−${trialEarlyDiscountText} USDT`" />
-            <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
-            <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="`−$${tradeinCreditText}`" />
-            <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="`$${cardFeeText}`" />
-            <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
-            <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
-            <CheckoutRow :label="t.store.coRowTotal" :value="trialConversionMode ? `${confirmTotalText} USDT` : `$${confirmTotalText}`" big />
+          <view v-if="!remoteApiEnabled" class="checkout-section">
+            <view class="checkout-section-heading"><text>{{ t.store.coPaymentMethod }}</text></view>
+            <view class="checkout-group" role="group" :aria-label="t.store.coPaymentMethod">
+              <view v-for="m in PAYMENT_METHODS" :key="m.id" class="checkout-option checkout-payment" :class="{ 'checkout-payment--active': payment === m.id }" role="button" tabindex="0" :aria-pressed="payment === m.id" @click.stop="selectPayment(m.id)">
+                <view class="checkout-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="m.iconPath" /><path v-if="m.iconPath2" :d="m.iconPath2" /></svg></view>
+                <view class="checkout-option-copy"><text class="checkout-row-title">{{ m.label }}</text><text class="checkout-row-description">{{ m.hint }}</text></view>
+                <view class="checkout-radio" :class="{ 'checkout-radio--active': payment === m.id }" aria-hidden="true" />
+              </view>
+            </view>
+          </view>
+
+          <view class="checkout-section">
+            <view class="checkout-section-heading"><text>{{ t.store.coReviewOrder }}</text></view>
+            <view class="checkout-group checkout-fees">
+              <CheckoutRow :label="t.store.coRowSubtotal" :value="reviewMoney(purchaseSubtotal, false, true)" class="checkout-fee" />
+              <CheckoutRow v-if="promoDiscount > 0" :label="promoRowLabel" :value="reviewMoney(promoDiscount, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="trialOffsetView.offsetUSD > 0" :label="t.store.coRowTrialOffset" :value="reviewMoney(trialOffsetView.offsetUSD, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="trialOffsetView.earlyDiscountUSD > 0" :label="trialCopy.earlyDiscountLabel" :value="reviewMoney(trialOffsetView.earlyDiscountUSD, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="reviewMoney(voucherDiscount, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="reviewMoney(tradeinCredit, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="reviewMoney(cardFee)" class="checkout-fee" />
+              <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" class="checkout-fee" />
+              <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" class="checkout-fee" />
+              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ flowCopy.paymentTotal }}</text><CheckoutAmount :value="netPrice + cardFee" currency="USD" /></view>
+            </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
-              <text>{{ earlyCopy.afterPurchaseLabel }}</text>
+              <text>{{ trialCopy.afterPurchaseLabel }}</text>
               <text class="checkout-trial-credit-value">{{ trialCreditText }}</text>
             </view>
-            <text v-if="trialConversionMode" class="block" style="font-size: var(--ui-type-meta, 12px); color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ purchaseCopy.refundClause }}</text>
-            <!-- 异常4: $0 due keeps the explicit confirm; surplus never refunds -->
-            <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
-          </view>
-          <view v-if="remoteApiEnabled && !hasOriginalCheckout && (hasTradein || removedTradein || tradeinAvailable)" class="checkout-tradein">
-            <view class="checkout-tradein-copy"><text>{{ t.tradein.checkoutRowLabel }}</text><text v-if="hasTradein" class="checkout-product-meta">{{ tradeinChipText }}</text></view>
-            <NxButton v-if="hasTradein && !remoteTradeinRecoveryRequired" variant="text" size="small" :label="t.tradein.checkoutRemove" @click="removeTradein" />
-            <NxButton v-else-if="!hasTradein" variant="text" size="small" :disabled="reAddingTradein || remoteTradeinRecoveryRequired" :busy="reAddingTradein" :label="t.tradein.checkoutReAdd" @click="reAddTradein" />
-          </view>
-          <text v-if="tradeinPlacementText" class="checkout-product-meta">{{ tradeinPlacementText }}</text>
-          <view v-if="!hasOriginalCheckout && ((checkoutOnboardingRequired && !freeTrial.hasPendingConversion()) || (checkoutCapacityRequired && !hasTradein && !remoteCapacityGate.canConfirm(false)))" class="checkout-capacity-notice" role="status">
-            <text>{{ checkoutCapacityMessage }}</text>
-            <view class="checkout-capacity-actions">
-              <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
-              <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
-              <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
-              <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
+            <text v-if="trialZeroDue" class="checkout-note">{{ t.store.coTrialZeroNote }}</text>
+            <view v-if="tradeinPlacementText" class="checkout-note"><text>{{ tradeinPlacementText }}</text></view>
+            <view v-if="(checkoutOnboardingRequired && !freeTrial.hasPendingConversion()) || (checkoutCapacityRequired && !hasTradein && !remoteCapacityGate.canConfirm(false))" class="checkout-note checkout-note--warning" role="status" data-testid="checkout-capacity-notice">
+              <text>{{ checkoutCapacityMessage }}</text>
+              <view class="checkout-capacity-actions">
+                <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
+                <NxButton v-else variant="text" size="small" :label="t.store.catalogRetry" :busy="remoteCapacityGate.pending" @click="retryCheckoutCapacity" />
+                <NxButton v-if="remoteCapacityGate.decision === 'REPLACE_REQUIRED'" variant="text" size="small" :label="t.tradein.checkoutReAdd" :busy="reAddingTradein" @click="reAddTradein" />
+                <NxButton v-if="remoteCapacityGate.decision" variant="text" size="small" :label="t.myDevices.inventoryTitle" @click="navTo('/pages/me/devices')" />
+              </view>
             </view>
+            <view v-else-if="!remoteApiEnabled && capped" class="checkout-note checkout-note--warning"><text>{{ slotsFullText }}</text></view>
+            <CheckoutLegal @navigate="openCheckoutLegal" />
           </view>
-          <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" v-if="!remoteApiEnabled" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="requestConfirmPay">
-            <text @click.stop="requestConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
-          </view>
-          <view v-if="!remoteApiEnabled" class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="changePayBtnStyle" role="button" tabindex="0" :aria-label="t.store.coChangePayment" @click.stop="goSelectPayment">
-            <text @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
-          </view>
-        </view>
+        </template>
 
         <!-- === pay-instructions === -->
         <view v-else-if="step === 'pay-instructions'" class="mx-4 nx-step-in">
@@ -229,7 +166,7 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           </view>
           <text class="block" :style="centerTitleStyle">{{ remoteOrderFailure ? t.tradein.errPurchaseFailed : t.store.coAwaiting }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ remoteOrderFailure ? t.store.coRecoverOriginalOrder : remoteApiEnabled ? t.store.coAwaitingServer : isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
+          <text class="block" style="margin-top: var(--v5-space-1); font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ remoteOrderFailure ? t.store.coRecoverOriginalOrder : remoteApiEnabled ? t.store.coAwaitingServer : isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
           <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
             <text>{{ t.store.coTrackOrder }}</text>
           </view>
@@ -245,9 +182,10 @@
               <view class="mx-auto grid place-items-center nx-pop-in" :style="medalStyle">
                 <text style="font-size: 26px">🏅</text>
               </view>
-              <text class="block" :style="centerTitleStyle" style="margin-top: 12px">{{ t.store.firstOrderTitle }}</text>
-              <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-2); line-height: 1.4">{{ t.store.firstOrderBody }}</text>
-              <view class="inline-flex items-center justify-center" style="margin-top: 8px; gap: 4px; font-size: 12px; color: var(--v5-brand)">
+              <text class="block" :style="centerTitleStyle" style="margin-top: var(--v5-space-3)">{{ t.store.firstOrderTitle }}</text>
+              <text class="block" style="margin-top: var(--v5-space-1); font-size: 12px; color: var(--v5-ink-2); line-height: 1.4">{{ t.store.firstOrderBody }}</text>
+              <!-- No server grants a first-hardware reward, so the achievement line stays in the local demo only. -->
+              <view v-if="!remoteApiEnabled" class="inline-flex items-center justify-center" style="margin-top: var(--v5-space-2); gap: var(--v5-space-1); font-size: 12px; color: var(--v5-brand)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 14.34 12 22l2.06-7.66L22 12l-7.94-2.34L12 2 9.94 9.66 2 12z" /></svg>
                 <text>{{ t.store.firstOrderAchievement }}</text>
               </view>
@@ -258,7 +196,7 @@
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             </view>
             <text class="block" :style="centerTitleStyle" style="color: var(--v5-brand)">{{ t.store.coPaymentConfirmed }}</text>
-            <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.coConfirmedSub }}</text>
+            <text class="block" style="margin-top: var(--v5-space-1); font-size: 12px; color: var(--v5-ink-3)">{{ t.store.coConfirmedSub }}</text>
           </template>
         </view>
 
@@ -268,11 +206,11 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           </view>
           <text class="block" :style="centerTitleStyle">{{ t.store.coActivating }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ activatingSubText }}</text>
-          <view class="mx-auto rounded-full overflow-hidden" style="margin-top: 16px; max-width: 200px; height: 6px; background: var(--v5-surface-2)">
+          <text class="block" style="margin-top: var(--v5-space-1); font-size: 12px; color: var(--v5-ink-3)">{{ activatingSubText }}</text>
+          <view class="mx-auto rounded-full overflow-hidden" style="margin-top: var(--v5-space-4); max-width: 200px; height: 6px; background: var(--v5-surface-2)">
             <view class="h-full nx-progress-fill" style="background: var(--v5-brand)" />
           </view>
-          <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 16px" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
+          <view v-if="orderId" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: var(--v5-space-4)" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
             <text>{{ t.store.coTrackOrder }}</text>
           </view>
         </view>
@@ -282,9 +220,9 @@
           <view class="mx-auto grid place-items-center" :style="liveSpinnerWrapStyle">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
           </view>
-          <text class="block" :style="liveTitleStyle">{{ t.store.coOrderPlaced }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; padding: 0 4px">{{ orderPlacedBody }}</text>
-          <view class="flex" style="margin-top: 20px; gap: 8px">
+          <text class="block" :style="liveTitleStyle">{{ completedOrderTitle }}</text>
+          <text class="block" style="margin-top: var(--v5-space-1); font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; padding: 0 4px">{{ orderPlacedBody }}</text>
+          <view class="flex" style="margin-top: var(--v5-space-5); gap: var(--v5-space-2)">
             <view class="flex-1 grid place-items-center active:opacity-90" :style="trackBtnStyle" role="button" tabindex="0" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
               <text @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
             </view>
@@ -295,8 +233,6 @@
         </view>
       </template>
     </view>
-    <CheckoutLegal v-if="!checkoutResultVisible" @navigate="openCheckoutLegal" />
-    <view v-if="!checkoutResultVisible" class="checkout-bottom-space" />
     <NxSheet :open="purchasePolicyOpen" :title="policyCopy.entry" @close="purchasePolicyOpen=false">
       <view class="checkout-policy-body">
         <view v-if="policyHasDevice" class="checkout-policy-section"><text class="checkout-policy-title">{{ policyCopy.deviceScope }}{{ t.store.faq.refund.q }}</text><text>{{ t.store.faq.refund.a }}</text></view>
@@ -328,6 +264,7 @@ import { ref, reactive, nextTick, computed, watch, onMounted, onUnmounted, type 
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
+import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
@@ -377,8 +314,7 @@ import { mockServerNow } from "@/store/server-time";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import { useSetPageHeader } from "@/composables/use-page-header";
-import { useTrialEarlyPurchaseCopy } from "@/i18n/trial-early-purchase";
+import { useProductImage } from "@/composables/use-product-image";
 import { navReplace, navReset, navBack, navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
@@ -423,7 +359,6 @@ interface PaymentMethod {
 }
 
 const t = useT();
-const earlyCopy = useTrialEarlyPurchaseCopy();
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatGroupedAmount(value);
 }
@@ -799,7 +734,7 @@ const NO_TRIAL: TrialQuote = { applied: false, promo: 0, offsetUSD: 0, remainder
 /** 单一解析:给定时刻解析一次试用状态机,派生本页全部试用金额(纯函数,零落盘)。 */
 function trialQuoteAt(now: number): TrialQuote {
   const cfg = trialCfg.value;
-  const r = remoteApiEnabled ? freeTrial.snapshot() : resolveTrialAt(freeTrial.snapshot(), now, cfg);
+  const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
   const trialProductId = resolveTrialCheckoutProductId(cfg.trialProductId);
   if ((r.status !== "active" && r.status !== "grace") || !trialProductId || productId.value !== trialProductId) return NO_TRIAL;
   // A server quote carries every amount convert() settles, including the
@@ -816,11 +751,15 @@ function trialQuoteAt(now: number): TrialQuote {
       quoteVersion: serverQuote.quoteVersion,
     };
   }
-  if (remoteApiEnabled) return NO_TRIAL;
-  // 影子口径与 free-trial.liveShadow* 同一条规则(active 按冻结窗口累计 /
-  // grace 取边界定格值),但锚在本次解析出的行上,不再各读各的时钟。
-  const acc = accruedShadow(r, now, cfg);
-  const split = computeTrialOffset(cfg, r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
+  // Remote credit is the same server projection shown by free-trial.liveShadow*.
+  // Only local mode accrues by time; recomputing remote credit would quote a
+  // different discount from the trial page and the conversion authority.
+  const acc = remoteApiEnabled
+    ? { usd: freeTrial.authoritativeShadowUSD, nex: freeTrial.authoritativeShadowNEX }
+    : accruedShadow(r, now, cfg);
+  const split = remoteApiEnabled
+    ? { offsetUSD: freeTrial.authoritativeOffsetUSD ?? 0, remainderUSD: freeTrial.authoritativeRemainderUSD ?? 0 }
+    : computeTrialOffset(cfg, r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
   return {
     applied: true,
     promo: computeDiscountedPrice(cfg).discount,
@@ -843,7 +782,8 @@ const trialEarlyQuoteLapsed = computed(() => {
 });
 const trialQuoteIncomplete = computed(() => trialEarlyQuoteLapsed.value
   || ((freeTrial.status === "active" || freeTrial.status === "grace")
-    && !freeTrial.authoritativeQuote));
+    && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null
+      || freeTrial.authoritativePriceUSD === null)));
 const trialQuoteUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
 // The 4s trial poll marks the authority loading while it re-reads. Keep the last confirmed quote on
 // screen meanwhile instead of swapping the page out (which also threw the scroll back to the top);
@@ -852,7 +792,7 @@ const trialQuoteScreenUnavailable = computed(() => remoteApiEnabled && !hasOrigi
   && !(freeTrial.authorityStatus === "loading" && freeTrial.authorityServerState !== null)) || trialQuoteIncomplete.value));
 const trialConversionMode = computed(() => trialView.value.applied);
 const purchaseSubtotal = computed(() => createdCheckoutOrder.value?.subtotalUsdt ?? pendingCheckoutCreate.value?.subtotal
-  ?? (remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote!.priceUSD : product.value?.price ?? 0));
+  ?? (remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativePriceUSD ?? 0 : product.value?.price ?? 0));
 const promoDiscount = computed(() => trialView.value.promo);
 const trialOffsetView = computed(() => trialView.value);
 const promoDiscountText = computed(() => formatAmount(promoDiscount.value));
@@ -1018,7 +958,6 @@ async function reAddTradein() {
 const netPrice = computed(() => {
   if (createdCheckoutOrder.value) return createdCheckoutOrder.value.amountUsdt;
   if (pendingCheckoutCreate.value) return pendingCheckoutCreate.value.amount;
-  if (remoteApiEnabled && trialConversionMode.value) return freeTrial.authoritativeQuote!.amountUSD;
   const canonical = remoteApiEnabled ? appliedTradeinView.value?.canonicalQuote ?? null : null;
   if (canonical) return canonical.payableUsdt;
   return Math.max(
@@ -1220,7 +1159,7 @@ function openCheckoutSetup() {
 const checkoutBackHref = computed(() => promotionRoute.value
   ? promotionStoreHref(promotionRoute.value.activityId,promotionRoute.value)
   : product.value ? '/pages/store/detail?id=' + encodeURIComponent(product.value.id) : '/pages/store/store');
-const checkoutImage = computed(() => product.value?.imageUrl);
+const { imageSrc: checkoutImage, imageError: checkoutImageError } = useProductImage(() => product.value?.imageUrl);
 const voucherDetailsOpen = ref(false);
 
 const step = ref<Step>("select-payment");
@@ -2804,7 +2743,7 @@ watch(step, async (s) => {
           shadowNEXNow > 0 &&
           postMoneyBill({
             type: "bonus",
-            symbol: "NEX",
+            symbol: "UVT",
             amount: shadowNEXNow,
             status: "posted",
             memo: fmt(t.value.store.coBillTrialNexMemo, { name: p.name }),
@@ -2903,8 +2842,6 @@ onUnload(() => cleanup());
 onUnmounted(() => cleanup());
 
 // ─── styles ───
-useSetPageHeader(() => ({ title: t.value.headerTitles.storeCheckout, backHref: checkoutBackHref.value, onBack: requestCheckoutBack }));
-
 const notFoundBtnStyle: CSSProperties = {
   minHeight: "44px",
   padding: "0 20px",
@@ -2915,68 +2852,18 @@ const notFoundBtnStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
 };
-const stepperRowStyle: CSSProperties = { margin: "0 16px 12px", gap: "6px" };
-const stepLabelRowStyle: CSSProperties = { margin: "0 16px 12px" };
 function stepFillStyle(i: number): CSSProperties {
-  const w = i < stepDisplay.value ? "100%" : i === stepDisplay.value ? "50%" : "0%";
-  return { width: w, background: "var(--v5-brand)", transition: "width 0.5s" };
+  const w = i < stepDisplay.value ? "100%" : i === stepDisplay.value ? "100%" : "0%";
+  return { width: w, background: "linear-gradient(90deg, var(--v5-brand-deep), var(--ui-lime-soft))", boxShadow: i <= stepDisplay.value ? "0 0 10px var(--v5-brand-border)" : "none", transition: "width 0.5s" };
 }
-const surfaceCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)", background: "var(--nx-glass-fill)" };
-const payHeadStyle: CSSProperties = { padding: "16px 20px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const payTotalStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "20px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-function methodRowStyle(active: boolean): CSSProperties {
-  return {
-    marginTop: "8px",
-    padding: "12px",
-    gap: "12px",
-    borderRadius: "12px",
-    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
-    borderColor: active ? "var(--v5-brand-border)" : "color-mix(in srgb, var(--v5-border) 70%, transparent)",
-  };
-}
-function methodIconStyle(active: boolean): CSSProperties {
-  return {
-    width: "36px",
-    height: "36px",
-    borderRadius: "8px",
-    // 两态原本都与所在行同色 → 图标框隐形:未选中 surface-2 撞未选中行的 surface-2,
-    // 选中 brand-soft 撞选中行的 brand-soft(第一轮只修了未选中,复扫才抓出选中态也坏)。
-    // 现在两态都从行里浮出来:选中用 L1 托住品牌色图标,未选中用 surface-3 内凹。
-    background: active ? "var(--v5-surface)" : "var(--v5-surface-3)",
-  };
-}
-const payFootStyle: CSSProperties = { padding: "16px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const cappedNoteStyle: CSSProperties = {
-  marginBottom: "8px",
-  padding: "8px 12px",
-  fontSize: "12px",
-  color: "var(--v5-warning)",
-  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-};
 const primaryBtnStyle: CSSProperties = {
   height: "44px",
   borderRadius: "999px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 600,
-};
-// Ghost cancel under the primary CTA — no fill, ink-3, 44px tap target.
-const ghostCancelStyle: CSSProperties = {
-  marginTop: "4px",
-  height: "44px",
-  color: "var(--v5-ink-3)",
-  fontSize: "13px",
-};
-const confirmCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
-  padding: "20px",
 };
 const confirmCtaStyle: CSSProperties = {
   marginTop: "20px",
@@ -2985,7 +2872,7 @@ const confirmCtaStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 600,
 };
 const changePayBtnStyle: CSSProperties = {
@@ -2998,7 +2885,7 @@ const changePayBtnStyle: CSSProperties = {
 };
 const centerCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
-  padding: "24px",
+  padding: "var(--v5-space-6)",
 };
 // awaiting / activating / confirmed-check spinner — brand 15% (source).
 const spinnerWrapStyle: CSSProperties = {
@@ -3017,8 +2904,8 @@ const liveSpinnerWrapStyle: CSSProperties = {
 const centerTitleStyle: CSSProperties = {
   marginTop: "16px",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 const celebrateGlowStyle: CSSProperties = {
@@ -3038,7 +2925,7 @@ const liveCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", b
   // uses --v5-surface (not the source's hardcoded #0F0F0F) for dual-theme safety.
   background:
     "var(--nx-glass-fill)",
-  padding: "24px",
+  padding: "var(--v5-space-6)",
 };
 const liveTitleStyle: CSSProperties = {
   marginTop: "16px",
@@ -3053,7 +2940,7 @@ const trackBtnStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 600,
 };
 const doneBtnStyle: CSSProperties = {
@@ -3065,7 +2952,7 @@ const doneBtnStyle: CSSProperties = {
   fontSize: "13px",
 };
 const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
-  padding: "24px 20px",
+  padding: "var(--v5-space-6) var(--v5-space-5)",
   background: "var(--nx-glass-fill)",
 };
 
@@ -3073,25 +2960,6 @@ const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-r
 </script>
 
 <style scoped>
-.checkout-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: center; gap: 16px; box-sizing: border-box; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); border-top: 1px solid var(--v5-border); background: var(--v5-surface); }
-.checkout-sticky-copy { flex: 1; min-width: 0; }
-.checkout-sticky :deep(.nx-button) { flex: 0 1 50%; min-width: 0; }
-.checkout-total { font-size: 24px; line-height: 30px; }
-.checkout-product-meta { display: block; margin-top: 4px; color: var(--v5-ink-3); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
-.checkout-bottom-space { height: calc(148px + env(safe-area-inset-bottom)); }
-.nx-chassis :deep(.purchase-payment-resume) { bottom: calc(148px + env(safe-area-inset-bottom)); }
-.nx-chassis:has(.purchase-payment-resume) .checkout-bottom-space { height: calc(324px + env(safe-area-inset-bottom)); }
-.checkout-tradein { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border); font-size: 13px; }
-.checkout-tradein-copy { flex: 1; min-width: 0; }
-.checkout-capacity-notice { display: grid; gap: 8px; margin-top: 16px; padding: 12px; border-radius: var(--v5-radius-m); background: var(--v5-warning-soft); color: var(--v5-warning); font-size: 13px; line-height: 20px; }
-.checkout-capacity-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-@media (max-width: 360px) {
-  .checkout-sticky { flex-wrap: wrap; gap: 8px; }
-  .checkout-sticky-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-basis: 100%; }
-  .checkout-sticky :deep(.nx-button) { flex-basis: 100%; }
-}
-.checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-2); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle, 13px); font-weight:600; color:var(--v5-ink-2); }
-.checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .nx-step-in {
   animation: nx-step-in 0.28s var(--ease-out, ease-out) both;
 }
@@ -3126,9 +2994,109 @@ const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-r
 </style>
 
 <style scoped>
-.checkout-exit-error { display:grid; gap:12px; padding:16px; }
+.checkout-header { margin-bottom:0; }
+.checkout-content { color:var(--v5-ink); padding-top:8px; padding-bottom:120px; }
+.checkout-content--result { padding-block: 0; }
+.checkout-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--v5-space-2); margin:0 16px; }
+.checkout-step-track { height:3px; border-radius:999px; background:var(--v5-surface-3); }
+.checkout-step-fill { height:100%; border-radius:inherit; }
+.checkout-step-label { display:block; margin-top:var(--v5-space-2); font:400 12.5px/18px var(--font-v5); color:var(--v5-ink-3); }
+.checkout-step-label--active { color:var(--v5-brand); font-weight:600; }
+.checkout-group { position:relative; overflow:hidden; border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); }
+.checkout-product { display:flex; align-items:center; gap:var(--v5-space-3); min-height:90px; margin:var(--v5-space-5) var(--v5-space-4) 0; padding:10px 16px; }
+.checkout-product-art { display:grid; place-items:center; flex:none; width:68px; height:68px; border-radius:16px; overflow:hidden; }
+.checkout-product-art image { width:74px; height:74px; }
+.checkout-product-copy { flex:1; min-width:0; }
+.checkout-product-name { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); overflow-wrap:anywhere; }
+.checkout-product-meta { display:block; margin-top:2px; font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); }
+.checkout-product-price { display:block; margin-top:var(--v5-space-1); font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
+.checkout-quantity { flex:none; text-align:center; }
+.checkout-quantity-controls { display:flex; align-items:center; margin-top:var(--v5-space-1); border:1px solid var(--v5-border); border-radius:999px; background:var(--ui-content-surface-2); }
+.checkout-quantity-button { display:grid; place-items:center; width:44px; min-height:44px; border-radius:999px; font:400 18px/20px var(--font-v5); cursor:pointer; }
+.checkout-quantity-button[aria-disabled="true"],.checkout-quantity-button[disabled] { opacity:.35; cursor:default; }
+button.checkout-quantity-button {margin:0;padding:0;background:transparent;color:inherit;border:0;}
+button.checkout-quantity-button::after {border:0;}
+.checkout-quantity-button:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
+.checkout-quantity-value { display:block; min-width:20px; font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
+@media(max-width:389px) {
+  .checkout-product { display:grid;grid-template-columns:68px minmax(0,1fr);gap:10px 12px; }
+  .checkout-quantity { grid-column:2;justify-self:start;text-align:left; }
+}
+.checkout-section { margin:var(--v5-space-5) var(--v5-space-4) 0; }
+.checkout-section-heading { display:flex; align-items:center; min-height:44px; padding:0 2px; font:600 var(--ui-type-section)/20px var(--font-v5); letter-spacing:-.012em; }
+.checkout-option { display:flex; align-items:center; gap:var(--v5-space-3); min-height:64px; padding:10px 16px; border-bottom:1px solid var(--v5-border); }
+.checkout-option:last-child { border-bottom:0; }
+.checkout-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; color:var(--v5-ink-2); background:var(--ui-content-surface-2); }
+.checkout-option-copy { flex:1; min-width:0; }
+.checkout-row-title { display:block; font:500 var(--ui-type-list-title)/20px var(--font-v5); }
+.checkout-row-description { display:block; margin-top:2px; font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
+.checkout-discount { flex:none; color:var(--v5-brand); font:600 15px/20px var(--font-v5); font-variant-numeric:tabular-nums; }
+.checkout-chevron { flex:none; width:16px; height:16px; color:var(--v5-ink-4); transition:transform 180ms ease; }
+.checkout-chevron--open { transform:rotate(90deg); }
+.checkout-voucher { cursor:pointer; }
+/* Voucher choice is a single-select list aligned with the row copy, then a muted link to the voucher list. */
+.checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
+.checkout-voucher-match { padding:var(--v5-space-2) var(--v5-space-4) 0 64px; }
+.checkout-voucher-choices { padding:var(--v5-space-1) var(--v5-space-4) var(--v5-space-1) 64px; }
+.checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; min-height:44px; padding:6px 0 6px 8px; color:var(--v5-brand); font-size:13px; }
+.checkout-payment { cursor:pointer; transition:background 180ms ease; }
+.checkout-payment--active { background:linear-gradient(90deg,color-mix(in srgb,var(--v5-brand) 12%,transparent),color-mix(in srgb,var(--v5-brand) 2%,transparent)); box-shadow:inset 3px 0 0 var(--v5-brand); }
+.checkout-payment--active .checkout-icon { color:var(--v5-brand); }
+.checkout-radio { flex:none; width:20px; height:20px; border-radius:50%; border:1.5px solid var(--v5-ink-4); background:var(--v5-ink); }
+.checkout-radio--active { border-color:var(--v5-brand); background:radial-gradient(circle,var(--v5-brand) 0 55%,transparent 62%); }
+.checkout-fees { padding:6px 0; }
+.checkout-fee { gap:var(--v5-space-4); min-height:40px; padding:6px 16px; }
+.checkout-fee :deep(uni-text),.checkout-fee :deep(text) { font-size:14px !important; line-height:20px; }
+.checkout-fee :deep(.tabular-nums) { text-align:right; flex-shrink:0; max-width:65%; overflow-wrap:anywhere; }
+.checkout-fee--discount :deep(.tabular-nums) { color:var(--v5-brand) !important; }
+.checkout-fee--total { margin-top:var(--v5-space-1); padding-block:12px; min-height:55px; box-sizing:border-box; border-top:1px solid var(--v5-border); }
+.checkout-fee--total > text,.checkout-fee--total > uni-text { font-weight:600; }
+.checkout-fee--total :deep(.tabular-nums) { font-size:18px !important; }
+.checkout-note { display:block; margin:var(--v5-space-3) 2px 0; font:400 12.5px/1.6 var(--font-v5); color:var(--v5-ink-3); }
+.checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-3); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle); line-height:var(--ui-type-list-subtitle-lh); font-weight:600; color:var(--v5-ink-2); }
+.checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
+.checkout-note--warning { padding:10px 12px; border-radius:12px; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
+.checkout-capacity-actions { display:flex; flex-wrap:wrap; gap:var(--v5-space-1) var(--v5-space-3); margin-top:6px; }
+.checkout-legal { margin:var(--v5-space-3) 2px 0; font:400 12.5px/20px var(--font-v5); color:var(--v5-ink-3); text-align:center; }
+.checkout-legal-link { display:inline; color:var(--v5-brand); cursor:pointer; }
+.checkout-legal-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:2px; }
+.checkout-policy-notice { margin-top:var(--v5-space-3); font:400 var(--ui-type-list-subtitle)/20px var(--font-v5); color:var(--v5-ink-2); overflow-wrap:anywhere; }
+button.checkout-policy-link { display:block; width:100%; min-height:44px; margin:0; padding:var(--v5-space-2) 0; border:0; border-radius:0; background:transparent; color:var(--v5-brand); font:500 13px/20px var(--font-v5); text-align:left; overflow-wrap:anywhere; }
+.checkout-policy-notice > button.checkout-policy-link { text-align:center; }
+button.checkout-policy-link::after { border:0; }
+.checkout-policy-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; }
+.checkout-policy-body { color:var(--v5-ink-2); font:400 14px/22px var(--font-v5); overflow-wrap:anywhere; }
+.checkout-policy-section { display:block; margin-bottom:var(--v5-space-5); }
+.checkout-policy-title { display:block; margin-bottom:6px; color:var(--v5-ink); font-weight:600; }
+.checkout-policy-links { border-top:1px solid var(--v5-border); }
+.checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
+.checkout-sticky { position:absolute; bottom:0; left:0; right:0; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:100px; padding:var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background:linear-gradient(180deg,color-mix(in srgb,var(--ui-ticket-top) 70%,transparent),color-mix(in srgb,var(--ui-ticket-bottom) 94%,transparent)); border-top:1px solid color-mix(in srgb,var(--v5-ink) 5%,transparent); backdrop-filter:blur(18px) saturate(160%); -webkit-backdrop-filter:blur(18px) saturate(160%); }
+.checkout-sticky-copy { min-width:0; }
+.checkout-total { display:block; font:600 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
+.checkout-sticky :deep(.nx-button) { flex:1 0 150px; min-width:150px; min-height:48px; font-size:var(--ui-type-button); box-shadow:0 8px 22px color-mix(in srgb,var(--v5-brand) 30%,transparent),inset 0 1px 0 var(--v5-liquid-highlight); }
+.checkout-summary-total { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:var(--v5-space-2); }
+.checkout-summary-total :deep(.checkout-amount) { font-size:var(--ui-type-section); }
+.checkout-exit-error { display:grid; gap:var(--v5-space-5); color:var(--v5-ink-2); line-height:1.6; }
+.checkout-promotion { padding:var(--v5-space-2) var(--v5-space-4) 120px; color:var(--v5-ink); }
+.checkout-promotion--result { padding: 0; }
+.checkout-promotion :deep(.promotion-flat) { border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); padding:var(--v5-space-4); }
+.checkout-promotion :deep(.promotion-summary) { min-height:40px; font-size:14px; }
+.checkout-promotion :deep(.promotion-summary.total) { min-height:55px; font-size:18px; }
+.checkout-promotion :deep(.promotion-image) { width:74px; height:74px; border-radius:16px; flex:none; }
+.checkout-promotion :deep(.promotion-price) { font-size:15px; font-weight:600; }
+.checkout-voucher:focus-visible,.checkout-payment:focus-visible,.checkout-cancel:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
+.checkout-voucher:active,.checkout-payment:active,.checkout-cancel:active { opacity:.8; }
+@media(prefers-reduced-motion:reduce) { .checkout-step-fill { transition:none !important; }.checkout-payment,.checkout-chevron { transition:none; } }
 </style>
 
 <style scoped>
-
+.checkout-voucher-choice { min-height:48px; display:flex; align-items:center; gap:var(--v5-space-3); border-bottom:1px solid var(--v5-border); cursor:pointer; }
+.checkout-voucher-choice:last-child { border-bottom:0; }
+.checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink-2); font:400 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
+.checkout-voucher-choice[aria-checked="true"] .checkout-voucher-choice__label { color:var(--v5-ink); font-weight:var(--ui-type-subheading-weight); }
+.checkout-voucher-choice[aria-disabled="true"] { opacity:.45; pointer-events:none; }
+.checkout-voucher-radio { width:22px; height:22px; flex:none; box-sizing:border-box; display:grid; place-items:center; border-radius:999px; border:1.5px solid var(--v5-ink-4); }
+.checkout-voucher-radio--on { border:0; background:var(--v5-brand); color:var(--v5-on-brand); }
+.checkout-voucher-link { min-height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px 0 64px; border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:500 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); cursor:pointer; }
+.checkout-voucher-choice:focus-visible,.checkout-voucher-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; }
 </style>

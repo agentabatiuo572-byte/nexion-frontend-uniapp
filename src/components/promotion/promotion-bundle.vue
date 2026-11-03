@@ -4,10 +4,11 @@
       <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : !scopeId?t.promotion.bundle:contextStatus==='ready'?t.promotion.disabled:contextStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
       <text v-if="!scopeId||activity" class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
       <text v-if="scopeId&&(contextStatus==='loading'||contextStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-      <view v-if="scopeId&&contextStatus==='error'" role="alert"><text class="promotion-copy">{{ t.promotion.errorNote }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshContext"><text>{{ t.promotion.retry }}</text></view></view>
+      <view v-if="scopeId&&contextStatus==='error'" class="nx-inline-recovery" role="alert"><text class="promotion-copy nx-inline-recovery__copy">{{ t.promotion.errorNote }}</text><view class="promotion-link nx-inline-recovery__action" role="button" tabindex="0" @click="refreshContext"><text>{{ t.promotion.retry }}</text></view></view>
       <text v-if="scopeId&&activity&&contextStatus==='ready'&&!available" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
     </view>
-    <template v-if="!scopeId||activity">
+    <view v-if="singleActivityProduct" class="promotion-flat" data-testid="single-activity-guidance"><text class="promotion-copy">{{ commerceCopy(locale.code).singleActivity }}</text><view class="promotion-action primary" role="button" tabindex="0" @click="openSingleProduct" @keydown.enter.prevent="openSingleProduct" @keydown.space.prevent="openSingleProduct"><text>{{ commerceCopy(locale.code).singlePurchase }}</text></view></view>
+    <template v-else-if="!scopeId||activity">
     <view class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.selected }}</text>
       <text v-if="!selection.length" class="promotion-copy">{{ t.promotion.selectTwo }}</text>
@@ -27,7 +28,7 @@
         </view>
       </view>
     </view>
-    <view v-if="catalogStatus!=='ready'" class="promotion-flat" role="status"><text class="promotion-copy">{{ catalogStatus==='error'?t.store.catalogErrorBody:t.store.catalogLoadingBody }}</text><view class="promotion-link" role="button" tabindex="0" @click="refreshProductCatalog(true)"><text>{{ t.promotion.retry }}</text></view></view>
+    <view v-if="catalogStatus!=='ready'" class="promotion-flat" :class="{ 'nx-inline-recovery': catalogStatus==='error' }" role="status"><text class="promotion-copy" :class="{ 'nx-inline-recovery__copy': catalogStatus==='error' }">{{ catalogStatus==='error'?t.store.catalogErrorBody:t.store.catalogLoadingBody }}</text><view class="promotion-link" :class="{ 'nx-inline-recovery__action': catalogStatus==='error' }" role="button" tabindex="0" @click="refreshProductCatalog(true)"><text>{{ t.promotion.retry }}</text></view></view>
     <view v-if="suggestions.length" class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.buyMore }}</text>
       <view v-for="product in suggestions" :key="product.id" class="promotion-row">
@@ -52,10 +53,10 @@
       <text class="promotion-copy">{{ t.promotion.rewardNote }}</text>
     </view>
     <view v-if="activity" class="promotion-link" role="button" tabindex="0" @click="termsOpen=true"><text>{{ t.promotion.rulesLink }}</text></view>
-    <view v-if="!signedIn" class="promotion-action primary" role="button" tabindex="0" @click="signIn"><LiquidGlass :radius="999" tone="control" /><text>{{ t.promotion.signIn }}</text></view>
-    <view v-else class="promotion-action" role="button" :tabindex="canQuote?0:-1" :aria-disabled="!canQuote" @click="refreshQuote"><LiquidGlass :radius="999" tone="control" /><text>{{ t.promotion.quote }}</text></view>
+    <view v-if="!signedIn" class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ t.promotion.signIn }}</text></view>
+    <view v-else class="promotion-action" role="button" :tabindex="canQuote?0:-1" :aria-disabled="!canQuote" @click="refreshQuote"><text>{{ t.promotion.quote }}</text></view>
     <text v-if="selection.length<2" class="promotion-copy">{{ t.promotion.selectTwo }}</text>
-    <view class="promotion-action primary" role="button" :tabindex="canContinue?0:-1" :aria-disabled="!canContinue" @click="continueCheckout"><LiquidGlass :radius="999" tone="control" /><text>{{ t.promotion.continue }}</text></view>
+    <view class="promotion-action primary" role="button" :tabindex="canContinue?0:-1" :aria-disabled="!canContinue" @click="continueCheckout"><text>{{ t.promotion.continue }}</text></view>
     <view class="promotion-link" role="button" tabindex="0" @click="navTo(promotionStoreHref(scopeId))"><text>{{ t.promotion.buyMore }}</text></view>
     <PromotionTerms :open="termsOpen" :title="localized(activity?.title,locale.code)" :terms="ruleTerms" :disclosures="promotionDisclosures(activity)" @close="termsOpen=false" />
     </template>
@@ -63,10 +64,10 @@
   </view>
 </template>
 <script setup lang="ts">
-import { platformDisplayText } from "@/lib/brand-copy";
 import { formatAmount } from "@/lib/amount-display";
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
+import { commerceCopy } from '@/lib/commerce-review';
 import { promotionApi,sessionVault } from '@/api/runtime';
 import type { Quote } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
@@ -78,11 +79,11 @@ import { isProductAvailable } from '@/store/product-availability';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { catalogProductImageUrl } from '@/lib/product-image';
-import { localized,displayDeadline,rewardAmount } from '@/lib/promotion-display';
+import { localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
 import { createPromotionReadFence,isEntryQuoteFresh,restoreEntrySelection,promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionDisclosures,promotionStoreHref,validEntryItems,type EntryItem,type EntrySelectionDraft } from '@/lib/promotion-entry';
-import LiquidGlass from '@/components/liquid-glass.vue';
+
 import RewardRows from './reward-rows.vue';
 import PromotionTerms from './promotion-terms.vue';
 const props=defineProps<{activityId:string;initialItems:EntryItem[]}>();
@@ -110,12 +111,14 @@ const ruleTerms=computed(()=>activity.value?[
     `${nameFor(rule.productNo)} · ${t.value.promotion.rulePer} ${rule.minBuyQty} · ${rule.repeatMode==='PER_GROUP'?t.value.promotion.perGroup:t.value.promotion.oncePerOrder}`,
     `${t.value.promotion.orderGroupLimit} · ${rule.maxGroups.mode==='LIMITED'?rule.maxGroups.value:t.value.promotion.unlimitedGroups}`,
     `${t.value.promotion.personGroupLimit} · ${rule.maxGroupsPerPerson.mode==='LIMITED'?rule.maxGroupsPerPerson.value:t.value.promotion.unlimitedGroups}`,
-    ...[rule.buyerReward,rule.inviterReward].filter(reward=>!!reward).map(reward=>reward?`${reward.beneficiaryRole==='BUYER'?t.value.promotion.buyer:t.value.promotion.inviter} · ${reward.type==='DEVICE'?(reward.disclosure.deviceName || t.value.promotion.unknown)+' × '+rewardAmount(reward):rewardAmount(reward)+' '+platformDisplayText(reward.type)}`:''),
+    ...[rule.buyerReward,rule.inviterReward].filter(reward=>!!reward).map(reward=>reward?`${reward.beneficiaryRole==='BUYER'?t.value.promotion.buyer:t.value.promotion.inviter} · ${rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName)}`:''),
   ].join('\n')),
   `${t.value.promotion.deadline} · ${displayDeadline(activity.value.endsAt,locale.code)}`,
 ].join('\n\n'):'');
 const totalUnits=computed(()=>selection.value.reduce((total,item)=>total+item.quantity,0));
 const signedIn=computed(()=>{void app.accountBindingEpoch;void app.accountKey;return !!sessionVault.read();});
+const singleActivityProduct=computed(()=>{if(!scopeId.value||!available.value||catalogStatus.value!=='ready')return null;const products=catalog.value.filter(p=>p.productType!=='SHARE'&&isProductAvailable(p,phase.value)&&activity.value?.productNos.includes(p.id));return products.length===1?products[0]:null;});
+function openSingleProduct(){if(singleActivityProduct.value)void navTo(promotionDetailHref(singleActivityProduct.value.id,scopeId.value));}
 const suggestions=computed(()=>catalog.value.filter(product=>!selection.value.some(item=>item.productNo===product.id)&&product.productType!=='SHARE'&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(product.id))));
 const productsReady=computed(()=>catalogStatus.value==='ready'&&selection.value.every(item=>{const product=productFor(item.productNo);return product&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(item.productNo));}));
 const canQuote=computed(()=>signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value)&&quoteStatus.value!=='loading');
@@ -148,8 +151,8 @@ onBeforeUnmount(()=>{visible=false;fence.invalidate();if(expiryTimer)clearInterv
 </script>
 <style src="./promotion.css"></style>
 <style scoped>
-.bundle-name { display:block;font-size:15px;font-weight:600;overflow-wrap:anywhere; }
-.bundle-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;width:max-content;max-width:100%;margin-top:10px;overflow:hidden; }
+.bundle-name { display:block;font-size:var(--ui-type-card-title);font-weight: var(--ui-type-card-title-weight);overflow-wrap:anywhere; }
+.bundle-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;width:max-content;max-width:100%;margin-top:var(--ui-space-row-y);overflow:hidden; }
 .bundle-stepper view,.bundle-add,.bundle-remove { min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:20px; }
 .bundle-stepper view { background:var(--v5-surface-2); }
 .bundle-stepper text { min-width:32px;text-align:center;font-variant-numeric:tabular-nums; }

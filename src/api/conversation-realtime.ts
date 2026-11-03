@@ -1,5 +1,6 @@
 /** Wire contract shared with the M3 client. No tokens in URLs or persistent message cache. */
 import { createAbortController } from "@/lib/abort-controller-compat";
+import { MESSAGE_ACK_TIMEOUT_MS } from '@/lib/conversation-delivery-policy';
 export interface RealtimeSocket {
   onopen: (()=>void)|null; onmessage: ((event:{data:string})=>void)|null;
   onclose: ((event:{code:number})=>void)|null; onerror: (()=>void)|null;
@@ -9,14 +10,14 @@ export interface RealtimeEnvelope { code:number; message?:string; data:unknown }
 export interface RealtimePresence { conversationNo:string; online:boolean; typing:boolean; expiresIn?:number }
 interface Options {
   url:string; ticket:(signal:AbortSignal)=>Promise<{ticket:string}>; socket:(url:string)=>RealtimeSocket;
-  reconcile:(signal:AbortSignal)=>Promise<void>; state?:(ready:boolean,terminal:boolean)=>void;
+  reconcile:(signal:AbortSignal)=>Promise<void>; state?:(ready:boolean,terminal:boolean,unavailable:boolean)=>void;
   presence?:(value:RealtimePresence|null)=>void;
   scopeInvalidated?:(customerId:number)=>void;
 }
 type Timer=ReturnType<typeof setTimeout>;
 export class ConversationRealtime {
   ready=false;
-  private stopped=true; private terminal=false; private epoch=0; private attempts=0; private lifecycle=0;
+  private stopped=true; private terminal=false; private unavailable=false; private epoch=0; private attempts=0; private lifecycle=0;
   private connection:RealtimeSocket|null=null; private controller=createAbortController(); private fallback=createAbortController();
   private retryTimer?:Timer; private pollTimer?:Timer; private heartbeatTimer?:Timer; private deadline?:Timer; private eventTimer?:Timer;private stableTimer?:Timer;
   private pending=new Map<string,{resolve:(value:RealtimeEnvelope)=>void;reject:(error:Error)=>void;timer:Timer}>();
@@ -24,9 +25,9 @@ export class ConversationRealtime {
   private watched:string|null=null; private lastTyping=0; private lastPong=0; private sequence=0;
   constructor(private readonly options:Options){}
   start(){if(!this.stopped)return;this.stopped=false;this.terminal=false;this.attempts=0;this.lifecycle++;this.fallback=createAbortController();this.connect();this.poll(this.lifecycle);}
-  stop(){this.stopped=true;this.lifecycle++;this.disconnect(false);this.fallback.abort();clearTimeout(this.pollTimer);this.options.presence?.(null);}
+  stop(preserveUnavailable=false){this.stopped=true;this.lifecycle++;this.disconnect(false,false,preserveUnavailable);this.fallback.abort();clearTimeout(this.pollTimer);this.options.presence?.(null);}
   /** An accepted token rotation replaces the old grant without replaying pending commands. */
-  renewCredentials(){if(this.stopped)return;this.stop();this.start();}
+  renewCredentials(){if(this.stopped)return;this.stop(true);this.start();}
   watch(no:string|null){this.watched=no;if(this.authenticated)this.send({type:'watch',conversationNo:no});}
   typing(active:boolean){
     if(!this.ready||!this.watched)return;
@@ -39,7 +40,7 @@ export class ConversationRealtime {
     const requestId=`c${Date.now()}_${++this.sequence}`;
     return new Promise((resolve,reject)=>{
       const abort=()=>{const p=this.pending.get(requestId);if(p){this.pending.delete(requestId);p.reject(new Error('CONVERSATION_DELIVERY_UNKNOWN'));}};
-      const timer=setTimeout(abort,12000);
+      const timer=setTimeout(abort,MESSAGE_ACK_TIMEOUT_MS);
       const done=()=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);};
       this.pending.set(requestId,{resolve:v=>{done();resolve(v)},reject:e=>{done();reject(e)},timer});
       signal?.addEventListener('abort',abort,{once:true});
@@ -47,13 +48,14 @@ export class ConversationRealtime {
     });
   }
   private send(value:unknown){this.connection?.send(JSON.stringify(value));}
-  private setReady(value:boolean){this.ready=value;this.options.state?.(value,this.terminal);}
-  private disconnect(retry:boolean,terminal=false){
+  private setReady(value:boolean,unavailable=false){this.ready=value;this.unavailable=unavailable;this.options.state?.(value,this.terminal,unavailable);}
+  private disconnect(retry:boolean,terminal=false,preserveUnavailable=false){
     this.epoch++;this.controller.abort();this.fallback.abort();this.fallback=createAbortController();this.connection?.close();this.connection=null;
     this.authenticated=false;this.syncing=false;this.dirty=false;this.terminal=terminal;
     for(const timer of [this.retryTimer,this.heartbeatTimer,this.deadline,this.eventTimer,this.stableTimer])clearTimeout(timer);
     this.pending.forEach(p=>p.reject(new Error('CONVERSATION_DELIVERY_UNKNOWN')));this.pending.clear();
-    this.setReady(false);this.options.presence?.(null);
+    // Renewal is not a failure, but must retain an existing failure until catch-up succeeds.
+    this.setReady(false,retry||(preserveUnavailable&&this.unavailable));this.options.presence?.(null);
     if(retry&&!this.stopped&&!terminal){const delay=Math.min(30000,1000*2**Math.min(this.attempts++,5)*(0.8+Math.random()*0.4));this.retryTimer=setTimeout(()=>this.connect(),delay);}
   }
   private async connect(){

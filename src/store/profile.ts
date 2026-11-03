@@ -1,14 +1,18 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { defaultNickname } from "@/lib/nickname";
 import { remoteApiEnabled } from "@/api/runtime";
-import { profileApi } from "@/api/runtime";
+import { apiRuntimeConfig, profileApi, sessionVault } from "@/api/runtime";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { isAmbiguousOutcome } from "@/api/errors";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import type { UserSession } from "@/api/contracts";
 import { acquireProfileCommandKey, finishProfileCommand } from "@/lib/profile-command-key";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
+import type { ProfileAvatar } from "@/api/profile-api";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
 // 旧设备级单键 "nexgrid-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
@@ -43,8 +47,29 @@ export const useProfile = defineStore("profile", () => {
   const init = remoteApiEnabled ? { displayName: "", avatarSeed: "" } : hydrate(boundKey);
   const displayName = ref(init.displayName);
   const avatarSeed = ref(init.avatarSeed);
+  const avatarUrl = ref("");
+  const avatarRevision = ref("");
+  let avatarReadEpoch = 0;
+  let avatarHasSnapshot = false;
+  let avatarInFlight: Promise<boolean> | null = null;
+  let environmentInvalidated = false;
   const phoneE164 = ref("");
+  const uid = ref("");
   const nicknameCandidates = ref<string[]>([]);
+
+  function clearAvatar() {
+    invalidatePassiveTabRead("profile-avatar");
+    avatarReadEpoch += 1;
+    avatarInFlight = null;
+    avatarHasSnapshot = false;
+    avatarUrl.value = "";
+    avatarRevision.value = "";
+  }
+  watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
+    environmentInvalidated = true;
+    clearAvatar();
+  }, { flush: "sync" });
+  sessionVault.subscribe?.((_previous, _next, continuation) => { if (!continuation) clearAvatar(); });
 
   function persist() {
     writeAccountRow<Persisted>(ACCOUNTS_KEY, boundKey, {
@@ -57,6 +82,8 @@ export const useProfile = defineStore("profile", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     remoteAccountEpoch.bind(boundKey);
+    clearAvatar();
+    uid.value = "";
     // A server session must never inherit a prior browser profile row. The
     // authoritative auth response is projected immediately after this bind;
     // until then leave an honest blank state rather than a demo identity.
@@ -82,6 +109,7 @@ export const useProfile = defineStore("profile", () => {
     displayName.value = identity.nickname;
     avatarSeed.value = `user:${identity.userId}`;
     phoneE164.value = `${identity.countryCode}${identity.phone}`;
+    uid.value = String(identity.userId);
   }
 
   /** Reconcile the mutable profile projection with an authoritative GET. */
@@ -89,6 +117,51 @@ export const useProfile = defineStore("profile", () => {
     if (!remoteApiEnabled) return;
     const normalized = nickname.trim();
     if (normalized) displayName.value = normalized;
+  }
+
+  function projectServerAvatar(avatar: ProfileAvatar) {
+    if (!remoteApiEnabled) return;
+    invalidatePassiveTabRead("profile-avatar");
+    avatarReadEpoch += 1;
+    avatarInFlight = null;
+    avatarHasSnapshot = true;
+    avatarUrl.value = avatar.avatarUrl;
+    avatarRevision.value = avatar.avatarRevision;
+    rememberPassiveTabRead("profile-avatar", Promise.resolve(true), undefined, undefined, () => avatarHasSnapshot);
+  }
+
+  function ensureAvatar(): Promise<boolean> {
+    return runPassiveTabRead("profile-avatar", () => avatarInFlight ?? refreshAvatar(), undefined,
+      () => avatarHasSnapshot, 60_000);
+  }
+
+  function refreshAvatar(): Promise<boolean> {
+    invalidateBeforePassiveTabRead("profile-avatar");
+    const promise = readAvatar();
+    avatarInFlight = promise;
+    rememberPassiveTabRead("profile-avatar", promise, undefined, undefined, () => avatarHasSnapshot);
+    const clear = () => { if (avatarInFlight === promise) avatarInFlight = null; };
+    void promise.then(clear, clear);
+    return promise;
+  }
+
+  async function readAvatar(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    if (environmentInvalidated) return false;
+    const account = remoteAccountEpoch.snapshot();
+    const runtime = captureRuntimeRevision();
+    const readEpoch = ++avatarReadEpoch;
+    try {
+      const projection = await profileApi.profile();
+      if (!remoteAccountEpoch.isCurrent(account) || readEpoch !== avatarReadEpoch || !isCurrentRuntimeRevision(runtime)) return false;
+      avatarUrl.value = projection.avatarUrl;
+      avatarRevision.value = projection.avatarRevision;
+      avatarHasSnapshot = true;
+      return true;
+    } catch (cause) {
+      if (remoteAccountEpoch.isCurrent(account) && readEpoch === avatarReadEpoch && !isTransientReadFailure(cause)) clearAvatar();
+      throw cause;
+    }
   }
 
   async function refreshNicknameCandidates(): Promise<boolean> {
@@ -136,8 +209,8 @@ export const useProfile = defineStore("profile", () => {
   }
 
   return {
-    displayName, avatarSeed, phoneE164, nicknameCandidates,
+    displayName, avatarSeed, avatarUrl, avatarRevision, phoneE164, uid, nicknameCandidates,
     setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity, projectServerNickname,
-    refreshNicknameCandidates,
+    refreshNicknameCandidates, projectServerAvatar, refreshAvatar, ensureAvatar,
   };
 });

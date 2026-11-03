@@ -416,7 +416,9 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
   };
 }
 
-function canonicalStatus(status: string): WithdrawalStatus {
+function canonicalStatus(status: string, chain?: string): WithdrawalStatus {
+  // These provider channels retain the reservation while the original transfer is being reconciled.
+  if (status.trim().toUpperCase() === "TX_ORPHANED" && (chain === "BANK-VND" || chain === "USDT-BEP20" || chain === "USDT-ERC20")) return "frozen";
   switch (status.trim().toUpperCase()) {
     case "REVIEW_PENDING":
     case "REVIEWING":
@@ -528,8 +530,7 @@ export function toCanonicalWithdrawal(
   address: string,
   submittedAt = submission.createdAt ?? Date.now(),
 ): Withdrawal {
-  const status = submission.chain === "BANK-VND" && submission.status.toUpperCase() === "TX_ORPHANED"
-    ? "frozen" : canonicalStatus(submission.status);
+  const status = canonicalStatus(submission.status, submission.chain);
   // A confirmed legacy row without a historical hold has no future estimate to
   // display. Its server-created timestamp is the only truthful terminal anchor;
   // never substitute the browser clock or manufacture a hold deadline.
@@ -563,6 +564,9 @@ export function toCanonicalWithdrawal(
     riskRoute: canonicalRiskRoute(submission.riskRoute),
     riskReasons: [],
     submittedAt,
+    displaySubmittedAt: typeof submission.createdAt === "number"
+      && submission.createdAt > 0 && Number.isFinite(submission.createdAt)
+      && Number.isFinite(new Date(submission.createdAt).getTime()) ? submission.createdAt : null,
     estimatedCompletion,
     // 🔴 顶层带出,不进 `fee`(fee 是报价快照,请求/响应同构;退款是事后事件)。
     // 提交回执上它**几乎恒为 0** —— 提交那一刻就被拒的单按规格是「零副作用、不烧 NEX」,
@@ -646,7 +650,7 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
     : null;
   const nexRefundedAt = positive(row.nexRefundedAt);
   return {
-    withdrawalNo, status: row.chain === "BANK-VND" && status.toUpperCase() === "TX_ORPHANED" ? "frozen" : canonicalStatus(status), confirmedAt, terminalReason, retriable,
+    withdrawalNo, status: canonicalStatus(status, typeof row.chain === "string" ? row.chain : undefined), confirmedAt, terminalReason, retriable,
     nexRefunded, nexRefundedAt,
   };
 }

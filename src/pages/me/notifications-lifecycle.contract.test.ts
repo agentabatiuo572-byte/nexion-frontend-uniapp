@@ -13,16 +13,16 @@ describe("notification foreground and clear-read accessibility", () => {
     expect(source).toMatch(/onShow\(\(\) => \{\s*if \(disposed\) return;\s*pageVisible = true;\s*preserveSectionInH5\(\);\s*void center.refresh\(\);/);
   });
 
-  it("gives the clear-read action an accessible label, 44px target, and confirmation", () => {
-    expect(source).toContain(':aria-label="t.notifs.clearReadAria"');
-    expect(styles).toContain("min-height: 44px");
-    expect(source).toContain("await uiConfirm({");
+  it("keeps clear-read on the message page with a confirmation, not in settings", () => {
+    expect(source).not.toContain('message-secondary-actions');
+    expect(source).toContain("navTo('/pages/me/preferences')");
+    expect(source).toContain('@click="confirmClearRead"');
     expect(source).toContain("notifs.clearRead()");
   });
 
   it("keeps mark-all and notification rows keyboard-operable", () => {
     expect(source).toContain(':aria-label="t.notifs.markAll"');
-    expect(source).toMatch(/role="button"[^>]*:tabindex="markingAll \? -1 : 0"[^>]*@click="markAll"/);
+    expect(source).toMatch(/role="button"[^>]*:tabindex="headerState.title && !markingAll && !clearingRead \? 0 : -1"[^>]*@click="markAll"/);
     expect(source).toMatch(/class="notification-row" role="button" tabindex="0"[^>]*@click="toggle\(n\)"/);
     expect(activation).toContain("Enter");
     expect(activation).toContain("click");
@@ -41,7 +41,7 @@ describe("notification foreground and clear-read accessibility", () => {
     expect(segments).toContain('@keydown="onKeydown($event, option)"');
     expect(segments).toContain('choose(target, "arrow")');
     expect(segments).toContain('?.focus()');
-    expect(source).toMatch(/role="button" tabindex="0"[^>]*@click="notifs.retryRemote\(\)"/);
+    expect(source).toMatch(/role="button" :tabindex="notifs.loading \? -1 : 0"[^>]*@click="notifs.retryRemote\(\)"/);
     expect(source).toMatch(/role="button" :tabindex="notifs.loading \? -1 : 0"[^>]*@click="notifs.loadMoreRemote\(\)"/);
   });
 

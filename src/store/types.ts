@@ -1,6 +1,6 @@
-import type { TaskExecutionMetadata } from "@/api/task-assignment-api";
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
 import type { EntrySurface } from "@/lib/entry-surface";
+import type { TaskExecutionMetadata } from "@/api/task-assignment-api";
 
 export type DeviceKind =
   | "phone"
@@ -70,6 +70,8 @@ export interface CompletedTask extends CurrentTask {
 
 export interface Device {
   id: string;
+  /** Exact owned SKU from the canonical fleet; retained separately from its display family. */
+  productCode?: string;
   /** Server CAS version. Remote mutations must send this exact value. */
   rowVersion?: number;
   /** Independent server runtime fact; absent on local simulation rows. */
@@ -86,7 +88,6 @@ export interface Device {
   /** E3 capacity projection source. Remote rows are display-only server facts;
    * mock rows intentionally omit this marker and keep the local simulation. */
   capacitySource?: "server" | "mock";
-  productCode?: string;
   capacityPct?: number | null;
   capacityAgeMonths?: number | null;
   capacitySubsidized?: boolean | null;
@@ -99,6 +100,8 @@ export interface Device {
   taskServerNow?: number | null;
   /** Monotonic receive anchor paired only with the task-state snapshot clock. */
   taskServerNowReceivedAt?: number | null;
+  phoneValidUntil?: number | null;
+  simulationState?: import("@/api/task-assignment-api").SimulationState;
   /** Monotonic receive anchor used to advance the signed server deadline while the card stays open. */
   capacitySnapshotReceivedAt?: number | null;
   // Lifecycle (Sprint 2): set on device creation; drives the monthly efficiency
@@ -138,9 +141,9 @@ export interface Device {
   gpuPower: number; // W
   vramUsed: number; // GB
   currentTask: CurrentTask | null;
+  /** Read-only unresolved legacy completion, including after its task lease expires. */
   recoveryPending?: boolean;
   recoveryReason?: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" | null;
-  simulationState?: import("@/api/task-assignment-api").SimulationState;
   recentTasks: CompletedTask[]; // last 10
   /** Server-authoritative post-completion task lock. Remote clients only display this value. */
   taskLockUntil?: number | null;
@@ -324,6 +327,8 @@ export interface Withdrawal {
    *  都还原不出「这单当时免了哪几道」,等于没做。与 riskReasons 同源同去处。 */
   waivedGates?: string[];
   submittedAt: number;
+  /** Read-only server creation time for display; absent legacy evidence stays unknown. */
+  displaySubmittedAt?: number | null;
   estimatedCompletion: number;
   /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
   confirmedAt?: number;

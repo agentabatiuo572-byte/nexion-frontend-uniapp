@@ -54,6 +54,7 @@ const validCapacityQuote = {
   sufficientFunds: true,
   decisionSource: "server",
 };
+const availableKeepQuote={...validCapacityQuote,decision:'CAPACITY_AVAILABLE',activeDevices:5,sourceDeviceId:null,sourceDeviceName:null};
 
 const validResult = {
   tradeinNo: "TIO-1",
@@ -71,8 +72,8 @@ const validKeepResult = {
   operationNo: "CPK-1",
   orderNo: "CKO-1",
   targetDeviceId: 44,
-  deviceStatus: "INACTIVE",
-  orderStatus: "PAID",
+  deviceStatus: "ACTIVE",
+  orderStatus: "COMPLETED",
   walletDebitUsdt: 1000,
   walletBalanceAfterUsdt: 500,
 };
@@ -188,6 +189,27 @@ test("E20 accepts the complete server decision matrix and preserves source seman
   assert.equal(replacement.sourceDeviceId, 11);
 });
 
+test("E20 preserves server capacity refusals when trial or order reservations fill the remaining slots", async () => {
+  for (const activeDevices of [4, 5]) {
+    for (const decision of ["REPLACE_REQUIRED", "NO_ACTIVE_DEVICE"]) {
+      const payload = {
+        ...validCapacityQuote,
+        activeDevices,
+        decision,
+        ...(decision === "NO_ACTIVE_DEVICE" ? { sourceDeviceId: null, sourceDeviceName: null } : {}),
+      };
+      const gate = new RemoteCapacityGate();
+      const quote = await gate.resolve(
+        () => apiReturning(payload).capacityQuote("stellarbox-pro-v2"),
+        () => {},
+      );
+      assert.equal(quote.decision, decision);
+      assert.equal(quote.activeDevices, activeDevices);
+      assert.equal(gate.canConfirm(false), false);
+    }
+  }
+});
+
 test("E20 rejects a source id without its authoritative display name", async () => {
   await assert.rejects(
     apiReturning({ ...validCapacityQuote, sourceDeviceName: null }).capacityQuote("stellarbox-pro-v2"),
@@ -228,29 +250,35 @@ test("E20 keep-and-buy uses the atomic capacity endpoint and validates the quote
     return structuredClone(validKeepResult);
   } });
 
-  const accepted = await api.capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote);
+  const accepted = await api.capacityKeep("stellarbox-pro-v2", "keep-key", availableKeepQuote);
 
   assert.equal(request.path, "/api/app/trade-in/capacity-keep");
   assert.deepEqual(request.body, { targetProductNo: "stellarbox-pro-v2", expectedPayableUsdt: 1000 });
   assert.equal(request.idempotencyKey, "keep-key");
-  assert.equal(accepted.deviceStatus, "INACTIVE");
+  assert.equal(request.retryAfterAuth,false);
+  assert.equal(accepted.deviceStatus, "ACTIVE");
   assert.equal(accepted.targetDeviceId, 44);
 });
 
-test("E20 keep-and-buy rejects a pending order or a result whose debit drifted", async () => {
+test("E20 keep-and-buy rejects inactive or pending results and debit drift", async () => {
+  await assert.rejects(
+    apiReturning({ ...validKeepResult, deviceStatus: "INACTIVE", orderStatus: "PAID" })
+      .capacityKeep("stellarbox-pro-v2", "keep-key", availableKeepQuote),
+    /E3_CANONICAL_RESPONSE_INVALID/,
+  );
   await assert.rejects(
     apiReturning({ ...validKeepResult, orderStatus: "PENDING_PAYMENT" })
-      .capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote),
+      .capacityKeep("stellarbox-pro-v2", "keep-key", availableKeepQuote),
     /E3_CANONICAL_RESPONSE_INVALID/,
   );
   await assert.rejects(
     apiReturning({ ...validKeepResult, walletDebitUsdt: 999 })
-      .capacityKeep("stellarbox-pro-v2", "keep-key", validCapacityQuote),
+      .capacityKeep("stellarbox-pro-v2", "keep-key", availableKeepQuote),
     /E3_CAPACITY_KEEP_RESULT_QUOTE_MISMATCH/,
   );
 });
 
-test("E20 rejects terminal replacement results with source or balance drift", async () => {
+test("E20 rejects source drift and invalid balances while accepting authoritative wallet changes", async () => {
   await assert.rejects(
     apiReturning({ ...validResult, sourceDeviceId: 12 }).capacityReplace(
       11, "stellarbox-pro-v2", "replace-key", validCapacityQuote,
@@ -258,11 +286,13 @@ test("E20 rejects terminal replacement results with source or balance drift", as
     /E3_TRADEIN_RESULT_QUOTE_MISMATCH/,
   );
   await assert.rejects(
-    apiReturning({ ...validResult, walletBalanceAfterUsdt: 501 }).capacityReplace(
+    apiReturning({ ...validResult, walletBalanceAfterUsdt: -1 }).capacityReplace(
       11, "stellarbox-pro-v2", "replace-key", validCapacityQuote,
     ),
-    /E3_TRADEIN_RESULT_QUOTE_MISMATCH/,
+    /E3_CANONICAL_RESPONSE_INVALID/,
   );
+  assert.equal((await apiReturning({...validResult,walletBalanceAfterUsdt:501}).capacityReplace(
+    11,'stellarbox-pro-v2','replace-key',validCapacityQuote)).walletBalanceAfterUsdt,501);
 });
 
 test("E20 rejects a non-terminal application even when its order says completed", async () => {
@@ -510,4 +540,37 @@ test("E20 retry keeps one idempotency key and success commits after fleet verifi
   await attempt();
   assert.deepEqual(submittedKeys, ["e3-tradein:stable-key", "e3-tradein:stable-key"]);
   assert.ok(events.lastIndexOf("success-toast") > events.lastIndexOf("verify-fleet"));
+});
+
+
+test("RETIRE quote and submit preserve source revision and placement independently of capacity", async () => {
+  for (const targetDeviceStatus of ["ACTIVE", "INACTIVE"]) {
+    const canonicalQuote = { sourceDeviceId: 11, sourceRowVersion: 9, targetDeviceStatus, sourceProductName: "S1",
+      targetProductId: 22, targetProductNo: "stellarbox-pro-v2", targetProductName: "Pro v2",
+      sourceActualPaidUsdt: 100, cumulativeOutputUsdt: 20, outputRatioPct: 20, creditRatePct: 20,
+      discountUsdt: 20, targetPriceUsdt: 1000, payableUsdt: 980, walletBalanceUsdt: 1500,
+      walletShortfallUsdt: 0, sufficientFunds: true, discountToWallet: false, pricingSource: "server" };
+    const response = { ...validResult, targetDeviceStatus, discountUsdt: 20, walletDebitUsdt: 980, walletBalanceAfterUsdt: 520 };
+    const requests = [];
+    const api = createDeviceE3Api({ request: async request => { requests.push(request); return request.path.endsWith("/quote") ? canonicalQuote : response; } });
+    const quote = await api.quote(11, "stellarbox-pro-v2");
+    const result = await api.submit(11, "stellarbox-pro-v2", "retire-key", quote);
+    assert.equal(result.targetDeviceStatus, targetDeviceStatus);
+    assert.equal(requests[1].body.expectedSourceVersion, 9);
+    assert.equal(requests[1].body.sourceDeviceId, 11);
+    assert.equal(requests[1].path, "/api/app/trade-in/submit");
+    await assert.rejects(apiReturning({ ...response, targetDeviceStatus: targetDeviceStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE" })
+      .submit(11, "stellarbox-pro-v2", "retire-key", quote), /E3_TRADEIN_RESULT_QUOTE_MISMATCH/);
+    await assert.rejects(apiReturning({ ...canonicalQuote, sourceRowVersion: undefined }).quote(11, "stellarbox-pro-v2"), /E3_CANONICAL_RESPONSE_INVALID/);
+  }
+});
+
+test("inventory is a coherent completed RETIRE order and never a normal purchase fallback", async () => {
+  const inventory = { ...activatedOrder, activationStatus: "INVENTORY", canonicalStatus: "inventory", activatedAt: null };
+  const list = row => createOrderApi({ request: async () => ({ serverCanonical: true, source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: [row] }) }).list();
+  assert.equal((await list(inventory)).orders[0].canonicalStatus, "inventory");
+  for (const malformed of [{ ...inventory, activatedAt: 3 }, { ...inventory, orderType: "SINGLE" },
+    { ...inventory, tradeinNo: null }, { ...inventory, paymentStatus: "PENDING" }, { ...inventory, sourceDeviceId: null }]) {
+    await assert.rejects(list(malformed), /ORDER_RESPONSE_INVALID/);
+  }
 });

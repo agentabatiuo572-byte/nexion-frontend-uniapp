@@ -1,10 +1,13 @@
 <template>
-  <view v-if="providers.length || message" class="third-party-auth" data-testid="third-party-auth">
-    <text class="oauth-title">{{ t.thirdParty.signInTitle }}</text>
-    <AuthProviderGrid v-if="labels.length" :providers="labels" :busy="!!flow || submitting || disabled" @select="start" />
-    <view v-if="flow" class="oauth-panel" aria-live="polite">
+  <view v-if="providers.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
+    <text class="oauth-title">{{ intent === "LINK" ? t.thirdParty.linkTitle : t.thirdParty.signInTitle }}</text>
+    <text v-if="intent === 'LINK' && !providers.length" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
+    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || disabled" :preserve-appearance="disabled && !flow && !submitting" @select="start" />
+    <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
       <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
+      <input v-if="verified && intent === 'LINK'" v-model="password" password :maxlength="128"
+        :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" class="oauth-input" />
       <view v-if="challengeNo">
         <text class="oauth-copy">{{ t.thirdParty.codePrompt }} {{ deliveryHint }}</text>
         <input v-model="code" type="number" :maxlength="6" :placeholder="t.thirdParty.codeLabel"
@@ -18,7 +21,7 @@
         :aria-disabled="submitting" @click="cancelFromUser" @keydown.enter.prevent="cancelFromUser" @keydown.space.prevent="cancelFromUser">
         <text>{{ t.ui.cancel }}</text>
       </view>
-    </view>
+    </component>
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
     <ServerCaptchaSlider v-if="showCaptcha" scene="LOGIN" phone="" @success="captchaComplete" @close="showCaptcha = false" />
   </view>
@@ -26,6 +29,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
@@ -41,28 +45,33 @@ import { validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth
 
 // beforeStart lets the host page veto a start (e.g. an invalid typed invite code) before the provider opens.
 // sponsorRejected hands a refused invite code back to the host page that owns the invite field.
-const props = withDefaults(defineProps<{ disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: (() => void) | null }>(), {
-  disabled: false, returnTo: null, sponsorCode: null, beforeStart: null, sponsorRejected: null,
+const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: (() => void) | null }>(), {
+  intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null, beforeStart: null, sponsorRejected: null,
 });
 const t = useT();
 const emit = defineEmits<{ (event: "busy", busy: boolean): void }>();
 const api = createOAuthProviderApi(apiClient, authApi);
 const providers = ref<ThirdPartyProvider[]>([]);
+const linked = ref<ThirdPartyProvider[]>([]);
 const flow = ref<OAuthFlow | null>(null);
 const selected = ref<ThirdPartyProvider>("GOOGLE");
 const verified = ref(false);
 const displayName = ref("");
 const message = ref("");
+const password = ref("");
 const challengeNo = ref("");
 const code = ref("");
 const deliveryHint = ref("");
 const submitting = ref(false);
-const confirmLabel = computed(() => t.value.thirdParty.continueLogin);
-const completionDisabled = computed(() => submitting.value || (!!challengeNo.value && !/^\d{6}$/.test(code.value)));
+const confirmLabel = computed(() => props.intent === "LINK" ? t.value.thirdParty.confirmLink : t.value.thirdParty.continueLogin);
+const completionDisabled = computed(() => submitting.value || (props.intent === "LINK" && !password.value)
+  || (!!challengeNo.value && !/^\d{6}$/.test(code.value)));
 const showCaptcha = ref(false);
 const names = { GOOGLE: "Google", APPLE: "Apple", TELEGRAM: "Telegram" } as const;
 const label = (provider: ThirdPartyProvider) => names[provider];
-const labels = computed(() => providers.value.map(label));
+const linkedLabels = computed(() => props.intent === "LINK" ? linked.value.map(label) : []);
+const labels = computed(() => (props.intent === "LINK"
+  ? [...new Set([...providers.value, ...linked.value])] : providers.value).map(label));
 let generation = 0;
 let pollVersion = 0;
 let disposed = false;
@@ -71,7 +80,8 @@ let expiresAt = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let popup: Window | null = null;
 function sameSession() {
-  return sessionVault.revision() === revision;
+  return sessionVault.revision() === revision
+    || (props.intent === "LINK" && sessionVault.isRefreshContinuation(revision));
 }
 function acceptReceipt(receipt: OAuthBrowserReceipt) {
   if (!flow.value || disposed || flow.value.flowId !== receipt.flowId) return;
@@ -90,13 +100,13 @@ function cancel() {
   pollVersion++;
   if (timer) clearTimeout(timer);
   popup?.close(); popup = null;
-  flow.value = null; verified.value = false; code.value = ""; challengeNo.value = "";
+  flow.value = null; verified.value = false; password.value = ""; code.value = ""; challengeNo.value = "";
   showCaptcha.value = false;
   emit("busy", false);
 }
 function cancelFromUser() {
   if (submitting.value) return;
-  if (!authApi.pendingLogin()
+  if (props.intent === "LOGIN" && !authApi.pendingLogin()
       && authApi.pendingLoginContext()?.context.flowId === flow.value?.flowId) authApi.cancelLoginChallenge();
   cancel();
 }
@@ -127,22 +137,27 @@ function sponsorRefused(cause: unknown): boolean {
 }
 async function start(name: string) {
   if (flow.value || submitting.value || props.disabled || disposed) return;
-  if (authApi.pendingLogin()) { message.value = t.value.login.unknownAttempt; return; }
+  if (props.intent === "LOGIN" && authApi.pendingLogin()) { message.value = t.value.login.unknownAttempt; return; }
   const provider = (Object.keys(names) as ThirdPartyProvider[]).find(key => names[key] === name);
-  if (!provider || !providers.value.includes(provider)) return;
+  if (!provider || !providers.value.includes(provider)
+      || (props.intent === "LINK" && linked.value.includes(provider))) return;
   const current = ++generation;
   revision = sessionVault.revision();
   selected.value = provider; message.value = ""; submitting.value = true; emit("busy", true);
   // Reserve a popup synchronously during the click; never use an embedded provider WebView.
+  // #ifdef H5
   popup = window.open("about:blank", "_blank");
   if (!popup) { message.value = t.value.thirdParty.popupBlocked; submitting.value = false; emit("busy", false); return; }
+  // #endif
   try {
     // The popup above is only a blank reservation; a veto closes it before any provider page loads.
     if (props.beforeStart && !(await props.beforeStart())) { cancel(); return; }
-    const next = await api.start(provider, "LOGIN", props.sponsorCode);
+    const next = await api.start(provider, props.intent, props.sponsorCode);
     if (disposed || current !== generation || !sameSession()) { cancel(); return; }
     flow.value = next; expiresAt = Date.now() + next.expiresInSec * 1000;
+    // #ifdef H5
     if (popup) popup.location.href = next.authorizationUrl;
+    // #endif
     void poll(current);
   } catch (cause) { if (!sponsorRefused(cause)) { cancel(); message.value = errorMessage(cause); } }
   finally { submitting.value = false; }
@@ -185,35 +200,43 @@ async function complete(captchaTicket?: string) {
   }
   submitting.value = true; message.value = "";
   try {
-    const result = await api.complete(selected.value, flow.value, revision,
-      challengeNo.value || undefined, code.value || undefined, captchaTicket);
-    if (disposed || current !== generation) {
-      if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
-      return;
+    if (props.intent === "LINK") {
+      await api.link(flow.value, password.value);
+      if (disposed || current !== generation) return;
+      // POST is the binding result. A failed optional list refresh must not turn it into a failed mutation.
+      if (!linked.value.includes(selected.value)) linked.value.push(selected.value);
+      cancel(); message.value = t.value.thirdParty.linkSuccess;
+    } else {
+      const result = await api.complete(selected.value, flow.value, revision,
+        challengeNo.value || undefined, code.value || undefined, captchaTicket);
+      if (disposed || current !== generation) {
+        if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
+        return;
+      }
+      if (result.kind === "challenge") {
+        challengeNo.value = result.challengeNo; deliveryHint.value = result.deliveryHint; code.value = ""; return;
+      }
+      const registrationDestination = result.registrationReceipt
+        ? "/pages/register/success"
+        : props.returnTo;
+      const completed = completeSignIn({
+        identity: `user:${result.user.userId}`, returnTo: registrationDestination,
+        serverProfile: result.user, onboardingComplete: result.user.onboardingComplete,
+        serverSessionRevision: result.vaultRevision,
+        deferNavigation: !!result.registrationReceipt,
+        registrationLocale: result.registrationReceipt ? useLocaleStore().code : undefined,
+      });
+      if (!completed.ok) throw new Error("SIGN_IN_FAILED");
+      if (result.registrationReceipt) {
+        stageRemoteRegistrationReceipt(result.registrationReceipt, `user:${result.user.userId}`);
+        toast.success(t.value.register.registrationSignedIn);
+        navReset({ url: "/pages/register/success", fail: () => navReset({ url: "/pages/index/index", fail: () => {} }) });
+      }
+      cancel();
     }
-    if (result.kind === "challenge") {
-      challengeNo.value = result.challengeNo; deliveryHint.value = result.deliveryHint; code.value = ""; return;
-    }
-    const registrationDestination = result.registrationReceipt
-      ? "/pages/register/success"
-      : props.returnTo;
-    const completed = completeSignIn({
-      identity: `user:${result.user.userId}`, returnTo: registrationDestination,
-      serverProfile: result.user, onboardingComplete: result.user.onboardingComplete,
-      serverSessionRevision: result.vaultRevision,
-      deferNavigation: !!result.registrationReceipt,
-      registrationLocale: result.registrationReceipt ? useLocaleStore().code : undefined,
-    });
-    if (!completed.ok) throw new Error("SIGN_IN_FAILED");
-    if (result.registrationReceipt) {
-      stageRemoteRegistrationReceipt(result.registrationReceipt, `user:${result.user.userId}`);
-      toast.success(t.value.register.registrationSignedIn);
-      navReset({ url: "/pages/register/success", fail: () => navReset({ url: "/pages/index/index", fail: () => {} }) });
-    }
-    cancel();
   } catch (cause) {
     if (!disposed && current === generation) {
-      if (authApi.pendingLogin()) {
+      if (props.intent === "LOGIN" && authApi.pendingLogin()) {
         // Leave the durable attempt intact. The shared login recovery UI owns
         // ambiguous completion, including recovery after this flow has expired.
         cancel(); message.value = t.value.login.unknownAttempt;
@@ -222,18 +245,26 @@ async function complete(captchaTicket?: string) {
       } else if (cause instanceof ApiError && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) showCaptcha.value = true;
       else if (!sponsorRefused(cause)) message.value = errorMessage(cause);
     }
-  } finally { submitting.value = false; }
+  } finally { submitting.value = false; password.value = ""; }
 }
 onMounted(async () => {
+  // #ifdef H5
   window.addEventListener("message", browserMessage);
+  // #endif
   try {
     const available = await api.available();
     if (!disposed) providers.value = available;
-  } catch { if (!disposed) message.value = t.value.thirdParty.unavailable; }
+    if (props.intent === "LINK") {
+      const value = await api.linked();
+      if (!disposed) linked.value = value;
+    }
+  } catch { if (!disposed && props.intent === "LINK") message.value = t.value.thirdParty.unavailable; }
 });
 onUnmounted(() => {
   disposed = true; cancel();
+  // #ifdef H5
   window.removeEventListener("message", browserMessage);
+  // #endif
 });
 </script>
 
@@ -249,4 +280,8 @@ onUnmounted(() => {
 .oauth-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .oauth-button[aria-disabled="true"] { opacity: 0.5; }
 .oauth-secondary { background: var(--v5-surface-2); color: var(--v5-ink); }
+</style>
+
+<style scoped>
+.oauth-panel-sheet :deep(.nx-sheet) { min-height:50vh; }
 </style>

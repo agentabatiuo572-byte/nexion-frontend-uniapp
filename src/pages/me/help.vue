@@ -1,7 +1,6 @@
 <!--
   Help Center (ported from Nexion-prototype/app/(main)/me/help/page.tsx).
-  FAQ search + category chips + accordion, an inline UVELBot chat (keyword
-  match over the FAQ corpus), and a contact card. Wrapped in <AppChassis active="me">.
+  FAQ search + category chips + accordion. The header link opens support. Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
@@ -37,7 +36,7 @@
 
       <!-- FAQ list -->
       <view class="mx-4" :style="faqWrapStyle">
-        <EmptyState v-if="faqLoadError && faqs.length === 0" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="loadFaqs" />
+        <EmptyState v-if="faqLoadError && faqs.length === 0" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="retryFaqs" />
         <EmptyState v-else-if="filtered.length === 0 && faqPageNum > 0 && !faqLoading && !faqLoadError && !canLoadMoreFaqs" :kind="query.trim() || requestedFaqId ? 'no-search-results' : 'empty-list'" :title="query.trim() || requestedFaqId ? t.empty.searchTitle : t.empty.listTitle" :desc="query.trim() || requestedFaqId ? t.empty.searchDesc : t.empty.listDesc" compact />
         <template v-else>
           <view
@@ -88,74 +87,6 @@
           <text>{{ faqLoading ? w.loadingMore : w.loadMore }}</text>
         </view>
       </view>
-
-      <!-- UVELBot -->
-      <view v-if="NOVA_SUPPORT_VISIBLE" class="nx-glass-card mx-4" :style="botCardStyle">
-        <view class="flex items-center" :style="botHeadStyle">
-          <view class="grid place-items-center" :style="botIconBoxStyle">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-          </view>
-          <text :style="botTitleStyle">{{ w.askBot }}</text>
-        </view>
-        <scroll-view scroll-y :style="botScrollStyle" :scroll-top="botScrollTop" :scroll-with-animation="true">
-          <view style="padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
-            <view v-for="m in bot" :key="m.id" class="flex" :style="{ justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start' }">
-              <view :style="bubbleStyle(m.from === 'user')">
-                <text :style="bubbleTextStyle(m.from === 'user')">{{ m.id === 'init' ? w.botGreeting : m.text }}</text>
-                <text v-if="m.meta" class="block" :style="bubbleMetaStyle(m.from === 'user')">{{ m.meta }}</text>
-              </view>
-            </view>
-            <view v-if="thinking" class="flex" style="justify-content: flex-start">
-              <view :style="thinkingStyle">
-                <text :style="thinkingTextStyle">{{ w.botThinking }}</text>
-              </view>
-            </view>
-          </view>
-        </scroll-view>
-        <view class="flex items-center" :style="botInputRowStyle">
-          <input
-            :value="botInput"
-            :placeholder="w.botPlaceholder"
-            :style="botInputStyle"
-            placeholder-class="ph"
-            confirm-type="send"
-            :aria-label="w.botInputLabel"
-            @input="onBotInput"
-            @confirm="sendToBot()"
-          />
-          <!-- 输入为空时点了没用 → 显式 aria-disabled;有内容时给按下反馈 -->
-          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() && !pendingBotRequest }" role="button" tabindex="0" :aria-label="w.botSendLabel" :aria-disabled="botInput.trim() && !pendingBotRequest ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim() && !pendingBotRequest)" @click="sendToBot()"  @keydown.enter.prevent="sendToBot()" @keydown.space.prevent="sendToBot()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() && !pendingBotRequest ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
-          </view>
-        </view>
-        <!-- BUG 175 降级入口:超时/失败后必须给用户出路 —— 重试同一提问,
-             或转人工工单。没有这一行,用户只能看着「正在思考…」干等。 -->
-        <view v-if="botFailure && !thinking" class="flex items-center" :style="botFallbackRowStyle" data-help-action="bot-fallback" role="status" aria-live="polite">
-          <text class="flex-1" :style="botFallbackHintStyle">{{ botFailure === 'timeout' ? w.botTimeoutHint : w.remoteFailed }}</text>
-          <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" :style="botFallbackBtnStyle" data-help-action="bot-retry" role="button" tabindex="0" :aria-label="w.botRetry" @click="retryBot"  @keydown.enter.prevent="retryBot" @keydown.space.prevent="retryBot">
-            <text>{{ w.botRetry }}</text>
-          </view>
-          <view class="shrink-0 inline-flex items-center justify-center active:opacity-80" :style="botFallbackContactStyle" data-help-action="bot-contact" role="button" tabindex="0" :aria-label="w.contactCta" @click="goContactSupport"  @keydown.enter.prevent="goContactSupport" @keydown.space.prevent="goContactSupport">
-            <text>{{ w.contactCta }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- Contact -->
-      <view class="mx-4" :style="contactRowStyle">
-        <view class="flex items-center" style="gap: 12px">
-          <view class="grid place-items-center" :style="mailBoxStyle">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
-          </view>
-          <view class="min-w-0" style="flex: 1">
-            <text class="block" :style="contactTitleStyle">{{ w.contactSupport }}</text>
-            <text class="block" :style="contactHintStyle">{{ w.contactHint }}</text>
-          </view>
-          <view class="active:opacity-90 transition-opacity" :style="contactCtaStyle" role="button" tabindex="0" :aria-label="w.contactCta" @click="goContactSupport"  @keydown.enter.prevent="goContactSupport" @keydown.space.prevent="goContactSupport">
-            <text>{{ w.contactCta }}</text>
-          </view>
-        </view>
-      </view>
     </view>
   </AppChassis>
 </template>
@@ -163,26 +94,23 @@
 <script setup lang="ts">
 import { platformDisplayText } from "@/lib/brand-copy";
 
-import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { novaAiApi, remoteApiEnabled, supportApi } from "@/api/runtime";
-import { asApiError } from "@/api/errors";
-import { buildRemoteHelpRequest } from "@/lib/help-bot-remote";
-import { requireCryptoUuid } from "@/lib/secure-command-id";
-import { createLatestAbortableRequest } from "@/lib/nova-thinking";
-import { createHelpBotScope, type HelpBotRequest } from "@/lib/help-bot-scope";
-import { NOVA_SUPPORT_VISIBLE } from "@/lib/nova-visibility";
+import { ApiError } from "@/api/errors";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import type { SupportFaq } from "@/domain/support";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
-import { readPublishedFaqPages } from "@/lib/published-faq-pages";
+import { passiveTabReadScope } from "@/lib/passive-tab-read";
+import { readPublishedFaqPage, readPublishedFaqs } from "@/store/published-content";
 
 const t = useT();
 const w = computed(() => t.value.help);
@@ -206,12 +134,15 @@ const cat = ref<FaqCategory | "all">("all");
 const openId = ref<string | null>(null);
 const faqLoadError = ref(false);
 let faqRequestGeneration = 0;
+let faqDisplayScope = "";
 const canLoadMoreFaqs = computed(() => faqs.value.length < faqTotal.value);
 const requestedFaqLanguage = computed(() => locale.code === "zh" ? "zh-CN" : locale.code === "vi" ? "vi-VN" : "en-US");
 const faqLanguageFallback = computed(() => faqs.value.length > 0
   && faqs.value.some((faq) => faq.language.toLowerCase() !== requestedFaqLanguage.value.toLowerCase()));
 
-async function loadFaqs() {
+async function loadFaqs(force = false) {
+  const displayScope = passiveTabReadScope(false);
+  if (faqDisplayScope !== displayScope) resetFaqProjection();
   const requestGeneration = ++faqRequestGeneration;
   const requestedLanguage = locale.code;
   const requestScope = remoteAccountScope.snapshot();
@@ -220,12 +151,13 @@ async function loadFaqs() {
   try {
     const targetId = requestedFaqId.value;
     const isCurrent = () => requestGeneration === faqRequestGeneration && requestedLanguage === locale.code
-      && remoteAccountScope.isCurrent(requestScope);
-    const allItems = targetId ? await readPublishedFaqPages(supportApi, requestedLanguage, isCurrent) : null;
+      && remoteAccountScope.isCurrent(requestScope) && displayScope === passiveTabReadScope(false);
+    const allItems = targetId ? await readPublishedFaqs(requestedLanguage, isCurrent, force) : null;
     const next = allItems ? { items: allItems, total: allItems.length, pageNum: 1 }
-      : await supportApi.faqPage(requestedLanguage, undefined, "Help Center", 1, FAQ_PAGE_SIZE);
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      : await readPublishedFaqPage(requestedLanguage, 1, FAQ_PAGE_SIZE, force);
+    if (isCurrent()) {
       faqs.value = next.items;
+      faqDisplayScope = displayScope;
       faqPageNum.value = next.pageNum;
       faqTotal.value = next.total;
       if (targetId && requestedFaqId.value === targetId) {
@@ -234,8 +166,13 @@ async function loadFaqs() {
         openId.value = target?.id ?? null;
       }
     }
-  } catch {
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) faqLoadError.value = true;
+  } catch (cause) {
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      if (cause instanceof ApiError && (cause.kind === "auth" || cause.status === 401 || cause.status === 403 || cause.code === 401 || cause.code === 403)) {
+        faqs.value = []; faqPageNum.value = 0; faqTotal.value = 0;
+      }
+      faqLoadError.value = true;
+    }
   } finally {
     if (requestGeneration === faqRequestGeneration && remoteAccountScope.isCurrent(requestScope)) faqLoading.value = false;
   }
@@ -243,21 +180,30 @@ async function loadFaqs() {
 
 async function loadMoreFaqs() {
   if (faqLoading.value || !canLoadMoreFaqs.value) return;
+  if (faqDisplayScope !== passiveTabReadScope(false)) return loadFaqs();
   const requestGeneration = ++faqRequestGeneration;
   const requestedLanguage = locale.code;
   const requestScope = remoteAccountScope.snapshot();
+  const displayScope = faqDisplayScope;
+  const force = faqLoadError.value;
   const nextPage = faqPageNum.value + 1;
   faqLoadError.value = false;
   faqLoading.value = true;
   try {
-    const next = await supportApi.faqPage(requestedLanguage, undefined, "Help Center", nextPage, FAQ_PAGE_SIZE);
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+    const next = await readPublishedFaqPage(requestedLanguage, nextPage, FAQ_PAGE_SIZE, force);
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)
+      && displayScope === passiveTabReadScope(false)) {
       faqs.value = [...new Map([...faqs.value, ...next.items].map(item => [item.id, item])).values()];
       faqPageNum.value = next.pageNum;
       faqTotal.value = next.total;
     }
-  } catch {
-    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) faqLoadError.value = true;
+  } catch (cause) {
+    if (requestGeneration === faqRequestGeneration && requestedLanguage === locale.code && remoteAccountScope.isCurrent(requestScope)) {
+      if (cause instanceof ApiError && (cause.kind === "auth" || cause.status === 401 || cause.status === 403 || cause.code === 401 || cause.code === 403)) {
+        faqs.value = []; faqPageNum.value = 0; faqTotal.value = 0;
+      }
+      faqLoadError.value = true;
+    }
   } finally {
     if (requestGeneration === faqRequestGeneration && remoteAccountScope.isCurrent(requestScope)) faqLoading.value = false;
   }
@@ -265,10 +211,11 @@ async function loadMoreFaqs() {
 
 function retryFaqs() {
   if (faqLoading.value) return;
-  void loadFaqs();
+  void loadFaqs(true);
 }
 
 function resetFaqProjection() {
+  faqDisplayScope = "";
   faqRequestGeneration += 1;
   faqs.value = [];
   faqPageNum.value = 0;
@@ -278,10 +225,18 @@ function resetFaqProjection() {
   faqLoading.value = false;
 }
 
+let releaseActiveRefresh = () => {};
+let helpVisible = false;
 onShow(() => {
-  syncBotAccountScope();
+  helpVisible = true;
+  releaseActiveRefresh();
+  releaseActiveRefresh = registerActivePageRefresh(() => loadFaqs(true));
   void loadFaqs();
 });
+onHide(() => { helpVisible = false; releaseActiveRefresh(); });
+onUnmounted(() => { helpVisible = false; releaseActiveRefresh(); });
+const stopRuntimeRefresh = subscribeRuntimeRevision(() => { resetFaqProjection(); if (helpVisible) void loadFaqs(); });
+onUnmounted(stopRuntimeRefresh);
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -345,55 +300,7 @@ function categoryLabel(c: FaqCategory): string {
   }
 }
 
-interface BotMessage {
-  id: string;
-  from: "user" | "bot";
-  text: string;
-  meta?: string;
-}
-const helpScope = createHelpBotScope(remoteAccountScope);
-let helpBound: HelpBotRequest = helpScope.capture();
-const bot = ref<BotMessage[]>([]);
-function resetBotTranscript() {
-  helpScope.add({ from: "bot", text: w.value.botGreeting });
-  bot.value = [{ id: "init", from: "bot", text: w.value.botGreeting }];
-}
-resetBotTranscript();
-const botInput = ref("");
-const thinking = ref(false);
-const botScrollTop = ref(0);
-// BUG 175: 远端 chat 的传输兜底是 120s —— 那是**传输**时限,不是 UI 时限。
-// 把它当 UI 时限,用户会在「正在思考…」上无限等待,而输入框/发送按钮
-// (thinking 期间被禁用)也一起被钉死,无法重试、无法改问。
-const BOT_REPLY_TIMEOUT_MS = 25_000;
-const botRequestControl = createLatestAbortableRequest();
-// 失败后暴露降级入口(重试 / 提交工单);成功或新一轮提问时清掉。
-const botFailure = ref<"timeout" | "error" | null>(null);
-// A local deadline cannot cancel the model task. Keep its exact identity for replay.
-const pendingBotRequest = ref<{ scope: HelpBotRequest; payload: ReturnType<typeof buildRemoteHelpRequest> } | null>(null);
-let botDeadline: ReturnType<typeof setTimeout> | null = null;
-
-function clearBotDeadline() {
-  if (botDeadline) clearTimeout(botDeadline);
-  botDeadline = null;
-}
-
-function syncBotAccountScope() {
-  const current = helpScope.capture();
-  if (helpScope.isCurrent(helpBound)) return;
-  helpScope.sync();
-  helpBound = current;
-  resetBotTranscript();
-  botInput.value = "";
-  thinking.value = false;
-  botFailure.value = null;
-  pendingBotRequest.value = null;
-  botRequestControl.cancel();
-  clearBotDeadline();
-}
-
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale.code], ([accountKey], [previousAccountKey]) => {
-  syncBotAccountScope();
   // A reload's first server-account binding must retain its URL target.
   if (previousAccountKey !== "default" || !/^user:[1-9]\d*$/.test(String(accountKey))) requestedFaqId.value = "";
   query.value = "";
@@ -401,136 +308,9 @@ watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale
   void loadFaqs();
 });
 
-function bumpScroll() {
-  // Nudge scroll-top to jump to the latest message (uni scroll-view).
-  botScrollTop.value += 9999;
-}
-function onBotInput(e: Event) {
-  botInput.value = detailVal(e);
-}
-async function sendToBot(retryPending = false) {
-  syncBotAccountScope();
-  if (remoteApiEnabled && (thinking.value || (pendingBotRequest.value && !retryPending))) return;
-  const pending = retryPending ? pendingBotRequest.value : null;
-  const q = pending?.payload.message ?? botInput.value.trim();
-  if (!q) return;
-  if (!pending) {
-    helpScope.add({ from: "user", text: q });
-    bot.value = [...bot.value, { id: `u-${Date.now()}`, from: "user", text: q }];
-    botInput.value = "";
-  }
-  botFailure.value = null;
-  thinking.value = true;
-  bumpScroll();
-  if (remoteApiEnabled) {
-    const language = locale.code === "zh" || locale.code === "vi" ? locale.code : "en";
-    const request = pending?.scope ?? helpScope.capture(language);
-    const payload = pending?.payload ?? buildRemoteHelpRequest(q, request.language, request.conversationId, requireCryptoUuid());
-    pendingBotRequest.value = { scope: request, payload };
-    // BUG 175: 超时/失败必须**必然**结束 thinking,并给出明确原因 + 降级入口。
-    // 单靠 finally 不够:传输层忽略 signal 时 catch/finally 永远不会跑。
-    const control = botRequestControl.begin();
-    const appendBot = (text: string, meta?: string) => {
-      const message = { from: "bot" as const, text, ...(meta ? { meta } : {}) };
-      helpScope.add(message);
-      bot.value = [...bot.value, { id: `b-${Date.now()}`, ...message }];
-    };
-    const abandon = (failure: "timeout" | "error") => {
-      botRequestControl.cancel();
-      botFailure.value = failure;
-      appendBot(
-        failure === "timeout" ? w.value.botTimeout : w.value.remoteFailed,
-        failure === "timeout" ? w.value.botTimeoutHint : undefined,
-      );
-      thinking.value = false;
-      bumpScroll();
-    };
-    clearBotDeadline();
-    botDeadline = setTimeout(() => {
-      if (!helpScope.isCurrent(request) || !botRequestControl.isCurrent(control.epoch)) return;
-      abandon("timeout");
-    }, BOT_REPLY_TIMEOUT_MS);
-    try {
-      let result: Awaited<ReturnType<typeof novaAiApi.chat>>;
-      while (true) {
-        try {
-          result = await novaAiApi.chat(payload, control.signal);
-          break;
-        } catch (error) {
-          const failure = asApiError(error);
-          if (failure.status !== 429 || failure.message !== "NOVA_AI_TURN_IN_PROGRESS") throw error;
-          // The original turn still owns the server slot. Poll the same turn;
-          // its committed answer is replayed once the worker finishes.
-          await new Promise<void>((resolve) => setTimeout(resolve, 3_000));
-          if (!helpScope.isCurrent(request) || !botRequestControl.isCurrent(control.epoch)) return;
-        }
-      }
-      if (!helpScope.isCurrent(request)) {
-        syncBotAccountScope();
-        return;
-      }
-      // 已被超时分支收尾(epoch 已失效):迟到/被取消的应答不得再追加。
-      if (!botRequestControl.isCurrent(control.epoch)) return;
-      clearBotDeadline();
-      pendingBotRequest.value = null;
-      appendBot(result.reply);
-    } catch (error) {
-      if (!helpScope.isCurrent(request)) {
-        syncBotAccountScope();
-        return;
-      }
-      if (!botRequestControl.isCurrent(control.epoch)) return;
-      clearBotDeadline();
-      const failure = asApiError(error);
-      if (failure.kind !== "network" && ![408, 429, 500, 502, 503, 504].includes(failure.status ?? 0)) pendingBotRequest.value = null;
-      botFailure.value = "error";
-      appendBot(w.value.remoteFailed);
-    } finally {
-      if (helpScope.isCurrent(request) && botRequestControl.isCurrent(control.epoch)) {
-        thinking.value = false;
-        bumpScroll();
-      }
-    }
-    return;
-  }
-  const localRequest = helpScope.capture("en");
-  setTimeout(() => {
-    if (!helpScope.isCurrent(localRequest)) {
-      syncBotAccountScope();
-      thinking.value = false;
-      return;
-    }
-    const needle = q.toLowerCase();
-    const hit = faqs.value.find((item) => item.question.toLowerCase().includes(needle)
-      || item.answer.toLowerCase().includes(needle)
-      || needle.split(/\s+/).some((word) => word.length > 3 && `${item.question} ${item.answer}`.toLowerCase().includes(word)));
-    const responseMessage = { from: "bot" as const, text: hit ? hit.answer : w.value.botUnmatched };
-    helpScope.add(responseMessage);
-    bot.value = [...bot.value, { id: `b-${Date.now()}`, ...responseMessage }];
-    thinking.value = false;
-    bumpScroll();
-  }, 900);
-}
-
 function goSupport() {
   navTo("/pages/me/support");
 }
-function goContactSupport() {
-  navTo("/pages/support/messages");
-}
-/** Retry the same server turn while its outcome is unknown. */
-function retryBot() {
-  if (thinking.value) return;
-  if (pendingBotRequest.value) {
-    void sendToBot(true);
-    return;
-  }
-  const lastUser = [...bot.value].reverse().find((m) => m.from === "user");
-  if (!lastUser) return;
-  botInput.value = lastUser.text;
-  void sendToBot();
-}
-
 const contactLinkStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", minHeight: "44px", paddingLeft: "10px", paddingRight: "10px" };
 const searchIconStyle: CSSProperties = { position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", zIndex: 1 };
 // Search — 输入框贴在页面底上,零 border。原 surface-3 对页面底亮色仅 ΔE 2.7(分不出),
@@ -540,7 +320,8 @@ const searchInputStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderRadius: "12px",
   padding: "10px 12px 10px 36px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-input)",
+  lineHeight: "var(--ui-type-input-lh)",
   color: "var(--v5-ink)",
 };
 function chipStyle(active: boolean): CSSProperties {
@@ -575,7 +356,7 @@ const faqFallbackStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 const emptyStyle: CSSProperties = { padding: "24px", textAlign: "center" };
-const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)" };
+const emptyTextStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)" };
 const faqDividerStyle: CSSProperties = { borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const faqHeadStyle: CSSProperties = { gap: "12px", padding: "14px 0", minHeight: "48px" };
 const faqQStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
@@ -583,80 +364,15 @@ function chevStyle(open: boolean): CSSProperties {
   return { transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 150ms ease" };
 }
 const faqBodyStyle: CSSProperties = { padding: "0 0 14px" };
-const faqAStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 };
+const faqAStyle: CSSProperties = { fontSize: "var(--ui-type-long-form)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-long-form-lh)" };
 const faqLoadMoreStyle: CSSProperties = { minHeight: "44px", color: "var(--v5-brand)", fontSize: "13px", fontWeight: 600, borderTop: "1px solid var(--v5-border)" };
-// UVELBot — a contained chat widget (single surface container, no border).
-const botCardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  marginBottom: "12px",
-  background: "var(--nx-glass-fill)",
-  borderRadius: "var(--nx-glass-radius)",
-  overflow: "hidden",
-};
-const botHeadStyle: CSSProperties = { gap: "8px", padding: "12px 16px", borderBottom: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const botIconBoxStyle: CSSProperties = { width: "32px", height: "32px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const botTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
-const botScrollStyle: CSSProperties = { maxHeight: "280px" };
-function bubbleStyle(isUser: boolean): CSSProperties {
-  return {
-    maxWidth: "80%",
-    padding: "8px 12px",
-    borderRadius: "16px",
-    background: isUser ? "color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "var(--v5-surface-2)",
-  };
-}
-function bubbleTextStyle(isUser: boolean): CSSProperties {
-  return {
-    fontSize: "13px",
-    color: isUser ? "var(--v5-ink)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
-    lineHeight: 1.375,
-  };
-}
-function bubbleMetaStyle(isUser: boolean): CSSProperties {
-  return {
-    marginTop: "5px",
-    fontSize: "12px",
-    color: isUser ? "var(--v5-ink-3)" : "var(--v5-ink-4)",
-    lineHeight: 1.35,
-  };
-}
-const thinkingStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "16px", padding: "8px 12px" };
-const thinkingTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
-const botInputRowStyle: CSSProperties = { gap: "8px", padding: "10px 12px", borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const botInputStyle: CSSProperties = { flex: "1", background: "transparent", fontSize: "13px", color: "var(--v5-ink)" };
-const botFallbackRowStyle: CSSProperties = { gap: "8px", padding: "8px 12px 12px", flexWrap: "wrap" };
-const botFallbackHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)", lineHeight: 1.4, minWidth: "140px" };
-const botFallbackBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 12px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 12%, transparent)", color: "var(--v5-brand)", fontSize: "12px", fontWeight: 600 };
-const botFallbackContactStyle: CSSProperties = { minHeight: "32px", padding: "0 12px", borderRadius: "999px", border: "1px solid var(--v5-border)", color: "var(--v5-ink-2)", fontSize: "12px", fontWeight: 600 };
-function sendBtnStyle(active: boolean): CSSProperties {
-  return { width: "32px", height: "32px", borderRadius: "8px", background: active ? "var(--v5-brand-2)" : "var(--v5-surface-2)" };
-}
-// Contact — trailing action row on the floor; hairline opens it under the bot.
-const contactRowStyle: CSSProperties = {
-  padding: "16px 2px 0",
-  borderTop: "1px solid var(--v5-border)",
-};
-const mailBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)" };
-const contactTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
-const contactHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
-const contactCtaStyle: CSSProperties = {
-  // 《07》tap≥44:原 32px
-  height: "44px",
-  padding: "0 12px",
-  display: "flex",
-  alignItems: "center",
-  borderRadius: "8px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontSize: "12px",
-  fontWeight: 600,
-};
 
 import GlassSegments from "@/components/glass-segments.vue";
 const categoryOptions = computed(() => [{ value: "all", label: t.value.receipt.tabAll }, ...catOrder.map(value => ({ value, label: categoryLabel(value) }))]);
 </script>
 
 <style scoped>
-/* placeholder-class="ph" target — referenced by the search + bot inputs (P2). */
+/* placeholder-class="ph" target — referenced by the search input (P2). */
 .ph {
   color: var(--v5-ink-4);
 }

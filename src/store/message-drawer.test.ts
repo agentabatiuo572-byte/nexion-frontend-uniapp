@@ -4,15 +4,15 @@ import type { CanonicalNotificationPage } from "@/api/notification-api";
 import type { Conversation } from "@/domain/support";
 import { installSupportStorage } from "@/test/storage-setup";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
+import { nativeTabUrl } from "@/lib/native-tab-navigation";
 import chassisSource from "@/components/app-chassis.vue?raw";
 import headerSource from "@/components/sub-page-header.vue?raw";
 import meSource from "@/pages/me/me.vue?raw";
-import bubbleSource from "@/components/nova/nova-bubble.vue?raw";
-import supportSource from "@/pages/me/support.vue?raw";
-import ts from "typescript";
+import bubbleSource from "@/components/support/support-bubble.vue?raw";
 
 installSupportStorage();
 const runtime = vi.hoisted(() => ({ remoteApiEnabled: true,
+  apiRuntimeConfig: { environment: "dev", baseUrl: "https://test.invalid" },
   notificationApi: { page: vi.fn(), markRead: vi.fn() },
   supportApi: { authorityRevision: vi.fn(), commandResult: vi.fn(),
     conversations: vi.fn(), conversationDismissals: vi.fn(),
@@ -98,6 +98,17 @@ describe("shared message center", () => {
     expect(center.totalUnread).toBe(4); expect(center.error).toBe("offline"); expect(center.loading).toBe(false);
   });
 
+  it.each(['notification', 'conversation', 'category'])("does not let a successful sibling source hide a %s failure", async source => {
+    const center = useMessageDrawer(); await center.refresh();
+    if (source === 'notification') runtime.notificationApi.page.mockRejectedValueOnce(new Error('offline'));
+    if (source === 'conversation') runtime.supportApi.conversations.mockRejectedValueOnce(new Error('offline'));
+    if (source === 'category') runtime.supportApi.conversationCategories.mockRejectedValueOnce(new Error('offline'));
+    await center.refresh();
+    expect(center.error).toBeTruthy(); expect(center.loading).toBe(false);
+    expect(center.actionableUnread).toBeNull();
+    await center.refresh(); expect(center.error).toBeNull();
+  });
+
   it("runs one non-overlapping foreground loop and leaves human polling to realtime", async () => {
     const slow = deferred<CanonicalNotificationPage>();
     runtime.notificationApi.page.mockReturnValueOnce(slow.promise);
@@ -111,6 +122,26 @@ describe("shared message center", () => {
     expect(runtime.notificationApi.page).toHaveBeenCalledTimes(2);
     center.stopRefresh(); await vi.advanceTimersByTimeAsync(30_000);
     expect(runtime.notificationApi.page).toHaveBeenCalledTimes(2);
+  });
+
+  it("polls the selected category after 15 seconds without reviving its exhausted tail", async () => {
+    const initial = notificationPage(203);
+    runtime.notificationApi.page.mockResolvedValueOnce({ ...initial, nextCursor: "1" })
+      .mockResolvedValueOnce({ ...initial, items: [], nextCursor: null })
+      .mockResolvedValue({ ...initial, nextCursor: "1" });
+    const notifications = useNotifications();
+    await notifications.selectCategory("finance"); await notifications.loadMoreRemote();
+    expect(notifications.nextCursor).toBeNull();
+    const center = useMessageDrawer(); center.startRefresh(); await flush();
+    expect(notifications.category).toBe("finance"); expect(notifications.nextCursor).toBeNull();
+    const before = runtime.notificationApi.page.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(runtime.notificationApi.page).toHaveBeenCalledTimes(before);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(runtime.notificationApi.page).toHaveBeenCalledTimes(before + 1);
+    expect(runtime.notificationApi.page).toHaveBeenLastCalledWith(undefined, undefined, "finance");
+    expect(notifications.items).toHaveLength(1); expect(notifications.nextCursor).toBeNull();
+    expect(center.totalUnread).toBe(203); expect(notifications.loadingMore).toBe(false);
   });
 
   it("rejects hidden responses and refreshes immediately when restored", async () => {
@@ -167,7 +198,8 @@ describe("shared message center", () => {
     expect(takeNavigationQuery("/pages/me/notifications")).toBe("?section=service");
     pages = [{ route: "pages/me/notifications" }];
     navBack("/pages/me/me");
-    expect(pages).toEqual([{ route: "pages/me/me" }]);
+    // Vitest executes the APP-PLUS branch; the physical tab host carries the logical target.
+    expect(pages).toEqual([{ route: nativeTabUrl("/pages/me/me").replace(/^\//, "") }]);
     expect(chassisSource).not.toContain("<MessageDrawer");
   });
 
@@ -187,18 +219,13 @@ describe("shared message center", () => {
     expect(navigate).toHaveBeenCalledTimes(2); expect(pages).toHaveLength(2);
   });
 
-  it("routes the floating shortcut and live-chat channel through the shared Service entry without reading replies", async () => {
+  it("routes the floating shortcut through the shared Service entry without reading replies", async () => {
     const center = useMessageDrawer();
     const floatingBody = bubbleSource.match(/function open\(\) \{([\s\S]*?)\n\}/)![1];
     const floating = new Function("messageCenter", floatingBody);
-    const channelFunction = supportSource.match(/function onChannel\(c: Channel\) \{[\s\S]*?\n\}/)![0];
-    const compiled = ts.transpileModule(channelFunction, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-    const channel = new Function("messageCenter", "navTo", compiled + ";return onChannel;")(center, navTo);
     expect(bubbleSource).toContain('@click="open"');
-    expect(supportSource).toContain('@click="onChannel(c)"');
     for (const [origin, open] of [
       ["pages/index/index", () => floating(center)],
-      ["pages/me/support", () => channel({ id: "lc" })],
     ] as const) {
       pages = [{ route: origin }]; navigate.mockClear(); center.section = "notifications";
       open(); await flush();
@@ -211,6 +238,19 @@ describe("shared message center", () => {
       navBack("/pages/me/me"); expect(pages).toEqual([{ route: origin }]);
     }
     expect(runtime.notificationApi.markRead).not.toHaveBeenCalled();
-    expect(supportSource).not.toContain('href: "/pages/me/support-tickets?mode=create"');
   });
+});
+
+
+it("bells use actionable authority while inbox reading unread retains marketing", async () => {
+  const center = useMessageDrawer(), notifications = useNotifications();
+  notifications.unread = 9;
+  expect(center.totalUnread).toBe(9); expect(center.actionableUnread).toBeNull();
+  notifications.actionableUnread = 0;
+  expect(center.actionableUnread).toBe(0);
+  runtime.supportApi.conversations.mockResolvedValue({ items: [human("advisor", "advisor", 2)], total: 1 });
+  runtime.notificationApi.page.mockResolvedValue({ ...notificationPage(9), actionableUnread: 0 });
+  await center.refresh(); expect(center.actionableUnread).toBe(2); expect(center.totalUnread).toBe(11);
+  notifications.actionableUnread = 4; expect(center.actionableUnread).toBe(6);
+  notifications.error = "offline"; expect(center.actionableUnread).toBeNull();
 });

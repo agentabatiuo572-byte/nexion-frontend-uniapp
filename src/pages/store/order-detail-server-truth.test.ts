@@ -1,3 +1,7 @@
+import { commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
+import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
+import { orderPaymentRejection } from '@/lib/order-payment-rejection';
+import { getOrderProductMedia } from "@/lib/product-media";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { compile } from "@vue/compiler-dom";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -7,7 +11,11 @@ import ts from "typescript";
 import * as Vue from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanonicalOrder, CanonicalOrderList } from "@/api/order-api";
-import { advanceRuntimeRevision, captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { advanceRuntimeRevision, captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, paidOrderReceipt } from "@/api/order-api";
+import { beginOrderAction, readOrderAction, markOrderActionPaid, clearOrderAction } from "@/lib/order-command-fence";
+import { purchaseRecoveryCopy } from "@/lib/purchase-recovery-copy";
+import { readPaymentCommand } from "@/api/payment-command-api";
+import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import { formatTrialDateTime } from "@/lib/trial-date";
 import { en } from "@/i18n/messages/en";
@@ -16,8 +24,9 @@ import { vi as vietnamese } from "@/i18n/messages/vi";
 import source from "./order-detail.vue?raw";
 import { fmt } from "@/i18n/format";
 import { trialPurchaseCopy } from "@/i18n/trial-purchase";
-import { trialEarlyPurchaseCopy } from "@/i18n/trial-early-purchase";
+import { trialLifecycleCopy } from "@/i18n/trial-lifecycle";
 
+vi.mock("@/store/product-catalog", () => ({ productCatalogState: { status: "ready" }, productCatalogPresentation: { value: null }, isProductCatalogDisplayCurrent: () => false, revalidateProductCatalog: vi.fn() }));
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
   productCatalogApi: { catalog: vi.fn() },
@@ -42,23 +51,26 @@ const copies = [
 ] as const;
 
 beforeEach(() => {
+  const disk: Record<string, unknown> = {};
+  vi.stubGlobal("uni", { getStorageSync: (key: string) => disk[key],
+    setStorageSync: (key: string, value: unknown) => { disk[key] = structuredClone(value); } });
   setActivePinia(createPinia());
   advanceRuntimeRevision(null);
   remote.orderApi.list.mockReset();
   remote.orderApi.cancel.mockReset();
   remote.orderApi.pay.mockReset();
 });
-afterEach(() => { for (const scope of scopes.splice(0)) scope.stop(); });
+afterEach(() => { for (const scope of scopes.splice(0)) scope.stop(); vi.unstubAllGlobals(); });
 
 function canonical(dataCenter: string | null, status: CanonicalOrder["canonicalStatus"] = "activated"): CanonicalOrder {
   return {
     orderNo: "ORD-SERVER-TRUTH", productId: 10, productNo: "cloud-share", productName: "Cloud Share ×1",
     quantity: 1, subtotalUsdt: 19.9, unitPriceUsdt: 19.9, discountUsdt: 0, amountUsdt: 19.9,
-    paymentMethod: "WALLET", paymentStatus: "PAID", orderStatus: "COMPLETED", activationStatus: "ACTIVATED",
-    canonicalStatus: status, orderType: "SINGLE", placedAt: 1000, expiresAt: null,
+    paymentMethod: "WALLET", paymentStatus: "PAID", orderStatus: "COMPLETED", activationStatus: status === "inventory" ? "INVENTORY" : "ACTIVATED",
+    canonicalStatus: status, orderType: status === "inventory" ? "TRADE_IN" : "SINGLE", placedAt: 1000, expiresAt: null,
     paidAt: 2000, activatedAt: status === "activated" ? 3000 : null, refundedAt: null,
     refundAmountUsdt: null, refundChannel: null, refundBillNo: null, dataCenter,
-    tradeinNo: null, sourceDeviceId: null, targetDeviceId: null, targetDeviceInstanceNo: null, itemCount: null,
+    tradeinNo: status === "inventory" ? "TI-1" : null, sourceDeviceId: status === "inventory" ? 11 : null, targetDeviceId: status === "inventory" ? 33 : null, targetDeviceInstanceNo: null, itemCount: null,
   };
 }
 
@@ -75,26 +87,40 @@ async function detail(dataCenter: string | null, copy = en, status: CanonicalOrd
   const copyRef = Vue.ref(copy);
   const navTo = vi.fn();
   const load = (id: string) => {
-    if (id === "@/lib/amount-display") return { formatAmount, formatGroupedAmount };
+    if (id === "@/lib/amount-display") return { formatAmount };
     if (id === "vue") return { ...Vue, onUnmounted: Vue.onScopeDispose };
     if (id === "@dcloudio/uni-app") return {
       onLoad: (callback: typeof onLoad) => { onLoad = callback; }, onShow: () => {}, onHide: () => {}, onUnload: () => {},
     };
+    if (id === "@/lib/commerce-review") return {commerceOrderTitle,commerceCopy};
+    if (id === "@/lib/checkout-flow-copy") return {checkoutFlowCopy};
+    if (id === "@/lib/order-payment-rejection") return {orderPaymentRejection};
+    if (id === "@/store/product-catalog") return { revalidateProductCatalog: vi.fn() };
+    if (id === "@/lib/product-media") return {getOrderProductMedia};
+    if (id === "@/composables/use-dialog-a11y") return {useDialogA11y:()=>{}};
+    if (id === "@/lib/authorized-payment") return { executePaymentWithPassword: vi.fn(async (_context: unknown, command: (authorization: PaymentPasswordAuthorization) => Promise<unknown>, current: () => boolean) =>
+      current() ? command({ paymentPassword: "039417", credentialVersion: 1, attemptNo: "fixture-attempt" }) : null) };
+    if (id === "@/api/payment-command-api") return { readPaymentCommand };
+    if (id === "@/lib/order-command-fence") return { beginOrderAction, readOrderAction, markOrderActionPaid, clearOrderAction };
+    if (id === "@/lib/purchase-recovery-copy") return { purchaseRecoveryCopy };
+    if (id === "@/store/locale") return {useLocaleStore:()=>({code:Vue.toRaw(copyRef.value)===zh?"zh":Vue.toRaw(copyRef.value)===en?"en":"vi"})};
     if (id === "@/store/orders") return { useOrders: () => orders, timelineFor };
     if (id === "@/store/app") return { useApp: () => ({}) };
+    if (id === "@/store/conversations") return { useConversations: () => ({}) };
+    if (id === "@/lib/advisor-chat-route") return { advisorChatRoute: async () => "/pages/support/chat?start=advisor" };
     if (id === "@/store/auth") return { useAuth: () => ({ isAuthenticated: true, accountId: "user:server-truth" }) };
     if (id === "@/i18n/use-t") return { useT: () => copyRef };
     if (id === "@/i18n/format") return { dateLocale: () => "en-US", fmt };
     if (id === "@/i18n/trial-purchase") return { useTrialPurchaseCopy: () => Vue.computed(() => trialPurchaseCopy[Vue.toRaw(copyRef.value) === zh ? "zh" : Vue.toRaw(copyRef.value) === en ? "en" : "vi"]) };
-    if (id === "@/i18n/trial-early-purchase") return { useTrialEarlyPurchaseCopy: () => Vue.computed(() => trialEarlyPurchaseCopy[Vue.toRaw(copyRef.value) === zh ? "zh" : Vue.toRaw(copyRef.value) === en ? "en" : "vi"]) };
+    if (id === "@/i18n/trial-lifecycle") return { useTrialLifecycleCopy: () => Vue.computed(() => trialLifecycleCopy[Vue.toRaw(copyRef.value) === zh ? "zh" : Vue.toRaw(copyRef.value) === en ? "en" : "vi"]) };
     if (id === "@/lib/brand-copy") return { nexGridBrandText };
     if (id === "@/lib/trial-date") return { formatTrialDateTime };
     if (id === "@/store/free-trial") return { trialReservesSlotNow: () => false };
     if (id === "@/store/ui" || id === "@/api/errors" || id === "@/lib/account-scope") return {};
     if (id === "@/composables/use-page-header") return { useSetPageHeader: () => {} };
-    if (id === "@/lib/route") return { navTo, takeNavigationQuery: () => "" };
+    if (id === "@/lib/route") return { navTo, navReset: vi.fn(), takeNavigationQuery: () => "" };
     if (id === "@/api/runtime") return remote;
-    if (id === "@/api/order-api") return { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision };
+    if (id === "@/api/order-api") return { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, paidOrderReceipt };
     if (id.endsWith(".vue")) return { __esModule: true, default: {} };
     throw new Error(`Unexpected order-detail script import: ${id}`);
   };
@@ -111,11 +137,51 @@ async function detail(dataCenter: string | null, copy = en, status: CanonicalOrd
 async function rendered(view: Awaited<ReturnType<typeof detail>>["view"]) {
   const app = Vue.createSSRApp({ render, setup: () => Vue.proxyRefs(view) });
   app.component("AppChassis", Vue.defineComponent({ setup: (_, { slots }) => () => Vue.h("main", slots.default?.()) }));
+  app.component("OrderRewards", Vue.defineComponent({ setup: () => () => Vue.h("div") }));
   app.component("DetailRow", Vue.defineComponent({ props: ["label", "value"], setup: (props) => () => Vue.h("div", `${props.label}: ${props.value}`) }));
+  // Same grouping helper as the real CheckoutAmount.
+  app.component("CheckoutAmount", Vue.defineComponent({ props: ["value", "currency"], setup: (props) => () => Vue.h("span", `${formatGroupedAmount(props.value)} ${props.currency}`) }));
   return renderToString(app);
 }
 
 describe("BUG 381 canonical order data-center and activation truth", () => {
+  it('shows purchased units rather than the number of distinct SKU lines', async () => {
+    const { view, orders } = await detail('Cloud-Global');
+    Object.assign(orders.orders[0], { quantity: 2, itemCount: 1, total: 2598 });
+    expect(view.orderQuantity.value).toBe(2);
+    expect(await rendered(view)).toContain(`${en.orders.quantity}: 2`);
+    orders.orders[0].lineItems = [
+      { sku: 'stellarbox-s1', name: 'UVELBox S1', quantity: 2, unitPriceUsdt: 1299, lineAmountUsdt: 2598 },
+      { sku: 'cloud-share', name: 'Cloud Share', quantity: 3, unitPriceUsdt: 20, lineAmountUsdt: 60 },
+    ];
+    expect(view.orderQuantity.value).toBe(5);
+    const html = await rendered(view);
+    expect(html).toContain('2 × 1,299.00');
+    expect(html).not.toContain('$1,299.00');
+    expect(orders.orders[0].total).toBe(2598);
+  });
+  it.each(['payment_failed','provisioning_failed','chargeback','expired'] as const)('offers read-only recovery for %s without unlocking payment or cancellation',async status=>{
+    const {view}=await detail('Cloud-Global',en,status);
+    const html=await rendered(view);
+    expect(html).toContain(en.orders.copyAndSupport);
+    // A closed order offers support, not a manual resync; unpaid closures never show a data center.
+    expect(html).not.toContain(en.store.catalogRetry);
+    if (status==='payment_failed'||status==='expired') expect(html).not.toContain(`${en.orders.dataCenter}:`);
+    else expect(html).toContain(`${en.orders.dataCenter}:`);
+    expect(view.canPayFromWallet.value).toBe(false);
+    expect(view.cancellable.value).toBe(false);
+    expect(view.canBuyAgain.value).toBe(status==='expired');
+    await view.handleWalletPayment();await view.handleCancel();
+    expect(remote.orderApi.pay).not.toHaveBeenCalled();expect(remote.orderApi.cancel).not.toHaveBeenCalled();
+  });
+  it.each(copies)('%s unpaid cancellation never promises a refund',(_language,copy)=>{
+    expect(copy.orders.cancelConfirm+' '+copy.orders.cancelDoneToast).not.toMatch(/退款|refund|hoàn tiền|1[–-]3/i);
+  });
+  it('formats authoritative order amounts with thousands separators without changing the amount',async()=>{
+    const {view,orders}=await detail('Cloud-Global');
+    orders.orders[0].total=12999;
+    expect(await rendered(view)).toContain('12,999.00 USDT');expect(orders.orders[0].total).toBe(12999);
+  });
   it.each(["Cloud-Global", "Frankfurt DC", "Singapore DC", "Other Region", "Cloud-Frankfurt", null, ""])(
     "preserves the canonical data-center %s instead of inferring a region", async (dataCenter) => {
       const { orders, row } = await detail(dataCenter);
@@ -150,7 +216,8 @@ describe("BUG 381 canonical order data-center and activation truth", () => {
     it.each([null, "", "   "])(`${language} renders unknown data-center %s neutrally`, async (dataCenter) => {
       const { view } = await detail(dataCenter, copy);
       const html = await rendered(view);
-      expect(html).toContain(copy.orders.activatedHint.replace("{dc}", "—"));
+      expect(html).toContain(commerceCopy(language.toLowerCase()).activatedLocationPending);
+      expect(html).not.toContain(copy.orders.activatedHint.replace("{dc}", "—"));
       expect(html).not.toContain(copy.store.coDcSingapore);
       expect(html).not.toContain(copy.store.coDcFrankfurt);
     });
@@ -183,4 +250,20 @@ describe("BUG 381 canonical order data-center and activation truth", () => {
     expect(html).toContain(en.orders.provisioningHint.replace("{dc}", "Cloud-Global"));
     expect(html).not.toContain(en.uiChrome.viewOnEarn);
   });
+});
+
+it('keeps static order summary and timeline labels while the first detail read is pending',async()=>{
+ const {view}=await detail('Cloud-Global');
+ const html=await rendered({...view,showRemoteOrderLoading:Vue.ref(true),order:Vue.ref(undefined)});
+ expect(html).toContain(en.orders.orderSummary);expect(html).toContain(en.orders.timelineTitle);
+});
+
+
+it.each([en, zh, vietnamese])('renders an inherited warehouse order as complete without an Earn claim', async copy => {
+  const { view, orders } = await detail(null, copy, 'inventory');
+  const html = await rendered(view);
+  expect(html).toContain(copy.orders.statusInventory); expect(html).toContain(copy.orders.inventoryToast);
+  expect(html).not.toContain(copy.uiChrome.viewOnEarn);
+  expect(orders.orders[0].status).toBe('inventory'); expect(orders.orders[0].activatedAt).toBeUndefined();
+  expect(orders.orders[0].timeline.map(event => event.status)).toEqual(['placed','paid','inventory']);
 });

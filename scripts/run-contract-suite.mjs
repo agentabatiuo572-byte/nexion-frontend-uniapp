@@ -22,10 +22,20 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCRIPTS = path.join(root, "scripts");
 
 const REGISTRY = {
+  // 10/28–10/30 新增后未登记的孤儿测试(BUG-013),已对齐当前实现后接入
+  "bare-template-content.behavior.test.mjs": { how: "chain" },
+  "me-error-layout.behavior.test.mjs": { how: "chain" },
+  "prototype-current-contracts.test.mjs": { how: "chain" },
+  "prototype-trial-capacity.test.mjs": { how: "chain" },
+  "tab-first-frame-scroll.behavior.test.mjs": { how: "chain" },
+  "prototype-machine-images.test.mjs": { how: "chain" },
+  "prototype-message-demo.test.mjs": { how: "chain" },
+  "lucky-spin-svg.browser.test.mjs": { how: "chain" },
+  "prototype-realtime.test.mjs": { how: "chain" },
   "touch-target-countdown.contract.test.mjs": { how: "chain" },
-  "app-h5-sync.test.mjs": { how: "elsewhere", by: "npm run test:app-h5-sync" },
   // ── chain:本执行器跑(原孤儿,z1 接入)──
   "native-svg-icons.test.mjs": { how: "chain" },
+  "native-glass-icon-layer.test.mjs": { how: "chain" },
   "hard-block-auth-contract.test.mjs": { how: "chain" },
   "session-ended-remote-contract.test.mjs": { how: "chain" },
   "hard-block-d5-runtime-contract.test.mjs": { how: "chain" },
@@ -43,7 +53,6 @@ const REGISTRY = {
   "remote-truth-boundary-contract.test.mjs": { how: "chain" },
   "remote-config-merge-contract.test.mjs": { how: "chain" },
   "remaining-feature-authority-contract.test.mjs": { how: "chain" },
-  "nova-local-ai-contract.test.mjs": { how: "chain" },
   "capacity-subsidy-countdown-contract.test.mjs": { how: "chain" },
   "remaining-feature-closure-contract.test.mjs": { how: "chain" },
   "phase-isolation-contract.test.mjs": { how: "chain" },

@@ -3,7 +3,6 @@
 // + 2 pure helpers; copied faithfully so the store page renders the same 6 tiers).
 
 import type { PhaseId } from "@/store/product-phase";
-import { nexGridBrandText } from "@/lib/brand-copy";
 
 // AI workload throughput per device — replaces "MH/s" hash rate in the
 // hero spec card, drives the v3.1 "you can power LLM 70B inference" narrative.
@@ -24,7 +23,7 @@ export interface AIPerformance {
 export interface PurchaseGate {
   rankMin?: number;           // 最低 V 级 (0-12);eligible 需 myRank >= rankMin
   activeDirectMin?: number;   // 最少活跃直推数
-  teamComputePointsMin?: number;     // 最低团队业绩 USD
+  teamComputePointsMin?: number; // 最低团队算力点
   mode: "all" | "either";     // 多条件 AND / OR
   quotaCap?: number;          // 锁额:本期可售上限
   quotaSold?: number;         // 已售 (server 维护;remaining = cap - sold)
@@ -42,6 +41,8 @@ export interface Product {
   // 缺失在渲染层降级成本地化占位串 (lib/product-copy.ts 的 specText)，
   // 不是解析失败——解析失败会连整份目录一起作废。
   gpu?: string;
+  specDocumentTitle?: string;
+  specDocumentUrl?: string;
   vram?: string;
   hashRate?: string;
   power?: string;
@@ -216,7 +217,7 @@ export const PRODUCTS: Product[] = [
     sold: 287,
     stock: 8,
     // 购买门(后台可改):组合 either —— V≥3 或 ≥15 活跃直推 或 ≥$20K 团队业绩 + 硬锁额(remaining=8)。
-    purchaseGate: { rankMin: 3, activeDirectMin: 15, teamComputePointsMin: 20000, mode: "either", quotaCap: 100, quotaSold: 92, quotaPeriod: "month", enforce: true },
+    purchaseGate: { rankMin: 3, activeDirectMin: 15, teamComputePointsMin: 200000, mode: "either", quotaCap: 100, quotaSold: 92, quotaPeriod: "month", enforce: true },
     features: [
       "Enterprise A100 GPUs",
       "Dedicated tier-3 datacenter slot",
@@ -306,7 +307,7 @@ export function clearProductCatalog(): void {
 export function replaceProductCatalog(products: readonly Product[]): void {
   // 服务端目录的 SKU 显示名可能是改名前的存量值("NexionBox Pro v2");这里是**展示**目录,
   // 归一后再进渲染面。协议侧不受影响:下单按 productNo(order-api 的 create 只发 productNo)。
-  PRODUCTS.splice(0, PRODUCTS.length, ...products.map((product) => ({ ...product, name: nexGridBrandText(product.name) })));
+  PRODUCTS.splice(0, PRODUCTS.length, ...products);
 }
 
 export function getProduct(id: string): Product | undefined {
@@ -324,7 +325,7 @@ export function annualRoiPct(p: Pick<Product, "dailyEarn" | "price">): number {
 // server-canonical in prod (server re-checks on POST /api/orders); client uses
 // this only for UI gating + progress copy.
 export interface GateContext {
-  rank: number; // myRank 0-12
+  rank: number; // myRank 0-8
   activeDirect: number; // active direct-invite count
   teamComputePoints: number;
 }
@@ -354,9 +355,9 @@ export function evaluatePurchaseGate(
     return { gated: false, eligible: true, soldOut: false, blocked: false, remaining: null, conditions: [], unmet: [], progressPct: 1 };
   }
   const conditions: GateCondition[] = [];
-  if (g.rankMin != null) conditions.push({ kind: "rank", need: g.rankMin, have: ctx.rank, met: ctx.rank >= g.rankMin });
-  if (g.activeDirectMin != null) conditions.push({ kind: "activeDirect", need: g.activeDirectMin, have: ctx.activeDirect, met: ctx.activeDirect >= g.activeDirectMin });
-  if (g.teamComputePointsMin != null) conditions.push({ kind: "teamComputePoints", need: g.teamComputePointsMin, have: ctx.teamComputePoints, met: ctx.teamComputePoints >= g.teamComputePointsMin });
+  if (g.rankMin != null && g.rankMin > 0) conditions.push({ kind: "rank", need: g.rankMin, have: ctx.rank, met: ctx.rank >= g.rankMin });
+  if (g.activeDirectMin != null && g.activeDirectMin > 0) conditions.push({ kind: "activeDirect", need: g.activeDirectMin, have: ctx.activeDirect, met: ctx.activeDirect >= g.activeDirectMin });
+  if (g.teamComputePointsMin != null && g.teamComputePointsMin > 0) conditions.push({ kind: "teamComputePoints", need: g.teamComputePointsMin, have: ctx.teamComputePoints, met: ctx.teamComputePoints >= g.teamComputePointsMin });
 
   const eligible =
     conditions.length === 0 ? true : g.mode === "all" ? conditions.every((c) => c.met) : conditions.some((c) => c.met);

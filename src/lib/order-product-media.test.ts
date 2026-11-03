@@ -35,8 +35,10 @@ describe("order art follows the storefront catalog", () => {
     state.products = catalog;
     expect(getOrderProductMedia("aggregate", [{ sku: "unknown" }])).toBeNull();
   });
-  it("does not read an older catalog while its current read is unavailable", () => {
-    state.status = "loading";
+  it("uses only a current retained catalog while loading and drops it when its proof is invalid", () => {
+    state.status = "loading"; state.proof = true; state.display = catalog;
+    expect(getProductMedia("stellarbox-pro-v2")?.src).toBe(catalog[2].imageUrl);
+    state.proof = false;
     expect(getProductMedia("stellarbox-pro-v2")).toBeNull();
   });
   it.each(["unknown×1", "stellarbox-s1×0", "stellarbox-s1x1", "stellarbox-s1×-1", "UVELBox S1", "stellarbox-s1×1 + cloud-share×1"])("does not guess an unrecognized identity: %s", sku => {

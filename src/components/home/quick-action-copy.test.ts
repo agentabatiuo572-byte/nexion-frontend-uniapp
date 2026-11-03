@@ -21,7 +21,7 @@ function actualChips(dictionary: typeof zh | typeof en | typeof vi) {
   const quest = Vue.reactive({ remoteStatus: "error", remoteQuests: [] });
   const modules: Record<string, unknown> = {
     vue: { ...Vue, onMounted() {} },
-    "@dcloudio/uni-app": { onShow() {} },
+    "@/composables/use-tab-page-lifecycle": { onShow() {} },
     "@/lib/route": { navTo() {} },
     "@/composables/use-now": { useNow: () => Vue.ref(Date.now() / 1000) },
     "@/i18n/use-t": { useT: () => Vue.ref(dictionary) },
@@ -29,6 +29,7 @@ function actualChips(dictionary: typeof zh | typeof en | typeof vi) {
     "@/store/nex-faucet": { useNexFaucet: () => faucet },
     "@/store/genesis": { useGenesis: () => genesis },
     "@/store/quest": { useQuest: () => quest },
+    "@/store/config": { useConfig: () => ({ isEnabled: () => true }) },
     "@/composables/use-genesis-sale-gate": { useGenesisSaleGate: () => ({ showUrgency: Vue.ref(true), blockText: Vue.ref(null) }) },
     "@/api/runtime": { remoteApiEnabled: true, stakingApi: {} },
     "./home-staking-rate": { highestLiveStakingApyPct },

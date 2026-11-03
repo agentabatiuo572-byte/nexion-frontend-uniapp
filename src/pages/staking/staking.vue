@@ -10,16 +10,19 @@
   (入账 ⊗ 记账,见 lib/money-receipt.ts) in the page handlers.
 -->
 <template>
+  <!-- isEnabled stays authoritative: it is false before a valid response,
+       on failure and on delisting. A background loading status alone must not
+       unmount the page and discard the calculator draft or scroll position. -->
   <AppChassis v-if="config.isEnabled('stakingVisible')" active="me">
     <CardStagger style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/wallet" />
+      <SubPageHeader back="/pages/me/me" />
       <!-- 开发诊断,不是产品文案:所以① 只在 DEV 构建渲染 ② 文案是裸英文字面量,不进三语词典 ——
            进了词典它就成了「工程名词写死在用户文案契约里」,而且词典对象摇不掉、会原样进生产包。
            ③ 与下面的 remoteError 分支解耦成独立 v-if:挂在同一条 v-else-if 链上时,这道闸一旦为假
            就会把 remoteError 分支放出来,是个只等某天 mock 下写了 remoteError 就会炸的暗雷。
            i18n-en-ok: 工程话诊断横幅,仅 DEV + mock 档渲染 -->
       <text v-if="isDevBuild && staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
-      <text v-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.staking.remoteUnavailableClosed }}</text>
+      <StakingReadStatus :has-snapshot="hasSnapshot" :loading="staking.remoteLoading" :failed="!!staking.remoteError && !staking.remoteReady" @retry="retryRemote" />
       <view v-if="staking.pendingOpenCount !== 0" class="nx-staking-recovery-entry" role="button" tabindex="0" :style="howPillStyle" @click="openRecovery" @keydown.enter.prevent="openRecovery" @keydown.space.prevent="openRecovery"><text>{{ t.stakingV3.sheet.checkPrevious }}</text></view>
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
@@ -33,7 +36,6 @@
             <view class="flex items-center justify-between" style="margin-bottom: 8px">
               <text :style="metaLabelStyle">{{ t.stakingV3.totalLocked }}</text>
               <view class="flex items-center" style="gap: 8px">
-                <text v-if="activePositions.length > 0" :style="earningChipStyle">{{ t.stakingV3.earningChip }}</text>
                 <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" role="link" tabindex="0" :aria-label="t.stakingV3.howItWorksEntry" @click="goHowItWorks">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
                   <text style="margin: 0 6px">{{ t.stakingV3.howItWorksEntry }}</text>
@@ -49,7 +51,7 @@
             </view>
 
             <!-- delta -->
-            <view class="tabular-nums" :style="deltaStyle">
+            <view v-if="hasSnapshot" class="tabular-nums" :style="deltaStyle">
               <text>{{ fmt(t.stakingV3.todayAccrued, { amount: `+$${todayAccruedText}` }) }}</text>
               <text style="color: var(--v5-ink-4)"> · {{ fmt(t.stakingV3.activeCount, { n: activePositions.length }) }}</text>
               <text v-if="maturedCount > 0" style="color: var(--v5-ink-4)"> · </text>
@@ -71,7 +73,7 @@
         </view>
 
         <!-- Section: vault picker -->
-        <view class="flex items-center" :style="secHeaderStyle">
+        <view v-if="stakingConfigAvailable" class="flex items-center" :style="secHeaderStyle">
           <text :style="secTitleStyle">{{ t.stakingV3.stakePlans }}</text>
         </view>
         <view v-if="stakingConfigAvailable" class="nx-glass-card" :style="vaultCardStyle">
@@ -82,41 +84,39 @@
             :apy="poolForTerm(term)?.apy ?? 0"
             :penalty="poolForTerm(term)?.penalty ?? 0"
             :min="poolForTerm(term)?.minAmountUsdt ?? 0"
-            :blurb="t.stakingV3.blurb[term]"
             :penalty-suffix="t.stakingV3.penaltySuffix"
-            :ribbon="RIBBONS[term]"
             :is-last="i === TERMS.length - 1"
             :disabled="!canOpenPool(term)"
             @open="openSheet(term)"
           />
         </view>
-        <view v-else :style="noticeStyle"><text>{{ t.staking.remoteUnavailableClosed }}</text></view>
 
         <!-- CompoundCalculator -->
-        <CompoundCalculator />
+        <CompoundCalculator v-if="stakingConfigAvailable && anyPlanSellable" />
 
         <!-- My positions -->
         <view class="flex items-center" :style="secHeaderStyle">
-          <text :style="secTitleStyle">{{ t.stakingV3.positions }}<text :style="countStyle">{{ positions.length }}</text></text>
+          <text :style="secTitleStyle">{{ t.stakingV3.positions }}<text :style="countStyle">{{ hasSnapshot ? positions.length : '—' }}</text></text>
         </view>
         <view style="display: flex; flex-direction: column; gap: 10px">
           <!-- 《06》no-owned-asset:无持仓是转化型空态。不给 CTA —— 方案列表就在这块的正上方,
                再放一个按钮等于让用户往回点,反而多余;文案直接指路。
                一个可售方案都没有时不能再承诺「锁定 USDT,睡觉也在赚」:那笔收益此刻买不到。 -->
-          <EmptyState v-if="positions.length === 0" kind="no-owned-asset" :title="t.empty.stakingTitle" :desc="anyPlanSellable ? t.empty.stakingDesc : stakingConfigAvailable ? t.home.quickStakeStopped : t.staking.remoteUnavailableClosed" compact />
+          <EmptyState v-if="stakingConfigAvailable && positions.length === 0" kind="no-owned-asset" :title="copy.empty" :desc="copy.emptyDetail" compact />
           <StakePositionRow
             v-for="p in positions"
             v-else
             :key="p.id"
             :p="p"
             :now="nowTs"
+            :disabled="!stakingConfigAvailable"
             @claim="handleClaim(p)"
             @early-withdraw="handleEarlyWithdraw(p)"
           />
         </view>
 
         <!-- Variable-APY notice -->
-        <text class="block" :style="noticeStyle">⚠️ {{ t.stakingV3.apyVariableNotice }}</text>
+        <text class="block" :style="noticeStyle">{{ copy.rateNotice }}</text>
       </view>
     </CardStagger>
 
@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { navTo, navReset } from "@/lib/route";
 import { useConfig } from "@/store/config";
@@ -140,6 +140,8 @@ import VaultRow from "@/components/staking/vault-row.vue";
 import StakePositionRow from "@/components/staking/position-row.vue";
 import CompoundCalculator from "@/components/staking/compound-calculator.vue";
 import StakeSheet from "@/components/staking/stake-sheet.vue";
+import StakingReadStatus from "@/components/staking/staking-read-status.vue";
+import { useStakingReviewCopy } from "@/lib/staking-review-copy";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
@@ -153,13 +155,11 @@ import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 const ONE_DAY_MS = 86400 * 1000;
 const TERMS: StakingTerm[] = [30, 90, 180, 365];
 const t = useT();
+const copy = useStakingReviewCopy();
 // Vite 在生产构建里把 import.meta.env.DEV 直接换成 false,整个横幅连同它的文案一起被摇掉。
 const isDevBuild = import.meta.env.DEV;
-const RIBBONS = computed<Partial<Record<StakingTerm, { label: string; tone: "cyan" | "gold" }>>>(() => ({
-  180: { label: t.value.stakingV3.ribbon.popular, tone: "cyan" },
-  365: { label: t.value.stakingV3.ribbon.topYield, tone: "gold" },
-}));
 const staking = useStaking();
+const hasSnapshot = computed(() => staking.isMockMode || staking.remoteHasSnapshot);
 const app = useApp(); // 仅用于 reportStuckFunds 取当前资金快照(入待对账队列)
 const stakingConfigAvailable = computed(() => staking.isMockMode || staking.remoteReady);
 function canOpenPool(term: StakingTerm) {
@@ -232,7 +232,7 @@ onShow(() => {
 onHide(hidePage);
 
 async function runRemoteMutation(kind: "claim" | "early", positionNo: string, scope = mutationScope()) {
-  if (!isCurrentMutationPage(scope)) return false;
+  if (!isCurrentMutationPage(scope) || !staking.remoteReady) return false;
   let lease;
   try {
     lease = remoteMutationGate.acquire(app.accountKey, kind, { positionNo });
@@ -262,16 +262,16 @@ async function runRemoteMutation(kind: "claim" | "early", positionNo: string, sc
 // Tick every 4s: re-mature positions + refresh accrual/progress.
 const nowTs = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | null = null;
+async function retryRemote() {
+  if (staking.remoteLoading) return;
+  if (await staking.syncRemote()) nowTs.value = staking.currentTime();
+}
 onMounted(() => {
   if (!staking.isMockMode) {
-    // syncRemote 自吞不 reject(resilience 门);失败信号走返回值。
-    void staking.syncRemote().then((ok) => {
-      nowTs.value = staking.currentTime();
-      if (!ok) toast.error(t.value.stakingV3.toast.staleTitle);
-    });
+    nowTs.value = staking.currentTime();
+    void retryRemote();
     timer = setInterval(() => {
-      nowTs.value = staking.currentTime();
-      void staking.syncRemote().then(() => { nowTs.value = staking.currentTime(); });
+      if (pageVisible && (staking.remoteReady || !staking.remoteError)) void retryRemote();
     }, 4000);
     return;
   }
@@ -308,9 +308,9 @@ const avgAPY = computed(() => {
   return w / totalLocked.value;
 });
 
-const totalLockedText = computed(() => formatAmount(totalLocked.value));
-const todayAccruedText = computed(() => formatAmount(todayAccrued.value));
-const totalAccruedText = computed(() => formatAmount(totalAccrued.value));
+const totalLockedText = computed(() => hasSnapshot.value ? formatAmount(totalLocked.value) : "—");
+const todayAccruedText = computed(() => hasSnapshot.value ? formatAmount(todayAccrued.value) : "—");
+const totalAccruedText = computed(() => hasSnapshot.value ? formatAmount(totalAccrued.value) : "—");
 const avgApyText = computed(() => (totalLocked.value > 0 ? `${formatStakingPercentage(avgAPY.value)}%` : "—"));
 
 function openRecovery() {
@@ -370,7 +370,7 @@ function reportStakingFailure(reason: unknown, fallbackTitle: string) {
 
 async function handleEarlyWithdraw(p: StakingPosition) {
   const scope = mutationScope();
-  if (!isCurrentMutationPage(scope)) return;
+  if (!isCurrentMutationPage(scope) || (!staking.isMockMode && !staking.remoteReady)) return;
   const penaltyRate = resolvePositionPenalty(p, staking.isMockMode, STAKING_PENALTY[p.termDays]);
   if (penaltyRate === null) {
     reportStakingFailure(null, t.value.staking.remoteUnavailableClosed);
@@ -510,15 +510,6 @@ const metaLabelStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
 };
-const earningChipStyle: CSSProperties = {
-  padding: "2px 8px",
-  borderRadius: "999px",
-  background: "var(--v5-tech-cyan-soft)",
-  color: "var(--v5-tech-cyan)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-};
 const bigDollarStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "20px",
@@ -563,7 +554,7 @@ function statVStyle(tint: string): CSSProperties {
 const secHeaderStyle: CSSProperties = { margin: "10px 2px 0" };
 const secTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-section)",
   fontWeight: 600,
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",

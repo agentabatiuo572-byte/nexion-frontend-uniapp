@@ -33,7 +33,7 @@ export interface CanonicalVRankRow {
 }
 
 export interface MonetaryVRankReward {
-  type: "USDT" | "NEX";
+  type: "USDT" | "UVT";
   amount: number;
   voucherId?: string;
   skuId?: string;
@@ -112,6 +112,17 @@ function optionalNumber(value: unknown, minimum = 0): number | undefined {
   return number(value, minimum);
 }
 
+/** Additive platform-count fields. Missing is unknown; never coerce money or strings. */
+function optionalComputePoints(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  return computePoints(value);
+}
+
+function computePoints(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) return invalid();
+  return value;
+}
+
 function integer(value: unknown, minimum = 0): number {
   const parsed = number(value, minimum);
   if (!Number.isInteger(parsed)) return invalid();
@@ -126,8 +137,8 @@ function optionalText(value: unknown): string | undefined {
 function reward(value: unknown): CanonicalVRankReward {
   const source = record(value);
   const type = text(source.type).toUpperCase();
-  if (type !== "USDT" && type !== "NEX" && type !== "VOUCHER" && type !== "SKU" && type !== "CUSTOM") return invalid();
-  if (type === "USDT" || type === "NEX") {
+  if (type !== "USDT" && type !== "UVT" && type !== "VOUCHER" && type !== "SKU" && type !== "CUSTOM") return invalid();
+  if (type === "USDT" || type === "UVT") {
     return { type, amount: number(source.amount), voucherId: optionalText(source.voucherId),
       skuId: optionalText(source.skuId), customLabel: optionalText(source.customLabel) };
   }
@@ -149,9 +160,9 @@ function rankRow(value: unknown): CanonicalVRankRow {
     v,
     title: text(source.title),
     cnTitle: text(source.cnTitle),
-    selfComputePoints: optionalNumber(source.selfComputePoints),
+    selfComputePoints: optionalComputePoints(source.selfComputePoints),
     directRefs: optionalNumber(source.directRefs),
-    teamComputePoints: optionalNumber(source.teamComputePoints),
+    teamComputePoints: optionalComputePoints(source.teamComputePoints),
     requiredDownlineRank: requiredRank,
     requiredDownlineCount: optionalNumber(source.requiredDownlineCount),
     directBonus: number(source.directBonus),
@@ -179,7 +190,7 @@ function ladder(value: unknown, mode: ApiEnvironment): CanonicalVRankLadder {
   const proof = provenance(source, mode);
   if (!Array.isArray(source.ranks)) return invalid();
   const ranks = source.ranks.map(rankRow).sort((left, right) => left.v - right.v);
-  if (ranks.length !== 9 || ranks.some((rank, index) => rank.v !== index)) return invalid();
+  if ((ranks.length < 1 || ranks.length > 13) || ranks.some((rank, index) => rank.v !== index)) return invalid();
   // 旧后端(尚未下发能力位)不能让整个阶梯判非法 —— 那会把等级页变成「数据不可用」,
   // 连配置比例都读不到。缺字段一律**失败关闭**为「不派发」:宁可少承诺,不能把配置
   // 比例写成已生效权益(#79)。字段在但类型不对属于协议违规,仍判非法。
@@ -212,9 +223,9 @@ function current(value: unknown, mode: ApiEnvironment): CanonicalVRankState {
     ...proof,
     rankCode,
     progress: {
-      selfComputePoints: number(progress.selfComputePoints),
+      selfComputePoints: computePoints(progress.selfComputePoints),
       directRefs: integer(progress.directRefs),
-      teamComputePoints: number(progress.teamComputePoints),
+      teamComputePoints: computePoints(progress.teamComputePoints),
       vDownlineCounts: counts,
     },
   };

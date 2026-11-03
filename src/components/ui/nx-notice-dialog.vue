@@ -30,7 +30,7 @@ const props = withDefaults(defineProps<{ open: boolean; title: string; body?: st
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
 // Esc / Android back take the quiet action when there is one; a notice without one must be answered.
-useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && !props.busy) emit('secondary'); });
+useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && !props.busy) emit('secondary'); }, true, 6);
 </script>
 <style scoped>
 .nx-notice-mask { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 24px 23px; box-sizing: border-box; background: var(--v5-bg-color-mask); }
@@ -42,8 +42,8 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary 
 .nx-notice--danger { --nx-notice-tone: var(--v5-danger); --nx-notice-fill: var(--v5-danger); --nx-notice-fill-amount: 16%; }
 .nx-notice--neutral { --nx-notice-tone: var(--v5-ink-2); --nx-notice-fill: var(--v5-ink-3); --nx-notice-fill-amount: 18%; }
 .nx-notice__title { display: block; margin-top: 16px; font: 600 20px/28px var(--font-v5); color: var(--v5-ink); }
-.nx-notice__body { display: block; margin-top: 8px; font: var(--ui-type-body-weight, 400) var(--ui-type-body, 15px)/var(--ui-type-body-lh, 22px) var(--font-v5); color: var(--v5-ink-2); }
+.nx-notice__body { display: block; margin-top: 8px; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); }
 .nx-notice__actions { align-self: stretch; display: grid; gap: 4px; margin-top: 24px; }
 /* The quiet action reads at button size, in the muted color. */
-.nx-notice__actions :deep(.nx-button--link) { font: var(--ui-type-button-weight, 500) var(--ui-type-button, 15px)/var(--ui-type-button-lh, 20px) var(--font-v5); }
+.nx-notice__actions :deep(.nx-button--link) { font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
 </style>

@@ -1,9 +1,10 @@
+import { teamPrivacyFixture } from './team-privacy.test-support';
+import { formatComputePoints } from "@/i18n/compute-points";
 import { describe, expect, it, vi } from "vitest";
 import ts from "typescript";
 import { compileTemplate, parse } from "@vue/compiler-sfc";
 import * as Vue from "vue";
 import { formatAmount } from "@/lib/amount-display";
-import { computePointsCopy, formatComputePoints } from "@/i18n/compute-points";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "@vue/server-renderer";
 import networkPage from "./network.vue?raw";
@@ -25,14 +26,15 @@ async function renderTree(remoteStatus: "idle" | "loading" | "ready" | "error", 
     components: {
       AppChassis: { setup: (_props: unknown, { slots }: { slots: { default?: () => Vue.VNode[] } }) => () => h("main", slots.default?.()) },
       SubPageHeader: { render: () => h("header") },
+      TeamArt: { render: () => h("figure") },
       TeamRosterSection: { props: ["emptyLabel"], render() { return h("section", this.$props.emptyLabel); } },
     },
     setup: () => ({
-      formatAmount, formatComputePoints, computePointsCopy, locale: { code: "en" },
-      remoteApiEnabled: remote,
+      visibility: teamPrivacyFixture().visibility, formatAmount, formatComputePoints, locale: {code:"en"},
+      networkReadable: !remote || remoteStatus === 'ready', remoteApiEnabled: remote, rosterMounted: !remote || remoteStatus === 'ready',
       network: { remoteStatus, refreshCanonicalNetwork: vi.fn(), ensureCanonicalNetwork: vi.fn() },
       t: { network: en.network, tree: en.tree },
-      members: [], direct: [], extended: [], totalPoints: 0, directSubtitle: "", extendedSubtitle: "",
+      members: [], direct: [], extended: [], totalVol: 0, directSubtitle: "", extendedSubtitle: "",
       expanded: { direct: true, extended: true }, errorStateStyle: {}, retryStyle: {}, readStateStyle: {},
       metricCardStyle: {}, metricLabelStyle: {}, metricSuffixStyle: {}, metricValueStyle: () => ({}),
     }),
@@ -43,7 +45,7 @@ async function renderTree(remoteStatus: "idle" | "loading" | "ready" | "error", 
 describe("team network and tree remote read states", () => {
   it("refreshes a cached Tree on return using the same coalesced read as mount", () => {
     const mounted: Array<() => void> = [], shown: Array<() => void> = [];
-    const lifecycle = treePage.slice(treePage.indexOf("onMounted("), treePage.indexOf("const members ="));
+    const lifecycle = treePage.slice(treePage.indexOf("onMounted("), treePage.indexOf("const networkReadable ="));
     const compiled = ts.transpileModule(lifecycle, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
     const network = { ensureCanonicalNetwork: vi.fn() };
     new Function("remoteApiEnabled", "network", "onMounted", "onShow", compiled)(true, network,
@@ -101,11 +103,12 @@ describe("team network and tree remote read states", () => {
       refreshCanonicalNetwork: vi.fn(),
     };
 
-    new Function("remoteApiEnabled", "network", "onMounted", "onShow", "setInterval", compiled)(
+    new Function("remoteApiEnabled", "network", "onMounted", "onShow", "onHide", "setInterval", compiled)(
       true,
       network,
       (callback: () => void) => mounted.push(callback),
       (callback: () => void) => shown.push(callback),
+      () => undefined,
       () => 1,
     );
     mounted.forEach((callback) => callback());

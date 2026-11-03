@@ -3,7 +3,6 @@
     <text class="block" style="font-weight:600">{{ paused ? copy.statuses.PAUSED : task.executionMode === 'SIMULATED' && task.status === 'RUNNING' ? copy.running : task.status ? copy.statuses[task.status] : copy.unknown }}<template v-if="task.settlementStatus && task.settlementStatus !== 'NONE'"> · {{ copy.statuses[task.settlementStatus] }}</template></text>
     <text class="block">{{ task.executionMode === 'SIMULATED' ? copy.duration : copy.estimated }} {{ visibility.mask(`${task.totalSec} ${copy.seconds}`) }}<template v-if="task.executionMode !== 'SIMULATED'"> · {{ copy.actual }} {{ visibility.mask(task.actualDurationSec == null ? copy.unknown : `${task.actualDurationSec} ${copy.seconds}`) }}</template></text>
     <text class="block">{{ task.executionMode === 'SIMULATED' ? copy.reward : copy.frozenReward }} {{ visibility.mask(formatTaskReward(task)) }}</text>
-    <text v-if="task.executionMode === 'RULE_CYCLE'" class="block">{{ copy.ruleCycle }}</text>
     <text v-if="task.executionMode !== 'SIMULATED' && task.settlementBatchNo" class="block">{{ copy.batch }} #{{ visibility.mask(task.settlementBatchNo) }}</text>
     <text v-if="task.executionMode !== 'SIMULATED' && task.configVersion" class="block">{{ copy.configVersion }} {{ visibility.mask(task.configVersion) }}</text>
   </view>

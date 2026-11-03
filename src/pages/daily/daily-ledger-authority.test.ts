@@ -1,4 +1,4 @@
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount as formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { computed, reactive, ref } from "vue";
@@ -20,6 +20,8 @@ import * as rewardView from "./daily-reward-view";
 
 const remote = vi.hoisted(() => ({
   fundsServerEnabled: true, remoteApiEnabled: true, expectedApiEnvironment: "dev",
+  apiRuntimeConfig: { environment: "dev", baseUrl: "https://fixture.invalid" },
+  apiRuntimeClientOrigin: { environment: "dev", baseUrl: "https://fixture.invalid" },
   walletBillsApi: { list: vi.fn(), summary: vi.fn() }, sessionVault: { read: vi.fn() },
   pointsApi: { state: vi.fn(), checkIn: vi.fn(), claimMilestone: vi.fn(), useSaver: vi.fn() },
   deviceE3Api: { fleet: vi.fn() }, taskAssignmentApi: { state: vi.fn() },
@@ -49,9 +51,11 @@ function mount(bills: ReturnType<typeof useBills>) {
   if (start < 0 || end < start) throw new Error("Daily ledger projection missing");
   const code = ts.transpileModule(source.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const faucet = reactive({ history: [{ delta: 999, ts: 1, reason: "cached reward" }, { delta: -50, ts: 2, reason: "cached swap" }] });
-  return new Function("formatAmount", "computed", "remoteApiEnabled", "bills", "faucet", "t", "resolveWalletBillMemo",
-    `${code}\nreturn { lifetimeEarned, lifetimeSpent, historyRows };`,
-  )(formatAmount, computed, true, bills, faucet, ref({ bills: { memo: {} }, wallet: { pending: "Pending" } }), resolveWalletBillMemo);
+  const display = source.slice(source.indexOf('const summaryScope ='), source.indexOf('async function refreshBalance'));
+  const displayCode = ts.transpileModule(display, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  return new Function("ref", "watch", "app", "locale", "apiRuntimeConfig", "formatAmount", "computed", "remoteApiEnabled", "bills", "faucet", "t", "resolveWalletBillMemo",
+    `${displayCode}\n${code}\nreturn { lifetimeEarned, lifetimeSpent, historyRows };`,
+  )(Vue.ref, Vue.watch, { accountKey: "user:test", accountBindingEpoch: 1 }, { code: "en" }, { environment: "dev" }, formatAmount, computed, true, bills, faucet, ref({ bills: { memo: {} }, wallet: { pending: "Pending" } }), resolveWalletBillMemo);
 }
 
 function commands(bills: ReturnType<typeof useBills>, accepted: boolean) {
@@ -106,7 +110,7 @@ const primary = (root: RenderNode) => pageButtons(root).find(el =>
 const stat = (root: RenderNode, label: string) => renderText(renderNodes(root).find(el => el.children.some(child => renderText(child) === label))!.children[1]);
 async function settlePage() { for (let n = 0; n < 20; n++) await Promise.resolve(); await Vue.nextTick(); }
 function pointsState(signed = false) {
-  return { rewardAsset: "NEX", serverDate: "2026-10-01", nextResetAtUtc: "2026-10-01T17:00:00Z",
+  return { rewardAsset: "UVT", serverDate: "2026-10-01", nextResetAtUtc: "2026-10-01T17:00:00Z",
     streak: { currentStreak: 1, longestStreak: 1, streakSavers: 1, lastCheckInDate: signed ? "2026-10-01" : null, checkedInToday: signed },
     dailyMilestones: [], earningMilestones: [], badgeAchievements: [], powerUps: [], topStreakers: [],
     rules: [{ key: "baseline", value: "2" }], source: "nx_user_streak + nx_daily_check_in",
@@ -151,12 +155,13 @@ async function mountedDaily() {
   const toast = { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() }, shows: Array<() => void> = [], hides: Array<() => void> = [];
   const slot = { setup: (_props: unknown, { slots }: any) => () => Vue.h("view", slots.default?.()) };
   const deps: Record<string, unknown> = {
-    "@/lib/amount-display": { formatAmount },
+    "@/lib/amount-display": { formatAmount, formatGroupedAmount },
     vue: Vue, "@dcloudio/uni-app": { onShow: (fn: () => void) => shows.push(fn), onHide: (fn: () => void) => hides.push(fn) },
     "@/api/runtime": remote, "@/store/app": { useApp: () => app }, "@/store/nex-faucet": { useNexFaucet: () => faucet },
     "@/store/bills": { useBills: () => bills }, "@/store/auth": { useAuth: () => auth }, "@/store/lucky-spin": { useLuckySpin: () => ({}) },
     "@/store/ui": { toast }, "@/i18n/use-t": { useT: () => ref(en) }, "@/i18n/format": { fmt, dateLocale: () => "en-US" },
     "@/lib/trial-date": { formatTrialDateTime },
+    "@/store/locale": { useLocaleStore: () => ({ code: "en" }) },
     "@/lib/binary-session-ready": { binarySessionReady }, "@/lib/binary-read-coalescer": { createScopedReadCoalescer },
     "@/api/order-api": { captureRuntimeRevision, subscribeRuntimeRevision }, "@/lib/route": { navTo: vi.fn() },
     "@/lib/wallet-bill-display": { resolveWalletBillMemo }, "@/api/geo-policy-error": { geoPolicyUserMessage: () => null },
@@ -396,7 +401,7 @@ describe("Daily wallet ledger authority", () => {
     await bills.refreshSummary();
     const refresh = vi.spyOn(bills, 'refreshSummary');
     const run = (h: ReturnType<typeof commands>) => action === 'check-in' ? h.handleCheckIn()
-      : h.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'nex', amount: 5 } });
+      : h.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'uvt', amount: 5 } });
     const refused = commands(bills, false);
     await run(refused);
     expect(refresh).not.toHaveBeenCalled();
@@ -415,7 +420,7 @@ describe("Daily wallet ledger authority", () => {
     remote.walletBillsApi.summary.mockRejectedValueOnce(new Error('ledger unavailable'));
     const accepted = commands(bills, true);
     if (action === 'check-in') await accepted.handleCheckIn();
-    else await accepted.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'nex', amount: 5 } });
+    else await accepted.handleClaimMilestone({ day: 3, rewardText: '5 NEX', reward: { type: 'uvt', amount: 5 } });
     await vi.waitFor(() => expect(bills.summaryStatus).toBe('error'));
     expect(view.lifetimeEarned.value).toBe('—');
     expect(view.lifetimeSpent.value).toBe('—');

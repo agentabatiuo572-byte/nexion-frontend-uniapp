@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import type { CanonicalE3Fleet } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignments } from "@/api/task-assignment-api";
+import { ApiError } from "@/api/errors";
 
 const remote = vi.hoisted(() => ({
   remoteApiEnabled: true,
   fundsServerEnabled: true,
   expectedApiEnvironment: "dev",
+  apiRuntimeClientOrigin: Object.freeze({ environment: "dev", baseUrl: "https://test.example" }),
+  apiRuntimeConfig: { environment: "dev", baseUrl: "https://test.example" },
   sessionVault: { read: vi.fn() },
   deviceE3Api: { fleet: vi.fn() },
   taskAssignmentApi: { state: vi.fn() },
@@ -79,6 +82,35 @@ beforeEach(() => {
 });
 
 describe("App remote fleet refresh wiring", () => {
+  it("binds authoritative usage to the current fleet lease and clears it on account change", async () => {
+    const previous = deferred<CanonicalE3Fleet>();
+    remote.deviceE3Api.fleet.mockReturnValueOnce(previous.promise)
+      .mockResolvedValueOnce({ ...fleet(0), slotsUsed: 2, reservedSlotCount: 1, trialSlotCount: 0 });
+    const app = useApp(); app.bindAccount("user:1001");
+    const oldRead = app.refreshRemoteFleet();
+    remote.sessionVault.read.mockReturnValue({ user: { userId: 2002 } });
+    app.bindAccount("user:2002");
+    expect(app.remoteSlotUsage).toBeNull();
+    await app.refreshRemoteFleet();
+    previous.resolve({ ...fleet(0), slotsUsed: 6, reservedSlotCount: 1, trialSlotCount: 1 });
+    expect(await oldRead).toBe(false);
+    expect(app.remoteSlotUsage?.slotsUsed).toBe(2);
+    expect(app.activeSlotCount).toBe(0);
+  });
+  it("rejects a late same-account capacity snapshot and supports a confirmed legacy response", async () => {
+    const previous = deferred<CanonicalE3Fleet>();
+    remote.deviceE3Api.fleet.mockReturnValueOnce(previous.promise)
+      .mockResolvedValueOnce({ ...fleet(0), slotsUsed: 6, reservedSlotCount: 1, trialSlotCount: 0 })
+      .mockResolvedValueOnce(fleet(0));
+    const app = useApp(); app.bindAccount("user:1001");
+    const oldRead = app.refreshRemoteFleet();
+    await app.refreshRemoteFleet();
+    previous.resolve({ ...fleet(0), slotsUsed: 5, reservedSlotCount: 0, trialSlotCount: 0 });
+    expect(await oldRead).toBe(false);
+    expect(app.remoteSlotUsage?.slotsUsed).toBe(6);
+    await app.refreshRemoteFleet();
+    expect(app.remoteSlotUsage).toBeNull();
+  });
   it.each(["success", "failure"])("keeps a delayed Home %s from the previous account out of the current wallet projection", async (outcome) => {
     const previous = deferred<unknown>();
     const overview = {
@@ -122,7 +154,7 @@ describe("App remote fleet refresh wiring", () => {
     };
     remote.appHomeApi.fetch
       .mockResolvedValueOnce(overview)
-      .mockRejectedValueOnce(new Error("home offline"));
+      .mockRejectedValueOnce(new ApiError({ kind: "network", message: "home offline" }));
     const app = useApp();
     app.bindAccount("user:1001");
 
@@ -132,6 +164,29 @@ describe("App remote fleet refresh wiring", () => {
     expect(app.homeTruth).toEqual(overview);
     expect(app.earnings.today).toBe(12);
     expect(app.homeTruthStatus).toBe("error");
+  });
+
+  it.each(["success", "failure"])("drops a previous same-account Home epoch's %s after rebind", async outcome => {
+    const previous = deferred<unknown>();
+    const overview = (amount: number) => ({ earnings: {
+      today: { usdt: 2, nex: 0 }, week: { usdt: 3, nex: 0 },
+      month: { usdt: 4, nex: 0 }, all: { usdt: amount, nex: 0 },
+    } });
+    remote.appHomeApi.fetch.mockResolvedValueOnce(overview(10))
+      .mockReturnValueOnce(previous.promise).mockResolvedValueOnce(overview(20));
+    const app = useApp(); app.bindAccount("user:1001");
+    await app.refreshHomeTruth();
+    const oldRead = app.refreshHomeTruth();
+    expect(app.homeTruthStatus).toBe("loading");
+    expect(app.homeTruth?.earnings.all.usdt).toBe(10);
+    app.bindAccount("user:1001");
+    expect(app.homeTruth).toBeNull(); expect(app.homeTruthStatus).toBe("idle");
+    await app.refreshHomeTruth();
+    if (outcome === "success") previous.resolve(overview(999));
+    else previous.reject(new Error("previous epoch offline"));
+    await expect(oldRead).resolves.toBe(false);
+    expect(app.homeTruth?.earnings.all.usdt).toBe(20);
+    expect(app.homeTruthStatus).toBe("ready"); expect(app.homeTruthError).toBeNull();
   });
 
   it("coalesces concurrent Home lifecycle reads for the current account generation", async () => {

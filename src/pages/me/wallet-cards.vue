@@ -11,14 +11,14 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet" :title="t.cards.listTitle" :subtitle="cardBindingAvailable ? t.cards.listSubtitle : t.cards.newTitle" />
+      <SubPageHeader back="/pages/me/me" :title="t.cards.listTitle" :subtitle="cardBindingAvailable ? t.cards.listSubtitle : t.cards.newTitle" />
       <CardSimulationBadge />
 
       <view :style="bodyStyle">
         <template v-if="cardBindingAvailable">
           <view v-if="remoteCardsError" data-testid="wallet-cards-refresh-error" class="mb-3 rounded-2xl" :style="refreshErrorStyle">
             <text class="block" :style="refreshErrorTextStyle">{{ t.security.opFailed }}</text>
-            <view class="inline-flex items-center justify-center active:opacity-80" :style="refreshRetryStyle" role="button" tabindex="0" :aria-disabled="remoteCardsRefreshing" data-testid="wallet-cards-retry" @click="refreshCards">
+            <view class="nx-card-recovery-action active:opacity-80" role="button" tabindex="0" :aria-disabled="remoteCardsRefreshing" data-testid="wallet-cards-retry" @click="refreshCards">
               <text>{{ remoteCardsRefreshing ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
             </view>
           </view>
@@ -29,7 +29,7 @@
           <view class="nx-glass-card" v-for="card in cards" :key="card.tokenId" :style="cardRowStyle">
           <view class="flex items-center" :style="cardRowHeadStyle">
             <view class="grid place-items-center shrink-0" :style="cardIconStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 6px">
@@ -152,7 +152,7 @@ function goNew() {
 }
 
 function returnToWallet() {
-  navBack("/pages/me/wallet");
+  navBack("/pages/me/me");
 }
 
 // ── styles ──
@@ -172,7 +172,7 @@ const emptyIconStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
 };
-const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "var(--ui-type-card-title)", fontWeight: 600, color: "var(--v5-ink)" };
 const emptyHintStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
 
 // Each saved card keeps its card-face identity as a filled surface; the outer
@@ -184,9 +184,9 @@ const cardRowStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
   overflow: "hidden",
 };
-const cardRowHeadStyle: CSSProperties = { padding: "16px 20px", gap: "12px" };
+const cardRowHeadStyle: CSSProperties = { padding: "var(--ui-space-inset) 20px", gap: "var(--ui-space-inline)" };
 const cardIconStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "8px", background: "var(--v5-surface-2)" };
-const cardNameStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const cardNameStyle: CSSProperties = { fontSize: "var(--ui-type-subheading)", fontWeight: "var(--ui-type-subheading-weight)", color: "var(--v5-ink)" };
 const defaultBadgeStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-brand)",
@@ -214,25 +214,16 @@ const disclaimerStyle: CSSProperties = {
   lineHeight: 1.625,
 };
 const unavailableStyle: CSSProperties = { padding: "4px 2px" };
-const unavailableTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const unavailableTitleStyle: CSSProperties = { fontSize: "var(--ui-type-card-title)", fontWeight: 600, color: "var(--v5-ink)" };
 const unavailableBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
 const unavailableCtaStyle: CSSProperties = { minHeight: "44px", marginTop: "16px", borderRadius: "999px", background: "var(--v5-surface-2)" };
-const unavailableCtaTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink-2)" };
+const unavailableCtaTextStyle: CSSProperties = { fontSize: "13px", fontWeight: "var(--ui-type-card-title-weight)", color: "var(--v5-ink-2)" };
 const refreshErrorStyle: CSSProperties = {
-  padding: "12px 14px",
+  padding: "var(--ui-space-inline) 14px",
   background: "color-mix(in srgb, var(--v5-warning) 10%, var(--v5-surface))",
   borderRadius: "16px",
 };
-const refreshErrorTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
-const refreshRetryStyle: CSSProperties = {
-  minHeight: "34px",
-  marginTop: "8px",
-  padding: "0 12px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontSize: "12px",
-};
+const refreshErrorTextStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)" };
 
 
 </script>

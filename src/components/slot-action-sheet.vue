@@ -16,12 +16,12 @@
   <view v-if="sheet.open" class="sas-root" role="dialog" aria-modal="true" :aria-label="t.slotSheet.title">
     <view class="sas-backdrop" @click="hide" />
 
-    <view class="sas-panel" @click.stop>
+    <view class="sas-panel nx-glass-sheet" @click.stop>
       <!-- header -->
       <view class="sas-head">
         <view class="sas-head-meta">
           <text class="sas-title">{{ t.slotSheet.title }}</text>
-          <text class="sas-desc">{{ t.slotSheet.desc }}</text>
+          <text class="sas-desc">{{ fmt(t.slotSheet.desc, { max: app.slotCap }) }}</text>
         </view>
         <view class="sas-close" role="button" tabindex="0" :aria-label="closeAria" @click="hide"  @keydown.enter.prevent="hide" @keydown.space.prevent="hide">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
@@ -46,7 +46,7 @@
             v-for="d in inactiveDevices"
             :key="d.id"
             class="sas-device"
-            :class="{ 'is-pending': activationInFlight.has(d.id) || slotsFull || !capacityReady }"
+            :class="{ 'is-pending': activationInFlight.has(d.id), 'is-full': slotsFull || !capacityReady }"
             role="button"
             :tabindex="activationInFlight.has(d.id) || slotsFull || !capacityReady ? -1 : 0"
             :aria-disabled="activationInFlight.has(d.id) || slotsFull || !capacityReady ? 'true' : 'false'"
@@ -69,8 +69,13 @@
         </view>
       </view>
 
-      <view v-if="!capacityReady" class="sas-unconfirmed" role="status"><text>{{ t.myDevices.inventoryStaleWarning }}</text></view>
-      <view v-else-if="slotsFull" class="sas-unconfirmed" role="status"><text>{{ fmt(t.slotSheet.toastSlotsFull, { max: app.slotCap }) }}</text></view>
+      <view v-if="!capacityReady" class="sas-unconfirmed" role="status">
+        <text>{{ t.myDevices.inventoryStaleWarning }}</text>
+      </view>
+      <view v-else-if="slotsFull" class="sas-unconfirmed" role="status">
+        <text>{{ fmt(t.slotSheet.toastSlotsFull, { max: app.slotCap }) }}</text>
+      </view>
+
       <view v-if="unconfirmedDevices.length > 0" class="sas-unconfirmed" role="status">
         <text>{{ t.myDevices.inventoryActivationUnconfirmed }}</text>
       </view>
@@ -84,15 +89,15 @@ import { navTo } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useApp } from "@/store/app";
-import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
+import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import type { Device } from "@/store/types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { isActivatableInventoryDevice, occupiesDeviceSlot, requiresActivationConfirmation } from "@/lib/device-slot-policy";
+import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/lib/device-slot-policy";
 import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import { isSettledRejection } from "@/api/errors";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
@@ -114,12 +119,13 @@ watch(
 const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
 const unconfirmedDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && requiresActivationConfirmation(d)));
 const activeCount = computed(() => app.activeSlotCount);
-const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const slotsUsed = computed(() => app.remoteSlotsUsed ?? (activeCount.value + reservedSlots.value));
-const slotsFull = computed(() => slotsUsed.value >= app.slotCap);
 const trialPresentation = useTrialPresentation();
+const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
+const slotsUsed = computed(() => app.remoteSlotsUsed ?? activeCount.value + reservedSlots.value);
+const slotsFull = computed(() => slotsUsed.value >= app.slotCap);
 const capacityReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready"
-  && (app.remoteSlotsUsed !== null || trialPresentation.actionsReady.value && trialPresentation.reservedSlots.value !== null));
+  && (app.remoteSlotsUsed != null || trialPresentation.actionsReady.value
+    && trialPresentation.reservedSlots.value !== null));
 
 const activateRowText = computed(() =>
   fmt(t.value.slotSheet.activateRow, { n: inactiveDevices.value.length }),
@@ -133,7 +139,7 @@ function hide() {
 const activationInFlight = ref(new Set<string>());
 
 async function onActivate(d: Device) {
-  if (!capacityReady.value) {
+  if (remoteApiEnabled && !capacityReady.value) {
     toast.warn(t.value.myDevices.inventoryStaleWarning);
     return;
   }
@@ -142,7 +148,7 @@ async function onActivate(d: Device) {
     return;
   }
   if (d.kind === "phone") return;
-  if (occupiesDeviceSlot(d.kind) && slotsUsed.value >= app.slotCap) {
+  if (slotsFull.value) {
     toast.warn(fmt(t.value.slotSheet.toastSlotsFull, { max: app.slotCap }));
     return;
   }
@@ -232,8 +238,10 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   right: 0;
   bottom: 0;
   z-index: 800;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
+  box-sizing: border-box;
+  max-height: calc(100% - var(--nx-overlay-top));
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
   background: var(--nx-glass-fill);
   border-top: 1px solid var(--v5-border);
   padding: 18px 16px;
@@ -261,7 +269,7 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
 }
 .sas-title {
   font-family: var(--font-v5);
-  font-size: 15px;
+  font-size: var(--ui-type-hero-title);
   font-weight: 600;
   color: var(--v5-ink);
   line-height: 1.2;
@@ -274,16 +282,19 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   text-wrap: pretty;
 }
 .sas-close {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 4px;
   border-radius: 999px;
   background: var(--v5-surface-2);
+  background-clip: content-box;
   display: grid;
   place-items: center;
   flex-shrink: 0;
 }
 .sas-close:active {
-  background: var(--v5-surface-3);
+  background-color: var(--v5-surface-3);
 }
 /* primary CTA — brand fill, recommended weight */
 .sas-store-cta {
@@ -326,7 +337,7 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   transform: scale(0.99);
 }
 .sas-activate-toggle-t {
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   font-weight: 500;
   color: var(--v5-ink-3);
   font-family: var(--font-v5);
@@ -363,6 +374,7 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   opacity: 0.58;
   pointer-events: none;
 }
+.sas-device.is-full { opacity: 0.58; }
 .sas-device-ico {
   width: 40px;
   height: 40px;

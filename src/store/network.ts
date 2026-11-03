@@ -1,7 +1,10 @@
+import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
+import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { defineStore } from "pinia";
-import { onScopeDispose, ref } from "vue";
+import { onScopeDispose, ref, watch } from "vue";
+import { sumComputePoints } from "@/i18n/compute-points";
 import type { VRank } from "./v-rank";
-import { remoteApiEnabled, teamNetworkApi } from "@/api/runtime";
+import { apiRuntimeConfig, remoteApiEnabled, teamNetworkApi } from "@/api/runtime";
 import {
   captureRuntimeRevision,
   isCurrentRuntimeRevision,
@@ -33,9 +36,8 @@ export interface NetworkMember {
   joinedAt: number; // epoch ms
   monthVolumeUSD: number;
   totalVolumeUSD: number | null;
-  /** Member contribution shown to the user; the server reports it in compute points only. */
-  monthComputePoints: number | null;
-  lifetimeComputePoints: number | null;
+  monthComputePoints?: number | null;
+  lifetimeComputePoints?: number | null;
   status: MemberStatus;
   city: string;
 }
@@ -82,8 +84,8 @@ function mk(
     joinedAt: Date.now() - (((i * 11) % 90) + 1) * ONE_DAY,
     monthVolumeUSD: monthVol,
     totalVolumeUSD: totalVol,
-    monthComputePoints: monthVol * 10,
-    lifetimeComputePoints: totalVol * 10,
+    monthComputePoints: opts.monthComputePoints ?? 320 + ((i * 53) % 17) * 80,
+    lifetimeComputePoints: opts.lifetimeComputePoints ?? 1280 + ((i * 31) % 19) * 160,
     status: opts.status ?? (i % 5 === 0 ? "idle" : i % 11 === 0 ? "offline" : "active"),
     city: CITIES[i % CITIES.length],
   };
@@ -141,18 +143,30 @@ export const useNetwork = defineStore("network", () => {
   const totalMembers = ref(initial.length);
   const totalMonthVolumeUSD = ref(initial.reduce((s, m) => s + m.monthVolumeUSD, 0));
   const totalAllTimeVolumeUSD = ref<number | null>(initial.reduce((s, m) => s + (m.totalVolumeUSD ?? 0), 0));
+  const totalMonthComputePoints = ref<number | null>(remoteApiEnabled ? null : sumComputePoints(initial.map(m => m.monthComputePoints)));
+  const totalLifetimeComputePoints = ref<number | null>(remoteApiEnabled ? null : sumComputePoints(initial.map(m => m.lifetimeComputePoints)));
   const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const hasRemoteSnapshot = ref(false);
+  const remoteRateLimited = ref(false);
+  const remoteTransientFailure = ref(false);
+
+  let retryAt = 0;
+  let environmentInvalidated = false;
   let accountEpoch = 0;
   let refreshSequence = 0;
   let inFlight: { epoch: number; runtime: ReturnType<typeof captureRuntimeRevision>; promise: Promise<boolean> } | null = null;
 
-  function clearRemoteNetwork(): void {
+  function clearRemoteNetwork(preserveCooldown = false): void {
     refreshSequence += 1;
+
+    remoteTransientFailure.value = false;
+    if (!preserveCooldown) { retryAt = 0; remoteRateLimited.value = false; }
     members.value = [];
     totalMembers.value = 0;
     totalMonthVolumeUSD.value = 0;
     totalAllTimeVolumeUSD.value = null;
+    totalMonthComputePoints.value = null;
+    totalLifetimeComputePoints.value = null;
     remoteStatus.value = "idle";
     hasRemoteSnapshot.value = false;
   }
@@ -162,19 +176,24 @@ export const useNetwork = defineStore("network", () => {
     // The commerce runtime moved (catalogue/order revision). Re-read the
     // projection, but keep the last confirmed snapshot mounted: clearing it
     // blanked the whole influence-network page mid-refresh (BUG 63).
+
     void refreshCanonicalNetwork();
   });
   onScopeDispose(unsubscribeCommerceRun);
 
   function ensureCanonicalNetwork(): Promise<boolean> {
-    return inFlight && inFlight.epoch === accountEpoch && isCurrentRuntimeRevision(inFlight.runtime)
-      ? inFlight.promise : refreshCanonicalNetwork();
+    if (Date.now() < retryAt) return Promise.resolve(false);
+    return runPassiveTabRead("network", () => inFlight && inFlight.epoch === accountEpoch && isCurrentRuntimeRevision(inFlight.runtime)
+      ? inFlight.promise : refreshCanonicalNetwork(), [accountEpoch, captureRuntimeRevision()]);
   }
 
   function refreshCanonicalNetwork(): Promise<boolean> {
+    invalidateBeforePassiveTabRead("network");
+    if (environmentInvalidated || Date.now() < retryAt) return Promise.resolve(false);
     const epoch = accountEpoch;
     const runtime = captureRuntimeRevision();
     const promise = readCanonicalNetwork();
+    rememberPassiveTabRead("network", promise, [epoch, runtime]);
     inFlight = { epoch, runtime, promise };
     const clear = () => { if (inFlight?.promise === promise) inFlight = null; };
     void promise.then(clear, clear);
@@ -195,7 +214,8 @@ export const useNetwork = defineStore("network", () => {
         id: member.id, name: member.name, avatar: member.avatarUrl ?? member.name.slice(0, 1).toUpperCase(),
         vRank: member.vRank as VRank, layer: member.layer,
         binary: member.leg === "A" ? "left" : member.leg === "B" ? "right" : "unassigned",
-        // USD volume only feeds the local demo's commission estimates and stays unknown here.
+        // The server reports member contribution in compute points only; USD volume
+        // feeds the local demo's commission estimates and stays unknown here.
         isSpillover: false, joinedAt: Date.parse(member.joinedAt), monthVolumeUSD: 0, totalVolumeUSD: null,
         monthComputePoints: member.monthComputePoints, lifetimeComputePoints: member.lifetimeComputePoints,
         status: member.status === "ACTIVE" ? "active" : member.status === "IDLE" ? "idle" : "offline",
@@ -204,14 +224,39 @@ export const useNetwork = defineStore("network", () => {
       totalMembers.value = snapshot.totalMembers;
       totalMonthVolumeUSD.value = 0;
       totalAllTimeVolumeUSD.value = null;
+      totalMonthComputePoints.value = snapshot.monthComputePoints;
+      totalLifetimeComputePoints.value = snapshot.lifetimeComputePoints;
+      retryAt = 0;
       remoteStatus.value = "ready";
+      remoteRateLimited.value = false;
+      remoteTransientFailure.value = false;
       hasRemoteSnapshot.value = true;
       return true;
-    } catch {
+    } catch (cause) {
       if (!current()) return false;
+
+      if (isHttpReadRateLimit(cause)) {
+        retryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
+      }
+      if (isTransientReadFailure(cause)) {
+        remoteRateLimited.value = isHttpReadRateLimit(cause);
+        remoteTransientFailure.value = true;
+      } else clearRemoteNetwork();
       remoteStatus.value = "error";
       return false;
     }
+  }
+
+  watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
+    environmentInvalidated = true; accountEpoch += 1; inFlight = null; clearRemoteNetwork();
+  }, { flush: "sync" });
+
+  function invalidateReadOwner(): void {
+    invalidatePassiveTabRead("network");
+
+    accountEpoch += 1; inFlight = null;
+    clearRemoteNetwork(true);
+    if (Date.now() < retryAt) remoteStatus.value = "error";
   }
 
   function bindAccount(_accountKey: string): void {
@@ -223,6 +268,8 @@ export const useNetwork = defineStore("network", () => {
     totalMembers.value = next.length;
     totalMonthVolumeUSD.value = next.reduce((sum, member) => sum + member.monthVolumeUSD, 0);
     totalAllTimeVolumeUSD.value = remoteApiEnabled ? null : next.reduce((sum, member) => sum + (member.totalVolumeUSD ?? 0), 0);
+    totalMonthComputePoints.value = remoteApiEnabled ? null : sumComputePoints(next.map(m => m.monthComputePoints));
+    totalLifetimeComputePoints.value = remoteApiEnabled ? null : sumComputePoints(next.map(m => m.lifetimeComputePoints));
     remoteStatus.value = remoteApiEnabled ? "idle" : "ready";
     if (remoteApiEnabled) void refreshCanonicalNetwork();
   }
@@ -284,8 +331,6 @@ export const useNetwork = defineStore("network", () => {
       joinedAt: now - i * 60000,
       monthVolumeUSD: 0,
       totalVolumeUSD: 0,
-      monthComputePoints: 0,
-      lifetimeComputePoints: 0,
       status: "active",
       city: "Auto-placed",
     }));
@@ -294,8 +339,8 @@ export const useNetwork = defineStore("network", () => {
   }
 
   return {
-    members, totalMembers, totalMonthVolumeUSD, totalAllTimeVolumeUSD,
+    members, totalMembers, totalMonthVolumeUSD, totalAllTimeVolumeUSD, totalMonthComputePoints, totalLifetimeComputePoints,
     byLayer, byBinary, leftVolumeMonth, rightVolumeMonth,
-    binaryMatchToday, vDownlineCounts, addSpillover, remoteStatus, hasRemoteSnapshot, refreshCanonicalNetwork, ensureCanonicalNetwork, bindAccount,
+    binaryMatchToday, vDownlineCounts, addSpillover, remoteStatus, remoteRateLimited, remoteTransientFailure, hasRemoteSnapshot, refreshCanonicalNetwork, ensureCanonicalNetwork, invalidateReadOwner, bindAccount,
   };
 });

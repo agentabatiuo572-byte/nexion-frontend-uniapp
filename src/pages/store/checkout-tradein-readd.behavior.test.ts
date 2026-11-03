@@ -3,6 +3,7 @@ import { ref } from "vue";
 import ts from "typescript";
 import source from "./checkout.vue?raw";
 import { resolveTradeinCheckoutPreflight } from "@/domain/tradein-checkout-preflight";
+import { asApiError } from "@/api/errors";
 import { CheckoutRouteFence } from "@/lib/checkout-route-fence";
 
 const script = source.split('<script setup lang="ts">')[1].split("</script>")[0];
@@ -39,9 +40,9 @@ function scenario() {
     capacityQuote: vi.fn(async () => ({ decision: "CAPACITY_AVAILABLE" })),
   };
   const deps = {
-    ref, tradein, deviceE3Api, remoteApiEnabled: true,
+    ref, asApiError, tradein, deviceE3Api, remoteApiEnabled: true, tradeinAvailable: ref(false), checkoutOnboardingRequired: ref(false),
     remoteTradeinRecoveryRequired: ref(false), removedTradein: ref(true),
-    toast: { warn: vi.fn() }, t: ref({ tradein: { errPleaseRetry: "Please retry", errNoActiveDevice: "No active device" } }),
+    toast: { warn: vi.fn() }, t: ref({ tradein: { errPleaseRetry: "Please retry", errNoActiveDevice: "No active device" }, store: { coCapacityUnavailable: "Unable to check activation slots" } }),
     trialConversionMode: ref(false), productId: ref(identity.productNo),
     getProduct: () => ({ id: identity.productNo, price: 2639 }), KNOWN_KINDS: [identity.productNo],
     captureCheckoutRoute, isCurrentCheckoutRoute,
@@ -52,7 +53,7 @@ function scenario() {
     app: { refreshRemoteFleet: vi.fn(async () => true) },
     handleNoActiveDeviceDecision: vi.fn(async ({ notify }: { notify: () => void }) => { notify(); }),
   };
-  const page = new Function(...Object.keys(deps), `let interceptFired=false; ${javascript}; return {reAddTradein,fireTradeinIntercept};`)(...Object.values(deps));
+  const page = new Function(...Object.keys(deps), `let checkoutCapacityRead=null, interceptFired=false; ${javascript}; return {reAddTradein,fireTradeinIntercept};`)(...Object.values(deps));
   return { result, deps, page, switchAccount() { identity.accountKey = "user:1058"; identity.accountEpoch++; },
     leave() { visible = false; fence.invalidate(); } };
 }
@@ -79,7 +80,7 @@ describe("actual checkout trade-in re-add async result", () => {
     await operation; await settle();
     expect(s.deps.tradein.state.kind).toBe("none");
     expect(s.deps.removedTradein.value).toBe(true);
-    expect(s.deps.toast.warn).toHaveBeenCalledExactlyOnceWith("Please retry");
+    expect(s.deps.toast.warn).toHaveBeenCalledExactlyOnceWith(outcome === "capacity-error" ? "Unable to check activation slots" : "Please retry");
   });
   it("coalesces repeated clicks while a re-add is pending", async () => {
     const s = scenario(); const first = s.page.reAddTradein(); const second = s.page.reAddTradein();
@@ -132,4 +133,9 @@ describe("actual checkout trade-in re-add async result", () => {
     expect(s.deps.removedTradein.value).toBe(false);
     expect(s.deps.toast.warn).toHaveBeenCalledTimes(1);
   });
+});
+
+it('initial checkout validates capacity but never opens an unsolicited sheet', async () => {
+  const s=scenario();const operation=s.page.fireTradeinIntercept();s.result.resolve(eligible());await operation;await settle();
+  expect(s.deps.tradeinAvailable.value).toBe(true);expect(s.deps.tradein.showChoice).not.toHaveBeenCalled();expect(s.deps.tradein.showCanonicalReplace).not.toHaveBeenCalled();
 });

@@ -7,16 +7,16 @@
 <template>
   <AppChassis v-if="visibility.isEnabled('stakingVisible')" active="me">
     <view style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/wallet" />
+      <SubPageHeader back="/pages/me/me" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- hero — rules-intro pill rides the title row (owner 2026-07-09: kill
              the empty gap above the hero). -->
         <view class="nx-glass-card" :style="heroStyle">
-          <view class="flex items-center justify-between" style="gap: 8px">
-            <view class="flex items-center" style="gap: 8px">
+          <view class="flex items-center justify-between" style="gap: 8px; flex-wrap: wrap">
+            <view class="flex items-center" style="gap: 8px; min-width: 0">
               <view class="grid place-items-center" :style="heroIconBoxStyle">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
               </view>
               <view>
                 <text class="block" :style="heroTitleStyle">{{ w.hero }}</text>
@@ -24,15 +24,15 @@
               </view>
             </view>
             <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" role="button" tabindex="0" @click="goHow"  @keydown.enter.prevent="goHow" @keydown.space.prevent="goHow">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
               <text style="margin: 0 6px">{{ w.howItWorksEntry }}</text>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
             </view>
           </view>
 
           <view class="grid grid-cols-2" :style="benefitsGridStyle">
-            <view v-for="(b, i) in benefitTiles" :key="b.text" class="flex items-center nx-step-in" :style="benefitStyle(b.tint, i)">
-              <view v-html="b.icon" />
+            <view v-for="(b, i) in benefitTiles" :key="b.text" class="flex items-center nx-step-in" :style="benefitStyle(i)">
+              <view class="shrink-0" v-html="b.icon" />
               <text :style="benefitTextStyle">{{ b.text }}</text>
             </view>
           </view>
@@ -43,7 +43,7 @@
           <text class="block" :style="unavailableBodyStyle">{{ unavailableBody }}</text>
         </view>
 
-        <view v-else-if="isRemote && !remoteReady" :style="unavailableStyle" role="status" :aria-busy="repurchase.loading">
+        <view v-else-if="isRemote && !remoteReady && (!repurchase.loading || !repurchaseDisplayable)" :style="unavailableStyle" role="status" :aria-busy="repurchase.loading">
           <text class="block" :style="unavailableTitleStyle">{{ repurchase.loading ? loadingLabel : unavailableTitle }}</text>
           <text v-if="!repurchase.loading" class="block" :style="unavailableBodyStyle">{{ unavailableBody }}</text>
           <view v-if="recovering" role="button" tabindex="0" :aria-disabled="repurchase.submitting" :style="retryCtaStyle" @click="handleRepurchase" @keydown.enter.prevent="handleRepurchase" @keydown.space.prevent="handleRepurchase">
@@ -54,10 +54,10 @@
           </view>
         </view>
 
-        <template v-else>
-        <view v-if="repurchase.historyLoading || repurchase.historyError" :style="cardStyle" role="status" aria-live="polite">
+        <template v-if="!isSandboxHold">
+        <view v-if="repurchase.historyError || (repurchase.historyLoading && repurchase.submitting)" :style="cardStyle" role="status" aria-live="polite">
           <text>{{ repurchase.historyLoading ? w.historySyncing : w.historySyncFailed }}</text>
-          <view v-if="!repurchase.historyLoading" role="button" tabindex="0" :style="retryCtaStyle" @click="repurchase.refreshHistory()"  @keydown.enter.prevent="repurchase.refreshHistory()" @keydown.space.prevent="repurchase.refreshHistory()">
+          <view v-if="!repurchase.historyLoading" role="button" tabindex="0" class="nx-card-recovery-action nx-card-recovery-action--quiet" @click="repurchase.refreshHistory()"  @keydown.enter.prevent="repurchase.refreshHistory()" @keydown.space.prevent="repurchase.refreshHistory()">
             <text>{{ retryLabel }}</text>
           </view>
         </view>
@@ -67,10 +67,11 @@
           <view class="flex items-baseline" style="gap: 8px; margin-top: 8px">
             <text class="shrink-0" :style="dollarStyle">$</text>
             <input
-              :value="formatCommandAmount(amount)"
+              :value="isRemote && !repurchaseDisplayable ? '' : formatCommandAmount(amount)"
+              :placeholder="isRemote && !repurchaseDisplayable ? '—' : undefined"
               :aria-label="w.amountLabel"
               type="digit"
-              :disabled="confirming || repurchase.submitting || recovering"
+              :disabled="confirming || repurchase.submitting || recovering || (isRemote && !remoteReady)"
               :style="amountInputStyle"
               @input="onAmount"
             />
@@ -78,23 +79,23 @@
           </view>
           <view class="grid grid-cols-4" style="gap: 8px; margin-top: 12px">
             <!-- 反馈恒定:选中档原是空 class,按下零反馈 -->
-            <view v-for="p in presets" :key="p" class="active:opacity-70 transition-opacity" :style="presetStyle(amount === p)" role="button" tabindex="0" @click="selectPreset(p)">
+            <view v-for="p in presets" :key="p" class="active:opacity-70 transition-opacity" :style="presetStyle(amount === p)" role="button" :tabindex="isRemote && !remoteReady ? -1 : 0" :aria-disabled="isRemote && !remoteReady" @click="selectPreset(p)">
               <text>${{ formatAmount(p) }}</text>
             </view>
           </view>
           <view style="margin-top: 12px">
             <text :style="balanceLabelStyle">{{ w.balanceLabel }}</text>
-            <text :style="balanceValueStyle"> ${{ formatAmount(displayBalance) }}</text>
+            <text :style="balanceValueStyle"> {{ repurchaseDisplayable ? '$' + formatAmount(displayBalance) : '—' }}</text>
           </view>
-          <text v-if="isRemote && repurchase.config" class="block" :style="lockedNoticeStyle">{{ fmt(w.minimumAmount, { amount: formatCommandAmount(repurchase.config.minAmountUsdt) }) }}</text>
+          <text v-if="isRemote" class="block" :style="lockedNoticeStyle">{{ fmt(w.minimumAmount, { amount: repurchaseDisplayable && repurchase.config ? formatCommandAmount(repurchase.config.minAmountUsdt) : '—' }) }}</text>
         </view>
 
         <!-- projection -->
         <view :style="cardStyle">
-          <text class="block" :style="monoLabelStyle">{{ isRemote ? fmt(w.afterDays, { days: repurchase.config?.lockDays ?? '—' }) : w.after90 }}</text>
+          <text class="block" :style="monoLabelStyle">{{ isRemote ? fmt(w.afterDays, { days: repurchaseDisplayable ? repurchase.config?.lockDays ?? '—' : '—' }) : w.after90 }}</text>
           <view style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px">
-            <Row :label="w.principal" :value="`$${formatAmount(amount)}`" />
-            <Row :label="isRemote ? fmt(w.interestCanonical, { apy: repurchase.config?.apyPct ?? '—', days: repurchase.config?.lockDays ?? '—' }) : w.interest" :value="projectedYield === null ? '—' : `+$${formatAmount(projectedYield)}`" tint="var(--v5-brand)" />
+            <Row :label="w.principal" :value="repurchaseDisplayable ? `$${formatAmount(amount)}` : '—'" />
+            <Row :label="isRemote ? fmt(w.interestCanonical, { apy: repurchaseDisplayable ? repurchase.config?.apyPct ?? '—' : '—', days: repurchaseDisplayable ? repurchase.config?.lockDays ?? '—' : '—' }) : w.interest" :value="projectedYield === null ? '—' : `+$${formatAmount(projectedYield)}`" tint="var(--v5-brand)" />
             <view :style="dividerStyle" />
             <Row :label="w.unlockable" :value="projectedYield === null ? '—' : `$${formatAmount(amount + projectedYield)}`" bold />
           </view>
@@ -105,7 +106,7 @@
         <!-- 置灰必须**说出来**:光换配色 + handler 里静默 return,读屏念的还是「按钮」、
              眼睛看到的还是「复投 $100.00」——实测复现单(#165)正是这么读成「仍启用」的。
              aria-disabled 同时是平台键盘激活层的第三道闸(a11y-activate 不激活置灰控件)。 -->
-        <view class="nx-repurchase-submit-cta w-full flex items-center justify-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="ctaStyle" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-busy="repurchase.submitting" @click="handleRepurchase">
+        <view v-if="!(isRemote && !remoteReady && recovering)" class="nx-repurchase-submit-cta w-full flex items-center justify-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="ctaStyle" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-busy="repurchase.submitting" @click="handleRepurchase">
           <text>{{ ctaLabel }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="canSubmit ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
@@ -121,16 +122,17 @@
           </view>
         </view>
 
-        <text class="block" :style="lockedNoticeStyle">{{ isRemote ? fmt(w.confirmMessage, { amount: formatAmount(amount), days: repurchase.config?.lockDays ?? '—', penalty: repurchase.config?.earlyPenaltyPct ?? '—' }) : w.lockedNotice }}</text>
+        <text class="block" :style="lockedNoticeStyle">{{ isRemote ? fmt(w.confirmMessage, { amount: repurchaseDisplayable ? formatAmount(amount) : '—', days: repurchaseDisplayable ? repurchase.config?.lockDays ?? '—' : '—', penalty: repurchaseDisplayable ? repurchase.config?.earlyPenaltyPct ?? '—' : '—' }) : w.lockedNotice }}</text>
         </template>
         <view v-if="isRemote" :style="cardStyle">
           <text class="block" :style="heroTitleStyle">{{ w.ordersTitle }}</text>
-          <view role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading" :style="retryCtaStyle" @click="refreshOrders"  @keydown.enter.prevent="refreshOrders" @keydown.space.prevent="refreshOrders"><text>{{ repurchase.loading ? w.loading : w.retry }}</text></view>
-          <text v-if="!repurchase.loading && !repurchase.error && !repurchase.orders.length">{{ w.ordersEmpty }}</text>
-          <view v-for="order in repurchase.orders" :key="order.orderNo" style="padding: 16px 0; border-top: 1px solid var(--v5-border)">
+          <view role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading" :style="retryCtaStyle" @click="refreshOrders"  @keydown.enter.prevent="refreshOrders" @keydown.space.prevent="refreshOrders"><text>{{ w.retry }}</text></view>
+          <text v-if="remoteReady && !repurchase.orders.length">{{ w.ordersEmpty }}</text>
+          <text v-if="!repurchaseDisplayable" role="status">—</text>
+          <view v-for="order in repurchaseDisplayable ? repurchase.orders : []" :key="order.orderNo" style="padding: 16px 0; border-top: 1px solid var(--v5-border)">
             <text class="block" style="overflow-wrap: anywhere">{{ order.orderNo }}</text>
             <Row :label="orderStatusLabel(order.status)" :value="`${formatAmount(order.amountUsdt)} USDT`" />
-            <Row :label="w.maturesAt" :value="new Date(order.unlockAt).toLocaleString(dateLocale())" />
+            <Row :label="w.maturesAt" :value="formatDisplayDateTime(order.unlockAt, dateLocale(), true)" />
             <Row :label="fmt(w.interestCanonical, { apy: order.apyPct, days: order.lockDays })" :value="`${formatAmount(order.estimatedInterestUsdt)} USDT`" />
             <view v-if="order.status === 'MATURE_UNCLAIMED'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleClaim(order.orderNo)"  @keydown.enter.prevent="handleClaim(order.orderNo)" @keydown.space.prevent="handleClaim(order.orderNo)"><text>{{ w.claimAction }}</text></view>
             <view v-if="order.status === 'ACTIVE'" role="button" tabindex="0" :aria-disabled="confirming || repurchase.submitting || repurchase.loading || !!repurchase.error" :style="retryCtaStyle" @click="handleEarlyWithdraw(order.orderNo)"  @keydown.enter.prevent="handleEarlyWithdraw(order.orderNo)" @keydown.space.prevent="handleEarlyWithdraw(order.orderNo)"><text>{{ w.earlyAction }}</text></view>
@@ -142,7 +144,8 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatDisplayDateTime } from "@/lib/display-date";
+import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -211,14 +214,15 @@ const recovering = computed(() => isRemote.value && repurchase.pendingOpenAmount
 watch(() => repurchase.pendingOpenAmount, (pending) => {
   if (pending !== null) amount.value = pending;
 }, { immediate: true });
-const presets = computed(() => (isRemote.value ? (repurchase.config?.presets ?? []) : PRESETS));
+const presets = computed(() => (isRemote.value ? (repurchaseDisplayable.value ? repurchase.config?.presets ?? [] : []) : PRESETS));
 const displayBalance = computed(() => (isRemote.value ? repurchase.walletBalanceUsdt : user.value.usdtBalance));
 const remoteReady = computed(() => isRemote.value && repurchase.config !== null
   && !repurchase.loading && repurchase.serverTime > 0 && !repurchase.error);
+const repurchaseDisplayable = computed(() => !isRemote.value || (repurchase.config !== null && repurchase.serverTime > 0 && !repurchase.error));
 
 const projectedYield = computed<number | null>(() => {
   if (!isRemote.value) return amount.value * 0.35 * (90 / 365);
-  const config = repurchase.config;
+  const config = repurchaseDisplayable.value ? repurchase.config : null;
   return config ? amount.value * (config.apyPct / 100) * (config.lockDays / 365) : null;
 });
 const canSubmit = computed(() => {
@@ -268,48 +272,47 @@ const submitHint = computed(() => {
 
 const ctaLabel = computed(() => recovering.value
   ? fmt(w.value.recoveryCta, { amount: formatAmount(amount.value) })
-  : fmt(w.value.cta, { amount: formatAmount(amount.value) }));
+  : fmt(w.value.cta, { amount: repurchaseDisplayable.value ? formatAmount(amount.value) : "—" }));
 const unavailableTitle = computed(() => w.value.unavailableTitle);
 const unavailableBody = computed(() => w.value.unavailableBody);
 const retryLabel = computed(() => w.value.retry);
 const loadingLabel = computed(() => w.value.loading);
 const heroApy = computed(() => {
   if (!isRemote.value) return w.value.benefits.apy;
-  const config = repurchase.config;
+  const config = repurchaseDisplayable.value ? repurchase.config : null;
   return config ? fmt(w.value.benefits.apyCanonical, { apy: config.apyPct, days: config.lockDays }) : "—";
 });
 
 const BENEFIT_SVG = {
-  sparkles: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>`,
-  zap: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg>`,
-  check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>`,
-  diamond: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>`,
+  sparkles: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>`,
+  zap: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg>`,
+  check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>`,
+  diamond: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>`,
 };
 
 const benefitTiles = computed(() => {
-  const config = repurchase.config;
-  if (isRemote.value && !config) return [];
+  const config = repurchaseDisplayable.value ? repurchase.config : null;
   return [
     {
       icon: BENEFIT_SVG.zap,
       text: isRemote.value
-        ? fmt(w.value.benefits.apyCanonical, { apy: config!.apyPct, days: config!.lockDays })
+        ? fmt(w.value.benefits.apyCanonical, { apy: config?.apyPct ?? "—", days: config?.lockDays ?? "—" })
         : w.value.benefits.apy,
-      tint: "var(--v5-warning)",
+      tint: "var(--v5-ink-2)",
     },
     {
       icon: BENEFIT_SVG.check,
       text: isRemote.value
-        ? fmt(w.value.benefits.cultivationCanonical, { multiplier: config!.effectiveNurtureMultiplier })
+        ? fmt(w.value.benefits.cultivationCanonical, { multiplier: config?.effectiveNurtureMultiplier ?? "—" })
         : w.value.benefits.cultivation,
-      tint: "var(--v5-tech-cyan)",
+      tint: "var(--v5-ink-2)",
     },
     {
       icon: BENEFIT_SVG.diamond,
       text: isRemote.value
-        ? fmt(w.value.benefits.genesisCanonical, { tickets: config!.ticketPerOrder })
+        ? fmt(w.value.benefits.genesisCanonical, { tickets: config?.ticketPerOrder ?? "—" })
         : w.value.benefits.genesis,
-      tint: "var(--v5-brand-2)",
+      tint: "var(--v5-ink-2)",
     },
   ];
 });
@@ -318,13 +321,13 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onAmount(e: Event) {
-  if (confirming.value || repurchase.submitting || recovering.value) return;
+  if (confirming.value || repurchase.submitting || recovering.value || (isRemote.value && !remoteReady.value)) return;
   amountTouched.value = true;
   amount.value = normalizeCommandAmount(detailVal(e));
 }
 
 function selectPreset(preset: number) {
-  if (confirming.value || repurchase.submitting || recovering.value) return;
+  if (confirming.value || repurchase.submitting || recovering.value || (isRemote.value && !remoteReady.value)) return;
   amountTouched.value = true;
   amount.value = preset;
 }
@@ -534,40 +537,41 @@ onUnmounted(() => {
   isMounted.value = false;
 });
 
-// Secondary nav pill — soft brand-2 tint carries the affordance, no border (chip rule).
+// Ordinary rule navigation uses the same neutral surface as other secondary controls.
 const howLinkStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   padding: "0 12px",
   height: "44px",  // 《07》tap≥44(原 34)
   borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
+  background: "var(--v5-surface-2)",
   fontSize: "12px",
   fontWeight: 500,
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-ink-2)",
 };
 // Spotlight hero kept (single per screen) but neutralised: the accent floor-adjacent
 // glow is dropped;描边已整条删除(《03》§3 零 border,C2 第二轮)。The colourful
-// benefit tiles inside carry the visual interest.
+// benefit tiles use the same neutral surface as the financial data.
 const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
   background: "var(--nx-glass-fill)",
 };
-const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
+const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "var(--v5-surface-2)" };
 const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "20px", letterSpacing: "-0.014em", color: "var(--v5-ink)" };
 const heroPtsStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const benefitsGridStyle: CSSProperties = { marginTop: "12px", gap: "8px" };
-function benefitStyle(tint: string, i: number): CSSProperties {
+function benefitStyle(i: number): CSSProperties {
   return {
     gap: "6px",
     padding: "8px",
     borderRadius: "8px",
-    background: `color-mix(in srgb, ${tint} 12%, transparent)`,
+    background: "var(--v5-surface-2)",
+    minWidth: "0",
     animationDelay: `${i * 0.08}s`,
   };
 }
-const benefitTextStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
+const benefitTextStyle: CSSProperties = { fontSize: "12px", lineHeight: 1.5, overflowWrap: "anywhere", color: "var(--v5-ink-2)" };
 // De-carded data sections (amount input, projection) on the page floor, 2px inset.
 const cardStyle: CSSProperties = { padding: "0 2px" };
 const monoLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
@@ -595,7 +599,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
   width: "100%",
   height: "48px",
   borderRadius: "999px",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 600,
   background: canSubmit.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
   color: canSubmit.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
@@ -603,9 +607,9 @@ const ctaStyle = computed<CSSProperties>(() => ({
 }));
 const lockedNoticeStyle: CSSProperties = { padding: "0 8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const unavailableStyle: CSSProperties = { padding: "16px", borderRadius: "12px", background: "var(--v5-surface-2)" };
-const unavailableTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const unavailableTitleStyle: CSSProperties = { fontSize: "var(--ui-type-card-title)", fontWeight: 600, color: "var(--v5-ink)" };
 const unavailableBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
-const retryCtaStyle: CSSProperties = { marginTop: "12px", height: "44px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "13px", fontWeight: 600 };
+const retryCtaStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", marginTop: "12px", minHeight: "44px", borderRadius: "999px", background: "var(--v5-surface)", color: "var(--v5-ink-2)", fontSize: "13px", fontWeight: "var(--ui-type-card-title-weight)" };
 // 余额不足提示:warning 描边 + 一句原因 + 一个充值出口。读屏靠 role="status" 播报,
 // 视觉靠 warning 色与主按钮的置灰形成对照。
 const insufficientNoticeStyle: CSSProperties = { padding: "12px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-warning) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--v5-warning) 40%, transparent)" };

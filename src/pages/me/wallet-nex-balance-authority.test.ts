@@ -1,22 +1,29 @@
-import { expect, test } from "vitest";
-import { computed, reactive } from "vue";
+import { afterEach, expect, test } from "vitest";
+import { computed, effectScope, reactive, ref, watch, type EffectScope } from "vue";
 import ts from "typescript";
 import source from "./wallet-nex.vue?raw";
 import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
-import { formatAmount } from "@/lib/amount-display";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
+
+const scopes: EffectScope[] = [];
+afterEach(() => scopes.splice(0).forEach(scope => scope.stop()));
 
 function mount(remote: boolean, hasSnapshot: boolean, balance: number, marketReady = true) {
-  const block = source.slice(source.indexOf("const nexBalance ="), source.indexOf("// NEX activity"))
+  const block = source.slice(source.indexOf("const locale = useLocaleStore();"), source.indexOf("let priceTimer:"))
+    + source.slice(source.indexOf("const nexBalance ="), source.indexOf("// NEX activity"))
     + source.slice(source.indexOf("function fmtNum("), source.indexOf("function goMarket("))
     + source.slice(source.indexOf("const breakdownRows ="), source.indexOf("const useTiles ="));
   const code = ts.transpileModule(block, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-  const app = reactive({ remoteFleetHasSnapshot: hasSnapshot, user: { nexBalance: balance }, visibleDevices: [] });
+  const app = reactive({ accountKey: "user:wallet-fixture", accountBindingEpoch: 1, remoteFleetHasSnapshot: hasSnapshot, user: { nexBalance: balance }, visibleDevices: [] });
+  const locale = reactive({ code: "en" });
+  const apiRuntimeConfig = reactive({ environment: "dev", baseUrl: "https://test.example" });
   const market = reactive({ remoteReady: marketReady, remoteError: marketReady ? null : "failed", nexPriceUSDT: 2, costBasis: 1, change24hPct: 0 });
   const bills = reactive({ summaryStatus: "error", summary: { todayNexEarn: 0, pendingNex: 0 } });
   const section = { liquid: "liquid", mining: "mining", pending: "pending", costBasis: "basis", totalSpent: "spent", currentValue: "value" };
-  const state = new Function("formatAmount", "computed", "app", "market", "remoteApiEnabled", "remoteAuthorityStatus", "bills", "t", "tintIcon", "ICON", code + ";return {breakdownRows,pnlSummary,pnlCells,balanceKnown,valuationKnown,nexBalance,usdValue,fmtNum,fmtUSD};")(
-    formatAmount, computed, app, market, remote, remoteAuthorityStatus, bills,
-    { value: { nexWallet: { breakdown: section, pnl: section } } }, () => "", {});
+  const scope = effectScope(); scopes.push(scope);
+  const state = scope.run(() => new Function("formatFinanceAmount", "computed", "app", "market", "remoteApiEnabled", "remoteAuthorityStatus", "bills", "t", "tintIcon", "ICON", "ref", "watch", "useLocaleStore", "apiRuntimeConfig", code + ";return {breakdownRows,balanceKnown,valuationKnown,nexBalance,usdValue,fmtNum,fmtUSD};")(
+    formatFinanceAmount, computed, app, market, remote, remoteAuthorityStatus, bills,
+    { value: { nexWallet: { breakdown: section } } }, () => "", {}, ref, watch, () => locale, apiRuntimeConfig));
   const balanceExpression = source.match(/:style="heroNumStyle">\{\{(.*?)\}\}/)?.[1];
   const valueExpression = source.match(/:style="heroUsdStyle">≈ \{\{(.*?)\}\}/)?.[1];
   if (!balanceExpression || !valueExpression) throw new Error("NEX hero bindings missing");
@@ -26,7 +33,7 @@ function mount(remote: boolean, hasSnapshot: boolean, balance: number, marketRea
   });
   return { ...state, app, market, bills, renderHero };
 }
-test.each([[-2, "-2.00 NEX"], [2, "+2.00 NEX"], [0, "+0.00 NEX"]] as const)("formats the signed daily NEX net amount %s", (amount, expected) => {
+test.each([[-2, "-2.00 UVT"], [2, "+2.00 UVT"], [0, "+0.00 UVT"]] as const)("formats the signed daily UVT net amount %s", (amount, expected) => {
   const s = mount(true, true, 50);
   s.bills.summary.todayNexEarn = amount;
   s.bills.summaryStatus = "ready";
@@ -39,21 +46,19 @@ test("missing wallet authority never displays zero holdings or invented valuatio
   expect(s.renderHero()).toEqual({balance:"—",value:"—"});
   expect(s.breakdownRows.value[0].value).toBe("—");
   expect(s.breakdownRows.value[0].hint).toBe("—");
-  expect(s.pnlSummary.value).toBe("—");
-  expect(s.pnlCells.value.slice(1).map((v: {value: string}) => v.value)).toEqual(["—", "—"]);
 });
 test("confirmed zero remains distinct from unavailable", () => {
-  const s = mount(true, true, 0); expect(s.breakdownRows.value[0].value).toBe("0.00 NEX"); expect(s.breakdownRows.value[0].hint).toBe("$0.00");
+  const s = mount(true, true, 0); expect(s.breakdownRows.value[0].value).toBe("0.00 UVT"); expect(s.breakdownRows.value[0].hint).toBe("$0.00");
 });
 test("snapshot arrival and account reset update all holding projections", () => {
   const s = mount(true, false, 50); expect(s.breakdownRows.value[0].value).toBe("—");
-  s.app.remoteFleetHasSnapshot = true; expect(s.breakdownRows.value[0].value).toBe("50.00 NEX"); expect(s.breakdownRows.value[0].hint).toBe("$100.00");
-  s.app.remoteFleetHasSnapshot = false; expect(s.breakdownRows.value[0].value).toBe("—"); expect(s.pnlSummary.value).toBe("—");
+  s.app.remoteFleetHasSnapshot = true; expect(s.breakdownRows.value[0].value).toBe("50.00 UVT"); expect(s.breakdownRows.value[0].hint).toBe("$100.00");
+  s.app.remoteFleetHasSnapshot = false; expect(s.breakdownRows.value[0].value).toBe("—");
 });
 test("price failure retains known NEX units but hides USD calculations", () => {
-  const s = mount(true, true, 50, false); expect(s.breakdownRows.value[0].value).toBe("50.00 NEX"); expect(s.breakdownRows.value[0].hint).toBe("—"); expect(s.pnlSummary.value).toBe("—");
+  const s = mount(true, true, 50, false); expect(s.breakdownRows.value[0].value).toBe("50.00 UVT"); expect(s.breakdownRows.value[0].hint).toBe("—");
 });
-test("local mode remains readable", () => { expect(mount(false, false, 12).breakdownRows.value[0].value).toBe("12.00 NEX"); });
+test("local mode remains readable", () => { expect(mount(false, false, 12).breakdownRows.value[0].value).toBe("12.00 UVT"); });
 
 
 test("page-show retries a failed balance read independently of bill failure", async () => {

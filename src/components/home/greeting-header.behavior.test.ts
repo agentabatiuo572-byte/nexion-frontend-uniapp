@@ -11,7 +11,7 @@ import { useI18nRuntime } from "@/store/i18n-runtime";
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { pendingProfileLocaleHydration } from "@/lib/locale-profile-hydration";
 import { homeGreetingName } from "./home-greeting";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { displayNickname } from "@/lib/brand-copy";
 import type { LocaleCode } from "@/i18n";
 
 const requests = vi.hoisted(() => ({ profile: vi.fn(), bundle: vi.fn() }));
@@ -51,7 +51,7 @@ async function mount(hour = 15, displayName = "UVEL 3778") {
     "@/i18n/use-t": { useT },
     "@/store/profile": { useProfile: () => profile },
     "./home-greeting": { homeGreetingName },
-    "@/lib/brand-copy": { nexGridBrandText },
+    "@/lib/brand-copy": { displayNickname },
   };
   const exports = { default: {} as Component };
   new Function("require", "exports", code)((id: string) => {
@@ -138,4 +138,15 @@ test("preserves the fallback and full server nickname while the locale changes",
   locale.setLocale("en");
   await Vue.nextTick();
   expect(header.text()).toBe("Good afternoon, UVEL 3778 Two Words");
+});
+
+
+test("mounted greeting preserves published wording and historical personal names", async () => {
+  useLocaleStore().setLocale("en");
+  const header = await mount(15, "NexGrid 3778");
+  expect(header.text()).toBe("Good afternoon, NexGrid 3778");
+  requests.bundle.mockResolvedValueOnce({ messages: { "home.greetingAfternoon": "Nexion NEX afternoon" } });
+  await useI18nRuntime().refresh("en", true);
+  await Vue.nextTick();
+  expect(header.text()).toBe("Nexion NEX afternoon, NexGrid 3778");
 });

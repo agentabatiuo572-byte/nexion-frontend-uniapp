@@ -115,19 +115,19 @@ onBeforeUnmount(() => {
 .checkout-result__fallback { display: grid; place-items: center; color: var(--v5-brand); }
 .checkout-result__fallback svg { width: 80px; height: 80px; }
 .checkout-result__art.is-activating .checkout-result__image { animation: checkout-device-breathe 1600ms ease-in-out infinite; }
-.checkout-result__title { display: block; text-align: center; font: var(--ui-type-page-title-weight, 600) var(--ui-type-page-title, 24px)/var(--ui-type-page-title-lh, 32px) var(--font-v5); }
-.checkout-result__status { min-height: calc(var(--ui-type-page-title-lh, 32px) + var(--v5-space-1) + var(--ui-type-description-lh, 20px) * 2); }
-.checkout-result__description { display: block; margin-top: var(--v5-space-1); text-align: center; color: var(--v5-ink-3); font: var(--ui-type-description-weight, 400) var(--ui-type-description, 13px)/var(--ui-type-description-lh, 20px) var(--font-v5); }
+.checkout-result__title { display: block; text-align: center; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); }
+.checkout-result__status { min-height: calc(var(--ui-type-page-title-lh) + var(--v5-space-1) + var(--ui-type-description-lh) * 2); }
+.checkout-result__description { display: block; margin-top: var(--v5-space-1); text-align: center; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .checkout-result__progress { display: grid; grid-template-rows: 6px 36px; justify-items: center; gap: var(--v5-space-2); width: min(100%, 240px); margin: var(--v5-space-4) auto; }
 .checkout-result__track { width: 200px; max-width: 100%; height: 6px; overflow: hidden; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); }
 .checkout-result__fill { width: 0; height: 100%; border-radius: inherit; background: var(--v5-brand); }
 .checkout-result__fill.is-activating { animation: checkout-activation-fill 3s linear both; }
 .checkout-result__fill.is-complete { width: 100%; }
-.checkout-result__progress-note { text-align: center; color: var(--v5-ink-3); font: var(--ui-type-note-weight, 400) var(--ui-type-note, 12px)/var(--ui-type-note-lh, 18px) var(--font-v5); }
+.checkout-result__progress-note { text-align: center; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .checkout-result__summary { display: grid; gap: var(--v5-space-1); margin-top: var(--v5-space-4); text-align: center; }
-.checkout-result__product { display: block; color: var(--v5-ink-2); font: var(--ui-type-body-weight, 400) var(--ui-type-body, 15px)/var(--ui-type-body-lh, 22px) var(--font-v5); }
-.checkout-result__amount { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: var(--v5-space-2); color: var(--v5-ink-3); font: var(--ui-type-description-weight, 400) var(--ui-type-description, 13px)/var(--ui-type-description-lh, 20px) var(--font-v5); }
-.checkout-result__amount > :last-child { color: var(--v5-ink); font-size: var(--ui-type-hero-title, 20px); line-height: var(--ui-type-hero-title-lh, 28px); }
+.checkout-result__product { display: block; color: var(--v5-ink-2); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
+.checkout-result__amount { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: var(--v5-space-2); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.checkout-result__amount > :last-child { color: var(--v5-ink); font-size: var(--ui-type-hero-title); line-height: var(--ui-type-hero-title-lh); }
 .checkout-result__actions { flex: none; display: grid; gap: var(--v5-space-2); margin-top: auto; padding: var(--v5-space-6) 0 var(--v5-space-4); background: var(--v5-bg); }
 .checkout-result__action-space { min-height: 48px; }
 .checkout-result__orbit { position: absolute; z-index: 2; left: calc(50% + 84px); bottom: var(--v5-space-3); width: 24px; height: 24px; border: 2px solid var(--v5-brand-soft); border-top-color: var(--v5-brand); border-right-color: var(--v5-brand); border-radius: 50%; animation: checkout-orbit-spin 1s linear infinite; pointer-events: none; }

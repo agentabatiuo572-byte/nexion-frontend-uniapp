@@ -26,6 +26,7 @@ const ROUTES = [
   "pages/me/wallet-topup",
   "pages/me/wallet-bills",
   "pages/me/security",
+  "pages/me/notifications",
   "pages/store/order-detail",
   "pages/register/success",
   "pages/index/index",

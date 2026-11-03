@@ -1,138 +1,136 @@
 <!--
-  TechMoneyCard — ZONE 1 home hero "Today's earnings" (ported from
-  mission-control.tsx TechMoneyCard). CROSS-STREAM aggregate: device mining,
-  team commission, and staking accrual. (Genesis 已移出每日 USD 聚合——
-  分红延期改造后它是上所后 NEX 排放，见 holder 页。) surface-2
-  base + aurora + tech-grid + drifting dots make it the conversion focal point.
-  Big streaming number + peer-avg / payback footer.
-  Source hardcoded the labels; ported to t.home.tech* for bilingual parity.
+  TechMoneyCard — home hero "Today's earnings" (design system 04.1 首页收益, P-57).
+  CROSS-STREAM aggregate: device mining, team commission, and staking accrual.
+  (Genesis 已移出每日 USD 聚合——分红延期改造后它是上所后 NEX 排放，见 holder 页。)
+  Open layout on the page: an amber floor glow that reaches under the glass
+  check-in card, and a flat brand grid behind the amount only.
 -->
 <template>
-  <view
-    class="relative isolate"
-    style="padding: 8px 2px 12px"
-  >
-    <!-- Left purple glow — soft radial, blurred so its edges feather into the black page bg.
-         走 --v5-ambient-nex:暗色是原样的极光(0 像素变化),亮色塌成 none。
-         此前虽已从 legacy --accent-purple 换到 --v5-nex 让门变绿,但两个 token 的
-         **亮色值都是 #7C5CFF**,米色底上那团发灰的淡紫斑一直还在(2026-08-18 实测)。 -->
-    <view
-      style="position: absolute; inset: 0; background: var(--v5-ambient-nex); filter: blur(24px); z-index: 0; pointer-events: none; animation: v5-aurora-drift 14s ease-in-out infinite alternate"
-    />
-    <!-- Tech grid (brand-tinted, masked) -->
-    <view
-      style="position: absolute; inset: 0; background-image: linear-gradient(to right, color-mix(in oklab, var(--v5-brand) 9%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--v5-brand) 9%, transparent) 1px, transparent 1px); background-size: 24px 24px; -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); z-index: 0; pointer-events: none"
-    />
-    <!-- Drifting dots -->
-    <view style="position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden">
-      <view v-for="(d, i) in dots" :key="i" :style="dotStyle(d)" />
+  <view class="earn-hero">
+    <view class="earn-hero__bg" aria-hidden="true"><view class="earn-hero__glow" /></view>
+    <view class="earn-hero__grid" aria-hidden="true" />
+
+    <view class="earn-hero__head">
+      <view class="earn-hero__label"><text>{{ t.home.techTodaysEarnings }}</text><DataVisibilityToggle /></view>
+      <text class="earn-hero__currency">{{ t.home.techEarningsCurrency }}</text>
     </view>
 
-    <view class="relative" style="z-index: 1">
-      <view class="flex justify-between items-center gap-2">
-        <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.techTodaysEarnings }}</text>
-        <text
-          class="inline-flex items-center gap-1 font-mono-tabular"
-          style="font-size: 12px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan-ink); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
-        >{{ t.home.techStreaming }}</text>
-      </view>
+    <view class="earn-hero__amount" :class="{ 'earn-hero__amount--long': longAmount }">
+      <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(intPart) }}</text>
+      <text v-else-if="remoteApiEnabled && remoteToday === null" class="earn-hero__int">—</text>
+      <template v-else>
+        <text class="earn-hero__cur">$</text>
+        <text class="earn-hero__int">{{ intPart }}</text>
+        <text class="earn-hero__dec">.{{ cents }}</text>
+      </template>
+    </view>
 
-      <view
-        class="mt-2.5 flex items-baseline gap-1"
-        style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)"
-      >
-        <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-        <text v-if="remoteApiEnabled && remoteToday === null" class="tabular-nums" style="font-size: 56px">—</text>
-        <text v-else class="tabular-nums" style="font-size: 56px">{{ intPart }}<text style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
-      </view>
-
-      <!-- 《02》§7:混合内容整句禁 Mono;保留 tabular-nums 让数字仍等宽对齐 -->
-      <text class="block mt-2 tabular-nums" style="font-size: 12px; line-height: 16px; color: var(--v5-success-ink)">{{ earningsSubtitle }}</text>
+    <view class="earnings-feedback" :aria-busy="retrying ? 'true' : 'false'">
+      <template v-if="recovering">
+        <text class="earnings-feedback__key" role="status">{{ app.homeTruthStatus === 'error' ? t.coreReview.earningsReadFailed : t.home.techEarningsLoading }}</text>
+        <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying ? 'true' : 'false'" class="earnings-retry" @click="retryEarnings" @keydown.enter.prevent="retryEarnings" @keydown.space.prevent="retryEarnings"><text>{{ t.ui.retry }}</text></view>
+      </template>
+      <template v-else>
+        <text class="earnings-feedback__key">{{ t.home.techVsYesterdaySamePeriod }}</text>
+        <text class="earnings-feedback__value" :class="deltaTone">{{ deltaText }}</text>
+      </template>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
-import { computed, type CSSProperties } from "vue";
+import { formatGroupedAmount } from "@/lib/amount-display";
+import { computed, ref } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
+import { useCountUp } from "@/composables/use-count-up";
 import { remoteApiEnabled } from "@/api/runtime";
-import { homeEarningsSubtitle } from "./home-real-copy";
-import { fmt } from "@/i18n/format";
+import { useDataVisibility } from "@/store/data-visibility";
+import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
 
 const t = useT();
+const visibility = useDataVisibility();
 const app = useApp();
+const retrying = ref(false);
+async function retryEarnings() {
+  if (retrying.value) return;
+  retrying.value = true;
+  try { await app.refreshHomeTruth(); } catch { /* The store keeps the read error visible. */ }
+  finally { retrying.value = false; }
+}
 const commission = useCommission();
 const staking = useStaking();
 
 // 创世节点不再计入「今日 USD 收益」——分红延期改造后它是上所后 NEX 排放（在 holder 页按
 // NEX 展示），非每日 USD 现金，故从首页每日聚合移除（去旧「平台交易量日分红」雷）。
-const computeToday = computed(() => app.earnings.today);
-const teamToday = computed(() => commission.todayUSDT());
-const stakingToday = computed(() => staking.todayAccruedUSDT());
-const todayTotal = computed(() => computeToday.value + teamToday.value + stakingToday.value);
+const todayTotal = computed(() => app.earnings.today + commission.todayUSDT() + staking.todayAccruedUSDT());
 const remoteToday = computed<number | null>(() => remoteApiEnabled
-  ? app.homeTruth?.earnings.today.usdt ?? null
+  ? app.homeTruthStatus === 'error' ? null : app.homeTruth?.earnings.today.usdt ?? null
   : null);
-const remoteJobCount = computed<number | null>(() => remoteApiEnabled
-  ? app.homeTruth?.earnings.today.jobCount ?? null
-  : null);
-const remoteTodayVsYesterdayPct = computed<number | null>(() => remoteApiEnabled
-  ? app.homeTruth?.earnings.todayVsYesterdayPct ?? null
-  : null);
-const earningsSubtitle = computed(() => homeEarningsSubtitle(
-  remoteApiEnabled,
-  app.homeTruthStatus,
-  remoteToday.value,
-  remoteJobCount.value,
-  remoteTodayVsYesterdayPct.value,
-  t.value.home.techVsYesterday,
-  t.value.home.techEarningsLoading,
-  t.value.uiChrome.unavailable,
-  t.value.home.techEarningsEmpty,
-  fmt(t.value.home.techSettledJobs, {
-    arrow: remoteTodayVsYesterdayPct.value === null ? "" : remoteTodayVsYesterdayPct.value > 0 ? "↑" : remoteTodayVsYesterdayPct.value < 0 ? "↓" : "→",
-    delta: remoteTodayVsYesterdayPct.value === null ? "—" : `${remoteTodayVsYesterdayPct.value > 0 ? "+" : ""}${remoteTodayVsYesterdayPct.value.toFixed(1)}%`,
-    count: remoteJobCount.value ?? 0,
-  }),
-));
+const recovering = computed(() => remoteApiEnabled && (app.homeTruthStatus === 'error' || (retrying.value && !app.homeTruth)));
 
-// Mock-only streaming number. Remote mode renders the exact server snapshot or
-// an unavailable placeholder; it never advances a client-side money counter.
+// Today minus yesterday comes only from the server field; it is never derived from the percentage.
+const vsYesterday = computed<number | null>(() => remoteApiEnabled && remoteToday.value !== null
+  ? app.homeTruth?.earnings.todayVsYesterdayUsdt ?? null
+  : null);
+const deltaText = computed(() => {
+  if (visibility.hidden) return visibility.mask("");
+  const value = vsYesterday.value;
+  if (value === null) return "—";
+  const [whole, fraction] = Math.abs(value).toFixed(3).split(".");
+  return `${value < 0 ? "−" : "+"}$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${fraction}`;
+});
+const deltaTone = computed(() => visibility.hidden || vsYesterday.value === null ? "is-none" : vsYesterday.value < 0 ? "is-down" : "is-up");
+
+// Mock-only streaming number. Remote mode shows the exact server snapshot; the only motion is a
+// one-time entrance count from 0 to that snapshot (07 首页收益入场), skipped for reduced motion.
 const display = useTicker(() => remoteToday.value ?? Math.max(todayTotal.value, 0.06), 0.0009, 1100, !remoteApiEnabled);
-const displayAmount = computed(() => remoteToday.value ?? display.value);
-const amountParts = computed(() => formatAmount(displayAmount.value).split("."));
+const shownToday = useCountUp(remoteToday);
+
+const amountParts = computed(() => formatGroupedAmount(shownToday.value ?? display.value).split("."));
 const intPart = computed(() => amountParts.value[0]);
 const cents = computed(() => amountParts.value[1]);
-
-interface Dot {
-  left: string;
-  delay: number;
-  color: string;
-}
-const dots: Dot[] = [
-  { left: "12%", delay: 0, color: "var(--v5-tech-cyan-ink)" },
-  { left: "32%", delay: 1.6, color: "var(--v5-brand)" },
-  { left: "54%", delay: 3.2, color: "var(--v5-brand-2-ink)" },
-  { left: "72%", delay: 4.8, color: "var(--v5-tech-cyan-ink)" },
-  { left: "88%", delay: 6.4, color: "var(--v5-brand)" },
-];
-function dotStyle(d: Dot): CSSProperties {
-  return {
-    position: "absolute",
-    bottom: "-6px",
-    left: d.left,
-    width: "4px",
-    height: "4px",
-    borderRadius: "50%",
-    background: d.color,
-    opacity: 0,
-    animation: "v5-dot-drift 8s linear infinite",
-    animationDelay: `${d.delay}s`,
-  };
-}
+// The masked amount keeps the 64px size so it does not reveal the magnitude.
+const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\D/g, "").length >= 4);
 </script>
+
+<style scoped>
+.earn-hero { position:relative; isolation:isolate; }
+/* Amber floor glow: from the amount's lower left down under the glass check-in card, fading out at the bottom. */
+.earn-hero__bg { position:absolute; left:-16px; right:-16px; top:-24px; bottom:-84px; z-index:-1; pointer-events:none; overflow:hidden; -webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent); mask-image:linear-gradient(to bottom,#000 70%,transparent); }
+.earn-hero__glow { position:absolute; left:-22%; width:100%; bottom:-24px; height:240px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-warning) 30%,transparent),transparent); filter:blur(12px); animation:earn-glow-in 1200ms cubic-bezier(.16,1,.3,1) both; }
+:global([data-theme="light"] .earn-hero__glow) { background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-warning) 22%,transparent),transparent); }
+/* Flat 20px brand grid behind the amount only (8px above the 12px label margin, which does not collapse in this flex item). */
+.earn-hero__grid { position:absolute; inset:4px -2px -12px; z-index:-1; pointer-events:none; background-image:linear-gradient(to right,color-mix(in oklab,var(--v5-brand) 9%,transparent) 1px,transparent 1px),linear-gradient(to bottom,color-mix(in oklab,var(--v5-brand) 9%,transparent) 1px,transparent 1px); background-size:20px 20px; -webkit-mask-image:radial-gradient(ellipse 62% 72% at 40% 52%,#000 25%,transparent 72%); mask-image:radial-gradient(ellipse 62% 72% at 40% 52%,#000 25%,transparent 72%); animation:earn-grid-in 900ms ease-out both; }
+.earn-hero__head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; height:20px; }
+.earn-hero__label { display:flex; align-items:center; gap:2px; min-width:0; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.earn-hero__label :deep(.data-visibility-toggle) { margin:-12px -10px; }
+.earn-hero__currency { padding:2px 7px; border-radius:4px; background:var(--v5-tech-cyan-soft); color:var(--v5-tech-cyan-ink); font:500 12px/16px var(--font-jet-mono); letter-spacing:.04em; white-space:nowrap; }
+.earn-hero__amount { display:flex; align-items:baseline; gap:4px; margin-top:10px; font-family:var(--font-amount); font-weight:600; letter-spacing:-.024em; line-height:1; color:var(--v5-ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.earn-hero__cur { font-size:24px; font-weight:500; color:var(--v5-ink-3); }
+.earn-hero__int { font-size:64px; }
+.earn-hero__dec { font-size:40px; color:var(--v5-ink-3); }
+.earnings-feedback { display:flex; align-items:center; gap:8px; margin-top:16px; min-height:20px; animation:earn-rise 520ms 200ms cubic-bezier(.2,.8,.2,1) both; }
+.earnings-feedback__key { min-width:0; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.earnings-feedback__value { font:500 16px/20px var(--font-jet-mono); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.earnings-feedback__value.is-up { color:var(--v5-success-ink); }
+.earnings-feedback__value.is-down { color:var(--v5-danger); }
+.earnings-feedback__value.is-none { color:var(--v5-ink-3); }
+.earnings-retry { flex-shrink:0; display:inline-flex; align-items:center; min-height:44px; margin:-12px 0 -12px auto; padding:0 4px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
+@keyframes earn-glow-in { from { opacity:0; transform:translateY(60px) scale(.8); } }
+@keyframes earn-grid-in { from { opacity:0; } }
+@keyframes earn-rise { from { opacity:0; transform:translateY(8px); } }
+@media (max-width:339px) {
+  .earn-hero__cur { font-size:20px; }
+  .earn-hero__int { font-size:52px; }
+  .earn-hero__dec { font-size:32px; }
+}
+.earn-hero__amount--long .earn-hero__int { font-size:48px; }
+.earn-hero__amount--long .earn-hero__dec { font-size:30px; }
+@media (prefers-reduced-motion:reduce) {
+  .earn-hero__glow, .earn-hero__grid, .earnings-feedback { animation:none; }
+}
+</style>

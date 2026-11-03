@@ -1,3 +1,5 @@
+import { formatDisplayDateTime } from "@/lib/display-date";
+import { parseServerTimestamp } from "@/api/server-time";
 import type { AppHomeEarningsLedgerRow } from "@/api/app-home-api";
 
 export interface CanonicalHomeActivityRow {
@@ -16,11 +18,9 @@ export interface CanonicalHomeEarningsItem {
   completedAt: string;
 }
 
-// Native engines can ignore locale options; keep the device's local time compact.
-export function formatHomeFeedTime(completedAt: string | null | undefined): string {
-  const date = new Date(completedAt ?? "");
-  if (Number.isNaN(date.getTime())) return "—";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+// Recent settlements may cross dates and years; retain the local calendar context.
+export function formatHomeFeedTime(completedAt: string | null | undefined, locale: string): string {
+  return formatDisplayDateTime(completedAt, locale);
 }
 
 export function buildCanonicalHomeFeed(
@@ -29,7 +29,7 @@ export function buildCanonicalHomeFeed(
 ): { activityRows: CanonicalHomeActivityRow[]; earningsItems: CanonicalHomeEarningsItem[] } {
   const capped = ledger
     .slice()
-    .sort((left, right) => Date.parse(right.completedAt) - Date.parse(left.completedAt))
+    .sort((left, right) => (parseServerTimestamp(right.completedAt) ?? 0) - (parseServerTimestamp(left.completedAt) ?? 0))
     .slice(0, Math.max(0, limit));
 
   return {

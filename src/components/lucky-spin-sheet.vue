@@ -42,7 +42,7 @@
       </view>
 
       <!-- 票况 + 社会证明 -->
-      <view class="lss-tickets">
+      <view v-if="!spin.remoteEnded && !spin.remoteLoading && !spin.remoteError" class="lss-tickets">
         <view class="lss-chips">
           <view v-if="hasFreeToday" class="lss-chip lss-chip-free">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z" /></svg>
@@ -53,29 +53,40 @@
             <text class="lss-chip-t lss-chip-t-bonus">{{ bonusChip }}</text>
           </view>
         </view>
-        <text v-if="!remoteApiEnabled" class="lss-social">{{ socialProofText }}</text>
       </view>
 
       <!-- ───────── 转盘 ───────── -->
-      <view class="lss-wheel-wrap">
+      <view v-if="prizes.length > 0 && !spin.remoteEnded && !spin.remoteError" class="lss-wheel-wrap">
         <!-- pointer(顶部固定指针)-->
         <view class="lss-pointer" />
-        <svg viewBox="0 0 200 200" width="248" height="248" class="lss-wheel-svg">
-          <!-- rim -->
-          <circle :cx="CX" :cy="CY" :r="R + 4" fill="none" stroke="var(--v5-border-strong)" stroke-width="3" />
-          <!-- Slices + their SVG <text> labels are injected via v-html so uni's H5
-               compiler doesn't rewrite the in-SVG <text> into <uni-text> (which the
-               browser won't render as SVG text → invisible prize labels, P-007 family). -->
-          <g :style="wheelStyle" @transitionend="onWheelTransitionEnd" v-html="slicesSvg" />
-          <!-- hub -->
-          <circle :cx="CX" :cy="CY" r="20" fill="var(--v5-surface-3)" stroke="var(--v5-border-strong)" stroke-width="2" />
-        </svg>
+        <!-- A complete SVG root preserves its namespace in the App view renderer. -->
+        <view class="lss-wheel-svg" :style="wheelStyle" @transitionend="onWheelTransitionEnd" v-html="wheelSvg" />
+        <view class="lss-wheel-fixed" v-html="wheelDecorationSvg" />
       </view>
 
       <!-- ───────── CTA 区(phase 驱动)───────── -->
       <view class="lss-cta-zone">
+        <view v-if="hasPendingSpin && spin.phase === 'idle'" class="lss-nospin" role="status">
+          <text class="lss-nospin-hint">{{ t.luckySpin.spinUnknown }}</text>
+          <view class="lss-earn-cta" role="button" tabindex="0" :aria-disabled="spinSubmitting" @click="doSpin(true)">
+            <text class="lss-earn-cta-t">{{ t.luckySpin.retryOriginal }}</text>
+          </view>
+        </view>
+        <view v-else-if="spin.remoteLoading && spin.phase === 'idle'" class="lss-nospin" role="status">
+          <text class="lss-nospin-title">{{ statusCopy.loading }}</text>
+        </view>
+        <view v-else-if="spin.remoteError && spin.phase === 'idle'" class="lss-nospin">
+          <text class="lss-nospin-title">{{ t.events.loadErrorTitle }}</text>
+          <view class="lss-earn-cta" role="button" tabindex="0" @click="spin.refreshRemoteState()">
+            <text class="lss-earn-cta-t">{{ t.events.retry }}</text>
+          </view>
+        </view>
+        <view v-else-if="spin.remoteEnded" class="lss-nospin">
+          <text class="lss-nospin-title">{{ t.events.chip.ended }}</text>
+          <text v-if="historyRows.length === 0" class="lss-nospin-hint">{{ statusCopy.noHistory }}</text>
+        </view>
         <!-- 中奖庆祝 -->
-        <view v-if="spin.phase === 'won' && wonPrize" class="lss-won" :style="wonCardStyle">
+        <view v-else-if="spin.phase === 'won' && wonPrize" class="lss-won" :style="wonCardStyle">
           <text class="lss-won-label">{{ isJackpot ? t.luckySpin.jackpotTitle : t.luckySpin.wonTitle }}</text>
           <text class="lss-won-prize" :style="wonPrizeStyle">{{ ls(wonPrize) }}</text>
           <text class="lss-won-hint">{{ wonPrize.kind === "coupon" ? t.luckySpin.couponHint : t.luckySpin.creditedHint }}</text>
@@ -95,7 +106,7 @@
         </view>
 
         <!-- idle / spinning(有次数)-->
-        <view v-else-if="available > 0" class="lss-spin-btn" :class="{ 'lss-spin-btn-busy': spin.phase === 'spinning' }" :style="spinBtnStyle" @click="onSpinClick">
+        <view v-else-if="available > 0 || spin.phase === 'spinning'" class="lss-spin-btn" :class="{ 'lss-spin-btn-busy': spin.phase === 'spinning' }" :style="spinBtnStyle" @click="onSpinClick">
           <text v-if="spin.phase === 'spinning'" class="lss-spin-btn-t">{{ t.luckySpin.spinningLabel }}</text>
           <template v-else>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z" /></svg>
@@ -116,11 +127,11 @@
       </view>
 
       <!-- 奖池一览(透明度)-->
-      <view class="lss-pool-toggle" @click="poolOpen = !poolOpen">
+      <view v-if="prizes.length > 0 && !spin.remoteEnded && !spin.remoteError" class="lss-pool-toggle" @click="poolOpen = !poolOpen">
         <text class="lss-pool-toggle-t">{{ t.luckySpin.poolTitle }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lss-pool-chev" :class="{ 'lss-pool-chev-open': poolOpen }"><path d="m9 18 6-6-6-6" /></svg>
       </view>
-      <view v-if="poolOpen" class="lss-pool-grid">
+      <view v-if="poolOpen && !spin.remoteEnded && !spin.remoteError" class="lss-pool-grid">
         <view v-for="sp in prizes" :key="sp.id" class="lss-pool-item" :style="{ opacity: sp.isReal && !realActive ? 0.45 : 1 }">
           <view class="lss-pool-dot" :style="{ background: sp.tint }" />
           <text class="lss-pool-name">{{ ls(sp) }}</text>
@@ -145,6 +156,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatDisplayDateTime } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
 import { navTo } from "@/lib/route";
@@ -160,6 +172,10 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { escapeSvgText } from "@/lib/svg-text";
+import { useLocaleStore } from "@/store/locale";
+import { eventStatusCopy } from "@/components/events/event-status-copy";
+import type { EventSpinHistory } from "@/api/events-api";
+import { displayDeadline } from "@/lib/promotion-display";
 
 const R = 94; // wheel radius (viewBox 200)
 const CX = 100;
@@ -169,12 +185,11 @@ const MOCK_NET_FAIL_RATE = 0.08; // mock: 区块链拥堵演示(server 侧真实
 const spin = useLuckySpin();
 const app = useApp();
 const t = useT();
+const locale = useLocaleStore();
+const statusCopy = computed(() => eventStatusCopy[locale.code as keyof typeof eventStatusCopy] ?? eventStatusCopy.en);
 
 const poolOpen = ref(false);
 let accountGeneration = 0;
-
-// social proof — mock 实时数(不必准确,营造真平台氛围)
-const winnersToday = 247;
 
 function polar(angleDeg: number, radius: number): { x: number; y: number } {
   const rad = (angleDeg * Math.PI) / 180;
@@ -207,11 +222,20 @@ const realPrizeSoldOut = computed(() => spin.realPrizeSoldOut);
 
 const ls = (sp: SpinPrize) => t.value.luckySpin.prizes[sp.labelKey as keyof typeof t.value.luckySpin.prizes]
   || (sp.rewardName ? platformDisplayText(sp.rewardName) : sp.id);
-const lsShort = (sp: SpinPrize) => t.value.luckySpin.prizesShort[sp.labelKey as keyof typeof t.value.luckySpin.prizesShort]
-  || (sp.rewardName ? platformDisplayText(sp.rewardName) : sp.id);
+const wheelUnits = {
+  zh: { points: "积分", coupon: "券" },
+  en: { points: "pts", coupon: "coupon" },
+  vi: { points: "điểm", coupon: "phiếu" },
+};
+function wheelLabel(sp: Pick<SpinPrize, "kind" | "amount">): string[] {
+  const units = wheelUnits[locale.code === "zh" || locale.code === "vi" ? locale.code : "en"];
+  return [
+    `${sp.kind === "usdt" || sp.kind === "coupon" ? "$" : ""}${sp.amount}`,
+    sp.kind === "uvt" ? "UVT" : sp.kind === "usdt" ? "USDT" : units[sp.kind],
+  ];
+}
 
 const bonusChip = computed(() => fmt(t.value.luckySpin.bonusTicketChip, { n: spin.bonusTickets }));
-const socialProofText = computed(() => fmt(t.value.luckySpin.socialProof, { n: winnersToday }));
 const noSpinHintText = computed(() => fmt(t.value.luckySpin.noSpinHint, { time: untilUtcResetLabel() }));
 
 const prizes = computed(() => remoteApiEnabled ? spin.remoteSegments : SPIN_PRIZES);
@@ -224,58 +248,80 @@ const slices = computed(() =>
     const a1 = -90 + (i + 1) * segmentDeg;
     const p0 = polar(a0, R);
     const p1 = polar(a1, R);
-    const mid = polar(a0 + segmentDeg / 2, 60);
+    const mid = polar(a0 + segmentDeg / 2, 70);
     const dim = sp.isReal && !realActive.value; // 降级/售罄 → 真实奖档置灰
     const fill = `color-mix(in srgb, ${sp.tint} ${i % 2 === 0 ? 46 : 30}%, var(--v5-surface-2))`;
-    return { sp, i, path: `M${CX},${CY} L${p0.x},${p0.y} A${R},${R} 0 0 1 ${p1.x},${p1.y} Z`, mid, dim, fill };
+    return { sp, i, path: `M${CX},${CY} L${p0.x},${p0.y} A${R},${R} 0 0 1 ${p1.x},${p1.y} Z`, mid, dim, fill, label: wheelLabel(sp) };
   }),
 );
 
-// Wheel slices rendered as a raw SVG string (path + label <text> per slice).
-// v-html'd into the rotating <g> so the in-SVG <text> survives uni's H5 tag
-// rewriting (a template <text> inside <svg> becomes <uni-text> → not real SVG
-// text → invisible labels). Label style is inlined (9px/600, ink, font-v5).
-const slicesSvg = computed(() =>
+// Inject the full SVG into a view: App creates template SVG tags in the HTML
+// namespace, while H5 rewrites template <text>. Keep untrusted labels escaped.
+const wheelSvg = computed(() =>
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="248" height="248">' +
   slices.value
     .map(
       (s) =>
         `<g opacity="${s.dim ? 0.32 : 1}">` +
         `<path d="${s.path}" fill="${s.fill}" stroke="var(--v5-bg)" stroke-width="1.5" />` +
-        `<text x="${s.mid.x}" y="${s.mid.y}" text-anchor="middle" dominant-baseline="middle" ` +
-        `style="font-size:12px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${escapeSvgText(lsShort(s.sp))}</text>` +
+        s.label.map((line, index) =>
+          `<text x="${s.mid.x}" y="${s.mid.y + (index === 0 ? -6 : 6)}" text-anchor="middle" dominant-baseline="middle" ` +
+          `${line.length > 8 ? 'textLength="40" lengthAdjust="spacingAndGlyphs" ' : ''}` +
+          `style="font-size:8.5px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${escapeSvgText(line)}</text>`,
+        ).join("") +
         `</g>`,
     )
-    .join(""),
+    .join("") + '</svg>',
 );
+const wheelDecorationSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="248" height="248">' +
+  `<circle cx="${CX}" cy="${CY}" r="${R + 4}" fill="none" stroke="var(--v5-border-strong)" stroke-width="3" />` +
+  `<circle cx="${CX}" cy="${CY}" r="20" fill="var(--v5-surface-3)" stroke="var(--v5-border-strong)" stroke-width="2" />` + '</svg>';
 
 const wonPrize = computed(() =>
   spin.lastWonPrizeId ? prizes.value.find((p) => p.id === spin.lastWonPrizeId) ?? null : null,
 );
 const isJackpot = computed(() =>
   wonPrize.value
-    ? wonPrize.value.amount >= 150 && (wonPrize.value.kind === "usdt" || wonPrize.value.kind === "nex")
+    ? wonPrize.value.amount >= 150 && (wonPrize.value.kind === "usdt" || wonPrize.value.kind === "uvt")
     : false,
 );
+
+function historyAwardTime(value: string): string {
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? displayDeadline(value, locale.code) : "";
+}
+
+function historyPrizeLabel(row: EventSpinHistory): string {
+  const kind = row.rewardType.toLowerCase();
+  const current = prizes.value.find(prize => prize.id === row.tierId && prize.kind === kind && prize.amount === row.rewardAmount);
+  if (current) {
+    const label = ls(current);
+    if (label !== current.id) return label;
+  }
+  if (kind === "uvt" || kind === "usdt" || kind === "points" || kind === "coupon") {
+    return wheelLabel({ kind, amount: row.rewardAmount }).join(" ");
+  }
+  return platformDisplayText(row.rewardName);
+}
 
 const historyRows = computed(() => {
   if (remoteApiEnabled) {
     return spin.remoteHistory.slice(0, 5).map((h) => ({
       ts: Date.parse(h.awardedAt),
-      label: platformDisplayText(h.rewardName),
-      time: h.awardedAt.slice(5, 16).replace("T", " "),
+      label: historyPrizeLabel(h),
+      time: historyAwardTime(h.awardedAt),
     }));
   }
   return spin.history.slice(0, 5).flatMap((h) => {
     const sp = SPIN_PRIZES.find((p) => p.id === h.prizeId);
     if (!sp) return [];
-    return [{ ts: h.ts, label: ls(sp), time: new Date(h.ts).toISOString().slice(5, 16).replace("T", " ") }];
+    return [{ ts: h.ts, label: ls(sp), time: formatDisplayDateTime(h.ts, locale.code) }];
   });
 });
 
 // ── inline styles (token-driven; CSSProperties) ──
 const wheelStyle = computed<CSSProperties>(() => ({
   transform: `rotate(${spin.wheelAngle}deg)`,
-  transformOrigin: "100px 100px",
+  transformOrigin: "50% 50%",
   transition: spin.phase === "spinning" ? "transform 3.6s cubic-bezier(0.16,1,0.3,1)" : "none",
 }));
 const wonCardStyle = computed<CSSProperties>(() => ({
@@ -300,9 +346,9 @@ const spinBtnStyle = computed<CSSProperties>(() => ({
 function creditPrize(sp: SpinPrize): boolean {
   const ref = `LSPIN-${sp.id}-${mockServerNow().toString(36)}`;
   const memo = fmt(t.value.luckySpin.billMemo, { prize: ls(sp) });
-  if (sp.kind === "nex" || sp.kind === "usdt") {
+  if (sp.kind === "uvt" || sp.kind === "usdt") {
     // 收据即指令:symbol 决定入哪种币,派奖与账单同生共死。
-    return postMoneyBill({ type: "bonus", symbol: sp.kind === "nex" ? "NEX" : "USDT", amount: sp.amount, status: "posted", memo, ref }) === "ok";
+    return postMoneyBill({ type: "bonus", symbol: sp.kind === "uvt" ? "UVT" : "USDT", amount: sp.amount, status: "posted", memo, ref }) === "ok";
   }
   // coupon: 购机抵扣券 — 记入转盘中奖历史(store.history,持久化),不入钱包余额
   // (对齐"仅抵购机款不可提现")。原型未建券兑换流;真后台落 coupon 账本 + 结账抵扣。
@@ -358,14 +404,15 @@ async function doSpin(skipConfirm = false) {
 }
 
 async function executeSpin(skipConfirm = false) {
-  if (spin.availableSpins() <= 0) return;
+  const retrying = remoteApiEnabled && (spin.pendingSpin !== null || spin.pendingStorageError);
+  if (!retrying && spin.availableSpins() <= 0) return;
   const generation = accountGeneration;
   const eventCode = spin.activeEventCode;
   const usingBonus = !spin.hasFreeSpinToday();
 
   // bonus 票为稀缺资源 → 二次确认;免费次数零门槛不弹(转化优先)。
   // 网络失败重试沿用上次确认,不重复弹窗(skipConfirm)。
-  if (usingBonus && !skipConfirm) {
+  if (usingBonus && !skipConfirm && !retrying) {
     const ok = await confirm({
       title: t.value.luckySpin.confirmTicketTitle,
       message: t.value.luckySpin.confirmTicketMsg,
@@ -392,24 +439,26 @@ async function executeSpin(skipConfirm = false) {
   }
 
   if (remoteApiEnabled) {
-    const key = pendingSpinKeys.get(eventCode) ?? createSpinIdempotencyKey();
-    pendingSpinKeys.set(eventCode, key);
-    const result = await spin.spinRemote(eventCode, key);
+    const result = await spin.spinRemote(eventCode, retrying);
     if (generation !== accountGeneration) return;
     if (result.stale) return;
     if (!result.ok) {
+      if (!result.failure || !result.failure.ambiguous) {
+        toast.warn(t.value.luckySpin.spinFailedTitle, t.value.luckySpin[result.failure?.messageKey ?? "spinUnavailable"]);
+        return;
+      }
       netError.show({
-        title: t.value.luckySpin.netErrorTitle,
-        message: t.value.luckySpin.netErrorMsg,
+        title: t.value.luckySpin.spinFailedTitle,
+        message: t.value.luckySpin[result.failure.messageKey],
         retryAfterMs: null,
         onRetry: () => {
+          if (generation !== accountGeneration || eventCode !== spin.activeEventCode) return;
           netError.hide();
           void doSpin(true);
         },
       });
       return;
     }
-    pendingSpinKeys.delete(eventCode);
     clearSettleTimer();
     settleTimer = setTimeout(() => {
       settleTimer = null;
@@ -436,10 +485,9 @@ async function executeSpin(skipConfirm = false) {
   }, 3650);
 }
 
-const pendingSpinKeys = new Map<string, string>();
+const hasPendingSpin = computed(() => remoteApiEnabled && (spin.pendingSpin !== null || spin.pendingStorageError));
 watch(() => app.accountKey, () => {
   accountGeneration += 1;
-  pendingSpinKeys.clear();
   clearSettleTimer();
 });
 watch(() => [spin.activeEventCode, spin.open], () => {
@@ -447,14 +495,6 @@ watch(() => [spin.activeEventCode, spin.open], () => {
   clearSettleTimer();
   netError.hide();
 }, { flush: "sync" });
-let spinKeySequence = 0;
-function createSpinIdempotencyKey(): string {
-  const randomUuid = globalThis.crypto?.randomUUID;
-  if (typeof randomUuid === "function") return `lucky-spin-${randomUuid()}`;
-  spinKeySequence += 1;
-  return `lucky-spin-${Date.now().toString(36)}-${spinKeySequence}`;
-}
-
 function onSpinClick() {
   if (spin.phase === "spinning") return;
   void doSpin();
@@ -514,14 +554,15 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   right: 0;
   bottom: 0;
   z-index: 800;
-  max-height: calc(100% - 24px);
+  max-height: calc(100% - max(24px, var(--nx-overlay-top)));
+  box-sizing: border-box;
   overflow-y: auto;
 
 
   background: var(--nx-glass-fill);
   border: none;
   padding: 18px 16px;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
+  padding-bottom: max(calc(env(safe-area-inset-bottom, 0px) + 32px), var(--nx-overlay-bottom));
 }
 
 /* header */
@@ -557,7 +598,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
 }
 .lss-title {
   font-family: var(--font-v5);
-  font-size: 15px;
+  font-size: var(--ui-type-hero-title);
   font-weight: 600;
   color: var(--v5-ink);
   margin-top: 2px;
@@ -631,10 +672,6 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
 .lss-chip-t-bonus {
   color: var(--v5-ink-2);
 }
-.lss-social {
-  font-size: 12px;
-  color: var(--v5-ink-3);
-}
 
 /* wheel */
 .lss-wheel-wrap {
@@ -657,9 +694,20 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   border-right: 11px solid transparent;
   border-top: 18px solid var(--v5-ink);
 }
-.lss-wheel-svg {
+.lss-wheel-svg,
+.lss-wheel-fixed {
   display: block;
+  width: 100%;
+  height: 100%;
+  line-height: 0;
+}
+.lss-wheel-svg {
   filter: drop-shadow(0 0 18px color-mix(in srgb, var(--v5-brand) 22%, transparent));
+}
+.lss-wheel-fixed {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 /* cta zone */
@@ -731,7 +779,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   transform: scale(0.98);
 }
 .lss-btn-again-t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -739,7 +787,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   background: var(--v5-brand);
 }
 .lss-btn-collect-t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -762,7 +810,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   opacity: 0.7;
 }
 .lss-spin-btn-t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -778,13 +826,13 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
 .lss-nospin-title {
   display: block;
   font-family: var(--font-v5);
-  font-size: 15px;
+  font-size: var(--ui-type-card-title);
   font-weight: 600;
   color: var(--v5-ink);
 }
 .lss-nospin-hint {
   display: block;
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
   margin-top: 4px;
 }
@@ -821,7 +869,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   opacity: 0.7;
 }
 .lss-pool-toggle-t {
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   font-weight: 500;
   color: var(--v5-ink-2);
 }

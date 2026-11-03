@@ -32,9 +32,10 @@ test("bundle editor uses the real remote order lifecycle with stable command rec
 test("remote team projection never turns errors into zero or local royalty money", async () => {
   const [store, page] = await Promise.all([read("src/store/network.ts"), read("src/pages/team/unilevel.vue")]);
   assert.doesNotMatch(store, /catch \{[\s\S]{0,260}totalMembers\.value = 0/);
-  assert.match(page, /amount\(remoteTotalUSDT\)/);
-  assert.match(page, /v-else-if="remoteState !== 'ready'"/);
-  assert.match(page, /v-if="remoteState === 'ready' && remoteSnapshot"/);
+  // P-41 splits the hero amount and keeps a confirmed snapshot visible while refreshing.
+  assert.match(page, /amount\(remoteTotalUSDT\.value\)\.split\('\.'\)/);
+  assert.match(page, /v-else-if="remoteState !== 'ready' && !remoteSnapshot"/);
+  assert.match(page, /v-if="\(remoteState === 'ready' \|\| remoteState === 'loading'\) && remoteSnapshot"/);
   assert.doesNotMatch(page, /totalRoyalty|UNILEVEL_USDT/);
   assert.match(page, /projectionErrorTitle/);
 });
@@ -49,14 +50,15 @@ test("global search offers Help Center and old AI links return to the inbox", as
   assert.doesNotMatch(search, /type=ai/);
   assert.match(search, /refreshProductCatalog/);
   assert.match(search, /refreshCanonicalNetwork/);
-  assert.match(chat, /if \(!NOVA_SUPPORT_VISIBLE\) \{/);
+  // The retired AI route is gone: any query other than cid/start returns to the message center.
+  assert.doesNotMatch(chat, /type === "ai"|nova/i);
   assert.match(chat, /navReplace\("\/pages\/support\/messages"\)/);
 });
 
 test("remote device activation and deactivation use server CAS and verify the fleet before success", async () => {
   const [api, page, types] = await Promise.all([
     read("src/api/device-e3-api.ts"),
-    read("src/pages/me/devices.vue"),
+    read("src/composables/use-device-deactivation.ts"),
     read("src/store/types.ts"),
   ]);
   assert.match(types, /rowVersion\?:\s*number/);
@@ -75,7 +77,7 @@ test("remote trial conversion and deferred device deactivation are server comman
   const [trialApi, trialStore, checkout, deviceApi, devices] = await Promise.all([
     read("src/api/trial-api.ts"), read("src/store/free-trial.ts"),
     read("src/pages/store/checkout.vue"), read("src/api/device-e3-api.ts"),
-    read("src/pages/me/devices.vue"),
+    read("src/composables/use-device-deactivation.ts"),
   ]);
   assert.match(trialApi, /path: "\/api\/trial\/convert"/);
   assert.match(trialApi, /sourceEnvironment !== "PRODUCTION"|sourceEnvironment: "PRODUCTION"/);
@@ -165,7 +167,10 @@ test("royalty page separates canonical purchase and device queries before pagina
   assert.match(page, /directApi\.snapshot/);
   assert.match(page, /directApi\.snapshot\(period\.value, page, pageSize, querySnapshotAt, "device_earning"\)/);
   assert.match(page, /purchaseApi\.unilevel\(period\.value, page, pageSize, querySnapshotAt, filter\.value\)/);
-  assert.match(page, /v-for="event in remoteSnapshot\.events"/);
+  // P-41 groups the same server page by day; every event is still rendered, none filtered out.
+  assert.match(page, /v-for="day in eventDays"/);
+  assert.match(page, /v-for="event in day\.events"/);
+  assert.match(page, /const eventDays = computed\(\(\) => \{[\s\S]{0,200}\(remoteSnapshot\.value\?\.events \?\? \[\]\)\.forEach\(/);
   assert.match(page, /v-if="remoteSnapshot\.totalRows === 0"/);
   assert.doesNotMatch(page, /\.filter\([^;\n]*event\.(?:kind|layer)/);
   assert.match(page, /remoteState === 'error'/);
@@ -219,14 +224,14 @@ test("remote Genesis holder renders server holdings and emission ledger without 
   assert.doesNotMatch(holder, /4192 - i \* 137/);
 });
 
-test("remote globe and search refresh when account or canonical catalog changes", async () => {
+// The globe has no account-scoped read since 3d3acc05: it presents public H9 configuration.
+test("search refreshes when the canonical catalog changes; the globe reads no account data", async () => {
   const [globe, search] = await Promise.all([
     read("src/pages/globe/globe.vue"),
     read("src/pages/search/search.vue"),
   ]);
-  assert.match(globe, /watch\(\(\) => \[String\(app\.accountKey\), app\.accountBindingEpoch\]/);
-  assert.match(globe, /networkProjection\.value = null/);
-  assert.match(globe, /void loadRegions\(\)/);
+  assert.match(globe, /cfg\.config\.publicStats\.globeDisplay/);
+  assert.doesNotMatch(globe, /networkRegionsApi|loadRegions/);
   assert.match(search, /productCatalogState/);
   assert.match(search, /productCatalogState\.status === "ready"/);
   assert.match(search, /@keydown\.enter\.prevent="openHelp"/);

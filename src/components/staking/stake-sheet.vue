@@ -8,8 +8,8 @@
 -->
 <template>
   <view v-if="open && recovering" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.stakingV3.sheet.checkPrevious">
-    <view class="nx-sheet-backdrop" @click="emitClose" />
-    <view class="nx-glass-sheet nx-sheet-panel" :style="panelStyle">
+    <view class="nx-sheet-backdrop nx-sheet-fade-in" @click="emitClose" />
+    <view class="nx-glass-sheet nx-sheet-panel nx-sheet-slide-up" :style="panelStyle">
       <text class="block" :style="titleStyle">{{ staking.pendingOpenRejection ? t.stakingV3.sheet.failedTitle : t.stakingV3.toast.openFailedTitle }}</text>
       <text v-if="pendingOpen" class="block" :style="subtitleStyle">{{ fmt(t.stakingV3.sheet.cta, { amount: formatAmount(pendingOpen.amountUsdt), n: pendingTerm }) }}</text>
       <text v-if="!staking.pendingOpenRejection" class="block" :style="noticeStyle">{{ t.stakingV3.sheet.pendingHint }}</text>
@@ -21,10 +21,10 @@
   </view>
   <view v-else-if="open && term !== null && selectedPool" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.staking.title">
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop nx-sheet-fade-in" @click="emitClose" />
     </transition>
     <transition name="nx-sheet-slide">
-      <view v-if="open" class="nx-glass-sheet nx-sheet-panel" :style="panelStyle" @click.stop>
+      <view v-if="open" class="nx-glass-sheet nx-sheet-panel nx-sheet-slide-up" :style="panelStyle" @click.stop>
         <!-- Title row -->
         <view class="flex items-start justify-between" style="margin-bottom: 16px">
           <view>
@@ -91,8 +91,8 @@
     </transition>
   </view>
   <view v-else-if="open && term !== null" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.staking.remoteUnavailableClosed">
-    <view class="nx-sheet-backdrop" @click="emitClose" />
-    <view class="nx-staking-sheet-panel" :style="panelStyle" @click.stop>
+    <view class="nx-sheet-backdrop nx-sheet-fade-in" @click="emitClose" />
+    <view class="nx-staking-sheet-panel nx-sheet-panel nx-sheet-slide-up" :style="panelStyle" @click.stop>
       <view class="flex items-start justify-between" style="gap: 12px">
         <text class="block" :style="titleStyle">{{ t.staking.remoteUnavailableClosed }}</text>
         <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose"  @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
@@ -104,11 +104,11 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { ref, computed, watch, onBeforeUnmount, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDate } from "@/lib/trial-date";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
@@ -209,7 +209,7 @@ const interestText = computed(() =>
   props.term !== null ? formatAmount(amount.value * apyRate.value * (props.term / 365)) : "0.00",
 );
 const unlockDateText = computed(() =>
-  props.term !== null ? formatTrialDate(Date.now() + props.term * ONE_DAY_MS) : "",
+  props.term !== null ? formatTrialDate(Date.now() + props.term * ONE_DAY_MS, dateLocale()) : "",
 );
 const totalText = computed(() =>
   props.term !== null ? formatAmount(amount.value * (1 + apyRate.value * (props.term / 365))) : "0.00",
@@ -296,9 +296,6 @@ async function submit() {
     let lease: RemoteIntentLease | null = null;
     try {
       lease = intentLease(pool.tierKey, submittedAmount);
-      if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) {
-        return;
-      }
       await staking.openRemote(pool.tierKey, submittedAmount, lease.key);
       remoteGate.complete(lease, true);
       if (expectedAccountKey !== app.accountKey || expectedBindingEpoch !== app.accountBindingEpoch || !isCurrentSheet()) return;
@@ -314,10 +311,8 @@ async function submit() {
         const title = cause.reason === "insufficient" ? t.value.stakingV3.toast.insufficient
           : cause.reason === "minimum" ? t.value.stakingV3.toast.minAmount
           : cause.reason === "unavailable" ? t.value.staking.remoteUnavailableClosed
-          : cause.reason === "disclosure" ? t.value.stakingV3.sheet.disclosureRejectedTitle
           : t.value.stakingV3.sheet.failedTitle;
-        toast.error(title, !cause.retired ? t.value.stakingV3.sheet.checkPrevious
-          : cause.reason === "disclosure" ? t.value.stakingV3.sheet.disclosureRejectedHint : undefined);
+        toast.error(title, cause.retired ? undefined : t.value.stakingV3.sheet.checkPrevious);
         return;
       }
       toast.error(unsent ? t.value.staking.remoteUnavailableClosed : t.value.stakingV3.toast.openFailedTitle);
@@ -337,7 +332,7 @@ async function submit() {
     symbol: "USDT",
     amount: -amount.value,
     status: "posted",
-    memo: `Stake open · ${term}d @ ${(STAKING_APY[term] * 100).toFixed(0)}% APY`,
+    memo: `Stake open · ${term}d`,
     ref: billRef,
   });
   // 同 purchase-sheet:拒绝在扣款落地之前,「资金没动」成立。
@@ -406,10 +401,10 @@ const titleStyle: CSSProperties = {
 const subtitleStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
 };
-const closeBtnStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "999px", color: "var(--v5-ink-3)" };
+const closeBtnStyle: CSSProperties = { width: "44px", height: "44px", flexShrink: 0, borderRadius: "999px", color: "var(--v5-ink-3)" };
 const amountWrapStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "16px", padding: "16px" };
 const amountLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -441,13 +436,13 @@ const usdtStyle: CSSProperties = {
 function presetStyle(p: number): CSSProperties {
   const active = amount.value === p;
   return {
-    height: "40px",
+    height: "44px",
     borderRadius: "999px",
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: 500,
     background: active ? "var(--v5-brand)" : "var(--v5-surface)",
-    color: active ? "var(--v5-ink)" : "var(--v5-ink-2)",
+    color: active ? "var(--v5-on-brand)" : "var(--v5-ink-2)",
     border: active ? "1px solid var(--v5-brand)" : "1px solid var(--v5-border)",
     display: "flex",
     alignItems: "center",
@@ -460,13 +455,13 @@ const balanceRowStyle: CSSProperties = {
   fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
-const maxStyle: CSSProperties = { color: "var(--v5-brand)", fontWeight: 600, fontSize: "13px" };
+const maxStyle: CSSProperties = { color: "var(--v5-brand)", fontWeight: 600, fontSize: "13px", minWidth: "44px", minHeight: "44px", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" };
 const projectionStyle: CSSProperties = {
   marginTop: "12px",
   background: "var(--v5-surface-2)",
   borderRadius: "14px",
   padding: "16px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   display: "flex",
   flexDirection: "column",
   gap: "8px",
@@ -475,7 +470,7 @@ const rowLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 const rowValStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   letterSpacing: "-0.005em",
   color: "var(--v5-ink)",
 };
@@ -498,7 +493,7 @@ const submitStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   letterSpacing: "-0.005em",
 };
 const noticeStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.45 };
@@ -519,6 +514,10 @@ useDialogA11y(computed(() => props.open), ".nx-staking-sheet-root", emitClose);
   backdrop-filter: blur(8px);
 }
 .nx-sheet-panel {
+  box-sizing: border-box;
+  max-height: calc(100vh - var(--nx-overlay-top));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   position: fixed;
   left: 0;
   right: 0;

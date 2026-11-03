@@ -1,12 +1,12 @@
-import { computePointsCopy, formatComputePoints } from "../i18n/compute-points";
+import { computePointsCopy, formatComputePoints } from "@/i18n/compute-points";
 export type RankHowRuntime = "dev" | "prod";
 
 export type RankHowPresentation = "canonical-ladder" | "hold";
 
 export interface RankHowConditions {
   selfComputePoints?: number;
-  directRefs?: number;
   teamComputePoints?: number;
+  directRefs?: number;
   vDownlines?: Partial<Record<number, number>>;
 }
 
@@ -34,10 +34,10 @@ export function formatCanonicalRankConditions(
 ): string[] {
   const conditions = rank.conditions;
   const parts: string[] = [];
-  const copy = computePointsCopy(locale);
   const interpolate = (label: string, value: string) => label
     .replace("${n}", value)
     .replace("{n}", value);
+  const copy = computePointsCopy(locale);
   if (conditions.selfComputePoints !== undefined) parts.push(`${copy.self} ≥ ${formatComputePoints(conditions.selfComputePoints, locale)}`);
   if (conditions.directRefs !== undefined) parts.push(interpolate(labels.directRefs, String(conditions.directRefs)));
   if (conditions.teamComputePoints !== undefined) parts.push(`${copy.team} ≥ ${formatComputePoints(conditions.teamComputePoints, locale)}`);

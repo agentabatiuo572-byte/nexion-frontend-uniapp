@@ -17,7 +17,7 @@ async function header(plain: boolean, t = zh) {
       props: { radius: { type: Number, required: true } },
       setup: props => () => Vue.h('span', { 'data-glass': true, 'data-radius': props.radius }),
     }) },
-    setup: () => ({ plain, statusBarHeight: 0, pendingBarInset: 0, rowH: 44, t, subtitle: '', displayTitle: DETAIL_TITLE, unread: 8, actionLabel: plain ? LIST_ACTION : undefined, action: plain ? () => {} : undefined, goBack: () => {}, goBell: () => {}, onKeyboardActivate: () => {} }),
+    setup: () => ({ plain, design: false, statusBarHeight: 0, pendingBarInset: 0, rowH: 44, t, subtitle: '', displayTitle: DETAIL_TITLE, unread: 8, actionLabel: plain ? LIST_ACTION : undefined, action: plain ? () => {} : undefined, goBack: () => {}, goBell: () => {}, onKeyboardActivate: () => {} }),
     render,
   }));
 }
@@ -55,18 +55,18 @@ describe('detail header controls', () => {
       expect(surface).toBeDefined();
       const glass = elements(surface).filter(isGlass);
       expect(glass).toHaveLength(1);
-      expect(glass[0].props.some(prop => prop.type === 6 && prop.name === 'data-radius' && prop.value?.content === '18')).toBe(true);
+      expect(glass[0].props.some(prop => prop.type === 6 && prop.name === 'data-radius' && prop.value?.content === '22')).toBe(true);
     }
     const title = elements(row).find(child => hasClass(child, 'spv-titlewrap'))!;
     expect(title).toBeDefined();
     expect(descendants(title).filter(isGlass)).toHaveLength(0);
-    expect(source).toMatch(/\.spv-glass\s*\{[^}]*width:\s*36px;[^}]*height:\s*36px;[^}]*border-radius:\s*50%/);
+    expect(source).toMatch(/\.spv-glass\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;[^}]*border-radius:\s*50%/);
   });
   it('keeps both controls keyboard-operable with repeat suppression and 44px targets', () => {
     expect(source).toContain('onKeyboardActivate($event, action)');
     expect(source).toContain('if (event.repeat) return;');
     expect(source).toContain('min-height: 44px');
     expect(source).toContain('.spv--plain .spv-glass { width: 44px; height: 44px; }');
-    expect(source).toContain('grid-template-columns: 92px minmax(0, 1fr) 92px');
+    expect(source).toContain('grid-template-columns: minmax(72px, max-content) minmax(0, 1fr) minmax(72px, max-content)');
   });
 });

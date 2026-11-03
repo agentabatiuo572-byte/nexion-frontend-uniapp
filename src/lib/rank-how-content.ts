@@ -1,38 +1,38 @@
 import { platformDisplayText } from "./brand-copy";
-import { formatComputePoints } from "../i18n/compute-points";
 import type { RankHowPolicy } from "@/api/rank-how-policy-api";
 import type { CanonicalVRankRow, CommissionCapabilities } from "@/api/v-rank-api";
 import type { RankHowConditionLabels } from "./v-rank-how-policy";
 import { formatAmount } from "./amount-display";
+import { formatComputePoints } from "../i18n/compute-points";
 
 // Interface/status copy only. Published business explanations come from the policy API.
 const COPY = {
   zh: {
     headline: "看懂晋升条件，了解每阶权益。", unavailable: "等级说明暂不可用，请稍后重试。", loading: "正在加载等级说明…",
     example: "完整范例 · 按当前规则演示", noThreshold: "本阶未设置此门槛", noReferralMinimum: "不要求自购算力点", noExample: "当前没有可演示的相邻等级门槛。", emptyLadder: "暂无可展示的等级", retry: "重新加载",
-    protected: "已开启保级；业绩回落时保留当前等级。已结算奖励的退款和撤销仍按结算规则处理。",
-    unprotected: "未开启保级；业绩或合格条件变化后，可能降至当前符合条件的等级。",
-    leadershipReady: "领导池参与资格、限额和到账以实际结算结果为准。",
-    leadershipHold: "领导池暂不可结算；票数不代表已获得分红。",
-    peerUnavailable: "平级奖励暂未开放，当前不派发；等级中显示的比例不代表已生效权益。",
+    protected: "达到的等级会保留，不会因团队变化而降级。",
+    unprotected: "条件不再满足时，等级可能调整为当前符合的等级。",
+    leadershipReady: "团队激励池奖励以实际发放为准。",
+    leadershipHold: "团队激励池暂未开放发放，票数不代表奖励已到账。",
+    peerUnavailable: "同级奖励暂未开放。",
   },
   en: {
     headline: "Understand each step and its benefits.", unavailable: "The rank guide is temporarily unavailable. Please try again later.", loading: "Loading the rank guide…",
     example: "Worked example · current rules", noThreshold: "No threshold set for this rank", noReferralMinimum: "No self compute-point minimum", noExample: "No adjacent rank thresholds are currently available for an example.", emptyLadder: "No visible ranks", retry: "Reload",
-    protected: "Rank protection is enabled: falling performance retains the current rank. Refunds and reversals still follow settlement rules.",
-    unprotected: "Rank protection is disabled: changes in performance or qualification may lower the rank to the level currently reached.",
-    leadershipReady: "Leadership pool eligibility, limits and payment are subject to actual settlement.",
-    leadershipHold: "Leadership pool settlement is currently unavailable. Votes do not mean a dividend has been received.",
-    peerUnavailable: "Peer rewards are not available and are not currently paid. Rates shown for a rank do not represent active benefits.",
+    protected: "Once reached, your rank is kept even if your team changes.",
+    unprotected: "If you no longer meet the requirements, your rank may be adjusted to the one you currently qualify for.",
+    leadershipReady: "Team incentive pool rewards are subject to actual payout.",
+    leadershipHold: "Team incentive pool payouts aren’t open yet. Votes do not mean rewards have been received.",
+    peerUnavailable: "Same-rank rewards aren’t open yet.",
   },
   vi: {
     headline: "Hiểu điều kiện và quyền lợi từng bậc.", unavailable: "Hướng dẫn về hạng hiện chưa khả dụng. Vui lòng thử lại sau.", loading: "Đang tải hướng dẫn về hạng…",
     example: "Ví dụ · theo quy tắc hiện tại", noThreshold: "Bậc này không đặt ngưỡng", noReferralMinimum: "Không yêu cầu điểm tính toán tự mua", noExample: "Hiện chưa có ngưỡng của hai bậc liền nhau để minh họa.", emptyLadder: "Chưa có hạng được hiển thị", retry: "Tải lại",
-    protected: "Đã bật bảo vệ hạng: giữ hạng khi doanh số giảm. Hoàn tiền và thu hồi thưởng vẫn theo quy tắc quyết toán.",
-    unprotected: "Chưa bật bảo vệ hạng: thay đổi doanh số hoặc điều kiện có thể làm giảm hạng về mức thực tế đạt được.",
-    leadershipReady: "Điều kiện tham gia, hạn mức và thanh toán của quỹ lãnh đạo theo kết quả quyết toán thực tế.",
-    leadershipHold: "Quỹ lãnh đạo hiện chưa thể quyết toán. Phiếu bầu không đồng nghĩa với cổ tức đã nhận.",
-    peerUnavailable: "Thưởng đồng cấp chưa mở và hiện không được chi trả. Tỷ lệ hiển thị theo hạng chưa phải là quyền lợi đang có hiệu lực.",
+    protected: "Hạng đã đạt sẽ được giữ nguyên, kể cả khi nhóm thay đổi.",
+    unprotected: "Nếu không còn đáp ứng điều kiện, hạng có thể được điều chỉnh về mức bạn đang đạt.",
+    leadershipReady: "Thưởng từ quỹ thưởng nhóm theo kết quả chi trả thực tế.",
+    leadershipHold: "Quỹ thưởng nhóm chưa mở chi trả. Phiếu bầu không đồng nghĩa với phần thưởng đã nhận.",
+    peerUnavailable: "Thưởng đồng cấp chưa mở.",
   },
 };
 
@@ -68,7 +68,7 @@ export function formatHowNumber(value: number | string, locale: string) {
 export function buildRankHowContent(policy: RankHowPolicy | null, ranks: CanonicalVRankRow[], capabilities: CommissionCapabilities, locale: string, labels: RankHowConditionLabels) {
   const copy = rankHowCopy(locale);
   const ladder = ranks.filter(rank => rank.visible).sort((a, b) => a.v - b.v);
-  const hasGate = (rank: CanonicalVRankRow) => [rank.selfComputePoints, rank.directRefs, rank.teamComputePoints].some(value => (value ?? 0) > 0)
+  const hasGate = (rank: CanonicalVRankRow) => [rank.selfComputePoints, rank.teamComputePoints, rank.directRefs].some(value => (value ?? 0) > 0)
     || ((rank.requiredDownlineRank ?? 0) > 0 && (rank.requiredDownlineCount ?? 0) > 0);
   const pairs = ladder.filter(rank => rank.v > 0 && hasGate(rank) && ladder.some(previous => previous.v === rank.v - 1));
   // Prefer an example containing both team and qualified-leg conditions; never invent thresholds.

@@ -13,7 +13,7 @@
     <view v-if="variant !== 'home' && isExpanded" :id="`trial-device-details-${variant}`" class="trial-device-row__body">
       <text v-if="presentation.status.value === 'grace'" class="trial-device-row__state">{{ copy.grace }}</text>
       <view class="trial-device-row__credit-block"><view class="trial-device-row__credit"><text>{{ copy.availableCredit }}</text><text v-if="variant === 'inventory'" class="trial-device-row__amount font-mono-tabular">{{ offsetParts[0] }}<text class="trial-device-row__dec">{{ offsetParts[1] }}</text></text><text v-else class="trial-device-row__amount font-mono-tabular">{{ money(presentation.offsetUSD.value) }}</text></view>
-      <view v-if="!hidePersonalData" class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
+      <view v-if="!hidePersonalData" class="trial-device-row__progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view v-viz-inview :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
       <view v-if="!presentation.presentationReady.value" class="trial-device-row__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view v-if="!presentation.presentationReady.value" class="trial-device-row__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
@@ -120,7 +120,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__image-badge { right:1px; padding:1px; font-size:8.5px; }
 /* Device warehouse card (P-43): always open, a static brand edge light marks the limited-time trial. */
 /* Dark: the conic edge light alone; light: plus a faint brand ring and the card shadow (as on the board). */
-.trial-device-row--inventory { position:relative; padding:16px; border-radius:var(--ui-radius-surface, 16px); background:var(--v5-surface); box-shadow:none; }
+.trial-device-row--inventory { position:relative; padding:16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); box-shadow:none; }
 [data-theme="light"] .trial-device-row--inventory { box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-brand) 18%,transparent),var(--v5-glass-shadow); }
 .trial-device-row--inventory::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 120deg,transparent 0 50%,color-mix(in srgb,var(--v5-brand) 85%,transparent) 72%,transparent 94%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
 .trial-device-row--inventory .trial-device-row__heading { min-height:72px; padding:0; }
@@ -132,12 +132,12 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__tag { justify-self:start; height:24px; padding:0 8px; border-radius:var(--v5-radius-full); background:var(--v5-brand-soft); color:var(--v5-brand); font:500 12px/24px var(--font-v5); white-space:nowrap; }
 .trial-device-row--inventory .trial-device-row__art { width:84px; height:72px; overflow:visible; }
 .trial-device-row--inventory .trial-device-row__image { width:78px; height:64px; margin-top:-4px; }
-.trial-device-row--inventory .trial-device-row__name { font:var(--ui-type-card-title-weight, 600) var(--ui-type-card-title, 16px)/var(--ui-type-card-title-lh, 24px) var(--font-v5); }
+.trial-device-row--inventory .trial-device-row__name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__remaining { font:500 15px/20px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__body { padding:0; }
 .trial-device-row--inventory .trial-device-row__credit-block { margin-top:12px; padding:12px; border-radius:var(--v5-radius-s); background:var(--v5-surface-2); }
 .trial-device-row--inventory .trial-device-row__credit { margin-top:0; }
-.trial-device-row--inventory .trial-device-row__amount { font-family:var(--font-amount, var(--font-jet-mono), monospace); font-size:22px; line-height:28px; font-weight:500; letter-spacing:-.02em; }
+.trial-device-row--inventory .trial-device-row__amount { font-family:var(--font-amount); font-size:22px; line-height:28px; font-weight:500; letter-spacing:-.02em; }
 .trial-device-row--inventory .trial-device-row__progress { height:6px; }
 .trial-device-row__progress > view { animation:nx-viz-grow 1400ms cubic-bezier(.16,1,.3,1) both; }
 .trial-device-row--inventory .trial-device-row__actions { margin-top:12px; }
@@ -146,7 +146,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row--inventory .trial-device-row__status { font:400 13px/18px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__note { font:400 12px/18px var(--font-v5); }
 .trial-device-row--inventory .trial-device-row__estimate { margin-top:8px; line-height:16px; }
-.trial-device-row--inventory .trial-device-row__estimate > text:last-child { color:var(--v5-ink-2); font:500 12px/16px var(--font-metric, var(--font-jet-mono), monospace); }
+.trial-device-row--inventory .trial-device-row__estimate > text:last-child { color:var(--v5-ink-2); font:500 12px/16px var(--font-metric); }
 .trial-device-row--inventory .trial-device-row__dec { opacity:.72; }
 /* Compact actions are glass pills: neutral for details, brand-tinted for buying early. */
 .trial-device-row--inventory .trial-device-row__details { color:var(--v5-ink); }

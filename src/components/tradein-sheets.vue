@@ -263,6 +263,7 @@
 </template>
 
 <script setup lang="ts">
+import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
@@ -553,10 +554,12 @@ function loadCanonicalTradeinConfig(retry = false): Promise<void> {
   if (!remoteApiEnabled || !purchaseMounted) return Promise.resolve();
   const key = canonicalTradeinConfigScope();
   if (canonicalTradeinConfigRead?.key === key) return canonicalTradeinConfigRead.result;
+  if (retry) invalidatePassiveTabRead("tradein-config");
   const requestScope = captureAccountScope();
+  // Read-only POSTs can advance the passive write revision; they do not change this config's owner.
   const current = () => purchaseMounted && key === canonicalTradeinConfigScope() && isCurrentAccountScope(requestScope);
   canonicalTradeinConfigStatus.value = "loading";
-  const result = deviceE3Api.tradeinConfig().then((value) => {
+  const result = runPassiveTabRead("tradein-config", () => deviceE3Api.tradeinConfig()).then((value) => {
     if (current()) { canonicalTradeinConfigStatus.value = "ready"; canonicalTradeinConfig.value = value; }
   }).catch(() => {
     if (current()) { canonicalTradeinConfig.value = null; canonicalTradeinConfigStatus.value = "error"; }
@@ -578,7 +581,7 @@ onMounted(() => {
 function kindLabel(kind: DeviceKind): string {
   // SKU name first (brand mark). Kinds with no store listing — phone, pc-gpu —
   // fall back to the localized device name, not the English DEVICE_SPECS one:
-  // Lite excludes phones from trade-in and replacement actions.
+  // the user's own phone can be the traded-in / replaced device here.
   return getProduct(kind)?.name ?? deviceNameByKind(t.value, kind, DEVICE_SPECS[kind]?.name ?? kind);
 }
 
@@ -1640,14 +1643,14 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-title {
   display: block;
   font-family: var(--font-v5);
-  font-size: var(--ui-type-hero-title, 20px);
+  font-size: var(--ui-type-hero-title);
   font-weight: 600;
   color: var(--v5-ink);
   line-height: 1.3;
 }
 .tis-subtitle {
   display: block;
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.5;
@@ -1677,7 +1680,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 .tis-opt-text {
   flex: 1;
   min-width: 0;
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink);
   line-height: 1.4;
 }
@@ -1702,7 +1705,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-card-line {
   display: block;
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink);
 }
 .tis-row {
@@ -1711,7 +1714,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   justify-content: space-between;
 }
 .tis-row-label {
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
 }
 .tis-row-value {
@@ -1760,7 +1763,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-cta-text {
   font-family: var(--font-v5);
-  font-size: var(--ui-type-button, 15px);
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -1778,7 +1781,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   opacity: 0.7;
 }
 .tis-secondary-text {
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-2);
 }
 .tis-ghost {
@@ -1793,7 +1796,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   opacity: 0.7;
 }
 .tis-ghost-text {
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   font-weight: 400;
   color: var(--v5-ink-3);
 }
@@ -1810,7 +1813,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   opacity: 0.7;
 }
 .tis-warn-ghost-text {
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   font-weight: 400;
   color: var(--v5-warning-ink);
 }
@@ -1831,7 +1834,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
 }
 .tis-block-warn {
   display: block;
-  font-size: var(--ui-type-list-subtitle, 13px);
+  font-size: var(--ui-type-list-subtitle);
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.625;

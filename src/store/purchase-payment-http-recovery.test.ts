@@ -12,19 +12,19 @@ vi.mock('./account-scoped-storage', () => ({
   writeAccountRow: (table: string, account: string, value: unknown) => { ports.rows.set(table + account, structuredClone(value)); return true; },
   acquireAccountCommandKey: () => 'unexpected-new-key', releaseAccountCommandKey: ports.release,
 }));
-const methods = ['CREGIS_USDT_BSC', 'HDPAY_BANK'] as const;
+const methods = ['CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20', 'HDPAY_BANK'] as const;
 const response = (status: number, code: number, message: string, data: unknown = null): HttpResponse => ({ status, headers: {}, data: JSON.stringify({ code, message, data }) });
 const ok = (data: unknown) => response(200, 0, 'OK', data);
 function quote(method: typeof methods[number], version = 1) {
   const bank = method === 'HDPAY_BANK';
-  return { paymentQuoteId: `Q-http-${version}`, kind: 'ORDER_PAY', paymentMethod: method, network: bank ? 'VND_BANK' : 'BSC',
+  return { paymentQuoteId: `Q-http-${version}`, kind: 'ORDER_PAY', paymentMethod: method, network: bank ? 'VND_BANK' : method === 'CREGIS_USDT_ERC20' ? 'ERC20' : 'BSC',
     subtotalUsdt: '100.00', channelFeeUsdt: version === 1 ? '1.75' : '2.75', networkConfirmFeeUsdt: bank ? '0.00' : '0.25',
     totalUsdt: bank ? version === 1 ? '101.75' : '102.75' : version === 1 ? '102.00' : '103.00', feePolicyVersion: version,
     expiresAt: '2099-01-01T00:00:00Z', fxRateVndPerUsdt: bank ? '25000' : null, amountVnd: bank ? version === 1 ? '2543750' : '2568750' : null };
 }
 function intent(method: typeof methods[number], version = 1, delivered = false) {
   return { ...quote(method, version), intentNo: 'PI-original-http', commandKey: 'original-business-key', status: delivered ? 'DELIVERED' : 'AWAITING_PAYMENT',
-    address: method === 'CREGIS_USDT_BSC' ? '0x' + '1'.repeat(40) : null, paymentUrl: method === 'HDPAY_BANK' ? 'https://api.hdpayadmin.com/pay/original-http' : null,
+    address: method !== 'HDPAY_BANK' ? '0x' + '1'.repeat(40) : null, paymentUrl: method === 'HDPAY_BANK' ? 'https://api.hdpayadmin.com/pay/original-http' : null,
     reason: '', receipt: delivered ? { orderNo: 'ORD-original', paymentNo: 'PI-original-http', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', canonicalStatus: 'activated',
       amountUsdt: '100.000000', paymentSubtotalUsdt: '100.00', walletDebitUsdt: '0.00', paymentMethod: method, walletBalanceAfterUsdt: null,
       idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: '' } : null };
@@ -57,7 +57,8 @@ describe.each(methods)('%s real HTTP envelope recovery', method => {
     expect(h.transport.mock.calls[2]![0]).toMatchObject({ method: 'GET', url: 'https://fixture.invalid/api/app/purchase-payment-intents?kind=ORDER_PAY&commandKey=original-business-key' });
     expect(h.payment.pending()).toEqual([]); expect(h.payment.state.pending).toBeNull(); expect(h.payment.state.quote).toBeNull();
     expect(ports.release).toHaveBeenCalledWith(expect.any(String), 'user:http-recovery', expect.any(String), 'original-business-key');
-    await h.payment.select(method); await h.payment.confirm();
+    // The refused quote is replaced automatically; no manual re-query.
+    await vi.waitFor(() => expect(h.payment.state.quote).toMatchObject({ paymentQuoteId: 'Q-http-2' })); await h.payment.confirm();
     const creates = h.transport.mock.calls.map(([request]) => request).filter(request => request.method === 'POST' && request.url.endsWith('-intents'));
     expect(creates).toHaveLength(2); expect(creates.map(request => request.headers['Idempotency-Key'])).toEqual(['original-business-key', 'original-business-key']);
     expect(creates.map(request => request.body)).toEqual([{ paymentQuoteId: 'Q-http-1' }, { paymentQuoteId: 'Q-http-2' }]);

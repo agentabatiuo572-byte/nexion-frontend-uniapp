@@ -29,7 +29,9 @@
             @keydown.up.prevent="moveLocale(i, -1)"
             @keydown.down.prevent="moveLocale(i, 1)"
           >
-            <text :style="flagStyle">{{ l.flag }}</text>
+            <view :style="languageIconStyle" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18" /></svg>
+            </view>
             <view class="min-w-0" style="flex: 1">
               <view class="flex items-center" style="gap: 8px">
                 <text class="truncate" :style="nameStyle(l.code === code)">{{ l.nativeName }}</text>
@@ -95,7 +97,7 @@ function goAccount() {
 // Intro caption — header already provides the 24px breathing (no top margin).
 const introStyle: CSSProperties = {
   marginBottom: "14px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
   lineHeight: 1.6,
 };
@@ -110,10 +112,10 @@ function rowStyle(divider: boolean, active: boolean): CSSProperties {
     background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
   };
 }
-const flagStyle: CSSProperties = { fontSize: "20px", lineHeight: 1 };
+const languageIconStyle: CSSProperties = { width: "32px", height: "32px", flexShrink: 0, display: "grid", placeItems: "center", color: "var(--v5-ink-2)" };
 function nameStyle(active: boolean): CSSProperties {
   return {
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     color: active ? "var(--v5-ink)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
     fontWeight: active ? 600 : 400,
   };

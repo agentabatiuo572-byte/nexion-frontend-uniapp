@@ -1,4 +1,5 @@
 import * as Vue from "vue";
+import * as pageEvents from "@dcloudio/uni-app";
 import type { Component, ComponentInternalInstance } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -56,6 +57,8 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
   const sheet = { open: false, closeTransient: idle, bindScope: idle, sessionShownCount: 0 };
   const dependencies: Record<string, unknown> = {
     vue: Vue, "@/i18n/use-t": { useT: () => translations },
+    "@/store/ui": { toast: idle },
+    "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/store/page-header": { usePageHeader }, "@/store/notifications": { useNotifications: () => ({ unread: 0 }) },
     "@/store/message-drawer": { useMessageDrawer: () => ({ show: messages }) },
     "@/store/refresh": { useRefresh: () => ({ isRefreshing: false }) },
@@ -68,6 +71,7 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
     "@/store/pending-checkout-core": { PENDING_BAR_INSET_KEY: Symbol("pending") },
     "@/store/popup-arbiter": { usePopupArbiter: () => ({ release: idle }), runPriorityRound: idle },
     "@/lib/route": { navBack: back, navTo: idle },
+    "@/lib/native-tab-navigation": { isCurrentNativeTab: () => false },
     "@/lib/unread-badge": { formatUnreadBadge },
     "@/lib/static-review-routes": { isStaticReviewRoute: () => false },
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
@@ -75,6 +79,7 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
     "@/lib/chassis-scroll": { resolveChassisScrollElement: () => null },
     "@/lib/liquid-glass-core": { rememberGlassNavigation: idle, consumeGlassNavigation: idle },
     "@/lib/voucher-popup-scheduler": { createVoucherPopupScheduler: () => ({ cancel: idle, schedule: idle }) },
+    "@dcloudio/uni-app": pageEvents,
     "@/lib/account-scope": { captureAccountScope: () => ({}), isCurrentAccountScope: () => true },
     "@/api/order-api": { captureRuntimeRevision: () => ({}), isCurrentRuntimeRevision: () => true, subscribeRuntimeRevision: idle },
     "@/services/behavior-analytics": { isAcceptanceObservationModalOpen: () => false },
@@ -84,7 +89,7 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
   descriptor.script = null;
   const script = compileScript(descriptor, { id: "header-chassis", inlineTemplate: true,
     templateOptions: { compilerOptions: { isCustomElement: tag => tag === "view" || tag === "text" } } });
-  const code = ts.transpileModule(script.content, { compilerOptions: {
+  const code = ts.transpileModule(script.content.replaceAll('import.meta.env.VITE_UVEL_SCROLL_DEBUG', '"false"'), { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS,
   } }).outputText;
   const exports = { default: {} as Component };
@@ -93,6 +98,9 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
       props: { radius: { type: Number, required: true } },
       setup: props => () => Vue.h("glass", { "data-radius": props.radius }),
     }) };
+    if (id === "@/components/support/support-bubble.vue") return { default: Vue.defineComponent({
+      props: ["dimmed"], setup: props => () => Vue.h("support-shortcut", { dimmed: props.dimmed }),
+    }) };
     if (id.endsWith(".vue")) return { default: blank };
     if (!(id in dependencies)) throw new Error(`Unexpected chassis dependency: ${id}`);
     return dependencies[id];
@@ -100,7 +108,7 @@ function chassis(translations: Vue.Ref<typeof en>, back: ReturnType<typeof vi.fn
   return exports.default;
 }
 
-async function navigation() {
+async function navigation(navCapsule = false) {
   const translations = Vue.ref(en), back = vi.fn(), messages = vi.fn();
   const Chassis = chassis(translations, back, messages);
   const instances = new Map<string, ComponentInternalInstance>();
@@ -115,7 +123,7 @@ async function navigation() {
         useSetPageHeader(() => ({
           title: key.startsWith("bundle") ? translations.value.headerTitles.storeBundle : title[key], backHref: "/store",
         }));
-        return () => Vue.h(Chassis, { active: "store", id: key === "pro" ? "stellarbox-s1" : undefined,
+        return () => Vue.h(Chassis, { active: "store", navCapsule, id: key === "pro" ? "stellarbox-s1" : undefined,
           class: "route-shell", style: { color: "rgb(1, 2, 3)" }, "data-route-attr": key },
           { default: () => Vue.h("draft", draft.value) });
       },
@@ -137,15 +145,15 @@ async function navigation() {
   const go = async (key: string) => { current.value = key; await Vue.nextTick(); };
   const controls = () => all(root).filter(item => item.props.role === "button");
   const expectHeader = (value: string) => {
-    const headers = all(root).filter(item => item.props.class === "nx-navheader");
+    const headers = all(root).filter(item => String(item.props.class).split(" ").includes("nx-navheader"));
     expect(headers).toHaveLength(1);
-    expect(headers[0].children.filter(item => item.tag === "glass")).toHaveLength(0);
+    expect(headers[0].children.filter(item => item.tag === "glass")).toHaveLength(navCapsule ? 1 : 0);
     const surfaces = all(headers[0]).filter(item => item.props.class === "nx-nav-glass");
     expect(surfaces).toHaveLength(2);
     for (const surface of surfaces) {
       const glass = surface.children.filter(item => item.tag === "glass");
-      expect(glass).toHaveLength(1);
-      expect(glass[0].props["data-radius"]).toBe(18);
+      expect(glass).toHaveLength(navCapsule ? 0 : 1);
+      if (!navCapsule) expect(glass[0].props["data-radius"]).toBe(18);
     }
     const titleWrap = all(headers[0]).find(item => item.props.class === "nx-nav-titlewrap")!;
     expect(all(titleWrap).filter(item => item.tag === "glass")).toHaveLength(0);
@@ -157,8 +165,8 @@ async function navigation() {
     close: () => { const close = unmounts.pop()!; close(); } };
 }
 
-it("cold Uni show renders the actual chassis controls; repeated keyboard activation stays guarded", async () => {
-  const p = await navigation(); p.uni("bundle", "onShow"); p.uni("bundle", "onShow"); await Vue.nextTick();
+it.each([false, true])("cold Uni show renders controls with capsule=%s; repeated keyboard activation stays guarded", async navCapsule => {
+  const p = await navigation(navCapsule); p.uni("bundle", "onShow"); p.uni("bundle", "onShow"); await Vue.nextTick();
   p.expectHeader("Bundle");
   const back = p.controls().find(item => item.props["aria-label"] === en.privacy.back)!;
   const keyboard = Array.isArray(back.props.onKeydown) ? back.props.onKeydown : [back.props.onKeydown];

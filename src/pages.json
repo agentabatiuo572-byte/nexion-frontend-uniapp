@@ -73,10 +73,6 @@
       "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/me/wallet",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
       "path": "pages/me/wallet-topup",
       "style": { "navigationStyle": "custom" }
     },
@@ -109,15 +105,15 @@
       "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/me/phone-binding",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
       "path": "pages/me/security",
       "style": { "navigationStyle": "custom" }
     },
     {
       "path": "pages/me/payment-password",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/phone-binding",
       "style": { "navigationStyle": "custom" }
     },
     {
@@ -263,6 +259,9 @@
     {
       "path": "pages/events/promotion-rewards", "style":{"navigationStyle":"custom"}},
     {"path":"pages/events/promotion-reward-detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/events/detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/events/promotion-detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/events/genesis-raffle","style":{"navigationStyle":"custom"}},
     {"path": "pages/events/events",
       "style": { "navigationStyle": "custom" }
     },
@@ -324,14 +323,6 @@
     },
     {
       "path": "pages/me/trial",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/me/wallet-repurchase",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/me/wallet-repurchase-how",
       "style": { "navigationStyle": "custom" }
     },
     {

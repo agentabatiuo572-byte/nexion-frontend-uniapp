@@ -4,8 +4,8 @@
     hero status (color-keyed by status) → activated→Earn jump → order summary →
     4-stage deployment timeline → cancel action (only while "placed").
 
-  Remote states come from the server; the 3s local tick is only for the offline
-  prototype. Original payment commands and intents are recovered before retry. Wrapped in
+  While on this page, advanceOrder(id) ticks every 3s so the provisioning bar
+  moves visibly. Cancel uses confirm() from the ui store (danger). Wrapped in
   <AppChassis active="store">; back + "Order details" title live in the sticky
   chassis nav header via useSetPageHeader.
 
@@ -14,26 +14,27 @@
 -->
 <template>
   <AppChassis active="store">
-    <OrderRewards v-if="remoteApiEnabled && id" :order-no="id" :payment-allowed="order?.status === 'placed' && !paymentExpired && !remoteOrderError && !remoteOrderRefreshing" />
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
       <view v-if="remoteOrderError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.orders.refreshFailed }}</text>
-          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrderRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrder">
+          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" :aria-disabled="remoteOrderRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrder">
             <text>{{ t.store.catalogRetry }}</text>
           </view>
         </view>
       </view>
 
       <view v-if="showRemoteOrderLoading" class="text-center" role="status" aria-live="polite" style="padding: 20px">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>
+        <text class="block" :style="sectionLabelStyle" style="margin-top: 24px">{{ t.orders.orderSummary }}</text>
+        <text class="block" :style="sectionLabelStyle" style="margin-top: 24px">{{ t.orders.timelineTitle }}</text>
       </view>
 
       <!-- Order not found only after the scoped remote read settles. -->
       <view v-else-if="showOrderNotFound" class="text-center" style="padding: 20px">
-        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
+        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" :aria-label="t.orders.title" @click.stop="goOrders">
           <text>{{ t.orders.title }} →</text>
         </view>
@@ -58,116 +59,39 @@
       </view>
 
       <template v-else-if="order">
-        <!-- Hero status — filled status-tint tile (accent border dropped). -->
-        <view class="mx-4 rounded-2xl" :style="heroStyle">
-          <view class="flex items-center" style="gap: 12px">
-            <view class="grid place-items-center" :style="heroIconStyle">
-              <svg v-if="isProvisioning" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nx-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-              <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" :stroke="statusColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in statusIcon" :key="di" :d="d" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="heroLabelStyle">{{ statusLabel(order.status) }}</text>
-              <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ nexGridBrandText(order.productName) }}</text>
-            </view>
-          </view>
-
-          <view v-if="order.status !== 'cancelled'" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--v5-border)">
-            <view class="flex items-center justify-between" style="font-size: 12px">
-              <text style="color: var(--v5-ink-3)">{{ t.orders.dataCenter }}</text>
-              <text class="tabular-nums" style="color: var(--v5-ink)">{{ dataCenterLabel }}</text>
-            </view>
-            <text v-if="order.status === 'provisioning'" class="block" :style="{ fontSize: '12px', marginTop: '8px', lineHeight: '1.5', color: statusColor }">{{ dynamicHint }}</text>
-          </view>
-        </view>
-
-        <text v-if="heroHint" class="block mx-4" style="margin-top:12px;color:var(--v5-warning);font-size:13px">{{ heroHint }}</text>
-
-        <!-- Activated → Earn jump -->
-        <view v-if="order.status === 'activated'" class="nx-glass-card mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
-          <view class="flex items-center" style="gap: 12px">
-            <view class="grid place-items-center" :style="earnIconStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ activatedHint }}</text>
-            </view>
-          </view>
-
-        </view>
-
-        <!-- Order summary -->
-        <view class="nx-glass-card mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
-          <text class="block" :style="sectionLabelStyle">{{ t.orders.orderSummary }}</text>
-          <DetailRow :label="t.orders.orderIdLabel" :value="order.id" mono copyable />
-          <DetailRow :label="t.orders.quantity" :value="`${order.itemCount ?? order.quantity}`" />
-          <view v-if="order.lineItems?.length" style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border)">
-            <view v-for="item in order.lineItems" :key="item.sku" class="flex items-center justify-between" style="padding: 4px 0; gap: 12px">
-              <view class="flex-1 min-w-0">
-                <text class="block truncate" style="font-size: 12px; color: var(--v5-ink)">{{ nexGridBrandText(item.name) }}</text>
-                <text class="block tabular-nums" style="font-size: 12px; color: var(--v5-ink-4)">{{ item.sku }} · {{ item.quantity }} × ${{ formatAmount(item.unitPriceUsdt) }}</text>
+        <!-- Status hero (DS-28): the progress track is the page's main visual;
+             the card's next step sits at its foot. -->
+        <view class="order-hero" :style="{ '--order-tone': statusColor }" data-testid="order-hero">
+          <view class="order-hero__top">
+            <view class="order-hero__text">
+              <NxTag :tone="statusTone" :label="statusLabel(order.status)" />
+              <text class="order-hero__title">{{ commerceOrderTitle(order,locale.code) }}</text>
+              <text v-if="order.status === 'provisioning'" class="order-hero__hint">{{ dynamicHint }}</text>
+              <text v-if="order.status === 'activated'" class="order-hero__hint">{{ activatedHint }}</text>
+              <view v-else-if="heroHint" class="order-hero__hint" :class="{ 'order-hero__hint--warning': order.status === 'placed' }">
+                <svg v-if="order.status === 'placed'" class="order-hero__hint-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                <text>{{ heroHint }}</text>
               </view>
-              <text class="shrink-0 tabular-nums" style="font-size: 12px; color: var(--v5-ink-2)">${{ formatAmount(item.lineAmountUsdt) }}</text>
             </view>
-          </view>
-          <DetailRow v-if="(order.itemCount ?? 1) === 1" :label="t.orders.unitPrice" :value="usdt(order.unitPrice)" />
-          <DetailRow :label="t.orders.subtotal" :value="usdt(order.subtotal)" />
-          <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`−${usdt(order.discount)}`" brand />
-          <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
-          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="`−${usdt(order.promoDiscountUSD ?? 0)}`" brand />
-          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`−${usdt(order.trialOffsetUSD ?? 0)}`" brand />
-          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="earlyCopy.earlyDiscountLabel" :value="`−${usdt(order.earlyDiscountUSD ?? 0)}`" brand />
-          <DetailRow :label="order.trialReward ? purchaseCopy.orderPaid : t.orders.total" :value="usdt(order.total)" big />
-          <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" brand />
-          <template v-if="order.status === 'refunded'">
-            <DetailRow v-if="order.refundReasonCode" :label="t.orders.refundReason" :value="t.orders.refundReasons[order.refundReasonCode]" />
-            <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="usdt(order.refundAmountUsdt)" brand />
-            <DetailRow v-if="order.refundChannel" :label="t.orders.refundChannel" :value="refundChannelLabel" />
-            <DetailRow v-if="order.refundBillNo" :label="t.orders.refundBillNo" :value="order.refundBillNo" mono copyable />
-            <text v-if="order.trialReward?.reversedOnRefund && trialRewardText" class="block" style="padding: 6px 0; font-size: var(--ui-type-meta, 12px); color: var(--v5-ink-3)">{{ purchaseCopy.orderRewardsReversed }}</text>
-            <view v-if="!order.refundedAt && order.refundAmountUsdt == null && !order.refundBillNo" role="status" style="padding: 8px 0; color: var(--v5-ink-3); font-size: 12px">
-              <text>{{ t.orders.refundDetailsUnavailable }}</text>
-            </view>
-          </template>
-          <view v-if="fullyVoucherSettled" role="status" aria-live="polite" style="margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--v5-brand-soft); color: var(--v5-ink-2)">
-            <text class="block" style="font-size: 12px; line-height: 1.5">{{ t.orders.voucherSettledNoWalletDebit }}</text>
-          </view>
-          <view class="grid" :style="tsGridStyle">
-            <view>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.placedAt }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.placedAt) }}</text>
-            </view>
-            <view v-if="order.status === 'placed' && order.expiresAt">
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.expiresAt }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-warning); margin-top: 2px">{{ dt(order.expiresAt) }}</text>
-            </view>
-            <view v-if="order.paidAt">
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.paidAt }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.paidAt) }}</text>
-            </view>
-            <view v-if="order.activatedAt">
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.activatedAt }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.activatedAt) }}</text>
-            </view>
-            <view v-if="order.refundedAt">
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.refundedAt }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.refundedAt) }}</text>
-            </view>
-          </view>
-        </view>
+            <view class="order-hero__art" aria-hidden="true">
+              <CatalogMachineImage class="order-hero__image nx-home-art-float" :sku="order.lineItems?.[0]?.sku ?? order.productId" :image-url="heroImage" :scope-key="order.id" />
 
-        <!-- Timeline -->
-        <view class="nx-glass-card mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
-          <text class="block" :style="sectionLabelStyle">{{ t.orders.timelineTitle }}</text>
-          <view class="relative" :style="timelineWrapStyle">
-            <view v-for="(stage, i) in stages" :key="stage" :style="{ marginTop: i !== 0 ? '12px' : '0' }">
-              <view class="absolute rounded-full" :style="dotStyle(i)" />
-              <view v-if="i <= currentIdx" class="flex items-center" style="gap: 8px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="i <= currentIdx && order.status !== 'cancelled' ? 'var(--v5-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in stageIcon(stage)" :key="di" :d="d" /></svg>
-                <text :style="{ fontSize: '12px', color: i <= currentIdx && order.status !== 'cancelled' ? 'var(--v5-ink)' : 'var(--v5-ink-4)' }">{{ statusLabel(stage) }}</text>
-              </view>
-              <text v-if="eventFor(stage)" class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px; margin-left: 22px">{{ eventText(stage) }}</text>
             </view>
           </view>
+
+          <view v-if="trackSteps.length" class="order-track" :style="{ gridTemplateColumns: `repeat(${trackSteps.length}, minmax(0, 1fr))` }" role="list" :aria-label="t.orders.timelineTitle">
+            <view v-for="(step, i) in trackSteps" :key="step.stage" class="order-track__step" role="listitem" :aria-hidden="step.state === 'todo' ? 'true' : undefined">
+              <view v-if="i < trackSteps.length - 1" class="order-track__segment"><view v-if="step.segmentDone" class="order-track__fill nx-viz-grow" /></view>
+              <view class="order-track__dot" :class="[`order-track__dot--${step.state}`, { 'order-track__dot--live': step.state === 'current' && (isProvisioning || order.status === 'paid') }]">
+                <svg v-if="step.state === 'done'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                <svg v-else-if="step.state === 'failed' || step.state === 'stopped'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </view>
+              <!-- Steps not reached yet show only their dot; the label appears once the order gets there. -->
+              <text v-if="step.state !== 'todo'" class="order-track__label" :class="[`order-track__label--${step.state}`, { 'order-track__label--waiting': step.state === 'current' && order.status === 'placed' }]">{{ step.label }}</text>
+            </view>
+          </view>
+
+          <text v-if="needsRecovery" class="order-hero__note" data-testid="order-recovery">{{ recoveryHint }}</text>
         </view>
 
         <!-- Pending remote orders can retry only the idempotent UVEL wallet debit. -->
@@ -180,7 +104,55 @@
           </view>
         </view>
 
-        <view style="height:120px" />
+        <!-- Order summary: the total leads, then only the lines that explain it, then the record. -->
+        <view class="order-summary order-block">
+          <text class="order-summary__title">{{ t.orders.orderSummary }}</text>
+          <view class="order-summary__total">
+            <text class="order-summary__total-label">{{ order.trialReward ? purchaseCopy.orderPaid : t.orders.total }}</text>
+            <CheckoutAmount class="order-summary__amount" :value="order.total" :currency="order.paidAt == null ? 'USD' : 'USDT'" />
+          </view>
+          <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
+          <view v-if="order.lineItems?.length" class="order-summary__lines">
+            <view v-for="item in order.lineItems" :key="item.sku" class="order-summary__line">
+              <view class="flex-1 min-w-0">
+                <text class="order-summary__line-name">{{ (item.name) }}</text>
+                <text class="order-summary__line-meta">{{ item.sku }} · {{ item.quantity }} × {{ summaryMoney(item.unitPriceUsdt) }}</text>
+              </view>
+              <text class="order-summary__line-amount">{{ summaryMoney(item.lineAmountUsdt) }}</text>
+            </view>
+          </view>
+          <DetailRow v-if="(order.itemCount ?? 1) === 1 && orderQuantity > 1" :label="t.orders.unitPrice" :value="summaryMoney(order.unitPrice)" />
+          <DetailRow v-if="Number(order.subtotal) !== Number(order.total)" :label="t.orders.subtotal" :value="summaryMoney(order.subtotal, true)" />
+          <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`−${summaryMoney(order.discount)}`" brand />
+          <!-- Trial conversion orders: each checkout discount on its own row (never folded into the voucher line). -->
+          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="`−${summaryMoney(order.promoDiscountUSD ?? 0)}`" brand />
+          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`−${summaryMoney(order.trialOffsetUSD ?? 0)}`" brand />
+          <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="`−${summaryMoney(order.earlyDiscountUSD ?? 0)}`" brand />
+          <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" brand />
+          <template v-if="order.status === 'refunded'">
+            <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="usdt(order.refundAmountUsdt)" brand />
+            <DetailRow v-if="order.refundChannel" :label="t.orders.refundChannel" :value="refundChannelLabel" />
+            <DetailRow v-if="order.refundBillNo" :label="t.orders.refundBillNo" :value="order.refundBillNo" mono copyable />
+            <text v-if="order.trialReward?.reversedOnRefund && trialRewardText" class="order-summary__note">{{ purchaseCopy.orderRewardsReversed }}</text>
+            <view v-if="!order.refundedAt && order.refundAmountUsdt == null && !order.refundBillNo" role="status" class="order-summary__note">
+              <text>{{ t.orders.refundDetailsUnavailable }}</text>
+            </view>
+          </template>
+          <view v-if="fullyVoucherSettled" role="status" aria-live="polite" class="order-summary__settled">
+            <text class="block">{{ t.orders.voucherSettledNoWalletDebit }}</text>
+          </view>
+          <view class="order-summary__divider" />
+          <DetailRow :label="t.orders.orderIdLabel" :value="order.id" mono copyable />
+          <DetailRow v-if="showDataCenter" :label="t.orders.dataCenter" :value="dataCenterLabel" />
+          <DetailRow :label="t.orders.placedAt" :value="dt(order.placedAt)" />
+          <DetailRow v-if="order.status === 'placed' && order.expiresAt" :label="t.orders.expiresAt" :value="dt(order.expiresAt)" warning />
+          <DetailRow v-if="order.paidAt" :label="t.orders.paidAt" :value="dt(order.paidAt)" />
+          <DetailRow v-if="order.activatedAt" :label="t.orders.activatedAt" :value="dt(order.activatedAt)" />
+          <DetailRow v-if="order.refundedAt" :label="t.orders.refundedAt" :value="dt(order.refundedAt)" />
+        </view>
+
+        <OrderRewards v-if="remoteApiEnabled && id" :order-no="id" :payment-allowed="order.status === 'placed' && !paymentExpired && !remoteOrderError && !remoteOrderRefreshing" />
+        <view :style="{ height: stickyActionsVisible ? '120px' : '24px' }" />
       </template>
     </view>
     <template #pageFixed>
@@ -222,19 +194,18 @@ import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
-import { nexGridBrandText } from "@/lib/brand-copy";
-import { formatGroupedAmount } from "@/lib/amount-display";
-import { useTrialEarlyPurchaseCopy } from "@/i18n/trial-early-purchase";
+import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import { pendingOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
+import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue";
 import CheckoutResult from "@/components/checkout/CheckoutResult.vue";
 import { checkoutFlowCopy } from "@/lib/checkout-flow-copy";
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { getOrderProductMedia } from "@/lib/product-media";
-import { refreshProductCatalog } from "@/store/product-catalog";
-
+import { revalidateProductCatalog } from "@/store/product-catalog";
+import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { useT } from "@/i18n/use-t";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { fmt } from "@/i18n/format";
@@ -248,6 +219,8 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { apiClient,orderApi,purchaseEligibilityApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
+import { advisorChatRoute } from "@/lib/advisor-chat-route";
+import { useConversations } from "@/store/conversations";
 import { asApiError } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
@@ -258,10 +231,9 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
-const earlyCopy = useTrialEarlyPurchaseCopy();
 const locale = useLocaleStore();
 const orders = useOrders();
-
+const conversations = useConversations();
 const app = useApp();
 const auth = useAuth();
 
@@ -354,7 +326,7 @@ async function refreshOrderWallet(): Promise<boolean> {
 }
 async function refreshOrder() {
   if (!remoteApiEnabled || !id.value.trim() || !remoteOrderBoundAccount.value) return;
-  void refreshProductCatalog();
+  void revalidateProductCatalog();
   if (remoteOrderRefreshing.value && activeRemoteOrderScope
     && isCurrentDetailScope(activeRemoteOrderScope)) return;
   const scope = captureDetailScope();
@@ -627,7 +599,7 @@ function contactOrderSupport() {
   const scope=captureDetailScope();
   uni.setClipboardData({data:order.value.id,success:async()=>{
     if(!isCurrentDetailScope(scope))return;
-    const route="/pages/me/notifications?section=service";
+    const route=await advisorChatRoute(conversations);
     if(isCurrentDetailScope(scope))void navTo(route);
   }});
 }
@@ -763,7 +735,7 @@ const trackSteps = computed(() => {
 
 function dt(ts: number): string {
   return Number.isFinite(ts) && Number.isFinite(new Date(ts).getTime())
-    ? formatTrialDateTime(ts)
+    ? formatTrialDateTime(ts, dateLocale())
     : "—";
 }
 
@@ -1085,26 +1057,6 @@ onUnload(() => cleanup());
 onUnmounted(() => cleanup());
 
 // ─── styles ───
-function stageIcon(stage: OrderStatus): string[] {
-  return iconFor(stage);
-}
-
-function eventFor(stage: OrderStatus) {
-  return order.value?.timeline.find((e) => e.status === stage);
-}
-
-function eventText(stage: OrderStatus): string {
-  const evt = eventFor(stage);
-  if (!evt) return "";
-  return dt(evt.ts);
-}
-
-function tint(color: string, pct: number): string {
-  return `color-mix(in srgb, ${color} ${pct}%, transparent)`;
-}
-
-const currentIdx = computed(() => order.value ? stages.value.indexOf(order.value.status) : -1);
-
 const notFoundBtnStyle: CSSProperties = {
   minHeight: "44px",
   padding: "0 20px",
@@ -1115,47 +1067,6 @@ const notFoundBtnStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
 };
-const heroStyle = computed<CSSProperties>(() => ({
-  padding: "20px",
-  background: tint(statusColor.value, 6),
-}));
-const heroIconStyle = computed<CSSProperties>(() => ({
-  width: "48px",
-  height: "48px",
-  borderRadius: "50%",
-  background: tint(statusColor.value, 12),
-}));
-const heroLabelStyle = computed<CSSProperties>(() => ({
-  fontSize: "15px",
-  fontWeight: 600,
-  lineHeight: "1.2",
-  color: statusColor.value,
-}));
-// Order summary / timeline / earn-jump — form-b single containers (surface, no
-// border). Internal hairlines (timestamp divider, timeline rail) do the parceling.
-const summaryCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
-  padding: "16px",
-};
-const earnIconStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  borderRadius: "12px",
-  background: "var(--v5-brand-soft)",
-};
-const earnBtnStyle: CSSProperties = {
-  marginTop: "12px",
-  height: "44px",
-  lineHeight: "44px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "13px",
-  letterSpacing: "-0.005em",
-  boxShadow: "var(--v5-spotlight-brand)",
-};
 const sectionLabelStyle: CSSProperties = {
   marginBottom: "12px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -1164,94 +1075,97 @@ const sectionLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-const tsGridStyle: CSSProperties = {
-  marginTop: "12px",
-  paddingTop: "12px",
-  borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "8px",
-};
-const timelineWrapStyle: CSSProperties = {
-  paddingLeft: "20px",
-  borderLeft: "1px solid color-mix(in srgb, var(--v5-border) 80%, transparent)",
-};
-function dotStyle(i: number): CSSProperties {
-  const done = i <= currentIdx.value && order.value?.status !== "cancelled";
-  const current = i === currentIdx.value && order.value?.status !== "cancelled";
-  return {
-    left: "-7px",
-    width: "12px",
-    height: "12px",
-    marginTop: "5px",
-    background: done ? "var(--v5-brand)" : "var(--v5-surface-2)",
-    border: done ? "none" : "1px solid var(--v5-border)",
-    boxShadow: current ? "0 0 0 4px color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "none",
-  };
-}
-const cancelBtnStyle: CSSProperties = {
-  height: "40px",
-  borderRadius: "12px",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-brand-2)",
-  fontSize: "13px",
-  fontWeight: 500,
-};
-const walletPaymentBtnStyle: CSSProperties = {
-  height: "44px",
-  marginBottom: "8px",
-  borderRadius: "12px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontSize: "13px",
-  fontWeight: 600,
-  boxShadow: "var(--v5-spotlight-brand)",
-};
 const remoteErrorStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "10px 12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };
-const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
 
 
 </script>
 
 <style scoped>
-.nx-spin {
-  animation: nx-spin 1s linear infinite;
-}
-@keyframes nx-spin {
-  to { transform: rotate(360deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .nx-spin { animation: none; }
-}
+/* Status hero (DS-28): solid surface with one 9% tone glow behind the machine art. */
+.order-hero { position: relative; overflow: hidden; margin: 0 16px; padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); background: radial-gradient(260px 220px at 100% 0%, color-mix(in srgb, var(--order-tone) 9%, transparent), transparent 72%), var(--v5-content-surface); }
+.order-block { margin: var(--ui-space-card-gap) 16px 0; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-content-surface); color: var(--v5-ink); }
+[data-theme="light"] .order-hero, [data-theme="light"] .order-block { box-shadow: var(--v5-glass-shadow); }
+.order-hero__top { display: flex; align-items: center; gap: 12px; }
+.order-hero__text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.order-hero__title { margin-top: 8px; color: var(--v5-ink); overflow-wrap: anywhere; font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
+.order-hero__hint { display: flex; align-items: flex-start; gap: 6px; margin-top: 4px; color: var(--v5-ink-3); overflow-wrap: anywhere; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.order-hero__hint--warning { color: var(--v5-warning-ink); }
+.order-hero__hint-icon { flex: none; margin-top: 3px; }
+.order-hero__art { position: relative; flex: none; width: 116px; height: 116px; margin: -8px -6px -8px 0; }
+.order-hero__art::before { content: ""; position: absolute; left: 18px; right: 18px; bottom: 12px; height: 16px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, #000 55%, transparent), transparent); }
+[data-theme="light"] .order-hero__art::before { background: radial-gradient(closest-side, rgba(20,16,8,.16), transparent); }
+.order-hero__image { position: relative; width: 116px; height: 116px; }
+.order-hero__icon { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin: 22px; border-radius: 50%; background: color-mix(in srgb, var(--order-tone) 12%, transparent); }
+.order-hero__note { display: block; margin-top: 20px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+/* Buttons sit side by side while their labels fit, otherwise each takes a full row. */
+/* 40px basis = the L button's side padding, so a 1:2 pair splits the remaining width like the design. */
+.order-hero__pay { flex-grow: 2; }
+.order-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-wrap: wrap; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
+.order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
+/* Paired buttons share a card row, so they take the M side padding (16px) to fit two labels. */
+.order-hero__cancel { --ui-button-ink: var(--v5-danger); }
+/* Progress track: 24px steps joined by 2px segments; done segments grow in (DS-29). */
+.order-track { display: grid; margin-top: 20px; }
+.order-track__step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; text-align: center; }
+.order-track__segment { position: absolute; top: 11px; left: calc(50% + 16px); width: calc(100% - 32px); height: 2px; overflow: hidden; border-radius: 2px; background: var(--v5-surface-3); }
+.order-track__fill { width: 100%; height: 100%; background: var(--v5-brand); }
+.order-track__dot { position: relative; box-sizing: border-box; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--v5-surface-3); color: var(--v5-ink-3); }
+.order-track__dot--done { background: var(--v5-brand); color: var(--v5-on-brand); }
+.order-track__dot--current { background: transparent; border: 2px solid var(--order-tone); box-shadow: 0 0 0 4px color-mix(in srgb, var(--order-tone) 18%, transparent); }
+.order-track__dot--current::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--order-tone); }
+.order-track__dot--live { animation: order-track-pulse 1.8s ease-in-out infinite; }
+.order-track__dot--failed { background: var(--v5-danger); color: var(--v5-on-brand); }
+[data-theme="light"] .order-track__dot--failed { color: #fff; }
+/* Break between words; a single word wider than its column is hyphenated (the page sets <html lang>). */
+.order-track__label { max-width: 100%; padding: 0 2px; color: var(--v5-ink); overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+/* A step that waits on the user (unpaid) reads as not done yet; server-side progress stays in primary ink. */
+.order-track__label--stopped, .order-track__label--waiting { color: var(--v5-ink-3); font-weight: 400; }
+.order-track__label--failed { color: var(--v5-danger); }
+@keyframes order-track-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--order-tone) 8%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .order-track__dot--live { animation: none; } }
+/* Order summary: total first (DS-27 amount), then field rows; one divider before the record. */
+.order-summary__title { display: block; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.order-summary__total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding-bottom: 4px; }
+.order-summary__total-label { flex: none; color: var(--v5-ink-3); font: 400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.order-summary__amount { min-width: 0; color: var(--v5-ink); font-size: 28px; line-height: 34px; letter-spacing: -.02em; }
+.order-summary__amount :deep(.checkout-amount__symbol) { font-size: 16px; }
+.order-summary__amount :deep(.checkout-amount__unit) { margin-left: 6px; font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
+.order-summary__lines { margin: 4px 0; padding: 8px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
+.order-summary__line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.order-summary__line-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--v5-ink); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.order-summary__line-meta { display: block; color: var(--v5-ink-3); font-variant-numeric: tabular-nums; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.order-summary__line-amount { flex: none; color: var(--v5-ink); font-variant-numeric: tabular-nums; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.order-summary__note { display: block; padding: 6px 0; color: var(--v5-ink-3); font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
+.order-summary__settled { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--v5-brand-soft); color: var(--v5-ink); font: 400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
+.order-summary__divider { height: 1px; margin: 8px 0; background: var(--v5-border); }
+</style>
+
+<style scoped>
+.order-payment-result { display:flex; flex-direction:column; gap:var(--v5-space-3); }
+.order-summary :deep(.copy-code-button) { width:44px; height:44px; margin:-6px -12px -6px -4px; }
+.order-summary :deep(.copy-code-button svg) { width:16px; height:16px; }
+.pending-notice-error { display:block; margin-top:var(--v5-space-3); font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color:var(--v5-danger); }
+
 .trial-result { display:flex;flex-direction:column;gap:var(--v5-space-3); }
 .trial-result-head { display:flex;flex-direction:column;align-items:center;gap:var(--v5-space-2);padding:var(--v5-space-4) 0;text-align:center; }
 .trial-result-icon { width:64px;height:64px;border-radius:var(--v5-radius-full);background:var(--v5-brand-soft);color:var(--v5-brand); }
-.trial-result-title { font-size:var(--ui-type-page-title, 24px);line-height:var(--ui-type-page-title-lh, 32px);font-weight:600;color:var(--v5-ink); }
-.trial-result-body { font-size:var(--ui-type-body, 15px);line-height:var(--ui-type-body-lh, 22px);color:var(--v5-ink-2);overflow-wrap:anywhere; }
+.trial-result-title { font-size:var(--ui-type-page-title);line-height:var(--ui-type-page-title-lh);font-weight:600;color:var(--v5-ink); }
+.trial-result-body { font-size:var(--ui-type-body);line-height:var(--ui-type-body-lh);color:var(--v5-ink-2);overflow-wrap:anywhere; }
 .trial-result-credit { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-4);border-radius:var(--v5-radius-l);background:color-mix(in srgb, var(--v5-brand) 10%, transparent);border:1px solid color-mix(in srgb, var(--v5-brand) 25%, transparent); }
-.trial-result-credit-label { font-size:var(--ui-type-list-subtitle, 13px);font-weight:600;color:var(--v5-ink-2); }
-.trial-result-row, .trial-result-line { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle, 13px);color:var(--v5-ink-3); }
-.trial-result-row > text:last-child { font-size:var(--ui-type-list-title, 15px);font-weight:600;font-variant-numeric:tabular-nums; }
+.trial-result-credit-label { font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);font-weight:600;color:var(--v5-ink-2); }
+.trial-result-row, .trial-result-line { display:flex;justify-content:space-between;align-items:baseline;gap:var(--v5-space-3);font-size:var(--ui-type-list-subtitle);line-height:var(--ui-type-list-subtitle-lh);color:var(--v5-ink-3); }
+.trial-result-row > text:last-child { font-size:var(--ui-type-list-title);line-height:var(--ui-type-list-title-lh);font-weight:600;font-variant-numeric:tabular-nums; }
 .trial-result-usdt, .trial-result-saved { color:var(--v5-brand); }
 .trial-result-uvt { color:var(--v5-nex); }
 .trial-result-summary { display:flex;flex-direction:column;gap:var(--v5-space-2);padding:var(--v5-space-3) var(--v5-space-4);border-radius:var(--v5-radius-l);background:var(--v5-surface); }
 .trial-result-line > text:last-child { color:var(--v5-ink-2);font-variant-numeric:tabular-nums; }
 .trial-result-actions { display:flex;flex-direction:column;gap:var(--v5-space-3);margin-top:var(--v5-space-2); }
-.trial-result-primary, .trial-result-secondary { display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--v5-radius-full);font-size:var(--ui-type-button, 14px);font-weight:600; }
+.trial-result-primary, .trial-result-secondary { display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--v5-radius-full);font-size:var(--ui-type-button);line-height:var(--ui-type-button-lh);font-weight:600; }
 .trial-result-primary { background:var(--v5-brand);color:var(--v5-on-brand); }
 .trial-result-secondary { border:1px solid var(--v5-border-strong);color:var(--v5-ink); }
-</style>
-
-<style scoped>
-.order-payment-result { display:flex; flex-direction:column; gap:var(--v5-space-3); }
-</style>
-
-<style scoped>
-.order-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-wrap: wrap; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
-.order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
-.order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
-.pending-notice-error { display:block; margin-top:var(--v5-space-3); font:400 var(--ui-type-meta, 12px)/var(--ui-type-meta-lh, 16px) var(--font-v5); color:var(--v5-danger); }
 </style>

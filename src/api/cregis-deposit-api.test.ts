@@ -41,7 +41,18 @@ describe("Cregis deposit API", () => {
     await expect(api.address()).resolves.toEqual(response);
   });
 
-  it("accepts all six existing states together and preserves historical credit", async () => {
+  it.each(["CREGIS_DEPOSIT_ACCOUNT_NOT_OPEN", "CREGIS_DEPOSIT_PAUSED", "UNKNOWN_REASON"])("preserves unavailable reason %s", async reason => {
+    const response = { enabled: false, network: "BEP20", reason };
+    const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue(response) } as unknown as ApiClient);
+    await expect(api.address()).resolves.toEqual(response);
+  });
+
+  it.each([null, false, 1])("rejects malformed unavailable reason %s", async reason => {
+    const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue({ enabled: false, network: "BEP20", reason }) } as unknown as ApiClient);
+    await expect(api.address()).rejects.toThrow("CREGIS_ADDRESS_INVALID");
+  });
+
+  it("accepts all current states together and preserves historical credit", async () => {
     const statuses: CregisDeposit["status"][] = ["CONFIRMING", "CREDITED", "DUST_HOLD", "REVIEW_HOLD",
       "REORG_INVESTIGATING", "PROVIDER_CONFLICT_HOLD", "REFUNDED", "REORG_REVERSED"];
     const rows = statuses.map((status, index) => ({ ...deposit, depositId: `CR-${index + 1}`, status,
@@ -81,4 +92,23 @@ it("retains precise string amounts and rejects malformed exact fields", async ()
   await expect(api.list()).resolves.toMatchObject([{ grossAmountUsdtExact: "999999999999.000001", creditedUsdtExact: "0.004999" }]);
   request.mockResolvedValueOnce([{ ...deposit, status: "CREDITED", creditedUsdtExact: "1.0000001" }]);
   await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
+});
+
+
+it("requests ERC20 explicitly and rejects a BEP20 response instead of reusing its EVM address", async () => {
+  const request = vi.fn().mockResolvedValueOnce({ ...address, network: "ERC20" }).mockResolvedValueOnce(address);
+  const api = createCregisDepositApi({ request } as unknown as ApiClient);
+  await expect(api.address("ERC20")).resolves.toMatchObject({ network: "ERC20" });
+  expect(request).toHaveBeenCalledWith({ method: "GET", path: "/api/deposits/address?network=ERC20" });
+  await expect(api.address("ERC20")).rejects.toThrow("CREGIS_ADDRESS_INVALID");
+  request.mockResolvedValueOnce([{ ...deposit, network: "ERC20", status: "CREDITED" }]);
+  await expect(api.list()).resolves.toMatchObject([{ network: "ERC20" }]);
+  request.mockResolvedValueOnce([{ ...deposit, network: "TRC20", status: "CREDITED" }]);
+  await expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
+});
+
+
+it.each([{ txHash: [deposit.txHash] }, { address: [deposit.address] }, { status: ["CREDITED"] }])("rejects JSON array coercion in a deposit record %j", patch => {
+  const api = createCregisDepositApi({ request: vi.fn().mockResolvedValue([{ ...deposit, status: "CREDITED", ...patch }]) } as unknown as ApiClient);
+  return expect(api.list()).rejects.toThrow("CREGIS_DEPOSITS_INVALID");
 });

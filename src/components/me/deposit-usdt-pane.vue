@@ -633,7 +633,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .nx-dep-net--on .nx-dep-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
 .nx-dep-net--on .nx-dep-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
-.nx-dep-ticket { position: relative; margin: 12px -2px 0; border-radius: var(--ui-radius-surface, var(--v5-radius-xl)); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.nx-dep-ticket { position: relative; margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-ticket__top { padding: 20px 20px 18px; text-align: center; }
 .nx-dep-via { display: inline-flex; color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); letter-spacing: .04em; }
 .nx-dep-qr-box { width: 184px; height: 184px; margin: 14px auto 0; padding: 10px; box-sizing: border-box; border-radius: 18px; background: #FFFFFF; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: nx-viz-pop 420ms cubic-bezier(.2,1.4,.4,1) 260ms both; }
@@ -657,9 +657,9 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-warnbox { display: flex; align-items: flex-start; gap: 10px; margin: 12px -2px 0; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-warning) 16%, transparent); color: var(--v5-warning-ink); font: 400 13px/20px var(--font-v5); }
 .nx-dep-warnbox > svg { flex: none; margin-top: 3px; }
 .nx-dep-amount-note { margin-top: 10px; padding: 0 2px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.nx-dep-rows { margin: 16px -2px 0; overflow: hidden; border-radius: var(--ui-radius-surface, var(--v5-radius-xl)); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.nx-dep-rows { margin: 16px -2px 0; overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-link { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; color: var(--v5-ink); cursor: pointer; }
-.nx-dep-link__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon, 12px); }
+.nx-dep-link__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); }
 .nx-dep-link__ico--tech { background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); }
 .nx-dep-link__ico--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
 .nx-dep-link__t { flex: 1; min-width: 0; font: 400 15px/20px var(--font-v5); }
@@ -670,13 +670,13 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-sec + view > .nx-dep-rows, .nx-dep-sec ~ .nx-dep-rows { margin-top: 0; }
 .nx-dep-record-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; }
 .nx-dep-record-row[role="button"]:active { opacity: .9; }
-.nx-dep-record-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon, 12px); background: var(--v5-surface-3); color: var(--v5-ink-2); }
+.nx-dep-record-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); background: var(--v5-surface-3); color: var(--v5-ink-2); }
 .nx-dep-record-row__ico--ok { background: var(--v5-success-soft); color: var(--v5-success-ink); }
 .nx-dep-record-row__main { flex: 1; min-width: 0; }
 .nx-dep-record-row__title { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
 .nx-dep-record-row__sub { display: block; padding-top: 3px; overflow: hidden; color: var(--v5-ink-3); font: 400 12px/16px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
 .nx-dep-record-row__side { flex: none; max-width: 50%; text-align: right; }
-.nx-dep-record-row__amt { display: block; font: 500 16px/20px var(--font-amount, var(--font-v5)); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-dep-record-row__amt { display: block; font: 500 16px/20px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-dep-record-row__state { display: block; margin-top: 2px; font: 400 12px/16px var(--font-v5); }
 @media (prefers-reduced-motion: reduce) { .nx-dep-net, .nx-dep-copy-address-cta { transition: none; } .nx-dep-net:active, .nx-dep-copy-address-cta:active { transform: none; } .nx-dep-qr-box { animation: none; } }
 /* 骨架 shimmer(匹配形状占位;通用 spinner 禁用) */

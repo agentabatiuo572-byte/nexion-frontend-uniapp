@@ -1,4 +1,11 @@
 import { formatAmount } from "../../lib/amount-display";
+export type DailyMilestoneRewardKind = "usdt" | "uvt" | "spin" | "badge" | "unknown";
+
+export function dailyMilestoneRewardKind(value: string): DailyMilestoneRewardKind {
+  const kind = value.trim().toLowerCase();
+  return kind === "usdt" || kind === "uvt" || kind === "spin" || kind === "badge" ? kind : "unknown";
+}
+
 export interface DailyRule { key: string; value: string }
 
 export function dailyBaseReward(rules: readonly DailyRule[]): number | null {
@@ -16,7 +23,8 @@ export function dailyUpcomingMilestone(streak: number, milestones: readonly {
   return next ? { remainingDays: next.day - streak, rewardText: next.rewardText } : null;
 }
 
-export function dailyLuckyHint(rules: readonly DailyRule[], fallback: string): string {
+/** The configured 1.5× / 2× lucky probabilities (percent strings), or null when either is missing or invalid. */
+export function dailyLuckyOdds(rules: readonly DailyRule[]): { p15: string; p2: string } | null {
   const probability = (key: string): string | null => {
     const value = rules.find((rule) => rule.key.toLowerCase() === key)?.value.trim() ?? "";
     if (!/^\d+(?:\.\d+)?$/.test(value)) return null;
@@ -25,7 +33,13 @@ export function dailyLuckyHint(rules: readonly DailyRule[], fallback: string): s
   };
   const p15 = probability("p15");
   const p2 = probability("p2");
-  if (p15 === null || p2 === null) return fallback;
+  return p15 === null || p2 === null ? null : { p15, p2 };
+}
+
+export function dailyLuckyHint(rules: readonly DailyRule[], fallback: string): string {
+  const odds = dailyLuckyOdds(rules);
+  if (odds === null) return fallback;
+  const { p15, p2 } = odds;
 
   // Keep the locale-owned sentence intact. Only the two configured percentages
   // are authoritative runtime values; this deliberately does not manufacture
@@ -95,8 +109,30 @@ export function dailyMilestoneRewardText(reward: {
   }
   const unit = type === "POINTS" ? labels.points
     : type === "SPIN" ? labels.spin
-    : type === "NEX" ? labels.nex
+    : type === "UVT" ? labels.nex
     : type === "USDT" ? labels.usdt
     : labels.unknown;
-  return `${unit} ${type === "USDT" || type === "NEX" ? formatAmount(reward.rewardAmount) : reward.rewardAmount}`;
+  return `${unit} ${type === "USDT" || type === "UVT" ? formatAmount(reward.rewardAmount) : reward.rewardAmount}`;
+}
+
+/**
+ * Streak ring for the current stage: the segments between the last reached
+ * milestone day (`prev`, 0 when none) and the next one. On the day a milestone
+ * is reached (signed today and the streak equals a milestone day) the ring
+ * shows that finished stage fully lit (`reached`); the next stage starts the
+ * following day. Past the last tier it is a full seven-segment circle with no
+ * next reward.
+ */
+export function dailyStreakRing(streak: number, milestoneDays: readonly number[], signedToday: boolean): {
+  segments: number; done: number; next: number | null; reached: boolean;
+} {
+  const days = [...new Set(milestoneDays.filter(day => day > 0))].sort((a, b) => a - b);
+  if (signedToday && days.includes(streak)) {
+    const prev = days.filter(day => day < streak).pop() ?? 0;
+    return { segments: streak - prev, done: streak - prev, next: streak, reached: true };
+  }
+  const next = days.find(day => day > streak) ?? null;
+  if (next === null) return { segments: 7, done: 7, next: null, reached: false };
+  const prev = days.filter(day => day <= streak).pop() ?? 0;
+  return { segments: next - prev, done: streak - prev, next, reached: false };
 }

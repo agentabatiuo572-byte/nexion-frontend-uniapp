@@ -9,15 +9,15 @@
         <text v-if="policy.conditions.filter(condition => !isQuota(condition)).length > (blockingOnly ? 1 : 0)" class="purchase-panel__note">{{ policy.mode === 'EITHER' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
         <view v-for="condition in policy.conditions.filter(condition => !isQuota(condition))" :key="condition.kind" class="purchase-panel__condition">
           <view class="purchase-panel__row"><text>{{ conditionLabel(condition) }}</text><text class="purchase-panel__values">{{ conditionValues(condition) }}</text></view>
-          <QuotaConditionBar :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
-          <text class="purchase-panel__note">{{ condition.met ? t.tradein.purchaseMet : fmt(t.tradein.purchaseGap, { amount: condition.kind === 'rank' ? fmt(t.tradein.purchaseRanks, { n: condition.gap }) : conditionAmount(condition, condition.gap) }) }}</text>
+          <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
+          <text class="purchase-panel__note">{{ condition.met ? t.tradein.purchaseMet : fmt(t.tradein.purchaseGap, { amount: condition.kind === 'rank' ? visibility.mask(fmt(t.tradein.purchaseRanks, { n: condition.gap })) : conditionAmount(condition, condition.gap, true) }) }}</text>
         </view>
         <!-- Quota is an independent remaining-capacity check, never part of EITHER unlock conditions. -->
         <text v-if="!blockingOnly && policy.conditions.some(isQuota)" class="purchase-panel__note">{{ t.tradein.purchaseQuotaRequired }}</text>
         <view v-for="condition in policy.conditions.filter(isQuota)" :key="condition.kind" class="purchase-panel__condition">
           <view class="purchase-panel__row"><text>{{ conditionLabel(condition) }}</text><text class="purchase-panel__values">{{ conditionValues(condition) }}</text></view>
-          <QuotaConditionBar :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
-          <text class="purchase-panel__note">{{ fmt(t.tradein.purchaseRemaining, { amount: conditionAmount(condition, condition.gap) }) }}</text>
+          <QuotaConditionBar v-if="!visibility.hidden" :pct="conditionRatio(condition)" :met="condition.met" tint="var(--v5-brand)" :label="conditionLabel(condition)" :value-text="conditionValues(condition)" />
+          <text class="purchase-panel__note">{{ fmt(t.tradein.purchaseRemaining, { amount: conditionAmount(condition, condition.gap, true) }) }}</text>
         </view>
       </view>
     </template>
@@ -31,10 +31,12 @@ import { formatComputePoints } from "@/i18n/compute-points";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
+import { useDataVisibility } from "@/store/data-visibility";
 import QuotaConditionBar from "@/components/team/quota-condition-bar.vue";
 const props = defineProps<{ status: PurchaseEligibilityRequestStatus; snapshot: PurchaseEligibilitySnapshot | null; blockingOnly?: boolean }>();
 const t = useT();
 const locale = useLocaleStore();
+const visibility = useDataVisibility();
 const message = computed(() => resolvePurchaseEligibilityMessage(props.status, props.snapshot));
 const visiblePolicies = computed(() => !props.blockingOnly ? props.snapshot?.policies ?? []
   : (props.snapshot?.policies ?? []).filter(policy => !policy.eligible).map(policy => {
@@ -51,14 +53,14 @@ function isQuota(condition: PurchaseEligibilityCondition): boolean {
 function conditionLabel(condition: PurchaseEligibilityCondition): string {
   return t.value.tradein.purchaseConditions[condition.kind];
 }
-function conditionAmount(condition: PurchaseEligibilityCondition, value: number): string {
+function conditionAmount(condition: PurchaseEligibilityCondition, value: number, hidden = false): string {
   const count = condition.kind === "teamComputePoints" ? formatComputePoints(value, locale.code)
     : condition.kind === "rank" ? `V${value}`
     : fmt(condition.kind === "activeDirect" ? t.value.tradein.purchasePeople : t.value.tradein.purchaseUnits, { n: value });
-  return count;
+  return hidden ? visibility.mask(count) : count;
 }
 function conditionValues(condition: PurchaseEligibilityCondition): string {
-  return `${conditionAmount(condition, condition.current)} / ${conditionAmount(condition, condition.required)}`;
+  return `${conditionAmount(condition, condition.current, true)} / ${conditionAmount(condition, condition.required)}`;
 }
 function conditionRatio(condition: PurchaseEligibilityCondition): number {
   return condition.required > 0 ? Math.max(0, Math.min(1, condition.current / condition.required)) : 0;

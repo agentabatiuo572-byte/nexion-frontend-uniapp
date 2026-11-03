@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+/src/static/phone-compute/
 .DS_Store
 dist
 *.local
@@ -21,6 +22,10 @@ dist
 
 # tooling / temp artifacts
 .cache/vite/
+
+# Payment PIN and checkout-flow browser evidence is regenerated locally and shared through uvel-docs.
+/output/payment-pin-20261030/
+/output/payment-flow-20261031/
 .trash/
 .playwright-mcp/
 .playwright-cli/

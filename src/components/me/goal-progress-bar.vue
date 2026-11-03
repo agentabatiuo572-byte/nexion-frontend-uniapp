@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import {
   useScrollGrowProgress,
   PROGRESS_GROW_TRANSITION,
@@ -24,18 +24,25 @@ const props = defineProps<{ pct: number }>();
 
 const { elRef, inView } = useScrollGrowProgress();
 
+const entered = ref(false);
+watch(inView, value => { if (value) entered.value = true; }, {immediate:true});
+
 const trackStyle: CSSProperties = {
   marginTop: "8px",
   height: "6px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
+  borderRadius: "var(--v5-radius-full)",
+  background: "var(--v5-surface-3)",
   overflow: "hidden",
 };
 const fillStyle = computed<CSSProperties>(() => ({
   height: "100%",
-  width: `${inView.value ? props.pct : 0}%`,
-  background: "linear-gradient(to right, var(--v5-warning), var(--v5-brand))",
-  transition: inView.value ? PROGRESS_GROW_TRANSITION : "none",
-  willChange: "width",
+  width: `${props.pct}%`,
+  transform: entered.value ? "scaleX(1)" : "scaleX(0)",
+  transformOrigin: "left",
+  background: "linear-gradient(to right, var(--v5-brand), var(--v5-brand))",
+  transition: "transform 1400ms cubic-bezier(.16,1,.3,1)",
+
 }));
 </script>
+
+<style scoped>@media (prefers-reduced-motion: reduce) { view > view { transition: none !important; transform: none !important; } }</style>

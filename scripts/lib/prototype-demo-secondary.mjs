@@ -28,8 +28,8 @@ export function secondaryDemo(url,state,request){
     if(p==='/api/tasks/receipts')return {...proof,items,nextOffset:null,nextCursor:null,total:items.length};
     return items.find(r=>r.receiptNo===p.split('/').pop());
   }
-  if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:empty?0:state.walletBalance??52800.64,pending_review:empty?0:12.5,bonus_locked:empty?0:50},assets:{USDT:{withdrawable:empty?0:state.walletBalance??52800.64,pending_review:empty?0:12.5,bonus_locked:empty?0:50},NEX:{withdrawable:empty?0:1280,pending_review:empty?0:10,bonus_locked:0}},releaseMode:'attest_or_manual',attestedOnlineSeconds:3600,requiredAttestationSeconds:86400,clusterRestricted:false};
-  if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'NEX',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
+  if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:empty?0:state.walletBalance??52800.64,pending_review:empty?0:12.5,bonus_locked:empty?0:50},assets:{USDT:{withdrawable:empty?0:state.walletBalance??52800.64,pending_review:empty?0:12.5,bonus_locked:empty?0:50},UVT:{withdrawable:empty?0:1280,pending_review:empty?0:10,bonus_locked:0}},releaseMode:'attest_or_manual',attestedOnlineSeconds:3600,requiredAttestationSeconds:86400,clusterRestricted:false};
+  if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
   if(p==='/api/app/team/insights/commissions'){
     const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other'];
     const events=empty?[]:['unlocked','cooling','withdrawn','frozen'].map((status,i)=>({id:'demo-commission-'+i,kind:kinds[i],sourceUserName:['Maya','Linh','Sam','Rin'][i],layer:i===0?1:2,orderId:'DEMO-ORDER-004',orderAmountUSD:1299,amountUSDT:25*(i+1),amountNEX:10,ts:now-i*day,unlockAt:status==='cooling'?now+day:now-day,status}));
@@ -37,8 +37,11 @@ export function secondaryDemo(url,state,request){
     return {...proof,...paginate(events),generatedAt:iso,snapshotAt:iso,aggregate:{totalUSDT:empty?0:250,totalNEX:empty?0:40,directUSDT:empty?0:75,extendedUSDT:empty?0:175,contributorCount:events.length,monthUSDT:empty?0:250,monthNEX:empty?0:40,todayUSDT:empty?0:25,unlockedUSDT:empty?0:25,unlockedNEX:empty?0:10,coolingUSDT:empty?0:50,eventCount:events.length,nextUnlockAt:empty?null:now+day,byKind}};
   }
   if(p==='/api/app/team/insights/leaderboard'){
-    const rows=empty?[]:['Maya','Linh','Alex','Sam','Rin'].map((handle,i)=>({rank:i+1,handle,flag:['🇸🇬','🇻🇳','🇯🇵','🇸🇬','🇯🇵'][i],cc:['SG','VN','JP','SG','JP'][i],directs:20-i*3,teamSize:100-i*12,earnedUSDT:1000-i*130,delta:i-2,vRank:8-i,hasDevice:true}));
-    return {...proof,period:url.searchParams.get('period')||'month',rows:rows.slice((page-1)*pageSize,page*pageSize),page,pageSize,totalRows:rows.length,myRank:empty?null:3,gapToNext:empty?0:130,poolUsd:empty?0:5000,topN:10,generatedAt:iso,snapshotAt:iso,snapshotVersion:'d'.repeat(64)};
+    const period=url.searchParams.get('period')||'month';
+    // Independent demo point snapshots, not a relabelled commission amount.
+    const points={today:[184,151,97,58,26],week:[1840,1512,970,586,264],month:[18400,15120,9700,5860,2640],all:[94400,78000,55300,27540,13820]}[period];
+    const rows=empty?[]:['Maya','Linh','Alex','Sam','Rin'].map((handle,i)=>({rank:i+1,handle,flag:['🇸🇬','🇻🇳','🇯🇵','🇸🇬','🇯🇵'][i],cc:['SG','VN','JP','SG','JP'][i],directs:20-i*3,teamSize:100-i*12,earnedUSDT:[870,1000,480,740,610][i],computePoints:points[i],delta:i-2,vRank:8-i,hasDevice:true}));
+    return {...proof,period,rankingMetric:'COMPUTE_POINTS',rows:rows.slice((page-1)*pageSize,page*pageSize),page,pageSize,totalRows:rows.length,myRank:empty?null:3,gapToNext:empty?0:520,gapToNextComputePoints:empty?null:points[1]-points[2],poolUsd:empty?0:5000,topN:10,generatedAt:iso,snapshotAt:iso,snapshotVersion:'d'.repeat(64)};
   }
   if(p==='/api/app/team/insights/unilevel'){
     const all=empty?[]:[1,2,3].map((layer,i)=>({id:'demo-unilevel-'+i,source:'device_purchase',sourceUserName:['Maya','Linh','Sam'][i],cycle:'2026-10',layer,orderId:'DEMO-ORDER-004',orderAmountUSD:1299,amountUSDT:30-i*10,amountNEX:5,currency:'USDT',status:i===0?'unlocked':'cooling',ts:now-i*day,unlockAt:now+day}));
@@ -56,7 +59,7 @@ export function secondaryDemo(url,state,request){
     const drawAt=mode==='ending'?anchor+60000:mode==='ended'?anchor-1000:anchor+day;
     const prizes=mode==='small-usdt'
       ? ['0.00032','0.00005'].map((amount,i)=>({id:'demo-prize-'+i,nameZh:amount+' USDT 奖励',nameEn:amount+' USDT reward',nameVi:'Thưởng '+amount+' USDT',rewardType:'USDT',amount,quantity:10}))
-      : [{id:'demo-prize',nameZh:'100 UVT 奖励',nameEn:'100 UVT reward',nameVi:'Thưởng 100 UVT',rewardType:'NEX',amount:'100',quantity:10}];
+      : [{id:'demo-prize',nameZh:'100 UVT 奖励',nameEn:'100 UVT reward',nameVi:'Thưởng 100 UVT',rewardType:'UVT',amount:'100',quantity:10}];
     return {availableTickets:empty?0:3-(state.raffleEntries||0),draws:empty||state.eventState==='empty'?[]:['OPEN','PROCESSING','DRAWN'].map((status,i)=>({id:'demo-draw-'+i,titleZh:['成长抽奖','上一期抽奖','已开奖记录'][i],titleEn:['Growth draw','Previous draw','Draw results'][i],titleVi:['Vòng quay tăng trưởng','Kỳ trước','Kết quả'][i],startsAt:new Date(i===0?startsAt:anchor-2*day).toISOString(),drawAt:new Date(i===0?drawAt:anchor-day).toISOString(),status,revision:1,myEntries:i===0?state.raffleEntries||0:2,totalEntries:120+(i===0?state.raffleEntries||0:0),prizes,myResults:i===2?prizes.map(prize=>({prizeId:prize.id,rewardType:prize.rewardType,amount:prize.amount,receiptId:'DEMO-RAFFLE-RECEIPT-'+prize.id,status:'PAID'})):[]}))};
   }
   if(p==='/api/events/genesis-raffle/demo-draw-0/enter'){

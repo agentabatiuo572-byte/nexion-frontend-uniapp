@@ -130,9 +130,9 @@ function purchaseGate(value: unknown): PurchaseGate | undefined {
   const quotaPeriod = optionalString(gate.quotaPeriod);
   if (quotaPeriod && !GATE_PERIODS.has(quotaPeriod as NonNullable<PurchaseGate["quotaPeriod"]>)) return invalid();
   return {
-    rankMin: optionalInteger(gate.rankMin),
-    activeDirectMin: optionalInteger(gate.activeDirectMin),
-    teamComputePointsMin: optionalNumber(gate.teamComputePointsMin),
+    rankMin: optionalInteger(gate.rankMin) ?? 0,
+    activeDirectMin: optionalInteger(gate.activeDirectMin) ?? 0,
+    teamComputePointsMin: optionalNumber(gate.teamComputePointsMin) ?? 0,
     mode: gate.mode as PurchaseGate["mode"],
     quotaCap: optionalInteger(gate.quotaCap),
     quotaSold: optionalInteger(gate.quotaSold),
@@ -194,6 +194,9 @@ function product(value: unknown): CatalogProduct {
     vram: displayString(source.vram),
     hashRate: optionalString(source.hashRate),
     power: displayString(source.power),
+    uptime: displayString(source.uptime),
+    specDocumentTitle: optionalString(source.specDocumentTitle),
+    specDocumentUrl: optionalString(source.specDocumentUrl),
     datacenter: displayString(source.datacenter),
     // 质保直接消费 nx_admin_device_sku.warranty 的服务端原文；它可能是月数、年数或
     // 限定条款，客户端不得改造成并不存在的 warrantyMonths 再猜单位。

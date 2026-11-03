@@ -39,6 +39,42 @@
       <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
            to clip the region glow halos at the rounded panel edge (functional). -->
       <view class="nx-glass-card mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
+        <!-- APP-vue does not paint template SVG nodes. Keep static geometry in
+             NativeSvg, with supported native controls over the same 440:240 box. -->
+        <!-- #ifdef APP-PLUS -->
+        <view class="nx-globe-native" :style="{ position: 'relative', width: '100%', height: '0', paddingTop: `${H / W * 100}%` }">
+          <view style="position: absolute; inset: 0; pointer-events: none">
+            <NativeSvg width="100%" height="100%" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <radialGradient :id="nativeGlowId" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.9" />
+                  <stop offset="60%" stop-color="var(--v5-brand)" stop-opacity="0.2" />
+                  <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient :id="nativeYouGlowId" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="1" />
+                  <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
+                </radialGradient>
+              </defs>
+              <circle v-for="(d, i) in dots" :key="`dot-${i}`" :cx="d.x" :cy="d.y" :r="d.r"
+                :fill="d.bright ? 'var(--v5-brand)' : 'var(--v5-ink-4)'" :opacity="d.bright ? 0.5 : 0.25" />
+              <line v-for="r in otherRegions" :key="`line-${r.id}`" :x1="meX" :y1="meY" :x2="r.cx * W" :y2="r.cy * H"
+                stroke="var(--v5-brand)" stroke-opacity="0.08" stroke-width="0.6" stroke-dasharray="2 3" />
+              <line v-for="r in regions" :key="`anchor-${r.id}`" :x1="r.anchorX * W" :y1="r.anchorY * H" :x2="r.cx * W" :y2="r.cy * H" stroke="var(--v5-brand)" stroke-opacity="0.35" stroke-width="0.7" pointer-events="none" />
+              <circle v-for="r in regions" :key="`glow-${r.id}`" :cx="r.cx * W" :cy="r.cy * H" r="18"
+                :fill="`url(#${r.isYou ? nativeYouGlowId : nativeGlowId})`" />
+            </NativeSvg>
+          </view>
+          <view v-for="r in regions" :key="r.id" class="nx-globe-native-node"
+            :style="nativeNodeStyle(r)" role="button" tabindex="0" :aria-label="regionName(r)"
+            @click="select(r)"  @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
+            <view v-if="pulseRegionId === r.id" :key="`pulse-${r.id}-${pulseTick}`" class="nx-globe-native-pulse"
+              :style="{ borderColor: r.isYou ? 'var(--v5-brand)' : 'var(--v5-brand)' }" />
+            <view class="nx-globe-native-dot" :style="{ background: r.isYou ? 'var(--v5-brand)' : 'var(--v5-brand)' }" />
+          </view>
+        </view>
+        <!-- #endif -->
+        <!-- #ifndef APP-PLUS -->
         <svg :viewBox="`0 0 ${W} ${H}`" class="w-full block" preserveAspectRatio="xMidYMid meet">
           <defs>
             <radialGradient id="globe-glow" cx="50%" cy="50%" r="50%">
@@ -98,6 +134,7 @@
             </circle>
           </g>
         </svg>
+        <!-- #endif -->
       </view>
 
       <!-- Region list — de-carded: transparent hairline group (earnings-ledger
@@ -174,19 +211,29 @@ import { useConfig } from "@/store/config";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
 import { networkPopulationBand } from "@/lib/platform-stats";
+// #ifdef APP-PLUS
+import NativeSvg from "@/components/native-svg.vue";
+// #endif
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+// #ifndef APP-PLUS
 import { useIntroMotion } from "@/composables/use-intro-motion";
+// #endif
 import { onHide, onShow } from "@dcloudio/uni-app";
+// #ifdef APP-PLUS
+import { onBackPress } from "@dcloudio/uni-app";
+// #endif
 
 import { globeSimulation, GLOBE_CENTERS } from "@/lib/globe-simulation";
 
 const t = useT();
 const cfg = useConfig();
 const app = useApp();
+// #ifndef APP-PLUS
 const motionAllowed = useIntroMotion();
+// #endif
 
 const W = 440;
 const H = 240;
@@ -222,6 +269,13 @@ const selected = computed<GlobeRegion | null>({
   get: () => regions.value.find(region => region.id === selectedId.value) ?? null,
   set: region => { selectedId.value = region?.id ?? null; },
 });
+// #ifdef APP-PLUS
+onBackPress(() => {
+  if (!selected.value) return false;
+  selected.value = null;
+  return true;
+});
+// #endif
 const me = computed(() => regions.value.find((r) => r.isYou) ?? null);
 const meX = computed(() => (me.value?.cx ?? 0) * W);
 const meY = computed(() => (me.value?.cy ?? 0) * H);
@@ -240,6 +294,16 @@ function select(r: GlobeRegion) {
   selected.value = r;
 }
 
+// #ifdef APP-PLUS
+const nativeGlowId = `globe-native-${Math.random().toString(36).slice(2, 8)}`;
+const nativeYouGlowId = `${nativeGlowId}-you`;
+function nativeNodeStyle(r: GlobeRegion): CSSProperties {
+  return {
+    position: "absolute", left: `${r.cx * 100}%`, top: `${r.cy * 100}%`,
+    width: "44px", height: "44px", transform: "translate(-50%, -50%)", pointerEvents: "none",
+  };
+}
+// #endif
 
 function regionName(r: GlobeRegion): string { return r.displayName; }
 function regionNodeDisplay(r: GlobeRegion): string { return r.devices === null ? '—' : networkPopulationBand(r.devices); }
@@ -256,11 +320,11 @@ onMounted(() => {
 onShow(() => {
   pageActive = true;
   simulationNow.value = Date.now();
-  void cfg.load();
+  void cfg.revalidate();
   // Same reads as the Earn page, so the job total matches its task centre.
   if (remoteApiEnabled) {
-    void app.refreshRemoteFleet(undefined, { coalesce: true }).catch(() => undefined);
-    void app.refreshHomeTruth().catch(() => undefined);
+    void app.ensureRemoteFleet().catch(() => undefined);
+    void app.ensureHomeTruth().catch(() => undefined);
   }
 });
 onHide(() => { pageActive = false; selected.value = null; });
@@ -421,6 +485,37 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () =>
 </script>
 
 <style scoped>
+/* #ifdef APP-PLUS */
+.nx-globe-native-dot,
+.nx-globe-native-pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.nx-globe-native-dot { pointer-events:auto; }
+.nx-globe-native-pulse {
+  border: 1px solid;
+  animation: nx-globe-native-pulse 1.6s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-globe-native-pulse { display: none; animation: none; }
+}
+@keyframes nx-globe-native-pulse {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(4.8); opacity: 0; }
+}
+.nx-globe-native-node:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+/* #endif */
 .nx-globe-drawer {
   position: fixed;
   inset: 0;

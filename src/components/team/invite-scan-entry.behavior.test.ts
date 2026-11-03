@@ -5,6 +5,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import source from "./invite-scan-entry.vue?raw";
 import login from "@/pages/login/login.vue?raw";
 import team from "@/pages/team/team.vue?raw";
+import me from "@/pages/me/me.vue?raw";
+import chassis from "@/components/app-chassis.vue?raw";
 import { scannedInvitationCode } from "@/lib/invite-scan";
 import { en } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
@@ -49,21 +51,23 @@ async function fixture(copy = en, authenticated = false, load = async () => {}) 
   const scanCode = vi.fn(options => requests.push(options));
   vi.stubGlobal("uni", { scanCode });
   const navTo = vi.fn(async (_url: string) => true), unloads: Array<() => void> = [];
+  const showError = vi.fn();
   const imports: Record<string, unknown> = {
-    vue: Vue, "@dcloudio/uni-app": { onUnload: (fn: () => void) => unloads.push(fn) },
+    vue: Vue, "@/composables/use-tab-page-lifecycle": { onUnload: (fn: () => void) => unloads.push(fn) },
     "@/i18n/use-t": { useT: () => Vue.ref(copy) }, "@/store/auth": { useAuth: () => auth },
     "@/store/config": { useConfig: () => config }, "@/lib/route": { navTo },
     "@/lib/account-scope": { captureAccountScope: () => epoch, isCurrentAccountScope: (value: number) => value === epoch },
     "@/lib/share": { buildShareLink: (value: string) => config.configStatus === "ready" ? config.config.share.baseUrl + value : "" },
     "@/lib/invite-scan": { scannedInvitationCode },
+    "@/store/ui": { toast: { error: showError } },
   };
   const exports = { default: {} as Vue.Component };
   new Function("require", "exports", compiled)((id: string) => { if (!(id in imports)) throw new Error(id); return imports[id]; }, exports);
-  const root = node("root"), props = Vue.reactive({ disabled: false });
+  const root = node("root"), props = Vue.reactive({ disabled: false, shortcut: false, iconOnly: false, label: undefined as string | undefined });
   const app = renderer.createApp({ render: () => Vue.h(exports.default, props) });
   app.mount(root); unmounts.push(() => app.unmount()); await Vue.nextTick();
   const button = () => all(root).find(item => item.props.role === "button")!;
-  return { root, button, scanCode, requests, config, auth, navTo, props,
+  return { root, button, scanCode, requests, config, auth, navTo, props, showError,
     pages, click: () => button().props.onClick(), unload: () => unloads.forEach(fn => fn()), rebind: () => epoch++, coverPage: () => { pages[pages.length++] = {}; } };
 }
 const flush = async () => { await Promise.resolve(); await Vue.nextTick(); await Promise.resolve(); };
@@ -150,12 +154,34 @@ it("does not open the camera after public-config wait changes account or the par
   f.props.disabled = true; await Vue.nextTick(); await f.click(); expect(f.scanCode).not.toHaveBeenCalled();
 });
 
-it("both real pages compile the entry and its import only for APP-PLUS", () => {
-  for (const page of [login, team]) {
+it("Me header replaces search with the APP scanner and leaves exactly seven shortcuts", () => {
+  expect(team).not.toContain("InviteScanEntry");
+  expect(me).toContain("['inventory', 'orders', 'missions', 'rewards', 'receipts', 'goals', 'learning']");
+  expect(me).not.toContain("InviteScanEntry");
+  expect(chassis).toContain("<template v-if=\"activeTab === 'me'\">");
+  expect(chassis).toContain("<view v-else class=\"nx-icon-btn nx-design-glass\"");
+  expect(chassis).toContain("toast.info(t.me.scanAppOnly)");
+  for (const page of [login, chassis]) {
     expect(page).toMatch(/<!-- #ifdef APP-PLUS -->\s*<InviteScanEntry[\s\S]*?<!-- #endif -->/);
     expect(page).toMatch(/\/\/ #ifdef APP-PLUS\s*import InviteScanEntry[\s\S]*?\/\/ #endif/);
     const h5 = page.replace(/<!-- #ifdef APP-PLUS -->[\s\S]*?<!-- #endif -->/g, "")
       .replace(/\/\/ #ifdef APP-PLUS[\s\S]*?\/\/ #endif/g, "");
     expect(h5).not.toContain("InviteScanEntry");
   }
+});
+
+it("Me header uses Scan label and reports failures as a toast without expanding the header", async () => {
+  const f = await fixture(zh, true);
+  Object.assign(f.props, { iconOnly: true, label: zh.me.shortcutLabels.scan });
+  await Vue.nextTick();
+  expect(f.button().props['aria-label']).toBe('扫一扫');
+  const scan = f.click(); await flush();
+  f.requests[0].fail({ errMsg: 'scanCode:fail auth deny' });
+  await scan; await flush();
+  expect(f.showError).toHaveBeenCalledExactlyOnceWith(zh.inviteScan.permission);
+  expect(all(f.root).some(item => item.props.role === 'alert')).toBe(false);
+  const retry = f.click(); await flush(); f.requests[1].fail({ errMsg: 'scanCode:fail cancel' });
+  await retry;
+  expect(f.scanCode).toHaveBeenCalledTimes(2);
+  expect(f.showError).toHaveBeenCalledOnce();
 });

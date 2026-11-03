@@ -1,4 +1,7 @@
+import * as displayDate from "@/lib/display-date";
 import { notificationCategory } from "@/lib/notification-category";
+import { isDirectNotificationSummary } from "@/lib/notification-summary";
+import { notificationActionsCopy } from "@/i18n/notification-actions";
 import { advanceMessageHeader, createMessageHeaderState } from "@/lib/message-header-scroll";
 import ts from "typescript";
 import * as vue from "vue";
@@ -25,21 +28,25 @@ function mountPage() {
     "@dcloudio/uni-app": { onResize: vi.fn(), onLoad: vi.fn(), onShow: vi.fn(), onHide: vi.fn() },
     "@/lib/remote-account-epoch": { remoteAccountScope: createRemoteAccountEpoch("fixture") },
     "@/lib/notification-category": { notificationCategory },
+    "@/lib/notification-summary": { isDirectNotificationSummary },
+    "@/i18n/notification-actions": { notificationActionsCopy },
     "@/lib/message-header-scroll": { advanceMessageHeader, createMessageHeaderState },
     "@/lib/device-preview": { h5DevicePreviewStatusBarHeight: () => 0 },
     "@/store/pending-checkout-core": { PENDING_BAR_INSET_KEY: Symbol() },
+    "@/store/locale": { useLocaleStore: () => ({ code: "zh" }) },
     "@/i18n/use-t": { useT: () => vue.ref(zh) },
-    "@/i18n/format": { fmt },
+    "@/lib/display-date": displayDate, "@/i18n/format": { fmt },
     "@/lib/unread-badge": { formatUnreadBadge },
     "@/store/notifications": { useNotifications: () => notifs },
     "@/store/message-drawer": { useMessageDrawer: () => vue.reactive({ section: "notifications", totalUnread: 1, serviceUnread: 0, refresh: () => notifs.refreshRemote() }) },
+    "@/store/conversations": { useConversations: () => ({ realtimeFallback: false, categoryLoading: false }) },
     "@/lib/route": { navTo: vi.fn() },
     "@/api/runtime": { remoteApiEnabled: true },
     "@/lib/notification-swipe": { isLeftConversionSwipe: vi.fn() },
     "@/store/ui": { confirm: async () => true, useUI: () => ({ clearConfirmsBy: vi.fn() }) },
     "@/store/app": { useApp: () => ({ accountKey: "fixture", accountBindingEpoch: 0 }) },
   };
-  const page = new Function("require", "exports", output + ";return { t, notifs, filter, filtered, countOf, filterLabel, emptyTitle, confirmClearRead, visibleFilterIds, serviceFilters };")(
+  const page = new Function("require", "exports", output + ";return { t, notifs, filter, filtered, countOf, filterLabel, emptyTitle, visibleFilterIds };")(
     (name: string) => {
       if (name.endsWith(".vue")) return {};
       if (!(name in modules)) throw new Error(`Unexpected dependency: ${name}`);
@@ -54,8 +61,14 @@ function evaluateBinding(expression: string, values: Record<string, unknown>) {
 }
 
 describe("notification empty-state context", () => {
-  it("does not offer retired ticket filtering in the service message parent page", () => {
-    expect(mountPage().page.serviceFilters.value.map((item: { value: string }) => item.value)).toEqual(["all", "advisor"]);
+  it('selected warm notification results keep busy state without a loading flow block, while empty selection keeps it', () => {
+    const { page, notifs } = mountPage(), context = vue.proxyRefs(page);
+    const loading = source.match(/<view v-if="([^\"]+)" class="message-state" role="status" aria-live="polite"/)![1];
+    notifs.loading = true; expect(Boolean(evaluateBinding(loading, context))).toBe(false);
+    const busy = source.match(/class="notification-feed" :aria-busy="([^\"]+)"/)![1]; expect(evaluateBinding(busy, context)).toBe(true);
+    page.filter.value = 'finance'; expect(page.filtered.value).toHaveLength(0); expect(Boolean(evaluateBinding(loading, context))).toBe(true);
+    notifs.items = []; page.filter.value = 'all'; expect(Boolean(evaluateBinding(loading, context))).toBe(true);
+    notifs.loading = false; expect(evaluateBinding(busy, context)).toBe(false); expect(Boolean(evaluateBinding(loading, context))).toBe(false);
   });
   for (const [name, template] of [["page", source]]) {
     it(`${name} never reports all read while the unread snapshot is unavailable`, () => {
@@ -99,7 +112,8 @@ describe("notification empty-state context", () => {
   it("keeps the selected category visible after clearing its last read notification", async () => {
     const { page } = mountPage();
     page.filter.value = "team";
-    await page.confirmClearRead();
+    // The secondary settings page mutates this shared store; the list keeps its filter.
+    await page.notifs.clearRead();
     expect(page.filtered.value).toHaveLength(0);
     expect(page.notifs.items).toHaveLength(1);
     // 断言行为而非模板文本:清空「team」最后一条已读后,该分类必须仍在可见清单里,
@@ -111,7 +125,7 @@ describe("notification empty-state context", () => {
   it("renders the category empty title rather than implying all notifications are gone", async () => {
     const { page } = mountPage();
     page.filter.value = "team";
-    await page.confirmClearRead();
+    await page.notifs.clearRead();
     const title = source.match(/<EmptyState[^>]*:title="([^\"]+)"/)![1];
     expect(evaluateBinding(title, vue.proxyRefs(page))).toBe(fmt(zh.notifs.emptyFilterTitle, { filter: zh.notifs.kindTeam }));
   });

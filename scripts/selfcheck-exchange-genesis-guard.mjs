@@ -283,8 +283,10 @@ const iDebit = Math.min(
     && /function setMax\(\) \{\s*if \(submitting\.value\) return;/.test(ex)
     && /function flip\(\) \{\s*if \(submitting\.value\) return;/.test(ex)
     && /const ctaEnabled = computed\(\(\) => valid\.value && !submitting\.value\)/.test(ex)
-    && /background: ctaEnabled\.value \? "var\(--v5-brand\)" : "var\(--v5-surface-2\)"/.test(ex)
-    && /color: ctaEnabled\.value \? "var\(--v5-on-brand\)" : "var\(--v5-ink-4\)"/.test(ex));
+    // 2026-11-01 P-46 改版:CTA 改用设计系统禁用态(同 NxButton:品牌色 50% 不透明度),
+    // 置灰与可点仍只由 ctaEnabled 一个源派生(class + aria-disabled 同源)。
+    && ex.includes(`:class="{ 'ex-confirm--on': ctaEnabled }"`)
+    && ex.includes(`:aria-disabled="ctaEnabled ? 'false' : 'true'"`));
 }
 
 // ══ B. 创世购买半屏 handlePurchase 的守卫纪律(结构) ═════════════════════════

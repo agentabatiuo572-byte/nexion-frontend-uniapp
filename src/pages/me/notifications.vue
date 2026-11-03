@@ -3,79 +3,90 @@
     <template #pageFixed="{ top }">
     <view class="message-center message-page" :style="{ top: top + 'px' }">
       <view class="message-nav">
-        <view class="message-button message-icon-button" role="button" tabindex="0" :aria-label="t.profile.back" @click="navBack('/pages/me/me')"><LiquidGlass :radius="24" /><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 5-7 7 7 7" /></svg></view>
-        <text class="message-title" :class="{ 'message-title--hidden': !headerState.title }" :aria-hidden="!headerState.title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text>
-        <view class="message-button message-icon-button" role="button" tabindex="0" :aria-label="t.notifs.preferences" @click="navTo('/pages/me/preferences')"><LiquidGlass :radius="24" /><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m9 3 6 0 1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></view>
+        <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.profile.back" @click="navBack('/pages/me/me')"><LiquidGlass :radius="22" tone="navigation" rendering="frosted" /><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg></view>
+        <view v-if="summaryRecovery.visible" class="message-summary-recovery" role="alert"><text v-if="!headerState.title" class="message-recovery-title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text><view class="message-button" role="button" :tabindex="summaryRecovery.busy ? -1 : 0" :aria-disabled="summaryRecovery.busy" :aria-label="summaryRecovery.label + ' · ' + t.ui.retry" @click="retrySummary"><text>{{ summaryRecovery.label }} · {{ t.ui.retry }}</text></view></view>
+        <view class="message-button message-icon-button nx-design-glass" role="button" tabindex="0" :aria-label="t.notifs.preferences" @click="navTo('/pages/me/preferences')"><LiquidGlass :radius="22" tone="navigation" rendering="frosted" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></view>
       </view>
-      <view class="message-compact" :class="{ 'message-compact--visible': !headerState.title }" :aria-hidden="headerState.title"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
+      <view v-if="!summaryRecovery.visible" class="message-compact" :class="{ 'message-compact--visible': !headerState.title }" :aria-hidden="headerState.title"><text>{{ t.notifs.drawerTitle }} · {{ section === 'service' ? t.notifs.serviceTab : t.notifs.notificationsTab }}</text></view>
       <view class="message-collapse" :class="{ 'message-collapse--hidden': !headerState.title }" :style="collapseStyle('title')" :aria-hidden="!headerState.title" :inert="!headerState.title ? true : undefined" @focusin="headerFocused = true" @focusout="headerFocused = false">
         <view class="message-heading">
-          <view class="message-subtitle" role="status"><view class="message-unread-label"><view v-if="center.totalUnread" class="message-status-dot" /><text>{{ unreadLabel }}</text></view></view>
-          <view v-if="section === 'notifications' && hasRead" class="message-button message-clear-read" role="button" :tabindex="headerState.title ? 0 : -1" :aria-label="t.notifs.clearReadAria" @click="confirmClearRead"><text>{{ t.notifs.clearReadAria }}</text></view>
+          <view class="message-heading-row">
+            <text class="message-title" :class="{ 'message-title--hidden': !headerState.title }" :aria-hidden="!headerState.title" role="heading" aria-level="1">{{ t.notifs.drawerTitle }}</text>
+            <view class="message-subtitle" role="status"><view v-if="center.totalUnread" class="message-status-dot" aria-hidden="true" /><text>{{ unreadLabel }}</text></view>
+            <view v-if="section === 'notifications' && notifs.unread > 0" class="message-button message-mark-all" role="button" :tabindex="headerState.title && !markingAll && !clearingRead ? 0 : -1" :aria-disabled="markingAll || clearingRead" :aria-label="t.notifs.markAll" @click="markAll"><text>{{ actionCopy.markAllShort }}</text></view>
+          </view>
         </view>
       </view>
       <view class="message-collapse message-primary-wrap" :class="{ 'message-collapse--hidden': !headerState.primary }" :style="collapseStyle('primary')" :aria-hidden="!headerState.primary" :inert="!headerState.primary ? true : undefined" @focusin="headerFocused = true" @focusout="headerFocused = false">
-        <view class="message-primary-inner"><GlassSegments v-model="section" :options="accessibleSectionOptions" :label="t.notifs.drawerTitle" class="message-primary" /></view>
+        <view class="message-primary-inner"><GlassSegments v-model="section" :options="accessibleSectionOptions" :label="t.notifs.drawerTitle" surface="glass" selection="flat" class="message-primary">
+          <template #option="{ option }"><text class="message-option-label">{{ option.label }}</text><view v-if="option.hasUnread" class="message-status-dot" aria-hidden="true" /></template>
+        </GlassSegments></view>
       </view>
-      <GlassSegments v-if="section === 'service'" v-model="serviceFilter" :options="serviceFilters" layout="scroll" semantics="radio" :label="t.notifs.serviceFilterLabel" class="message-filters">
-        <template #option="{ option }"><text>{{ option.label }}</text><view v-if="option.count && option.value !== 'all'" class="message-category-dot" aria-hidden="true" /></template>
+      <GlassSegments v-if="section !== 'service'" :label="t.notifs.filterGroupLabel" semantics="radio" v-model="filter" :options="filterOptions" layout="scroll" class="message-filters">
+        <template #option="{ option }"><text class="message-option-label">{{ option.label }}</text><view v-if="option.hasUnread && option.value !== 'all'" class="message-category-dot" aria-hidden="true" /></template>
       </GlassSegments>
-      <GlassSegments v-else :label="t.notifs.filterGroupLabel" semantics="radio" v-model="filter" :options="filterOptions" layout="scroll" class="message-filters">
-        <template #option="{ option }"><text>{{ option.label }}</text><view v-if="option.hasUnread && option.value !== 'all'" class="message-category-dot" aria-hidden="true" /></template>
-      </GlassSegments>
-      <scroll-view :key="section" scroll-y class="message-scroll" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
-      <ServiceMessageList v-if="section === 'service'" :filter="serviceFilter" hide-filters />
-      <view v-else class="notification-feed">
-        <view v-if="notifs.unread > 0" class="message-actions">
-          <view v-if="notifs.unread > 0" class="message-button message-action" role="button" :tabindex="markingAll ? -1 : 0" :aria-disabled="markingAll" :aria-label="t.notifs.markAll" @click="markAll"><LiquidGlass :radius="22" /><text>{{ t.notifs.markAll }}</text></view>
-        </view>
-        <view v-if="notifs.error" data-testid="notification-error" class="message-state" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button" role="button" tabindex="0" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><LiquidGlass :radius="22" /><text>{{ t.ui.retry }}</text></view></view>
+      <scroll-view :key="section" scroll-y class="message-scroll" :class="{ 'message-scroll--notifications': section === 'notifications' }" :show-scrollbar="false" @scroll="onMessageScroll" @wheel="onScrollInput" @touchmove="onScrollInput" @keydown.up="onScrollInput" @keydown.down="onScrollInput" @keydown.home="onScrollInput" @keydown.end="onScrollInput" @keydown.page-up="onScrollInput" @keydown.page-down="onScrollInput">
+      <ServiceMessageList v-if="section === 'service'" />
+      <view v-else class="notification-feed" :aria-busy="notifs.loading">
         <view v-if="!notifs.loading && !notifs.error && notifs.nextCursor && filtered.length === 0" role="status" class="message-state"><text>{{ t.notifs.moreToCheck }}</text></view>
         <EmptyState v-if="!notifs.loading && !notifs.error && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
-        <view v-for="n in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt }">
-          <view class="notification-row" role="button" tabindex="0" :aria-label="platformDisplayText(n.title)" :aria-expanded="expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
-            <view class="notification-icon" aria-hidden="true" v-html="kindIcon(n)" />
-            <view class="notification-content"><view class="notification-top"><text class="notification-title">{{ platformDisplayText(n.title) }}</text><text v-if="n.priority === 'critical' || n.priority === 'high'" class="notification-important">{{ t.notifs.important }}</text><text class="notification-time">{{ timeAgo(n.ts) }}</text><view v-if="!n.readAt" class="message-status-dot" /></view><text v-if="n.body" class="notification-preview">{{ platformDisplayText(n.body) }}</text></view>
+        <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
+          <text v-if="index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts)" class="notification-date" role="heading" aria-level="2">{{ dateHeading(n.ts) }}</text>
+          <view class="notification-row" role="button" tabindex="0" :aria-label="platformDisplayText(n.title)" :aria-expanded="directNotice(n) ? undefined : expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
+            <view class="notification-icon" :data-category="notificationCategory(n)" aria-hidden="true" v-html="kindIcon(n)" />
+            <view class="notification-content"><view class="notification-top"><view class="notification-heading"><text class="notification-title">{{ platformDisplayText(n.title) }}</text><text v-if="n.priority === 'critical' || n.priority === 'high'" class="notification-important">{{ t.notifs.important }}</text></view></view><text v-if="n.body && expandedId !== n.id" class="notification-preview">{{ platformDisplayText(n.body) }}</text></view>
+<view class="notification-meta"><text class="notification-time">{{ timeAgo(n.ts) }}</text><view v-if="!n.readAt" class="message-status-dot" aria-hidden="true" /></view>
           </view>
-          <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ platformDisplayText(n.body) }}</text><view v-if="n.ctaLabel && n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel)" @click.stop="onTap(n)"><LiquidGlass :radius="22" /><text>{{ platformDisplayText(n.ctaLabel) }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
+          <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ platformDisplayText(n.body) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="16" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
         </view>
-        <view v-if="notifs.loading" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
-        <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loading ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
-        <view v-if="remoteApiEnabled && notifs.items.length" class="message-original"><text>{{ t.notifs.originalTextNote }}</text></view>
+        <view v-if="notifs.error" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
+        <view v-if="notifs.loading && !filtered.length" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
+        <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loadingMore ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
       </view>
       <view class="message-scroll-compensation" :style="{ height: headerCompensation + 'px' }" aria-hidden="true" />
       </scroll-view>
+      <view v-if="section === 'notifications'" class="notification-management">
+        <NxButton variant="secondary" size="medium" :disabled="clearingRead || markingAll || notifs.loading" @click="confirmClearRead">{{ actionCopy.clearRead }}</NxButton>
+      </view>
     </view>
     </template>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
+import { displayTimestamp, formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onShow, onHide, onLoad, onResize } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ServiceMessageList from "@/components/support/service-message-list.vue";
+import { useConversations } from "@/store/conversations";
 import { useMessageDrawer, type MessageSection } from "@/store/message-drawer";
 import { notificationCategory, type NotificationCategory } from "@/lib/notification-category";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { useNotifications, type Notification } from "@/store/notifications";
 import { navTo, navBack, takeNavigationQuery } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
 import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
-import { confirm as uiConfirm, useUI } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
+import { isDirectNotificationSummary } from "@/lib/notification-summary";
+import { notificationActionsCopy } from "@/i18n/notification-actions";
+import { confirm, useUI } from "@/store/ui";
 
 const t = useT();
+const locale = useLocaleStore();
 const notifs = useNotifications();
 const app = useApp();
 const ui = useUI();
-const confirmOwner = `notifications:${typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-  ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+const actionCopy = computed(() => notificationActionsCopy[locale.code === 'zh' || locale.code === 'vi' ? locale.code : 'en']);
+const clearingRead = ref(false);
+const confirmOwner = `notification-center:${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let pageGeneration = 0;
 let pageVisible = true;
 let disposed = false;
@@ -92,6 +103,7 @@ function isCurrentIntent(intent: ReturnType<typeof captureIntent>) {
 const notifsErrorText = computed(() => notifs.error ? t.value.notifs.loadFailed : "");
 
 const center = useMessageDrawer();
+const conversations = useConversations();
 let sectionLoaded = false;
 let sectionAccountWasBound = app.accountKey !== "default";
 const initialSectionAccountEpoch = app.accountBindingEpoch;
@@ -102,6 +114,18 @@ const section = computed({ get: () => center.section, set: (value: MessageSectio
   if (!sectionAccountWasBound && sectionEntryAllowed) initialSection = value;
   preserveSectionInH5();
 } });
+const summaryRecovery = computed(() => ({
+  visible: !!center.error || (section.value === "service" && conversations.realtimeFallback),
+  label: center.error ? actionCopy.value.refreshFailed : actionCopy.value.liveUnavailable,
+  busy: center.loading || (section.value === "service" && conversations.categoryLoading),
+}));
+function retrySummary() {
+  if (!pageVisible || disposed || summaryRecovery.value.busy) return;
+  if (section.value === "service" && conversations.realtimeFallback) {
+    conversations.stopRealtime(); conversations.startRealtime();
+  }
+  void center.refresh();
+}
 function preserveSectionInH5() {
   if (!sectionLoaded || disposed || !pageVisible || typeof window === "undefined"
     || typeof window.history?.replaceState !== "function") return;
@@ -124,8 +148,8 @@ onLoad(query => {
   else preserveSectionInH5();
 });
 const sectionOptions = computed(() => [
-  { value: "notifications", label: t.value.notifs.notificationsTab, count: notifs.unread },
-  { value: "service", label: t.value.notifs.serviceTab, count: center.serviceUnread },
+  { value: "notifications", label: t.value.notifs.notificationsTab, hasUnread: notifs.unread > 0 },
+  { value: "service", label: t.value.notifs.serviceTab, hasUnread: center.serviceUnread > 0 },
 ]);
 const unreadLabel = computed(() => center.error ? t.value.notifs.unreadUnavailable : center.totalUnread > 0 ? fmt(t.value.notifs.unreadCount, { n: center.totalUnread }) : center.loading ? t.value.notifs.unreadUnavailable : t.value.notifs.allCaughtUp);
 type Filter = "all" | NotificationCategory;
@@ -135,21 +159,38 @@ const visibleFilterIds = computed(() => filterIds);
 const expandedId = ref<string | null>(null);
 const categoryKeys = { finance: "categoryFinance", device: "categoryDevice", team: "kindTeam", rewards: "categoryRewards", system: "kindSystem" } as const;
 const categoryIcons: Record<NotificationCategory, string> = {
-  finance: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18M16 14h2"/>',
-  device: '<rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8M12 16v5"/>',
-  team: '<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 7M22 21v-2a6 6 0 0 0-3-5"/>',
-  rewards: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8H7a3 3 0 1 1 3-3zm0 0h5a3 3 0 1 0-3-3z"/>',
-  system: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  finance: '<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7"/><path d="M16 14h.01"/>',
+  device: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  rewards: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  system: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
 };
 function kindIcon(n: Notification) { return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${categoryIcons[notificationCategory(n)]}</svg>`; }
-const hasRead = computed(() => notifs.items.some(item => !!item.readAt));
 function countOf(id: Filter) { return id === "all" ? notifs.items.length : notifs.items.filter(n => notificationCategory(n) === id).length; }
 const filtered = computed(() => filter.value === "all" ? notifs.items : notifs.items.filter(n => notificationCategory(n) === filter.value));
 function filterLabel(id: Filter) { return id === "all" ? t.value.notifs.filterAll : t.value.notifs[categoryKeys[id]]; }
-const emptyTitle = computed(() => notifs.items.length === 0 ? t.value.notifs.emptyAllTitle : fmt(t.value.notifs.emptyFilterTitle, { filter: filterLabel(filter.value) }));
-function toggle(n: Notification) { void notifs.markRead(n.id); expandedId.value = expandedId.value === n.id ? null : n.id; }
+const emptyTitle = computed(() => filter.value === "all" ? t.value.notifs.emptyAllTitle : fmt(t.value.notifs.emptyFilterTitle, { filter: filterLabel(filter.value) }));
+function directNotice(n: Notification) { return !!n.ctaHref && isDirectNotificationSummary(n.body); }
+function toggle(n: Notification) {
+  if (directNotice(n)) { void onTap(n); return; }
+  void notifs.markRead(n.id);
+  expandedId.value = expandedId.value === n.id ? null : n.id;
+}
 const markingAll = ref(false);
-async function markAll() { if (markingAll.value) return; markingAll.value = true; try { await notifs.markAllRead(); } finally { markingAll.value = false; } }
+async function markAll() { if (markingAll.value || clearingRead.value) return; markingAll.value = true; try { await notifs.markAllRead(); } finally { markingAll.value = false; } }
+async function confirmClearRead() {
+  const intent = captureIntent();
+  if (!isCurrentIntent(intent) || clearingRead.value || markingAll.value || notifs.loading) return;
+  clearingRead.value = true;
+  try {
+    const copy = actionCopy.value;
+    const accepted = await confirm({ owner: confirmOwner, title: copy.title, message: copy.message,
+      confirmLabel: copy.confirm, cancelLabel: copy.cancel, icon: 'warn', danger: true });
+    if (accepted && isCurrentIntent(intent)) await notifs.clearRead();
+  } finally {
+    if (isCurrentIntent(intent)) clearingRead.value = false;
+  }
+}
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextEpoch], [previousKey]) => {
   // Reapply only the first startup intent after the existing store reset.
   // A second bind (including the same account) is a real reset, even in one tick.
@@ -163,15 +204,34 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextE
     section.value = "notifications";
   }
   preserveSectionInH5();
-  expandedId.value = null; filter.value = "all"; serviceFilter.value = "all"; resetHeader();
+  expandedId.value = null; filter.value = "all"; resetHeader();
   if (!disposed && pageVisible) void center.refresh();
 });
 
+function dateHeading(ts: number): string {
+  if (displayTimestamp(ts) === null) return "—";
+  const date = new Date(ts), today = new Date(), yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return t.value.notifs.today;
+  if (date.toDateString() === yesterday.toDateString()) return t.value.notifs.yesterday;
+  return formatDisplayDate(ts, locale.code);
+}
+
 function timeAgo(ts: number): string {
-  const mins = Math.max(1, Math.floor((Date.now() - ts) / 60_000));
+  if (displayTimestamp(ts) === null) return "—";
+  const date = new Date(ts), now = new Date(), yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    const clock = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    return `${t.value.notifs.yesterday} ${clock}`;
+  }
+  // Compare local calendar dates, not elapsed 24-hour periods (including DST).
+  const days = Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+    - Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) / 86_400_000);
+  if (days > 1) return fmt(t.value.notifs.timeDaysAgo, { n: days });
+  const mins = Math.max(1, Math.floor((now.getTime() - ts) / 60_000));
   if (mins < 60) return fmt(t.value.notifs.timeMinutesAgo, { n: mins });
-  if (mins < 1440) return fmt(t.value.notifs.timeHoursAgo, { n: Math.floor(mins / 60) });
-  return fmt(t.value.notifs.timeDaysAgo, { n: Math.floor(mins / 1440) });
+  return fmt(t.value.notifs.timeHoursAgo, { n: Math.floor(mins / 60) });
 }
 
 async function onTap(n: Notification) {
@@ -193,19 +253,6 @@ async function onTap(n: Notification) {
   }
   await notifs.markRead(n.id);
   // Missing CTA is the PC operator's explicit "no navigation" choice.
-}
-
-async function confirmClearRead() {
-  const intent = captureIntent();
-  if (!isCurrentIntent(intent)) return;
-  const accepted = await uiConfirm({
-    owner: confirmOwner,
-    title: t.value.notifs.clearReadAria,
-    message: t.value.notifs.clearReadAria,
-    confirmLabel: t.value.notifs.clearReadAria,
-    icon: "warn",
-  });
-  if (accepted && isCurrentIntent(intent)) await notifs.clearRead();
 }
 
 type UniTouchEvent = { changedTouches?: ArrayLike<{ clientX: number; clientY: number }> };
@@ -236,9 +283,10 @@ async function onTouchEnd(n: Notification, event: UniTouchEvent) {
 }
 function invalidatePendingIntents() {
   pageGeneration += 1;
+  clearingRead.value = false;
+  ui.clearConfirmsBy(confirmOwner);
   touchStarts.clear();
   suppressedClick = null;
-  ui.clearConfirmsBy(confirmOwner);
 }
 function invalidatePage() {
   pageVisible = false;
@@ -258,7 +306,7 @@ onUnmounted(() => { disposed = true; invalidatePage(); });
 import GlassSegments from "@/components/glass-segments.vue";
 const filterOptions = computed(() => visibleFilterIds.value.map(value => {
   const count = value === 'all' ? notifs.unread : notifs.unreadByCategory[value];
-  return { value, label: filterLabel(value), hasUnread: count > 0, count: value === 'all' || notifs.unreadByCategoryExact ? count : undefined };
+  return { value, label: filterLabel(value), hasUnread: count > 0 };
 }));
 
 import { advanceMessageHeader, createMessageHeaderState } from "@/lib/message-header-scroll";
@@ -287,34 +335,76 @@ async function measureHeader() {
 }
 onMounted(measureHeader);
 onResize(measureHeader);
-watch([unreadLabel, sectionOptions, hasRead, section], measureHeader);
+watch([unreadLabel, sectionOptions, section, () => center.error], measureHeader);
 let lastScrollInputAt = -Infinity;
 function onScrollInput() { lastScrollInputAt = Date.now(); }
-const serviceFilter = ref<"all" | "advisor">("all");
-const serviceFilters = computed(() => [
-  { value: "all", label: t.value.notifs.filterAll, count: center.serviceUnread }, { value: "advisor", label: t.value.conversations.typeAdvisor, count: center.humanUnread },
-]);
 function onMessageScroll(event: { detail: { scrollTop: number } }) {
   const now = Date.now();
   headerState.value = advanceMessageHeader(headerState.value, event.detail.scrollTop, headerFocused.value, now, now - lastScrollInputAt < 160);
 }
 function resetHeader() { headerState.value = createMessageHeaderState(); }
 watch(section, () => { resetHeader(); preserveSectionInH5(); });
+watch(filter, value => {
+  expandedId.value = null;
+  resetHeader();
+  void notifs.selectCategory(value);
+}, { immediate: true });
 </script>
 
 <style src="@/styles/message-center.css"></style>
 <style scoped>
-.message-center .message-nav { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; gap: 12px; }
-.message-center .message-nav > .message-icon-button:last-child { grid-column: 3; }
-.message-center .message-nav .message-title { min-width: 0; font-size: 26px; line-height: 1.25; text-align: center; transition: opacity 180ms ease; }
-.message-center .message-nav .message-title--hidden { opacity: 0; }
-.message-center .message-compact { cursor: default; }
-.message-center .message-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding-bottom: 12px; }
-.message-center .message-subtitle { min-width: 0; margin-top: 0; line-height: 20px; text-align: start; }
-.message-center .message-clear-read { padding-inline: 0; margin-left: auto; flex-shrink: 0; max-width: 45%; font-size: 12px; border-radius: 0; text-align: end; }
-.message-unread-label { position: relative; display: inline-flex; align-items: center; margin-left: 15px; }
-.message-unread-label .message-status-dot { position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
-.message-center .message-filters { align-self: flex-start; width: fit-content; max-width: 100%; box-sizing: border-box; }
-.message-category-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); flex-shrink: 0; align-self: center; transform: translateY(-5px); }
-@media (prefers-reduced-motion: reduce) { .message-center .message-nav .message-title { transition: none; } }
+.message-recovery-title { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.message-nav .message-summary-recovery { flex:1; min-width:0; margin:0 8px; }
+.message-nav .message-summary-recovery .message-button { font:600 13px/20px var(--font-v5); text-align:center; }
+.message-page { bottom:0!important; }
+.message-center .message-nav { position:relative; z-index:41; height:70px; margin:-7px -4px 0; }
+.message-center .message-nav .message-icon-button { color:var(--v5-ink); }
+.message-nav .message-icon-button > svg { position:relative; z-index:1; }
+.message-nav :deep(.nx-liquid-glass) { background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-ink) 7%,transparent); box-shadow:var(--ui-glass-edge-shadow); backdrop-filter:blur(12px) saturate(125%); }
+:global([data-theme="light"] .message-center .message-nav .nx-liquid-glass) { background-color:color-mix(in srgb,var(--v5-surface) 78%,transparent); box-shadow:var(--v5-glass-shadow),var(--ui-glass-edge-shadow); }
+.message-center .message-heading { padding:0 4px; }
+.message-center .message-heading-row { min-height:44px; gap:10px; }
+.message-center .message-title { font-size:24px; line-height:32px; }
+.message-center .message-subtitle { font-size:13px; line-height:18px; color:var(--v5-ink-3); gap:6px; }
+.message-center .message-mark-all { font-size:13px; min-height:44px; padding-inline:0; font-weight:500; color:var(--v5-brand); }
+.message-center .message-primary-inner { padding-top:12px; }
+.message-center .message-primary { height:40px; box-sizing:border-box; padding:var(--v5-space-1); gap:var(--v5-space-1); }
+.message-center .message-primary :deep(.nx-glass-track) { --v5-liquid-shadow:none; }
+.message-center .message-primary :deep(.nx-glass-option) { min-height:32px; height:32px; padding:0 10px; gap:6px; font-size:14px; line-height:20px; font-weight:500; }
+.message-primary .message-status-dot { width:5px; height:5px; }
+.message-filters :deep(.nx-liquid-glass--selection) { background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-brand) 14%,transparent); box-shadow:var(--ui-glass-edge-shadow); backdrop-filter:blur(12px) saturate(125%); }
+.message-filters :deep(.nx-liquid-glass--selection .nx-liquid-tint) { background:none; box-shadow:none; }
+.message-filters :deep(.nx-liquid-glass--selection .nx-liquid-rim) { box-shadow:none; }
+.message-filters :deep(.nx-liquid-glass--selection .nx-liquid-specular) { background:none; }
+.message-option-label, .message-category-dot { position: relative; z-index: 1; }
+.message-center .message-filters { align-self:flex-start; width:fit-content; max-width:100%; box-sizing:border-box; height:44px; min-height:44px; margin:6px 0 -6px; padding:6px 0; gap:var(--v5-space-1); border-radius:0; background:transparent; }
+.message-center .message-filters :deep(.nx-glass-option) { min-height:32px; height:32px; padding:0 12px; gap:var(--v5-space-1); border:0; border-radius:var(--v5-radius-full); font-size:13px; line-height:18px; font-weight:500; }
+.message-center .message-filters :deep(.nx-glass-option:not(.nx-glass-option--selected)) { color:var(--v5-ink-3); }
+.message-category-dot { width:5px; height:5px; border-radius:50%; background:var(--v5-brand); flex-shrink:0; align-self:center; }
+.message-center .message-scroll--notifications { width:calc(100% + 32px); margin-inline:-16px; }
+.message-center .notification-feed { padding:0 16px 100px; }
+.message-center .notification-item { border:0; }
+.message-center .notification-date { margin:var(--v5-space-5) 4px 8px; font-size:12px; line-height:16px; font-weight:400; }
+.message-center .notification-row { padding:14px 16px; background:var(--v5-surface); }
+.message-center .notification-item--group-first .notification-row { border-top-left-radius:22px; border-top-right-radius:22px; }
+.message-center .notification-item--group-last .notification-row { border-bottom-left-radius:22px; border-bottom-right-radius:22px; }
+.message-center .notification-item:not(.notification-item--group-first) .notification-row { border-top:1px solid var(--v5-border); }
+.message-center .notification-icon { --notice-color:var(--v5-nex); display:flex; align-items:center; justify-content:center; width:40px; height:40px; margin:0; border-radius:var(--ui-radius-icon); background:color-mix(in srgb,var(--notice-color) 16%,transparent); color:var(--notice-color); }
+.message-center .notification-icon :deep(svg) { width:20px; height:20px; }
+.message-center .notification-icon[data-category="finance"] { --notice-color:var(--v5-success-ink); }
+.message-center .notification-icon[data-category="device"] { --notice-color:var(--ui-notification-device-ink); }
+.message-center .notification-icon[data-category="team"] { --notice-color:var(--v5-brand-2-ink); }
+.message-center .notification-icon[data-category="system"] { --notice-color:var(--v5-nex-ink); }
+.message-center .notification-icon[data-category="rewards"] { --notice-color:var(--v5-warning-ink); }
+.message-center .notification-heading { gap:var(--v5-space-2); }
+.message-center .notification-title { font-size:14px; line-height:20px; }
+.message-center .notification-preview { margin-top:2px; font-size:12.5px; line-height:18px; }
+.message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
+.message-center .notification-time { font-size:12px; line-height:16px; }
+.message-center .notification-meta .message-status-dot { width:8px; height:8px; }
+.message-center .notification-important { height:24px; background:var(--v5-warning-soft); font-size:12px; line-height:16px; padding:0 var(--v5-space-2); border-radius:var(--v5-radius-full); }
+.message-center .notification-detail { padding:0 16px 14px 68px; background:var(--v5-surface); }
+.notification-management { position:absolute; right:16px; bottom:38px; padding:0; }
+:global([data-theme="dark"] .message-center .notification-important) { background:color-mix(in srgb,var(--v5-warning) 16%,transparent); }
+:global([data-theme="light"] .message-center .notification-row) { box-shadow:var(--v5-glass-shadow); }
 </style>

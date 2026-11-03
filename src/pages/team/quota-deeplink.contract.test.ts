@@ -38,9 +38,9 @@ describe("quota deep link carries the product being viewed", () => {
     expect(quotaSource).toContain('takeNavigationQuery("/pages/team/quota")');
     expect(quotaSource).toMatch(/focusedTierPresent/);
     // 不在档位里时必须给出提示,而不是静默展示别的商品。
-    expect(quotaSource).toMatch(/v-if="!focusedTierPresent"/);
+    expect(quotaSource).toMatch(/v-else-if="!focusedTierPresent"/);
     expect(quotaSource).toMatch(/t\.quota\.focusedTierMissing/);
-    expect(quotaSource).toMatch(/v-else class="px-4"/);
+    expect(quotaSource).toMatch(/v-else class="quota-content"/);
     expect(quotaSource).toMatch(/v-for="tier in focusedTiers"/);
     expect(quotaSource).toMatch(/tiers\.value\.filter\(\(tier\) => tier\.productId === focusedProductId\.value\)/);
     expect(quotaSource).toMatch(/go\(focusedProductHref\)/);

@@ -32,7 +32,7 @@
 
       <!-- Tabs — SegmentedControl (HIG 44pt, accent = tech-cyan) -->
       <view class="mx-4 mt-3">
-        <GlassSegments :label="t.developer.headline" v-model="tab" :options="tabOptions"  />
+        <GlassSegments :label="t.developer.headline" v-model="tab" :options="tabOptions" layout="scroll" />
       </view>
 
       <!-- Overview -->
@@ -68,32 +68,33 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.requestAccess }}</text>
           </view>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.developer.requestAccessHint }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-bottom: var(--ui-space-inline)">{{ t.developer.requestAccessHint }}</text>
+          <text v-if="remoteApiEnabled && latestLoading && !latestRequest" role="status" class="developer-loading">{{ t.developer.loading }}</text>
           <view v-if="remoteApiEnabled && latestRequest" class="nx-glass-inset rounded-xl" :style="requestStatusStyle">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ latestRequest.requestNo }} · {{ latestRequestStatusLabel }}</text>
-            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ new Date(latestRequest.submittedAt).toLocaleString(dateLocale()) }}</text>
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ formatDisplayDateTime(latestRequest.submittedAt, dateLocale(), true) }}</text>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ latestRequestStatusDetail }}</text>
             <text v-if="requestReviewReason" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ developerCopy[requestReviewReason] }}</text>
           </view>
           <view v-if="remoteApiEnabled && latestLoadFailed" class="nx-glass-inset rounded-xl" :style="requestStatusStyle">
             <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.latestLoadFailed }}</text>
-            <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
+            <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text class="developer-read-retry-label">{{ t.network.retry }}</text></view>
           </view>
-          <view v-if="canSubmitAccessRequest" class="space-y-2">
-            <input v-model="company" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph"
+          <view v-if="!latestLoadFailed && (requestState?.canReapply ?? true)" class="space-y-2">
+            <input v-model="company" :disabled="!canSubmitAccessRequest" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph"
               :aria-label="t.developer.formCompany" :aria-invalid="accessIssue === ISSUE_COMPANY ? 'true' : 'false'"
               :aria-describedby="accessIssue === ISSUE_COMPANY ? 'dev-company-error' : undefined" />
             <text v-if="accessIssue === ISSUE_COMPANY" id="dev-company-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.developer.companyInvalid }}</text>
-            <input v-model="email" type="email" :maxlength="254" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph"
+            <input v-model="email" :disabled="!canSubmitAccessRequest" type="email" :maxlength="254" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph"
               :aria-label="t.developer.formEmail" :aria-invalid="accessIssue === ISSUE_EMAIL ? 'true' : 'false'"
               :aria-describedby="accessIssue === ISSUE_EMAIL ? 'dev-email-error' : undefined" />
             <text v-if="accessIssue === ISSUE_EMAIL" id="dev-email-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.developer.emailInvalid }}</text>
-            <textarea v-model="useCase" :maxlength="2000" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph"
+            <textarea v-model="useCase" :disabled="!canSubmitAccessRequest" :maxlength="2000" :placeholder="t.developer.formUseCasePlaceholder" :style="formTextareaStyle" placeholder-class="nx-dev-ph"
               :aria-label="t.developer.formUseCase" :aria-invalid="accessIssue === ISSUE_USE_CASE ? 'true' : 'false'"
               :aria-describedby="accessIssue === ISSUE_USE_CASE ? 'dev-usecase-error' : undefined" />
             <text v-if="accessIssue === ISSUE_USE_CASE" id="dev-usecase-error" class="block" :style="fieldErrorStyle" role="alert">{{ t.developer.useCaseInvalid }}</text>
           </view>
-          <view v-if="canSubmitAccessRequest" class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" role="button" tabindex="0" :aria-label="t.developer.formSubmit" :aria-busy="submitting ? 'true' : 'false'" @click="submitRequest">
+          <view v-if="!latestLoadFailed && (requestState?.canReapply ?? true)" class="mt-3 flex items-center justify-center active:opacity-85" :style="submitBtnStyle" role="button" :tabindex="submitting || !canSubmitAccessRequest ? -1 : 0" :aria-label="t.developer.formSubmit" :aria-disabled="submitting || !canSubmitAccessRequest ? 'true' : 'false'" :aria-busy="submitting ? 'true' : 'false'" @click="submitRequest" @keydown.enter.prevent="submitRequest" @keydown.space.prevent="submitRequest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ submitting ? "…" : t.developer.formSubmit }}</text>
           </view>
@@ -108,7 +109,7 @@
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
           </view>
           <view v-if="remoteApiEnabled && docsNotReleased" class="rounded-xl" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
-          <view v-else-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" :aria-label="t.network.retry" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block" style="font-size: 12px; margin-top: 6px">{{ t.network.retry }}</text></view>
+          <view v-else-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" :aria-label="t.network.retry" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block developer-read-retry-label" style="margin-top: 6px">{{ t.network.retry }}</text></view>
           <template v-else-if="!remoteApiEnabled || docs">
             <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
@@ -121,6 +122,7 @@
             <view v-if="!remoteApiEnabled" class="mt-3 rounded-lg" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
             <view v-if="docs" class="mt-3 rounded-lg" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.developer.docsEvents, { events: docs.events.join(" · ") }) }}</text></view>
           </template>
+          <text v-else role="status" class="developer-loading">{{ t.developer.loading }}</text>
         </view>
       </view>
 
@@ -129,6 +131,7 @@
         <view class="rounded-2xl" :style="formCardStyle">
           <view v-if="!remoteApiEnabled" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.remoteRequired }}</text></view>
           <view v-else>
+            <text v-if="resourcesLoading && !resourcesReady" role="status" class="developer-loading">{{ t.developer.loading }}</text>
             <view v-if="resourcesApprovalRequired" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
               <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'"  @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
@@ -138,9 +141,9 @@
             </view>
             <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
-              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
+              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text class="developer-read-retry-label">{{ t.network.retry }}</text></view>
             </view>
-            <view v-for="item in (canManageResources ? apiKeys : [])" :key="item.id" class="flex items-center" :style="resourceRowStyle">
+            <view v-for="item in (resourcesReady ? apiKeys : [])" :key="item.id" class="flex items-center" :style="resourceRowStyle">
               <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.prefix }}••••{{ item.last4 }} · {{ item.status }}</text></view>
               <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
             </view>
@@ -155,6 +158,7 @@
         <view class="rounded-2xl" :style="formCardStyle">
           <view v-if="!remoteApiEnabled" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.remoteRequired }}</text></view>
           <view v-else>
+            <text v-if="resourcesLoading && !resourcesReady" role="status" class="developer-loading">{{ t.developer.loading }}</text>
             <view v-if="resourcesApprovalRequired" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.approvalRequired }}</text>
               <view role="button" tabindex="0" :aria-label="t.developer.requestAccess" style="min-height: 44px; display: grid; place-items: center" @click="tab = 'overview'"  @keydown.enter.prevent="tab = 'overview'" @keydown.space.prevent="tab = 'overview'"><text>{{ t.developer.requestAccess }}</text></view>
@@ -164,12 +168,12 @@
             </view>
             <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
-              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text>{{ t.network.retry }}</text></view>
+              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text class="developer-read-retry-label">{{ t.network.retry }}</text></view>
             </view>
-            <view v-for="item in (canManageResources ? webhooks : [])" :key="item.id" :style="resourceRowStyle">
-              <view class="flex items-center">
-                <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.url }} · {{ item.deliveryStatus }}</text></view>
-                <view v-if="item.status !== 'DELETED'" class="flex" style="gap: 5px; flex-wrap: wrap; justify-content: flex-end"><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `toggle-webhook:${item.id}`)" role="button" tabindex="0" @click="setWebhookEnabled(item, item.status !== 'ACTIVE')"><text style="font-size: 12px">{{ item.status === 'ACTIVE' ? t.developer.disable : t.developer.enable }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `deliveries-webhook:${item.id}`)" role="button" tabindex="0" @click="loadWebhookDeliveries(item)"><text style="font-size: 12px">{{ t.developer.deliveryAttempts }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `rotate-webhook:${item.id}`)" role="button" tabindex="0" @click="rotateWebhook(item)"><text style="font-size: 12px">{{ t.developer.rotate }}</text></view><view class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `delete-webhook:${item.id}`)" role="button" tabindex="0" @click="deleteWebhook(item.id)"><text style="font-size: 12px">{{ t.developer.delete }}</text></view></view>
+            <view v-for="item in (resourcesReady ? webhooks : [])" :key="item.id" :style="resourceRowStyle">
+              <view style="display: flex; flex-direction: column; gap: 8px">
+                <view class="min-w-0" style="overflow-wrap: anywhere"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.url }} · {{ item.deliveryStatus }}</text></view>
+                <view v-if="item.status !== 'DELETED'" class="flex" style="gap: 8px; flex-wrap: wrap"><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `toggle-webhook:${item.id}`)" role="button" tabindex="0" @click="setWebhookEnabled(item, item.status !== 'ACTIVE')"><text style="font-size: 12px">{{ item.status === 'ACTIVE' ? t.developer.disable : t.developer.enable }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `deliveries-webhook:${item.id}`)" role="button" tabindex="0" @click="loadWebhookDeliveries(item)"><text style="font-size: 12px">{{ t.developer.deliveryAttempts }}</text></view><view class="rounded-lg" :style="resourceActionStyle(smallActionBtnStyle, `rotate-webhook:${item.id}`)" role="button" tabindex="0" @click="rotateWebhook(item)"><text style="font-size: 12px">{{ t.developer.rotate }}</text></view><view class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `delete-webhook:${item.id}`)" role="button" tabindex="0" @click="deleteWebhook(item.id)"><text style="font-size: 12px">{{ t.developer.delete }}</text></view></view>
               </view>
               <view v-if="rotationRecovery[item.id]" class="mt-2 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.rotationUnknownWarning }}</text></view>
               <view v-if="webhookDeliveries[item.id]?.length" class="mt-2 rounded-xl" :style="requestStatusStyle">
@@ -178,10 +182,10 @@
               <view v-else-if="webhookDeliveries[item.id]" class="mt-2 rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.deliveryEmpty }}</text></view>
             </view>
             <view v-if="resourcesReady && !webhooks.length" class="rounded-xl" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.developer.webhooksEmpty }}</text></view>
-            <template v-if="canManageResources">
-            <input v-model="webhookName" :maxlength="100" :placeholder="t.developer.webhookName" :aria-label="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="webhookUrl" :maxlength="-1" :placeholder="t.developer.webhookUrl" :aria-label="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
-            <input v-model="webhookEvents" :maxlength="-1" :placeholder="t.developer.webhookEvents" :aria-label="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <template v-if="!resourcesApprovalRequired && !resourcesNotReleased && !resourcesLoadFailed">
+            <input v-model="webhookName" :disabled="!canManageResources" :maxlength="100" :placeholder="t.developer.webhookName" :aria-label="t.developer.webhookName" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookUrl" :disabled="!canManageResources" :maxlength="-1" :placeholder="t.developer.webhookUrl" :aria-label="t.developer.webhookUrl" :style="formInputStyle" placeholder-class="nx-dev-ph" />
+            <input v-model="webhookEvents" :disabled="!canManageResources" :maxlength="-1" :placeholder="t.developer.webhookEvents" :aria-label="t.developer.webhookEvents" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="resourceActionStyle(submitBtnStyle, 'create-webhook')" role="button" tabindex="0" @click="createWebhook"><text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text></view>
             </template>
             <view v-if="newWebhookSecret && canManageResources" class="mt-3 rounded-xl" :style="requestStatusStyle"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.secretOnce }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan); margin-top: 5px; word-break: break-all">{{ newWebhookSecret }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 5px">{{ t.developer.deliveryDisabled }}</text></view>
@@ -193,14 +197,16 @@
 </template>
 
 <script setup lang="ts">
+import { formatDisplayDateTime } from "@/lib/display-date";
 import { ref, computed, nextTick, onUnmounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
+import { ApiError } from "@/api/errors";
 import { confirm, toast, useUI } from "@/store/ui";
-import { developerAccessApi, developerResourcesApi, remoteApiEnabled, apiClient, expectedApiEnvironment } from "@/api/runtime";
+import { developerAccessApi, developerResourcesApi, remoteApiEnabled, apiClient, expectedApiEnvironment, apiRuntimeConfig } from "@/api/runtime";
 import type { DeveloperAccessReceipt } from "@/api/developer-access-api";
 import type { DeveloperApiKey, DeveloperWebhook, DeveloperWebhookDelivery } from "@/api/developer-resources-api";
 import { useApp } from "@/store/app";
@@ -211,7 +217,7 @@ import { createDeveloperDocsFenceReader, type DeveloperDocsFence } from "./devel
 import { isApiKeyRevoked, isWebhookDeleted, isWebhookEnabled, readDeveloperResourceSnapshot } from "./developer-resource-reconciliation";
 import { createDeveloperRotationJournal, developerRotationUniStorage, type DeveloperRotationRecoveryState } from "./developer-rotation-journal";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 import { createDeveloperDocsApi, type DeveloperDocs } from "@/api/developer-docs-api";
 import { useLocaleStore } from "@/store/locale";
@@ -245,6 +251,7 @@ const accessIssue = ref<DeveloperFormIssue | null>(null);
 const submitting = ref(false);
 const latestRequest = ref<DeveloperAccessReceipt | null>(null);
 const latestLoadFailed = ref(false);
+const latestLoading = ref(false);
 const apiKeys = ref<DeveloperApiKey[]>([]);
 const webhooks = ref<DeveloperWebhook[]>([]);
 const webhookDeliveries = ref<Record<number, DeveloperWebhookDelivery[]>>({});
@@ -277,7 +284,7 @@ const rotationJournal = createDeveloperRotationJournal(
 );
 const requestState = computed(() => developerAccessState(latestRequest.value));
 const requestReviewReason = computed(() => developerAccessReviewReasonKey(latestRequest.value));
-const canSubmitAccessRequest = computed(() => requestState.value?.canReapply ?? true);
+const canSubmitAccessRequest = computed(() => !latestLoading.value && !latestLoadFailed.value && (requestState.value?.canReapply ?? true));
 const developerCopy = computed(() => t.value.developer as unknown as Record<DeveloperAccessCopyKey, string>);
 const latestRequestStatusLabel = computed(() => requestState.value ? developerCopy.value[requestState.value.label] : "");
 const latestRequestStatusDetail = computed(() => requestState.value ? developerCopy.value[requestState.value.detail] : "");
@@ -386,7 +393,7 @@ function setResourceBusy(intent: string, busy: boolean): void {
   resourceBusyKeys.value = next;
 }
 function resourceActionStyle(base: CSSProperties, intent: string): CSSProperties {
-  return { ...base, opacity: resourceBusy(intent) ? 0.55 : 1, pointerEvents: resourceBusy(intent) ? "none" : "auto" };
+  return { ...base, opacity: resourceBusy(intent) ? 0.55 : 1, pointerEvents: !canManageResources.value || resourceBusy(intent) ? "none" : "auto" };
 }
 function resourceKey(intent: string): string {
   const existing = resourceIntentKeys.get(intent);
@@ -514,13 +521,13 @@ async function submitRequest() {
   useCase.value = "";
 }
 function loadLatestRequest() {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || developerEnvironmentInvalidated) return;
   const accountKey = String(app.accountKey);
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   const generation = ++requestGeneration;
-  latestRequest.value = null;
   latestLoadFailed.value = false;
+  latestLoading.value = true;
   const current = () => generation === requestGeneration && accountKey === String(app.accountKey)
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
   void developerAccessApi.latest().then((value) => {
@@ -532,24 +539,23 @@ function loadLatestRequest() {
       }
     }
   }).catch(() => {
-    if (current()) latestLoadFailed.value = true;
+    if (current()) { latestRequest.value = null; latestLoadFailed.value = true; }
     else if (generation === requestGeneration) { latestRequest.value = null; latestLoadFailed.value = false; }
-  });
+  }).finally(() => { if (current()) latestLoading.value = false; });
 }
 async function loadResources(fence = resourceFence()) {
-  if (!remoteApiEnabled || !resourceFenceCurrent(fence)) return;
+  if (!remoteApiEnabled || developerEnvironmentInvalidated || !resourceFenceCurrent(fence)) return;
   // A mutation must start a fresh read even if an older list request is pending.
   const readVersion = ++resourceReadVersion;
   const current = () => resourceFenceCurrent(fence) && readVersion === resourceReadVersion;
   setResourceBusy("load", true);
   resourcesLoading.value = true;
-  resourcesReady.value = false;
   resourcesLoadFailed.value = false;
   try {
     const [keys, hooks] = await Promise.all([developerResourcesApi.listKeys(), developerResourcesApi.listWebhooks()]);
     if (!current()) return;
-    apiKeys.value = keys;
-    webhooks.value = hooks;
+    apiKeys.value = keys.map(({ secret: _secret, ...key }) => key);
+    webhooks.value = hooks.map(({ secret: _secret, ...hook }) => hook);
     refreshRotationRecovery(hooks);
     resourcesLoadFailed.value = false;
     resourcesApprovalRequired.value = false;
@@ -557,6 +563,7 @@ async function loadResources(fence = resourceFence()) {
     resourcesReady.value = true;
   } catch (cause) {
     if (current()) {
+      resourcesReady.value = false;
       resourcesApprovalRequired.value = isDeveloperApprovalRequired(cause);
       // A capability the server has not deployed (503 DEVELOPER_*) is a product
       // state, not a failed load: it must not render as a retryable error next
@@ -566,7 +573,8 @@ async function loadResources(fence = resourceFence()) {
       apiKeys.value = [];
       webhooks.value = [];
       webhookDeliveries.value = {};
-      if (resourcesApprovalRequired.value || resourcesNotReleased.value) newWebhookSecret.value = null;
+      if ((cause instanceof ApiError && (cause.status === 401 || cause.status === 403))
+        || resourcesApprovalRequired.value || resourcesNotReleased.value) newWebhookSecret.value = null;
     }
   } finally {
     if (current()) {
@@ -576,7 +584,7 @@ async function loadResources(fence = resourceFence()) {
   }
 }
 async function loadDocs() {
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || developerEnvironmentInvalidated) return;
   const fence = docsFenceReader.capture();
   docsLoadFailed.value = false;
   docsNotReleased.value = false;
@@ -784,20 +792,55 @@ async function rotateWebhook(item: DeveloperWebhook) {
 function deliveryFailureLabel(value: string): string {
   return /^[A-Z0-9_:-]{1,120}$/.test(value) ? value : t.value.developer.deliveryFailureRedacted;
 }
+let developerPageVisible = false;
+let developerEnvironmentInvalidated = false;
+watch(() => apiRuntimeConfig?.environment, () => {
+  developerEnvironmentInvalidated = true;
+  clearDeveloperConfirms(); requestGeneration += 1;
+  latestRequest.value = null; latestLoading.value = true;
+  resetDocsScope(); resetResourceScope();
+}, { flush: 'sync' });
+// Runtime/catalog hydration can invalidate all reads without changing the account.
+// Clear the old authority and immediately read the current scope while visible.
+const unsubscribeDeveloperRuntime = subscribeRuntimeRevision(() => {
+  if (!developerPageVisible || !remoteApiEnabled) return;
+  clearDeveloperConfirms();
+  requestGeneration += 1;
+  requestKey = null;
+  submitting.value = false;
+  docsGeneration += 1;
+  resourceGeneration += 1;
+  resourceReadVersion += 1;
+  newWebhookSecret.value = null;
+  resourceBusyKeys.value = new Set();
+  resourceIntentKeys.clear();
+  loadLatestRequest();
+  void loadResources();
+  void loadDocs();
+});
 onShow(() => {
+  developerPageVisible = true;
   loadLatestRequest();
   void loadResources();
   void loadDocs();
 });
 onHide(() => {
+  developerPageVisible = false;
   clearDeveloperConfirms();
   requestGeneration += 1;
-  latestRequest.value = null;
   latestLoadFailed.value = false;
-  resetDocsScope();
-  resetResourceScope();
+  latestLoading.value = true;
+  resourceGeneration += 1;
+  resourceReadVersion += 1;
+  resourcesLoading.value = true;
+  newWebhookSecret.value = null;
+  resourceBusyKeys.value = new Set();
+  resourceIntentKeys.clear();
+  docsGeneration += 1;
 });
 onUnmounted(() => {
+  developerPageVisible = false;
+  unsubscribeDeveloperRuntime();
   clearDeveloperConfirms();
   requestGeneration += 1;
   resetDocsScope();
@@ -828,7 +871,7 @@ const heroStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxSh
   background:
     "var(--nx-glass-fill)",
   borderColor: "transparent",
-  padding: "20px",
+  padding: "var(--ui-space-section)",
 };
 const heroIconBoxStyle: CSSProperties = {
   top: "12px",
@@ -888,7 +931,7 @@ const apiListStyle: CSSProperties = {
 function apiRowStyle(last: boolean): CSSProperties {
   return {
     padding: "14px 0",
-    gap: "12px",
+    gap: "var(--ui-space-inline)",
     borderBottom: last ? "none" : "1px solid var(--v5-border)",
   };
 }
@@ -906,13 +949,13 @@ const partnerTitleStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-ink-3)",
   letterSpacing: "-0.025em",
-  padding: "12px 8px 4px",
+  padding: "var(--ui-space-inline) 8px 4px",
 };
 const partnerGridStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
-  padding: "16px",
+  padding: "var(--ui-space-inset)",
   gridTemplateColumns: "repeat(4, 1fr)",
-  gap: "12px",
+  gap: "var(--ui-space-inline)",
 };
 const partnerCellStyle: CSSProperties = {
   aspectRatio: "3 / 2",
@@ -921,7 +964,7 @@ const partnerCellStyle: CSSProperties = {
 };
 const formCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
-  padding: "16px",
+  padding: "var(--ui-space-inset)",
 };
 const formInputStyle: CSSProperties = {
   width: "100%",
@@ -950,17 +993,22 @@ const fieldErrorStyle: CSSProperties = {
   color: "var(--v5-danger)",
 };
 const submitBtnStyle: CSSProperties = {
-  height: "48px",
-  background: "var(--v5-tech-cyan)",
+  minHeight: "48px",
+  padding: "var(--ui-space-inline) 20px",
+  boxSizing: "border-box",
+  borderRadius: "999px",
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
 };
-const requestStatusStyle: CSSProperties = { padding: "10px 12px", marginBottom: "12px", };
-const resourceRowStyle: CSSProperties = { padding: "12px 0", gap: "10px", borderBottom: "1px solid var(--v5-border)" };
-const dangerBtnStyle: CSSProperties = { padding: "7px 10px", color: "var(--v5-warning)", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
-const smallActionBtnStyle: CSSProperties = { padding: "7px 10px", color: "var(--v5-tech-cyan)", background: "color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent)" };
+const requestStatusStyle: CSSProperties = { padding: "var(--ui-space-row-y) 12px", marginBottom: "12px", };
+const resourceRowStyle: CSSProperties = { padding: "var(--ui-space-inline) 0", gap: "var(--ui-space-row-y)", borderBottom: "1px solid var(--v5-border)" };
+const resourceButtonLayout: CSSProperties = { minHeight: "44px", minWidth: "44px", display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 12px", boxSizing: "border-box" };
+const dangerBtnStyle: CSSProperties = { ...resourceButtonLayout, color: "var(--v5-warning)", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
+const smallActionBtnStyle: CSSProperties = { ...resourceButtonLayout, color: "var(--v5-ink-2)", background: "var(--v5-surface-2)" };
 const snippetWrapStyle: CSSProperties = {
   background: "var(--v5-surface-3)",
   borderRadius: "8px",
-  padding: "12px",
+  padding: "var(--ui-space-inline)",
   whiteSpace: "nowrap",
 };
 const snippetTextStyle: CSSProperties = {
@@ -991,6 +1039,8 @@ import GlassSegments from "@/components/glass-segments.vue";
 </script>
 
 <style scoped>
+.developer-read-retry-label { font: 600 13px/20px var(--font-v5); }
+.developer-loading { display:block;color:var(--v5-ink-3);font:400 var(--ui-text-body)/1.5 var(--font-v5);padding-block:var(--ui-space-inline); }
 .nx-dev-ph {
   color: var(--v5-ink-4);
 }

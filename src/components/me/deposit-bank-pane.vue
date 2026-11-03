@@ -130,7 +130,7 @@
 
         <template v-else>
         <view><text class="block text-center tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
-        <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-amount, var(--font-v5)); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
+        <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-amount); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
         <view><text class="block text-center" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ creditLineText }}</text></view>
         </template>
 
@@ -183,7 +183,7 @@
         <view style="margin-top: 14px">
           <view v-for="(s, i) in steps" :key="i" class="flex items-start" style="gap: 10px; padding: 5px 0">
             <view class="grid place-items-center shrink-0" :style="stepNumStyle"><text style="font-size: 12px; font-weight: 600; color: var(--v5-brand)">{{ i + 1 }}</text></view>
-            <view class="flex-1 min-w-0"><text style="font-size: var(--ui-type-list-subtitle, 13px); color: var(--v5-ink-2); line-height: 1.5">{{ s }}</text></view>
+            <view class="flex-1 min-w-0"><text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.5">{{ s }}</text></view>
           </view>
         </view>
 
@@ -897,7 +897,7 @@ const ghostBtnStyle: CSSProperties = {
   background: "transparent",
 };
 const ghostTextStyle: CSSProperties = {
-  fontSize: "var(--ui-type-list-subtitle, 13px)",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
 };
 const qrBoxStyle: CSSProperties = {
@@ -927,11 +927,11 @@ const bankRowStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const bankKeyStyle: CSSProperties = {
-  fontSize: "var(--ui-type-list-subtitle, 13px)",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
 };
 const bankValStyle: CSSProperties = {
-  fontSize: "var(--ui-type-list-subtitle, 13px)",
+  fontSize: "var(--ui-type-list-subtitle)",
   fontWeight: 500,
   color: "var(--v5-ink)",
   textAlign: "right",
@@ -972,8 +972,8 @@ const stepNumStyle: CSSProperties = {
 const stateTitleStyle: CSSProperties = {
   marginTop: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-card-title, 16px)",
-  fontWeight: "var(--ui-type-card-title-weight, 600)",
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 const stateBodyStyle: CSSProperties = {
@@ -1069,7 +1069,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .nx-bank-amtrow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
 .nx-bank-amt { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 74px); height: 52px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand);
-  font: 500 44px/52px var(--font-amount, var(--font-v5)); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  font: 500 44px/52px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .nx-bank-unit { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .nx-bank-vnd { display: block; margin-top: 2px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-bank-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
@@ -1105,12 +1105,12 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-ring__t { color: var(--v5-ink); font: 500 32px/38px var(--font-metric); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .nx-bank-cd { display: block; margin-top: 16px; color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
 .nx-bank-cd__time { color: var(--v5-ink); font-family: var(--font-metric); font-weight: 500; font-variant-numeric: tabular-nums; }
-.nx-bank-pay__rejected { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--v5-ink-2); font: 400 var(--ui-type-list-subtitle, 13px)/1.55 var(--font-v5); }
-.nx-bank-sum { margin: 12px -2px 0; border-radius: var(--ui-radius-surface, var(--v5-radius-xl)); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); overflow: hidden; }
+.nx-bank-pay__rejected { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--v5-ink-2); font: 400 var(--ui-type-list-subtitle)/1.55 var(--font-v5); }
+.nx-bank-sum { margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); overflow: hidden; }
 .nx-bank-sum__r { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; }
 .nx-bank-sum__r + .nx-bank-sum__r { border-top: 1px solid var(--v5-border); }
 .nx-bank-sum__v { min-width: 0; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.nx-bank-sum__v--big { font-family: var(--font-amount, var(--font-v5)); font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
+.nx-bank-sum__v--big { font-family: var(--font-amount); font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
 .nx-bank-sum__v--text { font: 500 14px/20px var(--font-v5); }
 /* Credited: medal pops once and rings once; amount in the success ink. */
 .nx-bank-done { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -5px; padding: 28px 20px 8px; text-align: center; }
@@ -1118,7 +1118,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done__medal { position: relative; width: 88px; height: 88px; display: grid; place-items: center; border-radius: 50%; background: var(--v5-success-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-success) 35%, transparent); animation: nx-viz-pop 520ms cubic-bezier(.2,1.4,.4,1) 120ms both; }
 .nx-bank-done__medal::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 2px solid var(--v5-success); opacity: 0; animation: nx-bank-ring-out 900ms 620ms ease-out both; }
 .nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: 600 20px/28px var(--font-v5); }
-.nx-bank-done__amt { position: relative; display: block; margin-top: 10px; color: var(--v5-success-ink); font: 500 36px/44px var(--font-amount, var(--font-v5)); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-done__amt { position: relative; display: block; margin-top: 10px; color: var(--v5-success-ink); font: 500 36px/44px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-bank-done__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 14px/16px var(--font-v5); letter-spacing: 0; }
 .nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }

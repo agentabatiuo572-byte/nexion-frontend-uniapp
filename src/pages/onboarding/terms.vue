@@ -9,17 +9,8 @@
 -->
 <template>
   <StandalonePageShell class="tos-root" :reserve-bottom="false">
-    <!-- Sticky back header + brand -->
-    <view class="tos-top">
-      <view class="tos-back active:opacity-60" :class="{ 'tos-back--blocked': exitBlocked }" role="button" tabindex="0" :aria-disabled="exitBlocked ? 'true' : 'false'" :aria-label="t.login.back" @click="goBack" @keydown.enter.prevent="goBack($event)" @keydown.space.prevent="goBack($event)">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-      </view>
-      <view class="tos-brand">
-        <BrandLockup variant="mark" :height="32" />
-        <text class="tos-brand__name">{{ t.terms.navTitle }}</text>
-      </view>
-      <view class="tos-top__spacer" />
-    </view>
+    <SubPageHeader :back="returnTo" :back-action="goBack" :title="t.terms.navTitle" plain design
+      class="tos-header" :class="{ 'tos-header--blocked': exitBlocked }" role="group" :aria-disabled="exitBlocked" />
 
     <view class="tos-wrap">
       <!-- Hero -->
@@ -27,7 +18,7 @@
         <text class="tos-eyebrow">{{ loadError ?? t.terms.loading }}</text>
       </view>
       <view v-else-if="serverTerms" class="tos-hero">
-        <text class="tos-eyebrow">{{ `${serverTerms.effectiveAt} · ${serverTerms.version}` }}</text>
+        <text class="tos-eyebrow">{{ `${effectiveDate} · ${serverTerms.version}` }}</text>
         <text class="tos-title">{{ platformDisplayText(serverTerms.title) }}</text>
         <text class="tos-sub">{{ platformDisplayText(serverTerms.summary) }}</text>
       </view>
@@ -67,8 +58,8 @@
       <!-- Numbered sections -->
       <view v-if="loadError" class="tos-fail" role="alert">
         <text class="tos-fail__message">{{ loadError }}</text>
-        <view class="tos-fail__retry active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
-          <text>{{ loadingTerms ? "…" : t.ui.retry }}</text>
+        <view class="tos-fail__retry nx-card-recovery-action active:opacity-70" role="button" tabindex="0" :aria-disabled="loadingTerms ? 'true' : 'false'" @click="retryTerms" @keydown.enter.prevent="retryTerms($event)" @keydown.space.prevent="retryTerms($event)">
+          <text :class="{ 'tos-fail__retry-label': !loadingTerms }">{{ loadingTerms ? "…" : t.ui.retry }}</text>
         </view>
       </view>
       <view v-else-if="loaded" class="tos-sections">
@@ -91,7 +82,7 @@
 
       <!-- Acknowledge & return -->
       <view v-if="!loadError && loaded" class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="confirmTerms" @keydown.enter.prevent="confirmTerms($event)" @keydown.space.prevent="confirmTerms($event)">
-        <text class="tos-cta__t">{{ confirming ? "…" : (serverTerms?.acknowledged ? t.terms.gotIt : t.terms.confirmContinue) }}</text>
+        <text class="tos-cta__t">{{ t.terms.gotIt }}</text>
       </view>
     </view>
   </StandalonePageShell>
@@ -101,7 +92,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBackPress, onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
-import BrandLockup from "@/components/brand-lockup.vue";
+import SubPageHeader from "@/components/sub-page-header.vue";
+import { dateLocale } from "@/i18n/format";
+import { formatLegalEffectiveDate } from "@/lib/legal-effective-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 import { useT } from "@/i18n/use-t";
 import { navBack, navTo } from "@/lib/route";
@@ -110,7 +103,6 @@ import { useLocaleStore } from "@/store/locale";
 import { LOCALES, type LocaleCode } from "@/i18n";
 import type { LegalTermsCurrent } from "@/api/legal-terms-api";
 import {
-  buildLegalTermsLoginRoute,
   buildLegalTermsRoute,
   sameLegalTermsSession,
   sameLegalTermsRun,
@@ -118,7 +110,6 @@ import {
   shouldBlockLegalTermsExit,
   type LegalTermsSessionFence,
 } from "@/lib/legal-terms-gate";
-import { recordLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
 import { pendingProfileLocaleHydration, isProfileLocaleHydrationError } from "@/lib/locale-profile-hydration";
 import { retryCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { captureRuntimeRevision } from "@/api/order-api";
@@ -127,6 +118,7 @@ import { createLegalTermsRequestFence } from "@/lib/legal-terms-request-fence";
 const t = useT();
 const locale = useLocaleStore();
 const serverTerms = ref<LegalTermsCurrent | null>(null);
+const effectiveDate = computed(() => formatLegalEffectiveDate(serverTerms.value?.effectiveAt, dateLocale()));
 type TermsErrorKey = "loadFailed" | "sessionChanged" | "runChanged" | "loginRequired" | "ackFailed" | "languageSyncFailed";
 const loadErrorKey = ref<TermsErrorKey | null>(null);
 const loadError = computed(() => loadErrorKey.value ? t.value.terms[loadErrorKey.value] : null);
@@ -243,7 +235,6 @@ async function loadTerms(retryRotation = true) {
       return;
     }
     serverTerms.value = snapshot;
-    if (snapshot.acknowledged) recordLegalTermsAcknowledged(snapshot);
   } catch (error) {
     if (!termsRequests.isCurrent(request, locale.code)) return;
     if (requestFence && !sameLegalTermsSession(requestFence, currentSessionFence())) {
@@ -324,54 +315,8 @@ function goRisk(event?: Event) {
   if (repeatedKeyboardActivation(event)) return;
   navTo(`/pages/me/risk-disclosure?return=${encodeURIComponent(buildLegalTermsRoute(returnTo.value))}&country=VN`);
 }
-async function confirmTerms(event?: Event) {
-  if (repeatedKeyboardActivation(event) || confirming.value) return;
-  if (!remoteApiEnabled || !serverTerms.value || serverTerms.value.acknowledged) { goBack(); return; }
-  if (!currentSessionFence()) {
-    loadErrorKey.value = "loginRequired";
-    navTo(buildLegalTermsLoginRoute(buildLegalTermsRoute(returnTo.value)));
-    return;
-  }
-  const requestFence = currentSessionFence();
-  const snapshot = serverTerms.value;
-  const snapshotLocale = locale.code;
-  const confirmation = ++confirmationGeneration;
-  // A language change or a fresh document read replaces this screen's consent
-  // target. Its earlier command may finish, but cannot decide the new gate.
-  const ownsSnapshot = () => confirmation === confirmationGeneration && termsPageVisible
-    && locale.code === snapshotLocale && serverTerms.value === snapshot;
-  if (!sameLegalTermsRun(snapshot, captureRuntimeRevision().runId)) {
-    loadErrorKey.value = "runChanged";
-    return;
-  }
-  confirming.value = true;
-  try {
-    const acknowledged = await legalTermsApi.acknowledge(snapshot);
-    if (!ownsSnapshot()) return;
-    if (!sameLegalTermsSession(requestFence, currentSessionFence()) && isCurrentRefreshContinuation(requestFence)) {
-      confirming.value = false;
-      await loadTerms();
-      return;
-    }
-    if (!sameLegalTermsSession(requestFence, currentSessionFence())
-      || acknowledged.version !== snapshot.version
-      || acknowledged.resolvedLocale !== snapshot.resolvedLocale
-      || acknowledged.resolvedJurisdiction !== snapshot.resolvedJurisdiction
-      || acknowledged.runId !== snapshot.runId
-      || !sameLegalTermsRun(acknowledged, captureRuntimeRevision().runId)) {
-      loadErrorKey.value = "sessionChanged";
-      return;
-    }
-    serverTerms.value = acknowledged;
-    if (acknowledged.acknowledged) {
-      recordLegalTermsAcknowledged(acknowledged, snapshotLocale);
-      goBack();
-    }
-  } catch {
-    if (ownsSnapshot()) loadErrorKey.value = sameLegalTermsSession(requestFence, currentSessionFence())
-      ? "ackFailed" : "sessionChanged";
-  }
-  finally { if (confirmation === confirmationGeneration) confirming.value = false; }
+function confirmTerms(event?: Event) {
+  goBack(event);
 }
 </script>
 
@@ -383,52 +328,13 @@ async function confirmTerms(event?: Event) {
   overflow-y: auto;
 }
 
-/* Top bar */
-.tos-top {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 10px 16px;
-  background: color-mix(in srgb, var(--v5-bg) 86%, transparent);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--v5-border);
-}
-.tos-back {
-  width: 44px;
-  height: 44px;
-  margin-left: -8px;
-  border-radius: 9999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  justify-self: start;
-}
-.tos-back--blocked {
-  opacity: 0.35;
-}
-.tos-brand {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: center;
-}
-.tos-brand__name {
-  color: var(--v5-ink);
-  font-weight: 600;
-  font-family: var(--font-v5);
-  font-size: 15px;
-  letter-spacing: -0.02em;
-}
-.tos-top__spacer {
-  justify-self: end;
-}
+/* This page is its own padded scrollport; the shell already reserves the status bar. */
+.tos-header { top: 0 !important; }
+.tos-header--blocked :deep(.spv-back) { opacity: 0.35; }
 
 /* Body */
 .tos-wrap {
-  padding: 16px 20px calc(env(safe-area-inset-bottom, 0px) + 40px);
+  padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 40px);
 }
 .tos-hero {
   margin-bottom: 18px;
@@ -464,16 +370,14 @@ async function confirmTerms(event?: Event) {
 .tos-sub {
   display: block;
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   line-height: 1.65;
   color: var(--v5-ink-3);
 }
 
 /* Numbered sections */
 .tos-sections {
-  border-radius: 16px;
-  background: var(--v5-surface);
-  padding: 2px 18px;
+  padding: 2px 0;
   display: flex;
   flex-direction: column;
 }
@@ -487,16 +391,6 @@ async function confirmTerms(event?: Event) {
 .tos-fail__message {
   display: block;
   line-height: 1.55;
-}
-.tos-fail__retry {
-  width: fit-content;
-  margin-top: 12px;
-  padding: 8px 14px;
-  border-radius: 9999px;
-  color: var(--v5-on-brand);
-  background: var(--v5-brand);
-  font-size: 13px;
-  font-weight: 600;
 }
 .tos-block {
   padding: 14px 0;
@@ -516,16 +410,16 @@ async function confirmTerms(event?: Event) {
   color: var(--v5-brand);
 }
 .tos-block__title {
-  font-size: 15px;
+  font-size: var(--ui-type-section);
   font-weight: 600;
   color: var(--v5-ink);
   letter-spacing: -0.01em;
 }
 .tos-block__body {
   display: block;
-  font-size: 13px;
+  font-size: var(--ui-type-long-form);
   color: var(--v5-ink-2);
-  line-height: 1.65;
+  line-height: var(--ui-type-long-form-lh);
 }
 
 /* Risk cross-link */
@@ -565,7 +459,7 @@ async function confirmTerms(event?: Event) {
   transition: transform 0.15s ease;
 }
 .tos-cta__t {
-  font-size: 15px;
+  font-size: var(--ui-type-button);
   font-weight: 600;
   color: var(--v5-on-brand);
 }

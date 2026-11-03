@@ -3,6 +3,8 @@ import source from "./app.ts?raw";
 import cardContent from "../components/earn/device-card-pc.vue?raw";
 import slotSheetContent from "../components/slot-action-sheet.vue?raw";
 import slotStoreSource from "./slot-action-sheet.ts?raw";
+import earnSource from "../pages/earn/earn.vue?raw";
+import homeSource from "../components/home/my-fleet-section.vue?raw";
 import ts from "typescript";
 import { isActiveSlotDevice, isActivatableInventoryDevice, requiresActivationConfirmation } from "../lib/device-slot-policy";
 
@@ -16,7 +18,7 @@ visit(ast);
 if (!body) throw new Error("canonicalDevice missing");
 const compiled = ts.transpileModule(body, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 const project = new Function("canonicalKind", `${compiled}; return canonicalDevice;`)((device: {kind?:string}) => device.kind ?? "cloud-share");
-const fixture = { id: 42, status: "ACTIVE", activatedAt: 123, purchasedAt: 100, pendingDeactivate: false,
+const fixture = { id: 42, productCode: "CLOUD-FINITE-600", status: "ACTIVE", activatedAt: 123, purchasedAt: 100, pendingDeactivate: false,
   capacityPct: 100, dailyUsdt: 2, dailyNex: 3, todayEarningsUsdt: 7, todayEarningsNex: 8,
   cumulativeOutputUsdt: 9, actualPaidUsdt: 10 };
 describe("remote fleet lifecycle and online state are independent", () => {
@@ -25,6 +27,7 @@ describe("remote fleet lifecycle and online state are independent", () => {
     expect(result.status).toBe("offline");
     expect(result.runtimeStatus).toBe(runtimeStatus ?? "UNKNOWN");
     expect(result.activatedAt).toBe(123);
+    expect(result.productCode).toBe("CLOUD-FINITE-600");
     expect(result.todayEarnings).toBe(7);
     expect(result.cumulativeEarningsUsdt).toBe(9);
   });
@@ -33,7 +36,7 @@ describe("remote fleet lifecycle and online state are independent", () => {
     expect(result.activatedAt).toBe(123);
     expect(result.status).toBe("offline");
     expect(isActiveSlotDevice(result)).toBe(true);
-    expect(isActiveSlotDevice({...result, pendingDeactivate:true})).toBe(false);
+    expect(isActiveSlotDevice({...result, pendingDeactivate:true})).toBe(true);
   });
   it.each([null, undefined])("does not invent activation time when the server returns %s", activatedAt => {
     const result = project({...fixture, kind:"stellarbox-s1", activatedAt, runtimeStatus:"ONLINE"},1000,20);
@@ -98,46 +101,19 @@ function findLabel(node: ts.Node) {
   ts.forEachChild(node, findLabel);
 }
 findLabel(cardAst);
-const labelFactory = new Function("props", "reconnecting", "idleGated", "deviceOnline", "task", "t", "phoneLocalReady", "phoneActivationGuidance", "nativePhoneAvailable", `return (${labelBody})();`);
-const texts = { value: { earn: { runtimeUnknown: "unknown", offline: "offline", online: "online", phoneTaskPaused: "paused" }, myDevices: { inventoryPendingDeactivateChip: "pending", phoneActivationTitle: "activate phone", phoneActivationAppOnlyTitle: "use Android App" } } };
-const withoutTask = (props: unknown, reconnecting: unknown, idleGated: unknown, deviceOnline: unknown, t: unknown) =>
-  labelFactory(props, reconnecting, idleGated, deviceOnline, { value: null }, t, { value: true }, { value: { title: "activate phone" } });
-describe("actual device card runtime label", () => {
+const labelFactory = new Function("onlineState", "t", `return (${labelBody})();`);
+const texts = { value: { earn: { runtimeUnknown: "unknown", offline: "offline", online: "online" } } };
+describe("actual device card business label", () => {
   it("does not expose mock heartbeat controls in the remote phone card", () => {
     expect(cardContent).toContain("v-if=\"device.kind === 'phone' && !remoteApiEnabled\"");
   });
-  it.each([["ONLINE", "online"], ["OFFLINE", "offline"], ["UNKNOWN", "unknown"]])("renders server phone %s as %s", (runtimeStatus, expected) => {
-    expect(withoutTask({ device: { kind: "phone", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe(expected);
-  });
-  it.each([undefined, "UNKNOWN"])("renders unknown rather than offline for %s", runtimeStatus => {
-    expect(withoutTask({ device: { kind: "cloud-share", capacitySource: "server", runtimeStatus } }, {value:false}, {value:false}, {value:false}, texts)).toBe("unknown");
-  });
-  it("keeps pending deactivation above unknown runtime", () => {
-    expect(withoutTask({ device: {kind:"cloud-share", capacitySource:"server", runtimeStatus:"UNKNOWN", pendingDeactivate:true} }, {value:false}, {value:false}, {value:false}, texts)).toBe("pending");
-  });
-  it("renders known offline accurately", () => {
-    expect(withoutTask({ device: {kind:"cloud-share", capacitySource:"server", runtimeStatus:"OFFLINE"} }, {value:false}, {value:false}, {value:false}, texts)).toBe("offline");
-  });
-  it("shows a server-paused phone task as paused even when the last runtime flag was ONLINE", () => {
-    expect(labelFactory({ device: {kind:"phone", capacitySource:"server", runtimeStatus:"ONLINE"} },
-      {value:false}, {value:false}, {value:false}, {value:{status:"PAUSED"}}, texts, {value:true}, {value:{title:"activate phone"}})).toBe("paused");
-  });
-  it("does not claim a different phone is running locally", () => {
-    const phone = { device: { kind: "phone", capacitySource: "server", runtimeStatus: "ONLINE" } };
-    for (const title of ["activate phone", "use Android App", "native unavailable"]) {
-      expect(labelFactory(phone, {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, {value:{title}}, true)).toBe(title);
-    }
-  });
-  it.each([["ONLINE", "online"], ["OFFLINE", "offline"], ["UNKNOWN", "unknown"]])("H5 reads phone %s without offering activation", (runtimeStatus, expected) => {
-    expect(labelFactory({ device: { kind: "phone", capacitySource: "server", runtimeStatus } },
-      {value:false}, {value:false}, {value:false}, {value:null}, texts, {value:false}, {value:{title:"use Android App"}}, false)).toBe(expected);
+  it.each(["online", "offline", "unknown"])("renders business state %s", value => {
+    expect(labelFactory({ value }, texts)).toBe(value === "offline" ? "" : value);
   });
 });
 
 // Recalibration is a distinct server-authorized repair flow; ordinary inventory activation stays blocked.
 import inventoryContent from "../pages/me/devices.vue?raw";
-import homeFleetContent from "../components/home/my-fleet-section.vue?raw";
-import earnContent from "../pages/earn/earn.vue?raw";
 const inventorySource = inventoryContent.split('<script setup lang="ts">')[1].split("</script>")[0];
 const inventoryAst = ts.createSourceFile("devices.ts", inventorySource, ts.ScriptTarget.Latest, true);
 let phoneOfferBody = "";
@@ -180,10 +156,26 @@ function inventorySelection(content: string, name: string, visibleDevices: unkno
   }
   visit(ast);
   if (!callback) throw new Error(`${name} missing`);
-  return new Function("app", "isActivatableInventoryDevice", "requiresActivationConfirmation", "isActiveSlotDevice", `return (${callback})();`)(
-    { visibleDevices }, isActivatableInventoryDevice, requiresActivationConfirmation, isActiveSlotDevice,
+  return new Function("app", "isActivatableInventoryDevice", "requiresActivationConfirmation", "deviceOnlineState", "fleetReady", `return (${callback})();`)(
+    { visibleDevices }, isActivatableInventoryDevice, requiresActivationConfirmation, () => "offline", { value: true },
   );
 }
+
+describe("activation queue preserves device instances", () => {
+  it.each([[earnSource, "devices"], [homeSource, "allDevices"]])("excludes an inactive phone and preserves offline activated phones and both Cloud Share purchases", (content, selector) => {
+    const devices = [
+      project({ ...fixture, id: 1144, kind: "phone", status: "DEACTIVATED", activatedAt: null }, 1000, 20),
+      project({ ...fixture, id: 1151, kind: "phone", runtimeStatus: "OFFLINE" }, 1000, 20),
+      project({ ...fixture, id: 1152, kind: "cloud-share", runtimeStatus: "OFFLINE" }, 1000, 20),
+      project({ ...fixture, id: 1156, kind: "stellarbox-s1", runtimeStatus: "OFFLINE" }, 1000, 20),
+      project({ ...fixture, id: 1202, kind: "cloud-share", runtimeStatus: "ONLINE" }, 1000, 20),
+      project({ ...fixture, id: 1203, kind: "cloud-share", status: "EXPIRED" }, 1000, 20),
+    ];
+    expect(inventorySelection(content, selector, devices).map(device => device.id)).toEqual(["1151", "1152", "1156", "1202"]);
+    expect(devices.filter(isActiveSlotDevice).map(device => device.id)).toEqual(["1151", "1152", "1156", "1202"]);
+    expect(devices).toHaveLength(6);
+  });
+});
 
 const slotStoreAst = ts.createSourceFile("slot-action-sheet.ts", slotStoreSource, ts.ScriptTarget.Latest, true);
 let openForSlotBody = "";
@@ -193,11 +185,11 @@ function findSlotBranch(node: ts.Node) {
 }
 findSlotBranch(slotStoreAst);
 if (!openForSlotBody) throw new Error("openForSlot missing");
-function openInventory(visibleDevices: unknown[]) {
+async function openInventory(visibleDevices: unknown[]) {
   const open = { value: false };
   const routes: string[] = [];
-  new Function("useApp", "open", "navTo", "isActivatableInventoryDevice", "requiresActivationConfirmation", `${openForSlotBody}; openForSlot();`)(
-    () => ({ visibleDevices }), open, (route: string) => routes.push(route), isActivatableInventoryDevice, requiresActivationConfirmation,
+  await new Function("useApp", "open", "navTo", "isActivatableInventoryDevice", "requiresActivationConfirmation", "remoteApiEnabled", "checking", `${openForSlotBody}; return openForSlot();`)(
+    () => ({ visibleDevices }), open, (route: string) => routes.push(route), isActivatableInventoryDevice, requiresActivationConfirmation, false, false,
   );
   return { open: open.value, routes };
 }
@@ -206,49 +198,33 @@ describe("purchased inventory excludes historical phones", () => {
   const oldPhone = project({ ...fixture, id: 1144, kind: "phone", status: "DEACTIVATED", activatedAt: null }, 1000, 20);
   const currentPhone = project({ ...fixture, id: 1151, kind: "phone" }, 1000, 20);
 
-  it("hides both old and active phones without changing their slot occupancy", () => {
+  it("does not advertise an old phone as inventory or hide the current active phone", async () => {
     const devices = [oldPhone, currentPhone];
     for (const content of [inventoryContent, slotSheetContent]) {
       expect(inventorySelection(content, "inactiveDevices", devices)).toEqual([]);
     }
-    expect(inventorySelection(inventoryContent, "activeDevices", devices)).toEqual([]);
-    expect(inventorySelection(homeFleetContent, "devices", devices)).toEqual([]);
-    expect(inventorySelection(earnContent, "devices", devices)).toEqual([]);
-    expect(inventorySelection(homeFleetContent, "slotDevices", devices)).toEqual([currentPhone]);
+    expect(inventorySelection(inventoryContent, "activeDevices", devices).map((device) => device.id)).toEqual(["1151"]);
     expect(devices.filter(isActiveSlotDevice)).toEqual([currentPhone]);
-    expect(openInventory([oldPhone])).toEqual({ open: false, routes: ["/pages/store/store"] });
-    expect(openInventory(devices)).toEqual({ open: false, routes: ["/pages/store/store"] });
+    expect(await openInventory([oldPhone])).toEqual({ open: false, routes: ["/pages/store/store"] });
+    expect(await openInventory(devices)).toEqual({ open: false, routes: ["/pages/store/store"] });
   });
 
-  it("keeps real hardware and Cloud Share inventory in both lists and opens their chooser", () => {
+  it("keeps real hardware and Cloud Share inventory in both lists and opens their chooser", async () => {
     const hardware = project({ ...fixture, id: 1201, kind: "stellarbox-s1", status: "DEACTIVATED" }, 1000, 20);
     const cloud = project({ ...fixture, id: 1202, kind: "cloud-share", status: "INVENTORY", activatedAt: null }, 1000, 20);
     const devices = [oldPhone, currentPhone, hardware, cloud];
     for (const content of [inventoryContent, slotSheetContent]) {
       expect(inventorySelection(content, "inactiveDevices", devices).map((device) => device.id)).toEqual(["1201", "1202"]);
     }
-    expect(openInventory(devices)).toEqual({ open: true, routes: [] });
+    expect(await openInventory(devices)).toEqual({ open: true, routes: [] });
   });
 
-  it.each(["phone", "stellarbox-s1"])("filters unconfirmed %s consistently across warehouse and add-device entry", (kind) => {
+  it.each(["phone", "stellarbox-s1"])("keeps unconfirmed %s visible without an inventory activation promise", async (kind) => {
     const unconfirmed = project({ ...fixture, id: 1203, kind, activatedAt: null }, 1000, 20);
     for (const content of [inventoryContent, slotSheetContent]) {
       expect(inventorySelection(content, "inactiveDevices", [unconfirmed])).toEqual([]);
-      expect(inventorySelection(content, "unconfirmedDevices", [unconfirmed]).map((device) => device.id))
-        .toEqual(kind === "phone" ? [] : ["1203"]);
+      expect(inventorySelection(content, "unconfirmedDevices", [unconfirmed]).map((device) => device.id)).toEqual(["1203"]);
     }
-    expect(openInventory([unconfirmed])).toEqual(kind === "phone"
-      ? { open: false, routes: ["/pages/store/store"] }
-      : { open: true, routes: [] });
-  });
-
-  it("retains every active purchased-device kind on all three surfaces", () => {
-    const kinds = ["pc-gpu", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2", "cloud-share"];
-    const purchased = kinds.map((kind, i) => project({ ...fixture, id: 1300 + i, kind }, 1000, 20));
-    const devices = [oldPhone, currentPhone, ...purchased];
-    for (const [content, name] of [[homeFleetContent, "devices"], [earnContent, "devices"], [inventoryContent, "activeDevices"]]) {
-      expect(inventorySelection(content, name, devices)).toEqual(purchased);
-    }
-    expect(devices).toHaveLength(9);
+    expect(await openInventory([unconfirmed])).toEqual({ open: true, routes: [] });
   });
 });

@@ -16,6 +16,8 @@ const state=structuredClone(demoDefaults),routes=[],init=[];
 if(process.env.DEMO_STATE_FILE)Object.assign(state,JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state);
 const authDemo=createAuthDemo(state);
 let locale='zh';
+// Purchases need the payment PIN and order commands, so the preview models them
+// unless DEMO_CHECKOUT_FLOW=0.
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
 // Keep trial wallet authorization available when the full checkout fixture is disabled.
 const trialPin=createPaymentPinFlowFixture();
@@ -27,7 +29,7 @@ await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.t
 const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{code:'zh',userSet:true}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json']});res.end(JSON.stringify(value));};
-const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|capacity-quote|quote)))$/;
+const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
 const server=http.createServer(async(req,res)=>{
   try {
     const url=new URL(req.url,'http://127.0.0.1:'+server.address().port);
@@ -40,7 +42,6 @@ const server=http.createServer(async(req,res)=>{
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,setupWrites:checkoutFlow.pin.state.setupWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }
-
     if(url.pathname==='/__demo/auth-requests')return sendJson(res,{simulation:true,requests:authDemo.trace});
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
@@ -60,6 +61,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.ambassadorState)for(const key of ['ambassadorSubmission','ambassadorCommands'])delete state[key];
         if(update.eventState)for(const key of ['eventStatuses','reminders','spun','spinHistory','raffleEntries'])delete state[key];
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
+        if(update.promotionTiming)state.promotionTimingAt=Date.now();
         if(update.computeState||update.fleetState)delete state.stoppedDevices;
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
         if(update.trialState||update.benefitState){if(state.trialOrderNo)state.createdOrders=(state.createdOrders||[]).filter(order=>order.orderNo!==state.trialOrderNo);for(const key of ['trialRow','trialCommands','trialStartFailed','trialOrderNo'])delete state[key];}
@@ -70,6 +72,7 @@ const server=http.createServer(async(req,res)=>{
       return sendJson(res,{state,options:demoOptions,simulation:true});
     }
     if(url.pathname==='/preview-language'){locale=['zh','en','vi'].includes(url.searchParams.get('code'))?url.searchParams.get('code'):'zh';if(state.profile)state.profile.language=locale;return res.end('OK');}
+    if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}
     const trustFile=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(incorporation|msb|ein)\/file$/);
     if(trustFile&&process.env.DEMO_TRUST_DOCUMENTS_DIR){
       const entry=fixtureFor(new URL('/api/content/trust/documents',url.origin),{method:()=>'GET',postDataJSON:()=>({}),headers:()=>req.headers}).documents.find(item=>item.slot===trustFile[1]);
@@ -77,8 +80,11 @@ const server=http.createServer(async(req,res)=>{
     }
     const trustPage=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(whitepaper|incorporation|msb|ein)\/pages\/([1-9][0-9]?)$/);
     if(trustPage&&process.env.DEMO_TRUST_DOCUMENTS_DIR){res.setHeader('Content-Type','image/jpeg');return res.end(await readFile(path.join(process.env.DEMO_TRUST_DOCUMENTS_DIR,'pages',trustPage[1],`${trustPage[2]}.jpg`)));}
+    if(url.pathname==='/api/app/support/advisor/avatar/1'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(import.meta.dirname,'fixtures/demo-advisor-photo.webp')));}
     if(url.pathname==='/api/app/support/attachments/demo-image/content'&&req.method==='GET'){res.setHeader('Content-Type','image/webp');return res.end(await readFile(path.join(root,'static/img/home-glass-20260928/s1.webp')));}
     if(/onboarding|risk-disclosure|auth\/users\/register/.test(url.pathname)){state.scopeCalls??={};const key=req.method+' '+url.pathname;state.scopeCalls[key]=(state.scopeCalls[key]??0)+1;}
+    // The signed-out switch refuses the refresh, so the App boots with no session at all.
+    if(url.pathname==='/auth/users/refresh'&&state.sessionState==='signed-out')return sendJson(res,{code:401,message:'AUTH_REQUIRED',data:null},401);
     if(authDemo.handles(url.pathname)) {
       let raw='';for await(const chunk of req)raw+=chunk;
       const response=authDemo.handle(url,req.method,req.headers,raw?JSON.parse(raw):{});

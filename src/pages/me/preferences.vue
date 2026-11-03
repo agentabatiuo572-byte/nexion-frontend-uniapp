@@ -1,31 +1,26 @@
 <!--
   Preferences (ported from Nexion-prototype/app/(main)/me/preferences/page.tsx).
-  Two toggle blocks: sound + haptics, and per-kind notification mute filters.
+  Two toggle blocks: interface sound, and per-kind notification mute filters.
   State persists via the preferences store. Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
     <view class="message-family" style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" />
-      <view v-if="prefs.error" class="mx-4" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
-        <text>{{ preferenceError }}</text>
-        <view class="family-control preferences-retry" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
-          <LiquidGlass :radius="24" /><text>{{ t.ui.retry }}</text>
+      <view v-if="prefs.error" class="mx-4 nx-inline-recovery" style="margin-bottom: 12px; color: var(--v5-danger);" data-testid="notification-preferences-error">
+        <text class="nx-inline-recovery__copy">{{ preferenceError }}</text>
+        <view class="family-control family-control--text nx-inline-recovery__action" role="button" tabindex="0" :aria-label="t.ui.retry" @click="prefs.refreshRemote()">
+          <text>{{ t.ui.retry }}</text>
         </view>
       </view>
 
-      <!-- Sound + haptics -->
+      <!-- Sound -->
       <view class="mx-4">
         <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
         <view class="nx-glass-card" :style="cardStyle">
-          <ToggleRow :label="w.soundLabel" :hint="w.soundHint" :value="prefs.soundEnabled" @toggle="prefs.toggleSound">
+          <ToggleRow :label="w.soundLabel" :hint="w.soundHint" :value="prefs.soundEnabled" last @toggle="prefs.toggleSound">
             <template #icon>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /><path d="M16 9a5 5 0 0 1 0 6" /><path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></svg>
-            </template>
-          </ToggleRow>
-          <ToggleRow :label="w.hapticsLabel" :hint="w.hapticsHint" :value="prefs.hapticsEnabled" last @toggle="prefs.toggleHaptics">
-            <template #icon>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 8 2 2-2 2 2 2-2 2" /><path d="m22 8-2 2 2 2-2 2 2 2" /><rect width="8" height="14" x="8" y="5" rx="1" /></svg>
             </template>
           </ToggleRow>
         </view>
@@ -35,15 +30,14 @@
       <view class="mx-4" style="margin-top: 20px">
         <text class="block" :style="headingStyle">{{ w.notifHeading }}</text>
         <text v-if="!prefs.remoteReady && !prefs.error" class="block" role="status" aria-live="polite">{{ w.loading }}</text>
-        <view v-if="prefs.remoteReady" class="nx-glass-card" :style="cardStyle">
+        <view class="nx-glass-card" :style="cardStyle">
           <ToggleRow
             v-for="(k, i) in notifKinds"
             :key="k"
             :label="w.notifKinds[k]"
-            :value="prefs.notifPrefs[k]"
+            :value="prefs.remoteReady ? prefs.notifPrefs[k] : null"
+            :unknown-label="t.uiChrome.unavailable"
             :last="i === notifKinds.length - 1"
-            :locked="isMandatoryNotifKind(k)"
-            :hint="isMandatoryNotifKind(k) ? w.notifMandatoryHint : undefined"
             @toggle="prefs.toggleNotifKind(k)"
           >
             <template #icon>
@@ -61,7 +55,6 @@
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import LiquidGlass from "@/components/liquid-glass.vue";
 import ToggleRow from "@/components/me/preference-toggle-row.vue";
 import { useT } from "@/i18n/use-t";
 import { isMandatoryNotifKind, usePreferences, type NotifKind } from "@/store/preferences";
@@ -74,7 +67,8 @@ const preferenceError = computed(() => {
   return prefs.error === "updateFailed" ? labels.updateFailed : labels.unavailable;
 });
 
-const notifKinds: NotifKind[] = ["commission", "team", "market", "genesis", "system"];
+// Mandatory kinds cannot be switched off, so they are not listed.
+const notifKinds = (["commission", "team", "market", "genesis", "system"] as NotifKind[]).filter(k => !isMandatoryNotifKind(k));
 const NOTIF_COLOR: Record<NotifKind, string> = {
   commission: "var(--v5-brand)",
   team: "var(--v5-tech-cyan)",
@@ -91,7 +85,7 @@ function dotStyle(k: NotifKind): CSSProperties {
 // Section label (de-card spec): 15/600/ink, sentence-case, sits above the group.
 const headingStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-section)",
   fontWeight: 600,
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
@@ -115,8 +109,7 @@ const footerStyle: CSSProperties = {
 
 </script>
 
-<style scoped>
-.preferences-retry { margin-top: 8px; }
-</style>
-
 <style src="@/styles/message-family.css"></style>
+
+<style scoped>
+</style>

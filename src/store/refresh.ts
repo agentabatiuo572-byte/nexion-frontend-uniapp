@@ -7,6 +7,7 @@ import { useExchange } from "./exchange";
 import { useConfig } from "./config";
 import { useGenesisConfig } from "./genesis-config";
 import { refreshActivePage } from "@/lib/active-page-refresh";
+import { invalidatePassiveTabReads } from "@/lib/passive-read-window";
 
 /**
  * Pull-to-refresh store. Ported from Nexion-prototype/lib/store/refresh.ts
@@ -32,6 +33,7 @@ export const useRefresh = defineStore("refresh", () => {
     isRefreshing.value = true;
     try {
       await new Promise<void>((r) => setTimeout(r, REFRESH_LATENCY_MS));
+      invalidatePassiveTabReads();
       useApp().tick(3500);
       tickOrders(trialReservesSlotNow() ? 1 : 0);
       useExchange().refreshRate();

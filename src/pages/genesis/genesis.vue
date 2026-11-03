@@ -1,201 +1,60 @@
-<!--
-  Genesis Node — creator-node presale (1000 slots / $9,999 / sales ticker /
-  dividend). Ported from Nexion-prototype/app/(main)/genesis/page.tsx.
-
-  Wrapped in <AppChassis active="me"> (sub-page reached from /me). The source's
-  chassis-level GenesisDockHost (sticky gold CTA) + GenesisSheetHost (confirm
-  sheet) are folded into the page: the dock is a fixed bottom bar inside the
-  chassis, the sheet is <GenesisPurchaseSheet v-model:open>.
-
-  🏛 金-曜石 hero 与吸底 CTA 的**金色描边**是「创世域」域级例外,**主人 2026-07-23 正式拍板**
-  (此前文件头自称「设计例外」写于 2026-07-09「原有条件例外一律收回」终裁之前,已失效;
-  C2 独立验收指出该措辞过期,故改为正式登记)。理由:金-曜石是 $11,999 旗舰 SKU 的视觉身份,
-  靠「暗底 + 金边」成立,删边后与普通暗卡不可区分。登记位置 `docs/ZERO-BORDER-ALLOWLIST.json`
-  (route+cls+size 精确匹配,只覆盖这两个元素);金色本体已于 C2 收敛为
-  `--v5-genesis-gold-on-dark` token,不再是散落 hex。**本页其它容器不享此例外**;shared
-  gen-* keyframes live in tokens.css (P-023). Holder perks + live-market cards
-  are faithful English data arrays (matching the source's inline PERKS), not i18n.
--->
+<!-- Genesis subscription: all supply, pricing and sale gates use the existing canonical projections. -->
 <template>
   <AppChassis active="me">
-    <view style="color: var(--v5-ink); padding-bottom: 120px">
-      <SubPageHeader back="/pages/me/me" />
-
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <GenesisArtwork style="border-radius: 18px" />
-        <!-- ════ HERO — dark obsidian gold ════ -->
-        <view class="relative overflow-hidden" :style="heroStyle">
-          <!-- Gold dust particles -->
-          <view aria-hidden class="absolute inset-0 overflow-hidden" style="pointer-events: none; z-index: 0">
-            <view v-for="(d, i) in dust" :key="i" class="gen-anim" :style="d" />
-          </view>
-          <!-- Diagonal pinstripe -->
-          <view aria-hidden class="gen-anim" :style="engraveStyle" />
-          <!-- Top-right glow blob -->
-          <view aria-hidden class="gen-anim" :style="glowStyle" />
-          <!-- Sweeping light pass -->
-          <view aria-hidden class="gen-anim" :style="sheenStyle" />
-
-          <view class="relative" style="z-index: 2">
-            <!-- Crown chip + rules-intro pill share the top row (gold-toned pill
-                 so it reads on the obsidian-gold hero; owner 2026-07-09 kill gap). -->
-            <view class="flex items-center justify-between" style="gap: 8px">
-              <view class="inline-flex items-center" :style="crownChipStyle">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-                <text>{{ t.genesis.heroCrown }}</text>
-              </view>
-              <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
-                <text style="margin: 0 6px">{{ t.genesis.howItWorksEntry }}</text>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-              </view>
-            </view>
-
-            <!-- Title — punchy, restrained (high-end OG seat, not a bark) -->
-            <text class="block" :style="titleStyle">{{ t.genesis.heroTitle }}</text>
-
-            <!-- Sub + disclaimer。🔴 heroSub 是**稀缺性/紧迫感**文案(「限量 1000 · 售完即止」),
-                 与同页其它紧迫感元素同源判定:市场关闭 / 熔断 / 配置未知时不得渲染 ——
-                 否则页面一边说「暂未开放」一边催「售完即止」(zentao #190)。 -->
-            <text v-if="showUrgency" class="block" :style="heroSubStyle">{{ t.genesis.heroSub }}</text>
-            <text class="block" :style="heroDiscStyle">{{ t.genesis.heroDisc }}</text>
-
-            <!-- Sales bar -->
-            <view style="margin-top: 18px">
-              <view ref="salesBarRef" :style="barTrackStyle">
-                <view class="relative overflow-hidden" :style="barFillStyle">
-                  <view aria-hidden class="gen-anim" :style="barShimmerStyle" />
-                </view>
-              </view>
-              <view class="flex items-center justify-between tabular-nums" :style="barMetaStyle">
-                <text v-if="supplyDisplay.known">
-                  <text>{{ supplyDisplay.summary }}</text>
-                  <text style="color: var(--v5-genesis-gold-on-dark); font-weight: 500"> {{ t.genesis.soldOf }}</text>
-                </text>
-                <text v-else>—</text>
-                <!-- 🔴 关闭态 / 售罄态不展示剩余名额紧迫文案(规格 FEAT-GEN10 ④:
-                     不对不可购买的东西制造紧迫感)。判据来自 showUrgency 单源,不在此处自判。 -->
-                <text v-if="showUrgency" class="gen-anim" :style="urgentStyle">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
-              </view>
-            </view>
-          </view>
+    <SubPageHeader back="/pages/me/me" />
+    <view class="genesis-page">
+      <!-- 主视觉 = 透明底创世卡片图(环绕光圈 + 底座后方的地面光影),深浅主题各一张,由 CSS 按 data-theme 切换,只加载当前主题那张。 -->
+      <view class="genesis-main-art" role="img" :aria-label="t.genesis.heroTitle" />
+      <view class="genesis-seat genesis-edge">
+        <view class="flex items-center justify-between" style="gap:8px">
+          <view class="genesis-crown-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z"/></svg><text>{{ t.genesis.heroCrown }}</text></view>
+          <view class="genesis-how" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesis.howItWorksEntry }} →</view>
         </view>
-
-        <!-- ════ Live social proof ════ -->
-        <!-- ════ Tier ladder — 售罄跳价 ════ -->
-        <view class="flex items-center justify-between" :style="secHeaderStyle">
-          <text :style="secTitleStyle">{{ t.genesis.tier.title }}</text>
-        </view>
-        <view :style="ladderCardStyle">
-          <view v-for="tr in tiers" :key="tr.id" class="flex items-center" :style="tierRowStyle(tr.state)">
-            <view class="flex-1 min-w-0">
-              <view class="flex items-center" style="gap: 8px">
-                <text :style="tierNameStyle">{{ t.genesis.tier[tr.labelKey] }}</text>
-                <text v-if="tr.state === 'current' && dockActive" :style="tierChipLiveStyle">{{ t.genesis.tier.live }}</text>
-                <text v-else-if="tr.state === 'sold'" :style="tierChipSoldStyle">{{ t.genesis.tier.soldOut }}</text>
-              </view>
-              <!-- 🔴 「还剩 N 席」也是名额紧迫文案,与 hero 那处同一条规则(FEAT-GEN10 ④)。
-                   独立验收 P1-4:上次只关了 hero,这里漏了,关闭态实测仍显示「Live · 153 left」。
-                   阻断态改显总席位数(中性事实),不显剩余。 -->
-              <text class="block" :style="tierMetaStyle">{{ tr.state === 'current' && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
-            </view>
-            <view class="text-right shrink-0">
-              <text class="block tabular-nums" :style="tierPriceStyle">${{ tr.priceText }}</text>
-              <text v-if="tr.state === 'current'" class="block" :style="tierCurrentStyle">{{ t.genesis.tier.current }}</text>
-            </view>
-          </view>
-          <text class="block" :style="tierPremiumStyle">{{ t.genesis.tier.premium }}</text>
-        </view>
-
-        <!-- ════ Value / perks ════ -->
-        <view class="flex items-center justify-between" :style="secHeaderStyle">
-          <text :style="secTitleStyle">{{ t.genesis.value.title }}</text>
-        </view>
-        <view :style="perksCardStyle">
-          <PerkRow v-for="(p, i) in PERKS" :key="p.name" :ico="p.ico" :name="p.name" :desc="p.desc" :is-last="i === PERKS.length - 1" />
-        </view>
-
-        <!-- ════ Live market ════ -->
-        <!-- 入口可用性同源于二级市场闸:市场未开放 / 熔断 / 配置未知时禁用入口,
-             而不是把用户送进一个只会说「暂未开放」的页面。 -->
-        <view class="flex items-center justify-between" :class="marketplaceEntryBlocked ? '' : 'active:opacity-80'" :style="secHeaderStyle" :role="marketplaceEntryBlocked ? undefined : 'button'" :tabindex="marketplaceEntryBlocked ? -1 : 0" :aria-disabled="marketplaceEntryBlocked ? 'true' : undefined" :aria-label="marketplaceEntryBlocked ? undefined : t.genesis.viewMarketplace" @click="openMarketplaceEntry"  @keydown.enter.prevent="openMarketplaceEntry" @keydown.space.prevent="openMarketplaceEntry">
-          <text :style="secTitleStyle">{{ t.genesis.secLiveMarket }}</text>
-          <text :style="secLinkStyle" style="pointer-events: none">{{ marketplaceEntryLabel }}</text>
-        </view>
-        <view class="grid grid-cols-2" style="gap: 10px">
-          <NftCard v-for="n in liveMarket" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago" />
-        </view>
-
-        <!-- ════ FAQ snippet — de-carded: floor hairline group ════ -->
-        <view :style="faqWrapStyle">
-          <view v-for="(k, i) in faqKeys" :key="k" :style="faqRowStyle(i)">
-            <text class="block" :style="faqQStyle">
-              <text style="color: var(--v5-ink); font-weight: 600">Q.</text>
-              <text> {{ t.genesis.faq[k] }}</text>
-            </text>
-            <text class="block" :style="faqAStyle">{{ faqAnswer(k) }}</text>
-          </view>
-        </view>
-
+        <text class="genesis-title">{{ t.genesis.heroTitle }}</text>
+        <text v-if="showUrgency && supplyDisplay.known" class="genesis-description">{{ supplyCaption }}</text>
+        <text class="genesis-description">{{ t.genesis.heroDisc }}</text>
+        <view ref="salesBarRef" class="genesis-meter" :aria-label="supplyDisplay.known ? supplyDisplay.summary : '—'" role="img"><view v-for="n in 20" :key="n"><view v-if="supplyDisplay.known" :style="{ transform: `scaleX(${salesBarInView ? Math.max(0, Math.min(1, parseFloat(supplyDisplay.progressWidth) / 5 - (n - 1))) : 0})` }" /></view></view>
+        <view class="genesis-meter-meta"><text>{{ t.genesis.soldOf }}</text><view v-if="supplyDisplay.known" class="genesis-meter-count"><text>{{ supplyDisplay.summary.split(" / ")[0] }}</text><text class="genesis-meter-total"> / {{ supplyDisplay.summary.split(" / ")[1] }}</text></view><text v-else class="genesis-meter-count">—</text></view>
+        <text v-if="showUrgency" class="genesis-remaining">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
       </view>
-    </view>
-
-    <!-- Sticky gold dock (folds source GenesisDockHost into the page) -->
-    <view class="nx-genesis-dock" :style="dockWrapStyle">
-      <view
-        class="relative w-full overflow-hidden"
-        :class="dockDisabled ? '' : 'active:scale-[0.98]'"
-        :style="dockBtnStyle"
-        @click="openSheet"
-      >
-        <!-- 装饰(高光 / 描边 / 流光)只在**可购买**时出现:置灰按钮不该还在发光。 -->
-        <template v-if="dockActive">
-          <view aria-hidden :style="dockSpecularStyle" />
-          <view aria-hidden :style="dockRimStyle" />
-          <view aria-hidden class="gen-anim" :style="dockSheenStyle" />
-        </template>
-        <!-- 🔴 这层的 color 供给 crown 图标与倒计时(它们用 currentColor / 继承),
-             同样必须跟 dockActive 走 —— 只改 dockLabelStyle 会剩下图标和倒计时还是金色,
-             在中性底上照样看不清(独立验收 P0 点名了「倒计时 1.95」这一处)。 -->
-        <view class="relative inline-flex items-center" :style="dockInnerStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-          <text :style="dockLabelStyle">{{ dockCtaText }}</text>
-          <template v-if="preSale && showTime">
-            <view :style="dockDividerStyle" />
-            <text class="tabular-nums">{{ countdownDisplay }}</text>
-          </template>
-          <!-- 价格跟随主售是否开放；账号资格只决定点击后的分流，不覆盖主售报价。 -->
-          <template v-else-if="dockShowsPrice">
-            <view :style="dockDividerStyle" />
-            <text class="tabular-nums">${{ priceText }}</text>
-          </template>
-          <!-- 右箭头 = 「点了会去某处」。可购买(开 sheet)与售罄(去二级市场)才有;
-               其余阻断态点了只给说明,不该用箭头暗示能往下走。 -->
-          <svg v-if="dockActive || block === 'soldOut'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+      <view class="genesis-section"><text>{{ t.genesis.tier.title }}</text><text v-if="!showUrgency" class="genesis-caption">{{ dockCtaText }}</text><view class="genesis-refresh" role="button" tabindex="0" :aria-label="t.genesis.refresh" :aria-disabled="refreshing" @click="retryGenesis"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></view></view>
+      <view class="genesis-tier-card">
+        <view v-for="tr in tiers" :key="tr.id" class="genesis-tier" :class="{ 'genesis-tier--sold': tr.state === 'sold' }">
+          <view class="genesis-gold-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2-10 5 10 5 10-5-10-5ZM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></view>
+          <view class="flex-1 min-w-0"><view class="flex items-center" style="gap:6px"><text class="genesis-subtitle">{{ t.genesis.tier[tr.labelKey] }}</text><text v-if="tr.state === 'current' && dockActive" class="genesis-tier-chip">{{ t.genesis.tier.live }}</text><text v-else-if="tr.state === 'sold'" class="genesis-caption">{{ t.genesis.tier.soldOut }}</text></view><text class="genesis-tier-meta">{{ tr.state === 'current' && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal.toLocaleString(locale.code) }) }}</text></view>
+          <view class="genesis-tier-price"><text class="genesis-amount"><text class="genesis-currency">$</text>{{ tr.priceText.split('.')[0] }}<text class="genesis-decimal">.{{ tr.priceText.split('.')[1] || '00' }}</text></text><text v-if="tr.state === 'current'" class="genesis-current">{{ t.genesis.tier.current }}</text></view>
         </view>
       </view>
+      <view class="genesis-section"><text>{{ t.genesis.value.title }}</text></view>
+      <view class="genesis-perks"><view v-for="p in PERKS" :key="p.name" class="genesis-perk"><view class="genesis-gold-icon genesis-perk-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path :d="p.path"/></svg></view><text class="genesis-subtitle">{{ p.name }}</text><text class="genesis-perk-desc">{{ p.desc }}</text></view></view>
+      <view class="genesis-market-entry" :role="marketplaceEntryBlocked ? undefined : 'button'" :tabindex="marketplaceEntryBlocked ? -1 : 0" :aria-disabled="marketplaceEntryBlocked ? 'true' : undefined" :aria-label="marketplaceEntryBlocked ? undefined : t.genesis.viewMarketplace" @click="openMarketplaceEntry"><view class="genesis-gold-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9h18l-2-5H5zM5 9v11h14V9M9 20v-6h6v6"/></svg></view><view class="flex-1 min-w-0"><text class="genesis-subtitle block">{{ t.genesis.secLiveMarket }}</text><text class="genesis-caption block" style="margin-top:2px">{{ marketplaceEntryLabel }}</text></view><svg v-if="!marketplaceEntryBlocked" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg></view>
+      <view v-if="liveMarket.length" class="grid grid-cols-2" style="gap:10px;margin-top:12px"><NftCard v-for="n in liveMarket" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago"/></view>
+      <view class="genesis-section"><text>{{ t.genesis.faq.title }}</text></view>
+      <view class="genesis-faq"><view v-for="k in faqKeys" :key="k" class="genesis-faq-row"><view class="genesis-faq-question" role="button" tabindex="0" :aria-expanded="expandedFaq === k" @click="expandedFaq = expandedFaq === k ? null : k"><text>{{ t.genesis.faq[k] }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" :style="{ transform: expandedFaq === k ? 'rotate(180deg)' : 'none' }"><path d="m6 9 6 6 6-6"/></svg></view><text v-if="expandedFaq === k" class="genesis-faq-answer">{{ faqAnswer(k) }}</text></view></view>
     </view>
-
-    <!-- Confirm sheet -->
+    <template #pageFixed><view class="nx-genesis-dock"><NxButton variant="primary" :disabled="dockDisabled" @click="openSheet"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z"/></svg><text>{{ dockCtaText }}</text><text v-if="preSale && showTime" class="genesis-dock-number"> · {{ countdownDisplay }}</text><text v-else-if="dockShowsPrice" class="genesis-dock-number"> · ${{ priceText }}</text></NxButton></view></template>
     <GenesisPurchaseSheet v-model:open="sheetOpen" />
-    <!-- 当前服务端认购资格投影。 -->
     <GenesisEligibilitySheet v-model:open="eligSheetOpen" @subscribe="onEligSubscribe" />
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
+  return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
+}
 import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import PerkRow from "@/components/genesis/perk-row.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import NftCard from "@/components/genesis/nft-card.vue";
 import GenesisPurchaseSheet from "@/components/genesis/purchase-sheet.vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useRemainderUiCopy } from "@/i18n/remainder-ui";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useGenesis, GENESIS_ELIGIBILITY_POLICY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
@@ -214,6 +73,12 @@ import { presentGenesisRoyalty } from "@/lib/genesis-marketplace-presentation";
 const t = useT();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
+const refreshing = ref(false);
+async function retryGenesis() {
+  if(refreshing.value)return;
+  refreshing.value=true;
+  try { await refreshGenesisPage(true); } finally { refreshing.value=false; }
+}
 let refreshInFlight: Promise<void> | null = null;
 let genesisPageVisible = false;
 let refreshRequested = false;
@@ -264,6 +129,7 @@ onUnmounted(() => {
   stopGenesisRevision();
 });
 const locale = useLocaleStore();
+const remainderCopy = useRemainderUiCopy();
 const { eligible, gate } = useGenesisEligibility();
 const { block, marketClosed, secondaryBlock, showUrgency, blockText, preSale, showTime, countdownDays, countdownClock } =
   useGenesisSaleGate();
@@ -281,18 +147,19 @@ const PERKS = computed(() => {
     const p = cp[i];
     const cName = p ? (isZh ? p.nameZh : p.nameEn) : "";
     const cDesc = p ? (isZh ? p.descZh : p.descEn) : "";
-    return { name: cName || name, desc: cDesc || desc };
+    return { name: (cName || name).replace(/\bDAO\b\s*/gi, ""), desc: (cDesc || desc).replace(/vesting/gi, fb.releaseTerm) };
   };
   return [
-    { ico: "🪙", ...pick(0, fb.emissionName, fb.emissionDesc) },
-    { ico: "🌐", ...pick(1, fb.poolName, fb.poolDesc) },
-    { ico: "🗳", ...pick(2, fb.daoName, fb.daoDesc) },
-    { ico: "🎁", ...pick(3, fb.airdropName, fb.airdropDesc) },
+    { path: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM9 10l3-3 3 3M12 7v10", ...pick(0, fb.emissionName, fb.emissionDesc) },
+    { path: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18", ...pick(1, fb.poolName, fb.poolDesc) },
+    { path: "M7 7h11l-3-3M17 17H6l3 3", ...pick(2, fb.daoName, fb.daoDesc) },
+    { path: "M3 4h18v16H3ZM7 15v-3M12 15V9M17 15v-5", ...pick(3, fb.airdropName, fb.airdropDesc) },
   ];
 });
 
 // Secondary-market recent fills（价格随尾盘档溢价，非旧 $25K 地板叙事）。
 const faqKeys = ["q1", "q2", "q3"] as const;
+const expandedFaq = ref<typeof faqKeys[number] | null>("q1");
 function answerKey(k: "q1" | "q2" | "q3"): "a1" | "a2" | "a3" {
   return k === "q1" ? "a1" : k === "q2" ? "a2" : "a3";
 }
@@ -310,6 +177,9 @@ const total = computed(() => genesis.totalSlots);
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => total.value - sold.value);
 const supplyDisplay = computed(() => genesisSupplyDisplay(sold.value, total.value, genesis.remoteSupplyKnown));
+const supplyCaption = computed(() => supplyDisplay.value.known
+  ? fmt(remainderCopy.value.genesisSupply, { n: total.value.toLocaleString(locale.code) })
+  : "");
 const liveMarket = computed(() => remoteApiEnabled
   ? genesis.remoteListings.slice(0, 2).map((listing) => ({
       id: listing.tokenId,
@@ -318,8 +188,16 @@ const liveMarket = computed(() => remoteApiEnabled
     }))
   : []);
 function ageText(ts: number): string {
-  const mins = Math.max(1, Math.floor((Date.now() - ts) / 60_000));
-  return mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h`;
+  // NftCard adds the localized "ago" suffix; pass a duration, not a full sentence.
+  const minutes = Math.max(0, Math.floor((Date.now() - ts) / 60_000));
+  const copy = remainderCopy.value;
+  if (minutes < 60) return minutes === 1 && "listingMinute" in copy ? copy.listingMinute : fmt(copy.listingMinutes, { n: minutes });
+  if (minutes < 1440) {
+    const hours = Math.floor(minutes / 60);
+    return hours === 1 && "listingHour" in copy ? copy.listingHour : fmt(copy.listingHours, { n: hours });
+  }
+  const days = Math.floor(minutes / 1440);
+  return days === 1 && "listingDay" in copy ? copy.listingDay : fmt(copy.listingDays, { n: days });
 }
 
 // Dock 文案:**阻断原因来自唯一派生 `block`**(composable),本页不再自排优先级。
@@ -457,370 +335,55 @@ function goMarketplace() {
   navTo("/pages/genesis/marketplace");
 }
 
-// ── styles ──
-// Gold-toned pill (matches the obsidian-gold hero's crown chip — a green
-// brand-soft would clash on the gold). Hardcoded gold is the .genesis-hero
-// design exception (see file header), not a v5 token slip.
-const howPillStyle: CSSProperties = {
-  height: "44px",  // 《07》tap≥44(原 34)
-  padding: "0 12px",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 14.000000000000002%, transparent)",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-genesis-gold-on-dark)",
-  letterSpacing: "-0.005em",
-  whiteSpace: "nowrap",
-};
-const heroStyle: CSSProperties = {
-  padding: "24px 22px 22px",
-  borderRadius: "16px",
-  background:
-    "radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 20%, transparent) 0%, transparent 55%)," +
-    "radial-gradient(circle at 0% 100%, rgba(132,90,42,0.30) 0%, transparent 60%)," +
-    "linear-gradient(160deg, #1B140A 0%, #0E0A05 60%, #1A1208 100%)",
-  border: "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 35%, transparent)",
-  boxShadow:
-    "inset 0 1px 0 color-mix(in srgb, var(--v5-genesis-gold-on-dark) 22%, transparent)," +
-    "inset 0 -1px 0 rgba(0,0,0,0.45)," +
-    "0 12px 32px rgba(0,0,0,0.20)",
-  color: "var(--v5-genesis-gold-pale-on-dark)",
-};
-const dustPos = ["12%", "32%", "54%", "72%", "86%"];
-const dustDur = [7, 8, 6.5, 9, 7.5];
-const dustDelay = [0, 1.4, 3.0, 4.6, 2.2];
-const dust = computed<CSSProperties[]>(() =>
-  [0, 1, 2, 3, 4].map((i) => ({
-    position: "absolute",
-    bottom: "0",
-    left: dustPos[i],
-    width: "2px",
-    height: "2px",
-    borderRadius: "50%",
-    background: "#E2C97C",
-    boxShadow: "0 0 4px rgba(226,201,124,0.7)",
-    opacity: 0,
-    animation: `gen-dust-rise ${dustDur[i]}s linear infinite`,
-    animationDelay: `${dustDelay[i]}s`,
-  })),
-);
-const engraveStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 5%, transparent) 0 1px, transparent 1px 14px)",
-  mixBlendMode: "screen",
-  opacity: 0.6,
-  pointerEvents: "none",
-  animation: "gen-engrave 30s linear infinite",
-};
-const glowStyle: CSSProperties = {
-  position: "absolute",
-  top: "-60px",
-  right: "-60px",
-  width: "200px",
-  height: "200px",
-  background: "radial-gradient(circle, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 28.000000000000004%, transparent), transparent 70%)",
-  filter: "blur(4px)",
-  pointerEvents: "none",
-  animation: "gen-glow-drift 9s ease-in-out infinite",
-};
-const sheenStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 18%, transparent) 50%, transparent 70%)",
-  transform: "translateX(-100%)",
-  animation: "gen-sheen 5.5s ease-in-out infinite",
-  pointerEvents: "none",
-  zIndex: 1,
-};
-const crownChipStyle: CSSProperties = {
-  padding: "4px 10px",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 10%, transparent)",
-  color: "var(--v5-genesis-gold-on-dark)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.14em",
-};
-const titleStyle: CSSProperties = {
-  marginTop: "18px",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "34px",
-  letterSpacing: "-0.024em",
-  lineHeight: 1.18,
-  color: "var(--v5-genesis-gold-pale-on-dark)",
-};
-const heroSubStyle: CSSProperties = {
-  marginTop: "12px",
-  fontSize: "13px",
-  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 72%, transparent)",
-  lineHeight: 1.55,
-};
-const heroDiscStyle: CSSProperties = {
-  marginTop: "6px",
-  fontSize: "12px",
-  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 50%, transparent)",
-  lineHeight: 1.5,
-};
-const barTrackStyle: CSSProperties = {
-  height: "4px",
-  borderRadius: "2px",
-  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 14.000000000000002%, transparent)",
-  overflow: "hidden",
-};
-const barFillStyle = computed<CSSProperties>(() => ({
-  height: "100%",
-  width: salesBarInView.value ? supplyDisplay.value.progressWidth : "0%",
-  background: "linear-gradient(90deg, #B5894A 0%, #E2C97C 50%, var(--v5-genesis-gold-on-dark) 100%)",
-  borderRadius: "2px",
-  boxShadow: "0 0 8px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 50%, transparent)",
-  transition: salesBarInView.value ? PROGRESS_GROW_TRANSITION : "none",
-  willChange: "width",
-}));
-const barShimmerStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
-  transform: "translateX(-100%)",
-  animation: "gen-bar-shimmer 2.4s ease-in-out infinite",
-};
-const barMetaStyle: CSSProperties = {
-  marginTop: "8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 55%, transparent)",
-  letterSpacing: "0.04em",
-};
-const urgentStyle: CSSProperties = {
-  color: "var(--v5-genesis-gold-on-dark)",
-  fontWeight: 500,
-  animation: "gen-urgent 1.8s ease-in-out infinite",
-};
-// Live social-proof bubble — filled surface, no border (chat-bubble idiom).
-const socialStyle: CSSProperties = {
-  padding: "8px 12px",
-  gap: "8px",
-  background: "var(--v5-surface)",
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-};
-const socialDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "50%", background: "var(--v5-success)" };
-const socialTimeStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-// 《07》tap≥44:整行可点的 section header 实测 354×21。上下 margin 让出 10px 给热区,
-// 总占位 22+21+12=55 → 12+44+2=58,视觉节奏基本不变。
-const secHeaderStyle: CSSProperties = { margin: "12px 2px 2px", minHeight: "44px" };
-const secTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
-  letterSpacing: "-0.014em",
-  color: "var(--v5-ink)",
-};
-const secLinkStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-brand)",
-  fontWeight: 500,
-};
-// De-carded: floor hairline group — PerkRow already carries its own dividers.
-const perksCardStyle: CSSProperties = {
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
-};
-// ── Tier ladder — de-carded: floor hairline group (rows sit on the page). ──
-const ladderCardStyle: CSSProperties = {
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
-};
-function tierRowStyle(state: GenesisTierDisplayState): CSSProperties {
-  return {
-    gap: "12px",
-    padding: "12px 0",
-    borderBottom: "1px solid var(--v5-border)",
-    opacity: state === "current" ? 1 : state === "sold" ? 0.6 : 0.85,
-  };
-}
-const tierNameStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-  letterSpacing: "-0.008em",
-};
-const tierChipLiveStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  padding: "1px 7px",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-warning) 16%, transparent)",
-  color: "var(--v5-warning)",
-  letterSpacing: "0.02em",
-  whiteSpace: "nowrap",
-};
-const tierChipSoldStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  padding: "1px 7px",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
-  color: "var(--v5-ink-4)",
-  letterSpacing: "0.02em",
-  whiteSpace: "nowrap",
-};
-const tierMetaStyle: CSSProperties = {
-  marginTop: "3px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-const tierPriceStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-  letterSpacing: "-0.014em",
-};
-const tierCurrentStyle: CSSProperties = {
-  marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  // 这行落在**跟主题的页面底**上(不是曜石 hero):原金亮主题实测 1.85 → 走跟主题的深金档
-  color: "var(--v5-genesis-gold)",
-  letterSpacing: "0.02em",
-};
-const tierPremiumStyle: CSSProperties = {
-  marginTop: "10px",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-// De-carded: floor hairline group + typed Q/A layering (title ink, body ink-2).
-const faqWrapStyle: CSSProperties = {
-  padding: "0 2px",
-  borderTop: "1px solid var(--v5-border)",
-};
-function faqRowStyle(i: number): CSSProperties {
-  return {
-    padding: "12px 0",
-    borderBottom: i < faqKeys.length - 1 ? "1px solid var(--v5-border)" : "none",
-  };
-}
-const faqQStyle: CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-  lineHeight: 1.4,
-};
-const faqAStyle: CSSProperties = {
-  marginTop: "5px",
-  fontSize: "13px",
-  color: "var(--v5-ink-2)",
-  lineHeight: 1.62,
-};
-
-// Sticky dock styles (folds GenesisDockHost) — anchored to chassis bottom.
-const dockWrapStyle: CSSProperties = {
-  padding: "12px 16px 24px",
-  background: "var(--v5-sticky-bar-bg)",
-  backdropFilter: "blur(18px) saturate(180%)",
-  borderTop: "1px solid var(--v5-sticky-bar-border)",
-};
-const dockBtnStyle = computed<CSSProperties>(() => ({
-  height: "54px",
-  borderRadius: "999px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background:
-    dockActive.value
-      // 吸底条按设计是**暗色金属面**,但原 alpha 0.55/0.72 在亮主题下被奶油页底冲淡,
-      // 合成底只到 rgb(83,78,71) → 金色价格实测 3.95 不达 AA(暗主题 8.95 正常)。
-      // 提到 0.88/0.92 让它在两个主题下都真的是暗面:亮主题合成底 rgb(38,32,26) → 7.73;
-      // 暗主题合成底 rgb(18,13,7)(原 22,18,13)→ 9.28,肉眼无差。(2026-07-23 C1)
-      ? "linear-gradient(180deg, rgba(50,38,20,0.88) 0%, rgba(20,14,8,0.92) 100%)"
-      : "var(--v5-surface-2)",
-  border: dockActive.value ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "none",
-  color: dockActive.value ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "15px",
-  letterSpacing: "0.02em",
-  boxShadow:
-    dockActive.value
-      ? [
-          "inset 0 1px 0 rgba(255,255,255,0.40)",
-          "inset 0 -1px 0 rgba(0,0,0,0.50)",
-          "inset 0 0 0 1px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 18%, transparent)",
-          "0 0 24px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 20%, transparent)",
-          "0 14px 30px rgba(0,0,0,0.45)",
-        ].join(", ")
-      : "none",
-}));
-const dockSpecularStyle: CSSProperties = {
-  position: "absolute",
-  top: "1px",
-  left: "1px",
-  right: "1px",
-  height: "55%",
-  borderRadius: "999px 999px 200px 200px / 999px 999px 40px 40px",
-  background: "linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 55%, transparent 100%)",
-  pointerEvents: "none",
-};
-const dockRimStyle: CSSProperties = {
-  position: "absolute",
-  left: "14%",
-  right: "14%",
-  bottom: "1px",
-  height: "1px",
-  background: "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent) 50%, transparent 100%)",
-  pointerEvents: "none",
-};
-const dockSheenStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%)",
-  transform: "translateX(-100%)",
-  animation: "gen-sheen 4.5s ease-in-out infinite",
-  pointerEvents: "none",
-};
-// 🔴 判据必须与 dockBtnStyle 用**同一个** `dockActive`,不能一个问 dockActive、
-//   一个问 remaining —— 底色换成中性面而文字仍取金色,在亮主题下就是**白字白底**
-//   (实测对比度 1.17)。2026-08-05 独立验收 P0:同一处样式共 5 个取色点,
-//   我只改了块内 4 个,漏掉本行,连带把原本正常的「预售倒计时」态也一起打翻。
-const dockLabelStyle = computed<CSSProperties>(() => ({
-  color: dockActive.value ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
-  fontWeight: 600,
-}));
-/** dock 内层容器色 —— 图标(currentColor)与倒计时靠它继承。与 dockLabelStyle 同判据。 */
-const dockInnerStyle = computed<CSSProperties>(() => ({
-  zIndex: 1,
-  gap: "6px",
-  color: dockActive.value ? "var(--v5-genesis-gold-on-dark)" : "var(--v5-ink-4)",
-}));
-const dockDividerStyle: CSSProperties = {
-  width: "1px",
-  height: "14px",
-  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 40%, transparent)",
-  margin: "0 4px",
-};
-
-import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";
 </script>
 
 <style scoped>
-.nx-genesis-dock {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 35;
-}
+.genesis-page { padding:3px 16px 120px; color:var(--v5-ink); --genesis-soft:color-mix(in srgb,var(--v5-genesis-gold) 16%,transparent); }
+.genesis-main-art { display:block; width:calc(100% + 32px); margin:0 -16px; aspect-ratio:1366 / 1254; background:url("/static/img/genesis/genesis-card-dark.webp") center / contain no-repeat; }
+[data-theme="light"] .genesis-main-art { background-image:url("/static/img/genesis/genesis-card-light.webp"); }
+.genesis-seat { position:relative; margin:-24px 12px 0; padding:18px 18px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
+.genesis-edge::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 160deg,transparent 0 40%,color-mix(in srgb,var(--v5-genesis-gold) 85%,transparent) 66%,transparent 92%); mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); mask-composite:exclude; pointer-events:none; }
+.genesis-crown-chip { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:var(--v5-radius-full); background:var(--genesis-soft); color:var(--v5-genesis-gold); font-size:12px; line-height:16px; font-weight:500; }
+.genesis-how { display:flex; align-items:center; min-height:44px; margin-block:-10px; font-size:13px; line-height:18px; font-weight:500; color:var(--v5-genesis-gold); }
+.genesis-title { display:block; margin-top:var(--v5-space-3); font-size:24px; line-height:32px; font-weight:600; color:var(--v5-genesis-gold-hi); }
+.genesis-description { display:block; margin-top:var(--v5-space-1); font-size:13px; line-height:20px; color:var(--v5-ink-3); }
+.genesis-meter { display:grid; grid-template-columns:repeat(20,minmax(0,1fr)); gap:3px; margin-top:var(--v5-space-4); }
+.genesis-meter > view { height:8px; border-radius:2px; background:color-mix(in srgb,var(--v5-ink) 10%,transparent); overflow:hidden; }
+.genesis-meter > view > view { height:100%; background:var(--v5-genesis-gold); transform-origin:left; transition:transform 900ms ease; }
+.genesis-meter-meta { display:flex; justify-content:space-between; margin-top:var(--v5-space-2); font-size:12px; line-height:16px; color:var(--v5-ink-3); }
+.genesis-meter-count { display:flex; align-items:baseline; font:500 13px/18px var(--font-metric); color:var(--v5-ink); }
+.genesis-meter-total { white-space:pre; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.genesis-remaining { display:block; margin-top:var(--v5-space-1); color:var(--v5-genesis-gold); font:12px/18px var(--font-metric); }
+.genesis-section { display:flex; align-items:center; gap:var(--v5-space-2); margin:var(--v5-space-8) 4px 12px; font-size:17px; line-height:24px; font-weight:600; }
+.genesis-section .genesis-caption { margin-left:auto; transform:translateY(2px); }
+.genesis-caption { color:var(--v5-ink-3); font:400 12px/16px var(--font-v5); }
+.genesis-refresh { flex:none; min-width:28px; min-height:44px; display:grid; place-items:center; margin-block:-11px; color:var(--v5-ink-3); }
+.genesis-tier-card,.genesis-perk,.genesis-market-entry,.genesis-faq { background:var(--v5-surface); border-radius:var(--ui-radius-surface); }
+.genesis-tier { display:flex; align-items:center; gap:var(--v5-space-3); padding:var(--v5-space-4); }
+.genesis-tier + .genesis-tier { border-top:1px solid var(--v5-border); }
+.genesis-tier--sold { opacity:.6; }
+.genesis-gold-icon { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:var(--ui-radius-icon); background:var(--genesis-soft); color:var(--v5-genesis-gold); }
+.genesis-subtitle { font-size:15px; line-height:22px; font-weight:500; }
+.genesis-tier-meta { display:inline; color:var(--v5-ink-3); font:400 12px/16px var(--font-metric); }
+.genesis-tier-chip { border-radius:6px; padding:1px 5px; color:var(--v5-genesis-gold); background:var(--genesis-soft); font-size:10px; }
+.genesis-tier-price { text-align:right; flex:none; }
+.genesis-amount { display:block; font:500 20px/26px var(--font-amount); font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.genesis-currency { font-size:.55em; margin-right:2px; letter-spacing:0; color:var(--v5-ink-3); }
+.genesis-decimal { color:var(--v5-ink-3); }
+.genesis-current { display:block; margin-top:2px; color:var(--v5-genesis-gold); font-size:12px; line-height:16px; }
+.genesis-perks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--v5-space-3); }
+.genesis-perk { min-height:132px; padding:var(--v5-space-4); }
+.genesis-perk-icon { width:40px; height:40px; }
+.genesis-perk .genesis-subtitle { display:block; margin-top:var(--v5-space-3); }
+.genesis-perk-desc { display:block; margin-top:0; color:var(--v5-ink-3); font-size:12px; line-height:18px; }
+.genesis-market-entry { display:flex; align-items:center; gap:var(--v5-space-3); padding:14px 16px; margin-top:var(--v5-space-3); }
+.genesis-market-entry .genesis-caption { display:inline; }
+.genesis-faq-row + .genesis-faq-row { border-top:1px solid var(--v5-border); }
+.genesis-faq-question { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:52px; padding:0 16px; font-size:15px; line-height:22px; font-weight:500; }
+.genesis-faq-question svg { flex:none; }
+.genesis-faq-answer { display:block; padding:0 16px 14px; font-size:13px; line-height:20px; color:var(--v5-ink-2); }
+.nx-genesis-dock { position:fixed; left:0; right:0; bottom:0; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); background:linear-gradient(180deg,color-mix(in srgb,var(--v5-surface) 70%,transparent),color-mix(in srgb,var(--v5-surface) 94%,transparent)); border-top:1px solid color-mix(in srgb,var(--v5-ink) 5%,transparent); backdrop-filter:blur(18px) saturate(160%); }
+.nx-genesis-dock .nx-button { width:100%; }
+.genesis-dock-number { font-family:var(--font-metric); }
+@media(prefers-reduced-motion:reduce) { .genesis-meter > view > view { transition:none; } }
 </style>

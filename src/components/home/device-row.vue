@@ -1,39 +1,80 @@
 <!-- A single device action combines the large bay, explicit status, name and live earnings. -->
 <template>
-  <view class="nx-device-row nx-home-glass-item" :data-online="isOnline ? 'true' : 'false'" :data-device-id="device.id"
+  <view class="nx-device-row" :data-online="isOnline ? 'true' : 'false'" :data-device-id="device.id"
     role="button" tabindex="0"
     :aria-label="`${t.earn.deviceDetailTitle}: ${displayName} · ${statusText}`"
     @click="go"  @keydown.enter.prevent="go" @keydown.space.prevent="go">
-    <view class="nx-home-glass-panel" aria-hidden="true" />
-    <text class="hf-device-status" :class="{ 'hf-device-status--online': isOnline }">{{ statusText }}</text>
-    <DeviceSlot :device="device" :online="isOnline" />
+    <view class="nx-device-row__main">
+    <DeviceSlot :device="device" :online="false" />
     <view class="hf-device-meta">
       <text class="hf-device-name">{{ displayName }}</text>
-      <text class="hf-device-income font-mono-tabular">+${{ todayText }}</text>
+      <view v-if="statusText" class="hf-device-status"><view class="hf-status-dot" :style="dotStyle" aria-hidden="true" /><text>{{ statusText }}</text></view>
     </view>
+    <view class="hf-device-income"><text class="font-mono-tabular">{{ visibility.mask(runtimeConfirmed ? (device.todayEarnings > 0 ? '+' : '') + fmtMoney(device.todayEarnings) : '-') }}</text><text class="hf-device-today">{{ copy.today }}</text></view>
     <view class="nx-home-arrow" aria-hidden="true">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7" /></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
     </view>
+    </view>
+    <view v-if="device.currentTask" class="hf-device-task">
+      <text class="hf-device-task__title">{{ visibility.mask(device.currentTask.type) }}</text>
+      <view class="hf-device-task__progress">
+        <view class="hf-device-task__track" role="progressbar" :aria-label="t.earn.currentTask" :aria-valuenow="visibility.hidden || progressPct == null ? undefined : progressPct" aria-valuemin="0" aria-valuemax="100">
+          <view v-if="!visibility.hidden && progressPct != null" v-viz-inview class="hf-device-task__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
+        </view>
+        <text class="font-mono-tabular">{{ visibility.mask(progressPct == null ? '-' : `${progressPct}%`) }}</text>
+      </view>
+      <text v-if="phoneTaskExpired || device.currentTask.status === 'PAUSED' || device.interruptedAt != null" class="hf-device-task__note">{{ device.interruptedAt != null ? t.earn.reconnecting : t.earn.phoneTaskPaused }}</text>
+      <text v-else-if="awaitingExecutionResultConfirmation" class="hf-device-task__note">{{ device.currentTask.executionMode === 'SIMULATED' ? computeCopy.confirming : t.earn.taskAwaitingExecutionResultConfirmation }}</text>
+    </view>
+    <view v-else class="hf-device-task hf-device-task--empty"><text>{{ recovering ? computeCopy.statuses.RECOVERING : !taskFactsReady ? t.earn.runtimeUnknown : t.earn.noCurrentTask }}</text></view>
   </view>
 </template>
 
 <script setup lang="ts">
+import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, type CSSProperties } from "vue";
+import { fmtMoney } from '@/i18n/format';
+import { useAuditUiCopy } from '@/i18n/audit-ui';
+import { computed, ref, type CSSProperties } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
+import { deviceTaskRecovering, taskProgressPercent } from "@/lib/task-progress";
+import { useComputeV2Copy } from "@/i18n/compute-v2";
+import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
 import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { deviceName } from "@/lib/device-copy";
 import type { Device } from "@/store/types";
 
-const props = defineProps<{ device: Device; divider?: boolean; runtimeConfirmed: boolean }>();
+const visibility = useDataVisibility();
+const props = defineProps<{ device: Device; divider?: boolean; runtimeConfirmed: boolean; tasksConfirmed?: boolean }>();
 const t = useT();
+const copy = useAuditUiCopy();
+const computeCopy = useComputeV2Copy();
+const recovering = computed(() => deviceTaskRecovering(props.device));
 // Stored device name is English + persisted → resolve from `kind` at render.
 const displayName = computed(() => deviceName(t.value, props.device));
 
 const onlineState = computed(() => deviceOnlineState(props.device, Date.now(), props.runtimeConfirmed));
-const isOnline = computed(() => onlineState.value === "online");
-const statusText = computed(() => onlineState.value === "unknown" ? t.value.earn.runtimeUnknown : isOnline.value ? t.value.earn.online : t.value.earn.offline);
+const isOnline = computed(() => !recovering.value && onlineState.value === "online");
+const statusText = computed(() => recovering.value ? computeCopy.value.statuses.RECOVERING : onlineState.value === "unknown" ? t.value.earn.runtimeUnknown : isOnline.value ? t.value.earn.online : "");
+const now = ref(Date.now());
+const monotonicNow = ref(readMonotonicNowMs());
+useVisibleInterval(() => {
+  now.value = Date.now();
+  monotonicNow.value = advanceMonotonicHighWater(monotonicNow.value, readMonotonicNowMs());
+}, 1000);
+const liveTaskNow = computed(() => props.device.taskServerNow != null && props.device.taskServerNowReceivedAt != null
+  ? projectServerNow(props.device.taskServerNow, props.device.taskServerNowReceivedAt, monotonicNow.value) : now.value);
+const taskFactsReady = computed(() => props.tasksConfirmed ?? props.runtimeConfirmed);
+const phoneTaskExpired = computed(() => props.device.kind === "phone" && props.device.phoneValidUntil != null
+  && liveTaskNow.value >= props.device.phoneValidUntil);
+const progressPct = computed(() => props.runtimeConfirmed && taskFactsReady.value
+  ? taskProgressPercent(props.device.currentTask, liveTaskNow.value, props.device.interruptedAt,
+    props.device.kind === "phone" ? props.device.phoneValidUntil : null) : null);
+const awaitingExecutionResultConfirmation = computed(() => props.device.currentTask != null
+  && awaitsExecutionResultConfirmation(props.device.currentTask, liveTaskNow.value));
 const rowStyle = computed<CSSProperties>(() => ({
   padding: "13px 14px",
   borderBottom: props.divider ? "1px solid var(--v5-border)" : "none",
@@ -57,16 +98,25 @@ import DeviceSlot from "./device-slot.vue";
 </script>
 
 <style scoped>
-.nx-device-row { min-width: 0; min-height: 192px; padding: 12px 12px 16px; border-radius: var(--v5-radius-xl); display: flex; flex-direction: column; }
-.hf-device-status { position: absolute; top: 10px; right: 10px; z-index: 2; padding: 4px 10px; max-width: calc(100% - 20px); border-radius: var(--v5-radius-full); font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); background: var(--v5-surface-3); text-align: center; overflow-wrap: anywhere; }
-.hf-device-status--online { color: var(--v5-brand); background: var(--v5-brand-soft); }
-.hf-device-meta { position: relative; min-width: 0; margin-top: auto; padding-right: 28px; }
-.hf-device-name { display: block; font: 500 13px/1.35 var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
-.hf-device-income { display: block; margin-top: 4px; font: 600 20px/1.3 var(--font-v5); color: var(--v5-ink); letter-spacing: -.025em; overflow-wrap: anywhere; }
-.nx-device-row .nx-home-arrow { position: absolute; right: 10px; bottom: 18px; width: 28px; height: 28px; }
-@media (max-width: 350px) {
-  .nx-device-row { padding: 10px 10px 14px; }
-  .hf-device-meta { padding-right: 0; }
-  .nx-device-row .nx-home-arrow { display: none; }
-}
+.nx-device-row { min-height: 64px; box-sizing:border-box;padding: 10px 16px; cursor: pointer; }
+.nx-device-row__main { display:flex; align-items:center; gap:12px; }
+.nx-device-row:active { background: var(--v5-surface-2); }
+.nx-device-row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; }
+.nx-device-row :deep(.nx-device-slot) { width: 48px; height: 48px; flex-shrink: 0;border-radius:14px;background:radial-gradient(80% 70% at 50% 70%,color-mix(in srgb,var(--v5-ink) 6%,transparent),transparent); }
+.nx-device-row :deep(.nx-home-art) { width: 52px;max-width:none; height: 52px; animation: none; }
+.nx-device-row :deep(.hf-computer) { height: 48px; }
+.hf-device-meta { min-width: 0; flex: 1; }
+.hf-device-name { display: block; font: 500 clamp(13px,3.85vw,15px)/20px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
+.hf-device-status { display: flex;align-items:center;gap:6px; margin-top: 2px; font: 400 clamp(11px,3.08vw,12px)/18px var(--font-v5); color: var(--v5-ink-3); }
+.hf-device-income { flex-shrink: 0; font: 600 clamp(13px,3.85vw,15px)/20px var(--font-v5); color: var(--v5-brand);text-align:right; }
+.hf-device-today {display:block;font:400 clamp(11px,3.08vw,12px)/18px var(--font-v5);color:var(--v5-ink-3);}
+.nx-home-arrow { display: flex; align-items: center; width: 16px; color: var(--v5-ink-4);background:none;box-shadow:none; }
+.hf-device-task { margin:10px 0 0 60px; min-width:0; color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); }
+.hf-device-task__title,.hf-device-task__id,.hf-device-task__note { display:block; overflow-wrap:anywhere; }
+.hf-device-task__title { color:var(--v5-ink-2); }
+.hf-device-task__id { margin-top:3px; }
+.hf-device-task__progress { display:flex; align-items:center; gap:12px; margin-top:6px; color:var(--v5-ink-2); }
+.hf-device-task__track { flex:1; height:4px; overflow:hidden; border-radius:999px; background:var(--v5-surface-2); }
+.hf-device-task__fill { height:100%; background:var(--v5-brand); transition:width .6s ease; }
+.hf-device-task__note { margin-top:4px; }
 </style>

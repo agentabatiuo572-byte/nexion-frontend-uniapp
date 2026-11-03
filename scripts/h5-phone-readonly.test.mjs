@@ -16,8 +16,10 @@ function compile(file, platform) {
 function functions(source, names) {
   const script = source.includes("<script") ? source.split('<script setup lang="ts">')[1].split("</script>")[0] : source;
   const ast = ts.createSourceFile("actual.ts", script, ts.ScriptTarget.Latest, true);
+  // Shared composables (use-device-deactivation, use-tradein-strip) declare their handlers inside the exported function.
+  const statements = ast.statements.flatMap((node) => [node, ...(ts.isFunctionDeclaration(node) && node.body ? node.body.statements : [])]);
   return names.map((name) => {
-    const fn = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === name);
+    const fn = statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === name);
     assert.ok(fn, `actual source function ${name} must exist`);
     return fn.getText(ast).replace(/^export\s+/, "");
   }).join("\n");
@@ -67,7 +69,11 @@ function inventory(platform, kind, remote = true) {
     },
   };
   const guard = functions(compile("src/lib/device-control-platform.ts", platform), ["canControlDevice"]);
-  const handlers = functions(compile("src/pages/me/devices.vue", platform), names);
+  const handlers = [
+    functions(compile("src/pages/me/devices.vue", platform), ["handleActivate"]),
+    functions(compile("src/composables/use-tradein-strip.ts", platform), ["handleTradein"]),
+    functions(compile("src/composables/use-device-deactivation.ts", platform), names.filter((name) => !["handleActivate", "handleTradein"].includes(name))),
+  ].join("\n");
   execute(`${guard}\n${handlers}\nexports.handlers = {${names.join(",")}};`, sandbox);
   return { d, writes, effects, sandbox, handlers: sandbox.exports.handlers };
 }
@@ -116,7 +122,11 @@ test("phone action is absent from all H5 inventory groups and the hidden row can
   assert.equal(rows.length, 3);
   for (const [row] of rows) assert.match(row, /:show-action="canControlDevice\(d\)"/);
   const row = compile("src/components/me/device-inventory-row.vue", "h5");
-  assert.match(row, /<view v-if="showAction"[^>]*role="button"/);
+  // The action buttons (NxButton, deactivate for active rows / activate for inactive ones) sit inside a showAction-gated group with the trade-in CTA.
+  const actions = /<view v-if="showAction" class="device-inventory-row__actions"[^>]*>([\s\S]*?)\n      <\/view>/.exec(row)?.[1] ?? "";
+  assert.match(actions, /<NxButton v-if="active" class="device-inventory-row__action"[^>]*@click="onAction"/);
+  assert.match(actions, /<NxButton v-if="!active" class="device-inventory-row__action device-inventory-row__action--activate"[^>]*@click="onAction"/);
+  assert.equal((row.match(/@click="onAction"/g) ?? []).length, 2);
   for (const showAction of [false, true]) {
     const events = [];
     const sandbox = { exports: {}, props: { showAction }, actionDisabled: { value: false }, emit: (name) => events.push(name) };
@@ -126,6 +136,14 @@ test("phone action is absent from all H5 inventory groups and the hidden row can
   }
 });
 test("native login deep-link and cookie error cannot render browser-only recovery copy", () => {
+  const sponsorshipSource = read("src/store/sponsorship.ts");
+  const sponsorshipAst = ts.createSourceFile("sponsorship.ts", sponsorshipSource, ts.ScriptTarget.Latest, true);
+  const refPattern = sponsorshipAst.statements.find((node) => ts.isVariableStatement(node)
+    && node.declarationList.declarations.some((declaration) => declaration.name.getText(sponsorshipAst) === "REF_CODE_RE"));
+  const sponsorship = { exports: {} };
+  execute(`${refPattern.getText(sponsorshipAst)}\n${functions(sponsorshipSource, ["normalizeRefCode"])}\nexports.normalizeRefCode=normalizeRefCode;`, sponsorship);
+  const sponsor = { exports: {}, require: () => sponsorship.exports };
+  execute(read("src/auth/registration-sponsor.ts"), sponsor);
   for (const platform of ["h5", "app-plus"]) {
     const compiled = compile("src/pages/login/login.vue", platform);
     if (platform === "h5") assert.match(compiled, /browserUnsupportedNotice|secureBrowserUnsupported/);
@@ -139,7 +157,8 @@ test("native login deep-link and cookie error cannot render browser-only recover
       URLSearchParams, takeNavigationQuery: () => "",
       exports: {}, onLoad: (handler) => { sandbox.load = handler; },
       returnParam: { value: null }, refOnLogin: { value: null }, serverSessionReloadNotice: { value: false },
-      browserUnsupportedNotice: { value: false }, normalizeRefCode: () => null,
+      browserUnsupportedNotice: { value: false }, remoteApiEnabled: true,
+      normalizeRegistrationSponsorCode: sponsor.exports.normalizeRegistrationSponsorCode,
       authApi: { pendingLoginContext: () => null, pendingLogin: () => false },
       retryContext: { value: null }, loginResultUnknown: { value: false },
       loginRecoveryPending: { value: false }, replayAvailable: { value: false },

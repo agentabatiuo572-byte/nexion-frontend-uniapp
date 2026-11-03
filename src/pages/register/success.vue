@@ -5,7 +5,7 @@
 -->
 <template>
   <StandalonePageShell class="rs-root" :reserve-bottom="false">
-    <view v-if="successVisible" class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none', 'rs-wrap--web-download': showH5Downloads }">
+    <view v-if="successVisible" class="rs-wrap" :class="{ 'rs-wrap--gift': giftState !== 'none' }">
       <view class="rs-main">
         <view class="rs-content">
           <view class="rs-badge">
@@ -87,6 +87,7 @@
           role="link"
           tabindex="0"
           @click="openOfficialDownload"
+          @keydown.enter.prevent="openOfficialDownload"
         >
           <text class="rs-h5-download__action-text">{{ t.register.doneOfficialDownloadLink }}</text>
           <text class="rs-h5-download__arrow">↗</text>
@@ -94,7 +95,7 @@
         <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
           <text class="rs-h5-download__pending">{{ t.register.doneOfficialDownloadPending }}</text>
         </view>
-        <view v-if="!officialDownloadUrl" class="rs-retry active-press" role="button" :tabindex="cfg.loading ? -1 : 0" :aria-disabled="cfg.loading" @click="retryDownloadConfig">
+        <view v-if="!officialDownloadUrl" class="rs-retry active-press" role="button" :tabindex="cfg.loading ? -1 : 0" :aria-disabled="cfg.loading" @click="retryDownloadConfig" @keydown.enter.prevent="retryDownloadConfig" @keydown.space.prevent="retryDownloadConfig">
           <text>{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -150,9 +151,7 @@ type GiftState = "posted" | "pending" | "none";
 const t = useT();
 const cfg = useConfig();
 const auth = useAuth();
-let showH5Downloads = false;
 // #ifdef H5
-showH5Downloads = true;
 const downloadOnly = ref(false);
 // #endif
 const remoteReceipt = ref<RegistrationReceipt | null>(null);
@@ -282,8 +281,8 @@ onBackPress(() => {
 <style scoped>
 .rs-root { position: fixed; inset: 0; background: var(--v5-bg); overflow-y: auto; }
 .rs-pending { min-height: 100%; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-3); }
-.rs-wrap { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 100%; padding: 0 24px; box-sizing: border-box; text-align: center; }
-.rs-main { position: absolute; inset: 0 24px; display: flex; align-items: center; justify-content: center; padding: 24px 0; box-sizing: border-box; }
+.rs-wrap { position: relative; display: flex; flex-direction: column; min-height: 100%; padding: 0 24px calc(env(safe-area-inset-bottom, 0px) + 114px); box-sizing: border-box; text-align: center; }
+.rs-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 0 20px; box-sizing: border-box; }
 .rs-content { width: 100%; }
 .rs-badge { width: 74px; height: 74px; border-radius: 9999px; margin: 0 auto; background: color-mix(in srgb, var(--v5-brand) 16%, transparent); display: flex; align-items: center; justify-content: center; }
 .rs-badge__in { width: 52px; height: 52px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; }
@@ -293,7 +292,7 @@ onBackPress(() => {
 .rs-gift { margin-top: 18px; border-radius: 16px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); padding: 16px 14px; }
 .rs-gift__cap { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; color: var(--v5-brand); }
 .rs-gift__amt { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin-top: 8px; }
-.rs-gift__usd { font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-ink); }
+.rs-gift__usd { font-family: var(--font-amount); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-ink); }
 .rs-gift__nex { font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-nex); }
 .rs-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; border-radius: 9999px; padding: 4px 10px; }
 .rs-chip--ok { background: color-mix(in srgb, var(--v5-success) 12%, transparent); }
@@ -306,21 +305,21 @@ onBackPress(() => {
 .rs-why__r:last-child { border-bottom: none; }
 .rs-why__ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .rs-why__t { flex: 1; font-size: 12px; color: var(--v5-ink-2); line-height: 1.5; text-wrap: pretty; }
-.rs-h5-download { position: absolute; right: 24px; bottom: calc(env(safe-area-inset-bottom, 0px) + 102px); left: 24px; }
-.rs-retry { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--v5-surface); color: var(--v5-brand); font-size: 12px; }
+.rs-h5-download { flex-shrink: 0; margin-bottom: 16px; }
+.rs-retry { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--v5-surface); color: var(--v5-brand); font: 600 13px/20px var(--font-v5); }
 .rs-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .rs-h5-download__hint { display: block; font-size: 12px; color: var(--v5-ink-2); line-height: 1.5; text-wrap: pretty; }
 .rs-h5-download__action { min-height: 44px; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 5px; border-radius: 9999px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 10%, transparent); }
 .rs-h5-download__action--disabled { color: var(--v5-ink-3); background: var(--v5-surface); }
 .rs-h5-download__action-text, .rs-h5-download__pending { font-size: 12px; font-weight: 500; }
-.rs-h5-download__arrow { font-size: 13px; line-height: 1; }
+.rs-h5-download__arrow { font-size: var(--ui-type-list-subtitle); line-height: 1; }
+.rs-footer { position: fixed; z-index: 3; right: 24px; bottom: 0; left: 24px; padding-top: 12px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 38px); background: linear-gradient(to bottom, transparent, var(--v5-bg) 12px); }
+.rs-cta { min-height: 52px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 0 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
+.rs-cta__t { font-size: var(--ui-type-button); font-weight: 500; color: var(--v5-on-brand); }
+.active-press:active { transform: scale(0.985); opacity: 0.9; }
 .rs-platform-downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
 .rs-platform-download__pending { display: block; margin-top: 5px; font-size: 12px; color: var(--v5-ink-3); }
 .rs-h5-download__action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.rs-footer { position: fixed; z-index: 3; right: 24px; bottom: 0; left: 24px; padding-top: 12px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 38px); background: linear-gradient(to bottom, transparent, var(--v5-bg) 12px); }
-.rs-cta { min-height: 52px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 0 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
-.rs-cta__t { font-size: 15px; font-weight: 500; color: var(--v5-on-brand); }
-.active-press:active { transform: scale(0.985); opacity: 0.9; }
 
 @media (max-height: 720px) {
   .rs-badge { width: 56px; height: 56px; }
@@ -334,13 +333,8 @@ onBackPress(() => {
   .rs-gift__note { margin-top: 5px; }
   .rs-why { margin-top: 6px; }
   .rs-why__r { padding: 4px 12px; }
-  .rs-h5-download__hint { display: none; }
   .rs-wrap--gift { height: auto; min-height: 100%; padding-top: 18px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 114px); }
   .rs-wrap--gift .rs-main { position: static; flex: 1; min-height: 0; padding: 0 0 12px; }
-  .rs-wrap--gift .rs-h5-download { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 102px); z-index: 2; margin-bottom: 12px; background: var(--v5-bg); }
-  .rs-wrap--web-setup.rs-wrap--gift .rs-h5-download { position: static; }
+  .rs-wrap--gift .rs-h5-download { margin-bottom: 12px; }
 }
-.rs-wrap--web-download { height: auto; min-height: 100%; padding-top: 32px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 114px); }
-.rs-wrap--web-download .rs-main { position: static; flex: 1; padding: 0 0 24px; }
-.rs-wrap--web-download .rs-h5-download { position: static; margin-bottom: 16px; }
 </style>

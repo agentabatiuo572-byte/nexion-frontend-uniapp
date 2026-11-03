@@ -24,7 +24,7 @@ function page() {
   const refreshRemote = vi.fn(async () => { rows.value = [{ id: "original-order" }]; });
   const hooks: Record<string, Array<() => void>> = { show: [], hide: [], dispose: [] };
   const deps = {
-    useManualScrollLoadMore: vi.fn(), refreshProductCatalog: vi.fn(),
+    useManualScrollLoadMore: vi.fn(), revalidateProductCatalog: vi.fn(),
     computed, ref, watch, captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, createRemoteOrdersRefresh,
     isInitialOrderReadLoading, orderListPanels, remoteCommerceRequestCurrent,
     app: reactive({ accountKey: "user:607", accountBindingEpoch: 1 }),
@@ -49,7 +49,7 @@ function page() {
     clear();
   };
   disposals.push(dispose);
-  return { state, refreshRemote, hooks, ready, dispose, refreshCatalog: deps.refreshProductCatalog };
+  return { state, refreshRemote, hooks, ready, dispose, refreshCatalog: deps.revalidateProductCatalog };
 }
 
 describe("visible orders survive catalog revision invalidation", () => {

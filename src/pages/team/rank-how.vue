@@ -1,105 +1,45 @@
 <template>
   <AppChassis active="team">
-    <view class="pb-8" style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/team/rank" />
-      <HowHero :label="w.heroLabel" :title="content.copy.headline" :sub="state.policy?.hero || statusText" accent="violet" />
-
-      <view v-if="state.loading || incomplete" class="mx-4 rounded-xl" :style="unavailableStyle" aria-live="polite">
-        <text class="block" :style="bodyStyle">{{ statusText }}</text>
-        <view v-if="!state.loading" :style="retryStyle" role="button" tabindex="0" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"><text>{{ content.copy.retry }}</text></view>
-      </view>
-
-      <!-- §1 · Published overview; the same section shell as 5174. -->
-      <HowSection :title="s(sectionId.overview, w.s1Title).title" accent="violet">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
-        </template>
-        <text class="block" :style="bodyStyle">{{ s(sectionId.overview).body }}</text>
-        <text class="block" :style="{ ...bodyStyle, marginTop: '10px' }">{{ s(sectionId.overviewDetail).body }}</text>
-      </HowSection>
-
-      <!-- §2 · Server ladder, without prototype names or clipped inline thresholds. -->
-      <HowSection :title="s(sectionId.ladder, w.s2Title).title" accent="violet">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" /><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" /><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" /></svg>
-        </template>
-        <text class="block" :style="captionStyle">{{ s(sectionId.ladder).body }}</text>
-        <view v-if="content.ladder.length" style="margin-top: 14px; padding: 0 2px; display: flex; flex-direction: column; gap: 7px">
-          <view v-for="rank in content.ladder" :key="rank.v" class="flex items-center" style="gap: 10px; min-width: 0">
-            <VBadgeIcon :v="rank.v as VRank" :size="22" />
-            <text class="font-display tabular-nums" :style="ladderVStyle">V{{ rank.v }}</text>
-            <text v-if="rankName(rank, locale.code)" :style="ladderTitleStyle">{{ rankName(rank, locale.code) }}</text>
-          </view>
+    <view class="rank-how-page">
+      <SubPageHeader back="/pages/team/rank" :title="guide.pageTitle" plain design />
+      <view class="rank-how-content">
+        <view v-if="state.loading && !state.policy" class="how-state" role="status" aria-live="polite" aria-busy="true"><text>{{ statusText }}</text></view>
+        <view v-else-if="state.error || incomplete" class="how-state" :role="state.error ? 'alert' : 'status'">
+          <text>{{ statusText }}</text>
+          <NxButton class="nx-retry-action" :label="content.copy.retry" variant="text" @click="reload" />
         </view>
-        <text v-else class="block mt-3" :style="bodyStyle">{{ state.loading ? content.copy.loading : content.copy.emptyLadder }}</text>
-      </HowSection>
+        <template v-else>
+          <TeamRuleHero kind="growth" :title="guide.headline" :sub="guide.intro" :sections="directory" :nav-label="ruleCopy.contents" data-rank-how="published" />
 
-      <!-- §3 · Four requirement tiles plus stepwise/protection callouts. -->
-      <HowSection :title="s(sectionId.promotion, w.s3Title).title" accent="violet">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
-        </template>
-        <text class="block" :style="{ ...captionStyle, marginBottom: '14px' }">{{ s(sectionId.promotion).body }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
-          <view v-for="req in requirements" :key="req.id" class="rounded-xl" :style="reqCardStyle">
-            <text class="block" :style="reqLabelStyle">{{ req.title }}</text>
-            <text class="block" :style="reqBodyStyle">{{ req.body }}</text>
-          </view>
-        </view>
-        <HowCalloutBox :title="'⚠️ ' + s(sectionId.stepwise).title" :body="s(sectionId.stepwise).body" tone="amber" />
-        <HowCalloutBox :title="'✓ ' + s(sectionId.protection).title" :body="s(sectionId.protection).body" tone="purple" />
-      </HowSection>
+          <TeamRuleSection anchor="ladder" :title="guide.ladder">
+            <scroll-view v-if="content.ladder.length" scroll-x class="how-ladder-scroll">
+              <view class="how-ladder">
+                <view v-for="rank in content.ladder" :key="rank.v" class="how-rank">
+                  <VBadgeIcon :v="rank.v" :size="56" />
+                  <text class="how-rank__level">V{{ rank.v }}</text>
+                  <text v-if="rankName(rank, locale.code)" class="how-rank__name">{{ rankName(rank, locale.code) }}</text>
+                </view>
+              </view>
+            </scroll-view>
+            <text v-else class="how-caption">{{ content.copy.emptyLadder }}</text>
+          </TeamRuleSection>
 
-      <!-- §4 · Same four icon rows; published settlement caveats are not replaced. -->
-      <HowSection :title="s(sectionId.rewards, w.s4Title).title" accent="violet">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="8" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
-        </template>
-        <text class="block" :style="captionStyle">{{ s(sectionId.rewards).body }}</text>
-        <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
-          <HowIconRow v-for="item in unlocks" :key="item.id" :emoji="item.emoji" :label="item.title" :body="item.body" />
-        </view>
-      </HowSection>
+          <template v-for="group in ruleGroups" :key="group.id">
+            <TeamRuleSection v-if="group.id === 'faq'" :anchor="group.id" :title="group.title" :lead="group.hint" list>
+              <TeamRuleSection v-for="(item, index) in group.sections" :key="item.id" :q="item.title" :a="item.body" :initial-open="index === 0" :data-rule-section="item.id" />
+            </TeamRuleSection>
+            <TeamRuleSection v-else :anchor="group.id" :title="group.title" :lead="group.hint" list>
+              <TeamRuleSection v-if="group.id === 'overview' && state.policy?.hero" item :body="state.policy.hero" />
+              <TeamRuleSection v-if="group.id === 'steps' && !content.example" item :body="content.copy.noExample" />
+              <TeamRuleSection v-for="item in group.sections" :key="item.id" :item="stepNumber(item) === undefined" :n="stepNumber(item)" :title="item.title" :body="item.body" :data-rule-section="item.id" />
+            </TeamRuleSection>
+          </template>
 
-      <!-- §5 · Illustrative adjacent ranks selected from current visible server configuration. -->
-      <HowSection :title="s(sectionId.example, content.copy.example).title" accent="violet">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+          <text class="how-authority">{{ guide.authority }}</text>
+          <view class="how-rank-link" role="link" tabindex="0" @click="navTo('/pages/team/rank')" @keydown.enter.prevent="navTo('/pages/team/rank')"><text>{{ guide.rankLink }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
         </template>
-        <text class="block" :style="{ fontSize: '13px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ content.example ? s(sectionId.example).body : (state.loading ? content.copy.loading : content.copy.noExample) }}</text>
-        <template v-if="content.example">
-          <view class="rounded-xl" :style="startCardStyle">
-            <text class="block" :style="startLabelStyle">{{ s(sectionId.exampleStart).title }}</text>
-            <text class="block" :style="bodyStyle">{{ s(sectionId.exampleStart).body }}</text>
-          </view>
-          <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px">
-            <HowStepRow v-for="phase in phases" :key="phase.id" :n="phase.n" :title="phase.title" :body="phase.body" accent="violet" />
-          </view>
-          <HowCalloutBox :title="'⚡ ' + s(sectionId.exampleTrigger).title" :body="s(sectionId.exampleTrigger).body" tone="purple" />
-          <view class="rounded-xl border" :style="unlockResultCardStyle">
-            <text class="block" :style="unlockResultLabelStyle">🎉 {{ s(sectionId.exampleResults).title }}</text>
-            <text class="block" :style="{ ...captionStyle, marginBottom: '6px' }">{{ s(sectionId.exampleResults).body }}</text>
-            <view style="display: flex; flex-direction: column; gap: 4px">
-              <text v-for="result in results" :key="result.id" class="block" :style="unlockResultItemStyle">• {{ result.body }}</text>
-            </view>
-          </view>
-        </template>
-      </HowSection>
-
-      <!-- §6 · Published FAQ, using the reference's shared FAQ rows. -->
-      <HowSection :title="w.faqTitle" accent="violet">
-        <template #icon>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
-        </template>
-        <view style="display: flex; flex-direction: column; gap: 10px">
-          <HowFaqRow v-for="faq in faqs" :key="faq.id" :q="faq.title" :a="faq.body" />
-        </view>
-      </HowSection>
-
-      <view class="mx-4 mt-6">
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack">
-          <text :style="ctaTextStyle">{{ w.ctaBack }}</text>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+        <view class="how-footer">
+          <NxButton :label="w.ctaBack" variant="secondary" @click="goBack" />
         </view>
       </view>
     </view>
@@ -107,32 +47,50 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref, watch } from "vue";
+import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import TeamRuleHero from '@/components/team/team-rule-hero.vue';
+import TeamRuleSection from '@/components/team/team-rule-section.vue';
+import { teamRuleGuideCopy } from '@/components/team/team-rule-guide-copy';
+import NxButton from '@/components/ui/nx-button.vue';
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
-import HowHero from "@/components/how/how-hero.vue";
-import HowSection from "@/components/how/how-section.vue";
-import HowCalloutBox from "@/components/how/how-callout-box.vue";
-import HowIconRow from "@/components/how/how-icon-row.vue";
-import HowStepRow from "@/components/how/how-step-row.vue";
-import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
+import { useApp } from '@/store/app';
+import { useAuth } from '@/store/auth';
+import { captureAccountScope, isCurrentAccountScope } from '@/lib/account-scope';
 import { useLocaleStore } from "@/store/locale";
-import type { VRank } from "@/store/v-rank";
-import { navBack } from "@/lib/route";
-import { apiClient, expectedApiEnvironment, vRankApi } from "@/api/runtime";
+import { navBack, navTo } from "@/lib/route";
+import { apiClient, apiRuntimeConfig, expectedApiEnvironment, vRankApi } from "@/api/runtime";
 import { createRankHowPolicyApi } from "@/api/rank-how-policy-api";
 import { buildRankHowContent, createRankHowResource, type RankHowResourceState } from "@/lib/rank-how-content";
 import { rankName } from "@/lib/v-rank-copy";
+import { rankGuideCopy } from '@/i18n/rank-guide-copy';
 
 const t = useT();
 const w = computed(() => t.value.rankHowItWorks);
 const locale = useLocaleStore();
+const guide = computed(() => rankGuideCopy(locale.code));
+const ruleCopy = computed(() => teamRuleGuideCopy(locale.code));
+const app = useApp();
+const auth = useAuth();
+const readEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
+let environmentInvalidated = false;
+watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
+const environmentCurrent = () => !environmentInvalidated && readEnvironment[0] === apiRuntimeConfig.environment && readEnvironment[1] === apiRuntimeConfig.baseUrl;
 const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [], capabilities: { peer: false, genesis: false } });
 const policyApi = createRankHowPolicyApi(apiClient, expectedApiEnvironment);
-const resource = createRankHowResource({ published: policyApi.published, ladder: vRankApi.ladder, apply: value => { state.value = value; } });
+let resourceOwner = captureAccountScope();
+function makeResource() {
+  const owner = captureAccountScope(), language = locale.code;
+  resourceOwner = owner;
+  return createRankHowResource({ published: policyApi.published, ladder: vRankApi.ladder, apply: value => {
+    if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
+    state.value = value.loading && state.value.policy ? { ...state.value, loading: true, error: false } : value;
+  } });
+}
+let resource = makeResource();
 const content = computed(() => buildRankHowContent(state.value.policy, state.value.ranks, state.value.capabilities, locale.code, t.value.rank.cond));
 const s = (id: string, fallbackTitle?: string) => content.value.section(id, fallbackTitle);
 const sectionId = {
@@ -141,37 +99,74 @@ const sectionId = {
   exampleStart: "example-start", exampleTrigger: "example-trigger", exampleResults: "example-results",
 } as const;
 const requirements = computed(() => ["requirement-self", "requirement-direct", "requirement-team", "requirement-legs"].map(id => s(id)));
-const unlocks = computed(() => ["network", "peer", "leadership", "cultivation"].map((name, index) => ({ ...s(`unlock-${name}`), emoji: ["📈", "🤝", "🏆", "🌱"][index] })));
+const unlocks = computed(() => ["network", "peer", "leadership", "cultivation"].map(name => s(`unlock-${name}`)));
 const phases = computed(() => ["self", "team", "legs"].map((name, index) => ({ ...s(`example-${name}`), n: index + 1 })));
 const results = computed(() => ["network", "peer", "leadership", "cultivation"].map(name => s(`result-${name}`)));
 const faqs = computed(() => ["members", "rank", "rewards"].map(name => s(`faq-${name}`)));
+// Preserve additional published sections instead of silently dropping new rules.
+const extraSections = computed(() => {
+  const known = new Set([
+    ...Object.values(sectionId), ...requirements.value.map(item => item.id), ...unlocks.value.map(item => item.id),
+    ...phases.value.map(item => item.id), ...results.value.map(item => item.id), ...faqs.value.map(item => item.id),
+  ]);
+  return (state.value.policy?.sections ?? []).filter(item => !known.has(item.id)).map(item => s(item.id));
+});
 const incomplete = computed(() => state.value.error || [
-  ...requirements.value, ...unlocks.value, ...faqs.value,
+  ...requirements.value, ...unlocks.value, ...faqs.value, ...extraSections.value,
   ...["overview", "overview-detail", "ladder", "promotion", "stepwise", "protection", "rewards"].map(id => s(id)),
   ...(content.value.example ? [...phases.value, ...results.value, ...["example", "example-start", "example-trigger", "example-results"].map(id => s(id))] : []),
 ].some(section => !section.available));
 const statusText = computed(() => state.value.loading ? content.value.copy.loading : content.value.copy.unavailable);
-function reload() { void resource.load(locale.code); }
+function reload() {
+  if (!isCurrentAccountScope(resourceOwner)) { resource.dispose(); resource = makeResource(); }
+  if (environmentCurrent() && auth.isAuthenticated) void resource.load(locale.code);
+}
 function goBack() { navBack("/pages/team/rank"); }
 onShow(reload);
-watch(() => locale.code, reload);
-onUnmounted(resource.dispose);
+onHide(() => { resource.dispose(); resource = makeResource(); });
+const resourceInputs = () => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
+watch(resourceInputs, () => {
+  resource.dispose(); state.value = { loading: true, error: false, policy: null, ranks: [], capabilities: { peer: false, genesis: false } }; resource = makeResource();
+}, { flush: 'sync' });
+// Clear old content synchronously, then read after completeSignIn has rebound
+// both app state and account-scoped stores. reload recaptures that final owner.
+watch(resourceInputs, reload);
+onUnmounted(() => resource.dispose());
 
-// Preserve the 5174 shared how-page scale and violet section identity.
-const bodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65, overflowWrap: "anywhere" };
-const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 };
-const ladderVStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", width: "28px", flexShrink: 0 };
-const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500, overflowWrap: "anywhere" };
-const unavailableStyle: CSSProperties = { padding: "14px", background: "var(--v5-surface-2)" };
-const retryStyle: CSSProperties = { marginTop: "8px", color: "var(--v5-brand)", background: "var(--v5-surface-2)" };
-const reqCardStyle: CSSProperties = { background: "var(--v5-surface-2)", padding: "10px 12px" };
-const reqLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-brand)" };
-const reqBodyStyle: CSSProperties = { marginTop: "5px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62, overflowWrap: "anywhere" };
-const startCardStyle: CSSProperties = { marginTop: "14px", background: "var(--v5-surface-2)", padding: "12px 14px" };
-const startLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "4px" };
-const unlockResultCardStyle: CSSProperties = { marginTop: "8px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)", borderColor: "color-mix(in srgb, var(--v5-brand-2) 30%, transparent)", padding: "12px" };
-const unlockResultLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "6px" };
-const unlockResultItemStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
-const ctaStyle: CSSProperties = { gap: "8px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
-const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "15px", fontWeight: 600 };
+const ruleGroups = computed(() => [
+  { id: 'overview', title: guide.value.overview, hint: guide.value.overviewHint,
+    sections: [s(sectionId.overview), s(sectionId.overviewDetail), s(sectionId.ladder)] },
+  { id: 'promotion', title: guide.value.conditions, hint: guide.value.conditionsHint,
+    sections: [s(sectionId.promotion), ...requirements.value, s(sectionId.stepwise)] },
+  { id: 'steps', title: guide.value.steps, hint: guide.value.stepsHint,
+    sections: content.value.example ? [s(sectionId.example), s(sectionId.exampleStart), ...phases.value, s(sectionId.exampleTrigger)] : [] },
+  { id: 'rewards', title: guide.value.rewards, hint: guide.value.rewardsHint,
+    sections: [s(sectionId.rewards), ...unlocks.value, s(sectionId.protection),
+      ...(content.value.example ? [s(sectionId.exampleResults), ...results.value] : [])] },
+  { id: 'faq', title: guide.value.faq, hint: guide.value.faqHint, sections: faqs.value },
+  ...(extraSections.value.length ? [{ id: 'more', title: guide.value.more, hint: guide.value.moreHint, sections: extraSections.value }] : []),
+]);
+// Expanded sections with an in-page directory replace the collapsed groups (design system 04.7).
+const stepNumber = (item: object) => ("n" in item && typeof item.n === "number" ? item.n : undefined);
+const directory = computed(() => [{ id: "ladder", title: guide.value.ladder }, ...ruleGroups.value.map(group => ({ id: group.id, title: group.title }))]);
 </script>
+
+<style src="@/components/team/team-rule-type.css"></style>
+<style scoped>
+.rank-how-page { color: var(--v5-ink); padding-bottom: 28px; }
+.how-state { margin: 0 20px; padding: 32px 0; display: flex; flex-direction: column; gap: 16px; color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); }
+.how-caption { display: block; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
+.how-ladder-scroll { width: 100%; }
+.how-ladder-scroll :deep(.uni-scroll-view) { scrollbar-width: thin; scrollbar-color: var(--v5-border) transparent; }
+.how-ladder { display: flex; align-items: flex-start; gap: 16px; padding-bottom: 4px; white-space: normal; }
+.how-rank { flex: 0 0 76px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.how-rank__level { display: block; margin-top: 8px; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
+.how-rank__name { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
+.how-authority { display: block; margin: 16px 20px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: anywhere; }
+.how-rank-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; margin: 16px 16px 0; padding: 0 16px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); cursor: pointer; }
+.how-rank-link > text { min-width: 0; overflow-wrap: anywhere; }
+.how-rank-link > svg { flex: none; color: var(--v5-ink-4); }
+.how-footer { margin: 24px 16px 0; }
+.how-footer :deep(.nx-button) { width: 100%; box-sizing: border-box; }
+.how-rank-link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+</style>

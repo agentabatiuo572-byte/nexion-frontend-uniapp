@@ -27,7 +27,7 @@ function parse(value: unknown, mode: ApiEnvironment): TeamQuotaSnapshot {
   const runId = text(source.runId, false);
   if (runId !== "") return invalid();
   const facts = row(source.facts);
-  const parsedFacts = { rank: num(facts.rank, true), directRefs: num(facts.directRefs, true), directInvites: facts.directInvites == null ? null : num(facts.directInvites, true), activeDirect: num(facts.activeDirect, true), teamComputePoints: num(facts.teamComputePoints) };
+  const parsedFacts = { rank: num(facts.rank, true), directRefs: num(facts.directRefs, true), directInvites: facts.directInvites == null ? null : num(facts.directInvites, true), activeDirect: num(facts.activeDirect, true), teamComputePoints: num(facts.teamComputePoints, true) };
   if (!Array.isArray(source.tiers)) return invalid();
   const tiers = source.tiers.map((value): TeamQuotaTier => {
     const item = row(value); const unlockKind = item.unlockKind;

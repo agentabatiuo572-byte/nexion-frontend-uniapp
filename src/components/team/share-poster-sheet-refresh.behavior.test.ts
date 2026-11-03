@@ -1,5 +1,10 @@
+import * as displayDate from "@/lib/display-date";
+import { teamLogicCopy } from '@/i18n/team-logic-copy';
 import * as Vue from "vue";
+import { teamRedesignCopy } from "@/i18n/team-redesign";
+import { useLocaleStore } from "@/store/locale";
 import { formatAmount } from "@/lib/amount-display";
+import { formatJoinedDate } from "@/lib/profile-date";
 import type { Component } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -8,26 +13,33 @@ import ts from "typescript";
 // @ts-expect-error Installed UniApp preprocessing is JavaScript without published declarations.
 import { preprocess } from "@dcloudio/uni-cli-shared/lib/preprocess/lib/preprocess.js";
 import qrcode from "qrcode-generator";
+// @ts-expect-error Existing Node-only QR decoder has no published declarations.
+import QrCode from "qrcode-reader";
+import { zh } from "@/i18n/messages/zh";
+import { vi as vietnamese } from "@/i18n/messages/vi";
 import { createApiClient, type HttpResponse } from "@/api/api-client";
 import { createSessionVault } from "@/api/session-vault";
 import { createAppHomeApi } from "@/api/app-home-api";
 import { createDeviceE3Api } from "@/api/device-e3-api";
 import { en } from "@/i18n/messages/en";
-import { fmt, dateLocale } from "@/i18n/format";
-import { nexGridBrandText } from "@/lib/brand-copy";
+import { fmt } from "@/i18n/format";
+import { displayNickname } from "@/lib/brand-copy";
 import { isActiveSlotDevice } from "@/lib/device-slot-policy";
 import source from "./share-poster-sheet.vue?raw";
 import segmentSource from "../glass-segments.vue?raw";
 
 const remote = vi.hoisted(() => ({
-  remoteApiEnabled: true, fundsServerEnabled: true, expectedApiEnvironment: "dev",
+  remoteApiEnabled: true, apiRuntimeConfig: { environment: "dev", baseUrl: "https://test.invalid" }, fundsServerEnabled: true, expectedApiEnvironment: "dev",
+  apiRuntimeClientOrigin: { environment: "dev", baseUrl: "https://test.invalid" },
   sessionVault: { read: vi.fn() }, deviceE3Api: { fleet: vi.fn() }, appHomeApi: { fetch: vi.fn() },
   taskAssignmentApi: { state: vi.fn() }, withdrawalApi: { list: vi.fn(), submit: vi.fn(), get: vi.fn() },
   purchaseEligibilityApi: { snapshot: vi.fn() },
+  profileApi: {},
 }));
 vi.mock("@/api/runtime", () => remote);
 const { useApp } = await import("@/store/app");
 const { useConfig } = await import("@/store/config");
+const { useProfile } = await import("@/store/profile");
 const { useReferralReward } = await import("@/store/referral-reward");
 const { buildShareLink, currentShareReferralCode } = await import("@/lib/share");
 
@@ -109,7 +121,8 @@ function home(today: number | null = null) {
     source: "server:nx_compute_receipt,nx_compute_task,nx_user_device,nx_compute_datacenter,nx_product,nx_growth_promo_banner" };
 }
 const response = (data: unknown): HttpResponse => ({ status: 200, headers: {}, data: { code: 0, message: "success", data } });
-async function mount(platform: "h5" | "native" = "h5") {
+async function mount(platform: "h5" | "native" = "h5", messages = en) {
+  useLocaleStore().setLocale(messages === zh ? "zh" : messages === vietnamese ? "vi" : "en");
   const vault = createSessionVault();
   const session = (userId: number) => vault.save({ accessToken: "fixture-access", refreshToken: "fixture-refresh", tokenType: "Bearer",
     user: { userId, countryCode: "+86", phone: "10000000000", nickname: "Fixture", onboardingComplete: true } });
@@ -125,7 +138,8 @@ async function mount(platform: "h5" | "native" = "h5") {
   const client = createApiClient({ baseUrl: "https://poster.example.test", transport: { request: transport }, vault });
   remote.deviceE3Api.fleet.mockImplementation(createDeviceE3Api(client, "dev").fleet);
   remote.appHomeApi.fetch.mockImplementation(createAppHomeApi(client, "dev").fetch);
-  const app = useApp(), cfg = useConfig(); app.bindAccount("user:1001");
+  const app = useApp(), cfg = useConfig(), profile = useProfile(); app.bindAccount("user:1001");
+  profile.bindAccount("user:1001"); profile.projectServerNickname("Fixture");
   cfg.configStatus = "ready"; cfg.config.rewards.enabled = false; cfg.config.share.baseUrl = "https://poster.example.test/ref/";
   cfg.config.share.channels = [{ key: "telegram", enabled: true, intentType: "web", urlTemplate: "https://t.example/?url={link}" }];
   const referral = useReferralReward();
@@ -134,13 +148,21 @@ async function mount(platform: "h5" | "native" = "h5") {
     sourceEnvironment: "PRODUCTION", runId: null, factSources: [], refreshedAt: "2026-10-01T00:00:00Z" };
   await Promise.all([app.refreshRemoteFleet(), app.refreshHomeTruth()]);
   expect(app.remoteFleetStatus).toBe("ready"); expect(app.homeTruthStatus).toBe("ready");
-  const canvas: Array<{ texts: string[] }> = [], exports: Array<{ success: (value: { tempFilePath: string }) => void }> = [];
+  type Drawing = { texts: string[]; images: any[][]; clips: number[][]; fills: Array<{ color: string; bounds: number[] }>; textPositions: Array<{ value: string; x: number; y: number; size: number }> };
+  const canvas: Drawing[] = [], exports: Array<{ success: (value: { tempFilePath: string }) => void }> = [];
   const native = {
-    getStorageSync: () => "", setStorageSync: vi.fn(), getImageInfo: ({ success }: any) => success({ path: "/fixture-logo.png" }),
+    getStorageSync: () => "", setStorageSync: vi.fn(), getImageInfo: vi.fn(({ src, success }: any) => success({ path: src.includes("atlas") ? "/fixture-atlas.png" : "/fixture-logo.png" })),
     createCanvasContext: () => {
-      const drawing = { texts: [] as string[] }; canvas.push(drawing);
+      const drawing: Drawing = { texts: [], images: [], clips: [], fills: [], textPositions: [] }; canvas.push(drawing);
+      let color = "", fontSize = 12, clip: number[] = [];
       return new Proxy({}, { get: (_target, key) => {
-        if (key === "fillText") return (value: string) => drawing.texts.push(value);
+        if (key === "fillText") return (value: string, x: number, y: number) => { drawing.texts.push(value); drawing.textPositions.push({ value, x, y, size: fontSize }); };
+        if (key === "setFontSize") return (value: number) => { fontSize = value; };
+        if (key === "setFillStyle") return (value: string) => { color = value; };
+        if (key === "fillRect") return (...bounds: number[]) => drawing.fills.push({ color, bounds });
+        if (key === "drawImage") return (...args: any[]) => drawing.images.push(args);
+        if (key === "rect") return (...bounds: number[]) => { clip = bounds; };
+        if (key === "clip") return () => drawing.clips.push(clip);
         if (key === "createLinearGradient" || key === "createCircularGradient") return () => ({ addColorStop() {} });
         if (key === "draw") return (_reserve: boolean, done: () => void) => done();
         return () => {};
@@ -165,10 +187,14 @@ async function mount(platform: "h5" | "native" = "h5") {
     throw new Error(`Unexpected segments import: ${id}`);
   }, segments, { update() {} });
   const dependencies: Record<string, unknown> = {
+    "@/i18n/team-logic-copy": { teamLogicCopy },
     "@/lib/amount-display": { formatAmount },
-    vue: Vue, "qrcode-generator": { default: qrcode }, "@/i18n/use-t": { useT: () => Vue.ref(en) }, "@/i18n/format": { fmt, dateLocale },
-    "@/lib/brand-copy": { nexGridBrandText }, "@/api/runtime": remote, "@/lib/device-slot-policy": { isActiveSlotDevice },
-    "@/store/app": { useApp }, "@/store/config": { useConfig }, "@/store/profile": { useProfile: () => ({ displayName: "Fixture" }) },
+    "@/lib/profile-date": { formatJoinedDate },
+    "@/store/locale": { useLocaleStore }, "@/i18n/team-redesign": { teamRedesignCopy },
+    "@/components/liquid-glass.vue": { default: { render: () => Vue.h("decoration") } },
+    vue: Vue, "qrcode-generator": { default: qrcode }, "@/i18n/use-t": { useT: () => Vue.ref(messages) }, "@/lib/display-date": displayDate, "@/i18n/format": { fmt },
+    "@/lib/brand-copy": { displayNickname }, "@/api/runtime": remote, "@/lib/device-slot-policy": { isActiveSlotDevice },
+    "@/store/app": { useApp }, "@/store/config": { useConfig }, "@/store/profile": { useProfile },
     "@/store/ui": { toast },
     "@/lib/share": { buildShareLink, currentShareReferralCode, copyText, activateChannel, notifyUnavailableShareLink: unavailable },
     "@/composables/use-dialog-a11y": { useDialogA11y: () => {} }, "@/components/glass-segments.vue": segments,
@@ -189,7 +215,7 @@ async function mount(platform: "h5" | "native" = "h5") {
   const finish = async (path = "/fixture-poster.png") => { exports.at(-1)!.success({ tempFilePath: path }); await flush(); };
   const selectYield = async () => { tab(en.share.tplYield)!.props.onClick({ currentTarget: {} }); await generate(); await finish(); };
   const hold = (path: string) => { const pending = deferred<HttpResponse>(); held.set(path, [...(held.get(path) ?? []), pending]); return pending; };
-  return { app, cfg, root, native, canvas, exports, copyText, activateChannel, unavailable, transport, session, hold, generate, finish, selectYield, control, tab,
+  return { app, cfg, profile, root, native, canvas, exports, copyText, activateChannel, unavailable, transport, session, hold, generate, finish, selectYield, control, tab,
     open, referral, toast, fetchImage, objectUrl, revokeUrl, download, anchors, unmount,
     image: () => all(root).find(entry => entry.tag === "image")?.props.src,
     selected: () => { const selected = all(root).find(entry => entry.props.role === "tab" && entry.props["aria-selected"]); return selected ? text(selected) : undefined; },
@@ -204,10 +230,83 @@ beforeEach(() => {
 afterEach(() => { unmounts.splice(0).forEach(unmount => unmount()); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("mounted poster template during real authority refresh", () => {
+  it.each(["h5", "native"] as const)("redraws the %s poster on a projected nickname change only while the username is shown", async platform => {
+    const s = await mount(platform); await s.generate(); await s.finish();
+    const oldCanvas = s.exports.at(-1)!, initialExports = s.exports.length;
+    s.profile.projectServerNickname("Current nickname"); await flush();
+    expect(s.image()).toBeUndefined(); expect(s.control(en.share.saveImage).props["aria-disabled"]).toBe(true);
+    oldCanvas.success({ tempFilePath: "/old-nickname.png" }); await flush();
+    expect(s.image()).toBeUndefined();
+    await s.generate();
+    expect(s.exports).toHaveLength(initialExports + 1);
+    expect(s.canvas.at(-1)!.texts).toContain("Current nickname");
+    expect(s.canvas.at(-1)!.texts).not.toContain("Fixture");
+    await s.finish("/current-nickname.png");
+    const toggle = all(s.root).find(entry => entry.props.role === "switch")!;
+    toggle.props.onClick(); await s.generate(); await s.finish("/hidden-nickname.png");
+    expect(s.canvas.at(-1)!.texts).not.toContain("Current nickname");
+    const hiddenExports = s.exports.length;
+    s.profile.projectServerNickname("Private nickname"); await flush(); await s.generate();
+    expect(s.exports).toHaveLength(hiddenExports); expect(s.image()).toBe("/hidden-nickname.png");
+    expect(s.control(en.share.saveImage).props["aria-disabled"]).toBe(false);
+    toggle.props.onClick(); await s.generate();
+    expect(s.exports).toHaveLength(hiddenExports + 1);
+    expect(s.canvas.at(-1)!.texts).toContain("Private nickname");
+  });
+
+  it.each(["h5", "native"] as const)("keeps the ready %s poster while public config polls the same link and closes on confirmed failure", async platform => {
+    const s = await mount(platform); await s.generate(); await s.finish();
+    const confirmedLink = buildShareLink(), exportsBefore = s.exports.length, imageBefore = s.image();
+    s.cfg.configStatus = "loading"; await flush();
+    expect(s.open.value).toBe(true);
+    expect(s.control(en.share.saveImage).props["aria-disabled"]).toBe(false);
+    await s.generate();
+    expect(s.exports).toHaveLength(exportsBefore); expect(s.image()).toBe(imageBefore);
+    await s.control(en.share.copyLink).props.onClick();
+    expect(s.copyText).toHaveBeenCalledWith(confirmedLink);
+    expect(s.unavailable).not.toHaveBeenCalled();
+    s.cfg.configStatus = "ready"; await flush();
+    expect(s.open.value).toBe(true);
+    await s.generate();
+    expect(s.exports).toHaveLength(exportsBefore); expect(s.image()).toBe(imageBefore);
+    s.cfg.configStatus = "failed"; await flush();
+    expect(s.open.value).toBe(false); expect(s.unavailable).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["h5", "brand"], ["native", "brand"], ["h5", "gift"], ["native", "gift"],
+  ] as const)("keeps a ready %s %s poster through unrelated home/fleet refresh, changed values and errors", async (platform, template) => {
+    const s = await mount(platform);
+    s.cfg.config.rewards.enabled = true; s.cfg.config.rewards.welcomeGift.usdtAmount = 2;
+    await s.generate(); await s.finish();
+    if (template === "gift") {
+      s.tab(en.share.tplGift)!.props.onClick({ currentTarget: {} }); await s.generate(); await s.finish("/gift-ready.png");
+    }
+    const imageBefore = s.image(), exportsBefore = s.exports.length;
+    const pendingHome = s.hold(homePath), pendingFleet = s.hold(fleetPath);
+    const reads = [s.app.refreshHomeTruth(), s.app.refreshRemoteFleet()]; await flush();
+    expect(s.app.homeTruthStatus).toBe("loading"); expect(s.app.remoteFleetStatus).toBe("loading");
+    expect(s.image()).toBe(imageBefore); expect(s.control(en.share.saveImage).props["aria-disabled"]).toBe(false);
+    await s.generate(); expect(s.exports).toHaveLength(exportsBefore);
+    pendingHome.resolve(response(home(1.23))); pendingFleet.resolve(response(fleet(false)));
+    expect(await Promise.all(reads)).toEqual([true, true]); await s.generate();
+    expect(s.exports).toHaveLength(exportsBefore); expect(s.image()).toBe(imageBefore);
+    expect(s.control(en.share.copyLink).props["aria-disabled"]).toBe(false);
+    const failedHome = s.hold(homePath), failedFleet = s.hold(fleetPath);
+    const failures = [s.app.refreshHomeTruth(), s.app.refreshRemoteFleet()]; await flush();
+    failedHome.resolve(response({ ...home(), serverCanonical: false }));
+    failedFleet.resolve(response({ ...fleet(), serverCanonical: false }));
+    expect(await Promise.all(failures)).toEqual([false, false]); await s.generate();
+    expect(s.app.homeTruthStatus).toBe("error"); expect(s.app.remoteFleetStatus).toBe("error");
+    expect(s.exports).toHaveLength(exportsBefore); expect(s.image()).toBe(imageBefore);
+    expect(s.control(en.share.saveImage).props["aria-disabled"]).toBe(false);
+    expect(s.selected()).toBe(template === "gift" ? en.share.tplGift : en.share.tplBrand);
+  });
+
   it.each(["home", "fleet", "both"])("keeps My yield selected through %s polling but exports only current confirmed data", async kind => {
     const s = await mount(); await s.selectYield();
     expect(s.canvas.at(-1)!.texts).toContain("+0.00");
-    expect(s.canvas.at(-1)!.texts).toContain(fmt(en.share.posterYieldUnit, { n: 1 }));
+    expect(s.canvas.at(-1)!.texts).toContain(fmt(en.share.posterYieldUnit, { n: 2 }));
     const pendingHome = kind !== "fleet" ? s.hold(homePath) : null, pendingFleet = kind !== "home" ? s.hold(fleetPath) : null;
     const reads = [pendingHome ? s.app.refreshHomeTruth() : Promise.resolve(true), pendingFleet ? s.app.refreshRemoteFleet() : Promise.resolve(true)];
     await flush();
@@ -233,19 +332,18 @@ describe("mounted poster template during real authority refresh", () => {
     await s.generate(); await s.finish(); expect(s.canvas.at(-1)!.texts).toContain("+1.23"); expect(s.selected()).toBe(en.share.tplYield);
   });
 
-  it("hides the yield template when the confirmed fleet only contains phones", async () => {
-    const s = await mount(); await s.selectYield(); const pending = s.hold(fleetPath), request = s.app.refreshRemoteFleet();
-    const phones = fleet(); phones.devices = phones.devices.filter(device => device.productCode === "phone");
-    pending.resolve(response(phones)); await request; await s.generate(); await s.finish();
-    expect(s.selected()).toBe(en.share.tplBrand); expect(s.tab(en.share.tplYield)).toBeUndefined();
-    expect(s.canvas.at(-1)!.texts).not.toContain(en.share.posterYieldCap);
-  });
-
-  it("keeps a Cloud Share yield poster when no physical slot is active", async () => {
+  it("keeps the yield poster available for an active Cloud Share without a physical device", async () => {
     const s = await mount(); await s.selectYield(); const pending = s.hold(fleetPath), request = s.app.refreshRemoteFleet();
     pending.resolve(response(fleet(false))); await request; await s.generate(); await s.finish();
-    expect(s.selected()).toBe(en.share.tplYield);
-    expect(s.canvas.at(-1)!.texts).toContain(fmt(en.share.posterYieldUnit, { n: 1 }));
+    expect(s.selected()).toBe(en.share.tplYield); expect(s.tab(en.share.tplYield)).toBeDefined();
+  });
+
+  it("falls back after a canonical current fleet confirms no active device slot", async () => {
+    const s = await mount(); await s.selectYield(); const pending = s.hold(fleetPath), request = s.app.refreshRemoteFleet();
+    const inactive = fleet(false); inactive.devices = inactive.devices.map(row => ({ ...row, status: "DEACTIVATED", activatedAt: null }));
+    pending.resolve(response(inactive)); await request; await s.generate(); await s.finish();
+    expect(s.selected()).toBe(en.share.tplBrand); expect(s.tab(en.share.tplYield)).toBeUndefined();
+    expect(s.canvas.at(-1)!.texts).not.toContain(en.share.posterYieldCap);
   });
 
   it("honors an explicit Network selection made while yield data is pending", async () => {
@@ -376,4 +474,115 @@ describe("mounted native save callbacks use the same operation fence", () => {
     const current = s.native.saveImageToPhotosAlbum.mock.calls[0][0]; expect(current.filePath).toBe(s.image());
     current.success(); expect(s.toast.success).toHaveBeenCalledExactlyOnceWith(en.share.saved); expect(s.fetchImage).not.toHaveBeenCalled();
   });
+});
+
+
+describe("approved decorative art and real poster QR", () => {
+  for (const platform of ["h5", "native"] as const) {
+    it.each([
+      [zh, "2026/10/22"], [en, "Oct 22, 2026"], [vietnamese, "22/10/2026"],
+    ] as const)(`formats the actual ${platform} reward effective date by the selected language without native Intl`, async (messages, date) => {
+      vi.spyOn(Date.prototype, "toLocaleDateString").mockReturnValue("Thu Oct 22 2026");
+      const s = await mount(platform, messages);
+      s.cfg.config.rewards.enabled = true; s.cfg.config.rewards.welcomeGift.usdtAmount = 2;
+      s.cfg.config.rewards.effectiveAt = new Date(2026, 9, 22, 12).toISOString();
+      await s.generate(); await s.finish();
+      const reward = all(s.root).find(entry => entry.props.class === "ps-reward")!;
+      expect(text(reward)).toContain(fmt(messages.share.posterRewardEffectiveAt, { date }));
+      expect(text(reward)).not.toContain("Thu Oct 22 2026");
+      for (const invalid of ["not-a-date", ""]) {
+        s.cfg.config.rewards.effectiveAt = invalid; await flush();
+        expect(all(reward).filter(entry => entry.tag === "text")).toHaveLength(1);
+      }
+    });
+  }
+
+  it.each([en, zh, vietnamese])("composes one invite tile, fits localized text and decodes the generated QR to the confirmed link", async messages => {
+    const s = await mount("h5", messages); await s.generate(); await s.finish();
+    const drawing = s.canvas.at(-1)!;
+    expect(drawing.images.filter(args => args[0] === "/fixture-atlas.png")).toEqual([["/fixture-atlas.png", 69, 108, 618, 618]]);
+    expect(drawing.clips).toEqual([[69, 108, 206, 206]]);
+    expect(drawing.texts.join(" ")).not.toContain("41,286");
+    for (const position of drawing.textPositions) {
+      expect(position.y).toBeLessThanOrEqual(446);
+      if (position.x === 20 && position.y >= 325 && position.y < 352) expect(position.y).toBeLessThanOrEqual(340);
+    }
+    const white = drawing.fills.find(fill => fill.color === "#FFFFFF")!;
+    const [x, y, size] = white.bounds;
+    const dimension = 288, scale = dimension / size;
+    const data = new Uint8ClampedArray(dimension * dimension * 4).fill(255);
+    for (const { color, bounds: [left, top, width, height] } of drawing.fills.filter(fill => fill.color === "#000000")) {
+      expect(color).toBe("#000000"); expect(left).toBeGreaterThan(x); expect(top).toBeGreaterThan(y);
+      for (let row = Math.round((top - y) * scale); row < Math.round((top + height - y) * scale); row++) {
+        for (let col = Math.round((left - x) * scale); col < Math.round((left + width - x) * scale); col++) {
+          const offset = (row * dimension + col) * 4; data[offset] = data[offset + 1] = data[offset + 2] = 0;
+        }
+      }
+    }
+    const decoded = await new Promise<string>((resolve, reject) => {
+      const reader = new QrCode(); reader.callback = (error: unknown, result: { result: string }) => error ? reject(error) : resolve(result.result);
+      reader.decode({ width: dimension, height: dimension, data });
+    });
+    expect(decoded).toBe(buildShareLink());
+    const body = all(s.root).find(entry => String(entry.props.class).includes("ps-body"))!;
+    const head = all(s.root).find(entry => entry.props.class === "ps-head")!;
+    expect(body.parent).toBe(head.parent);
+    expect(all(body).some(entry => entry.props["aria-label"] === messages.ui.close)).toBe(false);
+    expect(all(body)).toContain(s.control(messages.share.saveImage));
+  });
+
+  it("exports a real QR even when the decorative atlas fails to load", async () => {
+    const s = await mount();
+    s.native.getImageInfo.mockImplementation(({ src, success, fail }: any) => src.includes("atlas") ? fail() : success({ path: "/fixture-logo.png" }));
+    await s.generate(); await s.finish();
+    expect(s.image()).toBe("/fixture-poster.png");
+    expect(s.canvas.at(-1)!.images.every(args => args[0] !== "/fixture-atlas.png")).toBe(true);
+    expect(s.canvas.at(-1)!.fills.some(fill => fill.color === "#000000")).toBe(true);
+  });
+
+  it.each([zh, en, vietnamese])("keeps zero newcomer rewards off promotional posters without changing inviter rewards", async messages => {
+    const s = await mount("h5", messages);
+    s.cfg.config.rewards.enabled = true;
+    s.cfg.config.rewards.welcomeGift.usdtAmount = 0;
+    s.cfg.config.rewards.welcomeGift.nexAmount = 0;
+    await flush();
+    expect(s.tab(messages.share.tplGift)).toBeUndefined();
+    await s.generate(); await s.finish();
+    const printed = s.canvas.at(-1)!.texts.join(" ");
+    expect(printed).toContain(messages.share.posterBrandSubNoReward);
+    expect(printed).not.toContain(fmt(messages.share.posterRewardLine, { usd: "0.00", nex: "0.00" }));
+  });
+
+  it("invalidates a gift poster when configured recipient rewards change", async () => {
+    const s = await mount(); s.cfg.config.rewards.enabled = true; s.cfg.config.rewards.welcomeGift.usdtAmount = 1; await flush();
+    s.tab(en.share.tplGift)!.props.onClick({ currentTarget: {} }); await s.generate(); await s.finish();
+    s.cfg.config.rewards.welcomeGift.usdtAmount = 8; s.cfg.config.rewards.welcomeGift.nexAmount = 25; await flush();
+    expect(s.control(en.share.saveImage).props["aria-disabled"]).toBe(true);
+    await s.generate(); await s.finish();
+    expect(s.canvas.at(-1)!.texts).toContain(fmt(en.share.posterGiftAmount, { usd: "8.00", nex: "25.00" }));
+    expect(s.canvas.at(-1)!.texts.join(" ")).not.toContain(en.share.posterGiftSub2);
+  });
+
+  it("suppresses late clipboard feedback after the account epoch changes", async () => {
+    const s = await mount(); await s.generate(); await s.finish();
+    const copied = deferred<boolean>(); s.copyText.mockReturnValueOnce(copied.promise);
+    const action = s.control(en.share.copyLink).props.onClick();
+    s.app.bindAccount("user:2002"); await flush(); copied.resolve(true); await action;
+    expect(s.toast.success).not.toHaveBeenCalled(); expect(s.toast.info).not.toHaveBeenCalled();
+  });
+});
+
+
+it.each([['zh', zh], ['en', en], ['vi', vietnamese]] as const)('TI-F09 localizes the actual %s yield drawing and activates the whole 44px switch row', async (locale, messages) => {
+  const s = await mount('native', messages);
+  s.tab(messages.share.tplYield)!.props.onClick({ currentTarget: {} }); await s.generate(); await s.finish();
+  expect(s.canvas.at(-1)!.texts).toContain(teamLogicCopy(locale).posterYieldCap);
+  if (locale !== 'en') expect(s.canvas.at(-1)!.texts).not.toContain("TODAY'S EARNINGS");
+  const toggle = all(s.root).find(entry => entry.props.role === 'switch')!;
+  expect(toggle.props.class).toContain('ps-toggle'); expect(toggle.props.tabindex).toBe('0');
+  expect(toggle.props['aria-checked']).toBe(true);
+  expect(source).toMatch(/\.ps-toggle\s*\{[^}]*min-height:\s*44px/);
+  toggle.props.onClick(); await flush(); expect(toggle.props['aria-checked']).toBe(false);
+  expect(all(toggle).filter(entry => entry.props.role === 'switch')).toHaveLength(1);
+  s.app.bindAccount('user:2002'); await flush(); expect(s.open.value).toBe(false);
 });

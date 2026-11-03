@@ -112,13 +112,13 @@ describe('Rewards voucher list remote read states', () => {
     const bills = reactive({ bills: [], summaryStatus: 'ready', summary: { rewardsUsdt: 0, rewardsNex: 0 } });
     const t = ref({ rewards: {
       catVouchers: 'Vouchers', unitVouchers: 'vouchers', catVouchersDesc: 'Voucher rewards', expiredCount: '{n} expired',
-      catUsdt: 'USDT', catNex: 'NEX', catUsdtDesc: 'USDT rewards', catNexDesc: 'NEX rewards',
+      catUsdt: 'USDT', catNex: 'UVT', catUsdtDesc: 'USDT rewards', catNexDesc: 'NEX rewards',
     }, promotion: { rewardCategory: 'Promotion rewards', rewardCategoryDesc: 'Device gifts, USDT and NEX rewards' } });
     const result = new Function("formatAmount", 'computed', 'voucher', 'remoteApiEnabled', 'fundsServerEnabled', 'bills', 'isRewardBill', 't', 'fmt', 'ref', 'watch',
       `${l1Block}\nreturn { voucherReady, availableCount, expiredCount, allZero, cats };`,
     )(formatAmount, computed, voucher, true, true, bills, () => false, t, (template: string, args: { n: number }) => template.replace('{n}', String(args.n)), ref, watch);
 
-    expect(result.cats.value[0].big).toBe('-');
+    expect(result.cats.value[0].big).toBe('—');
     expect(result.allZero.value).toBe(false);
     voucher.remoteStatus = 'ready';
     expect(result.cats.value[0].big).toBe('0');
@@ -133,7 +133,7 @@ describe('Rewards voucher list remote read states', () => {
     const bills = reactive({ bills: [], summaryStatus: 'ready', summary: { rewardsUsdt: 12.5, rewardsNex: 340 } });
     const t = ref({ rewards: {
       catVouchers: 'Vouchers', unitVouchers: 'vouchers', catVouchersDesc: 'Voucher rewards', expiredCount: '{n} expired',
-      catUsdt: 'USDT', catNex: 'NEX', catUsdtDesc: 'USDT rewards', catNexDesc: 'NEX rewards',
+      catUsdt: 'USDT', catNex: 'UVT', catUsdtDesc: 'USDT rewards', catNexDesc: 'NEX rewards',
     }, promotion: { rewardCategory: 'Promotion rewards', rewardCategoryDesc: 'Device gifts, USDT and NEX rewards' } });
     const view = new Function("formatAmount", 'computed', 'voucher', 'remoteApiEnabled', 'fundsServerEnabled', 'bills', 'isRewardBill', 't', 'fmt', 'ref', 'watch',
       `${l1Block}\nreturn { availableCount, expiredCount, displayUsdtTotal, displayNexTotal, cats };`,

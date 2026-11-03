@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { computed, reactive, ref } from "vue";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatAmount } from "@/lib/amount-display";
 
 // The wallet payment row used to render only the static label "USDT balance",
@@ -32,6 +32,15 @@ function view(app: Record<string, unknown>) {
 }
 
 describe("checkout wallet balance hint", () => {
+  it("does not enter purchase confirmation until a wallet snapshot is readable", async () => {
+    const readable=ref(false),confirm=vi.fn(),step=ref('confirm');
+    const submit=new Function('quantitySwitching','remoteApiEnabled','checkoutWalletReadable','step','goConfirm','nextTick','requestConfirmPay',
+      'captureCheckoutRoute','trialQuoteUnavailable','trialQuoteScreenUnavailable','checkoutOnboardingRequired',
+      extract('async function submitReview()', 'function selectPayment')+'\nreturn submitReview;')
+      (ref(false),true,readable,step,()=>{},async()=>{},confirm,()=>({}),ref(false),ref(false),ref(false));
+    await submit();expect(confirm).not.toHaveBeenCalled();
+    readable.value=true;await submit();expect(confirm).toHaveBeenCalledOnce();
+  });
   it("shows the server-confirmed available balance instead of a bare label", () => {
     const v = view(reactive({
       user: { usdtBalance: 1299 },
@@ -39,7 +48,8 @@ describe("checkout wallet balance hint", () => {
       remoteWalletReceiptHasSnapshot: false,
       remoteFleetStatus: "ready",
     }));
-    expect(v.walletBalanceHint.value).toBe("USDT balance · $1299.00");
+    expect(v.walletBalanceHint.value).toBe("USDT balance · 1299.00");
+    expect(v.walletBalanceHint.value.match(/USDT/g)).toHaveLength(1);
   });
 
   it("states loading and unavailable instead of a stale number", () => {

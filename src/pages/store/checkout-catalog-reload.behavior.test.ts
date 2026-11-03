@@ -25,7 +25,7 @@ vi.mock("@/api/runtime", () => ({
   get sessionVault() { return state.vault; },
   get productCatalogApi() { return state.catalogApi; },
 }));
-vi.mock("@/api/order-api", () => ({ advanceRuntimeRevision: vi.fn() }));
+vi.mock("@/api/order-api", async importOriginal => await importOriginal());
 vi.mock("@/store/auth", () => ({ useAuth: () => state.auth }));
 vi.mock("@/store/app", () => ({ useApp: () => ({ refreshRemoteFleet: state.fleet }) }));
 
@@ -89,7 +89,7 @@ async function harness(seedSession = false) {
     readAccountSessionRecords: () => [{ sessionId: session.sessionId }],
     useProfile: () => ({ projectServerIdentity: vi.fn() }), hydrateCurrentProfileLocale: vi.fn(),
     afterLegalTermsAcknowledged: (callback: () => Promise<unknown>) => { acknowledge = callback; },
-    hasPendingLegalTermsRequirement: () => false, hasNativeAndroidPhoneRuntime: () => false,
+    hasPendingLegalTermsRequirement: () => false, hasNativeAndroidPhoneRuntime: () => false, hasNativePhoneRuntime: () => false, nativePhonePlatform: () => null,
     refreshRemoteFleetAfterCatalog: bootstrap.refreshRemoteFleetAfterCatalog,
     refreshEarningsReleaseStatus: async () => {}, scheduleLegalTermsGate: async () => {}, resolvePostSignInRoute, navReset: nav,
   }, "const completedSignIns = new Map(); const IDEMPOTENCY_TTL_MS = 600000;", "completeSignIn");

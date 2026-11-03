@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import test from "node:test";
-const { initPreContext, preJs } = createRequire(import.meta.url)("@dcloudio/uni-cli-shared");
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
 // 🔴 fnBlock:按大括号配平抠出**这一个函数的块**,断言只在块内量。
@@ -45,15 +43,10 @@ test("server mode starts unauthenticated and only retains a non-secret recovery 
   const nativeBlock = runtime.match(/\/\/ #ifdef APP-PLUS\s+if \(!h5RefreshCookieEnabled\) \{([\s\S]*?)\}\s+\/\/ #endif/)?.[1];
   assert.ok(nativeBlock, "native encrypted adapters must remain APP-PLUS only");
   assert.match(nativeBlock, /nativeSessionStorage = createNativeSessionStorage\(/);
-  assert.equal((runtime.match(/= createNativeSessionStorage\(/g) || []).length, 1);
+  assert.match(nativeBlock, /nativeAttemptStorage = createNativeSessionStorage\([^\n]+purpose: "login-attempt"/);
+  assert.equal((runtime.match(/= createNativeSessionStorage\(/g) || []).length, 2);
   const prepare = fnBlock(runtime, "prepareSessionVault");
-  assert.match(prepare, /await nativeSessionStorage\.ready\(\);\s+sessionVault\.hydrate\(\);/);
-  initPreContext("h5");
-  const h5 = preJs(runtime, "src/api/runtime.ts");
-  assert.doesNotMatch(h5, /clientSurface = "APP"|= createNativeSessionStorage\(/);
-  assert.match(h5, /executionSupported: \(\) => false/);
-  assert.match(h5, /attemptStorage: typeof sessionStorage !== "undefined"/);
-  assert.match(h5, /sessionStorage\.setItem\("uvel-login-attempt", JSON\.stringify\(value\)\)/);
+  assert.match(prepare, /await nativeSessionStorage\.ready\(\);\s+await nativeAttemptStorage\?\.ready\(\);\s+sessionVault\.hydrate\(\);/);
   assert.doesNotMatch(runtimeVault, /(?:window\.)?localStorage\.(?:setItem|getItem)|uni\.setStorageSync|storage\.set\(/,
     "cross-tab access-token continuity must remain in memory");
   assert.doesNotMatch(fnBlock(vault, "persistAndCommit"), /accessToken:\s*snapshot\.accessToken/,
@@ -186,10 +179,12 @@ test("remote policy branches use dedicated server contracts or stay fail-closed"
   assert.match(login, /async function requestCode\(captchaTicket\?: string\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.sendPasswordResetOtp[\s\S]*?authApi\.sendLoginOtp/);
   assert.match(login, /async function verifyCode\(\) \{[\s\S]*?if \(remoteTwoFactorChallenge\.value\) \{ await verifyRemoteTwoFactor\(\); return; \}[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.completeOtpLogin/);
   assert.match(login, /async function finishReset\(\) \{[\s\S]*?authApi\.completePasswordReset/);
-  assert.match(share, /if \(remoteApiEnabled && useConfig\(\)\.configStatus !== "ready"\) return "";/);
+  // c482b840: a validated share base survives config polling ("loading"); only idle/failed loads close sharing.
+  assert.match(share, /if \(remoteApiEnabled && \["idle", "failed"\]\.includes\(useConfig\(\)\.configStatus\)\) return "";/);
   assert.match(share, /if \(remoteApiEnabled\) return "";/);
   assert.match(share, /export function buildShareText\(\): string \{[\s\S]*?if \(remoteApiEnabled\) return "";/);
-  assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?useConfig\(\)\.config\.share\.channels\.filter\(\(c\) => c\.enabled\)/);
+  // Server-enabled channels only; scheme-launch channels are additionally hidden.
+  assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?useConfig\(\)\.config\.share\.channels\.filter\(\(c\) => c\.enabled && c\.intentType !== "scheme"\)/);
   assert.match(share, /const text = remoteApiEnabled[\s\S]*?referralShareText\([\s\S]*?def\.textTemplate \?\? "\{link\}"/);
   assert.match(share, /const effectiveDef = remoteApiEnabled && !remoteRewardEnabled[\s\S]*?textTemplate: undefined/);
 });

@@ -18,6 +18,26 @@ const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localho
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
 
 function formalEmptyResponse(url) {
+  const stakingRoute = arguments[1] === true;
+  // This probe checks the staking empty state while its App visibility switch
+  // is on. Other routes keep their existing unavailable-config fixtures.
+  if (stakingRoute && url.pathname === "/api/config/platform") return {
+    featureFlags: { computeShareEnabled: true, homeNewcomerTasksEnabled: false, homeWeeklyPromoEnabled: false, stakingVisible: true },
+    publicStats: { version: 1, serverCanonical: true, source: "server:nx_config_item,nx_user", sourceEnvironment: "PRODUCTION", runId: "", realUserCount: 0 },
+    onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 },
+    computerCompute: { domain: "E6", flags: [{ key: "computeShareEnabled", enabled: true }],
+      coefficients: [{ key: "h5BaseFactor", value: 0.6 }, { key: "continuityFullHours", value: 24 }],
+      yieldEstimate: [{ key: "topsBaseline", value: 100 }, { key: "dailyUsdtPerBaseline", value: 0.24 }, { key: "nexPerUsdt", value: 10 }],
+      gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, i) => ({ id, label: id, tops: (i + 1) * 100, keywords: [{ slot: "keyword1", value: id }] })),
+      download: { url: "", zhTitle: "", zhGuide: "", enTitle: "", enGuide: "" }, sources: ["e6.compute_config"] },
+    share: { baseUrl: "", channels: [], appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "", version: "", releaseNotes: { zh: "", en: "" }, source: "unavailable" } },
+    updatedAt: "2026-10-21T00:00:00Z",
+  };
+  if (stakingRoute && url.pathname === "/api/config/referral-rewards") return {
+    enabled: true, welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
+    inviterReward: { nexAmount: 10 }, rhythmMonth: 1, newcomerMultiplier: 1, inviterMultiplier: 1,
+    effectiveAt: "2026-10-21T00:00:00Z", sources: ["nx_user.sponsor_user_id"],
+  };
   if (url.pathname === "/api/config/commission/direct-referral") return {
     source: "server", serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
     configured: false, policyVersion: 0, effectiveAt: null, nexUsdtPrice: null,
@@ -54,7 +74,7 @@ function formalEmptyResponse(url) {
   // An unavailable exchange read is not an empty history. Supply the complete
   // canonical response so this probe exercises the actual empty-list branch.
   if (url.pathname === "/api/exchange") {
-    const caps = { asset: "NEX", currency: "USDT", currentPrice: 0.125,
+    const caps = { asset: "UVT", currency: "USDT", currentPrice: 0.125,
       userDailyCapUsdt: 50, platformDailyCapUsdt: 20000, feePct: 0, feeMinUsdt: 0.5,
       minUsdt: 3, minNex: 42, queueMode: "QUEUE", swapEnabled: false,
       serverCanonical: true, source: "G2/G3 server configuration", sourceEnvironment: "PRODUCTION", runId: "" };
@@ -87,7 +107,7 @@ function formalEmptyResponse(url) {
     halted: false,
     status: "NOT_ELIGIBLE",
     reservedAllocation: 0,
-    reservedAllocationUnit: "NEX",
+    reservedAllocationUnit: "UVT",
     priorityRank: null,
     priorityTier: "NONE",
     policyVersion: "formal-empty-v1",
@@ -156,7 +176,6 @@ const ROUTES = [
   { r: "pages/me/wallet-exchange" },
   { r: "pages/me/wallet-nex", unreachable: "🔴 mock 恒非空:activity computed 里硬塞了 5 条 mining 记录,当前空态不可达;接真后台后才可能为空(空态本身该留)" },
   { r: "pages/me/wallet-bills" },
-  { r: "pages/me/support-tickets" },
   { r: "pages/events/events", unreachable: "按 tab 过滤 EVENTS 常量,需切到无结果的 tab" },
   { r: "pages/team/commissions" },
   { r: "pages/me/help", type: TYPE_JUNK },
@@ -266,7 +285,9 @@ const consoleErrorsFor = (page) => {
 };
 
 const rows = await mapRoutes(browser, SPECS, async (page, spec, _i, lanes) => {
-  if (!formalSessionSet.has(page)) { await installFormalProbeSession(page, { responseFor: formalEmptyResponse }); formalSessionSet.add(page); }
+  if (!formalSessionSet.has(page)) { await installFormalProbeSession(page, {
+    responseFor: (url) => formalEmptyResponse(url, page.url().includes("#/pages/staking/staking")),
+  }); formalSessionSet.add(page); }
   const i = ROUTES.indexOf(spec);
   const route = spec.r;
   const consoleErrors = consoleErrorsFor(page);

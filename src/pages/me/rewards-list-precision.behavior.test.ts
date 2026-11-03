@@ -1,4 +1,8 @@
-import { formatAmount } from "@/lib/amount-display";
+import { growthButton } from "@/lib/entry-review.test-support";
+import * as displayDate from "@/lib/display-date";
+import * as brandCopy from "@/lib/brand-copy";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { formatUsd } from "@/lib/usd-display";
 import * as Vue from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { compileScript, parse } from "@vue/compiler-sfc";
@@ -8,12 +12,13 @@ import source from "./rewards-list.vue?raw";
 import { en } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
 import { vi as vietnamese } from "@/i18n/messages/vi";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { courseRewardId, rewardsListCategory } from "./course-reward-link";
+import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import type { Bill } from "@/store/bills";
 
 // Mount the complete production SFC, including its actual formatter and locale
@@ -50,26 +55,30 @@ const fixture = (amount: number, symbol: Bill["symbol"] = "USDT"): Bill => ({
   id: `local-reward-${amount}`, type: "bonus", amount, symbol, status: "posted",
   ts: Date.parse("2026-10-04T18:51:00Z"), memo: "", memoKey: "bonus",
 });
-async function mount(localeCode: "zh" | "en" | "vi", rows: Bill[]) {
+async function mount(localeCode: "zh" | "en" | "vi", rows: Bill[], vouchers?: VoucherDef[]) {
   const locale = useLocaleStore(); locale.setLocale(localeCode);
   const pager = Vue.reactive({ rows, status: "ready", hasMore: false, loadingMore: false, error: "",
     refresh: vi.fn(async () => {}), loadMore: vi.fn(async () => {}) });
+  const navTo = vi.fn();
   const shown: Array<() => void> = [], chassis = Vue.defineComponent({ setup: (_props, { slots }) => () => Vue.h("main", slots.default?.()) });
   const modules: Record<string, unknown> = {
-    "@/lib/amount-display": { formatAmount },
-    vue: Vue, "@dcloudio/uni-app": { onLoad: (callback: (options: { cat: string }) => void) => callback({ cat: rows[0]?.symbol === "NEX" ? "nex" : "usdt" }),
+    "@/components/ui/nx-button.vue": {default: growthButton},
+    "@/lib/brand-copy": brandCopy,
+    "@/lib/amount-display": { formatAmount, formatGroupedAmount },
+    "@/lib/usd-display": { formatUsd },
+    vue: Vue, "@dcloudio/uni-app": { onLoad: (callback: (options: { cat: string }) => void) => callback({ cat: vouchers ? "voucher" : rows[0]?.symbol === "UVT" ? "uvt" : "usdt" }),
       onShow: (callback: () => void) => shown.push(callback) },
     "@/components/app-chassis.vue": { default: chassis }, "@/components/empty-state.vue": { default: Vue.defineComponent(() => () => Vue.h("empty")) },
     "@/components/sub-page-header.vue": { default: Vue.defineComponent(() => () => Vue.h("header")) },
     "@/components/promotion/promotion-reward-list.vue": { default: Vue.defineComponent(() => () => Vue.h("promotion-rewards")) },
     "@/i18n/use-t": { useT: () => Vue.computed(() => dicts[locale.code as keyof typeof dicts]) },
-    "@/i18n/format": { fmt }, "@/store/locale": { useLocaleStore }, "@/lib/rank-how-content": { formatHowNumber },
+    "@/lib/display-date": displayDate, "@/i18n/format": { dateLocale, fmt }, "@/store/locale": { useLocaleStore }, "@/lib/rank-how-content": { formatHowNumber },
     "@/lib/wallet-bill-display": { resolveWalletBillMemo }, "@/composables/use-course-reward-titles": { useCourseRewardTitles: () => Vue.ref({}) },
-    "@/store/voucher": { useVoucher: () => ({ claimedUnused: [], expiredVouchers: [], remoteStatus: "ready", refreshRemote: vi.fn() }) },
+    "@/store/voucher": { useVoucher: () => ({ claimedUnused: vouchers ?? [], expiredVouchers: [], remoteStatus: "ready", refreshRemote: vi.fn() }) },
     "@/store/bills": { useBills: () => ({ getLedger: () => pager }), isRewardBill: vi.fn() },
     "./course-reward-link": { courseRewardId, rewardsListCategory }, "@/pages/learn/course-navigation": { courseRewardHref: vi.fn() },
-    "@/mock/products": { getProduct: vi.fn() }, "@/mock/vouchers": { isSingleSkuVoucher: vi.fn() },
-    "@/lib/route": { navTo: vi.fn(), takeNavigationQuery: () => "" },
+    "@/mock/products": { getProduct: vi.fn() }, "@/mock/vouchers": { isSingleSkuVoucher },
+    "@/lib/route": { navTo, takeNavigationQuery: () => "" },
     "@/composables/use-scroll-grow-progress": { useScrollGrowProgress: () => ({ elRef: Vue.ref(null), inView: Vue.ref(false) }) },
     "@/composables/use-manual-scroll-load-more": { useManualScrollLoadMore: vi.fn() },
     "@/api/runtime": { fundsServerEnabled: true, remoteApiEnabled: true, sessionVault: { read: () => ({ user: { userId: 7 } }) } },
@@ -84,25 +93,27 @@ async function mount(localeCode: "zh" | "en" | "vi", rows: Bill[]) {
   }, exports);
   const root = node(), app = renderer.createApp(exports.default);
   app.mount(root); cleanups.push(() => app.unmount()); shown.forEach(callback => callback()); await Vue.nextTick();
-  return { locale, pager, amounts: () => nodes(root).filter(entry => entry.tag === "text"
+  return { root, navTo, locale, pager, styles: () => nodes(root).filter(entry => entry.tag === "text" && entry.props.class === "block tabular-nums").map(entry => entry.props.style as Record<string, string>), amounts: () => nodes(root).filter(entry => entry.tag === "text"
     && entry.props.class === "block tabular-nums").map(textOf) };
 }
 beforeEach(() => {
   vi.stubGlobal("uni", { getStorageSync: () => "", setStorageSync: vi.fn(), getSystemInfoSync: () => ({ language: "en" }) });
   setActivePinia(createPinia());
 });
-afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanups.splice(0).forEach(cleanup => cleanup()); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("mounted reward detail precision", () => {
   it.each(["zh", "en", "vi"] as const)("keeps the authoritative exact amount for both reward assets in %s", async locale => {
     vi.stubGlobal("Intl", undefined);
-    for (const symbol of ["USDT", "NEX"] as const) {
+    for (const symbol of ["USDT", "UVT"] as const) {
       const rows = ["999999999999.999999", "-999999999999.999999", "0.000001", "0001.000001", "-0.000000"].map(amountExact => ({
         ...fixture(Number(amountExact), symbol), amountExact,
       }));
       const before = JSON.stringify(rows), page = await mount(locale, rows);
-      expect(page.amounts()).toEqual([`+1000000000000.00 ${symbol}`, `-1000000000000.00 ${symbol}`,
-        `+0.00 ${symbol}`, `+1.00 ${symbol}`, `0.00 ${symbol}`]);
+      const visibleSymbol = symbol === 'UVT' ? 'UVT' : symbol;
+      expect(page.amounts()).toEqual([`+1,000,000,000,000.00`, `−1,000,000,000,000.00`,
+        `+<${symbol === 'USDT' ? '0.0001' : '0.01'}`, `+1.00`, `0.00`]);
+      expect(nodes(page.root).filter(entry => entry.props.class === "block tabular-nums").every(entry => String(entry.props["aria-label"]).endsWith(visibleSymbol))).toBe(true);
       expect(JSON.stringify(rows)).toBe(before);
     }
   });
@@ -110,8 +121,8 @@ describe("mounted reward detail precision", () => {
   it.each(["zh", "en", "vi"] as const)("keeps six non-zero decimals, symbols, compact NEX and signs in %s", async locale => {
     const rows = [fixture(0.045005), fixture(0.000001), fixture(1234.045005), fixture(-0.045005)];
     const before = JSON.stringify(rows), page = await mount(locale, rows);
-    expect(page.amounts()).toEqual(["+0.05 USDT", "+0.00 USDT", "+1234.05 USDT", "-0.05 USDT"]);
-    const nexPage = await mount(locale, [fixture(146, "NEX")]); expect(nexPage.amounts()).toEqual(["+146.00 NEX"]);
+    expect(page.amounts()).toEqual(["+0.045", "+<0.0001", "+1,234.045", "−0.045"]);
+    const nexPage = await mount(locale, [fixture(146, "UVT")]); expect(nexPage.amounts()).toEqual(["+146.00"]);
     expect(JSON.stringify(rows)).toBe(before);
   });
 
@@ -119,17 +130,46 @@ describe("mounted reward detail precision", () => {
     vi.stubGlobal("Intl", undefined);
     const nativeFormat = vi.spyOn(Number.prototype, "toLocaleString").mockImplementation(() => { throw new Error("NATIVE_LOCALE_FORMAT_UNAVAILABLE"); });
     const page = await mount(locale, [fixture(0.045005), fixture(0.000001), fixture(-1234.045005)]);
-    expect(page.amounts()).toEqual(["+0.05 USDT", "+0.00 USDT", "-1234.05 USDT"]);
-    const nexPage = await mount(locale, [fixture(146, "NEX")]); expect(nexPage.amounts()).toEqual(["+146.00 NEX"]);
+    expect(page.amounts()).toEqual(["+0.045", "+<0.0001", "−1,234.045"]);
+    const nexPage = await mount(locale, [fixture(146, "UVT")]); expect(nexPage.amounts()).toEqual(["+146.00"]);
     expect(nativeFormat).not.toHaveBeenCalled();
   });
 
   it("reacts to the locale picker without rereading or changing the authoritative amount", async () => {
     const rows = [fixture(1234.045005)], page = await mount("en", rows), before = JSON.stringify(rows);
-    expect(page.amounts()).toEqual(["+1234.05 USDT"]);
-    page.locale.setLocale("vi"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1234.05 USDT"]);
-    page.locale.setLocale("zh"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1234.05 USDT"]);
+    expect(page.amounts()).toEqual(["+1,234.045"]);
+    page.locale.setLocale("vi"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1,234.045"]);
+    page.locale.setLocale("zh"); await Vue.nextTick(); expect(page.amounts()).toEqual(["+1,234.045"]);
     expect(page.pager.refresh).toHaveBeenCalledOnce(); expect(page.pager.loadMore).not.toHaveBeenCalled();
     expect(JSON.stringify(rows)).toBe(before);
   });
+});
+it("distinguishes debit, credit and zero without mutating ledger precision", async () => {
+ const rows = ["-1299.000001", "1299.000001", "-0.000000"].map(amountExact => ({ ...fixture(Number(amountExact)), amountExact }));
+ const before = JSON.stringify(rows), page = await mount("zh", rows);
+ expect(page.amounts()).toEqual(["−1,299.00", "+1,299.00", "0.00"]);
+ expect(page.styles().map(style => style.color)).toEqual(["var(--v5-brand-2-ink)", "var(--v5-brand)", "var(--v5-ink-2)"]);
+ expect(JSON.stringify(rows)).toBe(before);
+});
+
+
+it.each(["zh", "en", "vi"] as const)("keeps complete voucher expiry text and original Use action in %s", async language => {
+  vi.stubEnv("TZ", "Asia/Tokyo");
+  expect(new Date("2026-11-02T00:00:00Z").getTimezoneOffset()).toBe(-540);
+  const original: VoucherDef = { id: "date-fixture", name: "CloudShare BF20", type: "percent", percent: 20,
+    applicableSkus: ["cloud-fixture"], audience: "all", startAt: 0, endAt: Date.parse("2026-11-02T00:00:00Z"),
+    claimSurfaces: ["home"], popupEnabled: false, stackWithTrial: false, stackWithOthers: false, splittable: false, status: "active" };
+  const vouchers = [original, { ...original, id: "no-expiry", applicableSkus: [], endAt: 0 }, { ...original, id: "invalid", endAt: NaN }];
+  const before = JSON.stringify(vouchers), page = await mount(language, [], vouchers);
+  const expected = { zh: "2026/11/02", en: "Nov 2, 2026", vi: "02/11/2026" }[language];
+  const expiry = nodes(page.root).filter(entry => entry.tag === "text" && [fmt(dicts[language].rewards.validUntil, { date: expected }), dicts[language].rewards.noExpiry, fmt(dicts[language].rewards.validUntil, { date: "\u2014" })].includes(textOf(entry)));
+  expect(expiry.map(textOf)).toEqual([fmt(dicts[language].rewards.validUntil, { date: expected }), dicts[language].rewards.noExpiry, fmt(dicts[language].rewards.validUntil, { date: "\u2014" })]);
+  expect(expiry.every(entry => !Vue.normalizeClass(entry.props.class).split(" ").includes("truncate"))).toBe(true);
+  expect(expiry.every(entry => (entry.props.style as Record<string, string>).overflowWrap === "anywhere")).toBe(true);
+  const actions = nodes(page.root).filter(entry => entry.props.role === "button" && entry.props["aria-label"] === dicts[language].rewards.useCta);
+  expect(actions).toHaveLength(3);
+  expect(actions.every(entry => Vue.normalizeClass(entry.props.class).includes("nx-button--small"))).toBe(true);
+  (actions[0].props.onClick as () => void)(); expect(page.navTo).toHaveBeenLastCalledWith("/store/detail?id=cloud-fixture");
+  (actions[1].props.onClick as () => void)(); expect(page.navTo).toHaveBeenLastCalledWith("/store");
+  expect(textOf(page.root)).toContain(original.name); expect(JSON.stringify(vouchers)).toBe(before);
 });

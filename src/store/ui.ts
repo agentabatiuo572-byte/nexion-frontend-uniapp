@@ -30,6 +30,10 @@ export interface ConfirmOptions {
   icon?: "danger" | "warn" | "info" | "success" | null;
   /** 谁开的框(如页面实例的 owner 标记)—— 页面卸载时只收自己开的,不碰别人排队中的框。 */
   owner?: string;
+  /** Optional detail list (label/value rows) — switches the dialog to the centred detail layout. */
+  rows?: { label: string; value: string; amount?: boolean }[];
+  /** Badge above the title in the detail layout. */
+  glyph?: "withdraw";
 }
 
 interface ConfirmInternal extends ConfirmOptions {

@@ -14,6 +14,7 @@
     <view aria-hidden :style="hairlineStyle" />
 
     <view class="relative" style="padding: 20px">
+      <view v-if="ev.runtimeSource === 'remote' && ev.kind === 'wheel'" class="flex justify-end" role="link" tabindex="0" :aria-label="t.events.action.viewDetails + ' · ' + ev.title" @click="openDetails" @keydown.enter.prevent="openDetails"><text style="font-size:12px;color:var(--v5-brand)">{{ t.events.action.viewDetails }} ›</text></view>
       <!-- TOP — cap label + countdown -->
       <view class="flex items-center justify-between">
         <view class="inline-flex items-center font-mono-tabular" :style="capLabelStyle">
@@ -30,14 +31,14 @@
       <view class="mt-4 flex items-start justify-between" style="gap: 12px">
         <view class="flex-1 min-w-0">
           <text class="block" :style="titleStyle">{{ ev.title }}</text>
-          <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-top: 6px; line-height: 1.375">{{ ev.subtitle }}</text>
+          <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-top: 6px; line-height: 1.375">{{ ev.subtitle }}</text>
         </view>
-        <text aria-hidden class="shrink-0" :style="emojiStyle">{{ ev.emoji }}</text>
+        <EventIcon :kind="ev.kind" :size="40" />
       </view>
 
       <!-- REWARD pill -->
       <view class="mt-4 inline-flex items-center" :style="rewardPillStyle">
-        <text style="font-size: 14px; margin-right: 6px">🎁</text>
+        <EventIcon :size="16" :style="{marginRight:'6px',color:rewardColor}" />
         <text style="font-family: var(--font-v5)">{{ ev.reward }}</text>
       </view>
 
@@ -46,7 +47,7 @@
         <view class="flex items-center justify-between font-mono-tabular" style="font-size: 12px; margin-bottom: 6px">
           <text style="color: var(--v5-ink-3); text-transform: uppercase; letter-spacing: 0.08em">{{ ev.progress.label }}</text>
           <text class="tabular-nums" style="color: var(--v5-ink)">
-            <text :style="{ color: ev.tint, fontWeight: 600 }">{{ ev.progress.current.toLocaleString() }}</text>
+            <text style="color:var(--v5-brand);font-weight:600">{{ ev.progress.current.toLocaleString() }}</text>
             <text style="color: var(--v5-ink-4)"> / {{ ev.progress.total.toLocaleString() }}</text>
           </text>
         </view>
@@ -56,26 +57,27 @@
       </view>
 
       <!-- CTA -->
-      <view v-if="showClaim" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" :aria-label="claimLabel" @click="emitUnlessBusy('claim')">
+      <view v-if="ev.runtimeSource === 'remote' && ev.kind !== 'wheel'" class="mt-5 w-full rounded-full flex items-center justify-center" :style="joinBtnStyle" role="link" tabindex="0" @click="openDetails" @keydown.enter.prevent="openDetails"><text style="font-size: var(--ui-type-button);font-weight:600;color:var(--v5-on-brand)">{{ t.events.action.viewDetails }} ›</text></view>
+      <view v-else-if="showClaim" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" :aria-label="claimLabel" @click="emitUnlessBusy('claim')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z" /></svg>
-        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ claimLabel }}</text>
+        <text style="font-size: var(--ui-type-button); font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ claimLabel }}</text>
       </view>
       <view v-else-if="ev._claimed" class="mt-5 w-full rounded-full flex items-center justify-center" :class="{ 'active:opacity-90': !!ev.useHref }" :style="claimedPillStyle" :role="ev.useHref ? 'button' : undefined" :tabindex="ev.useHref ? 0 : -1" :aria-label="claimedAriaLabel" @click="onClaimedUse">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
-        <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
+        <text style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
         <template v-if="ev.useHref">
-          <text style="font-size: 13px; color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
-          <text :style="{ fontSize: '13px', fontWeight: 600, color: ev.tint, pointerEvents: 'none' }">{{ t.events.useCta }}</text>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
+          <text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
+          <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-brand)', pointerEvents: 'none' }">{{ t.events.useCta }}</text>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
         </template>
       </view>
       <view v-else-if="showJoinAction" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" :tabindex="busy ? -1 : 0" :aria-disabled="busy" :aria-label="ev.ctaLabel ?? t.events.joinCta" @click="emitUnlessBusy('join')">
-        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
+        <text style="font-size: var(--ui-type-button); font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
       </view>
       <view v-else-if="showOpenAction" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" tabindex="0" :aria-label="ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta)" @click="openHref">
         <svg v-if="ev.joined" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
-        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="openHref">{{ ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta) }}</text>
+        <text style="font-size: var(--ui-type-button); font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="openHref">{{ ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta) }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
       </view>
     </view>
@@ -83,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+import EventIcon from "./event-icon.vue";
 import { navTo } from "@/lib/route";
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
@@ -94,9 +97,11 @@ import { eventOpenTarget } from "./event-open-target";
 type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed: boolean };
 
 const props = withDefaults(defineProps<{ ev: EnrichedEvent; rewardNex: number; busy?: boolean }>(), { busy: false });
+const rewardColor = computed(() => /\b(?:UVT|NEX)\b/i.test(props.ev.reward) ? 'var(--v5-nex)' : 'var(--v5-brand)');
 const emit = defineEmits<{ (e: "join"): void; (e: "claim"): void; (e: "cta"): void }>();
 
 const t = useT();
+function openDetails() { navTo(`/pages/events/detail?id=${encodeURIComponent(props.ev.id)}`); }
 const busy = computed(() => props.busy);
 function emitUnlessBusy(event: "join" | "claim") {
   if (props.busy) return;
@@ -143,13 +148,14 @@ const hairlineStyle = computed<CSSProperties>(() => ({
   right: "0",
   top: "0",
   height: "1px",
-  background: `linear-gradient(90deg, transparent, ${props.ev.tint}, transparent)`,
+  background: "var(--v5-border)",
   opacity: 0.6,
 }));
 const capLabelStyle = computed<CSSProperties>(() => ({
   fontSize: "12px",
-  letterSpacing: "0.18em",
-  color: props.ev.tint,
+  letterSpacing: "0.04em",
+  fontFamily: "var(--font-v5)",
+  color: "var(--v5-ink-3)",
 }));
 const titleStyle: CSSProperties = {
   fontSize: "20px",
@@ -162,7 +168,7 @@ const titleStyle: CSSProperties = {
 const emojiStyle = computed<CSSProperties>(() => ({
   fontSize: "44px",
   lineHeight: 1,
-  filter: `drop-shadow(0 4px 12px color-mix(in srgb, ${props.ev.tint} 33%, transparent))`,
+  filter: `drop-shadow(0 4px 12px color-mix(in srgb, var(--v5-brand) 20%, transparent))`,
 }));
 const rewardPillStyle = computed<CSSProperties>(() => ({
   paddingLeft: "12px",
@@ -172,29 +178,29 @@ const rewardPillStyle = computed<CSSProperties>(() => ({
   borderRadius: "999px",
   fontSize: "13px",
   fontWeight: 600,
-  background: `color-mix(in srgb, ${props.ev.tint} 10%, transparent)`,
-  color: props.ev.tint,
+  background: `color-mix(in srgb, ${rewardColor.value} 10%, transparent)`,
+  color: rewardColor.value,
 }));
 const barFillStyle = computed<CSSProperties>(() => ({
   width: `${barInView.value ? progressPct.value : 0}%`,
-  background: `linear-gradient(90deg, ${props.ev.tint}, color-mix(in srgb, ${props.ev.tint} 80%, transparent))`,
-  boxShadow: `0 0 8px color-mix(in srgb, ${props.ev.tint} 53%, transparent)`,
+  background: "var(--v5-brand)",
+  boxShadow: "none",
   transition: barInView.value ? PROGRESS_GROW_TRANSITION : "none",
   willChange: "width",
 }));
 const claimBtnStyle = computed<CSSProperties>(() => ({
   height: "48px",
-  background: props.ev.tint,
-  boxShadow: `0 0 24px color-mix(in srgb, ${props.ev.tint} 40%, transparent)`,
+  background: "var(--v5-brand)",
+  boxShadow: `0 0 24px color-mix(in srgb, var(--v5-brand) 20%, transparent)`,
 }));
 const claimedPillStyle = computed<CSSProperties>(() => ({
   height: "48px",
-  background: `color-mix(in srgb, ${props.ev.tint} 6%, transparent)`,
+  background: "var(--v5-surface-2)",
 }));
 const joinBtnStyle = computed<CSSProperties>(() => ({
   height: "48px",
-  background: props.ev.tint,
-  boxShadow: `0 0 24px color-mix(in srgb, ${props.ev.tint} 33%, transparent)`,
+  background: "var(--v5-brand)",
+  boxShadow: `0 0 24px color-mix(in srgb, var(--v5-brand) 20%, transparent)`,
 }));
 
 

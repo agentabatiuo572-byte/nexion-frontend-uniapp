@@ -1,15 +1,18 @@
 <template>
   <AppChassis active="earn">
     <view class="nx-device-detail pb-8" style="color: var(--v5-ink)">
-      <SubPageHeader :back="backHref" :title="deviceTitle" :subtitle="deviceSubtitle" />
+      <SubPageHeader :back="backHref" :title="deviceTitle" />
 
       <view v-if="device && !waitingForFleet && !fleetFailed" class="nx-device-detail__surface nx-glass-card mx-4">
+        <DeviceSlot class="device-detail-art" :device="device" :online="false" />
         <DeviceCardPC
+          show-manage
+          detail-page
           :device="device"
           :expanded="expanded"
           @toggle="expanded = !expanded"
+          @statistics="focusStatistics"
         />
-        <ComputeSettlements style="padding:16px" />
       </view>
 
       <!-- A valid deep link starts from an empty remote account snapshot. Keep
@@ -58,12 +61,12 @@
 </template>
 
 <script setup lang="ts">
-import ComputeSettlements from "@/components/earn/compute-settlements.vue";
-import { computed, ref, watch, type CSSProperties } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
+import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import DeviceSlot from "@/components/home/device-slot.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 import { navBack, takeNavigationQuery } from "@/lib/route";
@@ -80,12 +83,14 @@ const rawRouteId = ref("");
 const backHref = ref("/pages/earn/earn");
 const loaded = ref(false);
 const expanded = ref(true);
+const requestedSection = ref('');
 const fleetReadStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 let fleetReadSequence = 0;
 
 onLoad((options) => {
   const routeOptions = (options || {}) as Record<string, string>;
   const fallback = new URLSearchParams(takeNavigationQuery("/pages/earn/device-detail"));
+  requestedSection.value = routeOptions.section || fallback.get('section') || '';
   const fallbackId = fallback.get("id") || "";
   const rawId = routeOptions.id || fallbackId;
   rawRouteId.value = rawId;
@@ -103,8 +108,28 @@ onLoad((options) => {
   loaded.value = true;
   preserveDeviceDetailQueryInH5();
 });
-onShow(() => { preserveDeviceDetailQueryInH5(); void retryFleet(); });
+onShow(() => { app.setTaskReadPageVisible("device-detail", true); preserveDeviceDetailQueryInH5(); void retryFleet(); });
+onHide(() => app.setTaskReadPageVisible("device-detail", false));
+onUnload(() => app.setTaskReadPageVisible("device-detail", false));
 watch(() => app.accountBindingEpoch, () => { if (loaded.value) void retryFleet(); });
+
+function focusStatistics() {
+  expanded.value = true;
+  void nextTick(() => {
+    if (typeof document !== 'undefined') {
+      const target = document.getElementById('device-statistics');
+      target?.scrollIntoView({ block: 'start' });
+      target?.focus({ preventScroll: true });
+      return;
+    }
+    // App logic and its WebView have separate DOM access.
+    // #ifdef APP-PLUS
+    const pages = getCurrentPages();
+    const page = pages[pages.length - 1] as unknown as { $getAppWebview?: () => { evalJS: (script: string) => void } };
+    page?.$getAppWebview?.().evalJS("var target=document.getElementById('device-statistics');if(target){target.scrollIntoView({block:'start'});target.focus({preventScroll:true});}");
+    // #endif
+  });
+}
 
 function preserveDeviceDetailQueryInH5() {
   // Uni H5 can drop navigateTo's visible query. Persist the selected device
@@ -169,6 +194,10 @@ async function retryFleet() {
   const current = app.captureRemoteAccountRequest();
   if (sequence !== fleetReadSequence || request.accountKey !== current.accountKey || request.epoch !== current.epoch) return;
   fleetReadStatus.value = refreshed && app.remoteFleetStatus === "ready" ? "ready" : "error";
+  if (fleetReadStatus.value === 'ready' && requestedSection.value === 'statistics') {
+    requestedSection.value = '';
+    focusStatistics();
+  }
 }
 
 const loadingStyle: CSSProperties = {
@@ -186,7 +215,7 @@ const loadingBarStyle: CSSProperties = {
 const loadingTextStyle: CSSProperties = {
   display: "block",
   marginTop: "16px",
-  fontSize: "13px",
+  fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
 };
 
@@ -197,7 +226,7 @@ const emptyStyle: CSSProperties = {
   background: "var(--v5-surface)",
 };
 const emptyTitleStyle: CSSProperties = {
-  fontSize: "15px",
+  fontSize: "var(--ui-type-list-title)",
   fontWeight: 500,
   color: "var(--v5-ink)",
 };
@@ -208,7 +237,9 @@ const backButtonStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   fontWeight: 500,
 };
 </script>
+
+<style scoped>.device-detail-art { height:210px; }.device-detail-art :deep(.nx-home-art) { width:210px; }.nx-device-detail__surface :deep(.earn-device-art) { display:none; }</style>

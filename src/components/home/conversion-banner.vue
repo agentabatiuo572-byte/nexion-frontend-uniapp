@@ -285,7 +285,7 @@ function onCardAction() {
   min-width: 0;
   overflow: hidden;
   font-family: var(--font-v5);
-  font-size: 15px;
+  font-size: var(--ui-type-card-title);
   font-weight: 600;
   color: var(--v5-ink);
   text-overflow: ellipsis;
@@ -393,7 +393,7 @@ function onCardAction() {
 }
 
 .weekly-quest__reward-value {
-  font-family: var(--font-v5);
+  font-family: var(--font-amount);
   font-size: 34px;
   font-weight: 500;
   line-height: 1;
@@ -414,7 +414,7 @@ function onCardAction() {
   margin-top: 0;
   overflow: hidden;
   font-family: var(--font-v5);
-  font-size: 13px;
+  font-size: var(--ui-type-list-subtitle);
   font-weight: 500;
   color: var(--v5-ink-3);
   letter-spacing: -0.008em;

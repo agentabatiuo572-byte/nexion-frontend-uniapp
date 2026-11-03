@@ -52,12 +52,15 @@ export interface CanonicalTaskDeviceState {
   recentTasks: CanonicalTaskAssignment[];
   recoveryPending?: boolean;
   recoveryReason?: "LEGACY_COMPLETE_OUTCOME_UNKNOWN" | null;
+  phoneValidUntil?: number | null;
   simulationState?: SimulationState;
 }
 
 export type SimulationState = "RUNNING" | "EXPIRED" | "STOPPED" | "WAITING_CONFIG" | "CLOSING" | "ERROR";
-export interface CanonicalTaskStop {
+export interface CanonicalPhoneOnline {
+  serverNow: number;
   deviceId: number;
+  phoneValidUntil: number | null;
   simulationState: SimulationState;
 }
 
@@ -74,6 +77,7 @@ export interface CanonicalTaskAssignments {
 
 export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   receiptNo: string;
+  displayReceiptNo?: string;
   taskNo: string;
   deviceId: number;
   deviceInstanceNo: string;
@@ -90,6 +94,7 @@ export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   rewardNex: number;
   earningStatus: string;
   proofHash: string | null;
+  receiptHash?: string;
   startedAt: number;
   completedAt: number;
   /** Null when the backend has not supplied an actual posting time. */
@@ -103,6 +108,7 @@ export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
 
 export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   receiptNo: string;
+  displayReceiptNo?: string;
   taskNo: string;
   taskName?: string;
   taskClass: CanonicalTaskAssignment["taskClass"];
@@ -129,7 +135,8 @@ export interface CanonicalComputeReceiptPage {
 
 export interface TaskAssignmentApi {
   state(preferV2?: boolean): Promise<CanonicalTaskAssignments>;
-  stopSimulatedTask(deviceId: number, afterCurrent: boolean, expectedVersion: number): Promise<CanonicalTaskStop>;
+  confirmPhoneOnline(deviceId: number, installationId: string): Promise<CanonicalPhoneOnline>;
+  stopSimulatedTask(deviceId: number, afterCurrent: boolean, installationId?: string): Promise<Omit<CanonicalPhoneOnline, "serverNow">>;
   receipt(receiptNo: string): Promise<CanonicalComputeReceipt>;
   receipts(offset?: number, limit?: number, cursor?: string | null): Promise<CanonicalComputeReceiptPage>;
   settlements(cursor?: string | null, limit?: number): Promise<ComputeSettlementPage>;
@@ -301,6 +308,7 @@ function device(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTas
     recentTasks,
     ...(version >= 2 ? { recoveryPending: source.recoveryPending === true,
       recoveryReason: source.recoveryReason == null ? null : "LEGACY_COMPLETE_OUTCOME_UNKNOWN" as const } : {}),
+    phoneValidUntil: timestamp(source.phoneValidUntil, true),
     simulationState: source.simulationState == null ? undefined : simulationState(source.simulationState),
   };
 }
@@ -360,7 +368,9 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
   const taskClass = text(source.taskClass).toUpperCase();
   const metadata = executionMetadata(source);
   const proofHash = metadata.executionMode === "SIMULATED" && source.proofHash == null ? null : text(source.proofHash).toLowerCase();
+  const receiptHash = source.receiptHash == null ? undefined : text(source.receiptHash);
   if (!/^(IG|VG|LL|FT|EM|SP)$/.test(taskClass) || (proofHash !== null && !/^[a-f0-9]{64,128}$/.test(proofHash))
+    || (receiptHash !== undefined && (metadata.executionMode !== "SIMULATED" || !/^[a-f0-9]{64}$/.test(receiptHash)))
     || (metadata.executionMode === "SIMULATED" && proofHash !== null)) {
     return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   }
@@ -371,6 +381,7 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
   if (completedAt < startedAt) return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   return {
     receiptNo: text(source.receiptNo),
+    displayReceiptNo: source.displayReceiptNo == null ? undefined : text(source.displayReceiptNo),
     taskNo: text(source.taskNo),
     deviceId: integer(source.deviceId, 1),
     deviceInstanceNo: text(source.deviceInstanceNo),
@@ -387,6 +398,7 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
     rewardNex: decimal(source.rewardNex),
     earningStatus: text(source.earningStatus),
     proofHash,
+    receiptHash,
     startedAt,
     completedAt,
     // The legacy detail constructor copies completedAt into settledAt. It does
@@ -408,6 +420,7 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
   }
   return {
     receiptNo: text(source.receiptNo),
+    displayReceiptNo: source.displayReceiptNo == null ? undefined : text(source.displayReceiptNo),
     taskNo: text(source.taskNo),
     taskName: source.taskName == null ? undefined : text(source.taskName),
     taskClass: taskClass as CanonicalTaskAssignment["taskClass"],
@@ -473,14 +486,28 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
       if (items.length > 200 || items.reduce((sum, row) => sum + BigInt(row.amount.replace(".", "")), BigInt(0)) !== BigInt(batch.amount.replace(".", ""))) return invalid();
       return { ...batch, items };
     },
-    async stopSimulatedTask(deviceId, afterCurrent, expectedVersion) {
+    async confirmPhoneOnline(deviceId, installationId) {
+      const expectedDeviceId = integer(deviceId, 1);
+      const source = record(await client.request<unknown>({
+        path: "/api/tasks/simulated/phone-online",
+        method: "POST",
+        headers: { "X-Phone-Installation-Id": text(installationId) },
+        body: { deviceId: expectedDeviceId },
+      }));
+      if (integer(source.deviceId, 1) !== expectedDeviceId) return invalid();
+      return { deviceId: expectedDeviceId, serverNow: timestamp(source.serverNow) as number,
+        phoneValidUntil: timestamp(source.phoneValidUntil, true), simulationState: simulationState(source.simulationState) };
+    },
+    async stopSimulatedTask(deviceId, afterCurrent, installationId) {
       const expectedDeviceId = integer(deviceId, 1);
       if (typeof afterCurrent !== "boolean") return invalid();
       const source = record(await client.request<unknown>({
-        path: "/api/tasks/simulated/stop", method: "POST", body: { deviceId: expectedDeviceId, afterCurrent, expectedVersion: integer(expectedVersion) },
+        path: "/api/tasks/simulated/stop", method: "POST", body: { deviceId: expectedDeviceId, afterCurrent },
+        ...(installationId === undefined ? {} : { headers: { "X-Phone-Installation-Id": text(installationId) } }),
       }));
       if (integer(source.deviceId, 1) !== expectedDeviceId) return invalid();
-      return { deviceId: expectedDeviceId, simulationState: simulationState(source.simulationState) };
+      return { deviceId: expectedDeviceId, phoneValidUntil: timestamp(source.phoneValidUntil, true),
+        simulationState: simulationState(source.simulationState) };
     },
     async receipt(receiptNo) {
       const normalizedReceiptNo = text(receiptNo);

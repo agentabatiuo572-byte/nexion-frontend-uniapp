@@ -1,0 +1,48 @@
+const copy = {
+  zh: {
+    quotaLoadError: '购买资格暂时无法加载，请重试。',
+    qualified: '已达参与等级', noVotes: '本期暂无票数，尚无可分配份额。',
+    votes: '我的票数', totalVotes: '本期总票数', share: '本期占比',
+    loading: '正在加载资料…', error: '资料暂时无法加载，请重试。',
+    days: '{n} 天', active: '活跃', idle: '暂不活跃', offline: '离线',
+    quotaUnavailable: '该商品暂不可购买，请稍后查看', estimatedDaily: '预估日产出 {n} UVT',
+    afterSales: '联系售后', securitySettings: '安全设置与登录设备',
+    backCommissions: '返回奖励明细', poolRecords: '查看本期票数、占比与分配记录',
+    poolFactsTitle: '本期参与情况', poolFactsHint: '实际发放金额以发放记录为准。',
+    netSummary: '已扣除撤销和未发放的奖励。', settlementDetails: '奖励规则',
+    recordDetails: '查看记录编号', hideDetails: '收起详情', pendingRecovery: '待扣回：{usdt} + {uvt} UVT',
+    budgetLabel: '申请预算（USDT）',
+  },
+  en: {
+    quotaLoadError: 'Unable to load purchase eligibility. Please retry.',
+    qualified: 'Rank requirement met', noVotes: 'No votes or allocation for this period yet.',
+    votes: 'My votes', totalVotes: 'Total votes', share: 'My share',
+    loading: 'Loading materials…', error: 'Unable to load these materials. Please retry.',
+    days: '{n} days', active: 'Active', idle: 'Inactive', offline: 'Offline',
+    quotaUnavailable: 'This product is currently unavailable. Check again later.', estimatedDaily: 'Estimated daily output: {n} UVT',
+    afterSales: 'Contact after-sales support', securitySettings: 'Security settings and login devices',
+    backCommissions: 'Back to reward history', poolRecords: 'View current votes, share and payout records',
+    poolFactsTitle: 'Participation this period', poolFactsHint: 'Actual payouts follow the payout records.',
+    netSummary: 'Reversed and unpaid rewards are excluded.', settlementDetails: 'Reward rules',
+    recordDetails: 'View record references', hideDetails: 'Hide details', pendingRecovery: 'To be reversed: {usdt} + {uvt} UVT',
+    budgetLabel: 'Requested budget (USDT)',
+  },
+  vi: {
+    quotaLoadError: 'Chưa thể tải điều kiện mua. Vui lòng thử lại.',
+    qualified: 'Đã đạt cấp tham gia', noVotes: 'Kỳ này chưa có phiếu hoặc phần phân bổ.',
+    votes: 'Phiếu của tôi', totalVotes: 'Tổng số phiếu', share: 'Tỷ lệ của tôi',
+    loading: 'Đang tải…', error: 'Chưa tải được dữ liệu. Vui lòng thử lại.',
+    days: '{n} ngày', active: 'Hoạt động', idle: 'Chưa hoạt động', offline: 'Ngoại tuyến',
+    quotaUnavailable: 'Sản phẩm hiện chưa thể mua. Vui lòng kiểm tra lại sau.', estimatedDaily: 'Sản lượng ước tính mỗi ngày: {n} UVT',
+    afterSales: 'Liên hệ hỗ trợ sau bán hàng', securitySettings: 'Bảo mật và thiết bị đăng nhập',
+    backCommissions: 'Về lịch sử thưởng', poolRecords: 'Xem phiếu, tỷ lệ và lịch sử phân bổ kỳ này',
+    poolFactsTitle: 'Tham gia kỳ này', poolFactsHint: 'Số tiền chi trả thực tế theo lịch sử chi trả.',
+    netSummary: 'Đã loại trừ các khoản thưởng bị hủy hoặc không được chi trả.', settlementDetails: 'Quy tắc thưởng',
+    recordDetails: 'Xem mã bản ghi', hideDetails: 'Thu gọn chi tiết', pendingRecovery: 'Chờ thu hồi: {usdt} + {uvt} UVT',
+    budgetLabel: 'Ngân sách đề nghị (USDT)',
+  },
+};
+
+export function networkReauditCopy(locale: string) {
+  return copy[locale === 'zh' || locale === 'vi' ? locale : 'en'];
+}

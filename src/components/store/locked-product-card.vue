@@ -22,15 +22,14 @@
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
-              <text class="font-mono-tabular tabular-nums" :style="stageChipStyle">{{ t.store.comingSoonHeading }}</text>
               <view class="grid place-items-center" :style="toggleStyle">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
               </view>
             </view>
           </view>
-          <text class="block mt-1" :style="titleStyle">{{ nexGridBrandText(product.name) }}</text>
+          <text class="block mt-1" :style="titleStyle">{{ (product.name) }}</text>
           <view v-if="detailsOpen">
-            <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
+            <text class="block mt-1 line-clamp-2" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
             <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
               <text style="color: var(--v5-ink-2)">{{ gpuText }}</text>
               <text style="color: var(--v5-ink-4)">·</text>
@@ -64,7 +63,6 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { productCopy, specText } from "@/lib/product-copy";
-import { nexGridBrandText } from "@/lib/brand-copy";
 
 const props = defineProps<{ product: Product }>();
 const app = useApp();
@@ -159,7 +157,7 @@ async function handleNotify() {
     if (!requestIsCurrent(scope, epoch, accountKey, runScope, productNo)) return;
     if (result.serverCanonical && result.productNo === productNo && result.subscribed === nextSubscribed) {
       serverSubscribed.value = nextSubscribed;
-      if (nextSubscribed) toast.success(fmt(t.value.store.notifyToast, { name: nexGridBrandText(props.product.name) }));
+      if (nextSubscribed) toast.success(fmt(t.value.store.notifyToast, { name: (props.product.name) }));
     } else {
       toast.error(t.value.authOtp.errorServiceUnavailable);
     }

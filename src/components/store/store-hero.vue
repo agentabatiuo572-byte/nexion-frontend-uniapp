@@ -13,7 +13,7 @@
       <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink)">{{ t.store.heroEyebrow }}</text>
       <text v-if="multiplier !== null" class="block" :style="titleStyle">{{ t.store.heroTitlePre }} <text style="color: var(--v5-brand-2-ink)">{{ multiplierText }}</text> {{ t.store.heroTitlePost }}</text>
       <text v-else class="block" :style="titleStyle">{{ t.store.secMoreTiers }}</text>
-      <text class="block" style="margin-top: 8px; font-size: 13px; color: var(--v5-ink-3); line-height: 1.45">{{ t.store.heroSub }}</text>
+      <text class="block" style="margin-top: 8px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); line-height: 1.45">{{ t.store.heroSub }}</text>
     </view>
     <view class="relative">
       <!-- StoreHeroArt — tier ladder schematic -->
@@ -26,9 +26,7 @@
         <circle cx="37" cy="68" r="1" fill="var(--v5-tech-cyan)" opacity="0.6" />
         <path d="M3,80 L9,73 M3,80 L9,86 M3,80 L88,28" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="1" stroke-dasharray="3 3" opacity="0.65" />
         <g transform="translate(86, 24)">
-          <path d="M0,-4 L1,-1 L4,0 L1,1 L0,4 L-1,1 L-4,0 L-1,-1 Z" fill="var(--v5-brand-2)">
-            <animate attributeName="opacity" values="0.5;1;0.5" dur="2.2s" repeatCount="indefinite" />
-          </path>
+          <path d="M0,-4 L1,-1 L4,0 L1,1 L0,4 L-1,1 L-4,0 L-1,-1 Z" fill="var(--v5-brand-2)" />
         </g>
       </svg>
     </view>

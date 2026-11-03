@@ -1,6 +1,6 @@
 <template>
   <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true" :aria-label="activated ? copy.activationSuccessTitle : copy.activateTitle">
-    <view class="tcs-backdrop" @click="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide" />
+    <view class="tcs-backdrop" @click="hide" />
     <view class="nx-glass-sheet tcs-panel" @click.stop>
       <view v-if="activated" class="tcs-head">
         <view class="tcs-head-l">
@@ -174,7 +174,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 <style scoped>
 .tcs-root { position:fixed;inset:0;z-index:790; }
 .tcs-backdrop { position:absolute;inset:0;background:var(--v5-bg-color-mask);backdrop-filter:blur(8px) saturate(150%);-webkit-backdrop-filter:blur(8px) saturate(150%);animation:tcs-fade .24s ease-out; }
-.tcs-panel { position:absolute;left:0;right:0;bottom:0;z-index:800;box-sizing:border-box;max-height:calc(100% - var(--nx-overlay-top, 0px));overflow-y:auto;border-radius:var(--nx-glass-radius) var(--nx-glass-radius) 0 0;box-shadow:var(--nx-glass-edge);background:var(--nx-glass-fill);border:none;padding:20px 16px calc(env(safe-area-inset-bottom) + 38px);animation:tcs-slide-up .36s cubic-bezier(.16,1,.3,1); }
+.tcs-panel { position:absolute;left:0;right:0;bottom:0;z-index:800;box-sizing:border-box;max-height:calc(100% - var(--nx-overlay-top));overflow-y:auto;border-radius:var(--nx-glass-radius) var(--nx-glass-radius) 0 0;box-shadow:var(--nx-glass-edge);background:var(--nx-glass-fill);border:none;padding:20px 16px calc(env(safe-area-inset-bottom) + 38px);animation:tcs-slide-up .36s cubic-bezier(.16,1,.3,1); }
 @keyframes tcs-fade { from { opacity:0; } to { opacity:1; } }
 @keyframes tcs-slide-up { from { transform:translateY(100%); } to { transform:translateY(0); } }
 .tcs-head { display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding-right:56px;margin-bottom:16px; }
@@ -191,16 +191,16 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-device-meta { min-width:0;display:flex;flex-direction:column;gap:5px; }
 .tcs-device-caption { font:400 11px/1.5 var(--font-v5);color:var(--v5-ink-3); }
 .tcs-device-name { font:600 19px/1.3 var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }
-.tcs-device-duration { font:500 var(--ui-type-list-subtitle, 13px)/1.5 var(--font-v5);color:var(--v5-brand);overflow-wrap:anywhere; }
+.tcs-device-duration { font:500 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-brand);overflow-wrap:anywhere; }
 .tcs-hero { margin-top:16px;border-radius:16px;padding:16px;position:relative;overflow:hidden;background:color-mix(in srgb,var(--v5-brand) 6%,var(--v5-surface-2));border:none; }
 .tcs-hero-grid { position:absolute;inset:0;pointer-events:none;opacity:.04;background-image:linear-gradient(var(--v5-brand) 1px,transparent 1px),linear-gradient(90deg,var(--v5-brand) 1px,transparent 1px);background-size:16px 16px; }
 .tcs-hero-row,.tcs-hero-num-row { position:relative; }
 .tcs-hero-label { font:500 12px/1.5 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }
 .tcs-hero-num-row { margin-top:8px; }
-.tcs-hero-num { font:600 34px/1.15 var(--font-amount, var(--font-jet-mono), monospace);letter-spacing:-.025em;color:var(--v5-brand);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+.tcs-hero-num { font:600 34px/1.15 var(--font-amount);letter-spacing:-.025em;color:var(--v5-brand);font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
 .tcs-estimate-note { display:block;position:relative;margin-top:9px;font:400 11px/1.65 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
 .tcs-success { margin-top:16px;padding:16px;border-radius:16px;background:color-mix(in srgb,var(--v5-brand) 7%,var(--v5-surface-2));border:1px solid color-mix(in srgb,var(--v5-brand) 25%,transparent); }
-.tcs-success-body { display:block;font:400 var(--ui-type-list-subtitle, 13px)/1.65 var(--font-v5);color:var(--v5-ink-2); }
+.tcs-success-body { display:block;font:400 var(--ui-type-list-subtitle)/1.65 var(--font-v5);color:var(--v5-ink-2); }
 .tcs-success-time { display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-top:14px;font:400 12px/1.5 var(--font-v5);color:var(--v5-ink-3); }
 .tcs-success-time > text:last-child { font-size:22px;font-weight:600;color:var(--v5-brand); }
 .tcs-error { margin-top:14px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--v5-warning) 10%,transparent); }
@@ -210,10 +210,10 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-claim:active { transform:scale(.98); }
 .tcs-claim--busy { opacity:.7;pointer-events:none; }
 .tcs-claim-t { font:600 13px/1.5 var(--font-v5);color:var(--v5-on-brand);text-align:center;overflow-wrap:anywhere; }
-.tcs-secondary { box-sizing:border-box;min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--v5-border);display:flex;align-items:center;justify-content:center;font:500 var(--ui-type-list-subtitle, 13px)/1.5 var(--font-v5);color:var(--v5-ink);text-align:center;overflow-wrap:anywhere; }
+.tcs-secondary { box-sizing:border-box;min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--v5-border);display:flex;align-items:center;justify-content:center;font:500 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-ink);text-align:center;overflow-wrap:anywhere; }
 .tcs-dismiss { width:100%;min-height:44px;display:flex;align-items:center;justify-content:center; }
 .tcs-dismiss:active { opacity:.7; }
-.tcs-dismiss-t { font:400 var(--ui-type-list-subtitle, 13px)/1.5 var(--font-v5);color:var(--v5-ink-3);text-align:center; }
+.tcs-dismiss-t { font:400 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-ink-3);text-align:center; }
 .tcs-claim:focus-visible,.tcs-secondary:focus-visible,.tcs-close:focus-visible,.tcs-dismiss:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 @media(max-width:350px) { .tcs-device-art { width:160px;height:160px; }.tcs-device-name {font-size:17px;}.tcs-title {font-size:16px;} }
 @media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-spark-box--success { animation:none; }.tcs-claim { transition:none; } }

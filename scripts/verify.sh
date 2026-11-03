@@ -878,8 +878,7 @@ if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
   src/components/me/my-devices-entry.vue \
   src/pages/me/me.vue \
   src/pages/me/proof.vue \
-  src/pages/support/chat.vue \
-  src/mock/nova-templates.ts >"${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log" 2>&1; then
+  src/pages/support/chat.vue >"${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log" 2>&1; then
   bad "SPEC-1 R7 user-facing online state bypasses heartbeat seam"; sed 's/^/        /' "${VERIFY_LOG_PREFIX}-uni-r7-ui-status.log"
 else
   ok "SPEC-1 R7 user-facing online state uses heartbeat seam"
@@ -920,8 +919,6 @@ if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev
 else
   ok "staking disclosure includes canonical high-tier penalties"
 fi
-sentinel_present "staking risk disclosure EN names all four penalties" src/i18n/messages/en.ts '5% / 15% / 30% / 50% of the locked amount'
-sentinel_present "staking risk disclosure ZH names all four penalties" src/i18n/messages/zh.ts '锁定金额的 5% / 15% / 30% / 50%'
 # The explanation renders current pool penalties. Fixed default strings cannot
 # prove that operator changes (including fractional rates) reach all locales.
 staking_display_log="${VERIFY_LOG_PREFIX}-staking-display.log"
@@ -1075,7 +1072,7 @@ sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEa
 sentinel_present "SPEC-7 settle accrues app attestation" src/store/app.ts 'recordAttestation\(accountKey\.value'
 sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 'if \(cfgStore\.syncFailed\) return'
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
-sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
+sentinel_present "SPEC-7 wallet shows config sync failure state" src/components/me/wallet-overview.vue 'syncFailedTitle'
 
 # ── PAY-VN 越南支付架构(规格 PRD/specs/ 下的「越南支付架构规格 v1.0」· 2026-07-24)──
 #    注:此处刻意不写规格文件名全称 —— 文件名带旧品牌前缀,写全会被本文件的 brand 哨兵抓,
@@ -1158,7 +1155,7 @@ sentinel_present "AUTH02 legacy risk migration seals schema2 barrier" src/store/
 sentinel_present "AUTH02 sponsorship is rebound per account" src/lib/account-scope.ts 'useSponsorship\(\)\.bindAccount\(accountKey\)'
 sentinel_present "AUTH02 sponsorship stores bindings per account" src/store/sponsorship.ts 'bindingsByAccount'
 sentinel_present "AUTH02 dev bridge is entrypoint DEV-gated" src/main.ts 'if \(import\.meta\.env\.DEV\)'
-sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
+sentinel_present "SPEC-7 wallet pending bucket info sheet" src/components/me/wallet-overview.vue 'pendingSheetTitle'
 # Bug7:钱包释放说明只使用服务端回执；零余额、不可读、限制及在线阈值由实际页面函数测试覆盖。
 if npx vitest run src/pages/me/wallet-release-message.test.ts >"${VERIFY_LOG_PREFIX}-wallet-release-message.log" 2>&1; then
   ok "SPEC-7 wallet release explanations follow server receipts"
@@ -1174,7 +1171,7 @@ sentinel_present "SPEC-7 dev bridge is DEV-gated" src/lib/spec7-dev-bridge.ts 'i
 sentinel_present "SPEC-7 earning buckets typed" src/store/types.ts 'interface EarningBuckets'
 sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earningBuckets: EarningBuckets'
 sentinel_present "SPEC-7 legacy account snapshots receive bucket defaults" src/store/app.ts 'withDefaultEarningBuckets'
-sentinel_present "SPEC-7 wallet page reads earning buckets" src/pages/me/wallet.vue 'app\.user\.earningBuckets'
+sentinel_present "SPEC-7 wallet page reads earning buckets" src/components/me/wallet-overview.vue 'app\.user\.earningBuckets'
 sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wallet-card.vue 'app\.user\.earningBuckets'
 # z1 判决 A:2026-07-31「上限=总余额」规则被 D5 server-canonical 新规则取代 ——
 # 可提上限 =(总余额 − 服务端 held 两桶)× policy.balanceMaxRatio,且 clusterRestricted /
@@ -1205,7 +1202,7 @@ fi
 #    故本门现在守两面:① 值仍是总余额(原判据,保留);② 标签不含「可提现」语义(新增)。
 withdrawable_source_parity() {
   local miss=""
-  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/pages/me/wallet.vue || miss="${miss}wallet.vue "
+  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet.vue "
   grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet-card.vue "
   if [ -z "$miss" ]; then ok "wallet surfaces show total balance (app.user.usdtBalance)";
   else bad "wallet surface value source DRIFT — still on old bucket: $miss"; fi
@@ -1228,7 +1225,7 @@ withdrawable_source_parity() {
   # 文件里顺手加一处引用旧桶的辅助展示(主 computed 仍正确),上面照样全绿而页面口径已分裂。
   local stale
   stale=$(grep -nE '(earningBuckets|buckets(\.value)?)\.withdrawableUsdt' \
-    src/pages/me/wallet.vue src/components/me/wallet-card.vue src/pages/me/wallet-withdraw.vue 2>/dev/null | head -4)
+    src/components/me/wallet-overview.vue src/components/me/wallet-card.vue src/pages/me/wallet-withdraw.vue 2>/dev/null | head -4)
   if [ -z "$stale" ]; then ok "no stale withdrawable-bucket reads in wallet surfaces (0 hits)";
   else bad "stale withdrawable-bucket read resurfaced (口径分裂面)"; echo "$stale" | sed 's/^/        /'; fi
 }
@@ -1237,7 +1234,7 @@ sentinel_present "SPEC-7 withdraw page consumes eligibility engine" src/pages/me
 sentinel_present "SPEC-7 withdraw submit re-evaluates async at submit (R5)" src/pages/me/wallet-withdraw.vue 'await requestWithdrawalEligibility'
 sentinel_present "SPEC-7 withdraw submit uses fresh route" src/pages/me/wallet-withdraw.vue 'fresh\.route'
 sentinel_present "SPEC-7 withdraw timeout does not debit" src/pages/me/wallet-withdraw.vue 'riskCheckTimeoutTitle'
-sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldBucketsLine'
+sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldReviewChip'
 sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 'riskReasonLines\(t\.value'
 sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
 # (原「SPEC-7 pairing registers payment instrument」哨兵随旧配对机制删除,2026-08-05 包 E。
@@ -2013,7 +2010,7 @@ sentinel_present "P2-8 achievements store is account-scoped" src/store/achieveme
 sentinel_present "P2-8 goals store is account-scoped" src/store/goals.ts 'writeAccountRow'
 sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow|createAccountRowCommit'
 sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-powerup.ts 'writeAccountRow|createAccountRowCommit'
-# P2-8 batch-4 记录/账户:通知/凭证/工单/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红)
+# P2-8 batch-4 记录/账户:通知/凭证/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红);用户工单已退役
 sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
 sentinel_absent "retired support tickets have no client store" 'useTickets|store/tickets'
@@ -2023,7 +2020,7 @@ sentinel_absent "retired support tickets have no client store" 'useTickets|store
 #   weekly-quest 改服务端权威+版次围栏(本地不落盘)、conversations 从 reset 改 bindAccount。
 #   新门改钉**不变量本身**:收口面从 account-scope.ts 的真实调用派生(不手写清单),
 #   三个 store 必须在收口面里(bindAccount / reset 都算),收口面塌空即判红。
-#   红测:摘掉 tickets → 红;把 bindAccount 全改名(收口面塌空)→ 红。
+#   红测:摘掉 conversations → 红;把 bindAccount 全改名(收口面塌空)→ 红。(tickets 已随用户工单退役)
 if "$NODE_BIN" scripts/account-scope-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-account-scope.log" 2>&1; then
   ok "账号隔离门 — $(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-account-scope.log")"
 else
@@ -2040,8 +2037,8 @@ sentinel_present "P2-8 cart store is account-scoped" src/store/cart.ts 'writeAcc
 sentinel_present "P2-8 profile store is account-scoped" src/store/profile.ts 'writeAccountRow'
 sentinel_present "P2-8 security store is account-scoped" src/store/security.ts 'writeAccountRow'
 sentinel_present "P2-8 rewards-seen store is account-scoped" src/store/rewards-seen.ts 'writeAccountRow'
-# P2-8 batch-5 会话记录:会话中心/Nova 非持久,换号收口点必须 reset 重播种(防上一账号的客服对话被下一账号看到;audit 2026-07-16)
-sentinel_present "P2-8 account-scope helper resets nova" src/lib/account-scope.ts 'useNova\(\)\.reset\(\)'
+# P2-8 batch-5 会话记录:会话中心非持久,换号收口点必须重绑重播种(防上一账号的客服对话被下一账号看到;audit 2026-07-16)
+sentinel_present "P2-8 account-scope helper rebinds conversations" src/lib/account-scope.ts 'useConversations\(\)\.bindAccount\(accountKey\)'
 # 客服会话闲置策略双端 parity(本仓侧 tripwire;admin 侧 canon-sentinel 逐键比 canon-numbers.json):
 # 改这两个默认值必须三处同步(uniapp 常量 + admin m-tabs/data.ts + canon json),单独改本仓即红。
 sentinel_present "support idle policy warn default pinned (1min · canon parity)" src/mock/conversations.ts 'SUPPORT_IDLE_WARN_MINS = 1'
@@ -2056,7 +2053,7 @@ spec4_account_session_semantics() {
     const register=fs.readFileSync("src/pages/register/register.vue","utf8");
     const signIn=fs.readFileSync("src/auth/complete-sign-in.ts","utf8");
     const entry=fs.readFileSync("src/lib/entry-surface.ts","utf8");
-    const wallet=fs.readFileSync("src/pages/me/wallet.vue","utf8");
+    const wallet=fs.readFileSync("src/components/me/wallet-overview.vue","utf8");
     const withdrawalTracking=fs.readFileSync("src/pages/me/wallet-withdraw-tracking.vue","utf8");
     if(/function writeActiveRecord|function readActiveRecord|const ACTIVE_KEY/.test(session)) throw new Error("legacy single active-session writer returned");
     if(/rec\.deviceId !== deviceId\.value[\s\S]*return "kicked"/.test(session)) throw new Error("different device login still kicks current session");
@@ -2378,7 +2375,7 @@ section_header_imported() {
 }
 section_header_imported
 # Chassis chrome completeness (PITFALLS P-037): the prototype's IOSFrame mounts a
-# fixed set of ALWAYS-ON chrome — Header + TabBar + NovaBubble (nova 浮标) +
+# fixed set of ALWAYS-ON chrome — Header + TabBar + SupportBubble (客服浮标) +
 # pull-to-refresh. Batch-0 chassis was simplified and silently dropped the bubble
 # + pull-refresh; verify only caught what it was told to look at (cf. P-036). This
 # sentinel enumerates the always-on chrome so it can't regress unnoticed.
@@ -2386,7 +2383,7 @@ chassis_chrome_complete() {
   local f="src/components/app-chassis.vue"
   local miss=""
   [ -f "$f" ] || { bad "chassis file missing ($f)"; return; }
-  grep -q 'NovaBubble' "$f" || miss="${miss}NovaBubble(nova浮标) "
+  grep -q 'SupportBubble' "$f" || miss="${miss}SupportBubble(客服浮标) "
   grep -q 'nx-refresher' "$f" || miss="${miss}pull-to-refresh(touch) "
   grep -q 'nx-page-enter' "$f" || miss="${miss}page-entrance-anim "
   grep -q 'nx-tabbar-pill' "$f" || miss="${miss}floating-pill-tabbar "
@@ -2394,7 +2391,7 @@ chassis_chrome_complete() {
   # frosted-glass chrome must NOT use <scroll-view> for content (P-039): its
   # separate compositing layer kills the fixed chrome's backdrop-filter frosting.
   grep -qE '<scroll-view[^>]*class="nx-content' "$f" && miss="${miss}scroll-view-breaks-frosting(use-overflow-view) "
-  if [ -z "$miss" ]; then ok "chassis chrome complete (header + pill + nova浮标 + pull-refresh + entrance, frosting-safe)";
+  if [ -z "$miss" ]; then ok "chassis chrome complete (header + pill + 客服浮标 + pull-refresh + entrance, frosting-safe)";
   else bad "chassis chrome INCOMPLETE — missing: $miss"; fi
 }
 chassis_chrome_complete
@@ -2405,8 +2402,8 @@ chassis_chrome_complete
 # aren't redefined locally: (a) the undefined var() makes the WHOLE font-family
 # declaration invalid → every text node falls back to Times New Roman serif;
 # (b) content-box makes height/width+padding elements larger than the prototype.
-# Plus the brand fonts must be loaded (index.html) — the prototype loads them in
-# layout.tsx. This sentinel guards all three so the foundation can't regress.
+# Plus the UI font must be bundled (src/styles/fonts.css declares Inter; design
+# system DS-25). This sentinel guards all three so the foundation can't regress.
 css_foundation() {
   local t="src/styles/tokens.css"
   local miss=""
@@ -2414,8 +2411,8 @@ css_foundation() {
   grep -qE '^\s*--font-display:' "$t"  || miss="${miss}--font-display-undef(→TimesNewRoman) "
   grep -qE '^\s*--font-jet-mono:' "$t" || miss="${miss}--font-jet-mono-undef "
   grep -qE 'box-sizing:\s*border-box' "$t" || miss="${miss}no-border-box-reset "
-  grep -q 'general-sans' index.html 2>/dev/null || miss="${miss}no-brand-font-link(index.html) "
-  if [ -z "$miss" ]; then ok "css foundation (font vars defined + border-box reset + brand font loaded)";
+  grep -q 'font-family: "Inter"' src/styles/fonts.css 2>/dev/null || miss="${miss}no-bundled-ui-font(fonts.css) "
+  if [ -z "$miss" ]; then ok "css foundation (font vars defined + border-box reset + UI font bundled)";
   else bad "css foundation BROKEN — $miss"; fi
 }
 css_foundation
@@ -2452,18 +2449,16 @@ nav_routes_valid() {
   else bad "INVALID nav routes (navigateTo silently fails): $bad_routes"; fi
 }
 nav_routes_valid
-# User-facing brand must be NOVA, never Stella (已决产品决策 / ALIGNMENT carve-out).
-# The AI assistant was renamed Stella→NOVA; code identifiers (nova-bubble.vue,
-# useNova, .nx-nova-*) are internal and fine, but no user-VISIBLE "Stella" may
-# leak. i18n message VALUES are the authoritative user-facing surface (all copy
+# The retired AI assistant's old name "Stella" must never be user-visible
+# (已决产品决策 / ALIGNMENT carve-out; the assistant itself was withdrawn).
+# No user-VISIBLE "Stella" may leak. i18n message VALUES are the authoritative user-facing surface (all copy
 # goes through t()), so guard quoted values containing "Stella" there (excluding
-# the unrelated 'stellar*' hardware SKU). Keys like `nova: {` aren't quoted values
-# so won't match.
+# the unrelated 'stellar*' hardware SKU).
 no_userfacing_stella() {
   local hits
   hits=$(grep -rnE ':[[:space:]]*"[^"]*[Ss]tella[^"]*"' src/i18n/messages 2>/dev/null | grep -iv 'stellar' | head -8)
-  if [ -z "$hits" ]; then ok "no user-facing 'Stella' (brand=NOVA) (0 hits)";
-  else bad "user-facing 'Stella' leaked (brand must be NOVA)"; echo "$hits" | sed 's/^/        /'; fi
+  if [ -z "$hits" ]; then ok "no user-facing 'Stella' (0 hits)";
+  else bad "user-facing 'Stella' leaked"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_userfacing_stella
 # Brand rebrand guard (2026-07-22 → NexGrid): 旧品牌词不得回流用户可见/运行时层。
@@ -2675,11 +2670,15 @@ platform_stats_anchor() {
     || grep -Fq 'onlineDevicesOf(cfg.config.publicStats)' src/pages/onboarding/intro.vue; then
     bad "platform-anchor: 引导页在线设备必须读服务端 verifiedStats,不能由 H9 配置派生"; fails=1
   fi
-  # 正式 App 的 On Grid 数字来自 Java Home canonical projection，不再从编译期平台锚派生。
-  # 同时钉字段消费与刷新入口，避免换成另一本地常量后假绿。
-  if ! grep -q 'app\.homeTruth?.onGrid\.perSecUsdt' src/components/home/on-grid-section.vue 2>/dev/null \
-    || ! grep -q 'app\.refreshHomeTruth()' src/components/home/on-grid-section.vue 2>/dev/null; then
-    bad "platform-anchor: on-grid 未消费 Java Home 投影 perSecUsdt 或缺少失败重读入口"; fails=1
+  # 2026-10-30：On Grid 展示在线数读 H9，/sec 读已发布 paidCents 相邻秒差；客户仍读 Java Home。
+  # 分别钉 H9 数据源与重读入口，并禁止回退真实业务指标。
+  if ! grep -Fq 'cfg.config.networkPulse?.onlineDevices' src/components/home/on-grid-section.vue \
+    || ! grep -Fq 'cfg.load()' src/components/home/on-grid-section.vue \
+    || ! grep -Fq '"/api/config/home-display"' src/components/home/on-grid-section.vue \
+    || ! grep -Fq 'displayValue.value?.paidPerSec' src/components/home/on-grid-section.vue \
+    || ! grep -Fq 'player.refresh()' src/components/home/on-grid-section.vue \
+    || grep -Eq 'onGrid\.(activeDevices|perSecUsdt)|app\.refreshHomeTruth\(' src/components/home/on-grid-section.vue; then
+    bad "platform-anchor: on-grid H9 展示源/独立重读入口缺失，或回退真实业务指标"; fails=1
   fi
   # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。
   #   这里不能再把字段名本身当成违规:服务端 publicStats 新投影可以合法携带

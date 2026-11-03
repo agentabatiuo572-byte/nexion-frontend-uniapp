@@ -14,8 +14,8 @@
 
     <!-- Shadow earnings -->
     <view class="flex items-baseline" style="gap: 6px; margin-top: 12px">
-      <text :style="shadowUsdStyle">{{ formatGroupedAmount(shadowUSD) }}</text>
-      <text :style="dollarStyle">USDT</text>
+      <text :style="dollarStyle">$</text>
+      <text :style="shadowUsdStyle">{{ formatAmount(shadowUSD) }}</text>
       <text :style="shadowNexStyle">+ {{ formatAmount(shadowNEX) }} UVT</text>
     </view>
     <text class="block" :style="ctaLineStyle">{{ cta }}</text>
@@ -40,11 +40,11 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { formatAmount } from "@/lib/amount-display";
 import { computed, type CSSProperties } from "vue";
 import Cell from "@/components/me/trial-time-cell.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDate } from "@/lib/trial-date";
 import { useTrialConfig } from "@/store/trial-config";
 import type { TrialStatus } from "@/store/free-trial";
@@ -94,12 +94,12 @@ const cta = computed(() => {
 
 const startDateLine = computed(() =>
   fmt(w.value.countdownStart, {
-    date: props.startedAt !== null ? formatTrialDate(props.startedAt) : w.value.countdownDateEmpty,
+    date: props.startedAt !== null ? formatTrialDate(props.startedAt, dateLocale()) : w.value.countdownDateEmpty,
   }),
 );
 const endDateLine = computed(() =>
   fmt(w.value.countdownEnd, {
-    date: props.graceEndsAt !== null ? formatTrialDate(props.graceEndsAt) : w.value.countdownDateEmpty,
+    date: props.graceEndsAt !== null ? formatTrialDate(props.graceEndsAt, dateLocale()) : w.value.countdownDateEmpty,
   }),
 );
 

@@ -30,7 +30,38 @@ vi.mock("@/i18n/use-t", () => ({
   getT: () => ({ ui: { navigationFailed: "Navigation failed" } }),
 }));
 
-import { navBack, navTo, navReset, navReplace, takeNavigationQuery, toUniRoute } from "./route";
+import { isStakingVisibilityRoute, navBack, navTo, navReset, navReplace, takeNavigationQuery, toUniRoute } from "./route";
+import { nativeTabEntry, registerNativeTabHost } from "./native-tab-navigation";
+
+describe("staking visibility routes", () => {
+  it("keeps ordinary native tab taps in place but resets still clear the page stack", async () => {
+    const page = { route: "pages/tabs/tabs", $page: { id: 3 } }, select = vi.fn();
+    const unregister = registerNativeTabHost({ page, location: () => nativeTabEntry(), select });
+    vi.stubGlobal("getCurrentPages", () => [page]);
+    const reLaunch = vi.fn((options: NavigationOptions) => options.success?.());
+    vi.stubGlobal("uni", { reLaunch });
+    await expect(navTo("/pages/me/me")).resolves.toBe(true);
+    expect(select).toHaveBeenCalledOnce(); expect(reLaunch).not.toHaveBeenCalled();
+    await expect(navReset("/pages/store/store?activityId=offer")).resolves.toBe(true);
+    expect(select).toHaveBeenCalledOnce();
+    expect(reLaunch.mock.calls[0][0].url).toBe("/pages/tabs/tabs?target=%2Fpages%2Fstore%2Fstore%3FactivityId%3Doffer");
+    unregister(); vi.unstubAllGlobals();
+  });
+  it("reports malformed native tab query encoding instead of throwing into the click handler", async () => {
+    const showToast = vi.fn();
+    vi.stubGlobal("uni", { showToast });
+    await expect(navTo("/pages/store/store?focus=%E0")).resolves.toBe(false);
+    await expect(navReset("/pages/store/store?focus=%E0")).resolves.toBe(false);
+    expect(showToast).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+  it("covers staking and reinvestment pages without hiding the wallet", () => {
+    expect(isStakingVisibilityRoute("/pages/staking/staking")).toBe(true);
+    expect(isStakingVisibilityRoute("/pages/me/wallet-repurchase?from=wallet")).toBe(true);
+    expect(isStakingVisibilityRoute("/pages/me/wallet-repurchase-how")).toBe(true);
+    expect(isStakingVisibilityRoute("/pages/me/wallet")).toBe(false);
+  });
+});
 
 type NavigationOptions = {
   url: string;
@@ -96,7 +127,7 @@ describe("route navigation failure handling", () => {
 
   it("recognizes physical tabBar routes during migrated navigation", () => {
     expect(toUniRoute("/pages/team/team")).toEqual({ url: "/pages/team/team", tab: true });
-    expect(toUniRoute("/pages/me/wallet")).toEqual({ url: "/pages/me/wallet", tab: false });
+    expect(toUniRoute("/pages/me/wallet")).toEqual({ url: "/pages/me/me", tab: true });
   });
 
   it("preserves a quota product for one H5 navigation when the destination loses its query", async () => {
@@ -314,4 +345,9 @@ describe("route navigation failure handling", () => {
     navTo("/pages/me/risk-disclosure");
     expect(uni.showToast).toHaveBeenCalledWith({ title: "Navigation failed", icon: "none" });
   });
+});
+
+
+it.each(["/me/wallet", "/pages/me/wallet", "/pages/me/wallet-repurchase", "/pages/me/wallet-repurchase-how", "/me/wallet/repurchase"])("retired wallet destination %s opens Me", href => {
+  expect(toUniRoute(href + "?from=notice")).toEqual({ url: "/pages/me/me?from=notice", tab: true });
 });

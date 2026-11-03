@@ -1,9 +1,9 @@
 /** Display only: keep API, ledger and command amounts at their original precision. */
-export function formatGroupedAmount(value: number | string | null | undefined): string {
-  const fixed = formatAmount(value), [whole, fraction] = fixed.split('.');
-  return fraction === undefined ? fixed : whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + fraction;
+export function formatGroupedAmount(value: number | string | null | undefined, precision: 2 | 6 | "full" = 2): string {
+  const fixed = formatAmount(value, precision), [whole, fraction] = fixed.split('.');
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction === undefined ? '' : '.' + fraction);
 }
-export function formatAmount(value: number | string | null | undefined, precision: 2 | 6 = 2): string {
+export function formatAmount(value: number | string | null | undefined, precision: 2 | 6 | "full" = 2): string {
   if (typeof value === "number" && !Number.isFinite(value)) return "-";
   const match = String(value ?? "").trim().match(/^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);
   if (!match) return "-";
@@ -14,6 +14,11 @@ export function formatAmount(value: number | string | null | undefined, precisio
   const point = integer.length + shift;
   const whole = point > 0 ? digits.slice(0, point).padEnd(point, "0") : "0";
   const tail = (point < 0 ? "0".repeat(-point) : "") + digits.slice(Math.max(point, 0));
+  if (precision === "full") {
+    const decimals = tail.replace(/0+$/, "");
+    return (sign === "-" && /[1-9]/.test(digits) ? "-" : "")
+      + whole.replace(/^0+(?=\d)/, "") + (decimals ? "." + decimals : "");
+  }
   const units = BigInt(whole + tail.slice(0, precision).padEnd(precision, "0")) + (tail[precision] >= "5" ? BigInt(1) : BigInt(0));
   const fixed = units.toString().padStart(precision + 1, "0");
   const decimals = fixed.slice(-precision).replace(/(\d{2}\d*?)0+$/, "$1");

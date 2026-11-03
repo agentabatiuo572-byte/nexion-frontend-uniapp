@@ -17,6 +17,19 @@ function page(startId: number, size: number, nextCursor: string | null = null) {
 }
 
 describe("team network API", () => {
+  it("requires whole point quantities on the snapshot and every member", async () => {
+    const data = page(1, 1);
+    const request = vi.fn().mockResolvedValue(data);
+    const api = createTeamNetworkApi({ request } as unknown as ApiClient, "prod");
+    Object.assign(data, {monthComputePoints: 320, lifetimeComputePoints: 1280});
+    Object.assign(data.members[0], {monthComputePoints: 320, lifetimeComputePoints: 1280});
+    expect(await api.snapshot()).toMatchObject({monthComputePoints:320,lifetimeComputePoints:1280,members:[{monthComputePoints:320}]});
+    expect(await api.snapshot()).not.toHaveProperty("monthVolumeUsdt");
+    for (const invalid of [-1, 1.5, null]) {
+      Object.assign(data, {monthComputePoints: invalid});
+      await expect(api.snapshot()).rejects.toMatchObject({kind:'protocol'});
+    }
+  });
   it("accepts a server-owned seven-level projection", async () => {
     const request = vi.fn().mockResolvedValue({
       totalMembers: 1, directMembers: 1, activeMembers: 1,

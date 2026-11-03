@@ -29,7 +29,7 @@ function parse(value: unknown, mode: ApiEnvironment): RankHowPolicy {
     const snapshot = row.rules as Record<string, unknown>;
     const threshold = snapshot.qualifiedReferralSelfComputePoints;
     if (typeof snapshot.permanentProtection !== "boolean" || typeof snapshot.leadershipConfigured !== "boolean"
-        || (threshold !== null && (typeof threshold !== "number" || !Number.isFinite(threshold) || threshold < 0))) return invalid();
+        || (threshold !== null && (typeof threshold !== "number" || !Number.isSafeInteger(threshold) || threshold < 0))) return invalid();
     rules = { permanentProtection: snapshot.permanentProtection, leadershipConfigured: snapshot.leadershipConfigured, qualifiedReferralSelfComputePoints: threshold as number | null };
   }
   return { version: row.version, locale: row.locale, hero: row.hero, sections, rules, source: "server", sourceEnvironment: row.sourceEnvironment as "SANDBOX" | "PRODUCTION", runId: row.runId as string };

@@ -24,7 +24,7 @@ const languages = [
   { locale: "vi", messages: vi, debit: "Thu hồi thưởng mời bạn", neutral: "Thưởng mời bạn" },
   { locale: "zh", messages: zh, debit: "邀请奖励扣回", neutral: "邀请奖励" },
 ] as const;
-function row(direction: "IN" | "OUT", asset: "USDT" | "NEX" = "USDT"): WalletBillRow {
+function row(direction: "IN" | "OUT", asset: "USDT" | "UVT" = "USDT"): WalletBillRow {
   return { id: "WL-commission", bizNo: "PRIVATE-RECOVERY-KEY", bizType: "TEAM_COMMISSION", asset,
     direction, amount: 64.95, balanceAfter: 4216.78, status: "SUCCESS", remark: "PRIVATE-REMARK",
     createdAt: 1791356400000, category: "refer", presentationCode: "refer" };
@@ -50,11 +50,11 @@ describe("controlled referral commission direction", () => {
   });
 
   it.each(languages)("keeps NEX activity's signed amount while rendering the debit memo in $locale", ({ messages, debit }) => {
-    const bill = productionBill(row("OUT", "NEX"));
+    const bill = productionBill(row("OUT", "UVT"));
     const bills = reactive({ summaryStatus: "ready", summary: { recentNexBills: [bill] } });
-    const view = new Function("computed", "remoteApiEnabled", "bills", "t", "resolveWalletBillMemo",
+    const view = new Function("computed", "remoteApiEnabled", "bills", "t", "resolveWalletBillMemo", "summaryForDisplay",
       code(nexSource, "const nexLedger = computed", "const pendingNex = computed") + ";return nexLedger;")(
-      computed, true, bills, ref(messages), resolveWalletBillMemo,
+      computed, true, bills, ref(messages), resolveWalletBillMemo, computed(() => bills.summary),
     ) as { value: Array<{ id: string; ts: number; nex: number; label: string }> };
     expect(view.value[0]).toMatchObject({ id: bill.id, ts: bill.ts, nex: -64.95, label: debit });
   });

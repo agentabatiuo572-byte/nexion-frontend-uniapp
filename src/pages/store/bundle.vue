@@ -39,7 +39,7 @@
       <view v-else-if="catalogStatus === 'error' || policyStatus === 'error'" data-testid="bundle-catalog-error" class="nx-glass-card mx-4" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
-        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog" @keydown="activate($event, retryCatalog)">
+        <view class="nx-card-recovery-action active:opacity-70" role="button" tabindex="0" @click="retryCatalog" @keydown="activate($event, retryCatalog)">
           <text>{{ t.store.catalogRetry }}</text>
         </view>
       </view>
@@ -92,7 +92,7 @@
           :style="{ borderBottom: i === products.length - 1 ? 'none' : '1px solid var(--v5-border)' }"
         >
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="itemNameStyle">{{ nexGridBrandText(p.name) }}</text>
+            <text class="block truncate" :style="itemNameStyle">{{ (p.name) }}</text>
             <text class="block" :style="itemMetaStyle">
               <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
             </text>
@@ -100,7 +100,7 @@
             <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
             <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
           </view>
-          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: nexGridBrandText(p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
+          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: (p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
             <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-surface-2)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             </view>
@@ -120,14 +120,14 @@
             role="button"
             tabindex="0"
             :aria-label="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
-              ? `${nexGridBrandText(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: nexGridBrandText(p.name) })"
+              ? `${(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: (p.name) })"
             @click.stop="onAddSuggestion(p)"
             @keydown="activate($event, () => onAddSuggestion(p))"
           >
             <view class="flex-1 min-w-0 text-left">
-              <text class="block truncate" :style="suggestionNameStyle">{{ nexGridBrandText(p.name) }}</text>
+              <text class="block truncate" :style="suggestionNameStyle">{{ (p.name) }}</text>
               <text class="block" :style="itemMetaStyle">
-                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ fmt(t.uiChrome.earnsPerDay, { amount: `+$${formatAmount(p.dailyEarn)}` }) }}</text>
+                <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
               </text>
               <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
               <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.gateBlockedToast }}</text>
@@ -163,8 +163,8 @@
           </view>
           <!-- Combined daily -->
           <view class="flex items-center justify-between" style="min-height: 24px">
-            <text :style="rowLabelStyle(false)">{{ t.bundle.combinedDaily }}</text>
-            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">+${{ formatAmount(cumulativeDailyEarn) }}/d</text>
+            <text :style="rowLabelStyle(false)">{{ t.bundle.estimatedDaily }}</text>
+            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">${{ formatAmount(cumulativeDailyEarn) }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
           <!-- Checkout CTA — 结算不可用时置灰 + 换文案(禁用原因),下一步走 CTA 下方那句 hint。
                箭头 / 上传图标一并撤掉:禁用态上留着「向前」的箭头是反语义的。 -->
@@ -195,23 +195,26 @@
 </template>
 
 <script setup lang="ts">
-import { formatAmount } from "@/lib/amount-display";
+import { promotionCheckoutHref } from "@/lib/promotion-entry";
+function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
+  return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
+}
+import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import PromotionBundle from '@/components/promotion/promotion-bundle.vue';
-import { promotionCheckoutHref, parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
+import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
-import { useLocaleStore } from "@/store/locale";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { nexGridBrandText } from "@/lib/brand-copy";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
 import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
 // 🔴 zentao #244:线上模式必须问**服务端**资格,本地门仅 mock 用 —— 与 detail.vue 同一口径。
 import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { isProductAvailable } from "@/store/product-availability";
+import { useLocaleStore } from "@/store/locale";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
@@ -305,7 +308,7 @@ const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN
 const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
 const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + (p.productType === "SHARE" ? 0 : p.dailyEarn), 0));
 function bundleProductYieldText(p: Product): string {
-  if (p.productType !== "SHARE") return fmt(t.value.uiChrome.earnsPerDay, { amount: `+${formatAmount(p.dailyEarn)}` });
+  if (p.productType !== "SHARE") return `${t.value.bundle.estimatedDaily} · $${formatAmount(p.dailyEarn)}`;
   const range = p.shareYieldMin != null && p.shareYieldMax != null
     ? `${p.shareYieldMin}%–${p.shareYieldMax}%`
     : t.value.store.shareAnnualUnavailable;
@@ -371,7 +374,7 @@ function formatBundleUsdt(value: number): string {
 }
 const totalText = computed(() => formatBundleUsdt(total.value));
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
-const checkoutCtaText = computed(() => fmt(t.value.bundle.checkoutCta, { total: totalText.value }));
+const checkoutCtaText = computed(() => t.value.promotion.continue);
 const submitting = ref(false);
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
@@ -472,7 +475,7 @@ async function onAddSuggestion(p: Product) {
   }
   if (!catalogReady.value || !isProductAvailable(p, phase.value) || cart.has(p.id)) return;
   cart.add(p.id);
-  toast.success(fmt(t.value.bundle.addedToBundle, { name: nexGridBrandText(p.name) }));
+  toast.success(fmt(t.value.bundle.addedToBundle, { name: (p.name) }));
 }
 interface PendingBundleCommands { commands: Record<string, PendingBundleCommand | string> }
 const BUNDLE_COMMAND_KEY = "nexgrid-bundle-order-command-v1";
@@ -723,7 +726,7 @@ async function onCheckout() {
   const gateCtx = {
     rank: vRank.myRank,
     activeDirect: network.members.filter((m) => m.layer === 1 && m.status === "active").length,
-    teamComputePoints: vRank.teamComputePoints,
+    teamComputePoints: vRank.teamComputePoints ?? 0,
   };
   const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
   if (blocked) {
@@ -802,8 +805,8 @@ const catalogStateStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
 };
 const catalogStateTitleStyle: CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 600,
+  fontSize: "var(--ui-type-card-title)",
+  fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
 const catalogStateBodyStyle: CSSProperties = {
@@ -956,7 +959,7 @@ const suggestionNameStyle: CSSProperties = {
 function rowLabelStyle(big: boolean): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13px",
+    fontSize: "var(--ui-type-list-subtitle)",
     fontWeight: big ? 600 : 500,
     color: big ? "var(--v5-ink)" : "var(--v5-ink-3)",
   };
@@ -984,7 +987,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
 const ctaLabelStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "15px",
+  fontSize: "var(--ui-type-button)",
   letterSpacing: "-0.005em",
   color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
 }));

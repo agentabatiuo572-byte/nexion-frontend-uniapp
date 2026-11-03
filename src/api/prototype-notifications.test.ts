@@ -3,6 +3,7 @@ import type { ApiClient } from './api-client';
 import { createNotificationApi } from './notification-api';
 import { createOrderApi } from './order-api';
 import { createDeviceE3Api } from './device-e3-api';
+import { isDirectNotificationSummary } from '@/lib/notification-summary';
 
 const { demoFixture, demoDefaults } = await import(new URL('../../scripts/lib/prototype-demo-data.mjs', import.meta.url).href);
 function demo(locale: string) {
@@ -39,9 +40,9 @@ describe('prototype notification record contracts', () => {
       }
     }
     const short = page.items.find(item => item.id === 903)!;
-    expect(short.ctaHref).toBeTruthy();
+    expect(short.ctaHref).toBeTruthy(); expect(isDirectNotificationSummary(short.body)).toBe(true);
     const long = page.items.find(item => item.id === 905)!;
-    expect(long.ctaHref).toBe(''); expect(long.body).toContain('\n');
+    expect(long.ctaHref).toBe(''); expect(long.body).toContain('\n'); expect(isDirectNotificationSummary(long.body)).toBe(false);
     await expect(d.api.recordAction(long.id, 'cta', 'no-link-action')).rejects.toThrow('DEMO_NOTIFICATION_ACTION_UNAVAILABLE');
   });
   it('has today, yesterday and older groups even just after local midnight', async () => {
