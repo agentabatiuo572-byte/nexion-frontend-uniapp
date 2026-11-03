@@ -173,15 +173,16 @@ const demoOrderSlots=(orders,orderNo)=>orders
   .filter(order=>(orderNo===undefined||order.orderNo===orderNo)&&['paid','provisioning'].includes(order.canonicalStatus))
   .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
 // Preview design rule. SCENARIO knobs (fleetState, checkoutState with its two-slot replace cap, trialState and
-// benefitState presets, entering or leaving dataState=empty, and Lite's scopeState, whose mixed scope owns a hidden
-// phone) start a fresh, coherent scenario: the preview server clears every record the old scenario owns (session
-// orders, purchases, trade-ins, stopped devices, trial, command receipts and payment intents on the server, the App's
-// order/payment recovery rows in the browser), and the next read seeds the devices here. A write is applied only in
-// the scenario it started in. dataState=empty is the empty account the empty pages are reviewed with: no devices
-// (hidden phones included), no sample orders and an empty wallet (balance 0, so wallet payments are refused for
-// funds), the trial as its own knobs say. PRESENTATION knobs (machineImageState, dataState loading/error, Lite's
-// computeState) only change what a read shows; they never reseed or change occupancy. Other Lite knobs
-// (setupGateState, promoState, promoEdgeState, ...) own no devices or orders and keep the scenario.
+// benefitState presets, entering or leaving dataState=empty or paymentState=low-balance, and Lite's scopeState, whose
+// mixed scope owns a hidden phone) start a fresh, coherent scenario: the preview server clears every record the old
+// scenario owns (session orders, purchases, trade-ins, stopped devices, trial, command receipts and payment intents on
+// the server, the App's order/payment recovery rows in the browser), and the next read seeds the devices here. A write
+// is applied only in the scenario it started in. dataState=empty is the empty account the empty pages are reviewed
+// with: no devices (hidden phones included), no sample orders and an empty wallet (balance 0, so wallet payments are
+// refused for funds), the trial as its own knobs say. paymentState=low-balance is an account whose wallet holds
+// 820.64 USDT. PRESENTATION knobs (machineImageState, dataState loading/error, Lite's computeState) only change what a
+// read shows; they never reseed or change occupancy. Other Lite knobs (setupGateState, promoState, promoEdgeState, ...)
+// own no devices or orders and keep the scenario.
 // After seeding, only lifecycle events change the fleet: purchases and deliveries, conversions, trade-ins and the
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
 // full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
@@ -688,7 +689,7 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/devices/earnings') {
     const facts=demoFleetFacts(url,locale,state);
-    const data=base();data.walletUsdt=empty?0:state.paymentState==='low-balance'?820.64:state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
+    const data=base();data.walletUsdt=state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
     Object.assign(data,facts);
     // Presentation only: Lite compute scenarios show device 42 as their Cloud Share cycle; the image knob may swap it.
     if((state.computeState??'app')!=='app')Object.assign(data.devices.find(device=>device.id===42)??{},{instanceNo:'DEMO-CLOUD',name:'Cloud Share',productCode:'CLOUD-SHARE',deviceType:'CLOUD'});
