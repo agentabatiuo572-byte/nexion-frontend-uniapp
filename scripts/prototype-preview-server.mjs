@@ -59,7 +59,7 @@ const server=http.createServer(async(req,res)=>{
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
         // account (dataState=empty) is one too. Presentation knobs keep them.
         const scenarioChange=['fleetState','checkoutState','trialState','benefitState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty;
-        if(scenarioChange)for(const key of ['fleetSeed','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
