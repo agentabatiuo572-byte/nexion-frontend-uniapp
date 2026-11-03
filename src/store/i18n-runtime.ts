@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { serverLanguage, type LocaleCode } from "@/i18n";
+import type { LocaleCode } from "@/i18n";
 import { i18nApi, remoteApiEnabled } from "@/api/runtime";
 
 export type I18nRuntimeStatus = "fallback" | "loading" | "ready" | "stale";
@@ -61,9 +61,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
     }
   }
 
-  // Published runtime copy exists for zh/en/vi only; other interface languages read the English bundle.
-  async function refresh(code: LocaleCode, force = false): Promise<void> {
-    const locale = serverLanguage(code);
+  async function refresh(locale: LocaleCode, force = false): Promise<void> {
     prepare();
     if (!remoteApiEnabled) {
       status.value[locale] = "fallback";
@@ -96,8 +94,7 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
     return request;
   }
 
-  function messages(code: LocaleCode): Readonly<Record<string, string>> {
-    const locale = serverLanguage(code);
+  function messages(locale: LocaleCode): Readonly<Record<string, string>> {
     prepare();
     // A cache is only an optimization. Until this locale is freshly confirmed by
     // the service, callers must use the bundled dictionary rather than present
