@@ -27,13 +27,14 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-export const demoDefaults = {trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',setupGateState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
-  scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
-  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU · 首页横幅与购机活动）']],
+  scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
+  promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU · 首页横幅与购机活动）'],['phone-gift','买 S1 送 iphone15（DEVICE 赠品为手机）']],
   downloadState:[['unavailable','下载入口未发布'],['published','iOS / Android / 官网入口（示例链接）']],
   ...authDemoOptions,
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换'],['capacity-error','容量读取失败'],['setup-required','需完成初始设置']],
+  setupGateState:[['open','正常写入'],['setup-required','服务端拒绝：需完成初始设置（试用领取 / 首日浏览商店任务 / 课程开始）']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
   computeState:[['app','App 默认（v1 任务）'],['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
   trialQuoteState:[['default','默认报价'],['full-term','整期抵扣 · 应付 910'],['precision','六位报价 · 342.123456'],['half-cent','半分报价 · 342.135 → 342.14'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','提前优惠变更 · 应付 909'],['capped','抵扣上限 · 余款 10'],['excess-offset','抵扣超过原价']],
@@ -183,6 +184,9 @@ export function demoFixture(url,locale,state,request) {
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   if((state.computeState??'app')!=='app'){const compute=computeDemo(url,locale,state,request);if(compute!==undefined)return compute;}
+  // USER_ONBOARDING_REQUIRED is the backend's shared write gate (HTTP 428, code 428).
+  if(state.setupGateState==='setup-required'&&request.method()==='POST'&&(pathname==='/api/trial/start'||pathname.startsWith('/api/growth/day-one/page-observations/')||/^\/api\/content\/learning\/courses\/[^/]+\/start$/.test(pathname)))throw Object.assign(new Error('USER_ONBOARDING_REQUIRED'),{status:428});
+  if(pathname.startsWith('/api/growth/day-one/page-observations/'))return {accepted:true,recorded:true};
   if(pathname.startsWith('/api/trial/')) {
     const capacity=demoPhysicalSlots(url,locale,state,products);
     return trialDemo(url,locale,state,request,capacity.used>=capacity.cap);
@@ -290,7 +294,8 @@ export function demoFixture(url,locale,state,request) {
     // Paid devices may trade up to any higher-priced device SKU (PRD §7.5.1).
     const input=request.postDataJSON(),product=products.find(p=>p.id===input.targetProductNo)||products[0];
     const devices=empty||product.productType!=='DEVICE'?[]:demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices;
-    const sources=devices.filter(d=>d.actualPaidUsdt>0).map(d=>{
+    // The mixed scope also has the server offer the phone as a trade-in source.
+    const sources=devices.filter(d=>d.actualPaidUsdt>0||(state.scopeState==='mixed'&&d.deviceType==='PHONE')).map(d=>{
       const reasonCode=d.productCode.toLowerCase()===product.id?'TARGET_MUST_DIFFER':product.price>d.actualPaidUsdt?'OK':'HIGHER_PRICE_REQUIRED';
       return {sourceDeviceId:d.id,sourceProductName:d.name,eligible:reasonCode==='OK',reasonCode};
     });
@@ -419,6 +424,11 @@ export function demoFixture(url,locale,state,request) {
       if(item.state!=='ACTIVE')item.eligibility='INELIGIBLE';
       if(state.machineImageState==='banner'&&item.state==='ACTIVE')item.bannerImageUrl=`/api/promotions/${item.activityId}/banner/${item.version}`;
       // Lite phone campaigns: offer 0 sells only iphone15 (hidden on the web), offer 4 leads with an iphone15 rule.
+      // Lite phone gift: offer 0 gives an iphone15 with S1 (the whole campaign is hidden on the web).
+      if(state.promoState==='phone-gift'&&i===0&&item.rewardRules[0].buyerReward.type==='DEVICE'){
+        const reward=item.rewardRules[0].buyerReward;reward.giftProductNo='iphone15';reward.disclosure.deviceName='iPhone 15';
+        reward.disclosure.benefitDescription={zh:'送 iPhone 15 1 台',en:'Get 1 iPhone 15',vi:'Tặng 1 iPhone 15'};item.title={zh:'买 S1，送 iPhone 15',en:'Buy S1, get iPhone 15',vi:'Mua S1, tặng iPhone 15'};
+      }
       if(state.promoState==='phone'&&(i===0||i===4)){
         const phoneRule={...structuredClone(item.rewardRules[0]),ruleId:'demo-rule-phone-'+i,productNo:'iphone15'};
         item.productNos=i===0?['iphone15']:['iphone15',...item.productNos];item.rewardRules=i===0?[phoneRule]:[phoneRule,...item.rewardRules];
@@ -467,6 +477,8 @@ export function demoFixture(url,locale,state,request) {
     if(empty) return {...data,quests:[],dayOneRequiredTaskCount:0,dayOneSnapshotStatus:'EMPTY'};
     const routes=['/pages/me/devices','/pages/store/store','/pages/earn/earn','/pages/learn/courses','/pages/me/profile','/pages/team/team'];
     data.quests.forEach((row,i)=>{row.actionRoute=routes[i];row.category=['identity','explore','explore','explore','identity','social'][i];});
+    // The store visit is the pending Day-One task; the account-phone task stays a web task so the group is usable.
+    if(state.setupGateState==='setup-required'&&data.quests[3]){data.quests[0].actionRoute='/pages/me/security';Object.assign(data.quests[3],{questCode:'visit_store',name:localized(locale,'浏览商店','Visit the store','Xem cửa hàng'),actionRoute:'/pages/store/store'});}
     const weekNames=locale==='zh'?['了解设备收益','完成一门课程','邀请一位好友','查看账户安全']:locale==='vi'?['Tìm hiểu thu nhập','Hoàn thành một bài học','Mời một người bạn','Kiểm tra bảo mật']:['Explore device earnings','Complete one course','Invite a friend','Review account security'];
     if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(now+(state.taskState==='expired'?-1000:5*day)).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
     if(state.scopeState==='mixed' && data.quests.length) {
