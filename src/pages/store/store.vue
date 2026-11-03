@@ -25,9 +25,8 @@
         <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" />
         <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :target="upgrade.target" />
         <template v-if="!voucherContext.voucherId">
-          <StoreHero :multiplier="yieldAuthority.multiplier" />
+          <StoreHero :multiplier="upgrade?.multiplier ?? null" />
           <ClusterLadder :authority="yieldAuthority" :owned="ownedHardware" />
-          <VsPhoneHero :authority="yieldAuthority" />
           <TradeinWindowBanner />
         </template>
       </template>
@@ -135,7 +134,6 @@ import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 import StoreHero from "@/components/store/store-hero.vue";
 import ClusterLadder from "@/components/store/cluster-ladder.vue";
-import VsPhoneHero from "@/components/store/vs-phone-hero.vue";
 import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
