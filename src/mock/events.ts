@@ -20,7 +20,6 @@ export type EventKind =
   | "regional"
   | "boost"
   | "seasonal"
-  | "holding"
   | "onboarding";
 
 export type EventStatus = "ongoing" | "upcoming" | "ended";
