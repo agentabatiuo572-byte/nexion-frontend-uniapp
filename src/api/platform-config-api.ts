@@ -3,6 +3,7 @@ import type {
   OnlineBonus,
   PlatformVerifiedAggregate,
   PlatformVerifiedStats,
+  PlatformConfig,
   PublicStatsConfig,
   RewardsConfig,
   ShareChannelDef,
@@ -22,6 +23,7 @@ export interface PlatformComputeConfigSnapshot {
     stakingVisible: boolean;
   };
   publicStats: PublicStatsConfig;
+  networkPulse: PlatformConfig["networkPulse"];
   publicStatsAuthority: PlatformPublicStatsAuthority;
   /**
    * 服务端可核验聚合。对外「在线设备 / 账号数」这类事实必须读它,不得再由
@@ -338,22 +340,28 @@ function parseVerifiedStats(value: unknown): PlatformVerifiedStats | null {
   };
 }
 
+const optionalNumber = (value: unknown): number | undefined => (typeof value === "number" ? value : undefined);
+
 function parsePublicStats(value: unknown): PublicStatsConfig {
   const projection = record(value);
+  const estimateValues = projection.values && typeof projection.values === "object" && !Array.isArray(projection.values) ? projection.values as Record<string,unknown> : projection;
   const realUserCount = finiteNumber(projection.realUserCount);
   if (!Number.isInteger(realUserCount) || realUserCount < 0 || realUserCount > 100_000_000) {
     return invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
   }
-  // Legacy servers may still send operator-configured values. Never install them
-  // into the public store: old surfaces could render them as measured facts.
-  // Invalid sentinels keep every H9-derived public display unavailable.
+  // Optional estimate parameters are rendered only with an explicit estimate label.
+  // Invalid or missing values are hidden by publicStatsHealth; they never replace realUserCount.
   return {
     fleetDevices: 0,
     onlineRatePct: 0,
     onlineJitter: -1,
-    registeredUsersBase: 0,
+    registeredUsersBase: typeof estimateValues.registeredUsersBase === "number" ? estimateValues.registeredUsersBase : -1,
     registeredUsersMonthlyGrowthPct: -1,
-    registeredUsersAnchorAt: 0,
+    registeredUsersAnchorAt: typeof estimateValues.registeredUsersAnchorAt === "number" ? estimateValues.registeredUsersAnchorAt : -1,
+    registeredUsersTickIntervalSec: typeof estimateValues.registeredUsersTickIntervalSec === "number" ? estimateValues.registeredUsersTickIntervalSec : undefined,
+    // A server from the first cadence release sends one fixed step; read it as min = max.
+    registeredUsersTickStepMin: optionalNumber(estimateValues.registeredUsersTickStepMin ?? estimateValues.registeredUsersTickStep),
+    registeredUsersTickStepMax: optionalNumber(estimateValues.registeredUsersTickStepMax ?? estimateValues.registeredUsersTickStep),
     realUserCount,
     virtualUserCount: -1,
     hashratePercentileTable: [],
@@ -362,6 +370,7 @@ function parsePublicStats(value: unknown): PublicStatsConfig {
 
 export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = "prod"): {
   config: PublicStatsConfig;
+  networkPulse: PlatformConfig["networkPulse"];
   authority: PlatformPublicStatsAuthority;
 } {
   const projection = record(value);
@@ -378,6 +387,7 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = 
   }
   return {
     config: parsePublicStats(projection),
+    networkPulse: parseNetworkPulse(projection.networkPulse),
     authority: {
       source: source as PlatformPublicStatsAuthority["source"],
       sourceEnvironment: sourceEnvironment as PlatformPublicStatsAuthority["sourceEnvironment"],
@@ -385,6 +395,18 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = 
       version,
     },
   };
+}
+
+function parseNetworkPulse(value: unknown): PlatformConfig["networkPulse"] {
+  if (value === null || value === undefined) return null;
+  const row = record(value);
+  const count = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    const parsed = finiteNumber(value);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) return invalid("H9_NETWORK_PULSE_INVALID");
+    return parsed;
+  };
+  return { registeredUsers: count(row.registeredUsers), onlineDevices: count(row.onlineDevices) };
 }
 
 export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment = "prod"): PlatformComputeConfigSnapshot {
@@ -439,6 +461,7 @@ export function parsePlatformComputeConfig(value: unknown, mode: ApiEnvironment 
   return {
     featureFlags: { ...experience.featureFlags, computeShareEnabled: false },
     publicStats: publicStatsProjection.config,
+    networkPulse: publicStatsProjection.networkPulse,
     publicStatsAuthority: publicStatsProjection.authority,
     verifiedStats: parseVerifiedStats(root.publicStats && typeof root.publicStats === "object"
       ? (root.publicStats as Record<string, unknown>).verified : null),

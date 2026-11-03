@@ -234,6 +234,12 @@ export interface PublicStatsConfig {
   registeredUsersMonthlyGrowthPct: number;
   /** 派生起点(ms epoch)。运营改基数即重置锚点。 */
   registeredUsersAnchorAt: number;
+  /** 注册用户跳动间隔(秒)。与每次增加人数范围一起下发,未设置时缺省并隐藏估算。[1, 86400]。 */
+  registeredUsersTickIntervalSec?: number;
+  /** 每次跳动最少增加的注册用户数。[0, 100000000]。 */
+  registeredUsersTickStepMin?: number;
+  /** 每次跳动最多增加的注册用户数,不小于最少值;每跳在两者之间按服务端同一规则取值。[0, 100000000]。 */
+  registeredUsersTickStepMax?: number;
   /** 服务端真实注册账号数，仅用于排名分母，不用于营销展示。 */
   realUserCount: number;
   /** 虚拟人口规模。真实人口 + 它 = 排名分母。[0, 10000000]。 */
@@ -271,6 +277,8 @@ export interface PlatformVerifiedStats {
 export interface PlatformConfig {
   featureFlags: FeatureFlags;
   publicStats: PublicStatsConfig;
+  /** H9 home display snapshot; separate from measured aggregates and ranking. */
+  networkPulse: { registeredUsers: number | null; onlineDevices: number | null } | null;
   /**
    * 服务端可核验聚合(zentao #59)。与 `publicStats` 的区别是**数据性质**:
    * `publicStats` 是运营手填的展示配置,`verifiedStats` 是真实表聚合。
@@ -303,7 +311,7 @@ type RuntimeWithdrawRuleKey =
  * Runtime consumers always receive a complete `PlatformConfig`; the config
  * store supplies newly required fields outside the Mock dataset boundary.
  */
-export type PlatformConfigSeed = Omit<PlatformConfig, "publicStats" | "verifiedStats" | "withdrawRules" | "otpGate"> & {
+export type PlatformConfigSeed = Omit<PlatformConfig, "publicStats" | "networkPulse" | "verifiedStats" | "withdrawRules" | "otpGate"> & {
   publicStats?: PublicStatsConfig;
   /** 本地 mock 没有可核验聚合;compat 会补 null。 */
   verifiedStats?: PlatformVerifiedStats | null;

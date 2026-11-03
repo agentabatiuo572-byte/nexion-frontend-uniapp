@@ -568,7 +568,6 @@ sandboxSponsorEnvironmentMismatch: "This invitation code can't be used. Check it
     networkPulseTitle: "Network pulse",
     networkLive: "live",
     networkPublishedScope: "Published scale estimates · not live connections",
-    networkEstimatedDevices: "Estimated online",
     networkGlobalGrid: "Global grid · live",
     networkMembers: "Members",
     networkDevices: "Devices",
@@ -613,16 +612,12 @@ sandboxSponsorEnvironmentMismatch: "This invitation code can't be used. Check it
     //   别用字符数估宽:vi 13 字符 = 139.14px、zh 5 字 = 59.2px。旧长式与其实测值
     //   (93.6/115.2/122.41/158.4/144.0 各 ✗)已随本次换串退役,不再是现网形态。
     networkMembersSub: "+{n}% /mo",
-    networkVerifiedMembers: "Updated {at}",
-    networkVerifiedDevices: "Updated {at}",
     networkDevicesSub: "running jobs",
-    networkRankUp24h: "+{n} in 24h",
     networkRankUnranked: "No rank",
     // 🔴 归属定案(2026-08-05,原规格 line 78「『未上榜』引导文案内的 CTA」没交代归属):
     //   「本条 hint 整条即 CTA」 —— 未上榜时它是可点元素,点进设备/商城既有入口。
     //   卡片一格只有一行副文本槽,放不下独立按钮,故不另立 CTA 文案键。
     //   接线方:别就地硬编码一句按钮文案,也别把它渲染成不可点的纯说明。
-    networkRankUnrankedHint: "View devices",
     networkRankTipRanked: "Network rank is calculated by the server. It is for reference and does not affect earnings or rewards.",
     networkRankTipUnranked: "You are not ranked yet. Rank is based on effective hashpower from eligible running devices. Activation alone does not guarantee a rank.",
     networkStatUpdating: "Updating",
