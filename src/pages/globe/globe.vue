@@ -246,17 +246,18 @@ const pulseTick = ref(0);
 const simulationNow = ref(Date.now());
 let pulseTimer = 0;
 const globeSettings = computed(() => cfg.config.publicStats.globeDisplay);
-// Totals are the home online-devices figure and the Earn task centre's job count; H9 only splits them.
-const simulatedStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0,
-  globeSettings.value, cfg.config.networkPulse?.onlineDevices ?? null, app.activeJobsDisplay));
-const activeNodesText = computed(() => simulatedStats.value?.nodes.toLocaleString() ?? '—');
-const activeJobsText = computed(() => simulatedStats.value?.jobs.toLocaleString() ?? '—');
+// Totals are the home online-devices figure and the Earn task centre's job count, shown directly; H9 only splits them.
+const onlineTotal = computed(() => cfg.config.networkPulse?.onlineDevices ?? null);
+const centerStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0,
+  globeSettings.value, onlineTotal.value, app.activeJobsDisplay));
+const activeNodesText = computed(() => onlineTotal.value?.toLocaleString() ?? '—');
+const activeJobsText = computed(() => app.activeJobsDisplay?.toLocaleString() ?? '—');
 // Display offsets separate nearby centers; leader lines preserve geographic anchors.
 const mapPositions: Record<string, readonly [number, number]> = {
   uk: [198, 37], fr: [212, 76], de: [244, 47], sg: [345, 136], vn: [335, 102],
 };
 const regions = computed<GlobeRegion[]>(() => GLOBE_CENTERS.map(center => {
-  const metrics = simulatedStats.value?.regions.find(row => row.id === center.id);
+  const metrics = centerStats.value?.find(row => row.id === center.id);
   return {
   id: center.id, displayName: t.value.globe[center.nameKey],
   cx: mapPositions[center.id] ? mapPositions[center.id][0] / W : (center.lon + 180) / 360,
