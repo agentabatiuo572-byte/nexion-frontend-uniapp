@@ -10,25 +10,25 @@
   carry over (P-013). Source dot hex (#1F2D1A bright olive / #101418 dim) →
   var(--v5-brand) low-opacity (matches "brighter green = denser cluster"
   legend) / var(--v5-ink-4). Drawer is position:fixed so it overlays the
-  whole chassis. Sandbox decorative values come from the named deterministic
-  fixture; production never promotes fixture values to telemetry.
+  whole chassis. Center node figures and headline counters are simulated
+  presentation data; API telemetry is never overwritten by these values.
 -->
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" />
 
-      <!-- Top stats -->
+      <!-- Simulation is presentation-only, separate from API telemetry. -->
       <view class="mx-4 mb-3 grid grid-cols-2 gap-2">
         <view class="rounded-2xl" :style="statTileStyle">
-          <view class="flex items-center" style="gap: 6px">
+          <view class="flex items-center" style="gap: 6px; min-height: 36px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
             <text style="font-size: 12px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeNodes }}</text>
           </view>
           <text class="block tabular-nums" :style="statValStyle">{{ activeNodesText }}</text>
         </view>
         <view class="rounded-2xl" :style="statTileStyle">
-          <view class="flex items-center" style="gap: 6px">
+          <view class="flex items-center" style="gap: 6px; min-height: 36px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
             <text style="font-size: 12px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeJobs }}</text>
           </view>
@@ -36,68 +36,9 @@
         </view>
       </view>
 
-      <view v-if="showProjectionBlockingState" class="mx-4 mt-4">
-        <EmptyState
-          :kind="projectionStatus === 'error' ? 'recoverable-error' : 'empty-list'"
-          :title="projectionStateTitle"
-          :desc="projectionStateDesc"
-          :cta-label="projectionStatus === 'error' ? t.ui.retry : undefined"
-          emphasis
-          compact
-          @cta="loadRegions"
-        />
-      </view>
-
-      <template v-else>
-      <view v-if="showProjectionInlineError" class="mx-4 mb-3">
-        <EmptyState
-          kind="recoverable-error"
-          :title="t.globe.regionProjectionErrorTitle"
-          :desc="t.globe.regionProjectionErrorDesc"
-          :cta-label="t.ui.retry"
-          compact
-          @cta="loadRegions"
-        />
-      </view>
       <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
            to clip the region glow halos at the rounded panel edge (functional). -->
       <view class="nx-glass-card mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
-        <!-- APP-vue does not paint template SVG nodes. Keep static geometry in
-             NativeSvg, with supported native controls over the same 440:240 box. -->
-        <!-- #ifdef APP-PLUS -->
-        <view class="nx-globe-native" :style="{ position: 'relative', width: '100%', height: '0', paddingTop: `${H / W * 100}%` }">
-          <view style="position: absolute; inset: 0; pointer-events: none">
-            <NativeSvg width="100%" height="100%" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="xMidYMid meet">
-              <defs>
-                <radialGradient :id="nativeGlowId" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.9" />
-                  <stop offset="60%" stop-color="var(--v5-brand)" stop-opacity="0.2" />
-                  <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
-                </radialGradient>
-                <radialGradient :id="nativeYouGlowId" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stop-color="var(--v5-tech-cyan)" stop-opacity="1" />
-                  <stop offset="100%" stop-color="var(--v5-tech-cyan)" stop-opacity="0" />
-                </radialGradient>
-              </defs>
-              <circle v-for="(d, i) in dots" :key="`dot-${i}`" :cx="d.x" :cy="d.y" :r="d.r"
-                :fill="d.bright ? 'var(--v5-brand)' : 'var(--v5-ink-4)'" :opacity="d.bright ? 0.5 : 0.25" />
-              <line v-for="r in otherRegions" :key="`line-${r.id}`" :x1="meX" :y1="meY" :x2="r.cx * W" :y2="r.cy * H"
-                stroke="var(--v5-brand)" stroke-opacity="0.08" stroke-width="0.6" stroke-dasharray="2 3" />
-              <circle v-for="r in regions" :key="`glow-${r.id}`" :cx="r.cx * W" :cy="r.cy * H" r="18"
-                :fill="`url(#${r.isYou ? nativeYouGlowId : nativeGlowId})`" />
-            </NativeSvg>
-          </view>
-          <view v-for="r in regions" :key="r.id" class="nx-globe-native-node"
-            :style="nativeNodeStyle(r)" role="button" tabindex="0" :aria-label="regionName(r)"
-            @click="select(r)"  @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
-            <view v-if="pulseRegionId === r.id" :key="`pulse-${r.id}-${pulseTick}`" class="nx-globe-native-pulse"
-              :style="{ borderColor: r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)' }" />
-            <view class="nx-globe-native-dot" :style="{ background: r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)' }" />
-          </view>
-          <text v-if="me" class="nx-globe-native-you" :style="{ left: `${me.cx * 100}%`, top: `${me.cy * 100}%` }">{{ t.globe.yourNodeBadge }}</text>
-        </view>
-        <!-- #endif -->
-        <!-- #ifndef APP-PLUS -->
         <svg :viewBox="`0 0 ${W} ${H}`" class="w-full block" preserveAspectRatio="xMidYMid meet">
           <defs>
             <radialGradient id="globe-glow" cx="50%" cy="50%" r="50%">
@@ -106,8 +47,8 @@
               <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
             </radialGradient>
             <radialGradient id="you-glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="var(--v5-tech-cyan)" stop-opacity="1" />
-              <stop offset="100%" stop-color="var(--v5-tech-cyan)" stop-opacity="0" />
+              <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="1" />
+              <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
             </radialGradient>
           </defs>
 
@@ -136,37 +77,27 @@
             stroke-dasharray="2 3"
           />
 
+          <line v-for="r in regions" :key="`anchor-${r.id}`" :x1="r.anchorX * W" :y1="r.anchorY * H" :x2="r.cx * W" :y2="r.cy * H" stroke="var(--v5-brand)" stroke-opacity="0.35" stroke-width="0.7" pointer-events="none" />
           <!-- Region nodes -->
-          <g v-for="r in regions" :key="r.id" class="cursor-pointer" role="button" tabindex="0" :aria-label="regionName(r)" @click="select(r)"  @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
+          <g v-for="r in regions" :key="r.id" class="cursor-pointer" pointer-events="none" role="button" tabindex="0" :aria-label="regionName(r)" @click="select(r)"  @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)">
             <circle :cx="r.cx * W" :cy="r.cy * H" r="18" :fill="`url(#${r.isYou ? 'you-glow' : 'globe-glow'})`" />
-            <circle :cx="r.cx * W" :cy="r.cy * H" r="5" :fill="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" />
+            <circle :cx="r.cx * W" :cy="r.cy * H" r="5" pointer-events="auto" :fill="r.isYou ? 'var(--v5-brand)' : 'var(--v5-brand)'" />
             <!-- Pulse ring -->
             <circle
-              v-if="pulseRegionId === r.id"
+              v-if="motionAllowed && pulseRegionId === r.id"
               :key="`pulse-${r.id}-${pulseTick}`"
               :cx="r.cx * W"
               :cy="r.cy * H"
               r="5"
               fill="none"
-              :stroke="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'"
+              :stroke="r.isYou ? 'var(--v5-brand)' : 'var(--v5-brand)'"
               stroke-width="1"
             >
               <animate attributeName="r" values="5;24" dur="1.6s" repeatCount="1" />
               <animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="1" />
             </circle>
-            <SvgText
-              v-if="r.isYou"
-              :x="r.cx * W + 8"
-              :y="r.cy * H - 8"
-              fill="var(--v5-tech-cyan)"
-              font-size="10"
-              font-weight="600"
-              font-family="ui-monospace, monospace"
-            >{{ t.globe.yourNodeBadge }}</SvgText>
           </g>
         </svg>
-        <!-- #endif -->
-        <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
       </view>
 
       <!-- Region list — de-carded: transparent hairline group (earnings-ledger
@@ -184,44 +115,45 @@
           @keydown.enter.prevent="select(r)" @keydown.space.prevent="select(r)"
         >
           <view class="grid place-items-center shrink-0" :style="regionIconBox(r.isYou)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="r.isYou ? 'var(--v5-brand)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
           </view>
           <view class="flex-1 min-w-0">
             <view class="flex items-center" style="gap: 8px">
               <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ regionName(r) }}</text>
-              <text v-if="r.isYou" :style="youChipStyle">{{ t.globe.youAre }}</text>
             </view>
-            <text class="block tabular-nums" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ regionDevicesText(r) }} · {{ regionLatencyText(r) }}</text>
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.globe.superComputeCenter }}</text>
           </view>
-          <text class="shrink-0 tabular-nums" :style="regionRateStyle">{{ (r.jobsPerHour / 1000).toFixed(1) }}k/h</text>
+          <view class="shrink-0 text-right"><text class="block tabular-nums" :style="regionRateStyle">{{ r.jobsPerHour?.toLocaleString() ?? '—' }}</text><text class="block" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.globe.jobsPerHour }}</text></view>
         </view>
       </view>
 
       <!-- Drawer -->
-      <view v-if="selected" class="nx-globe-drawer" role="dialog" aria-modal="true">
-        <view class="nx-globe-scrim" @click="selected = null" />
-        <view class="nx-glass-sheet relative border rounded-2xl" :style="drawerCardStyle">
+      <view v-if="selected" class="nx-globe-drawer" role="dialog" aria-modal="true"
+        @touchstart.stop @touchmove.stop @touchend.stop @touchcancel.stop>
+        <view class="nx-globe-scrim nx-sheet-fade-in" @touchmove.prevent @click="selected = null" />
+        <view class="nx-glass-sheet nx-sheet-slide-up relative border rounded-2xl" :style="drawerCardStyle">
           <view class="absolute grid place-items-center active:opacity-70" :style="drawerCloseStyle" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="selected = null"  @keydown.enter.prevent="selected = null" @keydown.space.prevent="selected = null">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            <view class="grid place-items-center" :style="drawerCloseFaceStyle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            </view>
           </view>
-          <view class="flex items-center" style="gap: 12px">
+          <view class="flex items-center" style="gap: 12px; padding-right: 28px">
             <view class="grid place-items-center" :style="drawerIconBox(selected.isYou)">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" :stroke="selected.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" :stroke="selected.isYou ? 'var(--v5-brand)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
             </view>
             <view class="flex-1 min-w-0">
               <text class="block" style="font-size: 20px; font-weight: 600; color: var(--v5-ink)">{{ regionName(selected) }}</text>
-              <text v-if="selected.isYou" class="block" style="font-size: 12px; color: var(--v5-brand-2); margin-top: 2px">{{ t.globe.youAre }}</text>
             </view>
           </view>
           <view class="grid grid-cols-3 gap-2 mt-4">
             <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
-              <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.devices.toLocaleString() }}</text>
+              <text class="block tabular-nums" :style="drawerStatValStyle">{{ regionNodeDisplay(selected) }}</text>
               <text class="block" :style="drawerStatLabelStyle">{{ t.globe.activeNodes }}</text>
             </view>
             <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
-              <text class="block tabular-nums" :style="drawerStatValStyle">{{ (selected.jobsPerHour / 1000).toFixed(1) }}k/h</text>
+              <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.jobsPerHour?.toLocaleString() ?? '—' }}</text>
               <text class="block" :style="drawerStatLabelStyle">{{ t.globe.jobsPerHour }}</text>
             </view>
             <view class="nx-glass-inset rounded-xl text-center" :style="drawerStatStyle">
@@ -230,132 +162,71 @@
               <text class="block" :style="drawerStatLabelStyle">{{ t.uiChrome.latency }}</text>
             </view>
           </view>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · {{ remoteApiEnabled ? fmt(t.globe.projectionUpdatedAt, { at: generatedAtText }) : fmt(t.globe.uptimeLine, { v: uptimeText }) }}</text>
-          <text v-if="remoteApiEnabled && selected.avgLatencyMs === null" class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 4px; line-height: 1.625">{{ t.globe.latencyTelemetryMissingHint }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ t.globe.simulationHint }}</text>
         </view>
       </view>
-      </template>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
-import SvgText from "@/components/svg-text";
-// #ifdef APP-PLUS
-import NativeSvg from "@/components/native-svg.vue";
-// #endif
+import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { useConfig } from "@/store/config";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
-import { useApp } from "@/store/app";
-import { useConfig } from "@/store/config";
-import { publicStatsHealth } from "@/lib/platform-stats";
-import { MOCK_GLOBE_FIXTURE_ID, REGIONS, type RegionData } from "@/mock/globe-regions";
-import { fmt } from "@/i18n/format";
-import { formatTrialDateTime } from "@/lib/trial-date";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
-import type { NetworkRegionProjection } from "@/api/network-regions-api";
+import { useIntroMotion } from "@/composables/use-intro-motion";
 import { onHide, onShow } from "@dcloudio/uni-app";
-import { registerActivePageRefresh } from "@/lib/active-page-refresh";
-import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+
+import { globeSimulation, GLOBE_CENTERS } from "@/lib/globe-simulation";
 
 const t = useT();
-const app = useApp();
 const cfg = useConfig();
+const motionAllowed = useIntroMotion();
 
 const W = 440;
 const H = 240;
-type GlobeRegion = {
-  id: string;
-  i18nKey?: RegionData["i18nKey"];
-  displayName?: string;
-  cx: number;
-  cy: number;
-  devices: number;
-  activeJobs: number;
-  jobsPerHour: number;
-  avgLatencyMs: number | null;
-  isYou?: boolean;
-};
-
-const selected = ref<GlobeRegion | null>(null);
-const networkProjection = ref<NetworkRegionProjection | null>(null);
-const projectionStatus = ref<"loading" | "ready" | "empty" | "error">(remoteApiEnabled ? "loading" : "ready");
-let projectionRequest = 0;
-let projectionFlight: { scope: string; promise: Promise<void> } | null = null;
-let disposed = false;
+type GlobeRegion = { id: string; displayName: string; cx: number; cy: number; anchorX: number; anchorY: number; devices: number | null;
+  activeJobs: number | null; jobsPerHour: number | null; avgLatencyMs: number | null; isYou: boolean };
+const selectedId = ref<string | null>(null);
 let pageActive = true;
 const pulseTick = ref(0);
+const simulationNow = ref(Date.now());
 let pulseTimer = 0;
-
-const global = computed(() => app.global);
-const activeNodesText = computed(() => {
-  if (remoteApiEnabled) return networkProjection.value?.activeNodes === undefined ? "—" : networkProjection.value.activeNodes.toLocaleString();
-  const health = publicStatsHealth(cfg.config.publicStats);
-  return cfg.syncFailed || !health.devicesOk
-    ? t.value.home.networkStatUpdating
-    : global.value.activeDevices.toLocaleString();
+const globeSettings = computed(() => cfg.config.publicStats.globeDisplay);
+const simulatedStats = computed(() => globeSimulation(globeSettings.value ? Math.floor(simulationNow.value / globeSettings.value.intervalMs) : 0, globeSettings.value));
+const activeNodesText = computed(() => simulatedStats.value?.nodes.toLocaleString() ?? '—');
+const activeJobsText = computed(() => simulatedStats.value?.jobs.toLocaleString() ?? '—');
+// Display offsets separate nearby centers; leader lines preserve geographic anchors.
+const mapPositions: Record<string, readonly [number, number]> = {
+  uk: [198, 37], fr: [212, 76], de: [244, 47], sg: [345, 136], vn: [335, 102],
+};
+const regions = computed<GlobeRegion[]>(() => GLOBE_CENTERS.map(center => {
+  const metrics = simulatedStats.value?.regions.find(row => row.id === center.id);
+  return {
+  id: center.id, displayName: t.value.globe[center.nameKey],
+  cx: mapPositions[center.id] ? mapPositions[center.id][0] / W : (center.lon + 180) / 360,
+  cy: mapPositions[center.id] ? mapPositions[center.id][1] / H : (90 - center.lat) / 180,
+  anchorX: (center.lon + 180) / 360, anchorY: (90 - center.lat) / 180,
+  devices: metrics?.nodes ?? null, activeJobs: metrics?.activeJobs ?? null, jobsPerHour: metrics?.jobsPerHour ?? null,
+  avgLatencyMs: metrics?.avgLatencyMs ?? null, isYou: center.id === "sg",
+}; }));
+const selected = computed<GlobeRegion | null>({
+  get: () => regions.value.find(region => region.id === selectedId.value) ?? null,
+  set: region => { selectedId.value = region?.id ?? null; },
 });
-const activeJobsText = computed(() => {
-  if (remoteApiEnabled) return networkProjection.value?.activeJobs === undefined ? "—" : networkProjection.value.activeJobs.toLocaleString();
-  return global.value.activeJobs.toLocaleString();
-});
-
-const regions = computed<GlobeRegion[]>(() => remoteApiEnabled
-  ? (networkProjection.value?.regions ?? []).map((region, index, all) => ({
-      id: region.id,
-      displayName: region.displayName,
-      cx: region.longitude === null ? (index + 1) / (all.length + 1) : (region.longitude + 180) / 360,
-      cy: region.latitude === null ? 0.38 + (index % 3) * 0.14 : (90 - region.latitude) / 180,
-      devices: region.activeNodes,
-      activeJobs: region.activeJobs,
-      jobsPerHour: region.jobsPerHour,
-      avgLatencyMs: null,
-      isYou: region.isUserRegion,
-    }))
-  : REGIONS.map((region) => ({ ...region, activeJobs: 0 })));
 const me = computed(() => regions.value.find((r) => r.isYou) ?? null);
 const meX = computed(() => (me.value?.cx ?? 0) * W);
 const meY = computed(() => (me.value?.cy ?? 0) * H);
 const otherRegions = computed(() => regions.value.filter((r) => !r.isYou));
 
-// Deterministic pulse selection is decorative only; it must never become a metric source.
+// Pulse timing also drives explicitly simulated counters; neither is API telemetry.
 const pulseRegionId = computed<string | null>(() => {
   if (pulseTick.value === 0) return null;
   if (regions.value.length === 0) return null;
   return regions.value[(pulseTick.value - 1) % regions.value.length]?.id ?? null;
 });
-
-// Mock-only fixture value. Remote mode renders unavailable telemetry instead.
-const uptimeText = computed(() => remoteApiEnabled
-  ? t.value.globe.metricUnavailable
-  : `${MOCK_GLOBE_FIXTURE_ID} · 99.20%`);
-const generatedAtText = computed(() => {
-  const timestamp = Date.parse(networkProjection.value?.generatedAt ?? "");
-  return Number.isFinite(timestamp)
-    ? formatTrialDateTime(timestamp)
-    : t.value.globe.metricUnavailable;
-});
-const projectionStateTitle = computed(() => projectionStatus.value === "error"
-  ? t.value.globe.regionProjectionErrorTitle
-  : projectionStatus.value === "empty"
-    ? t.value.globe.regionProjectionEmptyTitle
-    : t.value.globe.regionProjectionLoadingTitle);
-const projectionStateDesc = computed(() => projectionStatus.value === "error"
-  ? t.value.globe.regionProjectionErrorDesc
-  : projectionStatus.value === "empty"
-    ? t.value.globe.regionProjectionEmptyDesc
-    : t.value.globe.regionProjectionLoadingDesc);
-const hasUsableProjection = computed(() => (networkProjection.value?.regions.length ?? 0) > 0);
-const showProjectionBlockingState = computed(() => remoteApiEnabled
-  && !hasUsableProjection.value
-  && projectionStatus.value !== "ready");
-const showProjectionInlineError = computed(() => remoteApiEnabled
-  && hasUsableProjection.value
-  && projectionStatus.value === "error");
 
 const dots = computed(() => generateDotMap(W, H));
 
@@ -363,107 +234,26 @@ function select(r: GlobeRegion) {
   selected.value = r;
 }
 
-// #ifdef APP-PLUS
-const nativeGlowId = `globe-native-${Math.random().toString(36).slice(2, 8)}`;
-const nativeYouGlowId = `${nativeGlowId}-you`;
-function nativeNodeStyle(r: GlobeRegion): CSSProperties {
-  return {
-    position: "absolute", left: `${r.cx * 100}%`, top: `${r.cy * 100}%`,
-    width: "44px", height: "44px", transform: "translate(-50%, -50%)",
-  };
-}
-// #endif
 
-function regionName(r: GlobeRegion): string {
-  if (r.displayName) return r.displayName;
-  const g = t.value.globe as Record<string, string>;
-  return r.i18nKey ? g[r.i18nKey] ?? r.id : r.id;
-}
-function regionDevicesText(r: GlobeRegion): string {
-  return fmt(t.value.globe.regionDevices, { n: r.devices.toLocaleString() });
-}
-// Missing latency stays compact; the existing drawer explains its availability.
-function regionLatencyText(r: GlobeRegion): string {
-  if (r.avgLatencyMs === null) return t.value.globe.latencyTelemetryMissing;
-  return fmt(t.value.globe.regionLatency, { n: String(r.avgLatencyMs) });
-}
-function regionJobsText(r: GlobeRegion): string {
-  return fmt(t.value.globe.regionJobs, { n: r.jobsPerHour.toLocaleString() });
-}
-
-function projectionScope(): string {
-  return `${String(app.accountKey)}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`;
-}
-
-function loadRegions(): Promise<void> {
-  if (!remoteApiEnabled || disposed || !pageActive) return Promise.resolve();
-  const scope = projectionScope();
-  if (projectionFlight?.scope === scope) return projectionFlight.promise;
-  const request = ++projectionRequest;
-  projectionStatus.value = "loading";
-  const promise = (async () => {
-    try {
-      const next = await networkRegionsApi.list();
-      if (request !== projectionRequest || scope !== projectionScope()) return;
-      networkProjection.value = next;
-      projectionStatus.value = next.regions.length > 0 ? "ready" : "empty";
-    } catch {
-      if (request !== projectionRequest || scope !== projectionScope()) return;
-      projectionStatus.value = "error";
-    }
-  })();
-  const flight = { scope, promise };
-  projectionFlight = flight;
-  const clear = () => {
-    if (projectionFlight === flight) projectionFlight = null;
-  };
-  void promise.then(clear, clear);
-  return promise;
-}
-
-let releaseActiveRefresh = () => {};
-function activatePageRefresh() {
-  releaseActiveRefresh();
-  releaseActiveRefresh = registerActivePageRefresh(loadRegions);
-}
-
+function regionName(r: GlobeRegion): string { return r.displayName; }
+function regionNodeDisplay(r: GlobeRegion): string { return r.devices === null ? '—' : `${(r.devices / 10000).toFixed(1)}W+`; }
 onMounted(() => {
-  pulseTimer = setInterval(() => {
-    pulseTick.value += 1;
-  }, 1800) as unknown as number;
+  watch(() => globeSettings.value?.intervalMs, interval => {
+    if (pulseTimer) clearInterval(pulseTimer);
+    pulseTimer = setInterval(() => {
+      if (!pageActive) return;
+      pulseTick.value += 1;
+      simulationNow.value = Date.now();
+    }, Math.min(1800, interval ?? 1800)) as unknown as number;
+  }, { immediate: true });
 });
 onShow(() => {
-  if (disposed) return;
   pageActive = true;
-  activatePageRefresh();
-  void loadRegions();
+  simulationNow.value = Date.now();
+  void cfg.load();
 });
-onHide(() => {
-  pageActive = false;
-  projectionRequest += 1;
-  projectionFlight = null;
-  selected.value = null;
-  releaseActiveRefresh();
-});
-function resetProjection() {
-  if (disposed) return;
-  projectionRequest += 1;
-  projectionFlight = null;
-  selected.value = null;
-  networkProjection.value = null;
-  projectionStatus.value = remoteApiEnabled ? "loading" : "ready";
-  void loadRegions();
-}
-watch(() => [String(app.accountKey), app.accountBindingEpoch] as const, resetProjection);
-const unsubscribeRuntime = subscribeRuntimeRevision(resetProjection);
-onUnmounted(() => {
-  disposed = true;
-  projectionRequest += 1;
-  projectionFlight = null;
-  unsubscribeRuntime();
-  releaseActiveRefresh();
-  if (pulseTimer) clearInterval(pulseTimer);
-});
+onHide(() => { pageActive = false; selected.value = null; });
+onUnmounted(() => { if (pulseTimer) clearInterval(pulseTimer); });
 
 // Procedural dot-map silhouette (loose continent blobs).
 function generateDotMap(w: number, h: number): Array<{ x: number; y: number; r: number; bright: boolean }> {
@@ -553,17 +343,10 @@ function regionIconBox(isYou?: boolean): CSSProperties {
     height: "40px",
     borderRadius: "12px",
     background: isYou
-      ? "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)"
+      ? "var(--v5-surface-2)"
       : "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
   };
 }
-const youChipStyle: CSSProperties = {
-  fontSize: "12px",
-  padding: "2px 6px",
-  borderRadius: "8px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
-  color: "var(--v5-brand-2)",
-};
 const regionRateStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "15px",
@@ -573,13 +356,21 @@ const regionRateStyle: CSSProperties = {
 const drawerCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   width: "100%",
   maxWidth: "420px",
+  maxHeight: "100%",
+  overflowY: "auto",
+  overscrollBehaviorY: "contain",
+  boxSizing: "border-box",
   background: "var(--nx-glass-fill)",
   borderColor: "transparent",
   padding: "20px",
 };
 const drawerCloseStyle: CSSProperties = {
-  top: "12px",
-  right: "12px",
+  top: "4px",
+  right: "4px",
+  width: "44px",
+  height: "44px",
+};
+const drawerCloseFaceStyle: CSSProperties = {
   width: "28px",
   height: "28px",
   borderRadius: "999px",
@@ -591,7 +382,7 @@ function drawerIconBox(isYou?: boolean): CSSProperties {
     height: "48px",
     borderRadius: "12px",
     background: isYou
-      ? "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)"
+      ? "var(--v5-surface-2)"
       : "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
   };
 }
@@ -619,42 +410,6 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () =>
 </script>
 
 <style scoped>
-/* #ifdef APP-PLUS */
-.nx-globe-native-dot,
-.nx-globe-native-pulse {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
-  margin-top: -5px;
-  border-radius: 50%;
-  pointer-events: none;
-}
-.nx-globe-native-pulse {
-  border: 1px solid;
-  animation: nx-globe-native-pulse 1.6s;
-}
-@keyframes nx-globe-native-pulse {
-  from { transform: scale(1); opacity: 1; }
-  to { transform: scale(4.8); opacity: 0; }
-}
-.nx-globe-native-you {
-  position: absolute;
-  transform: translate(8px, -18px);
-  color: var(--v5-tech-cyan);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: ui-monospace, monospace;
-  pointer-events: none;
-}
-.nx-globe-native-node:focus-visible {
-  outline: 2px solid var(--v5-brand);
-  outline-offset: 2px;
-  border-radius: 50%;
-}
-/* #endif */
 .nx-globe-drawer {
   position: fixed;
   inset: 0;
@@ -662,11 +417,15 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () =>
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0 12px 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  overscroll-behavior-y: contain;
+  padding: 12px 12px calc(16px + max(env(safe-area-inset-bottom, 0px), 24px));
 }
 .nx-globe-scrim {
   position: absolute;
   inset: 0;
+  touch-action: none;
   background: color-mix(in srgb, var(--v5-surface-3) 80%, transparent);
   backdrop-filter: blur(4px);
 }
