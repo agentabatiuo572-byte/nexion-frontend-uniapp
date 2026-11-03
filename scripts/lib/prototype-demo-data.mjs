@@ -157,7 +157,7 @@ function demoLiveActivity(product,now) {
   sales24h=Math.min(sales24h,product.sold);
   const curve=(period,low,high)=>{const x=now/period,k=Math.floor(x),f=x-k,ease=f*f*(3-2*f),at=i=>low+demoNoise(product.id,period,i)*(high-low);return at(k)+(at(k+1)-at(k))*ease;};
   const floor=200+Math.round(daily*.8)+Math.round(demoNoise(product.id,'viewers')*20);
-  return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:sales24h?Math.max(1,sales30m):0};
+  return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:Math.min(sales24h,Math.max(1,sales30m))};
 }
 
 /** Mutable state belongs only to the loopback demonstration server. */
@@ -179,10 +179,10 @@ export function demoFixture(url,locale,state,request) {
   if (socialProduct) {
     const product = products.find(item => item.id === decodeURIComponent(socialProduct[1]));
     if (!product) return undefined;
+    const sold = empty ? 0 : product.sold;
     return { ...authority, source:'nx_product/nx_order/nx_order_item', productName:product.name,
-      cumulativeSales:empty?0:product.sold, windowDays:Number(url.searchParams.get('windowDays') || 30),
-      windowSales:empty?0:Math.floor(product.sold / 3),
-      liveActivity: empty?{viewers:0,sales24h:0,sales30m:0}:demoLiveActivity(product,now) };
+      cumulativeSales:sold, windowDays:Number(url.searchParams.get('windowDays') || 30),
+      windowSales:Math.floor(sold / 3), liveActivity:demoLiveActivity({id:product.id,sold},now) };
   }
   const base=(pathnameOverride=pathname)=>reviewFixture(new URL(pathnameOverride,url.origin),locale,state,request);
   if((state.computeState??'app')!=='app'){const compute=computeDemo(url,locale,state,request);if(compute!==undefined)return compute;}
