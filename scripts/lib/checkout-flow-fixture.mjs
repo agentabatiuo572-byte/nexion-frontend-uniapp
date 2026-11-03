@@ -11,7 +11,10 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
   const ok = data => ({status:200,message:'OK',data});
   const external = createPurchasePaymentPreviewFixture(state, locale);
   const handles = path => /^\/api\/(orders(?:\/|$)|promotion-commands\/|app\/(security\/payment-password|payment-commands\/))/.test(path) || external.handles(path);
+  // A reset or scenario change starts a fresh account: replayed receipts and PIN-held orders belong to the old one.
+  let epoch = state.scenarioEpoch;
   function handle(url, request) {
+    if (epoch !== state.scenarioEpoch) { epoch = state.scenarioEpoch; receipts.clear(); pin.orders.clear(); pin.state.balance = state.walletBalance ?? 52800.64; }
     const path = url.pathname, method = request.method(), key = request.headers()['idempotency-key'];
     const paymentCommand = path.match(/^\/api\/app\/payment-commands\/(order-pay|trial-convert|trade-in|capacity-replace|capacity-keep)\/(.+)$/);
     if (paymentCommand) {
