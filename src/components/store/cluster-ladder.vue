@@ -1,7 +1,7 @@
 <!--
   ClusterLadder — daily USD yield ladder (ported from store/page.tsx
-  ClusterLadderV5). Phone → Box S1 → Box Pro → Rack P1, drawn bottom-up
-  (column-reverse) with the user "←you" marker on Phone. Each row: label · bar
+  ClusterLadderV5). Phone → Box S1 → Box Pro → Box Pro v2 → Rack P1 → Rack P2, drawn bottom-up
+  (column-reverse) with the user "←you" marker on the highest owned tier. Each row: label · bar
   (width = relative yield) · $/d, inside one content card. The bars grow from
   zero each time the card scrolls into view (shared useScrollGrowProgress).
   Yields are parallel estimate comparisons, so they use the metric figures (DS-27).
@@ -57,37 +57,33 @@ interface Tier {
 }
 
 const tiers = computed<Tier[]>(() => {
-  const kindForRow: Record<string, string> = { phone: "phone", entry: "stellarbox-s1", pro: "stellarbox-pro", rack: "stellarrack-p1" };
-  const rows: Tier[] = props.authority.ladder.map((row: StoreYieldLadderRow) => {
-  const you = kindForRow[row.id] === props.owned?.kind;
-  const amount = you && props.owned ? { usd: props.owned.baseRate, nex: props.owned.baseRateNEX } : row.amount;
-  const labels = {
+  const kindForRow: Record<StoreYieldLadderRow["id"], string> = { phone: "phone", entry: "stellarbox-s1", pro: "stellarbox-pro",
+    proV2: "stellarbox-pro-v2", rack: "stellarrack-p1", rackP2: "stellarrack-p2" };
+  const labels: Record<StoreYieldLadderRow["id"], string> = {
     phone: t.value.store.ladderPhone,
     entry: t.value.store.ladderS1,
     pro: t.value.store.ladderPro,
+    proV2: t.value.store.ladderProV2,
     rack: t.value.store.ladderRack,
+    rackP2: t.value.store.ladderRackP2,
   };
-  return {
-    id: row.id,
-    label: labels[row.id],
-    y: storefrontUsd(amount),
-    yFull: storefrontUsdFull(amount),
-    amount: amount?.usd ?? 0,
-    width: row.widthPct,
-    you,
-    rack: row.id === "rack",
-    fill: "var(--v5-brand)",
-    fillOpacity: row.id === "entry" ? 0.35 : row.id === "pro" ? 0.55 : 0.75,
-  };
+  const rows: Tier[] = props.authority.ladder.map((row: StoreYieldLadderRow, index) => {
+    const you = kindForRow[row.id] === props.owned?.kind;
+    const amount = you && props.owned ? { usd: props.owned.baseRate, nex: props.owned.baseRateNEX } : row.amount;
+    return {
+      id: row.id,
+      label: labels[row.id],
+      y: storefrontUsd(amount),
+      yFull: storefrontUsdFull(amount),
+      amount: amount?.usd ?? 0,
+      width: row.widthPct,
+      you,
+      rack: row.id === "rack" || row.id === "rackP2",
+      fill: "var(--v5-brand)",
+      // Phone .25 at the bottom, ramping .10 per tier up to Rack P2 at .75.
+      fillOpacity: 0.25 + index * 0.1,
+    };
   });
-  if (props.owned && props.owned.kind !== "cloud-share" && !rows.some((row) => row.you)) {
-    const amount = { usd: props.owned.baseRate, nex: props.owned.baseRateNEX };
-    const maximum = Math.max(amount.usd, ...props.authority.ladder.map((row) => row.amount?.usd ?? 0));
-    const ownedRow = { id: props.owned.kind, label: props.owned.name, y: storefrontUsd(amount),
-      yFull: storefrontUsdFull(amount), amount: amount.usd, width: maximum > 0 ? Math.max(1, amount.usd / maximum * 100) : 0,
-      you: true, rack: props.owned.kind === "stellarrack-p2", fill: "var(--v5-brand)", fillOpacity: 0.75 };
-    rows.splice(props.owned.kind === "stellarbox-pro-v2" ? 4 : rows.length, 0, ownedRow);
-  }
   const maximum = Math.max(0, ...rows.map((row) => row.amount));
   return rows.filter((row) => row.id !== "phone").map((row) => ({ ...row, width: maximum > 0 && row.amount > 0 ? Math.max(1, row.amount / maximum * 100) : 0 }));
 });

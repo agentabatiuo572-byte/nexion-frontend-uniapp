@@ -99,6 +99,10 @@
                 </template>
               </view>
             </view>
+            <view v-if="computePointsLine" class="detail-compute-points">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.6" /><circle cx="5" cy="19" r="2.6" /><circle cx="19" cy="19" r="2.6" /><path d="M12 7.6v4.4M12 12l-5.2 5M12 12l5.2 5" /></svg>
+              <text>{{ computePointsLine.before }}<text class="detail-compute-points__value">{{ computePointsLine.value }}</text>{{ computePointsLine.after }}</text>
+            </view>
           </view>
         </view>
 
@@ -243,6 +247,7 @@ import { useT } from "@/i18n/use-t";
 import { useEarnConfig } from "@/store/earn-config";
 import { useLocaleStore } from "@/store/locale";
 import { fmt, fmtMoney } from "@/i18n/format";
+import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
@@ -534,6 +539,13 @@ const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock > 0 && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
+// Per-unit team compute points: a quiet product fact, not personal data, so the hide-stats eye does not mask it.
+const computePointsLine = computed(() => {
+  const points = product.value?.computePoints;
+  if (!points) return null;
+  const [before, after] = (isShare.value ? t.value.store.computePointsPerShare : t.value.store.computePointsPerUnit).split("{n}");
+  return { before, value: formatComputePoints(points, locale.code).split(" ")[0], after };
+});
 const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0));
 const shareYieldText = computed(() => product.value?.shareYieldMin != null && product.value?.shareYieldMax != null
   ? `${product.value.shareYieldMin}%–${product.value.shareYieldMax}%`
@@ -860,6 +872,9 @@ const faqQStyle: CSSProperties = {
 .detail-sales-stat__label { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--v5-type-body-s-lh) var(--font-v5); overflow-wrap: anywhere; }
 .detail-sales-stat__status { font: 500 var(--ui-type-list-subtitle)/var(--v5-type-h3-lh) var(--font-v5); overflow-wrap: anywhere; }
 .detail-sales-stat:only-child { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+.detail-compute-points { display: flex; align-items: flex-start; gap: 6px; margin-top: 14px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.detail-compute-points svg { flex: none; margin-top: 2px; }
+.detail-compute-points__value { margin: 0 2px; color: var(--v5-ink-2); font-family: var(--font-metric); font-weight: 500; font-variant-numeric: tabular-nums; }
 .share-returns { padding: var(--v5-space-5); }
 .share-returns__title { display: block; font: 600 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); }
 .share-returns__description { display: block; margin-top: var(--v5-space-1); font: 400 var(--v5-type-body-s)/var(--v5-type-body-s-lh) var(--font-v5); color: var(--v5-ink-3); }
