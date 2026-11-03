@@ -113,6 +113,7 @@ function cancelFromUser() {
 }
 function errorMessage(cause: unknown): string {
   const error = cause instanceof ApiError ? cause.message : "";
+  if (error === "USER_REGISTRATION_K1_IP_LIMIT") return t.value.register.errorSignupLimited;
   if (error === "OAUTH_LOGIN_EXPIRED") return t.value.thirdParty.restartExpired;
   if (error === "OAUTH_ACCOUNT_LINK_REQUIRED") return t.value.thirdParty.linkRequired;
   if (error === "USER_REGISTRATION_SPONSOR_NOT_FOUND" || error === "USER_REGISTRATION_SPONSOR_INVALID") return t.value.register.inviteInvalid;
@@ -251,7 +252,7 @@ async function complete(captchaTicket?: string) {
         cancel(); message.value = t.value.login.unknownAttempt;
       } else if (cause instanceof ApiError && cause.message === "OAUTH_LOGIN_EXPIRED") {
         cancel(); message.value = errorMessage(cause);
-      } else if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") showCaptcha.value = true;
+      } else if (cause instanceof ApiError && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) showCaptcha.value = true;
       else if (!sponsorRefused(cause)) message.value = errorMessage(cause);
     }
   } finally { submitting.value = false; password.value = ""; }
