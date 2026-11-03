@@ -615,10 +615,11 @@ export function demoFixture(url,locale,state,request) {
     // Traded-in devices leave the fleet.
     if(state.retiredDeviceIds?.length)data.devices=data.devices.filter(device=>!state.retiredDeviceIds.includes(device.id));
     // Device warehouse scenarios: an idle purchased device, a full fleet, or a slot held for provisioning.
+    // Device ids stay unique under any knob combination: the idle Rack is 49 because scopeState=mixed's hidden phone is 43.
     if(!empty&&state.fleetState&&state.fleetState!=='normal'){
       const clone=(id,code,name,daily,paid,extra)=>({...data.devices[0],id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
       if(state.fleetState==='phone-history')for(const [id,type]of [[43,'PHONE'],[44,'MOBILE']])data.devices.push(clone(id,type,`Demo ${type}`,1,0,{deviceType:type}));
-      if(state.fleetState==='inventory')data.devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
+      if(state.fleetState==='inventory')data.devices.push(clone(49,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
       if(state.fleetState==='full'){
         // Full = every slot occupied: formal devices fill whatever the trial and pending orders leave free.
         const free=data.slotCap-trialSlotCount-demoOrderSlots(state)-data.devices.filter(device=>device.activatedAt!==null).length;
