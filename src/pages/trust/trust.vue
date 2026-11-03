@@ -89,14 +89,13 @@
           </view>
         </view>
 
-        <view v-if="financialMetrics.length" class="trust-block">
+        <view class="trust-block">
           <view class="trust-block__head">
             <text class="trust-block__title">{{ center.dataTitle }}</text>
-            <text class="trust-block__hint">{{ center.dataHint }}</text>
           </view>
           <view class="trust-summary">
             <view v-for="metric in financialMetrics" :key="metric.key" class="trust-summary__cell">
-              <text class="trust-summary__value" :class="metricSize(metric.value)">{{ metric.value }}</text>
+              <text class="trust-summary__value">{{ metric.value }}</text>
               <text class="trust-summary__label">{{ metric.label }}</text>
             </view>
           </view>
@@ -194,7 +193,6 @@
 import { networkReauditCopy } from "@/i18n/network-reaudit";
 import { continuityCopy } from "@/i18n/continuity-fixes";
 import { trustCenterCopy } from "@/i18n/trust-center";
-import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -205,7 +203,6 @@ import { trustResources } from "./trust-resources";
 import { trustCategoryMaterial } from "./trust-category-material";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
-import { useConfig } from "@/store/config";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -213,11 +210,11 @@ import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api
 import { trustNumberedRows } from "@/lib/trust-fields";
 import { recordPublishedTrustViews, usePublishedTrust } from "@/composables/use-published-trust";
 import { useTrustDocuments } from "@/composables/use-trust-documents";
+import { usePublishedNetworkStats } from "@/composables/use-published-network-stats";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT();
 const openCategory = ref('');
-const cfg = useConfig();
 const tr = computed(() => t.value.trust);
 const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "en");
@@ -236,20 +233,13 @@ function section(key: PublishedTrustSection["sectionKey"]) {
 const leadershipSection = computed(() => section("leadership"));
 const auditSection = computed(() => section("auditsReserves"));
 
-const verified = computed(() => cfg.syncFailed ? null : cfg.config.verifiedStats);
-const financialMetrics = computed(() => {
-  const v = verified.value;
-  if (!v) return [];
-  return [
-    { key: "activeAccountsValue", label: tr.value.activeAccounts, value: v.activeAccounts.value.toLocaleString("en-US") },
-    { key: "devicesOnlineValue", label: tr.value.activeNodes, value: v.onlineDevices.value.toLocaleString("en-US") },
-    { key: "payoutsProcessedValue", label: tr.value.completedPayouts, value: formatGroupedAmount(v.completedPayoutUsdt.value) },
-  ];
-});
-// Figures stay exact (no K/M); a long one steps down from the design's 18px to fit a third-width cell.
-function metricSize(value: string): string {
-  return value.length <= 8 ? "" : value.length <= 10 ? "trust-summary__value--long" : "trust-summary__value--longer";
-}
+// Published figures, matching the home network snapshot card; never real aggregates.
+const published = usePublishedNetworkStats();
+const financialMetrics = computed(() => [
+  { key: "registeredUsers", label: t.value.home.networkMembers, value: published.registered.value },
+  { key: "onlineDevices", label: t.value.home.networkDevices, value: published.online.value },
+  { key: "paidOut", label: t.value.home.networkPaidOut, value: published.paidOut.value },
+]);
 const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ?? [], "document", ["Primary", "Secondary", "Url", "Type", "Date", "Size"] as const, language.value));
 const verifiedAuditRows = computed(() => auditRows.value.filter((row) => row.Primary));
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
@@ -423,11 +413,11 @@ const heroStyle: CSSProperties = { padding: "20px" };
 .trust-whitepaper__bottom { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); }
 .trust-whitepaper__meta { font: 400 12px/16px var(--font-v5); opacity: .85; font-variant-numeric: tabular-nums; }
 .trust-whitepaper__cta { display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: var(--v5-radius-full); background: var(--v5-on-brand); color: var(--v5-brand); font: 700 13px/18px var(--font-v5); }
-.trust-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--v5-space-2); }
+/* Two banded counts side by side; the paid-out amount takes a full row so it never breaks mid-number. */
+.trust-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--v5-space-2); }
+.trust-summary__cell:last-child { grid-column: 1 / -1; }
 .trust-summary__cell { display: flex; flex-direction: column; gap: var(--v5-space-1); padding: var(--v5-space-3); border-radius: var(--v5-radius-m); background: var(--v5-surface); min-width: 0; }
 .trust-summary__value { display: block; font: 700 18px/24px var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.trust-summary__value--long { font-size: 15px; line-height: 24px; }
-.trust-summary__value--longer { font-size: 12px; line-height: 24px; }
 .trust-summary__label { display: block; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .trust-surface { overflow: hidden; border-radius: var(--v5-radius-l); background: var(--v5-surface); }
 .trust-row, .trust-person { display: flex; align-items: center; gap: var(--v5-space-3); min-height: 60px; padding: var(--v5-space-3) var(--v5-space-4); cursor: pointer; }
