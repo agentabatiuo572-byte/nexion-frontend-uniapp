@@ -162,7 +162,6 @@
               <text class="block" :style="drawerStatLabelStyle">{{ t.uiChrome.latency }}</text>
             </view>
           </view>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ t.globe.simulationHint }}</text>
         </view>
       </view>
     </view>

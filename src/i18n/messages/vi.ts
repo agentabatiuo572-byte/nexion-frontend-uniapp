@@ -312,7 +312,6 @@ export const vi: Messages = {
     errorOtpSendUnavailable: "Mã xác minh chưa được gửi. Vui lòng thử lại sau.",
     errorServiceUnavailable: "Hiện chưa xác minh được tài khoản. Vui lòng thử lại.",
 
-sandboxCodeHint: "Mã trải nghiệm: {code}. Không gửi SMS.",
 },
   geoPolicy: {
     blocked: "Dịch vụ hiện chưa khả dụng tại khu vực này. Vui lòng liên hệ hỗ trợ.",
@@ -545,7 +544,6 @@ sandboxSponsorEnvironmentMismatch: "Mã mời này không dùng được. Kiểm
     onGridOnline: "trực tuyến",
     networkPulseTitle: "Nhịp mạng lưới",
     networkLive: "trực tiếp",
-    networkPublishedScope: "Quy mô ước tính công bố · không phải kết nối trực tiếp",
     networkGlobalGrid: "Lưới toàn cầu · trực tiếp",
     networkMembers: "Thành viên",
     networkDevices: "Thiết bị",
@@ -726,8 +724,6 @@ sandboxSponsorEnvironmentMismatch: "Mã mời này không dùng được. Kiểm
     liveFeedEmpty: "Chưa có hoạt động nhiệm vụ.",
 
 quickMissionsActive: "5 mở",
-sandboxQuoteLedgerTitle: "Báo giá tác vụ minh họa",
-sandboxQuoteNoCredit: "Dữ liệu minh họa · Không cộng vào số dư",
 trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
 },
   earn: {
@@ -1939,8 +1935,6 @@ storeHint: "Chọn mua thiết bị tại cửa hàng",
     configUnavailableBody: "Hãy kiểm tra kết nối mạng rồi thử lại.",
     configRetryCta: "Tải lại",
 
-sandboxHoldCta: "Chưa thể kết nối",
-sandboxHoldBody: "Chế độ trải nghiệm chưa hỗ trợ kết nối máy tính thật. Có thể xem hướng dẫn tải và kết nối.",
 },
   voucher: {
     popupCap: "Ưu đãi có hạn",
@@ -2404,8 +2398,6 @@ summerActivityName: "Ưu đãi mùa hè",
     pageFooter: "Vận hành trọn gói · không phí ship",
 
 specUptimeValue: "99.9%",
-coSandboxWallet: "Ví trải nghiệm",
-coHintSandboxWallet: "Thanh toán trải nghiệm · Không dùng tiền thật",
   shareDailyEstimateNote: "USDT được ước tính theo giá hiện tại, số lượng và tỷ lệ thưởng năm. Số thực nhận có thể khác.",
     shareFlexibleDescription: "Mua trực tiếp phần công suất tính toán, linh hoạt hơn.",
     cardEstimateNote: "Chỉ là ước tính; số thực nhận có thể khác.",
@@ -2488,7 +2480,6 @@ summaryView: "Xem đội",
 summaryLoading: "Đang tải thành viên…",
 summaryUnavailable: "Chưa tải được thành viên nhóm. Vui lòng thử lại.",
 rankBenefits: "Xem quyền lợi cấp bậc",
-sandboxBanner: "Chế độ trải nghiệm · Phần thưởng minh họa",
 },
   wallet: {
     loadingTransactions: "Đang tải lịch sử giao dịch…",
@@ -3795,9 +3786,6 @@ earningsMilestone: "Mốc thu nhập ${threshold}",
     loadMore: "Tải thêm",
     retry: "Thử lại",
 
-sandboxPayCta: "Tiếp tục thanh toán trải nghiệm",
-sandboxPayBusy: "Đang xác nhận thanh toán trải nghiệm…",
-sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem trạng thái đơn hàng sau khi hoàn tất.",
   closeReasons: {
       USER_CANCELLED: "Bạn đã hủy đơn hàng",
       PAYMENT_TIMEOUT: "Quá hạn thanh toán",
@@ -4008,7 +3996,6 @@ sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem tr�
   globe: {
     title: "Mạng lưới toàn cầu",
     back: "Quay lại",
-    headline: "Sơ đồ mạng UVEL",
     activeNodes: "Node hoạt động",
     activeJobs: "Tác vụ đang chạy",
     jobsPerHour: "Tác vụ/giờ",
@@ -4021,7 +4008,6 @@ sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem tr�
     centerNewYork: "New York",
     centerSanJose: "San Jose",
     superComputeCenter: "Trung tâm siêu máy tính",
-    simulationHint: "Nút, tác vụ và độ trễ là dữ liệu mô phỏng, không phải số liệu trực tiếp.",
     youAre: "Vị trí của bạn",
     regionAsia: "Châu Á - Thái Bình Dương",
     regionEurope: "Châu Âu",
@@ -4032,7 +4018,6 @@ sandboxPayHint: "Thanh toán trải nghiệm không dùng tiền thật. Xem tr�
     regionDevices: "{n} thiết bị",
     regionJobs: "{n} tác vụ / giờ",
     regionLatency: "Độ trễ TB {n}ms",
-    legend: "Các chấm và nhịp nhấp nháy chỉ để minh họa · xem tải thực tế trong chi tiết khu vực",
     yourNodeBadge: "Bạn",
     regionProjectionLoadingTitle: "Đang tải mạng theo khu vực",
     regionProjectionLoadingDesc: "Đang tải phân bố node và tác vụ đang hoạt động.",
@@ -5177,7 +5162,6 @@ openseaLine: "Xem trên OpenSea · giá sàn",
     heroSub: "Xem điều kiện tham gia, thời gian chi trả và lịch sử thưởng.",
     currentRulesTitle: "Quy tắc hiện hành",
     currentRules: "Đạt V{rank} để tham gia. Thưởng theo kết quả chi trả thực tế.",
-    localRules: "Bản xem trước cục bộ chỉ để minh họa giao diện, không phải quy tắc chi trả.",
     nextPayout: "Lần chi trả tiếp theo: {time}",
     s1Title: "Quỹ thưởng nhóm là gì?",
     s1Para1:
@@ -5964,7 +5948,6 @@ openSeaErrorPool: {
       "UVT là token của nền tảng UVEL, dùng để quy đổi sang USDT hoặc bù phí rút tiền.",
     publishedDataVersion: "Dữ liệu đã phát hành · {version}",
     activeAiClientsLabel: "Khách hàng AI đang hoạt động",
-    activeAiClientsNotice: "Chỉ số này lấy từ nội dung đã phát hành hiện tại, không phải số liệu thời gian thực.",
     s1Title: "UVT và USDT — khác nhau chỗ nào?",
     s1Para1:
       "Ví của bạn giữ hai loại tiền. USDT là stablecoin neo theo đô la Mỹ — giá dễ đoán, dùng để thanh toán và rút tiền. UVT là token nền tảng gốc của UVEL — giá thay đổi, dùng để đổi sang USDT và bù phí rút USDT.",
@@ -6626,7 +6609,6 @@ openSeaErrorPool: {
     reasonNewAddressAge: "Đang kiểm tra an toàn",
     startFailed: "Có lỗi xảy ra, vui lòng thử lại sau",
 
-sandboxMockNotice: "Chế độ trải nghiệm · Không thực hiện chuyển tiền thật",
 },
   learning: {
     centerTitle: "Trung tâm hướng dẫn",
@@ -6686,9 +6668,7 @@ phonePolicy: {
 publicCopy: {
     // Phone policy uses the same keys on APP and H5.
     memberIdle: "Chưa hoạt động",
-    experienceDepositCredited: "Đã ghi có tiền nạp trải nghiệm: {amount} USDT",
     orderWaitingSlot: "Chờ có suất thiết bị chạy để kích hoạt",
-    experienceMode: "Chế độ trải nghiệm · Không dùng tiền thật",
     operationUnconfirmed: "Chưa thể xác nhận kết quả. Tải lại để kiểm tra trước khi thử lại.",
     accountDeletionBlocked: "Hiện chưa thể xóa tài khoản. Liên hệ hỗ trợ để kiểm tra.",
     helpTitle: "Hướng dẫn",
