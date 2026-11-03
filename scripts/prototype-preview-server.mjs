@@ -18,7 +18,8 @@ const authDemo=createAuthDemo(state);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
-let scenarioEpoch=0;
+// Continue from an imported epoch, so the first scenario change never reuses it.
+let scenarioEpoch=state.scenarioEpoch??0;
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale):null;
 // Keep trial wallet authorization available when the full checkout fixture is disabled.
 const trialPin=createPaymentPinFlowFixture();
@@ -28,10 +29,20 @@ const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
 await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor});
 const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{code:'zh',userSet:true}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
+// Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
+// trade-in and trial commands, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
+// account and stay. Each page load drops them, before the App starts, when the scenario or this server run changed.
+const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-convert-accounts-v1'];
+const serverRun=Date.now().toString(36);
+const scenarioSeed=()=>'<script>(()=>{const scenario='+JSON.stringify(serverRun+':'+(state.scenarioEpoch??0))+";if(localStorage.getItem('uvel-preview-scenario')===scenario)return;for(const key of "+JSON.stringify(scenarioStorageKeys)+")localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);})();</script>";
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json']});res.end(JSON.stringify(value));};
 const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
 const server=http.createServer(async(req,res)=>{
+  // A write belongs to the scenario it started in: one whose body arrives after a scenario change is refused.
+  const startedIn=state.scenarioEpoch;
+  const staleWrite=()=>req.method!=='GET'&&state.scenarioEpoch!==startedIn;
+  const refuseStale=()=>sendJson(res,{code:409,message:'演示场景已切换，此操作未执行，请刷新页面',data:null},409);
   try {
     const url=new URL(req.url,'http://127.0.0.1:'+server.address().port);
     res.setHeader('Cache-Control','no-store');
@@ -109,6 +120,7 @@ const server=http.createServer(async(req,res)=>{
       }
       if(checkoutFlow?.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
+        if(staleWrite())return refuseStale();
         const response=checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         if(response.drop){res.destroy();return;}
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
@@ -129,6 +141,7 @@ const server=http.createServer(async(req,res)=>{
       if(businessRead&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
       if(businessRead&&state.dataState==='loading')await new Promise(resolve=>setTimeout(resolve,5000));
       let body='';for await(const chunk of req)body+=chunk;
+      if(staleWrite())return refuseStale();
       if(conversationDelete) {
         const data=fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers});
         return sendJson(res,{code:0,message:'OK',data});
@@ -151,7 +164,7 @@ const server=http.createServer(async(req,res)=>{
     const bytes=await readFile(file);res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');
     const savedAttempt=path.extname(file)==='.html'?authDemo.savedAttempt():null;
     const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
-    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
+    res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed()+seed+attemptSeed+(state.authState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'')):bytes);
   }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
