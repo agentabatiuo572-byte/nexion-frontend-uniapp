@@ -167,7 +167,7 @@ function demoSeedFleet(state,template,cap,occupied) {
 }
 const demoFleet=(url,locale,state)=>demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
 
-function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
+export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
   const requested=lines.reduce((count,line)=>count+line.quantity,0);
   const fleet=demoFleet(url,locale,state);
   // Paying an existing order reuses the slots it already holds.

@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoFixture} from './prototype-demo-data.mjs';
+import {demoFixture,demoOrderFitsCapacity} from './prototype-demo-data.mjs';
 
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
@@ -38,15 +38,20 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     // Non-order fixtures cover open, unknown and rejected commands. Their
     // business delivery/fleet mutation is not simulated here.
     if (intent.kind !== 'ORDER_PAY') throw Object.assign(new Error('PURCHASE_PAYMENT_DELIVERY_NOT_MODELED'), {status:503});
-    settle(intent.orderNo, 'activated', intent);
     const order = state.createdOrders?.find(row => row.orderNo === intent.orderNo);
+    // Like AppOrderCommandService.prepare inside delivery: an unpaid order holds no slot, so paid funds that no
+    // longer fit the slots go to manual review with the capacity code instead of activating over the cap.
+    if (order && !demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
+      order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity})), intent.orderNo))
+      return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CAPACITY_REPLACEMENT_REQUIRED'});
+    settle(intent.orderNo, 'activated', intent);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
       ...(order?.promotionQuoteId ? order : {}),
       orderNo: intent.orderNo, paymentNo: intent.intentNo, paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', canonicalStatus: 'activated',
       amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }
-  const view = intent => { const {createdAt, orderNo, ...row} = advance(intent); return row; };
+  const view = intent => { const {createdAt, orderNo, origin, ...row} = advance(intent); return row; };
   function paymentCommand(kind, key) {
     const intent = [...intents.values()].find(row => commandKinds[row.kind] === kind && row.commandKey === key);
     if (!intent) return null;
@@ -100,7 +105,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         intent = {...source.quote, intentNo, commandKey: key, status: 'AWAITING_PAYMENT', reason: '', receipt: null, expiresAt: new Date(expiresAt).toISOString(),
           paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? `https://api.hdpayadmin.com/pay/${intentNo}` : null,
           address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
-          createdAt: Date.now(), orderNo: source.orderNo};
+          createdAt: Date.now(), orderNo: source.orderNo, origin: url.origin};
         intents.set(intentNo, intent);
       }
       return {status: 200, message: 'OK', data: view(intent)};
