@@ -5401,45 +5401,66 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 ### 14.1 支持语言
 
-| 语言 | code | 状态 |
+App 和 H5 Lite 提供 9 种界面语言，语言页（我的 → 语言，`/pages/me/language`）按下表顺序列出：
+
+| 语言 | code | 说明 |
 |---|---|---|
-| English | en | 完整 |
-| 中文(简体) | zh | 完整 |
-| Spanish / French / German / Japanese / Korean / Arabic | es / fr / de / ja / ko / ar | 占位(fallback 到 en) |
+| 中文（简体） | zh | 默认语言 |
+| English | en | 键结构来源（`en.ts`） |
+| Tiếng Việt | vi | |
+| Bahasa Indonesia | id | 用「Anda」 |
+| Bahasa Melayu | ms | 马来西亚马来语，用词按马来西亚习惯（akaun、kata laluan），不混用印尼语 |
+| Filipino | fil | 他加禄语语法，保留菲律宾 App 常用的英文词（account、wallet、I-verify） |
+| Русский | ru | 用小写「вы」 |
+| Қазақ тілі | kk | 西里尔字母 |
+| Oʻzbekcha | uz | 拉丁字母，oʻ/gʻ 用 U+02BB |
+
+后 6 种（id、ms、fil、ru、kk、uz）只是界面语言：服务端账户语言和后台下发的内容目前只有 zh/en/vi，规则见 §14.4。运营可以在后台开关这 6 种语言，见 §14.4「语言开关」。
 
 ### 14.2 实现
 
-- `lib/i18n/use-t.ts` 提供 `useT()` hook,从 useLocale store 读当前 locale
-- `lib/i18n/format.ts` 提供 `fmt(s, params)` 插值 helper(支持 `{n}` `{amount}` 占位符)
-- `lib/i18n/messages/{en,zh}.ts` 各 ~770 keys,30+ 命名空间(详见 §14.3)
-- 关键页面 i18n 全覆盖:`/me`(60+ keys 含三个 section header + 16 SettingRow + 6 成就 badges + Wallet 卡 + Network 卡 + 状态文案)、`/genesis/marketplace`(70+ keys 含 ListingCard / MyTokenCard / Listed 状态 / 二次确认对话框 / OpenSea 外部市场 modal / 5 种 OpenSea 错误文案 / toast 全套),无任何 hardcoded 英文字符串
+- `src/i18n/use-t.ts`：`useT()`（模板）/ `getT()`（脚本）按当前语言读字典，没有字典的语言读英文。
+- `src/i18n/messages/<code>.ts`：每种语言一份完整字典。`en.ts` 是键结构来源，`Messages` 类型要求每种语言的键与英文完全一致。主字典 5,321 条，121 个顶层命名空间。
+- 主字典以外的页面文案（约 1,350 条，分布在 73 个文件）写成按语言分槽的对象（`Record<UiLocale, …>`），用 `uiLocale()` 取当前语言的槽位；缺任何一种语言都过不了类型检查。
+- `src/i18n/index.ts`：语言注册表；`LAUNCHED_LOCALES` 上线清单（当前 9 种全开，删掉某个代码即对用户隐藏该语言，译文保留）；`LOCALES` 为上线清单内的语言；`uiLocale()` 返回界面语言槽位；`serverLanguage()` 把界面语言投影为服务端语言（zh、vi 不变，其他一律 en）。
+- `src/i18n/format.ts` 的 `fmt()` 负责占位符插值（`{n}`、`{amount}`）。各语言译文的占位符必须与英文一致；只服务英文的 `{s}` 复数后缀，其他语言可以不写。
+- 日期按语言格式显示：zh `yyyy/mm/dd`，vi/id/ms `dd/mm/yyyy`，ru/kk/uz `dd.mm.yyyy`，fil `mm/dd/yyyy`，en `Mon d, yyyy`。新语言的月份和星期名称按 CLDR 写在代码里。金额统一为 `$1,234.56`，越南语保留原有的千分位/小数点互换。
+- 字体：Inter 带拉丁、拉丁扩展、越南语、西里尔、西里尔扩展子集，俄语和哈萨克语也用 Inter 显示；中文走系统字体。
 
 ### 14.3 命名空间
 
-`tabs / headerTitles / headerSubtitles / intro / authOtp / login / register / home / earn / store / team / wallet / onboarding / me / profile / security / help / support / replay / achievements / proof / globe / staking / developer / language / receipts / orders / errors / teamV3 / stakingV3 / trust / genesis / walletV3 / rank / unilevel / binary / pool / commissions / repurchase / network / tree / quota / agent / daily / marketplace / ref / upsell / leaderboard / market / marketPage / events / nexWallet / learn / kycExpress / tickets / genesisHolder / tradein / milestones / productPhase / riskDisclosure / terms / bundle / tx / goals / preferences / search / complianceBanner / missions / weeklyQuest / monthlyChallenge / daily.powerUps`
+以 `src/i18n/messages/en.ts` 的顶层键为准（121 个），新增业务时放进对应命名空间，不另建同义命名空间。
 
-**关键 namespace 说明**:
-- `headerTitles` — 60+ 路由的 header 显示标题映射。包含 tab roots(earn / store / team / me / 等)+ Me 子树(meWallet / meProfile / meSecurity / meWalletBills / ...)+ Team 子树(teamRank / teamUnilevel / teamBinary / ...)+ Store 子树 + Genesis / Trust / 动态路由(storeProduct / tx / ...)+ `howItWorksSuffix`(EN: ` · How it works` / ZH: ` · 玩法说明`)拼接 how-it-works 子路由。
-- `headerSubtitles` — 23 条路由的 header 品牌行副标题。与 `headerTitles` 共享相同 key 名,仅对有语境价值的路由提供条目;无对应条目的路由 header 仅显示标题行。
-- `me.slotsOpen` / `me.slotsOpenPlural` / `me.addDeviceCta` — `/me` 钱包卡设备槽位转化条文案(空槽数量 + 潜在收益 + 跳 /store CTA)。
-- `profile.tierLabels` — 用户生命周期 L0-L5 功能化标签(EN: Visitor/Newbie/Active/Upgrade-ready/Owner/Ambassador,ZH: 访客/新手/活跃/升级候选/持有者/推广大使)。**UI 永不暴露内部 enum `"L0"|...|"L5"` 编号**,避免与已废弃的 MLM 层级数字混淆。
-- `teamV3.extendedRoyalty` / `teamV3.directLabel` / `teamV3.extendedLabel` / `teamV3.networkComposition` — 影响力网络版税相关二分类术语(EN: Extended royalty / Direct / Extended / Influence network composition,ZH: 扩展网络版税 / 直推 / 扩展 / 影响力网络构成)。
-- `commissions.directBadge` / `commissions.extendedBadge` — Commission row 内 layer chip 二分类显示(EN: Direct / Extended,ZH: 直推 / 扩展)。数学层 `e.layer` 字段保留,UI 仅按 `layer === 1` 二分类显示对应 chip。
+**关键 namespace 说明**：
+- `headerTitles`：各路由 header 的标题映射；`howItWorksSuffix` 拼在玩法说明子路由的标题后。
+- `headerSubtitles`：部分路由 header 品牌行的副标题，与 `headerTitles` 同名；没有条目的路由只显示标题行。
+- `profile.tierLabels`：用户生命周期 L0–L5 的功能化标签。**UI 永不显示内部 enum `"L0"|...|"L5"` 编号**。
+- 团队奖励二分类：`teamV3.extendedRoyalty`「团队奖励」、`teamV3.directLabel`「我邀请的好友」；奖励明细行的标签 `commissions.directBadge`「好友」、`commissions.extendedBadge`「团队」。界面只分「你邀请的好友 / 团队其他成员」两类，不显示层级数字。
 
-### 14.4 切换机制
+### 14.4 切换机制与服务端语言
 
-- LocaleSwitcher 组件在 Header / 注册页 / 登录页
-- 用户选择持久化到 localStorage
-- 不可翻译保留英文:品牌名(UVEL / NVIDIA / TechCrunch...)、token 展示符号(USDT / UVT / ERC-721)；历史 NEX 接口/账本标识保持兼容
-
----
+- 切换入口：语言页（我的 → 语言）、引导页右上角的语言按钮；服务条款确认页在当前语言无法完成确认时，显示语言选择。
+- 选择保存在设备上（`nexgrid-locale-v1`），立即生效。已登录时同步写入账户语言。
+- 账户语言只接受 zh/en/vi：选 id、ms、fil、ru、kk、uz 时，账户语言写 `en`，注册请求的 `language` 也发 `en`。登录读取账户语言时，如果本机手动选的语言投影后与账户语言相同（例如本机选俄语、账户为 en），保留本机选择；不同时以账户语言为准。新设备登录会先显示账户语言，用户重新选一次即可。
+- 后台下发的内容（活动、任务、FAQ、课程、玩法说明、段位说明、开发者文档、信任中心、风险提示书、服务条款、隐私政策、活动多语言字段、抽奖标题、通知）在新语言下读英文版本。已有「内容暂未提供你的语言」提示的页面（玩法说明、FAQ、风险提示书）在新语言下显示这条提示。
+- 运行时文案包（运营发布的线上文案）只用于 zh/en/vi；新语言只用 App 内置字典，不叠加英文线上文案。
+- 不翻译、保留原文：品牌名（UVEL）、代币和协议符号（UVT、USDT、BEP20、ERC20），以及中英越三语都用英文的标签（如 AI WORKLOAD PRICE INDEX、作业类别名）。历史 NEX 接口和账本标识保持兼容。
+- **语言开关**：运营在 PC「系统配置 → 应用体验配置 → 界面语言」开关 6 种新语言；zh/en/vi 是基础语言，始终开启。App 读 `GET /api/config/platform` 顶层可选字段 `interfaceLanguages`（已开启的语言代码，含 zh/en/vi）。
+  - 字段缺失或无效、首次读取完成前：显示上线清单里的全部语言。
+  - 读取成功后：只显示列表里的语言；之后刷新失败时沿用上一次成功读到的列表。
+  - 用户正在使用的语言被关闭：界面改用英文，不写账户语言；重新开启后需要用户再选一次（未登录时的选择同样作废，登录后不会被恢复）。
+  - 后端存储与下发该字段之前（uvel-docs 后端待办 B26），PC 这一节只读，App 显示全部 9 种。
+- 后端原生支持 6 种新语言（账户语言、通知模板、运营内容多语言字段）的待办见 uvel-docs 后端待办 B26。
+- 这些市场的手机号注册暂不开放（短信服务商尚未覆盖），与界面语言无关。
 
 ### 14.5 i18n 验收规则
 
-- zh/en key mirror 必须 0 diff。
-- 语言切换必须在 top-up、staking、team、wallet 等核心业务页即时改变可见 copy。
-- 用户可见文本不得出现裸 key、mock/demo/simulated/fake 等开发态词。
-- 新增业务页必须先补双语 key,再进入验收。
+- 9 种语言的主字典键一致（`Messages` 类型），页面文案对象 9 个槽位齐全（类型检查）；占位符与英文一致。
+- 新语言的文案遵守与中文相同的用户侧口径：不用投资、理财、利息、分红类词，不用下线、层级、双轨类词，不做收益承诺；金额、费用、期限、不可逆后果写准确。
+- 排版：在 375px 宽下，按钮、标签、页签、芯片不因译文变长而多折行，文字不截断、不溢出；太长时先缩短文案，再考虑调整样式。
+- 语言切换要在核心业务页（首页、商城、钱包、团队、赚取）即时改变可见文案；刷新、重新登录后保持所选语言。
+- 用户可见文本不得出现裸 key 或 mock/demo/simulated/fake 等开发态词。
+- 新增业务文案必须同时补齐 9 种语言，再进入验收。
 
 ## 15. 非功能需求
 
