@@ -200,7 +200,8 @@ export function demoFleetFacts(url,locale,state) {
   const now=Date.now(),products=demoProducts(state,url.origin,locale),orders=demoScenarioOrders(products,state,now,false);
   const template={...reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'}).devices[0],runtimeStatus:'ONLINE'};
   const slotCap=state.checkoutState==='replace'?2:6,retired=state.retiredDeviceIds||[],session=[];
-  for(const order of orders)if(['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
+  // DEMO-ORDER-004 is seeded device 41's own order, also once checkout has adopted it: it never adds a device.
+  for(const order of orders)if(order.orderNo!=='DEMO-ORDER-004'&&['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
     // A paid unit is a device even if its SKU has left the catalog: fall back to the order line instead of dropping it.
     const product=products.find(p=>p.id===line.sku)??{id:line.sku,name:line.name??line.sku,price:Number(line.unitPriceUsdt)||0,dailyEarn:0,dailyEarnNEX:0};
     const instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';

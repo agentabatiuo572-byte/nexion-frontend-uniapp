@@ -43,20 +43,20 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
     if (action && method === 'POST') {
       const orderNo = decodeURIComponent(action[1]);
       let order = state.createdOrders?.find(item => item.orderNo === orderNo);
-      if (!order) {
+      const sample = !order;
+      if (sample) {
         order = demoFixture(new URL('/api/orders',url.origin),locale(),state,{...request,method:()=> 'GET'}).orders.find(item=>item.orderNo===orderNo);
         if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
-        // Seeded order-list rows predate dynamic purchase rows. Normalize their
-        // single SKU once when adopting them into the writable fixture store.
-        order.lineItems = [{sku:order.productNo,name:order.productName,quantity:order.quantity??1,unitPriceUsdt:order.unitPriceUsdt??order.amountUsdt,lineAmountUsdt:order.subtotalUsdt??order.amountUsdt}];
-        state.createdOrders ??= []; state.createdOrders.push(order);
       }
+      // A sample row is adopted into the writable store only once a pay is authorized; a cancellation (settled by
+      // the commerce fixture through its order status) or a refused command leaves the account's orders untouched.
       if (action[2] === 'cancel') return ok(demoFixture(url,locale(),state,request));
       if (!['PENDING','PAID'].includes(order.paymentStatus)) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
       pin.orders.set(orderNo,order);
       const before = structuredClone(order), beforeBalance = pin.state.balance, beforeWrites = pin.state.payWrites;
       const authorization = pin.handle(url,request);
       if (authorization.status !== 200) return authorization;
+      if (sample) { state.createdOrders ??= []; state.createdOrders.push(order); }
       // The PIN fixture validates and records the original authorization; the
       // existing commerce fixture owns stock/capacity/receipt/fleet semantics.
       Object.assign(order,before);
