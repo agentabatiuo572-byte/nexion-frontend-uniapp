@@ -97,7 +97,7 @@ export interface CanonicalComputeReceipt extends TaskExecutionMetadata {
   receiptHash?: string;
   startedAt: number;
   completedAt: number;
-  settledAt: number;
+  settledAt: number | null;
   durationSec: number;
   source: "server";
   sourceEnvironment: ServerSourceEnvironment;
@@ -117,6 +117,7 @@ export interface CanonicalComputeReceiptSummary extends TaskExecutionMetadata {
   rewardNex: number;
   earningStatus: string;
   completedAt: number;
+  settledAt?: number | null;
 }
 
 export interface CanonicalComputeReceiptPage {
@@ -375,6 +376,9 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
   }
   const startedAt = timestamp(source.startedAt) as number;
   const completedAt = timestamp(source.completedAt) as number;
+  const settledAt = timestamp(source.settledAt, true);
+  const verified = source.postingTimeVerified;
+  if (verified !== undefined && verified !== (settledAt !== null)) return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   const durationSec = integer(source.durationSec);
   if (completedAt < startedAt) return invalid("TASK_RECEIPT_RESPONSE_INVALID");
   return {
@@ -399,7 +403,8 @@ function receipt(value: unknown, mode: ApiEnvironment): CanonicalComputeReceipt 
     receiptHash,
     startedAt,
     completedAt,
-    settledAt: timestamp(source.settledAt, true) ?? completedAt,
+    // Older model details repeated completion time even without a wallet posting.
+    settledAt: verified === undefined && metadata.executionMode !== "SIMULATED" && settledAt === completedAt ? null : settledAt,
     durationSec,
     ...metadata,
     ...proof,
@@ -426,6 +431,7 @@ function receiptSummary(value: unknown): CanonicalComputeReceiptSummary {
     rewardNex: decimal(source.rewardNex),
     earningStatus,
     completedAt: timestamp(source.completedAt) as number,
+    settledAt: timestamp(source.settledAt, true),
     ...executionMetadata(source),
   };
 }

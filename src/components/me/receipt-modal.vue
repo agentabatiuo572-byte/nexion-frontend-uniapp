@@ -479,7 +479,7 @@ function fmtDuration(sec: number): string {
   const s = sec % 60;
   return `${m} ${units[0]} ${s.toString().padStart(2, "0")} ${units[1]} (${sec} ${units[1]})`;
 }
-function fmtDate(ts: number): string {
+function fmtDate(ts: number | null): string {
   return formatDisplayDateTime(ts, receiptLocale.value);
 }
 

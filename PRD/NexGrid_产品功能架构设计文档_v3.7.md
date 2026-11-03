@@ -3950,6 +3950,8 @@ sequenceDiagram
 
 #### 11.5.1 推理收据 `/me/receipts`
 
+计算收据详情和历史摘要的 `settledAt` 读取服务端实际入账时间。新详情有 `postingTimeVerified` 时，即使入账与完成发生在同一秒也保留该时间。缺乏入账事实时返回空值，沿用日期格式器的空值占位。旧后端普通模型详情将完成时间复制为入账时间时，客户端按未知处理。历史摘要的 `completedAt` 保留原排序与完成时间含义。
+
 每完成一笔 AI 推理任务生成"推理收据":
 - 任务 ID + 客户名 + AI 模型 + 设备/GPU + 时长 + 能耗 + 单价 + 收益明细(gross / network fee / net paid)
 - 客户地址 + 签名(rsa-sha256)+ attestation tx_hash + 区块号
