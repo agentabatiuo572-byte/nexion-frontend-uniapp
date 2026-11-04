@@ -133,6 +133,9 @@ export function trialDemo(url,locale,state,request,capacityFull){
       earlyRewardUsdt:quote.earlyRewardUsdt,earlyRewardNex:quote.earlyRewardNex,earlyDiscountUsdt:quote.earlyDiscountUsdt,source,provenance:{...proof,source}});
   }
   if(['/api/trial/state','/api/trial/eligibility'].includes(url.pathname)){
-    return snapshot();
+    const read=snapshot();
+    if(request.pricingAt===undefined||!read.quote)return read;
+    const {shadow,nex}=accruedAt(request.pricingAt);
+    return {...read,quote:quoteFor(shadow,nex,request.pricingAt<row.startedAt+duration)};
   }
 }
