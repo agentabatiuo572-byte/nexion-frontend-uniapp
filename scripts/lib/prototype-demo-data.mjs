@@ -81,6 +81,8 @@ export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
 
 // The disclosure PromotionPublicService projects for an order discount: it comes off the order at checkout, so nothing
 // is issued later and a refund follows the amount paid.
+// Each amount fits its campaign's product: promo 1 is the S1, promo 4 the 19.90 Cloud Share.
+const orderDiscounts={1:10,4:5};
 const orderDiscountDisclosure=amount=>({deviceName:null,deviceRights:null,title:{zh:'订单立减',en:'Order discount',vi:'Giảm giá đơn hàng'},
   benefitDescription:{zh:'下单立减，不另发钱包奖励；退款按实际支付金额。',en:'Deducted at checkout, with no wallet reward. Refunds use the amount paid.',vi:'Giảm trực tiếp khi đặt hàng, không thưởng thêm vào ví. Hoàn tiền theo số tiền thực trả.'},
   terms:{zh:'下单时直接减 '+amount+' USDT。',en:amount+' USDT comes off when you order.',vi:'Giảm trực tiếp '+amount+' USDT khi đặt hàng.'},
@@ -424,12 +426,15 @@ export function demoFixture(url,locale,state,request) {
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
     let remaining=bundleDiscount+voucherDiscount(state,input.voucherId,Number(subtotal)-bundleDiscount);quote.discountUsdt=remaining.toFixed(2);quote.amountUsdt=(Number(subtotal)-remaining).toFixed(2);
     for(const line of items){const discount=Math.min(remaining,Number(line.subtotalUsdt));line.discountUsdt=discount.toFixed(2);line.payableUsdt=(Number(line.subtotalUsdt)-discount).toFixed(2);remaining-=discount;}
-    // PromotionQuoteService.applyDiscounts: an order discount stays in its purchase line and never becomes a wallet reward.
+    // PromotionQuoteService.applyDiscounts: an order discount stays in its purchase line, never exceeds what that line
+    // still owes, leaves something to pay, and never becomes a wallet reward.
     for(const entry of quote.expectedRewards.filter(row=>row.reward.type==='DISCOUNT_USDT')){
       const line=items.find(row=>row.lineId===entry.lineId),discount=Number(entry.reward.amount);
+      if(discount>Number(line.payableUsdt))refuse('PROMOTION_DISCOUNT_EXCEEDS_LINE_AMOUNT');
       Object.assign(line,{promotionDiscountUsdt:discount.toFixed(2),discountUsdt:(Number(line.discountUsdt)+discount).toFixed(2),payableUsdt:(Number(line.payableUsdt)-discount).toFixed(2)});
       Object.assign(quote,{promotionDiscountUsdt:(Number(quote.promotionDiscountUsdt??0)+discount).toFixed(2),discountUsdt:(Number(quote.discountUsdt)+discount).toFixed(2),amountUsdt:(Number(quote.amountUsdt)-discount).toFixed(2)});
     }
+    if(quote.promotionDiscountUsdt&&Number(quote.amountUsdt)<=0)refuse('PROMOTION_DISCOUNT_REQUIRES_PAYMENT');
     if(!demoOrderFitsCapacity(url,locale,state,products,items)){
       quote.eligibility='INELIGIBLE';
       quote.warnings.push({zh:'设备槽不足，请先在设备管理中腾出位置或减少购买数量。',en:'Not enough device slots. Free up a slot in device management or reduce the quantity.',vi:'Không đủ vị trí thiết bị. Hãy giải phóng vị trí trong phần quản lý thiết bị hoặc giảm số lượng mua.'});
@@ -491,7 +496,7 @@ export function demoFixture(url,locale,state,request) {
         reward.disclosure.deviceRights={activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:365,taskEnabled:true,countsAsDeviceHolding:true,countsForRank:false,transferable:false,exchangeable:false,revocationMode:'REVOKE_IF_UNUSED'};
         if(state.promotionRewardType==='gift-discount')item.rewardRules[0].buyerReward={rewardRuleId:reward.rewardRuleId,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:'100',disclosure:orderDiscountDisclosure(100)};
       }
-      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&[1,4].includes(i)?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(i*10),disclosure:orderDiscountDisclosure(i*10)}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
+      if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
       if(state.eventState==='upcoming'){item.state='SCHEDULED';item.startsAt=new Date(now+day).toISOString();}else if(state.eventState==='ended'){item.state='ENDED';item.endsAt=new Date(now-day).toISOString();}
       // Boundary scenarios flip on the clock, one minute after the switch.
       const edge=(state.promotionTimingAt||now)+60000;
@@ -531,7 +536,8 @@ export function demoFixture(url,locale,state,request) {
     return {...authority,source:'nx_trust_section_version:published',sections:Object.entries(maps).map(([sectionKey,values])=>({sectionKey,version:'v1',description:example,structure:'Published resources',fields:Object.entries(values).map(([key,value])=>({key,label:key,value:empty?'':value}))}))};
   }
   if(pathname==='/api/promotion-rewards'||/^\/api\/promotion-rewards\/demo-reward-\d+$/.test(pathname)){
-    const offer=demoFixture(new URL('/api/promotions/demo-promo-0',url.origin),locale,{...state,eventState:'mixed',dataState:'normal'},request),spec=offer.rewardRules[0].buyerReward,{disclosure,...reward}=spec;
+    // A discount lives on the quote and the order: it creates no reward obligation, and history keeps its gift.
+    const offer=demoFixture(new URL('/api/promotions/demo-promo-0',url.origin),locale,{...state,eventState:'mixed',dataState:'normal',promotionRewardType:'reward'},request),spec=offer.rewardRules[0].buyerReward,{disclosure,...reward}=spec;
     // The rows belong to sample order 004 and share its timeline; without that order there are none.
     const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo==='DEMO-ORDER-004'),issuedAt=order&&new Date(order.activatedAt).toISOString();
     const items=empty||!order?[]:['PENDING','READY','PROCESSING','ISSUED','RETRYABLE_FAILED','OUTCOME_UNKNOWN','CANCELLED','REVERSAL_PENDING','REVERSED','MANUAL_REVIEW'].map((status,i)=>({obligationId:'demo-reward-'+i,orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',orderLineId:'demo-line-0',updatedAt:issuedAt,reward,disclosure,refundHold:status==='REVERSAL_PENDING',beneficiaryRole:'BUYER',state:status,refundRequestIds:[],assetReceipt:status==='ISSUED'?{deviceIds:[41],instanceNos:['REVIEW-S1'],source:'PROMOTION_GIFT',issuedAt,ledgerBizNo:null,earningsEntryNo:null}:null}));
