@@ -1321,11 +1321,6 @@ function totalStillConfirmed(confirmed: number) {
   return trialView.value.applied ? confirmationTotal.value <= confirmed : confirmationTotal.value === confirmed;
 }
 const cardFeeText = computed(() => formatAmount(cardFee.value));
-// The legacy card debit is settled in cents; keep its sum's binary float noise
-// out of the display while retaining canonical fee-free USDT precision.
-const confirmTotalText = computed(() => remoteApiEnabled && trialConversionMode.value ? formatPlainAmount(confirmationTotal.value) : cardFee.value > 0
-  ? formatPlainAmount(netPrice.value + cardFee.value).replace(/\B(?=(\d{3})+\.)/g, ',')
-  : formatAmount(netPrice.value));
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
 const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
 const activatingSubText = computed(() => {

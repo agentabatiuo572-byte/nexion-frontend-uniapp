@@ -614,8 +614,6 @@ export const zh: Messages = {
     // DoTheMathCard (ZONE 5)
     doMathTitle: "设备对比",
     doMathUnavailable: "暂无可比较的设备",
-    doMathHeadline: "{target} 预估日收益是 {base} 的 {mult}。",
-    doMathDaily: "每日",
     doMathVs: "对比 {base}",
     doMathSeeCta: "去升级",
     doMathStage: "预估日收益",
@@ -705,11 +703,9 @@ export const zh: Messages = {
     techVsYesterdaySamePeriod: "较昨日同期",
     techEarningsCurrency: "USDT",
     techSettlementSnapshot: "结算概览",
-    techVsYesterday: "↑ 较昨日 +5.2% · 已结算 142 单",
     techEarningsUnavailable: "登录后有真实结算记录时显示",
     techEarningsLoading: "正在读取今日结算记录",
     techEarningsEmpty: "今日暂无已结算任务",
-    techSettledJobs: "{arrow} 较昨日 {delta} · 已结算 {count} 单",
     // DayOneQuestCard
     taskCarouselLabel: "新手任务与每周任务",
     taskCarouselPosition: "第 {current} 张，共 {total} 张：{title}",
