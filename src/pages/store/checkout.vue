@@ -2003,6 +2003,11 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
             {kind:'TRADE_IN',payload:{sourceDeviceId:reviewedQuote.sourceDeviceId,expectedSourceVersion:reviewedQuote.sourceRowVersion,targetProductNo:recovery.productNo,expectedPayableUsdt:reviewedQuote.payableUsdt,expectedDiscountUsdt:reviewedQuote.discountUsdt},
               commandKey:markCommandSubmitted,parseReceipt:parseCanonicalTradeinResult});
           if (!paid) {
+            // The server no longer holds this payment and its record is released: nothing is left to recover.
+            if (!readCheckoutTradein(submissionScope.accountKey, recovery.productNo)) {
+              remoteTradeinRecoveryRequired.value = false;
+              throw new Error('PAYMENT_CANCELLED');
+            }
             // A reload must not turn an unsubmitted choice into a permanent lock.
             // Missing submission history remains unknown, even when the key is unseen.
             const original = await readPaymentCommand(apiClient, 'trade-in', key);

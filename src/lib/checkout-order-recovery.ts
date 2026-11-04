@@ -45,6 +45,13 @@ export function readCheckoutTradein(accountKey: string, productNo: string): Chec
   return pointer as CheckoutTradeinRecovery;
 }
 
+/** Ends the trade-in whose payment ran under this key, if this account holds one. */
+export function releaseCheckoutTradein(accountKey: string, paymentKey: string): void {
+  const orders = readAccountRow<Row>(KEY, accountKey, true)?.orders ?? {};
+  const pointer = Object.values(orders).find(row => row.tradeinQuote && row.commandKey.replace("h7-order:", "e3-tradein:") === paymentKey);
+  if (pointer) finishCheckoutTradein(accountKey, pointer as CheckoutTradeinRecovery);
+}
+
 export function finishCheckoutTradein(accountKey: string, pointer: CheckoutTradeinRecovery): void {
   const current = readCheckoutTradein(accountKey, pointer.productNo);
   if (current?.commandKey !== pointer.commandKey) throw new Error("CHECKOUT_RECOVERY_SCOPE_CHANGED");

@@ -4,6 +4,11 @@ import { parsePromotedOrder } from '../api/promotion-api';
 
 export interface PromotionPendingCommand { key: string; operation: PromotionOperation; targetId: string; paymentMethod?: 'WALLET' | 'EXTERNAL' }
 export interface PromotionCheckoutRecord { quote: Quote | null; order: OrderReceipt | null; pending: PromotionPendingCommand | null; previousPayment?: PromotionPendingCommand; voucherId?:string|null; voucherMode?:'auto'|'manual'; leavePromptShown?:boolean; paymentIntentRevision?:number }
+export const PROMOTION_CHECKOUT_TABLE='nexgrid-promotion-checkout-v1';
+/** A record without the payment the server no longer holds: the next payment takes a new key, and only the user starts it. */
+export function withoutPromotionPayment(record:PromotionCheckoutRecord,key:string):PromotionCheckoutRecord{
+  return record.pending?.operation==='payOrder'&&record.pending.key===key?{...record,pending:null,paymentIntentRevision:(record.paymentIntentRevision??0)+1}:record;
+}
 export function selectPromotionCheckoutRecord(records:Record<string,PromotionCheckoutRecord>,input:{activityId:string;items:{productNo:string;quantity:number}[];orderNo?:string;voucherId?:string;upgradeActivityId?:string}){
   const requested=input.orderNo?JSON.stringify(['order',input.orderNo]):JSON.stringify([input.activityId,input.items,...(input.voucherId?[input.voucherId,input.upgradeActivityId??'']:[])]);
   const entries=Object.entries(records),pending=entries.find(([,record])=>!!record.pending);
@@ -41,6 +46,13 @@ export class PromotionCheckoutSession {
   selectVoucher(voucherId:string|null):void {
     if(this.busy||this.record.pending||this.record.order)throw new Error('ORIGINAL_ORDER_UNRESOLVED');
     this.persist({...this.record,quote:null,voucherId,voucherMode:'manual'});this.confirmed=false;
+  }
+  /** The live copy of withoutPromotionPayment: the stored row may already be released. */
+  releaseExternalPayment(key:string):boolean {
+    if(this.record.pending?.key!==key)return false;
+    this.persist(withoutPromotionPayment(this.record,key));
+    this.unknown=false;this.confirmed=!!this.record.order;this.retryOriginal=false;
+    return true;
   }
   rememberLeavePrompt():void {this.persist({...this.record,leavePromptShown:true});}
   private persist(record: PromotionCheckoutRecord): void {
