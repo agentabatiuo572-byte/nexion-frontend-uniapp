@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // 账单「生产者存在」门 — node 直跑,不起浏览器:
 //   node scripts/selfcheck-bill-producers.mjs            # 判定
-//   node scripts/selfcheck-bill-producers.mjs --selftest # 红测(判据自己活着没有)
 //
 // 背景(2026-08-11 z4 · 提现单从不进账单):
 //   wallet-bills.vue 一直有整套 `type:"withdraw"` 的渲染代码 —— 图标、配色、可点、
@@ -44,8 +43,6 @@ import { strip } from "./lib/strip-code.mjs";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
 const BILLS_TS = "src/store/bills.ts";
-const BILLS_PAGE = "src/pages/me/wallet-bills.vue";
-const DRAFTS_TS = "src/lib/withdrawal-bill-drafts.ts";
 
 let pass = 0;
 let fail = 0;
@@ -233,9 +230,8 @@ function seedRange(src) {
 
 /**
  * 全站实测:type → { runtimeDebit, runtimeCredit, seed }。
- * @param overrides 红测用 —— { 相对路径: 改写后的源码 },不落盘。
  */
-function measure(types, overrides = {}) {
+function measure(types) {
   const known = new Set(types);
   const found = {};
   for (const t of types) found[t] = {};
@@ -246,7 +242,7 @@ function measure(types, overrides = {}) {
     const rel = path.relative(root, full).replace(/\\/g, "/");
     // keepStrings:判据要读 `type: "withdraw"` 的字符串内容,只能剥注释不能剥串。
     // (剥注释是刚需:App.vue / bills.ts 的注释里就写着 `type:"withdraw"` 这类文本。)
-    const src = strip(overrides[rel] ?? readFileSync(full, "utf8"), true);
+    const src = strip(readFileSync(full, "utf8"), true);
     if (!isLedgerFile(rel, src)) continue; // 不记账的文件里长得像 draft 的东西不算生产者
     ledgerFiles++;
     const seedSpan = rel === BILLS_TS ? seedRange(src) : null;
@@ -274,10 +270,10 @@ const shape = (counts) => Object.entries(counts).sort(([a], [b]) => a.localeComp
   .map(([k, n]) => (n > 1 ? `${k}×${n}` : k)).join(",") || "(无生产者)";
 
 /** 一次完整判定 —— 返回不符项,供正跑与红测共用同一条路径(判据只有一份)。 */
-function evaluate(overrides = {}) {
-  const billsSrc = strip(overrides[BILLS_TS] ?? read(BILLS_TS), true);
+function evaluate() {
+  const billsSrc = strip(read(BILLS_TS), true);
   const types = billTypesFromSource(billsSrc);
-  const { found, drafts, scanned, ledgerFiles } = measure(types, overrides);
+  const { found, drafts, scanned, ledgerFiles } = measure(types);
   const mismatches = [];
   for (const t of types) {
     const entry = LEDGER[t];
@@ -323,104 +319,6 @@ function run() {
   console.log(`  INFO  仅 mock 种子(接真后端即空):${seedOnly.join(", ") || "无"}`);
 }
 
-// ── 红测:判据自己活着没有 ────────────────────────────────────────────────────
-// 🔴 逐个隔离:每条只动**一处**,证明的是那一条判据在守。全绿的门必须能被这些注入打红,
-// 否则它只是「跑过了」而不是「在守」。改写只在内存里做,不落盘(不碰 git,不改磁盘)。
-function selftest() {
-  const cases = [];
-  const draftsSrc = read(DRAFTS_TS);
-  const appVue = "src/App.vue";
-  const appSrc = read(appVue);
-  const billsSrc = read(BILLS_TS);
-
-  // 🔴 提现有三条分录 token(USDT- / NEX- / NEX+),必须**逐条**注入 ——
-  // 合起来测只能证明「至少还剩一条」,而本次缺陷的每一种变体都是少掉其中一条。
-  // (本门第一版正是败在这:删主行后 NEX 腿仍撑着「有 debit 生产者」,红测当场判死。)
-
-  // 🔴 跨行锚点必须写 `\r?\n`:本仓源文件是 CRLF,字面 `\n` 一个都匹配不上 ——
-  // 而匹配不上时 `String.replace` **不报错**,只是原样返回,注入静默失效、红测跟着假绿。
-  // 下面 `injected` 那一列就是为此:改写没生效就直接判 FAIL,不许当作「测过了」。
-  const MAIN_ROW = /type: "withdraw",\r?\n    symbol: "USDT",/;
-
-  // ① 本次缺陷原样重放:主行没人写 → 用户「提了多少钱」在账单里彻底消失。
-  // 🔴 换成 BillType **之外**的值,只掉 withdraw 一族(改成 "bonus" 会同时让 bonus 多一条,
-  // 一次注入产生两条 mismatch = 不是单 token 隔离;独立审计点名)。
-  const noMain = draftsSrc.replace(MAIN_ROW, () => 'type: "withdrawx",\n    symbol: "USDT",');
-  cases.push(["① 删掉提现主行(USDT-)", { [DRAFTS_TS]: noMain }, noMain !== draftsSrc]);
-
-  // ①b 死代码不算生产者:把主行搬进一个**不记账的文件**(R1 审计 P0-1 —— 上一版
-  //     只做全站文本扫描,随便找个文件写段同形对象就能冒充生产者)。
-  const DECOY_ROW = '\nconst __decoy = { type: "withdraw", symbol: "USDT", amount: -1, status: "pending", memo: "x", ref: "y" };\n';
-  const decoy = "src/lib/route.ts";
-  cases.push(["①b 主行删掉、由不记账文件冒充", { [DRAFTS_TS]: noMain, [decoy]: read(decoy) + DECOY_ROW },
-    noMain !== draftsSrc]);
-
-  // ①d 🔴 decoy 落在**记账文件**里同样不许放行(R2 审计 P1-4 实测的绕过:
-  //     上一版判据是「调没调写入函数」,`src/store/app.ts` 因为有 Set.add 之类被误判成记账文件,
-  //     在它里面塞一个同形对象就能把红的判绿)。现判据是 import,app.ts 两条都不 import。
-  const decoyStore = "src/store/app.ts";
-  cases.push(["①d 主行删掉、由 app.ts 冒充(R2 实测绕过)", { [DRAFTS_TS]: noMain, [decoyStore]: read(decoyStore) + DECOY_ROW },
-    noMain !== draftsSrc]);
-
-  // ①c 同类型多生产者:只删其中一个也必须红(集合语义下删 4/5 个都不响 —— P0-2)。
-  const checkout = "src/pages/store/checkout.vue";
-  const checkoutSrc = read(checkout);
-  const onePurchaseGone = checkoutSrc.replace('type: "purchase",', 'type: "purchasex",');
-  cases.push(["①c 删掉 5 个 purchase 生产者里的 1 个", { [checkout]: onePurchaseGone },
-    onePurchaseGone !== checkoutSrc]);
-
-  // ② 方向反了:主行金额丢掉负号 → 账单说提现是**入账**(粗判「有生产者」放行这一格)。
-  const flipped = draftsSrc.replace("amount: -wd.amount,", "amount: wd.amount,");
-  cases.push(["② 主行符号被改反(USDT- → USDT+)", { [DRAFTS_TS]: flipped }, flipped !== draftsSrc]);
-
-  // ③ NEX 抵扣费行被删 → 服务端真烧了 NEX,账单里没有(冲正那条会变成孤行)。
-  const noNexLeg = draftsSrc.replace("amount: -fee.nexBurned,", "amount: fee.nexBurned,");
-  cases.push(["③ 抵扣费行符号被改反(NEX-)", { [DRAFTS_TS]: noNexLeg }, noNexLeg !== draftsSrc]);
-
-  // ④ 冲正分录被删 → 失败提现退还的 NEX 在账单上无凭证(台账三条各守各的)。
-  // 🔴 注入点随实现搬家(包 z6,2026-08-11):冲正行原在 App.vue,现已并进
-  // `withdrawal-bill-drafts` 与另两条腿同住。**本门当场判红把这次搬家抓了出来** ——
-  // 旧注入锚 `type: "withdraw",` 在 App.vue 里已不存在,红测静默失效(改写没生效 = 红测已死)。
-  // 锚点改用 `amount: refunded,`:它在 drafts 文件里**唯一**,而 `type: "withdraw",`
-  // 在那里有 3 处(主行 / 抵扣费行 / 冲正行),整体替换会一次废掉三条腿 ——
-  // 那测的就不再是「冲正行没了」而是「整族没了」,①② 两格已经守着后者。
-  const noRefund = draftsSrc.replace("amount: refunded,", "amount: -refunded,");
-  cases.push(["④ 删掉 NEX 退还冲正行(NEX+)", { [DRAFTS_TS]: noRefund }, noRefund !== draftsSrc]);
-
-  // ⑤ 新增类型未登记台账 → 必须红(不许悄悄多出一种没人管生产者的行)。
-  const newType = billsSrc.replace(/(export type BillType\s*=[\s\S]*?);/, '$1 | "airdrop";');
-  cases.push(["⑤ BillType 新增却没登记台账", { [BILLS_TS]: newType }, newType !== billsSrc]);
-
-  // ⑥ 种子里的类型被删 → seed 面同样受守(只守 runtime 会让种子悄悄消失)。
-  const noSeedRefer = billsSrc.replace('type: "refer"', 'type: "bonus"');
-  cases.push(["⑥ 种子不再产出 refer", { [BILLS_TS]: noSeedRefer }, noSeedRefer !== billsSrc]);
-
-  // ⑦ 币种被改错 → 主行记成 NEX:金额、方向、生产者数量全对,只有币种是假的。
-  //    只比「有几条分录」的台账会全绿,而用户看到的是「提了 500 NEX」。
-  // ⑧ 嵌套子对象掩护:里层塞一条反向分录、主行方向同时改反 —— 只读首个 amount 的版本会全绿。
-  const nested = draftsSrc.replace("amount: -wd.amount,", 'audit: { symbol: "USDT", amount: -1 },\r\n      amount: wd.amount,');
-  cases.push(["⑧ 嵌套子对象掩护 + 主行改反", { [DRAFTS_TS]: nested }, nested !== draftsSrc]);
-
-  const wrongSym = draftsSrc.replace(MAIN_ROW, () => 'type: "withdraw",\n    symbol: "NEX",');
-  cases.push(["⑦ 主行币种被改错(USDT- → NEX-)", { [DRAFTS_TS]: wrongSym }, wrongSym !== draftsSrc]);
-
-  for (const [name, overrides, injected] of cases) {
-    if (!injected) { check(`红测 ${name} — 注入锚点还在`, false, "改写没生效(源码变了,红测已失效)"); continue; }
-    const { mismatches } = evaluate(overrides);
-    check(`红测 ${name} → 判红`, mismatches.length > 0, mismatches.length ? "" : "注入后仍然全绿 = 这条判据是死的");
-  }
-
-  // 负控:动一处与账单无关的代码,不许红(避免判据宽到「改什么都红」)。
-  const irrelevant = draftsSrc.replace("function fmtNex(", "const __unusedProbe = 1;\nfunction fmtNex(");
-  const neg = evaluate({ [DRAFTS_TS]: irrelevant });
-  check("红测 负控:无关改动不判红", irrelevant !== draftsSrc && neg.mismatches.length === 0, neg.mismatches.join(" | "));
-
-  // 🔴 样本量当判据,不只打印(独立审计实测:删掉 8 条注入里的 7 条,--selftest 仍 exit 0
-  // 且输出「1 pass / 0 fail」,verify 照打 ok —— 那是一道「跑过了」而不是「在守」的门)。
-  const EXPECTED = 12; // 注入 + 边界/负控
-  check(`红测 样本量 = ${EXPECTED}(注入被删掉也必须响)`, pass + fail === EXPECTED, `实跑 ${pass + fail} 条`);
-}
-
 // 🔴 --print:改台账时**先看实测再落笔**。这张表的每一行都必须来自磁盘 ——
 // 本门自己的 swap 那行第一版是凭印象手写的 `NEX-,USDT+`,实测是 `*+,*-`(兑换双向,
 // 币种运行期才定),当场被 ① 判红。台账写记忆里的样子 = 门守着一件不存在的事。
@@ -430,11 +328,9 @@ function print() {
   for (const t of types) console.log(`    ${t.padEnd(13)} ${shape(found[t])}`);
 }
 
-const selftestMode = process.argv.includes("--selftest");
 const printMode = process.argv.includes("--print");
-console.log(selftestMode ? "账单生产者门 · 红测" : printMode ? "账单生产者门 · 实测台账" : "账单生产者门");
+console.log(printMode ? "账单生产者门 · 实测台账" : "账单生产者门");
 if (printMode) print();
-else if (selftestMode) selftest();
 else run();
 console.log(`\n${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

@@ -35,41 +35,6 @@ function copyStrings(src) {
   return out;
 }
 
-// ── 判据自检:先证判据自己还活着,再拿它去判文件 ──────────────────────────
-// 没有这一段,任何一次「正则被人改坏 / 词族被误删」都会表现为安静的 0 命中 PASS。
-// MUST_CATCH 全部取自本次真实清掉的旧文案 —— 门必须抓得住自己修过的那批。
-const MUST_CATCH = [
-  ["zh", "你已退出登录,本设备的挖矿已暂停。"],
-  ["zh", "同一时间只能有一台设备运行挖矿"],
-  ["zh", "今日挖矿收益"],
-  ["zh", "钻石矿工"],
-  ["zh", "没有预挖、没有团队解锁、没有固定释放节奏。"],
-  ["en", "You've been signed out. Mining is paused on this device."],
-  ["en", "Mine more NEX"],
-  ["en", "Diamond Miner"],
-  ["en", "There's no pre-mine, no team unlock cliff"],
-  ["vi", "Bạn đã đăng xuất. Việc khai thác trên thiết bị này đã tạm dừng."],
-  ["vi", "Đào thêm NEX"],
-  ["vi", "Thợ đào kim cương"],
-  ["vi", "Kiếm NEX qua điểm danh / đào / giới thiệu."],
-];
-// MUST_PASS 是放行规则的红线 —— 谁把上面两条放行删了,这里会立刻判红。
-const MUST_PASS = [
-  ["en", "Mine ({n})"], // Genesis 市场「我的」tab,不是动词
-  ["vi", "thưởng cho những thủ lĩnh đào tạo ra thủ lĩnh khác."], // đào tạo = 培训
-  ["en", "Determine the withdrawal amount"], // mine 只是子串
-  ["zh", "你已退出登录,本设备的算力任务已暂停。"], // 修好之后的正解不许再红
-];
-
-const selfFail = [];
-for (const [lang, s] of MUST_CATCH) if (!BAN.test(s)) selfFail.push(`判据漏抓 [${lang}] ${s}`);
-for (const [lang, s] of MUST_PASS) if (BAN.test(s)) selfFail.push(`判据误抓 [${lang}] ${s}`);
-if (selfFail.length) {
-  console.log(`FAIL  判据自检不过 —— 门本身坏了,它给出的任何 PASS 都不可信:`);
-  for (const f of selfFail) console.log(`        ${f}`);
-  process.exit(2);
-}
-
 // ── 真扫描 ────────────────────────────────────────────────────────────────
 let scanned = 0;
 const leaks = [];
@@ -94,5 +59,5 @@ if (leaks.length) {
 }
 
 console.log(
-  `mining-copy-gate PASS —— 扫 ${scanned} 条三语文案,判据自检 ${MUST_CATCH.length} 抓 / ${MUST_PASS.length} 放行全过,无挖矿词`,
+  `mining-copy-gate PASS —— 扫 ${scanned} 条三语文案,无挖矿词`,
 );

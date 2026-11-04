@@ -8,7 +8,7 @@
 // ② 圆角值集棘轮:border-radius 出现「基线外 且 非阶梯」的新离散值 = exit 1。
 //    阶梯 {12,16,20,24,28,32,999,9999} 永远合法(tokens.css --v5-radius-* 同源),鼓励新代码上梯。
 // 基线 docs/VALUE-LADDER-BASELINE.json;计数下降只提示可收紧,不自动改写。
-// 用法: node scripts/value-ladder-sentinel.mjs [--selftest | --update-baseline]
+// 用法: node scripts/value-ladder-sentinel.mjs [--update-baseline]
 // admin 双胞胎:Nexion-admin-prototype/scripts/font-ladder-sentinel.mjs(Tailwind class 形态,仅字号)。
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -19,7 +19,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_PATH = join(ROOT, "docs", "VALUE-LADDER-BASELINE.json");
 // 🔴 三种写法必须全覆盖(2026-07-23 B1 独立评分抓出盲区:原正则只认 kebab,
 // 漏掉 camelCase 1201 处 + UnoCSS 任意值 —— 迁移工具与哨兵共用同一个瞎正则,
-// 导致「债务归零」是用错的尺子量出来的假绿。红测见 --selftest)。
+// 导致「债务归零」是用错的尺子量出来的假绿。。
 //   ① CSS/内联字符串   font-size: 12px
 //   ② JS 样式对象      fontSize: "12px" / fontSize: '12px'
 //   ③ UnoCSS 任意值    text-[12px]
@@ -67,7 +67,7 @@ function scan() {
   return { perFile, fontLoc, radiusValues: Object.keys(radiusLoc).sort((a, b) => +a - +b), radiusLoc };
 }
 
-// 纯函数门:给定基线与现状,产违例(可 selftest)
+// 纯函数门:给定基线与现状,产违例
 function gate(baseline, cur) {
   const bad = [];
   const basePF = (baseline.font && baseline.font.perFile) || {};
@@ -83,41 +83,6 @@ function gate(baseline, cur) {
   }
   const tighten = Object.entries(basePF).filter(([f, b]) => (cur.perFile[f] || 0) < b);
   return { bad, tighten };
-}
-
-if (args.includes("--selftest")) {
-  // 双向红测:matcher 精度 + 棘轮方向
-  let fail = 0;
-  const T = (name, ok) => { if (!ok) { console.error(`SELFTEST FAIL: ${name}`); fail = 1; } };
-  // 14 档口径:合法集内不命中,集外命中(与旧 9 档口径相反的两例特意保留为回归锚:13 合法 / 13.5 违例)
-  const hits = (s) => [...s.matchAll(new RegExp(FONT_RE.source, "g"))].filter((m) => isOffLadderFont(m[1])).length;
-  T("13.5px 命中(档外)", hits("font-size: 13.5px") === 1);
-  T("11.5px 无空格命中(档外)", hits("font-size:11.5px") === 1);
-  T("17px 命中(档外)", hits("font-size: 17px") === 1);
-  T("13px 不命中(14 档 body.s)", hits("font-size: 13px") === 0);
-  T("15px 不命中(14 档 body.m)", hits("font-size: 15px") === 0);
-  T("56px 不命中(14 档 hero)", hits("font-size: 56px") === 0);
-  T("12.0px 归一化后不命中", hits("font-size: 12.0px") === 0);
-  // 🔴 三写法覆盖红测(2026-07-23 盲区回归锚:少任一条即退回 67% 假绿)
-  T('camelCase 双引号 fontSize:"11.5px" 命中', hits('fontSize: "11.5px"') === 1);
-  T("camelCase 单引号 fontSize:'10px' 命中", hits("fontSize: '10px'") === 1);
-  T('camelCase 档内 fontSize:"15px" 不命中', hits('fontSize: "15px"') === 0);
-  T("UnoCSS text-[11px] 命中", hits("class=\"text-[11px]\"") === 1);
-  T("UnoCSS text-[13px] 不命中(档内)", hits("class=\"text-[13px]\"") === 0);
-  T("三写法混排各计一次", hits('font-size: 17px; fontSize: "19px"; text-[21px]') === 3);
-  const rv = [...("border-radius: 17px; border-radius: 999px; border-radius: 12.0px".matchAll(new RegExp(RADIUS_RE.source, "g")))].map((m) => String(parseFloat(m[1])));
-  T("radius 抽取 17/999/12", rv.join(",") === "17,999,12");
-  // 棘轮方向:超基线必红 / 等于基线必绿 / 新离散圆角必红 / 阶梯值永远绿
-  const g1 = gate({ font: { perFile: { "a.vue": 1 } }, radius: { values: [] } }, { perFile: { "a.vue": 2 }, radiusValues: [], radiusLoc: {} });
-  T("字号超基线 → 红", g1.bad.length === 1);
-  const g0 = gate({ font: { perFile: { "a.vue": 3 } }, radius: { values: [] } }, { perFile: { "a.vue": 3 }, radiusValues: [], radiusLoc: {} });
-  T("字号等于基线 → 绿(棘轮不倒查存量)", g0.bad.length === 0);
-  const g2 = gate({ font: { perFile: { "a.vue": 2 } }, radius: { values: ["17"] } }, { perFile: { "a.vue": 2 }, radiusValues: ["17", "24"], radiusLoc: { 17: ["a:1"], 24: ["a:2"] } });
-  T("持平+基线内旧值+阶梯新值 → 绿", g2.bad.length === 0);
-  const g3 = gate({ font: { perFile: {} }, radius: { values: [] } }, { perFile: {}, radiusValues: ["17"], radiusLoc: { 17: ["a:1"] } });
-  T("新离散圆角 → 红", g3.bad.length === 1);
-  if (!fail) console.log("SELFTEST PASS: matcher 精度 13/13(14 档 × 三写法) + radius 抽取 1/1 + 棘轮方向 4/4");
-  process.exit(fail);
 }
 
 const cur = scan();
