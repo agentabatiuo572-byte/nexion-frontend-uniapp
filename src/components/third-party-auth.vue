@@ -44,8 +44,8 @@ import { ApiError } from "@/api/errors";
 import { validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth-browser-return";
 
 // beforeStart lets the host page veto a start (e.g. an invalid typed invite code) before the provider opens.
-// sponsorRejected hands a refused invite code back to the host page that owns the invite field.
-const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: (() => void) | null }>(), {
+// sponsorRejected hands the refused invite code, as sent, back to the host page that owns the invite field.
+const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: boolean; disabled?: boolean; returnTo?: string | null; sponsorCode?: string | null; beforeStart?: (() => Promise<boolean>) | null; sponsorRejected?: ((sent: string | null) => void) | null }>(), {
   intent: "LOGIN", disabled: false, returnTo: null, sponsorCode: null, beforeStart: null, sponsorRejected: null,
 });
 const t = useT();
@@ -79,6 +79,7 @@ let revision = 0;
 let expiresAt = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let popup: Window | null = null;
+let sentSponsorCode: string | null = null;
 function sameSession() {
   return sessionVault.revision() === revision
     || (props.intent === "LINK" && sessionVault.isRefreshContinuation(revision));
@@ -131,7 +132,7 @@ function sponsorRefused(cause: unknown): boolean {
   if (!(cause instanceof ApiError)
       || !["USER_REGISTRATION_SPONSOR_NOT_FOUND", "USER_REGISTRATION_SPONSOR_INVALID"].includes(cause.message)) return false;
   cancel();
-  if (props.sponsorRejected) props.sponsorRejected();
+  if (props.sponsorRejected) props.sponsorRejected(sentSponsorCode);
   else message.value = t.value.register.inviteInvalid;
   return true;
 }
@@ -152,7 +153,8 @@ async function start(name: string) {
   try {
     // The popup above is only a blank reservation; a veto closes it before any provider page loads.
     if (props.beforeStart && !(await props.beforeStart())) { cancel(); return; }
-    const next = await api.start(provider, props.intent, props.sponsorCode);
+    sentSponsorCode = props.sponsorCode;
+    const next = await api.start(provider, props.intent, sentSponsorCode);
     if (disposed || current !== generation || !sameSession()) { cancel(); return; }
     flow.value = next; expiresAt = Date.now() + next.expiresInSec * 1000;
     // #ifdef H5

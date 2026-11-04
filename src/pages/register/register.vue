@@ -528,9 +528,11 @@ async function manualInviteAccepted(): Promise<boolean> {
   // The user edited the code while it was being checked; let them submit again.
   return mounted && invite.value === typed;
 }
-// The server refused the code at submit or third-party sign-up. A link code can stop
+// The server refused the code at submit or third-party sign-up. It refused what was
+// sent, so the box is only marked if it still holds that code. A link code can stop
 // working after it was locked; reopen the field with it so the user can fix or clear it.
-function rejectSponsorCode() {
+function rejectSponsorCode(sent: string | null) {
+  if (normalizeRegistrationSponsorCode(sent, remoteApiEnabled) !== currentSponsorCode()) return;
   if (lockedRef.value) {
     invite.value = lockedRef.value;
     lockedRef.value = null;
@@ -641,7 +643,7 @@ function registrationErrorText(cause: unknown): string {
   return geoText(cause) ?? t.value.authOtp.errorServiceUnavailable;
 }
 
-function recoverRejectedRegistration(cause: unknown): boolean {
+function recoverRejectedRegistration(cause: unknown, sentSponsorCode: string | null): boolean {
   if (!(cause instanceof ApiError) || cause.kind !== "http") return false;
   const invalidOtp = cause.status === 422 && cause.message === "USER_REGISTRATION_OTP_INVALID";
   const signupLimited = cause.status === 409 && ["USER_REGISTRATION_K1_IP_LIMIT", "USER_REGISTRATION_DEVICE_LIMIT"].includes(cause.message);
@@ -659,7 +661,7 @@ function recoverRejectedRegistration(cause: unknown): boolean {
   resendLeft.value = 0;
   step.value = invalidOtp ? 2 : 1;
   if (sponsorRejected) {
-    rejectSponsorCode();
+    rejectSponsorCode(sentSponsorCode);
     return true;
   }
   error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired
@@ -833,7 +835,7 @@ async function finish() {
     }
     if (registration.kind === "registration_error") {
       completing.value = false;
-      if (!recoverRejectedRegistration(registration.error)) {
+      if (!recoverRejectedRegistration(registration.error, registrationRequest.sponsorCode ?? null)) {
         error.value = registrationErrorText(registration.error);
       }
       return;
