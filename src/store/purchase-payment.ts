@@ -131,6 +131,7 @@ function reconcileNetwork() {
   if (state.pending || state.step !== 'network' || available(state.method)) return;
   const other = state.method === 'CREGIS_USDT_ERC20' ? 'CREGIS_USDT_BSC' : state.method === 'CREGIS_USDT_BSC' ? 'CREGIS_USDT_ERC20' : null;
   if (other && available(other)) void select(other);
+  else choose('WALLET');
 }
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || !context) return;
