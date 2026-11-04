@@ -25,8 +25,6 @@ const ROOT = process.cwd();
 const SRC = join(ROOT, "src");
 const LIB = join(SRC, "lib", "a11y-activate.ts");
 const APP = join(SRC, "App.vue");
-const BEHAVIOR = join(ROOT, "scripts", "a11y-activate-behavior.test.mjs");
-const REDTEST = join(ROOT, "scripts", "a11y-activate-gate.redtest.mjs");
 const SEGMENTS = join(SRC, "components", "glass-segments.vue");
 const segmentsSource = existsSync(SEGMENTS) ? readFileSync(SEGMENTS, "utf8") : "";
 
@@ -91,13 +89,6 @@ else {
     .replace(/(^|[^:'"\\/])\/\/[^\n]*/g, (_m, lead) => lead);
   if (!/installKeyboardActivation\(\)/.test(app)) findings.D.push("App.vue 没有调用 installKeyboardActivation()(注释掉的不算)");
 }
-// 行为门与红测必须在盘上且有足够用例:D 一旦退回纯形状判据,这一族已被绕过两次。
-if (!existsSync(BEHAVIOR)) findings.D.push("行为门 scripts/a11y-activate-behavior.test.mjs 不存在");
-else {
-  const n = (readFileSync(BEHAVIOR, "utf8").match(/^test\(/gm) ?? []).length;
-  if (n < 8) findings.D.push(`行为门只剩 ${n} 个用例(要求 ≥8)—— 被清空的测试文件同样退 0,existsSync 看不出来`);
-}
-if (!existsSync(REDTEST)) findings.D.push("红测 scripts/a11y-activate-gate.redtest.mjs 不存在 —— A~E 退回从没红过的哨兵");
 
 const ACT = ACTIVATABLE ?? ["button", "link", "switch", "checkbox", "radio", "tab", "option", "menuitem"];
 

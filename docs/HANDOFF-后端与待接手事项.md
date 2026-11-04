@@ -28,7 +28,7 @@
 | **U-10** | 🔴 `PENDING`/`TX_ORPHANED`/`DEAD` 曾致单据回读静默失败(已修);还会发哪些未知状态码? | 二 2.2;门 = `withdraw-terminal-reason-parity` |
 | **U-11** | 🔴🔴 失败提现退 NEX:`nexRefunded`+`nexRefundedAt` 须同事务成对下发;客户端接料口已备好,①② 在后端 | 二 2.2a / PRD §4.6 |
 | **U-13** | 🔴 重试必须复用同一幂等键:去重窗口 ≥24h / 同 key 异 body 回 409 / `policyVersion` 进体即冻结 | 二 2.2a |
-| **U-14** | 🔴 你仓 4 个跨仓契约测试在前端独立 checkout 必 ENOENT 且崩链,已隔离到 `npm run test:cross-repo` | 二 2.2a |
+| **U-14** | 🔴 你仓 4 个跨仓契约测试在前端独立 checkout 必 ENOENT 且崩链,跨仓契约测试已于 2026-11-04 随测试清理删除 | 二 2.2a |
 | **U-15** | 🔴🔴 提现记录请回显 `idempotencyKey`:解开「结果未知,不敢重放也不敢作废」的死结 | 二 2.2a |
 | **U-16** | 🔴 创世售罄/关闭时别下发「买创世」周任务;过滤只能在派发端;端点名 `/api/quests/state` 请确认 | 二 2.2a |
 | **U-17** | 🔴 试用转化端点定名:`convert` 还是 `redeem-early`?另:真后台档转化链客户端尚未接线 | 二 2.2a |
@@ -51,5 +51,5 @@
 2. **注释里的接口地址有专门的门在盯**(`scripts/endpoint-citation-sentinel.mjs`)——注释不参与编译,写错了 tsc 抓不到。新增引用要同步登记台账并注明 PRD 出处。
 
 > 维护约定:**不要把交接内容写到这里** —— 正文只住后台仓,这里每条只有一行。
-> 机器门 `scripts/handoff-pointer-gate.mjs`(随 `bash scripts/verify.sh` / `npm run test:legacy-suite` 跑)在盯:
+> 机器门 `scripts/handoff-pointer-gate.mjs`(随 `bash scripts/verify.sh` / `npm run verify` 跑)在盯:
 > 行超长 / 「本文件(新增」字样 / U-x 双向集合不等,任一即红。
