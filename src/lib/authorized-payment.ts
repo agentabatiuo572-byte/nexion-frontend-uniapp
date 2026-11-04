@@ -24,7 +24,8 @@ export async function executePaymentWithPassword<T>(
     finally { stop(); }
     if (!authorization) return null;
     try {
-      if (!current()) return null;
+      // Time-based conditions, such as a deadline, end without the watcher above noticing.
+      if (!current()) { toast.warn(purchaseRecoveryCopy(useLocaleStore().code).changed); return null; }
       return await command(authorization);
     } catch (error) {
       if (!/^PAYMENT_PASSWORD_(INCORRECT|LOCKED|VERSION_CONFLICT|NOT_CONFIGURED|REQUIRED)$/.test(asApiError(error).message)) throw error;
