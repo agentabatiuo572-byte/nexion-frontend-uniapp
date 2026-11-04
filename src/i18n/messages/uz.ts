@@ -3996,7 +3996,7 @@ export const uz: Messages = {
     deviceCapTitle: "Qurilmalar limiti tugadi",
     deviceCapMsg: "Bir akkauntga koʻpi bilan {max} ta qurilma ulash mumkin. Yangisini qoʻshish uchun bittasini olib tashlang yoki toʻxtating.",
     insufficientBalanceTitle: "Balans yetarli emas",
-    insufficientBalanceMsg: "Davom etish uchun kamida ${amt} USDT kerak.",
+    insufficientBalanceMsg: "Davom etish uchun kamida {amt} USDT kerak.",
     minWithdrawTitle: "Eng kam summadan past",
     minWithdrawMsg: "Yechish summasi kamida $20.00 USDT boʻlishi kerak.",
     addressInvalidTitle: "Manzil notoʻgʻri",
