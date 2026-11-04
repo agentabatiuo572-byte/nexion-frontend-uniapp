@@ -322,6 +322,10 @@ async function loadQuote(){
   voucherOpen.value=false;freshQuoteReady.value=false;promotionReceivedAt=null;termsOpen.value=false;receivedAt=null;quoteFresh.value=false;
   await run(async()=>{
     try{session.invalidateQuote();revision.value++;}catch(cause){quotePresentation.value=null;throw cause;}
+    // Publishing the catalog invalidates voucher reads. Quote only after this
+    // checkout's catalog refresh has finished, as with its wallet read.
+    if(catalogRefresh)await catalogRefresh;
+    if(!readCurrent(generation))return;
     const sampledAt=readTrustedMonotonicNowMs();
     if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
       if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?value:null;promotionReceivedAt=sampledAt;updateClock();}
