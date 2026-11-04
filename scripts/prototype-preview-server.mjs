@@ -35,7 +35,8 @@ const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
 function previewScenarioPage(scenario,keys){
   if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
-  const follow=value=>{if(value&&value!==scenario)location.reload();};
+  // A record this page wrote after its scenario ended goes with it, also when another page has already entered the new one.
+  const follow=value=>{if(value&&value!==scenario){for(const key of keys)localStorage.removeItem(key);location.reload();}};
   addEventListener('storage',event=>{if(event.key==='uvel-preview-scenario')follow(event.newValue);});
   const local=target=>{try{return new URL(target,location.href).origin===location.origin;}catch{return false;}};
   const {open,send}=XMLHttpRequest.prototype;
