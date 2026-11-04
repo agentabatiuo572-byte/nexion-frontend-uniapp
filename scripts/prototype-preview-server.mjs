@@ -84,7 +84,7 @@ const server=http.createServer(async(req,res)=>{
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','urgent'].includes(value)?value:'';
-        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState);
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState),wasTrialQuote=state.trialQuoteState;
         if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
@@ -95,7 +95,9 @@ const server=http.createServer(async(req,res)=>{
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
         // account (dataState=empty), the low-balance account or the near-deadline sample (paymentState=low-balance /
         // urgent) is one too. Presentation knobs keep them.
-        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','scopeState','computeState'].some(key=>key in update)||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
+        // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
+        const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
+        const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
         if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
         // checks, not only numbers on screen.
