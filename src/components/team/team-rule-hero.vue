@@ -19,11 +19,11 @@ defineProps<{ kind: 'members' | 'balance' | 'ledger' | 'growth'; label?: string;
 // runs the same call inside the page WebView, as device-detail does.
 function jump(id: string) {
   const anchor = `team-rule-${id}`;
-  if (typeof document !== 'undefined') { document.getElementById(anchor)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+  if (typeof document !== 'undefined') { document.getElementById(anchor)?.scrollIntoView({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return; }
   // #ifdef APP-PLUS
   const pages = getCurrentPages();
   const page = pages[pages.length - 1] as unknown as { $getAppWebview?: () => { evalJS: (script: string) => void } };
-  page?.$getAppWebview?.().evalJS(`var target=document.getElementById(${JSON.stringify(anchor)});if(target){target.scrollIntoView({block:'start',behavior:'smooth'});}`);
+  page?.$getAppWebview?.().evalJS(`var target=document.getElementById(${JSON.stringify(anchor)});if(target){target.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}`);
   // #endif
 }
 </script>

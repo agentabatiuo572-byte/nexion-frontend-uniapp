@@ -63,11 +63,11 @@ const anchor = (id: string) => `exchange-guide-${id}`;
 // DOM directly; the App logic layer runs the same call inside the page WebView.
 function jump(id: string) {
   const target = anchor(id);
-  if (typeof document !== "undefined") { document.getElementById(target)?.scrollIntoView({ block: "start", behavior: "smooth" }); return; }
+  if (typeof document !== "undefined") { document.getElementById(target)?.scrollIntoView({ block: "start", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); return; }
   // #ifdef APP-PLUS
   const pages = getCurrentPages();
   const page = pages[pages.length - 1] as unknown as { $getAppWebview?: () => { evalJS: (script: string) => void } };
-  page?.$getAppWebview?.().evalJS(`var target=document.getElementById(${JSON.stringify(target)});if(target){target.scrollIntoView({block:'start',behavior:'smooth'});}`);
+  page?.$getAppWebview?.().evalJS(`var target=document.getElementById(${JSON.stringify(target)});if(target){target.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}`);
   // #endif
 }
 </script>
