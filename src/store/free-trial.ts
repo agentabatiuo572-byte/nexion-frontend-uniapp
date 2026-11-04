@@ -1,3 +1,4 @@
+import { TRIAL_CONVERT_COMMANDS_TABLE } from '@/lib/purchase-caller-record';
 import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
@@ -59,7 +60,7 @@ export type { TrialStatus } from "./trial-boundary";
 export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
 export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required";
 type TrialConversionFailure = TrialIneligibleReason | "insufficient-funds" | "quote-changed" | "rejected" | "storage-unavailable" | "payment-required";
-const CONVERT_COMMANDS_KEY = "nexgrid-trial-convert-accounts-v1";
+const CONVERT_COMMANDS_KEY = TRIAL_CONVERT_COMMANDS_TABLE;
 type ConversionCommands = { commands: Record<string, string> };
 
 // These structured refusals happen before settlement in the conversion contract.
@@ -649,8 +650,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         if (!receipt) {
           if (originalAmount === null) return {ok:false,reason:'unknown'};
           if (!authorization) return {ok:false,reason:'payment-required'};
-          // The original amount is the ceiling the user confirmed; accrual may only have lowered it since.
-          if (expectedAmountUsdt === undefined || expectedAmountUsdt > originalAmount || originalQuoteVersion !== (quoteVersion ?? null)) return {ok:false,reason:'quote-changed'};
+          // A replay sends the original payload, so this authorization must be for exactly that amount and version.
+          // Accrual never lowers a replay: its caller reads pendingConversion() and authorizes the original.
+          if (originalAmount !== expectedAmountUsdt || originalQuoteVersion !== (quoteVersion ?? null)) return {ok:false,reason:'quote-changed'};
           if (requestedEpoch !== accountBindingEpoch) return {ok:false,reason:'unknown'};
           // A cancelled PIN prompt has never sent a purchase and must not freeze a stale quote.
           if (!key) {
@@ -736,6 +738,16 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const intent = JSON.stringify(quoteVersion ? [authorityClaimNo.value, productNo, amount, quoteVersion] : [authorityClaimNo.value, productNo, amount]);
     if (intents.length && (intents.length !== 1 || intents[0] !== intent)) throw new Error('TRIAL_CONVERT_ORIGINAL_UNRESOLVED');
     return acquireAccountCommandKey(CONVERT_COMMANDS_KEY, boundKey, intent, 'h2-convert');
+  }
+  /** The unresolved original command: a replay keeps its amount and version. convert() validates and reports the row. */
+  function pendingConversion(): { amount: number | null; quoteVersion: string | null } | null {
+    if (!remoteApiEnabled) return null;
+    try {
+      const intents = Object.keys(readAccountRow<ConversionCommands>(CONVERT_COMMANDS_KEY, boundKey, true)?.commands ?? {});
+      if (intents.length !== 1) return null;
+      const original = JSON.parse(intents[0]!) as [string, string, number | null, string?];
+      return { amount: original[2], quoteVersion: original[3] ?? null };
+    } catch { return null; }
   }
   function hasPendingConversion(): boolean {
     if (!remoteApiEnabled) return false;
@@ -825,7 +837,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   return {
-    status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, conversionPaymentKey,
+    status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
