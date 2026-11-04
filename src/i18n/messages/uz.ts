@@ -3181,6 +3181,8 @@ export const uz: Messages = {
     avatarTypeInvalidHint: "PNG, JPG yoki WebP rasm tanlang",
     avatarSizeInvalidTitle: "Rasm 2 MBdan katta",
     avatarSizeInvalidHint: "2 MBgacha boʻlgan rasm tanlang",
+    avatarEmptyTitle: "Rasm fayli boʻsh",
+    avatarEmptyHint: "Boshqa rasm tanlang",
     walletAddress: "Hamyon manzili",
     walletEmpty: "Hali oʻrnatilmagan",
     walletUnknown: "Manzil holatini aniqlab boʻlmadi",
