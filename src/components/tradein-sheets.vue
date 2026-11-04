@@ -1103,7 +1103,8 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
         payload:{targetProductNo:target,expectedPayableUsdt:payable,...(effectiveOperation==='replace'?{sourceDeviceId:frozen!.sourceDeviceId}: {})},
         commandKey:()=>{const saved=readCapacityPending(scope.accountKey);const key=saved?.key??canonicalCapacityKey(effectiveOperation,frozen!,scope.accountKey);original=saved??{operation:effectiveOperation,intent,key,quote:frozen!};writeCapacityPending(scope.accountKey,original);return key;},
         parseReceipt:raw=>effectiveOperation==='replace'?parseCanonicalTradeinResult(raw):parseCanonicalCapacityKeepResult(raw)});
-      if (!receipt) return;
+      // The record may have been released with a payment the server no longer holds.
+      if (!receipt) { capacityRecovery.value=readCapacityPending(scope.accountKey); return; }
     }
     if (!isCurrentAccountScope(scope)||!original) return;
     if (Math.abs(purchasePrincipalUsdt(receipt)-payable)>0.000001

@@ -8,6 +8,7 @@ import { clearOrderAction, readOrderAction } from '@/lib/order-command-fence';
 import { navTo, navReplace } from '@/lib/route';
 import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
+import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
 import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
@@ -35,6 +36,12 @@ let context: PurchasePaymentContext | null = null;
 let resolveChoice: ((result: PurchaseChoice | null) => void) | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
 let quoteTimer: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<typeof setTimeout> | undefined;
+const releaseListeners = new Set<(accountKey: string, commandKey: string) => void>();
+/** A page holding its own copy of a payment's record hears when the server no longer holds that payment. */
+export function onPurchaseRecordReleased(listener: (accountKey: string, commandKey: string) => void) {
+  releaseListeners.add(listener);
+  return () => { releaseListeners.delete(listener); };
+}
 const account = () => useApp().accountKey;
 function rows(accountKey = account()): PendingRow { return readAccountRow<PendingRow>(TABLE, accountKey, true) ?? { records: {} }; }
 function save(pending: PendingExternal, accountKey = state.accountKey) {
@@ -210,6 +217,8 @@ async function query() {
       // The server no longer holds a payment it has shown us. Only the user may start another one, from the order.
       if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') {
         release(pending);
+        releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+        releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
         Object.assign(state, { pending: null, intent: null, quote: null, error: false });
         conclude('gone');
       } else state.error = true;
