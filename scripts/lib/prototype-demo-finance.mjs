@@ -28,6 +28,9 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       paymentMode: "hosted", providerStatus: "created", ...(paying ? { paymentUrl: "https://api.hdpayadmin.com/pay/demo-preview-only" } : { matchedAt: new Date(now - 60000).toISOString() }) }] };
   }
   if (p === "/api/app/deposits/vietqr/receipts") return { items: empty ? [] : [{ receiptNo: "DEMO-BANK-RECEIPT", intentNo: "VQR-DEMO123456", viewType: "credit", status: "credited", payableVnd: 1250000, receivedVnd: 1250000, lockedFxRate: 25000, creditedUsdt: 50.123456, createdAt: iso }], nextOffset: null };
-  if (p === "/api/deposits/address") return { enabled: true, creditEnabled: true, network: "BEP20", address: `0x${"1".repeat(40)}`, feeUsdt: .123456, minDepositUsdt: 50, confirmations: 15 };
+  if (p === "/api/deposits/address") {
+    const network = url.searchParams.get('network') || 'BEP20';
+    return { enabled: true, creditEnabled: true, network, address: `0x${(network === 'ERC20' ? '2' : '1').repeat(40)}`, feeUsdt: network === 'ERC20' ? 3.8 : .123456, minDepositUsdt: 50, confirmations: 15 };
+  }
   if (p === "/api/deposits") return empty ? [] : [{ depositId: "CR-77", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdt: 50.123456, creditedUsdt: 50, confirmations: 15, status: "CREDITED", createdAt: now }];
 };
