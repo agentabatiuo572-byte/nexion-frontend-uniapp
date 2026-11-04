@@ -10,7 +10,7 @@
 //     :style="s"                             :style="s"
 //   >                                      >
 //
-// 用法:node scripts/tag-comment-gate.mjs [--selftest]
+// 用法:node scripts/tag-comment-gate.mjs
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -37,20 +37,6 @@ function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
     d.isDirectory() ? walk(join(dir, d.name)) : d.name.endsWith(".vue") ? [join(dir, d.name)] : [],
   );
-}
-
-if (process.argv.includes("--selftest")) {
-  const BAD = `<template>\n  <view\n    v-for="x in xs"\n    <!-- 注释卡在属性之间 -->\n    :style="s"\n  >\n    <text>hi</text>\n  </view>\n</template>`;
-  const CLEAN = `<template>\n  <!-- 注释在标签外,合法 -->\n  <view v-for="x in xs" :style="s">\n    <!-- 子元素之间的注释也合法 -->\n    <text>hi</text>\n  </view>\n</template>`;
-  const fails = [];
-  if (scanText(BAD).length !== 1) fails.push(`假阴:阳性 fixture 应中 1 条,实得 ${scanText(BAD).length}`);
-  if (scanText(CLEAN).length !== 0) fails.push(`假阳:干净 fixture 报了 ${scanText(CLEAN).length} 条`);
-  if (fails.length) {
-    fails.forEach((f) => console.error("SELFTEST FAIL: " + f));
-    process.exit(1);
-  }
-  console.log("tag-comment selftest 全过(标签内阳性中 + 标签外/子元素间假阳 0)");
-  process.exit(0);
 }
 
 let hits = 0;

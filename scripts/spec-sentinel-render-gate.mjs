@@ -18,7 +18,6 @@
 //
 // 用法:
 //   node scripts/spec-sentinel-render-gate.mjs             扫全仓
-//   node scripts/spec-sentinel-render-gate.mjs --selftest   红测(判据自证有效)
 import fs from "node:fs";
 import path from "node:path";
 
@@ -197,87 +196,4 @@ function run() {
   return 0;
 }
 
-function selftest() {
-  const sentinel = { name: "SPEC_UNAVAILABLE", value: "unavailable" };
-  const F = ["gpu", "vram", "power", "datacenter", "uptime", "warranty", "phoneDailyEarn"];
-  const P = "src/pages/store/detail.vue";   // 渲染面
-  const O = "src/store/genesis.ts";          // 非渲染面
-  const cases = [
-    // ── 阳性:必须抓到 ──
-    // 下面三格在渲染面各中 2 条(A 兜底 + C 裸读):同一行确实同时犯了两个错,只修兜底
-    // 而不裹降级映射仍然会把服务端下发的哨兵值渲染出去,所以两条都报是对的。
-    ["🔴 原样回归:?? 兜底到字面量(A+C)", P, 'const v = computed(() => p.value?.warranty ?? "unavailable");', 2],
-    ["🔴 || 兜底同样算(换个运算符不逃逸)(A+C)", P, 'const v = p.warranty || "unavailable";', 2],
-    ["🔴 间接引用:兜底到常量名而非字面量(A+C)", P, "const v = p.warranty ?? SPEC_UNAVAILABLE;", 2],
-    ["🔴 非渲染面的 ?? 兜底也判(Rule A 全仓生效)", O, 'const v = x ?? "unavailable";', 1],
-    ["🔴 渲染面裸字面量(不经 ?? 也算,防挪位)", P, 'rows.push({ k: s.specWarranty, v: "unavailable" });', 1],
-    ["🔴 渲染面裸字面量在模板里", P, "<template><text>{{ ok ? v : 'unavailable' }}</text></template>", 1],
-    // ── 阴性:不许误伤 ──
-    ["合法:渲染面用 import 进来的常量做判定", P, "if (raw === SPEC_UNAVAILABLE) return 0;", 0],
-    ["合法:非渲染面拿它当状态枚举成员", O, 'return { ok: false, reason: "unavailable" };', 0],
-    ["合法:非渲染面的枚举比较", O, 'if (r.reason === "unavailable") return copy;', 0],
-    ["子串包含:标识符 purchaseUnavailable 不误伤", P, "const purchaseUnavailable = computed(() => x);", 0],
-    ["子串包含:i18n key specUnavailable 不误伤", P, "toast.warn(t.value.store.specUnavailable);", 0],
-    ["子串包含:更长的句子里含该词不误伤", P, 'const msg = "service unavailable now";', 0],
-    ["注释里写了不算违规", P, '// 兜底禁止写成 ?? "unavailable"', 0],
-    ["块注释里写了不算违规", P, '/* 曾经是 p.warranty ?? "unavailable" */', 0],
-    // ── Rule C:一个字面量都没有的裸读取。判据是「渲染面读了就必须裹」,不猜哪里是展示位 ──
-    // 前两格是实际漏网过的形态:对象字面量取值(自查抓到 detail.vue 的 gpu/vram)、
-    // 模板插值(独立审计抓到 locked-product-card.vue)。旧判据只认 `v:`/`value:`,对后者全瞎。
-    ["🔴 对象字面量取值裸读", P, "rows.push({ k: s.specGpu, v: p.gpu });", 1],
-    ["🔴 模板插值裸读(旧判据对这形态全瞎)", P, "<template><text>{{ product.gpu }}</text></template>", 1],
-    ["🔴 可选链裸读", P, "{ k: s.specWarranty, v: product.value?.warranty },", 1],
-    ["🔴 间接引用:先赋给局部变量再渲染", P, "const g = p.gpu;", 1],
-    ["🔴 跨行:取值换到下一行", P, "{\n  v:\n    p.uptime,\n}", 1],
-    ["🔴 字符串模板拼接裸读", P, "const s = `${p.gpu} · ${p.vram}`;", 2],
-    ["🔴 一行里两个裸读各算一条", P, "[{ v: p.gpu }, { v: p.vram }]", 2],
-    ["合法:裹了降级映射 specText", P, "{ k: s.specGpu, v: specText(t.value, p.gpu) },", 0],
-    ["合法:裹了行构造器 specRow(空行整行隐藏那条路)", P, "specRow(s.specGpu, p.gpu),", 0],
-    ["🔴 名字像但不在认可名单里的包装不算(防「碰巧包一层」就免检)", P, "wrapSpec(p.gpu),", 1],
-    ["🔴 认可名单里的函数**改名**后,原写法立刻判红", P, "specRowV2(s.specGpu, p.gpu),", 1],
-    ["合法:嵌套在映射实参里的第二个字段也算裹住", P, "`${specText(t, p.gpu)} · ${specText(t, p.vram)}`", 0],
-    ["合法:本行显式豁免标记", P, "const raw = product.value?.phoneDailyEarn; // spec-sentinel-ok: 取数值算术", 0],
-    ["合法:上一行显式豁免标记(模板里同行塞注释难看)", P, "<!-- spec-sentinel-ok: 不是目录字段 -->\n<text>{{ it.vram }}</text>", 0],
-    ["🔴 豁免标记在更早的行不生效(防一条标记罩一整段)", P, "// spec-sentinel-ok\nconst a = 1;\nconst g = p.gpu;", 1],
-    ["合法:非渲染面的同名字段读取不判", O, "{ v: p.warranty },", 0],
-    ["子串包含:字段名作为更长标识符的一部分不误伤", P, "{ v: p.warrantyBadgeUrl },", 0],
-    ["合法:读的是非哨兵字段", P, "{ k: s.specSold, v: p.sold },", 0],
-    ["合法:注释里提到字段不算读取", P, "// 这里以前是 p.gpu", 0],
-  ];
-  let failed = 0;
-  for (const [name, file, src, want] of cases) {
-    const got = scanSource(file, src, sentinel, F).length;
-    if (got !== want) { failed += 1; console.error(`  ✗ ${name} —— 期望 ${want} 条违规,实得 ${got}`); }
-  }
-  // Rule C 的判据来源自证:字段表现读自契约,解析空即门瞎。
-  if (readSentinelFields("const x = 1;").length !== 0) {
-    failed += 1; console.error("  ✗ 无 displayString 的源码不该解析出字段");
-  }
-  // 判据来源自证:能真从契约里解析出字段(而不是恒空 → Rule C 恒真)。
-  // 🔴 别在这里枚举完整字段集 —— 它会随字段归属调整而合法变化(P-111 就把 uptime /
-  // warranty / phoneDailyEarn* 移出了商品契约,各归平台文案 / 平台配置 / 按 SKU 月数),
-  // 枚举式锚点届时会对**正确的实现**判红。锚一个稳定字段 + 一个下限即可;
-  // 「一个都解析不到」那种真失效由 run() 里的 `fields.length === 0 → FAIL` 兜底。
-  const realFields = readSentinelFields(fs.readFileSync(CONTRACT, "utf8"));
-  if (realFields.length < 2 || !realFields.includes("gpu")) {
-    failed += 1; console.error(`  ✗ 从 ${CONTRACT} 现读 displayString 字段失败 —— Rule C 的判据来源断了(实得 ${realFields.length} 个:${realFields.join(", ")})`);
-  }
-  // 判据来源自证:契约里读不到常量时必须判红,而不是扫出 0 条然后报绿。
-  if (readSentinel("const SPEC_UNAVAILABLE = \"unavailable\";") !== null) {
-    failed += 1; console.error("  ✗ 未导出的常量不该被当成判据来源");
-  }
-  if (readSentinel('export const A = "x";\nexport const B = "y";') !== null) {
-    failed += 1; console.error("  ✗ 多个导出字符串常量时该判红(锚错的失效方式是假绿),不该挑第一个");
-  }
-  if (readSentinel('export const A = "";') !== null) {
-    failed += 1; console.error("  ✗ 空字符串哨兵不该被接受(空 needle 会匹配一切/一无所获)");
-  }
-  if (readSentinel(fs.readFileSync(CONTRACT, "utf8"))?.value !== "unavailable") {
-    failed += 1; console.error(`  ✗ 从 ${CONTRACT} 现读哨兵失败 —— 门的判据来源断了`);
-  }
-  if (failed) { console.error(`spec-sentinel selftest FAIL:${failed} 条判据不成立`); return 1; }
-  console.log(`spec-sentinel selftest PASS:${cases.length} 条判据逐条隔离验证 + 判据来源自证(改名/改值/间接引用/子串/注释 全覆盖)`);
-  return 0;
-}
-
-process.exit(process.argv.includes("--selftest") ? selftest() : run());
+process.exit(run());

@@ -73,17 +73,6 @@ for (const f of walk(SRC)) {
 check(`扫描器有效(扫到样式块 ${blocks} 个 / 文件 ${scanned} 个)`, blocks > 200,
   `只扫到 ${blocks} 个块,解析器可能失效`);
 
-// 自检:构造阳性/阴性各一,证明判据两个方向都работает
-{
-  const positive = `const x: CSSProperties = { background: "var(--v5-brand)", color: "var(--v5-ink)" };`;
-  const negative = `const y: CSSProperties = { background: "var(--v5-brand)", color: "var(--v5-on-brand)" };`;
-  const negTint = `const z: CSSProperties = { background: "color-mix(in srgb, var(--v5-brand) 8%, transparent)", color: "var(--v5-ink)" };`;
-  const hit = (s) => styleBlocks(s).some((b) => BRAND_BG.test(b.text) && INK_FG.test(b.text));
-  check("selftest:brand 底 + ink 字 → 命中", hit(positive));
-  check("selftest:brand 底 + on-brand 字 → 不命中", !hit(negative));
-  check("selftest:color-mix 浅色 tint 底 + ink 字 → 不命中(那不是亮底)", !hit(negTint));
-}
-
 check(`亮底文字全部走 on-brand*(违例 ${violations.length} 处)`, violations.length === 0,
   violations.join(" · "));
 

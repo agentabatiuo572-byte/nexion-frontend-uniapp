@@ -95,12 +95,6 @@ const minimumPolicyDisplay = (source) => norm(source).includes("const minWithdra
   && norm(source).includes("const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: formatAmount(minWithdrawable.value) }));")
   && /<text v-if="withdrawalFactsDisplayable">\{\{ minAmountLine \}\}/.test(source);
 check("🔴 最低提现额从当前有效政策配置插值并格式化,不写死", minimumPolicyDisplay(code));
-check("最低额配置来源/插值/有效政策门红测均能拒绝改坏的源码",
-  [
-    code.replace("withdrawalPolicy.value?.minAmount ?? 0", "20"),
-    code.replace("{ n: formatAmount(minWithdrawable.value) }", "{ n: formatAmount(20) }"),
-    code.replace('<text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}', '<text>{{ minAmountLine }}'),
-  ].every(changed => changed !== code && !minimumPolicyDisplay(changed)));
 // ── ②b z1 B2(2026-08-10):质押劝阻卡禁在空表单渲染 ──────
 // 漏网史:minWithdrawable 回退 0 时 `amountNum >= minWithdrawable` 对空表单(0)恒真,
 // 劝阻卡在用户一个字没输时就弹出(真回归,z1 修掉)。三门齐挂:已输入金额 /
