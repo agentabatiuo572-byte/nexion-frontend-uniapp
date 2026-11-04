@@ -19,10 +19,11 @@ type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: st
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed';
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone';
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
+const ORDER_REFUSALS: Record<string, PurchaseNotice> = { ORDER_PAYMENT_EXPIRED: 'orderExpired', ORDER_NOT_PAYABLE: 'orderClosed', ORDER_NOT_FOUND: 'orderMissing' };
 const api = createPurchasePaymentApi(apiClient);
 const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', image: '', deadlineAt: null as number | null,
@@ -125,7 +126,7 @@ function reconcileNetwork() {
 }
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || !context) return;
-  if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { state.notice = 'changed'; return; }
+  if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { state.notice = deadlinePassed(); return; }
   if (step) state.step = step;
   if (method !== state.method) quoteFailures = 0;
   state.method = method; state.quote = null; state.error = false; state.retrying = false; state.unavailable = false;
@@ -153,10 +154,14 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
       reconcileNetwork();
       return;
     }
+    // Only a network failure or a 5xx can change on retry; anything else is the server's answer.
+    if (cause.kind !== 'network' && (cause.status ?? 0) < 500) { state.notice = ORDER_REFUSALS[cause.message] ?? 'changed'; return; }
     state.retrying = true;
     quoteTimer = setTimeout(() => { if (owns(version, accountKey)) void select(method); }, Math.min(30000, 3000 * 2 ** quoteFailures++));
   } finally { if (owns(version, accountKey)) state.loading = false; }
 }
+/** An order past its deadline can no longer be paid; other purchases get a fresh quote and deadline from their own page. */
+function deadlinePassed(): PurchaseNotice { return state.kind === 'ORDER_PAY' ? 'orderExpired' : 'changed'; }
 function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
@@ -201,7 +206,8 @@ async function submitOriginal() {
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
       const rejectedQuote = cause.kind === 'http' && cause.status === cause.code
-        && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED'].includes(cause.message)
+        && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED'].includes(cause.message)
+          || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND'
           || cause.status === 503 && cause.message === 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
       if (!pending.intentNo && (rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message))) {
         let existing: PurchasePaymentIntent | null;
@@ -222,7 +228,7 @@ async function confirm() {
   state.notice = '';
   if (state.method === 'WALLET') { finish({ method: 'WALLET' }); return; }
   const quote = state.quote;
-  if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { state.notice = 'changed'; return; }
+  if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { state.notice = deadlinePassed(); return; }
   if (!quote || Date.parse(quote.expiresAt) <= Date.now()) { void select(state.method); return; }
   const scope = fingerprint(context);
   const commandKey = context.commandKey?.() ?? acquireAccountCommandKey(KEYS, state.accountKey, scope, 'purchase');
