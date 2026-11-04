@@ -147,7 +147,9 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
     const quote = await api.quote(expected.kind, method, expected.payload);
     if (!owns(version, accountKey)) return;
-    if (quote.kind !== expected.kind || quote.paymentMethod !== method || formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount) || !expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
+    // A trial's offset grows with accrual under one quote version, so only its rise needs a new confirmation.
+    const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
+    if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged || !expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
     state.quote = quote; quoteFailures = 0;
     if (quote.deadlineAt) state.deadlineAt = Date.parse(quote.deadlineAt);
     // Swap in a fresh quote 30 s before this one lapses.

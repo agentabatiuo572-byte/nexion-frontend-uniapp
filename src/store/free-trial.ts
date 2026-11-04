@@ -649,7 +649,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         if (!receipt) {
           if (originalAmount === null) return {ok:false,reason:'unknown'};
           if (!authorization) return {ok:false,reason:'payment-required'};
-          if (originalAmount !== expectedAmountUsdt || originalQuoteVersion !== (quoteVersion ?? null)) return {ok:false,reason:'quote-changed'};
+          // The original amount is the ceiling the user confirmed; accrual may only have lowered it since.
+          if (expectedAmountUsdt === undefined || expectedAmountUsdt > originalAmount || originalQuoteVersion !== (quoteVersion ?? null)) return {ok:false,reason:'quote-changed'};
           if (requestedEpoch !== accountBindingEpoch) return {ok:false,reason:'unknown'};
           // A cancelled PIN prompt has never sent a purchase and must not freeze a stale quote.
           if (!key) {
