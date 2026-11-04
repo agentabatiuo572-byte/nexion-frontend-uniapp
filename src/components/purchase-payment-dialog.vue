@@ -130,16 +130,16 @@
       </view>
     </view>
 
-    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': isBank }">
+    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': isBank && !conclusion }">
       <view class="pp-card pp-hero">
-        <text class="pp-hero__lab">{{ copy.payable }}</text>
+        <text class="pp-hero__lab">{{ conclusion ? copy.total : copy.payable }}</text>
         <view class="pp-hero__row">
           <CheckoutAmount class="pp-hero__amt" :value="fees?.totalUsdt ?? null" :currency="isBank ? 'USD' : 'USDT'" />
-          <view v-if="!isBank" class="pp-copy nx-frosted-button" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
+          <view v-if="!isBank && !conclusion" class="pp-copy nx-frosted-button" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
         </view>
-        <view v-if="payLeft !== null && !confirming" class="pp-cd" :class="{ 'is-urgent': urgent }">
+        <view v-if="payLeft !== null && !confirming && !conclusion" class="pp-cd" :class="{ 'is-urgent': urgent }">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
           <text>{{ fill(urgent ? (isBank ? copy.urgentBank : copy.urgent) : (isBank ? copy.payWithinBank : copy.payWithin), { t: clock(payLeft) }) }}</text>
         </view>
@@ -148,10 +148,11 @@
       </view>
 
       <view class="pp-card">
-        <view class="pp-wait" :class="{ 'is-alone': isBank }" role="status" :style="{ '--pp-st': waitTone }">
-          <view class="pp-wait__spin" aria-hidden="true" />
-          <text class="pp-wait__t">{{ waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
-          <text v-if="ready && !s.error" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
+        <view class="pp-wait" :class="{ 'is-alone': isBank || conclusion, 'is-concluded': conclusion }" role="status" :style="{ '--pp-st': waitTone }">
+          <view v-if="!conclusion" class="pp-wait__spin" aria-hidden="true" />
+          <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
+          <text v-if="conclusion" class="pp-wait__s">{{ conclusion.body }}</text>
+          <text v-else-if="ready && !s.error" class="pp-wait__s">{{ urgent ? copy.urgentHint : isBank ? copy.waitingBank : copy.waitingUsdt }}</text>
         </view>
         <template v-if="!isBank && ready">
           <view class="pp-card__top"><text class="pp-card__t">{{ copy.address }}</text><text class="pp-tag">{{ networkName }}</text></view>
@@ -174,13 +175,13 @@
         <view class="pp-kv"><text class="pp-kv__k">{{ copy.total }}</text><text class="pp-kv__v">{{ isBank ? `$${amount(fees.totalUsdt)}` : `${amount(fees.totalUsdt)} USDT` }}</text></view>
       </view>
 
-      <view class="pp-warn">
+      <view v-if="!conclusion" class="pp-warn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
         <text>{{ isBank ? copy.warnBank : s.intent?.paymentMethod === 'CREGIS_USDT_ERC20' ? copy.warnErc20 : copy.warnBep20 }}</text>
       </view>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30). -->
-    <view v-if="!received && isBank" class="pp-bar">
+    <view v-if="!received && isBank && !conclusion" class="pp-bar">
       <NxButton class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
     </view>
   </view>
@@ -226,7 +227,7 @@ import NxButton from '@/components/ui/nx-button.vue';
 import NxNoticeDialog from '@/components/ui/nx-notice-dialog.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
-import { usePurchasePayment } from '@/store/purchase-payment';
+import { usePurchasePayment, purchaseConclusion, type PurchaseNotice } from '@/store/purchase-payment';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
@@ -278,16 +279,16 @@ const timing = computed(() => purchasePaymentTiming(s.intent, now.value, s.deadl
 const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
-const waitTone = computed(() => s.error ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
+const waitTone = computed(() => s.error || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
 const waitTitle = computed(() => s.error ? copy.value.offline : confirming.value ? copy.value.confirming : ready.value ? copy.value.waiting : copy.value.creating);
 watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment.closeCashier(); });
 
 type Notice = { title: string; body: string; primary: string; secondary?: string; icon: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone: 'warning' | 'danger' | 'brand' | 'neutral'; onPrimary: () => void; onSecondary: () => void };
 const dismiss = () => payment.notify('');
-const notice = computed<Notice | null>(() => {
+function noticeFor(kind: PurchaseNotice): Notice | null {
   const c = copy.value, order = s.kind === 'ORDER_PAY' && !!s.orderNo;
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
-  switch (s.notice) {
+  switch (kind) {
     case 'reminder': return s.method === 'HDPAY_BANK'
       ? { icon: 'shield', tone: 'brand', title: c.remindBankTitle, body: c.remindBank, primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss }
       : { icon: 'shield', tone: 'brand', title: c.remindUsdtTitle, body: fill(s.method === 'CREGIS_USDT_ERC20' ? c.remindErc20 : c.remindBep20, { amt: s.quote ? amount(s.quote.totalUsdt) : '—' }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss };
@@ -307,7 +308,10 @@ const notice = computed<Notice | null>(() => {
     case 'changed': return { icon: 'info', tone: 'warning', title: c.changedTitle, body: c.changed, primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close, ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
     default: return null;
   }
-});
+}
+const notice = computed(() => noticeFor(s.notice));
+// A concluded payment page says what the notice says; nothing on it may still ask for payment.
+const conclusion = computed(() => noticeFor(purchaseConclusion(s.intent)));
 
 function amount(value: string | number) { return formatGroupedAmount(value); }
 function clock(ms: number) { const total = Math.ceil(ms / 1000); return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`; }
@@ -452,6 +456,8 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-addr { display: flex; align-items: center; gap: var(--v5-space-2); margin-top: var(--v5-space-3); padding: 6px 6px 6px 14px; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
 .pp-addr__t { flex: 1; min-width: 0; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-jet-mono); color: var(--v5-ink); overflow-wrap: anywhere; }
 .pp-wait.is-alone { margin: 0; padding: 0 2px; border: 0; }
+.pp-wait.is-concluded .pp-wait__t { white-space: normal; }
+.pp-wait.is-concluded .pp-wait__s { width: 100%; margin-left: 0; text-align: left; }
 .pp-pay.has-bar { padding-bottom: 120px; }
 .pp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
 .pp-reopen { display: flex; flex: 1; }
