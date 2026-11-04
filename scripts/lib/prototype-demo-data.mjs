@@ -475,8 +475,10 @@ export function demoFixture(url,locale,state,request) {
     const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
     // exclusive-voucher: the auto-selected phone-gift campaign (demo-promo-0) takes 100 off and the server drops the voucher instead of stacking it.
     // Only that campaign: a fixed 100 off a cheaper campaign line (Cloud Share 19.90) would quote a negative amount.
-    const exclusivePromotion=state.promoEdgeState==='exclusive-voucher'&&input.activityId==='demo-promo-0';if(exclusivePromotion){quote.voucherId=null;quote.promotionDiscountUsdt='100.00';}
-    let remaining=bundleDiscount+(exclusivePromotion?100:voucherDiscount(state,input.voucherId,Number(subtotal)-bundleDiscount));quote.discountUsdt=remaining.toFixed(2);quote.amountUsdt=(Number(subtotal)-remaining).toFixed(2);
+    // One discount source: when the campaign's reward is itself the order discount, the reward loop below applies it, once.
+    const exclusivePromotion=state.promoEdgeState==='exclusive-voucher'&&input.activityId==='demo-promo-0',rewardDiscount=quote.expectedRewards.some(row=>row.reward.type==='DISCOUNT_USDT');
+    if(exclusivePromotion){quote.voucherId=null;if(!rewardDiscount)quote.promotionDiscountUsdt='100.00';}
+    let remaining=bundleDiscount+(exclusivePromotion?(rewardDiscount?0:100):voucherDiscount(state,input.voucherId,Number(subtotal)-bundleDiscount));quote.discountUsdt=remaining.toFixed(2);quote.amountUsdt=(Number(subtotal)-remaining).toFixed(2);
     for(const line of items){const discount=Math.min(remaining,Number(line.subtotalUsdt));line.discountUsdt=discount.toFixed(2);line.payableUsdt=(Number(line.subtotalUsdt)-discount).toFixed(2);remaining-=discount;}
     // PromotionQuoteService.applyDiscounts: an order discount stays in its purchase line, never exceeds what that line
     // still owes, leaves something to pay, and never becomes a wallet reward.
