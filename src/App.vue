@@ -605,8 +605,8 @@ function beginServerSessionRestore(): Promise<boolean> {
       return false;
     }
     const route = readCurrentRoute();
-    // Public privacy remains readable during cookie restoration, including
-    // its query return target. Login/onboarding entries keep their usual reset.
+    // Public legal pages remain readable during cookie restoration, including
+    // their query return targets. Login/intro entries keep their usual reset.
     const preserveCurrentRoute = preserveRouteDuringSessionRestore(route);
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
