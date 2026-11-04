@@ -38,6 +38,7 @@ const zh = {
   orderExpiredTitle: '订单已过付款时间', orderExpired: '这笔订单不能再付款，可以查看订单或重新下单。',
   orderClosedTitle: '订单已不能付款', orderClosed: '这笔订单的状态已变化，可以查看订单或重新下单。',
   orderMissingTitle: '找不到这笔订单', orderMissing: '订单可能已不在你的账号中，可以重新下单。',
+  goneTitle: '付款记录已失效', gone: '这笔付款记录已不存在，请到订单详情查看，不要重复付款。',
   topupFor: '为订单充值', topupNeed: '{name} 还差 ', topupNeedTail: '，充值到账后可回到订单继续支付。', topupCloses: '订单 {t} 后自动关闭', topupDone: '余额已到账', topupEnough: '可用余额 {amt} USDT，足够支付这笔订单。', backToPay: '返回继续支付',
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
@@ -78,6 +79,7 @@ const en: typeof zh = {
   orderExpiredTitle: 'Payment time is over', orderExpired: 'This order can no longer be paid. View the order or place a new one.',
   orderClosedTitle: 'This order can’t be paid', orderClosed: 'The order’s status has changed. View the order or place a new one.',
   orderMissingTitle: 'Order not found', orderMissing: 'This order may no longer be in your account. You can place a new one.',
+  goneTitle: 'Payment record unavailable', gone: 'This payment record no longer exists. Check the order details and don’t pay again.',
   topupFor: 'Top up for your order', topupNeed: '{name} needs ', topupNeedTail: ' more. Once the top-up arrives, return to the order to pay.', topupCloses: 'Order closes in {t}', topupDone: 'Balance received', topupEnough: '{amt} USDT available, enough for this order.', backToPay: 'Back to payment',
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
@@ -118,6 +120,7 @@ const vi: typeof zh = {
   orderExpiredTitle: 'Đơn đã quá thời gian thanh toán', orderExpired: 'Không thể thanh toán đơn này nữa. Bạn có thể xem đơn hoặc đặt đơn mới.',
   orderClosedTitle: 'Không thể thanh toán đơn này', orderClosed: 'Trạng thái đơn đã thay đổi. Bạn có thể xem đơn hoặc đặt đơn mới.',
   orderMissingTitle: 'Không tìm thấy đơn hàng', orderMissing: 'Đơn này có thể không còn trong tài khoản của bạn. Bạn có thể đặt đơn mới.',
+  goneTitle: 'Bản ghi thanh toán không còn hiệu lực', gone: 'Bản ghi thanh toán này không còn tồn tại. Vui lòng xem chi tiết đơn hàng và không thanh toán lại.',
   topupFor: 'Nạp tiền cho đơn hàng', topupNeed: '{name} còn thiếu ', topupNeedTail: '. Nạp tiền xong có thể quay lại đơn để thanh toán tiếp.', topupCloses: 'Đơn tự đóng sau {t}', topupDone: 'Tiền đã vào ví', topupEnough: 'Số dư khả dụng {amt} USDT, đủ để thanh toán đơn này.', backToPay: 'Quay lại thanh toán',
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
@@ -158,6 +161,7 @@ const id: typeof zh = {
   orderExpiredTitle: 'Waktu pembayaran sudah lewat', orderExpired: 'Pesanan ini tidak bisa dibayar lagi. Lihat pesanan atau buat pesanan baru.',
   orderClosedTitle: 'Pesanan tidak bisa dibayar', orderClosed: 'Status pesanan sudah berubah. Lihat pesanan atau buat pesanan baru.',
   orderMissingTitle: 'Pesanan tidak ditemukan', orderMissing: 'Pesanan ini mungkin sudah tidak ada di akun Anda. Anda bisa membuat pesanan baru.',
+  goneTitle: 'Catatan pembayaran tidak tersedia', gone: 'Catatan pembayaran ini sudah tidak ada. Periksa detail pesanan dan jangan bayar lagi.',
   topupFor: 'Top up untuk pesanan Anda', topupNeed: '{name} masih kurang ', topupNeedTail: '. Setelah top up masuk, kembali ke pesanan untuk membayar.', topupCloses: 'Pesanan ditutup dalam {t}', topupDone: 'Saldo masuk', topupEnough: '{amt} USDT tersedia, cukup untuk pesanan ini.', backToPay: 'Kembali ke pembayaran',
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
@@ -198,6 +202,7 @@ const ms: typeof zh = {
   orderExpiredTitle: 'Masa bayaran telah tamat', orderExpired: 'Pesanan ini tidak boleh dibayar lagi. Lihat pesanan atau buat pesanan baharu.',
   orderClosedTitle: 'Pesanan tidak boleh dibayar', orderClosed: 'Status pesanan telah berubah. Lihat pesanan atau buat pesanan baharu.',
   orderMissingTitle: 'Pesanan tidak dijumpai', orderMissing: 'Pesanan ini mungkin tiada lagi dalam akaun anda. Anda boleh membuat pesanan baharu.',
+  goneTitle: 'Rekod bayaran tidak tersedia', gone: 'Rekod bayaran ini tidak wujud lagi. Semak butiran pesanan dan jangan bayar lagi.',
   topupFor: 'Tambah nilai untuk pesanan', topupNeed: '{name} perlu ', topupNeedTail: ' lagi. Setelah tambah nilai diterima, kembali ke pesanan untuk membayar.', topupCloses: 'Ditutup automatik dalam {t}', topupDone: 'Baki diterima', topupEnough: '{amt} USDT tersedia, cukup untuk pesanan ini.', backToPay: 'Kembali ke bayaran',
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
@@ -238,6 +243,7 @@ const fil: typeof zh = {
   orderExpiredTitle: 'Tapos na ang oras ng bayad', orderExpired: 'Hindi na mababayaran ang order na ito. Tingnan ang order o gumawa ng bago.',
   orderClosedTitle: 'Hindi mababayaran ang order', orderClosed: 'Nagbago na ang status ng order. Tingnan ang order o gumawa ng bago.',
   orderMissingTitle: 'Hindi makita ang order', orderMissing: 'Maaaring wala na ang order na ito sa account mo. Puwede kang gumawa ng bago.',
+  goneTitle: 'Wala nang record ng bayad', gone: 'Wala na ang record ng bayad na ito. Tingnan ang detalye ng order at huwag magbayad ulit.',
   topupFor: 'Mag-top up para sa order mo', topupNeed: 'Para sa {name}, kulang pa ng ', topupNeedTail: ' — pagdating ng top-up, bumalik sa order para magbayad.', topupCloses: 'Magsasara ang order sa {t}', topupDone: 'Pumasok na ang pondo', topupEnough: '{amt} USDT ang available, sapat para sa order na ito.', backToPay: 'Bumalik sa bayad',
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
@@ -278,6 +284,7 @@ const ru: typeof zh = {
   orderExpiredTitle: 'Время на оплату истекло', orderExpired: 'Этот заказ больше нельзя оплатить. Откройте заказ или оформите новый.',
   orderClosedTitle: 'Заказ нельзя оплатить', orderClosed: 'Статус заказа изменился. Откройте заказ или оформите новый.',
   orderMissingTitle: 'Заказ не найден', orderMissing: 'Возможно, этого заказа больше нет в вашем аккаунте. Вы можете оформить новый.',
+  goneTitle: 'Запись об оплате недоступна', gone: 'Этой записи об оплате больше нет. Проверьте детали заказа и не платите повторно.',
   topupFor: 'Пополнить для заказа', topupNeed: 'Для {name} не хватает ', topupNeedTail: '. Когда пополнение поступит, вернитесь к заказу и оплатите.', topupCloses: 'Закроется через {t}', topupDone: 'Пополнение поступило', topupEnough: 'Доступно {amt} USDT — хватает на этот заказ.', backToPay: 'Вернуться к оплате',
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
@@ -318,6 +325,7 @@ const kk: typeof zh = {
   orderExpiredTitle: 'Төлем уақыты өтті', orderExpired: 'Бұл тапсырысты енді төлеу мүмкін емес. Тапсырысты қарап шығыңыз немесе жаңасын жасаңыз.',
   orderClosedTitle: 'Тапсырысты төлеу мүмкін емес', orderClosed: 'Тапсырыс күйі өзгерді. Тапсырысты қарап шығыңыз немесе жаңасын жасаңыз.',
   orderMissingTitle: 'Тапсырыс табылмады', orderMissing: 'Бұл тапсырыс аккаунтыңызда енді болмауы мүмкін. Жаңасын жасай аласыз.',
+  goneTitle: 'Төлем жазбасы қолжетімсіз', gone: 'Бұл төлем жазбасы енді жоқ. Тапсырыс мәліметтерін тексеріңіз және қайта төлемеңіз.',
   topupFor: 'Тапсырыс үшін толтыру', topupNeed: '{name} үшін тағы ', topupNeedTail: ' қажет. Ақша шотқа түскеннен кейін тапсырысқа оралып, төлеңіз.', topupCloses: 'Тапсырыстың жабылуына: {t}', topupDone: 'Қаражат түсті', topupEnough: 'Қолжетімді {amt} USDT, бұл тапсырысқа жеткілікті.', backToPay: 'Төлемге оралу',
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
@@ -358,6 +366,7 @@ const uz: typeof zh = {
   orderExpiredTitle: 'Toʻlov vaqti tugadi', orderExpired: 'Bu buyurtmani endi toʻlab boʻlmaydi. Buyurtmani koʻring yoki yangisini bering.',
   orderClosedTitle: 'Buyurtmani toʻlab boʻlmaydi', orderClosed: 'Buyurtma holati oʻzgardi. Buyurtmani koʻring yoki yangisini bering.',
   orderMissingTitle: 'Buyurtma topilmadi', orderMissing: 'Bu buyurtma hisobingizda endi boʻlmasligi mumkin. Yangisini berishingiz mumkin.',
+  goneTitle: 'Toʻlov yozuvi mavjud emas', gone: 'Bu toʻlov yozuvi endi yoʻq. Buyurtma tafsilotlarini tekshiring va qayta toʻlamang.',
   topupFor: 'Buyurtma uchun toʻldirish', topupNeed: '{name} uchun yana ', topupNeedTail: ' kerak. Mablagʻ hisobga tushgach, toʻlash uchun buyurtmaga qayting.', topupCloses: 'Buyurtma yopilishiga {t}', topupDone: 'Balans toʻldirildi', topupEnough: 'Mavjud: {amt} USDT — bu buyurtma uchun yetarli.', backToPay: 'Toʻlovga qaytish',
   resume: 'Toʻlov jarayonda', view: 'Toʻlovni koʻrish', review: 'Toʻlovingiz tasdiqlanmoqda', ended: 'Bu toʻlov yakunlangan', delivered: 'Toʻlov yakunlandi',
 };

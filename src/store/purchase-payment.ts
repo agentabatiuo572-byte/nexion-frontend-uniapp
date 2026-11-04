@@ -47,6 +47,14 @@ function retire(pending: PendingExternal, accountKey: string) {
   releaseAccountCommandKey(KEYS, accountKey, pending.fingerprint, pending.commandKey);
   state.revision++;
 }
+/** Ends this intent's record and, when it was the order's payment key, renews that key. */
+function release(pending: PendingExternal) {
+  const orderNo = state.orderNo;
+  const orderKey = pending.kind === 'ORDER_PAY' && !!orderNo && readOrderAction(state.accountKey, orderNo)?.key === pending.commandKey;
+  retire(pending, state.accountKey);
+  if (orderKey) clearOrderAction(state.accountKey, orderNo, pending.commandKey, true);
+  return orderKey;
+}
 function fingerprint(value: PurchasePaymentContext): string {
   const stable = (raw: unknown): unknown => raw && typeof raw === 'object' && !Array.isArray(raw)
     ? Object.fromEntries(Object.keys(raw).sort().map(key => [key, stable((raw as Record<string, unknown>)[key])]))
@@ -185,7 +193,17 @@ async function query() {
     if (!owns(version, accountKey)) return;
     state.error = false;
     if (result) accept(result, pending); else state.unavailable = true;
-  } catch { failed = true; if (owns(version, accountKey)) state.error = true; }
+  } catch (error) {
+    failed = true;
+    if (owns(version, accountKey)) {
+      const cause = asApiError(error);
+      // The server no longer holds a payment it has shown us. Only the user may start another one, from the order.
+      if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') {
+        release(pending);
+        Object.assign(state, { pending: null, intent: null, quote: null, cashier: false, error: false, notice: 'gone' });
+      } else state.error = true;
+    }
+  }
   finally { if (owns(version, accountKey)) { state.busy = false; schedule(version, accountKey, failed); } }
 }
 /** Resubmits the original quote under the original key; the server applies it at most once. */
@@ -250,9 +268,7 @@ function restart(step: 'bank' | 'methods') {
   if (!pending || state.busy || state.intent?.status !== 'EXPIRED') return;
   const orderNo = state.orderNo;
   if (!context && !orderNo) { finish(null); return; }
-  const orderKey = pending.kind === 'ORDER_PAY' && !!orderNo && readOrderAction(state.accountKey, orderNo)?.key === pending.commandKey;
-  retire(pending, state.accountKey);
-  if (orderKey) clearOrderAction(state.accountKey, orderNo, pending.commandKey, true);
+  const orderKey = release(pending);
   // A reloaded dialog has no business callback. Re-read the original order and
   // its command before it may offer another payment, including promoted orders.
   if (!context) {
