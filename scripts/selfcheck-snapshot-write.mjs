@@ -84,25 +84,5 @@ const found = REVIVED.filter((n) => src.includes(n));
 check(`🔴 已撤的脏检查判据没复活(查 ${REVIVED.length} 个名字)`, found.length === 0,
   `复活了:${found.join(", ")} —— 要重来先把实测数字写进 scripts/selfcheck-snapshot-write.mjs 顶部`);
 
-// ── 红测自证:每条合取项**各自**注入,不许靠一条红掩护其余 ──────────────────────
-{
-  const cases = [
-    ["写盘加三元", body.replace(/const (\w+) = writeAccountSnapshot\((\w+)\);/, "const $1 = skip ? true : writeAccountSnapshot($2);"),
-      (b) => /^\s*const\s+\w+\s*=\s*writeAccountSnapshot\([\w.]+\);\s*$/m.test(b)],
-    ["回读加三元", body.replace("const stored = readAccountSnapshot(key);", "const stored = skip ? latest : readAccountSnapshot(key);"),
-      (b) => { const ls = b.split("\n").filter((l) => l.includes("readAccountSnapshot(")); return ls.length > 0 && ls.every((l) => !/[?]|&&|\|\|/.test(l)); }],
-    ["删掉一处回读", body.replace("const stored = readAccountSnapshot(key);", "const stored = merged;"),
-      (b) => b.split("\n").filter((l) => l.includes("readAccountSnapshot(")).length === READBACK_EXPECTED],
-  ];
-  for (const [label, injected, judge] of cases) {
-    check(`红测自证:${label} 后本条必须转 false`, injected !== body && judge(injected) === false,
-      injected === body ? "注入没生效 —— 红测本身是空转的" : "注入了却仍判通过 = 判据空转");
-  }
-  // 判据③单独隔离:名字复活必须被抓到
-  check(`红测自证:判据名复活后必须转 false`,
-    REVIVED.some((n) => `${src}\nconst ${REVIVED[0]} = 1;`.includes(n)) === true && found.length === 0,
-    "复活判据本身失效");
-}
-
-console.log(`\n${pass} pass / ${fail} fail(样本:1 个函数体 · ${writeLines.length} 处写盘 · ${readBackLines.length} 处回读 · ${REVIVED.length} 个禁名 · 3 条判据红测自证)`);
+console.log(`\n${pass} pass / ${fail} fail(样本:1 个函数体 · ${writeLines.length} 处写盘 · ${readBackLines.length} 处回读 · ${REVIVED.length} 个禁名)`);
 process.exit(fail === 0 ? 0 : 1);

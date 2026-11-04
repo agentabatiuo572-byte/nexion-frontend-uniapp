@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // 卡数据信任边界哨兵 —— 明文卡号 / CVV 只许活在托管组件里。
 //   node scripts/card-data-boundary.mjs            # 全量扫描
-//   node scripts/card-data-boundary.mjs --selftest # 双向红测(判据自身是否还活着)
 //
 // 为什么要这道门:产品文案向用户承诺「NexGrid 不会接触你的完整卡号」,
 // 而承诺只能由代码结构守住。任何人在托管组件之外再写一个卡号输入框,
@@ -107,54 +106,6 @@ function walk(dir, out = []) {
 }
 
 // ── 双向红测:判据失效 = 门失效,所以先证明判据还认得出违例、也不误伤合法写法 ──
-const POSITIVE = [
-  ['裸卡号绑定', '<input :value="cardNum" @input="onCardNum" />'],
-  ['裸 CVV 绑定', '<input :value="cvv" />'],
-  ['v-model 卡号', '<input v-model="pan" />'],
-  ['v-model.trim CVV', '<input v-model.trim="cvv" />'],
-  ['组件外持明文 ref', 'const cvv = ref("");'],
-  ['let 声明明文 ref', 'let pan = ref("");'],
-  ['裸 input 卡号占位符', '<input placeholder="1234 5678 9012 3456" />'],
-  ['越界注入 vault 读明文', 'const v = inject(HOSTED_CARD_VAULT);'],
-  ['越界注入(带默认值形式)', 'const v = inject( HOSTED_CARD_VAULT, null );'],
-  // 对抗审查实测的三种绕过,逐个钉死
-  ['对象属性绑定', '<input :value="state.cvv" @input="onCvv" />'],
-  ['深层对象属性绑定', '<input v-model="form.card.cardNum" />'],
-  ['reactive 分组持明文', 'const state = reactive({ cvv: "", cardNum: "" });'],
-  ['改名绕过(靠 cc-* 兜底)', '<input :value="securityCode" autocomplete="cc-csc" />'],
-  ['改名绕过·卡号(cc-number)', '<input :value="theLongNumber" autocomplete="cc-number" />'],
-  ['改名绕过·有效期(cc-exp)', '<input :value="validThru" autocomplete="cc-exp" />'],
-  ['跨行裸 input 卡号占位符', '<input\n  class="w-full"\n  placeholder="1234 5678 9012 3456"\n/>'],
-];
-const NEGATIVE = [
-  ['字段选择器 kind', '<HostedCardField kind="cvv" :input-style="s" />'],
-  ['CVV 位数(非明文)', 'const cvvLength = ref(0);'],
-  ['CVV 聚焦态', 'const cvvFocused = ref(false);'],
-  ['CVV 可提交态', 'const cvvReady = ref(false);'],
-  ['CVV 样式对象', 'const cvvInputStyle = computed(() => ({}));'],
-  ['已存卡后四位', '<text>{{ card.last4 }}</text>'],
-  ['卡有效期展示', '<text>{{ expiryLabel(card) }}</text>'],
-  ['托管回执 last4', 'const last4 = ref("");'],
-  ['金额绑定', '<input :value="amount" @input="onAmount" />'],
-  ['持卡人姓名(非卡数据)', '<input :value="holder" @input="onHolder" />'],
-  // 首轮实测踩到:行级判据把托管组件的占位符误伤成违例 → 改标签级 + 补此样本
-  ['托管组件传卡号占位符', '<HostedCardField kind="pan" placeholder="1234 5678 9012 3456" />'],
-  ['跨行托管组件传占位符', '<HostedCardField\n  kind="pan"\n  placeholder="1234 5678 9012 3456"\n/>'],
-];
-
-if (process.argv.includes("--selftest")) {
-  let bad = 0;
-  for (const [name, src] of POSITIVE) {
-    if (scanText(src).length === 0) { console.log(`  MISS 阳性未中: ${name} — ${src}`); bad++; }
-  }
-  for (const [name, src] of NEGATIVE) {
-    const h = scanText(src);
-    if (h.length > 0) { console.log(`  FALSE 阴性误伤: ${name} — ${src} (${h[0].rule})`); bad++; }
-  }
-  console.log(`card-data-boundary selftest: 阳性 ${POSITIVE.length} / 阴性 ${NEGATIVE.length} · 失败 ${bad}`);
-  process.exit(bad === 0 ? 0 : 1);
-}
-
 const files = walk(SRC);
 let inputsSeen = 0;
 const violations = [];

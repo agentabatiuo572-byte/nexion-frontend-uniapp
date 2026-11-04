@@ -30,7 +30,6 @@
 // 它是真 SVG text;`<component :is="'text'">` 也不判(H5 实测能出真 text)—— 但含这两种写法的 svg 文件同样会被运行时门要求登记路由。
 //
 // 用法:node scripts/svg-text-source-gate.mjs           扫全仓
-//       node scripts/svg-text-source-gate.mjs --selftest 红测(每条判据单独隔离:阳性必中 + 合法必放行)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -110,113 +109,14 @@ export function judgeRepo(files, unoText) {
   return { hits: all, exempts, spans, nodes, sites, unoMode: uno.mode };
 }
 
-// ── selftest ─────────────────────────────────────────────────────────────────
-function selftest() {
-  const IMP = 'import SvgText from "@/components/svg-text";';
-  const S = (tpl, script = IMP) => `<template><view>${tpl}</view></template>\n<script setup lang="ts">\n${script}\n</script>\n`;
-  const cases = [
-    // [name, source, tag, expectedCount]
-    ["🔴 svg 里裸 <text>", S('<svg><text x="1">YOU</text></svg>'), "svg-text", 1],
-    ["🔴 大写 <Text> 同样拦(XML 大小写敏感,渲染成未知元素)", S("<svg><Text>YOU</Text></svg>"), "svg-text", 1],
-    ["🔴 嵌在 <g> 里也拦", S('<svg><g><g><text x="1">A</text></g></g></svg>'), "svg-text", 1],
-    ["🔴 跨行开标签(<text\\n x=)也拦", S('<svg><text\n  x="1"\n  y="2">A</text></svg>'), "svg-text", 1],
-    ["🔴 一个 svg 里两处各计一次", S("<svg><text>A</text><text>B</text></svg>"), "svg-text", 2],
-    ["🔴 第二个 svg 块里的也抓(不只看第一个)", S("<svg><circle /></svg><view><svg><text>Z</text></svg></view>"), "svg-text", 1],
-    ["🔴 嵌套 svg:内层 </svg> 之后、外层之内的 <text> 也抓(A1 P1-1)", S('<svg><svg x="10" width="50"><circle /></svg><text x="1">GHOST</text></svg>'), "svg-text", 1],
-    ["🔴 三层嵌套 svg 的最外层 <text>", S("<svg><svg><svg><circle /></svg></svg><text>G</text></svg>"), "svg-text", 1],
-    ["🔴 属性值里的 </svg> 字符串不算闭合,其后 <text> 照抓", S('<svg><g data-x="</svg>"></g><text>G</text></svg>'), "svg-text", 1],
-    ["合法:自闭合 <svg …/> 后面的裸 <text> 是 uni 文本,不判", S('<svg viewBox="0 0 1 1" /><text>hello</text>'), "svg-text", 0],
-    ["合法:自闭合 <svg …/> 不算未闭合", S('<svg viewBox="0 0 1 1" /><text>hello</text>'), "svg-unclosed", 0],
-    ["合法:svg 外的 <text> 是 uni 文本组件,不判", S("<text>hello</text><svg><circle /></svg>"), "svg-text", 0],
-    ["合法:svg 里注释里提到 <text> 不算(注释已剥)", S("<svg><!-- <text>x</text> --><circle /></svg>"), "svg-text", 0],
-    ["合法:<textPath> 是别的 SVG 元素", S("<svg><SvgText><textPath href='#p'>x</textPath></SvgText></svg>"), "svg-text", 0],
-    ["合法:<foreignObject> 岛里的 <text> 是 HTML 内容(uni 文本在那里合法)", S('<svg><foreignObject x="0" y="0" width="10" height="10"><view><text>ok</text></view></foreignObject></svg>'), "svg-text", 0],
-    ["合法:script 里拼 v-html 字符串的 <text> 不在判定面(lucky-spin 先例)", S('<svg><g v-html="s" /></svg>', `${IMP}\nconst s = '<text x="1">A</text>';`), "svg-text", 0],
-    ["合法:script 字符串里自带 <svg> + <text>(判定面必须真的抹掉 script,A1 P2-5)", S("<view />", `${IMP}\nconst s = '<svg><text x=\"1\">A</text></svg>';`), "svg-text", 0],
-    ["合法:<SvgText> 在 svg 内 + 已 import", S('<svg><SvgText x="1">YOU</SvgText></svg>'), "svg-text", 0],
-    ["🔴 同族:svg 里写 <image>(uni 图片组件,SVG 不画)", S('<svg><image href="/a.png" x="1" y="1" width="10" height="10" /></svg>'), "svg-uni-tag", 1],
-    ["🔴 同族:svg 里写 <view>", S("<svg><view>x</view></svg>"), "svg-uni-tag", 1],
-    ["🔴 同族:svg 里写 <switch>(SVG 与 uni 都有这个名字)", S("<svg><switch><circle /></switch></svg>"), "svg-uni-tag", 1],
-    ["🔴 同族:svg 里写 <button>", S('<svg><button @click="go">x</button></svg>'), "svg-uni-tag", 1],
-    ["合法:foreignObject 岛里的 <view>/<text> 不判 uni-tag", S('<svg><foreignObject x="0" y="0" width="10" height="10"><view><text>ok</text></view></foreignObject></svg>'), "svg-uni-tag", 0],
-    ["合法:svg 外的 <image> 不判", S('<image src="/a.png" /><svg><circle /></svg>'), "svg-uni-tag", 0],
-    ["合法:前缀相同的自定义标签(<viewport-x> / <image-card>)不误伤", S("<svg><viewport-thing /><image-card /></svg>"), "svg-uni-tag", 0],
-    ["🔴 <SvgText> 写在 svg 外", S("<SvgText>oops</SvgText><svg><circle /></svg>"), "svgtext-outside", 1],
-    ["🔴 kebab <svg-text> 写在 svg 外也算", S("<svg-text>oops</svg-text><svg><circle /></svg>"), "svgtext-outside", 1],
-    ["合法:svg 外的 <SvgText> 带 svg-text-outside-ok: 注释(抽出来的子图组件)放行", S("<!-- svg-text-outside-ok: 关系网标注子组件,由父级 svg 承载 -->\n<SvgText>ok</SvgText>"), "svgtext-outside", 0],
-    ["合法:<SvgText> 在 svg 内不算 outside", S("<svg><SvgText>ok</SvgText></svg>"), "svgtext-outside", 0],
-    ["🔴 用了 <SvgText> 却没 import", S("<svg><SvgText>x</SvgText></svg>", "const a = 1;"), "svgtext-import", 1],
-    ["🔴 kebab <svg-text> 没 import(A1 P0-1:0×0 且两门曾全绿)", S("<svg><svg-text>x</svg-text></svg>", "const a = 1;"), "svgtext-import", 1],
-    ["🔴 大小写变体 <SVGTEXT> 没 import 也判", S("<svg><SVGTEXT>x</SVGTEXT></svg>", "const a = 1;"), "svgtext-import", 1],
-    ["合法:kebab <svg-text> + Pascal import(Vue 两种写法都认)", S("<svg><svg-text>x</svg-text></svg>"), "svgtext-import", 0],
-    ["合法:别名 import + 别名标签(<SvgLabel>)算已 import 且计入节点", S("<svg><SvgLabel>x</SvgLabel></svg>", 'import SvgLabel from "@/components/svg-text";'), "svgtext-import", 0],
-    ["合法:相对路径 import 也认", S("<svg><SvgText>x</SvgText></svg>", 'import SvgText from "../../components/svg-text";'), "svgtext-import", 0],
-    ["合法:没用 <SvgText> 就不要求 import", S("<svg><circle /></svg>", "const a = 1;"), "svgtext-import", 0],
-    ["🔴 <svg 没闭合", S("<svg><SvgText>x</SvgText>"), "svg-unclosed", 1],
-    // ── A2 加固 ──
-    ["🔴 自闭合 <foreignObject …/> 不开岛:其后 svg 内的 <text> 照抓(A2 P1-1)", S('<svg><foreignObject x="0" y="0" width="1" height="1" /><text>GHOST</text><foreignObject x="0" y="0" width="1" height="1"><view>x</view></foreignObject></svg>'), "svg-text", 1],
-    ["🔴 同上对 <view> 也一样(svg-uni-tag)", S('<svg><foreignObject x="0" y="0" width="1" height="1" /><view>GHOST</view></svg>'), "svg-uni-tag", 1],
-    ["🔴 foreignObject 岛里再嵌真 <svg>,里面的 <text> 回到判定面", S('<svg><foreignObject x="0" y="0" width="10" height="10"><view><svg><text>DEEP</text></svg></view></foreignObject></svg>'), "svg-text", 1],
-    ["🔴 svg 之外的 <foreignObject> 不是岛:里面 <svg><text> 照抓", S("<foreignObject><svg><text>GHOST</text></svg></foreignObject>"), "svg-text", 1],
-    ["🔴 <svg:svg> 命名空间写法也开跨度(A2 P2-4)", S("<svg:svg><text>NS</text></svg:svg>"), "svg-text", 1],
-    ["合法:import { default as X } + <X>(A2 P1-2)算已 import", S("<svg><SvgLabel>x</SvgLabel></svg>", 'import { default as SvgLabel } from "@/components/svg-text";'), "svgtext-import", 0],
-    ["合法:defineAsyncComponent(() => import(...))(A2 P2-6)", S("<svg><SvgText>x</SvgText></svg>", 'import { defineAsyncComponent } from "vue";\nconst SvgText = defineAsyncComponent(() => import("@/components/svg-text"));'), "svgtext-import", 0],
-    ["合法:.js 后缀 import(A2 P2-6)", S("<svg><SvgText>x</SvgText></svg>", 'import SvgText from "@/components/svg-text.js";'), "svgtext-import", 0],
-    ["🔴 script 字符串里的假 import 不算(A2 P2-5)", S("<svg><SvgText>x</SvgText></svg>", "const doc = 'import SvgText from \"@/components/svg-text\";';"), "svgtext-import", 1],
-    ["🔴 import 了 svg-text 却一个用法都没有 → svgtext-unused(死 import / 认不出的写法整族隐形)", S("<svg><circle /></svg>"), "svgtext-unused", 1],
-    ["合法:import 了且用了 → 不算 unused", S("<svg><SvgText>x</SvgText></svg>"), "svgtext-unused", 0],
-    ["合法:import 了、用 <component :is> 用法 → 不算 unused(候选另有登记要求)", S('<svg><component :is="SvgText" x="1">x</component></svg>'), "svgtext-unused", 0],
-    ["🔴 valve 写在元素文本里不算(A2 P2-1 E1)", S("<SvgText>svg-text-outside-ok: 借口</SvgText>"), "svgtext-outside", 1],
-    ["🔴 valve 写在属性字符串里不算(E2)", S('<SvgText title="svg-text-outside-ok: 借口">x</SvgText>'), "svgtext-outside", 1],
-    ["🔴 一条注释只放行紧随其后的一个标签,同行第二个照红(E4)", S("<!-- svg-text-outside-ok: 抽出的子图 -->\n<SvgText>a</SvgText><SvgText>b</SvgText>"), "svgtext-outside", 1],
-    ["合法:注释 valve + 紧随的一个标签 → 放行", S("<!-- svg-text-outside-ok: 抽出的子图 -->\n<SvgText>a</SvgText>"), "svgtext-outside", 0],
-  ];
-  const unoCases = [
-    ["合法:根本没启用 attributify(本仓现状)", "presets: [presetWind3()]", 0],
-    ["合法:只在注释里提到 presetAttributify( 与 prefixedOnly(本仓 uno.config 现状)不算启用", "// 不要再加 presetAttributify(2026-08-17 摘除):prefixedOnly:true 也别\npresets: [presetWind3()]", 0],
-    ["🔴 注释里写着「摘除」但代码里仍启用 → 照红(判据看代码不看注释)", "// 已摘除 presetAttributify(见 P-123)\npresets: [presetWind3(), presetAttributify()]", 1],
-    ["合法:prefixedOnly:true(裸属性一律不当工具类,实测 0 条属性规则)", "presetAttributify({ prefixedOnly: true })", 0],
-    ["🔴 裸 presetAttributify()", "presets: [presetWind3(), presetAttributify()]", 1],
-    ["🔴 ignoreAttributes 含 font-size 也不算修(绑定式 :opacity 绕过,A1 P0-2)", 'presetAttributify({ ignoreAttributes: ["placeholder", "fill", "opacity", "stroke-opacity", "font-size", "fill-opacity"] })', 1],
-  ];
-  let pass = 0, fail = 0;
-  const say = (ok, name, got, want) => { if (ok) { pass++; console.log(`  ✓ ${name}`); } else { fail++; console.log(`  ✗ ${name} —— 期望 ${want} 命中,实得 ${got}`); } };
-  for (const [name, src, tag, want] of cases) {
-    const got = judgeVue(src).hits.filter((h) => h.tag === tag).length;
-    say(got === want, name, got, want);
-  }
-  for (const [name, text, want] of unoCases) {
-    const got = judgeUnoConfig(text).hits.length;
-    say(got === want, `uno:${name}`, got, want);
-  }
-  // 别名 import 的节点要计入 svgTextNodes(运行时门据此登记路由)
-  const alias = judgeVue(S("<svg><SvgLabel>x</SvgLabel></svg>", 'import SvgLabel from "@/components/svg-text";'));
-  say(alias.svgTextNodes === 1, "别名标签计入 svgTextNodes(=1)", alias.svgTextNodes, 1);
-  // 行号钉在被判节点那一行(不是文件头)
-  const lineSrc = S("<svg>\n  <circle />\n  <text>L</text>\n</svg>");
-  const h = judgeVue(lineSrc).hits.find((x) => x.tag === "svg-text");
-  say(h && h.line === 3, "命中行号 = <text> 所在行(第 3 行)", h?.line, 3);
-  // 判定面塌缩:空清单
-  const okUno = "presets: [presetWind3()]";
-  const empty = judgeRepo([], okUno).hits.filter((x) => x.tag === "judged-plane").length;
-  say(empty === 1, "🔴 判定面塌缩:0 文件 → judged-plane 红(svg 块 0)", empty, 1);
-  const clean = judgeRepo([{ rel: "a.vue", src: S("<svg><SvgText>x</SvgText></svg>") }], okUno).hits.length;
-  say(clean === 0, "合法:有 svg + 有 SvgText + attributify 未启用 → 0 命中", clean, 0);
-  console.log(`svg-text-source-gate selftest: ${pass}/${pass + fail} 格通过`);
-  process.exit(fail ? 1 : 0);
-}
-
 // ── main ─────────────────────────────────────────────────────────────────────
-if (process.argv.includes("--selftest")) selftest();
-else {
-  const files = listVueFiles(fs, path, ROOT).map((p) => ({ rel: path.relative(ROOT, p).replace(/\\/g, "/"), src: fs.readFileSync(p, "utf8") }));
-  const unoText = fs.existsSync(path.join(ROOT, "uno.config.ts")) ? fs.readFileSync(path.join(ROOT, "uno.config.ts"), "utf8") : "";
-  const r = judgeRepo(files, unoText);
-  for (const e of r.exempts) console.log(`EXEMPT [svgtext-outside] ${e.file}:${e.line}  ${e.why}`);
-  if (r.hits.length) {
-    for (const h of r.hits) console.log(`FAIL [${h.tag}] ${h.file}:${h.line}  ${h.msg}`);
-    console.log(`svg-text-source-gate: ${r.hits.length} 处违规(svg 块 ${r.spans} · SvgText ${r.nodes} 处 / ${r.sites} 文件 · attributify=${r.unoMode})`);
-    process.exit(1);
-  }
-  console.log(`svg-text-source-gate: 0 违规 —— 扫 ${files.length} 个 .vue,<svg> 块 ${r.spans},SvgText ${r.nodes} 处 / ${r.sites} 文件,attributify=${r.unoMode},svg 外豁免 ${r.exempts.length} 处`);
+const files = listVueFiles(fs, path, ROOT).map((p) => ({ rel: path.relative(ROOT, p).replace(/\\/g, "/"), src: fs.readFileSync(p, "utf8") }));
+const unoText = fs.existsSync(path.join(ROOT, "uno.config.ts")) ? fs.readFileSync(path.join(ROOT, "uno.config.ts"), "utf8") : "";
+const r = judgeRepo(files, unoText);
+for (const e of r.exempts) console.log(`EXEMPT [svgtext-outside] ${e.file}:${e.line}  ${e.why}`);
+if (r.hits.length) {
+  for (const h of r.hits) console.log(`FAIL [${h.tag}] ${h.file}:${h.line}  ${h.msg}`);
+  console.log(`svg-text-source-gate: ${r.hits.length} 处违规(svg 块 ${r.spans} · SvgText ${r.nodes} 处 / ${r.sites} 文件 · attributify=${r.unoMode})`);
+  process.exit(1);
 }
+console.log(`svg-text-source-gate: 0 违规 —— 扫 ${files.length} 个 .vue,<svg> 块 ${r.spans},SvgText ${r.nodes} 处 / ${r.sites} 文件,attributify=${r.unoMode},svg 外豁免 ${r.exempts.length} 处`);

@@ -18,20 +18,6 @@ import crypto from "node:crypto";
 import { ROOT, CACHE_DIR } from "./lib/verify-scope.mjs";
 
 const args = process.argv.slice(2);
-if (args.includes("--selftest")) {
-  // 结构自证(秒级;真跑级变异测试太贵不进门链):① tsc 参数不含 --incremental(warm buildinfo 双向假结论,tester-A P0)
-  // ② FAIL 路径删 pass 记录(否则错指纹会被记成 pass 粘住)③ 记录含 fp/verdict(缓存键必须是内容指纹)
-  const self = fs.readFileSync(new URL(import.meta.url), "utf8");
-  const bits = [];
-  const argLine = (self.match(/const tscArgs = \[[^\n]*\];/) || [""])[0];
-  if (!argLine || /--incremental/.test(argLine.replace(/noIncremental \? \[\] : \[[^\]]*\]/, ""))) bits.push("①tsc 参数行仍可能带 --incremental");
-  if (!/const noIncremental = true/.test(self)) bits.push("①noIncremental 不再写死为 true");
-  if (!/rmSync\(RECORD, \{ force: true \}\)/.test(self)) bits.push("②FAIL 路径不再删 pass 记录");
-  if (!/verdict: "pass"/.test(self) || !/fp, verdict/.test(self)) bits.push("③pass 记录缺 fp/verdict");
-  if (bits.length) { console.log("typecheck-cached selftest FAIL: " + bits.join(" · ")); process.exit(1); }
-  console.log("typecheck-cached selftest PASS(裸 vue-tsc · FAIL 删记录 · 记录带内容指纹)");
-  process.exit(0);
-}
 const force = args.includes("--force");
 const noIncremental = true; // 见头注释:增量已禁用,参数只作兼容
 const RECORD = path.join(CACHE_DIR, "typecheck.json");

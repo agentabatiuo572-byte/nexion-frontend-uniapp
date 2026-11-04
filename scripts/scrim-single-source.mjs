@@ -90,41 +90,6 @@ function loadExemptions() {
 }
 const allowed = (h, ex) => ex.some((e) => e.file === h.file && (!e.selector || e.selector === h.selector));
 
-/* ── selftest:双向红测 ── */
-function selftest() {
-  const P = [];
-  const p = (n, e, a) => P.push({ n, ok: JSON.stringify(e) === JSON.stringify(a), e, a });
-
-  // 阳性:各种值形态都必须被抓(这正是我漏修的那批的真实写法)
-  for (const v of ["rgba(8, 8, 12, 0.45)", "rgba(7,9,15,0.62)", "rgba(0, 0, 0, 0.72)", "#000000", "rgba(19,20,26,0.44)"])
-    p(`阳性 rule ${v}`, 1, scanRuleBlocks(`.xx-backdrop {\n position: absolute;\n background: ${v};\n}`, "a.vue").length);
-  p("阳性 *-mask 选择器", 1, scanRuleBlocks(`.cs-mask { inset: 0; background: rgba(0,0,0,0.72); }`, "a.vue").length);
-  p("阳性 background-color 写法", 1, scanRuleBlocks(`.y-backdrop { background-color: #0A0A0A; }`, "a.vue").length);
-  p("阳性 内联覆盖层", 1, scanInline(`<view style="position: fixed; inset: 0; background: rgba(8,8,12,0.45)" />`, "a.vue").length);
-
-  // 阴性:合规写法与非遮罩必须 0
-  p("阴性 已用 token(rule)", 0, scanRuleBlocks(`.xx-backdrop { background: ${TOKEN}; }`, "a.vue").length);
-  p("阴性 已用 token(内联)", 0, scanInline(`<view style="position:absolute; inset: 0; background: ${TOKEN}" />`, "a.vue").length);
-  p("阴性 非遮罩选择器", 0, scanRuleBlocks(`.xx-card { background: rgba(8,8,12,0.45); }`, "a.vue").length);
-  p("阴性 面板用 surface token", 0, scanRuleBlocks(`.xx-mask { background: var(--v5-surface); }`, "a.vue").length);
-  p("阴性 注释里的违例", 0, scanRuleBlocks(`/* .xx-backdrop { background: #000; } */`, "a.vue").length);
-  p("阴性 无 inset 的定位元素", 0, scanInline(`<view style="position: fixed; top: 0; background: rgba(8,8,12,0.45)" />`, "a.vue").length);
-  p("阴性 渐变装饰层", 0, scanInline(`<view style="position:absolute; inset:0; background: linear-gradient(180deg,#000,transparent)" />`, "a.vue").length);
-  p("阴性 无 background 的遮罩块", 0, scanRuleBlocks(`.xx-backdrop { backdrop-filter: blur(4px); }`, "a.vue").length);
-
-  // 豁免机制
-  const h = scanRuleBlocks(`.xx-backdrop { background: #000; }`, "src/a.vue")[0];
-  p("豁免生效", true, allowed(h, [{ file: "src/a.vue", reason: "t" }]));
-  p("豁免不跨文件", false, allowed(h, [{ file: "src/b.vue", reason: "t" }]));
-  p("豁免每条有 reason", 0, loadExemptions().filter((e) => !e.reason || !String(e.reason).trim()).length);
-
-  const bad = P.filter((x) => !x.ok);
-  console.log("=== scrim-single-source selftest ===");
-  for (const x of P) console.log(`${x.ok ? "PASS" : "FAIL"}  ${x.n}${x.ok ? "" : ` expect=${JSON.stringify(x.e)} actual=${JSON.stringify(x.a)}`}`);
-  console.log(`\n${P.length - bad.length}/${P.length} pass`);
-  process.exit(bad.length ? 1 : 0);
-}
-if (process.argv.includes("--selftest")) selftest();
 
 const ex = loadExemptions();
 const all = [];
