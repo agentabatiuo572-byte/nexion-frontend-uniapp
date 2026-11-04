@@ -84,7 +84,7 @@ import { useDataVisibility } from "@/store/data-visibility";
 import { useTrialPresentation } from '@/composables/use-trial-presentation';
 import { useT } from "@/i18n/use-t";
 import { useAuditUiCopy } from '@/i18n/audit-ui';
-import { useTrialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecycle';
+import { useTrialLifecycleCopy, formatTrialCountdown, formatTrialRemaining } from '@/i18n/trial-lifecycle';
 import { fmt, fmtMoney } from '@/i18n/format';
 import { formatAmount } from "@/lib/amount-display";
 import { getProductMedia } from "@/lib/product-media";
@@ -144,11 +144,7 @@ const online = computed(() => trialView.presentationReady.value && status.value 
 const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
 const estimateParts = computed(() => { const match = /^(\$?)(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { currency: match[1], whole: match[2], cents: match[3] ?? '' }; });
 const creditText = computed(() => trialView.offsetUSD.value === null ? '-' : `$${formatAmount(trialView.offsetUSD.value)}`);
-const countdownText = computed(() => {
-  if (trialView.remainingMs.value === null) return '-';
-  const minutes = Math.max(0, Math.ceil(trialView.remainingMs.value / 60000));
-  return `${Math.floor(minutes / 1440)}d ${Math.floor(minutes % 1440 / 60)}h:${String(minutes % 60).padStart(2, '0')}`;
-});
+const countdownText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialCountdown(trialView.remainingMs.value));
 // Label follows the RETAINED offer state (BUG 14); the click stays gated by canClaim.
 const trialPill = computed<[string, string]>(() => {
   if (canRestart.value) return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
@@ -180,14 +176,15 @@ watch(() => offerCount.value + pendingCount.value > 0, shown => {
   enterTimer = setTimeout(() => { entering.value = false; }, 900);
 }, { immediate: true });
 // uni-app wraps view events, so the flag is cleared on a timer instead of animationend.
-function pop(flag: Ref<boolean>) { flag.value = true; setTimeout(() => { flag.value = false; }, 400); }
+const popTimers: ReturnType<typeof setTimeout>[] = [];
+function pop(flag: Ref<boolean>) { flag.value = true; popTimers.push(setTimeout(() => { flag.value = false; }, 400)); }
 // A claim can pass through a brief state with neither card, so remember that the offer was shown.
 let voucherOfferSeen = false, trialOfferSeen = false;
 watch(voucherPending, (pending, had) => { if (pending && !had && voucherOfferSeen) pop(popVoucher); });
 watch(trialPending, (pending, had) => { if (pending && !had && trialOfferSeen) pop(popTrial); });
 watch(voucherOffer, offer => { if (offer) voucherOfferSeen = true; }, { immediate: true });
 watch(trialOffer, offer => { if (offer) trialOfferSeen = true; }, { immediate: true });
-onUnmounted(() => clearTimeout(enterTimer));
+onUnmounted(() => { clearTimeout(enterTimer); popTimers.forEach(timer => clearTimeout(timer)); });
 
 function openVoucher() {
   if ((!remoteApiEnabled || voucher.remoteStatus === 'ready') && voucher.claimableVouchers.some(row => voucherSupportsSurface(row, 'home'))) voucherSheet.show('home');
