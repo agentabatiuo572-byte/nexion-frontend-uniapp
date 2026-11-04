@@ -7,7 +7,7 @@
     </view>
     <view class="home-display-separator" />
     <view class="home-display-item">
-      <text class="home-display-number home-display-number--brand">{{ value ? `$${formatAmount(value.paid)}` : '—' }}</text>
+      <text class="home-display-number home-display-number--brand">{{ value ? `$${formatGroupedAmount(value.paid)}` : '—' }}</text>
       <text>{{ t.intro.statsPaidTotal }}</text>
     </view>
   </view>
@@ -17,7 +17,7 @@
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { apiClient } from "@/api/runtime";
 import { useT } from "@/i18n/use-t";
-import { formatAmount } from "@/lib/amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { createHomeDisplayPlayer, parseHomeDisplayBatch } from "@/lib/home-display-player";
 
 const props = defineProps<{ active: boolean }>();
