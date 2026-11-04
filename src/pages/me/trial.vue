@@ -357,7 +357,7 @@ const ringOffset = computed(() => {
 const countdownText = computed(() => {
   const ms = remainingMsValue.value;
   if (ms >= 86_400_000) {
-    const minutes = Math.ceil(ms / 60_000);
+    const minutes = Math.floor(ms / 60_000);
     return fmt(detail.value.countdownDays, { days: Math.floor(minutes / 1440), hours: Math.floor(minutes % 1440 / 60), minutes: String(minutes % 60).padStart(2, "0") });
   }
   const seconds = Math.floor(ms / 1000);
