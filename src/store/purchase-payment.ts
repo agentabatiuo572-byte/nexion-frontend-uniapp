@@ -24,12 +24,13 @@ const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
 const ORDER_REFUSALS: Record<string, PurchaseNotice> = { ORDER_PAYMENT_EXPIRED: 'orderExpired', ORDER_NOT_PAYABLE: 'orderClosed', ORDER_NOT_FOUND: 'orderMissing' };
+const TRIAL_REFUSALS = ['TRIAL_QUOTE_CHANGED', 'TRIAL_AMOUNT_MISMATCH'];
 const api = createPurchasePaymentApi(apiClient);
 const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', image: '', deadlineAt: null as number | null,
   policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, notice: '' as PurchaseNotice, cashier: false,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
-  loading: false, retrying: false, busy: false, error: false, unavailable: false, pendingReadError: false, revision: 0 });
+  loading: false, retrying: false, busy: false, error: false, unavailable: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
 let resolveChoice: ((result: PurchaseChoice | null) => void) | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
@@ -97,10 +98,12 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   const conclusion = purchaseConclusion(intent);
   if (conclusion) state.notice = conclusion;
 }
+/** The payment ended with an answer: nothing of it stays behind the notice and no further read or write runs. */
+function conclude(notice: PurchaseNotice) { Object.assign(state, { notice, concluded: true, cashier: false }); }
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
   requestVersion++; stopTimers(); openCashierOnReady = false;
-  Object.assign(state, { open: false, loading: false, retrying: false, busy: false, cashier: false, notice: '' });
+  Object.assign(state, { open: false, loading: false, retrying: false, busy: false, cashier: false, notice: '', concluded: false });
   const done = resolveChoice; resolveChoice = null; context = null; done?.(result);
 }
 // A checkout owner may defer navigation until its payment operation releases
@@ -114,7 +117,7 @@ function closeAndNavigate(href: string) {
 function schedule(version: number, accountKey: string, failed: boolean) {
   pollFailures = failed ? pollFailures + 1 : 0;
   clearTimeout(pollTimer); pollTimer = undefined;
-  if (paused || !owns(version, accountKey) || !state.pending || settled(state.intent)) return;
+  if (paused || !owns(version, accountKey) || !state.pending || settled(state.intent) || state.concluded) return;
   pollTimer = setTimeout(() => { if (owns(version, accountKey)) void (state.unavailable ? submitOriginal() : query()); },
     failed ? POLL_BACKOFF[Math.min(pollFailures - 1, POLL_BACKOFF.length - 1)]! : POLL_MS);
 }
@@ -135,7 +138,7 @@ function reconcileNetwork() {
 }
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || !context) return;
-  if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { state.notice = deadlinePassed(); return; }
+  if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
   if (method !== state.method) quoteFailures = 0;
   state.method = method; state.quote = null; state.error = false; state.retrying = false; state.unavailable = false;
@@ -166,13 +169,17 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
       return;
     }
     // Only a network failure or a 5xx can change on retry; anything else is the server's answer.
-    if (cause.kind !== 'network' && (cause.status ?? 0) < 500) { state.notice = ORDER_REFUSALS[cause.message] ?? 'changed'; return; }
+    if (cause.kind !== 'network' && (cause.status ?? 0) < 500) {
+      const refusal = ORDER_REFUSALS[cause.message];
+      if (refusal) conclude(refusal); else state.notice = 'changed';
+      return;
+    }
     state.retrying = true;
     quoteTimer = setTimeout(() => { if (owns(version, accountKey)) void select(method); }, Math.min(30000, 3000 * 2 ** quoteFailures++));
   } finally { if (owns(version, accountKey)) state.loading = false; }
 }
 /** An order past its deadline can no longer be paid; other purchases get a fresh quote and deadline from their own page. */
-function deadlinePassed(): PurchaseNotice { return state.kind === 'ORDER_PAY' ? 'orderExpired' : 'changed'; }
+function deadlinePassed() { if (state.kind === 'ORDER_PAY') conclude('orderExpired'); else state.notice = 'changed'; }
 function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
@@ -203,7 +210,8 @@ async function query() {
       // The server no longer holds a payment it has shown us. Only the user may start another one, from the order.
       if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') {
         release(pending);
-        Object.assign(state, { pending: null, intent: null, quote: null, cashier: false, error: false, notice: 'gone' });
+        Object.assign(state, { pending: null, intent: null, quote: null, error: false });
+        conclude('gone');
       } else state.error = true;
     }
   }
@@ -227,16 +235,23 @@ async function submitOriginal() {
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
       const rejectedQuote = cause.kind === 'http' && cause.status === cause.code
-        && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED'].includes(cause.message)
+        && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
           || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND'
           || cause.status === 503 && cause.message === 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
       if (!pending.intentNo && (rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message))) {
+        // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
+        const refusal = pending.kind === 'ORDER_PAY' ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined;
         let existing: PurchasePaymentIntent | null;
         try { existing = await api.find(pending.kind, pending.commandKey); }
-        catch { return; } // Keep the original identity when this recovery read also fails.
+        catch {
+          // Only a read can prove no intent exists: the record stays, and the refusal still stands for the user.
+          if (refusal && owns(version, accountKey)) conclude(refusal);
+          return;
+        }
         if (!owns(version, accountKey)) return;
         state.error = false;
         if (existing) accept(existing, pending);
+        else if (refusal) { release(pending); Object.assign(state, { pending: null, quote: null, intent: null }); conclude(refusal); }
         else { retire(pending, accountKey); state.pending = null; state.quote = null; state.intent = null; requote = true; }
       }
     }
@@ -250,7 +265,7 @@ async function confirm() {
   state.notice = '';
   if (state.method === 'WALLET') { finish({ method: 'WALLET' }); return; }
   const quote = state.quote;
-  if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { state.notice = deadlinePassed(); return; }
+  if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { deadlinePassed(); return; }
   if (!quote || Date.parse(quote.expiresAt) <= Date.now()) { void select(state.method); return; }
   const scope = fingerprint(context);
   const commandKey = context.commandKey?.() ?? acquireAccountCommandKey(KEYS, state.accountKey, scope, 'purchase');
@@ -289,7 +304,7 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'orderNo'
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
   Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null, policy: null, notice: '', cashier: false,
-    quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false });
+    quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });
 }
 export function requestPurchasePayment(value: PurchasePaymentContext): Promise<PurchaseChoice | null> {
   if (state.open) throw new Error('PURCHASE_PAYMENT_ALREADY_OPEN');
@@ -324,7 +339,7 @@ export function usePurchasePayment() {
     openCashier: () => { if (state.intent?.paymentUrl && purchasePaymentTiming(state.intent, Date.now(), state.deadlineAt).canPay) state.cashier = true; },
     closeCashier: () => { state.cashier = false; paused = false; if (!state.busy) void query(); },
     pause: () => { paused = true; clearTimeout(pollTimer); pollTimer = undefined; },
-    wake: () => { paused = false; if (state.open && state.pending && !state.busy && !settled(state.intent)) void (state.unavailable ? submitOriginal() : query()); },
+    wake: () => { paused = false; if (state.open && state.pending && !state.busy && !settled(state.intent) && !state.concluded) void (state.unavailable ? submitOriginal() : query()); },
     topup: () => {
       const orderNo = state.orderNo, total = Number(state.amount), deadlineAt = state.deadlineAt, summary = state.summary;
       const query = orderNo ? `?orderNo=${encodeURIComponent(orderNo)}&amount=${total}&name=${encodeURIComponent(summary)}${deadlineAt ? `&deadline=${deadlineAt}` : ''}` : '';
