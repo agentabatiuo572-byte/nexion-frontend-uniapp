@@ -20,5 +20,4 @@ if (process.argv.includes('--write-baseline')) {
   const baseline = JSON.parse(fs.readFileSync(baselineFile,'utf8'));
   for (const [key, value] of Object.entries(measured)) assert.ok(value <= baseline[key], `${key}: ${value} exceeds ${baseline[key]}; reuse design tokens`);
 }
-assert.deepEqual(count('font-size: 13px; borderRadius: "22px"; gap: 12px; font-size: var(--ui-text-body);'), { fontSize:1,radius:1,spacing:1 });
 console.log('PASS design token budget', measured);

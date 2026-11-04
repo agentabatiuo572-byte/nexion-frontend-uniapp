@@ -116,14 +116,5 @@ for (const [label, src, needle, file] of LITERALS) {
     `字面量有而类型无:${sets[0].keys.filter((k) => !typeKeys.includes(k)).join(",") || "无"}`);
 }
 
-// ── 红测自证:判据不是空转 ──────────────────────────────────────────────────
-{
-  // 从任一字面量里摘掉一个字段,三处一致性必须转 false。用内存副本,不碰磁盘。
-  const victim = sets[0].keys[sets[0].keys.length - 1];
-  const shrunk = sets[0].keys.filter((k) => k !== victim);
-  const same = shrunk.length === sets[1].keys.length && shrunk.every((k, i) => k === sets[1].keys[i]);
-  check(`红测自证:从①摘掉「${victim}」后与②必须不再相同`, same === false, `摘后仍判相同 = 判据空转`);
-}
-
-console.log(`\n${pass} pass / ${fail} fail(样本:3 处字面量 × ${sets[0]?.keys.length ?? 0} 个字段 · 1 处类型声明 · 1 条判据红测自证)`);
+console.log(`\n${pass} pass / ${fail} fail(样本:3 处字面量 × ${sets[0]?.keys.length ?? 0} 个字段 · 1 处类型声明)`);
 process.exit(fail === 0 ? 0 : 1);

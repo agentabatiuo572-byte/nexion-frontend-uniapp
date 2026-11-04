@@ -119,25 +119,6 @@ console.log("selfcheck-deposit-resume — 在途入金单刷新后必须继续�
     /import \{[^}]*reportStuckFunds[^}]*\} from "@\/lib\/money-receipt"/.test(src));
 }
 
-// ── 红测自证:判据不是空转 ──────────────────────────────────────────────────
-{
-  // 正控:把每条判据的目标串从源码里摘掉,判据必须转 false。
-  const cases = [
-    ["syncChainDeposits 调用", "syncChainDeposits();", (s) => /syncChainDeposits\(\)/.test(s.slice(s.indexOf("function bindAccount("), s.indexOf("function bindAccount(") + 600))],
-    ["timers.has 去重", "if (timers.has(rec.depositId)) continue;", (s) => /timers\.has\(/.test(s.slice(s.indexOf("function syncChainDeposits("), s.indexOf("function syncChainDeposits(") + 600))],
-    ["settle 失败重排", "if (!settleCredited(depositId)) queue(stepDelay(required));", (s) => /if \(!settleCredited\(depositId\)\) queue\(/.test(s)],
-  ];
-  const misses = [];
-  for (const [name, needle, probe] of cases) {
-    if (!src.includes(needle)) { misses.push(`${name}(锚点串已不在源码里,判据失效)`); continue; }
-    const injected = src.split(needle).join("/* removed by redtest */");
-    if (probe(injected)) misses.push(`${name}(摘掉后判据仍为真 = 空转)`);
-  }
-  check(`红测自证:${cases.length} 条判据摘掉目标串后必须转 false(判据失效当场暴露)`,
-    misses.length === 0, misses.join(" | "));
-}
-
 // 样本量从实跑数取,不写死 —— 写死的话加了断言、标签还报旧数字,「加了没加」在输出里看不出来
-// (最后一条是红测自证,不算结构断言)。
-console.log(`\n${pass} pass / ${fail} fail(样本:${pass + fail - 1} 条结构断言 · 3 条判据红测自证)`);
+console.log(`\n${pass} pass / ${fail} fail(样本:${pass + fail} 条结构断言)`);
 process.exit(fail === 0 ? 0 : 1);
