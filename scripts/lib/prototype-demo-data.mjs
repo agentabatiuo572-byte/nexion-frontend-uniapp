@@ -56,7 +56,7 @@ export const demoOptions = {
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
   fleetState:[['normal','默认设备'],['none','暂无设备'],['inventory','含仓库未激活设备'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
-  paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款结果读取失败'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','ERC20 未开通'],['low-balance','钱包余额不足（820.64 USDT）']],
+  paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款结果读取失败'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['late','宽限结束后到账·订单已取消（示例 001 剩 1 分钟）'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','ERC20 未开通'],['usdt-off','USDT 两个网络都未开通'],['low-balance','钱包余额不足（820.64 USDT）']],
 };
 const skuDefinitions = [
   ['stellarbox-s1','UVELBox S1','Entry',1299,6.2,3,'4 × RTX 4090','96 GB',1200],
@@ -82,16 +82,22 @@ export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
 const orderStates={placed:['PENDING','PENDING_PAYMENT','WAITING_PAYMENT'],paid:['PAID','PAID','WAITING_PROVISIONING'],provisioning:['PAID','PROCESSING','PROVISIONING'],activated:['PAID','COMPLETED','ACTIVATED'],payment_failed:['FAILED','PAYMENT_FAILED','WAITING_PAYMENT'],expired:['EXPIRED','EXPIRED','WAITING_PAYMENT'],provisioning_failed:['PAID','PROVISIONING_FAILED','PROVISIONING_FAILED'],refunded:['REFUNDED','REFUNDED','REFUNDED'],chargeback:['CHARGEBACK','CHARGEBACK','DEACTIVATED'],cancelled:['CANCELLED','CANCELLED','WAITING_PAYMENT']};
 // Sample times are facts of the scenario: fixed when it is seeded, not regenerated per read. Like the backend's
 // pending-order TTL, an unpaid order (a sample or one placed in this session) may be paid for 30 minutes after it is
-// placed. The placed sample (001) is placed as the scenario starts, or, for paymentState=urgent, 25 min 10 s earlier,
-// so it and its payment share one deadline 4 min 50 s away. A paid sample was paid 3 minutes after it was placed, and
+// placed. The placed sample (001) is placed as the scenario starts, or earlier for paymentState=urgent and late, so it
+// and its payment share one deadline 4 min 50 s or 1 min away. A paid sample was paid 3 minutes after it was placed, and
 // its later events follow in order.
-const paymentWindow=30*60000,urgentPlacedAgo=paymentWindow-(4*60000+50000),samplePaidAfter=3*60000;
+export const paymentWindow=30*60000;
+const samplePlacedAgo={urgent:paymentWindow-(4*60000+50000),late:paymentWindow-60000},samplePaidAfter=3*60000;
+// Like AppOrderExpiryScheduler, a task running every 60 s closes an unpaid order past its deadline, and never one with a
+// payment intent: that order stays open until its payment concludes. Until the task runs, paying is refused as expired.
+const deadlineTaskDelay=60000;
+export const demoTimedOutOrder={canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'};
+export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'&&order.expiresAt+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo];
 function demoOrders(products,state,now) {
   const at=state.sampleOrdersAt??=now;
   return Object.entries(orderStates).map(([original,statuses],i)=>{
     const orderNo='DEMO-ORDER-'+String(i+1).padStart(3,'0'),canonicalStatus=state.orderStatuses?.[orderNo]||original;
     const [paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus],product=products[i%products.length];
-    const placedAt=original==='placed'?at-(state.paymentState==='urgent'?urgentPlacedAgo:0):at-(i+1)*day;
+    const placedAt=original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
     return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?at-3600000:null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:original==='activated'?41:null,targetDeviceInstanceNo:original==='activated'?'REVIEW-S1':null,itemCount:1,
       lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}]};
   });
@@ -134,9 +140,8 @@ const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
 // sample (004) is the order of seeded device 41 and is listed only while the seed holds that device, on that device's
 // timeline: paid and activated when the device was, placed 3 minutes before. A sample paid
 // in this session is adopted into createdOrders by the checkout or payment fixture and listed once. The empty
-// account (dataState=empty) has no sample rows, only what this session creates. An unpaid sample whose payment window
-// has ended reads as expired, as the server's deadline task (modelled for session orders by the checkout fixture)
-// leaves it.
+// account (dataState=empty) has no sample rows, only what this session creates. An unpaid sample the deadline task has
+// closed reads as expired, as that task (modelled for session orders by the checkout fixture) leaves it.
 function demoScenarioOrders(products,state,now,device41) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
   return [...own,...demoOrders(products,state,now).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
@@ -144,7 +149,7 @@ function demoScenarioOrders(products,state,now,device41) {
     &&(state.checkoutState!=='replace'||order.orderNo!=='DEMO-ORDER-003')
     &&(device41||order.orderNo!=='DEMO-ORDER-004'))
     .map(order=>order.orderNo==='DEMO-ORDER-004'?{...order,placedAt:device41.activatedAt-samplePaidAfter,paidAt:device41.activatedAt,activatedAt:device41.activatedAt}:order)
-    .map(order=>order.canonicalStatus==='placed'&&order.expiresAt<=now?{...order,canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'}:order)];
+    .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
 }
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
@@ -162,8 +167,8 @@ const demoOrderSlots=(orders,orderNo)=>orders
 // next read seeds the devices here. A write is applied only in the scenario it started in, and only from a page of that
 // scenario. dataState=empty is the empty account the empty pages are reviewed with: no devices, no sample orders and an
 // empty wallet (balance 0, so wallet payments are refused for funds), the trial as its own knobs say.
-// paymentState=low-balance is an account whose wallet holds 820.64 USDT; paymentState=urgent seeds the unpaid sample
-// close to its deadline. PRESENTATION knobs (machineImageState: artwork only; dataState loading/error; the other
+// paymentState=low-balance is an account whose wallet holds 820.64 USDT; paymentState=urgent and late seed the unpaid
+// sample close to its deadline. PRESENTATION knobs (machineImageState: artwork only; dataState loading/error; the other
 // external payment results) only change what a read shows or how a payment proceeds; they never change a fact.
 // After seeding, only lifecycle events change the fleet: purchases and deliveries, conversions, trade-ins and the
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
