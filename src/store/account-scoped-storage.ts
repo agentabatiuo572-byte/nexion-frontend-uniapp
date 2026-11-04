@@ -98,6 +98,13 @@ export function releaseAccountCommandKey(
   return readAccountRow<AccountCommandRow>(tableKey, accountKey)?.commands?.[normalizedIntent] === undefined;
 }
 
+/** Releases a command by its key when the caller no longer knows the intent it was minted for. */
+export function releaseAccountCommandByKey(tableKey: string, accountKey: string, key: string): boolean {
+  const commands = readAccountRow<AccountCommandRow>(tableKey, accountKey)?.commands ?? {};
+  const intent = Object.keys(commands).find(candidate => commands[candidate] === key);
+  return !!intent && releaseAccountCommandKey(tableKey, accountKey, intent, key);
+}
+
 /**
  * Remove every local row owned by one mock account.  This is deliberately a
  * best-effort, key-scoped cleanup: remote mode never calls it, and unrelated
