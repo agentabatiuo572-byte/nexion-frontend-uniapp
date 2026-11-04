@@ -101,6 +101,7 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote'])delete state[key];
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
         // checks, not only numbers on screen.
+        if(scenarioChange&&state.bankDemo)Object.assign(state.bankDemo,{quotes:{},orders:{},commands:{}});
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
         else if(scenarioChange&&state.paymentState==='low-balance')state.walletBalance=820.64;
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
