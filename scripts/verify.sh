@@ -468,13 +468,10 @@ sentinel_present "SPEC-1 R7 heartbeat typed" src/store/types.ts 'onlineHeartbeat
 sentinel_present "SPEC-1 R7 heartbeat freshest-wins merge" src/store/account-cloud.ts '"onlineHeartbeatAt"'
 sentinel_present "SPEC-1 R7 settle reads device online" src/store/app.ts 'isDeviceOnline\(d, now\)'
 sentinel_present "SPEC-1 R7 App stamps heartbeat" src/store/app.ts 'onlineHeartbeatAt: now'
-sentinel_present "SPEC-1 R7 home row uses confirmed runtime display" src/components/home/device-row.vue 'deviceOnlineState\(props\.device, Date\.now\(\), props\.runtimeConfirmed\)'
-sentinel_present "SPEC-1 R7 home slot uses confirmed runtime display" src/components/home/device-row.vue 'deviceOnlineState\(props\.device, Date\.now\(\), props\.runtimeConfirmed\)'
 sentinel_present "BUG 264 me summary uses activated device count" src/pages/me/me.vue 'activatedLabel.*n: activeCount\.value'
 sentinel_present "BUG 264 legacy me card uses activated device count" src/components/me/my-devices-entry.vue 'activatedLabel.*n: activeCount\.value'
 sentinel_present "BUG 264 wallet summary uses activated device count" src/components/me/wallet-card.vue 'walletSlotsLine.*active: visibility\.mask\(activeCount\.value'
 if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
-  src/components/home/device-row.vue \
   src/components/home/device-slot.vue \
   src/components/earn/device-card-pc.vue \
   src/components/me/wallet-card.vue \
@@ -574,16 +571,12 @@ sentinel_present "device card secondary controls are keyboard-accessible" src/co
 sentinel_present "device quick menu is a modal dialog" src/components/earn/device-card-pc.vue 'aria-modal="true"'
 sentinel_present "device quick menu traps focus" src/components/earn/device-card-pc.vue 'function trapMenuFocus'
 sentinel_present "device quick menu traps native H5 keydown in capture phase" src/components/earn/device-card-pc.vue 'addEventListener\("keydown", onDocumentMenuKeydown, true\)'
-sentinel_present "home slot opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
-sentinel_present "home row opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
-sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
-sentinel_present "home row device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="onKeyboardActivate\(\$event, goBack\)"'
-# ⚠️ 上面这 4 条 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
+# ⚠️ 上面的 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
 # 2026-08-11 量面结果说明了枚举式判据的天花板 —— 它们守住 4 个控件,而当时全仓有 151 个
 # 自造控件键盘不可达(覆盖率 3%)。构造性判据见文件末尾的 a11y_activate_gate:那道门遍历
 # 「全仓每一个模板元素」,新控件天然落进判定域,不需要谁记得往这张清单里补一行。
-# 这 4 条保留:它们额外锁的是「这几个具体控件的具体行为别被改掉」,与构造性门不重叠;
+# 这些保留:它们额外锁的是「这几个具体控件的具体行为别被改掉」,与构造性门不重叠;
 # 但**不要再往这张清单里加新的**——加了也追不上问题面的增长速度。
 # ── SPEC-7 风险簇/三桶/释放/提现 sentinels(推倒重写版 2026-07-02)──
 # 契约层: 全参数寄存器 + 新增整改 key(R1/R2/R4)
@@ -1064,7 +1057,6 @@ spec2_pc_gpu_kind_coverage() {
   grep -q '"pc-gpu"' src/store/types.ts || miss="${miss}DeviceKind "
   grep -q '"pc-gpu"' src/store/device-types.ts || miss="${miss}device-types "
   grep -q '"pc-gpu"' src/components/earn/device-card-pc.vue || miss="${miss}device-card-icon "
-  grep -q '"pc-gpu"' src/components/earn/empty-slots-hint.vue || miss="${miss}slot-grid-icon "
   if [ -z "$miss" ]; then ok "SPEC-2 pc-gpu kind coverage (types/specs/icons)";
   else bad "SPEC-2 pc-gpu kind coverage missing: $miss"; fi
 }

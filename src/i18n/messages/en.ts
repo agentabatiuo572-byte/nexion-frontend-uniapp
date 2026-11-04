@@ -629,8 +629,6 @@ export const en = {
     doMathTitle: "Device comparison",
     doMathUnavailable: "No devices available to compare",
     // {base} carries its own possessive ("Your phone") — see lib/device-copy.ts.
-    doMathHeadline: "{target} est. daily earnings: {mult} of {base}.",
-    doMathDaily: "daily",
     doMathVs: "vs {base}",
     doMathSeeCta: "Upgrade",
     doMathStage: "Est. daily earnings",
@@ -720,11 +718,9 @@ export const en = {
     techVsYesterdaySamePeriod: "vs same time yesterday",
     techEarningsCurrency: "USDT",
     techSettlementSnapshot: "Settlement snapshot",
-    techVsYesterday: "↑ +5.2% vs yesterday · 142 jobs settled",
     techEarningsUnavailable: "Shown after real settlements are recorded",
     techEarningsLoading: "Loading today's settlements",
     techEarningsEmpty: "No tasks have settled today",
-    techSettledJobs: "{arrow} {delta} vs yesterday · {count} jobs settled",
     // DayOneQuestCard
     taskCarouselLabel: "New user and weekly tasks",
     taskCarouselPosition: "Slide {current} of {total}: {title}",
