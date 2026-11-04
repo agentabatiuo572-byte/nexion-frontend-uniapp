@@ -3176,6 +3176,8 @@ export const fil: Messages = {
     avatarTypeInvalidHint: "Pumili ng PNG, JPG o WebP na larawan",
     avatarSizeInvalidTitle: "Lampas 2 MB ang larawan",
     avatarSizeInvalidHint: "Pumili ng larawang 2 MB pababa",
+    avatarEmptyTitle: "Walang laman ang file ng larawan",
+    avatarEmptyHint: "Pumili ng ibang larawan",
     walletAddress: "Address ng wallet",
     walletEmpty: "Hindi pa naka-set",
     walletUnknown: "Hindi available ang status ng address",

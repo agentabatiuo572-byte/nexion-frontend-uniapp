@@ -3176,6 +3176,8 @@ export const id: Messages = {
     avatarTypeInvalidHint: "Pilih gambar PNG, JPG, atau WebP",
     avatarSizeInvalidTitle: "Gambar lebih dari 2 MB",
     avatarSizeInvalidHint: "Pilih gambar maksimal 2 MB",
+    avatarEmptyTitle: "File gambar kosong",
+    avatarEmptyHint: "Pilih gambar lain",
     walletAddress: "Alamat penarikan",
     walletEmpty: "Belum diatur",
     walletUnknown: "Status alamat tidak tersedia",

@@ -3176,6 +3176,8 @@ export const ru: Messages = {
     avatarTypeInvalidHint: "Выберите изображение PNG, JPG или WebP",
     avatarSizeInvalidTitle: "Файл больше 2 МБ",
     avatarSizeInvalidHint: "Выберите изображение до 2 МБ",
+    avatarEmptyTitle: "Файл изображения пуст",
+    avatarEmptyHint: "Выберите другое изображение",
     walletAddress: "Адрес кошелька",
     walletEmpty: "Не задан",
     walletUnknown: "Статус адреса недоступен",

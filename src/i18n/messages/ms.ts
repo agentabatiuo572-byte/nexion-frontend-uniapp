@@ -3176,6 +3176,8 @@ export const ms: Messages = {
     avatarTypeInvalidHint: "Pilih imej PNG, JPG atau WebP",
     avatarSizeInvalidTitle: "Imej melebihi 2 MB",
     avatarSizeInvalidHint: "Pilih imej 2 MB atau kurang",
+    avatarEmptyTitle: "Fail imej kosong",
+    avatarEmptyHint: "Pilih imej lain",
     walletAddress: "Alamat pengeluaran",
     walletEmpty: "Belum ditetapkan",
     walletUnknown: "Status alamat tidak tersedia",
