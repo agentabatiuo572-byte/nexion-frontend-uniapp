@@ -31,17 +31,16 @@
         <path class="job-gauge__arc" d="M20 140 A110 110 0 0 1 240 140" fill="none" :stroke="`url(#${gradientId})`" stroke-width="6" stroke-linecap="round" />
         <!-- Ripples: twelve soft crests (14° each, every 30°) on the same r=110 circle turn about the centre (130,140)
              by one spacing per loop, so the train flows toward the head without a start or end. The mask is the filled
-             arc itself, so crests only show inside the completed part; it lives in this SVG to keep its transition. -->
-        <template v-if="live">
-          <mask :id="`${gradientId}-mask`" maskUnits="userSpaceOnUse" x="0" y="0" width="260" height="150">
-            <path class="job-gauge__fill" d="M20 140 A110 110 0 0 1 240 140" fill="none" :stroke="`url(#${gradientId}-fade)`" stroke-width="6" stroke-linecap="round" />
-          </mask>
-          <g class="job-gauge__ripple" :mask="`url(#${gradientId}-mask)`">
-            <g class="job-gauge__waves">
-              <path v-for="k in 12" :key="k" :transform="`rotate(${k * 30} 130 140)`" d="M116.59 30.82 A110 110 0 0 1 143.41 30.82" fill="none" :stroke="`url(#${gradientId}-wave)`" stroke-width="6" />
-            </g>
+             arc itself, so crests only show inside the completed part. It lives beside the arc, not with the ripple, so
+             both share one entry sweep and one transition and the mask is never ahead of the arc. -->
+        <mask :id="`${gradientId}-mask`" maskUnits="userSpaceOnUse" x="0" y="0" width="260" height="150">
+          <path class="job-gauge__fill" d="M20 140 A110 110 0 0 1 240 140" fill="none" :stroke="`url(#${gradientId}-fade)`" stroke-width="6" stroke-linecap="round" />
+        </mask>
+        <g v-if="live" class="job-gauge__ripple" :mask="`url(#${gradientId}-mask)`">
+          <g class="job-gauge__waves">
+            <path v-for="k in 12" :key="k" :transform="`rotate(${k * 30} 130 140)`" d="M116.59 30.82 A110 110 0 0 1 143.41 30.82" fill="none" :stroke="`url(#${gradientId}-wave)`" stroke-width="6" />
           </g>
-        </template>
+        </g>
         <g class="job-gauge__head">
           <circle cx="20" cy="140" r="4" :fill="color" />
           <circle v-if="live" class="job-gauge__ring" cx="20" cy="140" r="5.25" fill="none" :stroke="color" stroke-width="1.5" />
@@ -53,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const props = withDefaults(defineProps<{ progress?: number | null; idle?: boolean; live?: boolean; tone?: "brand" | "amber"; label?: string }>(), { progress: null, idle: false, live: false, tone: "brand", label: undefined });
@@ -71,10 +70,16 @@ const loops = useLoopsInView(".job-gauge");
 const loopRef = loops.elRef;
 // A state change (idle, running) still rewrites the App markup; once the entry sweep has played, the App drops it
 // (and the loops' start delay) so such a rewrite never replays the arc from zero. H5 keeps the stock timings.
-// It settles at 2.1s, after the ripple fade-in (1.4s + 600ms) has finished, so switching never cuts that fade short.
+// It settles 2.1s after the last rewrite, once the ripple fade-in (1.4s + 600ms) of the nodes on screen has finished,
+// so settling never cuts a fade short, however late those nodes appeared.
 const settled = ref(false);
 // #ifdef APP-PLUS
-const settleTimer = setTimeout(() => { settled.value = true; }, 2100);
+let settleTimer: ReturnType<typeof setTimeout> | undefined;
+watch([() => props.progress != null, () => props.live, () => props.idle, () => props.tone], () => {
+  if (settled.value) return;
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => { settled.value = true; }, 2100);
+}, { immediate: true });
 onUnmounted(() => clearTimeout(settleTimer));
 // #endif
 </script>
