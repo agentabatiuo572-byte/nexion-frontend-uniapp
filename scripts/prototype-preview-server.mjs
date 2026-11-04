@@ -41,8 +41,12 @@ const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
 function previewScenarioPage(scenario,keys){
   if(localStorage.getItem('uvel-preview-scenario')!==scenario){for(const key of keys)localStorage.removeItem(key);localStorage.setItem('uvel-preview-scenario',scenario);}
-  // A record this page wrote after its scenario ended goes with it, also when another page has already entered the new one.
-  const follow=value=>{if(value&&value!==scenario){for(const key of keys)localStorage.removeItem(key);location.reload();}};
+  const follow=value=>{if(value&&value!==scenario)location.reload();};
+  // Once another page has entered a new scenario the shared records are that scenario's: this page may neither write nor
+  // remove them. A page still alone in the old scenario writes freely, and the next load of the new one clears its records.
+  const {setItem,removeItem}=Storage.prototype,stale=(storage,key)=>storage===localStorage&&keys.includes(key)&&localStorage.getItem('uvel-preview-scenario')!==scenario;
+  Storage.prototype.setItem=function(key,value){if(stale(this,key)){location.reload();return;}return setItem.call(this,key,value);};
+  Storage.prototype.removeItem=function(key){if(stale(this,key)){location.reload();return;}return removeItem.call(this,key);};
   addEventListener('storage',event=>{if(event.key==='uvel-preview-scenario')follow(event.newValue);});
   const local=target=>{try{return new URL(target,location.href).origin===location.origin;}catch{return false;}};
   const {open,send}=XMLHttpRequest.prototype;
