@@ -96,7 +96,7 @@
   </view>
 
   <!-- Payment page: USDT address, bank in progress, or funds received. -->
-  <view v-if="active && s.open && s.pending" id="pp-page" class="pp-page" role="dialog" aria-modal="true" :aria-label="pageTitle" :style="{ paddingTop: statusBar + 'px' }">
+  <view v-if="pageOpen" id="pp-page" class="pp-page" role="dialog" aria-modal="true" :aria-label="pageTitle" :style="{ paddingTop: statusBar + 'px' }">
     <DeviceStatusBar />
     <view class="pp-nav">
       <view class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.back" @click="leavePage" @keydown.enter.prevent="leavePage">
@@ -258,8 +258,9 @@ const networks = computed(() => [
   { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
   { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
 ].filter(tab => payment.available(tab.id)));
-// These answers end the payment: the sheet has nothing left to offer behind them.
-const sheetOpen = computed(() => active.value && s.open && !s.pending && !['orderExpired', 'orderClosed', 'orderMissing', 'gone'].includes(s.notice));
+// A concluded payment has nothing left to offer behind its notice.
+const sheetOpen = computed(() => active.value && s.open && !s.pending && !s.concluded);
+const pageOpen = computed(() => active.value && s.open && !!s.pending && !s.concluded);
 const sheetTitle = computed(() => s.step === 'network' ? copy.value.networkTitle : s.step === 'bank' ? copy.value.bankTitle : copy.value.title);
 const fees = computed(() => s.intent ?? s.quote);
 const isBank = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'HDPAY_BANK');
@@ -289,7 +290,10 @@ type Notice = { title: string; body: string; primary: string; secondary?: string
 const dismiss = () => payment.notify('');
 function noticeFor(kind: PurchaseNotice): Notice | null {
   const c = copy.value, order = s.kind === 'ORDER_PAY' && !!s.orderNo;
-  const refused = { icon: 'info' as const, tone: 'warning' as const, primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder };
+  // A reloaded payment has no way to order again (PRD §6).
+  const refused = { icon: 'info' as const, tone: 'warning' as const, ...(s.coldResume
+    ? { primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
+    : { primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }) };
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
   switch (kind) {
     case 'reminder': return s.method === 'HDPAY_BANK'
@@ -312,7 +316,9 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'orderExpired': return { ...refused, title: c.orderExpiredTitle, body: c.orderExpired };
     case 'orderClosed': return { ...refused, title: c.orderClosedTitle, body: c.orderClosed };
     // There is no order to open, so only ordering again remains.
-    case 'orderMissing': return { ...refused, title: c.orderMissingTitle, body: c.orderMissing, secondary: c.close, onSecondary: payment.close };
+    case 'orderMissing': return s.coldResume
+      ? { ...refused, title: c.orderMissingTitle, body: c.orderMissing, primary: c.close, secondary: undefined, onPrimary: payment.close }
+      : { ...refused, title: c.orderMissingTitle, body: c.orderMissing, secondary: c.close, onSecondary: payment.close };
     case 'gone': return order
       ? { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
       : { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
@@ -339,7 +345,7 @@ function moveFocus(event: KeyboardEvent, delta: number, choose = false) {
 function leavePage() { if (received.value) payment.openOrder(); else payment.notify('leave'); }
 
 useDialogA11y(sheetOpen, '#pp-sheet', payment.close, true, 3);
-useDialogA11y(computed(() => active.value && s.open && !!s.pending && !s.cashier && !s.notice), '#pp-page', leavePage, true, 3);
+useDialogA11y(computed(() => pageOpen.value && !s.cashier && !s.notice), '#pp-page', leavePage, true, 3);
 useDialogA11y(computed(() => active.value && s.open && s.cashier), '.pp-cashier', payment.closeCashier, true, 4);
 
 // #ifdef APP-PLUS
