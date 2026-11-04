@@ -655,7 +655,7 @@ const humanHistory = computed(() => {
 const conv = computed(() => {
   const current = cid.value ? convStore.get(cid.value) : undefined;
   if (!current) return undefined;
-  const messages = [...new Map(humanHistory.value.flatMap(row => row.messages).map(message => [message.id,message])).values()].sort((a,b)=>a.ts-b.ts || String(a.id).localeCompare(String(b.id)));
+  const messages = [...new Map(humanHistory.value.flatMap(row => row.messages).map(message => [message.id,message])).values()].sort((a,b)=>a.ts-b.ts || a.id.length-b.id.length || a.id.localeCompare(b.id)); // Numeric ids: same order as the backend (createdAt,id) cursor.
   return { ...current, messages, historyTruncated: humanHistory.value.some(row=>row.historyTruncated), historyNextCursor: humanHistory.value.find(row=>row.historyNextCursor)?.historyNextCursor };
 });
 watch([cid, () => app.accountBindingEpoch, supportSessionReady, () => humanHistory.value.map(row=>`${row.id}:${row.lastPublicMessageId ?? row.lastTs}`).sort().join("|"), humanHistoryRetry, humanShowRevision], async ([id,, ready],_,onCleanup) => {
