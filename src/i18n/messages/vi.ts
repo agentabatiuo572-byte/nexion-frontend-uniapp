@@ -623,8 +623,6 @@ export const vi: Messages = {
     // DoTheMathCard (ZONE 5)
     doMathTitle: "So sánh thiết bị",
     doMathUnavailable: "Chưa có thiết bị để so sánh",
-    doMathHeadline: "Thu nhập ước tính mỗi ngày của {target} gấp {mult} {base}.",
-    doMathDaily: "mỗi ngày",
     doMathVs: "so với {base}",
     doMathSeeCta: "Nâng cấp",
     doMathStage: "Thu nhập ngày dự kiến",
@@ -714,11 +712,9 @@ export const vi: Messages = {
     techVsYesterdaySamePeriod: "So với cùng giờ hôm qua",
     techEarningsCurrency: "USDT",
     techSettlementSnapshot: "Tổng quan thu nhập",
-    techVsYesterday: "↑ +5.2% so với hôm qua · đã hoàn tất 142 tác vụ",
     techEarningsUnavailable: "Hiển thị sau khi có thu nhập được ghi nhận",
     techEarningsLoading: "Đang tải thu nhập hôm nay",
     techEarningsEmpty: "Hôm nay chưa có tác vụ đã ghi nhận",
-    techSettledJobs: "{arrow} {delta} so với hôm qua · đã hoàn tất {count} tác vụ",
     // DayOneQuestCard
     taskCarouselLabel: "Nhiệm vụ người mới và hằng tuần",
     taskCarouselPosition: "Trang {current}/{total}: {title}",

@@ -253,15 +253,6 @@ const themeModeLabel = computed(() =>
       : t.value.me.themeMetaLight,
 );
 
-// Trial routing — hero slot (eligible to start) vs active row (running).
-// BUG 173: 槽位是三态,不是两态 —— 首次读取期间用固定高度骨架占位,避免
-// 卡片在数据到达时凭空插入把下面的模块整体推下去。
-const trialStatus = computed(() => trial.status);
-const trialIsActive = computed(
-  () => trialStatus.value === "active" || trialStatus.value === "grace",
-);
-const trialIsHero = computed(() => !trialIsActive.value && trial.promoSlot === "visible");
-
 // Genesis row surfaces once the user actually owns a Genesis node →
 // links to the holder (holdings/dividends) page.
 const genesis = useGenesis();
