@@ -954,7 +954,8 @@ async function handleWalletPayment() {
         },
         paymentOrderCurrent,{kind:'ORDER_PAY',payload:{orderNo:requestOrderNo},commandKey:()=>{const action=beginOrderAction(orders.currentAccountKey(),'pay',requestOrderNo,requestAmountUsdt,'EXTERNAL');orderAction.value=action;return action.key;},parseReceipt:paidOrderReceipt,
           orderNo:requestOrderNo,deadlineAt:liveOrder.value.expiresAt??null,image:heroImage.value||undefined,reorder:()=>void navTo('/store')});
-      if (!receipt) return;
+      // A refused payment means this page's order is out of date.
+      if (!receipt) { if (isCurrentDetailScope(scope)) void refreshOrder(); return; }
     if (!isCurrentDetailScope(scope)) return;
     if (receipt.orderNo !== requestOrderNo) {
       throw new Error("WALLET_PAYMENT_RECEIPT_ORDER_MISMATCH");

@@ -35,6 +35,9 @@ const zh = {
   lateTitle: '收到一笔逾期付款', late: '订单已超时关闭，客服会协助处理这笔付款。',
   deliveryTitle: '设备开通遇到问题', delivery: '已收到付款，客服会协助完成开通。', support: '联系客服',
   changedTitle: '订单信息已更新', changed: '请重新确认后付款。',
+  orderExpiredTitle: '订单已过付款时间', orderExpired: '这笔订单不能再付款，可以查看订单或重新下单。',
+  orderClosedTitle: '订单已不能付款', orderClosed: '这笔订单的状态已变化，可以查看订单或重新下单。',
+  orderMissingTitle: '找不到这笔订单', orderMissing: '订单可能已不在你的账号中，可以重新下单。',
   topupFor: '为订单充值', topupNeed: '{name} 还差 ', topupNeedTail: '，充值到账后可回到订单继续支付。', topupCloses: '订单 {t} 后自动关闭', topupDone: '余额已到账', topupEnough: '可用余额 {amt} USDT，足够支付这笔订单。', backToPay: '返回继续支付',
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
@@ -72,6 +75,9 @@ const en: typeof zh = {
   lateTitle: 'Late payment received', late: 'The order had already closed. Support will help you with this payment.',
   deliveryTitle: 'Device setup issue', delivery: 'Your payment arrived. Support will help finish the setup.', support: 'Contact support',
   changedTitle: 'Order updated', changed: 'Review the order again before paying.',
+  orderExpiredTitle: 'Payment time is over', orderExpired: 'This order can no longer be paid. View the order or place a new one.',
+  orderClosedTitle: 'This order can’t be paid', orderClosed: 'The order’s status has changed. View the order or place a new one.',
+  orderMissingTitle: 'Order not found', orderMissing: 'This order may no longer be in your account. You can place a new one.',
   topupFor: 'Top up for your order', topupNeed: '{name} needs ', topupNeedTail: ' more. Once the top-up arrives, return to the order to pay.', topupCloses: 'Order closes in {t}', topupDone: 'Balance received', topupEnough: '{amt} USDT available, enough for this order.', backToPay: 'Back to payment',
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
@@ -109,6 +115,9 @@ const vi: typeof zh = {
   lateTitle: 'Đã nhận khoản thanh toán trễ hạn', late: 'Đơn đã đóng do quá hạn. Bộ phận hỗ trợ sẽ giúp bạn xử lý khoản thanh toán này.',
   deliveryTitle: 'Kích hoạt thiết bị gặp sự cố', delivery: 'Đã nhận thanh toán. Bộ phận hỗ trợ sẽ giúp bạn hoàn tất kích hoạt.', support: 'Liên hệ hỗ trợ',
   changedTitle: 'Đơn hàng đã được cập nhật', changed: 'Vui lòng kiểm tra lại trước khi thanh toán.',
+  orderExpiredTitle: 'Đơn đã quá thời gian thanh toán', orderExpired: 'Không thể thanh toán đơn này nữa. Bạn có thể xem đơn hoặc đặt đơn mới.',
+  orderClosedTitle: 'Không thể thanh toán đơn này', orderClosed: 'Trạng thái đơn đã thay đổi. Bạn có thể xem đơn hoặc đặt đơn mới.',
+  orderMissingTitle: 'Không tìm thấy đơn hàng', orderMissing: 'Đơn này có thể không còn trong tài khoản của bạn. Bạn có thể đặt đơn mới.',
   topupFor: 'Nạp tiền cho đơn hàng', topupNeed: '{name} còn thiếu ', topupNeedTail: '. Nạp tiền xong có thể quay lại đơn để thanh toán tiếp.', topupCloses: 'Đơn tự đóng sau {t}', topupDone: 'Tiền đã vào ví', topupEnough: 'Số dư khả dụng {amt} USDT, đủ để thanh toán đơn này.', backToPay: 'Quay lại thanh toán',
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
@@ -146,6 +155,9 @@ const id: typeof zh = {
   lateTitle: 'Pembayaran terlambat diterima', late: 'Batas waktu pesanan sudah habis dan pesanan ditutup. Layanan pelanggan akan membantu menangani pembayaran ini.',
   deliveryTitle: 'Masalah penyiapan perangkat', delivery: 'Pembayaran Anda sudah masuk. Layanan pelanggan akan membantu menyelesaikan penyiapan.', support: 'Hubungi CS',
   changedTitle: 'Pesanan diperbarui', changed: 'Tinjau lagi pesanan sebelum membayar.',
+  orderExpiredTitle: 'Waktu pembayaran sudah lewat', orderExpired: 'Pesanan ini tidak bisa dibayar lagi. Lihat pesanan atau buat pesanan baru.',
+  orderClosedTitle: 'Pesanan tidak bisa dibayar', orderClosed: 'Status pesanan sudah berubah. Lihat pesanan atau buat pesanan baru.',
+  orderMissingTitle: 'Pesanan tidak ditemukan', orderMissing: 'Pesanan ini mungkin sudah tidak ada di akun Anda. Anda bisa membuat pesanan baru.',
   topupFor: 'Top up untuk pesanan Anda', topupNeed: '{name} masih kurang ', topupNeedTail: '. Setelah top up masuk, kembali ke pesanan untuk membayar.', topupCloses: 'Pesanan ditutup dalam {t}', topupDone: 'Saldo masuk', topupEnough: '{amt} USDT tersedia, cukup untuk pesanan ini.', backToPay: 'Kembali ke pembayaran',
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
@@ -183,6 +195,9 @@ const ms: typeof zh = {
   lateTitle: 'Bayaran lewat diterima', late: 'Pesanan sudah ditutup. Khidmat pelanggan akan membantu anda dengan bayaran ini.',
   deliveryTitle: 'Masalah penyediaan peranti', delivery: 'Bayaran anda telah diterima. Khidmat pelanggan akan membantu melengkapkan penyediaan.', support: 'Hubungi bantuan',
   changedTitle: 'Pesanan dikemas kini', changed: 'Semak semula pesanan sebelum membayar.',
+  orderExpiredTitle: 'Masa bayaran telah tamat', orderExpired: 'Pesanan ini tidak boleh dibayar lagi. Lihat pesanan atau buat pesanan baharu.',
+  orderClosedTitle: 'Pesanan tidak boleh dibayar', orderClosed: 'Status pesanan telah berubah. Lihat pesanan atau buat pesanan baharu.',
+  orderMissingTitle: 'Pesanan tidak dijumpai', orderMissing: 'Pesanan ini mungkin tiada lagi dalam akaun anda. Anda boleh membuat pesanan baharu.',
   topupFor: 'Tambah nilai untuk pesanan', topupNeed: '{name} perlu ', topupNeedTail: ' lagi. Setelah tambah nilai diterima, kembali ke pesanan untuk membayar.', topupCloses: 'Ditutup automatik dalam {t}', topupDone: 'Baki diterima', topupEnough: '{amt} USDT tersedia, cukup untuk pesanan ini.', backToPay: 'Kembali ke bayaran',
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
@@ -220,6 +235,9 @@ const fil: typeof zh = {
   lateTitle: 'May natanggap na late na bayad', late: 'Sarado na ang order. Tutulungan ka ng support sa bayad na ito.',
   deliveryTitle: 'Problema sa setup ng device', delivery: 'Dumating ang bayad mo. Tutulong ang support na tapusin ang setup.', support: 'Kontakin ang support',
   changedTitle: 'Na-update ang order', changed: 'Suriin ulit ang order bago magbayad.',
+  orderExpiredTitle: 'Tapos na ang oras ng bayad', orderExpired: 'Hindi na mababayaran ang order na ito. Tingnan ang order o gumawa ng bago.',
+  orderClosedTitle: 'Hindi mababayaran ang order', orderClosed: 'Nagbago na ang status ng order. Tingnan ang order o gumawa ng bago.',
+  orderMissingTitle: 'Hindi makita ang order', orderMissing: 'Maaaring wala na ang order na ito sa account mo. Puwede kang gumawa ng bago.',
   topupFor: 'Mag-top up para sa order mo', topupNeed: 'Para sa {name}, kulang pa ng ', topupNeedTail: ' — pagdating ng top-up, bumalik sa order para magbayad.', topupCloses: 'Magsasara ang order sa {t}', topupDone: 'Pumasok na ang pondo', topupEnough: '{amt} USDT ang available, sapat para sa order na ito.', backToPay: 'Bumalik sa bayad',
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
@@ -257,6 +275,9 @@ const ru: typeof zh = {
   lateTitle: 'Получен запоздалый платёж', late: 'Заказ уже был закрыт. Поддержка поможет с этим платежом.',
   deliveryTitle: 'Проблема с подключением', delivery: 'Оплата получена. Поддержка поможет завершить подключение.', support: 'Поддержка',
   changedTitle: 'Заказ обновлён', changed: 'Проверьте заказ ещё раз перед оплатой.',
+  orderExpiredTitle: 'Время на оплату истекло', orderExpired: 'Этот заказ больше нельзя оплатить. Откройте заказ или оформите новый.',
+  orderClosedTitle: 'Заказ нельзя оплатить', orderClosed: 'Статус заказа изменился. Откройте заказ или оформите новый.',
+  orderMissingTitle: 'Заказ не найден', orderMissing: 'Возможно, этого заказа больше нет в вашем аккаунте. Вы можете оформить новый.',
   topupFor: 'Пополнить для заказа', topupNeed: 'Для {name} не хватает ', topupNeedTail: '. Когда пополнение поступит, вернитесь к заказу и оплатите.', topupCloses: 'Закроется через {t}', topupDone: 'Пополнение поступило', topupEnough: 'Доступно {amt} USDT — хватает на этот заказ.', backToPay: 'Вернуться к оплате',
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
@@ -294,6 +315,9 @@ const kk: typeof zh = {
   lateTitle: 'Кешіккен төлем түсті', late: 'Тапсырыстың төлем мерзімі өтіп, ол жабылған. Қолдау қызметі бұл төлем бойынша көмектеседі.',
   deliveryTitle: 'Құрылғыны баптауда ақау', delivery: 'Төлеміңіз түсті. Қолдау қызметі баптауды аяқтауға көмектеседі.', support: 'Қолдауға жазу',
   changedTitle: 'Тапсырыс жаңартылды', changed: 'Төлемес бұрын тапсырысты қайта растаңыз.',
+  orderExpiredTitle: 'Төлем уақыты өтті', orderExpired: 'Бұл тапсырысты енді төлеу мүмкін емес. Тапсырысты қарап шығыңыз немесе жаңасын жасаңыз.',
+  orderClosedTitle: 'Тапсырысты төлеу мүмкін емес', orderClosed: 'Тапсырыс күйі өзгерді. Тапсырысты қарап шығыңыз немесе жаңасын жасаңыз.',
+  orderMissingTitle: 'Тапсырыс табылмады', orderMissing: 'Бұл тапсырыс аккаунтыңызда енді болмауы мүмкін. Жаңасын жасай аласыз.',
   topupFor: 'Тапсырыс үшін толтыру', topupNeed: '{name} үшін тағы ', topupNeedTail: ' қажет. Ақша шотқа түскеннен кейін тапсырысқа оралып, төлеңіз.', topupCloses: 'Тапсырыстың жабылуына: {t}', topupDone: 'Қаражат түсті', topupEnough: 'Қолжетімді {amt} USDT, бұл тапсырысқа жеткілікті.', backToPay: 'Төлемге оралу',
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
@@ -331,6 +355,9 @@ const uz: typeof zh = {
   lateTitle: 'Kechikkan toʻlov qabul qilindi', late: 'Buyurtma allaqachon yopilgan edi. Yordam xizmati bu toʻlov boʻyicha yordam beradi.',
   deliveryTitle: 'Qurilmani sozlashda muammo', delivery: 'Toʻlovingiz tushdi. Yordam xizmati sozlashni yakunlashga yordam beradi.', support: 'Yordam xizmati',
   changedTitle: 'Buyurtma yangilandi', changed: 'Toʻlashdan oldin buyurtmani qayta tekshiring.',
+  orderExpiredTitle: 'Toʻlov vaqti tugadi', orderExpired: 'Bu buyurtmani endi toʻlab boʻlmaydi. Buyurtmani koʻring yoki yangisini bering.',
+  orderClosedTitle: 'Buyurtmani toʻlab boʻlmaydi', orderClosed: 'Buyurtma holati oʻzgardi. Buyurtmani koʻring yoki yangisini bering.',
+  orderMissingTitle: 'Buyurtma topilmadi', orderMissing: 'Bu buyurtma hisobingizda endi boʻlmasligi mumkin. Yangisini berishingiz mumkin.',
   topupFor: 'Buyurtma uchun toʻldirish', topupNeed: '{name} uchun yana ', topupNeedTail: ' kerak. Mablagʻ hisobga tushgach, toʻlash uchun buyurtmaga qayting.', topupCloses: 'Buyurtma yopilishiga {t}', topupDone: 'Balans toʻldirildi', topupEnough: 'Mavjud: {amt} USDT — bu buyurtma uchun yetarli.', backToPay: 'Toʻlovga qaytish',
   resume: 'Toʻlov jarayonda', view: 'Toʻlovni koʻrish', review: 'Toʻlovingiz tasdiqlanmoqda', ended: 'Bu toʻlov yakunlangan', delivered: 'Toʻlov yakunlandi',
 };
