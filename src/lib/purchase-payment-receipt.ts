@@ -21,7 +21,8 @@ export function validatePurchasePaymentReceipt(kind: PurchaseKind, payload: Reco
   }
   if (kind === 'TRIAL_CONVERT') {
     const receipt = parseTrialConvertReceipt(raw);
-    if (receipt.productNo !== payload.productNo || formatAmount(row.paymentSubtotalUsdt) !== formatAmount(payload.expectedAmountUsdt as string | number)) throw new Error('PURCHASE_PAYMENT_RECEIPT_MISMATCH');
+    // The confirmed amount is a ceiling: accrual may have lowered what this payment settled.
+    if (receipt.productNo !== payload.productNo || Number(row.paymentSubtotalUsdt) > Number(payload.expectedAmountUsdt)) throw new Error('PURCHASE_PAYMENT_RECEIPT_MISMATCH');
     return receipt.orderNo;
   }
   const receipt = kind === 'CAPACITY_KEEP' ? parseCanonicalCapacityKeepResult(raw) : parseCanonicalTradeinResult(raw);

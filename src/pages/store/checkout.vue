@@ -1327,6 +1327,11 @@ const confirmationTotal = computed(() => {
   }
   return Number(cents) / 100;
 });
+// A trial's offset grows with accrual under one quote version: a lower amount keeps the user's confirmation,
+// a higher one needs a new one (B14 item 2). Every other total must stay exactly as confirmed.
+function totalStillConfirmed(confirmed: number) {
+  return trialView.value.applied ? confirmationTotal.value <= confirmed : confirmationTotal.value === confirmed;
+}
 const cardFeeText = computed(() => formatAmount(cardFee.value));
 // The legacy card debit is settled in cents; keep its sum's binary float noise
 // out of the display while retaining canonical fee-free USDT precision.
@@ -1477,7 +1482,7 @@ async function requestConfirmPay() {
     paymentSheetAmount.value = amount;
     await nextTick();
     if (!isCurrentCheckoutRoute(scope) || ((!createdCheckoutOrder.value && !pendingCheckoutCreate.value) && trialQuoteScreenUnavailable.value) || step.value !== "confirm") return;
-    if (amount !== confirmationTotal.value
+    if (!totalStillConfirmed(amount)
         || (!createdCheckoutOrder.value && !pendingCheckoutCreate.value && !freeTrial.hasPendingConversion() && (reviewedTrialApplied !== trialView.value.applied
           || reviewedTrialQuoteVersion !== trialView.value.quoteVersion))) {
       toast.warn(t.value.store.coTotalQuoteChanged);
@@ -1523,7 +1528,7 @@ async function onConfirmPay() {
     if (!trialReady || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
   }
   if (trialQuoteUnavailable.value) { confirming = false; return; }
-  if (confirmedAmount !== confirmationTotal.value
+  if (!totalStillConfirmed(confirmedAmount)
       || (!freeTrial.hasPendingConversion() && (confirmedTrialApplied !== trialView.value.applied
         || confirmedTrialQuoteVersion !== trialView.value.quoteVersion))) {
     confirming = false;
@@ -1532,7 +1537,8 @@ async function onConfirmPay() {
     return;
   }
   trialQuote = trialView.value;
-  quotedTotal = remoteApiEnabled ? confirmationTotal.value : +(netPrice.value + cardFee.value).toFixed(2);
+  // The amount the user confirmed is the ceiling sent to the server, which settles its current, possibly lower, quote.
+  quotedTotal = remoteApiEnabled ? confirmedAmount : +(netPrice.value + cardFee.value).toFixed(2);
   voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
   quotedTradeIn = appliedTradeinView.value ? { deviceId: appliedTradeinView.value.device.id } : null;
   if (remoteApiEnabled) {
@@ -1561,12 +1567,12 @@ async function onConfirmPay() {
         const originalAmount = quotedTotal, originalVersion = trialQuote.quoteVersion;
         const authorized = await executeSelectedPurchase({amount:originalAmount,currency:'USDT',summary:p.name},
           async authorization=>{
-            if (!isCurrentCheckoutRoute(confirmationScope) || confirmedAmount!==confirmationTotal.value
+            if (!isCurrentCheckoutRoute(confirmationScope) || !totalStillConfirmed(confirmedAmount)
                 || confirmedTrialQuoteVersion!==trialView.value.quoteVersion) return null;
             return freeTrial.convert(p.id,originalAmount,originalVersion,authorization);
           },
           ()=>isCurrentCheckoutRoute(confirmationScope)&&!trialQuoteScreenUnavailable.value
-            &&confirmedAmount===confirmationTotal.value&&confirmedTrialApplied===trialView.value.applied
+            &&totalStillConfirmed(confirmedAmount)&&confirmedTrialApplied===trialView.value.applied
             &&confirmedTrialQuoteVersion===trialView.value.quoteVersion,
           {kind:'TRIAL_CONVERT',payload:{productNo:p.id,expectedAmountUsdt:originalAmount,quoteVersion:originalVersion},
             commandKey:()=>freeTrial.conversionPaymentKey(p.id,originalAmount,originalVersion),
