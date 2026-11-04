@@ -3176,6 +3176,8 @@ export const kk: Messages = {
     avatarTypeInvalidHint: "PNG, JPG немесе WebP суретін таңдаңыз",
     avatarSizeInvalidTitle: "Сурет 2 МБ-тан үлкен",
     avatarSizeInvalidHint: "2 МБ немесе одан кіші суретті таңдаңыз",
+    avatarEmptyTitle: "Сурет файлы бос",
+    avatarEmptyHint: "Басқа суретті таңдаңыз",
     walletAddress: "Шығару мекенжайы",
     walletEmpty: "Әлі орнатылмаған",
     walletUnknown: "Мекенжай күйі қолжетімсіз",
