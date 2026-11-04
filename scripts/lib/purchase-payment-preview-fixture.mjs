@@ -47,9 +47,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const openIntent = (subject, excluding) => [...intents.values()].some(row => row !== excluding && row.kind === subject.kind
     && !['DELIVERED', 'EXPIRED'].includes(row.status) && (row.kind === 'ORDER_PAY' ? row.orderNo === subject.orderNo : row.payloadKey === subject.payloadKey));
   // Like PurchasePaymentService.expire: no funds by the deadline plus grace ends the intent and its order together,
-  // unless a successor to a failed attempt now owns the order.
+  // unless a successor to a failed attempt now owns the order, or the order has already ended another way.
   function timeOut(intent) {
     if (openIntent(intent, intent)) return intent;
+    if (intent.orderNo) {
+      const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
+      if (order?.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT') return intent;
+    }
     settle(intent.orderNo, 'expired', intent);
     return Object.assign(intent, {status: 'EXPIRED', reason: 'PAYMENT_TIMEOUT'});
   }
