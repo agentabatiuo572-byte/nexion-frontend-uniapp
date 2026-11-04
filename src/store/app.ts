@@ -557,7 +557,7 @@ export const useApp = defineStore("app", () => {
     const base = cfg.config.publicStats.activeJobsBase ?? 0;
     if (!remoteApiEnabled) return global.value.activeJobs + base;
     const real = homeTruth.value?.onGrid.activeJobs ?? null;
-    if (real !== null) return real + base;
+    if (real !== null) return Number.isSafeInteger(real + base) ? real + base : null;
     const fleet = remoteRealizedToday.value;
     return fleet && fleet.usdt === 0 && fleet.nex === 0 ? base : null;
   });

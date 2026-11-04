@@ -15,9 +15,13 @@ export type GlobeDisplayConfig = {
   centers: { id: string; weight: number; latencyMs: number }[];
 };
 
+function decimalPlaces(value: number): number {
+  const [mantissa, exponent = '0'] = String(value).split('e');
+  return (mantissa.split('.')[1]?.length ?? 0) - Number(exponent);
+}
 /**
  * One boundary for the optional H9 projection. Invalid input leaves this module unavailable.
- * Two shapes: B22 sends `sharePct` on every center (0–100, summing to 100) and may omit `nodes` and the
+ * Two shapes: B22 sends `sharePct` on every center (0–100, at most two decimals, summing to 100) and may omit `nodes` and the
  * retired nodeJitterPct / activeJobsMinPct / activeJobsMaxPct; the old shape has no `sharePct` and uses `nodes` as weights.
  */
 export function parseGlobeDisplay(value: unknown): GlobeDisplayConfig | undefined {
@@ -27,8 +31,7 @@ export function parseGlobeDisplay(value: unknown): GlobeDisplayConfig | undefine
   for (const [key, [min, max]] of Object.entries(limits)) {
     const number = raw[key];
     if (typeof number !== "number" || !Number.isFinite(number) || number < min || number > max) return undefined;
-    const [mantissa, exponent = '0'] = String(number).split('e');
-    if ((mantissa.split('.')[1]?.length ?? 0) - Number(exponent) > 6) return undefined;
+    if (decimalPlaces(number) > 6) return undefined;
   }
   if (!Number.isInteger(raw.intervalMs) || !Number.isInteger(raw.latencyJitterMs)
       || (raw.throughputMin as number) > (raw.throughputMax as number)
@@ -48,7 +51,7 @@ export function parseGlobeDisplay(value: unknown): GlobeDisplayConfig | undefine
         || weights.every(nodes => nodes === 0)) return undefined;
   } else {
     weights = rows.map(center => center.sharePct as number);
-    if (weights.some(share => typeof share !== "number" || !Number.isFinite(share) || share < 0 || share > 100)
+    if (weights.some(share => typeof share !== "number" || !Number.isFinite(share) || share < 0 || share > 100 || decimalPlaces(share) > 2)
         || Math.abs(weights.reduce((sum, share) => sum + share, 0) - 100) > 1e-6) return undefined;
   }
   return {
