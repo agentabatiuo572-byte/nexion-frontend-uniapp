@@ -18,10 +18,10 @@ export function trialDemo(url,locale,state,request,capacityFull){
   // FEAT-TRIAL05 mirror of the Java quote: inside the original term the full claimed term is
   // settled and a fixed discount comes off what is left to pay; 0 switches the rule off.
   cfg.earlyPurchaseDiscountUSD??=String(state.trialEarlyDiscount??'10');
-  // P-59 / backend B13-B14: the trial discount caps at $50 and trial earnings offset without a cap (empty = none).
-  cfg.discountCapUSD='50';cfg.trialOffsetCapUSD='';
+  // P-59 / backend B13-B14: the trial discount caps at $50; an empty offset cap is JSON null in App responses.
+  cfg.discountCapUSD='50';cfg.trialOffsetCapUSD=null;
   const pricing=state.trialQuoteState||'default';
-  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='precision'?'432.123456':pricing==='half-cent'?'432.135':pricing==='precision-repriced'?'432.123457':pricing==='excess-offset'?'25':'1000',shadowDailyUSD:'10',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':''});
+  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='precision'?'432.123456':pricing==='half-cent'?'432.135':pricing==='precision-repriced'?'432.123457':pricing==='excess-offset'?'25':'1000',shadowDailyUSD:'10',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':null});
   const duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
   const scenario=mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
   if(!state.trialRow){
@@ -65,7 +65,7 @@ export function trialDemo(url,locale,state,request,capacityFull){
       return {settlementPolicy,quoteVersion,earlyPurchase:early,priceUsdt:number(price),accruedUsdt:shadow,accruedNex:nex,
         settledUsdt:number(settled),rewardNex:number(reward),earlyRewardUsdt:number(settled-units(shadow)),earlyRewardNex:number(reward-units(nex)),
         offsetUsdt:number(offset),remainderUsdt:number(settled-offset),promoDiscountUsdt:number(promo),earlyDiscountConfiguredUsdt:number(discount),earlyDiscountUsdt:number(earlyDiscount),
-        discountUsdt:number(baseDiscount+earlyDiscount),amountUsdt:number(amount),earlyEndsAtEpochMs:early?row.startedAt+duration:null};
+        discountUsdt:number(baseDiscount+earlyDiscount),amountUsdt:number(amount),earlyEndsAtEpochMs:early?row.startedAt+duration:null,trialOffsetCapUSD:cfg.trialOffsetCapUSD};
   }
 
   // PR #26 projection: the redeemed trial names its order; a refund of that order ends the purchase and,

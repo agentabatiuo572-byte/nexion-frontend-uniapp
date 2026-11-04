@@ -3149,7 +3149,7 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 | trialDays / graceDays / extensionDays | 累计期、抵扣保留期及符合资格的延长期；由后台返回各领取单时间边界 |
 | trialProductId / trialProductName | 当前可领取商品；已领取记录使用其商品快照 |
 | trialPriceUSD / shadowDailyUSD / shadowDailyNEX | 商品价格及日收益；优先取后台商品数据，领取后固定在领取单 |
-| trialOffsetCapUSD | 领取时固定的收益抵扣上限，超出部分按购后结算规则处理 |
+| trialOffsetCapUSD | 运营留空表示不设收益抵扣上限；App 配置与报价均返回 JSON `null`，是有效试用状态，界面使用无上限文案，不显示为 $0 或默认 $50。领取时固定该上限（含无上限），后续配置不改写已领取快照；有上限时超出部分按购后结算规则处理 |
 | discountRate / discountCapUSD | 现行主动购机促销比例与上限，最终优惠由 convert 计算 |
 | cooldownDays / phaseOpen / seatsLeftToday | 再领冷却、开放状态、当日剩余名额；只能通过权威资格决定能否领取 |
 | highQualityThresholdUSD | 既有延长资格参数，不保证所有用户可延长 |
