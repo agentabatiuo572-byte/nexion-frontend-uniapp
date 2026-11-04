@@ -1557,18 +1557,28 @@ async function onConfirmPay() {
         step.value = "select-payment";
         return;
       }
-      let conversion = await freeTrial.convert(p.id, quotedTotal, trialQuote.quoteVersion);
+      // A replay keeps the original payload and key, so this authorization covers the original amount, never a lower one.
+      // Live quotes keep the <= rule. The server settles its current amount either way, within that ceiling.
+      const replay = freeTrial.pendingConversion();
+      const originalAmount = replay?.amount ?? quotedTotal, originalVersion = replay ? replay.quoteVersion : trialQuote.quoteVersion;
+      quotedTotal = originalAmount;
+      const paymentCurrent = () => isCurrentCheckoutRoute(confirmationScope) && (!!replay || (!trialQuoteScreenUnavailable.value
+        && totalStillConfirmed(confirmedAmount) && confirmedTrialApplied === trialView.value.applied
+        && confirmedTrialQuoteVersion === trialView.value.quoteVersion));
+      let conversion = await freeTrial.convert(p.id, originalAmount, originalVersion);
       if (conversion.reason === 'payment-required') {
-        const originalAmount = quotedTotal, originalVersion = trialQuote.quoteVersion;
+        if (originalAmount !== confirmedAmount) {
+          const copy = purchaseRecoveryCopy(locale.code);
+          const accepted = await confirm({ title: copy.resume, message: fmt(copy.resumeAmount, { amt: formatAmount(originalAmount) }),
+            confirmLabel: copy.resume, cancelLabel: t.value.store.coCancel, icon: "warn", owner: dialogOwner });
+          if (!accepted || !isCurrentCheckoutRoute(confirmationScope)) { confirming = false; return; }
+        }
         const authorized = await executeSelectedPurchase({amount:originalAmount,currency:'USDT',summary:p.name},
           async authorization=>{
-            if (!isCurrentCheckoutRoute(confirmationScope) || !totalStillConfirmed(confirmedAmount)
-                || confirmedTrialQuoteVersion!==trialView.value.quoteVersion) return null;
+            if (!paymentCurrent()) return null;
             return freeTrial.convert(p.id,originalAmount,originalVersion,authorization);
           },
-          ()=>isCurrentCheckoutRoute(confirmationScope)&&!trialQuoteScreenUnavailable.value
-            &&totalStillConfirmed(confirmedAmount)&&confirmedTrialApplied===trialView.value.applied
-            &&confirmedTrialQuoteVersion===trialView.value.quoteVersion,
+          paymentCurrent,
           {kind:'TRIAL_CONVERT',payload:{productNo:p.id,expectedAmountUsdt:originalAmount,quoteVersion:originalVersion},
             commandKey:()=>freeTrial.conversionPaymentKey(p.id,originalAmount,originalVersion),
             parseReceipt:async raw=>{const receipt=parseTrialConvertReceipt(raw);const result=await freeTrial.convert(p.id,originalAmount,originalVersion);if(!result.ok||result.orderNo!==receipt.orderNo)throw new Error('TRIAL_CONVERT_RESULT_UNKNOWN');return result;}});
