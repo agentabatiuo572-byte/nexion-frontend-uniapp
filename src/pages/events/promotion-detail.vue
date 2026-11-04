@@ -2,8 +2,8 @@
   Purchase-offer landing page (P-58): SKU_GIFT, FIRST_PURCHASE and REPURCHASE.
   Every reward, limit, right, term and time comes from the public promotion read;
   other templates are sent on to the store filter. The page's main action lives in
-  the fixed bottom bar (DS-30) for every state. Sign-in, refusal, scheduled and ended
-  states follow the States board: no subtitle and no header rules button.
+  the fixed bottom bar (DS-30) for every state. Sign-in, refusal, scheduled, paused and
+  ended states follow the States board: no subtitle and no header rules button.
 -->
 <template>
   <AppChassis active="home">
@@ -243,6 +243,8 @@ let activityId = '';
 const kind = computed(() => activity.value ? landingKind(activity.value) : null);
 const rule = computed(() => activity.value?.rewardRules[0] ?? null);
 const phase = computed(() => activity.value?.state === 'ACTIVE' ? 'active' : activity.value?.state === 'SCHEDULED' ? 'scheduled' : 'ended');
+// A paused offer is closed like an ended one, so it keeps that layout; only its label and note say paused.
+const paused = computed(() => activity.value?.state === 'PAUSED');
 // The public read answers INELIGIBLE for every offer that is not running, so a refusal only counts while it runs.
 const refused = computed(() => phase.value === 'active' && activity.value?.eligibility === 'INELIGIBLE');
 const signInNeeded = computed(() => phase.value === 'active' && activity.value?.eligibility === 'SIGN_IN_REQUIRED');
@@ -288,6 +290,7 @@ const eligibilityTag = computed(() => {
 const timeTag = computed(() => {
   const a = activity.value!;
   if (phase.value === 'scheduled') return { tone: 'brand' as const, text: fmt(c.value.startsAt, { time: shortStart(a.startsAt) }) };
+  if (paused.value) return { tone: 'neutral' as const, text: c.value.pausedTag };
   if (phase.value === 'ended') return { tone: 'unavailable' as const, text: t.value.promotion.ended };
   return { tone: 'warning' as const, text: promotionRemaining(a, t.value.promotion) };
 });
@@ -295,6 +298,7 @@ const timeTag = computed(() => {
 const note = computed(() => {
   const a = activity.value;
   if (!a) return null;
+  if (paused.value) return { ended: false, text: c.value.pausedNote };
   if (phase.value === 'ended') return { ended: true, text: fmt(kind.value === 'gift' ? c.value.endedNoteGift : c.value.endedNoteReward, { time: displayDeadline(a.endsAt, locale.code) }) };
   if (phase.value !== 'active') return null;
   const message = localized(a.eligibilityMessage, locale.code);
@@ -458,7 +462,7 @@ async function load() {
     const lite = litePromotion(item);
     if (!lite) { void navReplace('/pages/events/events'); return; }
     activity.value = lite; readAt.value = Date.now(); now.value = readAt.value; status.value = 'ready';
-    if (item.template === 'REPURCHASE' && item.state === 'ACTIVE' && item.eligibility === 'INELIGIBLE') readFirstOffer(ticket, identity, signedIn);
+    if (item.template === 'REPURCHASE' && item.state === 'ACTIVE' && item.eligibility === 'INELIGIBLE') void readFirstOffer(ticket, identity, signedIn).catch(() => { /* Without the offer list the store stays the next step. */ });
   } catch (cause) {
     if (!fence.current(ticket) || identity !== readIdentity()) return;
     // A refused session drops the old account's view; any other failure keeps a shown offer as it was.
@@ -466,10 +470,17 @@ async function load() {
     status.value = 'error';
   }
 }
-function readFirstOffer(ticket: number, identity: string, signedIn: boolean) {
-  promotionApi.list({ limit: 20 }, signedIn).then(page => {
-    if (fence.current(ticket) && identity === readIdentity()) firstOfferId.value = page.items.find(item => item.template === 'FIRST_PURCHASE' && isPromotionActive(item) && litePromotion(item))?.activityId ?? null;
-  }, () => { /* Without the offer list the store stays the next step. */ });
+// Reads on until the first running first-purchase offer; the list has no template filter.
+async function readFirstOffer(ticket: number, identity: string, signedIn: boolean) {
+  let cursor: string | null = null;
+  do {
+    const page: Awaited<ReturnType<typeof promotionApi.list>> = await promotionApi.list({ limit: 20, cursor }, signedIn);
+    if (!fence.current(ticket) || identity !== readIdentity()) return;
+    const offer = page.items.find(item => item.template === 'FIRST_PURCHASE' && isPromotionActive(item) && litePromotion(item));
+    if (offer) { firstOfferId.value = offer.activityId; return; }
+    cursor = page.hasMore ? page.nextCursor : null;
+  } while (cursor);
+  firstOfferId.value = null;
 }
 function retry() { void load(); }
 
@@ -763,6 +774,6 @@ onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticke
 @media (prefers-reduced-motion: reduce) {
   .lp-rise, .lp-enter-main, .lp-enter-gift, .lp-pop, .lp-own, .lp-slot, .lp-bar, .lp-tick { animation: none; }
   .lp-press { transition: none; }
-  .lp-press:active { transform: none; }
+  .lp-press:active, .lp-cta.promotion-action:active { transform: none; }
 }
 </style>
