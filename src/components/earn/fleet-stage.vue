@@ -108,7 +108,8 @@ function select(key: string, focus = false) {
   void nextTick(() => {
     if (typeof document === "undefined") return;
     const chip = document.querySelector<HTMLElement>('.fleet-stage__chip[aria-selected="true"]');
-    chip?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    chip?.scrollIntoView({ behavior, block: "nearest", inline: "nearest" });
     if (focus) chip?.focus();
   });
 }
