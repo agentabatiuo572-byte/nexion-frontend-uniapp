@@ -190,6 +190,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         if (!order) return refused(404, 'ORDER_NOT_FOUND');
         if (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT') return refused(409, 'ORDER_NOT_PAYABLE');
       }
+      if (subject.kind === 'TRIAL_CONVERT') {
+        // Priced again as of the quote's own time: accrual since then changes nothing, a changed policy refuses before money moves.
+        const trial = demoFixture(new URL('/api/trial/state', url.origin), locale(), state, {...request, method: () => 'GET', pricingAt: source.pricingAt});
+        if (!['ACTIVE', 'GRACE'].includes(trial.state) || !trial.quote) return refused(409, 'TRIAL_NOT_CONVERTIBLE');
+        if (source.payload.quoteVersion !== trial.quote.quoteVersion) return refused(409, 'TRIAL_QUOTE_CHANGED');
+        if (Number(trial.quote.amountUsdt).toFixed(6) !== source.quote.businessAmountUsdt) return refused(409, 'PURCHASE_PAYMENT_PRICING_CHANGED');
+      }
       if (openIntent(subject)) return refused(409, 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED');
       const intentNo = `PPI-PREVIEW-${++sequence}`;
       // One deadline: the intent closes with the order, or 30 minutes from the quote when there is no order.
