@@ -167,7 +167,7 @@ const bankAction = computed(() => seg.value === "bank" ? bankPane.value?.primary
 const bankSecondary = computed(() => seg.value === "bank" ? bankPane.value?.secondaryAction ?? null : null);
 const bankOrderOpen = computed(() => seg.value === "bank" && !!bankPane.value && bankPane.value.paneView !== "form");
 // An open bank order stays on screen; otherwise a hidden bank channel hands over to USDT.
-watch([bankHidden, bankOrderOpen], ([hidden, open]) => { if (hidden && !open && seg.value === "bank") seg.value = "crypto"; }, { immediate: true });
+watch([bankHidden, bankOrderOpen, seg], ([hidden, open]) => { if (hidden && !open && seg.value === "bank") seg.value = "crypto"; }, { immediate: true });
 
 // ── styles ──
 // Segmented pill tabs — wallet-bills / SegmentedControl idiom.

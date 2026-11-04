@@ -21,7 +21,7 @@
           <view class="nx-dep-net__nm">
             <text class="nx-dep-net__name">{{ nw.label }}</text>
             <text v-if="nw.id === 'usdt-trc20'" class="nx-dep-net__sub">{{ t.topupChrome.netRecommended }}</text>
-            <text v-else class="nx-dep-net__sub">{{ fmt(t.topupChrome.netFee, { fee: (addressRefreshFailed || (fundsServerEnabled && !serverEnabled)) ? "—" : formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
+            <text v-else class="nx-dep-net__sub">{{ fmt(t.topupChrome.netFee, { fee: (addressRefreshFailed || (fundsServerEnabled && (!serverEnabled || nw.id !== net))) ? "—" : formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
           </view>
           <view class="nx-dep-net__ck" aria-hidden="true" />
         </view>
