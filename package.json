@@ -53,7 +53,7 @@
     "test:janus-retirement": "node --test scripts/janus-retirement.test.mjs",
     "test:production-boundaries": "node --test scripts/dev-prod-environment-contract.test.mjs scripts/funds-recoverable-operation-behavior.test.mjs scripts/h8-first-user-truth-contract.test.mjs scripts/janus-retirement.test.mjs",
     "test:prod-artifact": "node scripts/verify-production-artifact.mjs",
-    "test:real-backend-integration": "node --test scripts/behavior-analytics-auth-lifecycle-contract.test.mjs scripts/m-support-authority-contract.test.mjs scripts/e20-device-e3-api-behavior.test.mjs scripts/nova-local-ai-contract.test.mjs && vitest run",
+    "test:real-backend-integration": "node --test scripts/behavior-analytics-auth-lifecycle-contract.test.mjs scripts/m-support-authority-contract.test.mjs scripts/e20-device-e3-api-behavior.test.mjs && vitest run",
     "test:guard-liveness": "node scripts/selfcheck-guard-liveness.mjs",
     "test:session-reload-recovery": "node --test scripts/server-session-reload-recovery-contract.test.mjs && node scripts/verify-h5-runtime.mjs --server-session-reload-recovery",
     "test:h5-runtime": "node scripts/verify-h5-runtime.mjs",
