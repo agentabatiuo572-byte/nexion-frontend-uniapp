@@ -4001,7 +4001,7 @@ export const kk: Messages = {
     deviceCapTitle: "Құрылғы шегіне жеттіңіз",
     deviceCapMsg: "Бір аккаунтқа ең көбі {max} құрылғы қосуға болады. Жаңасын қосу үшін біреуін алып тастаңыз не кідіртіңіз.",
     insufficientBalanceTitle: "Баланс жеткіліксіз",
-    insufficientBalanceMsg: "Жалғастыру үшін кемінде ${amt} USDT қажет.",
+    insufficientBalanceMsg: "Жалғастыру үшін кемінде {amt} USDT қажет.",
     minWithdrawTitle: "Ең аз сомадан төмен",
     minWithdrawMsg: "Шығару сомасы кемінде $20.00 USDT болуы керек.",
     addressInvalidTitle: "Мекенжай жарамсыз",
