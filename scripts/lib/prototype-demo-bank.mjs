@@ -1,7 +1,7 @@
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
-import { secondaryDemo } from './prototype-demo-secondary.mjs';
+import { demoWithdrawalFacts, secondaryDemo } from './prototype-demo-secondary.mjs';
 
 const DAY = 86400000;
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
@@ -42,7 +42,12 @@ export function bankDemo(url, state, request) {
     return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: !intents.length ? null : { state: intents.length > 1 ? 'MULTIPLE' : 'NOT_SUBMITTED', intents, quoteNo: intents.length === 1 ? intents[0].quoteNo : null, withdrawalNo: null } };
   };
   const orderView = row => {
-    const settled = state.bankState === 'settled', rejected = state.bankState === 'rejected';
+    // The panel decides how an open order ends; once ended that is its fact. A rejected payout returns the funds.
+    if (!row.outcome && ['settled', 'rejected'].includes(state.bankState)) {
+      row.outcome = state.bankState;
+      if (row.outcome === 'rejected') state.walletBalance = Math.round((demoWithdrawalFacts(state).walletUsdt + row.bank.amountUsdt) * 1e6) / 1e6;
+    }
+    const settled = row.outcome === 'settled', rejected = row.outcome === 'rejected';
     return { ...snapshot(row), providerState: settled ? 'PAID' : rejected ? 'FAILED' : 'PENDING',
       withdrawal: { ...row.withdrawal, status: settled ? 'CONFIRMED' : rejected ? 'REFUNDED' : 'PROCESSING' },
       settlementEvidence: { status: settled ? 'paid' : rejected ? 'refunded' : 'unconfirmed', evidenceRef: settled || rejected ? 'DEMO-' + row.withdrawalNo : null, providerOrderId: settled ? 'DEMO-PROVIDER-' + row.withdrawalNo : null, providerStatus: settled ? 3 : null, checkedAt: new Date(now).toISOString(), amountUsdt: row.bank.amountUsdt } };
@@ -59,7 +64,8 @@ export function bankDemo(url, state, request) {
   });
   if (path === '/api/withdrawals/bank/quotes' && method === 'POST') {
     const bank = config().beneficiary, amountUsdt = Number(input().amountUsdt);
-    if (!bank?.canWithdraw || !Number.isFinite(amountUsdt) || amountUsdt < 10 || amountUsdt > config().capacity.maxWithdrawableUsdt) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
+    const { policy, capacity } = config();
+    if (!bank?.canWithdraw || !Number.isFinite(amountUsdt) || amountUsdt < policy.minAmountUsd || amountUsdt > policy.maxAmountUsd || amountUsdt > capacity.maxWithdrawableUsdt) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
     const feeUsdt = Math.round(Math.max(1, Math.min(100, amountUsdt * .01)) * 1e6) / 1e6;
     const netUsdt = Math.round((amountUsdt - feeUsdt) * 1e6) / 1e6;
     const quote = { quoteNo: 'BQ-' + randomBytes(16).toString('hex'), amountUsdt, feeUsdt, netUsdt, rateVnd: 25000, amountVnd: Math.round(netUsdt * 25000), bankCode: bank.bankCode, bankName: bank.bankName, bankRoutingVerified: true, maskedAccount: bank.maskedAccount, expiresAt: new Date(now + 300000).toISOString() };
@@ -80,8 +86,13 @@ export function bankDemo(url, state, request) {
     const row = demo.quotes[input().quoteNo];
     if (!row || row.abandoned || Date.parse(row.quote.expiresAt) <= now) fail('BANK_QUOTE_EXPIRED');
     if (row.order) return orderView(row.order);
+    // AppWithdrawalService.reserveBank: one daily count with USDT withdrawals, and the funds leave the wallet here.
+    const facts = demoWithdrawalFacts(state);
+    if (facts.dailyRemainingCount === 0) fail('WITHDRAWAL_DAILY_LIMIT_EXCEEDED');
+    if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
+    state.walletBalance = Math.round((facts.walletUsdt - row.quote.amountUsdt) * 1e6) / 1e6;
     const withdrawalNo = 'WD-DEMO' + (Object.keys(demo.orders).length + 1);
-    row.order = { state: 'COMMITTED', withdrawalNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
+    row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
     demo.orders[withdrawalNo] = row.order;
     return orderView(row.order);
   });
