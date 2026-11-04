@@ -68,25 +68,25 @@ const LEDGER = {
   earn: ["seed:USDT+"],
   // 佣金同上:结算进余额不落分录,mock 历史里有几行供账单页有内容可看。
   refer: ["seed:USDT+"],
-  bonus: ["*+×8", "USDT+×6", "seed:*+", "seed:USDT+"],
+  bonus: ["*+×2", "UVT+×6", "USDT+×6", "seed:UVT+", "seed:USDT+"],
   topup: ["USDT+×3", "seed:USDT+"],
-  // 兑换是双向的(NEX↔USDT),两条腿的 symbol 都是 `snap.fromSym` / `snap.toSym` ——
+  // 兑换是双向的(UVT↔USDT),两条腿的 symbol 都是 `snap.fromSym` / `snap.toSym` ——
   // 币种运行期才定,静态判不出,故记 `*`。(这一行原本手写成 `NEX-,USDT+`,
   // 被实测当场证伪 —— 台账的值必须来自磁盘,不来自记忆。)
   swap: ["*+", "*-"],
   // 🔴 本门的由来(2026-08-11 z4)。
   //   USDT- = 提现页按服务端回执写的主行 —— 用户「提了多少钱」的唯一凭据;
-  //   NEX-  = 同单号的 NEX 抵扣费行(勾了抵扣才有,服务端已烧);
-  //   NEX+  = 提现失败退还抵扣费时补的冲正行(与另两条腿同住 withdrawal-bill-drafts)。
-  // 三个都必须在。只剩 NEX+ 就是 2026-08-10~08-11 的实际状态:账单上只有一条
-  // 平台白送 NEX 的孤行,而它要冲正的那条 NEX- 与主行 USDT- 从来没被写过。
+  //   UVT-  = 同单号的 UVT 抵扣费行(勾了抵扣才有,服务端已烧);
+  //   UVT+  = 提现失败退还抵扣费时补的冲正行(与另两条腿同住 withdrawal-bill-drafts)。
+  // 三个都必须在。只剩 UVT+ 就是 2026-08-10~08-11 的实际状态:账单上只有一条
+  // 平台白送 UVT 的孤行,而它要冲正的那条 UVT- 与主行 USDT- 从来没被写过。
   // ✅ 可达性缺口已于包 z6(2026-08-11)补上,此处的旧表述一并更新:
-  // NEX+ 原来判据是**本地**退款幂等键,而写那把键的 creditRewardBucketInternal 对 remote 直接早退、
+  // UVT+ 原来判据是**本地**退款幂等键,而写那把键的 creditRewardBucketInternal 对 remote 直接早退、
   // mock 下又建不出提现单 —— 两头落空,**任何真实配置下都不可达**(静态门当时全绿)。
   // 现判据改锚服务端字段 `wd.nexRefunded`(契约 FEAT-WD01 §4.6),
   // 可达性由行为门 `selfcheck-withdraw-nex-refund.mjs` 在 **remote 模式**下实证。
   // 「有生产者」≠「跑得到」这条仍然成立:静态门守不了可达性,那一半归那道行为门。
-  withdraw: ["*+", "*-", "USDT-"],
+  withdraw: ["UVT+", "UVT-", "USDT-"],
   // 🔴 2026-08-13 从 5 → 6 + 一条 USDT+:创世购买半屏恢复了 mock 模式下的「扣款⊗记账 +
   //   铸造失败冲正」(8-10 转服务端权威时整段被删,而 mock 没有服务端 ⇒ 节点白送)。
   //   多出来的两个生产者就是那一对:主行 `amount: -cost`、冲正行 `amount: +cost`(同为
@@ -104,7 +104,7 @@ const LEDGER = {
   // 如实记 `?` 而不是猜成 `+` —— 猜错就是借贷记反,而那正是本门唯一要守的东西。
   unstake: ["USDT+", "USDT?"],
   // 2026-08-12:weekly-quest 两页的本地发奖迁服务端(同事批次),本地生产者各少一条。
-  achievement: ["*+×3", "USDT+×1", "seed:*+"],
+  achievement: ["UVT+×3", "USDT+×1", "seed:UVT+"],
   // Unknown production biz types are projected as `other` until the client
   // learns their semantic family. They are server-owned, so no local draft
   // producer is expected in this repository.
@@ -212,7 +212,7 @@ function draftToken(src, typeIdx) {
   const dir = /^-/.test(expr) ? "-" : /^[\w$."'[\]]+$/.test(expr) || /^\+/.test(expr) ? "+" : "?";
   // symbol 是 Bill 的必填字段;写成表达式(抽奖按奖品类型二选一)时静态判不出币种,
   // 记 `*` 如实交代 —— 不猜一个具体币种,那会让台账写着一件没被证实的事。
-  const sym = /(?<![\w$])symbol\s*:\s*"(USDT|NEX)"/.exec(body);
+  const sym = /(?<![\w$])symbol\s*:\s*"(USDT|UVT)"/.exec(body);
   return `${sym ? sym[1] : "*"}${dir}`;
 }
 
