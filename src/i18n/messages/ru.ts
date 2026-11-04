@@ -4001,7 +4001,7 @@ export const ru: Messages = {
     deviceCapTitle: "Лимит устройств исчерпан",
     deviceCapMsg: "На аккаунте уже максимум устройств — {max}. Удалите или приостановите одно, чтобы добавить новое.",
     insufficientBalanceTitle: "Недостаточно средств",
-    insufficientBalanceMsg: "Чтобы продолжить, нужно не меньше ${amt} USDT.",
+    insufficientBalanceMsg: "Чтобы продолжить, нужно не меньше {amt} USDT.",
     minWithdrawTitle: "Меньше минимума",
     minWithdrawMsg: "Минимальная сумма вывода — $20.00 USDT.",
     addressInvalidTitle: "Неверный адрес",

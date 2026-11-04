@@ -3618,7 +3618,7 @@ timeHoursAgo: "{n}h ago",
     deviceCapMsg:
       "You've reached the maximum of {max} devices per account. Remove or pause one to add another.",
     insufficientBalanceTitle: "Insufficient balance",
-    insufficientBalanceMsg: "You need at least ${amt} USDT to continue.",
+    insufficientBalanceMsg: "You need at least {amt} USDT to continue.",
     minWithdrawTitle: "Below minimum",
     minWithdrawMsg: "Withdrawals must be at least $20.00 USDT.",
     addressInvalidTitle: "Invalid address",

@@ -4001,7 +4001,7 @@ export const ms: Messages = {
     deviceCapTitle: "Had peranti dicapai",
     deviceCapMsg: "Anda telah mencapai maksimum {max} peranti bagi setiap akaun. Buang atau jeda satu untuk menambah yang lain.",
     insufficientBalanceTitle: "Baki tidak mencukupi",
-    insufficientBalanceMsg: "Anda perlu sekurang-kurangnya ${amt} USDT untuk teruskan.",
+    insufficientBalanceMsg: "Anda perlu sekurang-kurangnya {amt} USDT untuk teruskan.",
     minWithdrawTitle: "Di bawah minimum",
     minWithdrawMsg: "Pengeluaran mestilah sekurang-kurangnya $20.00 USDT.",
     addressInvalidTitle: "Alamat tidak sah",

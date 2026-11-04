@@ -3542,7 +3542,7 @@ timeHoursAgo: "{n} giờ",
     deviceCapMsg:
       "Bạn đã đạt tối đa {max} thiết bị mỗi tài khoản. Gỡ hoặc tạm dừng một cái để thêm cái khác.",
     insufficientBalanceTitle: "Số dư không đủ",
-    insufficientBalanceMsg: "Bạn cần tối thiểu ${amt} USDT để tiếp tục.",
+    insufficientBalanceMsg: "Bạn cần tối thiểu {amt} USDT để tiếp tục.",
     minWithdrawTitle: "Dưới mức tối thiểu",
     minWithdrawMsg: "Số tiền rút tối thiểu là $20.00 USDT.",
     addressInvalidTitle: "Địa chỉ không hợp lệ",
