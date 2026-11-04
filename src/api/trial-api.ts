@@ -3,7 +3,7 @@ import type { TrialStatus } from "../store/trial-boundary";
 
 export type TrialEligibilityReason =
   "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
-export type TrialConfigValue = string | boolean;
+export type TrialConfigValue = string | boolean | null;
 export type TrialSettlementPolicy = "FULL_TERM_ON_CONVERSION" | "ACCRUED_ON_CONVERSION";
 
 /**
@@ -239,7 +239,9 @@ function trialConfig(value: unknown): Record<string, TrialConfigValue> {
   if (!source) return invalid();
   const result: Record<string, TrialConfigValue> = {};
   for (const [key, item] of Object.entries(source)) {
-    if ((typeof item !== "string" && typeof item !== "boolean") || !key.trim()) return invalid();
+    // Only the documented offset cap can be null (the operator left it uncapped).
+    if ((typeof item !== "string" && typeof item !== "boolean"
+        && !(key === "trialOffsetCapUSD" && item === null)) || !key.trim()) return invalid();
     result[key] = item;
   }
   return result;
