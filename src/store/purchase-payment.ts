@@ -62,6 +62,12 @@ function matches(intent: PurchasePaymentIntent, pending: PendingExternal) {
 function settled(intent: PurchasePaymentIntent | null) {
   return !!intent && ['EXPIRED', 'MANUAL_REVIEW', 'DELIVERED'].includes(intent.status);
 }
+/** The outcome an intent has reached that ends the payment here; a failed bank attempt reports EXPIRED with its own reason. */
+export function purchaseConclusion(intent: PurchasePaymentIntent | null): PurchaseNotice {
+  if (intent?.status === 'EXPIRED') return intent.reason === 'PAYMENT_FAILED' ? 'bankFailed' : 'timeout';
+  if (intent?.status === 'MANUAL_REVIEW') return intent.reason === 'PAYMENT_LATE_REVIEW' ? 'late' : REVIEW_REASONS.includes(intent.reason ?? '') ? 'review' : 'delivery';
+  return '';
+}
 function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   matches(intent, pending);
   // Legacy recovery rows have only the quote identity; bind their first validated original intent for subsequent reads.
@@ -79,9 +85,8 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   }
   if (!purchasePaymentTiming(intent, Date.now(), state.deadlineAt).canPay) state.cashier = false;
   else if (openCashierOnReady && intent.paymentUrl) { openCashierOnReady = false; state.cashier = true; }
-  // A failed bank attempt ends that intent; the backend reports it as EXPIRED with this reason.
-  if (intent.status === 'EXPIRED') state.notice = intent.reason === 'PAYMENT_FAILED' ? 'bankFailed' : 'timeout';
-  if (intent.status === 'MANUAL_REVIEW') state.notice = intent.reason === 'PAYMENT_LATE_REVIEW' ? 'late' : REVIEW_REASONS.includes(intent.reason ?? '') ? 'review' : 'delivery';
+  const conclusion = purchaseConclusion(intent);
+  if (conclusion) state.notice = conclusion;
 }
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
