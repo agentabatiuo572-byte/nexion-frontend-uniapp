@@ -532,7 +532,7 @@ async function handleRegen() {
       if (!filePath) return;
       // Same rule as the server (≤ 2 MB; PNG / JPEG / WebP by file signature), checked before upload so the user sees why.
       const picked = Array.isArray(chosen.tempFiles) ? chosen.tempFiles[0] : chosen.tempFiles;
-      if (picked.size > 2 * 1024 * 1024) { showAvatarRejected("size"); return; }
+      if (picked.size <= 0 || picked.size > 2 * 1024 * 1024) { showAvatarRejected("size"); return; }
       // #ifdef H5
       // H5 uploads the original file; the native compressed pick is re-encoded and left to the server check.
       const head = Array.from(new Uint8Array(await (picked as File).slice(0, 12).arrayBuffer()), b => b.toString(16).padStart(2, "0")).join("");
