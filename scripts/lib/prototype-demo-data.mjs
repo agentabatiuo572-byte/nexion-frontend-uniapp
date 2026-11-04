@@ -209,15 +209,18 @@ export function demoFleetFacts(url,locale,state) {
     const product=products.find(p=>p.id===line.sku),instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
     state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
     if(retired.includes(state.deviceIds[instanceNo]))continue;
-    // A session device starts its own history at its order, not the seeded device's.
+    // A session device starts its own history at its order, not the seeded device's. Its capacity subsidy runs from
+    // activation, and the days left follow from that end, as the App's fleet read requires.
+    const subsidyEndsAt=(order.activatedAt??now)+template.capacitySubsidyDays*day,subsidyDaysLeft=Math.max(0,Math.ceil((subsidyEndsAt-now)/day));
     session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name:product.name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:tradein?Number(order.amountUsdt):product.price,
-      activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,capacityAgeMonths:0,capacitySubsidized:true,capacitySubsidyRemainingDays:30,capacitySubsidyEndsAt:(order.activatedAt??now)+30*day,
+      activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,capacityAgeMonths:0,capacitySubsidized:subsidyDaysLeft>0,capacitySubsidyRemainingDays:subsidyDaysLeft,capacitySubsidyEndsAt:subsidyEndsAt,
       ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
   }
   const reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
   const devices=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
-  return {devices,slotCap,reservedSlotCount,trialSlotCount,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
+  // serverNow is this read's time: the shared review fixture's clock stops at server start.
+  return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
 }
 
 export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
