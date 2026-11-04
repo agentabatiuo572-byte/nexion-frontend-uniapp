@@ -3996,7 +3996,7 @@ export const fil: Messages = {
     deviceCapTitle: "Naabot na ang limit ng device",
     deviceCapMsg: "Naabot mo na ang maximum na {max} device bawat account. Mag-alis o mag-pause ng isa para makapagdagdag.",
     insufficientBalanceTitle: "Kulang ang balanse",
-    insufficientBalanceMsg: "Kailangan ng hindi bababa sa ${amt} USDT para magpatuloy.",
+    insufficientBalanceMsg: "Kailangan ng hindi bababa sa {amt} USDT para magpatuloy.",
     minWithdrawTitle: "Mas mababa sa minimum",
     minWithdrawMsg: "Dapat hindi bababa sa $20.00 USDT ang withdrawal.",
     addressInvalidTitle: "Invalid na address",

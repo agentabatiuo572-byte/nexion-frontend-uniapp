@@ -3996,7 +3996,7 @@ export const id: Messages = {
     deviceCapTitle: "Batas perangkat tercapai",
     deviceCapMsg: "Anda sudah mencapai batas {max} perangkat per akun. Hapus atau jeda satu perangkat untuk menambah yang lain.",
     insufficientBalanceTitle: "Saldo tidak cukup",
-    insufficientBalanceMsg: "Anda butuh minimal ${amt} USDT untuk melanjutkan.",
+    insufficientBalanceMsg: "Anda butuh minimal {amt} USDT untuk melanjutkan.",
     minWithdrawTitle: "Di bawah minimum",
     minWithdrawMsg: "Penarikan minimal $20.00 USDT.",
     addressInvalidTitle: "Alamat tidak valid",
