@@ -1,6 +1,6 @@
 // Local frontend acceptance only. Never imported by src or deployed as a payment service.
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
-import {demoFixture} from './prototype-demo-data.mjs';
+import {demoFixture,demoOrderTimedOut,demoTimedOutOrder} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh') {
@@ -25,12 +25,9 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       if (result) return ok(result);
     }
     if (path.startsWith('/api/app/security/payment-password') || path.startsWith('/api/app/payment-commands/')) return pin.handle(url, request);
-    // Model the server's deadline task in this isolated fixture, not in product code.
-    for (const order of state.createdOrders ?? []) {
-      if (order.paymentStatus === 'PENDING' && order.expiresAt <= Date.now()) {
-        Object.assign(order,{canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'});
-      }
-    }
+    // Model the server's payment observer and deadline task in this isolated fixture, not in product code.
+    external.sweep();
+    for (const order of state.createdOrders ?? []) if (demoOrderTimedOut(order,state,Date.now())) Object.assign(order,demoTimedOutOrder);
     if (external.handles(path)) return external.handle(url, request);
     if (path === '/api/orders' && method === 'GET') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/quote') return ok(demoFixture(url,locale(),state,request));
@@ -51,11 +48,15 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       }
       // A sample row is adopted into the writable store only for a pay that commerce settles; a cancellation (settled
       // by the commerce fixture through its order status) or a refused command leaves the account's orders untouched.
+      if (external.openOrderPayment(orderNo)) return {status:409,message:'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS',data:null};
       if (action[2] === 'cancel') return ok(demoFixture(url,locale(),state,request));
       // Like AppPaymentPasswordService: a command key answers the outcome recorded for it.
       const command = 'order-pay:' + key, recorded = key && pin.commands.get(command);
       if (recorded) return recorded.status === 'SUCCEEDED' ? ok(recorded.receipt) : {status:recorded.code,message:recorded.message,data:null};
-      if (!['PENDING','PAID'].includes(order.paymentStatus)) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
+      // Like AppOrderCommandService.pay: once the deadline task has closed the order it is not payable; until then an
+      // order past its deadline is refused as expired.
+      if (!['PENDING','PAID'].includes(order.paymentStatus)) return {status:409,message:'ORDER_NOT_PAYABLE',data:null};
+      if (order.paymentStatus === 'PENDING' && order.expiresAt <= Date.now()) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
       // The PIN fixture only verifies the password. The commerce fixture authorizes the funds against the account's
       // one wallet balance and settles stock, capacity, receipt and fleet; the command is recorded only after it.
       const authorization = pin.authorize(request.postDataJSON());

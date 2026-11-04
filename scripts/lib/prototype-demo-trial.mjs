@@ -109,9 +109,11 @@ export function trialDemo(url,locale,state,request,capacityFull){
     Object.assign(row,{state:'CANCELLED',finishedAt:now,version:(row.version||1)+1});return remember(snapshot());
   }
   if(url.pathname==='/api/trial/convert'){
-    const current=snapshot(),body=request.postDataJSON();
+    // An external payment settles the quote it was priced on (VerifiedPurchasePayment), with no wallet debit.
+    const current=snapshot(),body=request.postDataJSON(),paid=request.verifiedPayment;
     if(!['ACTIVE','GRACE'].includes(row.state))refuse('TRIAL_NOT_CONVERTIBLE');
-    const quote=current.quote,amount=quote.amountUsdt;
+    const pricedAt=paid?.pricingAt??now,{shadow:pricedShadow,nex:pricedNex}=accruedAt(pricedAt);
+    const quote=paid?quoteFor(pricedShadow,pricedNex,pricedAt<row.startedAt+duration):current.quote,amount=quote.amountUsdt;
     if(body.productNo!==cfg.trialProductId)refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');
     // convert confirms cents, while the quote, debit and receipt retain six decimals.
     const expected=body.expectedAmountUsdt;
@@ -120,10 +122,10 @@ export function trialDemo(url,locale,state,request,capacityFull){
     if((units(amount)+5000n)/10000n>units(expected,2))refuse('TRIAL_AMOUNT_MISMATCH');
     if(body.quoteVersion&&body.quoteVersion!==quote.quoteVersion)refuse('TRIAL_QUOTE_CHANGED');
     state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
-    if((state.walletBalance??52800.64)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
+    if(!paid&&(state.walletBalance??52800.64)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
     const orderNo='TRC-DEMO'+now;
-    state.walletBalance=number(units(state.walletBalance??52800.64)-units(amount)+units(quote.remainderUsdt));
-    state.createdOrders??=[];state.createdOrders.unshift(conversionOrder(orderNo,now,quote));state.trialOrderNo=orderNo;
+    state.walletBalance=number(units(state.walletBalance??52800.64)-(paid?0n:units(amount))+units(quote.remainderUsdt));
+    state.createdOrders??=[];state.createdOrders.unshift({...conversionOrder(orderNo,now,quote),...(paid&&{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt})});state.trialOrderNo=orderNo;
     Object.assign(row,{state:'REDEEMED',finishedAt:now,version:(row.version||1)+1});
     const source='nx_trial_claim + nx_order + nx_order_item';
     return remember({...proof,orderNo,productNo:cfg.trialProductId,amountUsdt:amount,discountUsdt:number(units(current.priceUsdt)-units(amount)),paymentStatus:'PAID',orderStatus:'PAID',
