@@ -3,7 +3,8 @@ import { apiClient } from "@/api/runtime";
 import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { createHomeDisplayPlayer, parseHomeDisplayBatch } from "@/lib/home-display-player";
-import { derivedRegisteredUsers, networkPopulationBand, publicStatsHealth } from "@/lib/platform-stats";
+import { networkPopulationBand } from "@/lib/platform-stats";
+import { useRegisteredUsersEstimate } from "@/composables/use-registered-users-estimate";
 import { useConfig } from "@/store/config";
 
 /**
@@ -14,20 +15,19 @@ import { useConfig } from "@/store/config";
  */
 export function usePublishedNetworkStats() {
   const cfg = useConfig();
-  const now = ref(Date.now());
+  const registeredCount = useRegisteredUsersEstimate();
   const paid = ref<number | null>(null);
   const player = createHomeDisplayPlayer({
     fetch: async () => parseHomeDisplayBatch(await apiClient.request({ path: "/api/config/home-display", authenticated: false })),
     now: () => typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now(),
-    // The player paints every visible second, which also moves the registered estimate's clock.
-    render: next => { paid.value = next?.paid ?? null; now.value = Date.now(); },
+    render: next => { paid.value = next?.paid ?? null; },
   });
   let visible = false;
   function syncVisibility() {
     if (visible && (typeof document === "undefined" || !document.hidden)) player.start();
     else player.stop();
   }
-  onShow(() => { visible = true; now.value = Date.now(); syncVisibility(); });
+  onShow(() => { visible = true; syncVisibility(); });
   onHide(() => { visible = false; syncVisibility(); });
   onMounted(() => { if (typeof document !== "undefined") document.addEventListener("visibilitychange", syncVisibility); });
   onUnmounted(() => {
@@ -35,11 +35,7 @@ export function usePublishedNetworkStats() {
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", syncVisibility);
   });
 
-  const registered = computed(() => {
-    const value = derivedRegisteredUsers(cfg.config.publicStats, now.value);
-    return !cfg.syncFailed && publicStatsHealth(cfg.config.publicStats).membersOk && Number.isSafeInteger(value) && value >= 0
-      ? networkPopulationBand(value) : "-";
-  });
+  const registered = computed(() => registeredCount.value === null ? "-" : networkPopulationBand(registeredCount.value));
   const online = computed(() => {
     const value = cfg.config.networkPulse?.onlineDevices;
     return !cfg.syncFailed && typeof value === "number" && Number.isSafeInteger(value) && value >= 0
