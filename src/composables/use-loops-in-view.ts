@@ -46,7 +46,8 @@ export function useLoopsInView(selector: string) {
     nativeObserver = null;
     nativeInView.value = false;
     if (!element || !instance) return;
-    nativeObserver = uni.createIntersectionObserver(instance.proxy, { thresholds: [0] }).relativeToViewport();
+    // Entering along the edge can report ratio 0; the second threshold fires once the element moves further in.
+    nativeObserver = uni.createIntersectionObserver(instance.proxy, { thresholds: [0, 0.01] }).relativeToViewport();
     nativeObserver.observe(selector, (result) => { nativeInView.value = result.intersectionRatio > 0; });
   }, { flush: "post" });
   onUnmounted(() => { nativeObserver?.disconnect(); nativeObserver = null; });
