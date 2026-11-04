@@ -459,7 +459,9 @@ async function confirmPayment(){
           }
           catch(cause){
             const failure=asApiError(cause);
-            if(failure.kind==='business'&&!failure.message.startsWith('PAYMENT_PASSWORD_'))rejection=failure.message;
+            // The server answers a refusal with its code as the HTTP status; only a recorded outcome then decides the page.
+            const refused=failure.kind==='business'||failure.kind==='http'&&failure.status===failure.code&&failure.status!<500;
+            if(refused&&!failure.message.startsWith('PAYMENT_PASSWORD_'))rejection=failure.message;
             throw cause;
           }
         },
