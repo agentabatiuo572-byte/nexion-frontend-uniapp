@@ -1,4 +1,4 @@
-// Git Bash 定位(单源;run-legacy-suite / verify-chain 共用)。
+// Git Bash 定位(单源;run-sentinels 用它跑 verify.sh,verify-chain 经 npm run verify:sentinels 走同一入口)。
 // 🔴 Windows 上裸 `bash` 可能解析到 System32 的 WSL bash(env 不透传、路径变 /mnt/d、sed 行为有差,
 //    同一 verify 两个 bash 跑出不同红名单 —— env_windows_shell 记过),所以一律显式找 Git 的 bin/bash.exe。
 import { spawnSync } from "node:child_process";

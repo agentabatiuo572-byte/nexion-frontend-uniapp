@@ -45,7 +45,7 @@
     "verify:static": "node scripts/verify-chain.mjs --static",
     "verify:steps": "npm run type-check:cached && npm run verify:design-token-budget && npm run verify:sentinels && npm run build:h5:prod && npm run verify:prod-artifact",
     "verify:design-token-budget": "node scripts/design-token-budget.mjs",
-    "verify:sentinels": "bash scripts/verify.sh",
+    "verify:sentinels": "node scripts/run-sentinels.mjs",
     "verify:prod-artifact": "node scripts/verify-production-artifact.mjs",
     "postinstall": "node scripts/liquid-glass-install.mjs && node scripts/patch-liquid-glass.mjs"
   },
