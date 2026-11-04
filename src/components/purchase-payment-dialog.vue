@@ -88,7 +88,7 @@
         </view>
         <template v-if="s.step !== 'methods'">
           <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
-          <view class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying }" aria-hidden="true" /><text>{{ s.retrying ? copy.retrying : s.quote && quoteLeft !== null ? fill(copy.quoteValid, { t: clock(quoteLeft) }) : copy.loadingFees }}</text></view>
+          <view v-if="s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying }" aria-hidden="true" /><text>{{ s.retrying ? copy.retrying : s.quote && quoteLeft !== null ? fill(copy.quoteValid, { t: clock(quoteLeft) }) : copy.loadingFees }}</text></view>
         </template>
         <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="s.step === 'methods' ? !walletEnough : !s.quote || s.loading" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
       </view>
