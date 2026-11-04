@@ -575,8 +575,9 @@ const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision(() => {
   void retryWithdrawalFacts();
 });
 
-// 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提上限 = 总余额。
-// pendingReviewUsdt / bonusLockedUsdt 本就账外(不计入 usdtBalance),风控扣留照旧生效。
+// 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提基数 = 钱包可用余额(usdtBalance)。
+// 审核中与锁定金额都在这个余额之内:EarningsReleaseService.creditInternal 对每个分桶都记入钱包,所以这里要减掉
+// (后端 withdrawableAmount = 钱包可用 − pending_review − bonus_locked,比例在下方 maxWithdrawable 施加)。
 // 注意:这里读 usdtBalance 是本规则的正解。历史 P0(可提额度 > 总余额仍放行)的防线
 // 已随 c37e642 的本地扣款链一并移除 —— **提交路径**上客户端不再扣款,超额请求由本
 // computed 的 fail-closed 上限拦 + 服务端 reservation 拒;别再指望 app.ts 的提交函数里
