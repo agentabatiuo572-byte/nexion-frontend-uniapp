@@ -245,7 +245,8 @@ async function submitOriginal() {
   }
 }
 async function confirm() {
-  if (!context || state.loading || state.busy || state.pending || !context.current() || account() !== state.accountKey) return;
+  if (!context || state.loading || state.busy || state.pending || account() !== state.accountKey) return;
+  if (!context.current()) { state.notice = 'changed'; return; }
   state.notice = '';
   if (state.method === 'WALLET') { finish({ method: 'WALLET' }); return; }
   const quote = state.quote;
