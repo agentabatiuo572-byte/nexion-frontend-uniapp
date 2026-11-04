@@ -86,7 +86,7 @@ const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
 onLoad((query) => {
   const pending = new URLSearchParams(takeNavigationQuery('/pages/me/wallet-topup'));
   const channel = query?.channel ?? pending.get('channel');
-  const allowed = segments.find(item => item.id === channel);
+  const allowed = visibleSegments.value.find(item => item.id === channel);
   if (allowed) seg.value = allowed.id;
   const orderNo = query?.orderNo ?? pending.get('orderNo'), amount = Number(query?.amount ?? pending.get('amount')), deadline = Number(query?.deadline ?? pending.get('deadline'));
   if (orderNo && Number.isFinite(amount) && amount > 0) orderTopup.value = { orderNo, amount, name: query?.name ?? pending.get('name') ?? '', deadlineAt: Number.isFinite(deadline) && deadline > 0 ? deadline : null };
@@ -167,7 +167,7 @@ const bankAction = computed(() => seg.value === "bank" ? bankPane.value?.primary
 const bankSecondary = computed(() => seg.value === "bank" ? bankPane.value?.secondaryAction ?? null : null);
 const bankOrderOpen = computed(() => seg.value === "bank" && !!bankPane.value && bankPane.value.paneView !== "form");
 // An open bank order stays on screen; otherwise a hidden bank channel hands over to USDT.
-watch([bankHidden, bankOrderOpen, seg], ([hidden, open]) => { if (hidden && !open && seg.value === "bank") seg.value = "crypto"; }, { immediate: true });
+watch([bankHidden, bankOrderOpen], ([hidden, open]) => { if (hidden && !open && seg.value === "bank") seg.value = "crypto"; }, { immediate: true });
 
 // ── styles ──
 // Segmented pill tabs — wallet-bills / SegmentedControl idiom.
