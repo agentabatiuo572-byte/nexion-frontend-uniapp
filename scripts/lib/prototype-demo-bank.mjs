@@ -92,7 +92,7 @@ export function bankDemo(url, state, request) {
     if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
     state.walletBalance = Math.round((facts.walletUsdt - row.quote.amountUsdt) * 1e6) / 1e6;
     const withdrawalNo = 'WD-DEMO' + (Object.keys(demo.orders).length + 1);
-    row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
+    row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo: config().beneficiary.beneficiaryNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
     demo.orders[withdrawalNo] = row.order;
     return orderView(row.order);
   });
