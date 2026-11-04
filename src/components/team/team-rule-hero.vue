@@ -23,7 +23,7 @@ function jump(id: string) {
   // #ifdef APP-PLUS
   const pages = getCurrentPages();
   const page = pages[pages.length - 1] as unknown as { $getAppWebview?: () => { evalJS: (script: string) => void } };
-  page?.$getAppWebview?.().evalJS(`var target=document.getElementById(${JSON.stringify(anchor)});if(target){target.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}`);
+  page?.$getAppWebview?.().evalJS(`var target=document.getElementById(${JSON.stringify(anchor)});if(target){target.scrollIntoView({block:'start',behavior:window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}`);
   // #endif
 }
 </script>
