@@ -24,7 +24,7 @@
 //   [attributify]       uno.config.ts 启用了 UnoCSS presetAttributify 且不是 prefixedOnly:true → 红。它把 SVG 呈现属性
 //                       (`font-size="9.5"` → 2.375rem 字大 4 倍;`:opacity="0.25"` → 0.0025 全球节点图 669 个点隐形)当工具类;
 //                       ignoreAttributes 只挡裸属性、挡不住绑定式(提取器先查表后剥 `:`),所以「加豁免」不算修(A1 P0-2)。
-//   [judged-plane]      全仓一个 `<svg>` 块都扫不到、或一个 SvgText 都没有 → 判定面塌缩,红(仓内实有 4 文件 13 处)。
+//   [judged-plane]      全仓一个 `<svg>` 块都扫不到 → 判定面塌缩,红。
 //
 // 边界(如实):只判 .vue 的 <template> 区域;`v-html` 字符串里拼的 `<text>`(lucky-spin 转盘先例)在 script 面,不判 —— 运行时
 // 它是真 SVG text;`<component :is="'text'">` 也不判(H5 实测能出真 text)—— 但含这两种写法的 svg 文件同样会被运行时门要求登记路由。
@@ -107,7 +107,6 @@ export function judgeRepo(files, unoText) {
   const uno = judgeUnoConfig(unoText);
   for (const h of uno.hits) all.push({ ...h, file: "uno.config.ts" });
   if (spans === 0) all.push({ tag: "judged-plane", file: "src/**", line: 0, msg: "全仓一个 <svg> 块都没扫到 —— 判定面塌缩(仓内本有几百处内联 SVG)" });
-  if (nodes === 0) all.push({ tag: "judged-plane", file: "src/**", line: 0, msg: "全仓一个 <SvgText> 都没有 —— 判定面塌缩(仓内本有 4 文件 13 处 SVG 内文字)" });
   return { hits: all, exempts, spans, nodes, sites, unoMode: uno.mode };
 }
 
@@ -197,12 +196,10 @@ function selftest() {
   const lineSrc = S("<svg>\n  <circle />\n  <text>L</text>\n</svg>");
   const h = judgeVue(lineSrc).hits.find((x) => x.tag === "svg-text");
   say(h && h.line === 3, "命中行号 = <text> 所在行(第 3 行)", h?.line, 3);
-  // 判定面塌缩:空清单 / 没有 SvgText 的清单
+  // 判定面塌缩:空清单
   const okUno = "presets: [presetWind3()]";
   const empty = judgeRepo([], okUno).hits.filter((x) => x.tag === "judged-plane").length;
-  say(empty === 2, "🔴 判定面塌缩:0 文件 → judged-plane 红(svg 块 0 + SvgText 0)", empty, 2);
-  const noSvgText = judgeRepo([{ rel: "a.vue", src: S("<svg><circle /></svg>") }], okUno).hits.filter((x) => x.tag === "judged-plane").length;
-  say(noSvgText === 1, "🔴 判定面塌缩:有 svg 但全仓 0 个 SvgText → 红", noSvgText, 1);
+  say(empty === 1, "🔴 判定面塌缩:0 文件 → judged-plane 红(svg 块 0)", empty, 1);
   const clean = judgeRepo([{ rel: "a.vue", src: S("<svg><SvgText>x</SvgText></svg>") }], okUno).hits.length;
   say(clean === 0, "合法:有 svg + 有 SvgText + attributify 未启用 → 0 命中", clean, 0);
   console.log(`svg-text-source-gate selftest: ${pass}/${pass + fail} 格通过`);

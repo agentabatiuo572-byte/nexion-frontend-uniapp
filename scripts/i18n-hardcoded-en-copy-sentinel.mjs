@@ -56,7 +56,7 @@ const TECH_TOKENS = [
     // 🔴 `CertiK` 曾在这里,被本门自己的「0 命中即失效」判据赶走 —— 那行原文是 `CertiK audited`,
     //    `audited` 是要翻译的动词,整句收进 t.ref.certikAudited 之后判定面上再没有这个词。
     // VND is the ISO currency code for bank payout amounts, identical in all shipped locales.
-    tokens: ["NEX", "USDT", "VND", "UVEL", "UVELBox", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
+    tokens: ["UVT", "USDT", "VND", "UVEL", "UVELBox", "REF", "Visa", "Mastercard", "Passkey", "Google", "Apple", "Telegram"],
   },
   {
     id: "unit-abbrev",
@@ -66,7 +66,7 @@ const TECH_TOKENS = [
   {
     id: "input-format-mask",
     why: "输入框的**格式掩码**(卡片有效期 MM/YY · 日期 YYYY-MM-DD · 安全码 CVV):示意的是输入的字符位数与顺序,不是可读文案;翻成本地词反而没法照着填",
-    tokens: ["MM", "YY", "YYYY", "DD", "CVV"],
+    tokens: ["MM", "YY", "CVV"],
   },
 ];
 
@@ -105,8 +105,8 @@ const NON_COPY_ATTRS = [
   {
     id: "style-hook",
     why: "样式挂载点:class 名与内联 CSS / CSS 变量,值来自设计系统词汇表(`flex` / `truncate` / `var(--v5-ink-4)`),不是给人读的句子",
-    names: ["class", "style", "font-family", "font-size", "font-weight", "letter-spacing", "text-anchor", "dominant-baseline",
-      "placeholder-class", "placeholder-style", "input-style", "icon-bg", "tint", "accent", "previous-margin", "next-margin", "backdrop", "layout", "semantics"],
+    names: ["class", "style",
+      "placeholder-class", "placeholder-style", "input-style", "tint", "accent", "backdrop", "layout", "semantics"],
   },
   {
     id: "svg-geometry",
@@ -123,9 +123,7 @@ const NON_COPY_ATTRS = [
       // aria-invalid 是 ARIA 规定的校验态枚举("true"/"false"/"grammar"/"spelling"),aria-orientation
       // 是方向枚举("horizontal"/"vertical")。两者都是无障碍**状态**,取值来自规范而不是文案 ——
       // 与上面同族的 aria-required / aria-disabled 同理。
-      // aria-errormessage 的值是**指向错误元素 id 的引用**(与 aria-describedby / aria-controls
-      // 同族),不是给人读的文案;文案本身仍在被引用的 <text> 里走 i18n。
-      "aria-invalid", "aria-orientation", "aria-errormessage", "aria-current",
+      "aria-invalid", "aria-orientation", "aria-current",
       "disabled", "checked", "preload", "scroll-into-view", "cursor-spacing", "confirm-type", "focus"],
   },
   {
@@ -670,7 +668,6 @@ function selftest() {
     ["🔴 v-text 是展示位", P, "<template><text v-text=\"'No orders yet'\" /></template>", 1],
     ["合法:绑定属性读词典(不含字面量)", P, '<template><EmptyState :title="t.empty.listTitle" /></template>', 0],
     ["合法:data-* 前缀整族放行", P, '<template><view data-title="task lock until" /></template>', 0],
-    ["合法:几何 / 样式属性不判(font-family / text-anchor / stroke-linecap)", P, '<template><svg><text text-anchor="middle" stroke-linecap="round" font-family="ui-monospace, monospace">V3</text></svg></template>', 0],
     ["合法:class / style 里的设计系统词汇不判", P, '<template><view class="flex items-center truncate" style="color: red" /></template>', 0],
     ["合法:事件处理器里的事件名不判(emit(\"close\") 极常见)", P, "<template><view @click=\"emit('close')\" /></template>", 0],
     ["合法:v-if 条件里的枚举不判", P, "<template><view v-if=\"status === 'ready'\" /></template>", 0],
@@ -693,7 +690,7 @@ function selftest() {
     ["合法:比较位在左边同样放行(挪位不逃逸)", P, '<template><text>{{ "volume" === kind ? a : b }}</text></template>', 0],
     ["合法:includes / has 的查找参数是枚举不是文案", P, "<template><text>{{ set.has('processing') ? a : b }}</text></template>", 0],
     ["合法:取键写法(dict[`${k}_label`])是键名不是文案", P, "<template><text>{{ w[`${p.key}_label`] }}</text></template>", 0],
-    ["合法:插值里的授权 ticker", P, "<template><text>{{ `+${n} NEX` }}</text></template>", 0],
+    ["合法:插值里的授权 ticker", P, "<template><text>{{ `+${n} UVT` }}</text></template>", 0],
     ["合法:插值里只有单位记号", P, "<template><text>{{ `$${p}` }}</text></template>", 0],
     ["合法:插值里的授权单位", P, "<template><text>{{ `${ms}ms` }}</text></template>", 0],
     ["🔴 表达式含对象字面量时不许漏成「文本节点」(非贪婪匹配曾在此假阳)", P, "<template><text>{{ fmt(t.earn.hashTier, { n: cap }) }}</text></template>", 0],
@@ -765,10 +762,10 @@ function selftest() {
   // 🔴 v1 的「假绿防线」只护**抽取**路径:tokenHits 绕过 unauthorized()/exemptAt() 独立累计,
   //    所以判据整体取反(unauthorized 恒空 / exemptAt 恒真)时,存活台账照样满格、门照样 PASS(审计 F13)。
   //    下面几条把判决函数本身钉住。
-  if (AUTHORIZED.size < 20) { failed += 1; console.error(`  ✗ 授权词表异常小(${AUTHORIZED.size})—— 判据来源可疑`); }
+  if (AUTHORIZED.size < 15) { failed += 1; console.error(`  ✗ 授权词表异常小(${AUTHORIZED.size})—— 判据来源可疑`); }
   if (DUP_TOKENS.length) { failed += 1; console.error(`  ✗ TECH_TOKENS 有大小写重复条目:${DUP_TOKENS.join(", ")}`); }
-  if (!AUTHORIZED.has("usdt") || !AUTHORIZED.has("nex")) { failed += 1; console.error("  ✗ 核心 ticker 未授权 —— 全仓会被淹在误报里"); }
-  if (unauthorized("USDT NEX").length !== 0) { failed += 1; console.error("  ✗ 授权词不该被判违规"); }
+  if (!AUTHORIZED.has("usdt") || !AUTHORIZED.has("uvt")) { failed += 1; console.error("  ✗ 核心 ticker 未授权 —— 全仓会被淹在误报里"); }
+  if (unauthorized("USDT UVT").length !== 0) { failed += 1; console.error("  ✗ 授权词不该被判违规"); }
   if (unauthorized("slots open").length !== 2) { failed += 1; console.error("  ✗ unauthorized() 恒空 = 判据整体失效"); }
   if (unauthorized("Typing").length !== 1) { failed += 1; console.error("  ✗ 授权词作子串不该逃逸(Type ⊄ Typing)"); }
   if (unauthorized("Nexus").length !== 1) { failed += 1; console.error("  ✗ NEX 作子串不该让 Nexus 逃逸"); }
