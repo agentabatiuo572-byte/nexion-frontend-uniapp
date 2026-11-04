@@ -12,6 +12,7 @@
 .promotion-action.primary { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 90%,transparent);--ui-button-solid:var(--v5-brand);--ui-button-ink:var(--v5-on-brand); }
 .promotion-entry .entry-event .promotion-action { min-height:48px; font-size:14px; padding:12px 18px; }
 .promotion-action:active { transform:scale(.975); opacity:.86; }
+@media (prefers-reduced-motion: reduce) { .promotion-action:active { transform:none; } }
 .promotion-action[aria-disabled=true] { opacity:.45; }
 .promotion-action:focus-visible,.promotion-link:focus-visible { outline:2px solid var(--v5-brand); outline-offset:3px; }
 .promotion-link { display:flex; align-items:center; min-height:44px; color:var(--v5-brand); font-size:13px; }
