@@ -203,8 +203,10 @@ export function demoFleetFacts(url,locale,state) {
     const product=products.find(p=>p.id===line.sku),instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
     state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
     if(retired.includes(state.deviceIds[instanceNo]))continue;
+    // A session device starts its own history at its order, not the seeded device's.
     session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name:product.name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:tradein?Number(order.amountUsdt):product.price,
-      ...(tradein&&{cumulativeOutputUsdt:0}),...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
+      activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,capacityAgeMonths:0,capacitySubsidized:true,capacitySubsidyRemainingDays:30,capacitySubsidyEndsAt:(order.activatedAt??now)+30*day,
+      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
   }
   const reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
@@ -515,7 +517,9 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/promotion-rewards'||/^\/api\/promotion-rewards\/demo-reward-\d+$/.test(pathname)){
     const offer=demoFixture(new URL('/api/promotions/demo-promo-0',url.origin),locale,{...state,eventState:'mixed',dataState:'normal'},request),spec=offer.rewardRules[0].buyerReward,{disclosure,...reward}=spec;
-    const items=empty?[]:['PENDING','READY','PROCESSING','ISSUED','RETRYABLE_FAILED','OUTCOME_UNKNOWN','CANCELLED','REVERSAL_PENDING','REVERSED','MANUAL_REVIEW'].map((status,i)=>({obligationId:'demo-reward-'+i,orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',orderLineId:'demo-line-0',updatedAt:iso,reward,disclosure,refundHold:status==='REVERSAL_PENDING',beneficiaryRole:'BUYER',state:status,refundRequestIds:[],assetReceipt:status==='ISSUED'?{deviceIds:[41],instanceNos:['REVIEW-S1'],source:'PROMOTION_GIFT',issuedAt:iso,ledgerBizNo:null,earningsEntryNo:null}:null}));
+    // The rows belong to sample order 004 and share its timeline; without that order there are none.
+    const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo==='DEMO-ORDER-004'),issuedAt=order&&new Date(order.activatedAt).toISOString();
+    const items=empty||!order?[]:['PENDING','READY','PROCESSING','ISSUED','RETRYABLE_FAILED','OUTCOME_UNKNOWN','CANCELLED','REVERSAL_PENDING','REVERSED','MANUAL_REVIEW'].map((status,i)=>({obligationId:'demo-reward-'+i,orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',orderLineId:'demo-line-0',updatedAt:issuedAt,reward,disclosure,refundHold:status==='REVERSAL_PENDING',beneficiaryRole:'BUYER',state:status,refundRequestIds:[],assetReceipt:status==='ISSUED'?{deviceIds:[41],instanceNos:['REVIEW-S1'],source:'PROMOTION_GIFT',issuedAt,ledgerBizNo:null,earningsEntryNo:null}:null}));
     if(pathname!=='/api/promotion-rewards')return items.find(r=>r.obligationId===pathname.split('/').pop())||{};
     return {items:items.filter(r=>['state','activityId','orderNo'].every(key=>!url.searchParams.get(key)||r[key]===url.searchParams.get(key))),nextCursor:null,hasMore:false};
   }
