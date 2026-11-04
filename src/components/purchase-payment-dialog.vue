@@ -313,6 +313,9 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'orderClosed': return { ...refused, title: c.orderClosedTitle, body: c.orderClosed };
     // There is no order to open, so only ordering again remains.
     case 'orderMissing': return { ...refused, title: c.orderMissingTitle, body: c.orderMissing, secondary: c.close, onSecondary: payment.close };
+    case 'gone': return order
+      ? { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
+      : { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
     default: return null;
   }
 }
