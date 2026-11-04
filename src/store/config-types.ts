@@ -241,7 +241,7 @@ export interface PublicStatsConfig {
   registeredUsersTickStepMin?: number;
   /** 每次跳动最多增加的注册用户数,不小于最少值;每跳在两者之间按服务端同一规则取值。[0, 100000000]。 */
   registeredUsersTickStepMax?: number;
-  /** 全球作业展示基数(H9 运营发布,仅展示)。赚钱页任务中心显示「真实进行中作业 + 基数」;null = 未发布,只显示真实数。 */
+  /** 全球作业展示基数(H9 运营发布,仅展示)。赚钱页任务中心显示「真实进行中作业 + 基数」;null = 未发布,只显示真实数。[0, 100000000]。 */
   activeJobsBase: number | null;
   /** 服务端真实注册账号数，仅用于排名分母，不用于营销展示。 */
   realUserCount: number;
