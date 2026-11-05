@@ -265,6 +265,7 @@ export const ms: Messages = {
     retry: "Muat semula",
     loading: "Memuatkan maklumat terkini",
     disabled: "Promosi ini tidak tersedia",
+    activityConflictNote: "Peranti ini mempunyai beberapa tawaran, jadi kami belum dapat memilih satu untuk anda. Buka tawaran yang anda mahu dan beli dari halaman itu.",
     disabledNote: "Sebut harga ini belum disahkan tersedia. Lihat sebabnya atau muat semula.",
     ordinary: "Teruskan tanpa promosi",
     quick: "Akses pantas",

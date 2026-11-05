@@ -265,6 +265,7 @@ export const fil: Messages = {
     retry: "I-reload",
     loading: "Nilo-load ang bagong impormasyon",
     disabled: "Hindi available ang promo na ito",
+    activityConflictNote: "May higit sa isang alok para sa device na ito, kaya hindi kami makapili para sa iyo. Buksan ang alok na gusto mo at doon bumili.",
     disabledNote: "Hindi pa kumpirmadong available ang quote na ito. Tingnan ang dahilan o i-reload.",
     ordinary: "Magpatuloy nang walang promo",
     quick: "Mabilisang access",
