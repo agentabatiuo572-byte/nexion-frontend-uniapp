@@ -150,7 +150,7 @@ import { useVoucher } from '@/store/voucher';
 import { useOrders } from '@/store/orders';
 import { computeVoucherDiscount,isVoucherValid,voucherAppliesToSku,type VoucherDef } from '@/mock/vouchers';
 import { ApiError,asApiError } from '@/api/errors';
-import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
+import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,settleProductCatalogRefresh,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
 import { navTo,navBack,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
 import { fmt } from '@/i18n/format';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord,PROMOTION_CHECKOUT_TABLE } from '@/lib/promotion-checkout-session';
@@ -292,6 +292,10 @@ let receivedAt:number|null=null,promotionReceivedAt:number|null=null,orderClock:
 watch(quotePresentationKey,()=>{
   quotePresentation.value=null;freshQuoteReady.value=false;receivedAt=null;quoteFresh.value=false;readGeneration++;
 },{flush:'sync'});
+watch(()=>locale.code,()=>{
+  if(!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
+  if(busy.value)refreshOnIdle=true;else void loadQuote();
+},{flush:'post'});
 function updateClock(){
   const now=readTrustedMonotonicNowMs();quoteFresh.value=!!quote.value&&receivedAt!==null&&now!==null&&projectServerNow(Date.parse(quote.value.serverTime),receivedAt,now)<Date.parse(quote.value.expiresAt);
   const sample=receivedAt!==null&&quote.value?{serverNow:Date.parse(quote.value.serverTime),at:receivedAt}:promotionReceivedAt!==null&&promotion.value?{serverNow:Date.parse(promotion.value.serverTime),at:promotionReceivedAt}:orderClock;
@@ -324,8 +328,11 @@ async function loadQuote(){
     try{session.invalidateQuote();revision.value++;}catch(cause){quotePresentation.value=null;throw cause;}
     // Publishing the catalog invalidates voucher reads. Quote only after this
     // checkout's catalog refresh has finished, as with its wallet read.
-    if(catalogRefresh)await catalogRefresh;
+    catalogRefresh??=refreshProductCatalog(true);
+    const catalogReady=await settleProductCatalogRefresh(catalogRefresh);
+    if(!catalogReady)catalogRefresh=null;
     if(!readCurrent(generation))return;
+    if(!catalogReady){quotePresentation.value=null;promotion.value=null;throw new Error('PRODUCT_CATALOG_UNAVAILABLE');}
     const sampledAt=readTrustedMonotonicNowMs();
     if(props.activityId)void promotionApi.get(props.activityId,auth.isAuthenticated).then(value=>{
       if(readCurrent(generation)){promotion.value=value.state==='ACTIVE'?value:null;promotionReceivedAt=sampledAt;updateClock();}

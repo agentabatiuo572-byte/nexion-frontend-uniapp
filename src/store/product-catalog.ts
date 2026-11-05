@@ -129,6 +129,16 @@ export function revalidateProductCatalog(): Promise<boolean> {
   return runPassiveTabRead("product-catalog", () => refreshInFlight ?? refreshProductCatalog(true), [catalogBindingEpoch]);
 }
 
+/** Follow a replacement read; a superseded response is never a catalog failure. */
+export async function settleProductCatalogRefresh(read: Promise<boolean>): Promise<boolean> {
+  for (;;) {
+    await read;
+    if (refreshInFlight && refreshInFlight !== read) { read = refreshInFlight; continue; }
+    if (productCatalogState.status !== "loading") return productCatalogState.status === "ready";
+    read = refreshProductCatalog(true);
+  }
+}
+
 export function refreshProductCatalog(force = false): Promise<boolean> {
   if (force) invalidateBeforePassiveTabRead("product-catalog");
   if (!remoteApiEnabled) return Promise.resolve(true);
