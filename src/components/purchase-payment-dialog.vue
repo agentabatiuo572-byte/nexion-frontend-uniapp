@@ -30,7 +30,6 @@
             <view class="pp-prod__text"><text class="pp-prod__name">{{ s.summary }}</text><text v-if="s.orderNo" class="pp-prod__meta">{{ copy.orderNo }} <text class="pp-mono">{{ s.orderNo }}</text></text></view>
             <CheckoutAmount class="pp-prod__amt" :value="s.amount" currency="USD" />
           </view>
-          <text v-if="!payment.available('HDPAY_BANK')" class="pp-note" role="status">{{ copy.bankUnavailable }}</text>
           <text class="pp-label">{{ copy.methodLabel }}</text>
           <view class="pp-opts" role="radiogroup" :aria-label="copy.methodLabel" @keydown.down.prevent="moveFocus($event, 1)" @keydown.right.prevent="moveFocus($event, 1)" @keydown.up.prevent="moveFocus($event, -1)" @keydown.left.prevent="moveFocus($event, -1)">
             <view class="pp-opt" :class="{ on: s.method === 'WALLET' }" role="radio" :tabindex="s.method === 'WALLET' ? 0 : -1" :aria-checked="s.method === 'WALLET'" @click="payment.choose('WALLET')" @keydown.enter.prevent="payment.choose('WALLET')">
