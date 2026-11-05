@@ -9,7 +9,7 @@
       <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
       <text v-if="displayQuote||order" class="checkout-review-title">{{ order?.paymentStatus==='PENDING' ? p.pending : p.confirmOrder }}</text>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="recover"><text>{{ p.query }}</text></PromotionAction></view>
-      <view v-if="error" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
+      <view v-if="error" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
       <view v-if="openedOriginal" class="promotion-notice" role="status"><text>{{ p.openedOriginal }}</text></view>
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
@@ -216,7 +216,7 @@ function itemSubtotal(item:{productNo:string;quantity:number;subtotalUsdt?:strin
   if(item.subtotalUsdt!==undefined)return item.subtotalUsdt;
   return (order.value?receiptQuote.value:displayQuote.value)?.items.find(line=>line.productNo===item.productNo&&line.quantity===item.quantity)?.subtotalUsdt;
 }
-const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=ref(false),error=ref(''),termsOpen=ref(false);
+const promotion=shallowRef<PublicPromotion|null>(null),loading=ref(true),busy=ref(false),error=ref(''),activityConflict=ref(false),termsOpen=ref(false);
 const paymentSheetOpen=ref(false),paymentConfirming=ref(false),leaving=ref(false);
 const paymentEntryChecking=ref(false);
 const eventVoucherId=props.voucherId?.trim()??'';
@@ -313,10 +313,10 @@ const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!bu
 const canPay=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
-async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';try{await action();}catch(cause){if(current()){
+async function run(action:()=>Promise<void>){if(busy.value||!current())return;busy.value=true;error.value='';activityConflict.value=false;try{await action();}catch(cause){if(current()){
   const rejection=orderPaymentRejection(cause,locale.code);
   if(rejection)error.value=rejection;
-  else{const message=asApiError(cause).message;error.value=message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'?p.value.disabledNote:message.includes('CAPACITY_UNAVAILABLE')?p.value.capacityUnavailable:message==='PROMOTION_ACCOUNT_UNAVAILABLE'?p.value.accountUnavailable:message.includes('QUOTE_EXPIRED')||message.includes('QUOTE_INPUT_CHANGED')?p.value.quoteExpired:message.includes('INSUFFICIENT')?p.value.balanceInsufficient:p.value.errorNote;}
+  else{const message=asApiError(cause).message;activityConflict.value=message==='PROMOTION_EXCLUSIVE_ACTIVITY_CONFLICT';error.value=activityConflict.value?p.value.activityConflictNote:message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'?p.value.disabledNote:message.includes('CAPACITY_UNAVAILABLE')?p.value.capacityUnavailable:message==='PROMOTION_ACCOUNT_UNAVAILABLE'?p.value.accountUnavailable:message.includes('QUOTE_EXPIRED')||message.includes('QUOTE_INPUT_CHANGED')?p.value.quoteExpired:message.includes('INSUFFICIENT')?p.value.balanceInsufficient:p.value.errorNote;}
 }}finally{if(current()){busy.value=false;revision.value++;updateClock();}}}
 async function loadQuote(){
   if(busy.value||!visible.value||!current()||openedOriginal||props.orderNo||session.record.pending||session.record.order||!auth.isAuthenticated)return;
