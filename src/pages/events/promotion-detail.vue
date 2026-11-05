@@ -52,7 +52,7 @@
           <view v-if="note" class="lp-note lp-rise lp-d2" :class="{ 'lp-note--tight': phase === 'ended' }"><svg class="lp-line-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path v-if="note.ended" d="M12 7.5V12l3 2" /><path v-else d="M12 11v5M12 8h.01" /></svg><text>{{ note.text }}</text></view>
 
           <view class="lp-section lp-section-head lp-rise lp-d2">
-            <text class="lp-section-title">{{ c.giftRules }}</text>
+            <text class="lp-section-title">{{ activity.rewardRules.some(rule => rule.buyerReward.type === 'DISCOUNT_USDT') ? c.offerRules : c.giftRules }}</text>
             <view class="lp-link" role="button" tabindex="0" @click="openTerms" @keydown.enter.prevent="openTerms" @keydown.space.prevent="openTerms"><text>{{ c.fullRules }} ›</text></view>
           </view>
           <view v-for="ticket in giftTickets" :key="ticket.id" class="lp-rule lp-card lp-rise lp-d2">
