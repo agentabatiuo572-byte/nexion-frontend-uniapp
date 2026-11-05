@@ -132,13 +132,13 @@ async function loadPolicy() {
   const accountKey = state.accountKey;
   try {
     const policy = await api.policy();
-    if (state.open && state.accountKey === accountKey) { state.policy = policy; reconcileNetwork(); }
+    if (state.open && state.accountKey === accountKey) { state.policy = policy; reconcileChannel(); }
   } catch { /* Without the policy every channel stays selectable; its quote reports an unconfigured channel. */ }
 }
 function available(method: PurchaseMethod) { return method === 'WALLET' || !state.policy || state.policy[method] === true; }
-/** Before an intent exists, an unconfigured USDT network gives way to the other configured one. */
-function reconcileNetwork() {
-  if (state.pending || state.step !== 'network' || available(state.method)) return;
+/** Before an intent exists, leave an unconfigured channel and try another payment method. */
+function reconcileChannel() {
+  if (state.pending || state.step === 'methods' || available(state.method)) return;
   const other = state.method === 'CREGIS_USDT_ERC20' ? 'CREGIS_USDT_BSC' : state.method === 'CREGIS_USDT_BSC' ? 'CREGIS_USDT_ERC20' : null;
   if (other && available(other)) void select(other);
   else choose('WALLET');
@@ -172,7 +172,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (cause.status === 503 && cause.message === 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED') {
       // An unknown policy keeps the other channels selectable; only this one is known to be unconfigured.
       state.policy = { ...(state.policy ?? { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true }), [method]: false };
-      reconcileNetwork();
+      reconcileChannel();
       return;
     }
     // Only a network failure or a 5xx can change on retry; anything else is the server's answer.
