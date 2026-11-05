@@ -265,6 +265,7 @@ export const uz: Messages = {
     retry: "Yangilash",
     loading: "Soʻnggi maʼlumot yuklanmoqda",
     disabled: "Bu aksiya mavjud emas",
+    activityConflictNote: "Bu qurilma uchun hozir bir nechta aksiya bor, shu sababli bittasini avtomatik tanlay olmadik. Oʻzingiz xohlagan aksiyani ochib, oʻsha sahifadan xarid qiling.",
     disabledNote: "Bu narx taklifi tasdiqlanmagan. Sababini koʻring yoki qayta yuklang.",
     ordinary: "Aksiyasiz davom etish",
     quick: "Tezkor kirish",
