@@ -2671,7 +2671,7 @@ export const fil: Messages = {
     receiptsUnavailableTitle: "Hindi ma-load ang mga resibo ng kita",
     receiptsUnavailableBody: "I-reload ang mga resibo ng iyong kita.",
     syncFailedTitle: "Hindi ma-refresh ang impormasyon",
-    syncFailedBody: "Subukan ulit.",
+    syncFailedBody: "Awtomatikong sinusubukan muli.",
     fundsUnavailableTitle: "Hindi ma-refresh ang wallet",
     fundsUnavailableBody: "Hindi available ang kasalukuyang balanse mo. Mag-refresh muna bago gumawa ng anumang aksyon sa wallet.",
     fundsStaleBody: "Ipinapakita ang huling na-update na balanse. Mag-refresh para makita ang pinakabago.",

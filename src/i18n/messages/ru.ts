@@ -2671,7 +2671,7 @@ export const ru: Messages = {
     receiptsUnavailableTitle: "Квитанции о доходе не загрузились",
     receiptsUnavailableBody: "Загрузите квитанции о доходе ещё раз.",
     syncFailedTitle: "Не удалось обновить данные",
-    syncFailedBody: "Повторите попытку.",
+    syncFailedBody: "Повторяем попытку автоматически.",
     fundsUnavailableTitle: "Не удалось обновить кошелёк",
     fundsUnavailableBody: "Текущие балансы недоступны. Обновите страницу, прежде чем проводить операции в кошельке.",
     fundsStaleBody: "Показан последний обновлённый баланс. Обновите, чтобы увидеть актуальный.",

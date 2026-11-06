@@ -2671,7 +2671,7 @@ export const uz: Messages = {
     receiptsUnavailableTitle: "Daromad cheklari yuklanmadi",
     receiptsUnavailableBody: "Daromad cheklarini qayta yuklang.",
     syncFailedTitle: "Maʼlumotni yangilab boʻlmadi",
-    syncFailedBody: "Qayta urinib koʻring.",
+    syncFailedBody: "Avtomatik qayta urinilmoqda.",
     fundsUnavailableTitle: "Hamyonni yangilab boʻlmadi",
     fundsUnavailableBody: "Joriy balanslarni yuklab boʻlmadi. Hamyonda amal bajarishdan oldin sahifani yangilang.",
     fundsStaleBody: "Oxirgi yangilangan balans koʻrsatilmoqda. Eng soʻnggisini koʻrish uchun yangilang.",
