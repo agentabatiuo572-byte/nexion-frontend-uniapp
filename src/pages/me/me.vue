@@ -5,7 +5,7 @@
       <ProfileRow />
 
       <WalletCard compact />
-      <WalletOverview section="summary" />
+      <WalletOverview />
 
       <NxSection :title="t.me.frequentFunctions" :action="t.me.deviceAddLabel" class="me-shortcuts" @action="navTo('/pages/store/store')">
         <view class="me-shortcut-grid">
@@ -40,12 +40,6 @@
       <view v-if="remoteApiEnabled && remoteOrdersLoading && !remoteOrdersHasRead" class="mx-0 flex items-center" style="gap: 8px; min-height: 32px" data-me-orders-state="loading">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>
       </view>
-      <view v-else-if="remoteApiEnabled && remoteOrdersFailed" class="mx-0 flex items-center justify-between" style="gap: 12px; min-height: 44px" data-me-orders-state="failed">
-        <text class="flex-1" style="font-size: 12px; color: var(--v5-danger)">{{ t.orders.refreshFailed }}</text>
-        <view class="shrink-0 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline active:opacity-70" data-me-action="retry-orders" role="button" tabindex="0" :aria-label="t.ui.retry" @click="refreshRemoteOrders"  @keydown.enter.prevent="refreshRemoteOrders" @keydown.space.prevent="refreshRemoteOrders">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
 
       <!-- Sign out -->
       <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signOutStyle" data-me-action="sign-out" role="button" tabindex="0" :aria-label="t.me.signOut" @click="handleSignOut"  @keydown.enter.prevent="handleSignOut" @keydown.space.prevent="handleSignOut">
@@ -55,7 +49,6 @@
 
       <!-- i18n-en-ok: 品牌、平台及当前资源版本指纹，报障时逐字保留；? 表示未知 -->
       <text class="block text-center font-mono-tabular" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4)">{{ versionFooter }}</text>
-      <WalletOverview section="recovery" />
     </CardStagger>
   </AppChassis>
 
@@ -63,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
@@ -117,7 +111,7 @@ import { subscribeRuntimeRevision } from "@/api/order-api";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { settleRemoteMeLoaders } from "@/lib/remote-me-refresh";
 import { revalidateProductCatalog } from "@/store/product-catalog";
-import { ensureEarningsReleaseStatus } from "@/store/earning-release";
+import { earningsReleaseStatus, ensureEarningsReleaseStatus } from "@/store/earning-release";
 import { compiledResourceVersion, formatResourceVersion, readNativeResourceVersion } from "@/lib/app-version";
 
 const versionFooter = ref("UVEL");
@@ -302,7 +296,7 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "missions", label: t.value.me.missionsRow, href: "/pages/missions/missions", icon: "target", tone: "brand" },
       { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "gift", dot: rewardsDot.value, tone: "brand" },
       { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", tone: "brand" },
-      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders?from=me", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
+      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders?from=me", icon: "package", meta: remoteApiEnabled && !remoteOrdersHasRead.value ? "—" : orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
       { key: "genesis", label: t.value.me.genesisNode, href: ownsGenesis.value ? "/genesis/holder" : "/genesis", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
       { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
@@ -362,6 +356,11 @@ async function refreshRemoteOrders(passive: unknown = false) {
   );
 }
 
+useAutoRecovery({
+  failed: () => remoteApiEnabled && remoteOrdersFailed.value && !remoteOrdersLoading.value,
+  retry: () => refreshRemoteOrders(),
+});
+
 async function refreshRemoteSecurity() {
   if (!remoteApiEnabled || !remoteMeActive.value || !binarySessionReady({
     remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
@@ -388,12 +387,12 @@ async function refreshRemoteMe() {
   if (!remoteApiEnabled) return;
   await settleRemoteMeLoaders([
     ["profile-avatar", () => profile.ensureAvatar()],
-    ["home", () => app.ensureHomeTruth()],
-    ["commission", () => commission.ensureCanonicalEvents()],
-    ["withdrawals", () => runPassiveTabRead('withdrawals', () => app.refreshRemoteWithdrawalList())],
-    ["fleet", async () => { await revalidateProductCatalog(); await app.ensureRemoteFleet(); await ensureEarningsReleaseStatus(); }],
+    ["home", () => app.homeTruthStatus === "error" ? undefined : app.ensureHomeTruth()],
+    ["commission", () => commission.eventsStatus === "error" ? undefined : commission.ensureCanonicalEvents()],
+    ["withdrawals", () => app.remoteWithdrawalListStatus === "error" ? undefined : runPassiveTabRead('withdrawals', () => app.refreshRemoteWithdrawalList())],
+    ["fleet", async () => { await revalidateProductCatalog(); if (app.remoteFleetStatus !== "error") await app.ensureRemoteFleet(); if (earningsReleaseStatus.value !== "error") await ensureEarningsReleaseStatus(); }],
     ["funds", refreshRemoteFunds],
-    ["orders", () => refreshRemoteOrders(true)],
+    ["orders", () => remoteOrdersFailed.value ? undefined : refreshRemoteOrders(true)],
     ["security", refreshRemoteSecurity],
     ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.error)],
     ["conversations", () => runPassiveTabRead('conversations', () => conversations.refresh(), { owner: conversations.scopeInvalidated }, () => !conversations.loading && !conversations.error)],
@@ -403,7 +402,7 @@ async function refreshRemoteMe() {
     ["genesis", () => runPassiveTabRead('genesis-state', () => genesis.syncRemote())],
     ["bills", () => runPassiveTabRead('bills-summary', () => bills.refreshSummary(), undefined, () => bills.summaryStatus === 'ready')],
     ["market", () => runPassiveTabRead('market', () => market.syncRemote())],
-    ["config", () => config.revalidate()],
+    ["config", () => config.configStatus === "failed" ? undefined : config.revalidate()],
   ]);
 }
 

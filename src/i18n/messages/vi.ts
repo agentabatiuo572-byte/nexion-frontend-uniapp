@@ -2481,7 +2481,7 @@ rankBenefits: "Xem quyền lợi cấp bậc",
 },
   session: {
     restoreRetryNotice: "Tạm thời chưa thể khôi phục phiên đăng nhập. Đang tự động thử lại.",
-    nativeStorageFailure: "Bộ nhớ phiên đăng nhập tạm thời không khả dụng. Hoạt động tài khoản đã dừng. Chưa xác nhận hoàn tất xóa phiên cục bộ; hãy mở lại ứng dụng để thử lại.",
+    nativeStorageFailure: "Chưa thể lưu thông tin đăng nhập. Vui lòng mở lại ứng dụng.",
     secureBrowserUnsupported: "Trình duyệt này không hỗ trợ đăng nhập hoặc khôi phục phiên an toàn. Vui lòng cập nhật trình duyệt rồi thử lại.",
     kickedTitle: "Phiên đã kết thúc",
     kickedBodySessionEnded: "Phiên đăng nhập này đã kết thúc. Hãy đăng nhập lại để xem lịch sử tác vụ và thu nhập.",
@@ -3979,8 +3979,7 @@ timeHoursAgo: "{n} giờ",
     withdrawAlreadyOnFileBody:
       "Yêu cầu rút tiền ban đầu đã được ghi nhận, không phát sinh chi trả trùng lặp. Vui lòng kiểm tra trạng thái rút tiền.",
     withdrawResendDeclinedTitle: "Lần thử lại không được tiếp nhận",
-    withdrawResendDeclinedBody:
-      "Lần thử lại không được tiếp nhận. Kết quả lệnh rút ban đầu vẫn chưa được xác nhận. Vui lòng kiểm tra trạng thái rút tiền; nếu không có bản ghi, hãy thử lại yêu cầu ban đầu sau. Không tạo lệnh rút mới.",
+    withdrawResendDeclinedBody: "Kết quả lệnh rút ban đầu chưa được xác nhận. Hãy xem tiến độ rút tiền, không tạo lệnh rút mới.",
     withdrawDailyLimitWithPending:
       "Đã hết số lần rút tiền hôm nay. Yêu cầu ban đầu có thể đã dùng một lượt. Vui lòng kiểm tra trạng thái rút tiền trước; không tạo lệnh rút mới.",
     earnNexCta: "Kiếm thêm UVT",

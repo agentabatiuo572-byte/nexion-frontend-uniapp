@@ -102,11 +102,7 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
-          <view v-if="remoteApiEnabled && bills.summaryStatus === 'error'" :style="activityEmptyStyle">
-            <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-            <view role="button" tabindex="0" class="inline-flex items-center active:opacity-70" :style="viewAllStyle" @click="refreshNexSummary"><text>{{ t.store.catalogRetry }}</text></view>
-          </view>
-          <view v-else-if="remoteApiEnabled && summaryForDisplay == null" :style="activityEmptyStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
+          <view v-if="remoteApiEnabled && summaryForDisplay == null" :style="activityEmptyStyle" role="status" :aria-busy="bills.summaryStatus === 'loading'"><text>{{ bills.summaryStatus === 'error' ? '—' : t.wallet.loadingTransactions }}</text></view>
           <EmptyState v-else-if="activity.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-else :style="activityListStyle">
             <view v-for="(a, i) in activity" :key="a.id" class="flex items-center" :style="activityRowStyle(i)">
@@ -132,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { dateLocale } from "@/i18n/format";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { navTo } from "@/lib/route";
@@ -177,11 +174,12 @@ onMounted(() => {
 onUnmounted(() => {
   if (priceTimer) clearInterval(priceTimer);
 });
-function refreshNexSummary() {
+async function refreshNexSummary() {
   if (!remoteApiEnabled) return;
-  void app.refreshRemoteFleet().catch(() => undefined);
-  void bills.refreshSummary().catch(() => undefined);
+  await Promise.all([app.refreshRemoteFleet(), bills.refreshSummary()]);
 }
+useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && bills.summaryStatus !== "loading"
+  && (app.remoteFleetStatus === "error" || bills.summaryStatus === "error"), retry: refreshNexSummary });
 onShow(refreshNexSummary);
 watch(() => locale.code, refreshNexSummary);
 

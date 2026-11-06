@@ -2529,7 +2529,7 @@ rankBenefits: "View rank benefits",
 },
   session: {
     restoreRetryNotice: "Unable to restore your session right now. Retrying automatically.",
-    nativeStorageFailure: "Session storage is unavailable. Account activity has stopped. Local session cleanup is not confirmed; reopen the app to retry.",
+    nativeStorageFailure: "Login details can't be saved right now. Reopen the app.",
     secureBrowserUnsupported: "This browser cannot securely sign in or restore your session. Please update your browser and try again.",
     kickedTitle: "Session ended",
     kickedBodySessionEnded: "This sign-in has ended. Sign in again to view your task and settlement records.",
@@ -4061,8 +4061,7 @@ timeHoursAgo: "{n}h ago",
     withdrawAlreadyOnFileBody:
       "The original withdrawal request is recorded. No duplicate payout was made. Check withdrawal status.",
     withdrawResendDeclinedTitle: "Retry not accepted",
-    withdrawResendDeclinedBody:
-      "The retry was not accepted. The original withdrawal result remains unconfirmed. Check withdrawal status; if no record appears, retry the original request later. Do not create another withdrawal.",
+    withdrawResendDeclinedBody: "The original withdrawal is still unconfirmed. Check its progress; do not start a new withdrawal.",
     withdrawDailyLimitWithPending:
       "Today's withdrawal count is exhausted. The original request may already count toward this limit. Check withdrawal status first; do not create another withdrawal.",
     earnNexCta: "Earn more UVT",

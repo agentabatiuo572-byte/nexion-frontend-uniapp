@@ -2923,7 +2923,7 @@ export const id: Messages = {
   },
   session: {
     restoreRetryNotice: "Sesi Anda belum dapat dipulihkan. Mencoba lagi otomatis.",
-    nativeStorageFailure: "Penyimpanan sesi tidak tersedia. Aktivitas akun dihentikan. Pembersihan sesi lokal belum terkonfirmasi; buka ulang aplikasi untuk mencoba lagi.",
+    nativeStorageFailure: "Info login belum dapat disimpan. Buka ulang aplikasi.",
     secureBrowserUnsupported: "Browser ini tidak dapat masuk atau memulihkan sesi dengan aman. Perbarui browser Anda, lalu coba lagi.",
     kickedTitle: "Sesi berakhir",
     kickedBodySessionEnded: "Sesi masuk ini telah berakhir. Masuk lagi untuk melihat catatan tugas dan pembayaran Anda.",
@@ -4400,7 +4400,7 @@ export const id: Messages = {
     withdrawAlreadyOnFileTitle: "Permintaan penarikan tercatat",
     withdrawAlreadyOnFileBody: "Permintaan penarikan awal sudah tercatat. Tidak ada pembayaran ganda. Cek status penarikan.",
     withdrawResendDeclinedTitle: "Pengulangan tidak diterima",
-    withdrawResendDeclinedBody: "Pengulangan tidak diterima. Hasil penarikan awal masih belum terkonfirmasi. Cek status penarikan; jika belum ada catatan, ulangi permintaan awal nanti. Jangan membuat penarikan lain.",
+    withdrawResendDeclinedBody: "Hasil penarikan awal belum dikonfirmasi. Periksa progresnya; jangan ajukan penarikan baru.",
     withdrawDailyLimitWithPending: "Jatah penarikan hari ini sudah habis. Permintaan awal mungkin sudah terhitung dalam batas ini. Cek status penarikan dulu; jangan membuat penarikan lain.",
     earnNexCta: "Dapatkan UVT lagi",
     feeConfirmRow: "Biaya konfirmasi jaringan",

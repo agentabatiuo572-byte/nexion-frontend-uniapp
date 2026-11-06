@@ -16,14 +16,9 @@
 
       <view :style="bodyStyle">
         <template v-if="cardBindingAvailable">
-          <view v-if="remoteCardsError" data-testid="wallet-cards-refresh-error" class="mb-3 rounded-2xl" :style="refreshErrorStyle">
-            <text class="block" :style="refreshErrorTextStyle">{{ t.security.opFailed }}</text>
-            <view class="nx-card-recovery-action active:opacity-80" role="button" tabindex="0" :aria-disabled="remoteCardsRefreshing" data-testid="wallet-cards-retry" @click="refreshCards">
-              <text>{{ remoteCardsRefreshing ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
-            </view>
-          </view>
+          <view v-if="cardsReadFailed && !cards.length" :style="unavailableStyle" role="status"><text>—</text></view>
           <!-- Empty -->
-          <EmptyState v-if="cards.length === 0" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="t.empty.cardsCta" @cta="goNew" />
+          <EmptyState v-if="cards.length === 0 && !cardsReadFailed && !remoteCardsRefreshing" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="t.empty.cardsCta" @cta="goNew" />
 
           <!-- Card rows -->
           <view class="nx-glass-card" v-for="card in cards" :key="card.tokenId" :style="cardRowStyle">
@@ -79,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navBack, navTo, navReplace } from "@/lib/route";
 import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
@@ -102,17 +98,22 @@ const cardBindingAvailable = computed(() => !remoteApiEnabled || developmentPaym
 const cards = computed(() => cardsStore.cards);
 const defaultTokenId = computed(() => cardsStore.defaultTokenId);
 const remoteCardsError = ref(false);
+const cardsReadFailed = ref(false);
 const remoteCardsRefreshing = ref(false);
 
 async function refreshCards() {
   if (!cardBindingAvailable.value || !remoteApiEnabled || remoteCardsRefreshing.value) return;
   remoteCardsRefreshing.value = true;
   try {
+    cardsReadFailed.value = false;
     remoteCardsError.value = !(await cardsStore.refreshRemote());
+    cardsReadFailed.value = remoteCardsError.value;
   } finally {
     remoteCardsRefreshing.value = false;
   }
 }
+
+useAutoRecovery({ failed: () => cardsReadFailed.value && !remoteCardsRefreshing.value, retry: refreshCards });
 
 function openCards() {
   if (!cardBindingAvailable.value) { navReplace("/pages/me/wallet-cards-new"); return; }

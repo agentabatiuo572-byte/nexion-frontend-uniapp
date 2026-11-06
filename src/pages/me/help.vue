@@ -58,21 +58,6 @@
         <view v-if="faqLoading && faqs.length === 0" role="status" aria-live="polite" aria-busy="true" :style="faqFallbackStyle">
           <text>{{ w.loadingMore }}</text>
         </view>
-        <view v-if="faqLoadError && faqs.length > 0" :style="faqFallbackStyle" role="status" aria-live="polite">
-          <text>{{ t.empty.errorDesc }}</text>
-          <view
-            class="active:opacity-80"
-            role="button"
-            tabindex="0"
-            :aria-label="t.empty.errorCta"
-            :aria-disabled="faqLoading ? 'true' : 'false'"
-            @click="retryFaqs"
-
-            @keydown.enter.prevent="retryFaqs" @keydown.space.prevent="retryFaqs"
-          >
-            <text>{{ t.empty.errorCta }}</text>
-          </view>
-        </view>
         <view
           v-if="canLoadMoreFaqs"
           class="flex items-center justify-center active:opacity-80"
@@ -92,6 +77,8 @@
 </template>
 
 <script setup lang="ts">
+import { toast } from "@/store/ui";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { platformDisplayText } from "@/lib/brand-copy";
 
 import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
@@ -134,6 +121,7 @@ onLoad((options) => {
 const cat = ref<FaqCategory | "all">("all");
 const openId = ref<string | null>(null);
 const faqLoadError = ref(false);
+const faqAppendFailed = ref(false);
 let faqRequestGeneration = 0;
 let faqDisplayScope = "";
 const canLoadMoreFaqs = computed(() => faqs.value.length < faqTotal.value);
@@ -149,6 +137,7 @@ async function loadFaqs(force = false) {
   const requestedLanguage = locale.code;
   const requestScope = remoteAccountScope.snapshot();
   faqLoadError.value = false;
+  faqAppendFailed.value = false;
   faqLoading.value = true;
   try {
     const targetId = requestedFaqId.value;
@@ -190,6 +179,7 @@ async function loadMoreFaqs() {
   const force = faqLoadError.value;
   const nextPage = faqPageNum.value + 1;
   faqLoadError.value = false;
+  faqAppendFailed.value = false;
   faqLoading.value = true;
   try {
     const next = await readPublishedFaqPage(serverLanguage(requestedLanguage), nextPage, FAQ_PAGE_SIZE, force);
@@ -205,16 +195,19 @@ async function loadMoreFaqs() {
         faqs.value = []; faqPageNum.value = 0; faqTotal.value = 0;
       }
       faqLoadError.value = true;
+      faqAppendFailed.value = true;
+      toast.error(t.value.empty.errorDesc);
     }
   } finally {
     if (requestGeneration === faqRequestGeneration && remoteAccountScope.isCurrent(requestScope)) faqLoading.value = false;
   }
 }
 
-function retryFaqs() {
+async function retryFaqs() {
   if (faqLoading.value) return;
-  void loadFaqs(true);
+  await loadFaqs(true);
 }
+useAutoRecovery({ failed: () => faqLoadError.value && !faqAppendFailed.value && !faqLoading.value, retry: retryFaqs });
 
 function resetFaqProjection() {
   faqDisplayScope = "";
@@ -224,6 +217,7 @@ function resetFaqProjection() {
   faqTotal.value = 0;
   openId.value = null;
   faqLoadError.value = false;
+  faqAppendFailed.value = false;
   faqLoading.value = false;
 }
 
@@ -232,7 +226,7 @@ let helpVisible = false;
 onShow(() => {
   helpVisible = true;
   releaseActiveRefresh();
-  releaseActiveRefresh = registerActivePageRefresh(() => loadFaqs(true));
+  releaseActiveRefresh = registerActivePageRefresh(() => faqLoadError.value ? undefined : loadFaqs(true));
   void loadFaqs();
 });
 onHide(() => { helpVisible = false; releaseActiveRefresh(); });

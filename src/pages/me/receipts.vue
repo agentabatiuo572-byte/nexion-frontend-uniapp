@@ -85,20 +85,7 @@
           </template>
         </view>
         <view
-          v-if="showRemoteReceiptInlineError"
-          class="flex items-center justify-center active:opacity-70"
-          style="min-height: 44px; margin: 8px 0"
-          role="button"
-          tabindex="0"
-          :aria-label="t.empty.errorCta"
-          @click="retryRemoteReceipts"
-
-          @keydown.enter.stop.prevent="retryRemoteReceipts" @keydown.space.stop.prevent="retryRemoteReceipts"
-        >
-          <text :style="rowSubStyle">{{ t.empty.errorDesc }} · {{ t.empty.errorCta }}</text>
-        </view>
-        <view
-          v-if="remoteReceiptHasMore"
+          v-if="remoteReceiptHasMore && !showRemoteReceiptInitialError"
           class="grid place-items-center active:opacity-70"
           style="min-height: 44px; margin: 8px 0 16px"
           role="button"
@@ -173,6 +160,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { displayTimestamp, formatDisplayDate, formatDisplayTime } from "@/lib/display-date";
 import { receiptLine } from "@/lib/receipt-line";
 import { formatAmount } from "@/lib/amount-display";
@@ -328,7 +316,7 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor
       && expectedBindingEpoch === app.accountBindingEpoch) {
       failedComputeReceiptRequest.value = { offset, cursor, append };
       remoteComputeReceiptStatus.value = "error";
-      toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
+      if (append) toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
     }
   } finally {
     if (requestEpoch === receiptPageRequestEpoch
@@ -367,26 +355,34 @@ async function loadSelectedMoreRemoteReceipts(): Promise<void> {
   remoteDepositMoreLoading.value = true;
   try {
     await depositsStore.loadMoreRemoteVietQrReceipts();
+    if (depositsStore.remoteReceiptMoreStatus === "error") toast.error(t.value.wallet.receiptsUnavailableTitle, t.value.wallet.receiptsUnavailableBody);
   } finally {
     if (receiptsPageFence.isCurrent(requestScope)) remoteDepositMoreLoading.value = false;
   }
 }
 
-function retryRemoteReceipts(): void {
+async function retryRemoteReceipts(): Promise<void> {
   if (remoteReceiptKind.value === "compute" && remoteComputeReceiptStatus.value === "error") {
     const failed = failedComputeReceiptRequest.value ?? { offset: 0, cursor: null, append: false };
-    if (failed.append) void loadSelectedMoreRemoteReceipts();
-    else void loadRemoteComputeReceipts(failed.offset, false, failed.cursor);
+    if (failed.append) await loadSelectedMoreRemoteReceipts();
+    else await loadRemoteComputeReceipts(failed.offset, false, failed.cursor);
     return;
   }
   if (remoteReceiptKind.value === "deposit" && depositsStore.remoteReceiptInitialStatus === "error") {
-    void depositsStore.refreshRemoteVietQrDeposits();
+    await depositsStore.refreshRemoteVietQrDeposits();
     return;
   }
   if (remoteReceiptKind.value === "deposit" && depositsStore.remoteReceiptMoreStatus === "error") {
-    void loadSelectedMoreRemoteReceipts();
+    await loadSelectedMoreRemoteReceipts();
   }
 }
+
+useAutoRecovery({
+  failed: () => remoteReceiptsMode && !remoteReceiptLoading.value && !remoteMoreLoading.value
+    && remoteReceiptInitialStatus.value === "error"
+    && (remoteReceiptKind.value !== "compute" || !failedComputeReceiptRequest.value?.append),
+  retry: retryRemoteReceipts,
+});
 
 function loadSelectedRemoteReceipts(): void {
   // After an H5 reload the session is restored after the page shows; the account watch reads once it is bound.
