@@ -182,13 +182,13 @@ import { commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import OrderRewards from '@/components/promotion/order-rewards.vue';
-import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, nextTick, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { pendingOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
+import { pendingOrderPayment, usePurchasePayment, onPurchaseRecordReleased } from "@/store/purchase-payment";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import CheckoutPaymentSheet from "@/components/checkout/CheckoutPaymentSheet.vue";
@@ -511,6 +511,12 @@ function restoreOrderAction():void {
   } catch { orderCommandUnavailable.value=true; }
 }
 watch(()=>[auth.accountId,id.value],restoreOrderAction,{flush:'sync'});
+const stopPurchaseRelease = onPurchaseRecordReleased((accountKey, key) => {
+  // The release event precedes lock cleanup in the same turn; read it after that work finishes.
+  void nextTick(() => {
+    if (detailMounted && accountKey === orders.currentAccountKey() && orderAction.value?.key === key) restoreOrderAction();
+  });
+});
 async function recoverOrderAction(retryCancel=false):Promise<void> {
   if (!remoteApiEnabled||!detailVisible||orderCommandQuerying.value||orderCommandReading.value||payingFromWallet.value||cancellingOrder.value) return;
   const scope=captureDetailScope(),accountKey=orders.currentAccountKey();
@@ -1063,6 +1069,7 @@ function cleanup() {
   detailVisible = false;
   detailEpoch += 1;
   unsubscribeRuntimeRevision();
+  stopPurchaseRelease();
   if (tickTimer) clearInterval(tickTimer);
 }
 onUnload(() => cleanup());
