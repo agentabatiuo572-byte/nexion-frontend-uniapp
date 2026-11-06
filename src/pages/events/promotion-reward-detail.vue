@@ -14,13 +14,14 @@
 </template>
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import EmptyState from "@/components/empty-state.vue";
 import{ref,computed,watch,onBeforeUnmount}from'vue';import{onLoad,onShow,onHide}from'@dcloudio/uni-app';import AppChassis from'@/components/app-chassis.vue';import RewardRows from'@/components/promotion/reward-rows.vue';import DisclosureDetails from'@/components/promotion/disclosure-details.vue';import{useT}from'@/i18n/use-t';import{useApp}from'@/store/app';import{useLocaleStore}from'@/store/locale';import{promotionApi}from'@/api/runtime';import type{Reward}from'@/api/promotion-api';import type{ReferralProgress}from'@/api/promotion-contracts';import{useSetPageHeader}from'@/composables/use-page-header';import{navTo,takeNavigationQuery}from'@/lib/route';import{localized,displayDeadline}from'@/lib/promotion-display';
 const t=useT(),p=computed(()=>t.value.promotion),app=useApp(),locale=useLocaleStore();useSetPageHeader(()=>({title:p.value['reward-detail'],backHref:'/pages/me/rewards-list?cat=promotion'}));
 const reward=ref<Reward|null>(null),progress=ref<ReferralProgress|null>(null),loading=ref(false),error=ref(false);let id='',generation=0,visible=true;
 onLoad(options=>{const q=new URLSearchParams(takeNavigationQuery('/pages/events/promotion-reward-detail'));id=String(options?.obligationId??q.get('obligationId')??'').trim();void load();});
 async function load(){if(!id){error.value=true;loading.value=false;return;}const request=++generation,account=app.accountKey,epoch=app.accountBindingEpoch;loading.value=true;error.value=false;const current=()=>visible&&request===generation&&account===app.accountKey&&epoch===app.accountBindingEpoch;try{const item=await promotionApi.reward(id);if(!current())return;reward.value=item;if(item.beneficiaryRole==='DIRECT_INVITER'){const value=await promotionApi.referral(item.activityId);if(current())progress.value=value;}}catch{if(current())error.value=true;}finally{if(current())loading.value=false;}}
-watch(()=>[app.accountKey,app.accountBindingEpoch],()=>{generation++;reward.value=null;progress.value=null;void load();});onShow(()=>{visible=true;void load();});onHide(()=>{visible=false;generation++;loading.value=false;});onBeforeUnmount(()=>{visible=false;generation++;});
+watch(()=>[app.accountKey,app.accountBindingEpoch],()=>{generation++;reward.value=null;progress.value=null;void load();});let releaseActiveRefresh=()=>{};onShow(()=>{visible=true;releaseActiveRefresh=registerActivePageRefresh(()=>error.value?undefined:load(),'pages/events/promotion-reward-detail');void load();});onHide(()=>{visible=false;releaseActiveRefresh();generation++;loading.value=false;});onBeforeUnmount(()=>{visible=false;releaseActiveRefresh();generation++;});
 useAutoRecovery({ failed: () => !!id && error.value && !loading.value, retry: load });
 </script>
 <style src="../../components/promotion/promotion.css"></style>

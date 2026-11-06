@@ -3,6 +3,10 @@
     <SubPageHeader :back="back" :title="heading" />
     <view v-if="loading && !content" class="team-rule-published__notice" role="status"><text>{{ t.howPublished.loading }}</text></view>
     <template v-if="content">
+      <view v-if="languageFallback" class="team-rule-published__notice" role="status" aria-live="polite">
+        <text>{{ t.howPublished.languageFallback }}</text>
+        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.ui.retry }}</text></view>
+      </view>
       <TeamRuleHero :kind="kind" :title="copy.overview" :sections="directory" :nav-label="copy.contents" />
       <TeamRuleDocument :blocks="content.blocks" />
     </template>
@@ -30,6 +34,7 @@ import { serverLanguage } from '@/i18n';
 
 const props = defineProps<{ contentKey: HowContentKey; back: string; backLabel: string; kind: 'members' | 'balance'; heading: string }>();
 const locale = useLocaleStore(), t = useT();
+const languageFallback = computed(() => !!content.value && content.value.locale.split(/[-_]/)[0].toLowerCase() !== locale.code.split(/[-_]/)[0].toLowerCase());
 const copy = computed(() => teamRuleGuideCopy(locale.code));
 const content = ref<HowContentDocument | null>(null);
 const loading = ref(true), error = ref(false);

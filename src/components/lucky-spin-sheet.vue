@@ -180,7 +180,7 @@ const CY = 100;
 const MOCK_NET_FAIL_RATE = 0.08; // mock: 区块链拥堵演示(server 侧真实裁决)
 
 const spin = useLuckySpin();
-useAutoRecovery({ failed: () => spin.open && spin.remoteError && !spin.remoteLoading && spin.phase === "idle", retry: () => spin.refreshRemoteState() });
+useAutoRecovery({ failed: () => spin.open && spin.remoteError && !spin.remoteLoading && spin.phase === "idle", retry: () => spin.refreshRemoteState(), repeatMs: 30_000 });
 const app = useApp();
 const t = useT();
 const locale = useLocaleStore();

@@ -60,8 +60,8 @@ export const LADDER = [
   { file: "src/components/milestone-celebration.vue", sel: ".ms-overlay", role: "里程碑庆祝(必须在业务 UI 之下)" },
   { file: "src/components/country-code-sheet.vue", sel: ".cc-sheet", role: "国家区号半屏" },
   { file: "src/components/global-ui.vue", sel: ".nx-mask", role: "阻断式弹窗 confirm/netError" },
-  { file: "src/components/toast-host.vue", sel: ".nx-toast-host", role: "toast 瞬时层(高于所有 sheet 和确认框,不拦截点击)" },
   { file: "src/components/captcha-slider.vue", sel: ".cs-layer", role: "🔴 滑块人机验证(阻断式安全控件,发码流程停在它上面)" },
+  { file: "src/components/toast-host.vue", sel: ".nx-toast-host", role: "toast 瞬时层(高于所有浮层和验证码,不拦截点击)" },
   { file: "src/components/device/standalone-page-shell.vue", sel: ".nx-standalone-home", role: "模拟设备 chrome(硬件层,pointer-events:none)" },
 ];
 
@@ -207,6 +207,7 @@ export const MILESTONE_FILE = "src/components/milestone-celebration.vue";
 
 /* ── 契约 ②:允许高于滑块的白名单(只有模拟硬件 chrome)────────────────────── */
 export const CEILING_EXEMPT = [
+  { file: "src/components/toast-host.vue", reason: "瞬时提示不拦截点击，高于验证码才看得见断网等提示" },
   { file: "src/components/device/standalone-page-shell.vue", reason: "模拟设备状态栏 / Home Indicator = 硬件层,与居中卡片零几何重叠,indicator 还是 pointer-events:none" },
 ];
 

@@ -132,7 +132,8 @@ async function retrySummary() {
   await center.refresh();
 }
 useAutoRecovery({
-  failed: () => remoteApiEnabled && summaryRecovery.value.visible && !summaryRecovery.value.busy,
+  // The service list owns this same refresh while its tab is shown.
+  failed: () => remoteApiEnabled && section.value !== "service" && summaryRecovery.value.visible && !summaryRecovery.value.busy,
   retry: retrySummary,
 });
 function preserveSectionInH5() {

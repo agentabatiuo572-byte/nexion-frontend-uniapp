@@ -37,7 +37,7 @@ onHide(() => { shown.value = false; });
 .nx-toast-host {
   position: fixed;
   inset: 0;
-  z-index: 9300;
+  z-index: 9600;
   display: flex;
   align-items: center;
   justify-content: center;
