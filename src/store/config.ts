@@ -1,21 +1,22 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./config-types";
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
 import { platformConfigApi, remoteApiEnabled } from "@/api/runtime";
 import type { PlatformPublicStatsAuthority } from "@/api/platform-config-api";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 
 const IS_PRODUCTION = import.meta.env.PROD;
+const CONFIG_REFRESH_MS = 30 * 60_000;
+const CONFIG_INVALIDATION_MS = 90_000;
+const CONFIG_RETRY_MS = 60_000;
 
 // Platform config / feature-flag store. Single source for client-side feature
 // flags + tunable platform config across all carriers (signed APP / H5 /
 // janus-loaded real-disc).
-//
-// MOCK-ONLY: seeded from mock/platform-config.ts. Future PROD wiring replaces
-// the seed with `GET /api/config/platform` on app boot; the client treats the
-// fetched response as READ-ONLY (no current admin push channel in this repo).
+// Remote builds use the public platform snapshot. Local demo builds use the mock seed.
 export const useConfig = defineStore("config", () => {
   const mockConfig = completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG);
   // Remote mode never exposes plausible server-owned seed values while the
@@ -161,8 +162,14 @@ export const useConfig = defineStore("config", () => {
    * 🔴 失败时**不得**把 config 重置成前端种子 —— 那等于回退写死值(FEAT-RISK02 异常3)。
    */
   const loading = ref(false);
-  let reloadAfterCurrentFlight = false;
   let currentLoad: Promise<void> | null = null;
+  let snapshotVersion: string | null = null;
+  let invalidation = 0;
+  let nextCheckAt = 0;
+  let retryAt = 0;
+  const guestSlot = Math.floor(Math.random() * CONFIG_REFRESH_MS);
+  let refreshSlot = guestSlot;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clearRemotePlatformAuthority() {
     if (!remoteApiEnabled) return;
@@ -182,68 +189,111 @@ export const useConfig = defineStore("config", () => {
     syncFailed.value = true;
   }
 
-  function load(): Promise<void> {
-    if (currentLoad) {
-      reloadAfterCurrentFlight = true;
-      return currentLoad;
+  function nextSlot(now: number): number {
+    return (Math.floor((now - refreshSlot) / CONFIG_REFRESH_MS) + 1) * CONFIG_REFRESH_MS + refreshSlot;
+  }
+
+  function scheduleRefresh(): void {
+    clearTimeout(refreshTimer);
+    if (!remoteApiEnabled || !foregroundReadAllowed() || currentLoad) return;
+    const delay = Math.max(nextCheckAt, retryAt) - Date.now();
+    if (delay <= 0) void load();
+    else refreshTimer = setTimeout(scheduleRefresh, delay);
+  }
+
+  function startRefresh(accountKey: () => string): void {
+    watch([foregroundReadAllowed, accountKey], ([, key], previous) => {
+      if (key !== previous?.[1]) {
+        let hash = 2166136261;
+        for (let index = 0; index < key.length; index++) hash = Math.imul(hash ^ key.charCodeAt(index), 16777619);
+        refreshSlot = key.startsWith("user:") ? (hash >>> 0) % CONFIG_REFRESH_MS : guestSlot;
+        nextCheckAt = Math.min(nextCheckAt, nextSlot(Date.now()));
+      }
+      scheduleRefresh();
+    }, { immediate: true });
+  }
+
+  function invalidate(): void {
+    invalidation += 1;
+    nextCheckAt = Math.min(nextCheckAt, Date.now() + refreshSlot % CONFIG_INVALIDATION_MS);
+    scheduleRefresh();
+  }
+
+  function load(force = false): Promise<void> {
+    if (currentLoad) return currentLoad;
+    const now = Date.now();
+    if (remoteApiEnabled && (!foregroundReadAllowed() || now < retryAt || (!force && now < nextCheckAt))) {
+      return Promise.resolve();
     }
+    const previousStatus = configStatus.value;
     loading.value = true;
     configStatus.value = "loading";
+    const startedInvalidation = invalidation;
     let flight!: Promise<void>;
     // Start in a microtask so even a synchronous API mock/adapter throw cannot
     // run finally before currentLoad has received this flight.
     flight = Promise.resolve().then(async () => {
+      const current = () => currentLoad === flight && invalidation === startedInvalidation;
       try {
-        const remote = await platformConfigApi.platformConfig();
-        if (remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION"
-            || remote.publicStatsAuthority.runId !== "") {
-          throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
+        if (!current() || (remoteApiEnabled && !foregroundReadAllowed())) return;
+        const { version, snapshot: remote } = await platformConfigApi.platformConfig(snapshotVersion);
+        if (!current()) return;
+        if (remote) {
+          if (remote.publicStatsAuthority.sourceEnvironment !== "PRODUCTION"
+              || remote.publicStatsAuthority.runId !== "") {
+            throw new Error("H9_PUBLIC_STATS_ENVIRONMENT_MISMATCH");
+          }
+          config.value = {
+            // The server snapshot is authoritative for every field it provides.
+            // Keep only the client-only structural branches that are not part of
+            // this bounded context; no fetched field is allowed to fall back to a
+            // mock value by precedence.
+            ...config.value,
+            // Platform's public endpoint owns only this subset. Keep unrelated
+            // client feature declarations structurally present, but never use a
+            // mock value for a server-supplied flag.
+            featureFlags: { ...config.value.featureFlags, ...remote.featureFlags },
+            // 🔴 publicStats 是 H9 的**唯一**来源:种子里没有它(819a6da 把它移出 mock 数据),
+            //   compat 只补一个「故意非法」哨兵。这里漏写 = 服务端投影解析完就被丢掉,
+            //   publicStatsHealth 六位恒 false,16 个消费点永久走「不可用」占位(z1 独立审计 P0-3)。
+            //   本行由 scripts/remote-config-merge-contract.test.mjs 的覆盖等式钉着:
+            //   解析器返回的每个属于 PlatformConfig 的字段都必须在这里落地,漏一个即红。
+            publicStats: remote.publicStats,
+            verifiedStats: remote.verifiedStats,
+            onlineBonus: remote.onlineBonus,
+            rewards: remote.rewards,
+            computeShare: remote.computeShare,
+            share: remote.share,
+          };
+          if (!current()) return;
+          publicStatsAuthority.value = remote.publicStatsAuthority;
         }
-        config.value = {
-        // The server snapshot is authoritative for every field it provides.
-        // Keep only the client-only structural branches that are not part of
-        // this bounded context; no fetched field is allowed to fall back to a
-        // mock value by precedence.
-        ...config.value,
-        // Platform's public endpoint owns only this subset. Keep unrelated
-        // client feature declarations structurally present, but never use a
-        // mock value for a server-supplied flag.
-        featureFlags: { ...config.value.featureFlags, ...remote.featureFlags },
-        // 🔴 publicStats 是 H9 的**唯一**来源:种子里没有它(819a6da 把它移出 mock 数据),
-        //   compat 只补一个「故意非法」哨兵。这里漏写 = 服务端投影解析完就被丢掉,
-        //   publicStatsHealth 六位恒 false,16 个消费点永久走「不可用」占位(z1 独立审计 P0-3)。
-        //   本行由 scripts/remote-config-merge-contract.test.mjs 的覆盖等式钉着:
-        //   解析器返回的每个属于 PlatformConfig 的字段都必须在这里落地,漏一个即红。
-        publicStats: remote.publicStats,
-        verifiedStats: remote.verifiedStats,
-        onlineBonus: remote.onlineBonus,
-        rewards: remote.rewards,
-        computeShare: remote.computeShare,
-        share: remote.share,
-        };
-        publicStatsAuthority.value = remote.publicStatsAuthority;
+        if (!current()) return;
+        snapshotVersion = version;
+        nextCheckAt = nextSlot(Date.now());
+        retryAt = 0;
         syncFailed.value = false;
+        if (!current()) return;
         configStatus.value = "ready";
       } catch {
+        if (!current()) return;
+        snapshotVersion = null;
+        nextCheckAt = 0;
+        retryAt = Date.now() + CONFIG_RETRY_MS;
         clearRemotePlatformAuthority();
+        if (!current()) return;
         configStatus.value = "failed";
       } finally {
-        loading.value = false;
-        if (currentLoad === flight) currentLoad = null;
-        if (reloadAfterCurrentFlight) {
-          reloadAfterCurrentFlight = false;
-          void load();
+        if (currentLoad === flight) {
+          currentLoad = null;
+          loading.value = false;
+          if (configStatus.value === "loading") configStatus.value = previousStatus;
+          scheduleRefresh();
         }
       }
     });
     currentLoad = flight;
     return flight;
-  }
-
-  /** Join startup work without turning a page's wait into an extra reload. */
-  function ensureLoaded(): Promise<void> {
-    if (currentLoad) return currentLoad;
-    return configStatus.value === "ready" ? Promise.resolve() : load();
   }
 
   // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。
@@ -275,7 +325,8 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, publicStatsAuthority, configStatus, syncFailed, loading, load, ensureLoaded, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
+  return { config, publicStatsAuthority, configStatus, syncFailed, loading,
+    load, refresh: () => load(true), ensureLoaded: load, startRefresh, invalidate, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 
 // currentNetworkConfirmFeeUsd(权威网络费跨 store 纯函数)已随 c37e642 的 D5 policy
