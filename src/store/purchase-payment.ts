@@ -223,10 +223,19 @@ async function query() {
     if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
     if (result) accept(result, pending); else state.unavailable = true;
-  } catch {
-    // A missing intent on an automatic read does not prove the original payment was refused.
+  } catch (error) {
     failed = true;
-    if (owns(version, accountKey) && !state.concluded) state.error = true;
+    if (owns(version, accountKey) && !state.concluded) {
+      const cause = asApiError(error);
+      // The server no longer holds a payment it has shown us. Only the user may start another one, from the order.
+      if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') {
+        release(pending);
+        releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+        releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+        Object.assign(state, { pending: null, intent: null, quote: null, error: false });
+        conclude('gone');
+      } else state.error = true;
+    }
   }
   finally { if (owns(version, accountKey)) { state.busy = false; schedule(version, accountKey, failed); } }
 }
