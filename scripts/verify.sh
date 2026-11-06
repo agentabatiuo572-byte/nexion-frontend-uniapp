@@ -1995,7 +1995,12 @@ const WHITELIST=new RegExp(`${tok}Box\\s+(?:S1|Pro\\s+v2)|${tok}-(prototype|unia
 // Strip only the permitted occurrence; display copy on the same line stays red.
 const ENGINEERING_URLS = /https:\/\/github\.com\/agentabatiuo572-byte\/nexion-frontend-(?:uniapp|prototype)\.git(?=["\x27\x60\s]|$)/gi;
 const ENGINEERING_DISCOVERY = /\bdiscover\(root,\s*"Nexion-H5"\)/g;
-const residual = (line) => line.replace(ENGINEERING_URLS, "").replace(ENGINEERING_DISCOVERY, "").replace(WHITELIST, "");
+// Only these complete resolver declarations at column zero; keep any suffix for scanning.
+const ENGINEERING_BACKEND_RESOLVER_IMPORT = /^const \{ resolveNexionBackendRoot \} = await import\(pathToFileURL\(path\.join\(adminRoot, "scripts\/lib\/nexion-workspace-paths\.mjs"\)\)\.href\);/;
+const ENGINEERING_BACKEND_ROOT_CALL = /^const backendRoot = resolveNexionBackendRoot\(\{ adminRoot \}\);/;
+const residual = (line) => line.replace(ENGINEERING_URLS, "").replace(ENGINEERING_DISCOVERY, "")
+  .replace(ENGINEERING_BACKEND_RESOLVER_IMPORT, "").replace(ENGINEERING_BACKEND_ROOT_CALL, "")
+  .replace(WHITELIST, "");
 const hasOldBrand = (line) => new RegExp(tok,"i").test(residual(line));
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
