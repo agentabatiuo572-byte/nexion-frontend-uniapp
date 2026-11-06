@@ -284,7 +284,7 @@ async function submitOriginal() {
           if (unconfigured) retire(pending, accountKey); else release(pending);
           Object.assign(state, { pending: null, quote: null, intent: null });
           // Channel-not-configured keeps its existing fallback. A cold resume has no caller to quote or confirm again.
-          if (state.coldResume && !unconfigured) conclude('changed'); else requote = true;
+          if (state.coldResume) conclude('changed'); else requote = true;
         }
       }
     }
