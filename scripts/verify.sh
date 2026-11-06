@@ -1855,7 +1855,7 @@ css_foundation
 # navigateTo, so they're mapped to real flattened uni routes.
 nav_routes_valid() {
   local bad_routes
-  bad_routes=$("$NODE_BIN" -e '
+  if ! bad_routes=$("$NODE_BIN" -e '
     const fs=require("fs"), path=require("path");
     const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
     const valid=new Set((pj.pages||[]).map(p=>"/"+p.path));
@@ -1875,9 +1875,13 @@ nav_routes_valid() {
     }
     const broken=[...refs].filter(r=>!valid.has(r)).sort();
     if(broken.length) process.stdout.write(broken.join(" "));
-  ' 2>/dev/null)
-  if [ -z "$bad_routes" ]; then ok "nav routes valid (all /pages/ literals exist in pages.json)";
-  else bad "INVALID nav routes (navigateTo silently fails): $bad_routes"; fi
+  '); then
+    bad "nav route scanner failed"
+  elif [ -n "$bad_routes" ]; then
+    bad "INVALID nav routes (navigateTo silently fails): $bad_routes"
+  else
+    ok "nav routes valid (all /pages/ literals exist in pages.json)"
+  fi
 }
 nav_routes_valid
 # The retired AI assistant's old name "Stella" must never be user-visible
