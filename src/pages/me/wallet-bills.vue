@@ -223,6 +223,7 @@ async function refreshLedger() {
   } catch { /* pager owns recoverable state */ }
   finally { if (current()) locatingReceipt.value = false; }
 }
+useAutoRecovery({ failed: () => fundsServerEnabled && app.homeTruthStatus === "error", retry: () => app.refreshHomeTruth() });
 useAutoRecovery({
   failed: () => fundsServerEnabled && !locatingReceipt.value && !activePager.value.loadingMore
     && (activePager.value.status === "error" || (!!ledgerBizNo.value && !!activePager.value.error && activePager.value.status !== "loading")),
