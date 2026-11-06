@@ -107,6 +107,7 @@
     "@dcloudio/types": "3.4.31",
     "@dcloudio/uni-cli-shared": "3.0.0-alpha-5030220261016001",
     "@dcloudio/uni-stacktracey": "3.0.0-alpha-5030220261016001",
+    "@dcloudio/uni-uts-v1": "3.0.0-alpha-5030220261016001",
     "@dcloudio/vite-plugin-uni": "3.0.0-alpha-5030220261016001",
     "@vue/runtime-core": "3.5.43",
     "@vue/tsconfig": "^0.1.3",
