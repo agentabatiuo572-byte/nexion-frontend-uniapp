@@ -36,13 +36,7 @@
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
       </view>
-      <view v-else-if="catalogStatus === 'error' || policyStatus === 'error'" data-testid="bundle-catalog-error" class="nx-glass-card mx-4" :style="catalogStateStyle">
-        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
-        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
-        <view class="nx-card-recovery-action active:opacity-70" role="button" tabindex="0" @click="retryCatalog" @keydown="activate($event, retryCatalog)">
-          <text>{{ t.store.catalogRetry }}</text>
-        </view>
-      </view>
+      <EmptyState v-else-if="catalogStatus === 'error' || policyStatus === 'error'" kind="recoverable-error" :title="t.store.catalogErrorTitle" :desc="t.store.catalogErrorBody" :cta-label="t.store.catalogRetry" @cta="retryCatalog" />
       <template v-else>
 
       <view v-if="receiptWriteFailure" class="nx-glass-card mx-4 rounded-2xl text-center" :style="receiptFailureCardStyle">
@@ -195,6 +189,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { promotionCheckoutHref } from "@/lib/promotion-entry";
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
@@ -332,11 +327,10 @@ watch([() => products.value.map((p) => p.id).join("|"),
     .map((p) => purchaseEligibilityStore.ensure(p.id, true)));
 }, { immediate: true });
 
-function retryCatalog() {
-  void refreshProductCatalog(true);
-  void refreshServerProductPhase(true);
-  void refreshBundlePolicy();
+async function retryCatalog() {
+  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
 }
+useAutoRecovery({ failed: () => catalogStatus.value !== "loading" && policyStatus.value !== "loading" && (catalogStatus.value === "error" || policyStatus.value === "error"), retry: retryCatalog });
 
 function retryReceiptWrite() {
   const failure = receiptWriteFailure.value;

@@ -262,6 +262,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
@@ -380,6 +381,7 @@ let purchaseOpeningRead: {
   result: Promise<PurchaseEligibilitySnapshot | null>;
 } | null = null;
 const purchaseStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
+const purchaseReadFailed = ref(false);
 const purchaseRecovery = ref<"none" | "pending" | "error">("none");
 let purchaseReadGeneration = 0;
 let purchaseSheetEpoch = 0;
@@ -431,6 +433,7 @@ function readTradeinRecovery(): "none" | "pending" | "error" {
   return purchaseRecovery.value;
 }
 
+useAutoRecovery({ failed: () => props.active && state.value.kind === "tradein" && purchaseReadFailed.value && purchaseStatus.value === "error", retry: refreshTradeinPurchaseEligibility });
 async function refreshTradeinPurchaseEligibility(): Promise<boolean> {
   if (readTradeinRecovery() !== "none") return false;
   const key = purchaseScopeKey.value;
@@ -442,6 +445,7 @@ async function refreshTradeinPurchaseEligibility(): Promise<boolean> {
   const current = () => purchaseMounted && props.active && request === purchaseReadGeneration
     && purchaseRecovery.value === "none" && key === purchaseScopeKey.value && isCurrentAccountScope(account)
     && origin.environment === apiRuntimeConfig.environment && origin.baseUrl === apiRuntimeConfig.baseUrl;
+  purchaseReadFailed.value = false;
   purchaseStatus.value = "loading";
   purchaseSnapshot.value = null;
   const opening = purchaseOpeningRead;
@@ -460,7 +464,7 @@ async function refreshTradeinPurchaseEligibility(): Promise<boolean> {
     purchaseStatus.value = "ready";
     return resolvePurchaseEligibilityMessage("ready", snapshot) === "eligible";
   } catch {
-    if (current()) purchaseStatus.value = "error";
+    if (current()) { purchaseReadFailed.value = true; purchaseStatus.value = "error"; }
     return false;
   } finally {
     if (purchaseMounted && request === purchaseReadGeneration
@@ -476,6 +480,7 @@ watch([purchaseScopeKey, state, () => app.accountKey, () => app.accountBindingEp
   purchaseReadGeneration++;
   purchaseSnapshot.value = null;
   purchaseStatus.value = "idle";
+  purchaseReadFailed.value = false;
   confirming.value = false;
   if (readTradeinRecovery() !== "none") { purchaseOpeningRead = null; return; }
   if (remoteApiEnabled && props.active && state.value.kind === "tradein") {

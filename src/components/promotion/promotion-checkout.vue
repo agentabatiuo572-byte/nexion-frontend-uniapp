@@ -10,7 +10,7 @@
       <text v-if="displayQuote||order" class="checkout-review-title">{{ order?.paymentStatus==='PENDING' ? p.pending : p.confirmOrder }}</text>
       <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="recover"><text>{{ p.query }}</text></PromotionAction></view>
       <view v-if="error" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
-      <view v-if="openedOriginal" class="promotion-notice" role="status"><text>{{ p.openedOriginal }}</text></view>
+
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
           <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" /></view>
@@ -74,10 +74,7 @@
             </view>
             <view class="checkout-wallet-topup" role="link" tabindex="0" @click="openWalletTopup" @keydown.enter.prevent="openWalletTopup"><text>{{ p.topup }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
           </view>
-          <view v-if="walletState==='error'" class="checkout-wallet-recovery" role="status">
-            <text>{{ reviewCopy.walletError }}</text>
-            <view class="promotion-link" role="button" tabindex="0" @click="refreshWallet(true)"><text>{{ t.empty.errorCta }}</text></view>
-          </view>
+
         </view>
       </view>
       <view v-if="summary" class="checkout-section" data-testid="checkout-fees">
@@ -123,6 +120,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { commerceCopy } from '@/lib/commerce-review';
@@ -174,6 +172,7 @@ function selectedItemName(item:{productNo:string;productName?:string}){return (i
 const reviewCopy=computed(()=>commerceCopy(locale.code));
 const flowCopy=computed(()=>checkoutFlowCopy(locale.code));
 const walletState=ref<'idle'|'loading'|'ready'|'error'>('idle');
+useAutoRecovery({ failed: () => walletState.value === "error", retry: () => refreshWallet(true) });
 let walletGeneration=0;
 let walletTimer:ReturnType<typeof setInterval>|undefined;
 let catalogRefresh:Promise<boolean>|null=null;

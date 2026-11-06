@@ -6,13 +6,10 @@
       <NxButton class="hf-manage" :label="t.home.fleetManage" variant="link" size="medium" @click="goManage"><text>{{ t.home.fleetManage }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></NxButton>
     </view>
 
-    <view v-if="unavailable" class="hf-dock" role="status">
-      <text class="hf-dock__error">{{ copy.fleetUnavailable }}</text>
-      <view class="hf-retry" role="button" tabindex="0" @click="retry"><text>{{ t.ui.retry }}</text></view>
-    </view>
-    <view v-else-if="!fleet.fleetVisible.value" class="hf-dock" role="status" aria-busy="true">
+
+    <view v-if="!fleet.fleetVisible.value" class="hf-dock" role="status" :aria-busy="app.remoteFleetStatus === 'loading'">
       <view class="hf-avatars" aria-hidden="true"><view v-for="n in app.slotCap" :key="n" class="hf-av hf-av--loading" /></view>
-      <text class="hf-dock__sub">{{ copy.fleetLoading }}</text>
+      <text class="hf-dock__sub">{{ app.remoteFleetStatus === 'error' ? '—' : copy.fleetLoading }}</text>
     </view>
     <view v-else-if="!fleet.occupied.value.length && !fleet.slots.value.some((slot) => slot.kind === 'pending')" class="hf-dock hf-dock--action" role="button" tabindex="0" :aria-label="`${t.earn.addDevice}, ${freeSlotsText}`" @click="addDevice">
       <view class="hf-avatars" aria-hidden="true"><view v-for="(slot, i) in fleet.slots.value" :key="i" class="hf-av" :class="slot.kind === 'reserved' ? 'hf-av--reserved' : 'hf-av--empty'" :style="{ '--i': i }"><view v-if="slot.kind === 'reserved'" class="hf-spin" /><svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view></view>
@@ -61,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, ref } from "vue";
 import { onShow } from "@/composables/use-tab-page-lifecycle";
 import { useDataVisibility } from "@/store/data-visibility";
@@ -74,8 +72,6 @@ import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { formatTrialCountdown } from "@/i18n/trial-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
 import { getProductMedia } from "@/lib/product-media";
-import { invalidatePassiveTabRead } from "@/lib/passive-tab-read";
-import { useFreeTrial } from "@/store/free-trial";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useFleetSlots, type FleetSlot } from "@/composables/use-fleet-slots";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
@@ -91,7 +87,7 @@ const t = useT();
 const copy = useAuditUiCopy();
 const trialCopy = useTrialFleetCopy();
 const app = useApp();
-const trial = useFreeTrial();
+useAutoRecovery({ failed: () => remoteApiEnabled && !useSlotActionSheet().open && (app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error"), retry: () => app.refreshRemoteFleet(undefined, { coalesce: true }) });
 const fleet = useFleetSlots();
 // Online dots and the provisioning spinner loop only while this section is on screen and Home is shown.
 const loops = useLoopsInView(".hf-section");
@@ -103,9 +99,8 @@ onShow(() => { expanded.value = false; });
 
 const tasksReady = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
   || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
-const unavailable = computed(() => app.remoteFleetStatus === "error" || trial.authorityStatus === "error");
 const freeSlotsText = computed(() => fmt(t.value.myDevices.emptySlots, { n: fleet.freeSlots.value }));
-const onlineText = computed(() => fmt(t.value.myDevices.activatedLabel, { n: fleet.occupied.value.filter((slot) => (slot.kind === "trial" || slot.kind === "device") && slot.online).length }));
+const onlineText = computed(() => !fleet.fleetReady.value ? "—" : fmt(t.value.myDevices.activatedLabel, { n: fleet.occupied.value.filter((slot) => (slot.kind === "trial" || slot.kind === "device") && slot.online).length }));
 // Job state is only stated once the task snapshot is confirmed; paused, queued, interrupted or recovering jobs are not running.
 const jobsText = computed(() => tasksReady.value && fleet.fleetReady.value
   ? fmt(copy.value.jobs, { n: fleet.devices.value.filter(deviceTaskRunning).length }) : "—");
@@ -131,10 +126,6 @@ function goManage() { navTo("/pages/me/devices"); }
 function goTrial() { navTo("/pages/me/trial"); }
 function goEarn() { navTo("/pages/earn/earn"); }
 function addDevice() { useSlotActionSheet().openForSlot(); }
-function retry() {
-  if (app.remoteFleetStatus === "error") { invalidatePassiveTabRead("remote-fleet"); void app.refreshRemoteFleet().catch(() => undefined); }
-  if (trial.authorityStatus === "error") void trial.refreshRemote();
-}
 </script>
 
 <style scoped>
@@ -149,10 +140,8 @@ function retry() {
 [data-theme="light"] .hf-dock { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .hf-dock--action { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .hf-dock--action:active { opacity: .85; }
-.hf-dock--action:focus-visible, .hf-retry:focus-visible, .hf-more__link:focus-visible, .hf-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.hf-dock--action:focus-visible, .hf-more__link:focus-visible, .hf-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .hf-dock__sub { display: block; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
-.hf-dock__error { flex: 1; min-width: 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
-.hf-retry { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
 
 .hf-avatars { display: flex; align-items: center; flex: none; }
 .hf-av { position: relative; flex: none; width: 38px; height: 38px; margin-left: -10px; border-radius: 50%; box-sizing: border-box; background: radial-gradient(80% 70% at 50% 72%, color-mix(in srgb, var(--v5-ink) 10%, transparent), transparent), var(--v5-surface-2); box-shadow: 0 0 0 2.5px var(--v5-surface), inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 45%, transparent); animation: hf-pop 360ms cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }

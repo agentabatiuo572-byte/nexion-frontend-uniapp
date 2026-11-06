@@ -43,7 +43,7 @@
             <NexChart :data="nexChartData" :up="nexUp" />
           </view>
           <view v-else class="rounded-xl flex items-center justify-center" :style="chartBoxStyle">
-            <text class="active:opacity-70" :style="[marketHoldBodyStyle, market.remoteError ? { font: '600 13px/20px var(--font-v5)' } : {}]" role="button" tabindex="0" :aria-label="market.remoteError ? t.ui.retry : historyUnavailableText" @click="retryMarkets">{{ market.remoteError ? t.ui.retry : historyUnavailableText }}</text>
+            <text :style="marketHoldBodyStyle">{{ historyUnavailableText }}</text>
           </view>
 
           <!-- buy / sell CTAs -->
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { ref, computed, onMounted, nextTick, type CSSProperties } from "vue";
@@ -98,6 +99,8 @@ import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 
 const t = useT();
 const market = useMarket();
+const marketReading = ref(false);
+useAutoRecovery({ failed: () => !market.isMockMode && !marketReading.value && market.remoteError !== null, retry: retryMarkets });
 const marketAuthorityStatus = computed(() => remoteAuthorityStatus({
   remoteApiEnabled,
   hasSnapshot: market.remoteReady,
@@ -120,7 +123,7 @@ const nex = computed(() => ({
   spark30d: market.klineDaily,
 }));
 const nexPriceText = computed(() => market.isMockMode || market.remoteReady ? fmtPrice(nex.value.priceUSD) : "—");
-onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
+onMounted(() => { if (!market.isMockMode) void retryMarkets(); });
 
 const tf = ref<Timeframe>("24H");
 
@@ -136,8 +139,10 @@ function cycleTimeframe(delta: number): void {
   });
 }
 
-function retryMarkets() {
-  void market.syncRemote();
+async function retryMarkets() {
+  if (marketReading.value) return;
+  marketReading.value = true;
+  try { return await market.syncRemote(); } finally { marketReading.value = false; }
 }
 
 const nexChartData = computed(() => {

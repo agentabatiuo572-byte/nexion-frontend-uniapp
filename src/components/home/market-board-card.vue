@@ -6,7 +6,7 @@
 <template>
   <view class="home-market" data-home-section="compute-market">
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text><text v-if="app.homeTruthStatus === 'error' && app.homeTruth" style="font-size: 12px; color: var(--v5-warning)"> · {{ t.home.networkStale }}</text></text>
+      <text style="font-family: var(--font-v5); font-weight: var(--ui-type-card-title-weight); font-size: var(--ui-type-card-title); color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
       <view
         class="market-board-open font-mono-tabular inline-flex items-center active:opacity-70"
         style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500"
@@ -56,7 +56,7 @@
     </view>
     <view v-else class="rounded-xl flex items-center justify-between" style="min-height: 60px; gap: 12px; background: var(--v5-surface); padding: 14px">
       <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ marketBoardStatusText }}</text>
-      <text v-if="app.homeTruthStatus === 'error'" class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; font: 600 13px/20px var(--font-v5); color: var(--v5-brand)" role="button" tabindex="0" data-home-action="compute-market-retry" @click="retryHome"  @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
+
     </view>
   </view>
 </template>
@@ -95,9 +95,6 @@ function deltaColor(row: AppHomeWorkload) {
 }
 function goEarn() {
   void navTo("/pages/earn/earn");
-}
-function retryHome() {
-  void app.refreshHomeTruth();
 }
 
 

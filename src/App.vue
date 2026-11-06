@@ -726,10 +726,6 @@ function beginServerSessionRestore(): Promise<boolean> {
     // short of authenticated work, and let the foreground guard retry.
     serverSessionRestoreState = "idle";
     serverSessionRestoreRetryAt = Date.now() + SERVER_SESSION_RESTORE_RETRY_MS;
-    if (!serverSessionRestoreNoticeShown) {
-      serverSessionRestoreNoticeShown = true;
-      toast.warn(useT().value.session.restoreRetryNotice);
-    }
     return false;
   }).finally(() => {
     serverSessionRestoreInFlight = null;

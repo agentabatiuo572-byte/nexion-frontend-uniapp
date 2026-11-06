@@ -8,8 +8,8 @@
     <text v-else class="block">{{ copy.unknown }}</text>
     <text class="block" style="color:var(--v5-ink-3);margin-top:4px">{{ copy.pendingHint }}</text>
     </view>
-    <view class="flex items-center justify-between" style="margin-top:16px"><text style="font-weight:600">{{ copy.batch }}</text><view role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="load(false)" @keydown.enter.stop.prevent="load(false)" @keydown.space.stop.prevent="load(false)"><text style="color:var(--v5-brand)">{{ copy.retry }}</text></view></view>
-    <text v-if="error" class="block" role="alert" style="color:var(--v5-danger)">{{ copy.unavailable }}</text>
+    <text class="block" style="margin-top:16px;font-weight:600">{{ copy.batch }}</text>
+    <text v-if="error && !batches.length" class="block">—</text>
     <text v-if="loading" class="block" role="status">{{ copy.loading }}</text>
     <text v-else-if="!error && !batches.length" class="block">{{ copy.empty }}</text>
     <view v-for="batch in batches" :key="batch.batchNo" class="compute-settlements__row" role="button" tabindex="0" @click="openBatch(batch.batchNo)" @keydown.enter.stop.prevent="openBatch(batch.batchNo)" @keydown.space.stop.prevent="openBatch(batch.batchNo)">
@@ -30,6 +30,8 @@
 </template>
 
 <script setup lang="ts">
+import { toast } from "@/store/ui";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
 import { taskAssignmentApi, remoteApiEnabled } from "@/api/runtime";
@@ -49,6 +51,7 @@ const nextCursor = ref<string | null>(null);
 const detail = ref<ComputeSettlementDetail | null>(null);
 const loading = ref(false), error = ref(false), detailLoading = ref(false), detailError = ref(false);
 const historyAvailable = ref(false);
+useAutoRecovery({ failed: () => error.value && !loading.value, retry: () => load(false) });
 const pendingAvailable = computed(() => app.remotePendingEarned?.some(row => row.taskCount > 0) === true);
 // Settlement batches exist only when the server offers them; the Task Center shows its entry row on this signal.
 const available = computed(() => remoteApiEnabled && (app.remoteComputeProtocolVersion === 2 || pendingAvailable.value || historyAvailable.value));
@@ -74,7 +77,10 @@ async function load(append: boolean) {
   } catch (cause) {
     if (current() && request === listEpoch) {
       const unavailable = cause instanceof ApiError && cause.kind === 'http' && (cause.status === 404 || cause.status === 501);
-      if (!unavailable || app.remoteComputeProtocolVersion === 2) { error.value = true; historyAvailable.value = true; }
+      if (!unavailable || app.remoteComputeProtocolVersion === 2) {
+        if (append) toast.error(copy.value.unavailable); else error.value = true;
+        historyAvailable.value = true;
+      }
     }
   }
   finally { if (current() && request === listEpoch) loading.value = false; }

@@ -70,10 +70,7 @@
         @cta="openHelp"
       />
 
-      <view v-if="searchResultState.showSourceError" class="nx-search-source-note nx-inline-recovery mx-4 mt-3" role="status">
-        <text class="nx-inline-recovery__copy">{{ recoveryCopy.partial }}</text>
-        <view class="nx-search-source-retry nx-inline-recovery__action" role="button" tabindex="0" @click="retrySearchSources" @keydown.enter.prevent="retrySearchSources" @keydown.space.prevent="retrySearchSources"><text>{{ t.ui.retry }}</text></view>
-      </view>
+
 
       <!-- Results -->
       <view v-if="searchResultState.body === 'results'" class="mx-4 mt-3 space-y-3">
@@ -103,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navTo } from "@/lib/route";
 import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
@@ -155,6 +153,8 @@ const q = ref("");
 let searchSourceReadEpoch = 0;
 const publishedFaqs = ref<SupportFaq[]>([]);
 const publishedFaqStatus = ref<SearchRemoteStatus>("idle");
+const searchReading = ref(false);
+useAutoRecovery({ failed: () => remoteApiEnabled && !searchReading.value && [productCatalogState.status, network.remoteStatus, app.remoteFleetStatus, publishedFaqStatus.value].includes("error"), retry: retrySearchSources });
 let publishedFaqReadEpoch = 0;
 
 async function refreshPublishedFaqs(force = false): Promise<void> {
@@ -179,18 +179,21 @@ async function refreshPublishedFaqs(force = false): Promise<void> {
 async function refreshSearchSources(force = false, forceFaqs = false): Promise<void> {
   if (!remoteApiEnabled) return;
   const readEpoch = ++searchSourceReadEpoch;
-  const accountKey = app.accountKey;
-  const accountEpoch = app.accountBindingEpoch;
-  // A successful catalogue read advances the runtime revision. Do not start
-  // E3 fleet work under the revision it is about to invalidate.
-  await refreshProductCatalog(force);
-  if (readEpoch !== searchSourceReadEpoch
-    || accountKey !== app.accountKey
-    || accountEpoch !== app.accountBindingEpoch) return;
-  void refreshPublishedFaqs(forceFaqs);
-  void network.refreshCanonicalNetwork();
-  void (force ? app.refreshRemoteFleet() : app.ensureRemoteFleet());
-  void staking.syncRemote();
+  searchReading.value = true;
+  try {
+    const accountKey = app.accountKey;
+    const accountEpoch = app.accountBindingEpoch;
+    // A successful catalogue read advances the runtime revision. Do not start
+    // E3 fleet work under the revision it is about to invalidate.
+    await refreshProductCatalog(force);
+    if (readEpoch !== searchSourceReadEpoch
+      || accountKey !== app.accountKey
+      || accountEpoch !== app.accountBindingEpoch) return;
+    await Promise.allSettled([
+      refreshPublishedFaqs(forceFaqs), network.refreshCanonicalNetwork(),
+      force ? app.refreshRemoteFleet() : app.ensureRemoteFleet(), staking.syncRemote(),
+    ]);
+  } finally { if (readEpoch === searchSourceReadEpoch) searchReading.value = false; }
 }
 
 const searchVisibility = createPageVisibilityRefresh((reason) => refreshSearchSources(reason === "return"));
@@ -203,7 +206,7 @@ bindPageVisibilityRefresh(searchVisibility, {
 watch([() => String(app.accountKey), () => app.accountBindingEpoch, () => locale.code], () => refreshSearchSources(true));
 
 function retrySearchSources() {
-  refreshSearchSources(true, true);
+  return refreshSearchSources(true, true);
 }
 
 const devices = computed(() => !remoteApiEnabled

@@ -70,25 +70,7 @@
         </view>
       </view>
     </view>
-    <view
-      v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'"
-      class="mb-3 rounded-xl nx-inline-recovery"
-      style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)"
-    >
-      <view class="nx-inline-recovery__copy">
-        <text class="block" style="font-size: 12px; font-weight: 600">{{ t.wallet.assignmentsUnavailableTitle }}</text>
-        <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.assignmentsUnavailableBody }}</text>
-      </view>
-      <view
-        class="nx-inline-recovery__action active:opacity-70"
-        style="color: var(--v5-brand)"
-        role="button"
-        tabindex="0"
-        @click="retryAssignments"
-      >
-        <text>{{ t.ui.retry }}</text>
-      </view>
-    </view>
+    <view v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" class="pb-4" style="min-height:44px;color:var(--v5-ink-3)"><text>—</text></view>
     <view
       v-else-if="remoteApiEnabled && (app.remoteAssignmentStatus === 'idle' || (app.remoteAssignmentStatus === 'loading' && !app.remoteAssignmentHasSnapshot))"
       class="pb-4" role="status" aria-live="polite"
@@ -294,9 +276,6 @@ function goReceipts() {
   navTo("/pages/me/receipts");
 }
 
-function retryAssignments() {
-  void app.refreshVisibleTaskAssignments();
-}
 
 function completedTime(ts: number): string {
   return formatDisplayDateTime(ts, dateLocale());

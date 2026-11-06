@@ -156,8 +156,8 @@
                 <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 12px">{{ f.label }}</text>
                 <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
               </view>
-              <view v-if="genesis.emissionPage.cursor" class="active:opacity-70" role="button" tabindex="0" :aria-disabled="genesis.emissionPage.busy ? 'true' : 'false'" :aria-busy="genesis.emissionPage.busy ? 'true' : 'false'" style="padding:var(--v5-space-3);text-align:center;color:var(--v5-brand)" @click="!genesis.emissionPage.busy && genesis.loadMoreEmissions()">
-                <text>{{ genesis.emissionPage.error ? t.orders.retry : t.orders.loadMore }}</text>
+              <view v-if="genesis.emissionPage.cursor" class="active:opacity-70" role="button" tabindex="0" :aria-disabled="genesis.emissionPage.busy ? 'true' : 'false'" :aria-busy="genesis.emissionPage.busy ? 'true' : 'false'" style="padding:var(--v5-space-3);text-align:center;color:var(--v5-brand)" @click="loadMoreEmissionPage()">
+                <text>{{ t.orders.loadMore }}</text>
               </view>
             </view>
           </view>
@@ -234,6 +234,8 @@
 </template>
 
 <script setup lang="ts">
+import { useApp } from "@/store/app";
+import { toast } from "@/store/ui";
 import { formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
@@ -265,6 +267,12 @@ const t = useT();
 const locale = useLocaleStore();
 const consumerCopy = computed(() => genesisConsumerCopyFor(locale.code));
 const genesis = useGenesis();
+async function loadMoreEmissionPage() {
+  if (genesis.emissionPage.busy) return;
+  const epoch = useApp().accountBindingEpoch;
+  await genesis.loadMoreEmissions();
+  if (epoch === useApp().accountBindingEpoch && genesis.emissionPage.error) toast.error(t.value.orders.refreshFailed);
+}
 const config = useConfig();
 onShow(() => { void config.load(); });
 const genesisPoints = useGenesisPoints();

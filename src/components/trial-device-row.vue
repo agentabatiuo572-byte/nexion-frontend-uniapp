@@ -28,6 +28,10 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useFreeTrial } from "@/store/free-trial";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { computed, ref } from "vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
@@ -43,6 +47,7 @@ const visibility = useDataVisibility();
 const hidePersonalData = computed(() => props.variant !== "inventory" && visibility.hidden);
 const emit = defineEmits<{ (event: "cancel"): void; (event: "toggle"): void }>();
 const presentation = useTrialPresentation();
+useAutoRecovery({ failed: () => remoteApiEnabled && props.variant === "inventory" && !useTrialClaimSheet().open && useFreeTrial().authorityStatus === "error", retry: () => presentation.refresh() });
 const copy = useTrialFleetCopy();
 const t = useT();
 const localExpanded = ref(false);

@@ -26,30 +26,16 @@
           <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.model ?? "—" }} <text style="color: var(--v5-ink-4)">· {{ c.city ?? "—" }}</text></text>
         </view>
       </view>
-      <!-- H9 在线数与已发放批次独立降级、独立重读；客户仍读 Home canonical 投影。 -->
-      <view
-        v-if="devicesBad && fleetBad"
-        class="nx-glass-inset px-4 py-2 flex items-center justify-center font-mono-tabular active:opacity-70"
-        style="border-top: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3); min-height: 44px"
-        role="button"
-        tabindex="0"
-        data-home-action="on-grid-status"
-        @click="retryConfig"
-        @keydown.enter.stop.prevent="retryConfig" @keydown.space.stop.prevent="retryConfig"
-      >
-        <text>{{ gridStatusText }} · <text style="color: var(--v5-tech-cyan-ink)">{{ t.home.networkStatRetry }}</text></text>
-      </view>
-      <view v-else class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-3)">
-        <text v-if="devicesBad" class="on-grid-retry" role="button" tabindex="0" :aria-label="t.home.networkStatRetry" data-home-action="on-grid-online-retry" @click="retryDevices" @keydown.enter.stop.prevent="retryDevices" @keydown.space.stop.prevent="retryDevices">-</text>
-        <text v-else><text style="color: var(--v5-ink); font-weight: 500">{{ activeDevicesText }}</text> {{ t.home.onGridOnline }}</text>
-        <text v-if="fleetBad" class="on-grid-retry on-grid-retry--paid" role="button" tabindex="0" :aria-label="t.home.networkStatRetry" data-home-action="on-grid-paid-retry" @click="retryFleet" @keydown.enter.stop.prevent="retryFleet" @keydown.space.stop.prevent="retryFleet">-</text>
-        <text v-else style="color: var(--v5-success-ink); font-weight: 500">{{ perSecText }}</text>
+      <view class="nx-glass-inset px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top:1px solid var(--v5-border);font-size:12px;color:var(--v5-ink-3);min-height:44px">
+        <text><text style="color:var(--v5-ink);font-weight:500">{{ activeDevicesText }}</text> {{ t.home.onGridOnline }}</text>
+        <text style="color:var(--v5-success-ink);font-weight:500">{{ perSecText }}</text>
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { networkPopulationBand } from "@/lib/platform-stats";
 import { navTo } from "@/lib/route";
@@ -66,13 +52,22 @@ const app = useApp();
 const cfg = useConfig();
 const displayValue = ref<ReturnType<typeof homeDisplayAt>>(null);
 const batchLoading = ref(false);
+const batchFailed = ref(false);
 const player = createHomeDisplayPlayer({
-  fetch: async () => parseHomeDisplayBatch(await apiClient.request({ path: "/api/config/home-display", authenticated: false })),
+  fetch: async () => {
+    try {
+      const batch = parseHomeDisplayBatch(await apiClient.request({ path: "/api/config/home-display", authenticated: false }));
+      batchFailed.value = false;
+      return batch;
+    } catch (cause) { batchFailed.value = true; throw cause; }
+  },
   now: () => typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now(),
   render: next => { displayValue.value = next; },
   onLoading: loading => { batchLoading.value = loading; },
 });
 let visible = false;
+useAutoRecovery({ failed: () => batchFailed.value && !batchLoading.value, retry: () => player.refresh() });
+useAutoRecovery({ failed: () => cfg.configStatus === "failed", retry: () => cfg.load() });
 function syncVisibility() {
   if (visible && (typeof document === "undefined" || !document.hidden)) player.start();
   else player.stop();
@@ -91,21 +86,15 @@ const gridStatusText = computed(() => cfg.loading || batchLoading.value
   : t.value.uiChrome.unavailable);
 const perSecText = computed(() => {
   const value = displayValue.value?.paidPerSec;
-  if (value == null) return "";
+  if (value == null) return "—";
   return `+${formatAmount(value)}/sec`;
 });
-function retryConfig() {
-  if (devicesBad.value) retryDevices();
-  if (fleetBad.value) retryFleet();
-}
-function retryDevices() { if (!cfg.loading) void cfg.load(); }
-function retryFleet() { void player.refresh(); }
 defineExpose({ refresh: () => player.refresh() });
 
 const gridClients = computed(() => (app.homeTruth?.onGrid.clients ?? [])
   .map((client) => ({ ...client, color: "var(--v5-brand)" })));
 const activeDevicesText = computed(() => {
-  return devicesBad.value ? "-" : networkPopulationBand(cfg.config.networkPulse!.onlineDevices!);
+  return devicesBad.value ? "—" : networkPopulationBand(cfg.config.networkPulse!.onlineDevices!);
 });
 
 function companyInitial(value: string | null) {
@@ -117,7 +106,3 @@ function goGlobe() {
 
 
 </script>
-<style scoped>
-.on-grid-retry { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
-.on-grid-retry--paid { justify-content: flex-end; }
-</style>
