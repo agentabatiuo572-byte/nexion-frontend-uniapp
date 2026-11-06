@@ -288,6 +288,7 @@ function unauthorized(text) {
 export function tokenizeTemplate(tpl) {
   const texts = [];
   const tags = [];
+  const interpolationEnds = new Map(interpolations(tpl).map(({ start, end }) => [start, end]));
   let i = 0;
   const n = tpl.length;
   while (i < n) {
@@ -306,7 +307,8 @@ export function tokenizeTemplate(tpl) {
       continue;
     }
     let j = i;
-    while (j < n && tpl[j] !== "<") j += 1;
+    // 插值里的泛型、比较和字符串可含 `<`；保留完整原文给 I 规则与行号计算。
+    while (j < n && tpl[j] !== "<") j = interpolationEnds.get(j) ?? j + 1;
     if (j > i) texts.push({ start: i, text: tpl.slice(i, j) });
     i = j;
   }
