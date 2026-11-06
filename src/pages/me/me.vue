@@ -420,7 +420,10 @@ watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId
   remoteOrdersRequest += 1;
 }, { flush: "sync" });
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
-  if (remoteApiEnabled) void refreshRemoteMe();
+  if (remoteApiEnabled) {
+    if (remoteMeActive) void refreshVisibleMe();
+    else void refreshRemoteMe();
+  }
 });
 let releaseActiveRefresh = () => {};
 async function refreshVisibleMe() {
