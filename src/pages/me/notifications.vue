@@ -38,7 +38,7 @@
           </view>
           <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ platformDisplayText(n.body) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="16" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
         </view>
-        <view v-if="notifs.error" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
+        <view v-if="notifs.error && (notifs.hasRemoteSnapshot || notifs.items.length === 0)" data-testid="notification-error" class="message-state" :class="{ 'message-state--inline': notifs.items.length > 0 }" role="alert"><text>{{ notifsErrorText }}</text><view class="message-button message-retry" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.retry" @click="notifs.retryRemote()"><text>{{ t.ui.retry }}</text></view></view>
         <view v-if="notifs.loading && !filtered.length" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
         <view v-if="notifs.nextCursor" class="message-more"><view class="message-button" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.notifs.loadMore" @click="notifs.loadMoreRemote()"><LiquidGlass :radius="22" /><text>{{ notifs.loadingMore ? t.help.loadingMore : t.notifs.loadMore }}</text></view></view>
       </view>
@@ -119,15 +119,11 @@ const summaryRecovery = computed(() => ({
   // The notification row also carries command outcomes; only a failed read
   // without a snapshot belongs to this automatic summary recovery.
   visible: !!conversations.error || conversations.categoryAvailabilityStatus === "failed"
-    || (!!notifs.error && !notifs.hasRemoteSnapshot)
-    || (section.value === "service" && conversations.realtimeFallback),
+    || (!!notifs.error && !notifs.hasRemoteSnapshot),
   busy: center.loading || conversations.categoryLoading,
 }));
 async function retrySummary() {
   if (!pageVisible || disposed || summaryRecovery.value.busy) return;
-  if (section.value === "service" && conversations.realtimeFallback) {
-    conversations.stopRealtime(); conversations.startRealtime();
-  }
   await center.refresh();
 }
 useAutoRecovery({

@@ -77,11 +77,10 @@ function openRow(row: Row) {
 }
 async function retry() {
   if (loading.value) return;
-  if (conversations.realtimeFallback) { conversations.stopRealtime(); conversations.startRealtime(); }
   await center.refresh();
 }
 useAutoRecovery({
-  failed: () => !loading.value && (failed.value || conversations.realtimeFallback),
+  failed: () => !loading.value && failed.value,
   retry,
 });
 </script>
