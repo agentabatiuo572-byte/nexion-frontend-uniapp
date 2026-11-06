@@ -64,6 +64,7 @@ import {
   setRemoteUnauthorizedHandler,
 } from "@/api/runtime";
 import { completeSignIn } from "@/auth/complete-sign-in";
+import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route';
 import { prepareProductCatalog, refreshProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
@@ -83,7 +84,6 @@ import { isLegalTermsGateExemptRoute } from "@/lib/legal-terms-gate";
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
 let tickTimer: ReturnType<typeof setInterval> | undefined;
-let lastPlatformConfigLoadAt = 0;
 let lastTick = Date.now();
 let accountSessionBootstrapped = false;
 let businessLoopsRunning = false;
@@ -99,9 +99,6 @@ const SERVER_SESSION_RESTORE_RETRY_MS = 15_000;
 let serverSessionRestoreRetryAt = 0;
 let serverSessionRestoreNoticeShown = false;
 let secureBrowserUnsupported = false;
-const SERVER_SESSION_PROBE_MIN_MS = 60_000;
-let serverSessionProbeAt = 0;
-let serverSessionProbeInFlight: Promise<boolean> | null = null;
 // Capture the non-secret trace before any startup request can reject and clear
 // its persisted shell. It is consumed on the first recovery redirect.
 let serverAuthenticatedAccountTraceAtBoot = remoteApiEnabled && readServerAuthenticatedAccountTrace();
@@ -448,9 +445,12 @@ function installForegroundReadSignals() {
   });
   // #endif
   const app = useApp();
-  watch([foregroundReadAllowed, appReadOnline, () => app.accountBindingEpoch], ([allowed, online], [, wasOnline]) => {
-    if (allowed) runScheduledReads(readCurrentRoute(), online && !wasOnline);
-    else scheduledReadBinding = "";
+  useConfig().startRefresh(() => app.accountKey);
+  watch([foregroundReadAllowed, appReadOnline, () => app.accountBindingEpoch], ([allowed, online], [wasAllowed, wasOnline]) => {
+    if (allowed) {
+      if (!wasAllowed && canRunBusinessLoops() && !hasPendingLegalTermsRequirement()) maintainRemoteSession(true);
+      runScheduledReads(readCurrentRoute(), online && !wasOnline);
+    } else scheduledReadBinding = "";
   });
 }
 
@@ -585,35 +585,6 @@ function canRefreshRemoteAccount(auth: ReturnType<typeof useAuth>): boolean {
 }
 
 /**
- * A formal-App session can be revoked while the user is idle. The local
- * registry is a mock-only convenience and must never decide remote authority.
- * Probe the server at most once per foreground minute; the API client owns the
- * single-flight refresh and routes an authoritative 401/403 through the safe
- * logout handler. Transport failures deliberately retain the visible session.
- */
-function probeServerSession(): Promise<boolean> {
-  const auth = useAuth();
-  if (!canRefreshRemoteAccount(auth)) return Promise.resolve(false);
-  if (serverSessionProbeInFlight) return serverSessionProbeInFlight;
-  const now = Date.now();
-  if (now - serverSessionProbeAt < SERVER_SESSION_PROBE_MIN_MS) return Promise.resolve(true);
-  const accountId = auth.accountId;
-  const revision = sessionVault.revision();
-  serverSessionProbeAt = now;
-  const probe = apiClient.refreshSession()
-    .then((session) => auth.isAuthenticated
-      && auth.accountId === accountId
-      && sessionVault.revision() >= revision
-      && session.user.userId === Number(accountId.replace("user:", "")))
-    .catch(() => false)
-    .finally(() => {
-      if (serverSessionProbeInFlight === probe) serverSessionProbeInFlight = null;
-    });
-  serverSessionProbeInFlight = probe;
-  return probe;
-}
-
-/**
  * Sandbox E3 provenance is issued by the authenticated product catalog. Never
  * start a fleet request against the cleared RunID during cold start/login;
  * await (and retry) catalog loading first.
@@ -709,7 +680,6 @@ function beginServerSessionRestore(): Promise<boolean> {
     serverSessionRestoreState = "ready";
     serverSessionRestoreRetryAt = 0;
     serverSessionRestoreNoticeShown = false;
-    serverSessionProbeAt = Date.now();
     return true;
   })().catch((error: unknown) => {
     if (error instanceof ApiError && error.message === "NATIVE_SESSION_STORAGE_UNAVAILABLE") {
@@ -869,7 +839,7 @@ function checkSession(): boolean {
   const auth = useAuth();
   if (!auth.isAuthenticated) return false; // auth guard handles unauth
   if (remoteApiEnabled) {
-    void probeServerSession();
+    if (canRefreshRemoteAccount(auth)) maintainRemoteSession();
     return false;
   }
   const session = useSession();
@@ -1119,10 +1089,6 @@ function checkQuestRoute() {
   // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
   if (checkSession()) return; // evicted/invalid session → redirected; recalibration is explicit device management only
-  if (remoteApiEnabled && Date.now() - lastPlatformConfigLoadAt >= 15_000) {
-    lastPlatformConfigLoadAt = Date.now();
-    void useConfig().load();
-  }
   if (route !== lastLegalTermsGateRoute || useLocaleStore().code !== lastLegalTermsGateLocale) {
     lastLegalTermsGateRoute = route;
     lastLegalTermsGateLocale = useLocaleStore().code;
@@ -1344,7 +1310,7 @@ onLaunch(() => {
     subject: auth.accountId,
   }));
   installBusinessLoopProbe();
-  void useConfig().load();
+  if (!remoteApiEnabled) void useConfig().load();
   void useGenesisConfig().refresh();
   if (remoteApiEnabled) {
     // Public server configuration is warmed at launch. Each store starts
@@ -1390,8 +1356,6 @@ onShow(() => {
   attachSessionWatch();
   if (remoteApiEnabled) {
     useApp().setRemoteTaskForeground(true);
-    void useConfig().load();
-    lastPlatformConfigLoadAt = Date.now();
     // PC-managed runtime configuration must converge when the App returns to
     // foreground; a launch-only fetch leaves pricing, phase and translations
     // stale for an entire long-lived session.
@@ -1419,9 +1383,6 @@ onShow(() => {
     || hasPendingLegalTermsRequirement())) {
     stopBusinessLoops();
     return;
-  }
-  if (canRefreshRemoteAccount(useAuth())) {
-    void probeServerSession();
   }
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   runScheduledReads(readCurrentRoute());

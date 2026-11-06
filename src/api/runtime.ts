@@ -40,7 +40,7 @@ import { createEarningsReleaseApi } from "./earnings-release-api";
 import { createTaskAssignmentApi } from "./task-assignment-api";
 import { createReferralRewardApi } from "./referral-reward-api";
 import { createSupportApi } from "./support-api";
-import { renewAppConversationRealtime, withConversationRealtime } from "./app-conversation-realtime";
+import { withConversationRealtime } from "./app-conversation-realtime";
 import { createProfileApi } from "./profile-api";
 import { createNovaAiApi } from "./nova-ai-api";
 import { createComputeShareApi } from "./compute-share-api";
@@ -125,7 +125,6 @@ export const apiClient = createRuntimeApiClient({
   development: import.meta.env.DEV,
   localPreview: isLoopbackSameOriginPreview(apiRuntimeConfig.baseUrl),
   onUnauthorized: reason => unauthorizedHandler?.(reason),
-  onSessionRefreshed: renewAppConversationRealtime,
   refreshCredentialMode,
   nativeRefreshRecovery: !!nativeSessionStorage,
 });
