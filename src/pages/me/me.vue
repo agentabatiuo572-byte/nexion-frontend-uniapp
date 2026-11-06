@@ -69,6 +69,7 @@ import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow, onUnload } from "@/composables/use-tab-page-lifecycle";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import NxSection from "@/components/ui/nx-section.vue";
@@ -169,7 +170,8 @@ const remoteOrdersFailed = ref(false);
 const remoteOrdersHasRead = ref(false);
 let remoteSecurityRequest = 0;
 let remoteOrdersRequest = 0;
-let remoteMeActive = false;
+const remoteMeActive = ref(false);
+let meEntryReadPending = true;
 
 const iconPaths = {
   network: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 7a4 4 0 1 0 0 .01", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"],
@@ -355,13 +357,13 @@ async function refreshRemoteOrders(passive: unknown = false) {
       if (request !== remoteOrdersRequest || accountKey !== app.accountKey || readScope !== passiveTabReadScope()) return;
       remoteOrdersLoading.value = state.loading && passive === true && remoteOrdersFailed.value ? false : state.loading;
       remoteOrdersFailed.value = state.loading && passive === true ? remoteOrdersFailed.value : state.failed;
-      if (remoteMeActive && !state.loading && !state.failed) remoteOrdersHasRead.value = true;
+      if (remoteMeActive.value && !state.loading && !state.failed) remoteOrdersHasRead.value = true;
     },
   );
 }
 
 async function refreshRemoteSecurity() {
-  if (!remoteApiEnabled || !remoteMeActive || !binarySessionReady({
+  if (!remoteApiEnabled || !remoteMeActive.value || !binarySessionReady({
     remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
     accountId: auth.accountId, appAccountKey: app.accountKey,
     sessionUserId: sessionVault.read()?.user.userId ?? null,
@@ -371,7 +373,7 @@ async function refreshRemoteSecurity() {
   const binding = app.accountBindingEpoch;
   const scope = captureAccountScope();
   const readScope = passiveTabReadScope();
-  const current = () => remoteMeActive && request === remoteSecurityRequest
+  const current = () => remoteMeActive.value && request === remoteSecurityRequest
     && accountKey === app.accountKey && binding === app.accountBindingEpoch && isCurrentAccountScope(scope) && readScope === passiveTabReadScope();
   try {
     const snapshot = await runPassiveTabRead('security-overview', () => accountApi.securityOverview());
@@ -380,15 +382,6 @@ async function refreshRemoteSecurity() {
   } catch {
     if (current()) remoteSecurity.value = null;
   }
-}
-
-async function refreshRemoteTrial() {
-  // BUG 173: 原来是 state + eligibility 两次串行 RTT —— 卡片 4.2s 才出现、
-  // 7.0s 第二次置 loading 又把它禁掉,用户看到两段抖动。
-  // GET /api/trial/state 的权威答复里已经带 canStart/eligibilityReason,
-  // 一次读取就能定态;eligibility 读取只留作 state 读失败后的修复路径。
-  if (await runPassiveTabRead('trial-state', () => trial.refreshRemote())) return;
-  await runPassiveTabRead('trial-eligibility', () => trial.refreshEligibilityRemote());
 }
 
 async function refreshRemoteMe() {
@@ -404,7 +397,7 @@ async function refreshRemoteMe() {
     ["security", refreshRemoteSecurity],
     ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.error)],
     ["conversations", () => runPassiveTabRead('conversations', () => conversations.refresh(), { owner: conversations.scopeInvalidated }, () => !conversations.loading && !conversations.error)],
-    ["trial", refreshRemoteTrial],
+    ["trial", () => trial.refreshVisible(true)],
     ["vouchers", () => voucher.revalidateRemote()],
     ["rank", () => vrank.ensureCanonicalVRank()],
     ["genesis", () => runPassiveTabRead('genesis-state', () => genesis.syncRemote())],
@@ -421,23 +414,30 @@ watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId
   remoteOrdersRequest += 1;
 }, { flush: "sync" });
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
-  if (remoteApiEnabled) void refreshRemoteMe();
+  if (remoteApiEnabled && remoteMeActive.value && foregroundReadAllowed()) void refreshRemoteMe();
 });
 let releaseActiveRefresh = () => {};
 async function refreshVisibleMe() {
-  if (!remoteMeActive) return;
+  if (!remoteMeActive.value) return;
   await Promise.allSettled([refreshPaymentPassword(), refreshRemoteMe()]);
 }
 onShow(() => {
-  remoteMeActive = true;
+  meEntryReadPending = true;
+  remoteMeActive.value = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshVisibleMe);
-  void refreshPaymentPassword();
-  if (remoteApiEnabled) void refreshRemoteMe();
+});
+watch([remoteMeActive, foregroundReadAllowed], ([active, allowed]) => {
+  if (!active || !allowed) return;
+  if (meEntryReadPending) {
+    meEntryReadPending = false;
+    void refreshVisibleMe();
+  }
+  else if (remoteApiEnabled) void app.refreshRemoteWithdrawalList();
 });
 onHide(() => {
   releaseActiveRefresh();
-  remoteMeActive = false;
+  remoteMeActive.value = false;
   remoteSecurityRequest += 1;
   remoteOrdersRequest += 1;
 });
@@ -447,7 +447,7 @@ const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
   invalidatePassiveTabRead("orders");
   invalidatePassiveTabRead("earning-release");
   remoteOrdersRequest += 1;
-  if (remoteMeActive && binarySessionReady({
+  if (remoteMeActive.value && foregroundReadAllowed() && binarySessionReady({
     remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
     accountId: auth.accountId, appAccountKey: app.accountKey,
     sessionUserId: sessionVault.read()?.user.userId ?? null,
@@ -458,7 +458,7 @@ const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
 });
 onUnmounted(() => {
   releaseActiveRefresh();
-  remoteMeActive = false;
+  remoteMeActive.value = false;
   remoteSecurityRequest += 1;
   remoteOrdersRequest += 1;
   unsubscribeOrdersRevision();
@@ -481,7 +481,7 @@ async function openSupportChat() {
   openingChat.value = true;
   try {
     const route = await advisorChatRoute(conversations);
-    if (remoteMeActive) await navTo(route);
+    if (remoteMeActive.value) await navTo(route);
   } finally {
     openingChat.value = false;
   }

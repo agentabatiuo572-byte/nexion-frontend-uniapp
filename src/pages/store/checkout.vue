@@ -271,6 +271,7 @@ import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
@@ -614,6 +615,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     const [catalogReady] = await Promise.all([
       refreshProductCatalog(true),
       refreshServerProductPhase(true),
+      freeTrial.refreshVisible(),
     ]);
     // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
     if (!isCurrentCheckoutRoute(routeScope) || !catalogReady) return;
@@ -747,7 +749,7 @@ const NO_TRIAL: TrialQuote = { applied: false, promo: 0, offsetUSD: 0, remainder
 /** 单一解析:给定时刻解析一次试用状态机,派生本页全部试用金额(纯函数,零落盘)。 */
 function trialQuoteAt(now: number): TrialQuote {
   const cfg = trialCfg.value;
-  const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
+  const r = resolveTrialAt(freeTrial.snapshot(), freeTrial.serverTimeAt(now), cfg);
   const trialProductId = resolveTrialCheckoutProductId(cfg.trialProductId);
   if ((r.status !== "active" && r.status !== "grace") || !trialProductId || productId.value !== trialProductId) return NO_TRIAL;
   // A server quote carries every amount convert() settles, including the
@@ -791,14 +793,14 @@ const trialView = computed(() => hasOriginalCheckout.value ? NO_TRIAL : trialQuo
 // An early quote past its original-term end is stale too: never show or pay a lapsed offer.
 const trialEarlyQuoteLapsed = computed(() => {
   const quote = freeTrial.authoritativeQuote;
-  return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && nowTick.value >= quote.earlyEndsAt;
+  return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && freeTrial.serverTimeAt(nowTick.value) >= quote.earlyEndsAt;
 });
 const trialQuoteIncomplete = computed(() => trialEarlyQuoteLapsed.value
   || ((freeTrial.status === "active" || freeTrial.status === "grace")
     && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null
       || freeTrial.authoritativePriceUSD === null)));
 const trialQuoteUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
-// The 4s trial poll marks the authority loading while it re-reads. Keep the last confirmed quote on
+// While trial authority is loading, keep the last confirmed quote on
 // screen meanwhile instead of swapping the page out (which also threw the scroll back to the top);
 // every action still waits on trialQuoteUnavailable.
 const trialQuoteScreenUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && ((freeTrial.authorityStatus !== "ready"
@@ -811,7 +813,6 @@ const trialOffsetView = computed(() => trialView.value);
 const promoDiscountText = computed(() => formatAmount(promoDiscount.value));
 const trialOffsetText = computed(() => formatAmount(trialOffsetView.value.offsetUSD));
 const trialEarlyDiscountText = computed(() => formatAmount(trialOffsetView.value.earlyDiscountUSD));
-watch(trialEarlyQuoteLapsed, (lapsed) => { if (lapsed) void freeTrial.refreshRemote(true); });
 // What the trial purchase credits right after payment (server quote convert() settles).
 const trialCreditText = computed(() => {
   const quote = remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote : null;
@@ -1355,7 +1356,7 @@ const stepLabels = computed(() => [
 const stepDisplay = computed(() => ['confirmed','activating','live'].includes(step.value) ? 2 : ['pay-instructions','awaiting'].includes(step.value) ? 1 : 0);
 async function submitReview() {
   const scope = captureCheckoutRoute();
-  // A tap during the 4s trial re-read waits for that read, then goes on with the fresh authority.
+  // A tap during a trial read waits for it, then goes on with fresh authority.
   if (trialQuoteUnavailable.value && !trialQuoteScreenUnavailable.value) {
     const ready = await freeTrial.refreshRemote();
     if (!ready || !isCurrentCheckoutRoute(scope)) return;
@@ -2408,6 +2409,9 @@ async function submitRemoteOrder(): Promise<void> {
 // 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-116 同款)。
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
+watch(foregroundReadAllowed, allowed => {
+  if (allowed && pageVisible && checkoutRouteInitialized && !promotionRoute.value) void freeTrial.refreshVisible();
+});
 let tradeinMirror: NonNullable<typeof tradein.appliedTradein> | null = null;
 watch(() => tradein.appliedTradein, (v) => {
   if (!pageVisible) return;
@@ -2423,6 +2427,7 @@ function reassertTradeinContext() {
 onShow(() => {
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
+  void freeTrial.refreshVisible();
   if (checkoutSetupReturn) {
     checkoutSetupReturn = false;
     if (checkoutRouteInitialized) void initializeCheckout(beginCheckoutRoute());
