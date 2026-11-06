@@ -256,7 +256,7 @@ export const useConfig = defineStore("config", () => {
     if (!currentClient()) return Promise.resolve();
     if (currentLoad) return currentLoad;
     const now = Date.now();
-    if (remoteApiEnabled && (!foregroundReadAllowed() || now < retryAt || (!force && now < nextCheckAt))) {
+    if (remoteApiEnabled && (!foregroundReadAllowed() || (!force && (now < retryAt || now < nextCheckAt)))) {
       return Promise.resolve();
     }
     const previousStatus = configStatus.value;
