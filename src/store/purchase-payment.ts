@@ -270,6 +270,11 @@ async function submitOriginal() {
         }
         if (!owns(version, accountKey)) return;
         state.error = false;
+        if (!existing) {
+          // A definite refusal plus a successful empty lookup releases the caller's matching unknown command too.
+          releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+          releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+        }
         if (existing) accept(existing, pending);
         else if (refusal) { release(pending); Object.assign(state, { pending: null, quote: null, intent: null }); conclude(refusal); }
         else { retire(pending, accountKey); state.pending = null; state.quote = null; state.intent = null; requote = true; }
