@@ -38,10 +38,7 @@
             <text class="trust-block__hint">{{ center.credentialsHint }}</text>
           </view>
           <text v-if="!documents && documentsStatus !== 'error'" class="trust-state" role="status" aria-live="polite">{{ center.documentsLoading }}</text>
-          <view v-else-if="!documents" class="nx-inline-recovery" role="alert">
-            <text class="nx-inline-recovery__copy">{{ center.documentsError }}</text>
-            <NxButton class="nx-inline-recovery__action" variant="text" size="small" :label="t.ui.retry" @click="refreshDocuments" />
-          </view>
+          <view v-else-if="!documents" class="trust-state"><text>—</text></view>
           <template v-else>
           <view v-for="card in credentialCards" :key="card.slot" class="trust-credential">
             <view class="trust-credential__head">
@@ -128,7 +125,7 @@
               </view>
               <view v-if="openCategory === item.key" class="trust-category-body">
                 <text v-if="loading" role="status" aria-live="polite">{{ auditCopy.loading }}</text>
-                <view v-else-if="hasError" class="nx-inline-recovery" role="alert"><text class="nx-inline-recovery__copy">{{ auditCopy.error }}</text><NxButton class="nx-inline-recovery__action" variant="text" size="small" :label="t.ui.retry" @click="loadTrustSections" /></view>
+                <view v-else-if="hasError"><text>—</text></view>
                 <template v-else-if="item.key === 'audit'">
                   <view v-for="row in verifiedAuditRows" :key="row.Primary" class="trust-document" role="link" :tabindex="safeHref(row.Url) ? 0 : -1" :aria-disabled="!safeHref(row.Url)" @click="safeHref(row.Url) && openHref(row.Url)" @keydown.enter.prevent="safeHref(row.Url) && openHref(row.Url)">
                     <text class="block trust-material-title">{{ row.Primary }}</text>
@@ -176,13 +173,6 @@
           <view class="trust-contact__cta" role="button" tabindex="0" @click="navTo('/pages/me/support')"><text>{{ center.contactCta }}</text></view>
         </view>
 
-        <!-- Refresh feedback follows the retained content: its insertion/removal
-             must not move the reader's anchor while a hidden page returns. -->
-        <view v-if="refreshError" class="trust-refresh-status" :class="{ 'nx-inline-recovery': refreshError }" role="status" aria-live="polite">
-          <text class="nx-inline-recovery__copy">{{ continuity.trustRefreshFailed }}</text>
-          <NxButton v-if="refreshError" class="nx-inline-recovery__action" variant="text" :label="t.ui.retry" @click="loadTrustSections" />
-        </view>
-
         <text class="block trust-footnote">{{ center.footnote }}</text>
       </view>
     </CardStagger>
@@ -190,8 +180,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { networkReauditCopy } from "@/i18n/network-reaudit";
-import { continuityCopy } from "@/i18n/continuity-fixes";
 import { trustCenterCopy } from "@/i18n/trust-center";
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
@@ -221,9 +211,8 @@ const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => serverLanguage(locale.code));
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const resources = computed(() => trustResources(locale.code));
-const continuity = computed(() => continuityCopy(locale.code));
 const center = computed(() => trustCenterCopy(locale.code));
-const { sections, status, refreshError, refresh } = usePublishedTrust();
+const { sections, status, refresh } = usePublishedTrust();
 const { documents, status: documentsStatus, refresh: refreshDocuments } = useTrustDocuments();
 const loading = computed(() => remoteApiEnabled && !sections.value.length && (status.value === "idle" || status.value === "loading"));
 const hasError = computed(() => !remoteApiEnabled || (!sections.value.length && status.value === "error"));
@@ -361,6 +350,8 @@ onUnmounted(() => {
 });
 
 const heroStyle: CSSProperties = { padding: "20px" };
+useAutoRecovery({ failed: () => documentsStatus.value === "error", retry: refreshDocuments });
+useAutoRecovery({ failed: () => remoteApiEnabled && status.value === "error", retry: loadTrustSections });
 </script>
 
 <style scoped>

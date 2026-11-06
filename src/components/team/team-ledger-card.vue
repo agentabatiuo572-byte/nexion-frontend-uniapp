@@ -15,7 +15,7 @@
     </view>
     <view class="team-ledger__control">
       <!-- Lifetime composition stays open; data-state says whether its figures are current. -->
-      <view class="team-ledger__breakdown" :class="{ 'is-hidden': (loading && !hasAmounts) || failed, 'is-unknown': !hasAmounts }" :data-state="failed ? 'failed' : loading ? 'loading' : hasAmounts ? 'ready' : 'unknown'" :aria-hidden="(loading && !hasAmounts) || failed">
+      <view class="team-ledger__breakdown" :class="{ 'is-unknown': !hasAmounts }" :data-state="failed ? 'failed' : loading ? 'loading' : hasAmounts ? 'ready' : 'unknown'">
         <view class="team-ledger__lifetime"><text>{{ copy.lifetimeBreakdown }} · {{ visibility.mask(hasAmounts ? contributors : '—') }} {{ t.teamV3.contributors }}</text><text class="team-ledger__lifetime-total">{{ visibility.mask(hasAmounts ? formatUsd(totalUSDTLifetime) : '—') }}</text></view>
         <view ref="barEl" class="team-ledger__bar" aria-hidden="true">
           <template v-if="!visibility.hidden && hasAmounts">
@@ -26,13 +26,6 @@
         <view class="team-ledger__split">
           <view class="team-ledger__label"><view class="team-ledger__dot" aria-hidden="true" /><text>{{ copy.friendRewards }}</text><text class="team-ledger__value">{{ visibility.mask(hasAmounts ? formatUsd(directUSDT) : '—') }}</text></view>
           <view class="team-ledger__label"><view class="team-ledger__dot team-ledger__dot--extended" aria-hidden="true" /><text>{{ copy.teamRewards }}</text><text class="team-ledger__value">{{ visibility.mask(hasAmounts ? formatUsd(extendedUSDT) : '—') }}</text></view>
-        </view>
-      </view>
-      <!-- Feedback shares the composition cell, so a failure replaces it without a second row. -->
-      <view class="team-ledger__feedback" role="status" aria-live="polite" aria-atomic="true">
-        <view class="team-ledger__feedback-item" :class="{ 'is-active': failed }" :aria-hidden="!failed">
-          <text>{{ t.network.projectionErrorDesc }}</text>
-          <view class="team-ledger__retry" role="button" :tabindex="failed ? 0 : -1" :aria-disabled="!failed" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry">{{ t.network.retry }}</view>
         </view>
       </view>
     </view>
@@ -65,7 +58,6 @@ const props = withDefaults(defineProps<{
   unlockedUSDT: number;
   coolingUSDT: number;
 }>(), { available: true, loading: false, failed: false });
-const emit = defineEmits<{ (event: 'retry'): void }>();
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -74,9 +66,6 @@ const copy = computed(() => teamRedesignCopy(locale.code));
 const { elRef: barEl, inView: barInView } = useScrollGrowProgress();
 const hasAmounts = computed(() => props.available);
 
-function retry() {
-  if (props.failed) emit('retry');
-}
 
 // Only the month USDT headline counts up once when it first becomes readable; the sub-figures and lifetime composition stay static.
 const shownMonthUSDT = useCountUp(() => hasAmounts.value ? props.monthUSDT : null);

@@ -12,15 +12,13 @@
       <view v-if="narrative.state === 'loading'" class="mx-4" :style="stateCardStyle">
         <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeLoading }}</text>
       </view>
-      <view v-else-if="narrative.state === 'error'" class="mx-4" :style="stateCardStyle">
-        <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeError }}</text>
-        <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="loadNarrative(true)" @keydown.enter.prevent="loadNarrative(true)" @keydown.space.prevent="loadNarrative(true)">{{ t.ui.retry }}</text>
-      </view>
+      <EmptyState v-else-if="narrative.state === 'error'" kind="recoverable-error" :title="t.trust.nexNarrativeError" :cta-label="t.ui.retry" @cta="loadNarrative(true)" />
       <view v-else-if="narrative.state === 'unpublished'" class="mx-4" :style="stateCardStyle">
         <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeUnavailable }}</text>
         <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="loadNarrative(true)" @keydown.enter.prevent="loadNarrative(true)" @keydown.space.prevent="loadNarrative(true)">{{ t.ui.retry }}</text>
       </view>
 
+      <template v-if="narrative.state !== 'error'">
       <HowHero :label="narrative.state === 'ready' ? `${w.heroLabel} · ${narrative.version}` : w.heroLabel" :title="narrative.state === 'ready' ? narrative.hero : '—'" :sub="narrative.state === 'ready' ? narrative.subhero ?? '' : ''" accent="purple" />
 
       <HowSection :title="w.s1Title" accent="purple">
@@ -105,11 +103,14 @@
           <text>{{ w.ctaBack }}</text>
         </view>
       </view>
+      </template>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
+import EmptyState from "@/components/empty-state.vue";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navBack, navReplace, navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
@@ -265,6 +266,7 @@ const ctaBackStyle: CSSProperties = {
 };
 
 
+useAutoRecovery({ failed: () => status.value === "error", retry: () => loadNarrative(true) });
 </script>
 
 <style scoped>

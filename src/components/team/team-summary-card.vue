@@ -4,7 +4,6 @@
     <view class="team-summary__body" :class="{ 'team-summary__body--long-count': readable && !visibility.hidden && String(total).length > 6 }"><TeamArt kind="members" :size="56" /><view class="team-summary__metrics"><text class="team-summary__number" :style="{ '--team-summary-count-units': countUnits }">{{ totalText }}</text><text class="team-summary__label">{{ copy.peopleUnit }}</text></view></view>
     <view class="team-summary__direct"><text>{{ copy.directInvited }}</text><text>{{ visibility.mask(readable ? direct : '—') }}</text><text v-if="readable && total > direct" class="team-summary__team">{{ teamLabel }} <text>{{ visibility.mask(total - direct) }}</text></text></view>
     <view v-if="readable && !total && status !== 'error'" class="team-summary__empty"><text v-if="!visibility.hidden">{{ t.team.summaryEmpty }}</text><NxButton class="team-summary__action" :label="copy.inviteFriends" variant="secondary" size="medium" @click="$emit('invite')" /></view>
-    <view v-else-if="status === 'error'" class="team-summary__status" role="status"><text>{{ t.team.summaryUnavailable }}</text><NxButton v-if="status === 'error'" class="team-summary__action" :label="t.network.retry" variant="text" size="medium" @click="$emit('retry')" /></view>
   </view>
 </template>
 <script setup lang="ts">

@@ -4,9 +4,8 @@
     <text class="raffle-copy">{{ copy.intro }}</text>
     <view class="raffle-status" role="status" aria-live="polite">
       <text v-if="loading && !snapshot">{{ copy.loading }}</text>
-      <text v-else-if="error && snapshot">{{ copy.refreshError }}</text>
     </view>
-    <view v-if="error && !snapshot" class="nx-glass-card raffle-card" role="alert"><text>{{ copy.error }}</text><view class="raffle-link" role="button" tabindex="0" @click="load" @keydown.enter.prevent="activate($event, load)" @keydown.space.prevent="activate($event, load)"><text class="raffle-read-retry-label">{{ copy.retry }}</text></view></view>
+    <EmptyState v-if="error && !snapshot && !loading" kind="recoverable-error" :title="copy.error" :cta-label="copy.retry" @cta="load" />
     <template v-if="snapshot">
       <view class="raffle-row"><text>{{ copy.available }}</text><text class="raffle-number">{{ snapshot.availableTickets }}</text></view>
       <text v-if="!snapshot.draws.length" class="raffle-copy">{{ copy.empty }}</text>
@@ -35,13 +34,14 @@
         </template>
         <text v-if="notice[draw.id]" class="raffle-copy" role="status">{{ copy[notice[draw.id]] }}</text>
       </view>
-      <view class="raffle-link" role="button" :tabindex="busy || loading ? -1 : 0" :aria-disabled="!!busy || loading" @click="!busy && !loading && load()" @keydown.enter.prevent="!busy && !loading && activate($event, load)" @keydown.space.prevent="!busy && !loading && activate($event, load)"><text :class="{ 'raffle-read-retry-label': error }">{{ error ? copy.retry : copy.refresh }}</text></view>
     </template>
   </view></AppChassis>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { apiClient, apiRuntimeConfig } from "@/api/runtime";
@@ -151,6 +151,7 @@ onHide(() => { visible = false; reset(); });
 watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { reset(); void load(); });
 const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });
 onUnmounted(() => { visible = false; reset(); unsubscribe(); });
+useAutoRecovery({ failed: () => error.value && !loading.value && !busy.value, retry: load });
 </script>
 <style scoped>
 .raffle-page { padding:0 16px 28px; color:var(--v5-ink); }

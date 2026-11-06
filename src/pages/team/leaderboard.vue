@@ -4,11 +4,9 @@
       <SubPageHeader back="/pages/team/team" :title="pointsCopy.title" />
       <view class="leader-content">
         <GlassSegments class="nx-leader-periods" surface="glass" selection="flat" :label="pointsCopy.title" :model-value="period" @select="selectPeriod" :options="periodOptions" />
-        <view v-if="remoteApiEnabled && remoteState !== 'ready' && !(remoteState === 'loading' && remoteSnapshot)" class="leader-state" role="status" :aria-busy="remoteState === 'loading'">
-          <text>{{ remoteState === 'loading' ? t.leaderboard.loading : t.leaderboard.loadError }}</text>
-          <view v-if="remoteState === 'error'" class="leader-cta" role="button" tabindex="0" @click="loadRemote()" @keydown.enter.prevent="loadRemote()" @keydown.space.prevent="loadRemote()"><text class="leader-retry-label">{{ t.leaderboard.retry }}</text><text aria-hidden="true">→</text></view>
-        </view>
-        <template v-if="!remoteApiEnabled || remoteState === 'ready' || (remoteState === 'loading' && remoteSnapshot !== null)">
+        <EmptyState v-if="remoteApiEnabled && remoteState === 'error' && !remoteSnapshot" kind="recoverable-error" :title="t.leaderboard.loadError" :cta-label="t.leaderboard.retry" @cta="loadRemote()" />
+        <view v-else-if="remoteApiEnabled && remoteState === 'loading' && !remoteSnapshot" class="leader-state" role="status" aria-busy="true"><text>{{ t.leaderboard.loading }}</text></view>
+        <template v-if="!remoteApiEnabled || remoteSnapshot !== null">
           <view v-if="paused" role="status" aria-live="polite" class="leader-state">
             <text class="leader-state-title">{{ t.leaderboard.pausedTitle }}</text>
             <text>{{ t.leaderboard.pausedBody }}</text>
@@ -50,7 +48,7 @@
               </view>
             </view>
             <view v-if="hasMore" class="leader-more" role="button" :tabindex="remoteState !== 'ready' || remoteLoadingMore ? -1 : 0" :aria-disabled="remoteState !== 'ready' || remoteLoadingMore" :aria-busy="remoteLoadingMore" @click="loadMore" @keydown.enter.prevent="loadMore" @keydown.space.prevent="loadMore">
-              <text :class="{ 'leader-retry-label': remoteLoadMoreError }">{{ remoteLoadMoreError ? t.leaderboard.retry : t.leaderboard.cta.loadMore }}</text><text aria-hidden="true">↓</text>
+              <text>{{ t.leaderboard.cta.loadMore }}</text><text aria-hidden="true">↓</text>
             </view>
             <NxButton class="leader-share" variant="primary" :label="t.leaderboard.cta.share" @click="go('/pages/team/team?intent=share')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 13v7h14v-7" /></svg><text>{{ t.leaderboard.cta.share }}</text>
@@ -64,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatComputePoints } from "@/i18n/compute-points";
@@ -84,6 +83,8 @@ import { LEADERBOARD, MY_RANK, type LeaderPeriod } from "@/mock/leaderboard";
 import { apiRuntimeConfig, remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { TeamLeaderboardSnapshot } from "@/api/team-insights-api";
 import { asApiError } from "@/api/errors";
+import { toast } from "@/store/ui";
+import EmptyState from "@/components/empty-state.vue";
 import { useAuth } from '@/store/auth';
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -203,6 +204,7 @@ async function loadRemote(page = 1, append = false) {
   } catch (error) {
     if (!current()) return;
     const apiError = asApiError(error);
+    if (append) toast.error(t.value.leaderboard.loadError);
     if (append && apiError.message === "TEAM_LEADERBOARD_SNAPSHOT_STALE") {
       // The server deliberately refuses a continuation after its five-minute
       // frozen candidate snapshot expires; restart from page one rather than
@@ -270,6 +272,7 @@ function movePeriod(delta: -1 | 1) {
 const footerNoteStyle: CSSProperties = { paddingTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 import GlassSegments from "@/components/glass-segments.vue";
 const periodOptions = computed(() => PERIODS.map(value => ({ value, label: t.value.leaderboard.periods[value] })));
+useAutoRecovery({ failed: () => remoteApiEnabled && remoteState.value === "error" && !remoteLoadingMore.value, retry: () => loadRemote() });
 </script>
 
 <style scoped>

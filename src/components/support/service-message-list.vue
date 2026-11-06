@@ -25,20 +25,12 @@
         <view class="service-meta"><view v-if="unreadUnavailable(row) || row.unread > 0" class="service-unread"><text>{{ unreadUnavailable(row) ? '-' : formatUnreadBadge(row.unread) }}</text></view></view>
       </view>
     </ConversationSwipeRow>
-    <view v-if="!failed && conversations.realtimeFallback" class="service-state nx-inline-recovery" role="status">
-      <text class="nx-inline-recovery__copy">{{ t.conversations.realtimeFallback }}</text>
-      <view class="service-button service-retry nx-inline-recovery__action" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry"><text>{{ t.ui.retry }}</text></view>
-    </view>
-    <view v-if="failed" class="service-state nx-inline-recovery" role="alert">
-      <text class="nx-inline-recovery__copy">{{ rows.length ? t.conversations.staleSnapshot : t.conversations.loadError }}</text>
-      <view class="service-button service-retry nx-inline-recovery__action" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry">
-        <text>{{ t.ui.retry }}</text>
-      </view>
-    </view>
+    <view v-if="failed && !rows.length" class="service-state"><text>{{ t.conversations.title }}</text><text>—</text></view>
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed } from "vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ConversationSwipeRow from './conversation-swipe-row.vue';
@@ -83,11 +75,15 @@ function go(route: string) { emit("navigate"); navTo(route); }
 function openRow(row: Row) {
   go(`/pages/support/chat?cid=${encodeURIComponent(row.id)}`);
 }
-function retry() {
+async function retry() {
   if (loading.value) return;
   if (conversations.realtimeFallback) { conversations.stopRealtime(); conversations.startRealtime(); }
-  void center.refresh();
+  await center.refresh();
 }
+useAutoRecovery({
+  failed: () => !loading.value && (failed.value || conversations.realtimeFallback),
+  retry,
+});
 </script>
 
 <style scoped>

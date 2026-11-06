@@ -31,10 +31,7 @@
             <NxButton data-testid="learning-next-course" class="course-next__cta" variant="primary" :label="completionCopy.startNext" @click="openNextCourse" />
           </view>
           <view v-else-if="nextLoading" class="course-next-state" role="status"><text>{{ completionCopy.nextLoading }}</text></view>
-          <view v-else-if="nextError" class="course-next-state nx-inline-recovery" role="alert">
-            <text class="nx-inline-recovery__copy">{{ completionCopy.nextUnavailable }}</text>
-            <NxButton class="nx-inline-recovery__action" variant="text" :label="t.ui.retry" @click="retryNextCourses" />
-          </view>
+          <view v-else-if="nextError" class="course-next-state"><text class="course-next__label">{{ auditCopy.nextCourse }}</text><text>—</text></view>
           <view v-else-if="nextOverview" class="course-next-state"><text>{{ auditCopy.allCoursesDone }}</text><text class="course-next__reward">{{ fmt(auditCopy.earned, { n: formatAmount(nextOverview.earnedNex) }) }}</text></view>
           <NxButton class="course-result__back" variant="text" :label="completionCopy.backToCenter" @click="backToCourses" />
         </view>
@@ -78,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import GrowthProgress from "@/components/ui/growth-progress.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
@@ -629,12 +627,13 @@ async function loadNextCourses(force = false) {
     if (request === nextRequest && current(scope)) nextLoading.value = false;
   }
 }
-function retryNextCourses() { void loadNextCourses(true); }
+
 watch(() => [serverCompleted.value, courseId.value, app.accountKey, app.accountBindingEpoch, language.value] as const, () => { void loadNextCourses(); });
 watch(() => [courseId.value, app.accountKey, app.accountBindingEpoch, language.value] as const, () => resetNextCourses(), { flush: "sync" });
 watch(() => displayCourse.value, value => { if (!value) resetNextCourses(); }, { flush: "sync" });
 onHide(() => resetNextCourses(true));
 onUnmounted(resetNextCourses);
+useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nextError.value && !nextLoading.value, retry: () => loadNextCourses(true) });
 </script>
 
 <style scoped>

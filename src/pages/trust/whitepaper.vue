@@ -3,7 +3,8 @@
     <CardStagger class="wp-root" style="padding-bottom: 24px">
       <SubPageHeader back="/pages/trust/trust" plain solid />
 
-      <view class="px-4 wp-page">
+      <EmptyState v-if="!whitepaper && status === 'error'" kind="recoverable-error" :title="copy.wpError" :cta-label="t.ui.retry" @cta="refresh" />
+      <view v-else class="px-4 wp-page">
         <view class="wp-cover">
           <view class="wp-cover__top">
             <text class="wp-cover__eyebrow">UVEL WHITEPAPER</text>
@@ -20,11 +21,7 @@
             </view>
           </view>
           <text v-if="!whitepaper && status !== 'error'" class="wp-cover__state" role="status" aria-live="polite">{{ copy.wpLoading }}</text>
-          <view v-else-if="!whitepaper" class="wp-cover__state" role="alert">
-            <text class="block">{{ copy.wpError }}</text>
-            <view class="wp-cover__cta wp-cover__cta--small" role="button" tabindex="0" @click="refresh"><text>{{ t.ui.retry }}</text></view>
-          </view>
-          <view v-else class="wp-cover__cta" role="button" tabindex="0" @click="read">
+          <view v-else-if="whitepaper" class="wp-cover__cta" role="button" tabindex="0" @click="read">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
             <text>{{ copy.readWhitepaper }}</text>
           </view>
@@ -63,8 +60,10 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -97,6 +96,7 @@ function read() {
 }
 
 onShow(() => { void refresh(); });
+useAutoRecovery({ failed: () => status.value === "error", retry: refresh });
 </script>
 
 <style scoped>

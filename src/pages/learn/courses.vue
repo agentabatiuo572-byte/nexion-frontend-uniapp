@@ -3,11 +3,8 @@
     <view class="learning-center">
       <SubPageHeader design back="/pages/me/me" :title="t.learning.centerTitle" />
       <view v-if="loading && !overview" class="learning-state" role="status"><text>{{ t.learning.centerLoading }}</text></view>
-      <view v-else-if="error" class="learning-state" role="alert" aria-live="assertive">
-        <text class="block">{{ errorText }}</text>
-        <NxButton class="learning-retry nx-retry-action" variant="text" :label="t.ui.retry" @click="retryCourses" />
-      </view>
-      <view v-if="!overview" class="learning-summary">
+      <EmptyState v-else-if="error && !overview" kind="recoverable-error" :title="t.learning.centerTitle" :desc="errorText" :cta-label="t.ui.retry" @cta="retryCourses" />
+      <view v-if="!overview && !error" class="learning-summary">
         <view class="learning-summary__line"><text class="learning-summary__progress">{{ fmt(pageCopy.progress, {done:'—',total:'—'}) }}</text><view class="learning-summary__earned"><text>{{ pageCopy.earned }}</text><text class="learning-reward">— UVT</text></view></view>
         <view class="course-list__heading"><text class="course-list__title">{{ pageCopy.allCourses }}</text><text class="course-list__count">—</text></view>
       </view>
@@ -55,6 +52,7 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -172,7 +170,7 @@ bindPageVisibilityRefresh(courseVisibility, {
   shown: (callback) => onShow(() => {
     mounted = true;
     releaseActiveRefresh();
-    releaseActiveRefresh = registerActivePageRefresh(() => load(true));
+    releaseActiveRefresh = registerActivePageRefresh(() => error.value ? undefined : load(true), "pages/learn/courses");
     callback();
   }),
   hidden: (callback) => onHide(() => {
@@ -197,6 +195,7 @@ const stopRuntimeRefresh = subscribeRuntimeRevision(refreshForScopeChange);
 onUnmounted(stopRuntimeRefresh);
 
 
+useAutoRecovery({ failed: () => remoteApiEnabled && !!error.value && !loading.value && !environmentInvalidated, retry: () => load(true) });
 </script>
 
 <style scoped>

@@ -4,10 +4,7 @@
       <SubPageHeader back="/pages/team/rank" :title="guide.pageTitle" plain design />
       <view class="rank-how-content">
         <view v-if="state.loading && !state.policy" class="how-state" role="status" aria-live="polite" aria-busy="true"><text>{{ statusText }}</text></view>
-        <view v-else-if="state.error || incomplete" class="how-state" :role="state.error ? 'alert' : 'status'">
-          <text>{{ statusText }}</text>
-          <NxButton class="nx-retry-action" :label="content.copy.retry" variant="text" @click="reload" />
-        </view>
+        <EmptyState v-else-if="state.error || incomplete" kind="recoverable-error" :title="statusText" :cta-label="content.copy.retry" @cta="reload" />
         <template v-else>
           <TeamRuleHero kind="growth" :title="guide.headline" :sub="guide.intro" :sections="directory" :nav-label="ruleCopy.contents" data-rank-how="published" />
 
@@ -47,8 +44,10 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TeamRuleHero from '@/components/team/team-rule-hero.vue';
@@ -119,7 +118,7 @@ const incomplete = computed(() => state.value.error || [
 const statusText = computed(() => state.value.loading ? content.value.copy.loading : content.value.copy.unavailable);
 function reload() {
   if (!isCurrentAccountScope(resourceOwner)) { resource.dispose(); resource = makeResource(); }
-  if (environmentCurrent() && auth.isAuthenticated) void resource.load(locale.code);
+  return environmentCurrent() && auth.isAuthenticated ? resource.load(locale.code) : Promise.resolve();
 }
 function goBack() { navBack("/pages/team/rank"); }
 onShow(reload);
@@ -149,6 +148,7 @@ const ruleGroups = computed(() => [
 // Expanded sections with an in-page directory replace the collapsed groups (design system 04.7).
 const stepNumber = (item: object) => ("n" in item && typeof item.n === "number" ? item.n : undefined);
 const directory = computed(() => [{ id: "ladder", title: guide.value.ladder }, ...ruleGroups.value.map(group => ({ id: group.id, title: group.title }))]);
+useAutoRecovery({ failed: () => state.value.error && !state.value.loading, retry: reload });
 </script>
 
 <style src="@/components/team/team-rule-type.css"></style>

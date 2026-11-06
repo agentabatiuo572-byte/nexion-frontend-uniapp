@@ -12,10 +12,7 @@
         </HowSection>
         <HowSection anchor="settlement" :title="copy.settlement" :body="copy.settlementBody" />
         <HowSection anchor="references" :title="copy.references" :body="copy.referencesBody" />
-        <view class="team-guide-unavailable" role="status">
-          <text>{{ t.howPublished.unavailableTitle }}</text>
-          <text>{{ t.howPublished.unavailableBody }}</text>
-        </view>
+        <EmptyState kind="recoverable-error" :title="t.howPublished.unavailableTitle" :desc="t.howPublished.unavailableBody" />
         <view class="mx-4 mt-6">
           <view class="reward-cta reward-cta--wide" role="button" tabindex="0" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ w.ctaBack }}</text></view>
         </view>
@@ -24,6 +21,7 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
+import EmptyState from "@/components/empty-state.vue";
 import { computed } from 'vue';
 import AppChassis from '@/components/app-chassis.vue';
 import RewardPageSurface from '@/components/team/reward-page-surface.vue';

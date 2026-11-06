@@ -5,7 +5,8 @@
       <SubPageHeader back="/pages/team/team" :title="t.directReferral.title" :action-label="t.unilevel.howItWorksEntry" :action="openRules" plain />
       <view class="px-4" style="display: flex; flex-direction: column; gap: 16px">
         <EmptyState v-if="remoteState === 'error'" kind="recoverable-error" :title="updateRequired ? t.directReferral.updateRequired : t.network.projectionErrorTitle" :desc="updateRequired ? t.directReferral.updateHint : t.network.projectionErrorDesc" :cta-label="t.network.retry" @cta="retryRemote" />
-        <view v-else-if="remoteState !== 'ready' && !remoteSnapshot" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
+        <template v-else>
+        <view v-if="remoteState !== 'ready' && !remoteSnapshot" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
         <template v-else-if="remoteSnapshot">
           <RewardHero class="nx-unilevel-hero nx-viz-press" kind="members">
             <text class="block nx-unilevel-hero-title">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : t.directReferral.purchaseTotal }} · {{ visibility.mask(remoteGroupCount) }} {{ t.directReferral.settlementGroups }}</text>
@@ -43,12 +44,9 @@
           </view>
           <EmptyState v-if="remoteSnapshot.totalRows === 0" kind="no-filter-results" :title="t.directReferral.empty" :desc="t.directReferral.emptyDesc" />
           <view v-if="remoteSnapshot.totalRows === 0" role="button" tabindex="0" class="nx-unilevel-focus reward-cta" @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')"><text>{{ t.directReferral.invite }}</text></view>
-          <view v-if="remoteSnapshot.events.length < remoteSnapshot.totalRows" class="nx-unilevel-load-more nx-unilevel-focus reward-cta reward-cta--wide" role="button" :tabindex="remoteState !== 'ready' || remoteLoadMoreStatus === 'loading' ? -1 : 0" :aria-disabled="remoteState !== 'ready' || remoteLoadMoreStatus === 'loading'"  @click="loadMoreRemote" @keydown.enter.prevent="loadMoreRemote" @keydown.space.prevent="loadMoreRemote"><text>{{ remoteLoadMoreStatus === 'error' ? t.network.retry : t.unilevel.loadMore }}</text></view>
+          <view v-if="remoteSnapshot.events.length < remoteSnapshot.totalRows" class="nx-unilevel-load-more nx-unilevel-focus reward-cta reward-cta--wide" role="button" :tabindex="remoteState !== 'ready' || remoteLoadMoreStatus === 'loading' ? -1 : 0" :aria-disabled="remoteState !== 'ready' || remoteLoadMoreStatus === 'loading'"  @click="loadMoreRemote" @keydown.enter.prevent="loadMoreRemote" @keydown.space.prevent="loadMoreRemote"><text>{{ t.unilevel.loadMore }}</text></view>
         </view>
-        <view v-if="policyState === 'error'" role="alert">
-          <text class="block">{{ t.directReferral.policyError }}</text>
-          <view role="button" tabindex="0" class="nx-unilevel-focus nx-card-recovery-action" @click="retryRemote" @keydown.enter.prevent="retryRemote" @keydown.space.prevent="retryRemote"><text>{{ t.network.retry }}</text></view>
-        </view>
+        <view v-if="policyState === 'error'" class="nx-unilevel-details"><text>{{ auditCopy.settlementDetails }}</text><text>—</text></view>
         <view v-else-if="policyState !== 'ready' && !policy" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
         <view v-else-if="policy" style="display: flex; flex-direction: column; gap: 8px">
           <text v-if="!policy.configured" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.directReferral.unconfigured }}</text>
@@ -62,6 +60,7 @@
             <text class="block">{{ ruleDescription }}</text>
           </template>
         </view>
+        </template>
       </view>
     </view>
     </RewardPageSurface>
@@ -69,10 +68,12 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import { toast } from "@/store/ui";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardHero from "@/components/team/reward-compact-hero.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
@@ -159,11 +160,11 @@ async function loadMoreRemote() {
     const events = [...snapshot.events, ...(next.events as (TeamUnilevelEvent | DirectReferralEvent)[]).filter(event => !seen.has(event.id))];
     remoteSnapshot.value = { ...next, events } as TeamUnilevelSnapshot | DirectReferralSnapshot;
     remoteLoadMoreStatus.value = "idle";
-  } catch { if (current()) remoteLoadMoreStatus.value = "error"; }
+  } catch { if (current()) { remoteLoadMoreStatus.value = "error"; toast.error(t.value.network.projectionErrorDesc); } }
 }
 function retryRemote() {
-  if (!remoteSessionReady.value || !mounted) return;
-  void readCoalescer.run({ accountKey: app.accountKey, accountBindingEpoch: app.accountBindingEpoch, runtime: captureRuntimeRevision() }, loadRemote);
+  if (!remoteSessionReady.value || !mounted) return Promise.resolve();
+  return readCoalescer.run({ accountKey: app.accountKey, accountBindingEpoch: app.accountBindingEpoch, runtime: captureRuntimeRevision() }, loadRemote);
 }
 function invalidate(resetSnapshot = true) {
   showSettlementDetails.value = false;
@@ -240,6 +241,7 @@ function statusLabel(event: DirectReferralEvent | TeamUnilevelEvent, status = ev
 }
 function go(url: string) { navTo(url); }
 function openRules() { go('/pages/team/unilevel-how'); }
+useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && remoteState.value !== "loading" && policyState.value !== "loading" && (remoteState.value === "error" || policyState.value === "error"), retry: retryRemote });
 </script>
 
 <style scoped>

@@ -4,8 +4,7 @@
     <view class="invite-card__header">
       <text class="invite-card__title">{{ copy.inviteHeadline }}</text>
       <view class="invite-card__header-actions">
-      <view v-if="needsRetry" class="invite-card__history invite-card__retry" role="button" tabindex="0" :aria-label="t.network.retry" @click="rewards.refresh()" @keydown.enter.prevent="rewards.refresh()" @keydown.space.prevent="rewards.refresh()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.5 7a8 8 0 0 1 13-1L20 9M4 15l1.5 3a8 8 0 0 0 13-1"/></svg></view>
-      <view v-else class="invite-card__history" role="button" tabindex="0" :aria-label="copy.rewardRecords" @click="detailMode='records'; detailOpen=true" @keydown.enter.prevent="detailMode='records'; detailOpen=true" @keydown.space.prevent="detailMode='records'; detailOpen=true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg><text>{{ copy.rewardRecords }}</text></view>
+      <view class="invite-card__history" role="button" tabindex="0" :aria-label="copy.rewardRecords" @click="detailMode='records'; detailOpen=true" @keydown.enter.prevent="detailMode='records'; detailOpen=true" @keydown.space.prevent="detailMode='records'; detailOpen=true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg><text>{{ copy.rewardRecords }}</text></view>
       <view class="invite-card__rules" role="button" tabindex="0" @click="detailMode='rules'; detailOpen=true" @keydown.enter.prevent="detailMode='rules'; detailOpen=true" @keydown.space.prevent="detailMode='rules'; detailOpen=true"><text>{{ copy.rules }}</text><text aria-hidden="true">›</text></view>
       </view>
     </view>
@@ -15,7 +14,6 @@
         <view class="invite-card__descriptions">
           <text class="invite-card__description" :class="{ 'is-active': rewardCaption === 'qualified' }" :aria-hidden="rewardCaption !== 'qualified'">{{ copy.qualifiedFriendReward }}</text>
           <view class="invite-card__description" :class="{ 'is-active': rewardCaption === 'disabled' }" :aria-hidden="rewardCaption !== 'disabled'"><text>{{ t.team.referralRewardsDisabled }}</text><text>{{ t.team.sharingStillAvailable }}</text></view>
-          <text class="invite-card__description" :class="{ 'is-active': rewardCaption === 'error' }" :aria-hidden="rewardCaption !== 'error'">{{ t.team.settlementUnavailable }}</text>
           <text class="invite-card__description" :class="{ 'is-active': rewardCaption === 'unavailable' }" :aria-hidden="rewardCaption !== 'unavailable'">{{ t.share.linkUnavailable }}</text>
         </view>
       </view>
@@ -80,9 +78,8 @@ const rewardEnabled=computed(()=>rewards.snapshot?.rewardEnabled===true);
 const nexReward=computed(()=>rewards.snapshot?.inviterRewardNex ?? 0);
 const rewardAmount=computed(()=>formatAmount(nexReward.value).replace(/\.00$/, ''));
 const referralCode=computed(()=>remoteApiEnabled ? rewards.referralCode : app.user.referralCode);
-const rewardCaption=computed(()=>rewards.error ? 'error' : !rewards.loading && rewards.snapshot && !referralCode.value ? 'unavailable'
+const rewardCaption=computed(()=>rewards.error ? 'unknown' : !rewards.loading && rewards.snapshot && !referralCode.value ? 'unavailable'
   : rewardRead.value==='disabled' ? 'disabled' : 'qualified');
-const needsRetry=computed(()=>!rewards.loading && (!!rewards.error || !referralCode.value));
 const copiedCode = ref(false);
 const copiedLink = ref(false);
 const posterOpen = ref(false);

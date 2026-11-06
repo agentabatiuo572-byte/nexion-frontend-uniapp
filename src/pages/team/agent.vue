@@ -3,11 +3,9 @@
     <view class="pb-6 nx-viz-motion" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamAgent" />
 
-      <view v-if="remoteApiEnabled && pageReadState !== 'ready' && !(pageReadState === 'loading' && policy)" class="px-4 text-center" style="padding-top: 32px" role="status" aria-live="polite" :aria-busy="pageReadState === 'loading'">
-        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ pageReadState === 'loading' ? t.agent.loading : t.agent.loadError }}</text>
-        <view v-if="pageReadState === 'error'" class="agent-cta agent-retry" role="button" tabindex="0" @click="retryAgentPage" @keydown.enter.prevent="retryAgentPage" @keydown.space.prevent="retryAgentPage"><text>{{ t.agent.retry }}</text><text aria-hidden="true">→</text></view>
-      </view>
-      <view class="agent-content">
+      <EmptyState v-if="remoteApiEnabled && pageReadState === 'error' && !policy" kind="recoverable-error" :title="t.agent.loadError" :cta-label="t.agent.retry" @cta="retryAgentPage" />
+      <view v-else-if="remoteApiEnabled && pageReadState === 'loading' && !policy" class="px-4 text-center" style="padding-top: 32px" role="status" aria-busy="true"><text>{{ t.agent.loading }}</text></view>
+      <view v-if="!remoteApiEnabled || policy" class="agent-content">
         <!-- P-41: headline, intro and eligibility share one tinted card with a V1→V5 track. -->
         <view class="agent-hero-card nx-viz-press">
         <view class="agent-hero">
@@ -175,12 +173,14 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
 import { ambassadorDraftCache, clearAmbassadorDraft, beginAmbassadorDraftSubmit, endAmbassadorDraftSubmit, type AmbassadorDraftForm } from "@/lib/ambassador-draft-session";
 import { navTo } from "@/lib/route";
 import { ref, shallowRef, computed, watch, type CSSProperties } from "vue";
 import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useVRank } from "@/store/v-rank";
@@ -485,8 +485,8 @@ async function submit() {
   clearAgentFormState(settled.form);
 }
 
-function refreshAgentPage(): void {
-  if (!remoteApiEnabled || !agentMounted || !auth.isAuthenticated || !environmentCurrent()) return;
+function refreshAgentPage(): Promise<void> {
+  if (!remoteApiEnabled || !agentMounted || !auth.isAuthenticated || !environmentCurrent()) return Promise.resolve();
   invalidateAgentRequests();
   const requestScope = captureAgentRequest();
   pageReadState.value = "loading";
@@ -496,7 +496,7 @@ function refreshAgentPage(): void {
   // 预算规则、活动类型、申请记录全都读到了也照样不显示,而且重试永远复现,因为重试跑的是同一组读。
   // 现在:三条大使读取成功即就绪;等级失败只降级「资格横幅」(unlocked 仍要求 rankReady,
   // rankReady=false 时渲染未知态),不再吃掉整页。
-  void Promise.all([
+  return Promise.all([
     refreshLatest(requestScope),
     refreshHistory(requestScope),
     ambassadorApplicationApi.policy().then((value) => {
@@ -522,9 +522,9 @@ function refreshAgentPage(): void {
   });
 }
 
-function retryAgentPage(): void {
+function retryAgentPage(): Promise<void> {
   resetAgentPageState();
-  refreshAgentPage();
+  return refreshAgentPage();
 }
 
 watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.isAuthenticated, () => locale.code, () => apiRuntimeConfig.environment, () => apiRuntimeConfig.baseUrl], () => {
@@ -584,6 +584,7 @@ const casesGroupStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)"
 function caseRowStyle(isLast: boolean): CSSProperties {
   return { padding: "16px 0", borderBottom: isLast ? "none" : "1px solid var(--v5-border)", overflowWrap: "anywhere" };
 }
+useAutoRecovery({ failed: () => remoteApiEnabled && pageReadState.value === "error", retry: retryAgentPage });
 </script>
 
 <style scoped>
