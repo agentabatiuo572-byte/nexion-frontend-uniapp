@@ -374,25 +374,89 @@ fi
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
 # 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
-# safe-area base padding (PITFALLS P-065): any padding that references
-# env(safe-area-inset-bottom) must carry a base offset ≥22px — a bare env()
-# (base 0) or a small base hugs the iOS home indicator. House baseline = 38px
-# (bottom sheets); 22px floor admits the chat composer. Both operand orders +
-# the env(…, 0px) fallback form are parsed.
-sa_bad=$("$NODE_BIN" -e '
+# Bottom spacing keeps P-065 (inset + at least 22px). The shared overlay
+# tokens retain their declared contract; a consumer with a smaller offset
+# needs separate context evidence. Height calculations are a different concern.
+if ! sa_bad=$("$NODE_BIN" -e '
 const fs=require("fs"),path=require("path");
+const tokens=fs.readFileSync("src/styles/tokens.css","utf8");
+const spacing=new Map([...tokens.matchAll(/(--v5-space-\d+)\s*:\s*(\d+(?:\.\d+)?px)\s*;/g)].map(m=>[m[1],m[2]]));
+const normalize=value=>value
+  .replace(/var\(\s*(--v5-space-\d+)\s*\)/g,(all,key)=>spacing.get(key)??all)
+  .replace(/env\(\s*safe-area-inset-bottom\s*(?:,\s*0(?:px)?\s*)?\)/g,"INSET")
+  .replace(/\s*\+\s*/g,"+").replace(/\(\s*/g,"(").replace(/\s*\)/g,")").replace(/\s*,\s*/g,",")
+  .replace(/max\(INSET,24px\)/g,"SAFE24").trim();
+const tokenValues=name=>[...tokens.matchAll(new RegExp(name+"\\s*:\\s*([^;]+);","g"))].map(match=>normalize(match[1]));
+const safeValues=tokenValues("--nx-overlay-safe-bottom"),bottomValues=tokenValues("--nx-overlay-bottom");
+const overlayDefined=safeValues.length>0&&bottomValues.length>0
+  && safeValues.every(value=>value==="SAFE24")
+  && bottomValues.every(value=>value==="calc(16px+var(--nx-overlay-safe-bottom))");
+const insetSource=/safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/;
 const bad=[];
-const re1=/(\d+(?:\.\d+)?)px\s*\+\s*env\(safe-area-inset-bottom(?:,[^)]*)?\)/;
-const re2=/env\(safe-area-inset-bottom(?:,[^)]*)?\)\s*\+\s*(\d+(?:\.\d+)?)px/;
 (function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);const s=fs.statSync(p);
 if(s.isDirectory())walk(p);else if(/\.(vue|css)$/.test(f)){
-fs.readFileSync(p,"utf8").split(/\r?\n/).forEach((ln,i)=>{
-if(!ln.includes("safe-area-inset-bottom"))return;
-const m=ln.match(re1)||ln.match(re2);
-const base=m?parseFloat(m[1]):0;
-if(base<22)bad.push(p.split(path.sep).join("/")+":"+(i+1)+" base="+base+"px");});}}})("src");
-if(bad.length){console.log(bad.join("\n"));process.exit(1)}' 2>&1)
-if [ -z "$sa_bad" ]; then ok "safe-area-inset-bottom base padding >=22px (P-065)"; else bad "safe-area base padding <22px (iOS home-indicator hug)"; echo "$sa_bad" | sed 's/^/        /'; fi
+const source=fs.readFileSync(p,"utf8");
+let offset=0;
+for(const declaration of source.split(";")){
+    const start=offset;
+    offset+=declaration.length+1;
+    if(!insetSource.test(declaration))continue;
+    const properties=[...declaration.matchAll(/(?:^|[{\s,"\x27])(--nx-overlay-(?:safe-bottom|bottom)|padding[\w-]*|bottom)["\x27]?\s*:/g)];
+    for(const [index,match] of properties.entries()){
+    const raw=declaration.slice(match.index+match[0].length,properties[index+1]?.index).trim();
+    if(!insetSource.test(match[1]+" "+raw))continue;
+    const line=source.slice(0,start+match.index).split("\n").length;
+    const quoted=raw.match(/^(["\x27])([^\r\n]*?)\1(?=\s*(?:[,}]|$))/);
+    let value=normalize(quoted?quoted[2]:raw.replace(/["\x27]\s*\/?>[\s\S]*$/,"").replace(/}\s*$/,"").trim());
+    if(match[1].startsWith("--nx-overlay-")){
+      const expected=match[1]==="--nx-overlay-safe-bottom"?"SAFE24":"calc(16px+var(--nx-overlay-safe-bottom))";
+      if(value===expected)continue;
+      bad.push(p.split(path.sep).join("/")+":"+line+" invalid shared token "+match[1]);
+      continue;
+    }
+    if(match[1]==="padding"||match[1]==="padding-block"||match[1]==="paddingBlock"){
+      const sides=[];
+      let depth=0,start=0;
+      for(let at=0;at<=value.length;at++){
+        if(at===value.length||(depth===0&&/\s/.test(value[at]))){
+          if(at>start)sides.push(value.slice(start,at));
+          start=at+1;
+        }else if(value[at]==="(")depth++;
+        else if(value[at]===")")depth--;
+      }
+      const logical=match[1]!=="padding";
+      const bottomAt=logical?sides.length-1:sides.length<3?0:2;
+      value=depth===0&&sides.length<=(logical?2:4)?(sides[bottomAt]??""):"";
+      if(value&&!/INSET|SAFE24|safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/.test(value))continue;
+    }
+    if(overlayDefined&&/^var\(--nx-overlay-(?:safe-bottom|bottom)\)$/.test(value))continue;
+    if(overlayDefined){
+      const shared=value.replace(/var\(--nx-overlay-safe-bottom(?:,(?:0|24)px)?\)/g,"SHARED_SAFE");
+      if(shared==="calc(16px+SHARED_SAFE)"||shared==="calc(SHARED_SAFE+16px)")continue;
+      value=shared.replace(/SHARED_SAFE/g,"SAFE24");
+    }
+    // Existing sheets take the larger of inset+24px and the shared overlay
+    // bottom. Both complete branches must retain their declared shapes.
+    const maximum=value.match(/^max\((calc\([^()]*\)),var\(--nx-overlay-bottom\)\)$/);
+    if(maximum&&overlayDefined)value=maximum[1];
+    const body=value.match(/^calc\(([^()]*)\)$/)?.[1];
+    const terms=body?.split("+")??[];
+    const insets=terms.filter(term=>term==="INSET"||term==="SAFE24");
+    const pixels=terms.filter(term=>/^\d+(?:\.\d+)?px$/.test(term));
+    const known=insets.length===1&&pixels.length+1===terms.length;
+    const base=known?pixels.reduce((sum,term)=>sum+parseFloat(term),0):null;
+    if(base!==null&&base>=22)continue;
+    bad.push(p.split(path.sep).join("/")+":"+line+" base="+(base===null||insets[0]==="SAFE24"?"unknown":base+"px"));
+}}}}})("src");
+if(bad.length)console.log(bad.join("\n"));' 2>&1); then
+  bad "safe-area scanner failed"
+  printf "%s\n" "$sa_bad" | sed 's/^/        /'
+elif [ -n "$sa_bad" ]; then
+  bad "safe-area bottom spacing failed (P-065 / overlay contract)"
+  printf "%s\n" "$sa_bad" | sed 's/^/        /'
+else
+  ok "safe-area bottom padding (P-065 / current overlay contract)"
+fi
 # Auth/onboarding bare pages must use one system-chrome owner. This catches the
 # orthogonal failure where a new flow page looks fine but forgets the status bar,
 # Home Indicator, or bottom safe-area reserve (P-069).
