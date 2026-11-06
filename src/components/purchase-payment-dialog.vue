@@ -177,7 +177,7 @@
 
       <view v-if="!conclusion" class="pp-warn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-        <text>{{ isBank ? copy.warnBank : s.intent?.paymentMethod === 'CREGIS_USDT_ERC20' ? copy.warnErc20 : copy.warnBep20 }}</text>
+        <text>{{ isBank ? copy.warnBank : (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'CREGIS_USDT_ERC20' ? copy.warnErc20 : copy.warnBep20 }}</text>
       </view>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30). -->
@@ -266,7 +266,7 @@ const fees = computed(() => s.intent ?? s.quote);
 const isBank = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'HDPAY_BANK');
 const received = computed(() => s.intent?.status === 'FUNDS_CONFIRMED');
 const ready = computed(() => timing.value.canPay && (isBank.value ? !!s.intent?.paymentUrl : !!s.intent?.address));
-const networkName = computed(() => s.intent?.paymentMethod === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20);
+const networkName = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20);
 const methodName = computed(() => isBank.value ? copy.value.bank : networkName.value);
 const pageTitle = computed(() => received.value ? copy.value.resultTitle : isBank.value ? copy.value.bankTitle : copy.value.usdtPage);
 const cashierUrl = computed(() => timing.value.canPay && s.intent?.paymentUrl ? validateHostedPaymentUrl(s.intent.paymentUrl) ?? '' : '');
