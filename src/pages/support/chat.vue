@@ -1117,11 +1117,13 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 import SupportAvatar from "@/components/support/support-avatar.vue";
 import { useTheme } from "@/store/theme";
 const theme = useTheme();
-useAutoRecovery({ failed: () => remoteApiEnabled && supportSessionReady.value && attachmentPolicyError.value, retry: loadAttachmentPolicy });
-useAutoRecovery({ failed: () => remoteApiEnabled && advisorApplies.value && convStore.advisorError && !convStore.advisorLoading, retry: () => convStore.refreshAdvisor() });
+// This page has no pull-to-refresh, so reads keep repeating after the three retries.
+useAutoRecovery({ failed: () => remoteApiEnabled && supportSessionReady.value && attachmentPolicyError.value, retry: loadAttachmentPolicy, repeatMs: 30_000 });
+useAutoRecovery({ failed: () => remoteApiEnabled && advisorApplies.value && convStore.advisorError && !convStore.advisorLoading, retry: () => convStore.refreshAdvisor(), repeatMs: 30_000 });
 useAutoRecovery({
   failed: () => remoteApiEnabled && supportSessionReady.value && !humanHistoryRetryBusy.value && !humanEarlierBusy.value && !humanHistoryLoading.value && (humanHistoryError.value || humanHistoryListError.value),
   retry: retryHumanHistory,
+  repeatMs: 30_000,
 });
 </script>
 
