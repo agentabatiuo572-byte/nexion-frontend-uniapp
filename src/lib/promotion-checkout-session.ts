@@ -77,8 +77,8 @@ export class PromotionCheckoutSession {
   private persist(record: PromotionCheckoutRecord): boolean {
     if (!this.ports.current()) throw new Error('ACCOUNT_SCOPE_CHANGED');
     if (record.pending?.operation === 'payOrder' && record.pending.key === this.record.pending?.key && this.adoptReleasedPayment()) return false;
+    const stored = this.ports.read();
     if (!record.pending) {
-      const stored = this.ports.read();
       if (stored?.pending && stored.pending.key !== this.record.pending?.key) {
         this.record = stored;
         this.unknown = true; this.confirmed = false; this.retryOriginal = false;
@@ -86,6 +86,7 @@ export class PromotionCheckoutSession {
         return false;
       }
     }
+    record = { ...record, paymentIntentRevision: Math.max(stored?.paymentIntentRevision ?? 0, record.paymentIntentRevision ?? 0) };
     this.ports.save(record);
     this.record = record;
     return true;
