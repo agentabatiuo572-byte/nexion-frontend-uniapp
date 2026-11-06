@@ -139,6 +139,7 @@ export function createSessionVault(storage?: KeyValueStorage, options?: { deferH
         current = null;
         revision += 1;
         identityRevision = revision;
+        notify(previous);
         try {
           storage.remove();
         } catch {

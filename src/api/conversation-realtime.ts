@@ -13,6 +13,8 @@ interface Options {
   reconcile:(signal:AbortSignal)=>Promise<void>; state?:(ready:boolean,terminal:boolean,unavailable:boolean)=>void;
   presence?:(value:RealtimePresence|null)=>void;
   scopeInvalidated?:(customerId:number)=>void;
+  authRejected?:()=>void;
+  configInvalidated?:()=>void;
 }
 type Timer=ReturnType<typeof setTimeout>;
 export class ConversationRealtime {
@@ -23,11 +25,26 @@ export class ConversationRealtime {
   private pending=new Map<string,{resolve:(value:RealtimeEnvelope)=>void;reject:(error:Error)=>void;timer:Timer}>();
   private eventIds=new Set<string>(); private dirty=false; private syncing=false; private authenticated=false;
   private watched:string|null=null; private lastTyping=0; private lastPong=0; private sequence=0;
+  private reauthSupported=false; private reauthTimer?:Timer; private reauthQueued=false;
   constructor(private readonly options:Options){}
   start(){if(!this.stopped)return;this.stopped=false;this.terminal=false;this.attempts=0;this.lifecycle++;this.fallback=createAbortController();this.connect();this.poll(this.lifecycle);}
   stop(preserveUnavailable=false){this.stopped=true;this.lifecycle++;this.disconnect(false,false,preserveUnavailable);this.fallback.abort();clearTimeout(this.pollTimer);this.options.presence?.(null);}
-  /** An accepted token rotation replaces the old grant without replaying pending commands. */
-  renewCredentials(){if(this.stopped)return;this.stop(true);this.start();}
+  /** Keep watches and pending acknowledgements on a ready socket during rotation. */
+  renewCredentials(){
+    if(this.stopped)return;
+    if(!this.ready||!this.reauthSupported){
+      this.disconnect(false,false,true);
+      void this.connect();
+      return;
+    }
+    if(this.reauthTimer!==undefined){this.reauthQueued=true;return;}
+    const epoch=this.epoch;
+    const signal=this.controller.signal;
+    this.reauthTimer=setTimeout(()=>{if(epoch===this.epoch)this.disconnect(true);},8000);
+    void this.options.ticket(signal).then(({ticket})=>{
+      if(epoch===this.epoch)this.send({type:'reauth',ticket});
+    }).catch(()=>{if(epoch===this.epoch)this.disconnect(true);});
+  }
   watch(no:string|null){this.watched=no;if(this.authenticated)this.send({type:'watch',conversationNo:no});}
   typing(active:boolean){
     if(!this.ready||!this.watched)return;
@@ -49,10 +66,15 @@ export class ConversationRealtime {
   }
   private send(value:unknown){this.connection?.send(JSON.stringify(value));}
   private setReady(value:boolean,unavailable=false){this.ready=value;this.unavailable=unavailable;this.options.state?.(value,this.terminal,unavailable);}
+  private rejectCredentials(terminal=false){
+    this.disconnect(true,terminal);
+    this.options.authRejected?.();
+  }
   private disconnect(retry:boolean,terminal=false,preserveUnavailable=false){
     this.epoch++;this.controller.abort();this.fallback.abort();this.fallback=createAbortController();this.connection?.close();this.connection=null;
     this.authenticated=false;this.syncing=false;this.dirty=false;this.terminal=terminal;
-    for(const timer of [this.retryTimer,this.heartbeatTimer,this.deadline,this.eventTimer,this.stableTimer])clearTimeout(timer);
+    for(const timer of [this.retryTimer,this.heartbeatTimer,this.deadline,this.eventTimer,this.stableTimer,this.reauthTimer])clearTimeout(timer);
+    this.reauthSupported=false;this.reauthTimer=undefined;this.reauthQueued=false;
     this.pending.forEach(p=>p.reject(new Error('CONVERSATION_DELIVERY_UNKNOWN')));this.pending.clear();
     // Renewal is not a failure, but must retain an existing failure until catch-up succeeds.
     this.setReady(false,retry||(preserveUnavailable&&this.unavailable));this.options.presence?.(null);
@@ -67,7 +89,7 @@ export class ConversationRealtime {
       const ticket=await this.options.ticket(signal);if(!current())return;
       const socket=this.options.socket(this.options.url);this.connection=socket;
       socket.onopen=()=>{if(current())this.send({type:'auth',ticket:ticket.ticket})};
-      socket.onclose=()=>{if(current())this.disconnect(true)};
+      socket.onclose=({code})=>{if(current()){if(code===4401)this.rejectCredentials();else this.disconnect(true);}};
       socket.onerror=()=>{if(current())this.disconnect(true)};
       socket.onmessage=e=>{
         if(!current())return;
@@ -75,20 +97,31 @@ export class ConversationRealtime {
           const f=JSON.parse(e.data);
           switch(f.type){
             case 'ready':
+              if(this.authenticated)break;
               clearTimeout(this.deadline);this.fallback.abort();this.authenticated=true;this.lastPong=Date.now();this.watch(this.watched);
+              this.reauthSupported=f.reauth===true;
               this.dirty=true;void this.sync(epoch);this.heartbeat(epoch);break;
+            case 'reauth-ready':
+              if(this.reauthTimer===undefined)break;
+              clearTimeout(this.reauthTimer);this.reauthTimer=undefined;
+              if(this.reauthQueued){this.reauthQueued=false;this.renewCredentials();}
+              break;
             case 'pong':this.lastPong=Date.now();break;
             case 'ack':{const p=this.pending.get(f.requestId);if(p){this.pending.delete(f.requestId);p.resolve(f.result)}break;}
             case 'event':
               if(typeof f.eventId!=='string'||this.eventIds.has(f.eventId))break;
               this.eventIds.add(f.eventId);if(this.eventIds.size>2048)this.eventIds.delete(this.eventIds.values().next().value!);
+              if(f.eventType==='PLATFORM_CONFIG_CHANGED'){this.options.configInvalidated?.();break;}
               this.dirty=true;if(!this.syncing){clearTimeout(this.eventTimer);this.eventTimer=setTimeout(()=>void this.sync(epoch),80)}break;
             case 'presence':if(f.conversationNo===this.watched)this.options.presence?.(f);break;
             case 'scope-invalidated':
               if(f.reason==='ASSIGNMENT_CHANGED' && Number.isSafeInteger(f.customerId) && f.customerId>0)
                 this.options.scopeInvalidated?.(f.customerId);
               break;
-            case 'error':this.disconnect(true,f.code===401||f.code===403);break;
+            case 'error':
+              if(f.code===401||f.code===403)this.rejectCredentials(this.reauthTimer===undefined);
+              else this.disconnect(true);
+              break;
           }
         }catch{this.disconnect(true);}
       };
