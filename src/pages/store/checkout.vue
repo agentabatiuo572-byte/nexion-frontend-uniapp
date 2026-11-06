@@ -308,7 +308,7 @@ import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
-import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId } from "@/store/trial-config";
+import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, formatTrialDiscountPercent, resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { resolveTrialAt, accruedShadow } from "@/store/trial-boundary";
 import { mockServerNow } from "@/store/server-time";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
@@ -821,7 +821,7 @@ const trialCreditText = computed(() => {
 });
 // An empty trial discount cap means no cap: drop the "up to" clause instead of printing "0".
 const promoRowLabel = computed(() => {
-  const pct = (trialCfg.value.discountRate * 100).toFixed(0);
+  const pct = formatTrialDiscountPercent(trialCfg.value.discountRate);
   const cap = trialCfg.value.discountCapUSD;
   return cap === null ? fmt(t.value.store.coRowTrialDiscountNoCap, { pct }) : fmt(t.value.store.coRowTrialDiscount, { pct, cap: String(cap) });
 });
