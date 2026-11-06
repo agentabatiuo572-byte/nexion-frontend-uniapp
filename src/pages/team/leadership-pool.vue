@@ -7,6 +7,8 @@
       <view class="pool-content">
 
 
+        <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="retryRemotePool" />
+        <template v-else>
         <view class="pool-hero nx-viz-press">
           <view class="pool-share">
             <view ref="shareRingRef" class="pool-ring" :class="{ 'pool-ring--capped': !visibility.hidden && !(remoteApiEnabled && !remotePool) && myShare > 0 }" :style="{ '--nx-viz-ring': shareRingInView === false || visibility.hidden || (remoteApiEnabled && !remotePool) ? 0 : Math.min(100, Math.max(0, myShare * 100)), transition: shareRingInView === false || visibility.hidden ? 'none' : VIZ_RING_TRANSITION }"><view class="pool-ring__hole"><text class="pool-ring__pct">{{ visibility.mask(shareLabel) }}</text><text class="pool-ring__label">{{ t.pool.myShare }}</text></view></view>
@@ -69,13 +71,7 @@
           </view>
         </view>
 
-        <view v-if="remoteApiEnabled && remoteState !== 'ready' && !(remoteState === 'loading' && remotePool)" class="pool-read-state" role="status" aria-live="polite" :aria-busy="remoteState === 'loading'">
-          <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.pool.loading : remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError }}</text>
-          <view v-if="remoteState === 'error' || remoteState === 'hold'" class="pool-action" style="margin-top: 14px" role="button" tabindex="0" @click="retryRemotePool" @keydown.enter.prevent="retryRemotePool" @keydown.space.prevent="retryRemotePool">
-            <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.pool.retry }}</text>
-          </view>
-        </view>
-
+        </template>
       </view>
     </view>
     </RewardPageSurface>
@@ -83,12 +79,14 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useScrollGrowProgress, VIZ_RING_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { navTo } from "@/lib/route";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -251,14 +249,14 @@ function retryRemotePool() {
   void loadRemotePool();
 }
 
-async function loadRemotePool() {
+async function loadRemotePool(refreshRank = true) {
   if (!remoteApiEnabled || !pageVisible || !auth.isAuthenticated || !environmentCurrent()) return;
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   const readLocale = locale.code;
-  void vState.refreshCanonicalVRank();
+  if (refreshRank) void vState.refreshCanonicalVRank();
   remoteState.value = "loading";
   const current = () => mounted && pageVisible && request === remoteRequest && accountKey === app.accountKey
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope)
@@ -329,6 +327,8 @@ const pastHeadStyle: CSSProperties = { padding: "0 0 12px", fontSize: "var(--ui-
 function historyRowStyle(isLast: boolean): CSSProperties {
   return { padding: "12px 16px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
+useAutoRecovery({ failed: () => remoteApiEnabled && remoteState.value === "error", retry: () => loadRemotePool(false) });
+useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry: () => vState.refreshCanonicalVRank() });
 </script>
 
 <style scoped>

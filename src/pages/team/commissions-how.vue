@@ -6,10 +6,8 @@
 
       <HowHero v-if="!state.error && !content.incomplete" kind="ledger" :title="s(sectionId.hero).title" :sub="s(sectionId.hero).body" :sections="directory" :nav-label="guideCopy.contents" />
 
-      <view v-if="(state.loading && !state.snapshot) || state.error || content.incomplete" class="commission-guide-state" aria-live="polite">
-        <text class="block">{{ state.loading ? content.copy.loading : content.copy.unavailable }}</text>
-        <view v-if="!state.loading" role="button" tabindex="0" class="nx-card-recovery-action" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"><text>{{ content.copy.retry }}</text></view>
-      </view>
+      <view v-if="state.loading && !state.snapshot" class="commission-guide-state" role="status" aria-busy="true"><text>{{ content.copy.loading }}</text></view>
+      <EmptyState v-else-if="state.error || content.incomplete" kind="recoverable-error" :title="content.copy.unavailable" :cta-label="content.copy.retry" @cta="reload" />
 
       <template v-if="!state.error && !content.incomplete">
         <HowSection anchor="overview" :title="s(sectionId.overview).title" :body="s(sectionId.overview).body" />
@@ -56,10 +54,7 @@
         <TeamRuleSection :title="guideCopy.fullText" fold>
           <view v-if="publicationFallback" class="commission-guide-publication-note" role="status"><text>{{ t.howPublished.languageFallback }}</text></view>
           <TeamRuleDocument v-if="publishedBlocks" :blocks="publishedBlocks" compact />
-          <view v-else role="status" class="commission-guide-publication-note">
-            <text>{{ t.howPublished.unavailableBody }}</text>
-            <view class="nx-card-recovery-action" role="button" tabindex="0" @click="reload" @keydown.enter.prevent="reload" @keydown.space.prevent="reload"><text>{{ content.copy.retry }}</text></view>
-          </view>
+          <view v-else class="commission-guide-publication-note"><text>—</text></view>
         </TeamRuleSection>
 
         <text class="commission-guide-footer">{{ s(sectionId.footer).body }}</text>
@@ -74,8 +69,10 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -172,7 +169,7 @@ const exampleRows = computed(() => {
 });
 function reload() {
   if (!isCurrentAccountScope(resourceOwner)) { resource.dispose(); resource = makeResource(); }
-  if (environmentCurrent() && auth.isAuthenticated) void resource.load(locale.code);
+  return environmentCurrent() && auth.isAuthenticated ? resource.load(locale.code) : Promise.resolve();
 }
 onShow(reload);
 onHide(() => { resource.dispose(); resource = makeResource(); });
@@ -187,6 +184,7 @@ onUnmounted(() => resource.dispose());
 function goBack() {
   navBack("/pages/team/commissions");
 }
+useAutoRecovery({ failed: () => state.value.error && !state.value.loading, retry: reload });
 </script>
 <style scoped>
 .commission-guide-state { margin: 16px 16px 0; padding: 18px 0; border-block: 1px solid var(--v5-border); color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); }

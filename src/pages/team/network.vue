@@ -4,13 +4,8 @@
       <SubPageHeader back="/pages/team/team" :title="t.network.pageTitle" />
 
       <view class="network-content">
-        <view v-if="remoteApiEnabled && network.remoteStatus === 'error'" class="nx-inline-recovery" :style="errorStateStyle">
-          <view class="nx-inline-recovery__copy">
-            <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
-            <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-          </view>
-          <view class="nx-inline-recovery__action nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="network.refreshCanonicalNetwork()" @keydown.enter.prevent="network.refreshCanonicalNetwork()" @keydown.space.prevent="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
-        </view>
+        <EmptyState v-if="remoteApiEnabled && network.remoteStatus === 'error' && !network.hasRemoteSnapshot" kind="recoverable-error" :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.network.retry" @cta="network.refreshCanonicalNetwork()" />
+        <template v-else>
         <view class="network-overview nx-viz-press">
           <view class="network-overview__head">
             <text class="network-overview__split">{{ visibility.mask(metricsUnavailable ? '—' : ringSplitText) }}</text>
@@ -52,6 +47,7 @@
             </view>
           </view>
         </view>
+        </template>
       </view>
 
       <!-- Member details keep the existing keyboard and pointer interactions. -->
@@ -90,12 +86,14 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { displayNickname } from "@/lib/brand-copy";
 import { networkReauditCopy } from "@/i18n/network-reaudit";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import GlassSegments from "@/components/glass-segments.vue";
@@ -249,6 +247,7 @@ function sheetStatValStyle(color: string): CSSProperties {
 useDialogA11y(computed(() => selected.value !== null), ".nx-net-sheet-wrap", () => { selected.value = null; }, true);
 
 
+useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
 </script>
 
 <style scoped>

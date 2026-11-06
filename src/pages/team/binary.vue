@@ -47,11 +47,7 @@
               </view>
             </view>
 
-            <view v-if="remoteApiEnabled && pageState.memberDetails === 'error'" class="binary-member-recovery" :style="memberReadErrorStyle">
-              <text class="binary-note">{{ t.binary.memberDetailsUnavailable }}</text>
-              <view role="button" tabindex="0" class="binary-text-action" @click="retryNetworkMembers" @keydown.enter.prevent="retryNetworkMembers" @keydown.space.prevent="retryNetworkMembers"><text>{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
-            </view>
-            <view v-if="wings.some(wing => wing.top)" class="binary-leaders">
+            <view v-if="wings.some(wing => wing.top) || pageState.memberDetails !== 'ready'" class="binary-leaders">
               <text class="binary-section-title">{{ binaryCopy.leadingMembers }}</text>
               <view class="reward-wings">
                 <view v-for="wing in wings" :key="wing.key" class="reward-wing nx-viz-press" :style="wingStyle(wing.isWeak)">
@@ -88,6 +84,7 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, VIZ_GROW_HEIGHT_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
@@ -329,10 +326,6 @@ function retryCanonicalData(): void {
   ]).then(() => undefined));
 }
 
-function retryNetworkMembers(): void {
-  if (!remoteSessionReady.value) return;
-  void network.refreshCanonicalNetwork();
-}
 
 watch(remoteSessionReady, (ready, wasReady) => {
   if (ready && !wasReady) retryCanonicalData();
@@ -357,6 +350,8 @@ const recentGroupStyle: CSSProperties = {};
 function recentRowStyle(isLast: boolean): CSSProperties {
   return { padding: "14px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
+useAutoRecovery({ failed: () => remoteSessionReady.value && commission.binaryStatus === "error", retry: () => remoteSessionReady.value ? commission.refreshCanonicalBinary() : Promise.resolve() });
+useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus === "error", retry: () => remoteSessionReady.value ? network.refreshCanonicalNetwork() : Promise.resolve(false) });
 </script>
 
 <style scoped>

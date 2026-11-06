@@ -15,7 +15,6 @@
           :month-n-e-x="monthNEX"
           :unlocked-u-s-d-t="unlockedUSDT"
           :cooling-u-s-d-t="coolingUSDT"
-          @retry="refreshRemoteLedger"
         />
 
         <!-- Invite hero -->
@@ -30,7 +29,6 @@
           :direct="byLayerBuckets[1].length"
           @invite="inviteCard?.openShare()"
           @open="go('/pages/team/tree')"
-          @retry="network.refreshCanonicalNetwork()"
         />
 
         <!-- My V-rank summary -->
@@ -44,7 +42,6 @@
           <view v-if="rankBars.length" ref="rankBarsEl" class="team-rank__bars" aria-hidden="true">
             <view v-for="(bar, index) in rankBars" :key="bar.key" class="team-rank__bar"><text>{{ bar.label }}</text><view class="team-rank__track"><view :style="{ width: rankBarsInView === false || visibility.hidden || bar.percent === null ? '0%' : `${bar.percent}%`, transition: rankBarsInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: rankBarsInView === false ? '0ms' : vizStagger(index) }" /></view></view>
           </view>
-          <view v-if="vrank.remoteError" class="team-rank__status" role="status"><text>{{ t.rank.loadError }}</text><view class="team-rank__retry" role="button" tabindex="0" @click.stop="vrank.refreshCanonicalVRank()" @keydown.enter.stop.prevent="vrank.refreshCanonicalVRank()" @keydown.space.stop.prevent="vrank.refreshCanonicalVRank()">{{ t.rank.retry }}</view></view>
         </view>
 
         </view>
@@ -110,6 +107,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { formatUsd, formatUsdOverviewParts } from "@/lib/usd-display";
@@ -141,6 +139,7 @@ import { productCatalogState, productCatalogDisplayProof, productCatalogPresenta
 import type { CanonicalBinaryState } from "@/api/commission-config-api";
 import type { TeamCommissionSnapshot, TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
+import { useConfig } from "@/store/config";
 import { useReferralReward } from "@/store/referral-reward";
 import { useApp } from "@/store/app";
 import { useDataVisibility } from '@/store/data-visibility';
@@ -400,8 +399,10 @@ let releaseActiveRefresh = () => {};
 async function refreshVisibleTeam() {
   if (!remotePoolVisible || !remoteApiEnabled) return;
   await Promise.allSettled([
-    vrank.ensureCanonicalVRank(), commission.ensureCanonicalBinary(), commission.ensureCanonicalEvents(),
-    network.ensureCanonicalNetwork(), referralRewards.ensure(), refreshRemotePool(),
+    vrank.remoteError ? undefined : vrank.ensureCanonicalVRank(), commission.ensureCanonicalBinary(),
+    commission.eventsStatus === "error" ? undefined : commission.ensureCanonicalEvents(),
+    network.remoteStatus === "error" ? undefined : network.ensureCanonicalNetwork(),
+    referralRewards.error ? undefined : referralRewards.ensure(), refreshRemotePool(),
   ]);
 }
 onMounted(() => {
@@ -412,7 +413,7 @@ onMounted(() => {
 onShow(() => {
   remotePoolVisible = true;
   releaseActiveRefresh();
-  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleTeam);
+  releaseActiveRefresh = registerActivePageRefresh(refreshVisibleTeam, "pages/team/team");
   if (!remoteApiEnabled) return;
   void vrank.ensureCanonicalVRank();
   void commission.ensureCanonicalBinary();
@@ -442,9 +443,6 @@ async function refreshRemotePool(passive = false) {
     remotePool.value = null;
     remotePoolState.value = leadershipPoolFailureState(cause);
   }
-}
-async function refreshRemoteLedger() {
-  await Promise.allSettled([network.refreshCanonicalNetwork(), commission.refreshCanonicalEvents()]);
 }
 watch(() => app.accountKey, () => { if (remoteApiEnabled) { remotePool.value = null; void refreshRemotePool(true); } });
 const unsubscribeRemotePoolRun = subscribeRuntimeRevision(scope => {
@@ -586,6 +584,13 @@ watch([pendingShareIntent, invitePageVisible, inviteCard, () => referralRewards.
   inviteCard.value.openShare();
 }, { flush: 'post' });
 const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus : "ready");
+// Shared card and sheet readers recover once per source on the Team page.
+const recoveryConfig = useConfig();
+useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
+useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
+useAutoRecovery({ failed: () => remoteApiEnabled && !!vrank.remoteError, retry: () => vrank.refreshCanonicalVRank() });
+useAutoRecovery({ failed: () => remoteApiEnabled && !!referralRewards.error && !referralRewards.loading, retry: () => referralRewards.refresh() });
+useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !recoveryConfig.loading, retry: () => recoveryConfig.load() });
 </script>
 
 <style scoped>
