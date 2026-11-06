@@ -1061,7 +1061,6 @@ export const useApp = defineStore("app", () => {
       homeTruthError.value = null;
       // The authenticated catalog/bootstrap helper owns the first fleet read.
       // A bare account rebind has no authority to fetch a mixed old/new projection.
-      void refreshRemoteWithdrawalList(key);
       return;
     }
     const snapshot = hydrateSnapshotEconomics(readAccountSnapshot(key)) ?? createSeedSnapshot(key, rawAccountKey, surface);
@@ -1078,7 +1077,7 @@ export const useApp = defineStore("app", () => {
     persistAccountSnapshot();
   }
 
-  /** Rehydrates every historical production withdrawal after login/reload. */
+  /** Refreshes the canonical withdrawal list for a wallet entry or explicit action. */
   async function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
     if (!remoteApiEnabled || expectedAccountKey !== accountKey.value) return false;
     const request = remoteAccountEpoch.snapshot();

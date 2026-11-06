@@ -23,7 +23,7 @@
           <CountdownHero
             :status="status"
             :extended="freeTrial.authorityServerState === 'EXTENDED'"
-            :now="now"
+            :now="freeTrial.serverTimeAt(now)"
             :remaining-ms="remainingMsValue"
             :shadow-u-s-d="shadowUSD"
             :shadow-n-e-x="shadowNEX"
@@ -163,6 +163,7 @@
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CountdownHero from "@/components/me/trial-countdown-hero.vue";
@@ -180,6 +181,7 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const t = useT();
 const freeTrial = useFreeTrial();
+onShow(() => { void freeTrial.refreshVisible(); });
 const trialConfig = useTrialConfig();
 
 const cfg = computed(() => trialConfig.config);

@@ -1,7 +1,7 @@
-import { computed, ref } from "vue";
+import { computed, onScopeDispose, ref } from "vue";
 import { defineStore } from "pinia";
 import { supportApi } from "@/api/runtime";
-import { apiClient,apiRuntimeConfig } from "@/api/runtime";
+import { apiClient,apiRuntimeConfig,sessionVault } from "@/api/runtime";
 import { ConversationRealtime } from '@/api/conversation-realtime';
 import { createUniRealtimeSocket,setAppConversationRealtime } from '@/api/app-conversation-realtime';
 import { catchUpConversation,mergeConversationMessages } from '@/api/conversation-history';
@@ -12,6 +12,8 @@ import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAd
 import type { Conversation, ConversationCategoryAvailability, ConversationType, TicketCategory } from "@/domain/support";
 import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
 import { restoreSupportPending, persistSupportPending, clearSupportPending } from "@/lib/support-pending-storage";
+import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
+import { useConfig } from "@/store/config";
 
 function mutationKey(scope: string): string {
   const label = scope.split(":", 1)[0].replace(/[^a-z0-9-]/gi, "").slice(0, 24) || "command";
@@ -203,14 +205,18 @@ export const useConversations = defineStore("conversations", () => {
   let typingExpiry: ReturnType<typeof setTimeout> | undefined;
   function startRealtime() {
     if (realtime || !remoteApiEnabled || !accountKeyValue.startsWith("user:")) return;
+    const session = sessionVault.read();
+    if (!session?.accessToken || accountKeyValue !== `user:${session.user.userId}`) return;
     const epoch = accountEpoch; let instance!: ConversationRealtime;
     const current = () => realtime === instance && epoch === accountEpoch;
     instance = new ConversationRealtime({
       url: `${apiRuntimeConfig.baseUrl.replace(/^http/, "ws").replace(/\/$/, "")}/ws/conversations`,
-      ticket: () => apiClient.request({ method: "POST", path: "/api/app/support/realtime-ticket" }), socket: createUniRealtimeSocket,
+      ticket: signal => apiClient.request({ method: "POST", path: "/api/app/support/realtime-ticket", signal }), socket: createUniRealtimeSocket,
       reconcile: async signal => { const active = () => current() && !signal.aborted; if (!active()) return; await refresh(active); if (active() && watchedId) { const id=watchedId; await open(id,()=>active()&&watchedId===id); } },
       state: (ready) => { if (current()) { realtimeReady.value = ready; realtimeFallback.value = !ready; } },
       presence: value => { if (!current()) return; clearTimeout(typingExpiry); if (!value) { typingIds.value={}; onlineIds.value={}; return; } onlineIds.value[value.conversationNo]=value.online; typingIds.value[value.conversationNo]=value.typing; typingExpiry=setTimeout(()=>{if(current())typingIds.value[value.conversationNo]=false;},value.expiresIn??5000); },
+      authRejected: () => { if (current()) maintainRemoteSession(true); },
+      configInvalidated: () => { if (current()) useConfig().invalidate(); },
       scopeInvalidated: customerId => {
         if (!current() || accountKeyValue !== `user:${customerId}`) return;
         const account = accountKeyValue;
@@ -226,6 +232,11 @@ export const useConversations = defineStore("conversations", () => {
     realtime=instance; setAppConversationRealtime(instance); instance.watch(watchedId); instance.start();
   }
   function stopRealtime() { const instance=realtime; realtime=null; setAppConversationRealtime(null); clearTimeout(typingExpiry); realtimeReady.value=false; realtimeFallback.value=false; typingIds.value={}; onlineIds.value={}; instance?.stop(); }
+  const unsubscribeSession = sessionVault.subscribe?.((previous, next, continuation) => {
+    if (!continuation) stopRealtime();
+    else if (previous?.accessToken !== next?.accessToken) realtime?.renewCredentials();
+  });
+  onScopeDispose(() => { unsubscribeSession?.(); stopRealtime(); });
   function watchRealtime(id: string | null) { watchedId=id; realtime?.watch(id); if (!id) { typingIds.value={}; onlineIds.value={}; } }
   function setTyping(active: boolean) { realtime?.typing(active); }
   async function refreshAdvisor(): Promise<void> {
