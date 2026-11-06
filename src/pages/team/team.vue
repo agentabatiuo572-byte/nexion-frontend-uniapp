@@ -351,7 +351,7 @@ const leadershipPoolPrimary = computed(() =>
 );
 const poolAmountParts = computed(() => !remotePoolReadable.value ? null : formatUsdOverviewParts(leadershipPoolUnlocked.value ? projectedPayout.value : leadershipPoolTotal.value));
 const leadershipPoolLineA = computed(() =>
-  !remotePoolReadable.value ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : t.value.network.projectionErrorDesc) : leadershipPoolUnlocked.value ? `${visibility.mask(myVotes.value)} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
+  !remotePoolReadable.value ? (remotePoolState.value === "hold" ? t.value.pool.settlementHoldShort : remotePoolState.value === "loading" ? t.value.pool.loading : "—") : leadershipPoolUnlocked.value ? `${visibility.mask(myVotes.value)} ${t.value.teamV3.votes}` : `V${leadershipUnlockRank.value}`,
 );
 const poolThisWeekText = computed(() => {
   const rate = remoteApiEnabled ? remotePool.value?.injectRate : 0.05;
