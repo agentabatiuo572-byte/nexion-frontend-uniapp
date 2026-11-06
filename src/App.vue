@@ -450,7 +450,10 @@ function installForegroundReadSignals() {
     if (allowed) {
       if (!wasAllowed && canRunBusinessLoops() && !hasPendingLegalTermsRequirement()) maintainRemoteSession(true);
       runScheduledReads(readCurrentRoute(), online && !wasOnline);
-    } else scheduledReadBinding = "";
+    } else {
+      scheduledReadBinding = "";
+      stopBusinessLoops();
+    }
   });
 }
 
@@ -1220,7 +1223,7 @@ function canRunBusinessLoops(): boolean {
   if (!auth.isAuthenticated) return false;
   // Formal App authority is the server session. The local carrier registry is
   // retained only for mock mode and cannot keep remote business loops alive.
-  if (remoteApiEnabled) return canRefreshRemoteAccount(auth);
+  if (remoteApiEnabled) return foregroundReadAllowed() && canRefreshRemoteAccount(auth);
   return useSession().validate() === "active";
 }
 
