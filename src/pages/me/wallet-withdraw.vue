@@ -298,8 +298,9 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -526,12 +527,14 @@ const remoteSessionReady = computed(() => binarySessionReady({
   sessionUserId: sessionVault.read()?.user.userId ?? null,
 }));
 
+const withdrawalPageVisible = ref(false);
+let withdrawalEntryReadPending = true;
 async function retryWithdrawalFacts(): Promise<void> {
   // A cold H5 load drops the access token and restores it through the refresh
   // cookie; a protected read started before that restore returns AUTH_REQUIRED
   // and left this page permanently on "钱包暂时无法刷新". Wait for the same
   // account binding the other F3 pages wait for, then read.
-  if (remoteApiEnabled && !remoteSessionReady.value) return;
+  if (!withdrawalPageVisible.value || !foregroundReadAllowed() || (remoteApiEnabled && !remoteSessionReady.value)) return;
   const accountKey = app.accountKey;
   await Promise.allSettled([
     app.refreshRemoteFleet(),
@@ -560,22 +563,17 @@ function invalidateWithdrawalFacts(): void {
   refreshedConflictVersion = "";
 }
 
-watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
-  invalidateWithdrawalFacts();
-  void retryWithdrawalFacts();
-});
-
-// The cold-load read is deferred until restore binds this account; without
-// this trigger the page would sit on "loading" with no second read.
-watch(remoteSessionReady, (ready, wasReady) => {
-  if (!ready || wasReady) return;
+// Cold entry retries as soon as session restore binds the visible page's account.
+watch([() => app.accountBindingEpoch, remoteSessionReady], ([epoch, ready], [previousEpoch]) => {
+  if (epoch !== previousEpoch) invalidateWithdrawalFacts();
+  if (!withdrawalPageVisible.value || !ready || !foregroundReadAllowed()) return;
   if (remoteApiEnabled) void payout.refreshRemote();
   void retryWithdrawalFacts();
 }, { flush: "post" });
 
 const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision(() => {
   invalidateWithdrawalFacts();
-  void retryWithdrawalFacts();
+  if (foregroundReadAllowed()) void retryWithdrawalFacts();
 });
 
 // 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提基数 = 钱包可用余额(usdtBalance)。
@@ -784,22 +782,33 @@ function stopFreezeTimer() {
   if (freezeTimer !== undefined) clearInterval(freezeTimer);
   freezeTimer = undefined;
 }
-onMounted(() => {
-  if (remoteApiEnabled && remoteSessionReady.value) void payout.refreshRemote();
-  void retryWithdrawalFacts();
-});
 // 🔴 回前台 / 返回本页时重取策略。上一轮我把这条补给了追踪页,**加错页了**:
 // 真正靠日限与最低额拦人的是**这一页**,而 App 端页面进栈后不销毁,不补拉就可能拿着
 // 好几天前的限额判人(R2 跨端镜头点名)。loader 自带在途守卫,重复触发是安全的。
 onShow(() => {
+  withdrawalEntryReadPending = true;
+  withdrawalPageVisible.value = true;
   stopFreezeTimer();
   nowTick.value = mockServerNow();
   freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
   refreshPendingAttempt();
+});
+watch([withdrawalPageVisible, foregroundReadAllowed], ([visible, allowed]) => {
+  if (!visible || !allowed) return;
+  if (!withdrawalEntryReadPending && app.remoteWithdrawalListHasSnapshot) {
+    void app.refreshRemoteWithdrawalList();
+    return;
+  }
+  withdrawalEntryReadPending = false;
+  if (remoteApiEnabled && remoteSessionReady.value) void payout.refreshRemote();
   void retryWithdrawalFacts();
 });
-onHide(stopFreezeTimer);
+onHide(() => {
+  withdrawalPageVisible.value = false;
+  stopFreezeTimer();
+});
 onUnmounted(() => {
+  withdrawalPageVisible.value = false;
   stopFreezeTimer();
   stopWithdrawalFactsRuntimeWatch();
 });

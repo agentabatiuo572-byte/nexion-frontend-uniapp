@@ -1,9 +1,6 @@
 <!--
   Withdrawal tracking (ported from Nexion-prototype/app/(main)/me/wallet/withdraw/tracking/page.tsx).
-  5-step status stepper. Reads app.latestWithdrawal; empty state when none.
-  🔴 本页只展示、不推进状态(SPEC-7 + verify 哨兵守着)。到账推进由 App 层驱动
-  (App.vue 的 onShow 补齐 + 定时轮询 → app.advanceWithdrawalArrival),
-  判定单源在 withdrawal-arrival-core.advanceArrival;接真后端时改由服务端推送。
+  5-step status stepper. The visible page reads its current withdrawal's server state.
   四态(加载骨架 / 空 / 进行中 / 终态)见下方三个分支 + etaSub。
   Wrapped in <AppChassis active="me">.
 -->
@@ -128,12 +125,15 @@ import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-ap
 import { toCanonicalWithdrawal, type WithdrawalDetailSnapshot, type WithdrawalPolicy } from "@/api/withdrawal-api";
 import { mockServerNow } from "@/store/server-time";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
+import { occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
 import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
+import { useAuth } from "@/store/auth";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import type { Withdrawal, WithdrawalStatus } from "@/store/types";
 import { navTo, navReplace } from "@/lib/route";
 import { riskReasonLines, terminalReasonLine } from "@/lib/risk-reason-text";
@@ -149,30 +149,30 @@ const STEP_DELAY_MS = 3500;
 
 const t = useT();
 const app = useApp();
+const auth = useAuth();
 // 🔴 用**主单**(优先最早的在途单):只显示「最新一笔」时,在途的人工审核单
 // 会被后提且已到账的那笔挤掉,用户查不到自己还在审核的钱(独立验收实测)。
 // 深链(?id=)按单号精确定位;找不到走「查无此单」空态,**绝不回落主单** ——
 // 回落等于把别的单渲染在这个单号名下(账单深链串数据 P0 同型,2026-08-02)。
 const deepLinkId = ref<string | null>(null);
+const trackedId = computed(() => deepLinkId.value ?? app.primaryWithdrawal?.id ?? null);
 onLoad((options) => {
   deepLinkId.value = typeof options?.id === "string" && options.id ? options.id : null;
 });
 const trackedWithdrawal = ref<Withdrawal | null>(null);
-// Captured by identity, rather than by status: the global list replaces a row
-// after a later authoritative poll, at which point it must outrank this page's
-// initial exact snapshot.
+// A newer canonical list row may supersede the default selection's snapshot.
 const storeRowAtTrackedRead = ref<Withdrawal | null>(null);
 const trackingReadStatus = ref<WithdrawalTrackingReadStatus>("waiting");
-let trackingPageVisible = false;
+const trackingPageVisible = ref(false);
 let trackingPageEpoch = 0;
 
 function trackingReadScope(): WithdrawalTrackingReadScope | null {
-  const withdrawalNo = deepLinkId.value;
+  const withdrawalNo = trackedId.value;
   // A cold page can mount before the authenticated binding finishes. Hold the
   // exact read until the runtime has a concrete user scope; never query under
   // the bootstrap/default account and never reuse an earlier account response.
   const session = sessionVault.read();
-  if (!remoteApiEnabled || !trackingPageVisible || !withdrawalNo || !session?.accessToken
+  if (!remoteApiEnabled || !trackingPageVisible.value || !foregroundReadAllowed() || !auth.isAuthenticated || !withdrawalNo || !session?.accessToken
       || app.accountKey !== `user:${session.user.userId}`) return null;
   return {
     withdrawalNo,
@@ -213,15 +213,15 @@ const trackingReadPending = computed(() => remoteApiEnabled && (deepLinkId.value
 const trackingReadError = computed(() => remoteApiEnabled && (deepLinkId.value !== null
   ? trackingReadStatus.value === "error" : app.remoteWithdrawalListStatus === "error"));
 const wd = computed(() => {
-  if (deepLinkId.value) {
-    if (remoteApiEnabled && trackingReadStatus.value === "not-found") return null;
-    return resolveTrackedWithdrawal(
-      trackedWithdrawal.value,
-      app.withdrawals.find((row) => row.id === deepLinkId.value) ?? null,
-      storeRowAtTrackedRead.value,
-    );
-  }
-  return app.primaryWithdrawal;
+  const id = trackedId.value;
+  if (!id || (deepLinkId.value && remoteApiEnabled && trackingReadStatus.value === "not-found")) return null;
+  const exact = trackedWithdrawal.value?.id === id ? trackedWithdrawal.value : null;
+  if (deepLinkId.value && exact) return exact;
+  return resolveTrackedWithdrawal(
+    exact,
+    app.withdrawals.find((row) => row.id === id) ?? null,
+    storeRowAtTrackedRead.value,
+  );
 });
 const deepLinkMiss = computed(() => deepLinkId.value !== null && !wd.value
   && (!remoteApiEnabled || trackingReadStatus.value === "not-found"));
@@ -229,7 +229,7 @@ const deepLinkMiss = computed(() => deepLinkId.value !== null && !wd.value
 let bankRedirecting = false;
 function openBankTracking() {
   const row = wd.value;
-  if (trackingPageVisible && !bankRedirecting && row?.network === "BANK-VND") {
+  if (trackingPageVisible.value && !bankRedirecting && row?.network === "BANK-VND") {
     bankRedirecting = true;
     void navReplace(`/pages/me/wallet-withdraw-bank?order=${encodeURIComponent(row.id)}`)
       .then(ok => { if (!ok) bankRedirecting = false; });
@@ -237,35 +237,66 @@ function openBankTracking() {
 }
 watch(() => wd.value, openBankTracking);
 
-async function refreshTrackedWithdrawal(): Promise<void> {
-  if (deepLinkId.value) await trackedWithdrawalRead.refresh();
-  else if (remoteApiEnabled && app.remoteWithdrawalListStatus !== "loading") await app.refreshRemoteWithdrawalList();
+async function refreshTrackedWithdrawal(quiet = false, refreshPrimary = false): Promise<void> {
+  if (!trackingPageVisible.value || !foregroundReadAllowed() || !auth.isAuthenticated) return;
+  const account = app.accountKey, epoch = app.accountBindingEpoch;
+  if (trackedId.value) await trackedWithdrawalRead.refresh(quiet);
+  if (!trackingPageVisible.value || !foregroundReadAllowed() || !auth.isAuthenticated
+      || account !== app.accountKey || epoch !== app.accountBindingEpoch) return;
+  // The default view resolves its primary selection on entry and manual retry.
+  if (remoteApiEnabled && (!app.remoteWithdrawalListHasSnapshot || (refreshPrimary && !deepLinkId.value))
+      && app.remoteWithdrawalListStatus !== "loading") await app.refreshRemoteWithdrawalList();
 }
 
 function retryTrackedWithdrawal(): Promise<void> {
-  return refreshTrackedWithdrawal();
+  return refreshTrackedWithdrawal(false, true);
 }
 useAutoRecovery({ failed: () => trackingReadError.value && trackingReadStatus.value !== "loading" && app.remoteWithdrawalListStatus !== "loading", retry: retryTrackedWithdrawal });
 
+function canPollTrackedWithdrawal(): boolean {
+  return remoteApiEnabled && trackingPageVisible.value && auth.isAuthenticated && foregroundReadAllowed()
+    && occupiesWithdrawalSlot(wd.value?.status) && wd.value?.network !== "BANK-VND"
+    && trackingReadStatus.value !== "not-found";
+}
+
+watch(canPollTrackedWithdrawal, (enabled, _, onCleanup) => {
+  if (!enabled) return;
+  const timer = setInterval(() => {
+    if (canPollTrackedWithdrawal()) void trackedWithdrawalRead.refresh(true);
+  }, 30_000);
+  onCleanup(() => clearInterval(timer));
+});
+
+watch([trackingPageVisible, foregroundReadAllowed, () => auth.isAuthenticated], ([visible, allowed, authenticated], [wasVisible]) => {
+  if (!visible || !allowed || !authenticated) {
+    trackedWithdrawalRead.invalidate();
+    return;
+  }
+  if (!wasVisible || !deepLinkId.value || canPollTrackedWithdrawal() || (!wd.value && trackingReadStatus.value !== "not-found")) {
+    void refreshTrackedWithdrawal(wasVisible && !!wd.value, true);
+    if (!wasVisible || !withdrawalPolicy.value) void loadWithdrawalPolicy();
+  }
+});
+
 watch(
-  () => [deepLinkId.value, app.accountKey, app.accountBindingEpoch] as const,
-  () => {
+  () => [trackedId.value, app.accountKey, app.accountBindingEpoch] as const,
+  ([, account, epoch], [, previousAccount, previousEpoch]) => {
     trackedWithdrawal.value = null;
     storeRowAtTrackedRead.value = null;
     trackedWithdrawalRead.invalidate();
-    if (!trackingPageVisible) return;
-    refreshTrackedWithdrawal();
-    void loadWithdrawalPolicy();
+    if (!trackingPageVisible.value || !foregroundReadAllowed()) return;
+    void refreshTrackedWithdrawal();
+    if (account !== previousAccount || epoch !== previousEpoch) void loadWithdrawalPolicy();
   },
 );
 
 const stopTrackingRuntimeWatch = subscribeRuntimeRevision(() => {
-  if (!trackingPageVisible) return;
+  if (!trackingPageVisible.value) return;
   trackingPageEpoch += 1;
   trackedWithdrawal.value = null;
   storeRowAtTrackedRead.value = null;
   trackedWithdrawalRead.invalidate();
-  refreshTrackedWithdrawal();
+  void refreshTrackedWithdrawal();
 });
 
 const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>(() => [
@@ -328,7 +359,7 @@ async function loadWithdrawalPolicy(): Promise<void> {
   // App 端每次回前台再叠一次 —— 没有守卫就会重复发请求,且**后到的响应覆盖先到的**。
   if (withdrawalPolicyLoading.value) return;
   // After an H5 reload the session is restored after the page shows; the account watch above reads it then.
-  if (remoteApiEnabled && !sessionVault.read()) return;
+  if (remoteApiEnabled && (!foregroundReadAllowed() || !sessionVault.read())) return;
   withdrawalPolicyLoading.value = true;
   try {
     withdrawalPolicy.value = await withdrawalApi.policy();
@@ -355,23 +386,21 @@ const stopDayTimer = () => { if (dayTimer) { clearInterval(dayTimer); dayTimer =
 // 且隔壁 support/chat 就是这么写的。uni 页面栈会保活页面实例,前进离开时 onUnmounted 不触发:
 // 每往返一次就多留一个常驻 60s tick。我抄追踪页这段时只抄了「加个定时器」,没抄那条约束。
 onShow(() => {
-  trackingPageVisible = true;
+  trackingPageVisible.value = true;
   openBankTracking();
   trackingPageEpoch += 1;
   nowTick.value = mockServerNow();
   stopDayTimer();
   dayTimer = setInterval(() => (nowTick.value = mockServerNow()), 60_000);
-  void loadWithdrawalPolicy();
-  refreshTrackedWithdrawal();
 });
 onHide(() => {
-  trackingPageVisible = false;
+  trackingPageVisible.value = false;
   trackingPageEpoch += 1;
   trackedWithdrawalRead.invalidate();
   stopDayTimer();
 });
 onUnmounted(() => {
-  trackingPageVisible = false;
+  trackingPageVisible.value = false;
   trackingPageEpoch += 1;
   trackedWithdrawalRead.invalidate();
   stopDayTimer();

@@ -274,6 +274,7 @@ import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
 import { readCapacityPending } from '@/lib/capacity-command-recovery';
 import { validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
@@ -617,6 +618,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     const [catalogReady] = await Promise.all([
       refreshProductCatalog(true),
       refreshServerProductPhase(true),
+      freeTrial.refreshVisible(),
     ]);
     // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
     if (!isCurrentCheckoutRoute(routeScope) || !catalogReady) return;
@@ -750,6 +752,7 @@ const NO_TRIAL: TrialQuote = { applied: false, promo: 0, offsetUSD: 0, remainder
 
 /** 单一解析:给定时刻解析一次试用状态机,派生本页全部试用金额(纯函数,零落盘)。 */
 function trialQuoteAt(now: number): TrialQuote {
+  now = freeTrial.serverTimeAt(now);
   const cfg = trialCfg.value;
   const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
   const trialProductId = resolveTrialCheckoutProductId(cfg.trialProductId);
@@ -2403,6 +2406,9 @@ async function submitRemoteOrder(): Promise<void> {
 // 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-116 同款)。
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
+watch([foregroundReadAllowed, () => app.accountBindingEpoch], ([allowed]) => {
+  if (allowed && pageVisible && checkoutRouteInitialized && !promotionRoute.value) void freeTrial.refreshVisible();
+});
 useAutoRecovery({
   failed: () => remoteApiEnabled && settledResultReplay.value && !!orderId.value
     && !checkoutResultReading.value && !checkoutWalletRefreshing.value && !paymentFlowBusy.value && !checkoutLeaving.value && !confirming
@@ -2425,6 +2431,7 @@ function reassertTradeinContext() {
 onShow(() => {
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
   pageVisible = true;
+  void freeTrial.refreshVisible();
   if (checkoutRouteInitialized && !activeCheckoutLoad && !settledResultReplay.value && !createdCheckoutOrder.value) void resumeServerOrder();
   reassertTradeinContext();
   // 页面重新可见 → 先回灌磁盘:这张票若已在别处结算 / 取消,本页不能继续展示一张死票。

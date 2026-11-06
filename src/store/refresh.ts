@@ -50,7 +50,7 @@ export const useRefresh = defineStore("refresh", () => {
       // Wait for visible page facts and failed sections before ending refresh.
       const results = await Promise.allSettled([
         refreshFailedPageSections(() => epoch === app.accountBindingEpoch),
-        useConfig().load(),
+        useConfig().refresh(),
         refreshActivePage(),
       ]);
       if (epoch !== app.accountBindingEpoch) return;

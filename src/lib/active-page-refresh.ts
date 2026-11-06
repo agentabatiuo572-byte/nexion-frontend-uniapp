@@ -1,6 +1,6 @@
 export type ActivePageRefresh = () => Promise<unknown> | unknown;
 
-let activeRefresh: ActivePageRefresh | null = null;
+let activeRefresh: { refresh: ActivePageRefresh; route?: string } | null = null;
 
 type PageRecovery = {
   failed: () => boolean;
@@ -35,16 +35,17 @@ export async function refreshFailedPageSections(isCurrent: () => boolean): Promi
  * The disposer is identity-safe so a hidden older page cannot unregister a
  * newer page that has already become active.
  */
-export function registerActivePageRefresh(refresh: ActivePageRefresh): () => void {
-  activeRefresh = refresh;
+export function registerActivePageRefresh(refresh: ActivePageRefresh, route?: string): () => void {
+  const registration = { refresh, route };
+  activeRefresh = registration;
   return () => {
-    if (activeRefresh === refresh) activeRefresh = null;
+    if (activeRefresh === registration) activeRefresh = null;
   };
 }
 
-export async function refreshActivePage(): Promise<void> {
-  const refresh = activeRefresh;
-  if (refresh) await refresh();
+export async function refreshActivePage(expectedRoute?: string): Promise<void> {
+  const registration = activeRefresh;
+  if (registration && (expectedRoute === undefined || registration.route === expectedRoute)) await registration.refresh();
 }
 
 export function resetActivePageRefreshForTest(): void {

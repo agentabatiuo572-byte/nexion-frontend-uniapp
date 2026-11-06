@@ -14,8 +14,7 @@ export function useTrialPresentation() {
   const now = useNow();
   const retained = shallowRef<(TrialRowSnapshot & { config: TrialConfig }) | null>(null);
   let binding = `${app.accountKey}:${app.accountBindingEpoch}`;
-  const presentationReady = computed(() => !remoteApiEnabled || trial.authorityStatus === "ready"
-    || (trial.authorityStatus === "loading" && trial.authorityServerState !== null));
+  const presentationReady = computed(() => !remoteApiEnabled || trial.authorityServerState !== null);
   const actionsReady = computed(() => !remoteApiEnabled || trial.authorityStatus === "ready");
 
   // Run after the store finishes applying/clearing a receipt. A synchronous
@@ -35,12 +34,12 @@ export function useTrialPresentation() {
   const deviceName = computed(() => retained.value
     ? resolveTrialDeviceName(retained.value.config.trialProductId, retained.value.config.trialProductName) : null);
   const productId = computed(() => retained.value ? resolveTrialCheckoutProductId(retained.value.config.trialProductId) : null);
-  const reservedSlots = computed(() => presentationReady.value ? (active.value ? 1 : 0) : null);
+  const reservedSlots = computed(() => presentationReady.value && trial.authorityStatus !== "error" ? (active.value ? 1 : 0) : null);
   const remainingMs = computed(() => {
     if (!presentationReady.value || !retained.value) return null;
     const boundary = status.value === "active" ? retained.value.expiresAt
       : status.value === "grace" ? retained.value.graceEndsAt : null;
-    return boundary === null ? null : Math.max(0, boundary - now.value * 1000);
+    return boundary === null ? null : Math.max(0, boundary - trial.serverTimeAt(now.value * 1000));
   });
   const shadowUSD = computed(() => presentationReady.value ? liveShadowUSD(now.value * 1000) : null);
   const shadowNEX = computed(() => presentationReady.value ? liveShadowNEX(now.value * 1000) : null);

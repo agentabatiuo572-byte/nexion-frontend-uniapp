@@ -180,7 +180,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, takeNavigationQuery } from "@/lib/route";
-import { onLoad, onUnload } from '@dcloudio/uni-app';
+import { onLoad, onShow, onUnload } from '@dcloudio/uni-app';
 import { computed, ref } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -213,6 +213,7 @@ import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/
 const t = useT();
 const app = useApp();
 const trial = useFreeTrial();
+onShow(() => { void trial.refreshVisible(); });
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);

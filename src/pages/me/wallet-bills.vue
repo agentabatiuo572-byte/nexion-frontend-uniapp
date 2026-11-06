@@ -160,6 +160,7 @@ import { navTo, takeNavigationQuery } from "@/lib/route";
 import { fundsServerEnabled, sessionVault } from "@/api/runtime";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useManualScrollLoadMore } from "@/composables/use-manual-scroll-load-more";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatGroupedAmount } from "@/lib/amount-display";
 
 const t = useT();
@@ -172,7 +173,8 @@ const sourceRefOpen = ref("");
 watch(() => app.accountBindingEpoch, () => { sourceRefOpen.value = ""; detail.value = null; });
 const ledgerBizNo = ref("");
 const locatingReceipt = ref(false);
-let lookupGeneration = 0, visible = true;
+let lookupGeneration = 0;
+const visible = ref(false);
 let releaseActiveRefresh = () => {};
 
 type Tab = "all" | "in" | "out" | "reward";
@@ -211,9 +213,9 @@ const emptyDesc = computed(() => ledgerBizNo.value ? t.value.promotion.unknown :
 const scrollAnchor = ref<unknown>(null);
 
 async function refreshLedger() {
-  if (!fundsServerEnabled || !remoteSessionReady.value || !visible) return;
+  if (!fundsServerEnabled || !remoteSessionReady.value || !visible.value || !foregroundReadAllowed()) return;
   const request = ++lookupGeneration, account = app.accountKey, epoch = app.accountBindingEpoch;
-  const current = () => visible && request === lookupGeneration && account === app.accountKey && epoch === app.accountBindingEpoch;
+  const current = () => visible.value && request === lookupGeneration && account === app.accountKey && epoch === app.accountBindingEpoch;
   locatingReceipt.value = Boolean(ledgerBizNo.value);
   try {
     await activePager.value.refresh();
@@ -229,15 +231,18 @@ useAutoRecovery({
   retry: refreshLedger,
 });
 async function loadMore() {
-  if (!fundsServerEnabled || !remoteSessionReady.value || !visible || locatingReceipt.value) return;
+  if (!fundsServerEnabled || !remoteSessionReady.value || !visible.value || !foregroundReadAllowed() || locatingReceipt.value) return;
   try { await activePager.value.loadMore(); } catch { toast.error(t.value.walletV3.submitReasonServiceUnavailable); }
 }
-function invalidateReceiptLookup() { visible = false; lookupGeneration++; locatingReceipt.value = false; releaseActiveRefresh(); }
+function invalidateReceiptLookup() { visible.value = false; lookupGeneration++; locatingReceipt.value = false; releaseActiveRefresh(); }
 onShow(() => {
-  visible = true;
+  visible.value = true;
   releaseActiveRefresh();
   // Receipt lookup can paginate and stays an explicit entry read.
-  releaseActiveRefresh = registerActivePageRefresh(() => ledgerBizNo.value || activePager.value.status === "error" ? undefined : refreshLedger());
+  releaseActiveRefresh = registerActivePageRefresh(() => ledgerBizNo.value || activePager.value.status === "error" ? undefined : refreshLedger(), "pages/me/wallet-bills");
+});
+watch(() => visible.value && foregroundReadAllowed(), (allowed) => {
+  if (!allowed) return;
   void refreshLedger();
   if (app.homeTruthStatus === "idle" || app.homeTruthStatus === "error") void app.refreshHomeTruth();
 });
@@ -247,7 +252,7 @@ watch([tab, asset], () => { void refreshLedger(); });
 // Cookie restore and same-page account rebind both reset the active ledger.
 watch([remoteSessionReady, () => app.accountBindingEpoch], ([ready, epoch], [wasReady, previousEpoch]) => {
   lookupGeneration++; locatingReceipt.value = false;
-  if (ready && (!wasReady || epoch !== previousEpoch)) void refreshLedger();
+  if (ready && foregroundReadAllowed() && (!wasReady || epoch !== previousEpoch)) void refreshLedger();
 });
 const scrollPager = useManualScrollLoadMore(scrollAnchor, {
   enabled: () => fundsServerEnabled && !ledgerBizNo.value && !activePager.value.error,
