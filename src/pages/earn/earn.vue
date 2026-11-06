@@ -97,7 +97,6 @@
 </template>
 
 <script setup lang="ts">
-import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsdOverviewParts } from "@/lib/usd-display";
 import { onUnmounted, computed, nextTick, ref, watch } from "vue";
@@ -165,19 +164,18 @@ let releaseActiveRefresh = () => {};
 async function refreshVisibleEarn() {
   if (!earnPageVisible || !remoteApiEnabled) return;
   await Promise.allSettled([
-    freeTrial.refreshRemote(), app.ensureRemoteFleet(), app.ensureHomeTruth(), useEarnConfig().ensure(),
+    freeTrial.refreshVisible(), app.ensureRemoteFleet(), app.ensureHomeTruth(), useEarnConfig().ensure(),
   ]);
 }
 
-// The banner is the first discoverable H2 entry. Do not make a new user wait
-// for the global poll before we know whether the server has made it eligible.
+// The banner uses the current trial projection on each visible entry.
 onShow(() => {
   earnPageVisible = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshVisibleEarn);
   app.setTaskReadPageVisible("earn", true);
   if (remoteApiEnabled) {
-    void runPassiveTabRead('trial-state', () => freeTrial.refreshRemote());
+    void freeTrial.refreshVisible();
     void app.ensureRemoteFleet().catch(() => undefined);
     void app.ensureHomeTruth().catch(() => undefined);
     void observeDayOneEarnPage();

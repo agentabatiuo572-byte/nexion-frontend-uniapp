@@ -133,6 +133,7 @@ import type { Conversation, ConversationType, ConvMessage } from "@/domain/suppo
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatUnreadBadge } from "@/lib/unread-badge";
 
 const t = useT();
@@ -141,7 +142,7 @@ const app = useApp();
 const actions = useConversationDelete();
 
 const selectedType = ref<ConversationType>("advisor");
-let inboxVisible = false;
+const inboxVisible = ref(false);
 const retrying = ref(false);
 let retryGeneration = 0;
 function cancelRetry() { retryGeneration++; retrying.value = false; }
@@ -149,28 +150,28 @@ watch(() => [app.accountKey, app.accountBindingEpoch], () => {
   cancelRetry();
   // Account binding invalidates in-flight store reads. A visible page must start
   // replacements after the synchronous account-scoped stores have been rebound.
-  if (inboxVisible) void refreshInbox();
+  if (inboxVisible.value && foregroundReadAllowed()) void refreshInbox();
 });
 
 // Entering the inbox is a lazy timeout checkpoint (chat entry and session start
 // sweep too): stale-active support sessions flip to closed here (real backend
 // closes server-side and pushes the status).
 async function refreshInbox(): Promise<void> {
-  if (!inboxVisible) return;
+  if (!inboxVisible.value) return;
   const tasks: Promise<unknown>[] = [convStore.refresh(), convStore.refreshCategories()];
   if (remoteApiEnabled) tasks.push(convStore.refreshAdvisor());
   await Promise.allSettled(tasks);
 }
 
 let releaseActiveRefresh = () => {};
-onShow(async () => {
-  inboxVisible = true;
+onShow(() => {
+  inboxVisible.value = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshInbox);
-  await refreshInbox();
 });
+watch(() => inboxVisible.value && foregroundReadAllowed(), (allowed) => { if (allowed) void refreshInbox(); });
 function leaveInbox() {
-  inboxVisible = false;
+  inboxVisible.value = false;
   cancelRetry();
   releaseActiveRefresh();
 }
@@ -178,7 +179,7 @@ onHide(leaveInbox);
 onUnmounted(leaveInbox);
 
 async function retryConversations(event?: Event) {
-  if (!inboxVisible || retrying.value || (event as KeyboardEvent)?.repeat || convStore.loading || convStore.categoryLoading) return;
+  if (!inboxVisible.value || retrying.value || (event as KeyboardEvent)?.repeat || convStore.loading || convStore.categoryLoading) return;
   const generation = retryGeneration;
   retrying.value = true;
   try {

@@ -195,7 +195,7 @@
 
 <script setup lang="ts">
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
-import { onLoad, onUnload } from '@dcloudio/uni-app';
+import { onLoad, onShow, onUnload } from '@dcloudio/uni-app';
 import { computed, ref } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -234,6 +234,7 @@ const session = useSession();
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 const trial = useFreeTrial();
+onShow(() => { void trial.refreshVisible(); });
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);

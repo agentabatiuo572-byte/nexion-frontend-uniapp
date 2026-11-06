@@ -41,6 +41,7 @@ import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
 import { useConfig } from '@/store/config';
 import { useApp } from '@/store/app';
+import { useFreeTrial } from '@/store/free-trial';
 import { remoteApiEnabled, sessionVault } from '@/api/runtime';
 import type { PublicPromotion } from '@/api/promotion-contracts';
 import { createPromotionReadFence, isPromotionActive } from '@/lib/promotion-entry';
@@ -64,6 +65,7 @@ async function refreshVisibleHome() {
   fence.invalidate(); pendingTicket = null;
   await Promise.allSettled([
     refresh(), app.ensureHomeTruth(), app.ensureRemoteFleet(),
+    useFreeTrial().refreshVisible(),
     useNexFaucet().ensureRemote(), useProfile().ensureAvatar(),
     homeActions.value?.refresh(), homeGrid.value?.refresh(), homeTrust.value?.refresh(),
   ]);
@@ -89,7 +91,7 @@ async function refresh(passive=false) {
     }
   } finally {if(pendingTicket===ticket)pendingTicket=null;}
 }
-onShow(() => { visible = true; releaseActiveRefresh(); releaseActiveRefresh = registerActivePageRefresh(refreshVisibleHome); app.setTaskReadPageVisible("home", true); void refresh(true); });
+onShow(() => { visible = true; releaseActiveRefresh(); releaseActiveRefresh = registerActivePageRefresh(refreshVisibleHome); app.setTaskReadPageVisible("home", true); void refresh(true); void useFreeTrial().refreshVisible(); });
 onHide(() => { releaseActiveRefresh(); visible = false; app.setTaskReadPageVisible("home", false); });
 onUnmounted(() => { releaseActiveRefresh(); visible = false; app.setTaskReadPageVisible("home", false); fence.invalidate(); });
 onLoad(() => locale.ensureSystemDetected());
