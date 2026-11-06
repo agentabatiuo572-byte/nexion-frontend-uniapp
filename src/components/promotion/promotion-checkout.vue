@@ -538,8 +538,10 @@ async function recover():Promise<boolean>{
   if(!current()||!visible.value||busy.value||session.busy||recoveryReading.value)return false;
   const generation=readGeneration;
   recoveryGeneration=generation;recoveryReading.value=true;
+  const clockOnly=order.value?.paymentStatus==='PENDING'&&payWindow.value===null&&session.confirmed
+    &&!session.record.pending&&!unknown.value&&!recoveryReadFailed.value;
   try{
-    await session.recover();
+    if(!clockOnly)await session.recover();
     if(!readCurrent(generation))return false;
     if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
@@ -547,7 +549,7 @@ async function recover():Promise<boolean>{
     await loadOrderClock();
     if(!readCurrent(generation))return false;
     if(order.value?.paymentStatus==='PAID')await readActivation();
-    else await refreshWallet(true,true);
+    else if(!clockOnly)await refreshWallet(true,true);
     return readCurrent(generation)&&!unknown.value;
   }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
   finally{recoveryGeneration=null;recoveryReading.value=false;}
@@ -576,7 +578,7 @@ const purchaseReadBusy=()=>loading.value||busy.value||session.busy||recoveryRead
 useAutoRecovery({
   failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!session.retryOriginal
     &&(unknown.value||recoveryReadFailed.value||!!order.value&&!session.confirmed
-      ||order.value?.paymentStatus==='PENDING'&&payWindow.value===false),
+      ||order.value?.paymentStatus==='PENDING'&&payWindow.value!==true),
   retry:recover,
   repeatMs:15_000,
 });
