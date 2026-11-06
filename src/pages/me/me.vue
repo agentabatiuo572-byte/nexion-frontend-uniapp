@@ -125,6 +125,7 @@ import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useNotifications } from "@/store/notifications";
 import { useConversations } from "@/store/conversations";
 import { useMessageDrawer } from "@/store/message-drawer";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { useGenesis } from "@/store/genesis";
 import { useConfig } from "@/store/config";
 import { useVoucher } from "@/store/voucher";
@@ -187,7 +188,8 @@ const remoteOrdersLoading = ref(false);
 const remoteOrdersFailed = ref(false);
 let remoteSecurityRequest = 0;
 let remoteOrdersRequest = 0;
-let remoteMeActive = false;
+const remoteMeActive = ref(false);
+let meEntryReadPending = true;
 
 const iconPaths = {
   network: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 7a4 4 0 1 0 0 .01", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"],
@@ -389,13 +391,8 @@ async function refreshRemoteSecurity() {
   }
 }
 
-async function refreshRemoteTrial() {
-  // BUG 173: 原来是 state + eligibility 两次串行 RTT —— 卡片 4.2s 才出现、
-  // 7.0s 第二次置 loading 又把它禁掉,用户看到两段抖动。
-  // GET /api/trial/state 的权威答复里已经带 canStart/eligibilityReason,
-  // 一次读取就能定态;eligibility 读取只留作 state 读失败后的修复路径。
-  if (await trial.refreshRemote(true)) return;
-  await trial.refreshEligibilityRemote();
+function refreshRemoteTrial() {
+  return trial.refreshVisible(true);
 }
 
 async function refreshRemoteMe() {
@@ -419,28 +416,33 @@ async function refreshRemoteMe() {
 }
 
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
-  if (remoteApiEnabled) void refreshRemoteMe();
+  if (remoteApiEnabled && remoteMeActive.value && foregroundReadAllowed()) void refreshRemoteMe();
 });
 onShow(() => {
-  remoteMeActive = true;
-  if (remoteApiEnabled) void refreshRemoteMe();
+  meEntryReadPending = true;
+  remoteMeActive.value = true;
+});
+watch([remoteMeActive, foregroundReadAllowed], ([active, allowed]) => {
+  if (!remoteApiEnabled || !active || !allowed || !meEntryReadPending) return;
+  meEntryReadPending = false;
+  void refreshRemoteMe();
 });
 onHide(() => {
-  remoteMeActive = false;
+  remoteMeActive.value = false;
   remoteOrdersRequest += 1;
 });
 // Catalog replacement clears the shared order list even without an account change.
 const unsubscribeOrdersRevision = subscribeRuntimeRevision(() => {
   if (!remoteApiEnabled) return;
   remoteOrdersRequest += 1;
-  if (remoteMeActive && binarySessionReady({
+  if (remoteMeActive.value && foregroundReadAllowed() && binarySessionReady({
     remote: remoteApiEnabled, authenticated: auth.isAuthenticated,
     accountId: auth.accountId, appAccountKey: app.accountKey,
     sessionUserId: sessionVault.read()?.user.userId ?? null,
   })) void refreshRemoteOrders();
 });
 onUnmounted(() => {
-  remoteMeActive = false;
+  remoteMeActive.value = false;
   remoteOrdersRequest += 1;
   unsubscribeOrdersRevision();
 });

@@ -58,6 +58,7 @@ import EmptyState from "@/components/empty-state.vue";
 import LiquidGlass from "@/components/liquid-glass.vue";
 import ServiceMessageList from "@/components/support/service-message-list.vue";
 import { useMessageDrawer, type MessageSection } from "@/store/message-drawer";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { notificationCategory, type NotificationCategory } from "@/lib/notification-category";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -76,13 +77,13 @@ const ui = useUI();
 const confirmOwner = `notifications:${typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
   ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 let pageGeneration = 0;
-let pageVisible = true;
+const pageVisible = ref(false);
 let disposed = false;
 function captureIntent() {
   return { generation: pageGeneration, account: remoteAccountScope.snapshot() };
 }
 function isCurrentIntent(intent: ReturnType<typeof captureIntent>) {
-  return !disposed && pageVisible && intent.generation === pageGeneration
+  return !disposed && pageVisible.value && intent.generation === pageGeneration
     && remoteAccountScope.isCurrent(intent.account);
 }
 // store 保留机器码(SESSION_EXPIRED / NOTIFICATION_UNAVAILABLE / 服务端 envelope 原文…),
@@ -102,7 +103,7 @@ const section = computed({ get: () => center.section, set: (value: MessageSectio
   preserveSectionInH5();
 } });
 function preserveSectionInH5() {
-  if (!sectionLoaded || disposed || !pageVisible || typeof window === "undefined"
+  if (!sectionLoaded || disposed || !pageVisible.value || typeof window === "undefined"
     || typeof window.history?.replaceState !== "function") return;
   const hash = window.location.hash.replace(/^#/, "");
   const question = hash.indexOf("?");
@@ -163,7 +164,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, ([nextKey, nextE
   }
   preserveSectionInH5();
   expandedId.value = null; filter.value = "all"; serviceFilter.value = "all"; resetHeader();
-  if (!disposed && pageVisible) void center.refresh();
+  if (!disposed && pageVisible.value && foregroundReadAllowed()) void center.refresh();
 });
 
 function timeAgo(ts: number): string {
@@ -240,16 +241,19 @@ function invalidatePendingIntents() {
   ui.clearConfirmsBy(confirmOwner);
 }
 function invalidatePage() {
-  pageVisible = false;
+  pageVisible.value = false;
   invalidatePendingIntents();
 }
 watch(() => [app.accountKey, app.accountBindingEpoch], invalidatePendingIntents, { flush: "sync" });
-onMounted(() => { if (!disposed && pageVisible) void center.refresh(); });
 onShow(() => {
   if (disposed) return;
-  pageVisible = true;
+  pageVisible.value = true;
   preserveSectionInH5();
-  void center.refresh();
+});
+watch([pageVisible, foregroundReadAllowed], ([visible, allowed], [wasVisible]) => {
+  if (disposed || !visible || !allowed) return;
+  if (!wasVisible || section.value === "service") void center.refresh();
+  else if (!notifs.loading) void notifs.refreshRemote();
 });
 onHide(invalidatePage);
 onUnmounted(() => { disposed = true; invalidatePage(); });

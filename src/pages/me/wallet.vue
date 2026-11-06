@@ -123,7 +123,8 @@
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import WalletListRow from "@/components/me/wallet-list-row.vue";
@@ -146,21 +147,35 @@ const commission = useCommission();
 const cards = useCards();
 const cfg = useConfig();
 let visibilityTimer: ReturnType<typeof setInterval> | null = null;
+const walletVisible = ref(false);
+let walletEntryReadPending = true;
 
 // uni pages remain alive in the navigation stack. Refresh the server-owned
 // wallet projection whenever this page becomes visible so a completed exchange
 // cannot send the user back to a stale pre-exchange balance.
 onShow(() => {
-  void cfg.load();
+  walletEntryReadPending = true;
+  walletVisible.value = true;
   if (visibilityTimer) clearInterval(visibilityTimer);
-  if (remoteApiEnabled) visibilityTimer = setInterval(() => { void cfg.load(); }, 15_000);
+  if (remoteApiEnabled) visibilityTimer = setInterval(() => { if (foregroundReadAllowed()) void cfg.load(); }, 15_000);
+});
+watch([walletVisible, foregroundReadAllowed], ([active, allowed]) => {
+  if (!active || !allowed) return;
+  if (remoteApiEnabled) void app.refreshRemoteWithdrawalList();
+  if (!walletEntryReadPending) return;
+  walletEntryReadPending = false;
+  void cfg.load();
   if (remoteApiEnabled) {
     void app.refreshRemoteFleet();
     void refreshEarningsReleaseStatus().catch(() => undefined);
     retryEarningsAuthority();
   }
 });
+watch(() => app.accountBindingEpoch, () => {
+  if (walletVisible.value && foregroundReadAllowed() && remoteApiEnabled) void app.refreshRemoteWithdrawalList();
+});
 onHide(() => {
+  walletVisible.value = false;
   if (visibilityTimer) clearInterval(visibilityTimer);
   visibilityTimer = null;
 });

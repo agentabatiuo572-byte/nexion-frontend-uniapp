@@ -19,7 +19,7 @@ export interface TrialConfig {
   discountCapUSD: number;
   /** Trial-earnings offset cap, USD (offsets device price at purchase; remainder
    *  credited to balance AFTER purchase; before purchase only offsets). 后台可调。 */
-  trialOffsetCapUSD: number;
+  trialOffsetCapUSD: number | null;
   /** Trial product id selected by the authoritative product policy. */
   trialProductId: TrialProductId;
   /** Server-owned E1 display name for the selected product. */
@@ -159,7 +159,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       graceDays: integer("graceDays"),
       discountRate: discountRate > 1 ? discountRate / 100 : discountRate,
       discountCapUSD: number("discountCapUSD"),
-      trialOffsetCapUSD: number("trialOffsetCapUSD"),
+      trialOffsetCapUSD: raw.trialOffsetCapUSD === null ? null : number("trialOffsetCapUSD"),
       trialProductId,
       trialProductName,
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
@@ -204,7 +204,7 @@ export function computeTrialOffset(
   shadowUSD: number,
 ): { offsetUSD: number; remainderUSD: number } {
   const earnings = Math.max(0, shadowUSD);
-  const offsetUSD = +Math.min(earnings, config.trialOffsetCapUSD).toFixed(2);
+  const offsetUSD = +Math.min(earnings, config.trialOffsetCapUSD ?? Infinity).toFixed(2);
   const remainderUSD = +(earnings - offsetUSD).toFixed(2);
   return { offsetUSD, remainderUSD };
 }

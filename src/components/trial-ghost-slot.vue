@@ -172,7 +172,7 @@ const etaLabel = computed(() => {
 const progressPct = computed(() => {
   const cfg = trialCfg.config;
   const totalMs = (cfg.trialDays + cfg.graceDays) * ONE_DAY;
-  const elapsedMs = trial.startedAt !== null ? now.value - trial.startedAt : 0;
+  const elapsedMs = trial.startedAt !== null ? trial.serverTimeAt(now.value) - trial.startedAt : 0;
   return Math.min(100, Math.max(2, (elapsedMs / totalMs) * 100));
 });
 

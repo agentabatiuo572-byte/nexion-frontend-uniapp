@@ -86,7 +86,8 @@ const claimCtaText = computed(() => {
 const dailyEarnText = computed(() => `${formatAmount(dailyEarn.value)}/d × ${trialDays.value}`);
 // State the basis when the cap bites: the daily rate line alone would read as if
 // the total were days × rate, which is exactly the overstatement BUG 78 reported.
-const creditBasisText = computed(() => trialOffset.value.offsetUSD < trialDays.value * dailyEarn.value
+const creditBasisText = computed(() => trialCfg.config.trialOffsetCapUSD !== null
+  && trialOffset.value.offsetUSD < trialDays.value * dailyEarn.value
   ? fmt(t.value.trial.heroCreditCapNote, { cap: formatAmount(trialCfg.config.trialOffsetCapUSD) })
   : dailyEarnText.value);
 

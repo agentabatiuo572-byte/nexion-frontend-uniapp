@@ -2,8 +2,8 @@ import type { ApiClient } from "./api-client";
 import type { TrialStatus } from "../store/trial-boundary";
 
 export type TrialEligibilityReason =
-  "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "unknown";
-export type TrialConfigValue = string | boolean;
+  "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
+export type TrialConfigValue = string | boolean | null;
 
 export interface TrialAuthorityState {
   authoritative: true;
@@ -18,6 +18,7 @@ export interface TrialAuthorityState {
   expiresAt: number | null;
   graceEndsAt: number | null;
   extendedEndsAt?: number | null;
+  endReason?: "expired" | "cancelled" | null;
   finishedAt: number | null;
   cooldownUntil: number | null;
   shadowUSD: number;
@@ -32,7 +33,7 @@ export interface TrialAuthorityState {
     sourceEnvironment: "PRODUCTION";
     runId: "";
   };
-  paymentRail: "NEXION_USDT_WALLET";
+  paymentRail: "NEXION_USDT_WALLET" | "UVEL_USDT_WALLET";
   config: Record<string, TrialConfigValue>;
 }
 
@@ -73,7 +74,7 @@ const SERVER_STATES = new Set([
   "ELIGIBLE", "ACTIVE", "GRACE", "EXTENDED", "REDEEMED", "FAILED", "CANCELLED",
 ]);
 const REASONS = new Set([
-  "in-progress", "converted", "used", "phase-closed", "quota-exhausted", "risk", "product-unavailable", "unknown",
+  "in-progress", "converted", "used", "phase-closed", "quota-exhausted", "risk", "product-unavailable", "capacity-full", "unknown",
 ]);
 
 function invalid(): never {
@@ -135,6 +136,10 @@ function trialConfig(value: unknown): Record<string, TrialConfigValue> {
   if (!source) return invalid();
   const result: Record<string, TrialConfigValue> = {};
   for (const [key, item] of Object.entries(source)) {
+    if (key === "trialOffsetCapUSD" && item === null) {
+      result[key] = null;
+      continue;
+    }
     if ((typeof item !== "string" && typeof item !== "boolean") || !key.trim()) return invalid();
     result[key] = item;
   }
@@ -160,7 +165,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
       || !source || row.serverCanonical !== true || row.sourceEnvironment !== "PRODUCTION" || row.runId !== ""
       || provenance?.serverCanonical !== true || provenance.source !== source
       || provenance.sourceEnvironment !== "PRODUCTION" || provenance.runId !== ""
-      || row.paymentRail !== "NEXION_USDT_WALLET"
+      || (row.paymentRail !== "NEXION_USDT_WALLET" && row.paymentRail !== "UVEL_USDT_WALLET")
       || (reason !== undefined && !REASONS.has(reason))
       || (canStart && reason !== undefined)
       || (!canStart && reason === undefined)
@@ -173,6 +178,8 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
   const graceEndsAt = timestamp(row.graceEndsAtEpochMs ?? row.graceEndsAt);
   const extendedEndsAt = timestamp(row.extendedEndsAtEpochMs ?? row.extendedEndsAt);
   if (serverState === "EXTENDED" && extendedEndsAt === null) return invalid();
+  const endReason = row.endReason;
+  if (endReason !== undefined && endReason !== null && endReason !== "expired" && endReason !== "cancelled") return invalid();
   const finishedAt = timestamp(row.finishedAtEpochMs ?? row.finishedAt);
   const cooldownUntil = timestamp(row.cooldownUntilEpochMs ?? row.cooldownUntil);
   if (["ACTIVE", "GRACE", "EXTENDED", "REDEEMED"].includes(serverState)
@@ -191,6 +198,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
     expiresAt,
     graceEndsAt,
     extendedEndsAt,
+    endReason,
     finishedAt,
     cooldownUntil,
     shadowUSD,
@@ -205,7 +213,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
       sourceEnvironment: "PRODUCTION",
       runId: "",
     },
-    paymentRail: "NEXION_USDT_WALLET",
+    paymentRail: row.paymentRail,
     config: trialConfig(row.config),
   };
 }
