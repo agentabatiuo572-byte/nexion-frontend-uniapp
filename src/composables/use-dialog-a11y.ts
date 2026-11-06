@@ -35,7 +35,7 @@ function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefine
   }, { immediate: true, flush: "sync" });
   onBeforeUnmount(remove);
 
-  // Opt in at the theme sheet: other pages retain their existing Back handlers.
+  // NxSheet opts in by default; each close callback retains its submission guards.
   // One handler per page avoids Uni invoking several sheet callbacks on one press.
   if (nativeBack && !dialogs.backRegistered) {
     dialogs.backRegistered = true;
