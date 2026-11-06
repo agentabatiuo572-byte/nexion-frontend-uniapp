@@ -72,7 +72,6 @@
       :image-labels="t.conversations.image"
       :attach-disabled="!supportSessionReady || attachmentPolicy?.available !== true"
       :attach-unavailable="attachmentPolicy?.available !== true ? (!remoteApiEnabled || attachmentPolicyError || attachmentPolicy?.available === false ? t.conversations.image.unavailable : t.conversations.image.checkingPolicy) : undefined"
-      :attach-retry="remoteApiEnabled && attachmentPolicyError"
       :attachment-draft="attachmentDisplay"
       :attachment-preview-src="imageDraft?.filePath"
       :failed-send-label="failedHumanLabel"
@@ -82,7 +81,6 @@
       @send="onSend"
       @draft-change="draftText = $event"
       @attach="chooseSupportImage"
-      @retry-policy="loadAttachmentPolicy"
       @retry-upload="retrySupportUpload"
       @replace-attachment="replaceSupportAttachment"
       @cancel-attachment="cancelSupportAttachment"
@@ -94,10 +92,6 @@
       @restart="onRestart"
     >
       <template #history-prefix>
-      <view v-if="advisorApplies && convStore.advisorError" class="cp-history-error" role="alert">
-        <text class="cp-ai-history-t">{{ t.conversations.image.advisorUnavailable }}</text>
-        <view class="cp-history-text-action" role="button" :tabindex="convStore.advisorLoading ? -1 : 0" :aria-disabled="convStore.advisorLoading" :aria-busy="convStore.advisorLoading" @click="!convStore.advisorLoading && convStore.refreshAdvisor()" @keydown.enter.prevent="!convStore.advisorLoading && convStore.refreshAdvisor()" @keydown.space.prevent="!convStore.advisorLoading && convStore.refreshAdvisor()"><text>{{ t.conversations.image.retryPolicy }}</text></view>
-      </view>
       <view v-if="conv?.historyTruncated" class="cp-ai-history" role="status" aria-live="polite">
         <text class="cp-ai-history-t">{{ t.conversations.historyTruncated }}</text>
       </view>
@@ -105,7 +99,6 @@
         :aria-label="t.conversations.loadEarlier" @click="loadEarlierHumanHistory"  @keydown.enter.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, loadEarlierHumanHistory)">
         <text class="cp-ai-history-t">{{ t.conversations.loadEarlier }}</text>
       </view>
-      <view v-if="humanHistoryError || humanHistoryListError" class="cp-history-error" role="alert"><text>{{ t.conversations.loadError }}</text><view class="cp-history-text-action" role="button" :tabindex="humanHistoryRetryBusy || humanEarlierBusy ? -1 : 0" :aria-disabled="humanHistoryRetryBusy || humanEarlierBusy" :aria-busy="humanHistoryRetryBusy" @click="retryHumanHistory" @keydown.enter.prevent="onKeyboardActivate($event, retryHumanHistory)" @keydown.space.prevent="onKeyboardActivate($event, retryHumanHistory)"><text>{{ t.conversations.retry }}</text></view></view>
       <view v-if="unassignedNotice" class="cp-ai-history" role="status"><text class="cp-ai-history-t">{{ unassignedNotice }}</text></view>
       </template>
     </ConversationThread>
@@ -124,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { ref, shallowRef, computed, watch, nextTick, onMounted, onUnmounted, getCurrentInstance, type CSSProperties } from "vue";
 import { onLoad, onUnload, onShow, onHide } from "@dcloudio/uni-app";
 import ConversationThread from "@/components/support/conversation-thread.vue";
@@ -635,6 +629,8 @@ onHide(() => {
 const humanHistoryError = ref(false);
 const humanHistoryListError = ref(false);
 const humanHistoryRetry = ref(0);
+const humanHistoryLoading = ref(false);
+let humanHistoryRead: Promise<void> = Promise.resolve();
 const humanHistoryRetryBusy = ref(false), humanEarlierBusy = ref(false);
 let historyRetryGeneration = 0;
 function cancelHistoryRetry() { historyRetryGeneration++; humanHistoryRetryBusy.value=false; humanEarlierBusy.value=false; }
@@ -644,7 +640,14 @@ async function retryHumanHistory() {
   const binding=app.accountBindingEpoch, id=cid.value, request=++historyRetryGeneration, scope=convStore.scopeInvalidated;
   humanHistoryRetryBusy.value=true;
   const current=()=>pageVisible && request===historyRetryGeneration && binding===app.accountBindingEpoch && scope===convStore.scopeInvalidated && id===cid.value;
-  try { await convStore.refresh(current); if(current()) { humanHistoryListError.value=false; humanHistoryRetry.value++; } }
+  try {
+    await convStore.refresh(current);
+    if(current()) {
+      humanHistoryListError.value=false; humanHistoryRetry.value++;
+      await nextTick();
+      await humanHistoryRead;
+    }
+  }
   catch { if(current()) humanHistoryListError.value=true; }
   finally { if(request===historyRetryGeneration)humanHistoryRetryBusy.value=false; }
 }
@@ -658,14 +661,19 @@ const conv = computed(() => {
   const messages = [...new Map(humanHistory.value.flatMap(row => row.messages).map(message => [message.id,message])).values()].sort((a,b)=>a.ts-b.ts || a.id.length-b.id.length || a.id.localeCompare(b.id)); // Numeric ids: same order as the backend (createdAt,id) cursor.
   return { ...current, messages, historyTruncated: humanHistory.value.some(row=>row.historyTruncated), historyNextCursor: humanHistory.value.find(row=>row.historyNextCursor)?.historyNextCursor };
 });
-watch([cid, () => app.accountBindingEpoch, supportSessionReady, () => humanHistory.value.map(row=>`${row.id}:${row.lastPublicMessageId ?? row.lastTs}`).sort().join("|"), humanHistoryRetry, humanShowRevision], async ([id,, ready],_,onCleanup) => {
-  if (!id || !ready) return;
+watch([cid, () => app.accountBindingEpoch, supportSessionReady, () => humanHistory.value.map(row=>`${row.id}:${row.lastPublicMessageId ?? row.lastTs}`).sort().join("|"), humanHistoryRetry, humanShowRevision], ([id,, ready],_,onCleanup) => {
+  if (!id || !ready) { humanHistoryLoading.value=false; return; }
   let current = true; onCleanup(()=>{current=false;}); humanHistoryError.value=false;
-  for (const row of humanHistory.value) {
-    if (!current || !pageVisible) return;
-    if (row.id === id) continue;
-    try { await convStore.open(row.id,()=>current && pageVisible); } catch { if(current)humanHistoryError.value=true; }
-  }
+  humanHistoryLoading.value=true;
+  humanHistoryRead=(async () => {
+    try {
+      for (const row of humanHistory.value) {
+        if (!current || !pageVisible) return;
+        if (row.id === id) continue;
+        try { await convStore.open(row.id,()=>current && pageVisible); } catch { if(current)humanHistoryError.value=true; }
+      }
+    } finally { if(current) humanHistoryLoading.value=false; }
+  })();
 }, { immediate: true });
 watch(() => conv.value?.messages?.map(message => [message.attachmentId, avatarImageKey(message)].join(":")).join("|"), () => { if (pageVisible) void loadPrivateImages(); });
 const humanType = computed<Exclude<ConversationType, "ai"> | null>(() =>
@@ -1109,6 +1117,12 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 import SupportAvatar from "@/components/support/support-avatar.vue";
 import { useTheme } from "@/store/theme";
 const theme = useTheme();
+useAutoRecovery({ failed: () => remoteApiEnabled && supportSessionReady.value && attachmentPolicyError.value, retry: loadAttachmentPolicy });
+useAutoRecovery({ failed: () => remoteApiEnabled && advisorApplies.value && convStore.advisorError && !convStore.advisorLoading, retry: () => convStore.refreshAdvisor() });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && supportSessionReady.value && !humanHistoryRetryBusy.value && !humanEarlierBusy.value && !humanHistoryLoading.value && (humanHistoryError.value || humanHistoryListError.value),
+  retry: retryHumanHistory,
+});
 </script>
 
 <style scoped>

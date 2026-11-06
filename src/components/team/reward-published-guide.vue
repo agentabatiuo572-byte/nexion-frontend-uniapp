@@ -3,12 +3,6 @@
     <SubPageHeader :back="back" />
     <view v-if="loading && !content" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status"><text>{{ t.howPublished.loading }}</text></view>
     <view v-if="content" class="pb-8">
-      <view v-if="languageFallback" class="mx-4" style="margin: 16px; padding: 14px 0; border-block: 1px solid var(--v5-border);" role="status" aria-live="polite">
-        <text class="block" :style="bodyStyle">{{ t.howPublished.languageFallback }}</text>
-        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
       <HowHero :kind="kind" :label="heroLabel(content.contentKey)" :title="content.blocks[0]?.title ?? heroLabel(content.contentKey)" :sub="content.blocks[0]?.body ?? ''" accent="purple" />
       <view v-if="content.blocks[0]?.items?.length" class="mx-4" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px">
         <view v-for="(item, itemIndex) in content.blocks[0].items" :key="itemIndex" style="display: flex; gap: 8px">
@@ -26,21 +20,16 @@
         </HowSection>
       </template>
     </view>
-    <view v-if="error" class="mx-4" style="padding: 28px 0;" role="alert" aria-live="polite">
-      <view style="padding: 14px 0; color: var(--v5-ink-2);">
-        <text class="block" style="font-size: var(--ui-type-card-title); font-weight: var(--ui-type-card-title-weight);">{{ t.howPublished.unavailableTitle }}</text>
-        <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3);">{{ t.howPublished.unavailableBody }}</text>
-        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
-    </view>
+    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :desc="t.howPublished.unavailableBody" :cta-label="t.ui.retry" @cta="load" />
     <view class="mx-4 mt-6"><view class="reward-cta reward-cta--wide" role="button" tabindex="0" @click="navBack(back)" @keydown.enter.prevent="navBack(back)" @keydown.space.prevent="navBack(back)"><text>{{ backLabel }}</text></view></view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import EmptyState from "@/components/empty-state.vue";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { onShow } from "@/composables/use-tab-page-lifecycle";
+import { onUnmounted, ref, watch } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/team/reward-compact-hero.vue";
 import HowSection from "@/components/team/reward-rule-block.vue";
@@ -62,10 +51,6 @@ const loading = ref(true);
 const error = ref(false);
 const bodyStyle = { fontSize: "var(--ui-type-long-form)", color: "var(--v5-ink-2)", lineHeight: "var(--ui-type-long-form-lh)", minWidth: 0 };
 const requestFence = new PublishedContentRequestFence();
-
-const languageFallback = computed(() => !!content.value
-  && content.value.locale.trim().split(/[-_]/)[0].toLowerCase()
-    !== locale.code.split(/[-_]/)[0].toLowerCase());
 
 function heroLabel(contentKey: HowContentKey): string {
   switch (contentKey) {
@@ -122,6 +107,8 @@ watch(
   },
   { immediate: true, flush: "sync" },
 );
+onShow(() => { if (remoteApiEnabled && !loading.value) void load(); });
+useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value, retry: load });
 onUnmounted(() => requestFence.invalidate());
 </script>
 <style scoped>

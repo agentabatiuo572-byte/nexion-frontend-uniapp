@@ -94,7 +94,7 @@
               @click="loadMoreEvents"
               @keydown="activateLoadMore"
             >
-              <text>{{ commission.eventsLoadMoreStatus === "error" ? t.network.retry : t.unilevel.loadMore }}</text>
+              <text>{{ t.unilevel.loadMore }}</text>
             </view>
         </template>
       </view>
@@ -111,11 +111,13 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { teamRedesignCopy } from "@/i18n/team-redesign";
 import { navTo } from "@/lib/route";
 import { ref, computed, watch, onMounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import { toast } from "@/store/ui";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardHero from "@/components/team/reward-compact-hero.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
@@ -253,9 +255,10 @@ function assetTotal(value: number | null | undefined, asset: 'usdt' | 'uvt'): st
   if (typeof value !== 'number' || !Number.isFinite(value)) return asset === 'uvt' ? `${visibility.mask('—')} UVT` : `${visibility.mask('—')} USD`;
   return asset === 'usdt' ? `$${visibility.mask(formatAmount(value))}` : `${visibility.mask(formatAmount(value))} UVT`;
 }
-function loadMoreEvents() {
+async function loadMoreEvents() {
   if (commission.eventsStatus !== 'ready' || !hasMoreEvents.value || commission.eventsLoadMoreStatus === 'loading') return;
-  void commission.loadMoreCanonicalEvents();
+  await commission.loadMoreCanonicalEvents();
+  if (commission.eventsLoadMoreStatus === "error") toast.error(t.value.network.projectionErrorDesc);
 }
 
 const coolingOverviewText = computed(() => {
@@ -361,6 +364,7 @@ const filterOptions = computed(() => [
   { value: "all" as Filter, label: filterCopy.value.all, fullLabel: t.value.commissions.all, count: remoteApiEnabled ? ledger.value?.totalRows : commission.events.length },
   ...KIND_ORDER.map(value => ({ value, label: filterCopy.value.kinds[value], fullLabel: t.value.commissions.kind[value], count: byKind.value[value].count })),
 ]);
+useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
 </script>
 
 <style scoped>

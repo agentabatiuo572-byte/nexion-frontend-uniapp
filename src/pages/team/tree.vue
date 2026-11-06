@@ -4,13 +4,8 @@
       <SubPageHeader back="/pages/team/team" :title="t.tree.pageTitle" />
 
       <view class="team-tree-content">
-        <view v-if="remoteApiEnabled && network.remoteStatus === 'error'" class="nx-inline-recovery" :style="errorStateStyle">
-          <view class="nx-inline-recovery__copy">
-            <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
-            <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-          </view>
-          <view class="nx-inline-recovery__action nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="network.refreshCanonicalNetwork()" @keydown.enter.prevent="network.refreshCanonicalNetwork()" @keydown.space.prevent="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
-        </view>
+        <EmptyState v-if="remoteApiEnabled && network.remoteStatus === 'error' && !network.hasRemoteSnapshot" kind="recoverable-error" :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.network.retry" @cta="network.refreshCanonicalNetwork()" />
+        <template v-else>
         <!-- P-41: three stat tiles, then a member search above the two roster cards. -->
         <view class="tree-stats">
           <view class="tree-stat nx-viz-press"><view class="tree-total"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : members.length) }}</text></view><text class="tree-stat__label">{{ t.tree.totalNetwork }}</text></view>
@@ -57,12 +52,14 @@
         <view v-if="remoteApiEnabled && !networkReadable && (network.remoteStatus === 'idle' || network.remoteStatus === 'loading')" :style="readStateStyle" role="status" aria-busy="true">
           <text>{{ t.network.projectionLoadingTitle }}</text>
         </view>
+        </template>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { navTo } from "@/lib/route";
 import { formatAmount } from "@/lib/amount-display";
@@ -70,6 +67,7 @@ import { computePointsCopy, formatComputePoints, sumComputePoints } from "@/i18n
 import { useLocaleStore } from "@/store/locale";
 import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TeamRosterSection from "@/components/team/team-roster-section.vue";
@@ -134,6 +132,7 @@ const extendedSubtitle = computed(() =>
 const errorStateStyle: CSSProperties = { padding: "12px 0", borderBottom: "1px solid var(--v5-border)", color: "var(--v5-ink)" };
 const readStateStyle: CSSProperties = { minHeight: "88px", display: "grid", placeItems: "center", color: "var(--v5-ink-3)", fontSize: "13px" };
 const metricLabelStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-3)", lineHeight: "var(--ui-type-list-subtitle-lh)" };
+useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
 </script>
 
 <style scoped>

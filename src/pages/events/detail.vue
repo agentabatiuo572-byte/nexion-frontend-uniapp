@@ -2,10 +2,7 @@
   <AppChassis active="home"><view class="event-detail" :aria-busy="loading">
     <SubPageHeader back="/pages/events/events?source=legacy" :title="copy.title" />
     <text v-if="loading && !detail" class="event-copy" role="status">{{ copy.loading }}</text>
-    <view v-else-if="!detail" class="event-section event-section--plain" role="alert">
-      <text class="event-copy">{{ copy.unavailable }}</text>
-      <view class="event-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="activate($event, load)" @keydown.space.prevent="activate($event, load)"><text class="event-read-retry-label">{{ copy.retry }}</text></view>
-    </view>
+    <EmptyState v-else-if="!detail" kind="recoverable-error" :title="copy.unavailable" :cta-label="copy.retry" @cta="load" />
     <template v-else>
       <view class="nx-glass-card event-section">
         <text class="event-title">{{ detail.event.title }}</text>
@@ -46,17 +43,14 @@
       <NxButton v-if="action==='open'" class="event-navigate" variant="secondary" :label="copy.open" :busy="busy" :disabled="loading || error" @click="run"><text>{{ copy.open }}</text><text aria-hidden="true">→</text></NxButton>
       <view v-else-if="action" class="event-primary" role="button" :tabindex="busy || loading || error ? -1 : 0" :aria-disabled="busy || loading || error" @click="run" @keydown.enter.prevent="activate($event, run)" @keydown.space.prevent="activate($event, run)"><text>{{ busy ? copy.busy : action === 'remind' ? reminderCopy.remind : copy[action] }}</text></view>
       <text v-else-if="detail.event.state === 'ongoing' && detail.enabled" class="event-copy">{{ copy.automatic }}</text>
-      <view class="event-action" role="button" :tabindex="busy || loading ? -1 : 0" :aria-disabled="busy || loading" @click="!busy && !loading && load()" @keydown.enter.prevent="!busy && !loading && activate($event, load)" @keydown.space.prevent="!busy && !loading && activate($event, load)"><text>{{ copy.refresh }}</text></view>
-      <view v-if="error" class="event-section event-section--plain" role="alert">
-        <text class="event-copy">{{ copy.unavailable }}</text>
-        <view class="event-action" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="!loading && load()" @keydown.enter.prevent="!loading && activate($event, load)" @keydown.space.prevent="!loading && activate($event, load)"><text>{{ copy.retry }}</text></view>
-      </view>
     </template>
   </view></AppChassis>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from '@/components/ui/nx-button.vue';
@@ -125,6 +119,7 @@ onHide(() => { visible = false; reset(); });
 watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { reset(); void load(); }, { flush: "sync" });
 const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });
 onUnmounted(() => { visible = false; reset(); unsubscribe(); });
+useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value && !busy.value, retry: load });
 </script>
 <style scoped>
 .event-detail { padding:0 16px 28px; color:var(--v5-ink); }

@@ -3,22 +3,17 @@
     <SubPageHeader :back="back" :title="heading" />
     <view v-if="loading && !content" class="team-rule-published__notice" role="status"><text>{{ t.howPublished.loading }}</text></view>
     <template v-if="content">
-      <view v-if="languageFallback" class="team-rule-published__notice" role="status" aria-live="polite">
-        <text>{{ t.howPublished.languageFallback }}</text>
-        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.ui.retry }}</text></view>
-      </view>
       <TeamRuleHero :kind="kind" :title="copy.overview" :sections="directory" :nav-label="copy.contents" />
       <TeamRuleDocument :blocks="content.blocks" />
     </template>
-    <view v-if="error" class="team-rule-published__notice" role="alert" aria-live="polite">
-      <text class="team-rule-published__error-title">{{ t.howPublished.unavailableTitle }}</text>
-      <text>{{ t.howPublished.unavailableBody }}</text>
-      <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.ui.retry }}</text></view>
-    </view>
+    <EmptyState v-if="error && !content && !loading" kind="recoverable-error" :title="t.howPublished.unavailableTitle" :desc="t.howPublished.unavailableBody" :cta-label="t.ui.retry" @cta="load" />
     <view class="mx-4 mt-6"><view class="reward-cta reward-cta--wide" role="button" tabindex="0" @click="navBack(back)" @keydown.enter.prevent="navBack(back)" @keydown.space.prevent="navBack(back)"><text>{{ backLabel }}</text></view></view>
   </view>
 </template>
 <script setup lang="ts">
+import EmptyState from "@/components/empty-state.vue";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { onShow } from "@/composables/use-tab-page-lifecycle";
 import { computed, onUnmounted, ref, watch } from 'vue';
 import SubPageHeader from '@/components/sub-page-header.vue';
 import TeamRuleHero from './team-rule-hero.vue';
@@ -44,7 +39,6 @@ const directory = computed(() => {
   const sections = (content.value?.blocks ?? []).filter(block => block.kind !== "callout").map(block => ({ id: block.id, title: block.title }));
   return sections.length <= 6 ? sections : [];
 });
-const languageFallback = computed(() => !!content.value && content.value.locale.split(/[-_]/)[0].toLowerCase() !== locale.code.split(/[-_]/)[0].toLowerCase());
 
 // Keep the existing publication acceptance and refresh boundary. Only its
 // presentation is scoped here; shared wallet/rank guides stay on their own UI.
@@ -72,6 +66,8 @@ watch(() => [props.contentKey, locale.code], () => {
   if (remoteApiEnabled) void load();
   else loading.value = false;
 }, { immediate: true, flush: 'sync' });
+onShow(() => { if (remoteApiEnabled && !loading.value) void load(); });
+useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value, retry: load });
 onUnmounted(() => requestFence.invalidate());
 </script>
 <style src="./team-rule-type.css"></style>
