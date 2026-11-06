@@ -153,7 +153,7 @@ function evaluateConfig(text) {
     "config store must use the formal API runtime");
   assert.doesNotMatch(load, /if\s*\(!remoteApiEnabled\)/,
     "formal App config loading must not retain a browser-local authority branch");
-  assert.match(load, /await platformConfigApi\.platformConfig\(\)/,
+  assert.match(load, /await platformConfigApi\.platformConfig\((?:snapshotVersion)?\)/,
     "formal App config loading must fetch Java's authoritative platform projection");
   assert.match(load, /sourceEnvironment !== "PRODUCTION"[\s\S]*runId !== ""/,
     "formal App must fail closed on a non-production-shaped Java projection");
