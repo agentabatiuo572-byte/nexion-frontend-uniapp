@@ -26,6 +26,7 @@
 
       <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: var(--v5-space-5)">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); margin-bottom: var(--v5-space-3)">{{ t.store.catalogErrorTitle }}</text>
+        <view class="mb-3"><NxButton :label="t.store.catalogRetry" @click="refreshProductCatalog(true)" /></view>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text>{{ t.store.coBackToStore }}</text>
         </view>
