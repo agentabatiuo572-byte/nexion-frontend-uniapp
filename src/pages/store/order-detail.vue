@@ -17,7 +17,7 @@
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
-      <view v-if="remoteOrderError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
+      <view v-if="remoteOrderError && !resultOrder" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
         <view class="flex items-center justify-between" style="gap: 12px">
           <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.orders.refreshFailed }}</text>
           <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" :aria-disabled="remoteOrderRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrder">
@@ -42,7 +42,7 @@
 
       <!-- FEAT-TRIAL05 purchase result: shown once right after a trial purchase. -->
       <view v-else-if="resultOrder && (showTrialResult || paymentResultVisible)" class="order-payment-result" data-testid="trial-purchase-result">
-        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.refreshFailed : ''" @devices="goDevices" @retry="refreshOrder">
+        <CheckoutResult :state="paymentResultState" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="getOrderProductMedia(resultOrder.productId, resultOrder.lineItems)?.src" :amount="resultOrder.paidTotal ?? resultOrder.total" :currency="resultOrder.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" :error="paymentResultState === 'error' ? t.orders.refreshFailed : ''" @devices="goDevices">
         <text v-if="showTrialResult && paymentResultState === 'activated'" class="trial-result-body">{{ resultRunningText }}</text>
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -98,7 +98,6 @@
         <view v-if="(orderAction || orderCommandUnavailable) && !externalPayment" class="order-block" role="status">
           <text class="block">{{ orderAction?.kind==='cancel' ? recoveryCopy.cancelPending : recoveryCopy.paymentPending }}</text>
           <view class="flex flex-wrap gap-2 mt-3">
-            <NxButton variant="secondary" size="small" :label="recoveryCopy.query" :busy="orderCommandQuerying" :disabled="payingFromWallet || cancellingOrder" @click="recoverOrderAction(false)" />
             <NxButton v-if="orderAction?.kind==='cancel'" variant="secondary" size="small" :label="recoveryCopy.retryCancel" :disabled="orderCommandQuerying || cancellingOrder" @click="recoverOrderAction(true)" />
             <NxButton v-if="orderAction?.kind==='pay' && resumePaymentAllowed && canPayFromWallet" size="small" :label="recoveryCopy.resume" :disabled="orderCommandQuerying || payingFromWallet" @click="handleWalletPayment" />
           </view>
@@ -176,7 +175,7 @@
       <NxNoticeDialog :open="cancelBlocked" icon="clock" :title="t.orders.cancelBlockedTitle" :body="t.orders.cancelBlockedBody"
         :primary="t.orders.paymentInProgressContinue" :secondary="t.orders.cancelBlockedOk" @primary="cancelBlocked = false; requestPendingPayment()" @secondary="cancelBlocked = false" />
       <NxNoticeDialog class="pending-order-notice" :open="!!paymentNotice" :title="paymentNotice === 'query' ? pendingCopy.queryFailed : pendingCopy.cannotPay" :body="paymentNoticeReason === pendingCopy.queryFailed ? '' : paymentNoticeReason"
-        :icon="paymentNotice === 'query' ? 'alert' : 'info'" :primary="paymentNotice === 'query' ? pendingCopy.retry : orderAction?.kind === 'cancel' ? recoveryCopy.retryCancel : orderAction || orderCommandUnavailable ? recoveryCopy.query : liveOrder?.status === 'placed' ? pendingCopy.cancelOrder : pendingCopy.viewDetails"
+        :icon="paymentNotice === 'query' ? 'alert' : 'info'" :primary="paymentNotice === 'query' ? pendingCopy.retry : orderAction?.kind === 'cancel' ? recoveryCopy.retryCancel : orderAction || orderCommandUnavailable ? pendingCopy.viewDetails : liveOrder?.status === 'placed' ? pendingCopy.cancelOrder : pendingCopy.viewDetails"
         :secondary="t.store.coCancel" :busy="pendingPaymentChecking || cancellingOrder || orderCommandQuerying" @primary="runPaymentNoticeAction" @secondary="paymentNotice = ''">
         <text v-if="noticeCancelFailed" class="pending-notice-error" role="alert">{{ pendingCopy.cancelFailed }}</text>
       </NxNoticeDialog>
@@ -229,6 +228,7 @@ import { beginOrderAction,readOrderAction,markOrderActionPaid,clearOrderAction,t
 import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -308,7 +308,7 @@ const remoteOrderRefreshing = ref(false);
 const remoteOrderAttempted = ref(false);
 let remoteOrderRefreshSequence = 0;
 let activeRemoteOrderScope: DetailRequestScope | null = null;
-let pendingPaymentReadScope: DetailRequestScope | null = null;
+let remoteOrderRead: Promise<void> | null = null;
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
 async function refreshOrderWallet(): Promise<boolean> {
@@ -325,41 +325,35 @@ async function refreshOrderWallet(): Promise<boolean> {
   }
 }
 async function refreshOrder() {
-  if (!remoteApiEnabled || !id.value.trim() || !remoteOrderBoundAccount.value) return;
+  if (!remoteApiEnabled || !detailVisible || !id.value.trim() || !remoteOrderBoundAccount.value) return;
   void revalidateProductCatalog();
   if (remoteOrderRefreshing.value && activeRemoteOrderScope
-    && isCurrentDetailScope(activeRemoteOrderScope)) return;
+    && isCurrentDetailScope(activeRemoteOrderScope)) return remoteOrderRead;
   const scope = captureDetailScope();
   const sequence = ++remoteOrderRefreshSequence;
   activeRemoteOrderScope = scope;
   remoteOrderAttempted.value = true;
   remoteOrderRefreshing.value = true;
-  remoteOrderError.value = false;
-  try {
-    const result = await orders.ensureRemoteOrder(id.value);
-    if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) orderPresentation.value = result ?? null;
-  } catch {
-    if (sequence !== remoteOrderRefreshSequence || !isCurrentDetailScope(scope)) return;
-    remoteOrderError.value = true;
-    orderPresentation.value = null;
-  } finally {
-    if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
-      remoteOrderRefreshing.value = false;
-      activeRemoteOrderScope = null;
-      if (autoPayRequested.value) {
-        if (remoteOrderError.value) {
-          autoPayRequested.value = false;
-          pendingPaymentIntentAccount = '';
-          pendingPaymentReadScope = null;
-          paymentNoticeReason.value = pendingCopy.value.queryFailed;
-          paymentNotice.value = 'query';
-        } else {
-          pendingPaymentReadScope = scope;
-          void requestPendingPayment(true);
-        }
+  // Explicit payment entry can await this same read without putting PIN work in its completion.
+  remoteOrderRead = Promise.resolve().then(async () => {
+    if (!isCurrentDetailScope(scope)) return;
+    try {
+      const result = await orders.ensureRemoteOrder(scope.orderNo);
+      if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
+        orderPresentation.value = result ?? null;
+        remoteOrderError.value = false;
       }
+    } catch {
+      if (sequence !== remoteOrderRefreshSequence || !isCurrentDetailScope(scope)) return;
+      remoteOrderError.value = true;
     }
-  }
+  }).finally(() => {
+    if (sequence !== remoteOrderRefreshSequence) return;
+    remoteOrderRefreshing.value = false;
+    activeRemoteOrderScope = null;
+    remoteOrderRead = null;
+  });
+  return remoteOrderRead;
 }
 onShow(() => {
   if (detailVisible) return;
@@ -367,9 +361,14 @@ onShow(() => {
   detailVisible = true;
   detailEpoch += 1;
   restoreOrderAction();
-  void recoverOrderAction(false);
   preserveOrderOriginInH5();
-  void refreshOrder();
+  // A ?pay=1 link is an explicit payment intent, separate from background reads.
+  void (async () => {
+    const scope = captureDetailScope();
+    await recoverOrderAction(false);
+    await refreshOrder();
+    if (isCurrentDetailScope(scope) && remoteOrderBoundAccount.value && autoPayRequested.value) void requestPendingPayment(true);
+  })();
   void refreshOrderWallet();
 });
 onHide(() => {
@@ -380,7 +379,6 @@ onHide(() => {
   pendingPaymentChecking.value = false;
   autoPayRequested.value = false;
   pendingPaymentIntentAccount = '';
-  pendingPaymentReadScope = null;
 });
 
 const liveOrder = computed(() => orders.orders.find((o) => o.id === id.value));
@@ -392,13 +390,12 @@ watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value],
   paymentResultOrder.value = null; paymentResultVisible.value = false;
   paymentSheetOpen.value = false; paymentNotice.value = '';
   pendingPaymentChecking.value = false;
-  pendingPaymentReadScope = null;
 }, { flush: 'sync' });
 watch(liveOrder, value => {
   if (value && !orderEnvironmentInvalidated.value) orderPresentation.value = value;
 }, { immediate: true, flush: 'sync' });
 // Runtime invalidation still clears the shared store and every command uses liveOrder.
-const order = computed(() => orderEnvironmentInvalidated.value || remoteOrderError.value ? undefined : liveOrder.value ?? orderPresentation.value ?? undefined);
+const order = computed(() => orderEnvironmentInvalidated.value ? undefined : liveOrder.value ?? orderPresentation.value ?? undefined);
 const orderQuantity = computed(() => order.value?.lineItems?.reduce((total, item) => total + item.quantity, 0) ?? order.value?.quantity ?? 0);
 const refundChannelLabel = computed(() => order.value?.refundChannel === "WALLET"
   ? t.value.promotion.wallet : t.value.orders.refundDetailsUnavailable);
@@ -426,7 +423,9 @@ watch(remoteOrderBinding, (binding, previousBinding) => {
   if (!detailVisible || !binding.accountKey || binding.revision === previousBinding.revision || !id.value.trim()) return;
   remoteOrderAttempted.value = false;
   remoteOrderError.value = false;
-  void refreshOrder();
+  void refreshOrder().then(() => {
+    if (detailVisible && autoPayRequested.value) void requestPendingPayment(true);
+  });
 });
 // Catalogue refresh clears the shared remote orders without rebinding the
 // account. The visible detail must read again under the new runtime revision.
@@ -496,6 +495,7 @@ const cancellingOrder = ref(false);
 const orderAction = ref<PendingOrderAction|null>(null);
 const orderCommandUnavailable = ref(false);
 const orderCommandQuerying = ref(false);
+const orderCommandReading = ref(false);
 const resumePaymentAllowed = ref(false);
 const recoveryCopy = computed(()=>purchaseRecoveryCopy(locale.code));
 let cancelAttemptSequence = 0;
@@ -517,13 +517,14 @@ function restoreOrderAction():void {
 }
 watch(()=>[auth.accountId,id.value],restoreOrderAction,{flush:'sync'});
 async function recoverOrderAction(retryCancel=false):Promise<void> {
-  if (!remoteApiEnabled||orderCommandQuerying.value||payingFromWallet.value||cancellingOrder.value) return;
+  if (!remoteApiEnabled||!detailVisible||orderCommandQuerying.value||orderCommandReading.value||payingFromWallet.value||cancellingOrder.value) return;
   const scope=captureDetailScope(),accountKey=orders.currentAccountKey();
   const receiptScope=app.captureRemoteAccountRequest();
-  orderCommandQuerying.value=true;resumePaymentAllowed.value=false;
+  if (retryCancel) orderCommandQuerying.value=true;
+  else orderCommandReading.value=true;
   try {
     const action=readOrderAction(accountKey,id.value);orderAction.value=action;orderCommandUnavailable.value=false;
-    if (!action) return;
+    if (!action) { resumePaymentAllowed.value=false;return; }
     if (action.kind==='cancel') {
       if (retryCancel) await orders.cancelOrderRemote(action.orderNo);
       if (!isCurrentDetailScope(scope)) return;
@@ -536,6 +537,7 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
       const result=await readPaymentCommand(apiClient,'order-pay',action.key);
       if (!isCurrentDetailScope(scope)) return;
       if (result.status==='SUCCEEDED') {
+        resumePaymentAllowed.value=false;
         const receipt=paidOrderReceipt(result.receipt);
         if (receipt.orderNo!==action.orderNo||receipt.amountUsdt!==action.amount) throw new Error('PAYMENT_COMMAND_RECEIPT_MISMATCH');
         markOrderActionPaid(accountKey,action.orderNo);walletPaymentConfirmed.value=true;
@@ -543,6 +545,7 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
         if (receipt.paymentMethod==='WALLET'&&(receipt.walletBalanceAfterUsdt===null
             || !app.adoptCommerceWallet(receipt.walletBalanceAfterUsdt,receiptScope))) throw new Error('PAYMENT_COMMAND_WALLET_UNAVAILABLE');
       } else if (result.status==='REJECTED') {
+        resumePaymentAllowed.value=false;
         await refreshOrder();
         if (isCurrentDetailScope(scope)&&!remoteOrderError.value&&!remoteOrderRefreshing.value&&liveOrder.value)
           clearOrderAction(accountKey,action.orderNo,action.key,true);
@@ -553,23 +556,41 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
         if (isCurrentDetailScope(scope)) resumePaymentAllowed.value=!remoteOrderError.value&&!remoteOrderRefreshing.value
           &&liveOrder.value?.status==='placed'&&liveOrder.value.total===action.amount;
         return;
-      } else return;
+      } else { resumePaymentAllowed.value=false;return; }
     }
     walletPaymentConfirmed.value=true;
     await refreshOrder();
-    if (isCurrentDetailScope(scope)&&!remoteOrderError.value&&liveOrder.value?.status==='activated') {
+    if (isCurrentDetailScope(scope)&&!remoteOrderError.value&&liveOrder.value&&['activated','inventory'].includes(liveOrder.value.status)) {
       clearOrderAction(accountKey,action.orderNo,action.key);orderAction.value=null;
       void app.refreshRemoteFleet(receiptScope);
     }
   } catch {
-    if (isCurrentDetailScope(scope)) {orderCommandUnavailable.value=true;toast.warn(recoveryCopy.value.paymentPending);}
+    if (isCurrentDetailScope(scope)) {
+      orderCommandUnavailable.value=true;
+      if (retryCancel) toast.warn(recoveryCopy.value.paymentPending);
+    }
   } finally {
     orderCommandQuerying.value=false;
-    // A list deep link can finish its order read while the original command is
-    // still being recovered. Consume that completed read once the lock clears.
-    if (autoPayRequested.value && pendingPaymentReadScope && isCurrentDetailScope(pendingPaymentReadScope)) void requestPendingPayment(true);
+    orderCommandReading.value=false;
   }
 }
+const purchaseReadBusy = () => remoteOrderRefreshing.value || orderCommandReading.value || orderCommandQuerying.value
+  || payingFromWallet.value || cancellingOrder.value || pendingPaymentChecking.value || autoPayRequested.value
+  || paymentSheetOpen.value || walletRefreshing.value;
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!remoteOrderBoundAccount.value && !purchaseReadBusy() && !resumePaymentAllowed.value
+    && !orderAction.value && !orderCommandUnavailable.value
+    && (remoteOrderError.value || !!resultOrder.value && ['paid','provisioning'].includes(resultOrder.value.status)),
+  retry: refreshOrder,
+  repeatMs: 15_000,
+});
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!remoteOrderBoundAccount.value && !purchaseReadBusy() && !resumePaymentAllowed.value
+    && (orderCommandUnavailable.value || !!orderAction.value)
+    && (!liveOrder.value || liveOrder.value.status === 'placed' || ['paid','provisioning'].includes(liveOrder.value.status)),
+  retry: () => recoverOrderAction(false),
+  repeatMs: 15_000,
+});
 const pendingOrderActionsVisible = computed(() => order.value?.status === "placed" && !order.value.promotionQuoteId && !walletPaymentConfirmed.value);
 // Any state with a next action gets the bottom action bar.
 const stickyActionsVisible = computed(() => !!order.value && (pendingOrderActionsVisible.value || needsRecovery.value
@@ -785,30 +806,23 @@ async function offerWalletTopup(requiredUsdt: number): Promise<void> {
 
 /** Re-read the original order and its eligibility before the payment sheet opens; the server rechecks everything at pay. */
 async function requestPendingPayment(originalJustRead = false): Promise<void> {
-  if (!remoteApiEnabled || pendingPaymentChecking.value || payingFromWallet.value || cancellingOrder.value || orderCommandQuerying.value) return;
+  if (!remoteApiEnabled || pendingPaymentChecking.value || payingFromWallet.value || cancellingOrder.value || orderCommandQuerying.value || orderCommandReading.value) return;
   const scope = captureDetailScope();
   if (originalJustRead && pendingPaymentIntentAccount && pendingPaymentIntentAccount !== scope.accountScope.accountKey) {
     autoPayRequested.value = false;
     pendingPaymentIntentAccount = '';
-    pendingPaymentReadScope = null;
     return;
   }
   const attempt = ++pendingPaymentSequence;
-  let waitingForRead = false;
   autoPayRequested.value = true;
   pendingPaymentIntentAccount = scope.accountScope.accountKey;
-  pendingPaymentReadScope = null;
   pendingPaymentChecking.value = true;
   paymentSheetError.value = '';
   paymentNotice.value = '';
   noticeCancelFailed.value = false;
   try {
-    if (!originalJustRead) await refreshOrder();
+    if (!originalJustRead || remoteOrderRefreshing.value) await refreshOrder();
     if (!isCurrentDetailScope(scope)) return;
-    pendingPaymentReadScope = null;
-    // Another read of this order is still running (e.g. the page just came back to the
-    // foreground): keep the pay intent and continue when that read lands, as on a cold ?pay=1.
-    if (remoteOrderRefreshing.value && !remoteOrderError.value) { waitingForRead = true; return; }
     if (remoteOrderError.value || !liveOrder.value) throw new Error('ORDER_READ_UNAVAILABLE');
     let original = liveOrder.value;
     restoreOrderAction();
@@ -867,14 +881,10 @@ async function requestPendingPayment(originalJustRead = false): Promise<void> {
     // local lock, but must never unlock a newer attempt after hide/re-entry.
     if (attempt === pendingPaymentSequence) {
       pendingPaymentChecking.value = false;
-      if (!waitingForRead && isCurrentDetailScope(scope) && (paymentSheetOpen.value || payingFromWallet.value || paymentResultVisible.value || paymentNotice.value || orderAction.value || orderCommandUnavailable.value)) {
+      if (isCurrentDetailScope(scope) && (paymentSheetOpen.value || payingFromWallet.value || paymentResultVisible.value || paymentNotice.value || orderAction.value || orderCommandUnavailable.value)) {
         autoPayRequested.value = false;
         pendingPaymentIntentAccount = '';
-        pendingPaymentReadScope = null;
       }
-      // A newer authoritative read may have finished while this obsolete
-      // attempt was busy. Consume that read once; never start a retry timer.
-      if (autoPayRequested.value && pendingPaymentReadScope && isCurrentDetailScope(pendingPaymentReadScope)) void requestPendingPayment(true);
     }
   }
 }
@@ -887,7 +897,7 @@ function topupPendingOrder(): void {
 async function runPaymentNoticeAction(): Promise<void> {
   if (pendingPaymentChecking.value || cancellingOrder.value || orderCommandQuerying.value) return;
   if (paymentNotice.value === 'query') { await requestPendingPayment(); return; }
-  if (orderAction.value?.kind === 'pay' || orderCommandUnavailable.value) { await recoverOrderAction(false); return; }
+  if (orderAction.value?.kind === 'pay' || orderCommandUnavailable.value) { paymentNotice.value = ''; return; }
   const scope = captureDetailScope();
   noticeCancelFailed.value = false;
   if (orderAction.value?.kind === 'cancel') {
