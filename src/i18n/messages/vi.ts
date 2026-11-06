@@ -2664,6 +2664,8 @@ rankBenefits: "Xem quyền lợi cấp bậc",
 autoDetect: "tự động nhận diện sắp ra mắt",
 },
   ui: {
+    refreshFailed: "Không thể làm mới. Vui lòng thử lại sau.",
+    networkDisconnected: "Đã mất kết nối mạng.",
     confirm: "Xác nhận",
     cancel: "Hủy",
     dismiss: "Bỏ qua",

@@ -3114,6 +3114,8 @@ export const ms: Messages = {
     autoDetect: "kesan automatik akan datang",
   },
   ui: {
+    refreshFailed: "Gagal memuat semula. Sila cuba lagi nanti.",
+    networkDisconnected: "Sambungan rangkaian terputus.",
     confirm: "Sahkan",
     cancel: "Batal",
     dismiss: "Tutup",

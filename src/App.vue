@@ -421,9 +421,15 @@ function runScheduledReads(route: string, reconnected = false) {
 }
 
 function installForegroundReadSignals() {
+  let outage = false;
+  const syncOnline = (online: boolean) => {
+    appReadOnline.value = online;
+    if (!online && !outage) toast.warn(useT().value.ui.networkDisconnected);
+    outage = !online;
+  };
   // #ifdef H5
   const syncDocument = () => { documentReadVisible.value = !document.hidden; };
-  const syncNetwork = () => { appReadOnline.value = navigator.onLine; };
+  const syncNetwork = () => { syncOnline(navigator.onLine); };
   document.addEventListener("visibilitychange", syncDocument);
   window.addEventListener("online", syncNetwork);
   window.addEventListener("offline", syncNetwork);
@@ -435,16 +441,17 @@ function installForegroundReadSignals() {
   let observedNetworkChange = false;
   uni.onNetworkStatusChange(({ isConnected }) => {
     observedNetworkChange = true;
-    appReadOnline.value = isConnected;
+    syncOnline(isConnected);
   });
   uni.getNetworkType({
-    success: ({ networkType }) => { if (!observedNetworkChange) appReadOnline.value = networkType !== "none"; },
-    fail: () => { if (!observedNetworkChange) appReadOnline.value = true; },
+    success: ({ networkType }) => { if (!observedNetworkChange) syncOnline(networkType !== "none"); },
+    fail: () => { if (!observedNetworkChange) syncOnline(true); },
   });
   // #endif
   const app = useApp();
-  useConfig().startRefresh(() => app.accountKey);
+  if (remoteApiEnabled) useConfig().startRefresh(() => app.accountKey);
   watch([foregroundReadAllowed, appReadOnline, () => app.accountBindingEpoch], ([allowed, online], [wasAllowed, wasOnline]) => {
+    if (!remoteApiEnabled) return;
     if (allowed) {
       if (!wasAllowed && canRunBusinessLoops()) maintainRemoteSession(true);
       runScheduledReads(readCurrentRoute(), online && !wasOnline);
@@ -1257,7 +1264,7 @@ onLaunch(() => {
   // 同样必须在 early return 之前挂 —— 退役路由 / 静态评审页也有输入框。
   installFieldNaming();
   const auth = useAuth();
-  if (remoteApiEnabled) installForegroundReadSignals();
+  installForegroundReadSignals();
   // #ifdef APP-PLUS
   installNativePush({ client: apiClient, vault: sessionVault,
     canNavigate: () => canRefreshRemoteAccount(useAuth())

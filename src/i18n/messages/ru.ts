@@ -3114,6 +3114,8 @@ export const ru: Messages = {
     autoDetect: "автоопределение скоро",
   },
   ui: {
+    refreshFailed: "Не удалось обновить. Попробуйте позже.",
+    networkDisconnected: "Соединение с сетью потеряно.",
     confirm: "Подтвердить",
     cancel: "Отмена",
     dismiss: "Закрыть",

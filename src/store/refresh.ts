@@ -6,8 +6,10 @@ import { tickOrders } from "./orders";
 import { useExchange } from "./exchange";
 import { useConfig } from "./config";
 import { useGenesisConfig } from "./genesis-config";
-import { refreshActivePage } from "@/lib/active-page-refresh";
+import { refreshActivePage, refreshFailedPageSections, hasFailedPageSections } from "@/lib/active-page-refresh";
 import { invalidatePassiveTabReads } from "@/lib/passive-read-window";
+import { getT } from "@/i18n/use-t";
+import { toast } from "./ui";
 
 /**
  * Pull-to-refresh store. Ported from Nexion-prototype/lib/store/refresh.ts
@@ -31,8 +33,11 @@ export const useRefresh = defineStore("refresh", () => {
   async function refresh(): Promise<void> {
     if (isRefreshing.value) return;
     isRefreshing.value = true;
+    const app = useApp();
+    const epoch = app.accountBindingEpoch;
     try {
       await new Promise<void>((r) => setTimeout(r, REFRESH_LATENCY_MS));
+      if (epoch !== app.accountBindingEpoch) return;
       invalidatePassiveTabReads();
       useApp().tick(3500);
       tickOrders(trialReservesSlotNow() ? 1 : 0);
@@ -42,13 +47,22 @@ export const useRefresh = defineStore("refresh", () => {
       //   (独立验收 P1)。config 是共享 store,一处刷新全消费者的 computed 同步更新。
       useGenesisConfig().refresh();
       // 🔴 平台展示配置同理(2026-08-06 审计 P2 同型):脉搏三格 / 页脚 $/sec 的失败态,
-      //   用户第一自救动作就是下拉 —— 不重拉配置,占位态永远刷不回来。fire-and-forget:
-      //   load 自带合成延迟与 loading 态,卡片骨架去闪由 300ms 防抖门管。
-      void useConfig().refresh();
+      //   用户第一自救动作就是下拉 —— 等可见页面和失败区块读完再结束刷新。
+      // Capture failed sections before healthy page reads enter loading. A
+      // healthy read that fails during this pull is not dispatched a second time.
+      const results = await Promise.allSettled([
+        refreshFailedPageSections(() => epoch === app.accountBindingEpoch),
+        useConfig().refresh(),
+        refreshActivePage(),
+      ]);
+      if (epoch !== app.accountBindingEpoch) return;
       // The active route owns remote page data that cannot be inferred from
       // global stores (events, missions, globe, etc.). Await its registered
       // refresh so the spinner only closes after the visible facts are new.
-      await refreshActivePage();
+      if (hasFailedPageSections() || (results[0].status === "fulfilled" && results[0].value === true)
+        || useConfig().configStatus === "failed" || results.some(result => result.status === "rejected")) {
+        toast.error(getT().ui.refreshFailed);
+      }
     } finally {
       isRefreshing.value = false;
     }

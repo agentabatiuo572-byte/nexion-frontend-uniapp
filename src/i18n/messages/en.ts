@@ -2723,6 +2723,8 @@ rankBenefits: "View rank benefits",
 autoDetect: "auto-detect coming soon",
 },
   ui: {
+    refreshFailed: "Refresh failed. Please try again later.",
+    networkDisconnected: "You’re offline.",
     confirm: "Confirm",
     cancel: "Cancel",
     dismiss: "Dismiss",

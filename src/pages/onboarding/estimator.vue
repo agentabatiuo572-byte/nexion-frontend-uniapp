@@ -99,10 +99,13 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="detected ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import { toast } from "@/store/ui";
+import ToastHost from "@/components/toast-host.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
@@ -349,14 +352,14 @@ async function deferPhoneActivation() {
     if (!localPhoneStateCommitted && !remoteApiEnabled) throw new Error("PHONE_DEFER_LOCAL_COMMIT_FAILED");
     if (!completeOnboardingLocally()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
 
-    uni.showToast({ title: t.value.onboarding.activationDeferredToast, icon: "none" });
+    toast.info(t.value.onboarding.activationDeferredToast);
     navReset({ url: "/pages/index/index", fail: () => {} });
   } catch {
     if (isCurrent(scope)) {
       calibration.value = null;
       deferFailed.value = true;
       loadFailed.value = true;
-      uni.showToast({ title: t.value.onboarding.activationDeferFailed, icon: "none" });
+      toast.info(t.value.onboarding.activationDeferFailed);
     }
   } finally {
     if (isCurrent(scope)) deferBusy.value = false;

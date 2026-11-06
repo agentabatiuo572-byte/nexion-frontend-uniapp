@@ -2,6 +2,34 @@ export type ActivePageRefresh = () => Promise<unknown> | unknown;
 
 let activeRefresh: { refresh: ActivePageRefresh; route?: string } | null = null;
 
+type PageRecovery = {
+  failed: () => boolean;
+  pending: () => boolean;
+  retry: () => Promise<boolean>;
+};
+const pageRecoveries = new Set<PageRecovery>();
+
+/** Only shown page sections register; retained, hidden pages release their entries. */
+export function registerPageRecovery(section: PageRecovery): () => void {
+  pageRecoveries.add(section);
+  return () => { pageRecoveries.delete(section); };
+}
+
+export function hasFailedPageSections(): boolean {
+  return [...pageRecoveries].some(section => section.failed());
+}
+
+/** Await each failed section, including a read already in flight, without a request burst. */
+export async function refreshFailedPageSections(isCurrent: () => boolean): Promise<boolean> {
+  const sections = [...pageRecoveries].filter(section => section.failed() || section.pending());
+  for (const section of sections) {
+    if (!isCurrent()) return false;
+    if (!pageRecoveries.has(section)) continue;
+    await section.retry();
+  }
+  return isCurrent() && sections.some(section => pageRecoveries.has(section) && section.failed());
+}
+
 /**
  * Registers the refresh operation for the page that is currently visible.
  * The disposer is identity-safe so a hidden older page cannot unregister a

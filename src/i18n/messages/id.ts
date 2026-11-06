@@ -3114,6 +3114,8 @@ export const id: Messages = {
     autoDetect: "deteksi otomatis segera hadir",
   },
   ui: {
+    refreshFailed: "Gagal memuat ulang. Coba lagi nanti.",
+    networkDisconnected: "Koneksi jaringan terputus.",
     confirm: "Konfirmasi",
     cancel: "Batal",
     dismiss: "Tutup",
