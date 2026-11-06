@@ -100,7 +100,9 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { apiClient } from "@/api/runtime";
+import { useAuth } from "@/store/auth";
+import { apiClient, sessionVault } from "@/api/runtime";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { createBankWithdrawalApi, hasVerifiedBankIdentity, type BankConfig, type BankQuote, type BankOrder, type BankIntent, type BankRecovery } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
@@ -111,6 +113,7 @@ import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 const c = computed(() => useTranslations.value.bankWithdrawal);
 const useTranslations = useT();
 const app = useApp();
+const auth = useAuth();
 const api = createBankWithdrawalApi(apiClient);
 const config = ref<BankConfig | null>(null);
 const quote = ref<BankQuote | null>(null);
@@ -128,7 +131,7 @@ let lastCapacityResetRead = "";
 let revision = 0;
 let inFlight: { current: () => boolean; orderNo: string | null } | null = null;
 let alive = true;
-let visible = false;
+const visible = ref(false);
 const pendingKey = () => `nexgrid.bank-withdraw.pending:${app.accountKey}`;
 const money = (value: number) => formatAmount(value);
 const displayDate = formatBankDateTime;
@@ -140,6 +143,7 @@ const multipleIntents = computed(() => config.value?.unresolvedIntent?.state ===
 const accountStatus = computed(() => config.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(config.value.beneficiary)] : "");
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));
+const terminalOrderStatuses = ["CONFIRMED", "FAILED", "REFUNDED", "REVIEW_REJECTED"];
 const statusLabel = computed(() => c.value[outcome.value]);
 const recipient = computed(() => order.value?.bank ?? quote.value ?? config.value?.beneficiary);
 const canContinue = computed(() => bankCanQuote(config.value) && !!config.value?.policy && !!config.value?.capacity && config.value.capacity.withdrawalEnabled);
@@ -204,6 +208,44 @@ async function load() {
     }
   });
 }
+
+function canReadVisibleBankPage(): boolean {
+  return visible.value && auth.isAuthenticated && foregroundReadAllowed();
+}
+
+function canPollOrder(): boolean {
+  return canReadVisibleBankPage() && !!order.value && !terminalOrderStatuses.includes(order.value.status);
+}
+
+let pollingOrder = false;
+async function pollOrder(): Promise<void> {
+  const snapshot = order.value;
+  const session = sessionVault.read();
+  if (!snapshot || !canPollOrder() || busy.value || pollingOrder
+      || !session?.accessToken || app.accountKey !== `user:${session.user.userId}`) return;
+  const readRevision = revision;
+  const runtime = captureRuntimeRevision();
+  pollingOrder = true;
+  try {
+    const loaded = await api.get(snapshot.withdrawalNo);
+    if (canPollOrder() && order.value === snapshot && revision === readRevision
+        && isCurrentRuntimeRevision(runtime)) order.value = loaded;
+  } catch { /* Keep the last known order state during a passive read failure. */ }
+  finally { pollingOrder = false; }
+}
+
+watch(canPollOrder, (enabled, _, onCleanup) => {
+  if (!enabled) return;
+  const timer = setInterval(() => { void pollOrder(); }, 30_000);
+  onCleanup(() => clearInterval(timer));
+});
+
+watch([visible, foregroundReadAllowed, () => auth.isAuthenticated], ([isVisible, allowed, authenticated], [wasVisible]) => {
+  if (!isVisible || !allowed || !authenticated) return;
+  if (!wasVisible || (!order.value && !config.value && !quote.value)) void load();
+  else if (canPollOrder()) void pollOrder();
+});
+
 function applyRecovery(recovered: BankRecovery) {
   accepted.value = false;
   if (recovered.state === "COMMITTED") { order.value = recovered; quote.value = null; uni.removeStorageSync(pendingKey()); }
@@ -258,7 +300,7 @@ function invalidate() {
   if (busy.value && inFlight?.current() && inFlight.orderNo === (requestedOrder ?? order.value?.withdrawalNo ?? null)) return;
   revision++; config.value = null; quote.value = null; order.value = null; busy.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
-  if (alive && visible) void load();
+  if (alive && canReadVisibleBankPage()) void load();
 }
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, invalidate);
 const stopRuntime = subscribeRuntimeRevision(invalidate);
@@ -269,13 +311,15 @@ onLoad(params => {
 });
 watch(now, () => {
   const resetAt = config.value?.capacity?.dailyCountResetAt;
-  if (!visible || busy.value || quote.value || order.value || uncertain.value || !resetAt || lastCapacityResetRead === resetAt) return;
+  if (!canReadVisibleBankPage() || busy.value || quote.value || order.value || uncertain.value || !resetAt || lastCapacityResetRead === resetAt) return;
   if ((parseServerTimestamp(resetAt) ?? Infinity) <= now.value) { lastCapacityResetRead = resetAt; void load(); }
 });
 function stopTimer() { if (timer) clearInterval(timer); timer = undefined; }
-onShow(() => { visible = true; now.value = Date.now(); stopTimer(); timer = setInterval(() => { now.value = Date.now(); }, 1000); void load(); });
-onHide(() => { visible = false; stopTimer(); });
-onUnload(() => { alive = false; visible = false; stopTimer(); stopRuntime(); revision++; });
+onShow(() => {
+  visible.value = true; now.value = Date.now(); stopTimer(); timer = setInterval(() => { now.value = Date.now(); }, 1000);
+});
+onHide(() => { visible.value = false; stopTimer(); });
+onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(); revision++; });
 </script>
 
 <style scoped>

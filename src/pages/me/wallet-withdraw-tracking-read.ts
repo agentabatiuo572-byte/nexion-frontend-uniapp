@@ -79,7 +79,7 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
       && active.pageEpoch === scope.pageEpoch;
   }
 
-  async function refresh(automaticScopeRetry = false): Promise<void> {
+  async function refresh(quiet = false, automaticScopeRetry = false): Promise<void> {
     if (pendingRequest !== null) return;
     const request = ++requestEpoch;
     pendingRequest = request;
@@ -96,6 +96,7 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
         if (request !== requestEpoch) return;
         scope = options.currentScope();
         if (scope) break;
+        if (quiet) return;
         if (attempt === attempts) {
           options.setStatus("error");
           return;
@@ -105,30 +106,31 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
       }
       if (!scope || request !== requestEpoch) return;
 
-    const activeScopeKey = scopeKey(scope);
-    if (inFlight?.scopeKey === activeScopeKey) return;
-    inFlight = { request, scopeKey: activeScopeKey };
-    options.setStatus("loading");
-    try {
-      const result = await options.read(scope.withdrawalNo);
-      if (!isCurrent(scope, request)) {
-        retryForChangedScope = request === requestEpoch && options.currentScope() !== null;
-        return;
+      const activeScopeKey = scopeKey(scope);
+      if (inFlight?.scopeKey === activeScopeKey) return;
+      inFlight = { request, scopeKey: activeScopeKey };
+      if (!quiet) options.setStatus("loading");
+      try {
+        const result = await options.read(scope.withdrawalNo);
+        if (!isCurrent(scope, request)) {
+          retryForChangedScope = !quiet && request === requestEpoch && options.currentScope() !== null;
+          return;
+        }
+        if (result.withdrawalNo !== scope.withdrawalNo) {
+          throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
+        }
+        options.apply(result);
+        options.setStatus("ready");
+      } catch (error) {
+        if (!isCurrent(scope, request)) {
+          retryForChangedScope = !quiet && request === requestEpoch && options.currentScope() !== null;
+          return;
+        }
+        if (asApiError(error).status === 404) options.setStatus("not-found");
+        else if (!quiet) options.setStatus("error");
+      } finally {
+        if (inFlight?.request === request) inFlight = null;
       }
-      if (result.withdrawalNo !== scope.withdrawalNo) {
-        throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
-      }
-      options.apply(result);
-      options.setStatus("ready");
-    } catch (error) {
-      if (!isCurrent(scope, request)) {
-        retryForChangedScope = request === requestEpoch && options.currentScope() !== null;
-        return;
-      }
-      options.setStatus(asApiError(error).status === 404 ? "not-found" : "error");
-    } finally {
-      if (inFlight?.request === request) inFlight = null;
-    }
     } finally {
       if (pendingRequest === request) pendingRequest = null;
       // sessionVault.revision() is intentionally non-reactive. If a bearer is
@@ -138,7 +140,7 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
       const ownsAutomaticRecovery = automaticScopeRecovery?.recoveryRequest === request;
       if (retryForChangedScope && options.currentScope() !== null && automaticScopeRecovery === null) {
         automaticScopeRecovery = { sourceRequest: request, recoveryRequest: null };
-        void refresh(true);
+        void refresh(false, true);
       } else if (retryForChangedScope && ownsAutomaticRecovery) {
         // One request may recover a non-reactive bearer revision. If it changes
         // again before that recovery settles, stop rather than chasing an

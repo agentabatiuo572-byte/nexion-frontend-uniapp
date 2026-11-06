@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { refreshActivePage } from "@/lib/active-page-refresh";
+import { appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
 import { navReset } from "@/lib/route";
@@ -9,6 +11,7 @@ import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useApp } from "@/store/app";
 import { useConversations } from '@/store/conversations';
 import { useMessageDrawer } from "@/store/message-drawer";
+import { useNotifications } from "@/store/notifications";
 import {
   useFreeTrial,
   liveShadowUSD,
@@ -142,11 +145,7 @@ function stopTick() {
   }
 }
 
-// ── 提现到账推进轮询(FEAT-WD01b)──
-// 追踪页只展示、不推进(SPEC-7),所以「用户点进追踪页发现已到账」这条路径要靠这个
-// 定时器兜住 —— 5s 一次:一次调用就是一个纯函数判定 + 一次 null 判断,开销可忽略,
-// 但用户不会盯着「处理中」干等半分钟。真正的离线缺口补齐发生在 onShow 那一下。
-// PROD: 整块删掉,状态改由 SSE/webhook 推。
+// Mock-only withdrawal progression. Remote pages read their own server state.
 const ARRIVAL_TICK_MS = 5_000;
 let arrivalTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -160,23 +159,10 @@ function advanceArrivalAndSettleBill() {
   const app = useApp();
   // 🔴 按**本次真正推进的那几笔**逐个结算,不能问「最新一笔是谁」——
   // 推进是全表扫,最新那笔未必是刚到账的那笔(独立验收实测:双向都会结算错单)。
-  // 远端模式下 advanceWithdrawalArrival 恒返回空(闸在 advanceArrival 里),状态改由
-  // refreshRemoteWithdrawals 从 GET /api/withdrawals/:id 镜像回来 —— 两条路产出同一种
-  // 「本次变动了哪几笔」,后面的结算与对账逻辑一字不改。
   const advanced = app.advanceWithdrawalArrival();
   if (advanced.length) {
     const bills = useBills();
     for (const ref of advanced) bills.settleByRef(ref, "posted");
-  }
-  if (remoteApiEnabled) {
-    // fire-and-forget:拉不到就保持原样,下一拍(5s)再问;reconcileBills 本身是
-    // 「从数据推出该做什么」的自愈式对账,晚一拍拿到镜像也能自己收敛。
-    void app.refreshRemoteWithdrawals()
-      .then((mirrored) => {
-        if (!mirrored.length) return;
-        reconcileBills();
-      })
-      .catch(() => undefined);
   }
   // 结算失败的那几笔不靠「记在内存里下次重试」找回来 —— 见 reconcileBills 的注释。
   reconcileBills();
@@ -288,11 +274,7 @@ function stopArrivalPoll() {
   }
 }
 
-// ── Trial state-machine poll (FEAT-TRIAL02 cardless machine) ──
-// The 4s poll only advances the lifecycle (active→grace→ended) and surfaces
-// toasts/urgency pushes. Spec ④ 禁止动作: NO auto-charge, NO auto-order — the
-// grace→ended flip touches state only; conversion money + the order live in
-// the checkout page (user-confirmed). Mirrors TRIAL_TICK_MS = 4000.
+// Mock trial progression and shared lifecycle notices.
 const TRIAL_TICK_MS = 4000;
 const URGENCY_24H_MS = 24 * 3_600_000;
 const URGENCY_1H_MS = 60 * 60_000;
@@ -305,15 +287,27 @@ async function pollTrial() {
   if (!ensureBusinessLoopsAllowed() || trialPollRunning) return;
   trialPollRunning = true;
   const freeTrial = useFreeTrial();
+  const trialBindingEpoch = freeTrial.getBindingEpoch();
   const before = freeTrial.status;
   const nowMs = Date.now();
+  let confirmed = false;
   try {
-    await freeTrial.poll(nowMs);
+    confirmed = await freeTrial.poll(nowMs);
   } finally {
     trialPollRunning = false;
   }
+  if (!confirmed || !ensureBusinessLoopsAllowed()) return;
+  showTrialNotices(before, nowMs, trialBindingEpoch);
+}
+
+function showTrialNotices(before: ReturnType<typeof useFreeTrial>["status"], nowMs: number, trialBindingEpoch: number) {
+  const freeTrial = useFreeTrial();
   const after = freeTrial.status;
+  const expired = remoteApiEnabled ? freeTrial.takeExpiryNotice(trialBindingEpoch)
+    : (before === "active" || before === "grace") && after === "ended";
+  if (!expired && after !== "active" && after !== "grace" && after === before) return;
   const t = useT().value;
+  if (expired) toast.info(t.trial.endedToast);
 
   if (before !== after) {
     if (after === "grace") {
@@ -323,8 +317,6 @@ async function pollTrial() {
       toast.info(fmt(t.trial.graceStartToast, { time: until }));
       urgencyFired.grace24h = false;
       urgencyFired.grace1h = false;
-    } else if (after === "ended") {
-      toast.info(t.trial.endedToast);
     } else if (after === "active") {
       urgencyFired.active24h = false;
       urgencyFired.grace24h = false;
@@ -367,6 +359,99 @@ function stopTrialPoll() {
     clearInterval(trialTimer);
     trialTimer = undefined;
   }
+}
+
+const IDLE_READ_MS = 30 * 60_000;
+const trialReadRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/me", "pages/me/devices", "pages/me/trial"]);
+let scheduledReadBinding = "";
+let idleReadOffset = 0;
+let lastIdleSlot = 0;
+let trialExpiryAttempt = "";
+let lastTrialNoticeEpoch = -1;
+let lastTrialNoticeStatus: ReturnType<typeof useFreeTrial>["status"] = "none";
+
+function refreshVisibleResource(route: string) {
+  if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible();
+  else if (route === "pages/me/wallet-bills") void refreshActivePage(route);
+  else if (route === "pages/me/notifications" && useMessageDrawer().section === "notifications") {
+    const notifications = useNotifications();
+    if (!notifications.loading) void notifications.refreshRemote();
+  }
+}
+
+function runScheduledReads(route: string, reconnected = false) {
+  if (!remoteApiEnabled || !businessLoopsRunning || !foregroundReadAllowed() || hasPendingLegalTermsRequirement()
+    || !route || isAuthWhitelisted(route) || isLegalTermsGateExemptRoute(`/${route}`)) return;
+  const app = useApp();
+  const auth = useAuth();
+  if (!canRefreshRemoteAccount(auth) || app.accountKey !== auth.accountId) return;
+  const binding = `${app.accountKey}:${app.accountBindingEpoch}`;
+  const resumed = binding !== scheduledReadBinding;
+  const now = Date.now();
+  if (resumed) {
+    let hash = 2166136261;
+    for (let i = 0; i < app.accountKey.length; i++) hash = Math.imul(hash ^ app.accountKey.charCodeAt(i), 16777619);
+    idleReadOffset = (hash >>> 0) % IDLE_READ_MS;
+    lastIdleSlot = Math.floor((now - idleReadOffset) / IDLE_READ_MS);
+    scheduledReadBinding = binding;
+  }
+  const slot = Math.floor((now - idleReadOffset) / IDLE_READ_MS);
+  const idleDue = slot > lastIdleSlot;
+  if (idleDue) lastIdleSlot = slot;
+
+  const trial = useFreeTrial();
+  const epoch = trial.getBindingEpoch();
+  const status = trial.status;
+  if (trial.authorityStatus === "ready") {
+    if (epoch !== lastTrialNoticeEpoch) {
+      lastTrialNoticeEpoch = epoch;
+      lastTrialNoticeStatus = status;
+      urgencyFired.active24h = urgencyFired.grace24h = urgencyFired.grace1h = false;
+    }
+    showTrialNotices(lastTrialNoticeStatus, now, epoch);
+    lastTrialNoticeStatus = status;
+  }
+  const boundary = status === "active" ? trial.expiresAt : status === "grace" ? trial.graceEndsAt : null;
+  if (boundary !== null && trial.serverTimeAt(now) >= boundary) {
+    const attempt = `${epoch}:${trial.authorityClaimNo}:${boundary}`;
+    if (trialExpiryAttempt !== attempt || ((resumed || reconnected) && trial.authorityStatus === "error")) {
+      trialExpiryAttempt = attempt;
+      void trial.refreshAtBoundary(boundary).then(checked => {
+        if (!checked && trialExpiryAttempt === attempt) trialExpiryAttempt = "";
+      });
+      return;
+    }
+  }
+  if (idleDue || ((resumed || reconnected) && trialReadRoutes.has(route))) refreshVisibleResource(route);
+}
+
+function installForegroundReadSignals() {
+  // #ifdef H5
+  const syncDocument = () => { documentReadVisible.value = !document.hidden; };
+  const syncNetwork = () => { appReadOnline.value = navigator.onLine; };
+  document.addEventListener("visibilitychange", syncDocument);
+  window.addEventListener("online", syncNetwork);
+  window.addEventListener("offline", syncNetwork);
+  syncDocument();
+  syncNetwork();
+  // #endif
+  // #ifdef APP-PLUS
+  appReadOnline.value = false;
+  let observedNetworkChange = false;
+  uni.onNetworkStatusChange(({ isConnected }) => {
+    observedNetworkChange = true;
+    appReadOnline.value = isConnected;
+  });
+  uni.getNetworkType({
+    success: ({ networkType }) => { if (!observedNetworkChange) appReadOnline.value = networkType !== "none"; },
+    fail: () => { if (!observedNetworkChange) appReadOnline.value = true; },
+  });
+  // #endif
+  const app = useApp();
+  watch([foregroundReadAllowed, appReadOnline, () => app.accountBindingEpoch], ([allowed, online], [, wasOnline]) => {
+    if (allowed) runScheduledReads(readCurrentRoute(), online && !wasOnline);
+    else scheduledReadBinding = "";
+  });
 }
 
 // ── ORDER_TICK 6s loop (ports SimulationProvider's ORDER_TICK loop) ──
@@ -1058,6 +1143,7 @@ function checkQuestRoute() {
   // 所以离开评审页后必须由仍存活的守卫在这一拍重新校验并恢复；放在同路由短路前，
   // 才能覆盖「路由已经切回业务页、lastQuestRoute 也已更新」的时序。
   if (!ensureBusinessLoopsRunning()) return;
+  runScheduledReads(route);
   if (route === lastQuestRoute) return; // only act on route change
   lastQuestRoute = route;
   if (remoteApiEnabled) {
@@ -1148,9 +1234,9 @@ function installBusinessLoopProbe(): void {
 // 🔴 不变量:守卫只随前台/后台成对开关 —— onShow 起、onHide 停,其余任何时候都活着。
 // 它在白名单页由自身前两行(checkAuthGuard/checkSession 的白名单短路)保持惰性,常开无业务副作用。
 function stopBusinessLoops() {
-  useMessageDrawer().stopRefresh();
   useConversations().stopRealtime();
   businessLoopsRunning = false;
+  scheduledReadBinding = "";
   stopBusinessTimeouts();
   useDeposits().pauseMockEngine();
   pauseBehaviorAnalytics();
@@ -1198,17 +1284,18 @@ function ensureBusinessLoopsAllowed(): boolean {
 function ensureBusinessLoopsRunning(): boolean {
   if (!ensureBusinessLoopsAllowed()) return false;
   useConversations().startRealtime();
-  useMessageDrawer().startRefresh();
   if (businessLoopsRunning) return true;
 
   useApp().settle();
-  advanceArrivalAndSettleBill();
+  if (!remoteApiEnabled) advanceArrivalAndSettleBill();
   businessLoopsRunning = true;
   try {
     useDeposits().resumeMockEngine();
     startTick();
-    startArrivalPoll();
-    startTrialPoll();
+    if (!remoteApiEnabled) {
+      startArrivalPoll();
+      startTrialPoll();
+    }
     startOrderPoll();
     startMilestonePoll();
     startBehaviorAnalytics();
@@ -1233,6 +1320,7 @@ onLaunch(() => {
   // 同样必须在 early return 之前挂 —— 退役路由 / 静态评审页也有输入框。
   installFieldNaming();
   const auth = useAuth();
+  if (remoteApiEnabled) installForegroundReadSignals();
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler(() => {
       // Preserve only the non-secret trace long enough to choose the login explanation.
@@ -1294,6 +1382,7 @@ onLaunch(() => {
   scheduleAccountSessionBootstrap();
 });
 onShow(() => {
+  appReadForeground.value = true;
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");
@@ -1335,10 +1424,12 @@ onShow(() => {
     void probeServerSession();
   }
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
+  runScheduledReads(readCurrentRoute());
   if (remoteApiEnabled) void useApp().syncRemoteTaskAssignments();
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
+  appReadForeground.value = false;
   if (remoteApiEnabled) useApp().setRemoteTaskForeground(false);
   detachSessionWatch();
   stopBusinessLoops();

@@ -157,12 +157,11 @@ const freeTrial = useFreeTrial();
 let earnPageVisible = false;
 let earnObservationEpoch = 0;
 
-// The banner is the first discoverable H2 entry. Do not make a new user wait
-// for the global poll before we know whether the server has made it eligible.
+// The banner uses the current trial projection on each visible entry.
 onShow(() => {
   earnPageVisible = true;
   if (remoteApiEnabled) {
-    void freeTrial.refreshRemote(true);
+    void freeTrial.refreshVisible();
     void app.refreshRemoteFleet(undefined, { coalesce: true }).catch(() => undefined);
     void app.refreshHomeTruth().catch(() => undefined);
     void observeDayOneEarnPage();

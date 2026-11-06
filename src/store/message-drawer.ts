@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { remoteApiEnabled } from "@/api/runtime";
 import { useNotifications } from "./notifications";
 import { useConversations } from "./conversations";
 import { useTickets } from "./tickets";
@@ -20,9 +19,7 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
   const error = computed(() => notifications.error || conversations.error || tickets.error
     || (conversations.categoryAvailabilityStatus === "failed" ? "SUPPORT_CATEGORIES_UNAVAILABLE" : null));
   let epoch = 0;
-  let running = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let inFlight: { human: boolean; promise: Promise<void> } | undefined;
+  let inFlight: Promise<void> | undefined;
   let opening: Promise<boolean> | undefined;
 
   function show(initialSection?: MessageSection) {
@@ -36,45 +33,23 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
       .finally(() => { opening = undefined; });
   }
 
-  async function refresh(includeHuman = true): Promise<void> {
+  async function refresh(): Promise<void> {
+    if (inFlight) return inFlight;
     const requestEpoch = epoch;
     const active = () => requestEpoch === epoch;
-    if (inFlight) {
-      const previous = inFlight;
-      await previous.promise;
-      if (active() && includeHuman && !previous.human) await refresh();
-      return;
-    }
-    const work = async () => {
-      const requests: Promise<unknown>[] = [];
-      // A page-triggered request already supplies this snapshot; do not race pagination.
-      if (!notifications.loading) requests.push(notifications.refreshRemote(undefined, active));
-      if (!tickets.loading) requests.push(tickets.refresh(active));
-      if (includeHuman) requests.push(conversations.refresh(active), conversations.refreshCategories(active));
-      await Promise.allSettled(requests);
-    };
-    const job = { human: includeHuman, promise: work() };
+    const requests: Promise<unknown>[] = [];
+    // A page-triggered request already supplies this snapshot; do not race pagination.
+    if (!notifications.loading) requests.push(notifications.refreshRemote(undefined, active));
+    if (!tickets.loading) requests.push(tickets.refresh(active));
+    requests.push(conversations.refresh(active), conversations.refreshCategories(active));
+    const job = Promise.allSettled(requests).then(() => undefined);
     inFlight = job;
-    try { await job.promise; }
+    try { await job; }
     finally { if (inFlight === job) inFlight = undefined; }
   }
 
-  function startRefresh() {
-    if (running || !remoteApiEnabled) return;
-    running = true;
-    const requestEpoch = epoch;
-    const tick = async () => {
-      if (!running || requestEpoch !== epoch) return;
-      await refresh(false);
-      if (running && requestEpoch === epoch) timer = setTimeout(() => { void tick(); }, 15_000);
-    };
-    void tick();
-  }
   function stopRefresh() {
-    running = false;
     epoch += 1;
-    clearTimeout(timer);
-    timer = undefined;
     inFlight = undefined;
     notifications.cancelRefresh();
     tickets.cancelRefresh();
@@ -85,5 +60,5 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
   }
 
   return { section, show, advisorUnread, supportUnread, humanUnread, ticketUnread, serviceUnread, totalUnread,
-    loading, error, refresh, startRefresh, stopRefresh, bindAccount };
+    loading, error, refresh, startRefresh: refresh, stopRefresh, bindAccount };
 });

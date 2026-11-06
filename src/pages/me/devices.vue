@@ -215,6 +215,7 @@
 import { formatAmount } from "@/lib/amount-display";
 import { navReset, navTo } from "@/lib/route";
 import { computed, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
@@ -255,6 +256,7 @@ const session = useSession();
 const nativePhoneAvailable = hasNativeAndroidPhoneRuntime();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 const trial = useFreeTrial();
+onShow(() => { void trial.refreshVisible(); });
 const deferredCommandInFlight = ref<Set<string>>(new Set());
 
 // A fleet snapshot alone cannot establish the slot count: an active trial

@@ -116,6 +116,7 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
+import { useFreeTrial } from "@/store/free-trial";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
 import { useGenesisConfig } from "@/store/genesis-config";
 import AppChassis from "@/components/app-chassis.vue";
@@ -175,6 +176,7 @@ onShow(() => useGenesisConfig().refresh());
 const locale = useLocaleStore();
 const platformConfig = useConfig();
 onShow(() => { void platformConfig.load(); });
+onShow(() => { void useFreeTrial().refreshVisible(); });
 const weeklyQuestStore = useWeeklyQuest();
 const instance = getCurrentInstance();
 const homePromotions = ref<PublicPromotion[]>([]);
