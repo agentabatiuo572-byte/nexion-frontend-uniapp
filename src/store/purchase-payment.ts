@@ -279,7 +279,13 @@ async function submitOriginal() {
         }
         if (existing) accept(existing, pending);
         else if (refusal) { release(pending); Object.assign(state, { pending: null, quote: null, intent: null }); conclude(refusal); }
-        else { retire(pending, accountKey); state.pending = null; state.quote = null; state.intent = null; requote = true; }
+        else {
+          const unconfigured = cause.status === 503 && cause.message === 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED';
+          if (unconfigured) retire(pending, accountKey); else release(pending);
+          Object.assign(state, { pending: null, quote: null, intent: null });
+          // Channel-not-configured keeps its existing fallback. A cold resume has no caller to quote or confirm again.
+          if (state.coldResume && !unconfigured) conclude('changed'); else requote = true;
+        }
       }
     }
   } finally {
