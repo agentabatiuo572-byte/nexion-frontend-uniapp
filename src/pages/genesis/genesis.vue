@@ -17,8 +17,9 @@
         <view class="genesis-meter-meta"><text>{{ t.genesis.soldOf }}</text><view v-if="supplyDisplay.known" class="genesis-meter-count"><text>{{ supplyDisplay.summary.split(" / ")[0] }}</text><text class="genesis-meter-total"> / {{ supplyDisplay.summary.split(" / ")[1] }}</text></view><text v-else class="genesis-meter-count">—</text></view>
         <text v-if="showUrgency" class="genesis-remaining">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
       </view>
-      <view class="genesis-section"><text>{{ t.genesis.tier.title }}</text><text v-if="!showUrgency" class="genesis-caption">{{ dockCtaText }}</text><view class="genesis-refresh" role="button" tabindex="0" :aria-label="t.genesis.refresh" :aria-disabled="refreshing" @click="retryGenesis"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></view></view>
+      <view class="genesis-section"><text>{{ t.genesis.tier.title }}</text><text v-if="!showUrgency" class="genesis-caption">{{ dockCtaText }}</text></view>
       <view class="genesis-tier-card">
+        <view v-if="!tiers.length" class="genesis-tier" style="min-height:132px"><text>—</text></view>
         <view v-for="tr in tiers" :key="tr.id" class="genesis-tier" :class="{ 'genesis-tier--sold': tr.state === 'sold' }">
           <view class="genesis-gold-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2-10 5 10 5 10-5-10-5ZM2 12l10 5 10-5M2 17l10 5 10-5"/></svg></view>
           <view class="flex-1 min-w-0"><view class="flex items-center" style="gap:6px"><text class="genesis-subtitle">{{ t.genesis.tier[tr.labelKey] }}</text><text v-if="tr.state === 'current' && dockActive" class="genesis-tier-chip">{{ t.genesis.tier.live }}</text><text v-else-if="tr.state === 'sold'" class="genesis-caption">{{ t.genesis.tier.soldOut }}</text></view><text class="genesis-tier-meta">{{ tr.state === 'current' && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal.toLocaleString(locale.code) }) }}</text></view>
@@ -39,6 +40,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
@@ -82,6 +84,8 @@ async function retryGenesis() {
 let refreshInFlight: Promise<void> | null = null;
 let genesisPageVisible = false;
 let refreshRequested = false;
+const genesisReadFailed = ref(false);
+useAutoRecovery({ failed: () => remoteApiEnabled && genesisReadFailed.value, retry: () => refreshGenesisPage(true) });
 
 function refreshGenesisPage(recheck = false): Promise<void> {
   if (!genesisPageVisible) return Promise.resolve();
@@ -89,12 +93,14 @@ function refreshGenesisPage(recheck = false): Promise<void> {
     if (recheck) refreshRequested = true;
     return refreshInFlight;
   }
+  genesisReadFailed.value = false;
   const operation = (async () => {
     do {
       refreshRequested = false;
       await cfg.refresh();
       if (!genesisPageVisible) return;
       await genesis.syncRemote();
+      genesisReadFailed.value = !cfg.loaded || (genesis.remotePublicReadState === "unavailable" && genesis.remotePublicError !== "GENESIS_SERIES_UNAVAILABLE");
     } while (refreshRequested && genesisPageVisible);
   })();
   refreshInFlight = operation;
@@ -239,7 +245,7 @@ const priceText = computed(() => formatAmount(price.value));
 // 运营增删档(t3/t4…)标签不错位、末档恒为 Final(修 id 硬编码致 label 错位)。
 type TierLabelKey = "wl" | "t1" | "tail";
 const tiers = computed(() =>
-  deriveGenesisTierRows(cfg.config.tiers, sold.value).map((tier, i, arr) => {
+  remoteApiEnabled && !cfg.loaded ? [] : deriveGenesisTierRows(cfg.config.tiers, sold.value).map((tier, i, arr) => {
     const labelKey: TierLabelKey = i === 0 ? "wl" : i === arr.length - 1 ? "tail" : "t1";
     return {
       id: tier.id,

@@ -36,6 +36,8 @@
 </template>
 
 <script setup lang="ts">
+import { useFreeTrial } from "@/store/free-trial";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { computed, nextTick, ref, watch } from "vue";
 import { onShow } from "@/composables/use-tab-page-lifecycle";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -62,8 +64,9 @@ const t = useT();
 const copy = useAuditUiCopy();
 const trialCopy = useTrialFleetCopy();
 const fleet = useFleetSlots();
+useAutoRecovery({ failed: () => remoteApiEnabled && !useTrialClaimSheet().open && useFreeTrial().authorityStatus === "error", retry: () => useFreeTrial().refreshRemote() });
 useAutoRecovery({
-  failed: () => remoteApiEnabled && (app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error"),
+  failed: () => !useSlotActionSheet().open && remoteApiEnabled && (app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error"),
   retry: () => app.refreshRemoteFleet(undefined, { coalesce: true }),
 });
 

@@ -118,6 +118,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
@@ -191,6 +192,7 @@ const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold
 const entered = ref(false);
 watch(cardInView, visible => { if (visible) entered.value = true; });
 const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id, cardInView);
+useAutoRecovery({ failed: () => remoteApiEnabled && cardInView.value && eligibility.value.status === "error", retry: retryEligibility });
 const gate = computed(() => stockUnavailable.value
   ? {
       gated: true,

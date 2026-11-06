@@ -25,7 +25,7 @@
       <view v-if="publicOnly" class="promotion promotion-main" data-testid="promotion-public-detail">
         <text class="promotion-title">{{ activity?localized(activity.title,locale.code):promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
         <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-        <view v-else-if="promotionStatus==='error'" class="nx-inline-recovery" role="alert"><text class="promotion-copy nx-inline-recovery__copy">{{ t.promotion.errorNote }}</text><view class="promotion-link nx-inline-recovery__action" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
+        <text v-else-if="promotionStatus === 'error'" class="promotion-copy">—</text>
         <text v-else-if="activity&&promotionStatus==='ready'&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
         <PromotionProduct v-if="activity" :activity="activity" :product-no="id" expanded public-only />
         <view v-if="activity||voucherContext.voucherId" class="promotion-action primary" role="button" tabindex="0" @click="navTo('/pages/login/login?return='+encodeURIComponent(promotionDetailHref(id,activityId,voucherContext)))"><text>{{ t.promotion.signIn }}</text></view>
@@ -110,7 +110,7 @@
         <view v-if="activityId" class="mx-4 mt-3 promotion promotion-flat" data-testid="detail-promotion">
           <text class="promotion-title">{{ activity?t.promotion.gift:promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
           <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-          <view v-else-if="promotionStatus==='error'" class="nx-inline-recovery" role="alert"><text class="promotion-copy nx-inline-recovery__copy">{{ t.promotion.errorNote }}</text><view class="promotion-link nx-inline-recovery__action" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
+          <text v-else-if="promotionStatus === 'error'" class="promotion-copy">—</text>
           <text v-else-if="activity&&promotionStatus==='ready'&&(!promotionAvailable||!activity.productNos.includes(product.id))" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
           <PromotionProduct v-if="activity" :activity="activity" :product-no="product.id" expanded />
           <view v-if="bundleActivityVisible" :aria-disabled="!canBundleActivity" class="promotion-link" role="button" tabindex="0" @click="canBundleActivity && navTo(promotionBundleHref(activityId,[{productNo:product.id,quantity:qty}]))"><text>{{ t.promotion.bundle }}</text></view>
@@ -213,8 +213,8 @@
               </view>
             </template>
             <template v-else>
-              <text class="block" :style="trustBodyStyle">{{ trustStatus === 'error' ? t.store.relatedMaterialsLoadFailed : t.store.relatedMaterialsEmpty }}</text>
-              <view v-if="trustStatus === 'error'" class="product-material-retry" role="button" tabindex="0" @click="refreshTrustMaterial" @keydown.enter.prevent="refreshTrustMaterial" @keydown.space.prevent="refreshTrustMaterial"><text class="product-material-retry__label">{{ t.network.retry }}</text><text aria-hidden="true">→</text></view>
+              <text class="block" :style="trustBodyStyle">{{ trustStatus === 'error' ? '—' : t.store.relatedMaterialsEmpty }}</text>
+
             </template>
           </view>
         </template>
@@ -242,6 +242,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
@@ -295,6 +296,7 @@ const phase = useProductPhase();
 const trustLanguage = computed<TrustLocale>(() => serverLanguage(locale.code));
 const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = usePublishedTrust();
 function refreshTrustMaterial() { if (trustStatus.value === 'error') void refreshTrust(true); }
+useAutoRecovery({ failed: () => trustStatus.value === "error", retry: () => refreshTrust(true) });
 
 const app = useApp();
 const id = ref("");
@@ -302,6 +304,7 @@ const activityId=ref('');
 const voucherContext=ref<VoucherEntryContext>({});
 const publicOnly=computed(()=>{void app.accountKey;void app.accountBindingEpoch;return !sessionVault.read();});
 const {activity,status:promotionStatus,available:promotionAvailable,refresh:refreshPromotion}=usePromotionContext(activityId, true);
+useAutoRecovery({ failed: () => promotionStatus.value === "error", retry: () => refreshPromotion() });
 const catalogRetrying = ref(false);
 let detailPageVisible = false;
 let detailObservationEpoch = 0;
@@ -972,9 +975,6 @@ const faqQStyle: CSSProperties = {
   backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);
   box-shadow:inset 0 1px 0 var(--v5-sticky-bar-border);
 }
-.product-material-retry { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: var(--v5-space-1) var(--v5-space-4); margin-top: var(--v5-space-3); border: 1px solid var(--v5-border); border-radius: 999px; color: var(--v5-ink); font-size: var(--ui-type-list-subtitle); }
-.product-material-retry__label { font: 600 13px/20px var(--font-v5); }
-.product-material-retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .promotion-quantity-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;overflow:hidden; }
 .promotion-quantity-stepper view { min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--v5-surface-2); }
 .promotion-quantity-stepper text { min-width:36px;text-align:center;font-variant-numeric:tabular-nums; }

@@ -3,13 +3,13 @@
   三格:注册用户 / 在线设备 / 设备排名。
 -->
 <template>
-  <NxSection v-if="compactView && compactAvailable" :title="t.home.networkPulseTitle" :action="copy.details" action-icon-only @action="navTo('/pages/globe/globe')" data-home-section="network">
+  <NxSection v-if="compactView" :title="t.home.networkPulseTitle" :action="copy.details" action-icon-only @action="navTo('/pages/globe/globe')" data-home-section="network">
     <view class="network-compact">
       <view v-for="(m,i) in metrics" :key="m.k" class="network-compact__cell" :role="m.tap ? 'button' : undefined" :tabindex="m.tap ? 0 : -1" @click="activate(m.tap)" @keydown.enter.prevent="activate(m.tap)" @keydown.space.prevent="activate(m.tap)">
         <text class="network-compact__label">{{ m.k }}</text>
         <text class="network-compact__value" :style="m.vSize ? {fontSize:m.vSize} : {}">{{ m.v }}</text>
-        <text v-if="m.subTap" class="network-compact__retry" role="button" tabindex="0" @click.stop="m.subTap()" @keydown.enter.stop.prevent="m.subTap()" @keydown.space.stop.prevent="m.subTap()">{{ m.sub }}</text>
-        <text v-else-if="m.v === '-'" class="network-compact__retry">{{ m.sub }}</text>
+
+
       </view>
     </view>
   </NxSection>
@@ -44,19 +44,10 @@
               class="block mt-0.5 tabular-nums"
               :style="{ fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: m.vSize ?? '20px', color: m.tone, letterSpacing: '-0.014em', lineHeight: 1.05, whiteSpace: 'nowrap' }"
             >{{ m.v }}</text>
-            <!-- Retry has its own tap target; explanation uses the whole rank cell. -->
-            <text
-              v-if="m.subTap"
-              class="block mt-1 truncate active:opacity-70"
-              role="button"
-              tabindex="0"
-              :style="{ font: '600 13px/20px var(--font-v5)', color: m.subTone ?? 'var(--v5-ink-4)', padding: '14px 0', margin: '-14px 0' }"
-              @click.stop="m.subTap()"
+            <!-- The rank cell still opens its explanation. -->
 
-              @keydown.enter.stop.prevent="activate(m.subTap)" @keydown.space.stop.prevent="activate(m.subTap)"
-            >{{ m.sub }}</text>
             <text
-              v-else
+              v-if="m.sub"
               class="block mt-1 font-mono-tabular truncate"
               :style="{ fontSize: '12px', color: m.subTone ?? 'var(--v5-ink-4)' }"
             >{{ m.sub }}</text>
@@ -71,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
@@ -90,6 +82,7 @@ const t = useT();
 const app = useApp();
 const cfg = useConfig();
 const remoteRank = useNetworkRank();
+useAutoRecovery({ failed: () => remoteApiEnabled && remoteRank.status === "error", retry: () => remoteRank.refresh() });
 const visibility = useDataVisibility();
 function refreshRankMoment() {
   if (remoteApiEnabled) void remoteRank.ensure();
@@ -132,17 +125,7 @@ const rank = computed(() => {
     : { kind: snapshot.state };
 });
 // This optional home summary is shown only when all three cells are usable.
-// The full card retains its existing explanations and retry controls.
-const compactAvailable = computed(() => {
-  const members = props.estimated ? props.registeredDisplay : cfg.config.networkPulse?.registeredUsers;
-  const devices = cfg.config.networkPulse?.onlineDevices;
-  const currentRank = rank.value;
-  return !cfg.syncFailed && remoteRank.status !== 'error'
-    && typeof members === 'number' && Number.isSafeInteger(members) && members >= 0
-    && typeof devices === 'number' && Number.isSafeInteger(devices) && devices >= 0
-    && (currentRank.kind === 'unranked'
-      || (currentRank.kind === 'ranked' && Number.isSafeInteger(currentRank.rank) && currentRank.rank > 0));
-});
+// The rank explanation stays available while reads recover automatically.
 const rankExplanation = ref<string | null>(null);
 function explainRank() {
   const state = rank.value.kind;
@@ -163,24 +146,22 @@ interface Cell {
   color?: string;
   skeleton?: boolean; // 只属占位格:健康格有活数据,刷新期间保持旧值(stale-while-revalidate),不糊骨架
   tap?: () => void;
-  subTap?: () => void;
 }
 
 function activate(action?: () => void) {
   action?.();
 }
 
-function placeholderCell(label: string, retry?: () => void, skeleton = showSkeleton.value): Cell {
+function placeholderCell(label: string, skeleton = showSkeleton.value): Cell {
   return {
     k: label,
-    v: "-",
+    v: "—",
     vSize: "12.5px",
     tone: "var(--v5-ink-3)",
-    sub: t.value.home.networkStatRetry,
+    sub: "",
     subTone: "var(--v5-tech-cyan-ink)",
     data: null,
     skeleton,
-    tap: retry ?? (() => { void cfg.load(); }),
   };
 }
 
@@ -197,19 +178,16 @@ const metrics = computed<Cell[]>(() => {
   const devices = displayCell(t.value.home.networkDevices, pulse?.onlineDevices, "var(--v5-tech-cyan-ink)");
 
   const r = rank.value;
-  const retainedRank = remoteRank.status === "error" && remoteRank.snapshot !== null;
   const rankCell: Cell = {
     k: t.value.home.networkYourRank,
     v: r.kind === "ranked" ? visibility.mask(`#${compact(r.rank)}`)
-      : r.kind === "unranked" ? t.value.home.networkRankUnranked : "-",
+      : r.kind === "unranked" ? t.value.home.networkRankUnranked : "—",
     vSize: r.kind === "ranked" ? "20px" : "12px",
     tone: r.kind === "ranked" ? "var(--v5-brand)" : "var(--v5-ink-3)",
-    sub: retainedRank ? t.value.home.networkStale
-      : r.kind === "unavailable" ? t.value.home.networkStatRetry : t.value.home.networkRankExplanation,
+    sub: t.value.home.networkRankExplanation,
     subTone: "var(--v5-tech-cyan-ink)",
     skeleton: remoteApiEnabled && remoteRank.status === "loading" && remoteRank.snapshot === null,
     tap: explainRank,
-    subTap: r.kind === "unavailable" || retainedRank ? () => { void remoteRank.refresh(); } : undefined,
   };
 
   return [members, devices, rankCell];

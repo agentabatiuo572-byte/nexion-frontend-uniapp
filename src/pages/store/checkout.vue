@@ -258,6 +258,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { ref, reactive, nextTick, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
@@ -723,6 +725,7 @@ const { gate: purchaseGate } = usePurchaseGate(product);
 // 都不再读原始 `freeTrial.status`。展示侧按 1s ticker 解析,越界后 ≤1s 自动收回
 // 抵扣行;支付侧按 mockServerNow() 重解一次只用于「还能不能按这份报价成交」。
 const freeTrial = useFreeTrial();
+useAutoRecovery({ failed: () => remoteApiEnabled && !useTrialClaimSheet().open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
 const trialCopy = useTrialLifecycleCopy();
 const purchaseCopy = useTrialPurchaseCopy();
 const trialCfg = computed(() => useTrialConfig().config);

@@ -25,22 +25,17 @@
       </template>
     </view>
 
-    <view class="earnings-feedback" :aria-busy="retrying ? 'true' : 'false'">
-      <template v-if="recovering">
-        <text class="earnings-feedback__key" role="status">{{ app.homeTruthStatus === 'error' ? t.coreReview.earningsReadFailed : t.home.techEarningsLoading }}</text>
-        <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying ? 'true' : 'false'" class="earnings-retry" @click="retryEarnings" @keydown.enter.prevent="retryEarnings" @keydown.space.prevent="retryEarnings"><text>{{ t.ui.retry }}</text></view>
-      </template>
-      <template v-else>
-        <text class="earnings-feedback__key">{{ t.home.techVsYesterdaySamePeriod }}</text>
-        <text class="earnings-feedback__value" :class="deltaTone">{{ deltaText }}</text>
-      </template>
+    <view class="earnings-feedback">
+      <text class="earnings-feedback__key">{{ t.home.techVsYesterdaySamePeriod }}</text>
+      <text class="earnings-feedback__value" :class="deltaTone">{{ deltaText }}</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatGroupedAmount } from "@/lib/amount-display";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
@@ -54,13 +49,7 @@ import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
 const t = useT();
 const visibility = useDataVisibility();
 const app = useApp();
-const retrying = ref(false);
-async function retryEarnings() {
-  if (retrying.value) return;
-  retrying.value = true;
-  try { await app.refreshHomeTruth(); } catch { /* The store keeps the read error visible. */ }
-  finally { retrying.value = false; }
-}
+useAutoRecovery({ failed: () => remoteApiEnabled && app.homeTruthStatus === "error", retry: () => app.refreshHomeTruth() });
 const commission = useCommission();
 const staking = useStaking();
 
@@ -70,7 +59,6 @@ const todayTotal = computed(() => app.earnings.today + commission.todayUSDT() + 
 const remoteToday = computed<number | null>(() => remoteApiEnabled
   ? app.homeTruthStatus === 'error' ? null : app.homeTruth?.earnings.today.usdt ?? null
   : null);
-const recovering = computed(() => remoteApiEnabled && (app.homeTruthStatus === 'error' || (retrying.value && !app.homeTruth)));
 
 // Today minus yesterday comes only from the server field; it is never derived from the percentage.
 const vsYesterday = computed<number | null>(() => remoteApiEnabled && remoteToday.value !== null
@@ -119,7 +107,6 @@ const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\
 .earnings-feedback__value.is-up { color:var(--v5-success-ink); }
 .earnings-feedback__value.is-down { color:var(--v5-danger); }
 .earnings-feedback__value.is-none { color:var(--v5-ink-3); }
-.earnings-retry { flex-shrink:0; display:inline-flex; align-items:center; min-height:44px; margin:-12px 0 -12px auto; padding:0 4px; font:500 13px/18px var(--font-v5); color:var(--v5-brand); cursor:pointer; }
 @keyframes earn-glow-in { from { opacity:0; transform:translateY(60px) scale(.8); } }
 @keyframes earn-grid-in { from { opacity:0; } }
 @keyframes earn-rise { from { opacity:0; transform:translateY(8px); } }

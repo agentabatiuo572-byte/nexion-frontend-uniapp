@@ -4,7 +4,7 @@
       <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : !scopeId?t.promotion.bundle:contextStatus==='ready'?t.promotion.disabled:contextStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
       <text v-if="!scopeId||activity" class="promotion-copy">{{ t.promotion.quantityLimit }}</text>
       <text v-if="scopeId&&(contextStatus==='loading'||contextStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-      <view v-if="scopeId&&contextStatus==='error'" class="nx-inline-recovery" role="alert"><text class="promotion-copy nx-inline-recovery__copy">{{ t.promotion.errorNote }}</text><view class="promotion-link nx-inline-recovery__action" role="button" tabindex="0" @click="refreshContext"><text>{{ t.promotion.retry }}</text></view></view>
+      <text v-if="scopeId && !activity && contextStatus === 'error'" class="promotion-copy">—</text>
       <text v-if="scopeId&&activity&&contextStatus==='ready'&&!available" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
     </view>
     <view v-if="singleActivityProduct" class="promotion-flat" data-testid="single-activity-guidance"><text class="promotion-copy">{{ commerceCopy(locale.code).singleActivity }}</text><view class="promotion-action primary" role="button" tabindex="0" @click="openSingleProduct" @keydown.enter.prevent="openSingleProduct" @keydown.space.prevent="openSingleProduct"><text>{{ commerceCopy(locale.code).singlePurchase }}</text></view></view>
@@ -28,7 +28,7 @@
         </view>
       </view>
     </view>
-    <view v-if="catalogStatus!=='ready'" class="promotion-flat" :class="{ 'nx-inline-recovery': catalogStatus==='error' }" role="status"><text class="promotion-copy" :class="{ 'nx-inline-recovery__copy': catalogStatus==='error' }">{{ catalogStatus==='error'?t.store.catalogErrorBody:t.store.catalogLoadingBody }}</text><view class="promotion-link" :class="{ 'nx-inline-recovery__action': catalogStatus==='error' }" role="button" tabindex="0" @click="refreshProductCatalog(true)"><text>{{ t.promotion.retry }}</text></view></view>
+    <view v-if="catalogStatus!=='ready'" class="promotion-flat" role="status"><text class="promotion-copy">{{ catalogStatus==='loading'?t.store.catalogLoadingBody:'—' }}</text></view>
     <view v-if="suggestions.length" class="promotion-flat">
       <text class="promotion-title">{{ t.promotion.buyMore }}</text>
       <view v-for="product in suggestions" :key="product.id" class="promotion-row">
@@ -64,6 +64,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
@@ -101,6 +102,8 @@ function restore(initial:EntryItem[]=props.initialItems){
 }
 restore(props.initialItems);
 const catalogStatus=computed(()=>productCatalogState.status);
+useAutoRecovery({ failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
+useAutoRecovery({ failed: () => contextStatus.value === "error", retry: () => refreshContext() });
 const catalog=computed(()=>productCatalogPresentation.value?.products??[]);
 const productFor=(id:string)=>catalog.value.find(product=>product.id===id);
 const nameFor=(id:string)=>productFor(id)?.name??t.value.uiChrome.unavailable;

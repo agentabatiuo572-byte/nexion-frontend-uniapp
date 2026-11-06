@@ -9,7 +9,7 @@
         </view>
         <text class="promotion-title">{{ activity ? localized(activity.title,locale.code) : promotionStatus==='ready'?t.promotion.disabled:promotionStatus==='error'?t.promotion.error:t.promotion.loading }}</text>
         <text v-if="!activity&&(promotionStatus==='loading'||promotionStatus==='idle')" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-        <view v-else-if="promotionStatus==='error'" class="nx-inline-recovery" role="alert"><text class="promotion-copy nx-inline-recovery__copy">{{ t.promotion.errorNote }}</text><view class="promotion-link nx-inline-recovery__action" role="button" tabindex="0" @click="refreshPromotion"><text>{{ t.promotion.retry }}</text></view></view>
+        <text v-else-if="promotionStatus==='error'" class="promotion-copy">—</text>
         <text v-else-if="activity&&promotionStatus==='ready'&&!promotionAvailable" class="promotion-copy">{{ localized(activity.eligibilityMessage,locale.code)||t.promotion.disabledNote }}</text>
         <text v-else-if="activity" class="promotion-copy">{{ t.promotion.promoSub }}</text>
         <view v-if="activity && unlockedProducts.filter(p=>p.productType!=='SHARE').length>=2" :aria-disabled="!promotionAvailable" class="promotion-link" role="button" tabindex="0" @click="promotionAvailable && navTo(promotionBundleHref(activityId))"><text>{{ t.promotion.bundle }}</text></view>
@@ -48,9 +48,7 @@
       <view v-if="focusProductId&&!activityId" data-testid="store-goal-focus" class="rounded-2xl" :style="goalFocusCardStyle">
         <text class="block" :style="goalFocusTitleStyle">{{ t.store.goalFocusTitle }}</text>
         <text class="block mt-1" :style="goalFocusBodyStyle">{{ goalFocusBody }}</text>
-        <view v-if="!focusFeatured" class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="goalFocusRetryStyle" @click="retryCatalog">
-          <text>{{ t.store.catalogRetry }}</text>
-        </view>
+
       </view>
 
       <!-- Server mode has no seeded purchase inventory. Keep the live catalog
@@ -59,20 +57,14 @@
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
       </view>
-      <view class="nx-glass-card" v-else-if="catalogStatus === 'error' && !catalogHasProducts" data-testid="store-catalog-error" :style="catalogStateStyle">
-        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
-        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
-        <view class="nx-card-recovery-action active:opacity-70" role="button" tabindex="0" @click="retryCatalog">
-          <text>{{ t.store.catalogRetry }}</text>
-        </view>
-      </view>
+      <view v-else-if="catalogStatus === 'error' && !catalogHasProducts" class="nx-glass-card" :style="catalogStateStyle"><text class="block" :style="catalogStateTitleStyle">{{ t.store.allProducts }}</text><text class="block mt-1" :style="catalogStateBodyStyle">—</text></view>
       <view class="nx-glass-card" v-if="!activityId && catalogStatus === 'ready' && !catalogHasProducts" data-testid="store-catalog-empty" :style="catalogStateStyle">
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogEmptyTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogEmptyBody }}</text>
       </view>
       <view v-if="activity&&promotionStatus==='ready'&&catalogStatus==='ready'&&!unlockedProducts.length" class="promotion-flat"><text class="promotion-copy">{{ t.promotion.noMatchingProducts }}</text><view class="promotion-link" role="button" tabindex="0" @click="clearPromotion"><text>{{ t.promotion.allProducts }}</text></view></view>
       <template v-if="catalogHasProducts">
-        <NxSection class="store-catalogue" :title="t.store.allProducts" :meta="String(unlockedProducts.length)" :action="catalogStatus === 'error' ? t.store.catalogRetry : undefined" @action="retryCatalog">
+        <NxSection class="store-catalogue" :title="t.store.allProducts" :meta="String(unlockedProducts.length)">
           <view class="store-product-grid">
             <ProductCard v-for="p in catalogProducts" :key="p.id" :product="p" :promotion="activity" :activity-id="activityId" :voucher-context="voucherContext" :promotion-ready="promotionStatus==='ready'" compact />
           </view>
@@ -98,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSProperties } from "vue";
@@ -380,6 +373,8 @@ const catalogProducts = computed(() => focusFeatured.value
 function retryCatalog() {
   void refreshProductCatalog(true);
 }
+useAutoRecovery({ failed: () => promotionStatus.value === "error", retry: () => refreshPromotion() });
+useAutoRecovery({ failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
 
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:
 // soft bg tint + content color, no border).

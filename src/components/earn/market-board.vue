@@ -55,7 +55,7 @@
           </view>
         </view>
       </view>
-      <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="earn-market__retry" role="button" tabindex="0" @click="app.refreshHomeTruth()" @keydown.enter.stop.prevent="app.refreshHomeTruth()" @keydown.space.stop.prevent="app.refreshHomeTruth()"><text>{{ t.uiChrome.unavailable }} · {{ t.ui.retry }}</text></view>
+
     </view>
   </view>
 </template>
@@ -192,7 +192,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-row { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) 96px; align-items: center; gap: 8px; min-height: 44px; }
 .earn-ranking-row--link { cursor: pointer; }
 .earn-ranking-row--link:active { opacity: .7; }
-.earn-ranking-row--link:focus-visible, .earn-market__retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.earn-ranking-row--link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .earn-ranking-row__no { font: 500 12px/16px var(--font-metric); color: var(--v5-ink-3); }
 .earn-ranking-row__art { width: 28px; height: 24px; }
 .earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
@@ -202,7 +202,6 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-ranking-value__track { position: relative; width: 96px; height: 3px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .earn-ranking-value__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: color-mix(in srgb, var(--v5-tech-cyan) 60%, transparent); }
-.earn-market__retry { display: inline-flex; align-items: center; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
 @media (max-width: 374px) {
   .earn-market__tile { padding: 10px 8px 8px; }
   .earn-market__price { font-size: 13px; line-height: 18px; }

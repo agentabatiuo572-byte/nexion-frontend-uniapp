@@ -4,11 +4,8 @@
       <text class="promotion-title">{{ t.promotion.promotionList }}</text>
       <view class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.space.prevent="navTo('/pages/me/rewards-list?cat=promotion')"><text>{{ t.promotion.rewards }}</text><text aria-hidden="true">›</text></view>
     </view>
-    <view v-if="(status==='idle'||status==='loading')&&!items.length&&!listRead" class="entry-placeholder" role="status" aria-busy="true" :aria-label="t.promotion.loading"><view /><view /></view>
-    <view v-if="status==='error'" class="entry-status nx-inline-recovery" role="alert">
-      <view class="nx-inline-recovery__copy"><text class="promotion-title">{{ t.promotion.error }}</text><text class="promotion-copy">{{ t.promotion.errorNote }}</text></view>
-      <NxButton class="entry-retry nx-inline-recovery__action" variant="text" size="medium" :label="t.promotion.retry" @click="load(true)"><text>{{ t.promotion.retry }}</text><text aria-hidden="true">→</text></NxButton>
-    </view>
+    <view v-if="!items.length&&!listRead" class="entry-placeholder" role="status" :aria-busy="status==='loading'" :aria-label="status==='loading'?t.promotion.loading:undefined"><text v-if="mode==='home'" class="promotion-title">{{ t.promotion.promotionList }}</text><view /><view /></view>
+
     <view v-if="status==='ready'&&!items.length&&mode==='events'" class="entry-status">
       <text class="promotion-title">{{ t.promotion.empty }}</text><text class="promotion-copy">{{ t.promotion.emptyNote }}</text>
       <NxButton class="entry-cta" size="medium" :label="t.promotion.allProducts" @click="navTo(promotionStoreHref())"><text>{{ t.promotion.allProducts }}</text><text aria-hidden="true">→</text></NxButton>
@@ -83,6 +80,8 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { toast } from "@/store/ui";
 import { fmt } from '@/i18n/format';
 import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
 import { onHide,onShow } from '@/composables/use-tab-page-lifecycle';
@@ -111,6 +110,7 @@ const app=useApp(),locale=useLocaleStore(),theme=useTheme(),t=useT();
 const landing=computed(()=>landingCopy(locale.code));
 const items=ref<PublicPromotion[]>([]),status=ref<'idle'|'loading'|'ready'|'error'>('idle');
 const listRead=ref(false);
+useAutoRecovery({ failed: () => props.active && status.value === "error", retry: () => load(true) });
 const cursor=ref<string|null>(null),hasMore=ref(false),activeIndex=ref(0),termsActivity=ref<PublicPromotion|null>(null);
 const loadedBanners=ref(new Set<string>()),imageRefresh=ref(0);
 const catalogRefreshKey=computed(()=>imageRefresh.value);
@@ -192,7 +192,7 @@ async function load(reset:boolean,preserveImages=false){
     listRead.value=true;
   }catch(cause){if(fence.current(ticket)&&identity===`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`){
     if(cause instanceof Error && 'status' in cause && (cause.status===401||cause.status===403))clear();
-    status.value='error';
+    if(reset)status.value='error';else{status.value='ready';toast.error(t.value.promotion.error);}
   }}finally{if(pendingTicket===ticket)pendingTicket=null;}
 }
 async function move(delta:number){

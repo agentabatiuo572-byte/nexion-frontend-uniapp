@@ -322,10 +322,7 @@
           <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAllAccountReceipts }}</text>
         </view>
       </view>
-      <view v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" role="status" aria-live="polite">
-        <text class="block" style="font-size: 12px; color: var(--v5-danger)">{{ t.wallet.assignmentsUnavailableTitle }}</text>
-        <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.wallet.assignmentsUnavailableBody }}</text>
-      </view>
+      <text v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" class="block" style="min-height:44px;color:var(--v5-ink-3)">—</text>
       <text v-else-if="!taskHistoryReady" class="block" role="status" aria-live="polite" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.taskHistory.loading }}</text>
       <view v-else-if="deviceTodayCompleted.length" class="space-y-1.5">
         <view
@@ -440,10 +437,7 @@
       </view>
       <view v-if="phoneFactsReady" class="earn-stage__recent" data-device-today-completed="true">
         <view class="earn-stage__recent-head"><text>{{ t.earn.todayRecentCompleted }}</text><view class="earn-stage__link" role="link" tabindex="0" @click.stop="goTaskHistory" @keydown.enter.stop.prevent="goTaskHistory"><text>{{ t.taskHistory.viewAllAccountReceipts }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view></view>
-        <view v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" class="earn-stage__recent-note" role="status" aria-live="polite">
-          <text class="block" style="color: var(--v5-danger)">{{ t.wallet.assignmentsUnavailableTitle }}</text>
-          <text class="block">{{ t.wallet.assignmentsUnavailableBody }}</text>
-        </view>
+        <text v-if="remoteApiEnabled && app.remoteAssignmentStatus === 'error'" class="block" style="min-height:44px;color:var(--v5-ink-3)">—</text>
         <text v-else-if="!taskHistoryReady" class="earn-stage__recent-note" role="status" aria-live="polite">{{ t.taskHistory.loading }}</text>
         <view v-else-if="deviceTodayCompleted.length" class="earn-stage__chips">
           <view v-for="done in deviceTodayCompleted" :key="done.receiptNo ?? done.id" class="earn-stage__chip" data-phone-today-task="true"><text>{{ done.type }}</text><text class="earn-stage__chip-amount">{{ visibility.mask(formatTaskReward(done, true)) }}</text></view>
