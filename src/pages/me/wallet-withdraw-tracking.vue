@@ -240,16 +240,16 @@ function openBankTracking() {
 }
 watch(() => wd.value, openBankTracking);
 
-function refreshTrackedWithdrawal(quiet = false): void {
+function refreshTrackedWithdrawal(quiet = false, refreshPrimary = false): void {
   if (!trackingPageVisible.value || !foregroundReadAllowed() || !auth.isAuthenticated) return;
   if (trackedId.value) void trackedWithdrawalRead.refresh(quiet);
-  // Only a missing account snapshot needs an entry list read for selection and daily limits.
-  if (remoteApiEnabled && !app.remoteWithdrawalListHasSnapshot
+  // Entry and manual retry refresh the primary selection when no order was specified.
+  if (remoteApiEnabled && (!app.remoteWithdrawalListHasSnapshot || (refreshPrimary && !deepLinkId.value))
       && app.remoteWithdrawalListStatus !== "loading") void app.refreshRemoteWithdrawalList();
 }
 
 function retryTrackedWithdrawal(): void {
-  refreshTrackedWithdrawal();
+  refreshTrackedWithdrawal(false, true);
 }
 
 function canPollTrackedWithdrawal(): boolean {
@@ -271,8 +271,8 @@ watch([trackingPageVisible, foregroundReadAllowed, () => auth.isAuthenticated], 
     trackedWithdrawalRead.invalidate();
     return;
   }
-  if (!wasVisible || canPollTrackedWithdrawal() || (!wd.value && trackingReadStatus.value !== "not-found")) {
-    refreshTrackedWithdrawal(wasVisible && !!wd.value);
+  if (!wasVisible || !deepLinkId.value || canPollTrackedWithdrawal() || (!wd.value && trackingReadStatus.value !== "not-found")) {
+    refreshTrackedWithdrawal(wasVisible && !!wd.value, true);
     if (!wasVisible || !withdrawalPolicy.value) void loadWithdrawalPolicy();
   }
 });
