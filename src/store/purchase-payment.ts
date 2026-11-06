@@ -20,7 +20,7 @@ type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: st
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone';
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone';
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
@@ -33,6 +33,7 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
   loading: false, retrying: false, busy: false, error: false, unavailable: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
+let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
 let resolveChoice: ((result: PurchaseChoice | null) => void) | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
 let quoteTimer: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<typeof setTimeout> | undefined;
@@ -110,6 +111,7 @@ function conclude(notice: PurchaseNotice) { Object.assign(state, { notice, concl
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
   requestVersion++; stopTimers(); openCashierOnReady = false;
+  reviewedQuote = confirmedQuote = null;
   Object.assign(state, { open: false, loading: false, retrying: false, busy: false, cashier: false, notice: '', concluded: false });
   const done = resolveChoice; resolveChoice = null; context = null; done?.(result);
 }
@@ -147,7 +149,7 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (state.busy || state.pending || !context) return;
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
-  if (method !== state.method) quoteFailures = 0;
+  if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; }
   state.method = method; state.quote = null; state.error = false; state.retrying = false; state.unavailable = false;
   clearTimeout(quoteTimer);
   const version = ++requestVersion, accountKey = state.accountKey, expected = context;
@@ -161,6 +163,10 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
     if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged || !expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
     state.quote = quote; quoteFailures = 0;
+    if (reviewedQuote && !samePaymentTerms(reviewedQuote, quote)) {
+      confirmedQuote = null; state.notice = 'quoteChanged';
+    }
+    reviewedQuote = quote;
     if (quote.deadlineAt) state.deadlineAt = Date.parse(quote.deadlineAt);
     // Swap in a fresh quote 30 s before this one lapses.
     // (setTimeout fires at once beyond 2^31-1 ms, so far-off expiries are capped.)
@@ -194,9 +200,14 @@ function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   const network: ExternalPaymentMethod = !available('CREGIS_USDT_ERC20') && available('CREGIS_USDT_BSC') ? 'CREGIS_USDT_BSC' : 'CREGIS_USDT_ERC20';
   void select(network, 'network');
 }
+function samePaymentTerms(left: PurchaseQuote, right: PurchaseQuote) {
+  return left.paymentMethod === right.paymentMethod && formatAmount(left.totalUsdt) === formatAmount(right.totalUsdt)
+    && left.feePolicyVersion === right.feePolicyVersion;
+}
 /** 前往付款: a short deadline warns first, then the pre-payment reminder; the intent is created only after the reminder. */
 function proceed() {
   if (!state.quote || state.loading || state.busy) return;
+  confirmedQuote = state.quote;
   state.notice = state.deadlineAt !== null && state.deadlineAt - Date.now() < SHORT_DEADLINE_MS ? 'timeShort' : 'reminder';
 }
 async function query() {
@@ -271,11 +282,15 @@ async function submitOriginal() {
 async function confirm() {
   if (!context || state.loading || state.busy || state.pending || account() !== state.accountKey) return;
   if (!context.current()) { state.notice = 'changed'; return; }
-  state.notice = '';
   if (state.method === 'WALLET') { finish({ method: 'WALLET' }); return; }
   const quote = state.quote;
   if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { deadlinePassed(); return; }
-  if (!quote || Date.parse(quote.expiresAt) <= Date.now()) { void select(state.method); return; }
+  if (!quote || Date.parse(quote.expiresAt) <= Date.now()) { confirmedQuote = null; state.notice = ''; void select(state.method); return; }
+  // A new quote id alone is silent; the amount, fee version and method must still be the terms reviewed in the reminder.
+  if (state.notice !== 'reminder' || !confirmedQuote || !samePaymentTerms(confirmedQuote, quote)) {
+    confirmedQuote = null; state.notice = 'quoteChanged'; return;
+  }
+  state.notice = ''; confirmedQuote = null;
   const scope = fingerprint(context);
   const commandKey = context.commandKey?.() ?? acquireAccountCommandKey(KEYS, state.accountKey, scope, 'purchase');
   openCashierOnReady = quote.paymentMethod === 'HDPAY_BANK';
@@ -311,6 +326,7 @@ function restart(step: 'bank' | 'methods') {
 function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'orderNo' | 'image' | 'deadlineAt'> & { amount?: number | string }, pending: PendingExternal | null) {
   const accountKey = account();
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
+  reviewedQuote = confirmedQuote = null;
   Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null, policy: null, notice: '', cashier: false,
     quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });

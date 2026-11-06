@@ -312,6 +312,9 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'leave': return { icon: 'alert', tone: 'warning', title: c.leaveTitle, body: c.leaveBody, primary: c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: payment.close };
+    case 'quoteChanged': return { icon: 'info', tone: 'warning', title: c.changedTitle,
+      body: s.quote ? `${c.changed} ${c.total}: ${s.method === 'HDPAY_BANK' ? '$' : ''}${amount(s.quote.totalUsdt)}${s.method === 'HDPAY_BANK' ? '' : ' USDT'}` : c.changed,
+      primary: c.ok, onPrimary: dismiss, onSecondary: dismiss };
     case 'changed': return { icon: 'info', tone: 'warning', title: c.changedTitle, body: c.changed, primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close, ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
     case 'orderExpired': return { ...refused, title: c.orderExpiredTitle, body: c.orderExpired };
     case 'orderClosed': return { ...refused, title: c.orderClosedTitle, body: c.orderClosed };
