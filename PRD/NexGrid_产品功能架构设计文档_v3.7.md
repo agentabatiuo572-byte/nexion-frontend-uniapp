@@ -2433,17 +2433,11 @@ UI:
 
 ## 9. Wallet(钱包系统)
 
-### 9.1 钱包总览 `/me/wallet`
+### 9.1 钱包总览（「我的」`/pages/me/me`）
 
-iOS Settings 风分组列表:
+钱包摘要与收益概览位于「我的」，旧 `/me/wallet` 独立首页已退役。摘要展示 USDT 余额、UVT 持有量与估值，提供账单、充值、提现和兑换入口；收益概览展示今日收益、累计收益（设备与团队拆分）、待确认收益和锁定奖励。金额按现有服务端权威读取结果展示，缺失时使用占位，不回退为本地默认金额。
 
-| 区 | 内容 |
-|---|---|
-| 顶 hero | USDT $248.56 + NEX 1,240(≈$212)+ Pending $2.31 |
-| 3 圆形 action | Top-up / Withdraw / Exchange |
-| Earnings section | Today / Pending / All-time |
-| Activity section | Daily Check-in 入口(显示当前 streak)+ Transaction History |
-| NEX highlight footer | +10% boost active 提示 |
+**配置读取失败（2026-11-07，BUG-363）**：收益概览下方的配置恢复区显示「正在自动重试。」（九种语言同步），没有手动重试控件，不要求用户重试或刷新。页面显示期间沿用现有自动重读与配置读取冷却；成功后提示自行消失，不改变读取逻辑。余额读取失败时优先显示原余额恢复提示，不叠加配置提示。配置恢复区只显示正文，不显示 `syncFailedTitle`；上方保留「收益」标题。
 
 ### 9.2 充值 `/me/wallet/topup`
 
