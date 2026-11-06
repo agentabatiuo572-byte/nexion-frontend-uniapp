@@ -121,10 +121,12 @@
         <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.trustCenter" @click="goTrust">{{ t.ref.trustCenter }}</text>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import ToastHost from "@/components/toast-host.vue";
 import { displayNickname } from "@/lib/brand-copy";
 import { formatAmount } from "@/lib/amount-display";
 import { privacyPolicyHref } from "@/lib/privacy-return";

@@ -3114,6 +3114,8 @@ export const fil: Messages = {
     autoDetect: "malapit na ang auto-detect",
   },
   ui: {
+    refreshFailed: "Hindi ma-refresh. Subukan ulit mamaya.",
+    networkDisconnected: "Nawala ang koneksyon sa network.",
     confirm: "Kumpirmahin",
     cancel: "I-cancel",
     dismiss: "Isara",

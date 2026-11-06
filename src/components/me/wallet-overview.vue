@@ -70,6 +70,9 @@
     </view>
     </template>
   </view>
+  <NxSheet :open="releaseExplanation !== null" :title="releaseExplanation?.title ?? ''" @close="releaseExplanation = null">
+    <text class="wallet-explanation">{{ releaseExplanation?.message }}</text>
+  </NxSheet>
 </template>
 <script setup lang="ts">
 import { invalidatePassiveTabRead } from "@/lib/passive-tab-read";
@@ -82,7 +85,7 @@ import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot, earningsReleaseHasSnapshot, earningsReleaseStatus, refreshEarningsReleaseStatus, type LedgerRoute } from "@/store/earning-release";
 import { useCommission } from "@/store/commission";
 import { useConfig } from "@/store/config";
-import { confirm as uiConfirm } from "@/store/ui";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { resolveWalletTodayEarnings } from "@/lib/wallet-today-earnings";
 
@@ -141,23 +144,12 @@ function releaseSheetMessage(route: LedgerRoute): string {
     hours: Math.ceil(snapshot.requiredAttestationSeconds / 3600 * 100) / 100,
   });
 }
+const releaseExplanation = ref<{ title: string; message: string } | null>(null);
 function showPendingSheet() {
-  uiConfirm({
-    title: t.value.wallet.pendingSheetTitle,
-    message: releaseSheetMessage("pending_review"),
-    confirmLabel: t.value.wallet.sheetOk,
-    hideCancel: true,
-    icon: "info",
-  });
+  releaseExplanation.value = { title: t.value.wallet.pendingSheetTitle, message: releaseSheetMessage("pending_review") };
 }
 function showLockedSheet() {
-  uiConfirm({
-    title: t.value.wallet.lockedSheetTitle,
-    message: releaseSheetMessage("bonus_locked"),
-    confirmLabel: t.value.wallet.sheetOk,
-    hideCancel: true,
-    icon: "info",
-  });
+  releaseExplanation.value = { title: t.value.wallet.lockedSheetTitle, message: releaseSheetMessage("bonus_locked") };
 }
 
 const buckets = computed(() => ({
@@ -199,6 +191,7 @@ function amountStyle(value: string, size: number, half = false): CSSProperties {
 }
 </script>
 <style scoped>
+.wallet-explanation { display: block; white-space: pre-line; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .me-wallet-overview { color: var(--v5-ink); font-family: var(--font-v5); }
 .wallet-overview-card { padding: var(--v5-space-4); border-radius: var(--v5-radius-l); }
 .wallet-section-title { display: block; margin-bottom: var(--v5-space-3); font-size: var(--ui-type-section); font-weight: 500; }

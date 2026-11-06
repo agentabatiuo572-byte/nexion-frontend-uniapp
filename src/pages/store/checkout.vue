@@ -635,7 +635,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.productUnavailable;
       if (trialCheckoutSource) navBack("/pages/me/trial");
       else navTo("/store");
-      setTimeout(() => { uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 }); }, 120);
+      setTimeout(() => { toast.info(unavailableCopy, undefined, 2600); }, 120);
       return;
     }
     if (!hasOriginalCheckout.value && pp.inventoryMode === "FINITE" && (pp.stock ?? 0) <= 0) {
@@ -643,13 +643,13 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.temporarilyOutOfStock;
       if (trialCheckoutSource) navBack("/pages/me/trial");
       else navTo("/store");
-      setTimeout(() => { uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 }); }, 120);
+      setTimeout(() => { toast.info(unavailableCopy, undefined, 2600); }, 120);
       return;
     }
     const trialConversion = trialQuoteAt(mockServerNow()).applied;
     if (!trialConversion && pp.purchaseBlocked) {
       dropResumeInvoice();
-      uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
+      toast.info(t.value.store.specUnavailable);
       navTo("/store");
       return;
     }
@@ -659,7 +659,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
         && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
       if (!mockEarlyWindow) {
         dropResumeInvoice();
-        uni.showToast({ title: t.value.store.releaseComingToast, icon: "none" });
+        toast.info(t.value.store.releaseComingToast);
         navTo("/store");
         return;
       }
@@ -668,7 +668,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     if (!isCurrentCheckoutRoute(routeScope) || eligibility === "stale") return;
     if (eligibility === "ineligible") {
       dropResumeInvoice();
-      uni.showToast({ title: purchaseEligibilityFailureCopy(), icon: "none" });
+      toast.info(purchaseEligibilityFailureCopy());
       if (resolvePurchaseEligibilityMessage(remotePurchaseEligibilityStatus.value, remotePurchaseEligibility.value) === "quotaDepleted") {
         navTo(`/pages/store/detail?id=${routeScope.productNo}`);
       } else {

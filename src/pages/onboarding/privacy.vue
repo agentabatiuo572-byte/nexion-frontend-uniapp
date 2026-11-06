@@ -16,10 +16,12 @@
         </view>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import ToastHost from "@/components/toast-host.vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";

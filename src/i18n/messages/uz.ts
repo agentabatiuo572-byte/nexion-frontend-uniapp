@@ -3114,6 +3114,8 @@ export const uz: Messages = {
     autoDetect: "avtomatik aniqlash tez orada",
   },
   ui: {
+    refreshFailed: "Yangilab boʻlmadi. Keyinroq qayta urinib koʻring.",
+    networkDisconnected: "Tarmoq aloqasi uzildi.",
     confirm: "Tasdiqlash",
     cancel: "Bekor",
     dismiss: "Yopish",

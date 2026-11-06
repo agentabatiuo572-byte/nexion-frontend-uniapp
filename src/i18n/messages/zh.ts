@@ -2686,6 +2686,8 @@ rankBenefits: "查看等级权益",
 autoDetect: "自动识别即将推出",
 },
   ui: {
+    refreshFailed: "刷新失败，请稍后再试",
+    networkDisconnected: "网络已断开",
     confirm: "确认",
     cancel: "取消",
     dismiss: "关闭",

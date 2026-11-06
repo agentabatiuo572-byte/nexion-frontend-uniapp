@@ -188,7 +188,7 @@ async function collectCalibrationSignals() {
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import type { OnboardingCalibration, PhoneActivationVersions } from "@/api/onboarding-calibration-api";
-import { confirm as uiConfirm, useUI } from "@/store/ui";
+import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -630,7 +630,7 @@ async function deferPhoneActivation() {
       throw new Error("PHONE_DEFER_LOCAL_COMMIT_FAILED");
     }
     if (!completeOnboardingLocally()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
-    uni.showToast({ title: t.value.onboarding.activationDeferredToast, icon: "none" });
+    toast.info(t.value.onboarding.activationDeferredToast);
     navReset({ url: isRecal.value ? "/pages/me/devices" : "/pages/index/index", fail: () => {} });
   } catch (cause) {
     if (scopeIsCurrent(requestScope)) {

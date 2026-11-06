@@ -58,9 +58,9 @@ export function scanAll(files) {
    数值大小 = 真实压盖顺序(已用 elementFromPoint 实测验证过这个前提)。 */
 export const LADDER = [
   { file: "src/components/milestone-celebration.vue", sel: ".ms-overlay", role: "里程碑庆祝(必须在业务 UI 之下)" },
-  { file: "src/components/global-ui.vue", sel: ".nx-toast-host", role: "toast 瞬时层" },
   { file: "src/components/country-code-sheet.vue", sel: ".cc-sheet", role: "国家区号半屏" },
   { file: "src/components/global-ui.vue", sel: ".nx-mask", role: "阻断式弹窗 confirm/netError" },
+  { file: "src/components/toast-host.vue", sel: ".nx-toast-host", role: "toast 瞬时层(高于所有 sheet 和确认框,不拦截点击)" },
   { file: "src/components/captcha-slider.vue", sel: ".cs-layer", role: "🔴 滑块人机验证(阻断式安全控件,发码流程停在它上面)" },
   { file: "src/components/device/standalone-page-shell.vue", sel: ".nx-standalone-home", role: "模拟设备 chrome(硬件层,pointer-events:none)" },
 ];

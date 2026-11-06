@@ -3114,6 +3114,8 @@ export const kk: Messages = {
     autoDetect: "автоматты анықтау жақында",
   },
   ui: {
+    refreshFailed: "Жаңарту сәтсіз аяқталды. Кейінірек қайталап көріңіз.",
+    networkDisconnected: "Желі байланысы үзілді.",
     confirm: "Растау",
     cancel: "Бас тарту",
     dismiss: "Жабу",

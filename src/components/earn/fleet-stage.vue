@@ -1,20 +1,13 @@
 <!-- Earn fleet (P-62): device switcher chips over one device stage; empty, first-load and read-failure states take the stage's place. -->
 <template>
   <view class="fleet-stage">
-    <view v-if="app.remoteFleetStatus === 'error'" class="fleet-stage__banner" role="status">
-      <view class="fleet-stage__banner-copy">
-        <text class="fleet-stage__banner-title">{{ t.coreReview.fleetReadFailed }}</text>
-        <text class="fleet-stage__banner-body">{{ t.coreReview.fleetReadRetry }}</text>
-      </view>
-      <view class="fleet-stage__retry" role="button" tabindex="0" @click="retryFleet"><text>{{ t.ui.retry }}</text></view>
-    </view>
-    <template v-else-if="!fleetReady">
+    <template v-if="!fleetVisible">
       <view class="fleet-stage__chips" aria-hidden="true"><view v-for="n in 3" :key="n" class="fleet-stage__chip fleet-stage__chip--placeholder" /></view>
-      <view class="fleet-stage__skeleton" aria-busy="true">
+      <view class="fleet-stage__skeleton" :aria-busy="app.remoteFleetStatus === 'loading' ? 'true' : 'false'">
         <view class="fleet-stage__bar" style="width: 46%; height: 20px; margin-top: 4px" />
         <view class="fleet-stage__bar" style="width: 22%; height: 12px; margin-top: 10px" />
         <JobGauge />
-        <text class="fleet-stage__loading" role="status">{{ copy.fleetLoading }}</text>
+        <text class="fleet-stage__loading" role="status">{{ app.remoteFleetStatus === 'error' ? '—' : copy.fleetLoading }}</text>
         <view class="fleet-stage__skeleton-stats"><view v-for="n in 3" :key="n"><view class="fleet-stage__bar" style="width: 56px; height: 12px" /><view class="fleet-stage__bar" style="width: 64px; height: 18px" /></view></view>
         <view style="height: 16px" />
       </view>
@@ -50,7 +43,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
-import { invalidatePassiveTabRead } from "@/lib/passive-tab-read";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { deviceName } from "@/lib/device-copy";
 import { deviceTaskRecovering } from "@/lib/task-progress";
@@ -69,10 +62,15 @@ const t = useT();
 const copy = useAuditUiCopy();
 const trialCopy = useTrialFleetCopy();
 const fleet = useFleetSlots();
+useAutoRecovery({
+  failed: () => remoteApiEnabled && (app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error"),
+  retry: () => app.refreshRemoteFleet(undefined, { coalesce: true }),
+});
 
 // A background refresh keeps the bound account's last confirmed fleet; a first read stays unknown.
 const fleetReady = computed(() => !remoteApiEnabled || app.remoteFleetStatus === "ready"
   || (app.remoteFleetStatus === "loading" && app.remoteFleetHasSnapshot));
+const fleetVisible = computed(() => !remoteApiEnabled || app.remoteFleetHasSnapshot);
 const freeSlotsText = computed(() => fmt(t.value.myDevices.emptySlots, { n: fleet.freeSlots.value }));
 const trialArt = computed(() => getProductMedia(fleet.trial.productId.value)?.src ?? null);
 
@@ -119,17 +117,10 @@ function move(delta: number) {
   if (next) select(next.key, true);
 }
 function addDevice() { useSlotActionSheet().openForSlot(); }
-function retryFleet() { invalidatePassiveTabRead("remote-fleet"); void app.refreshRemoteFleet().catch(() => undefined); }
 </script>
 
 <style scoped>
 .fleet-stage { color: var(--v5-ink); }
-.fleet-stage__banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--v5-danger-soft); color: var(--v5-danger); }
-.fleet-stage__banner-copy { min-width: 0; }
-.fleet-stage__banner-title { display: block; font: 600 13px/18px var(--font-v5); }
-.fleet-stage__banner-body { display: block; margin-top: 2px; font: 400 12px/18px var(--font-v5); }
-.fleet-stage__retry { position: relative; flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
-.fleet-stage__retry::after { content: ""; position: absolute; inset: 0 -8px; }
 
 .fleet-stage__chips { display: flex; gap: 8px; padding: 0 16px 2px; overflow-x: auto; scrollbar-width: none; }
 .fleet-stage__chips::-webkit-scrollbar { display: none; }

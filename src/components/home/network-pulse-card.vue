@@ -65,6 +65,9 @@
       </view>
     </view>
   </view>
+  <NxSheet :open="rankExplanation !== null" :title="t.home.networkYourRank" @close="rankExplanation = null">
+    <text class="network-rank-explanation">{{ rankExplanation }}</text>
+  </NxSheet>
 </template>
 
 <script setup lang="ts">
@@ -80,7 +83,7 @@ import { useNetworkRank } from "@/store/network-rank";
 import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
 import { compactNumber as compact, networkPopulationBand } from "@/lib/platform-stats";
-import { confirm } from "@/store/ui";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import { navTo } from "@/lib/route";
 
 const t = useT();
@@ -140,14 +143,13 @@ const compactAvailable = computed(() => {
     && (currentRank.kind === 'unranked'
       || (currentRank.kind === 'ranked' && Number.isSafeInteger(currentRank.rank) && currentRank.rank > 0));
 });
+const rankExplanation = ref<string | null>(null);
 function explainRank() {
   const state = rank.value.kind;
   const status = state === "unranked" ? t.value.home.networkRankTipUnranked
     : state === "disabled" ? t.value.home.networkRankDisabled
     : state === "unavailable" ? t.value.home.networkRankUnavailable : "";
-  void confirm({ title: t.value.home.networkYourRank,
-    message: [status, t.value.home.networkRankTipRanked].filter(Boolean).join("\n\n"),
-    hideCancel: true, icon: "info" });
+  rankExplanation.value = [status, t.value.home.networkRankTipRanked].filter(Boolean).join("\n\n");
 }
 
 interface Cell {
@@ -216,6 +218,7 @@ const metrics = computed<Cell[]>(() => {
 
 </script>
 <style scoped>
+.network-rank-explanation { display: block; white-space: pre-line; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .network-compact {position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:16px 0;border-radius:22px;border:1px solid var(--v5-border);background:var(--v5-surface);}
 .network-compact::before {content:'';position:absolute;inset:0;background-image:radial-gradient(color-mix(in srgb,var(--v5-brand) 10%,transparent) 1px,transparent 1.2px);background-size:10px 10px;mask-image:radial-gradient(80% 120% at 70% 50%,#000,transparent 75%);pointer-events:none;}
 .network-compact__cell {position:relative;min-width:0;padding:0 14px;border-left:1px solid var(--v5-border);}
