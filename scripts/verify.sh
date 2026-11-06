@@ -377,8 +377,9 @@ sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13
 # Bottom spacing keeps P-065 (inset + at least 22px). The shared overlay
 # tokens retain their declared contract; a consumer with a smaller offset
 # needs separate context evidence. Height calculations are a different concern.
-if ! sa_bad=$("$NODE_BIN" -e '
-const fs=require("fs"),path=require("path");
+if ! sa_bad=$("$NODE_BIN" <<'NODE' 2>&1
+const fs=require("fs"),path=require("path"),ts=require("typescript");
+const {parse}=require("@vue/compiler-sfc"),postcss=require("postcss");
 const tokens=fs.readFileSync("src/styles/tokens.css","utf8");
 const spacing=new Map([...tokens.matchAll(/(--v5-space-\d+)\s*:\s*(\d+(?:\.\d+)?px)\s*;/g)].map(m=>[m[1],m[2]]));
 const normalize=value=>value
@@ -393,9 +394,197 @@ const overlayDefined=safeValues.length>0&&bottomValues.length>0
   && bottomValues.every(value=>value==="calc(16px+var(--nx-overlay-safe-bottom))");
 const insetSource=/safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/;
 const bad=[];
-(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);const s=fs.statSync(p);
-if(s.isDirectory())walk(p);else if(/\.(vue|css)$/.test(f)){
-const source=fs.readFileSync(p,"utf8");
+const files=[];
+(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f),s=fs.statSync(p);
+if(s.isDirectory())walk(p);else if(/\.(vue|css)$/.test(f))files.push([p,fs.readFileSync(p,"utf8")]);}})("src");
+const parseTs=(text,file="safe-area.ts")=>{
+  const ast=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+  if(ast.parseDiagnostics.length)throw new Error(`${file}: ${ts.flattenDiagnosticMessageText(ast.parseDiagnostics[0].messageText," ")}`);
+  return ast;
+};
+const binding=n=>(ts.isVariableDeclaration(n.parent)||ts.isParameter(n.parent)||ts.isFunctionDeclaration(n.parent)||ts.isClassDeclaration(n.parent)||ts.isEnumDeclaration(n.parent)
+  ||ts.isImportSpecifier(n.parent)||ts.isImportClause(n.parent)||ts.isNamespaceImport(n.parent)||ts.isBindingElement(n.parent))&&n.parent.name===n;
+const visit=(node)=>{const nodes=[];(function walk(n){nodes.push(n);ts.forEachChild(n,walk);})(node);return nodes;};
+// ponytail: one complete composer chain, not a general data-flow solver. Unknown
+// shapes stay red; local renames and quote/comment changes preserve this proof.
+const proof=parseTs(`
+const composerHost=ref<unknown>(null),composerSpace=ref(86),composerMeasured=ref(false);
+const composerVisible=computed(()=>!props.closed&&!(props.failedSendLabel&&props.canDiscardSend));
+const inputHeight=ref(24);
+if(Number.isFinite(event.detail.height))inputHeight.value=Math.max(24,Math.min(144,event.detail.height));
+composerSpace.value=inputHeight.value+62+(showInputLength.value?36:0)+(inputOverLimit.value?36:0)+(props.attachRetry?44:0);
+composerMeasured.value=false;
+const padding=composerVisible?(composerMeasured?composerSpace+'px':'calc('+composerSpace+'px + env(safe-area-inset-bottom))'):undefined;
+function measureComposer(follow=followingTail){
+  const owner=historyOwner(),epoch=++composerMeasureEpoch;
+  void nextTick(()=>{
+    if(epoch!==composerMeasureEpoch||!threadVisible.value||!composerVisible.value)return;
+    const apply=(height:number|undefined)=>{
+      if(epoch!==composerMeasureEpoch||!threadVisible.value||!composerVisible.value||owner!==historyOwner()||!height||!Number.isFinite(height))return;
+      composerSpace.value=height;
+      composerMeasured.value=true;
+      if(follow&&followingTail&&!preparedHistory&&!pendingPosition)scrollToEnd();
+      else scheduleBubblePositions();
+    };
+    const node=(composerHost.value as {$el?:HTMLElement}|null)?.$el??composerHost.value as HTMLElement|null;
+    if(node?.getBoundingClientRect){apply(node.getBoundingClientRect().height);return;}
+    if(typeof uni==='undefined'||!uni.createSelectorQuery)return;
+    try{
+      const query=uni.createSelectorQuery().in(threadInstance);
+      query.select('.nx-conv-composer').boundingClientRect();
+      query.exec(rows=>apply((rows[0] as UniApp.NodeInfo)?.height));
+    }catch{}
+  });
+}
+const threadInstance=getCurrentInstance();
+const heightStyle={height:inputHeight+'px'};
+function observeComposer(){
+  composerResizeObserver?.disconnect();composerResizeObserver=undefined;invalidateComposerMeasure();measureComposer();
+  const node=(composerHost.value as {$el?:HTMLElement}|null)?.$el??composerHost.value as HTMLElement|null;
+  if(typeof ResizeObserver!=='undefined'&&node?.getBoundingClientRect){composerResizeObserver=new ResizeObserver(()=>measureComposer());composerResizeObserver.observe(node);}
+}
+const measuredList=listHost.value,measuredComposer=composerHost.value;
+if(epoch!==bubbleMeasureEpoch||!threadVisible.value||owner!==historyOwner()||measuredList!==listHost.value||measuredComposer!==composerHost.value||!viewport?.height||viewport.top===undefined)return;
+const composer=(composerHost.value as {$el?:HTMLElement}|null)?.$el??composerHost.value as HTMLElement|null;
+apply(root.getBoundingClientRect(),Array.from(root.querySelectorAll('.nx-conv-bubble')).map(node=>node.getBoundingClientRect()),composer?.querySelector('.nx-conv-compose-field')?.getBoundingClientRect());
+watch(()=>[historyOwner(),listHost.value,composerHost.value,threadVisible.value,composerVisible.value],()=>{
+  cancelBubblePositions();bubblePositions.value={};composerLight.value=composerReflection(undefined,[]);void nextTick(scheduleBubblePositions);
+},{flush:'sync'});
+watch(composerHost,observeComposer,{flush:'post'});
+onMounted(observeComposer);`);
+const same=(actual,expected,names)=>{
+  const aliases=new Map(names);
+  const compare=(a,b)=>{
+    if(!a||!b||a.kind!==b.kind)return false;
+    if((ts.isPrefixUnaryExpression(b)||ts.isPostfixUnaryExpression(b))&&a.operator!==b.operator)return false;
+    if(ts.isIdentifier(b)){
+      if((ts.isPropertyAccessExpression(b.parent)||ts.isPropertySignature(b.parent)||ts.isPropertyAssignment(b.parent))&&b.parent.name===b)return a.text===b.text;
+      if(binding(b)&&!aliases.has(b.text))aliases.set(b.text,a.text);
+      return a.text===(aliases.get(b.text)??b.text);
+    }
+    if(ts.isStringLiteral(b)||ts.isNumericLiteral(b))return a.text===b.text;
+    const ac=[],bc=[];ts.forEachChild(a,n=>{ac.push(n);});ts.forEachChild(b,n=>{bc.push(n);});
+    return ac.length===bc.length&&ac.every((n,i)=>compare(n,bc[i]));
+  };
+  return compare(actual,expected);
+};
+const unwrap=n=>ts.isParenthesizedExpression(n)?unwrap(n.expression):n;
+function composerProof(source,file){
+  const allowed=new Set(),candidates=new Set();
+  if(!file.endsWith(".vue")||!source.includes("paddingBottom"))return {allowed,candidates};
+  const {descriptor,errors}=parse(source,{filename:file});
+  if(errors.length)throw new Error(`${file}: ${errors[0]}`);
+  const elements=[],expressions=[];(function walk(n){
+    if(n.type===1){elements.push(n);for(const prop of n.props)for(const exp of [prop.exp,prop.arg?.isStatic?null:prop.arg])if(exp)expressions.push({exp,prop,owner:n});}
+    if(n.type===5)expressions.push({exp:n.content});
+    for(const c of n.children??[])walk(c);
+  })(descriptor.template.ast);
+  const ast=parseTs(descriptor.scriptSetup?.content??"",file),nodes=visit(ast);
+  const attr=(el,name)=>el.props.find(p=>p.type===6&&p.name===name)?.value?.content;
+  for(const el of elements)for(const style of el.props.filter(p=>p.type===7&&p.name==="bind"&&p.arg?.content==="style")){
+    const expression=unwrap(parseTs(`(${style.exp.content})`).statements[0].expression);
+    if(!ts.isObjectLiteralExpression(expression))continue;
+    for(const property of expression.properties){
+      if(!ts.isPropertyAssignment(property)||property.name.getText()!=="paddingBottom")continue;
+      const outer=unwrap(property.initializer),inner=ts.isConditionalExpression(outer)?unwrap(outer.whenTrue):null;
+      if(!inner||!ts.isConditionalExpression(inner))continue;
+      const position=style.exp.loc.start.offset+property.name.getStart()-1;
+      candidates.add(position);
+      const measured=unwrap(inner.whenTrue);
+      if(!ts.isIdentifier(outer.condition)||!ts.isIdentifier(inner.condition)||!ts.isBinaryExpression(measured)||!ts.isIdentifier(measured.left))continue;
+      const names=new Map([["composerVisible",outer.condition.text],["composerMeasured",inner.condition.text],["composerSpace",measured.left.text]]);
+      const decl=name=>nodes.filter(n=>ts.isVariableDeclaration(n)&&ts.isIdentifier(n.name)&&n.name.text===names.get(name));
+      const space=decl("composerSpace");
+      if(space.length!==1||!ts.isVariableDeclarationList(space[0].parent)||space[0].parent.declarations.length!==3)continue;
+      names.set("composerHost",space[0].parent.declarations[0].name.getText());
+      const writes=name=>nodes.filter(n=>ts.isBinaryExpression(n)&&n.operatorToken.kind>=ts.SyntaxKind.FirstAssignment&&n.operatorToken.kind<=ts.SyntaxKind.LastAssignment
+        &&ts.isPropertyAccessExpression(n.left)&&ts.isIdentifier(n.left.expression)&&n.left.expression.text===names.get(name)&&n.left.name.text==="value");
+      const sw=writes("composerSpace"),mw=writes("composerMeasured");
+      if(sw.length!==2||mw.length!==2)continue;
+      const measuredWrite=sw.find(n=>ts.isIdentifier(n.right)),fallback=sw.find(n=>n!==measuredWrite);
+      const height=visit(fallback?.right??ast).find(n=>ts.isPropertyAccessExpression(n)&&n.name.text==="value"&&ts.isIdentifier(n.expression));
+      if(!measuredWrite||!fallback||!height)continue;
+      names.set("inputHeight",height.expression.text);
+      let fn=measuredWrite;while(fn&&!ts.isFunctionDeclaration(fn))fn=fn.parent;
+      if(!fn?.name)continue;
+      names.set("measureComposer",fn.name.text);
+      const scoped=visit(fn).find(n=>ts.isCallExpression(n)&&ts.isPropertyAccessExpression(n.expression)&&n.expression.name.text==="in");
+      if(!scoped||!ts.isIdentifier(scoped.arguments[0]))continue;
+      names.set("threadInstance",scoped.arguments[0].text);
+      if(fn.parent!==ast||[space[0],decl("composerVisible")[0],decl("inputHeight")[0],decl("threadInstance")[0]].some(n=>n?.parent.parent.parent!==ast))continue;
+      const expected=proof.statements;
+      if(!same(space[0].parent.parent,expected[0],names)||!same(decl("composerVisible")[0]?.parent.parent,expected[1],names)
+        ||!same(decl("inputHeight")[0]?.parent.parent,expected[2],names)||!same(property.initializer,expected[6].declarationList.declarations[0].initializer,names)
+        ||!same(fn,expected[7],names)||!same(fallback.parent,expected[4],names)||!same(decl("threadInstance")[0]?.parent.parent,expected[8],names))continue;
+      const block=fallback.parent.parent,index=block.statements?.indexOf(fallback.parent);
+      if(index===undefined||index<0||!same(block.statements[index+1],expected[5],names))continue;
+      const iw=writes("inputHeight"),approved=new Set([...sw,...mw,...iw]);
+      if(iw.length!==2||!iw.every(n=>n.operatorToken.kind===ts.SyntaxKind.EqualsToken&&(n.right.getText()==="24"||same(n.parent.parent,expected[3],names))))continue;
+      const imports=ast.statements.filter(ts.isImportDeclaration).filter(n=>n.moduleSpecifier.text==="vue"&&!n.importClause?.isTypeOnly)
+        .flatMap(n=>n.importClause?.namedBindings?.elements??[]);
+      const roles=new Set([...names].filter(([key])=>key!=="threadInstance").map(([,value])=>value)),globals=new Set(["ref","computed","nextTick","watch","getCurrentInstance","Number","Math","uni"]);
+      const guarded=[];let depth=0,from=0;
+      for(const directive of source.matchAll(/^[\t ]*(?:\/\/|<!--)\s*#(ifdef|ifndef|endif)\b.*$/gm)){
+        if(directive[1]!=="endif"){if(depth++===0)from=directive.index;}
+        else if(--depth===0)guarded.push([from,directive.index+directive[0].length]);
+      }
+      if(depth>0)guarded.push([from,source.length]);
+      let valid=!nodes.some(n=>ts.isIdentifier(n)&&[...names.values()].includes(n.text)&&guarded.some(([a,b])=>a<=descriptor.scriptSetup.loc.start.offset+n.getStart()&&descriptor.scriptSetup.loc.start.offset+n.getStart()<b));
+      for(const {exp,prop,owner} of expressions){
+        const scanner=ts.createScanner(ts.ScriptTarget.Latest,true,ts.LanguageVariant.Standard,exp.content),refs=[];
+        for(let token=scanner.scan();token!==ts.SyntaxKind.EndOfFileToken;token=scanner.scan())if(token===ts.SyntaxKind.Identifier&&roles.has(scanner.getTokenValue()))refs.push(scanner.getTokenPos());
+        if(!refs.length||exp===style.exp&&refs.every(at=>property.initializer.getStart()-1<=at&&at<property.initializer.end-1))continue;
+        if(!(owner?.tag==="textarea"&&prop.name==="bind"&&prop.arg?.isStatic&&prop.arg.content==="style"
+          &&same(unwrap(parseTs(`(${exp.content})`).statements[0].expression),expected[9].declarationList.declarations[0].initializer,names)))valid=false;
+      }
+      const observers=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="observeComposer"&&same(n,expected[10],names));
+      const bubble=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="measureBubblePositions"),bubbleNodes=bubble?visit(bubble):[];
+      const readers=expected.slice(11,15).map(model=>bubbleNodes.filter(n=>n.kind===model.kind&&same(n,model,names)));
+      const watches=ast.statements.filter(n=>same(n,expected[15],names));
+      if(observers.length!==1||watches.length!==1||readers.some(matches=>matches.length!==1)||!ast.statements.some(n=>same(n,expected[16],names)))valid=false;
+      for(const alias of ["measuredComposer","composer"])if(bubbleNodes.filter(n=>ts.isIdentifier(n)&&n.text===alias).length!==2)valid=false;
+      const hostReaders=[fn,...observers,...watches,...readers.flat()];
+      for(const n of nodes.filter(n=>ts.isIdentifier(n)&&n.text===names.get("composerHost")&&!binding(n)&&ts.isPropertyAccessExpression(n.parent)))
+        if(!hostReaders.some(reader=>reader.getStart()<=n.getStart()&&n.end<=reader.end))valid=false;
+      for(const n of nodes.filter(n=>ts.isIdentifier(n)&&n.text==="observeComposer"))if(!binding(n)&&!(ts.isCallExpression(n.parent)
+        &&(same(n.parent.parent,expected[16],names)||same(n.parent.parent,expected[17],names))))valid=false;
+      if(decl("threadInstance").length!==1||nodes.some(n=>ts.isCallExpression(n)&&ts.isIdentifier(n.expression)&&n.expression.text==="eval"))valid=false;
+      for(const name of roles)if(nodes.filter(n=>ts.isIdentifier(n)&&n.text===name&&binding(n)).length!==1)valid=false;
+      for(const name of ["ref","computed","nextTick","watch","getCurrentInstance"])if(!imports.some(n=>!n.isTypeOnly&&n.name.text===name&&(n.propertyName??n.name).text===name))valid=false;
+      for(const n of nodes.filter(ts.isIdentifier)){
+        if(globals.has(n.text)&&binding(n)&&!imports.includes(n.parent))valid=false;
+        if(n.text===names.get("threadInstance")&&!binding(n)&&!(ts.isCallExpression(n.parent)&&ts.isPropertyAccessExpression(n.parent.expression)&&n.parent.expression.name.text==="in"&&n.parent.arguments[0]===n))valid=false;
+        if(globals.has(n.text)){let root=n;while(root.parent&&(ts.isPropertyAccessExpression(root.parent)||ts.isElementAccessExpression(root.parent)))root=root.parent;
+          if(ts.isBinaryExpression(root.parent)&&root.parent.left===root&&root.parent.operatorToken.kind>=ts.SyntaxKind.FirstAssignment&&root.parent.operatorToken.kind<=ts.SyntaxKind.LastAssignment)valid=false;
+          if(["Number","Math","uni"].includes(n.text)&&!binding(n)&&!(ts.isPropertyAccessExpression(n.parent)&&n.parent.expression===n)&&!ts.isTypeOfExpression(n.parent))valid=false;}
+        if(!roles.has(n.text)||binding(n))continue;
+        if(ts.isPropertyAccessExpression(n.parent)&&n.parent.expression===n&&n.parent.name.text==="value"){
+          let access=n.parent;while(access.parent&&(ts.isPropertyAccessExpression(access.parent)||ts.isElementAccessExpression(access.parent)||ts.isAsExpression(access.parent)||ts.isParenthesizedExpression(access.parent)))access=access.parent;
+          const parent=access.parent;
+          if(ts.isBinaryExpression(parent)&&parent.left===access&&parent.operatorToken.kind>=ts.SyntaxKind.FirstAssignment&&parent.operatorToken.kind<=ts.SyntaxKind.LastAssignment&&!approved.has(parent))valid=false;
+          if(ts.isPrefixUnaryExpression(parent)||ts.isPostfixUnaryExpression(parent))if(parent.operator===ts.SyntaxKind.PlusPlusToken||parent.operator===ts.SyntaxKind.MinusMinusToken)valid=false;
+        }else if(n.text===names.get("measureComposer")){if(!ts.isCallExpression(n.parent)||n.parent.expression!==n)valid=false;}
+        else if(!(n.text===names.get("composerHost")&&ts.isCallExpression(n.parent)&&same(n.parent.parent,expected[16],names)))valid=false;
+      }
+      const hosts=elements.filter(e=>attr(e,"ref")===names.get("composerHost"));
+      if(hosts.length!==1||hosts[0].tag!=="view"||attr(hosts[0],"class")!=="nx-conv-composer"||hosts[0].props.some(p=>p.name==="style"||p.name==="bind"&&(!p.arg||!p.arg.isStatic)||p.arg?.content==="style"||p.arg?.content==="class"))valid=false;
+      const pads=[];
+      for(const [cssFile,text]of files.filter(([,text])=>text.includes("nx-conv-composer"))){
+        const sheets=cssFile.endsWith(".css")?[text]:parse(text,{filename:cssFile}).descriptor.styles.filter(s=>cssFile===file||!s.scoped).map(s=>s.content);
+        for(const sheet of sheets)postcss.parse(sheet).walkRules(rule=>{
+          if(!rule.selector.includes("nx-conv-composer"))return;
+          rule.walkDecls(d=>{if(/^padding(?:$|-bottom$|-block(?:-end)?$)/.test(d.prop))pads.push(d);if(/^(?:all|transform|zoom|scale)$/.test(d.prop))valid=false;});
+        });
+      }
+      if(pads.length!==1||pads[0].parent.selector!==".nx-conv-composer"||pads[0].prop!=="padding-bottom"||normalize(pads[0].value)!=="calc(INSET+22px)")valid=false;
+      if(valid)allowed.add(position);
+    }
+  }
+  return {allowed,candidates};
+}
+for(const [p,source]of files){
+const dynamic=composerProof(source,p);
+for(const position of dynamic.candidates)if(!dynamic.allowed.has(position))bad.push(p.split(path.sep).join("/")+":"+source.slice(0,position).split("\n").length+" unproven dynamic composer spacing");
 let offset=0;
 for(const declaration of source.split(";")){
     const start=offset;
@@ -403,6 +592,7 @@ for(const declaration of source.split(";")){
     if(!insetSource.test(declaration))continue;
     const properties=[...declaration.matchAll(/(?:^|[{\s,"\x27])(--nx-overlay-(?:safe-bottom|bottom)|padding[\w-]*|bottom)["\x27]?\s*:/g)];
     for(const [index,match] of properties.entries()){
+    if(dynamic.allowed.has(start+match.index+match[0].indexOf(match[1])))continue;
     const raw=declaration.slice(match.index+match[0].length,properties[index+1]?.index).trim();
     if(!insetSource.test(match[1]+" "+raw))continue;
     const line=source.slice(0,start+match.index).split("\n").length;
@@ -447,8 +637,11 @@ for(const declaration of source.split(";")){
     const base=known?pixels.reduce((sum,term)=>sum+parseFloat(term),0):null;
     if(base!==null&&base>=22)continue;
     bad.push(p.split(path.sep).join("/")+":"+line+" base="+(base===null||insets[0]==="SAFE24"?"unknown":base+"px"));
-}}}}})("src");
-if(bad.length)console.log(bad.join("\n"));' 2>&1); then
+}}}
+if(!files.length)throw new Error("no safe-area source files scanned");
+if(bad.length)console.log([...new Set(bad)].join("\n"));
+NODE
+); then
   bad "safe-area scanner failed"
   printf "%s\n" "$sa_bad" | sed 's/^/        /'
 elif [ -n "$sa_bad" ]; then
