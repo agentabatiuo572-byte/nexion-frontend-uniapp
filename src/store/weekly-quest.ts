@@ -1,7 +1,7 @@
 import { computed, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
-import { isAmbiguousOutcome } from "@/api/errors";
+import { isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import type { CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
 import {
   acquireWeeklyQuestCommandKey,
@@ -47,7 +47,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
 
   function claimOutcomeAmbiguous(cause: unknown): boolean {
     return UNKNOWN_IDEMPOTENCY_RESULTS.has(cause instanceof Error ? cause.message : "")
-      || isAmbiguousOutcome(cause);
+      || isAmbiguousEnvelopeOutcome(cause);
   }
 
   async function recoverClaim(
@@ -169,11 +169,12 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
         error.value = message;
         return false;
       }
-      if (claimOutcomeAmbiguous(cause)) {
+      const notice = questClaimNoticeFor(cause);
+      if (!notice && claimOutcomeAmbiguous(cause)) {
         const recovery = await recoverClaim(quest, isCurrentRequest);
         if (!isCurrentRequest()) return false;
         if (recovery === "claimed") return true;
-        if (message === "IDEMPOTENCY_RESULT_UNKNOWN" && recovery === "not_claimed") {
+        if (isApiRefusal(cause, 409, "IDEMPOTENCY_RESULT_UNKNOWN") && recovery === "not_claimed") {
           try {
             finishWeeklyQuestCommand(accountKeyValue, quest.questCode, quest.instanceKey);
           } catch (storageCause) {
@@ -187,7 +188,6 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
         error.value = "WEEKLY_QUEST_CLAIM_OUTCOME_UNKNOWN";
         return false;
       }
-      const notice = questClaimNoticeFor(cause);
       try {
         finishWeeklyQuestCommand(accountKeyValue, quest.questCode, quest.instanceKey);
       } catch (storageCause) {
