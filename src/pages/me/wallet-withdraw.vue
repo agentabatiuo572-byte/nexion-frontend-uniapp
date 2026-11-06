@@ -336,10 +336,7 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 
-// 🔴 不再 import isAmbiguousOutcome:本页改用 isSettledRejection + isIdempotencyConflict 分诊。
-// 那行 import 曾经是**全文件唯一**的 isAmbiguousOutcome 出现处(零调用),却正好喂饱了
-// selfcheck-fastlane 的一格字符串针 —— 门以为页面在用它,实际一次没调过。
-// tsconfig 未开 noUnusedLocals,type-check 抓不到这种幻影针,只能靠删掉它。
+// Submission failures share the exact refusal and original-attempt policy below.
 import { ApiError } from "@/api/errors";
 import { triageWithdrawFailure } from "@/lib/withdraw-failure-triage";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
@@ -674,20 +671,7 @@ const withdrawalChannelStatusText = computed(() => {
  *    ABANDONED 才清理本地尝试，若已 COMMITTED 则跳转真实订单，网络不确定继续保留。
  */
 
-/**
- * 服务端「今日笔数已达上限」拒单的识别。
- *
- * 🔴 实测更正(假后端 `dailyLimit` 档):超额拒单走 **HTTP 429**,而 429 不是 2xx,
- * 所以客户端拿到的是 `kind:"http"` 而**不是** `business` —— `business` 只在 2xx 且
- * 业务码非 0 时才产生。也就是说「按 kind 认」认不出它,真正认得出的是 message 这一路。
- * 契约定名前保持串匹配;定名后收敛,见 HANDOFF U-19(原 U-4,2026-08-14 撞号重编)。
- *
- * 🔴 为什么按 message 认而不按 code:本仓的 `ApiError` 带 kind/code/message 三样,
- * 但 code 是 HTTP 状态码(超日限多半统一 4xx,认不出是哪条规则),真正区分规则的是
- * 服务端 envelope 的 message。契约里还没钉死这个串 —— 所以这里按**一组候选**宽松匹配,
- * 并且**只用于换一句更准的话**,认不出就回落原文案,认错也不会放行或拦截任何东西。
- * 待后端定名后收敛成单串:见 HANDOFF U-19(原 U-4,2026-08-14 撞号重编)。
- */
+/** Daily-limit copy context; triage also requires the exact server 409 envelope. */
 function isDailyLimitRejection(err: unknown): boolean {
   const msg = err instanceof ApiError ? err.message : "";
   if (!msg) return false;
@@ -1433,9 +1417,6 @@ async function handleSubmit() {
     switch (verdict.kind) {
       case "daily-limit":
         toast.error(verdict.fate === "keep" ? dailyLimitReachedWithPendingText.value : dailyLimitReachedText.value);
-        return;
-      case "already-on-file":
-        toast.error(t.value.walletV3.withdrawAlreadyOnFileTitle, t.value.walletV3.withdrawAlreadyOnFileBody);
         return;
       case "geo":
         toast.error(geo ?? t.value.walletV3.withdrawDeclinedTitle, t.value.geoPolicy.fundsSafeNote);

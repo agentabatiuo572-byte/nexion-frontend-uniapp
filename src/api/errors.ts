@@ -75,6 +75,13 @@ export function asApiError(error: unknown): ApiError {
   return new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true });
 }
 
+/** Match the exact backend envelope before applying a caller's refusal policy. */
+export function isApiRefusal(error: unknown, status: number, ...messages: string[]): boolean {
+  return error instanceof ApiError && error.code === status && messages.includes(error.message)
+    && (error.kind === "business" && error.status !== undefined && error.status >= 200 && error.status < 300
+      || error.kind === "http" && error.status === status);
+}
+
 /**
  * 4xx 里**不能**当作「服务端已定局拒绝」的几个:语义都是「我可能已经收到了」。
  * 408 请求超时(服务端中途放弃,写入可能已落) · 409 幂等键冲突(记录已存在) ·

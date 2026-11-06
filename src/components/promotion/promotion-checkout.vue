@@ -147,7 +147,7 @@ import type { DeviceKind } from '@/store/types';
 import { useVoucher } from '@/store/voucher';
 import { useOrders } from '@/store/orders';
 import { computeVoucherDiscount,isVoucherValid,voucherAppliesToSku,type VoucherDef } from '@/mock/vouchers';
-import { ApiError,asApiError } from '@/api/errors';
+import { ApiError,asApiError,isApiRefusal } from '@/api/errors';
 import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,settleProductCatalogRefresh,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
 import { navTo,navBack,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
 import { fmt } from '@/i18n/format';
@@ -367,7 +367,8 @@ async function loadQuote(){
           }catch(cause){
             if(!readCurrent(generation))return null;
             // A rejected coupon can be skipped; an unavailable quote cannot be charged.
-            if(asApiError(cause).kind!=='business')throw cause;
+            if(!isApiRefusal(cause,409,'VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE','VOUCHER_MIN_PURCHASE_NOT_MET',
+                'VOUCHER_TYPE_UNSUPPORTED','VOUCHER_DISCOUNT_ZERO'))throw cause;
           }
         }
         return {quote:best,voucherId:id};
