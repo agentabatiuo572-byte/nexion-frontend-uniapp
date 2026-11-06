@@ -2666,7 +2666,7 @@ export const id: Messages = {
     receiptsUnavailableTitle: "Kuitansi pendapatan gagal dimuat",
     receiptsUnavailableBody: "Muat ulang kuitansi pendapatan Anda.",
     syncFailedTitle: "Informasi gagal dimuat ulang",
-    syncFailedBody: "Coba lagi.",
+    syncFailedBody: "Mencoba lagi secara otomatis.",
     fundsUnavailableTitle: "Dompet gagal dimuat ulang",
     fundsUnavailableBody: "Saldo Anda saat ini tidak tersedia. Muat ulang sebelum melakukan transaksi dompet.",
     fundsStaleBody: "Menampilkan saldo terakhir yang diperbarui. Muat ulang untuk melihat yang terbaru.",

@@ -2666,7 +2666,7 @@ export const kk: Messages = {
     receiptsUnavailableTitle: "Табыс түбіртектері жүктелмеді",
     receiptsUnavailableBody: "Табыс түбіртектерін қайта жүктеңіз.",
     syncFailedTitle: "Ақпарат жаңартылмады",
-    syncFailedBody: "Қайталап көріңіз.",
+    syncFailedBody: "Автоматты түрде қайталануда.",
     fundsUnavailableTitle: "Әмиян жаңартылмады",
     fundsUnavailableBody: "Қазіргі балансты көру мүмкін емес. Әмиянда операция жасамас бұрын жаңартыңыз.",
     fundsStaleBody: "Соңғы жаңартылған баланс көрсетілуде. Соңғысын көру үшін жаңартыңыз.",
