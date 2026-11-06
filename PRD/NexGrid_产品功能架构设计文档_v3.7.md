@@ -1592,6 +1592,10 @@ Cloud Share variant:Cloud Share 是数字份额(`productType=SHARE`,`inventoryMo
 
 #### 7.3.3 支付结果与原单恢复
 
+2026-11-07（BUG-158 交付与验收边界）本批接入自动券、任务、提现、试用四组。正式 App 源码的 H5 编译入口和 H5 Lite 已完成关键业务实测，最新支付修复合成后补验券报价入口。原生业务与共享外付恢复各自保留待验，外付还需可用测试商户下的真实报价、intent 创建及原流程恢复。旧外付候选须按后续上游重新整合。
+
+2026-11-07（BUG-158 回执兼容）精确拒绝同时兼容成功 HTTP（2xx）、非零 code 的 business envelope 回执；其 code 仍须等于对应业务状态并命中既定原因清单，当前 http 回执仍须 HTTP 状态与 code 一致，未知原因、错配状态或码以及普通异常继续保留原恢复路径。
+
 **⑤ 交互四态**
 
 - 默认：展示当前原单商品、数量、优惠、美元展示金额及可用方式；原单通过预检便直接选方式，选钱包后显示真实 USDT 总额。
@@ -1800,6 +1804,8 @@ flowchart TD
 **铁律**:文案永不暴露 phase / 内部参数名等 PM 术语;抵扣口径向用户明示"按累计产出计算、越早置换抵得越多"(合规透明,同时构成紧迫感)。
 
 ### 7.7 代金券(Voucher · 领券促销)
+
+2026-11-06（BUG-158）自动选券逐个报价时，仅 HTTP 409 与 code 409 一致且原因属于 `VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE`、`VOUCHER_MIN_PURCHASE_NOT_MET`、`VOUCHER_TYPE_UNSUPPORTED`、`VOUCHER_DISCOUNT_ZERO` 的候选可以跳过，继续比较已取得的有效报价。手选券、活动指定券及活动整体不可用均按原错误处理。H5 Lite 的两轮候选比较均遵守现行商品和实体赠机范围。
 
 平台促销代金券:运营在后台(运营控制台 H7)创建 / 配置,用户领取后在结算对应设备时自动抵扣。两类:**满减(fixed)**= 订单满 `minPurchaseUSD` 减 `amountUSD`;**折扣(percent)**= 按 `percent`% 抵扣、封顶 `maxDiscountUSD`。
 
@@ -2641,6 +2647,8 @@ flowchart TD
 
 #### 9.3.1a 提现提交闭环
 
+2026-11-06（BUG-158）提交拒绝按真实 HTTP/envelope 组合识别。409 `WITHDRAWAL_DAILY_LIMIT_EXCEEDED` 使用既有今日限额提示；409 `WITHDRAWAL_POLICY_VERSION_CONFLICT` 在首次提交后更新政策并提示重新核对；已知开关、通道、地址、余额、风险释放桶及金额拒绝使用既有拒绝提示。首次明确拒绝可以结束本次键；重放受拒保留原键和冻结正文并提示核对原单。未知 409、429、5xx 和幂等／attempt 冲突保留未确认状态与原命令。
+
 - 未 KYC 用户先进入 KYC-Express,完成后回到提现页继续提交。
 - 提现提交必须生成 tracking record 与 USDT 提现单;烧了 NEX 抵扣手续费时另写一条 NEX 抵扣单。
 - 提交为原子操作:若 nexBurned > 0 先扣减用户 NEX 余额(`debitNex(nexBurned)`),再提交提现单;提现单失败则回滚已扣的 NEX,保证不出现"扣了 NEX 却没提现"或"提现了却没扣 NEX"。nexBurned = 0(用户无 NEX)时不扣 NEX,直接按全额惩罚费提交。
@@ -3147,6 +3155,8 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 - 首页不自动弹出领取；领取入口唯一，状态入口不计为第二次领取。加载保留骨架或同账号已确认的只读快照；失败不得变成未领取、零余额或已购成功。
 
 ### 9.11a 试用接口与交易边界
+
+2026-11-06（BUG-158）领取已知拒绝沿用现有资格原因和纠正入口。仅 HTTP 409 与 code 409 一致、原因已映射，且随后 state 读回仍为同一原领取单、处于非 active／grace 状态时结束本次缓存拒绝键。读回 active／grace 则确认既有领取结果；读取失败、领取单不匹配或未知结果继续保留原键。
 
 用户端以正式后台 AppTrialLifecycleService 返回的领取单和资格为准。运营配置通过既有后台配置服务发布；客户端不直接调用管理员配置接口，也不自行决定资格、扣款或入账。
 
@@ -4757,6 +4767,8 @@ Conversation:
 ```
 
 ### 12.11 Quest(useQuest,persist key `nexgrid-quest-v1`)
+
+2026-11-06（BUG-158）任务领取的 HTTP 409、code 409 若明确为 `QUEST_ALREADY_CLAIMED`、`QUEST_INSTANCE_NOT_FOUND`、`QUEST_DEFINITION_INACTIVE`、`QUEST_EXPIRED`、`QUEST_NOT_COMPLETED`，结束对应实例的拒绝命令并读取当前任务，再显示既有本地化状态提示。周任务须先识别这五种回执，再处理其他冲突的未确认恢复。任务中心、首日任务卡及资料保存后的任务奖励共用该提示；拒绝不触发新奖励或成功庆祝。未知回执和失败读回保留原恢复路径。成功 HTTP 非零业务 envelope 的未知冲突、限流和服务错误同样按 envelope code 的歧义语义保留原键，不落入普通业务拒绝的直接收口分支。
 
 ```
 {

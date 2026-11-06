@@ -12,7 +12,7 @@ import { parseTrialConvertReceipt, type TrialConvertReceipt } from "@/api/trial-
 import { readPaymentCommand } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
 import type { TrialAuthorityState, TrialConversionOutcome, TrialConversionQuote } from "@/api/trial-api";
-import { asApiError, isAmbiguousOutcome } from "@/api/errors";
+import { asApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
 import {
   resolveTrialAt,
   accruedShadow,
@@ -593,7 +593,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         // A known rejected command may be cached by the idempotency boundary.
         // Retire it only after a read confirms that no claim was created.
         if (reconciled && authorityClaimNo.value === previousClaimNo && reason !== "unknown"
-            && failure.kind === "business" && status.value !== "active" && status.value !== "grace") pendingStartKey = null;
+            && isApiRefusal(failure, 409, failure.message)
+            && status.value !== "active" && status.value !== "grace") pendingStartKey = null;
         return { ok: false, reason };
       }
     }
