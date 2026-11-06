@@ -242,6 +242,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
@@ -641,6 +642,7 @@ watch(() => payout.serverClock, (anchor) => {
   clockFault.value = now === null || !anchor || now < anchor.receivedMonotonicAt;
 }, { immediate: true, flush: "sync" });
 
+useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
 async function retryRemoteSnapshot() {
   if (!payoutAddressServerEnabled || !pageVisible || remoteRefreshPending.value) return;
   // Store-owned account/runtime/version guards decide the final read status,

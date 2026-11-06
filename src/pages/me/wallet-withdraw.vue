@@ -295,6 +295,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { ref, computed, nextTick, onUnmounted, watch, type CSSProperties } from "vue";
@@ -545,6 +546,11 @@ async function retryWithdrawalFacts(): Promise<void> {
     loadWithdrawalPolicy(),
   ]);
 }
+
+useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteFleetStatus === "error", retry: () => app.refreshRemoteFleet() });
+useAutoRecovery({ failed: () => remoteApiEnabled && earningsReleaseStatus.value === "error", retry: () => refreshEarningsReleaseStatus(app.accountKey) });
+useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteWithdrawalListStatus === "error", retry: () => app.refreshRemoteWithdrawalList(app.accountKey) });
+useAutoRecovery({ failed: () => remoteApiEnabled && !!withdrawalPolicyError.value && !withdrawalPolicyLoading.value, retry: loadWithdrawalPolicy });
 
 function invalidateWithdrawalFacts(): void {
   // A retained policy/eligibility belongs to the previous account or bearer

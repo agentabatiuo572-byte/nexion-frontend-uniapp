@@ -25,21 +25,20 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
         </template>
         <text class="block" :style="captionStyle">{{ w.s2Caption }}</text>
-        <view v-if="configAvailable" :style="tableStyle">
+        <view :style="tableStyle">
           <view class="flex" :style="tableHeadStyle">
             <text class="text-left" :style="thCellLeft">{{ w.colTerm }}</text>
             <text class="text-right" :style="thCellRight">{{ w.colApy }}</text>
             <text class="text-right" :style="thCellRight">{{ w.colMin }}</text>
             <text class="text-right" :style="thCellRight">{{ w.colReturn }}</text>
           </view>
-          <view v-for="(row, i) in visibleRows" :key="row.term" class="flex" :style="tableRowStyle(i === 0)">
-            <text class="text-left tabular-nums" :style="tdTermStyle">{{ copy.days(row.term) }}</text>
+          <view v-for="(row, i) in visibleRows" :key="i" class="flex" :style="tableRowStyle(i === 0)">
+            <text class="text-left tabular-nums" :style="tdTermStyle">{{ row.term === null ? '—' : copy.days(row.term) }}</text>
             <text class="text-right tabular-nums" :style="tdApyStyle">{{ row.apyPct }}</text>
             <text class="text-right tabular-nums" :style="tdMinStyle">{{ row.minText }}</text>
             <text class="text-right tabular-nums" :style="tdReturnStyle">{{ row.ret }}</text>
           </view>
         </view>
-        <StakingReadStatus :has-snapshot="staking.isMockMode || staking.remoteHasSnapshot" :loading="staking.remoteLoading" :failed="!!staking.remoteError && !staking.remoteReady" @retry="retryRemote" />
         <text class="block" :style="footnoteStyle">{{ w.s2Footnote }}</text>
       </HowSection>
 
@@ -79,7 +78,6 @@
           <HowFaqRow open :q="w.faqQ3" :a="w.faqA3" />
           <HowFaqRow open :q="w.faqQ4" :a="stakingAvailable === true ? w.faqA4 : stakingAvailable === false ? w.faqA4Paused : w.faqA4Unknown" />
           <HowFaqRow open :q="w.faqQ5" :a="w.faqA5" />
-          <view v-if="exchangeReadFailed && !staking.remoteError" class="nx-card-recovery-action" role="button" :aria-disabled="retrying" :tabindex="retrying ? -1 : 0" @click="retryRemote" @keydown.enter.prevent="retryRemote" @keydown.space.prevent="retryRemote"><text>{{ copy.retry }}</text></view>
         </view>
       </HowSection>
 
@@ -94,6 +92,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { navTo, navReset } from "@/lib/route";
 import { useConfig } from "@/store/config";
@@ -105,7 +104,6 @@ import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
 import HowStepRow from "@/components/how/how-step-row.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
-import StakingReadStatus from "@/components/staking/staking-read-status.vue";
 import { useStakingReviewCopy } from "@/lib/staking-review-copy";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { useT } from "@/i18n/use-t";
@@ -141,6 +139,7 @@ const staking = useStaking();
 const retrying = ref(false);
 const exchangeAvailable = ref<boolean | null>(remoteApiEnabled ? null : true);
 const exchangeReadFailed = ref(false);
+const exchangeLoading = ref(false);
 const stakingAvailable = computed<boolean | null>(() => {
   if (staking.isMockMode) return true;
   if (!staking.remoteReady || !staking.remoteHasSnapshot || staking.remoteError) return null;
@@ -161,14 +160,22 @@ async function refreshStakingAvailability() {
 async function refreshExchangeAvailability() {
   if (!remoteApiEnabled) return;
   exchangeAvailable.value = null;
+  exchangeReadFailed.value = false;
+  exchangeLoading.value = true;
   try { exchangeAvailable.value = (await exchangeApi.fetchCaps()).swapEnabled; exchangeReadFailed.value = false; }
   catch { exchangeAvailable.value = null; exchangeReadFailed.value = true; }
+  finally { exchangeLoading.value = false; }
 }
 async function retryRemote() {
   if (retrying.value) return;
   retrying.value = true;
   try { await Promise.all([refreshStakingAvailability(), refreshExchangeAvailability()]); } finally { retrying.value = false; }
 }
+
+useAutoRecovery({
+  failed: () => !staking.isMockMode && !staking.remoteLoading && !exchangeLoading.value && !retrying.value && (!!staking.remoteError || exchangeReadFailed.value),
+  retry: retryRemote,
+});
 
 // APY table — derived from canonical pools, with the local table available only
 // in mock mode; the displayed $100 example is held to maturity.
@@ -189,8 +196,7 @@ const tableRows = computed(() =>
     };
   }),
 );
-const configAvailable = computed(() => tableRows.value.every((row) => row !== null));
-const visibleRows = computed(() => tableRows.value.filter((row): row is NonNullable<typeof row> => row !== null));
+const visibleRows = computed(() => tableRows.value.map(row => row ?? { term: null, apyPct: "—", minText: "—", ret: "—" }));
 const penaltiesText = computed(() => {
   const values = ([30, 90, 180, 365] as StakingTerm[]).map((termDays) => {
     const pool = resolveStakingPool(
