@@ -76,10 +76,7 @@
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ latestRequestStatusDetail }}</text>
             <text v-if="requestReviewReason" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ developerCopy[requestReviewReason] }}</text>
           </view>
-          <view v-if="remoteApiEnabled && latestLoadFailed" class="nx-glass-inset rounded-xl" :style="requestStatusStyle">
-            <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.latestLoadFailed }}</text>
-            <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text class="developer-read-retry-label">{{ t.network.retry }}</text></view>
-          </view>
+          <view v-if="remoteApiEnabled && latestLoadFailed" class="rounded-xl" :style="requestStatusStyle"><text>—</text></view>
           <view v-if="!latestLoadFailed && (requestState?.canReapply ?? true)" class="space-y-2">
             <input v-model="company" :disabled="!canSubmitAccessRequest" :maxlength="120" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph"
               :aria-label="t.developer.formCompany" :aria-invalid="accessIssue === ISSUE_COMPANY ? 'true' : 'false'"
@@ -109,7 +106,7 @@
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
           </view>
           <view v-if="remoteApiEnabled && docsNotReleased" class="rounded-xl" :style="docsComingStyle"><text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text></view>
-          <view v-else-if="remoteApiEnabled && docsLoadFailed" class="rounded-xl" :style="requestStatusStyle" role="button" tabindex="0" :aria-label="t.network.retry" @click="loadDocs"><text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text><text class="block developer-read-retry-label" style="margin-top: 6px">{{ t.network.retry }}</text></view>
+          <EmptyState v-else-if="remoteApiEnabled && docsLoadFailed && !docs" kind="recoverable-error" :title="t.developer.resourceLoadFailed" :cta-label="t.network.retry" @cta="loadDocs" />
           <template v-else-if="!remoteApiEnabled || docs">
             <view v-if="docs" class="rounded-lg" :style="requestStatusStyle"><text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ docs.version }} · {{ docs.locale }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ fmt(t.developer.docsCounts, { endpoints: docs.endpoints.length, events: docs.events.length }) }}</text></view>
             <scroll-view scroll-x :style="snippetWrapStyle"><text class="font-mono-tabular" :style="snippetTextStyle">{{ docsSnippet }}</text></scroll-view>
@@ -139,10 +136,7 @@
             <view v-if="resourcesNotReleased" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text>
             </view>
-            <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
-              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
-              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text class="developer-read-retry-label">{{ t.network.retry }}</text></view>
-            </view>
+            <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle"><text>—</text></view>
             <view v-for="item in (resourcesReady ? apiKeys : [])" :key="item.id" class="flex items-center" :style="resourceRowStyle">
               <view class="flex-1"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.prefix }}••••{{ item.last4 }} · {{ item.status }}</text></view>
               <view v-if="item.status === 'ACTIVE'" class="rounded-lg" :style="resourceActionStyle(dangerBtnStyle, `revoke-key:${item.id}`)" role="button" tabindex="0" @click="revokeApiKey(item.id)"><text style="font-size: 12px">{{ t.developer.revoke }}</text></view>
@@ -166,10 +160,7 @@
             <view v-if="resourcesNotReleased" class="rounded-xl" :style="requestStatusStyle">
               <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.apiCapabilityUnavailable }}</text>
             </view>
-            <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle">
-              <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.resourceLoadFailed }}</text>
-              <view role="button" tabindex="0" :aria-label="t.network.retry" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="retryLoadResources"><text class="developer-read-retry-label">{{ t.network.retry }}</text></view>
-            </view>
+            <view v-else-if="resourcesLoadFailed" class="rounded-xl" :style="requestStatusStyle"><text>—</text></view>
             <view v-for="item in (resourcesReady ? webhooks : [])" :key="item.id" :style="resourceRowStyle">
               <view style="display: flex; flex-direction: column; gap: 8px">
                 <view class="min-w-0" style="overflow-wrap: anywhere"><text class="block" style="font-size: 13px; font-weight: 600">{{ item.name }}</text><text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 3px">{{ item.url }} · {{ item.deliveryStatus }}</text></view>
@@ -197,9 +188,11 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { ref, computed, nextTick, onUnmounted, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -520,8 +513,8 @@ async function submitRequest() {
   email.value = "";
   useCase.value = "";
 }
-function loadLatestRequest() {
-  if (!remoteApiEnabled || developerEnvironmentInvalidated) return;
+function loadLatestRequest(): Promise<void> {
+  if (!remoteApiEnabled || developerEnvironmentInvalidated) return Promise.resolve();
   const accountKey = String(app.accountKey);
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
@@ -530,7 +523,7 @@ function loadLatestRequest() {
   latestLoading.value = true;
   const current = () => generation === requestGeneration && accountKey === String(app.accountKey)
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
-  void developerAccessApi.latest().then((value) => {
+  return developerAccessApi.latest().then((value) => {
     if (current()) {
       latestRequest.value = value;
       latestLoadFailed.value = false;
@@ -600,7 +593,6 @@ async function loadDocs() {
     else docsLoadFailed.value = true;
   }
 }
-function retryLoadResources(): void { void loadResources(); }
 async function revokeApiKey(id: number) {
   if (!canManageResources.value) return;
   const intent = `revoke-key:${id}`;
@@ -1036,6 +1028,9 @@ const smallBtnStyle: CSSProperties = {
 };
 
 import GlassSegments from "@/components/glass-segments.vue";
+useAutoRecovery({ failed: () => remoteApiEnabled && latestLoadFailed.value && !latestLoading.value, retry: loadLatestRequest });
+useAutoRecovery({ failed: () => remoteApiEnabled && docsLoadFailed.value, retry: loadDocs });
+useAutoRecovery({ failed: () => remoteApiEnabled && resourcesLoadFailed.value && !resourcesLoading.value, retry: () => loadResources() });
 </script>
 
 <style scoped>

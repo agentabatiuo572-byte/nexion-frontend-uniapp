@@ -52,7 +52,7 @@
           </view>
         </view>
         <EmptyState
-          v-else-if="remoteEventsError"
+          v-else-if="remoteEventsError && !remoteEvents.length"
           kind="recoverable-error"
           :title="t.events.loadErrorTitle"
           :desc="t.events.loadErrorBody"
@@ -84,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 const { embedded = false } = defineProps<{ embedded?: boolean }>();
 import { formatAmount } from "@/lib/amount-display";
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
@@ -98,6 +99,7 @@ import PromotionEntry from "@/components/promotion/promotion-entry.vue";
 import { useT } from "@/i18n/use-t";
 import { isStakingVisibilityRoute, navTo, takeNavigationQuery } from '@/lib/route';
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { ApiError } from "@/api/errors";
 import { eventsApi, remoteApiEnabled,sessionVault } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
@@ -155,7 +157,7 @@ const remoteCommandFence = createRemotePageCommandFence(remoteAccountEpoch, () =
 let releaseActiveRefresh = () => {};
 function activatePageRefresh() {
   releaseActiveRefresh();
-  releaseActiveRefresh = registerActivePageRefresh(loadRemoteEvents);
+  releaseActiveRefresh = registerActivePageRefresh(() => remoteEventsError.value ? undefined : loadRemoteEvents(), "pages/events/events");
 }
 
 const eventActionLabels = computed<EventActionLabels>(() => ({
@@ -178,9 +180,9 @@ async function loadRemoteEvents() {
     if (!remoteRequestFence.isCurrent(scope)) return;
     remoteEvents.value = snapshot.events;
     remoteEventsError.value = false;
-  } catch {
+  } catch (cause) {
     if (remoteRequestFence.isCurrent(scope)) {
-      remoteEvents.value = [];
+      if (!(cause instanceof ApiError && cause.kind === "network")) remoteEvents.value = [];
       remoteEventsError.value = true;
     }
   } finally {
@@ -440,4 +442,5 @@ const emptyStyle: CSSProperties = {
 import GlassSegments from "@/components/glass-segments.vue";
 import { uiLocale } from "@/i18n";
 const tabOptions = computed(() => TABS.map(value => ({ value, label: t.value.events.tabs[value] })));
+useAutoRecovery({ failed: () => remoteApiEnabled && remoteEventsError.value && !remoteEventsLoading.value, retry: loadRemoteEvents });
 </script>

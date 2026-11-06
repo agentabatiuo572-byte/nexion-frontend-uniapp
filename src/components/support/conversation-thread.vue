@@ -159,7 +159,6 @@
         @blur="emit('typing', false)"
       />
       <view v-if="showInputLength" class="nx-conv-length" :class="{ 'nx-conv-length--over': inputOverLimit }" role="status"><text>{{ inputLength }} / {{ inputLimit }}</text><text v-if="inputOverLimit">{{ inputLimitHint }}</text></view>
-      <view v-if="attachRetry" class="nx-conv-policy-retry" role="button" tabindex="0" @click="emit('retry-policy')" @keydown.enter.prevent="emit('retry-policy')" @keydown.space.prevent="emit('retry-policy')"><text>{{ imageLabels?.retryPolicy }}</text></view>
       </view>
       <view class="nx-conv-send" :class="{ 'nx-conv-send--ready': canSend || sendFeedback || sendTurning, 'nx-conv-send--feedback': sendFeedback, 'nx-conv-send--turning': sendTurning }" role="button" :tabindex="canSend ? 0 : -1" :aria-label="sendLabel" :aria-disabled="!canSend" :aria-busy="sendTurning" @click="onSend" @keydown.enter.prevent="onKeyboardActivate($event, onSend)" @keydown.space.prevent="onKeyboardActivate($event, onSend)">
         <view class="nx-conv-send-face" aria-hidden="true"><LiquidGlass rendering="frosted" :radius="22" /><svg class="nx-conv-send-plane" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></svg></view>

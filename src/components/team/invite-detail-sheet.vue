@@ -10,7 +10,6 @@
           <NxButton class="invite-detail__support" variant="secondary" :label="copy.contactSupport" @click="contactSupport" />
         </template>
         <template v-else>
-          <view v-if="rewards.error || !recordsPresentation" class="invite-detail__read" role="status" :aria-busy="rewards.loading"><text>{{ rewards.loading ? t.team.rewardLoading : t.team.settlementUnavailable }}</text><NxButton v-if="!rewards.loading" class="nx-retry-action" :label="t.network.retry" variant="text" size="medium" @click="rewards.refresh()" /></view>
             <view class="invite-detail__hero">
             <view class="invite-detail__total"><text>{{ copy.totalInviteRewards }}</text><text class="invite-detail__amount">{{ totalParts[0] }}<text v-if="totalParts[1]" class="invite-detail__fraction">.{{ totalParts[1] }}</text><text class="invite-detail__unit"> UVT</text></text></view>
             <view v-if="rewardDots.length" class="invite-detail__dots" aria-hidden="true"><view v-for="(dot, index) in rewardDots" :key="index" class="invite-detail__dot" :class="{ 'invite-detail__dot--pending': dot === 'pending' }" /></view>

@@ -13,10 +13,7 @@
 
         <HowSection anchor="gap" :title="w.s4Title">
           <text class="block">{{ t.binary.gapHint }}</text>
-          <view class="binary-how-unavailable" role="status">
-            <text class="block">{{ t.howPublished.unavailableTitle }}</text>
-            <text class="block" style="margin-top: 8px">{{ t.howPublished.unavailableBody }}</text>
-          </view>
+          <EmptyState kind="recoverable-error" :title="t.howPublished.unavailableTitle" :desc="t.howPublished.unavailableBody" />
         </HowSection>
 
         <HowSection anchor="faq" :title="w.faqTitle" list>
@@ -36,6 +33,7 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from "@/components/empty-state.vue";
 import { computed } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
