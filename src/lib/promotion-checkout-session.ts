@@ -21,6 +21,7 @@ export function selectPromotionCheckoutRecord(records:Record<string,PromotionChe
 }
 export interface PromotionSessionPorts {
   api: Pick<PromotionApi, 'create' | 'pay' | 'cancel' | 'command' | 'paymentCommand' | 'findOrder'>;
+  read(): PromotionCheckoutRecord | null;
   save(record: PromotionCheckoutRecord): void;
   key(intent: string): string;
   current(): boolean;
@@ -55,10 +56,25 @@ export class PromotionCheckoutSession {
     return true;
   }
   rememberLeavePrompt():void {this.persist({...this.record,leavePromptShown:true});}
-  private persist(record: PromotionCheckoutRecord): void {
+  /** Another page can release this key while the session still holds its old pending row. */
+  private adoptReleasedPayment(): boolean {
+    const pending = this.record.pending;
+    if (pending?.operation !== 'payOrder') return false;
+    const stored = this.ports.read();
+    if (stored?.pending?.key === pending.key) return false;
+    this.record = stored ?? withoutPromotionPayment(this.record, pending.key);
+    this.unknown = !!this.record.pending;
+    this.confirmed = !!this.record.order && !this.unknown;
+    this.retryOriginal = false;
+    this.unseenPaymentKey = null;
+    return true;
+  }
+  private persist(record: PromotionCheckoutRecord): boolean {
     if (!this.ports.current()) throw new Error('ACCOUNT_SCOPE_CHANGED');
+    if (record.pending?.operation === 'payOrder' && record.pending.key === this.record.pending?.key && this.adoptReleasedPayment()) return false;
     this.ports.save(record);
     this.record = record;
+    return true;
   }
   canExecute(operation:PromotionOperation):boolean {
     const pending=this.record.pending;
@@ -77,7 +93,7 @@ export class PromotionCheckoutSession {
     if(pending&&(pending.operation!=='payOrder'||pending.targetId!==order.orderNo))throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
     const revision = this.record.paymentIntentRevision ?? 0;
     const key = pending?.key??this.ports.key(`payOrder:${order.orderNo}${revision ? `:payment-intent:${revision}` : ''}`);
-    this.persist({ ...this.record, pending: { operation: 'payOrder', targetId: order.orderNo, key, paymentMethod: 'EXTERNAL' } });
+    if (!this.persist({ ...this.record, pending: { operation: 'payOrder', targetId: order.orderNo, key, paymentMethod: 'EXTERNAL' } })) throw new Error('ORIGINAL_COMMAND_UNRESOLVED');
     this.unknown = true;
     this.unseenPaymentKey=null;
     return key;
@@ -106,7 +122,7 @@ export class PromotionCheckoutSession {
     const revision=operation==='payOrder'?(this.record.paymentIntentRevision??0):0;
     const identity = (cancelUnseen?null:previous) ?? { operation, targetId, key: this.ports.key(`${operation}:${targetId}${revision?`:payment-intent:${revision}`:''}`) };
     const pending:PromotionPendingCommand=operation==='payOrder'?{...identity,paymentMethod:'WALLET'}:identity;
-    this.persist({ ...this.record, pending, ...(cancelUnseen?{previousPayment:previous!}:{}) }); // Must succeed before the network write.
+    if (!this.persist({ ...this.record, pending, ...(cancelUnseen?{previousPayment:previous!}:{}) })) return; // Must succeed before the network write.
     this.unseenPaymentKey=null;
     this.busy = true;
     this.retryOriginal = false;
@@ -181,7 +197,8 @@ export class PromotionCheckoutSession {
     this.persist({quote:null,order:null,pending:null});this.confirmed=false;this.retryOriginal=false;
   }
   async recover(): Promise<void> {
-    if (this.busy) return;
+    if (this.busy || !this.ports.current()) return;
+    this.adoptReleasedPayment();
     this.unseenPaymentKey=null;
     this.busy = true;
     try {
@@ -203,7 +220,7 @@ export class PromotionCheckoutSession {
             if (order) {
               if (order.paymentStatus!=='PENDING') {this.acceptOrder(order);return;}
               this.validateOrder(order);
-              this.persist({...this.record,order});
+              if (!this.persist({...this.record,order})) return;
               const external=pending.paymentMethod==='EXTERNAL';
               this.unknown = external; this.confirmed = !external; this.retryOriginal = !external;
               if(pending.paymentMethod==='WALLET')this.unseenPaymentKey=pending.key;
