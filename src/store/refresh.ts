@@ -44,7 +44,7 @@ export const useRefresh = defineStore("refresh", () => {
       // 🔴 平台展示配置同理(2026-08-06 审计 P2 同型):脉搏三格 / 页脚 $/sec 的失败态,
       //   用户第一自救动作就是下拉 —— 不重拉配置,占位态永远刷不回来。fire-and-forget:
       //   load 自带合成延迟与 loading 态,卡片骨架去闪由 300ms 防抖门管。
-      void useConfig().load();
+      void useConfig().refresh();
       // The active route owns remote page data that cannot be inferred from
       // global stores (events, missions, globe, etc.). Await its registered
       // refresh so the spinner only closes after the visible facts are new.

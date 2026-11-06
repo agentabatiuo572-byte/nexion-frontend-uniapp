@@ -59,8 +59,13 @@ export interface PlatformPublicStatsAuthority {
 }
 
 
+export interface PlatformConfigRead {
+  version: string | null;
+  snapshot: PlatformComputeConfigSnapshot | null;
+}
+
 export interface PlatformConfigApi {
-  platformConfig(): Promise<PlatformComputeConfigSnapshot>;
+  platformConfig(knownVersion?: string | null): Promise<PlatformConfigRead>;
 }
 
 const GPU_TIER_IDS = ["G1", "G2", "G3", "G4", "G5", "G6"] as const;
@@ -570,25 +575,36 @@ export function parseReferralRewardConfig(value: unknown): ReferralRewardConfigS
 
 export function createPlatformConfigApi(client: ApiClient, mode: ApiEnvironment = "prod"): PlatformConfigApi {
   return {
-    platformConfig: async () => {
-      const [computeRaw, referralRaw] = await Promise.all([
-        client.request({
-          method: "GET",
-          path: "/api/config/platform?officialLinkFragments=true",
-          authenticated: false,
-        }),
-        client.request({
+    platformConfig: async (knownVersion) => {
+      const versionQuery = knownVersion ? `&knownVersion=${encodeURIComponent(knownVersion)}` : "";
+      const root = record(await client.request({
+        method: "GET",
+        path: `/api/config/platform?officialLinkFragments=true&snapshot=true${versionQuery}`,
+        authenticated: false,
+      }));
+      // Older servers ignore the opt-in and return the existing platform payload.
+      // Only a valid legacy payload can trigger its separate H8 read.
+      const legacy = !("version" in root) && "featureFlags" in root;
+      const version = legacy ? null : nonEmptyString(root.version);
+      if (!legacy && root.unchanged === true) {
+        if (version !== knownVersion) return invalid();
+        return { version, snapshot: null };
+      }
+      if (!legacy && root.unchanged !== false) return invalid();
+      const compute = parsePlatformComputeConfig(legacy ? root : root.platform, mode);
+      const referral = parseReferralRewardConfig(legacy
+        ? await client.request({
           method: "GET",
           path: "/api/config/referral-rewards",
           authenticated: false,
-        }),
-      ]);
-      const compute = parsePlatformComputeConfig(computeRaw, mode);
-      const referral = parseReferralRewardConfig(referralRaw);
+        }) : root.referralRewards);
       return {
-        ...compute,
-        rewards: referral.rewards,
-        sources: [...compute.sources, ...referral.sources],
+        version,
+        snapshot: {
+          ...compute,
+          rewards: referral.rewards,
+          sources: [...compute.sources, ...referral.sources],
+        },
       };
     },
   };
