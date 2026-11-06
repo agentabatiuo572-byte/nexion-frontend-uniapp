@@ -1,4 +1,4 @@
-<!-- Earn stage for the free-trial device: amber credit gauge, time left, estimate and the existing cancel / buy-early flows. -->
+<!-- Earn stage for the free-trial device: amber credit gauge, time left, estimate and the existing buy-early flow. -->
 <template>
   <view ref="loopRef" class="trial-stage" :class="{ 'trial-stage--online': online && !visibility.hidden, 'nx-loops-paused': !loops.running.value }" role="tabpanel" :aria-label="`${name} · ${copy.imageBadge}`" data-device-key="trial:current">
     <view class="trial-stage__top">
@@ -18,7 +18,6 @@
     <text class="trial-stage__note">{{ copy.creditNote }}</text>
     <view v-if="!presentation.presentationReady.value" class="trial-stage__notice nx-inline-recovery" role="status"><text class="nx-inline-recovery__copy">{{ copy.unknown }}</text><view class="trial-stage__retry nx-inline-recovery__action" role="button" tabindex="0" @click="presentation.refresh"><text>{{ copy.retry }}</text></view></view>
     <view class="trial-stage__actions">
-      <view v-if="presentation.status.value === 'active'" class="trial-stage__cancel" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="cancelTrial"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
       <view class="trial-stage__group">
         <view class="trial-stage__pill" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails"><text class="trial-stage__pill-face nx-frosted-button">{{ copy.detailsAction }}</text></view>
         <view class="trial-stage__pill trial-stage__pill--brand" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy"><text class="trial-stage__pill-face nx-frosted-button">{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }} →</text></view>
@@ -28,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
@@ -38,9 +37,6 @@ import { fmt } from "@/i18n/format";
 import { formatAmount } from "@/lib/amount-display";
 import { getProductMedia } from "@/lib/product-media";
 import { navTo } from "@/lib/route";
-import { useApp } from "@/store/app";
-import { useFreeTrial } from "@/store/free-trial";
-import { confirm as uiConfirm, toast } from "@/store/ui";
 import NxTag from "@/components/ui/nx-tag.vue";
 import DeviceArt from "@/components/device-art.vue";
 import JobGauge from "./job-gauge.vue";
@@ -50,9 +46,6 @@ const visibility = useDataVisibility();
 const presentation = useTrialPresentation();
 const copy = useTrialFleetCopy();
 const t = useT();
-const app = useApp();
-const trial = useFreeTrial();
-const cancelBusy = ref(false);
 // The online dot breathes only while the stage is on screen and the page is shown.
 const loops = useLoopsInView(".trial-stage");
 const loopRef = loops.elRef;
@@ -70,29 +63,6 @@ function money(value: number | null) {
 function goDetails() { navTo("/pages/me/trial"); }
 function goBuy() { if (presentation.actionsReady.value) goDetails(); }
 
-// Same confirmation, re-entry guard and account guard as the device warehouse trial card.
-async function cancelTrial() {
-  if (cancelBusy.value || !presentation.actionsReady.value || trial.status !== "active") return;
-  const accountKey = app.accountKey;
-  const bindingEpoch = app.accountBindingEpoch;
-  cancelBusy.value = true;
-  try {
-    const ok = await uiConfirm({
-      title: t.value.trial.cancelConfirmTitle,
-      message: t.value.trial.cancelConfirmMsg,
-      confirmLabel: t.value.trial.cancelConfirmOk,
-      cancelLabel: t.value.trial.cancelConfirmKeep,
-    });
-    if (!ok || accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch
-      || !presentation.actionsReady.value || trial.status !== "active") return;
-    const result = await trial.cancel();
-    if (accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch) return;
-    if (result.ok) toast.info(t.value.trial.toastCancelled);
-    else toast.warn(t.value.trial.cancelError);
-  } finally {
-    cancelBusy.value = false;
-  }
-}
 </script>
 
 <style scoped>
@@ -118,13 +88,12 @@ async function cancelTrial() {
 .trial-stage__notice { position: relative; margin-top: 8px; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .trial-stage__retry { display: flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--v5-brand); }
 .trial-stage__actions { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; margin-top: 6px; }
-.trial-stage__cancel { display: inline-flex; align-items: center; min-height: 44px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-3); cursor: pointer; }
 .trial-stage__group { display: flex; gap: 8px; margin-left: auto; }
 /* 44px hit area; the visible glass pill stays a compact 32px. */
 .trial-stage__pill { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; }
 .trial-stage__pill-face { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 999px; font: 500 13px/18px var(--font-v5); white-space: nowrap; }
 .trial-stage__pill--brand .trial-stage__pill-face { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); }
-.trial-stage__pill[aria-disabled="true"], .trial-stage__cancel[aria-disabled="true"] { opacity: .5; }
+.trial-stage__pill[aria-disabled="true"] { opacity: .5; }
 .trial-stage__pill:active .trial-stage__pill-face { transform: scale(.97); }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 999px; }
 @keyframes trial-stage-in { from { opacity: 0; transform: translateY(6px); } }
