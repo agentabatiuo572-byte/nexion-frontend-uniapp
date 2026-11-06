@@ -12,7 +12,7 @@ import { computed, getCurrentInstance } from 'vue';
 import NxButton from './nx-button.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
-const props = defineProps<{ open: boolean; title: string; nativeBack?: boolean }>();
+const props = withDefaults(defineProps<{ open: boolean; title: string; nativeBack?: boolean }>(), { nativeBack: true });
 const emit = defineEmits<{ (event: 'close'): void }>();
 const copy = useAuditUiCopy();
 const id = `nx-sheet-${getCurrentInstance()?.uid}`;

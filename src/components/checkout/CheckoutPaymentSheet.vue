@@ -43,7 +43,7 @@ const enoughBalance = computed(() => amountReadable.value && (amountNumber.value
 const canConfirm = computed(() => props.open && enoughBalance.value && !props.busy && !props.error && !submitted.value);
 const feedback = computed(() => props.error || (!amountReadable.value ? copy.value.cannotPay : amountNumber.value === 0 ? '' : !balanceReadable.value ? copy.value.balanceUnavailable : !enoughBalance.value ? copy.value.insufficientBalance : ''));
 watch(() => [props.open, props.busy, props.error], () => { if (!props.open || !props.busy) submitted.value = false; });
-function requestClose() { if (props.open) emit('close'); }
+function requestClose() { if (props.open && !props.busy && !submitted.value) emit('close'); }
 function confirm() { if (!canConfirm.value) return; submitted.value = true; emit('confirm'); }
 </script>
 <style scoped>
