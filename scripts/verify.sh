@@ -681,7 +681,17 @@ sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEa
 sentinel_present "SPEC-7 settle accrues app attestation" src/store/app.ts 'recordAttestation\(accountKey\.value'
 sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 'if \(cfgStore\.syncFailed\) return'
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
-sentinel_present "SPEC-7 wallet shows config sync failure state" src/components/me/wallet-overview.vue 'syncFailedTitle'
+# The failure body is shared by the old retry panel and the current automatic recovery UI.
+if "$NODE_BIN" -e '
+const source=require("fs").readFileSync("src/components/me/wallet-overview.vue","utf8").replace(/<!--[\s\S]*?-->/g,"");
+const template=source.match(/^\s*<template>([\s\S]*?)<\/template>\s*<script\b/)?.[1] ?? "";
+const failed=template.match(/<view\s+v-if="configSyncFailed(?:\s*&&\s*!fundsAuthorityUnavailable)?"[^>]*>([\s\S]*?)<\/view>/)?.[1] ?? "";
+process.exit(/<text\b[^>]*>\s*\{\{\s*t\.wallet\.syncFailedBody\s*\}\}\s*<\/text>/.test(failed) ? 0 : 1);
+'; then
+  ok "SPEC-7 wallet shows config sync failure state"
+else
+  bad "SPEC-7 wallet shows config sync failure state"
+fi
 
 # ── PAY-VN 越南支付架构(规格 PRD/specs/ 下的「越南支付架构规格 v1.0」· 2026-07-24)──
 #    注:此处刻意不写规格文件名全称 —— 文件名带旧品牌前缀,写全会被本文件的 brand 哨兵抓,
@@ -758,7 +768,28 @@ fi
 sentinel_present "AUTH02 phone account directory exists" src/store/auth-account.ts 'AUTH_ACCOUNT_STORAGE_KEY'
 sentinel_present "AUTH02 OTP exchanges verified old number" src/store/auth-otp.ts 'exchangeVerifiedSignIn'
 sentinel_present "AUTH02 registered-number handoff uses destination toast" src/pages/register/register.vue 'toast\.info\(t\.value\.register\.accountExistsTitle'
-sentinel_present "AUTH02 handoff toast is assistive-technology announced" src/components/global-ui.vue 'aria-live="polite"'
+# Accept the old inline toast or the mounted shared host, never an unrelated live-region keyword.
+if "$NODE_BIN" -e '
+const fs=require("fs");
+const read=file=>fs.readFileSync(file,"utf8").replace(/<!--[\s\S]*?-->/g,"");
+const template=source=>source.match(/^\s*<template>([\s\S]*?)<\/template>\s*<script\b/)?.[1] ?? "";
+const live=attrs=>/\srole="status"/.test(attrs) && /\saria-live="polite"/.test(attrs) && /\saria-atomic="true"/.test(attrs);
+const source=read("src/components/global-ui.vue"), markup=template(source);
+const inline=markup.match(/<view\b([^>]*\sv-for="t in ui\.toasts"[^>]*)>([\s\S]*?)<\/view>/);
+if(inline && live(inline[1]) && /<text\b[^>]*>\s*\{\{\s*t\.title\s*\}\}\s*<\/text>/.test(inline[2])
+  && /<text\b[^>]*>\s*\{\{\s*t\.description\s*\}\}\s*<\/text>/.test(inline[2])) process.exit(0);
+const code=(source.match(/<script\b[^>]*>([\s\S]*?)<\/script>/)?.[1] ?? "").replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,"");
+if(!/^\s*import ToastHost from "@\/components\/toast-host\.vue";\s*$/m.test(code)
+  || !/<ToastHost\s+v-if="showBusinessOverlays"\s*\/>/.test(markup)) process.exit(1);
+const host=template(read("src/components/toast-host.vue")).match(/^\s*<view\b([^>]*)>([\s\S]*)<\/view>\s*$/);
+process.exit(host && live(host[1]) && /v-if="shown && ui\.activeToast"/.test(host[2])
+  && /<text\b[^>]*>\s*\{\{\s*ui\.activeToast\.title\s*\}\}\s*<\/text>/.test(host[2])
+  && /<text\b[^>]*>\s*\{\{\s*ui\.activeToast\.description\s*\}\}\s*<\/text>/.test(host[2]) ? 0 : 1);
+'; then
+  ok "AUTH02 handoff toast is assistive-technology announced"
+else
+  bad "AUTH02 handoff toast is assistive-technology announced"
+fi
 sentinel_present "AUTH02 sign-in rejects an unregistered phone identity" src/auth/complete-sign-in.ts '"account_not_found"'
 sentinel_present "AUTH02 legacy risk migration seals schema2 barrier" src/store/risk-identity.ts 'sealLegacyRiskRegistryForAuthDirectory'
 sentinel_present "AUTH02 sponsorship is rebound per account" src/lib/account-scope.ts 'useSponsorship\(\)\.bindAccount\(accountKey\)'
