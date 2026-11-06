@@ -30,6 +30,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, ref, watch } from "vue";
 import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -46,6 +47,7 @@ const t = useT(), app = useApp();
 const pending = ref(readWithdrawAttempt(app.accountKey));
 const checking = ref(false), recoveryKnown = ref(false), bankIntent = ref(false);
 const bankEnabled = ref(false);
+const readFailed = ref(false);
 // Destination summary on each card: the bound payout address / bank account tail, only when the server returned one.
 const payout = ref<{ network: string; address: string } | null>(null), beneficiaryTail = ref("");
 const usdtRoute = computed(() => payout.value ? { network: payout.value.network.replace(/^USDT-/, ""),
@@ -58,6 +60,7 @@ const canOpenBank = computed(() => !pending.value && !checking.value && !bankUna
 async function load() {
   const currentRevision = ++revision, account = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
   const current = () => visible && currentRevision === revision && account === app.accountKey && epoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime);
+  readFailed.value = false;
   pending.value = readWithdrawAttempt(account); checking.value = true; recoveryKnown.value = false; bankIntent.value = false; bankEnabled.value = false;
   payout.value = null; beneficiaryTail.value = "";
   // The route summary is decoration: a failed address read leaves the card without it and never gates a method.
@@ -70,9 +73,10 @@ async function load() {
     const config = await createBankWithdrawalApi(apiClient).config(); if (!current()) return;
     recoveryKnown.value = config.unresolvedIntent !== undefined; bankIntent.value = !!config.unresolvedIntent; bankEnabled.value = config.enabled;
     beneficiaryTail.value = /[0-9]{4}$/.exec(config.beneficiary?.maskedAccount ?? "")?.[0] ?? "";
-  } catch { /* Keep new withdrawals closed; original bank requests remain reachable. */ }
+  } catch { if (current()) readFailed.value = true; /* Keep original bank requests reachable. */ }
   finally { if (current()) checking.value = false; }
 }
+useAutoRecovery({ failed: () => readFailed.value && !checking.value, retry: load });
 function reset() { revision++; recoveryKnown.value = false; bankIntent.value = false; pending.value = readWithdrawAttempt(app.accountKey); if (visible) void load(); }
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, reset);
 const stopRuntime = subscribeRuntimeRevision(reset);

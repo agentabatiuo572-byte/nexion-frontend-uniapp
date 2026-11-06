@@ -2922,7 +2922,7 @@ export const ms: Messages = {
   },
   session: {
     restoreRetryNotice: "Sesi anda tidak dapat dipulihkan sekarang. Mencuba semula secara automatik.",
-    nativeStorageFailure: "Storan sesi tidak tersedia. Aktiviti akaun telah dihentikan. Pembersihan sesi tempatan belum disahkan; buka semula app untuk mencuba lagi.",
+    nativeStorageFailure: "Maklumat log masuk belum dapat disimpan. Buka semula aplikasi.",
     secureBrowserUnsupported: "Pelayar ini tidak dapat log masuk atau memulihkan sesi anda dengan selamat. Sila kemas kini pelayar dan cuba lagi.",
     kickedTitle: "Sesi tamat",
     kickedBodySessionEnded: "Log masuk ini telah tamat. Log masuk semula untuk melihat rekod tugasan dan pembayaran anda.",
@@ -4399,7 +4399,7 @@ export const ms: Messages = {
     withdrawAlreadyOnFileTitle: "Permintaan pengeluaran direkodkan",
     withdrawAlreadyOnFileBody: "Permintaan pengeluaran asal telah direkodkan. Tiada pembayaran berganda dibuat. Semak status pengeluaran.",
     withdrawResendDeclinedTitle: "Cubaan semula tidak diterima",
-    withdrawResendDeclinedBody: "Cubaan semula tidak diterima. Keputusan pengeluaran asal masih belum disahkan. Semak status pengeluaran; jika tiada rekod, cuba semula permintaan asal kemudian. Jangan buat pengeluaran lain.",
+    withdrawResendDeclinedBody: "Keputusan pengeluaran asal belum disahkan. Semak kemajuannya; jangan buat pengeluaran baharu.",
     withdrawDailyLimitWithPending: "Had bilangan pengeluaran hari ini telah habis. Permintaan asal mungkin sudah dikira dalam had ini. Semak status pengeluaran dahulu; jangan buat pengeluaran lain.",
     earnNexCta: "Jana lebih UVT",
     feeConfirmRow: "Caj pengesahan rangkaian",

@@ -15,13 +15,10 @@
       <view style="color: var(--v5-ink)">
         <SubPageHeader back="/pages/me/me" :title="t.proof.title" />
 
-        <view v-if="!proofDisplayReady || (!remoteLoading && !proofReady)" :style="remoteErrorStyle" role="status" :aria-busy="remoteLoading">
-          <text class="block" style="font-weight: 600">{{ recoveryTitle }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ recoveryHint }}</text>
-          <view v-if="!remoteLoading" role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof" @keydown.enter.stop.prevent="refreshRemoteProof" @keydown.space.stop.prevent="refreshRemoteProof"><text>{{ t.ui.retry }}</text></view>
-        </view>
+        <view v-if="remoteLoading && !proofDisplayReady" :style="remoteErrorStyle" role="status" aria-busy="true"><text>{{ recoveryTitle }}</text></view>
+        <EmptyState v-else-if="!proofDisplayReady || !proofReady" kind="recoverable-error" :title="recoveryTitle" :desc="recoveryHint" :cta-label="t.ui.retry" @cta="refreshRemoteProof" />
 
-      <view :style="bodyStyle">
+      <view v-if="proofDisplayReady" :style="bodyStyle">
         <!-- Variant tabs -->
         <view>
           <text class="block font-mono-tabular" :style="variantLabelStyle">{{ t.proof.variantLabel }}</text>
@@ -186,11 +183,13 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDate } from "@/lib/display-date";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onUnload } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -289,6 +288,11 @@ async function refreshRemoteProof() {
     if (current()) remoteLoading.value = false;
   }
 }
+
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !remoteLoading.value && (remoteError.value || config.configStatus === "failed"),
+  retry: refreshRemoteProof,
+});
 
 watch([() => String(app.accountKey), () => app.accountBindingEpoch], () => {
   if (!remoteApiEnabled || !remoteMounted) return;
