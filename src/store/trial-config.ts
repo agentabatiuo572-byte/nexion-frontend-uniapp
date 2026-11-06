@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { formatAmount } from "@/lib/amount-display";
 import { parseTrialBooleanConfig } from "@/lib/trial-config-enum";
 import type { TrialConfigValue } from "@/api/trial-api";
 
@@ -186,6 +187,11 @@ export const useTrialConfig = defineStore("trialConfig", () => {
 });
 
 /** Compute discounted price for a conversion purchase during trial/grace. */
+export function formatTrialDiscountPercent(rate: number): string {
+  const [mantissa, exponent = "0"] = String(rate).split("e");
+  return formatAmount(`${mantissa}e${Number(exponent) + 2}`, "full");
+}
+
 export function computeDiscountedPrice(config: TrialConfig): {
   subtotal: number;
   discount: number;

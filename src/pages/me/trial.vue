@@ -251,7 +251,7 @@ import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDeadline } from "@/lib/trial-date";
 import { geoPolicyErrorKind, geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
-import { useTrialConfig, computeTrialOffset, resolveTrialCheckoutProductId } from "@/store/trial-config";
+import { useTrialConfig, computeTrialOffset, formatTrialDiscountPercent, resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { getProduct } from "@/mock/products";
@@ -397,7 +397,7 @@ const totalBreakdown = computed(() => {
   return credit ? fmt(detail.value.totalBreakdown, { discount, credit }) : fmt(detail.value.totalDiscountOnly, { discount });
 });
 const promoLabel = computed(() => {
-  const pct = (cfg.value.discountRate * 100).toFixed(0);
+  const pct = formatTrialDiscountPercent(cfg.value.discountRate);
   const cap = cfg.value.discountCapUSD;
   return cap === null ? fmt(detail.value.promoRowNoCap, { pct }) : fmt(detail.value.promoRow, { pct, cap: usdShort(cap) });
 });
