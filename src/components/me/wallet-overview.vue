@@ -11,7 +11,7 @@
         </view>
         <view class="wallet-metric" data-wallet-metric="all-time">
           <text class="wallet-metric-label">{{ t.wallet.allTimeEarnings }}</text>
-          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(allTimeEarned === null ? '-' : `$${formatAmount(allTimeEarned)}`), 22, true)">{{ visibility.mask(allTimeEarned === null ? '-' : `$${formatAmount(allTimeEarned)}`) }}</text>
+          <text class="wallet-metric-amount tabular-nums" :style="amountStyle(visibility.mask(allTimeEarned === null ? '—' : `$${formatAmount(allTimeEarned)}`), 22, true)">{{ visibility.mask(allTimeEarned === null ? '—' : `$${formatAmount(allTimeEarned)}`) }}</text>
           <view class="wallet-metric-sub wallet-metric-breakdown" role="group" tabindex="0" :aria-label="allTimeSublabel">
             <view class="wallet-metric-breakdown__item" aria-hidden="true">
               <svg class="wallet-metric-breakdown__icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3M10 10h4v4h-4z" /></svg>
@@ -39,40 +39,30 @@
     </template>
     <template v-if="props.section !== 'summary'">
       <!-- SPEC-7 FEAT-RISK02 异常3: 配置同步失败 → 结算暂停提示(不回退写死默认) -->
-      <view v-if="configSyncFailed" class="wallet-recovery">
-        <text class="block wallet-recovery-title">{{ t.wallet.syncFailedTitle }}</text>
+      <view v-if="configSyncFailed && !fundsAuthorityUnavailable" class="wallet-recovery">
         <text class="block wallet-recovery-body">{{ t.wallet.syncFailedBody }}</text>
       </view>
       <view v-if="fundsAuthorityUnavailable" class="wallet-recovery">
-        <text class="block wallet-recovery-title">{{ t.wallet.fundsUnavailableTitle }}</text>
         <text class="block wallet-recovery-body">{{ app.remoteFleetHasSnapshot ? t.wallet.fundsStaleBody : app.remoteWalletReceiptHasSnapshot ? t.wallet.fundsReceiptOnlyBody : t.wallet.fundsUnavailableBody }}</text>
-        <view role="button" tabindex="0" :aria-label="t.ui.retry" class="nx-card-recovery-action active:opacity-70" @click="retryFundsAuthority" @keydown.enter.prevent="retryFundsAuthority" @keydown.space.prevent="retryFundsAuthority">
-          <text>{{ t.ui.retry }}</text>
-        </view>
       </view>
       <view v-if="releaseAuthorityUnavailable" class="wallet-recovery">
         <text class="block wallet-recovery-body">{{ t.wallet.releaseDetailsUnavailable }}</text>
-        <view role="button" tabindex="0" :aria-label="t.ui.retry" class="nx-card-recovery-action active:opacity-70" @click="retryReleaseAuthority" @keydown.enter.prevent="retryReleaseAuthority" @keydown.space.prevent="retryReleaseAuthority">
-          <text>{{ t.ui.retry }}</text>
-        </view>
       </view>
       <view v-if="earningsRecoveryVisible" class="wallet-recovery">
         <text class="block wallet-recovery-body">{{ t.wallet.earningsUnavailable }}</text>
-        <view role="button" tabindex="0" :aria-label="t.ui.retry" class="nx-card-recovery-action active:opacity-70" @click="retryEarningsAuthority" @keydown.enter.prevent="retryEarningsAuthority" @keydown.space.prevent="retryEarningsAuthority">
-          <text>{{ t.ui.retry }}</text>
-        </view>
       </view>
 
     <view v-if="remoteApiEnabled && app.remoteWithdrawalListStatus === 'error'" class="wallet-recovery">
-      <text class="block wallet-recovery-title">{{ t.wallet.withdrawalStatusSubtitle }}</text>
-      <text class="block wallet-recovery-body">{{ t.empty.errorDesc }}</text>
-      <view class="nx-card-recovery-action active:opacity-70" role="button" tabindex="0" :aria-label="t.ui.retry" @click="app.refreshRemoteWithdrawalList()" @keydown.enter.prevent="app.refreshRemoteWithdrawalList()" @keydown.space.prevent="app.refreshRemoteWithdrawalList()"><text>{{ t.ui.retry }}</text></view>
+      <text class="block wallet-recovery-body">{{ t.wallet.withdrawalStatusSubtitle }} · {{ t.empty.errorDesc }}</text>
     </view>
     </template>
   </view>
+  <NxSheet :open="releaseExplanation !== null" :title="releaseExplanation?.title ?? ''" @close="releaseExplanation = null">
+    <text class="wallet-explanation">{{ releaseExplanation?.message }}</text>
+  </NxSheet>
 </template>
 <script setup lang="ts">
-import { invalidatePassiveTabRead } from "@/lib/passive-tab-read";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { useDataVisibility } from "@/store/data-visibility";
 import { computed, ref, watch, type CSSProperties } from "vue";
@@ -82,7 +72,7 @@ import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot, earningsReleaseHasSnapshot, earningsReleaseStatus, refreshEarningsReleaseStatus, type LedgerRoute } from "@/store/earning-release";
 import { useCommission } from "@/store/commission";
 import { useConfig } from "@/store/config";
-import { confirm as uiConfirm } from "@/store/ui";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { resolveWalletTodayEarnings } from "@/lib/wallet-today-earnings";
 
@@ -92,7 +82,7 @@ const visibility = useDataVisibility();
 const app = useApp();
 const commission = useCommission();
 const cfg = useConfig();
-const configSyncFailed = computed(() => cfg.syncFailed);
+const configSyncFailed = computed(() => cfg.configStatus === "failed");
 const fundsAuthorityUnavailable = computed(() => remoteApiEnabled && app.remoteFleetStatus === "error");
 const releaseAuthorityUnavailable = computed(() => remoteApiEnabled && earningsReleaseStatus.value === "error");
 const earningsReadPending = computed(() => app.homeTruthStatus === "idle" || app.homeTruthStatus === "loading"
@@ -109,18 +99,13 @@ const bucketsReadable = computed(() => !remoteApiEnabled || (earningsReleaseHasS
   && earningsReleaseSnapshot.value?.serverCanonical === true
   && (earningsReleaseStatus.value === "ready" || earningsReleaseStatus.value === "loading")));
 
-function retryFundsAuthority() {
-  invalidatePassiveTabRead("remote-fleet");
-  void app.refreshRemoteFleet();
-}
-function retryReleaseAuthority() {
-  invalidatePassiveTabRead("earning-release");
-  if (earningsReleaseStatus.value === "loading") return;
-  void refreshEarningsReleaseStatus().catch(() => undefined);
-}
-function retryEarningsAuthority() {
-  if (app.homeTruthStatus !== "loading") void app.refreshHomeTruth().catch(() => undefined);
-  if (commission.eventsStatus !== "loading") void commission.refreshCanonicalEvents().catch(() => undefined);
+if (props.section !== "recovery") {
+  useAutoRecovery({ failed: () => remoteApiEnabled && cfg.configStatus === "failed" && !cfg.loading, retry: () => cfg.load() });
+  useAutoRecovery({ failed: () => fundsAuthorityUnavailable.value, retry: () => app.refreshRemoteFleet(undefined, { coalesce: true }) });
+  useAutoRecovery({ failed: () => releaseAuthorityUnavailable.value, retry: () => refreshEarningsReleaseStatus() });
+  useAutoRecovery({ failed: () => remoteApiEnabled && app.homeTruthStatus === "error", retry: () => app.refreshHomeTruth() });
+  useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
+  useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteWithdrawalListStatus === "error", retry: () => app.refreshRemoteWithdrawalList() });
 }
 
 // Release explanations use the same account-scoped server receipt as the
@@ -141,23 +126,12 @@ function releaseSheetMessage(route: LedgerRoute): string {
     hours: Math.ceil(snapshot.requiredAttestationSeconds / 3600 * 100) / 100,
   });
 }
+const releaseExplanation = ref<{ title: string; message: string } | null>(null);
 function showPendingSheet() {
-  uiConfirm({
-    title: t.value.wallet.pendingSheetTitle,
-    message: releaseSheetMessage("pending_review"),
-    confirmLabel: t.value.wallet.sheetOk,
-    hideCancel: true,
-    icon: "info",
-  });
+  releaseExplanation.value = { title: t.value.wallet.pendingSheetTitle, message: releaseSheetMessage("pending_review") };
 }
 function showLockedSheet() {
-  uiConfirm({
-    title: t.value.wallet.lockedSheetTitle,
-    message: releaseSheetMessage("bonus_locked"),
-    confirmLabel: t.value.wallet.sheetOk,
-    hideCancel: true,
-    icon: "info",
-  });
+  releaseExplanation.value = { title: t.value.wallet.lockedSheetTitle, message: releaseSheetMessage("bonus_locked") };
 }
 
 const buckets = computed(() => ({
@@ -189,8 +163,8 @@ const hasReadRecovery = computed(() => configSyncFailed.value || fundsAuthorityU
   || earningsRecoveryVisible.value
   || (remoteApiEnabled && app.remoteWithdrawalListStatus === "error"));
 const allTimeAmounts = computed(() => ({
-  c: visibility.mask(miningLifetimeUSD.value === null ? "-" : `$${formatAmount(miningLifetimeUSD.value)}`),
-  tm: visibility.mask(teamLifetimeUSD.value === null ? "-" : `$${formatAmount(teamLifetimeUSD.value)}`),
+  c: visibility.mask(miningLifetimeUSD.value === null ? "—" : `$${formatAmount(miningLifetimeUSD.value)}`),
+  tm: visibility.mask(teamLifetimeUSD.value === null ? "—" : `$${formatAmount(teamLifetimeUSD.value)}`),
 }));
 const allTimeSublabel = computed(() => fmt(t.value.wallet.allTimeSublabel, allTimeAmounts.value));
 // Amounts keep their full precision and shrink only when their formatted text needs it.
@@ -199,6 +173,7 @@ function amountStyle(value: string, size: number, half = false): CSSProperties {
 }
 </script>
 <style scoped>
+.wallet-explanation { display: block; white-space: pre-line; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .me-wallet-overview { color: var(--v5-ink); font-family: var(--font-v5); }
 .wallet-overview-card { padding: var(--v5-space-4); border-radius: var(--v5-radius-l); }
 .wallet-section-title { display: block; margin-bottom: var(--v5-space-3); font-size: var(--ui-type-section); font-weight: 500; }
@@ -215,8 +190,7 @@ function amountStyle(value: string, size: number, half = false): CSSProperties {
 .wallet-metric-breakdown:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: var(--v5-radius-s); }
 .wallet-metric-breakdown__item { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 3px; font-size: 10px; line-height: 1.4; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .wallet-metric-breakdown__icon { flex: 0 0 12px; }
-.wallet-recovery { padding: var(--v5-space-3); margin-bottom: var(--v5-space-3); border-radius: var(--v5-radius-m); background: var(--v5-warning-soft); }
-.wallet-recovery-title { font-size: var(--v5-type-caption); color: var(--v5-warning); font-weight: 500; }
+.wallet-recovery { margin-top: var(--v5-space-2); }
 .wallet-recovery-body { font-size: var(--v5-type-caption); color: var(--v5-ink-3); line-height: 1.5; overflow-wrap: anywhere; }
 [role="button"] { cursor: pointer; }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; border-radius: var(--v5-radius-s); }

@@ -71,12 +71,8 @@
         <text style="margin: 0 8px">{{ t.register.create }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
-      <view v-if="remoteApiEnabled && (remotePreviewState === 'unavailable' || remotePreviewState === 'loading')" class="ref-preview-status" role="status" aria-live="polite" :aria-busy="remotePreviewState === 'loading'">
-        <text>{{ remotePreviewState === 'loading' ? recoveryCopy.referralLoading : requestedCode ? recoveryCopy.referralUnavailable : recoveryCopy.referralInvalid }}</text>
-        <view v-if="requestedCode" class="ref-preview-retry nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" :tabindex="remotePreviewState === 'loading' ? -1 : 0" :aria-disabled="remotePreviewState === 'loading'" @click="loadRemotePreview" @keydown.enter.prevent="loadRemotePreview" @keydown.space.prevent="loadRemotePreview">
-          <text>{{ t.ui.retry }}</text>
-        </view>
-      </view>
+      <view v-if="remoteApiEnabled && remotePreviewState === 'unavailable' && !requestedCode" class="ref-preview-status" role="status"><text>{{ recoveryCopy.referralInvalid }}</text></view>
+      <view v-else-if="remoteApiEnabled && (remotePreviewState === 'unavailable' || remotePreviewState === 'loading')" class="ref-preview-status" role="status" :aria-busy="remotePreviewState === 'loading'"><text>{{ remotePreviewState === 'loading' ? recoveryCopy.referralLoading : '—' }}</text></view>
       <view v-if="authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp"  @keydown.enter.prevent="enterApp" @keydown.space.prevent="enterApp">
         <text style="margin: 0 8px">{{ t.ref.enterApp }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -121,10 +117,13 @@
         <text class="nx-ref-footer-link" :style="footerLinkStyle" role="link" tabindex="0" :aria-label="t.ref.trustCenter" @click="goTrust">{{ t.ref.trustCenter }}</text>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import ToastHost from "@/components/toast-host.vue";
 import { displayNickname } from "@/lib/brand-copy";
 import { formatAmount } from "@/lib/amount-display";
 import { privacyPolicyHref } from "@/lib/privacy-return";
@@ -224,6 +223,7 @@ async function loadRemotePreview() {
     if (cause instanceof ApiError && ["REFERRAL_PREVIEW_INVALID", "REFERRAL_PREVIEW_NOT_FOUND"].includes(cause.message)) requestedCode.value = null;
   }
 }
+useAutoRecovery({ failed: () => remoteApiEnabled && !!requestedCode.value && remotePreviewState.value === "unavailable", retry: loadRemotePreview });
 function cleanupReferralLoad() {
   referralMounted = false;
   referralLoadVersion += 1;

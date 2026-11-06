@@ -23,7 +23,6 @@
     <view class="checkout-result__actions">
       <NxButton v-if="state === 'inventory' || (state === 'activated' && phase === 'complete')" :label="copy.devices" variant="primary" @click="emit('devices')" />
       <template v-else-if="state === 'error' || state === 'processing'">
-        <NxButton :label="copy.query" variant="primary" @click="emit('retry')" />
         <NxButton :label="copy.deviceInventory" variant="text" @click="emit('devices')" />
       </template>
       <view v-else class="checkout-result__action-space" aria-hidden="true" />
@@ -38,7 +37,7 @@ import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import NxButton from '@/components/ui/nx-button.vue';
 import CheckoutAmount from './CheckoutAmount.vue';
 const props = defineProps<{ state: 'activated' | 'inventory' | 'processing' | 'error'; productName?: string; productImage?: string; amount?: string | number; currency?: 'USD' | 'USDT'; error?: string }>();
-const emit = defineEmits<{ (event: 'devices'): void; (event: 'retry'): void }>();
+const emit = defineEmits<{ (event: 'devices'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));
 const phase = ref<'confirmed' | 'activating' | 'complete'>('complete');

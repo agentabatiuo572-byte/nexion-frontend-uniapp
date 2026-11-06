@@ -104,7 +104,6 @@ export function useDeviceDeactivation() {
         : fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) }));
     };
     try {
-      toast.info(t.value.deactivateSheet.toastSubmitting);
       const result = await deviceE3Api.deactivateAfterTask(Number(d.id), version, key);
       if (result.status === "ACTIVE") throw new Error("DEVICE_DEFERRED_RESPONSE_INVALID");
       if (!current()) return false;

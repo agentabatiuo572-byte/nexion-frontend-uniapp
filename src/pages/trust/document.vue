@@ -5,10 +5,7 @@
 
       <view class="px-4 doc-page">
         <text v-if="!document && status !== 'error'" class="doc-state" role="status" aria-live="polite">{{ copy.documentsLoading }}</text>
-        <view v-else-if="!document" class="nx-inline-recovery" role="alert">
-          <text class="nx-inline-recovery__copy">{{ copy.documentsError }}</text>
-          <view class="doc-link" role="button" tabindex="0" @click="refresh"><text>{{ t.ui.retry }}</text></view>
-        </view>
+        <EmptyState v-else-if="!document" kind="recoverable-error" :title="copy.documentsError" :cta-label="t.ui.retry" @cta="refresh" />
         <template v-else>
           <view class="doc-head">
             <text class="block doc-head__title">{{ title }}</text>
@@ -46,8 +43,10 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, ref } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -106,6 +105,7 @@ onLoad((options) => {
   if (requested === "whitepaper" || requested === "incorporation" || requested === "msb" || requested === "ein") slot.value = requested;
 });
 onShow(() => { void refresh(); });
+useAutoRecovery({ failed: () => status.value === "error", retry: refresh });
 </script>
 
 <style scoped>

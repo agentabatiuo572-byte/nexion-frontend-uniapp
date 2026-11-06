@@ -3,10 +3,7 @@
     <SubPageHeader :back="returnTo" :back-action="goBack" :title="t.privacy.title" plain design />
     <view class="privacy-page">
       <text v-if="loading" class="privacy-copy">{{ t.terms.loading }}</text>
-      <view v-else-if="failed" role="alert">
-        <text class="privacy-copy">{{ t.privacy.unavailable }}</text>
-        <view role="button" tabindex="0" class="privacy-back" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.ui.retry }}</text></view>
-      </view>
+      <EmptyState v-else-if="failed" kind="recoverable-error" :title="t.privacy.unavailable" :cta-label="t.ui.retry" @cta="load" />
       <view v-else-if="policy">
         <text class="privacy-copy">{{ t.privacy.version }} {{ policy.version }} · {{ policy.locale }}</text>
         <text class="privacy-copy">{{ platformDisplayText(policy.hero) }}</text>
@@ -16,10 +13,14 @@
         </view>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import EmptyState from "@/components/empty-state.vue";
+import ToastHost from "@/components/toast-host.vue";
 import { onLoad } from "@dcloudio/uni-app";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -48,6 +49,7 @@ async function load() {
   catch { if (request === generation) failed.value = true; }
   finally { if (request === generation) loading.value = false; }
 }
+useAutoRecovery({ failed: () => failed.value && !loading.value, retry: load });
 function goBack() { navBack(returnTo.value); }
 onLoad((options) => { returnTo.value = resolvePrivacyReturn(options?.return); });
 onMounted(() => { void load(); });

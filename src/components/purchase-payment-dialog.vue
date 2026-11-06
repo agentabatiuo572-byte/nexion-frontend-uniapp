@@ -216,7 +216,7 @@
     <view class="pp-cashier__foot" :style="{ paddingBottom: cashierFootPad + 'px' }"><view class="pp-pulse" aria-hidden="true" /><text>{{ copy.autoReturn }}</text></view>
   </view>
 
-  <NxNoticeDialog v-if="active && s.open && notice" :open="true" :title="notice.title" :body="notice.body" :primary="notice.primary" :secondary="notice.secondary"
+  <NxNoticeDialog v-if="active && s.open && notice && !acknowledgementOnly" :open="true" :title="notice.title" :body="notice.body" :primary="notice.primary" :secondary="notice.secondary"
     :icon="notice.icon" :tone="notice.tone" :busy="s.busy" @primary="notice.onPrimary" @secondary="notice.onSecondary" />
 </template>
 <script setup lang="ts">
@@ -326,6 +326,14 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
   }
 }
 const notice = computed(() => noticeFor(s.notice));
+const acknowledgementOnly = computed(() => !!notice.value && !notice.value.secondary
+  && (s.notice === 'timeout' || s.notice === 'gone' || s.notice === 'changed' || s.notice === 'orderMissing'));
+watch(() => active.value && s.open && acknowledgementOnly.value, show => {
+  if (!show || !notice.value) return;
+  const { title, body } = notice.value;
+  payment.close();
+  toast.warn(title, body);
+}, { immediate: true });
 // A concluded payment page says what the notice says; nothing on it may still ask for payment.
 const conclusion = computed(() => noticeFor(purchaseConclusion(s.intent)));
 

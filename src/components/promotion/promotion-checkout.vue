@@ -2,15 +2,15 @@
   <view class="promotion promotion-main" :class="{'promotion-main--result':order?.paymentStatus==='PAID'}">
     <view v-if="!auth.isAuthenticated" class="promotion-flat"><text class="promotion-title">{{ p.signIn }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="signIn"><text>{{ p.signIn }}</text></PromotionAction></view>
     <view v-else-if="loading" class="promotion-flat" role="status" aria-live="polite"><text>{{ p.loading }}</text></view>
-    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?getProduct(items[0].productNo)?.imageUrl:undefined" :amount="order.paidTotalUsdt??order.amountUsdt??''" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices" @retry="readActivation">
+    <CheckoutResult v-else-if="order?.paymentStatus==='PAID'" :state="resultState" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0]?getProduct(items[0].productNo)?.imageUrl:undefined" :amount="order.paidTotalUsdt??order.amountUsdt??''" :currency="order.paymentMethod==='HDPAY_BANK'?'USD':'USDT'" :error="resultError" @devices="viewDevices">
       <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" data-testid="checkout-buy-again" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
     </CheckoutResult>
     <template v-else>
       <view v-if="keepRecoveryTarget" class="promotion-notice" role="alert"><text>{{ keepRecoveryReadError?t.tradein.keepRecoveryReadError:purchaseRecoveryCopy(locale.code).original }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" @click="recoverKeepBeforeNewPurchase(true)"><text>{{ t.tradein.keepRecoveryAction }}</text></PromotionAction></view>
       <text v-if="displayQuote||order" class="checkout-review-title">{{ order?.paymentStatus==='PENDING' ? p.pending : p.confirmOrder }}</text>
-      <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text><PromotionAction class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="recover"><text>{{ p.query }}</text></PromotionAction></view>
-      <view v-if="error" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
-      <view v-if="openedOriginal" class="promotion-notice" role="status"><text>{{ p.openedOriginal }}</text></view>
+      <view v-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
+      <view v-if="error&&!unknown" class="promotion-notice" role="alert"><text>{{ error }}</text><view v-if="activityConflict" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/events/events')" @keydown.enter.prevent="navTo('/pages/events/events')" @keydown.space.prevent="navTo('/pages/events/events')"><text>{{ p.promotionList }}</text></view><view v-if="!order&&!openedOriginal&&!session.record.pending&&!freshQuoteReady&&!busy" class="promotion-link" role="button" tabindex="0" @click="loadQuote"><text>{{ t.empty.errorCta }}</text></view></view>
+
       <view v-if="items.length" class="checkout-group checkout-products" :aria-label="p.selected">
         <view v-for="item in items" :key="item.productNo" class="promotion-row checkout-product-line">
           <view class="checkout-product-art"><image v-if="getProduct(item.productNo)?.imageUrl" :src="getProduct(item.productNo)!.imageUrl" class="promotion-image" mode="aspectFit" aria-hidden="true" /></view>
@@ -74,10 +74,7 @@
             </view>
             <view class="checkout-wallet-topup" role="link" tabindex="0" @click="openWalletTopup" @keydown.enter.prevent="openWalletTopup"><text>{{ p.topup }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
           </view>
-          <view v-if="walletState==='error'" class="checkout-wallet-recovery" role="status">
-            <text>{{ reviewCopy.walletError }}</text>
-            <view class="promotion-link" role="button" tabindex="0" @click="refreshWallet(true)"><text>{{ t.empty.errorCta }}</text></view>
-          </view>
+
         </view>
       </view>
       <view v-if="summary" class="checkout-section" data-testid="checkout-fees">
@@ -94,9 +91,8 @@
         <template v-if="order">
           <text class="promotion-copy">{{ p.orderNo }} · {{ order.orderNo }}</text>
           <text class="promotion-title">{{ order.paymentStatus==='REFUNDED' ? p.refunded : order.paymentStatus==='PENDING' ? p.pending : order.paymentStatus==='CANCELLED' ? p.rewardCancelled : order.paymentStatus==='EXPIRED' ? t.orders.statusExpired : p.unavailable }}</text>
-          <text v-if="order.paymentStatus==='PENDING'&&payWindow!==true" class="promotion-notice">{{ payWindow===false?t.orders.statusExpired:p.unknown }}</text>
+          <text v-if="order.paymentStatus==='PENDING'&&payWindow!==true" class="promotion-notice">{{ p.unknown }}</text>
 
-          <PromotionAction class="promotion-action" role="button" tabindex="0" :aria-disabled="busy" @click="recover"><text>{{ p.query }}</text></PromotionAction>
           <view class="promotion-link" role="button" tabindex="0" @click="viewOrder"><text>{{ p.viewOrder }}</text></view>
           <PromotionAction v-if="!openedOriginal&&!props.orderNo&&props.items.length&&canStartNew" class="promotion-action primary" role="button" tabindex="0" :aria-disabled="busy" @click="startNewPurchase"><text>{{ p.buyAgain }}</text></PromotionAction>
         </template>
@@ -123,6 +119,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { commerceCopy } from '@/lib/commerce-review';
@@ -176,12 +173,13 @@ function selectedItemName(item:{productNo:string;productName?:string}){return (i
 const reviewCopy=computed(()=>commerceCopy(locale.code));
 const flowCopy=computed(()=>checkoutFlowCopy(locale.code));
 const walletState=ref<'idle'|'loading'|'ready'|'error'>('idle');
+useAutoRecovery({ failed: () => walletState.value === "error", retry: () => refreshWallet(true) });
 let walletGeneration=0;
 let walletTimer:ReturnType<typeof setInterval>|undefined;
 let catalogRefresh:Promise<boolean>|null=null;
-async function refreshWallet(coalesce=false){
+async function refreshWallet(coalesce=false,background=false){
   if(!current()||!visible.value||!auth.isAuthenticated)return;
-  const generation=++walletGeneration;walletState.value='loading';
+  const generation=++walletGeneration;if(!background)walletState.value='loading';
   try{
     // Catalog completion advances the runtime fence. Capture the wallet read
     // afterwards, without delaying original-order or command recovery.
@@ -194,12 +192,15 @@ async function refreshWallet(coalesce=false){
 const visible=ref(true);
 const account=app.accountKey,epoch=app.accountBindingEpoch;let alive=true,readGeneration=0,refreshOnIdle=false;const current=()=>alive&&app.accountKey===account&&app.accountBindingEpoch===epoch;
 const readCurrent=(generation:number)=>current()&&visible.value&&generation===readGeneration;
+const recoveryReading=ref(false);
+const recoveryReadFailed=ref(false);
+let recoveryGeneration:number|null=null;
 const TABLE=PROMOTION_CHECKOUT_TABLE;
 let storageReadable=true;let records:Record<string,PromotionCheckoutRecord>={};
 try{records=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};}catch{storageReadable=false;}
 // A changed route cannot bypass an unresolved command from this same account.
 const {intent,record:stored,openedOriginal}=selectPromotionCheckoutRecord(records,props);
-const session=new PromotionCheckoutSession({api:promotionApi,current,key:key=>acquireAccountCommandKey('nexgrid-promotion-commands-v1',account,key,'promotion'),save:record=>{if(!storageReadable)throw new Error('STORAGE_UNAVAILABLE');const rows=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};if(!writeAccountRow(TABLE,account,{...rows,[intent]:record}))throw new Error('STORAGE_UNAVAILABLE');}},stored);
+const session=new PromotionCheckoutSession({api:promotionApi,current:()=>current()&&(recoveryGeneration===null||readCurrent(recoveryGeneration)),key:key=>acquireAccountCommandKey('nexgrid-promotion-commands-v1',account,key,'promotion'),save:record=>{if(!storageReadable)throw new Error('STORAGE_UNAVAILABLE');const rows=readAccountRow<Record<string,PromotionCheckoutRecord>>(TABLE,account,true)??{};if(!writeAccountRow(TABLE,account,{...rows,[intent]:record}))throw new Error('STORAGE_UNAVAILABLE');}},stored);
 const stopReleaseWatch=onPurchaseRecordReleased((accountKey,key)=>{if(accountKey===account&&current()&&session.releaseExternalPayment(key))revision.value++;});
 const quotePresentation=shallowRef<{key:string;quote:Quote}|null>(null);
 const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.value;return session.record.pending||session.record.order||(freshQuoteReady.value&&quotePresentation.value?.key===quotePresentationKey())?session.record.quote:null;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
@@ -208,6 +209,9 @@ const displayQuote=computed(()=>current()&&visible.value&&auth.isAuthenticated ?
 function quotePresentationKey(){return JSON.stringify([app.accountKey,app.accountBindingEpoch,auth.isAuthenticated,props.activityId,selection.value,eventVoucherId,props.upgradeActivityId??'',manualVoucher()?['manual',voucherId.value]:['auto'],locale.code]);}
 const resultState=ref<'activated'|'inventory'|'processing'|'error'>('processing'),resultError=ref(''),resultReading=ref(false);
 let resultGeneration=0;
+watch(()=>order.value?.orderNo,()=>{
+  resultGeneration++;resultReading.value=false;resultState.value='processing';resultError.value='';
+},{flush:'sync'});
 const receiptQuote=computed(()=>order.value?.promotionQuoteId===quote.value?.quoteId?quote.value:null);
 const summary=computed(()=>order.value?{
   subtotalUsdt:order.value.subtotalUsdt??receiptQuote.value?.subtotalUsdt,
@@ -308,9 +312,9 @@ function updateClock(){
 }
 async function loadOrderClock(){
   updateClock();if(!current()||order.value?.paymentStatus!=='PENDING'||payWindow.value!==null)return;
-  const generation=++clockGeneration,sampledAt=readTrustedMonotonicNowMs();if(sampledAt===null)return;
+  const generation=++clockGeneration,read=readGeneration,sampledAt=readTrustedMonotonicNowMs();if(sampledAt===null)return;
   // Persisted quotes have no live monotonic anchor; an empty fleet still carries validated server time.
-  const fleet=await deviceE3Api.fleet();if(!current()||generation!==clockGeneration)return;
+  const fleet=await deviceE3Api.fleet();if(!readCurrent(read)||generation!==clockGeneration)return;
   orderClock={serverNow:fleet.serverNow,at:sampledAt};updateClock();
 }
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!unknown.value&&!keepRecoveryTarget.value&&(liteSelectionAllowed.value||session.retryOriginal)&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
@@ -450,6 +454,7 @@ async function pay(){
     // Keep the original order amount. A current quote is not current purchase
     // permission: all original lines need fresh overall server decisions.
     const recovered=await recover();
+    if(recoveryReadFailed.value&&current()&&visible.value)error.value=flowCopy.value.queryFailed;
     if(!recovered||!canPay.value||!current()||!visible.value)return;
     const expectedOrder=order.value,generation=readGeneration,runtime=captureRuntimeRevision(),sessionRevision=sessionVault.revision();
     if(!expectedOrder)return;
@@ -526,18 +531,28 @@ async function confirmPayment(){
   }
 }
 async function recover():Promise<boolean>{
-  let verified=false;
-  walletState.value='loading';
-  await run(async()=>{await session.recover();if(!current())return;revision.value++;await loadOrderClock();verified=true;});
-  await refreshWallet();
-  if(current()&&visible.value&&order.value?.paymentStatus==='PAID')await readActivation();
-  return verified&&current()&&visible.value&&!unknown.value;
+  if(!current()||!visible.value||busy.value||session.busy||recoveryReading.value)return false;
+  const generation=readGeneration;
+  recoveryGeneration=generation;recoveryReading.value=true;
+  try{
+    await session.recover();
+    if(!readCurrent(generation))return false;
+    if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
+    recoveryReadFailed.value=false;
+    revision.value++;
+    await loadOrderClock();
+    if(!readCurrent(generation))return false;
+    if(order.value?.paymentStatus==='PAID')await readActivation();
+    else await refreshWallet(true,true);
+    return readCurrent(generation)&&!unknown.value;
+  }catch{if(readCurrent(generation))recoveryReadFailed.value=true;return false;}
+  finally{recoveryGeneration=null;recoveryReading.value=false;}
 }
 async function readActivation(){
   if(!current()||!visible.value||resultReading.value||order.value?.paymentStatus!=='PAID')return;
   const orderNo=order.value.orderNo,generation=++resultGeneration;
   const valid=()=>current()&&visible.value&&generation===resultGeneration&&order.value?.orderNo===orderNo;
-  resultReading.value=true;resultError.value='';resultState.value='processing';walletState.value='loading';
+  resultReading.value=true;
   try{
     if(catalogRefresh)await catalogRefresh;
     if(!valid())return;
@@ -548,9 +563,25 @@ async function readActivation(){
     if(canonical.status==='activated'||canonical.status==='inventory')resultState.value=canonical.status;
     else if(['paid','provisioning'].includes(canonical.status))resultState.value='processing';
     else throw new Error('ACTIVATION_READBACK_UNCONFIRMED');
+    resultError.value='';
   }catch{if(valid()){resultState.value='error';resultError.value=t.value.orders.walletPaymentConfirmedRefreshPending;if(walletState.value==='loading')walletState.value='error';}}
   finally{if(generation===resultGeneration)resultReading.value=false;}
 }
+const purchaseReadBusy=()=>loading.value||busy.value||session.busy||recoveryReading.value||resultReading.value
+  ||walletState.value==='loading'||paymentConfirming.value||paymentEntryChecking.value||paymentSheetOpen.value||leaving.value||voucherLoading.value;
+useAutoRecovery({
+  failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!session.retryOriginal
+    &&(unknown.value||recoveryReadFailed.value||!!order.value&&!session.confirmed
+      ||order.value?.paymentStatus==='PENDING'&&payWindow.value===false),
+  retry:recover,
+  repeatMs:15_000,
+});
+useAutoRecovery({
+  failed:()=>current()&&visible.value&&auth.isAuthenticated&&!purchaseReadBusy()&&!unknown.value
+    &&order.value?.paymentStatus==='PAID'&&['processing','error'].includes(resultState.value),
+  retry:readActivation,
+  repeatMs:15_000,
+});
 async function startNewPurchase(){if(!canStartNew.value||props.orderNo||openedOriginal)return;session.startNewPurchase();voucherId.value=props.voucherId?.trim()||null;revision.value++;await loadQuote();}
 async function cancelOrder():Promise<boolean>{
   if(!canCancel.value||!current()||!visible.value)return false;
@@ -587,7 +618,7 @@ async function requestLeave():Promise<boolean>{
     if(!order.value)return !session.record.pending;
     if(order.value.paymentStatus!=='PENDING')return true;
     // Missing trusted time cannot turn an unresolved original order into a
-    // successful cancellation. Keep it visible for an explicit read retry.
+    // successful cancellation. Keep it visible until a read settles it.
     if(payWindow.value===null){error.value=p.value.unknown;return false;}
     const cancelled=await cancelOrder();
     if(!cancelled&&current()&&visible.value&&session.record.order?.paymentStatus!=='PAID'&&!error.value)error.value=t.value.orders.resultReadback;

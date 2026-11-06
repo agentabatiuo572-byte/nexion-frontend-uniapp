@@ -287,6 +287,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { useLocaleStore } from "@/store/locale";
@@ -337,6 +338,10 @@ const readError = ref("");
 const readRetryPending = ref(false);
 const readRetryBusy = computed(() => readRetryPending.value || fx.loading || dep.serverStatus === "loading");
 const readFailure = computed(() => readError.value || (paymentSessionReady.value && fx.syncFailed ? t.value.bankPane.createFxUnavailable : ""));
+useAutoRecovery({
+  failed: () => pageActive.value && paymentSessionReady.value && !readRetryBusy.value && !!readFailure.value,
+  retry: retryReadData,
+});
 async function retryReadData() {
   if (!pageActive.value || !paymentSessionReady.value || readRetryBusy.value) return;
   const accountKey = app.accountKey, bindingEpoch = app.accountBindingEpoch;

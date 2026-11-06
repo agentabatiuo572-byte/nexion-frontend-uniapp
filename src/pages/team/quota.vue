@@ -21,12 +21,8 @@
           </view>
         </view>
 
-        <view v-if="remoteApiEnabled && remoteError" class="quota-state nx-inline-recovery" role="alert"><text class="quota-body nx-inline-recovery__copy">{{ auditCopy.quotaLoadError }}</text><NxButton class="nx-inline-recovery__action" variant="text" :label="t.store.catalogRetry" :busy="remoteRefreshing" @click="refreshRemoteQuota" /></view>
-        <view v-else-if="remoteApiEnabled && !remoteSnapshot" class="quota-state" role="status" aria-live="polite" aria-busy="true"><text>{{ auditCopy.loading }}</text></view>
-        <view v-if="remoteApiEnabled && (!catalogDisplayReady || productCatalogState.status === 'error')" class="quota-state" :class="{ 'nx-inline-recovery': productCatalogState.status === 'error' }" :role="productCatalogState.status === 'error' ? 'alert' : 'status'">
-          <text class="quota-body nx-inline-recovery__copy">{{ productCatalogState.status === 'error' ? t.store.catalogErrorTitle : t.store.catalogLoadingTitle }}</text>
-          <NxButton v-if="productCatalogState.status === 'error'" class="nx-inline-recovery__action" variant="text" :label="t.store.catalogRetry" @click="retryCatalog" />
-        </view>
+        <view v-if="remoteApiEnabled && !remoteSnapshot && !remoteError" class="quota-state" role="status" aria-live="polite" :aria-busy="remoteRefreshing"><text>{{ remoteRefreshing ? auditCopy.loading : '—' }}</text></view>
+        <view v-if="remoteApiEnabled && !catalogDisplayReady" class="quota-state"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><text>—</text></view>
         <view v-if="quotaReady && !focusedTiers.length" class="quota-state" role="status"><text>{{ t.empty.listTitle }}</text></view>
         <view v-if="focusedTiers.length" class="quota-devices-heading"><text class="quota-section-title">{{ t.quota.availableDevices }}</text><NxButton variant="link" size="small" :label="t.empty.devicesCta" @click="go('/pages/store/store')" /></view>
         <!-- Tiers swipe sideways as large product cards (P-41). -->
@@ -45,6 +41,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
@@ -167,9 +164,6 @@ onUnload(() => {
   stopQuotaRuntime();
   resetQuotaPageState();
 });
-function retryCatalog(): void {
-  void refreshProductCatalog(true);
-}
 // 礼包 NEX 数量单源派生自 platform config。
 const inviteHint = computed(() => remoteApiEnabled ? "—" : fmt(t.value.quota.inviteFriendsHint, { inviterNex: formatAmount(cfg.config.rewards.inviterReward.nexAmount), nex: formatAmount(cfg.config.rewards.welcomeGift.nexAmount) }));
 
@@ -346,6 +340,9 @@ const heroTier = computed(() => focusedTiers.value[0]);
 const heroPriceParts = computed(() => formatFinanceAmount(heroTier.value?.price).split('.'));
 const heroImage = computed(() => heroTier.value ? getProductMedia(heroTier.value.productId)?.src ?? heroTier.value.imageUrl : undefined);
 const quotaReady = computed(() => !remoteApiEnabled || (catalogDisplayReady.value && remoteSnapshot.value !== null && !remoteRefreshing.value && !remoteError.value && productCatalogState.status === 'ready'));
+useAutoRecovery({ failed: () => remoteApiEnabled && !conditionsOnly.value && !!remoteError.value && !remoteRefreshing.value, retry: refreshRemoteQuota });
+useAutoRecovery({ failed: () => remoteApiEnabled && productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
+useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && conditionEligibility.value.status === "error", retry: retryConditionEligibility });
 </script>
 
 <style scoped>

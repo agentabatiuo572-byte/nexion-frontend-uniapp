@@ -30,15 +30,7 @@ const TAB_ROOT: Record<string, string> = {
 };
 
 function reportNavigationFailure(): void {
-  // Bare Intro/Terms/session-ended pages do not mount GlobalUi. Native feedback
-  // must be first even when Pinia is active, for every kind of navigation.
-  let title = "Unable to open this page. Please try again.";
-  try { title = getT().ui.navigationFailed; } catch { /* i18n is not mounted yet */ }
-  try {
-    uni.showToast({ title, icon: "none" });
-  } catch {
-    try { toast.error(title); } catch { /* Neither renderer is mounted yet. */ }
-  }
+  toast.error(getT().ui.navigationFailed);
 }
 
 function closeTransientNavigationSheets(): void {

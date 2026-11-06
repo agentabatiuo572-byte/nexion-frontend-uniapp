@@ -17,12 +17,7 @@
     <view class="dly" :class="{ 'dly--instant': returned }">
       <SubPageHeader back="/pages/me/me" plain />
 
-      <view v-if="remoteApiEnabled && (remoteRefreshError || faucet.remoteReadState === 'error')" class="dly-warn" role="alert">
-        <text class="dly-warn__t">{{ t.authOtp.errorServiceUnavailable }}</text>
-        <view class="dly-warn__b active:opacity-70" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily" @keydown.enter.prevent="refreshDaily" @keydown.space.prevent="refreshDaily">
-          <text>{{ t.store.catalogRetry }}</text>
-        </view>
-      </view>
+
 
       <!-- Streak energy ring -->
       <view class="dly-hero" :class="{ 'dly-hero--glow': dailyFactsVisible }" :role="dailyFactsVisible ? undefined : 'status'" :aria-label="t.daily.activeStreak">
@@ -189,9 +184,7 @@
           <text v-if="remoteApiEnabled" class="dly-wn">{{ t.daily.ledgerScope }}</text>
           <view v-if="remoteApiEnabled && app.remoteFleetStatus === 'error'" class="dly-wn" role="status">
             <text class="block">{{ app.remoteFleetHasSnapshot ? t.wallet.fundsStaleBody : t.wallet.fundsUnavailableBody }}</text>
-            <view class="nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-70" role="button" tabindex="0" @click="refreshBalance(false)" @keydown.enter.prevent="refreshBalance(false)" @keydown.space.prevent="refreshBalance(false)">
-              <text>{{ t.wallet.retryFunds }}</text>
-            </view>
+
           </view>
           <text v-if="remoteApiEnabled && summaryForDisplay != null && (summaryForDisplay?.settledRewardsNex == null || summaryForDisplay?.withdrawalOffsetNexSpent == null)" class="dly-wn">{{ t.home.quickFactsFailed }}</text>
           <view class="dly-wlk active:opacity-70" role="button" tabindex="0" @click="goWithdraw" @keydown.enter.prevent="goWithdraw" @keydown.space.prevent="goWithdraw">
@@ -206,10 +199,8 @@
         <view class="dly-sh"><text class="dly-sh__h">{{ t.daily.recent }}</text></view>
         <view class="dly-hs">
           <view v-if="remoteApiEnabled && summaryForDisplay == null" class="dly-hs__msg">
-            <text>{{ bills.summaryStatus === 'error' ? t.home.quickFactsFailed : t.home.quickFactsLoading }}</text>
-            <view v-if="bills.summaryStatus === 'error'" class="nx-card-recovery-action nx-card-recovery-action--quiet active:opacity-70" role="button" tabindex="0" @click="refreshLedger()" @keydown.enter.prevent="refreshLedger()" @keydown.space.prevent="refreshLedger()">
-              <text>{{ t.store.catalogRetry }}</text>
-            </view>
+            <text>{{ bills.summaryStatus === 'error' ? '—' : t.home.quickFactsLoading }}</text>
+
           </view>
           <EmptyState v-else-if="historyRows.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-for="(h, i) in historyRows" v-else :key="`${h.ts}-${i}`" class="dly-hr">
@@ -238,10 +229,7 @@
             <text v-if="countdownParts.after">{{ countdownParts.after }}</text>
           </view>
         </view>
-        <view v-else-if="!checkInStateConfirmed && (remoteRefreshError || faucet.remoteReadState === 'error')" class="dly-cta dly-cta--sync nx-frosted-button active:opacity-85" role="button" tabindex="0" :aria-disabled="remoteRefreshing ? 'true' : 'false'" @click="refreshDaily" @keydown.enter.prevent="refreshDaily" @keydown.space.prevent="refreshDaily">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>
-          <text>{{ t.daily.checkInUnconfirmed }}</text>
-        </view>
+        <view v-else-if="!checkInStateConfirmed" class="dly-cta dly-cta--sync" role="status"><text>{{ t.daily.checkInUnconfirmed }}</text></view>
         <view v-else class="dly-cta active:opacity-90" role="button" tabindex="0" :aria-busy="checkInSubmitting ? 'true' : 'false'" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting || !checkInStateConfirmed ? 'true' : 'false'" @click="handleCheckIn" @keydown.enter.prevent="handleCheckIn" @keydown.space.prevent="handleCheckIn">
           <view class="dly-cta__sheen" aria-hidden="true" />
           <view v-if="checkInSubmitting" class="dly-cta__spin" aria-hidden="true" />
@@ -254,6 +242,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
@@ -400,6 +390,9 @@ const remoteInitialLoading = ref(remoteApiEnabled);
 const checkInStateConfirmed = computed(() => !remoteApiEnabled
   || (remoteSessionReady.value && faucet.remoteReadState === 'ready' && !remoteRefreshError.value));
 let dailyRefreshRequest = 0;
+useAutoRecovery({ failed: () => remoteApiEnabled && bills.summaryStatus === "error", retry: () => refreshLedger(true) });
+useAutoRecovery({ failed: () => remoteApiEnabled && !useSlotActionSheet().open && app.remoteFleetStatus === "error", retry: () => refreshBalance(false) });
+useAutoRecovery({ failed: () => remoteApiEnabled && !remoteRefreshing.value && (remoteRefreshError.value || faucet.remoteReadState === "error"), retry: refreshDaily });
 async function refreshDaily() {
   if (!remoteApiEnabled || !remoteSessionReady.value || !pageActive || remoteRefreshing.value) return;
   const request = ++dailyRefreshRequest;
@@ -633,7 +626,6 @@ async function handleCheckIn() {
   if (!r.ok) {
     // conflict = 别的标签页刚签过(store 已刷新到最新);否则就是本页自己今天已签。
     if (r.conflict) toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
-    else toast.info("Already checked in today", "Come back tomorrow for more UVT.");
     return;
   }
   // Faucet store tracks streak only; crediting NEX to the wallet is composed here

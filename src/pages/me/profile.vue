@@ -80,17 +80,6 @@
         <text :style="tierLabelStyle">{{ tierLabel }}</text>
       </view>
       <text class="block" :style="tierProgressStyle">{{ tierProgressLine }}</text>
-      <view v-if="remoteApiEnabled && vRank.remoteError" class="mx-4 mt-2" role="status" aria-live="polite">
-        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2)">{{ t.profile.rankUnavailable }}</text>
-        <view
-          class="nx-profile-rank-retry inline-flex items-center active:opacity-80"
-          style="min-height: 44px; font-size: var(--ui-type-list-subtitle); color: var(--v5-brand)"
-          role="button"
-          tabindex="0"
-          :aria-label="t.rank.retry"
-          @click="refreshVRankForCurrentAccount"
-        >{{ t.rank.retry }}</view>
-      </view>
 
       <!-- Wallet binding — navigates to address management, so it is a link. -->
       <view class="nx-glass-card mx-4 flex items-center active:opacity-90" :style="walletCardStyle" role="link" tabindex="0" :aria-label="`${t.profile.walletAddress} · ${walletAction}`" @click="goWallet">
@@ -130,6 +119,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import ProfileUid from "@/components/me/profile-uid.vue";
 import { navTo } from "@/lib/route";
 import { displayNickname } from "@/lib/brand-copy";
@@ -240,17 +230,23 @@ function refreshProfileForCurrentAccount() {
   void refreshVRankForCurrentAccount();
 }
 
+const rankReadPending = ref(false);
 async function refreshVRankForCurrentAccount() {
   const pageScope = profilePageFence.capture("v-rank");
   const accountScope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
-  await vRank.refreshCanonicalVRank();
+  rankReadPending.value = true;
+  try { await vRank.refreshCanonicalVRank(); } finally { rankReadPending.value = false; }
   // The store fences account, request generation, and runtime revision before
   // applying its projection; this page fence prevents a hidden/rebound page
   // from treating the completed read as current work.
   if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
 }
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!vRank.remoteError && !rankReadPending.value,
+  retry: refreshVRankForCurrentAccount,
+});
 
 async function refreshPayoutForCurrentAccount() {
   const pageScope = profilePageFence.capture("payout-address");
@@ -473,11 +469,15 @@ async function handleSave() {
   }
 }
 
+const profileReadFailed = ref(false);
+const profileReadPending = ref(false);
 async function loadRemoteProfile() {
   const pageScope = profilePageFence.capture("profile");
   const scope = captureAccountScope();
   const accountKey = auth.accountId;
   if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
+  profileReadFailed.value = false;
+  profileReadPending.value = true;
   try {
     const projection = await profileApi.profile();
     if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
@@ -491,9 +491,11 @@ async function loadRemoteProfile() {
     profile.projectServerAvatar(projection);
   } catch {
     if (!isCurrentProfileRequest(pageScope, scope, accountKey)) return;
-    toast.error(t.value.profile.serverMutationFailed);
-  }
+    profileReadFailed.value = true;
+  } finally { profileReadPending.value = false; }
 }
+
+useAutoRecovery({ failed: () => remoteApiEnabled && profileReadFailed.value && !profileReadPending.value, retry: loadRemoteProfile });
 
 async function handleRegen() {
   if (avatarUploading.value) return;

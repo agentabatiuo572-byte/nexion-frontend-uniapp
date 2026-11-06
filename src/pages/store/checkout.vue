@@ -172,7 +172,7 @@
           </view>
         </view>
 
-        <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay" :state="checkoutResultState" :product-name="product.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? netPrice" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @retry="refreshCheckoutResult" />
+        <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay" :state="checkoutResultState" :product-name="product.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? netPrice" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" />
 
         <!-- === confirmed === -->
         <view v-else-if="step === 'confirmed'" class="nx-glass-card mx-4 rounded-2xl text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
@@ -258,6 +258,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { ref, reactive, nextTick, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
@@ -633,7 +635,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.productUnavailable;
       if (trialCheckoutSource) navBack("/pages/me/trial");
       else navTo("/store");
-      setTimeout(() => { uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 }); }, 120);
+      setTimeout(() => { toast.info(unavailableCopy, undefined, 2600); }, 120);
       return;
     }
     if (!hasOriginalCheckout.value && pp.inventoryMode === "FINITE" && (pp.stock ?? 0) <= 0) {
@@ -641,13 +643,13 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
       const unavailableCopy = trialCheckoutSource ? t.value.store.trialProductUnavailable : t.value.store.temporarilyOutOfStock;
       if (trialCheckoutSource) navBack("/pages/me/trial");
       else navTo("/store");
-      setTimeout(() => { uni.showToast({ title: unavailableCopy, icon: "none", duration: 2600 }); }, 120);
+      setTimeout(() => { toast.info(unavailableCopy, undefined, 2600); }, 120);
       return;
     }
     const trialConversion = trialQuoteAt(mockServerNow()).applied;
     if (!trialConversion && pp.purchaseBlocked) {
       dropResumeInvoice();
-      uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
+      toast.info(t.value.store.specUnavailable);
       navTo("/store");
       return;
     }
@@ -657,7 +659,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
         && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
       if (!mockEarlyWindow) {
         dropResumeInvoice();
-        uni.showToast({ title: t.value.store.releaseComingToast, icon: "none" });
+        toast.info(t.value.store.releaseComingToast);
         navTo("/store");
         return;
       }
@@ -666,7 +668,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope): Promise<void>
     if (!isCurrentCheckoutRoute(routeScope) || eligibility === "stale") return;
     if (eligibility === "ineligible") {
       dropResumeInvoice();
-      uni.showToast({ title: purchaseEligibilityFailureCopy(), icon: "none" });
+      toast.info(purchaseEligibilityFailureCopy());
       if (resolvePurchaseEligibilityMessage(remotePurchaseEligibilityStatus.value, remotePurchaseEligibility.value) === "quotaDepleted") {
         navTo(`/pages/store/detail?id=${routeScope.productNo}`);
       } else {
@@ -721,6 +723,7 @@ const { gate: purchaseGate } = usePurchaseGate(product);
 // 都不再读原始 `freeTrial.status`。展示侧按 1s ticker 解析,越界后 ≤1s 自动收回
 // 抵扣行;支付侧按 mockServerNow() 重解一次只用于「还能不能按这份报价成交」。
 const freeTrial = useFreeTrial();
+useAutoRecovery({ failed: () => remoteApiEnabled && !useTrialClaimSheet().open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
 const trialCopy = useTrialLifecycleCopy();
 const purchaseCopy = useTrialPurchaseCopy();
 const trialCfg = computed(() => useTrialConfig().config);
@@ -1210,9 +1213,12 @@ function presentSettledPurchase(firstHardwareOrder: boolean, onResultShown: (() 
 }
 const checkoutResultState = computed(() => completedOrder.value?.status === 'activated' ? 'activated'
   : completedOrder.value?.status === 'inventory' ? 'inventory' : 'processing');
+const checkoutResultReading = ref(false);
 async function refreshCheckoutResult() {
-  if (!orderId.value) return;
-  await orders.ensureRemoteOrder(orderId.value);
+  if (!orderId.value || !pageAlive || !pageVisible || checkoutResultReading.value) return;
+  checkoutResultReading.value = true;
+  try { await orders.ensureRemoteOrder(orderId.value); }
+  finally { checkoutResultReading.value = false; }
 }
 // Open the warehouse on a fresh stack: back returns to Me, never to this finished result.
 function viewPurchasedDevices() { void navReset('/pages/me/devices'); }
@@ -2396,6 +2402,13 @@ async function submitRemoteOrder(): Promise<void> {
 // 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-116 同款)。
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
+useAutoRecovery({
+  failed: () => remoteApiEnabled && settledResultReplay.value && !!orderId.value
+    && !checkoutResultReading.value && !checkoutWalletRefreshing.value && !paymentFlowBusy.value && !checkoutLeaving.value && !confirming
+    && (!completedOrder.value || ['paid', 'provisioning'].includes(completedOrder.value.status)),
+  retry: refreshCheckoutResult,
+  repeatMs: 15_000,
+});
 let tradeinMirror: NonNullable<typeof tradein.appliedTradein> | null = null;
 watch(() => tradein.appliedTradein, (v) => {
   if (!pageVisible) return;

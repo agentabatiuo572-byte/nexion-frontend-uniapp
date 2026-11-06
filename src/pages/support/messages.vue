@@ -25,19 +25,6 @@
             <text>{{ t.help.loadingMore }}</text>
           </view>
           <template v-else>
-          <view v-if="remoteApiEnabled && convStore.realtimeFallback && !humanReadFailed && !convStore.advisorError" class="nx-conv-refresh-warning" role="status" aria-live="polite">
-            <text class="nx-conv-refresh-warning__text">{{ t.conversations.realtimeFallback }}</text>
-            <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying" class="nx-conv-refresh-warning__retry family-control" @click="retryConversations"  @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations">
-              <text>{{ t.ui.retry }}</text>
-            </view>
-          </view>
-          <view v-if="remoteApiEnabled && convStore.advisorError && !humanReadFailed" class="nx-conv-refresh-warning" role="alert">
-            <text class="nx-conv-refresh-warning__text">{{ t.conversations.image.advisorUnavailable }}</text>
-            <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying" class="nx-conv-refresh-warning__retry family-control" :aria-label="t.conversations.retry"
-              @click="retryConversations"  @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations">
-              <text>{{ t.ui.retry }}</text>
-            </view>
-          </view>
           <!-- A new turn opens a composer first. The authenticated user's text is the
                first durable timeline entry; this surface never invents an opening. -->
           <view
@@ -56,19 +43,7 @@
             <text class="nx-conv-contact-t">{{ contactLabel }}</text>
           </view>
 
-          <view
-            v-if="(convStore.error || convStore.categoryAvailabilityStatus === 'failed') && rows.length > 0"
-            class="nx-conv-refresh-warning"
-          >
-            <text class="nx-conv-refresh-warning__text">{{ t.conversations.staleSnapshot }}</text>
-            <view role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying" class="nx-conv-refresh-warning__retry family-control" @click="retryConversations">
-              <text>{{ t.ui.retry }}</text>
-            </view>
-          </view>
-          <view v-if="(convStore.error || convStore.categoryAvailabilityStatus === 'failed') && rows.length === 0" class="nx-conv-retry-state">
-            <EmptyState kind="recoverable-error" :title="t.conversations.loadError" :desc="t.conversations.loadErrorDesc" compact />
-            <view class="family-control family-control--text" role="button" :tabindex="retrying ? -1 : 0" :aria-disabled="retrying" :aria-label="t.conversations.retry" @click="retryConversations" @keydown.enter.prevent="retryConversations" @keydown.space.prevent="retryConversations"><text>{{ t.conversations.retry }}</text></view>
-          </view>
+          <view v-if="humanReadFailed && !rows.length" class="nx-conv-category-loading"><text>{{ t.conversations.title }}</text><text>—</text></view>
           <EmptyState
             v-else-if="convStore.categoryAvailabilityStatus === 'ready' && TYPES.length === 0"
             kind="empty-list"
@@ -116,6 +91,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, nextTick, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -166,7 +142,7 @@ let releaseActiveRefresh = () => {};
 onShow(async () => {
   inboxVisible = true;
   releaseActiveRefresh();
-  releaseActiveRefresh = registerActivePageRefresh(refreshInbox);
+  releaseActiveRefresh = registerActivePageRefresh(() => inboxReadFailed.value ? undefined : refreshInbox());
   await refreshInbox();
 });
 function leaveInbox() {
@@ -189,6 +165,7 @@ async function retryConversations(event?: Event) {
 
 const humanConversations = computed(() => convStore.humanThreads);
 const humanReadFailed = computed(() => !!(convStore.error || convStore.categoryAvailabilityStatus === "failed"));
+const inboxReadFailed = computed(() => humanReadFailed.value || convStore.advisorError || convStore.realtimeFallback);
 const currentAdvisorThread = computed(() => convStore.advisor?.currentAdvisorId
   ? humanConversations.value.find(row => row.ownerAgentId === String(convStore.advisor!.currentAdvisorId))
   : undefined);
@@ -361,6 +338,10 @@ function avaStyle(tint: string): CSSProperties {
 
 import GlassSegments from "@/components/glass-segments.vue";
 const typeOptions = computed(() => TYPES.value.map(type => ({ value: type.key, label: typeLabel(type.key), icon: type.icon, tint: type.tint, count: typeUnreadBadge(type.key), className: "nx-conv-rail-item" })));
+useAutoRecovery({
+  failed: () => remoteApiEnabled && inboxReadFailed.value && !retrying.value && !convStore.loading && !convStore.categoryLoading && !convStore.advisorLoading,
+  retry: () => retryConversations(),
+});
 </script>
 
 <style scoped>

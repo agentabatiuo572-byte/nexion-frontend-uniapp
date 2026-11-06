@@ -5,12 +5,8 @@
       <SubPageHeader back="/pages/team/leadership-pool" />
       <HowHero kind="balance" :title="w.heroTitle" :sub="w.heroSub" :sections="remoteState === 'ready' || remotePool || ruleFacts ? directory : []" :nav-label="guide.contents" />
 
-      <view v-if="remoteState !== 'ready' && !(remoteState === 'loading' && (remotePool || ruleFacts))" class="text-center" style="padding: 48px 20px">
-        <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'hold' ? t.pool.settlementHold : remoteState === 'error' || vState.remoteError ? t.pool.loadError : t.pool.loading }}</text>
-        <view v-if="remoteState === 'hold' || remoteState === 'error' || vState.remoteError" class="nx-card-recovery-action" style="margin: 14px auto 0" role="button" tabindex="0" @click="loadRemotePool" @keydown.enter.prevent="loadRemotePool" @keydown.space.prevent="loadRemotePool">
-          <text>{{ t.pool.retry }}</text>
-        </view>
-      </view>
+      <view v-if="remoteState === 'loading' && !remotePool && !ruleFacts" class="text-center" style="padding: 48px 20px" role="status" aria-busy="true"><text>{{ t.pool.loading }}</text></view>
+      <EmptyState v-else-if="remoteState !== 'ready' && !remotePool && !ruleFacts" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="loadRemotePool" />
 
       <template v-else>
         <HowSection anchor="rules" :title="w.currentRulesTitle">
@@ -28,10 +24,7 @@
             </view>
             <text v-else class="block" :style="bodyStyle">{{ remotePool ? w.noVoteRows : '—' }}</text>
           </template>
-          <view v-else role="status" class="pool-how-config-state">
-            <text class="block">{{ vState.remoteError ? t.pool.loadError : t.pool.loading }}</text>
-            <view v-if="vState.remoteError" class="nx-card-recovery-action" role="button" tabindex="0" @click="refreshRankConfig" @keydown.enter.prevent="refreshRankConfig" @keydown.space.prevent="refreshRankConfig"><text>{{ t.pool.retry }}</text></view>
-          </view>
+          <view v-else class="pool-how-config-state"><text>—</text></view>
         </HowSection>
 
         <HowSection anchor="facts" :title="auditCopy.poolFactsTitle">
@@ -64,8 +57,10 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -126,7 +121,6 @@ const configuredVoteRows = computed(() => !rankDisplayReady.value || !facts.valu
 const distributionRows = computed(() => (remotePool.value?.distribution ?? []).map(row => ({
   ...row, label: rankDisplayReady.value ? rankLabel(row.vRank as VRank, locale.code, rankPresentation.value ?? []) : `V${row.vRank}`,
 })).sort((a, b) => a.vRank - b.vRank));
-function refreshRankConfig() { void vState.refreshCanonicalVRank(); }
 const shareText = computed(() => remotePool.value && remotePool.value.totalVotes > 0 && Number.isFinite(remotePool.value.mySharePct)
   ? `${(remotePool.value.mySharePct * 100).toLocaleString(locale.code, { maximumFractionDigits: 2 })}%` : '—');
 const currentRulesText = computed(() => facts.value
@@ -136,14 +130,14 @@ const nextPayoutText = computed(() => {
   if (!remotePool.value) return "";
   return fmt(w.value.nextPayout, { time: formatDisplayDateTime(remotePool.value.nextPayoutAt, locale.code, true) });
 });
-async function loadRemotePool() {
+async function loadRemotePool(refreshRank = true) {
   if (!remoteApiEnabled || !pageVisible || !auth.isAuthenticated || !environmentCurrent()) return;
   const request = ++remoteRequest;
   const accountKey = app.accountKey;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   const readLocale = locale.code;
-  void vState.refreshCanonicalVRank();
+  if (refreshRank) void vState.refreshCanonicalVRank();
   remoteState.value = "loading";
   const current = () => mounted && pageVisible && request === remoteRequest && accountKey === app.accountKey
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope)
@@ -176,6 +170,8 @@ function goBack() { navBack("/pages/team/leadership-pool"); }
 const bodyStyle: CSSProperties = { color: "var(--v5-ink-2)" };
 const guide = computed(() => teamRuleGuideCopy(locale.code));
 const directory = computed(() => [{ id: "rules", title: w.value.currentRulesTitle }, { id: "votes", title: w.value.s2Title }, { id: "facts", title: auditCopy.value.poolFactsTitle }]);
+useAutoRecovery({ failed: () => remoteApiEnabled && remoteState.value === "error", retry: () => loadRemotePool(false) });
+useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry: () => vState.refreshCanonicalVRank() });
 </script>
 
 <style scoped>

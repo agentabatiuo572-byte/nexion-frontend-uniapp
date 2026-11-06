@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
 import { navTo, navReset } from "@/lib/route";
@@ -266,6 +267,7 @@ async function retryRemote() {
   if (staking.remoteLoading) return;
   if (await staking.syncRemote()) nowTs.value = staking.currentTime();
 }
+useAutoRecovery({ failed: () => !staking.isMockMode && !!staking.remoteError && !staking.remoteLoading, retry: retryRemote });
 onMounted(() => {
   if (!staking.isMockMode) {
     nowTs.value = staking.currentTime();

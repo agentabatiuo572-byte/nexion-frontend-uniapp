@@ -32,12 +32,6 @@
         emphasis
         @cta="retryInventory"
       />
-      <view v-if="inventoryStale" class="mx-4 nx-inline-recovery" role="status" style="margin-bottom: 12px; padding: 12px; border-radius: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
-        <text class="block nx-inline-recovery__copy" style="font-size: var(--ui-type-list-subtitle)">{{ t.myDevices.inventoryStaleWarning }}</text>
-        <view class="nx-inline-recovery__action" style="color: var(--v5-brand)" role="button" tabindex="0" @click="retryInventory">
-          <text>{{ t.empty.errorCta }}</text>
-        </view>
-      </view>
 
       <!-- Slot chassis: a liquid-glass panel whose bays show which device holds each compute slot. -->
       <view v-if="!inventoryError" class="device-stage mx-4">
@@ -184,6 +178,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { onLoad, onUnload } from '@dcloudio/uni-app';
 import { computed, ref } from "vue";
@@ -230,13 +225,15 @@ const inventoryError = computed(() => !inventoryReady.value && (app.remoteFleetS
   || trial.authorityStatus === "error"
   || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")));
 const inventoryLoading = computed(() => !inventoryReady.value && !inventoryError.value);
-const inventoryStale = computed(() => inventoryReady.value && remoteApiEnabled
-  && (app.remoteFleetStatus === "error" || trial.authorityStatus === "error"));
-
-function retryInventory() {
-  void refreshRemoteFleetAfterCatalog(app.accountKey).catch(() => undefined);
-  void trial.poll(Date.now());
+async function retryInventory() {
+  await Promise.all([refreshRemoteFleetAfterCatalog(app.accountKey), trial.poll(Date.now())]);
 }
+useAutoRecovery({
+  failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && trial.authorityStatus !== "loading"
+    && productCatalogState.status !== "loading" && (app.remoteFleetStatus === "error" || trial.authorityStatus === "error"
+      || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")),
+  retry: retryInventory,
+});
 
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));

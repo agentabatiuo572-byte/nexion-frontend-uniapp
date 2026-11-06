@@ -95,9 +95,6 @@
         <view v-else class="rs-h5-download__action rs-h5-download__action--disabled" role="status" aria-disabled="true">
           <text class="rs-h5-download__pending">{{ t.register.doneOfficialDownloadPending }}</text>
         </view>
-        <view v-if="!officialDownloadUrl" class="rs-retry active-press" role="button" :tabindex="cfg.loading ? -1 : 0" :aria-disabled="cfg.loading" @click="retryDownloadConfig" @keydown.enter.prevent="retryDownloadConfig" @keydown.space.prevent="retryDownloadConfig">
-          <text>{{ t.ui.retry }}</text>
-        </view>
       </view>
       <!-- #endif -->
 
@@ -126,6 +123,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
@@ -261,9 +259,7 @@ function openDownload(url: string) {
   if (!url) return;
   window.location.assign(url);
 }
-function retryDownloadConfig() {
-  if (!cfg.loading) void cfg.load();
-}
+useAutoRecovery({ failed: () => cfg.configStatus === "failed" && !cfg.loading, retry: () => cfg.load() });
 // #endif
 
 function continueWeb() {

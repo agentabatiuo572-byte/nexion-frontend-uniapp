@@ -84,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { computed, ref, watch } from "vue";
@@ -104,6 +105,7 @@ import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-comma
 
 const sheet = useSlotActionSheet();
 const app = useApp();
+useAutoRecovery({ failed: () => remoteApiEnabled && sheet.open && (app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error"), retry: () => app.refreshRemoteFleet(undefined, { coalesce: true }) });
 const t = useT();
 
 // openForSlot 只在有未激活库存时放行本层,层的身份即「选择要激活的设备」——
@@ -140,7 +142,6 @@ const activationInFlight = ref(new Set<string>());
 
 async function onActivate(d: Device) {
   if (remoteApiEnabled && !capacityReady.value) {
-    toast.warn(t.value.myDevices.inventoryStaleWarning);
     return;
   }
   if (requiresActivationConfirmation(d)) {
