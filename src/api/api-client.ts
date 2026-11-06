@@ -77,7 +77,7 @@ export interface ApiClient {
   request<T>(request: ApiRequest): Promise<T>;
   upload<T>(request: ApiUploadRequest): Promise<T>;
   download?(request: { path: string; signal?: AbortSignal }): Promise<string>;
-  refreshSession(): Promise<SessionSnapshot>;
+  refreshSession(expectedRevision?: number): Promise<SessionSnapshot>;
 }
 
 export interface ApiUploadRequest {
@@ -285,6 +285,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return terminateSession(expectedRevision);
   }
 
+  function endedSessionReason(error: ApiError, session: SessionSnapshot | null): string | undefined {
+    // A suspended H5 tab can miss the successor sent over BroadcastChannel.
+    if (error.sessionEndedReason === "SESSION_ROTATED" && refreshCredentialMode === "cookie"
+        && session?.sessionChainId && session.sessionSyncKey) return undefined;
+    return error.sessionEndedReason;
+  }
+
   async function refreshNow(rotationNonce?: string): Promise<SessionSnapshot> {
     const revision = options.vault.revision();
     const current = options.vault.read();
@@ -307,7 +314,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         reportNativeSessionStage("REFRESH_RESPONSE_INVALID");
         throw new ApiError({ kind: "protocol", message: "AUTH_RESPONSE_INVALID" });
       }
-      if (current && data.user.userId !== current.user.userId) {
+      if (current && (data.user.userId !== current.user.userId
+          || (refreshCredentialMode === "cookie" && current.sessionChainId
+            && (data.sessionChainId !== current.sessionChainId
+              || (current.sessionSyncKey && data.sessionSyncKey !== current.sessionSyncKey))))) {
         reportNativeSessionStage("REFRESH_DENIED");
         return expireSession(revision);
       }
@@ -358,11 +368,18 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
   }
 
-  function refreshSession(): Promise<SessionSnapshot> {
+  function refreshSession(expectedRevision?: number): Promise<SessionSnapshot> {
     if (!refreshInFlight) {
       const revision = options.vault.revision();
+      const requireCurrentRevision = () => {
+        if (expectedRevision !== undefined && expectedRevision !== options.vault.revision()) {
+          throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REFRESH" });
+        }
+      };
       const refresh = refreshCredentialMode === "cookie"
         ? withSessionCookieLock(async () => {
+          // Another H5 tab may rotate the shared cookie while this one waits.
+          requireCurrentRevision();
           const nonce = acquireRotationNonce();
           let session: SessionSnapshot;
           try {
@@ -371,6 +388,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
             if (asApiError(error).message !== "USER_REFRESH_ROTATION_SUPERSEDED") throw error;
             // Another tab may still be installing the newer shared cookie.
             await new Promise(resolve => setTimeout(resolve, 100));
+            requireCurrentRevision();
             try {
               session = await refreshNow(nonce);
             } catch (retryError) {
@@ -382,7 +400,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
           }
           clearRotationNonce(nonce);
           return session;
-        }) : (async () => refreshNow(options.nativeRefreshRecovery ? options.vault.prepareRefreshRotation() : undefined))();
+        }) : (async () => {
+          requireCurrentRevision();
+          return refreshNow(options.nativeRefreshRecovery ? options.vault.prepareRefreshRotation() : undefined);
+        })();
       refreshInFlight = refresh.catch(async (error: unknown) => {
         const apiError = asApiError(error);
         if ((apiError.message === "COOKIE_LOCK_UNAVAILABLE"
@@ -436,7 +457,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     } catch (error) {
       const apiError = asApiError(error);
       if (!authenticated || apiError.kind !== "auth") throw apiError;
-      if (apiError.sessionEndedReason) return terminateSession(sessionRevision, apiError.sessionEndedReason);
+      const endedReason = endedSessionReason(apiError, session);
+      if (endedReason) return terminateSession(sessionRevision, endedReason);
       if (terminalAuthFailure(apiError.status ?? 0, apiError.code, apiError.message)) {
         return terminateSession(sessionRevision, apiError.message, apiError.status ?? 403, apiError.code ?? 403);
       }
@@ -510,7 +532,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     } catch (error) {
       const apiError = asApiError(error);
       if (!authenticated || apiError.kind !== "auth") throw apiError;
-      if (apiError.sessionEndedReason) return terminateSession(sessionRevision, apiError.sessionEndedReason);
+      const endedReason = endedSessionReason(apiError, session);
+      if (endedReason) return terminateSession(sessionRevision, endedReason);
       if (terminalAuthFailure(apiError.status ?? 0, apiError.code, apiError.message)) {
         return terminateSession(sessionRevision, apiError.message, apiError.status ?? 403, apiError.code ?? 403);
       }

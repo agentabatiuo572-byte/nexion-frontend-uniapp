@@ -241,7 +241,8 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
-import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
@@ -267,6 +268,7 @@ import { useTrialDetailCopy } from "@/i18n/trial-detail";
 
 const t = useT();
 const freeTrial = useFreeTrial();
+onShow(() => { void freeTrial.refreshVisible(); });
 const trialConfig = useTrialConfig();
 const visibility = useDataVisibility();
 const lifecycle = useTrialLifecycleCopy();
@@ -275,10 +277,9 @@ const detail = useTrialDetailCopy();
 const authorityIncomplete = computed(() => (freeTrial.status === "active" || freeTrial.status === "grace")
   && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null));
 const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || authorityIncomplete.value));
-// The 4s trial poll marks the authority loading while it re-reads; keep the confirmed page on screen
+// Keep the confirmed page on screen during a trial read
 // meanwhile instead of swapping in the read state. Actions still wait on authorityUnavailable.
-const authorityScreenUnavailable = computed(() => remoteApiEnabled && ((freeTrial.authorityStatus !== "ready"
-  && !(freeTrial.authorityStatus === "loading" && freeTrial.authorityServerState !== null)) || authorityIncomplete.value));
+const authorityScreenUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityServerState === null || authorityIncomplete.value));
 
 const cfg = computed(() => trialConfig.config);
 const status = computed(() => freeTrial.status);
@@ -320,15 +321,14 @@ const trialOffset = computed(() => remoteApiEnabled
   : computeTrialOffset(cfg.value, shadowUSD.value));
 const estimatedOffsetUSD = computed(() => computeTrialOffset(cfg.value, cfg.value.shadowDailyUSD * cfg.value.trialDays).offsetUSD);
 // FEAT-TRIAL05: the server quote convert() will settle. An early quote is shown only while
-// the original term is still running; once its end passes it is stale, so hide it and re-read.
+// the original term is still running. App's boundary read supplies the next quote.
 const earlyQuoteLapsed = computed(() => {
   const quote = freeTrial.authoritativeQuote;
-  return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && now.value >= quote.earlyEndsAt;
+  return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && freeTrial.serverTimeAt(now.value) >= quote.earlyEndsAt;
 });
 const purchaseQuote = computed(() => remoteApiEnabled && isActiveCycle.value && !earlyQuoteLapsed.value
   ? freeTrial.authoritativeQuote : null);
 const earlyQuote = computed(() => status.value === "active" && purchaseQuote.value?.earlyPurchase ? purchaseQuote.value : null);
-watch(earlyQuoteLapsed, (lapsed) => { if (lapsed) void freeTrial.refreshRemote(true); });
 
 // Prices and discounts are dollars; earnings and credit are USDT (a quote counts 1 USDT as $1).
 const usd = (value: number) => `$${formatGroupedAmount(value)}`;
