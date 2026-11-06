@@ -4,7 +4,9 @@ import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTria
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, writeAccountRow } from "./account-scoped-storage";
-import { remoteApiEnabled, trialApi } from "@/api/runtime";
+import { remoteApiEnabled, trialApi, sessionVault } from "@/api/runtime";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
+import { hasPendingLegalTermsRequirement } from "@/lib/legal-terms-gate-runtime";
 import type { TrialAuthorityState } from "@/api/trial-api";
 import { asApiError, isAmbiguousOutcome } from "@/api/errors";
 import {
@@ -194,12 +196,25 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const authorityClaimNo = ref<string | null>(null);
   const authorityServerState = ref<TrialAuthorityState["serverState"] | null>(null);
   const authorityVersion = ref(0);
+  const serverClockOffsetMs = ref(0);
+  let sampledServerTime = 0;
   let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightAccount: string | null = null;
   let pendingStartKey: string | null = null;
   let authorityRequestSequence = 0;
   let lastAppliedSequence = 0;
   let accountBindingEpoch = 0;
+  let pendingExpiryClaim: string | null = null;
+
+  function getBindingEpoch(): number { return accountBindingEpoch; }
+  function serverTimeAt(localNow: number): number { return localNow + serverClockOffsetMs.value; }
+
+  function takeExpiryNotice(expectedEpoch: number): boolean {
+    if (expectedEpoch !== accountBindingEpoch || authorityStatus.value !== "ready"
+        || !pendingExpiryClaim || pendingExpiryClaim !== authorityClaimNo.value) return false;
+    pendingExpiryClaim = null;
+    return true;
+  }
 
   /** Current row as a plain snapshot — resolver 的唯一输入形态(生产 = GET /api/trial/state 行)。 */
   function snapshot(): FreeTrialState {
@@ -257,12 +272,28 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityError.value = error;
   }
 
+  function markAuthorityReadFailure(error: string) {
+    const boundary = status.value === "active" ? expiresAt.value : status.value === "grace" ? graceEndsAt.value : null;
+    if (boundary !== null && serverTimeAt(Date.now()) >= boundary) {
+      authorityStatus.value = "error";
+      authorityError.value = error;
+    } else {
+      clearRemoteFacts("error", error);
+    }
+  }
+
   function applyAuthority(next: TrialAuthorityState, sequence: number, receiptEpoch?: number): boolean {
     // A current-binding command receipt can outrank a read of the same known claim.
     // Reads and unknown or different claims keep their request-sequence fence.
     const newerCurrentReceipt = receiptEpoch === accountBindingEpoch && next.claimNo !== null
       && next.claimNo === authorityClaimNo.value && next.version > authorityVersion.value;
     if (sequence < lastAppliedSequence && !newerCurrentReceipt) return false;
+    if (authorityClaimNo.value === next.claimNo && next.version === authorityVersion.value
+        && next.status === "ended" && (status.value === "active" || status.value === "grace")) {
+      lastAppliedSequence = Math.max(lastAppliedSequence, sequence);
+      markAuthorityReadFailure("TRIAL_RESPONSE_STALE");
+      return false;
+    }
     if (authorityClaimNo.value === next.claimNo && next.version < authorityVersion.value) {
       // Retain the newer canonical receipt even while a read is loading.
       lastAppliedSequence = Math.max(lastAppliedSequence, sequence);
@@ -272,7 +303,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     }
     // Validate the whole policy before committing snapshot or promotion presentation.
     useTrialConfig().applyAuthoritative(next.config);
+    const expired = next.status === "ended" && next.endReason === "expired";
+    if (!expired || pendingExpiryClaim !== next.claimNo) pendingExpiryClaim = null;
+    if (expired && next.claimNo && next.claimNo === authorityClaimNo.value && next.version > authorityVersion.value
+        && (status.value === "active" || status.value === "grace")) pendingExpiryClaim = next.claimNo;
     lastAppliedSequence = Math.max(lastAppliedSequence, sequence);
+    sampledServerTime = next.serverNow;
+    serverClockOffsetMs.value = next.serverNow - Date.now();
     load({
       status: next.status,
       startedAt: next.startedAt,
@@ -316,7 +353,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       .catch((error: unknown) => {
         if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
-          clearRemoteFacts("error", asApiError(error).message);
+          markAuthorityReadFailure(asApiError(error).message);
         }
         return false;
       })
@@ -331,6 +368,33 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return request;
   }
 
+  function canReadVisible(): boolean {
+    const session = sessionVault.read();
+    return remoteApiEnabled && foregroundReadAllowed() && !!session && boundKey === `user:${session.user.userId}`
+      && !hasPendingLegalTermsRequirement();
+  }
+
+  async function refreshVisible(eligibilityFallback = false): Promise<boolean> {
+    if (!canReadVisible()) return false;
+    const epoch = accountBindingEpoch;
+    const ready = await refreshRemote();
+    if (ready || !eligibilityFallback || epoch !== accountBindingEpoch || !canReadVisible()) return ready;
+    return refreshEligibilityRemote();
+  }
+
+  async function refreshAtBoundary(boundary: number): Promise<boolean> {
+    if (sampledServerTime >= boundary && authorityStatus.value === "ready") return true;
+    if (refreshInFlight) {
+      const epoch = accountBindingEpoch;
+      await refreshInFlight;
+      if (epoch !== accountBindingEpoch) return false;
+      if (sampledServerTime >= boundary && authorityStatus.value === "ready") return true;
+    }
+    if (!canReadVisible()) return false;
+    await refreshRemote();
+    return true;
+  }
+
   async function refreshEligibilityRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const requestedAccount = boundKey;
@@ -343,7 +407,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     } catch (error) {
       if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
         lastAppliedSequence = sequence;
-        clearRemoteFacts("error", asApiError(error).message);
+        markAuthorityReadFailure(asApiError(error).message);
       }
       return false;
     }
@@ -358,10 +422,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       confirmedPromoVisible.value = false;
       confirmedPromoKnown.value = false;
       confirmedHeroVisible.value = false;
+      pendingExpiryClaim = null;
+      sampledServerTime = 0;
+      serverClockOffsetMs.value = 0;
       clearRemoteFacts();
-      // A rebind invalidates even same-key responses. Start this generation's
-      // own read instead of deduplicating onto the request we just invalidated.
-      void refreshRemote(true);
+      refreshInFlight = null;
+      refreshInFlightAccount = null;
       return;
     }
     load(hydrate(boundKey, useTrialConfig().config));
@@ -727,8 +793,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityClaimNo, authorityVersion, authorityServerState,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
-    start, convert, cancel, poll, bindAccount, snapshot,
-    refreshRemote, refreshEligibilityRemote,
+    start, convert, cancel, poll, bindAccount, snapshot, getBindingEpoch, takeExpiryNotice,
+    refreshRemote, refreshEligibilityRemote, refreshVisible, refreshAtBoundary, serverTimeAt,
   };
 });
 
@@ -760,6 +826,7 @@ export function liveShadowNEX(now: number): number {
 /** Remaining ms until the next state boundary. */
 export function remainingMs(now: number): number {
   const s = useFreeTrial();
+  now = s.serverTimeAt(now);
   if (s.status === "active" && s.expiresAt !== null) return Math.max(0, s.expiresAt - now);
   if (s.status === "grace" && s.graceEndsAt !== null) return Math.max(0, s.graceEndsAt - now);
   return 0;

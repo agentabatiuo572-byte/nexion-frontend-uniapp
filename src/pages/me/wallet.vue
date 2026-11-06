@@ -151,6 +151,7 @@ const cfg = useConfig();
 // cannot send the user back to a stale pre-exchange balance.
 onShow(() => {
   if (remoteApiEnabled) {
+    void app.refreshRemoteWithdrawalList();
     void app.refreshRemoteFleet();
     void refreshEarningsReleaseStatus().catch(() => undefined);
     retryEarningsAuthority();

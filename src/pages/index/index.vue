@@ -124,6 +124,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFreeTrial } from "@/store/free-trial";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import { hasNativeAndroidPhoneRuntime } from "@/lib/native-phone-runtime";
@@ -189,6 +190,7 @@ function goPhoneBinding() { if (hasNativeAndroidPhoneRuntime()) navTo("/pages/on
 //   此前只有 3 个创世页接了 onShow,首页与商城页漏接 —— 用户停在首页,运营切关闭,
 //   首页仍在催「仅剩 N 席」)。
 onShow(() => useGenesisConfig().refresh());
+onShow(() => { void useFreeTrial().refreshVisible(); });
 const locale = useLocaleStore();
 const platformConfig = useConfig();
 const weeklyQuestStore = useWeeklyQuest();

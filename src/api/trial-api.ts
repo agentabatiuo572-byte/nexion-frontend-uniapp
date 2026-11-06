@@ -18,6 +18,7 @@ export interface TrialAuthorityState {
   expiresAt: number | null;
   graceEndsAt: number | null;
   extendedEndsAt?: number | null;
+  endReason?: "expired" | "cancelled" | null;
   finishedAt: number | null;
   cooldownUntil: number | null;
   shadowUSD: number;
@@ -173,6 +174,8 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
   const graceEndsAt = timestamp(row.graceEndsAtEpochMs ?? row.graceEndsAt);
   const extendedEndsAt = timestamp(row.extendedEndsAtEpochMs ?? row.extendedEndsAt);
   if (serverState === "EXTENDED" && extendedEndsAt === null) return invalid();
+  const endReason = row.endReason;
+  if (endReason !== undefined && endReason !== null && endReason !== "expired" && endReason !== "cancelled") return invalid();
   const finishedAt = timestamp(row.finishedAtEpochMs ?? row.finishedAt);
   const cooldownUntil = timestamp(row.cooldownUntilEpochMs ?? row.cooldownUntil);
   if (["ACTIVE", "GRACE", "EXTENDED", "REDEEMED"].includes(serverState)
@@ -191,6 +194,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
     expiresAt,
     graceEndsAt,
     extendedEndsAt,
+    endReason,
     finishedAt,
     cooldownUntil,
     shadowUSD,
