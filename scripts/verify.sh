@@ -1656,12 +1656,106 @@ if(hits.length){console.log(hits.slice(0,5).join("\n"));process.exit(1)}' 2>&1)
 no_tap_binding
 # Raw navigateBack guard (PITFALLS P-054): uni H5 navigateBack on a single-entry
 # stack (cold-open/deep-link) returns SUCCESS as a no-op — fail never fires →
-# dead back button. Use navBack() helper (src/lib/route.ts, the one legit caller).
+# dead back button. Use navBack(), or prove the complete PRD course-chain return.
 no_raw_navigateback() {
   local hits
-  hits=$(grep -rnE 'uni\.navigateBack\(' src 2>/dev/null | grep -vE 'src/lib/route\.ts' | head -5)
-  if [ -z "$hits" ]; then ok "no raw uni.navigateBack (use navBack() helper) (0 hits)";
-  else bad "raw uni.navigateBack — cold-open no-op; use navBack() helper (P-054)"; echo "$hits" | sed 's/^/        /'; fi
+  if hits=$("$NODE_BIN" <<'NODE' 2>&1
+const fs = require("fs"), path = require("path"), ts = require("typescript");
+const { parse } = require("@vue/compiler-sfc");
+const printer = ts.createPrinter({ removeComments: true });
+const print = (node, source) => printer.printNode(ts.EmitHint.Unspecified, node, source);
+// ponytail: match one complete AST shape, not arbitrary control flow. Changed
+// implementations must establish the same proof before receiving an exemption.
+// This proves len >= 2, 1 <= delta <= len-1, no unrelated page crossed, and
+// replacement on missing center, unreadable stack, thrown pop or failed pop.
+const proof = ts.createSourceFile("proof.ts", `function proof() {
+  try {
+    const routes = getCurrentPages().map(page => page.route?.replace(/^\\//, ""));
+    let center = routes.length - 2;
+    while (center >= 0 && routes[center] === "pages/learn/course") center--;
+    if (routes[routes.length - 1] === "pages/learn/course" && center >= 0 && routes[center] === "pages/learn/courses") {
+      uni.navigateBack({ delta: routes.length - 1 - center, fail: () => { void navReplace("/pages/learn/courses"); } });
+      return;
+    }
+  } catch {}
+  void navReplace("/pages/learn/courses");
+}`, ts.ScriptTarget.Latest, true);
+if (proof.parseDiagnostics.length) throw new Error("invalid course-return proof");
+const expected = print(proof.statements[0].body, proof);
+const protectedNames = new Set(["uni", "getCurrentPages", "navReplace"]);
+const hits = [];
+let scanned = 0;
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const file = path.posix.join(dir, entry.name);
+    if (entry.isDirectory()) { walk(file); continue; }
+    if (file === "src/lib/route.ts") continue; // Existing shared helper boundary.
+    const source = fs.readFileSync(file, "utf8"), allowed = new Set();
+    const matches = [...source.matchAll(/\buni\s*\.\s*navigateBack\s*\(/g)];
+    scanned++;
+    if (matches.length && /\.(vue|[cm]?[jt]sx?)$/.test(file)) {
+      let script = source;
+      if (file.endsWith(".vue")) {
+        const { descriptor, errors } = parse(source, { filename: file });
+        if (errors.length) throw new Error(`${file}: ${errors[0]}`);
+        script = "";
+        let end = 0;
+        const blocks = [descriptor.script, descriptor.scriptSetup].filter(Boolean)
+          .sort((a, b) => a.loc.start.offset - b.loc.start.offset);
+        for (const block of blocks) {
+          script += source.slice(end, block.loc.start.offset).replace(/[^\r\n]/g, " ") + block.content;
+          end = block.loc.start.offset + block.content.length;
+        }
+        script += source.slice(end).replace(/[^\r\n]/g, " ");
+      }
+      const ast = ts.createSourceFile(file, script, ts.ScriptTarget.Latest, true,
+        /\.[jt]sx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      if (ast.parseDiagnostics.length) {
+        throw new Error(`${file}: ${ts.flattenDiagnosticMessageText(ast.parseDiagnostics[0].messageText, " ")}`);
+      }
+      const routeImport = ast.statements.filter(ts.isImportDeclaration)
+        .filter(node => node.moduleSpecifier.text === "@/lib/route" && !node.importClause?.isTypeOnly)
+        .flatMap(node => node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+          ? node.importClause.namedBindings.elements : [])
+        .find(node => !node.isTypeOnly && node.name.text === "navReplace" && (node.propertyName || node.name).text === "navReplace");
+      let shadowed = false;
+      (function bindings(node) {
+        const declaresName = ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node)
+          || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)
+          || ts.isImportSpecifier(node) || ts.isImportClause(node) || ts.isNamespaceImport(node);
+        if (declaresName && protectedNames.has(node.name?.text) && node !== routeImport) shadowed = true;
+        if (ts.isBinaryExpression(node)
+          && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+          && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+          && ts.isIdentifier(node.left) && protectedNames.has(node.left.text)) shadowed = true;
+        ts.forEachChild(node, bindings);
+      })(ast);
+      if (routeImport && !shadowed) for (const fn of ast.statements.filter(ts.isFunctionDeclaration)) {
+        if (!fn.body || fn.parameters.length || fn.asteriskToken || print(fn.body, ast) !== expected) continue;
+        // UniApp directives can remove guards even when the uncompiled AST matches.
+        if (/#(?:ifdef|ifndef|endif)\b/.test(fn.body.getText(ast))) continue;
+        (function calls(node) {
+          if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+            && node.expression.expression.getText(ast) === "uni" && node.expression.name.text === "navigateBack") {
+            allowed.add(node.expression.getStart(ast));
+          }
+          ts.forEachChild(node, calls);
+        })(fn.body);
+      }
+    }
+    for (const match of matches) {
+      if (!allowed.has(match.index)) {
+        const line = source.slice(0, match.index).split("\n").length;
+        hits.push(`${file}:${line}: ${source.slice(match.index).split(/\r?\n/)[0].trim()}`);
+      }
+    }
+  }
+})("src");
+if (!scanned) throw new Error("no source files scanned");
+if (hits.length) { console.log(hits.slice(0, 5).join("\n")); process.exit(1); }
+NODE
+  ); then ok "no unguarded raw uni.navigateBack (navBack or proven course-chain return, P-054)";
+  else bad "raw uni.navigateBack — cold-open no-op or unproven stack return (P-054)"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_raw_navigateback
 # Week-boundary epoch-modulo guard (leadership-pool fix 2026-06-24): the JS epoch
