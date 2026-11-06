@@ -158,14 +158,13 @@ async function retryConversations(event?: Event) {
   const generation = retryGeneration;
   retrying.value = true;
   try {
-    if (convStore.realtimeFallback) { convStore.stopRealtime(); convStore.startRealtime(); }
     await refreshInbox();
   } finally { if (generation === retryGeneration) retrying.value = false; }
 }
 
 const humanConversations = computed(() => convStore.humanThreads);
 const humanReadFailed = computed(() => !!(convStore.error || convStore.categoryAvailabilityStatus === "failed"));
-const inboxReadFailed = computed(() => humanReadFailed.value || convStore.advisorError || convStore.realtimeFallback);
+const inboxReadFailed = computed(() => humanReadFailed.value || convStore.advisorError);
 const currentAdvisorThread = computed(() => convStore.advisor?.currentAdvisorId
   ? humanConversations.value.find(row => row.ownerAgentId === String(convStore.advisor!.currentAdvisorId))
   : undefined);

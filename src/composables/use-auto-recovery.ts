@@ -11,6 +11,7 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
   const shown = ref(false);
   const delays = [3_000, 10_000, 30_000];
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
   let inFlight: Promise<boolean> | null = null;
   let attempts = 0;
   let retryAt = 0;
@@ -86,8 +87,10 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
   onHide(() => { shown.value = false; clearTimer(); release(); });
   watch(options.failed, failed => {
     if (inFlight) return; // loading during our own attempt must not renew the budget.
-    if (!failed) { clearTimer(); attempts = 0; retryAt = 0; }
-    else schedule();
+    clearTimeout(settleTimer);
+    if (failed) schedule();
+    // A read from elsewhere also turns failed() off, so only a recovery that holds renews the budget.
+    else settleTimer = setTimeout(() => { clearTimer(); attempts = 0; retryAt = 0; }, 5_000);
   });
   watch(foregroundReadAllowed, (allowed, wasAllowed) => {
     clearTimer();
@@ -97,7 +100,7 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
     clearTimer(); attempts = 0; retryAt = 0;
     schedule();
   });
-  onBeforeUnmount(() => { disposed = true; clearTimer(); release(); });
+  onBeforeUnmount(() => { disposed = true; clearTimer(); clearTimeout(settleTimer); release(); });
 
   return { retry };
 }

@@ -116,7 +116,7 @@ async function run() {
 function activate(event: KeyboardEvent, action: () => unknown) { if (!event.repeat) void action(); }
 onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/pages/events/detail")); code = String(options?.id ?? query.get("id") ?? "").trim(); reset(); if (visible) void load(); });
 let releaseActiveRefresh = () => {};
-onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value ? undefined : load(), "pages/events/detail"); void load(); });
+onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value ? undefined : load()); void load(); });
 onHide(() => { visible = false; releaseActiveRefresh(); reset(); });
 watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { reset(); void load(); }, { flush: "sync" });
 const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });

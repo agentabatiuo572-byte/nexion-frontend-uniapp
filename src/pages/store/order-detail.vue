@@ -17,14 +17,7 @@
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
-      <view v-if="remoteOrderError && !resultOrder" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
-        <view class="flex items-center justify-between" style="gap: 12px">
-          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.orders.refreshFailed }}</text>
-          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" :aria-disabled="remoteOrderRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrder">
-            <text>{{ t.store.catalogRetry }}</text>
-          </view>
-        </view>
-      </view>
+      <EmptyState v-if="remoteOrderError && !resultOrder" kind="recoverable-error" :title="t.orders.refreshFailed" :cta-label="t.store.catalogRetry" @cta="refreshOrder" />
 
       <view v-if="showRemoteOrderLoading" class="text-center" role="status" aria-live="polite" style="padding: 20px">
         <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ t.orders.refreshing }}</text>
@@ -229,6 +222,7 @@ import { purchaseRecoveryCopy } from '@/lib/purchase-recovery-copy';
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import EmptyState from "@/components/empty-state.vue";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -414,6 +408,7 @@ const remoteOrderBoundAccount = computed(() => remoteOrderBinding.value.accountK
 const showRemoteOrderLoading = computed(() => remoteApiEnabled
   && hasOrderId.value
   && !order.value
+  && !remoteOrderError.value
   && (!remoteOrderBoundAccount.value || !remoteOrderAttempted.value || remoteOrderRefreshing.value));
 const showOrderNotFound = computed(() => !order.value && (!remoteApiEnabled
   || !hasOrderId.value
@@ -1091,11 +1086,6 @@ const sectionLabelStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
-};
-const remoteErrorStyle: CSSProperties = {
-  marginBottom: "12px",
-  padding: "10px 12px",
-  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
 };
 
 
