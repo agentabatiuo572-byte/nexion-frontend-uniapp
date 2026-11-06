@@ -413,7 +413,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId
   remoteOrdersRequest += 1;
 }, { flush: "sync" });
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
-  if (remoteApiEnabled && remoteMeActive.value && foregroundReadAllowed()) void refreshRemoteMe();
+  if (remoteApiEnabled && remoteMeActive.value && foregroundReadAllowed()) void refreshVisibleMe();
 });
 let releaseActiveRefresh = () => {};
 async function refreshVisibleMe() {
