@@ -107,7 +107,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (conclusion) state.notice = conclusion;
 }
 /** The payment ended with an answer: nothing of it stays behind the notice and no further read or write runs. */
-function conclude(notice: PurchaseNotice) { Object.assign(state, { notice, concluded: true, cashier: false }); }
+function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, { notice, concluded: true, cashier: false }); }
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
 function finish(result: PurchaseChoice | null) {
   requestVersion++; stopTimers(); openCashierOnReady = false;
@@ -146,7 +146,7 @@ function reconcileChannel() {
   else choose('WALLET');
 }
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
-  if (state.busy || state.pending || !context) return;
+  if (state.busy || state.pending || state.concluded || !context) return;
   if (state.deadlineAt !== null && state.deadlineAt <= Date.now()) { deadlinePassed(); return; }
   if (step) state.step = step;
   if (method !== state.method) { quoteFailures = 0; reviewedQuote = confirmedQuote = null; }
@@ -214,44 +214,35 @@ function proceed() {
 }
 async function query() {
   const pending = state.pending;
-  if (!pending || state.busy) return;
+  if (!pending || state.busy || state.concluded) return;
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false;
   state.busy = true; state.unavailable = false;
   try {
     const result = pending.intentNo ? await api.get(pending.intentNo) : await api.find(pending.kind, pending.commandKey);
-    if (!owns(version, accountKey)) return;
+    if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
     if (result) accept(result, pending); else state.unavailable = true;
-  } catch (error) {
+  } catch {
+    // A missing intent on an automatic read does not prove the original payment was refused.
     failed = true;
-    if (owns(version, accountKey)) {
-      const cause = asApiError(error);
-      // The server no longer holds a payment it has shown us. Only the user may start another one, from the order.
-      if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') {
-        release(pending);
-        releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-        releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
-        Object.assign(state, { pending: null, intent: null, quote: null, error: false });
-        conclude('gone');
-      } else state.error = true;
-    }
+    if (owns(version, accountKey) && !state.concluded) state.error = true;
   }
   finally { if (owns(version, accountKey)) { state.busy = false; schedule(version, accountKey, failed); } }
 }
 /** Resubmits the original quote under the original key; the server applies it at most once. */
 async function submitOriginal() {
   const pending = state.pending;
-  if (!pending || state.busy) return;
+  if (!pending || state.busy || state.concluded) return;
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false;
   state.busy = true; state.unavailable = false;
   try {
     const intent = await api.create(pending.paymentQuoteId, pending.commandKey);
-    if (owns(version, accountKey)) { state.error = false; accept(intent, pending); }
+    if (owns(version, accountKey) && !state.concluded) { state.error = false; accept(intent, pending); }
   } catch (error) {
     failed = true;
-    if (owns(version, accountKey)) {
+    if (owns(version, accountKey) && !state.concluded) {
       state.error = true;
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
