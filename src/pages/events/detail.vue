@@ -48,6 +48,7 @@
 </template>
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { computed, onUnmounted, ref, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import EmptyState from "@/components/empty-state.vue";
@@ -114,11 +115,12 @@ async function run() {
 }
 function activate(event: KeyboardEvent, action: () => unknown) { if (!event.repeat) void action(); }
 onLoad(options => { const query = new URLSearchParams(takeNavigationQuery("/pages/events/detail")); code = String(options?.id ?? query.get("id") ?? "").trim(); reset(); if (visible) void load(); });
-onShow(() => { visible = true; void load(); });
-onHide(() => { visible = false; reset(); });
+let releaseActiveRefresh = () => {};
+onShow(() => { visible = true; releaseActiveRefresh = registerActivePageRefresh(() => error.value ? undefined : load(), "pages/events/detail"); void load(); });
+onHide(() => { visible = false; releaseActiveRefresh(); reset(); });
 watch(() => [app.accountKey, app.accountBindingEpoch, language.value], () => { reset(); void load(); }, { flush: "sync" });
 const unsubscribe = subscribeRuntimeRevision(() => { reset(); void load(); });
-onUnmounted(() => { visible = false; reset(); unsubscribe(); });
+onUnmounted(() => { visible = false; releaseActiveRefresh(); reset(); unsubscribe(); });
 useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value && !busy.value, retry: load });
 </script>
 <style scoped>
