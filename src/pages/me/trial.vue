@@ -239,6 +239,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
@@ -478,6 +479,8 @@ function goCheckout() {
   if (!productId) return; // applyAuthoritative already rejects unknown policy ids
   navTo(`/pages/store/checkout?product=${productId}&source=trial`);
 }
+useAutoRecovery({ failed: () => remoteApiEnabled && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote(true) });
+useAutoRecovery({ failed: () => productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
 function retryCatalog() {
   if (productCatalogState.status !== "error") return;
   void refreshProductCatalog(true);

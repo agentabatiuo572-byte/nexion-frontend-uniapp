@@ -2922,7 +2922,7 @@ export const fil: Messages = {
   },
   session: {
     restoreRetryNotice: "Hindi maibalik ang session mo ngayon. Awtomatikong sinusubukan ulit.",
-    nativeStorageFailure: "Hindi available ang session storage. Huminto ang aktibidad ng account. Hindi kumpirmado ang paglilinis ng local session; buksan ulit ang app para subukan ulit.",
+    nativeStorageFailure: "Hindi ma-save ang impormasyon sa pag-login sa ngayon. Buksan muli ang app.",
     secureBrowserUnsupported: "Hindi ligtas na makakapag-log in o maibabalik ng browser na ito ang session mo. I-update ang browser at subukan ulit.",
     kickedTitle: "Natapos ang session",
     kickedBodySessionEnded: "Natapos na ang pag-log in na ito. Mag-log in ulit para makita ang record ng task at payout mo.",
@@ -4399,7 +4399,7 @@ export const fil: Messages = {
     withdrawAlreadyOnFileTitle: "Naitala ang request ng withdrawal",
     withdrawAlreadyOnFileBody: "Naitala ang orihinal na request ng withdrawal. Walang dobleng payout. Tingnan ang status ng withdrawal.",
     withdrawResendDeclinedTitle: "Hindi tinanggap ang pag-ulit",
-    withdrawResendDeclinedBody: "Hindi tinanggap ang pag-ulit. Hindi pa rin kumpirmado ang resulta ng orihinal na withdrawal. Tingnan ang status ng withdrawal; kung walang record, ulitin ang orihinal na request mamaya. Huwag gumawa ng bagong withdrawal.",
+    withdrawResendDeclinedBody: "Hindi pa kumpirmado ang resulta ng unang withdrawal. Tingnan ang progreso; huwag gumawa ng bagong withdrawal.",
     withdrawDailyLimitWithPending: "Naabot na ang limit sa bilang ng withdrawal ngayong araw. Baka kasama na sa limit ang orihinal na request. Tingnan muna ang status ng withdrawal; huwag gumawa ng bagong withdrawal.",
     earnNexCta: "Kumita pa ng UVT",
     feeConfirmRow: "Fee sa kumpirmasyon ng network",

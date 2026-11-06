@@ -28,6 +28,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onShow } from "@dcloudio/uni-app";
 import { navBack } from "@/lib/route";
 import { computed, onUnmounted, ref } from "vue";
@@ -59,6 +60,7 @@ async function loadExchangeCaps() {
     if (request === capsRequest) exchangeLoading.value = false;
   }
 }
+useAutoRecovery({ failed: () => remoteApiEnabled && !exchangeLoading.value && exchangeAvailable.value === null, retry: loadExchangeCaps });
 onShow(() => { void loadExchangeCaps(); });
 onUnmounted(() => { capsRequest += 1; });
 

@@ -2503,7 +2503,7 @@ rankBenefits: "查看等级权益",
 },
   session: {
     restoreRetryNotice: "暂时无法恢复登录，正在自动重试。",
-    nativeStorageFailure: "本机登录存储暂时不可用，已停止账号操作。本机登录凭据清理未确认完成，请重新打开 App 重试。",
+    nativeStorageFailure: "登录信息暂时无法保存，请重新打开 App。",
     secureBrowserUnsupported: "此浏览器不支持安全登录或会话恢复。请更新浏览器后重试。",
     kickedTitle: "登录已结束",
     kickedBodySessionEnded: "当前登录已结束。请重新登录后查看任务和结算记录。",
@@ -3993,7 +3993,7 @@ timeHoursAgo: "{n}小时前",
     // 重放被拒:本次没过,但先前那笔的状态**仍然未知** —— 两件事都要说,只说一件会让用户
     // 以为「那就是没成功」,转头去开新的一笔。
     withdrawResendDeclinedTitle: "重试未获受理",
-    withdrawResendDeclinedBody: "重试未获受理，原提现结果仍待确认。请查询提现进度；无记录时请稍后重试原请求，勿发起新提现。",
+    withdrawResendDeclinedBody: "原提现结果待确认，请查看提现进度，勿发起新提现。",
     // 重放时撞上日限:与首次提交的日限话术不同 —— 首次是「今天不能提了」,
     // 重放是「今天不能提了,而且先前那笔可能已经占掉了额度」。
     withdrawDailyLimitWithPending: "今日提现次数已用完。原请求可能已占用额度，请先查询提现进度，勿发起新提现。",

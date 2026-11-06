@@ -2922,7 +2922,7 @@ export const uz: Messages = {
   },
   session: {
     restoreRetryNotice: "Seansni hozir tiklab boʻlmadi. Avtomatik qayta urinilmoqda.",
-    nativeStorageFailure: "Seans xotirasi mavjud emas. Akkaunt amallari toʻxtatildi. Lokal seans tozalanishi tasdiqlanmadi; qayta urinish uchun ilovani qayta oching.",
+    nativeStorageFailure: "Kirish maʼlumotlarini hozir saqlab boʻlmaydi. Ilovani qayta oching.",
     secureBrowserUnsupported: "Bu brauzer xavfsiz kirish yoki seansni tiklashni qoʻllab-quvvatlamaydi. Brauzerni yangilab, qayta urining.",
     kickedTitle: "Seans tugadi",
     kickedBodySessionEnded: "Bu kirish seansi tugadi. Vazifalar va toʻlovlar tarixini koʻrish uchun qayta kiring.",
@@ -4399,7 +4399,7 @@ export const uz: Messages = {
     withdrawAlreadyOnFileTitle: "Yechish soʻrovi qayd etilgan",
     withdrawAlreadyOnFileBody: "Asl yechish soʻrovi qayd etilgan. Takroriy toʻlov qilinmadi. Pul yechish holatini tekshiring.",
     withdrawResendDeclinedTitle: "Takrorlash qabul qilinmadi",
-    withdrawResendDeclinedBody: "Takrorlash qabul qilinmadi. Asl yechish natijasi hali tasdiqlanmagan. Pul yechish holatini tekshiring; yozuv chiqmasa, asl soʻrovni keyinroq takrorlang. Yangi soʻrov yaratmang.",
+    withdrawResendDeclinedBody: "Dastlabki pul yechish natijasi tasdiqlanmagan. Jarayonni tekshiring, yangi pul yechish soʻrovini yubormang.",
     withdrawDailyLimitWithPending: "Bugungi pul yechish limiti tugadi. Asl soʻrov limitga hisoblangan boʻlishi mumkin. Avval pul yechish holatini tekshiring, yangi soʻrov yaratmang.",
     earnNexCta: "Koʻproq UVT olish",
     feeConfirmRow: "Tarmoq tasdiqlash haqi",

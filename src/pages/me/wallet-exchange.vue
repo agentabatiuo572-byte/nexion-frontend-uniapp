@@ -36,9 +36,6 @@
         <view class="ex-fresh">
           <svg class="ex-fresh__ring" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle class="ex-fresh__trk" cx="9" cy="9" r="7" /><circle class="ex-fresh__val" cx="9" cy="9" r="7" :style="{ strokeDashoffset: `${(44 * (1 - rateFreshness)).toFixed(1)}` }" /></svg>
           <text class="ex-k ex-fresh__t">{{ updatedLabel }}</text>
-        <view class="ex-refresh" role="button" tabindex="0" :aria-disabled="remoteApiEnabled && exchangeAuthorityStatus === 'loading'" :aria-label="t.exchange.refreshRate" @click="onRefresh"  @keydown.enter.prevent="onRefresh" @keydown.space.prevent="onRefresh">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" /><path d="M21 3v5h-5" /></svg>
-        </view>
         </view>
       </view>
 
@@ -186,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
@@ -306,6 +304,7 @@ async function syncRemoteState(
 ): Promise<boolean> {
   if (!remoteApiEnabled) return true;
   if (!remoteScopeCurrent(scope, runScope)) return false;
+  if (remoteFirstPagePending.value) return false;
   const readGeneration = ++remoteReadGeneration;
   const snapshotVersion = remoteSnapshotVersion;
   historyLoadingMore.value = false;
@@ -684,22 +683,10 @@ function flip() {
   input.value = "";
 }
 
-function onRefresh() {
-  if (remoteApiEnabled) {
-    if (exchangeAuthorityStatus.value === "loading") return;
-    const scope = captureExchangeScope();
-    const runScope = captureRuntimeRevision();
-    void syncRemoteState(scope, runScope)
-      .then((applied) => {
-        if (!applied) return;
-        toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(t.value.exchange.remoteRefreshed));
-      })
-      .catch(() => undefined);
-    return;
-  }
-  exchange.refreshRate();
-  toast.info(t.value.exchange.quoteRefreshing);
-}
+useAutoRecovery({
+  failed: () => remoteApiEnabled && remoteError.value !== null && !remoteFirstPagePending.value && !historyLoadingMore.value,
+  retry: () => syncRemoteState(),
+});
 function goHowItWorks() {
   navTo("/pages/me/wallet-exchange-how");
 }
@@ -877,7 +864,6 @@ async function handleConfirm() {
     });
     if (!ok || !remoteScopeCurrent(requestScope, requestRunScope)) return;
 
-    toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.info(t.value.exchange.confirmingToast));
     // 结算延迟(MOCK:真实现是兑换提交 endpoint〔TBD;PRD 未定义〕的往返)。写成 await 而不是 setTimeout 回调 ——
     // 回调版的守卫在函数返回时就复位了,等于没守;await 让整条链留在同一个 try/finally 里。
     await new Promise((r) => setTimeout(r, 900));
