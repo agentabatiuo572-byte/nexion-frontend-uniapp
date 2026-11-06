@@ -2,7 +2,6 @@ import { reactive, watch } from "vue";
 import { apiClient, apiRuntimeConfig, sessionVault } from "@/api/runtime";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
-import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { createPaymentPasswordApi, type PaymentPasswordApi, type PaymentPasswordAuthorization, type PaymentPasswordChallenge, type PaymentPasswordProof, type PaymentPasswordReceipt, type PaymentPasswordState } from "@/api/payment-password-api";
 import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
@@ -108,8 +107,8 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   }
   async function readDisplayStatus(): Promise<boolean> {
     if (!identity() || environmentInvalidated) return false;
-    const account = identity(), epoch = ++displayReadEpoch, runtime = captureRuntimeRevision();
-    const currentRead = () => epoch === displayReadEpoch && account === identity() && isCurrentRuntimeRevision(runtime);
+    const account = identity(), epoch = ++displayReadEpoch;
+    const currentRead = () => epoch === displayReadEpoch && account === identity();
     display.loading = true;
     try {
       const state = await api.status();
