@@ -172,7 +172,7 @@
           </view>
         </view>
 
-        <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay" :state="checkoutResultState" :product-name="product.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? netPrice" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" @retry="refreshCheckoutResult" />
+        <CheckoutResult v-else-if="remoteApiEnabled && settledResultReplay" :state="checkoutResultState" :product-name="product.name" :product-image="checkoutImage ?? undefined" :amount="completedOrder?.paidTotal ?? completedOrder?.total ?? netPrice" :currency="completedOrder?.paymentMethod === 'HDPAY_BANK' ? 'USD' : 'USDT'" @devices="viewPurchasedDevices" />
 
         <!-- === confirmed === -->
         <view v-else-if="step === 'confirmed'" class="nx-glass-card mx-4 rounded-2xl text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
@@ -1226,9 +1226,12 @@ function presentSettledPurchase(firstHardwareOrder: boolean, onResultShown: (() 
 }
 const checkoutResultState = computed(() => completedOrder.value?.status === 'activated' ? 'activated'
   : completedOrder.value?.status === 'inventory' ? 'inventory' : 'processing');
+const checkoutResultReading = ref(false);
 async function refreshCheckoutResult() {
-  if (!orderId.value) return;
-  await orders.ensureRemoteOrder(orderId.value);
+  if (!orderId.value || !pageAlive || !pageVisible || checkoutResultReading.value) return;
+  checkoutResultReading.value = true;
+  try { await orders.ensureRemoteOrder(orderId.value); }
+  finally { checkoutResultReading.value = false; }
 }
 // Open the warehouse on a fresh stack: back returns to Me, never to this finished result.
 function viewPurchasedDevices() { void navReset('/pages/me/devices'); }
@@ -2412,6 +2415,13 @@ async function submitRemoteOrder(): Promise<void> {
 // 重新可见时把镜像挂回去(P-044 页头同款「onShow 重设」),卸载时只清自己 owner 的那份(P-116 同款)。
 const tradeinOwner = Symbol("checkout-tradein");
 let pageVisible = true;
+useAutoRecovery({
+  failed: () => remoteApiEnabled && settledResultReplay.value && !!orderId.value
+    && !checkoutResultReading.value && !checkoutWalletRefreshing.value && !paymentFlowBusy.value && !checkoutLeaving.value && !confirming
+    && (!completedOrder.value || ['paid', 'provisioning'].includes(completedOrder.value.status)),
+  retry: refreshCheckoutResult,
+  repeatMs: 15_000,
+});
 watch(foregroundReadAllowed, allowed => {
   if (allowed && pageVisible && checkoutRouteInitialized && !promotionRoute.value) void freeTrial.refreshVisible();
 });

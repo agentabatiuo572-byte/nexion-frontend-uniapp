@@ -6,7 +6,7 @@ import { registerPageRecovery } from "@/lib/active-page-refresh";
 import { useApp } from "@/store/app";
 
 /** READS only. retry must use the store's account/generation guards and read window. */
-export function useAutoRecovery(options: { failed: () => boolean; retry: () => Promise<unknown> }) {
+export function useAutoRecovery(options: { failed: () => boolean; retry: () => Promise<unknown>; repeatMs?: number }) {
   const app = useApp();
   const shown = ref(false);
   const delays = [3_000, 10_000, 30_000];
@@ -22,7 +22,7 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
     timer = undefined;
   }
 
-  function schedule(delay = delays[attempts]) {
+  function schedule(delay = delays[attempts] ?? options.repeatMs) {
     if (disposed || timer !== undefined || inFlight || !shown.value || !foregroundReadAllowed()
       || !options.failed() || delay === undefined) return;
     const epoch = app.accountBindingEpoch;
@@ -33,7 +33,7 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
         || epoch !== app.accountBindingEpoch || account !== app.accountKey) return;
       attempts += 1;
       void attempt();
-    }, Math.max(delay * (0.85 + Math.random() * 0.3), retryAt - Date.now()));
+    }, Math.max(delay === options.repeatMs ? delay : delay * (0.85 + Math.random() * 0.3), retryAt - Date.now()));
   }
 
   function attempt(): Promise<boolean> {
