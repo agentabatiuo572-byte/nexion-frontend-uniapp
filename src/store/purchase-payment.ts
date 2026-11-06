@@ -163,10 +163,10 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
     if (quote.kind !== expected.kind || quote.paymentMethod !== method || amountChanged || !expected.current()) throw new Error('PURCHASE_CONTEXT_CHANGED');
     state.quote = quote; quoteFailures = 0;
-    if (reviewedQuote && !samePaymentTerms(reviewedQuote, quote)) {
-      confirmedQuote = null; state.notice = 'quoteChanged';
-    }
-    reviewedQuote = quote;
+    const reviewed = confirmedQuote ?? reviewedQuote;
+    if (reviewed && !samePaymentTerms(reviewed, quote)) {
+      confirmedQuote = null; state.notice = 'quoteChanged'; reviewedQuote = quote;
+    } else reviewedQuote = reviewed ?? quote;
     if (quote.deadlineAt) state.deadlineAt = Date.parse(quote.deadlineAt);
     // Swap in a fresh quote 30 s before this one lapses.
     // (setTimeout fires at once beyond 2^31-1 ms, so far-off expiries are capped.)
@@ -201,7 +201,9 @@ function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   void select(network, 'network');
 }
 function samePaymentTerms(left: PurchaseQuote, right: PurchaseQuote) {
-  return left.paymentMethod === right.paymentMethod && formatAmount(left.totalUsdt) === formatAmount(right.totalUsdt)
+  const amountAllowed = left.kind === 'TRIAL_CONVERT' ? Number(right.totalUsdt) <= Number(left.totalUsdt)
+    : formatAmount(left.totalUsdt) === formatAmount(right.totalUsdt);
+  return left.paymentMethod === right.paymentMethod && amountAllowed
     && left.feePolicyVersion === right.feePolicyVersion;
 }
 /** 前往付款: a short deadline warns first, then the pre-payment reminder; the intent is created only after the reminder. */
@@ -291,7 +293,7 @@ async function confirm() {
   const quote = state.quote;
   if (quote?.deadlineAt && Date.parse(quote.deadlineAt) <= Date.now()) { deadlinePassed(); return; }
   if (!quote || Date.parse(quote.expiresAt) <= Date.now()) { confirmedQuote = null; state.notice = ''; void select(state.method); return; }
-  // A new quote id alone is silent; the amount, fee version and method must still be the terms reviewed in the reminder.
+  // A new id is silent. Trials keep the confirmed ceiling; other purchases require the reviewed amount exactly.
   if (state.notice !== 'reminder' || !confirmedQuote || !samePaymentTerms(confirmedQuote, quote)) {
     confirmedQuote = null; state.notice = 'quoteChanged'; return;
   }
