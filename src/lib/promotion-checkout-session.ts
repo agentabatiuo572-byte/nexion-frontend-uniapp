@@ -51,7 +51,7 @@ export class PromotionCheckoutSession {
   /** The live copy of withoutPromotionPayment: the stored row may already be released. */
   releaseExternalPayment(key:string):boolean {
     if(this.record.pending?.key!==key)return false;
-    this.persist(withoutPromotionPayment(this.record,key));
+    if (!this.persist(withoutPromotionPayment(this.record,key))) return true;
     this.unknown=false;this.confirmed=!!this.record.order;this.retryOriginal=false;
     return true;
   }
@@ -62,7 +62,12 @@ export class PromotionCheckoutSession {
     if (pending?.operation !== 'payOrder') return false;
     const stored = this.ports.read();
     if (stored?.pending?.key === pending.key) return false;
-    this.record = stored ?? withoutPromotionPayment(this.record, pending.key);
+    if (!stored || (stored.paymentIntentRevision ?? 0) <= (this.record.paymentIntentRevision ?? 0)) {
+      this.ports.save(this.record);
+      this.unknown = true; this.confirmed = false; this.retryOriginal = false;
+      return false;
+    }
+    this.record = stored;
     this.unknown = !!this.record.pending;
     this.confirmed = !!this.record.order && !this.unknown;
     this.retryOriginal = false;
@@ -72,6 +77,15 @@ export class PromotionCheckoutSession {
   private persist(record: PromotionCheckoutRecord): boolean {
     if (!this.ports.current()) throw new Error('ACCOUNT_SCOPE_CHANGED');
     if (record.pending?.operation === 'payOrder' && record.pending.key === this.record.pending?.key && this.adoptReleasedPayment()) return false;
+    if (!record.pending) {
+      const stored = this.ports.read();
+      if (stored?.pending && stored.pending.key !== this.record.pending?.key) {
+        this.record = stored;
+        this.unknown = true; this.confirmed = false; this.retryOriginal = false;
+        this.unseenPaymentKey = null;
+        return false;
+      }
+    }
     this.ports.save(record);
     this.record = record;
     return true;
@@ -182,8 +196,8 @@ export class PromotionCheckoutSession {
       quote = { ...quote, quoteId: order.promotionQuoteId };
     }
     this.validateOrder(order, quote);
-    this.persist({ ...this.record, quote, order, pending: null,
-      ...(retireRejectedPayment?{paymentIntentRevision:(this.record.paymentIntentRevision??0)+1}:{}) });
+    if (!this.persist({ ...this.record, quote, order, pending: null,
+      ...(retireRejectedPayment?{paymentIntentRevision:(this.record.paymentIntentRevision??0)+1}:{}) })) return;
     this.unknown = false;
     this.confirmed = true;
     this.unseenPaymentKey=null;
@@ -238,7 +252,7 @@ export class PromotionCheckoutSession {
             if(!this.ports.current())return;
             if(!order){this.unknown=true;this.confirmed=false;return;}
             this.acceptOrder(order);
-          }else{this.persist({quote:null,order:null,pending:null,...(this.record.leavePromptShown?{leavePromptShown:true}:{})});this.unknown=false;this.confirmed=false;}
+          }else{if(!this.persist({quote:null,order:null,pending:null,...(this.record.leavePromptShown?{leavePromptShown:true}:{})}))return;this.unknown=false;this.confirmed=false;}
           this.retryOriginal=false;
         } else if (result.status === 'NOT_FOUND') {
           this.unknown = false;
