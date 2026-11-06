@@ -547,8 +547,10 @@ async function recoverOrderAction(retryCancel=false):Promise<void> {
       } else if (result.status==='REJECTED') {
         resumePaymentAllowed.value=false;
         await refreshOrder();
-        if (isCurrentDetailScope(scope)&&!remoteOrderError.value&&!remoteOrderRefreshing.value&&liveOrder.value)
+        if (isCurrentDetailScope(scope)&&!remoteOrderError.value&&!remoteOrderRefreshing.value&&liveOrder.value) {
           clearOrderAction(accountKey,action.orderNo,action.key,true);
+          toast.warn(recoveryCopy.value.rejected);
+        }
         if (isCurrentDetailScope(scope)) orderAction.value=readOrderAction(accountKey,action.orderNo);
         return;
       } else if (result.status==='NOT_SEEN'&&result.canResumeSameKey) {
@@ -806,7 +808,11 @@ async function offerWalletTopup(requiredUsdt: number): Promise<void> {
 
 /** Re-read the original order and its eligibility before the payment sheet opens; the server rechecks everything at pay. */
 async function requestPendingPayment(originalJustRead = false): Promise<void> {
-  if (!remoteApiEnabled || pendingPaymentChecking.value || payingFromWallet.value || cancellingOrder.value || orderCommandQuerying.value || orderCommandReading.value) return;
+  // A background read of the original command must not swallow this tap.
+  if (orderCommandReading.value) await new Promise<void>(resolve => {
+    const stop = watch(orderCommandReading, reading => { if (!reading) { stop(); resolve(); } });
+  });
+  if (!remoteApiEnabled || !detailVisible || pendingPaymentChecking.value || payingFromWallet.value || cancellingOrder.value || orderCommandQuerying.value || orderCommandReading.value) return;
   const scope = captureDetailScope();
   if (originalJustRead && pendingPaymentIntentAccount && pendingPaymentIntentAccount !== scope.accountScope.accountKey) {
     autoPayRequested.value = false;

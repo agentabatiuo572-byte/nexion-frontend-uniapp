@@ -3,6 +3,12 @@
     <SubPageHeader :back="back" />
     <view v-if="loading && !content" class="mx-4" style="padding: 28px 0; color: var(--v5-ink-3);" role="status"><text>{{ t.howPublished.loading }}</text></view>
     <view v-if="content" class="pb-8">
+      <view v-if="languageFallback" class="mx-4" style="margin: 16px; padding: 14px; border-radius: 12px; background: var(--v5-surface-2);" role="status" aria-live="polite">
+        <text class="block" :style="bodyStyle">{{ t.howPublished.languageFallback }}</text>
+        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load">
+          <text>{{ t.ui.retry }}</text>
+        </view>
+      </view>
       <!-- A page may render the accepted publication itself (scoped slot); loading, fallback and
            failure stay here so every guide keeps the same acceptance and refresh boundary. -->
       <slot v-if="$slots.default" :blocks="content.blocks" />
@@ -34,7 +40,7 @@
 import EmptyState from "@/components/empty-state.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onShow } from "@/composables/use-tab-page-lifecycle";
-import { onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import HowHero from "@/components/how/how-hero.vue";
 import HowSection from "@/components/how/how-section.vue";
@@ -50,6 +56,9 @@ import { serverLanguage } from "@/i18n";
 const props = defineProps<{ contentKey: HowContentKey; back: string; neutral?: boolean }>();
 const emit = defineEmits<{ unavailable: [] }>();
 const locale = useLocaleStore();
+const languageFallback = computed(() => !!content.value
+  && content.value.locale.trim().split(/[-_]/)[0].toLowerCase()
+    !== locale.code.split(/[-_]/)[0].toLowerCase());
 const t = useT();
 const content = ref<HowContentDocument | null>(null);
 const loading = ref(true);
