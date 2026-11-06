@@ -2671,7 +2671,7 @@ export const ms: Messages = {
     receiptsUnavailableTitle: "Resit pendapatan gagal dimuatkan",
     receiptsUnavailableBody: "Sila muat semula resit pendapatan anda.",
     syncFailedTitle: "Maklumat tidak dapat dimuat semula",
-    syncFailedBody: "Sila cuba lagi.",
+    syncFailedBody: "Mencuba semula secara automatik.",
     fundsUnavailableTitle: "Dompet gagal dimuat semula",
     fundsUnavailableBody: "Baki semasa anda tidak tersedia. Muat semula sebelum membuat sebarang tindakan dompet.",
     fundsStaleBody: "Memaparkan baki terakhir dikemas kini. Muat semula untuk melihat yang terkini.",
