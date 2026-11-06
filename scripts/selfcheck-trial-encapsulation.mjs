@@ -19,6 +19,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
+import { parse as parseSfc } from "@vue/compiler-sfc";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src");
@@ -62,28 +64,258 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** 剥掉 // 行注释与 /* *\/ 块注释,防「注释里提到就算命中」的假阳性。 */
-function stripComments(text) {
-  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+/** 保留旧剥注释语义,同时映射到原文位置;不能因证明节点而漏掉同行的其他读取。 */
+function stripComments(text, withOffsets = false) {
+  let body = text, offsets = withOffsets ? Array.from({ length: text.length }, (_, i) => i) : [];
+  for (const pattern of [/\/\*[\s\S]*?\*\//g, /^[ \t]*\/\/.*$/gm]) {
+    if (!withOffsets) { body = body.replace(pattern, ""); continue; }
+    const ranges = [];
+    let start = 0;
+    for (const match of body.matchAll(pattern)) { ranges.push([start, match.index]); start = match.index + match[0].length; }
+    ranges.push([start, body.length]);
+    const nextOffsets = ranges.flatMap(([from, to]) => offsets.slice(from, to));
+    body = ranges.map(([from, to]) => body.slice(from, to)).join("");
+    offsets = nextOffsets;
+  }
+  return { body, offsets };
+}
+
+const printer = ts.createPrinter({ removeComments: true });
+function canonical(node, source) {
+  const result = ts.transform(node, [context => root => ts.visitNode(root, function visit(child) {
+    return ts.isStringLiteral(child) ? ts.factory.createStringLiteral(child.text) : ts.visitEachChild(child, visit, context);
+  })]);
+  const text = printer.printNode(ts.EmitHint.Unspecified, result.transformed[0], source);
+  result.dispose();
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, text), tokens = [];
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) tokens.push([token, scanner.getTokenText()]);
+  return JSON.stringify(tokens);
+}
+function parseScript(text, file) {
+  const ast = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  if (ast.parseDiagnostics.length) throw new Error(`${file}: ${ts.flattenDiagnosticMessageText(ast.parseDiagnostics[0].messageText, " ")}`);
+  return ast;
+}
+const snippets = (text) => {
+  const ast = parseScript(text, "trial-proof.ts");
+  return ast.statements.map(node => ({ kind: node.kind, text: canonical(node, ast) }));
+};
+// ponytail: prove these two finite source shapes, not arbitrary data flow. Any
+// new consumer or changed shape must establish its purpose before being accepted.
+const claimProof = snippets(`
+const freeTrial = useFreeTrial();
+const claiming = ref(false);
+const activated = ref(false);
+if (claiming.value || !sheet.open || activated.value) return;
+activated.value = true;
+watch(() => app.accountBindingEpoch, () => {
+  claimSequence++; claiming.value = false; activated.value = false;
+  claimError.value = false; claimErrorReason.value = undefined; sheet.closeTransient();
+}, { flush: "sync" });
+watch(() => sheet.open, open => {
+  if (!open) return;
+  claimError.value = false; claimErrorReason.value = undefined;
+  activated.value = !claiming.value && freeTrial.authorityStatus === "ready"
+    && (freeTrial.status === "active" || freeTrial.status === "grace");
+});`);
+const quoteProof = snippets(`
+const freeTrial = useFreeTrial();
+const hasOriginalCheckout = computed(() => !!createdCheckoutOrder.value || !!pendingCheckoutCreate.value);
+const trialQuoteIncomplete = computed(() => trialEarlyQuoteLapsed.value
+  || ((freeTrial.status === "active" || freeTrial.status === "grace")
+    && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null || freeTrial.authoritativePriceUSD === null)));
+const trialQuoteUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
+const trialQuoteScreenUnavailable = computed(() => remoteApiEnabled && !hasOriginalCheckout.value && ((freeTrial.authorityStatus !== "ready"
+  && !(freeTrial.authorityStatus === "loading" && freeTrial.authorityServerState !== null)) || trialQuoteIncomplete.value));
+if (trialQuoteUnavailable.value && !trialQuoteScreenUnavailable.value) {
+  const ready = await freeTrial.refreshRemote(); if (!ready || !isCurrentCheckoutRoute(scope)) return;
+}
+if (trialQuoteUnavailable.value || quantitySwitching.value || (remoteApiEnabled && !checkoutWalletReadable.value)) return;
+if (trialQuoteUnavailable.value) return;
+if (trialQuoteUnavailable.value && !createdCheckoutOrder.value && !pendingCheckoutCreate.value) return;
+if (!isCurrentCheckoutRoute(scope) || ((!createdCheckoutOrder.value && !pendingCheckoutCreate.value) && trialQuoteScreenUnavailable.value) || step.value !== "confirm") return;
+if (trialQuoteScreenUnavailable.value && !createdCheckoutOrder.value && !pendingCheckoutCreate.value) return;
+if (trialQuoteUnavailable.value) { confirming = false; return; }
+const paymentCurrent = () => isCurrentCheckoutRoute(confirmationScope) && (!!replay || (!trialQuoteScreenUnavailable.value
+  && totalStillConfirmed(confirmedAmount) && confirmedTrialApplied === trialView.value.applied && confirmedTrialQuoteVersion === trialView.value.quoteVersion));
+if (!createdCheckoutOrder.value && !pendingCheckoutCreate.value && (trialQuoteScreenUnavailable.value || trialView.value.applied || freeTrial.hasPendingConversion()
+    || reviewedTrialVersion !== trialView.value.quoteVersion || reviewedTotal !== confirmationTotal.value)) {
+  confirming = false; toast.warn(t.value.store.coTotalQuoteChanged); step.value = "select-payment"; return;
+}
+const authorized = await executeSelectedPurchase({ amount: originalAmount, currency: "USDT", summary: p.name },
+  async authorization => {
+    if (!paymentCurrent()) return null;
+    return freeTrial.convert(p.id, originalAmount, originalVersion, authorization);
+  }, paymentCurrent,
+  { kind: "TRIAL_CONVERT", payload: { productNo: p.id, expectedAmountUsdt: originalAmount, quoteVersion: originalVersion },
+    commandKey: () => freeTrial.conversionPaymentKey(p.id, originalAmount, originalVersion),
+    parseReceipt: async raw => { const receipt = parseTrialConvertReceipt(raw); const result = await freeTrial.convert(p.id, originalAmount, originalVersion); if (!result.ok || result.orderNo !== receipt.orderNo) throw new Error("TRIAL_CONVERT_RESULT_UNKNOWN"); return result; } });`);
+claimProof.forEach((proof, i) => { proof.owner = i === 3 || i === 4 ? "onClaim" : ""; });
+quoteProof.forEach((proof, i) => { proof.owner = ["", "", "", "", "", "submitReview", "submitReview", "goConfirm", "requestConfirmPay", "requestConfirmPay", "onConfirmPay", "onConfirmPay", "onConfirmPay", "submitRemoteOrder", "onConfirmPay"][i]; });
+const paymentProof = snippets(`
+const recoveryScope = captureCheckoutRoute();
+const confirmedAmount = confirmationTotal.value;
+const confirmedTrialApplied = trialView.value.applied;
+const confirmedTrialQuoteVersion = trialView.value.quoteVersion;
+if (remoteApiEnabled) {
+  const recovering = createdCheckoutOrder.value ? false : await resumeServerOrder(recoveryScope);
+  if (recovering || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
+  if (checkoutOnboardingRequired.value && !freeTrial.hasPendingConversion()) {
+    confirming = false; step.value = "select-payment"; toast.warn(t.value.store.coSetupRequired); return;
+  }
+  const trialReady = await freeTrial.refreshRemote();
+  if (!trialReady || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
+}
+if (trialQuoteUnavailable.value) { confirming = false; return; }
+if (!totalStillConfirmed(confirmedAmount) || (!freeTrial.hasPendingConversion() && (confirmedTrialApplied !== trialView.value.applied
+    || confirmedTrialQuoteVersion !== trialView.value.quoteVersion))) {
+  confirming = false; toast.warn(t.value.store.coTotalQuoteChanged); step.value = "select-payment"; return;
+}`);
+const claimTemplate = [
+  ["if:", "activated", 4], ["bind:class", "{ 'tcs-spark-box--success': activated }", 1],
+  ["else-if:", "!activated && freeTrial.authorityStatus === 'error'", 1],
+  ["bind:aria-label", "activated ? copy.activationSuccessTitle : copy.activateTitle", 1],
+  ["bind:aria-label", "activated ? copy.close : t.trial.sheetDismissCta", 1],
+  ["text", "activated ? copy.close : t.trial.sheetDismissCta", 1],
+];
+const quoteTemplate = [
+  ["else-if:", "trialQuoteScreenUnavailable", 1],
+  ["if:", "!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')", 1],
+];
+const expressionKey = (text) => snippets(`const value = (${text});`)[0].text;
+
+function provenAuthorityReads(source, file) {
+  let script = source, template;
+  if (file.endsWith(".vue")) {
+    const { descriptor, errors } = parseSfc(source, { filename: file });
+    if (errors.length) throw new Error(`${file}: ${errors[0]}`);
+    template = descriptor.template?.ast;
+    script = source.replace(/[^\r\n]/g, " ");
+    for (const block of [descriptor.script, descriptor.scriptSetup].filter(Boolean)) {
+      script = script.slice(0, block.loc.start.offset) + block.content + script.slice(block.loc.end.offset);
+    }
+  }
+  const ast = parseScript(script, file), nodes = [], identifiers = [], bindings = new Map(), rawNodes = [];
+  const conditionalRegions = [], starts = [];
+  for (const match of source.matchAll(/^[ \t]*(?:\/\/|<!--)[ \t]*#(ifdef|ifndef|endif)\b[^\r\n]*/gm)) {
+    if (match[1] !== "endif") starts.push(match.index);
+    else {
+      const start = starts.pop();
+      if (start === undefined) throw new Error(`${file}: unmatched conditional-compilation endif`);
+      conditionalRegions.push([start, match.index + match[0].length]);
+    }
+  }
+  for (const start of starts) conditionalRegions.push([start, source.length]);
+  const conditional = (node) => conditionalRegions.some(([from, to]) => node.getStart(ast) < to && node.end > from);
+  (function visit(node) {
+    if (ts.isIdentifier(node)) identifiers.push(node);
+    if (ts.isVariableStatement(node) || ts.isIfStatement(node) || ts.isExpressionStatement(node)) nodes.push(node);
+    if ((ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node) || ts.isFunctionDeclaration(node)
+      || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node) || ts.isImportSpecifier(node) || ts.isImportClause(node) || ts.isNamespaceImport(node)) && node.name && ts.isIdentifier(node.name)) {
+      bindings.set(node.name.text, [...(bindings.get(node.name.text) || []), node]);
+    }
+    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "freeTrial" && node.name.text === "status") rawNodes.push(node);
+    ts.forEachChild(node, visit);
+  })(ast);
+  const code = new Map(), allowed = new Set();
+  const normalized = (node) => {
+    if (!code.has(node)) code.set(node, canonical(node, ast));
+    return code.get(node);
+  };
+  const owner = (node) => {
+    for (let parent = node.parent; parent && parent !== ast; parent = parent.parent) if (ts.isFunctionLike(parent)) return ts.isFunctionDeclaration(parent) ? parent.name?.text : null;
+    return node.parent === ast ? "" : null;
+  };
+  const importFrom = (name, module) => {
+    const entries = bindings.get(name) || [];
+    return entries.length === 1 && ts.isImportSpecifier(entries[0]) && !entries[0].isTypeOnly
+      && (entries[0].propertyName || entries[0].name).text === name
+      && !entries[0].parent.parent.isTypeOnly && entries[0].parent.parent.parent.moduleSpecifier.text === module;
+  };
+  for (const [proof, flags, expectedTemplate, imports, protectedNames] of [
+    [claimProof, ["activated"], claimTemplate, [["ref", "vue"], ["watch", "vue"]], ["claiming", "sheet", "app"]],
+    [quoteProof, ["trialQuoteIncomplete", "trialQuoteUnavailable", "trialQuoteScreenUnavailable"], quoteTemplate,
+      [["computed", "vue"], ["remoteApiEnabled", "@/api/runtime"], ["executeSelectedPurchase", "@/lib/selected-purchase-payment"]],
+      ["hasOriginalCheckout", "createdCheckoutOrder", "pendingCheckoutCreate"]],
+  ]) {
+    const names = ["freeTrial", "useFreeTrial", ...flags, ...protectedNames, ...imports.map(([name]) => name)];
+    if (!importFrom("useFreeTrial", "@/store/free-trial") || !imports.every(([name, module]) => importFrom(name, module))
+      || names.some(name => bindings.get(name)?.length !== 1)) continue;
+    if (names.some(name => conditional(bindings.get(name)[0]))) continue;
+    let changedBinding = false;
+    (function assignments(node) {
+      if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        && ts.isIdentifier(node.left) && names.includes(node.left.text)) changedBinding = true;
+      ts.forEachChild(node, assignments);
+    })(ast);
+    if (changedBinding) continue;
+    const matches = proof.map(expected => nodes.filter(node => node.kind === expected.kind && owner(node) === expected.owner && normalized(node) === expected.text));
+    if (matches.some(found => found.length !== 1)) continue;
+    const approved = matches.flat();
+    if (approved.some(conditional)) continue;
+    if (identifiers.some(node => flags.includes(node.text) && !approved.some(parent => node.getStart(ast) >= parent.getStart(ast) && node.end <= parent.end))) continue;
+    if (proof === quoteProof) {
+      const paymentNode = approved.find(node => ts.isVariableStatement(node) && node.declarationList.declarations[0].name.getText(ast) === "paymentCurrent");
+      const paymentScope = paymentNode.parent;
+      const paymentUses = approved.filter(node => node === paymentNode || (ts.isVariableStatement(node) && node.declarationList.declarations[0].name.getText(ast) === "authorized"));
+      if (identifiers.some(node => node.text === "paymentCurrent" && node.getStart(ast) >= paymentScope.getStart(ast) && node.end <= paymentScope.end
+        && !paymentUses.some(parent => node.getStart(ast) >= parent.getStart(ast) && node.end <= parent.end))) continue;
+      const fn = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "onConfirmPay" && !node.parameters.length);
+      const statements = fn?.body?.statements || [];
+      if (!statements.some((node, start) => paymentProof.every((expected, i) => statements[start + i]?.kind === expected.kind
+        && canonical(statements[start + i], ast) === expected.text && !conditional(statements[start + i])))) continue;
+    }
+    const seenTemplate = new Map();
+    let unknownTemplate = false;
+    (function visitTemplate(node) {
+      for (const [expression, dynamicArg] of [[node.type === 5 ? node.content : node.exp, false], [node.arg?.isStatic === false ? node.arg : undefined, true]]) {
+        if (expression?.content && flags.some(name => new RegExp(`\\b${name}\\b`).test(expression.content))) {
+          const parsed = parseScript(`const value = (${expression.content});`, `${file}:template`);
+          let readsFlag = false;
+          (function reads(child) { if (ts.isIdentifier(child) && flags.includes(child.text)) readsFlag = true; ts.forEachChild(child, reads); })(parsed);
+          if (readsFlag) {
+            const kind = node.type === 5 ? "text" : `${node.name}:${node.arg?.isStatic === false ? "dynamic:" : ""}${node.arg?.content || ""}`;
+            const index = expectedTemplate.findIndex(([type, text]) => type === kind && expressionKey(text) === canonical(parsed.statements[0], parsed));
+            if (dynamicArg || index < 0) unknownTemplate = true;
+            else seenTemplate.set(index, (seenTemplate.get(index) || 0) + 1);
+          }
+        }
+      }
+      for (const child of node.children || []) visitTemplate(child);
+      for (const prop of node.props || []) visitTemplate(prop);
+    })(template || {});
+    if (unknownTemplate || expectedTemplate.some(([, , count], i) => seenTemplate.get(i) !== count)) continue;
+    for (const node of rawNodes) if (approved.some(parent => node.getStart(ast) >= parent.getStart(ast) && node.end <= parent.end)) allowed.add(node.getStart(ast));
+  }
+  return allowed;
 }
 
 const files = walk(SRC);
 const consumers = new Map(); // rel -> [lineNo...]
 let scannedHits = 0;
+let provenHits = 0;
 
 for (const full of files) {
   const rel = path.relative(ROOT, full).replace(/\\/g, "/");
   const raw = readFileSync(full, "utf8");
-  const body = stripComments(raw);
-  const lines = body.split(/\r?\n/);
-  const hits = [];
-  lines.forEach((line, i) => {
-    if (RAW_READ.test(line)) hits.push(i + 1);
+  const { body } = stripComments(raw);
+  const rawHits = [], hitLines = new Set();
+  let offset = 0;
+  body.split(/(?<=\n)/).forEach((line, i) => {
+    if (RAW_READ.test(line)) for (const match of line.matchAll(new RegExp(RAW_READ.source, "g"))) {
+      rawHits.push({ offset: offset + match.index, line: i + 1 }); hitLines.add(i + 1);
+    }
+    offset += line.length;
   });
-  if (!hits.length) continue;
-  scannedHits += hits.length;
+  if (!rawHits.length) continue;
+  scannedHits += hitLines.size;
   if (RESOLVER_FILES.includes(rel)) continue; // 定义面,不算消费者
-  consumers.set(rel, hits);
+  const { offsets } = stripComments(raw, true);
+  for (const hit of rawHits) { hit.offset = offsets[hit.offset]; hit.line = raw.slice(0, hit.offset).split("\n").length; }
+  const proven = provenAuthorityReads(raw, rel);
+  const hits = [...new Set(rawHits.filter(hit => !proven.has(hit.offset)).map(hit => hit.line))];
+  provenHits += rawHits.filter(hit => proven.has(hit.offset)).length;
+  if (hits.length) consumers.set(rel, hits);
 }
 
 const fails = [];
@@ -126,5 +358,6 @@ const listed = [...consumers.keys()];
 console.log(
   `PASS trial state encapsulation: 消费者 ${listed.length} 处均已登记且非钱路径` +
     `(${listed.join(" · ") || "无"});扫 ${files.length} 个源文件 / ${scannedHits} 处原始状态读取 / ` +
+    `完整权威布尔用途已证明 ${provenHits} 个读取节点 / ` +
     `钱路径禁令覆盖 ${MONEY_PATHS.length} 个文件`,
 );
