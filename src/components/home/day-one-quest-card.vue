@@ -107,7 +107,7 @@
     </text>
 
     <view
-      v-if="(!missionLayout || !expanded || questLoadError) && (!claimState.empty || questLoadError)"
+      v-if="!questUnavailable && (!missionLayout || !expanded) && !claimState.empty"
       class="nx-glass-action newcomer-task__toggle"
       :style="toggleStyle"
       role="button"
@@ -127,6 +127,7 @@
 
 <script setup lang="ts">
 import { isLiteQuest } from "@/lib/lite-scope";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
@@ -182,6 +183,7 @@ const locale = useLocaleStore();
 const nowTick = useNow();
 const { elRef, inView } = useScrollGrowProgress();
 const quest = useQuest();
+useAutoRecovery({ failed: () => remoteApiEnabled && props.active && quest.remoteStatus === "error", retry: () => quest.refreshRemote() });
 const app = useApp();
 const stakingDisplay = useConfig();
 const mockReward = 500;
@@ -332,10 +334,6 @@ function onRowTap(task: QuestTask) {
 }
 
 function toggleExpanded() {
-  if (questLoadError.value) {
-    void quest.refreshRemote();
-    return;
-  }
   if (questUnavailable.value) return;
   expanded.value = !expanded.value;
 }

@@ -16,14 +16,7 @@
         <text :style="{ color: 'var(--v5-ink-3)', fontSize: '12px', lineHeight: '1.5' }">{{ t.store.catalogLoadingTitle }}</text>
       </view>
 
-      <view v-if="orderPanels.showSourceOutage" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
-        <view v-for="source in unavailableOrderSources" :key="source.label" class="flex items-center justify-between" style="gap: 12px">
-          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ source.label }} · {{ source.message }}</text>
-          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click.stop="requestOrdersRefresh" @keydown.enter.prevent="requestOrdersRefresh" @keydown.space.prevent="requestOrdersRefresh">
-            <text>{{ t.store.catalogRetry }}</text>
-          </view>
-        </view>
-      </view>
+      <view v-if="orderPanels.showSourceOutage && !orderList.length" class="mx-4 rounded-2xl" :style="remoteErrorStyle"><text style="color:var(--v5-ink-3)">—</text></view>
 
       <!-- An empty claim requires every order source to have loaded successfully. -->
       <EmptyState v-if="orderPanels.mainPresentation === 'empty'" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
@@ -92,8 +85,8 @@
         >
           <text>{{ t.orders.loadMore }}{{ orders.loadingMore ? '…' : '' }}</text>
         </view>
-        <view v-if="remoteApiEnabled && genesis.orderPage.cursor" class="active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="genesis.orderPage.busy ? 'true' : 'false'" :aria-busy="genesis.orderPage.busy ? 'true' : 'false'" @click="!genesis.orderPage.busy && genesis.loadMoreGenesisOrders()">
-          <text :class="{ 'order-read-retry-label': genesis.orderPage.error }">{{ genesis.orderPage.error ? t.orders.retry : t.orders.loadMore }} · {{ t.me.genesisNode }}</text>
+        <view v-if="remoteApiEnabled && genesis.orderPage.cursor" class="active:opacity-70" :style="loadMoreBtnStyle" role="button" tabindex="0" :aria-disabled="genesis.orderPage.busy ? 'true' : 'false'" :aria-busy="genesis.orderPage.busy ? 'true' : 'false'" @click="loadMoreOrderPage()">
+          <text>{{ t.orders.loadMore }} · {{ t.me.genesisNode }}</text>
         </view>
       </view>
     </view>
@@ -101,6 +94,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { toast } from "@/store/ui";
 import { dateLocale, fmt } from "@/i18n/format";
 import { commerceOrderTitle } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
@@ -144,6 +139,12 @@ const app = useApp();
 const auth = useAuth();
 const orders = useOrders();
 const genesis = useGenesis();
+async function loadMoreOrderPage() {
+  if (genesis.orderPage.busy) return;
+  const epoch = useApp().accountBindingEpoch;
+  await genesis.loadMoreGenesisOrders();
+  if (epoch === useApp().accountBindingEpoch && genesis.orderPage.error) toast.error(t.value.orders.refreshFailed);
+}
 // Cold H5 loads restore the bearer through the refresh cookie. A protected
 // order read started before that returns AUTH_REQUIRED, which is what left the
 // commerce and genesis panels on "暂时无法确认账号状态" until a reload.
@@ -199,6 +200,7 @@ const orderPanels = computed(() => orderListPanels({
   availability: remoteOrderAvailability.value,
   orderCount: orderList.value.length,
 }));
+const ordersReadFailed = ref(false);
 let refreshEpoch = 0;
 let ordersPageActive = true;
 async function refreshOrders() {
@@ -210,10 +212,10 @@ async function refreshOrders() {
     accountKey: app.accountKey,
     epoch: app.accountBindingEpoch,
   });
+  ordersReadFailed.value = false;
   remoteOrdersRefreshing.value = true;
-  // During a retry, leave the prior per-source failure and its retry control
-  // visible. Reset only for a genuinely new first read (including account
-  // rebind), where an empty list would otherwise be misleading.
+  // Keep the previous source outcome during recovery. A new first read must
+  // not present an empty list as a confirmed result.
   if (!remoteOrdersResolved.value) {
     remoteOrderAvailability.value = "ready";
     commerceOrdersUnavailable.value = false;
@@ -230,16 +232,14 @@ async function refreshOrders() {
     isCurrent: current,
   })();
   if (outcome.availability === "stale") return;
+  ordersReadFailed.value = outcome.commerceUnavailable || outcome.genesisUnavailable;
   commerceOrdersUnavailable.value = outcome.commerceUnavailable;
   genesisOrdersUnavailable.value = outcome.genesisUnavailable;
   remoteOrderAvailability.value = outcome.availability;
   remoteOrdersResolved.value = true;
   remoteOrdersRefreshing.value = false;
 }
-function requestOrdersRefresh() {
-  if (remoteOrdersRefreshing.value) return;
-  void refreshOrders();
-}
+useAutoRecovery({ failed: () => remoteApiEnabled && !remoteOrdersRefreshing.value && ordersReadFailed.value, retry: refreshOrders });
 async function loadMoreOrders() {
   if (orders.loadingMore || !orders.nextCursor) return;
   const request = { accountKey: app.accountKey, epoch: app.accountBindingEpoch };
@@ -255,6 +255,7 @@ async function loadMoreOrders() {
     remoteOrderAvailability.value = genesisOrdersUnavailable.value ? "partial" : "ready";
   } catch {
     if (!current()) return;
+    toast.error(t.value.orders.refreshFailed);
     commerceOrdersUnavailable.value = true;
     remoteOrderAvailability.value = "partial";
   }
@@ -475,5 +476,4 @@ const browseBtnStyle: CSSProperties = {
 .order-card__pay { flex: none; margin-left: auto; }
 @media (prefers-reduced-motion: reduce) { .order-card { transition: none; } .order-card:active { transform: none; } }
 .orders-filter-empty { display: block; padding: 32px 16px; text-align: center; color: var(--v5-ink-3); font: 400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.order-read-retry-label { font: 600 13px/20px var(--font-v5); }
 </style>

@@ -85,10 +85,13 @@
         <text class="tos-cta__t">{{ t.terms.gotIt }}</text>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import { toast } from "@/store/ui";
+import ToastHost from "@/components/toast-host.vue";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBackPress, onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
@@ -300,7 +303,7 @@ function blockRequiredExit(): boolean {
   const now = Date.now();
   if (now - lastRequiredExitNotice >= 3_000) {
     lastRequiredExitNotice = now;
-    uni.showToast({ title: t.value.terms.confirmRequired, icon: "none" });
+    toast.info(t.value.terms.confirmRequired);
   }
   return true;
 }

@@ -26,10 +26,7 @@
       <template v-else-if="cat === 'voucher'">
         <view v-if="voucherInitialLoading" :style="loadingStyle"><text>{{ t.home.networkStatUpdating }}</text></view>
         <template v-else>
-          <view v-if="voucherReadError" class="flex items-center justify-between" :style="remoteErrorStyle">
-            <text>{{ t.authOtp.errorServiceUnavailable }}</text>
-            <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="retryVouchers"><text>{{ t.ui.retry }}</text></view>
-          </view>
+          <view v-if="voucherReadError && !available.length && !expired.length" :style="loadingStyle"><text>—</text></view>
           <!-- An empty voucher wallet is a definite conclusion only after its current remote read. -->
           <EmptyState v-if="voucherKnownEmpty" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
 
@@ -87,10 +84,7 @@
       <!-- ── USDT / NEX reward records (paginated) ── -->
       <template v-else>
         <view class="reward-list-summary"><text class="block">{{ pageTitle }}</text><view class="reward-list-summary__amount"><text><template v-if="categoryTotal !== null"><text v-if="symbol === 'USDT'" class="amount-cur">$</text>{{ formatAmount(categoryTotal).split('.')[0] }}<text class="amount-dec">{{ '.' + formatAmount(categoryTotal).split('.')[1] }}</text></template><template v-else>—</template></text><text class="reward-list-summary__unit">{{ platformDisplayText(symbol) }}</text></view><text class="block reward-list-summary__note">{{ symbol === 'USDT' ? t.rewards.catUsdtDesc : t.rewards.catNexDesc }}</text></view>
-        <view v-if="initialError" class="flex items-center justify-between" :style="remoteErrorStyle">
-          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
-        </view>
+        <view v-if="initialError" :style="loadingStyle"><text>—</text></view>
         <view v-else-if="initialLoading" :style="loadingStyle"><text>…</text></view>
         <EmptyState v-else-if="records.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="fmt(t.empty.rewardsTokenDesc, { asset: platformDisplayText(symbol) })" />
 
@@ -125,14 +119,6 @@
         <view v-if="!fundsServerEnabled" ref="loadMoreSentinel" style="height: 1px" />
         <view v-else ref="scrollAnchor" style="height: 1px" />
         <view v-if="fundsServerEnabled && activePager.loadingMore" :style="loadingStyle" aria-live="polite" aria-busy="true"><text>…</text></view>
-        <view v-if="refreshErrorWithRows" class="flex items-center justify-between" :style="remoteErrorStyle">
-          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshRecords"><text>{{ t.store.catalogRetry }}</text></view>
-        </view>
-        <view v-else-if="appendError" class="flex items-center justify-between" :style="remoteErrorStyle">
-          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="loadMoreRecords"><text>{{ t.store.catalogRetry }}</text></view>
-        </view>
         <view v-if="showManualLoadMore" class="inline-flex items-center active:opacity-70" :style="manualLoadMoreStyle" role="button" tabindex="0" @click="loadMoreRecords"><text>{{ t.receipt.loadMore }}</text></view>
       </template>
     </view>
@@ -140,6 +126,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { toast } from "@/store/ui";
 import NxButton from "@/components/ui/nx-button.vue";
 import { formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
@@ -221,7 +209,8 @@ const voucherInitialLoading = computed(() => remoteApiEnabled
 const voucherReadError = computed(() => remoteApiEnabled && voucher.remoteStatus === "error");
 const voucherKnownEmpty = computed(() => (!remoteApiEnabled || voucher.remoteStatus === "ready")
   && available.value.length === 0 && expired.value.length === 0);
-function retryVouchers() { void voucher.refreshRemote(); }
+function retryVouchers() { return voucher.refreshRemote(); }
+useAutoRecovery({ failed: () => cat.value === "voucher" && voucherReadError.value, retry: retryVouchers });
 
 // ── reward records (per-symbol, newest-first from the ledger) ──
 const symbol = computed(() => (cat.value === "uvt" ? "UVT" : "USDT"));
@@ -242,17 +231,22 @@ const initialLoading = computed(() => fundsServerEnabled && activePager.value.st
 const initialError = computed(() => fundsServerEnabled && activePager.value.status === "error" && records.value.length === 0);
 const refreshErrorWithRows = computed(() => fundsServerEnabled && activePager.value.status === "error" && records.value.length > 0);
 const appendError = computed(() => fundsServerEnabled && activePager.value.status === "ready" && records.value.length > 0 && Boolean(activePager.value.error));
-const showManualLoadMore = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore && !appendError.value && !refreshErrorWithRows.value);
+const showManualLoadMore = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore);
 
 async function refreshRecords() {
   if (!fundsServerEnabled || (cat.value !== "usdt" && cat.value !== "uvt")) return;
   if (!remoteSessionReady.value) return;
   try { await activePager.value.refresh(); } catch { /* the pager retains rows and exposes the error */ }
 }
+useAutoRecovery({
+  failed: () => fundsServerEnabled && (cat.value === "usdt" || cat.value === "uvt")
+    && activePager.value.status === "error" && !activePager.value.loadingMore,
+  retry: refreshRecords,
+});
 async function loadMoreRecords() {
   if (cat.value !== "usdt" && cat.value !== "uvt") return;
   if (fundsServerEnabled) {
-    try { await activePager.value.loadMore(); } catch { /* keep loaded rows visible for retry */ }
+    try { await activePager.value.loadMore(); } catch { toast.error(t.value.walletV3.submitReasonServiceUnavailable); }
     return;
   }
   if (hasMore.value) visibleCount.value = Math.min(records.value.length, visibleCount.value + PAGE_SIZE);

@@ -46,7 +46,7 @@
       </view>
       <view v-if="displayActivityRows.length === 0 && runningCount === 0" class="nx-feed-state">
         <text>{{ remoteFeedStatusText }}</text>
-        <text v-if="app.homeTruthStatus === 'error'" class="nx-feed-retry" role="button" tabindex="0" @click="retryHome" @keydown.enter.stop.prevent="retryHome" @keydown.space.stop.prevent="retryHome">{{ t.ui.retry }}</text>
+
       </view>
     </view>
 
@@ -189,9 +189,6 @@ function activateTabFromKeyboard(nextTab: "activity" | "earnings") {
     if (typeof document === "undefined") return;
     document.getElementById(`home-live-feed-tab-${nextTab}`)?.focus();
   });
-}
-function retryHome() {
-  void app.refreshHomeTruth();
 }
 // Activity opens every task receipt; income opens the bills page filtered to income.
 function goAll() {

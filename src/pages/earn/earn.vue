@@ -35,15 +35,7 @@
             <text v-else class="earn-hero__int">{{ totalInt }}</text>
             <text v-if="totalKnown && !visibility.hidden" class="earn-hero__dec">.{{ totalCents }}</text>
           </view>
-          <!-- 只有**确实请求失败**时才说不可用并给重试;零值已在上面显示为 0(#128)。 -->
-          <view v-if="remoteApiEnabled && app.homeTruthStatus === 'error'" class="earn-hero__recovery" role="status" aria-live="polite">
-            <view class="earn-hero__recovery-copy">
-              <text class="earn-hero__recovery-title">{{ t.earn.summaryUnavailableTitle }}</text>
-              <text class="earn-hero__recovery-body">{{ t.earn.summaryUnavailableBody }}</text>
-            </view>
-            <view class="earn-hero__retry" role="button" tabindex="0" @click="retrySummary" @keydown.enter.prevent="retrySummary" @keydown.space.prevent="retrySummary"><text>{{ t.ui.retry }}</text></view>
-          </view>
-          <text v-else class="earn-hero__nex">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}<text class="earn-hero__nex-unit">UVT</text></text>
+          <text class="earn-hero__nex">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}<text class="earn-hero__nex-unit">UVT</text></text>
         </view>
         <view class="earn-tile earn-tile--half" role="group" :aria-label="t.earn.completedJobs">
           <view class="earn-half__label"><view class="earn-half__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg></view><text>{{ t.earn.completedJobs }}</text></view>
@@ -96,6 +88,7 @@ import { formatUsdOverviewParts } from "@/lib/usd-display";
 import { onUnmounted, computed, nextTick, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useEarnConfig } from "@/store/earn-config";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -143,10 +136,18 @@ const freeTrial = useFreeTrial();
 let earnPageVisible = false;
 let earnObservationEpoch = 0;
 let releaseActiveRefresh = () => {};
+useAutoRecovery({
+  failed: () => remoteApiEnabled && app.homeTruthStatus === "error",
+  retry: () => app.refreshHomeTruth(),
+});
 async function refreshVisibleEarn() {
   if (!earnPageVisible || !remoteApiEnabled) return;
   await Promise.allSettled([
-    freeTrial.refreshRemote(), app.ensureRemoteFleet(), app.ensureHomeTruth(), useEarnConfig().ensure(),
+    freeTrial.refreshRemote(),
+    // Failed reads are awaited by the shared section registry, once each.
+    app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error" ? undefined : app.ensureRemoteFleet(),
+    app.homeTruthStatus === "error" ? undefined : app.ensureHomeTruth(),
+    useEarnConfig().ensure(),
   ]);
 }
 
@@ -199,8 +200,6 @@ watch([() => app.homeTruthStatus, () => app.remoteFleetStatus, () => app.homeTru
   void observeDayOneEarnPage();
 });
 
-/** Retry the summary read itself (Home overview), not just the fleet. */
-function retrySummary() { void app.refreshHomeTruth().catch(() => undefined); }
 function rangeLabel(r: Range): string { return r === "Today" ? t.value.earn.rangeToday : r === "Week" ? t.value.earn.rangeWeek : r === "Month" ? t.value.earn.rangeMonth : t.value.earn.rangeAll; }
 /** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(roving tabindex 的标准行为)。 */
 function moveRange(index: number, delta: number): void {
@@ -231,7 +230,7 @@ const serverPeriod = computed(() => {
 /**
  * A successful Home overview encodes an empty settled-receipt period as three
  * nulls. That is a confirmed zero for every range; a failed/absent overview has
- * no period and stays unknown with the existing retry state. For a partial
+ * no period and stays unknown during automatic recovery. For a partial
  * Today projection, the device snapshot remains the zero-safe fallback. #249
  */
 const serverPeriodValue = computed(() => {
@@ -301,17 +300,10 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 .earn-hero__dec { font-size: 34px; color: var(--v5-ink-3); letter-spacing: -.024em; }
 .earn-hero__nex { position: relative; display: block; margin-top: 10px; font: 600 15px/20px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; }
 .earn-hero__nex-unit { margin-left: 3px; font: 500 12px/16px var(--font-v5); letter-spacing: .04em; }
-.earn-hero__recovery { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
-.earn-hero__recovery-copy { min-width: 0; }
-.earn-hero__recovery-title { display: block; font: 500 12px/18px var(--font-v5); color: var(--v5-danger); }
-.earn-hero__recovery-body { display: block; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
-/* Board spacing (2px); an invisible extension keeps the 44px touch target without taking layout width. */
-.earn-hero__retry { position: relative; flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: 500 13px/18px var(--font-v5); color: var(--v5-brand); cursor: pointer; }
-.earn-hero__retry::after { content: ""; position: absolute; inset: 0 -8px; }
 .earn-tile--half { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 116px; padding: 14px 14px 12px; }
 .earn-tile--link { cursor: pointer; }
 .earn-tile--link:active { opacity: .85; }
-.earn-tile--link:focus-visible, .earn-hero__retry:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.earn-tile--link:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .earn-half__label { display: flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .earn-half__icon { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 7px; background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); color: var(--v5-tech-cyan); }
 .earn-half__count { font: 500 30px/34px var(--font-metric); color: var(--v5-ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }

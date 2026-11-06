@@ -49,6 +49,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { getProductMedia } from "@/lib/product-media";
@@ -66,6 +67,7 @@ import { useTrialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecy
 
 const sheet = useTrialClaimSheet();
 const freeTrial = useFreeTrial();
+useAutoRecovery({ failed: () => remoteApiEnabled && sheet.open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
 const trialView = useTrialPresentation();
 const app = useApp();
 const t = useT();

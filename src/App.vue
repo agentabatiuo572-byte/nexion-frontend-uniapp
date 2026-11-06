@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appReadForeground, appReadOnline, documentReadVisible } from "@/lib/foreground-read";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";
@@ -371,6 +372,24 @@ function stopTrialPoll() {
   }
 }
 
+function installForegroundReadSignals() {
+  // #ifdef H5
+  let outage = false;
+  const syncOnline = () => {
+    const online = navigator.onLine;
+    appReadOnline.value = online;
+    if (!online && !outage) toast.warn(useT().value.ui.networkDisconnected);
+    outage = !online;
+  };
+  const syncDocument = () => { documentReadVisible.value = !document.hidden; };
+  document.addEventListener("visibilitychange", syncDocument);
+  window.addEventListener("online", syncOnline);
+  window.addEventListener("offline", syncOnline);
+  syncDocument();
+  syncOnline();
+  // #endif
+}
+
 // ── ORDER_TICK 6s loop (ports SimulationProvider's ORDER_TICK loop) ──
 // Single global driver that advances every in-flight order one stage on the
 // 6s cadence from the prototype (simulation-provider.tsx:36-64):
@@ -674,10 +693,6 @@ function beginServerSessionRestore(): Promise<boolean> {
     // short of authenticated work, and let the foreground guard retry.
     serverSessionRestoreState = "idle";
     serverSessionRestoreRetryAt = Date.now() + SERVER_SESSION_RESTORE_RETRY_MS;
-    if (!serverSessionRestoreNoticeShown) {
-      serverSessionRestoreNoticeShown = true;
-      toast.warn(useT().value.session.restoreRetryNotice);
-    }
     return false;
   }).finally(() => {
     serverSessionRestoreInFlight = null;
@@ -1215,6 +1230,7 @@ onLaunch(() => {
   // 同样必须在 early return 之前挂 —— 退役路由 / 静态评审页也有输入框。
   installFieldNaming();
   const auth = useAuth();
+  installForegroundReadSignals();
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler(() => {
       // Preserve only the non-secret trace long enough to choose the login explanation.
@@ -1292,6 +1308,7 @@ window.addEventListener("hashchange", () => {
 });
 // #endif
 onShow(() => {
+  appReadForeground.value = true;
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
   // #endif
@@ -1322,6 +1339,7 @@ onShow(() => {
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
+  appReadForeground.value = false;
   if (remoteApiEnabled) useApp().setRemoteTaskForeground(false);
   detachSessionWatch();
   stopBusinessLoops();

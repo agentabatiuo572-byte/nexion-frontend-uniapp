@@ -52,9 +52,10 @@ export interface NetErrorState {
 
 let toastSeq = 0;
 let confirmSeq = 0;
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useUI = defineStore("ui", () => {
-  const toasts = ref<Toast[]>([]);
+  const activeToast = ref<Toast | null>(null);
   const confirmQueue = ref<ConfirmInternal[]>([]);
   const netError = ref<NetErrorState>({
     visible: false,
@@ -64,22 +65,19 @@ export const useUI = defineStore("ui", () => {
   });
 
   function pushToast(t: Omit<Toast, "id" | "durationMs"> & { durationMs?: number }) {
-    // Same kind+title already on screen → replace it (fresh id + timer) instead of
-    // stacking duplicates — rapid repeats (e.g. send rate-limit warning) must show
-    // as ONE refreshed toast. The old timer's dismiss becomes a harmless no-op.
-    const dup = toasts.value.find((x) => x.kind === t.kind && x.title === t.title);
-    if (dup) dismissToast(dup.id);
+    // One toast at a time (design system 3.5.1): a new one replaces the old one and its timer.
+    clearTimeout(toastTimer);
     const id = `tst-${++toastSeq}`;
-    const durationMs = t.durationMs ?? 3200;
-    toasts.value = [...toasts.value, { ...t, id, durationMs }];
+    const durationMs = t.durationMs ?? ((t.kind === "warn" || t.kind === "error" ? 3000 : 2000) + (t.description ? 1000 : 0));
+    activeToast.value = { ...t, id, durationMs };
     if (durationMs > 0) {
-      setTimeout(() => dismissToast(id), durationMs);
+      toastTimer = setTimeout(() => dismissToast(id), durationMs);
     }
     return id;
   }
 
   function dismissToast(id: string) {
-    toasts.value = toasts.value.filter((t) => t.id !== id);
+    if (activeToast.value?.id === id) activeToast.value = null;
   }
 
   function confirm(opts: ConfirmOptions) {
@@ -120,7 +118,7 @@ export const useUI = defineStore("ui", () => {
   }
 
   return {
-    toasts,
+    activeToast,
     confirmQueue,
     netError,
     pushToast,
@@ -136,14 +134,14 @@ export const useUI = defineStore("ui", () => {
 
 // ───── Convenience helpers (importable anywhere, no hook needed) ─────
 export const toast = {
-  success: (title: string, description?: string) =>
-    useUI().pushToast({ kind: "success", title, description }),
-  info: (title: string, description?: string) =>
-    useUI().pushToast({ kind: "info", title, description }),
-  warn: (title: string, description?: string) =>
-    useUI().pushToast({ kind: "warn", title, description }),
-  error: (title: string, description?: string) =>
-    useUI().pushToast({ kind: "error", title, description, durationMs: 4500 }),
+  success: (title: string, description?: string, durationMs?: number) =>
+    useUI().pushToast({ kind: "success", title, description, durationMs }),
+  info: (title: string, description?: string, durationMs?: number) =>
+    useUI().pushToast({ kind: "info", title, description, durationMs }),
+  warn: (title: string, description?: string, durationMs?: number) =>
+    useUI().pushToast({ kind: "warn", title, description, durationMs }),
+  error: (title: string, description?: string, durationMs?: number) =>
+    useUI().pushToast({ kind: "error", title, description, durationMs }),
 };
 
 export const confirm = (opts: ConfirmOptions): Promise<boolean> => useUI().confirm(opts);

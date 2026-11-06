@@ -38,14 +38,7 @@
         </view>
       </template>
 
-      <view v-if="initialError" :style="ledgerErrorStyle">
-        <view class="flex items-center justify-between" style="gap: 12px">
-          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="shrink-0 active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshLedger">
-            <text>{{ t.store.catalogRetry }}</text>
-          </view>
-        </view>
-      </view>
+      <EmptyState v-if="initialError" kind="recoverable-error" :title="t.walletV3.submitReasonServiceUnavailable" :cta-label="t.store.catalogRetry" @cta="refreshLedger" />
 
       <!-- Empty -->
       <view v-else-if="initialLoading" :style="loadingStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
@@ -102,18 +95,6 @@
         </view>
         <view ref="scrollAnchor" style="height: 1px" />
         <view v-if="fundsServerEnabled && activePager.loadingMore" :style="loadingStyle" role="status" aria-live="polite" aria-busy="true"><text>{{ t.wallet.loadingTransactions }}</text></view>
-        <view v-if="refreshErrorWithRows" :style="appendErrorStyle">
-          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="inline-flex items-center active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="refreshLedger">
-            <text>{{ t.store.catalogRetry }}</text>
-          </view>
-        </view>
-        <view v-else-if="appendError" :style="appendErrorStyle">
-          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
-          <view class="inline-flex items-center active:opacity-70 nx-card-recovery-action nx-card-recovery-action--quiet nx-card-recovery-action--inline" role="button" tabindex="0" @click="loadMore">
-            <text>{{ t.store.catalogRetry }}</text>
-          </view>
-        </view>
         <view v-if="showManualLoadMore" class="inline-flex items-center active:opacity-70" :style="manualLoadMoreStyle" role="button" tabindex="0" @click="loadMore">
           <text>{{ t.receipt.loadMore }}</text>
         </view>
@@ -148,6 +129,9 @@
 </template>
 
 <script setup lang="ts">
+import { toast } from "@/store/ui";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { platformDisplayText } from "@/lib/brand-copy";
 
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from "vue";
@@ -189,6 +173,7 @@ watch(() => app.accountBindingEpoch, () => { sourceRefOpen.value = ""; detail.va
 const ledgerBizNo = ref("");
 const locatingReceipt = ref(false);
 let lookupGeneration = 0, visible = true;
+let releaseActiveRefresh = () => {};
 
 type Tab = "all" | "in" | "out" | "reward";
 const TABS: Tab[] = ["all", "in", "out", "reward"];
@@ -237,13 +222,22 @@ async function refreshLedger() {
   } catch { /* pager owns recoverable state */ }
   finally { if (current()) locatingReceipt.value = false; }
 }
+useAutoRecovery({
+  failed: () => fundsServerEnabled && !locatingReceipt.value && !activePager.value.loadingMore
+    && (activePager.value.status === "error" || (!!ledgerBizNo.value && !!activePager.value.error && activePager.value.status !== "loading")),
+  retry: refreshLedger,
+});
 async function loadMore() {
   if (!fundsServerEnabled || !remoteSessionReady.value || !visible || locatingReceipt.value) return;
-  try { await activePager.value.loadMore(); } catch { /* retain rows; render retry */ }
+  try { await activePager.value.loadMore(); } catch { toast.error(t.value.walletV3.submitReasonServiceUnavailable); }
 }
-function invalidateReceiptLookup() { visible = false; lookupGeneration++; locatingReceipt.value = false; }
+function invalidateReceiptLookup() { visible = false; lookupGeneration++; locatingReceipt.value = false; releaseActiveRefresh(); }
 onShow(() => {
-  visible = true; void refreshLedger();
+  visible = true;
+  releaseActiveRefresh();
+  // Receipt lookup can paginate and stays an explicit entry read.
+  releaseActiveRefresh = registerActivePageRefresh(() => ledgerBizNo.value || activePager.value.status === "error" ? undefined : refreshLedger());
+  void refreshLedger();
   if (app.homeTruthStatus === "idle" || app.homeTruthStatus === "error") void app.refreshHomeTruth();
 });
 onHide(invalidateReceiptLookup);
@@ -266,7 +260,7 @@ const initialError = computed(() => fundsServerEnabled && ((Boolean(ledgerBizNo.
   || (activePager.value.status === "error" && activePager.value.rows.length === 0)));
 const refreshErrorWithRows = computed(() => fundsServerEnabled && activePager.value.status === "error" && activePager.value.rows.length > 0);
 const appendError = computed(() => fundsServerEnabled && activePager.value.status === "ready" && activePager.value.rows.length > 0 && Boolean(activePager.value.error));
-const showManualLoadMore = computed(() => fundsServerEnabled && !ledgerBizNo.value && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore && !appendError.value && !refreshErrorWithRows.value);
+const showManualLoadMore = computed(() => fundsServerEnabled && !ledgerBizNo.value && activePager.value.status === "ready" && activePager.value.hasMore && !activePager.value.loadingMore);
 const listEnded = computed(() => !ledgerBizNo.value && (!fundsServerEnabled || (activePager.value.status === "ready" && !activePager.value.hasMore && !activePager.value.error)));
 
 // Overview: the home earnings periods for the selected asset (USDT or UVT).

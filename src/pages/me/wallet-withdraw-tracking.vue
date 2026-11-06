@@ -18,12 +18,7 @@
         <view :style="skelStyle('66%', '34px', '8px')" />
         <view :style="skelStyle('88%', '14px', '12px')" />
       </view>
-      <view v-else-if="trackingReadError" class="px-5 text-center">
-        <text class="block" :style="emptyTextStyle">{{ t.empty.errorDesc }}</text>
-        <view class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" @click.stop="retryTrackedWithdrawal" @keydown.enter.prevent="retryTrackedWithdrawal" @keydown.space.prevent="retryTrackedWithdrawal">
-          <text :style="emptyLinkStyle">{{ t.empty.errorCta }}</text>
-        </view>
-      </view>
+      <EmptyState v-else-if="trackingReadError && !wd" kind="recoverable-error" :title="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="retryTrackedWithdrawal" />
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
       <view v-else-if="!wd" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ deepLinkMiss ? t.wallet.withdrawalNotFound : t.wallet.noActiveWithdrawal }}</text>
@@ -123,6 +118,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
@@ -132,6 +128,7 @@ import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-ap
 import { toCanonicalWithdrawal, type WithdrawalDetailSnapshot, type WithdrawalPolicy } from "@/api/withdrawal-api";
 import { mockServerNow } from "@/store/server-time";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
+import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -240,14 +237,15 @@ function openBankTracking() {
 }
 watch(() => wd.value, openBankTracking);
 
-function refreshTrackedWithdrawal(): void {
-  if (deepLinkId.value) void trackedWithdrawalRead.refresh();
-  else if (remoteApiEnabled && app.remoteWithdrawalListStatus !== "loading") void app.refreshRemoteWithdrawalList();
+async function refreshTrackedWithdrawal(): Promise<void> {
+  if (deepLinkId.value) await trackedWithdrawalRead.refresh();
+  else if (remoteApiEnabled && app.remoteWithdrawalListStatus !== "loading") await app.refreshRemoteWithdrawalList();
 }
 
-function retryTrackedWithdrawal(): void {
-  refreshTrackedWithdrawal();
+function retryTrackedWithdrawal(): Promise<void> {
+  return refreshTrackedWithdrawal();
 }
+useAutoRecovery({ failed: () => trackingReadError.value && trackingReadStatus.value !== "loading" && app.remoteWithdrawalListStatus !== "loading", retry: retryTrackedWithdrawal });
 
 watch(
   () => [deepLinkId.value, app.accountKey, app.accountBindingEpoch] as const,

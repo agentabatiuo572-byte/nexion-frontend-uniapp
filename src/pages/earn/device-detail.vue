@@ -61,6 +61,8 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -86,6 +88,7 @@ const expanded = ref(true);
 const requestedSection = ref('');
 const fleetReadStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 let fleetReadSequence = 0;
+useAutoRecovery({ failed: () => remoteApiEnabled && !useSlotActionSheet().open && fleetReadStatus.value !== "loading" && (fleetReadStatus.value === "error" || app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error"), retry: retryFleet });
 
 onLoad((options) => {
   const routeOptions = (options || {}) as Record<string, string>;

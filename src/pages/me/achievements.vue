@@ -10,7 +10,7 @@
     <view class="growth-achievements" style="padding-bottom: 24px">
       <SubPageHeader v-if="!embedded" back="/pages/me/me" />
 
-      <view v-if="total !== 0" class="achievement-summary mx-4">
+      <view v-if="total !== 0 && !(remoteApiEnabled && remoteError && !remoteSnapshot)" class="achievement-summary mx-4">
         <GrowthProgress ring :size="82" :stroke="9" :value="percent" :label="percentLabel"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="1.8"><circle cx="12" cy="9" r="6" /><path d="m8 14-2 7 6-3 6 3-2-7" /></svg></GrowthProgress>
         <view><text class="block" :style="heroLabelStyle">{{ w.progress }}</text><view class="achievement-summary__count">{{ unlocked ?? '—' }} <text>/ {{ total === null ? '—' : total }}</text></view><text class="block" :style="heroLabelStyle">{{ percent === null ? '—' : fmt(t.growthUi.achievementCompleted, {n:percent}) }}</text></view>
       </view>
@@ -20,16 +20,10 @@
         <view v-if="remoteLoading && !remoteSnapshot" class="nx-glass-card mx-4" :style="listStyle">
           <text class="block" style="padding: 18px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ w.remoteLoading }}</text>
         </view>
-        <view v-else-if="remoteError" class="nx-glass-card mx-4" :style="listStyle">
-          <text class="block" style="padding: 18px 18px 6px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ w.remoteUnavailable }}</text>
-          <view class="active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" :aria-label="w.retry" @click="refreshRemote">
-            <text>{{ w.retry }}</text>
-          </view>
-        </view>
+        <EmptyState v-else-if="remoteError && !remoteSnapshot" kind="recoverable-error" :title="w.remoteUnavailable" :cta-label="w.retry" @cta="refreshRemote" />
         <template v-if="remoteSnapshot">
-          <view v-if="!remoteGroups.length && !remoteError" class="mx-4" style="padding:var(--v5-space-6) 0;color:var(--v5-ink-3)" role="status">
+          <view v-if="!remoteGroups.length" class="mx-4" style="padding:var(--v5-space-6) 0;color:var(--v5-ink-3)" role="status">
             <text class="block">{{ emptyAchievements }}</text>
-            <view role="button" tabindex="0" :style="retryBtnStyle" @click="refreshRemote"><text>{{ w.retry }}</text></view>
           </view>
           <view v-for="grp in remoteGroups" :key="grp.key" class="mx-4">
             <text class="block" :style="catHeadStyle">{{ grp.label }}</text>
@@ -116,6 +110,8 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from "@/components/empty-state.vue";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 const { embedded = false } = defineProps<{ embedded?: boolean }>();
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { onMounted, computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
@@ -242,10 +238,13 @@ async function refreshRemote() {
   } else {
     remoteFailure.value = result.failure;
     remoteError.value = true;
-    if (remoteSnapshot.value) toast.warn(w.value.remoteUnavailable);
   }
   remoteLoading.value = false;
 }
+useAutoRecovery({
+  failed: () => remoteApiEnabled && remoteError.value && !remoteLoading.value,
+  retry: refreshRemote,
+});
 
 onMounted(() => {
   if (!embedded) return;

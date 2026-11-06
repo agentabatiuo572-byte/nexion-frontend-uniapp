@@ -3,13 +3,13 @@
   Lite 两格:注册用户 / 在线设备(不含按绑定手机算力的个人排名)。
 -->
 <template>
-  <NxSection v-if="compactView && compactAvailable" :title="t.home.networkPulseTitle" :action="copy.details" action-icon-only @action="navTo('/pages/globe/globe')" data-home-section="network">
+  <NxSection v-if="compactView" :title="t.home.networkPulseTitle" :action="copy.details" action-icon-only @action="navTo('/pages/globe/globe')" data-home-section="network">
     <view class="network-compact">
       <view v-for="(m,i) in metrics" :key="m.k" class="network-compact__cell" :role="m.tap ? 'button' : undefined" :tabindex="m.tap ? 0 : -1" @click="activate(m.tap)" @keydown.enter.prevent="activate(m.tap)" @keydown.space.prevent="activate(m.tap)">
         <text class="network-compact__label">{{ m.k }}</text>
         <text class="network-compact__value" :style="m.vSize ? {fontSize:m.vSize} : {}">{{ m.v }}</text>
-        <text v-if="m.subTap" class="network-compact__retry" role="button" tabindex="0" @click.stop="m.subTap()" @keydown.enter.stop.prevent="m.subTap()" @keydown.space.stop.prevent="m.subTap()">{{ m.sub }}</text>
-        <text v-else-if="m.v === '-'" class="network-compact__retry">{{ m.sub }}</text>
+
+
       </view>
     </view>
   </NxSection>
@@ -44,19 +44,9 @@
               class="block mt-0.5 tabular-nums"
               :style="{ fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: m.vSize ?? '20px', color: m.tone, letterSpacing: '-0.014em', lineHeight: 1.05, whiteSpace: 'nowrap' }"
             >{{ m.v }}</text>
-            <!-- Retry has its own tap target; explanation uses the whole rank cell. -->
-            <text
-              v-if="m.subTap"
-              class="block mt-1 truncate active:opacity-70"
-              role="button"
-              tabindex="0"
-              :style="{ font: '600 13px/20px var(--font-v5)', color: m.subTone ?? 'var(--v5-ink-4)', padding: '14px 0', margin: '-14px 0' }"
-              @click.stop="m.subTap()"
 
-              @keydown.enter.stop.prevent="activate(m.subTap)" @keydown.space.stop.prevent="activate(m.subTap)"
-            >{{ m.sub }}</text>
             <text
-              v-else
+              v-if="m.sub"
               class="block mt-1 font-mono-tabular truncate"
               :style="{ fontSize: '12px', color: m.subTone ?? 'var(--v5-ink-4)' }"
             >{{ m.sub }}</text>
@@ -68,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
@@ -80,6 +71,7 @@ import { navTo } from "@/lib/route";
 
 const t = useT();
 const cfg = useConfig();
+useAutoRecovery({ failed: () => cfg.syncFailed && !cfg.loading, retry: () => cfg.load() });
 
 // 🔴 骨架防闪的真机制(R2 审计后改):**有活数据的格永不切骨架**(stale-while-revalidate,
 //   下拉链 await 900ms 后 load 600ms,600>300 恒成立,纯时长防抖必被击穿)。
@@ -97,15 +89,7 @@ watch(() => cfg.loading, (l) => {
 });
 onUnmounted(() => { if (skeletonTimer !== null) clearTimeout(skeletonTimer); }); // R3 P2 卫生债
 
-// Lite: no personal rank cell. The App ranks the bound phone's compute, which the web does not run (rule 1);
-// the summary shows the two shared network figures and appears when both are usable.
-const compactAvailable = computed(() => {
-  const members = props.estimated ? props.registeredDisplay : cfg.config.networkPulse?.registeredUsers;
-  const devices = cfg.config.networkPulse?.onlineDevices;
-  return !cfg.syncFailed
-    && typeof members === 'number' && Number.isSafeInteger(members) && members >= 0
-    && typeof devices === 'number' && Number.isSafeInteger(devices) && devices >= 0;
-});
+// Lite keeps only the shared network figures, with placeholders while reads recover.
 
 interface Cell {
   k: string;
@@ -118,24 +102,22 @@ interface Cell {
   color?: string;
   skeleton?: boolean; // 只属占位格:健康格有活数据,刷新期间保持旧值(stale-while-revalidate),不糊骨架
   tap?: () => void;
-  subTap?: () => void;
 }
 
 function activate(action?: () => void) {
   action?.();
 }
 
-function placeholderCell(label: string, retry?: () => void, skeleton = showSkeleton.value): Cell {
+function placeholderCell(label: string, skeleton = showSkeleton.value): Cell {
   return {
     k: label,
-    v: "-",
+    v: "—",
     vSize: "12.5px",
     tone: "var(--v5-ink-3)",
-    sub: t.value.home.networkStatRetry,
+    sub: "",
     subTone: "var(--v5-tech-cyan-ink)",
     data: null,
     skeleton,
-    tap: retry ?? (() => { void cfg.load(); }),
   };
 }
 

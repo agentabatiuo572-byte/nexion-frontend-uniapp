@@ -1,27 +1,6 @@
-<!--
-  ThemePickerSheet — centered modal for choosing the appearance mode
-  (light / dark / system). Opened from the /me theme settings row; applies the
-  choice immediately via the theme store (setMode → data-theme on H5) and closes.
-
-  Centered-modal范式(scrim flex-centers panel, both `nx-sheet-fade-in`, prop
-  `open` / emit `close`, P-032 page-mounted) — same convention as global-ui.vue
-  nx-mask/nx-modal. Overlay z-index 790/800 对齐主流 sheet(trial-claim / slot-action
-  等),盖过 chassis header/tabbar/客服浮标(z 90–110);device-deactivate 的 79/80 会被那些
-  chrome 浮在遮罩之上,勿照抄。
-  Device-local preference — no backend call.
--->
+<!-- Appearance choices apply immediately; the shared bottom sheet owns dismissal. -->
 <template>
-  <view v-if="open" class="nx-theme-picker-root" role="dialog" aria-modal="true" :aria-label="t.me.themePickerTitle">
-    <view class="nx-sheet-fade-in" :style="scrimStyle" @click="emit('close')">
-      <view class="nx-glass-sheet nx-dialog-pop-in" :style="panelStyle" @click.stop>
-        <!-- Title row -->
-        <view class="flex items-start justify-between" style="gap: 12px; margin-bottom: 14px">
-          <text class="block" :style="titleStyle">{{ t.me.themePickerTitle }}</text>
-          <view class="grid place-items-center shrink-0 active:opacity-60" :style="closeBtnStyle" data-me-action="theme-close" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-          </view>
-        </view>
-
+  <NxSheet :open="open" :title="t.me.themePickerTitle" native-back class="nx-theme-picker-root" @close="emit('close')">
         <GlassSegments :model-value="theme.mode" :options="glassOptions" layout="vertical" semantics="radio" class="nx-theme-options" :label="t.me.themePickerTitle" @select="choose">
           <template #option="{ option, selected }">
             <view class="grid place-items-center shrink-0" :style="iconChipStyle(option.value as ThemeMode)">
@@ -33,23 +12,20 @@
             <svg v-if="selected" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           </template>
         </GlassSegments>
-      </view>
-    </view>
-  </view>
+  </NxSheet>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, type CSSProperties } from "vue";
-import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { computed, type CSSProperties } from "vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { useTheme, type ThemeMode } from "@/store/theme";
 
-const props = defineProps<{ open: boolean }>();
+defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const t = useT();
 const theme = useTheme();
-useDialogA11y(computed(() => props.open), ".nx-theme-picker-root", () => emit("close"), true);
 
 const SUN = ["M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41", "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8"];
 const MOON = ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"];
@@ -70,65 +46,6 @@ function choose(next: ThemeMode, reason = "activation") {
   if (reason !== "arrow") emit("close");
 }
 
-function moveTheme(index: number, step: number) {
-  const next = options.value[(index + step + options.value.length) % options.value.length];
-  if (!next) return;
-  theme.setMode(next.mode);
-  void nextTick(() => {
-    if (typeof document === "undefined") return;
-    document.querySelector<HTMLElement>(`.nx-theme-picker-root [role="radio"][aria-checked="true"]`)?.focus();
-  });
-}
-
-// ── styles ──
-const scrimStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 790,
-  background: "rgba(8,8,12,0.45)",
-  backdropFilter: "blur(8px) saturate(150%)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxSizing: "border-box",
-  padding: "max(24px, var(--nx-overlay-top)) 24px var(--nx-overlay-bottom)",
-};
-const panelStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  width: "100%",
-  maxWidth: "320px",
-  boxSizing: "border-box",
-  maxHeight: "calc(100vh - max(24px, var(--nx-overlay-top)) - var(--nx-overlay-bottom))",
-  overflowY: "auto",
-  overscrollBehavior: "contain",
-  zIndex: 800,
-  borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-  border: "none",
-  padding: "18px 16px 20px",
-};
-const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-hero-title)",
-  fontWeight: "var(--ui-type-hero-title-weight)",
-  color: "var(--v5-ink)",
-};
-const closeBtnStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-};
-function optionStyle(m: ThemeMode): CSSProperties {
-  const on = isActive(m);
-  return {
-    gap: "12px",
-    minHeight: "52px",
-    marginTop: "8px",
-    padding: "0 14px",
-    borderRadius: "14px",
-    background: on ? "color-mix(in srgb, var(--v5-brand) 12%, transparent)" : "var(--v5-surface-2)",
-  };
-}
 function iconChipStyle(m: ThemeMode): CSSProperties {
   const on = isActive(m);
   return {

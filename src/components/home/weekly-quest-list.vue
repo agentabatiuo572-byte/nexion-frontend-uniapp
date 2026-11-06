@@ -6,11 +6,9 @@
       <view :style="{ width: row === 2 ? '56%' : '72%', height: '12px', borderRadius: '4px', background: 'var(--v5-surface-2)' }" />
     </view>
   </view>
-  <view v-else-if="mounted && wq.error && !wq.snapshot" class="nx-glass-card mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
-    <text :style="pendingLabelStyle">{{ w.loadError }}</text>
-  </view>
+
   <view v-else-if="mounted && !wq.snapshot" class="nx-glass-card mx-4 mt-3 px-4 py-3" :style="cardStyle">
-    <text :style="pendingLabelStyle">{{ w.loading }}</text>
+    <text :style="pendingLabelStyle">{{ w.tier2Label }}</text><text class="block">—</text>
   </view>
   <view v-else-if="mounted" class="nx-glass-card mx-4 mt-3 overflow-hidden" :style="cardStyle">
     <!-- Header -->
@@ -22,9 +20,7 @@
       </view>
     </view>
 
-    <view v-if="wq.error && !wq.claimErrorQuestCode" class="px-4 py-2 active:opacity-70" role="button" tabindex="0" :style="refreshErrorStyle" @click="retry">
-      <text>{{ w.refreshError }}</text>
-    </view>
+
 
     <!-- Quest rows -->
     <view>
@@ -71,7 +67,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: -2px; flex-shrink: 0"><path d="m9 6 6 6-6 6" /></svg>
         </view>
       </view>
-      <view v-if="tier2Quests.length === 0" class="px-4 py-3" :style="pendingLabelStyle" @click="retry">
+      <view v-if="tier2Quests.length === 0" class="px-4 py-3" :style="pendingLabelStyle">
         {{ w.empty }}
       </view>
     </view>
@@ -81,6 +77,9 @@
 
 <script setup lang="ts">
 import { isLiteQuest } from "@/lib/lite-scope";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
@@ -108,11 +107,21 @@ const stakingDisplay = useConfig();
 const locale = useLocaleStore();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
+const weeklyReadFailed = ref(false);
+async function refreshWeekly() {
+  const epoch = useApp().accountBindingEpoch;
+  weeklyReadFailed.value = false;
+  const ready = await wq.refresh();
+  if (epoch !== useApp().accountBindingEpoch) return;
+  weeklyReadFailed.value = !ready && !!wq.error && !wq.claimErrorQuestCode;
+  mounted.value = true;
+}
+useAutoRecovery({ failed: () => remoteApiEnabled && weeklyReadFailed.value && !wq.loading && !wq.claimErrorQuestCode, retry: refreshWeekly });
 const mounted = ref(false);
 const nowTick = useNow();
 
 const weeklyQuestVisibility = createPageVisibilityRefresh(() => {
-  void wq.refresh().finally(() => { mounted.value = true; });
+  void refreshWeekly();
 });
 bindPageVisibilityRefresh(weeklyQuestVisibility, {
   mounted: (callback) => onMounted(callback),
@@ -210,9 +219,6 @@ function onRowCta(q: CanonicalQuest) {
   navTo(q.actionRoute);
 }
 
-function retry() {
-  void wq.refresh();
-}
 
 async function onClaimRow(q: CanonicalQuest) {
   const claimed = await wq.claim(q);

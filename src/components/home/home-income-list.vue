@@ -20,11 +20,12 @@
   </view>
   <view v-else class="nx-feed-state">
     <text>{{ stateText }}</text>
-    <text v-if="pager.status === 'error'" class="nx-feed-retry" role="button" tabindex="0" @click="refresh" @keydown.enter.stop.prevent="refresh">{{ t.ui.retry }}</text>
+
   </view>
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
@@ -47,6 +48,7 @@ const t = useT();
 const visibility = useDataVisibility();
 const billsStore = useBills();
 const pager = billsStore.getLedger({ direction: "IN" });
+useAutoRecovery({ failed: () => fundsServerEnabled && props.active && pager.status === "error", retry: () => runPassiveTabRead("bills-income", () => pager.refresh(), undefined, () => pager.status === "ready") });
 const rows = computed(() => (fundsServerEnabled ? pager.rows : billsStore.bills.filter(bill => bill.amount > 0)).slice(0, ROWS));
 const stateText = computed(() => fundsServerEnabled && (pager.status === "idle" || pager.status === "loading") ? t.value.home.networkStatUpdating
   : fundsServerEnabled && pager.status === "error" ? t.value.uiChrome.unavailable : t.value.home.incomeEmpty);

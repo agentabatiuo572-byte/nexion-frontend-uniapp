@@ -25,29 +25,29 @@
             <text class="referral-summary__rule">{{ copy.giftRule }}</text>
           </view>
           <text class="referral-activity-title">{{ copy.myGifts }}</text>
-          <view v-if="progressErrors[activity.activityId]" class="nx-inline-recovery"><text class="promotion-copy nx-inline-recovery__copy" role="alert">{{ t.promotion.error }}</text><NxButton class="referral-retry nx-inline-recovery__action" variant="text" size="medium" :busy="progressBusy[activity.activityId]" :label="t.promotion.retry" @click="loadProgress(activity.activityId,true)" /></view>
-          <RewardRows v-else-if="progress[activity.activityId]?.ownRewards.length" :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
+          <RewardRows v-if="progress[activity.activityId]?.ownRewards.length" :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
           <view v-else class="referral-empty" role="status">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18v4H3zM5 12v9h14v-9M12 8v13M12 8C6 8 5 5 7 3c2-2 5 2 5 5M12 8c6 0 7-3 5-5-2-2-5 2-5 5" /></svg>
-            <text>{{ !progress[activity.activityId] && progressBusy[activity.activityId] ? t.promotion.loading : copy.noRewardRecords }}</text>
+            <text>{{ !progress[activity.activityId] ? progressBusy[activity.activityId] ? t.promotion.loading : '—' : copy.noRewardRecords }}</text>
           </view>
           <view class="referral-rule-link" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
           <NxButton class="referral-share" variant="primary" :label="copy.inviteFriends" @click="emit('share')" />
         </view>
       </NxSheet>
     </view>
-    <!-- Lite: a referral offer whose rules all give a phone is not advertised; the user's earned rewards from it stay readable. -->
+    <!-- Lite: phone-only offers stay hidden; previously earned rewards remain readable. -->
     <view v-for="activity in earnedRecords" :key="'records:'+activity.activityId" class="referral-activity referral-records" :data-activity-id="activity.activityId">
       <text class="referral-activity-title">{{ copy.myGifts }}</text>
       <RewardRows v-if="progress[activity.activityId]" :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
-      <view v-else class="nx-inline-recovery"><text class="promotion-copy nx-inline-recovery__copy" role="alert">{{ t.promotion.error }}</text><NxButton class="referral-retry nx-inline-recovery__action" variant="text" size="medium" :busy="progressBusy[activity.activityId]" :label="t.promotion.retry" @click="loadProgress(activity.activityId)" /></view>
+      <text v-else class="promotion-copy" role="status">{{ progressBusy[activity.activityId] ? t.promotion.loading : '—' }}</text>
     </view>
-    <view v-if="error" class="referral-recovery nx-inline-recovery"><text class="promotion-copy nx-inline-recovery__copy" role="alert">{{ t.promotion.error }}</text><NxButton class="referral-retry nx-inline-recovery__action" variant="text" size="medium" :busy="loading" :label="t.promotion.retry" @click="loadActivities(true)"><text>{{ t.promotion.retry }}</text><text aria-hidden="true">→</text></NxButton></view>
+    <view v-if="error && !activities.length && !earnedRecords.length" class="referral-activity"><text class="referral-title">{{ copy.firstPurchase }}</text><text class="referral-number">—</text></view>
     <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text><text aria-hidden="true">→</text></NxButton>
     <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="localized(termsActivity?.terms,locale.code)" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import{computed,ref,watch,onBeforeUnmount}from'vue';import{promotionApi,remoteApiEnabled,sessionVault}from'@/api/runtime';import type{PublicPromotion,ReferralProgress}from'@/api/promotion-contracts';import{useApp}from'@/store/app';import{useAuth}from'@/store/auth';import{useT}from'@/i18n/use-t';import{useLocaleStore}from'@/store/locale';import{localized}from'@/lib/promotion-display';import RewardRows from'./reward-rows.vue';
 import { onHide,onShow } from '@/composables/use-tab-page-lifecycle';
@@ -93,7 +93,7 @@ function referralImageProps(activity:PublicPromotion){
   return {sku:slot?.sku,imageUrl:auth.isAuthenticated&&readable&&slot?getProduct(slot.sku)?.imageUrl:undefined,
     scopeKey:activity.activityId+':purchase',refreshKey:JSON.stringify([activity.version,imageRefresh.value[activity.activityId]])};
 }
-function qualifyingCount(id:string){return progressErrors.value[id]?'-':progress.value[id]?.qualifyingOrders??'-';}
+function qualifyingCount(id:string){return progress.value[id]?.qualifyingOrders??'—';}
 function showProgress(id:string){if(!visible||progressBusy.value[id]||!auth.isAuthenticated)return;expandedActivity.value=expandedActivity.value===id?null:id;if(expandedActivity.value)void loadProgress(id,true);}
 function currentRead(){const request=generation,account=app.accountKey,epoch=app.accountBindingEpoch,authenticated=auth.isAuthenticated,language=locale.code,readScope=passiveTabReadScope();return()=>alive&&visible&&request===generation&&account===app.accountKey&&epoch===app.accountBindingEpoch&&authenticated===auth.isAuthenticated&&language===locale.code&&readScope===passiveTabReadScope();}
 function clearRead(preserveExpanded=true){
@@ -143,6 +143,11 @@ watch(readIdentity,()=>{if(visible)void loadActivities(true,true);},{immediate:t
 onShow(()=>{visible=true;startProgressUpdates();void loadActivities(true,true);});
 onHide(()=>{visible=false;stopProgressUpdates();generation++;progressBusy.value={};loading.value=false;termsActivity.value=null;});
 onBeforeUnmount(()=>{alive=false;visible=false;stopProgressUpdates();generation++;});
+useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value, retry: () => loadActivities(true) });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && auth.isAuthenticated && !loading.value && Object.keys(progressErrors.value).some(id => progressErrors.value[id] && !progressBusy.value[id]),
+  retry: () => Promise.all(Object.keys(progressErrors.value).filter(id => progressErrors.value[id] && !progressBusy.value[id]).map(id => loadProgress(id, true))),
+});
 </script>
 <style src="./promotion.css"></style>
 <style scoped>

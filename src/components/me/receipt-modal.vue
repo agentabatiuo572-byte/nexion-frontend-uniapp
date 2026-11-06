@@ -5,25 +5,17 @@
   slide-up card (nx-step-in, tokens.css). Sections rendered generically from a
   computed `sections` descriptor (the source's Row/RowCopy/Section/DetailsRows
   components collapse into {k, v, accent, muted, strong, copyValue, hint} rows).
-  framer AnimatePresence → v-if + CSS. ESC handler dropped (mobile).
+  The shared NxSheet handles scroll, focus, Escape and native Back.
   Tap-to-copy on hash/signature/wallet rows (uni.setClipboardData + toast +
   transient ✓ icon, mirrors prototype RowCopy). Driven by
   :receipt prop (null = hidden) + @close emit (P-032: page-mounted sheet,
   prop/emit — no chassis-level overlay host).
 -->
 <template>
-  <view v-if="receipt" class="nx-receipt-modal-root" role="dialog" aria-modal="true" :aria-label="receiptTitle">
-    <view class="nx-receipt-scrim" :style="scrimStyle" @click="emit('close')">
-    <view class="nx-step-in" :style="sheetStyle" @click.stop>
-      <!-- Close -->
-      <view class="grid place-items-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-      </view>
-
+  <NxSheet :open="receipt !== null" :title="receiptTitle" native-back class="nx-receipt-modal-root" style="z-index: 1000" @close="emit('close')">
       <!-- Header -->
       <view :style="headerStyle">
-        <text class="block" :style="headerKickerStyle">{{ receiptTitle }}</text>
-        <view class="flex items-center" style="margin-top: 8px; gap: 8px">
+        <view class="flex items-center" style="gap: 8px">
           <text v-if="isReceiptSettled" class="inline-flex items-center" :style="stampStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="margin-left: 4px">{{ isSimulatedReceipt ? copy.posted : t.receipt.stampVerified }}</text>
@@ -77,9 +69,7 @@
         </view>
       </view>
       </view>
-    </view>
-  </view>
-  </view>
+  </NxSheet>
 </template>
 
 <script setup lang="ts">
@@ -87,7 +77,7 @@ import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { receiptLine } from "@/lib/receipt-line";
 import { computed, ref, onUnmounted, type CSSProperties } from "vue";
-import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import NxSheet from "@/components/ui/nx-sheet.vue";
 import type { Receipt, ReceiptDetails } from "@/mock/receipt";
 import { shortenHex } from "@/mock/receipt";
 import type { CanonicalComputeReceipt } from "@/api/task-assignment-api";
@@ -131,7 +121,6 @@ function fieldLabel(key: string): string {
   return fieldLabels[receiptLocale.value][key] ?? key;
 }
 const identifierFields = new Set(["receipt_no","task_no","compliance_id","job_id","device_instance","gpu_fingerprint","block"]);
-useDialogA11y(computed(() => props.receipt !== null), ".nx-receipt-modal-root", () => emit("close"), true);
 // "KY" = 存量验证类回执(机制已删,历史数据保留可查 —— 白名单字段)。
 function isCanonicalComputeReceipt(
   receipt: Receipt | CanonicalComputeReceipt,
@@ -446,56 +435,12 @@ function fmtDate(ts: number | null): string {
 }
 
 // ── styles ──
-const scrimStyle: CSSProperties = {
-  position: "fixed",
-  left: "0",
-  right: "0",
-  top: "0",
-  bottom: "0",
-  zIndex: 1000,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxSizing: "border-box",
-  padding: "var(--nx-overlay-top) 16px var(--nx-overlay-bottom)",
-  background: "rgba(0,0,0,0.7)",
-};
-const sheetStyle: CSSProperties = {
-  position: "relative",
-  width: "100%",
-  maxWidth: "480px",
-  boxSizing: "border-box",
-  maxHeight: "min(85vh, calc(100vh - var(--nx-overlay-top) - var(--nx-overlay-bottom)))",
-  display: "flex",
-  flexDirection: "column",
-  overflow: "hidden",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-surface-2)",
-  borderRadius: "16px",
-  fontFamily: "var(--font-v5)",
-  color: "var(--v5-ink)",
-};
-const closeBtnStyle: CSSProperties = {
-  position: "absolute",
-  top: "8px",
-  right: "8px",
-  width: "44px",
-  height: "44px",
-  borderRadius: "999px",
-  zIndex: 10,
-};
 const headerStyle: CSSProperties = {
-  padding: "20px 60px 16px 20px",
+  padding: "16px 20px",
   flexShrink: 0,
   borderBottom: "1px solid color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
 };
-const headerKickerStyle: CSSProperties = {
-  fontSize: "19px",
-  fontWeight: 600,
-  lineHeight: 1.4,
-  color: "var(--v5-ink)",
-};
-const bodyStyle: CSSProperties = { minHeight: 0, overflowX: "hidden", overflowY: "auto", overscrollBehavior: "contain", paddingBottom: "16px" };
+const bodyStyle: CSSProperties = { paddingBottom: "16px" };
 const summaryStyle: CSSProperties = { padding: "20px", borderBottom: "1px solid var(--v5-border)" };
 const stampStyle = computed<CSSProperties>(() => ({
   alignItems: "center",
@@ -544,6 +489,7 @@ const copyRowStyle: CSSProperties = { gap: "6px", minHeight: "44px", minWidth: 0
 </script>
 
 <style scoped>
+.nx-receipt-modal-root :deep(.nx-sheet__body) { padding: 0; }
 .nx-receipt-line {
   display: block;
   min-width: 0;

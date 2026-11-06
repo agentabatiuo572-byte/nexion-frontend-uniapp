@@ -12,17 +12,11 @@
         <template #actionIcon><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z" /><path d="M14 3.5V8h4M9.5 12h5M9.5 15.5h5" /></svg></template>
       </SubPageHeader>
 
-      <!-- First read: keep the page structure; a failure says so in place, with no reward shown. -->
-      <view v-if="!activity" class="lp-body" :role="status === 'error' ? undefined : 'status'" :aria-busy="status !== 'error'" :aria-label="status === 'error' ? undefined : t.promotion.loading">
+      <EmptyState v-if="!activity && status === 'error'" kind="recoverable-error" :title="c.loadError" :desc="c.loadErrorNote" :cta-label="c.retry" @cta="retry" />
+      <view v-else-if="!activity" class="lp-body" role="status" aria-busy="true" :aria-label="t.promotion.loading">
         <view class="lp-tags"><view class="lp-skel lp-skel--tag" /><view class="lp-skel lp-skel--chip" /></view>
         <view class="lp-skel lp-skel--title" />
-        <view class="lp-skel-card">
-          <template v-if="status === 'error'"><text class="lp-skel-card__label">{{ c.rewardLabel }}</text><text class="lp-skel-card__value">—</text></template>
-        </view>
-        <view v-if="status === 'error'" class="lp-recovery nx-inline-recovery" role="alert">
-          <view class="nx-inline-recovery__copy"><text class="lp-recovery__title">{{ c.loadError }}</text><text class="lp-recovery__note">{{ c.loadErrorNote }}</text></view>
-          <view class="nx-inline-recovery__action nx-card-recovery-action nx-card-recovery-action--inline lp-recovery__retry" role="button" tabindex="0" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry"><text>{{ c.retry }}</text></view>
-        </view>
+        <view class="lp-skel-card" />
       </view>
 
       <view v-else class="lp-body">
@@ -209,6 +203,8 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from "@/components/empty-state.vue";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app';
 import AppChassis from '@/components/app-chassis.vue';
@@ -235,6 +231,7 @@ import { getProductMedia } from '@/lib/product-media';
 const app = useApp(), locale = useLocaleStore(), t = useT();
 const c = computed(() => landingCopy(locale.code));
 const activity = ref<PublicPromotion | null>(null), status = ref<'loading' | 'ready' | 'error'>('loading');
+const reading = ref(false);
 const readAt = ref(0), now = ref(0), pageVisible = ref(false), termsOpen = ref(false);
 const firstOfferId = ref<string | null>(null);
 const fence = createPromotionReadFence();
@@ -451,6 +448,7 @@ async function load() {
   if (!pageVisible.value) return;
   const ticket = fence.next(), identity = readIdentity(), signedIn = !!sessionVault.read();
   if (!activityId || !remoteApiEnabled) { status.value = 'error'; return; }
+  reading.value = true;
   if (!activity.value) status.value = 'loading';
   // Join the shared catalog read so names, prices and images match the store.
   const catalogRead = signedIn ? refreshProductCatalog() : Promise.resolve(true);
@@ -468,6 +466,8 @@ async function load() {
     // A refused session drops the old account's view; any other failure keeps a shown offer as it was.
     if (cause instanceof Error && 'status' in cause && (cause.status === 401 || cause.status === 403)) activity.value = null;
     status.value = 'error';
+  } finally {
+    if (fence.current(ticket) && identity === readIdentity()) reading.value = false;
   }
 }
 // Reads on until the first running first-purchase offer; the list has no template filter.
@@ -513,6 +513,7 @@ watch([activity, readAt, pageVisible], () => {
 onShow(() => { pageVisible.value = true; void load(); });
 onHide(() => { pageVisible.value = false; fence.invalidate(); termsOpen.value = false; });
 onBeforeUnmount(() => { pageVisible.value = false; fence.invalidate(); if (ticker !== null) clearInterval(ticker); if (boundary !== null) clearTimeout(boundary); });
+useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value === 'error' && !reading.value, retry: load });
 </script>
 
 <style src="../../components/promotion/promotion.css"></style>

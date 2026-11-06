@@ -75,12 +75,7 @@
         <view v-else-if="spin.remoteLoading && spin.phase === 'idle'" class="lss-nospin" role="status">
           <text class="lss-nospin-title">{{ statusCopy.loading }}</text>
         </view>
-        <view v-else-if="spin.remoteError && spin.phase === 'idle'" class="lss-nospin">
-          <text class="lss-nospin-title">{{ t.events.loadErrorTitle }}</text>
-          <view class="lss-earn-cta" role="button" tabindex="0" @click="spin.refreshRemoteState()">
-            <text class="lss-earn-cta-t">{{ t.events.retry }}</text>
-          </view>
-        </view>
+        <view v-else-if="spin.remoteError && spin.phase === 'idle'" class="lss-nospin"><text class="lss-nospin-title">—</text></view>
         <view v-else-if="spin.remoteEnded" class="lss-nospin">
           <text class="lss-nospin-title">{{ t.events.chip.ended }}</text>
           <text v-if="historyRows.length === 0" class="lss-nospin-hint">{{ statusCopy.noHistory }}</text>
@@ -156,6 +151,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
@@ -184,6 +180,7 @@ const CY = 100;
 const MOCK_NET_FAIL_RATE = 0.08; // mock: 区块链拥堵演示(server 侧真实裁决)
 
 const spin = useLuckySpin();
+useAutoRecovery({ failed: () => spin.open && spin.remoteError && !spin.remoteLoading && spin.phase === "idle", retry: () => spin.refreshRemoteState() });
 const app = useApp();
 const t = useT();
 const locale = useLocaleStore();

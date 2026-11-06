@@ -442,6 +442,9 @@ export const useApp = defineStore("app", () => {
   }
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
+  // Passive display recovery must honour the server's read throttling even
+  // though this store converts API errors into section status instead of throwing.
+  let remoteFleetRetryAt = 0;
   const remoteFleetHasSnapshot = ref(!remoteApiEnabled);
   /**
    * The fleet's own "today" total, which the backend defines as zero-safe
@@ -1032,6 +1035,7 @@ export const useApp = defineStore("app", () => {
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
     options: RemoteFleetRefreshOptions = {},
   ): Promise<boolean> {
+    if (options.coalesce && Date.now() < remoteFleetRetryAt) return false;
     invalidateBeforePassiveTabRead("remote-fleet");
     if (!remoteApiEnabled) return true;
     if (homeTruthEnvironmentInvalidated) return false;
@@ -1072,6 +1076,9 @@ export const useApp = defineStore("app", () => {
         }
         const assignmentReadCurrent = assignmentReadEpochAtStart === taskAssignmentReadEpoch;
         if (assignmentReadCurrent && assignmentResult.status === "rejected") {
+          if (isHttpReadRateLimit(assignmentResult.reason)) {
+            remoteFleetRetryAt = Date.now() + (assignmentResult.reason.retryAfterMs ?? 30_000);
+          }
           remoteAssignmentStatus.value = "error";
           remoteAssignmentError.value = assignmentResult.reason instanceof Error
             ? assignmentResult.reason.message : "TASK_ASSIGNMENT_STATE_UNAVAILABLE";
@@ -1133,6 +1140,7 @@ export const useApp = defineStore("app", () => {
           && refreshSequence === remoteFleetRefreshSequence) {
           remoteFleetStatus.value = "error";
           remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
+          if (isHttpReadRateLimit(cause)) remoteFleetRetryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
           if (!isTransientReadFailure(cause)) {
             remoteFleetHasSnapshot.value = false;
             remoteRealizedToday.value = null;
@@ -1164,6 +1172,7 @@ export const useApp = defineStore("app", () => {
       lastCloudSnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
+      remoteFleetRetryAt = 0;
       remoteFleetHasSnapshot.value = false;
       remoteRealizedToday.value = null;
       slotCap.value = MAX_DEVICES;

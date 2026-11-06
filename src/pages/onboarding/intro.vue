@@ -159,10 +159,12 @@
       </scroll-view>
       </view>
     </view>
+    <ToastHost />
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
+import ToastHost from "@/components/toast-host.vue";
 import HomeDisplayStats from "@/components/home/home-display-stats.vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import { navReset, navTo } from "@/lib/route";

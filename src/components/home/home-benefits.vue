@@ -72,6 +72,7 @@
   </NxSection>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch, watchEffect, type Ref } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
 import { useVoucher } from "@/store/voucher";
@@ -98,6 +99,7 @@ const COUPON_ART = '/static/img/home-glass-20260928/coupon.webp';
 const copy = useAuditUiCopy(), t = useT(), lifecycleCopy = useTrialLifecycleCopy();
 const voucher = useVoucher(), voucherSheet = useVoucherClaimSheet();
 const trial = useFreeTrial(), trialCfg = useTrialConfig(), trialView = useTrialPresentation(), trialSheet = useTrialClaimSheet();
+useAutoRecovery({ failed: () => remoteApiEnabled && !trialSheet.open && trial.authorityStatus === "error", retry: () => trialView.refresh() });
 const visibility = useDataVisibility();
 
 // Voucher: same remote/local sources as the previous home banner, split into claimable and claimed.

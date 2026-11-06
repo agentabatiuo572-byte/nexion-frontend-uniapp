@@ -5,13 +5,14 @@
     <RewardRows :expected="receipt?.rewards?.filter(row=>row.reward.type==='DISCOUNT_USDT')" :lines="receipt?.items" />
     <RewardRows v-if="rewards.length" :rewards="rewards" :lines="receipt?.items" />
     <RewardRows v-else :expected="receipt?.rewards?.filter(row=>row.reward.type!=='DISCOUNT_USDT')" :lines="receipt?.items" />
-    <text v-if="error" class="promotion-copy" role="alert">{{ t.promotion.error }}</text>
-    <view class="promotion-link" role="button" tabindex="0" :aria-disabled="loading" @click="load"><text>{{ t.promotion.refresh }}</text></view>
+    <text v-if="error && !receipt && !rewards.length" class="promotion-copy">—</text>
+
     <PromotionAction v-if="resumeAllowed" class="promotion-action primary" role="button" tabindex="0" @click="resume"><text>{{ t.promotion.resume }}</text></PromotionAction>
     <view v-if="rewards.length||receipt?.rewards?.some(row=>row.reward.type!=='DISCOUNT_USDT')" class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion&orderNo='+encodeURIComponent(orderNo))"><text>{{ t.promotion.rewards }}</text></view>
   </view>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import PromotionAction from '@/components/promotion/promotion-action.vue';
 import {ref,computed,watch,onBeforeUnmount} from 'vue';import {useT} from '@/i18n/use-t';import {useApp} from '@/store/app';import {promotionApi,remoteApiEnabled} from '@/api/runtime';import type{OrderReceipt,Reward} from '@/api/promotion-api';import {navTo} from '@/lib/route';import RewardRows from './reward-rows.vue';
 const props=defineProps<{orderNo:string;paymentAllowed:boolean}>();const t=useT(),app=useApp();const receipt=ref<OrderReceipt|null>(null),rewards=ref<Reward[]>([]),error=ref(false),loading=ref(false);let generation=0,alive=true;
@@ -22,6 +23,7 @@ function canResume():boolean {
     &&Date.parse(receipt.value.payBy)>Date.now();
 }
 const resumeAllowed=computed(canResume);
+useAutoRecovery({ failed: () => error.value && !loading.value, retry: load });
 async function load(){
   if(!props.orderNo||!remoteApiEnabled||loading.value)return;
   const request=++generation,account=app.accountKey,epoch=app.accountBindingEpoch;

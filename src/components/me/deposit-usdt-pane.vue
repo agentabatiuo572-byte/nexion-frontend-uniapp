@@ -161,6 +161,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount as formatBaseAmount } from "@/lib/amount-display";
 import { exactDepositAmount } from "@/api/cregis-deposit-api";
 const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 2);
@@ -233,7 +234,7 @@ let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 let loadGeneration = 0;
 let pageVisible = true;
-let requestRunning = false;
+const requestRunning = ref(false);
 let nextPollAt = 0;
 let pollFailures = 0;
 function pollDelay(state: "preparing" | "ready" | "error", failures = 0): number {
@@ -258,29 +259,29 @@ const copied = ref(false);
 const minDeposit = ref<string | number | null>(fundsServerEnabled ? null : MIN_DEPOSIT_USDT);
 const feeUsdt = ref<string | number | null>(fundsServerEnabled ? null : 0);
 const confirmations = ref(CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"]);
-function refresh(background = false): void {
+function refresh(background = false): Promise<void> {
   offNets.value = [];
-  load(background);
+  return load(background);
 }
-function refreshBankHistory(): void {
+async function refreshBankHistory(): Promise<void> {
   if (fundsServerEnabled && remoteSessionReady.value && dep.currentAccountKey() === app.accountKey
-      && dep.remoteReceiptInitialStatus !== "loading") void dep.refreshRemoteVietQrDeposits();
+      && dep.remoteReceiptInitialStatus !== "loading") await dep.refreshRemoteVietQrDeposits();
 }
-function load(background = false) {
+async function load(background = false): Promise<void> {
   if (fundsServerEnabled && (!remoteSessionReady.value || !pageVisible)) return;
-  if (background && requestRunning) return;
+  if (background && requestRunning.value) return;
   const hadSnapshot = background && phase.value === "ready";
   if (!background) phase.value = "loading";
   if (loadTimer) clearTimeout(loadTimer);
   if (fundsServerEnabled) {
     if (!background) refreshBankHistory();
     const generation = ++loadGeneration;
-    requestRunning = true;
+    requestRunning.value = true;
     nextPollAt = Number.POSITIVE_INFINITY;
     const account = app.accountKey;
     const bindingEpoch = app.accountBindingEpoch;
     const selectedNetwork = net.value === "usdt-erc20" ? "ERC20" : "BEP20";
-    void (async () => {
+    await (async () => {
       try {
         const snapshot = await cregisDepositApi.address(selectedNetwork);
         if (generation !== loadGeneration || account !== app.accountKey
@@ -357,7 +358,7 @@ function load(background = false) {
           nextPollAt = Date.now() + pollDelay("error", pollFailures++);
         }
       } finally {
-        if (generation === loadGeneration) requestRunning = false;
+        if (generation === loadGeneration) requestRunning.value = false;
       }
     })();
     return;
@@ -367,6 +368,15 @@ function load(background = false) {
     phase.value = offline ? "error" : "ready";
   }, 650);
 }
+useAutoRecovery({
+  failed: () => fundsServerEnabled && remoteSessionReady.value && !requestRunning.value
+    && (phase.value === "error" || (phase.value === "ready" && (addressRefreshFailed.value || chainHistoryFailed.value))),
+  retry: () => refresh(true),
+});
+useAutoRecovery({
+  failed: () => fundsServerEnabled && remoteSessionReady.value && dep.remoteReceiptInitialStatus === "error",
+  retry: refreshBankHistory,
+});
 watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch], ([ready]) => {
   if (!fundsServerEnabled) return;
   loadGeneration++;
@@ -386,11 +396,11 @@ onMounted(() => {
   if (!fundsServerEnabled) load();
   if (fundsServerEnabled) pollTimer = setInterval(() => {
     if (!pageVisible || (typeof document !== "undefined" && document.hidden)) return;
-    if (phase.value !== "loading" && Date.now() >= nextPollAt) load(true);
+    if (phase.value !== "loading" && Date.now() >= nextPollAt) void load(true);
   }, 1_000);
 });
 onShow(() => { pageVisible = true; if (fundsServerEnabled) refresh(true); });
-onHide(() => { pageVisible = false; loadGeneration++; requestRunning = false; });
+onHide(() => { pageVisible = false; loadGeneration++; requestRunning.value = false; });
 onUnmounted(() => {
   pageVisible = false;
   loadGeneration++;
