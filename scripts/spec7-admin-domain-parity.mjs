@@ -1,26 +1,15 @@
-// SPEC-7 双端参数 parity · 域锚版(2026-08-15 单独立项,替换死文件字面锚)。
-//
-// 历史:原门比 uniapp seed ↔ admin `lib/mock/admin/compute-config.ts` 的 defaultVal 字面值。
-// 该文件 2026-08-04(admin main 2c477b4)作为死代码进 .trash —— admin 已 server-canonical:
-// 前端不再持有参数默认值,字面权威在真后端 DB(nexion-backend,本机无仓)。
-// 含全键 defaultVal 的寄存器只活在 admin 非 main 分支,而 wd02 契约锚只在 main 族 ——
-// 没有任何 admin 分支能同时喂饱两门,故不复活死文件、不切离 main,改锚 main 活源:
-//   · lib/admin/k-client.ts —— riskCluster 11 键 + otpGate 5 键的键集与**允许值域**
-//     (K1_RELEASE_PARAM_LIMITS / validateK1ParamValue / validateK2ParamValue 各 if 行)
-//   · lib/admin/h-client.ts —— lockMode 白名单(newcomer.lockMode 校验行)
-// 语义随之降级并如实改名:字面级「值相等」→「seed ∈ admin 允许值域 + 枚举白名单成员」。
-// 抓得住:种子越域 / 枚举串漂移 / admin 收紧值域甩下 uniapp 种子;抓不住:域内字面漂移
-// (那份权威已上移真后端,前端两仓谁都不再持有)。恢复字面级 parity 的条件:真后端仓
-// 本机可达、或 admin main 恢复声明式默认值锚(照 wd02 家法锚测试文件亦可)。
-//
-// 纪律(继承原门):任何提取失败(文件缺失/形态漂移/键少了)一律红,禁空集全过。
-// 另带升级哨兵:K3 提现前置 / K4 聚簇权重键 main 前端尚未落地(只在 PRD),一旦代表键
-// 在 admin lib/admin/ 出现即红 —— 提醒把新落地的域接进本比对,防「未实现登记表」过期假绿。
+// SPEC-7:活跃参数域、历史读取兼容及退役合同。不是默认值等值检查。
+// 活跃6个K1数值键仍锚PC校验域；3个历史键仅核结构及Java退役/存储读取合同。
+// 在线证明时长同样只保留兼容结构，禁止重新开放；旧模式读取必须归一为manual_only。
+// Java旧修改入口已410，历史促销合同仍按原字段顺序读取storedValue；不再断言旧值域。
+// 任一必需源/有限提取锚缺失、模式误重开或未知形态均红，不以空集通过。
+// K2/H8检查和K3/K4升级哨兵保持原范围。
 //
 // 用法:node scripts/spec7-admin-domain-parity.mjs <ADMIN_ROOT> "<riskCluster 键清单>" "<otpGate 键清单>"
 // 键清单来自 verify.sh 的 SPEC7_RISKCLUSTER_KEYS / SPEC7_OTPGATE_KEYS(单源,勿在此另抄)。
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const [adminRoot, rcKeysArg, ogKeysArg] = process.argv.slice(2);
 if (!adminRoot || !rcKeysArg || !ogKeysArg) {
@@ -48,17 +37,25 @@ if (!uni || !kClient || !hClient) {
   console.log(`result: ${pass} pass, ${fail} fail`);
   process.exit(1);
 }
+const { resolveNexionBackendRoot } = await import(pathToFileURL(path.join(adminRoot, "scripts/lib/nexion-workspace-paths.mjs")).href);
+const backendRoot = resolveNexionBackendRoot({ adminRoot });
+const javaRelease = read(path.join(backendRoot, "src/main/java/ffdd/opsconsole/risk/application/RiskReleaseParamsService.java"), "Java K1退役合同");
+const javaEarnings = read(path.join(backendRoot, "src/main/java/ffdd/opsconsole/finance/application/EarningsReleaseService.java"), "Java收益释放");
+if (!javaRelease || !javaEarnings) process.exit(1);
 
 // ── uniapp seed 提取(块内逐键,与 verify.sh 覆盖度门同块口径)──────────────
 function seedBlock(src, name) {
   const m = src.match(new RegExp(`${name}: \\{([\\s\\S]*?)\\n  \\}`));
   if (!m) { bad(`uniapp 种子块 ${name} 定位失败(形状变了必红)`); return {}; }
   const out = {};
-  for (const kv of m[1].matchAll(/(\w+): ("[^"]*"|true|false|-?[\d.]+)/g)) out[kv[1]] = kv[2];
+  for (const kv of m[1].matchAll(/(\w+): ("[^"]*"|true|false|-?[\d.]+)(?=\s*(?:,|$))/g)) out[kv[1]] = kv[2];
   return out;
 }
 const seedRc = seedBlock(uni, "riskCluster");
 const seedOg = seedBlock(uni, "otpGate");
+if (Object.keys(seedRc).length !== RC_KEYS.length || RC_KEYS.some(key => !(key in seedRc))) {
+  bad("riskCluster 种子键集与调用方键集不一致");
+}
 
 // ── admin 值域提取 ─────────────────────────────────────────────────────────
 // LIMITS 表:`key: { min: X, max: Y, step: Z, integer: B }`
@@ -76,34 +73,90 @@ function inlineDomain(src, keyLiteral) {
   if (!stmt) return null;
   const lo = stmt.match(/>=\s*(-?[\d.]+)/), hi = stmt.match(/<=\s*(-?[\d.]+)/);
   if (!lo || !hi) return null;
-  return { min: +lo[1], max: +hi[1], multiple: stmt.match(/%\s*(\d+)\s*===\s*0/)?.[1] };
+  return { min: +lo[1], max: +hi[1], integer: /Number\.isInteger\s*\(/.test(stmt), multiple: stmt.match(/%\s*(\d+)\s*===\s*0/)?.[1] };
 }
 
-// ── riskCluster 11 键:数值 ∈ 域 · releaseMode ∈ 白名单 · 布尔二值 ─────────
-const modeList = kClient.match(/K1_RELEASE_MODE_VALUES = \[([^\]]+)\]/)?.[1]?.match(/"[^"]+"/g)?.map((s) => s.slice(1, -1));
+// ── K1当前读取/编辑分界：四历史键必须过滤，旧mode只可作为读取输入 ────────
+// 完整字符串字面量列表，可有尾逗号；表达式不提取合法子串。
+const quoted = text => text && /^\s*"[^"]+"(?:\s*,\s*"[^"]+")*\s*,?\s*$/.test(text)
+  ? text.match(/"[^"]+"/g).map(value => value.slice(1, -1)) : [];
+const sameSet = (actual, expected) => actual.length === expected.length && expected.every(key => actual.includes(key));
+// 只压缩代码空白，键名和拒绝原因字符串内的原文必须保留。
+const compact = text => text.replace(/"(?:\\.|[^"\\])*"|\s+/g, token => token.startsWith('"') ? token : "");
+const pcCompact = compact(kClient), javaCompact = compact(javaRelease);
+const retiredKeys = quoted(kClient.match(/RETIRED_K1_RELEASE_KEYS\s*=\s*new Set\(\[([^\]]+)\]/)?.[1]);
+const editableKeys = quoted(kClient.match(/K1_RELEASE_PARAM_KEYS\s*=\s*\[([^\]]+)\]/)?.[1]);
+const retiredContract = ["freePhoneSlotsPerCluster", "pendingReleaseHours", "appAttestationReleaseHours", "freeSlotRequiresBinding"];
+const validators = kClient.match(/(?:export )?function validateK1(?:Release)?ParamValue\b[\s\S]*?\n\}/g);
+if (!sameSet(retiredKeys, retiredContract)
+    || !sameSet(editableKeys, ["duplicateAccountPendingFrom", "duplicateAccountFreezeFrom", "releaseMode"])
+    || !pcCompact.includes("constcurrentReleaseParams=releaseParams.filter(param=>!RETIRED_K1_RELEASE_KEYS.has(param.key));")
+    || validators?.length !== 2
+    || retiredContract.some(key => limits[key] || validators.some(source => source.includes(`"${key}"`)))) {
+  bad("K1历史键退役/过滤锚缺失或重新进入编辑域");
+} else ok("K1四历史键保留读取兼容、排除PC编辑域");
+
+const historyKeys = retiredContract.filter(key => key !== "appAttestationReleaseHours");
+const javaRetiredKeys = quoted(javaCompact.match(/\bRETIRED_KEYS=Set\.of\(("[^"]+"(?:,"[^"]+")*)\);/)?.[1]);
+const javaActiveKeys = quoted(javaCompact.match(/\bKEYS=List\.of\(("[^"]+"(?:,"[^"]+")*)\);/)?.[1]);
+const javaPromotionKeys = quoted(javaCompact.match(/\bPROMOTION_CONTRACT_KEYS=List\.of\(("[^"]+"(?:,"[^"]+")*)\);/)?.[1]);
+const promotionContract = ["freePhoneSlotsPerCluster", "duplicateAccountPendingFrom", "duplicateAccountFreezeFrom",
+  "pendingReleaseHours", "appAttestationReleaseHours", "releaseMode", "freeSlotRequiresBinding"];
+if (!sameSet(javaRetiredKeys, historyKeys)
+    || !sameSet(javaActiveKeys, [...editableKeys, "appAttestationReleaseHours"])
+    || javaPromotionKeys.join() !== promotionContract.join()
+    || !javaCompact.includes("publicList<Map<String,Object>>rows(){returnrows(KEYS,values());}")
+    || !javaCompact.includes("privateMap<String,String>values(){Map<String,String>map=newLinkedHashMap<>();for(Stringkey:KEYS){")) {
+  bad("Java K1历史键退役/活跃读取集合/旧合同字段顺序锚缺失或误重开");
+} else ok("Java K1三历史键退出活跃集合、保留原促销合同字段顺序");
+
+for (const [label, source, anchor] of [
+  ["在线证明禁用", javaCompact, "privatestaticfinalbooleantrustedAttestationEnabled=false;"],
+  ["在线证明写410", javaCompact, 'if("appAttestationReleaseHours".equals(key))thrownewBizException(410,"K1_TRUSTED_ATTESTATION_RETIRED");'],
+  ["在线证明兼容值", javaCompact, 'if("appAttestationReleaseHours".equals(key)){map.put(key,"1");continue;}'],
+  ["三历史键修改410", javaCompact, 'publicApiResult<Map<String,Object>>update(Stringkey,StringidempotencyKey,RiskReleaseParamUpdateRequestrequest){'
+    + 'if("appAttestationReleaseHours".equals(key))thrownewBizException(410,"K1_TRUSTED_ATTESTATION_RETIRED");'
+    + 'if(RETIRED_KEYS.contains(key))thrownewBizException(410,"K1_RELEASE_PARAM_RETIRED");'],
+  ["旧促销合同storedValue读取", javaCompact, 'publicList<Map<String,Object>>promotionContractRows(){Map<String,String>snapshot=values();'
+    + 'for(Stringkey:RETIRED_KEYS){Stringvalue=config.storedValue(PREFIX+key).filter(StringUtils::hasText)'
+    + '.orElseThrow(()->newBizException(503,"K1_RELEASE_CONFIG_UNAVAILABLE"));snapshot.put(key,value.trim());}'
+    + 'returnrows(PROMOTION_CONTRACT_KEYS,snapshot);}'],
+  ["K1有效释放模式", javaCompact, 'booleanmode="releaseMode".equals(key);StringeffectiveValue=mode?"manual_only":values.get(key);'],
+  ["收益有效释放模式", compact(javaEarnings), 'response.put("releaseMode","manual_only");'],
+]) {
+  if (!source.includes(anchor)) bad(`Java ${label}退役锚缺失或形态改变`);
+  else ok(`Java ${label}锚有效`);
+}
+const modeList = quoted(kClient.match(/K1_RELEASE_MODE_VALUES = \[([^\]]+)\]/)?.[1]);
+const modeRead = pcCompact.match(/for\(constparamofcurrentReleaseParams\)if\(param\.key==="releaseMode"\)\{([^}]+)\}/)?.[1] ?? "";
+const readModes = quoted(modeRead.match(/if\(!\[([^\]]+)\]\.includes\(param\.value\)\)invalidK1Response\("multiAccount\.releaseParams\.releaseMode"\);/)?.[1]);
+const modesValid = sameSet(modeList, ["manual_only"])
+  && sameSet(readModes, ["manual_only", "attest_or_manual"])
+  && modeRead.includes('param.value="manual_only";param.val="manual_only";param.adjustable=false;');
+if (!modesValid) bad("releaseMode读取兼容/有效归一化/仅人工编辑域锚缺失或误重开");
+
+// ── riskCluster 11键：6活跃域、4历史兼容结构、1模式归一化 ──────────────
 for (const k of RC_KEYS) {
   const raw = seedRc[k];
   if (raw == null) { bad(`${k} uniapp 种子缺失(riskCluster 块里没有)`); continue; }
   if (k === "releaseMode") {
-    if (!modeList?.length) bad(`releaseMode 白名单 K1_RELEASE_MODE_VALUES 提取失败(形状变了必红)`);
-    else if (modeList.includes(raw.replace(/"/g, ""))) ok(`releaseMode seed=${raw} ∈ admin 白名单 [${modeList}]`);
-    else bad(`releaseMode seed=${raw} 不在 admin 白名单 [${modeList}]`);
+    if (modesValid && readModes.includes(raw.replace(/"/g, ""))) ok(`releaseMode seed=${raw} ∈ 读取兼容域 → manual_only(不可重开自动证明)`);
+    else bad(`releaseMode seed=${raw} 不满足当前读取/仅人工释放合同`);
     continue;
   }
-  if (k === "freeSlotRequiresBinding") {
-    if (!/freeSlotRequiresBinding"\) return value === "true" \|\| value === "false"/.test(kClient)) {
-      bad(`freeSlotRequiresBinding admin 二值校验行丢失`);
-    } else if (raw === "true" || raw === "false") ok(`freeSlotRequiresBinding seed=${raw} ∈ 二值域`);
-    else bad(`freeSlotRequiresBinding seed=${raw} 不是布尔字面`);
+  if (retiredContract.includes(k)) {
+    const valid = k === "freeSlotRequiresBinding" ? raw === "true" || raw === "false" : Number.isFinite(Number(raw));
+    if (!valid) bad(`${k} 历史兼容结构不是${k === "freeSlotRequiresBinding" ? "布尔" : "数值"}字面`);
+    else ok(`${k} seed=${raw} 仅历史兼容结构，不作为当前释放政策`);
     continue;
   }
   const dom = limits[k] ?? inlineDomain(kClient, k);
-  if (!dom) { bad(`${k} admin 值域提取失败(LIMITS 表 / validateK1ParamValue 都没抓到 —— 形状变了必红)`); continue; }
+  if (!dom) { bad(`${k} admin值域提取失败(形状变了必红)`); continue; }
   const v = Number(raw);
   if (!Number.isFinite(v)) bad(`${k} seed=${raw} 不是数值,没法进域断言`);
-  else if (v < dom.min || v > dom.max) bad(`${k} seed=${v} 越出 admin 允许域 [${dom.min},${dom.max}]`);
+  else if (v < dom.min || v > dom.max) bad(`${k} seed=${v} 越出 admin允许域 [${dom.min},${dom.max}]`);
   else if (dom.integer && !Number.isInteger(v)) bad(`${k} seed=${v} 应为整数(admin integer 域)`);
-  else ok(`${k} seed=${v} ∈ admin 域 [${dom.min},${dom.max}]`);
+  else ok(`${k} seed=${v} ∈ admin域 [${dom.min},${dom.max}]`);
 }
 
 // ── otpGate:正式服务端共用键锚 admin 域;本地滑块模拟键锚客户端安全域 ────────
