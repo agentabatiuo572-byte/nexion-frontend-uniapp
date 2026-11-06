@@ -315,7 +315,7 @@ async function loadOrderClock(){
   orderClock={serverNow:fleet.serverNow,at:sampledAt};updateClock();
 }
 const catalogReadFailed=computed(()=>freshQuoteReady.value&&!order.value&&!openedOriginal&&!session.record.pending&&productCatalogState.status==='error');
-const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&productCatalogState.status==='ready'&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
+const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
 const canPay=computed(()=>!busy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
