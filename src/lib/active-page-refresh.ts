@@ -6,6 +6,8 @@ type PageRecovery = {
   failed: () => boolean;
   pending: () => boolean;
   retry: () => Promise<boolean>;
+  // A pending result keeps polling after a good read, so a pull must not report it as failed.
+  quiet: boolean;
 };
 const pageRecoveries = new Set<PageRecovery>();
 
@@ -16,7 +18,7 @@ export function registerPageRecovery(section: PageRecovery): () => void {
 }
 
 export function hasFailedPageSections(): boolean {
-  return [...pageRecoveries].some(section => section.failed());
+  return [...pageRecoveries].some(section => !section.quiet && section.failed());
 }
 
 /** Await each failed section, including a read already in flight, without a request burst. */
@@ -27,7 +29,7 @@ export async function refreshFailedPageSections(isCurrent: () => boolean): Promi
     if (!pageRecoveries.has(section)) continue;
     await section.retry();
   }
-  return isCurrent() && sections.some(section => pageRecoveries.has(section) && section.failed());
+  return isCurrent() && sections.some(section => !section.quiet && pageRecoveries.has(section) && section.failed());
 }
 
 /**

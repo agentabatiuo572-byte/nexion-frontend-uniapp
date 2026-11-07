@@ -207,7 +207,7 @@ function goVerify() {
 }
 // Header back walks the change flow one step at a time; outside it, the page goes back.
 const headerBack = computed(() => {
-  if (state.phase === "uncertain") return async () => { await form.waitForRead(); navBack("/pages/me/me"); };
+  if (state.phase === "uncertain") return () => navBack("/pages/me/me");
   if (state.phase !== "details" || !changing.value) return undefined;
   return () => { if (changeStep.value === 2) changeStep.value = 1; else changing.value = false; };
 });
@@ -268,8 +268,8 @@ function reset() {
 watch(() => [props.active, app.accountKey, app.accountBindingEpoch] as const, reset, { immediate: true });
 const stopRuntime = subscribeRuntimeRevision(reset);
 onBeforeUnmount(() => { stopRuntime(); if (timer) clearInterval(timer); form.reset(); });
-async function done() { await form.waitForRead(); void navReplace(props.returnTo === "/pages/me/wallet-cards" ? "/pages/me/me" : props.returnTo); }
-async function goWithdraw() { await form.waitForRead(); navTo("/pages/me/wallet-withdraw-bank"); }
+function done() { void navReplace(props.returnTo === "/pages/me/wallet-cards" ? "/pages/me/me" : props.returnTo); }
+function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 </script>
 
 <style scoped>
