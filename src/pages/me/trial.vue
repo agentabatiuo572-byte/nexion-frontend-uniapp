@@ -187,7 +187,7 @@
 
     <!-- Every state's main action sits in the thumb zone (DS-30). -->
     <template #pageFixed>
-      <view v-if="!authorityScreenUnavailable" class="trial-bar" :class="{ 'trial-bar--pair': conversionRefunded }">
+      <view v-if="!authorityScreenUnavailable" class="trial-bar nx-glass-bar" :class="{ 'trial-bar--pair': conversionRefunded }">
         <template v-if="isActiveCycle || (status === 'ended' && !claimVisible)">
           <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
@@ -615,8 +615,8 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-terminal-copy__body { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);text-wrap:pretty; }
 .trial-terminal-copy__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-wrap:pretty; }
 
-/* ── Bottom action bar (DS-30): the store purchase bar material ── */
-.trial-bar { position:absolute;left:0;right:0;bottom:0;z-index:36;display:flex;flex-direction:column;padding:12px 16px calc(30px + env(safe-area-inset-bottom));background:var(--v5-sticky-bar-bg);box-shadow:inset 0 1px 0 var(--v5-sticky-bar-border);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);animation:trial-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
+/* ── Bottom action bar (DS-30): the shared glass bar ── */
+.trial-bar { position:absolute;left:0;right:0;bottom:0;z-index:36;display:flex;flex-direction:column;padding:12px 16px calc(30px + env(safe-area-inset-bottom));animation:trial-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
 .trial-bar--pair { flex-direction:row;flex-wrap:wrap;gap:12px; }
 .trial-bar__note { margin:0 0 10px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;text-wrap:pretty; }
 .trial-bar__retry { display:flex;justify-content:center;margin:-6px 0 4px; }

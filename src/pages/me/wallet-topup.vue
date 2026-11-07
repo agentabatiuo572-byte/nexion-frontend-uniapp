@@ -40,8 +40,8 @@
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30): back to the order once it is covered, otherwise the bank pane's create action. -->
     <template #pageFixed>
-      <view v-if="orderFunded" class="topup-sticky nx-frosted-button"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
-      <view v-else-if="bankAction" class="topup-sticky nx-frosted-button">
+      <view v-if="orderFunded" class="topup-sticky nx-glass-bar"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
+      <view v-else-if="bankAction" class="topup-sticky nx-glass-bar">
         <NxButton v-if="bankSecondary" :class="['topup-sticky__btn', bankSecondary.className]" variant="secondary" :label="bankSecondary.label" @click="bankSecondary.run()" />
         <NxButton :class="['topup-sticky__btn', bankAction.className]" variant="primary" :label="bankAction.label" :disabled="!bankAction.enabled" @click="bankAction.run()">
           <view class="topup-sticky__label">
