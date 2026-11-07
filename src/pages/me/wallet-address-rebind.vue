@@ -571,7 +571,11 @@ async function applyAfterOtp(scope = captureCommandScope()) {
       const error = asApiError(cause);
       if (error.message === "PAYOUT_ADDRESS_OTP_INVALID") otpError.value = t.value.addrRebind.startFailed;
       else if (error.message === "PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL") otpError.value = t.value.addrRebind.inFlightBlocked;
-      else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") otpError.value = cooldownUntilText.value;
+      else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") {
+        await payout.refreshRemote();
+        if (!draftIsCurrent()) return;
+        otpError.value = remoteReadStatus.value === "ready" ? cooldownUntilText.value : t.value.addrRebind.cooldownActive;
+      }
       else if (error.message === "PAYOUT_ADDRESS_FORMAT_INVALID") otpError.value = t.value.addrRebind.invalidAddress;
       else if (error.message === "PAYOUT_ADDRESS_NETWORK_INVALID" || error.message === "WITHDRAWAL_NETWORK_DISABLED") otpError.value = t.value.bankWithdrawal.networkUnavailable;
       else otpError.value = t.value.addrRebind.startFailed;
@@ -663,13 +667,18 @@ watch(() => payout.serverClock, (anchor) => {
 
 useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
 let withdrawalListEntryPending = true;
+let withdrawalListEntryRead: Promise<boolean> | null = null;
 function refreshWithdrawalListOnEntry() {
   // Cold-session catalogue publication advances the runtime and would discard
   // an earlier list response. Wait for that existing read, without holding UI.
   if (!payoutAddressServerEnabled || !pageVisible || !withdrawalListEntryPending
     || productCatalogState.status === "loading") return;
   withdrawalListEntryPending = false;
-  void app.refreshRemoteWithdrawalList(app.accountKey);
+  const read = app.refreshRemoteWithdrawalList(app.accountKey);
+  withdrawalListEntryRead = read;
+  void read.finally(() => {
+    if (withdrawalListEntryRead === read) withdrawalListEntryRead = null;
+  });
 }
 watch(() => productCatalogState.status, refreshWithdrawalListOnEntry, { flush: "post" });
 async function retryRemoteSnapshot() {
@@ -710,6 +719,12 @@ function clearNetworkPolicy() {
   networkPolicyStatus.value = "idle";
 }
 const stopRuntimeRead = subscribeRuntimeRevision(() => {
+  // The list still uses the commerce revision. Replace this entry's pending
+  // read after publication; an old completion must not retire the replacement.
+  if (pageVisible && withdrawalListEntryRead) {
+    withdrawalListEntryPending = true;
+    void nextTick(refreshWithdrawalListOnEntry);
+  }
   // This channel also reports API-origin changes. Catalog events leave the
   // address/policy/command scope intact, including a pending OTP or save.
   if (readApiOrigin.value.environment === apiRuntimeConfig.environment
@@ -785,7 +800,8 @@ function fmtStamp(ts: number): string {
 // 频控拦截给绝对时刻(平台口径,不说「明天」;规格 ② 异常3)
 const cooldownUntilText = computed(() => {
   const at = payout.stateFor(network.value).nextChangeAt;
-  return fmt(t.value.addrRebind.cooldownUntil, { time: at ? fmtStamp(at) : "" });
+  return at === null ? t.value.addrRebind.cooldownActive
+    : fmt(t.value.addrRebind.cooldownUntil, { time: fmtStamp(at) });
 });
 const safetyNoteText = computed(() => fmt(t.value.addrRebind.safetyNote, { days: cooldownDays.value }));
 // 新地址保护期标记:时长取后台配置(newAddressHoldHours),判定输入与风控信号同源

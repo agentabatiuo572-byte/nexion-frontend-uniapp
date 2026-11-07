@@ -5413,6 +5413,7 @@ openSeaErrorPool: {
     inFlightBlocked: "有提现处理中,完成后才能更换地址",
     inFlightGoCta: "查看提现进度",
     cooldownUntil: "{time} 后可再次更换",
+    cooldownActive: "当前仍在地址更换冷却期内，请稍后重试。",
     freezeBanner: "新提现地址保护期中 · 剩余 {t}",
     timeStatusUnavailable: "暂时无法确认保护期状态，请刷新后重试。",
     refreshTimeStatusCta: "刷新状态",
