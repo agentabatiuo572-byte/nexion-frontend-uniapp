@@ -115,5 +115,5 @@ export function createBankBindingForm(api: BindingApi, identity: () => string, c
     outcomeRead = read;
     return read;
   }
-  return { state, readOutcome, waitForRead, canContinue, canSendOtp, sendOtp, load, reset, submit };
+  return { state, readOutcome, canContinue, canSendOtp, sendOtp, load, reset, submit };
 }

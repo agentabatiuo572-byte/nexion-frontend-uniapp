@@ -300,7 +300,6 @@ async function syncRemoteState(
   runScope = captureRuntimeRevision(),
 ): Promise<boolean> {
   if (!remoteApiEnabled) return true;
-  if (pendingExchangeLeases.value.length || recoveringExchange.value) return false;
   if (!remoteScopeCurrent(scope, runScope)) return false;
   if (remoteFirstPagePending.value) return false;
   const readGeneration = ++remoteReadGeneration;
@@ -339,7 +338,6 @@ const canLoadMoreHistory = computed(() => remoteApiEnabled
   && remoteState.value.orders.length < remoteState.value.ordersPage.total);
 
 async function loadMoreHistory() {
-  await pendingRecoveryRead?.catch(() => {});
   if (!remoteState.value || !canLoadMoreHistory.value || historyLoadingMore.value) return;
   const scope = captureExchangeScope();
   const runScope = captureRuntimeRevision();
@@ -693,13 +691,10 @@ function flip() {
 }
 
 useAutoRecovery({
-  failed: () => remoteApiEnabled && !pendingExchangeLeases.value.length && !submitting.value && !cancellingOrderNo.value
-    && remoteError.value !== null && !remoteFirstPagePending.value && !historyLoadingMore.value,
+  failed: () => remoteApiEnabled && remoteError.value !== null && !remoteFirstPagePending.value && !historyLoadingMore.value,
   retry: () => syncRemoteState(),
 });
-async function goHowItWorks() {
-  await pendingRecoveryRead?.catch(() => {});
-  if (!exchangeMounted) return;
+function goHowItWorks() {
   navTo("/pages/me/wallet-exchange-how");
 }
 
