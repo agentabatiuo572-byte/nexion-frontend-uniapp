@@ -998,7 +998,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 </script>
 
 <style scoped>
-.nx-action-sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px calc(16px + var(--nx-overlay-safe-bottom)); border-radius: 24px 24px 0 0; background: var(--v5-surface); max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; font-family: var(--font-v5); }
+.nx-action-sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px calc(16px + var(--nx-overlay-safe-bottom)); border-radius: 24px 24px 0 0; max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; font-family: var(--font-v5); }
 .nx-action-sheet__handle { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 18%, transparent); align-self: center; }
 .nx-action-sheet__head { display: flex; flex-direction: column; gap: 2px; padding: 4px 4px 0; }
 .nx-action-sheet__title { color: var(--v5-ink); font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: var(--ui-type-section-weight); overflow-wrap: anywhere; }
