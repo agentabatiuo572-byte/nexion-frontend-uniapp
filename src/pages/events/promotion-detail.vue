@@ -714,7 +714,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-bar--wide .lp-cta { flex: 1; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .lp-cta--neutral.promotion-action { background: var(--v5-surface-2); }
-  .lp-slab.nx-soft-glass { background: var(--v5-surface); }
+  .lp-slab.nx-soft-glass { background: var(--v5-surface-2); }
 }
 
 /* UVT units stay purple wherever they sit (01.1.1); declared after the unit roles above. */
