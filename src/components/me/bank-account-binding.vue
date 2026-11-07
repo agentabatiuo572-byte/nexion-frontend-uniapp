@@ -24,7 +24,7 @@
       <!-- Bound account overview: change entry, or why it is locked. -->
       <template v-else-if="screen === 'overview' && state.config?.beneficiary">
         <!-- P-52: the bound account as a physical bank card; rules as a numbered list; the change action sits in the page bar. -->
-        <view class="bcard nx-frosted-button" :aria-label="`${c.currentAccount} ${state.config.beneficiary.maskedAccount}`">
+        <view class="bcard nx-soft-glass" :aria-label="`${c.currentAccount} ${state.config.beneficiary.maskedAccount}`">
           <view class="bcard__top">
             <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
             <text class="bcard__nm">{{ t.bankWithdrawal.recipientSubtitle }}</text>
@@ -75,7 +75,7 @@
       <template v-else-if="screen === 'first' || screen === 'details'">
         <!-- Change step 1 (P-52): step track, a live preview card of the new account, then the two fields in wells. -->
         <view v-if="screen === 'details'" class="steps2" :aria-label="`1 / 2 ${c.stepNew}`"><view class="steps2__on"><text class="steps2__i">1</text><text>{{ c.stepNew }}</text></view><view class="steps2__ln" aria-hidden="true" /><view class="steps2__off" aria-hidden="true" /></view>
-        <view v-if="screen === 'details'" class="bcard bcard--preview nx-frosted-button" aria-hidden="true">
+        <view v-if="screen === 'details'" class="bcard bcard--preview nx-soft-glass" aria-hidden="true">
           <text class="bcard__lb">{{ c.newAccount }}</text>
           <text class="bcard__no">{{ groupedAccount || "—" }}</text>
           <text class="bcard__ho">{{ state.holder.trim().toUpperCase() || "—" }}</text>
@@ -360,7 +360,6 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .binding-body { padding-top: 3px; }
 .bcard { position: relative; display: flex; flex-direction: column; height: 208px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: var(--v5-ink); }
-[data-theme="light"] .bcard { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .bcard--preview { height: 160px; padding: 18px 20px; justify-content: flex-start; }
 .bcard--preview .bcard__no { margin-top: auto; font-size: 24px; line-height: 30px; }
 .bcard--preview .bcard__ho { font-family: var(--font-metric); }

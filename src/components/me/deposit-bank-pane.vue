@@ -38,7 +38,7 @@
         </view>
         <!-- Amount on a liquid-glass slab over a soft aura; preset amounts sit under it (selected = brand glass, others flat). -->
         <view class="nx-bank-stage">
-          <view class="nx-bank-slab nx-frosted-button">
+          <view class="nx-bank-slab nx-soft-glass">
             <text class="nx-bank-k">{{ t.bankPane.amountLabel }}</text>
             <view class="nx-bank-amtrow">
               <input
@@ -86,7 +86,7 @@
         <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
         <template v-if='intent.paymentMode === "hosted"'>
           <view class="nx-bank-stage">
-            <view class="nx-bank-slab nx-bank-pay nx-frosted-button">
+            <view class="nx-bank-slab nx-bank-pay nx-soft-glass">
               <template v-if="!hostedRejected">
                 <view class="nx-bank-ring" role="timer" :aria-label="`${t.bankPane.remainingLabel} ${countdownText}`">
                   <svg width="148" height="148" viewBox="0 0 148 148" aria-hidden="true">
@@ -1054,10 +1054,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 <style scoped>
 /* P-44 top-up form: amount on the step's soft-glass slab, presets, and a recessed facts well. */
 .nx-bank-stage { position: relative; margin: 4px -2px 0; }
-/* No backdrop-filter: the slab sits on the plain page floor, and the blur only took effect while the
-   page-enter animation composited the page, so the slab flashed brighter and then dimmed. */
-.nx-bank-slab { position: relative; padding: 23px 20px 20px; border-radius: 24px; backdrop-filter: none; -webkit-backdrop-filter: none; }
-[data-theme="light"] .nx-bank-slab { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+.nx-bank-slab { position: relative; padding: 23px 20px 20px; border-radius: 24px; }
 .nx-bank-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .nx-bank-amtrow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
 .nx-bank-amt { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 74px); height: 52px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand);

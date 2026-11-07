@@ -35,7 +35,7 @@
 
       <!-- Slot chassis: a liquid-glass panel whose bays show which device holds each compute slot. -->
       <view v-if="!inventoryError" class="device-stage mx-4">
-        <view class="device-hero nx-frosted-button" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
+        <view class="device-hero nx-soft-glass" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
           <view class="device-hero__top">
             <view>
               <text class="device-hero__title">{{ t.myDevices.inventorySlotsLabel }}</text>
@@ -371,10 +371,9 @@ function goStore() {
 
 <style scoped>
 .device-stage { position: relative; margin-top: 15px; }
-/* Page focus block: shared soft glass; bays sit in it as recessed wells. No backdrop-filter: the hero sits on
-   the plain page floor, and the blur only applied while the page-enter animation composited the page. */
-.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl); backdrop-filter: none; -webkit-backdrop-filter: none; }
-[data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+/* Page focus block on the shared soft glass; bays sit in it as recessed wells. */
+.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl); }
+[data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); }
 .device-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .device-hero__title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .device-hero__count { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; font-family: var(--font-metric); font-variant-numeric: tabular-nums; }

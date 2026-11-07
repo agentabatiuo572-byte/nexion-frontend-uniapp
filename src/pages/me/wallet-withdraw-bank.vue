@@ -33,7 +33,7 @@
         <text class="vh" role="heading" aria-level="1">{{ title }}</text>
         <!-- P-45 account step: the bound account as a physical bank card, then the binding rule. -->
         <template v-if="!quote && formStep === 'account'">
-          <view class="bcard nx-frosted-button" :aria-label="`${c.recipientTitle} ${recipient?.maskedAccount ?? '—'}`">
+          <view class="bcard nx-soft-glass" :aria-label="`${c.recipientTitle} ${recipient?.maskedAccount ?? '—'}`">
             <view class="bcard__top">
               <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
               <text class="bcard__nm">{{ c.recipientSubtitle }}</text>
@@ -56,7 +56,7 @@
 
         <template v-if="quote">
           <view class="stage">
-            <view class="slab nx-frosted-button">
+            <view class="slab nx-soft-glass">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
               <text class="slab__amt">{{ money(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
               <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text>
@@ -97,7 +97,7 @@
 
         <template v-else>
           <view class="stage">
-            <view class="slab nx-frosted-button">
+            <view class="slab nx-soft-glass">
               <view class="slab__head">
                 <text class="k">{{ c.amount }}</text>
                 <view class="use-max" role="button" tabindex="0" data-testid="bank-max" :aria-disabled="busy || !canContinue || maxAmount <= 0" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax"><text>{{ c.all }}</text></view>
@@ -506,7 +506,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .hint { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .hint.pad { margin: 12px 4px 0; }
 .bcard { position: relative; display: flex; flex-direction: column; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: var(--v5-ink); }
-[data-theme="light"] .bcard { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
 .bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--v5-surface-2); }
 .bcard__nm { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
@@ -524,7 +523,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .acct__no { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); }
 .stage { position: relative; margin-top: 12px; }
 .slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
-[data-theme="light"] .slab { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .slab__head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
