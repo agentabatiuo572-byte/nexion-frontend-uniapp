@@ -1,12 +1,11 @@
 <template>
   <AppChassis active="me">
-    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" />
+    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" :back-action="leavePage" />
     <view class="payment-pin-page">
       <text v-if="!state || state.configured" class="payment-pin-page__note">{{ t.paymentPin.purpose }}</text>
       <view v-if="loading" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>
       <template v-else-if="ui.pendingOperation">
         <text class="payment-pin-page__note" role="status">{{ t.paymentPin.pending }}</text>
-        <NxButton variant="primary" class="payment-pin-page__primary" @click="pin.resumePending">{{ t.paymentPin.query }}</NxButton>
       </template>
       <template v-else-if="!state">
         <text class="payment-pin-page__error" role="alert">{{ t.paymentPin.readFailed }}</text>
@@ -38,6 +37,7 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -47,12 +47,13 @@ import PaymentPasswordInput from "@/components/payment-password-input.vue";
 import { usePaymentPassword, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navTo } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
 import { sessionVault } from "@/api/runtime";
 const pin = usePaymentPassword(); const ui = pin.ui; const state = computed(() => ui.state); const t = useT();
 const passwords = reactive({ current: "", new: "", confirm: "" }); const loading = ref(true);
-let active = true; let submitted = false;
+const active = ref(true);
+let pageGeneration = 0;
 const fields = computed(() => ([{ key: "current" as const, label: t.value.paymentPin.current }, { key: "new" as const, label: t.value.paymentPin.new }, { key: "confirm" as const, label: t.value.paymentPin.confirmNew }]));
 const complete = computed(() => Object.values(passwords).every(validPaymentPassword));
 const validation = computed(() => {
@@ -68,28 +69,47 @@ const lockMessage = computed(() => {
 });
 const canSave = computed(() => complete.value && !validation.value && !ui.busy && !state.value?.lockedUntil && !ui.pendingOperation);
 function clear() { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; }
-async function load() { loading.value = true; ui.changeError = ""; if (!sessionVault.read()) return; await pin.refreshStatus(); if (active) { loading.value = false; await pin.resumePending(); } }
-async function setup() { if (await pin.setup()) { toast.success(t.value.paymentPin.setupSuccess); navTo("/me"); } else await load(); }
-async function recover() { if (ui.busy) return; clear(); if (await pin.recover()) { toast.success(t.value.paymentPin.resetSuccess); navTo("/me"); } else await load(); }
+async function load() {
+  await pin.waitForQuery();
+  if (!active.value) return;
+  const generation = pageGeneration;
+  loading.value = true; ui.changeError = "";
+  if (!sessionVault.read()) return;
+  try { pin.restorePendingRead(); }
+  catch { if (active.value) { ui.changeError = "failed"; loading.value = false; } return; }
+  await pin.refreshStatus({ isCurrent: () => active.value && generation === pageGeneration });
+  if (active.value && generation === pageGeneration) loading.value = false;
+}
+useAutoRecovery({
+  failed: () => active.value && !loading.value && !ui.visible && !!ui.pendingOperation && !ui.busy && !ui.reading,
+  retry: () => {
+    const generation = pageGeneration;
+    return pin.query(() => active.value && generation === pageGeneration && !ui.visible);
+  }, repeatMs: 15_000,
+});
+async function leavePage() { await pin.waitForQuery(); if (active.value) navBack("/pages/me/me"); }
+async function setup() { await pin.waitForQuery(); if (!await pin.setup()) await load(); }
+async function recover() { await pin.waitForQuery(); if (ui.busy) return; clear(); if (!await pin.recover()) await load(); }
 async function save() {
+  await pin.waitForQuery();
   if (!canSave.value || !state.value) return;
-  submitted = true;
   const result = pin.change(passwords.current, passwords.new, passwords.confirm);
   passwords.current = "";
-  const success = await result;
-  if (!success && !ui.visible) submitted = false;
+  await result;
   if (pin.locked() || ui.visible) clear();
 }
 watch(() => ui.completedRevision, () => {
-  if (submitted && ui.completedOperation === "change") {
-    submitted = false; clear(); toast.success(t.value.paymentPin.changeSuccess); navTo("/me");
-  }
+  if (!active.value || ui.context || !ui.completedOperation) return;
+  clear(); toast.success(t.value.paymentPin[`${ui.completedOperation}Success`]); navTo("/me");
+});
+watch(() => ui.rejectedRevision, () => {
+  if (active.value && !ui.visible) toast.error(t.value.paymentPin[ui.error || "failed"]);
 });
 // After an H5 reload the session is restored after the page shows: load() waits for it and reads here.
-const unsubscribe = sessionVault.subscribe?.((_previous, next, continuation) => { if (!continuation) { clear(); submitted = false; if (next && active) void load(); } });
-function hide() { active = false; clear(); }
+const unsubscribe = sessionVault.subscribe?.((_previous, next, continuation) => { if (!continuation) { clear(); if (next && active.value) void load(); } });
+function hide() { pageGeneration++; active.value = false; clear(); }
 function visibility() { if (typeof document !== "undefined" && document.hidden) hide(); }
-onShow(() => { active = true; void load(); }); onHide(hide); onUnload(hide);
+onShow(() => { active.value = true; void load(); }); onHide(hide); onUnload(hide);
 let timer: ReturnType<typeof setInterval>;
 onMounted(() => { timer = setInterval(pin.tick, 1000); if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
 onUnmounted(() => { clear(); clearInterval(timer); unsubscribe?.(); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });

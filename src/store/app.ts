@@ -495,14 +495,15 @@ export const useApp = defineStore("app", () => {
       void syncRemoteTaskAssignments();
     }
   }
-  function acceptPhoneActivation(): void {
+  function acceptPhoneActivation(options: { reportOnline?: boolean } = {}): void {
     // A confirmed activation supersedes failures from the previous binding.
     remoteTaskForegroundEpoch += 1;
     remoteTaskSyncAfter = 0;
     remotePhoneBindingInvalid.value = false;
     nativePhoneBinding = null;
     invalidateRemoteTaskAssignments();
-    void syncRemoteTaskAssignments();
+    // Outcome recovery may finalize local state, but must not send the phone-online POST.
+    if (options.reportOnline !== false) void syncRemoteTaskAssignments();
   }
   function invalidateRemoteTaskAssignments(): void {
     taskAssignmentReadEpoch += 1;

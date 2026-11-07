@@ -91,11 +91,6 @@
 
       <view v-if="remoteApiEnabled && pendingExchangeLeases.length" style="margin: 16px 16px 0">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.exchange.pendingRecoveryHint }}</text>
-        <view role="button" tabindex="0" :aria-disabled="recoveringExchange ? 'true' : 'false'"
-          class="grid place-items-center" style="min-height: 44px; color: var(--v5-brand)"
-          @click="recoverPendingExchange"  @keydown.enter.prevent="recoverPendingExchange" @keydown.space.prevent="recoverPendingExchange">
-          <text>{{ recoveringExchange ? t.exchange.recoveryChecking : t.exchange.recoverPending }}</text>
-        </view>
       </view>
       <!-- UVT note (plain text, no box) -->
       <view class="ex-note">
@@ -203,7 +198,7 @@ import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBills } from "@/lib/money-receipt";
-import { createExchangePendingMutationStore, executeExchangeSwap, recoverExchangeSwap, ExchangeOutcomeUnknownError, type ExchangeSwapIntent } from "@/lib/exchange-pending-mutation";
+import { createExchangePendingMutationStore, executeExchangeSwap, recoverExchangeSwap, ExchangeRejectedError, ExchangeOutcomeUnknownError, type ExchangeSwapIntent } from "@/lib/exchange-pending-mutation";
 import { acquireExchangeCancelCommand, createExchangeCancelStorage, exchangeOrderCanCancel, finishExchangeCancelCommand, isCurrentExchangeCancelScope, visibleQueuedExchangeOrders } from "@/lib/exchange-cancel";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
@@ -239,7 +234,9 @@ const pendingExchangeLeases = computed(() => {
   return pendingExchangeMutations.list(app.accountKey);
 });
 const recoveringExchange = ref(false);
+const submitting = ref(false);
 let pendingRecoveryGeneration = 0;
+let pendingRecoveryRead: Promise<void> | null = null;
 const exchangeCancelStorage = createExchangeCancelStorage();
 const cancellingOrderNo = ref<string | null>(null);
 const historyLoadingMore = ref(false);
@@ -303,6 +300,7 @@ async function syncRemoteState(
   runScope = captureRuntimeRevision(),
 ): Promise<boolean> {
   if (!remoteApiEnabled) return true;
+  if (pendingExchangeLeases.value.length || recoveringExchange.value) return false;
   if (!remoteScopeCurrent(scope, runScope)) return false;
   if (remoteFirstPagePending.value) return false;
   const readGeneration = ++remoteReadGeneration;
@@ -341,6 +339,7 @@ const canLoadMoreHistory = computed(() => remoteApiEnabled
   && remoteState.value.orders.length < remoteState.value.ordersPage.total);
 
 async function loadMoreHistory() {
+  await pendingRecoveryRead?.catch(() => {});
   if (!remoteState.value || !canLoadMoreHistory.value || historyLoadingMore.value) return;
   const scope = captureExchangeScope();
   const runScope = captureRuntimeRevision();
@@ -379,6 +378,7 @@ async function loadMoreHistory() {
 }
 
 async function cancelRemoteOrder(exchangeNo: string): Promise<"cancelled" | "unknown" | "stale" | "not-cancellable"> {
+  await pendingRecoveryRead?.catch(() => {});
   if (!remoteApiEnabled) return "unknown";
   const scope = captureExchangeScope();
   const runScope = captureRuntimeRevision();
@@ -551,41 +551,51 @@ onUnmounted(() => {
   if (agoTimer) clearInterval(agoTimer);
 });
 
-async function recoverPendingExchange() {
-  if (!remoteApiEnabled || recoveringExchange.value || submitting.value || cancellingOrderNo.value) return;
-  const scope = captureExchangeScope();
-  const runScope = captureRuntimeRevision();
-  if (!remoteScopeCurrent(scope, runScope)) return;
+function recoverPendingExchange(): Promise<void> {
+  if (pendingRecoveryRead) return pendingRecoveryRead;
+  if (!remoteApiEnabled || !exchangeMounted || submitting.value || cancellingOrderNo.value) return Promise.resolve();
+  const scope = captureExchangeScope(), runScope = captureRuntimeRevision();
+  if (!remoteScopeCurrent(scope, runScope)) return Promise.resolve();
   const leases = pendingExchangeMutations.list(scope.accountKey);
-  if (!leases.length) return;
+  if (!leases.length) return Promise.resolve();
   const generation = ++pendingRecoveryGeneration;
   const current = () => generation === pendingRecoveryGeneration && remoteScopeCurrent(scope, runScope);
   recoveringExchange.value = true;
   const mutation = beginRemoteMutation(scope.accountKey);
-  try {
+  const read = Promise.resolve().then(async () => {
     for (const lease of leases) {
       if (!current()) return;
-      const result = await recoverExchangeSwap({
-        pending: pendingExchangeMutations, lease,
-        recover: saved => exchangeApi.recover(saved.intent.direction, saved.intent.fromAmount,
-          saved.intent.queueIfCapped, saved.key),
-        fetchState: () => exchangeApi.fetchState(), isCurrent: current,
-      });
-      if (!current()) return;
-      commitRemoteSnapshot(result.snapshot);
-      remoteError.value = null;
-      remoteSnapshotReceivedAt.value = Date.now();
-      refreshCommittedExchangeWalletProjection(result.order as ExchangeOrder, scope, runScope);
-      notifyRemoteSwapResult(result.order as ExchangeOrder, scope, runScope);
+      try {
+        const result = await recoverExchangeSwap({
+          pending: pendingExchangeMutations, lease,
+          recover: saved => exchangeApi.recover(saved.intent.direction, saved.intent.fromAmount,
+            saved.intent.queueIfCapped, saved.key),
+          fetchState: () => exchangeApi.fetchState(), isCurrent: current,
+        });
+        if (!current()) return;
+        commitRemoteSnapshot(result.snapshot);
+        remoteError.value = null;
+        remoteSnapshotReceivedAt.value = Date.now();
+        refreshCommittedExchangeWalletProjection(result.order as ExchangeOrder, scope, runScope);
+        notifyRemoteSwapResult(result.order as ExchangeOrder, scope, runScope);
+      } catch (cause) {
+        if (!(cause instanceof ExchangeRejectedError)) throw cause;
+        if (current()) toast.error(t.value.exchange.swapFailedReason);
+      }
     }
-  } catch {
-    if (current()) toast.info(t.value.exchange.pendingRecoveryHint);
-  } finally {
+  }).finally(() => {
     mutation.finish();
-    if (generation === pendingRecoveryGeneration) recoveringExchange.value = false;
+    if (pendingRecoveryRead === read) { pendingRecoveryRead = null; recoveringExchange.value = false; }
     pendingExchangeRevision.value += 1;
-  }
+  });
+  pendingRecoveryRead = read;
+  return read;
 }
+useAutoRecovery({
+  failed: () => remoteApiEnabled && exchangeMounted && pendingExchangeLeases.value.length > 0
+    && !recoveringExchange.value && !submitting.value && !cancellingOrderNo.value,
+  retry: recoverPendingExchange, repeatMs: 15_000,
+});
 
 const fromSym = computed(() => (direction.value === "usdt2nex" ? "USDT" : "UVT"));
 const toSym = computed(() => (direction.value === "usdt2nex" ? "UVT" : "USDT"));
@@ -654,7 +664,6 @@ const valid = computed(() => exchangeSubmissionAllowed.value
  * 置位点在**第一个 await 之前**,复位统一交给 finally:确认弹窗打开的那几秒
  * 页面还活着,不挡就能叠出第二个弹窗 → 两次确认 = 两条完整兑换链。
  */
-const submitting = ref(false);
 const ctaEnabled = computed(() => valid.value && !submitting.value);
 // USD value of this swap = the leg denominated in USDT
 const swapUSDValue = computed(() => remoteApiEnabled ? (remoteQuote.value?.grossUsdt ?? 0) : (direction.value === "usdt2nex" ? fromAmount.value : toAmount.value));
@@ -684,10 +693,13 @@ function flip() {
 }
 
 useAutoRecovery({
-  failed: () => remoteApiEnabled && remoteError.value !== null && !remoteFirstPagePending.value && !historyLoadingMore.value,
+  failed: () => remoteApiEnabled && !pendingExchangeLeases.value.length && !submitting.value && !cancellingOrderNo.value
+    && remoteError.value !== null && !remoteFirstPagePending.value && !historyLoadingMore.value,
   retry: () => syncRemoteState(),
 });
-function goHowItWorks() {
+async function goHowItWorks() {
+  await pendingRecoveryRead?.catch(() => {});
+  if (!exchangeMounted) return;
   navTo("/pages/me/wallet-exchange-how");
 }
 
@@ -734,6 +746,7 @@ function refreshCommittedExchangeWalletProjection(
 }
 
 async function handleConfirm() {
+  await pendingRecoveryRead?.catch(() => {});
   // 🔴 重入守卫排在最前:无守卫时连点两次会排队两条完整兑换链,而第二条的额度门
   // 读到的还是第一条 v3.record 之前的计数 —— 两笔都放行,日限直接翻倍。
   if (submitting.value || !exchangeSubmissionAllowed.value) return;
@@ -939,6 +952,9 @@ async function handleConfirm() {
   } catch (err) {
     if (remoteApiEnabled) {
       if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
+      if (err instanceof ExchangeRejectedError) {
+        toast.error(t.value.exchange.swapFailedReason); return;
+      }
       if (err instanceof ExchangeOutcomeUnknownError) {
         if (app.accountKey === snap.account && err.authoritativeState) {
           commitRemoteSnapshot(err.authoritativeState as ExchangeSnapshot);

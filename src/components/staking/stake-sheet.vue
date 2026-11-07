@@ -7,15 +7,12 @@
   postMoneyBill,见 lib/money-receipt.ts),不在 store 里;不裸调资金原语 / 账单写入。
 -->
 <template>
-  <view v-if="open && recovering" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.stakingV3.sheet.checkPrevious">
+  <view v-if="open && recovering" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.stakingV3.sheet.pendingHint">
     <view class="nx-sheet-backdrop nx-sheet-fade-in" @click="emitClose" />
     <view class="nx-glass-sheet nx-sheet-panel nx-sheet-slide-up" :style="panelStyle">
       <text class="block" :style="titleStyle">{{ staking.pendingOpenRejection ? t.stakingV3.sheet.failedTitle : t.stakingV3.toast.openFailedTitle }}</text>
       <text v-if="pendingOpen" class="block" :style="subtitleStyle">{{ fmt(t.stakingV3.sheet.cta, { amount: formatAmount(pendingOpen.amountUsdt), n: pendingTerm }) }}</text>
       <text v-if="!staking.pendingOpenRejection" class="block" :style="noticeStyle">{{ t.stakingV3.sheet.pendingHint }}</text>
-      <view class="nx-staking-sheet-status-cta" role="button" :aria-disabled="remotePending || recoveryBlocked" :tabindex="remotePending || recoveryBlocked ? -1 : 0" :style="submitStyle" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit">
-        <text>{{ t.stakingV3.sheet.checkPrevious }}</text>
-      </view>
       <view role="button" tabindex="0" :style="closeBtnStyle" @click="emitClose" @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose"><text>{{ t.ui.close }}</text></view>
     </view>
   </view>
@@ -106,6 +103,9 @@
 <script setup lang="ts">
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { formatStakingPercentage } from "@/lib/staking-percentage";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { onShow, onHide } from "@dcloudio/uni-app";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { ref, computed, watch, onBeforeUnmount, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -230,45 +230,55 @@ function onAmountInput(e: Event) {
 function setMax() {
   amount.value = normalizeCommandAmount(staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt);
 }
-function emitClose() {
+async function emitClose() {
+  await openRead?.catch(() => {});
   // Invalidate before the parent applies v-model, including close/reopen in one tick.
   sheetOpenGeneration += 1;
   emit("update:open", false);
 }
 
+const readingOpen = ref(false);
+const pageVisible = ref(true);
+let openRead: Promise<void> | null = null;
+onShow(() => { pageVisible.value = true; });
+onHide(() => { pageVisible.value = false; sheetOpenGeneration++; });
+function readPendingOpen(): Promise<void> {
+  if (openRead) return openRead;
+  if (!props.open || !pageVisible.value || remotePending.value || !pendingOpen.value || recoveryBlocked.value) return Promise.resolve();
+  const original = pendingOpen.value, account = app.accountKey, epoch = app.accountBindingEpoch;
+  const generation = sheetOpenGeneration, runtime = captureRuntimeRevision();
+  const current = () => account === app.accountKey && epoch === app.accountBindingEpoch
+    && generation === sheetOpenGeneration && props.open && pageVisible.value && isCurrentRuntimeRevision(runtime);
+  const lease = remoteGate.lookup(account, "open", original);
+  if (!lease || lease.pending) return Promise.resolve();
+  readingOpen.value = true;
+  const read = Promise.resolve().then(async () => {
+    if (!current()) return;
+    const status = await staking.openStatus(original.tierKey, original.amountUsdt, lease.key);
+    if (!current()) return;
+    if (status === "SUCCEEDED" || status === "FAILED") {
+      remoteGate.complete(lease, true);
+      restorePendingOpen();
+      staking.refreshPendingOpen();
+      if (status === "SUCCEEDED") toast.success(t.value.stakingV3.toast.stakeSuccess);
+      else toast.error(t.value.stakingV3.sheet.failedTitle);
+    }
+  }).finally(() => {
+    if (openRead === read) { openRead = null; readingOpen.value = false; }
+  });
+  openRead = read;
+  return read;
+}
+useAutoRecovery({
+  failed: () => props.open && pageVisible.value && !staking.isMockMode && !!pendingOpen.value
+    && !recoveryBlocked.value && !remotePending.value && !readingOpen.value,
+  retry: readPendingOpen, repeatMs: 15_000,
+});
 async function submit() {
+  await openRead?.catch(() => {});
   if (!props.open || remotePending.value) return;
   restorePendingOpen();
-  if (!staking.isMockMode && (pendingOpen.value || recoveryBlocked.value)) {
-    if (recoveryBlocked.value || !pendingOpen.value) return;
-    const original = pendingOpen.value;
-    const account = app.accountKey;
-    const epoch = app.accountBindingEpoch;
-    const generation = sheetOpenGeneration;
-    const lease = remoteGate.lookup(account, "open", original);
-    if (!lease || lease.pending) return;
-    remotePending.value = true;
-    try {
-      const status = await staking.openStatus(original.tierKey, original.amountUsdt, lease.key);
-      if (account !== app.accountKey || epoch !== app.accountBindingEpoch || generation !== sheetOpenGeneration || !props.open) return;
-      if (status === "SUCCEEDED" || status === "FAILED") {
-        remoteGate.complete(lease, true);
-        restorePendingOpen();
-        staking.refreshPendingOpen();
-        if (status === "SUCCEEDED") toast.success(t.value.stakingV3.toast.stakeSuccess);
-        else toast.error(t.value.stakingV3.sheet.failedTitle);
-      } else {
-        toast.error(t.value.stakingV3.toast.openFailedTitle, t.value.stakingV3.sheet.pendingHint);
-      }
-    } catch {
-      if (account === app.accountKey && epoch === app.accountBindingEpoch && generation === sheetOpenGeneration && props.open) {
-        toast.error(t.value.stakingV3.toast.openFailedTitle, t.value.stakingV3.sheet.pendingHint);
-      }
-    } finally {
-      remotePending.value = false;
-    }
-    return;
-  }
+  if (!staking.isMockMode && (pendingOpen.value || recoveryBlocked.value)) return;
   if (!canOpen.value) return;
   const term = props.term;
   if (term === null) return;
@@ -313,7 +323,7 @@ async function submit() {
           : cause.reason === "unavailable" ? t.value.staking.remoteUnavailableClosed
           : cause.reason === "disclosure" ? t.value.stakingV3.sheet.disclosureRejectedTitle
           : t.value.stakingV3.sheet.failedTitle;
-        toast.error(title, !cause.retired ? t.value.stakingV3.sheet.checkPrevious
+        toast.error(title, !cause.retired ? t.value.stakingV3.sheet.pendingHint
           : cause.reason === "disclosure" ? t.value.stakingV3.sheet.disclosureRejectedHint : undefined);
         return;
       }
