@@ -1,5 +1,5 @@
 <template>
-  <view class="amb-card nx-viz-press" :class="{ 'amb-card--glass nx-frosted-button': glass }" role="link" tabindex="0" :aria-label="fmt(c.openDetail, { title: application.city ?? '', status: statusText })"
+  <view class="amb-card nx-viz-press" :class="glass ? 'nx-soft-glass' : 'amb-card--solid'" role="link" tabindex="0" :aria-label="fmt(c.openDetail, { title: application.city ?? '', status: statusText })"
     @click="open" @keydown.enter.prevent="open">
     <view class="amb-card__head">
       <AmbassadorBucketIcon :bucket="application.bucket" />
@@ -42,10 +42,9 @@ function open() { if (props.application.applicationId) void navTo(AMBASSADOR_ROU
 </script>
 
 <style scoped>
-/* Content cards are solid; the records page marks its in-progress card as the page focus (soft glass). */
-.amb-card { display: block; box-sizing: border-box; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow, none); color: var(--v5-ink); cursor: pointer; }
-.amb-card--glass { background: color-mix(in srgb, var(--v5-ink) 7%, transparent); box-shadow: var(--ui-glass-edge-shadow); }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .amb-card--glass { background: var(--v5-surface-2); } }
+/* Content cards are solid; the records page marks its in-progress card as the page focus (shared soft glass). */
+.amb-card { display: block; box-sizing: border-box; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); color: var(--v5-ink); cursor: pointer; }
+.amb-card--solid { background: var(--v5-surface); box-shadow: var(--v5-glass-shadow, none); }
 .amb-card__head { display: flex; align-items: flex-start; gap: var(--ui-space-inline); }
 .amb-card__titles { flex: 1; min-width: 0; }
 .amb-card__title { display: block; font: var(--ui-type-card-title-weight, 600) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
