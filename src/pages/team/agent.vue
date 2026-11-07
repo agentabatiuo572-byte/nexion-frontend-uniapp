@@ -87,11 +87,11 @@
               <view class="agent-control"><input v-model="city" class="agent-control__value agent-control__input" :aria-label="t.agent.fieldCity" type="text" :disabled="!formReady || submitting" :placeholder="t.agent.cityPlaceholder" placeholder-class="agent-control__placeholder" /></view>
             </view>
             <view class="agent-field">
-              <view class="agent-field__label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg><text>{{ auditCopy.budgetLabel }}</text></view>
+              <view class="agent-field__label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg><text>{{ c.budgetLabel }}</text></view>
               <view class="agent-control">
                 <text class="agent-control__prefix">USDT</text>
-                <text v-if="visibility.hidden" class="agent-control__value" :aria-label="auditCopy.budgetLabel">{{ visibility.mask(budgetText) }}</text>
-                <input v-else v-model="budgetText" class="agent-control__value agent-control__input" :aria-label="auditCopy.budgetLabel" type="text" inputmode="decimal" :disabled="!formReady || submitting" />
+                <text v-if="visibility.hidden" class="agent-control__value" :aria-label="c.budgetLabel">{{ visibility.mask(budgetText) }}</text>
+                <input v-else v-model="budgetText" class="agent-control__value agent-control__input" :aria-label="c.budgetLabel" type="text" inputmode="decimal" :disabled="!formReady || submitting" />
               </view>
               <text v-if="selectedBucket" class="agent-field__help">{{ fmt(c.bucketRange, { bucket: selectedBucket.title, range: selectedBucket.range }) }}</text>
             </view>
@@ -134,7 +134,6 @@ import AmbassadorBucketIcon from "@/components/team/ambassador-bucket-icon.vue";
 import { useVRank } from "@/store/v-rank";
 import { rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
-import { networkReauditCopy } from "@/i18n/network-reaudit";
 import { ambassadorCopy } from "@/i18n/ambassador";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
@@ -165,7 +164,6 @@ const visibility = useDataVisibility();
 const vrank = useVRank();
 const locale = useLocaleStore();
 const logicCopy = computed(() => teamLogicCopy(locale.code));
-const auditCopy = computed(() => networkReauditCopy(locale.code));
 const c = computed(() => ambassadorCopy(locale.code));
 const app = useApp();
 const auth = useAuth();
