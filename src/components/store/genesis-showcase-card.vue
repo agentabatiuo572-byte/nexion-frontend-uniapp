@@ -15,8 +15,6 @@
 <template>
   <view>
     <view class="nx-glass-card relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
-      <!-- Gold aurora wash（装饰,卡内合法光晕:bg+overflow-hidden）-->
-      <view aria-hidden :style="auroraStyle" />
 
       <view class="relative" style="z-index: 1">
         <GenesisArtwork style="border-radius: 12px; margin-bottom: 14px" />
@@ -208,15 +206,6 @@ const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   borderRadius: "var(--nx-glass-radius)",
   padding: "18px 16px 16px",
 };
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  top: "-46px",
-  right: "-36px",
-  width: "220px",
-  height: "170px",
-  background: "radial-gradient(closest-side, color-mix(in srgb, var(--v5-genesis-gold) 16%, transparent), transparent 72%)",
-  pointerEvents: "none",
-};
 const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   letterSpacing: "0.08em",
@@ -267,7 +256,7 @@ const ctaStyle: CSSProperties = {
   padding: "0 16px",
   borderRadius: "999px",
   gap: "5px",
-  background: "linear-gradient(135deg, color-mix(in srgb, var(--v5-genesis-gold) 22%, transparent), color-mix(in srgb, var(--v5-genesis-gold) 10%, transparent))",
+  background: "color-mix(in srgb, var(--v5-genesis-gold) 16%, transparent)",
   color: "var(--v5-genesis-gold)",
 };
 const ctaTextStyle: CSSProperties = {

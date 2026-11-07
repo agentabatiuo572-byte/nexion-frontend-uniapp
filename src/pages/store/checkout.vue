@@ -178,7 +178,6 @@
         <!-- === confirmed === -->
         <view v-else-if="step === 'confirmed'" class="nx-glass-card mx-4 rounded-2xl text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
           <template v-if="firstOrderCelebrating">
-            <view aria-hidden :style="celebrateGlowStyle" />
             <view class="relative">
               <view class="mx-auto grid place-items-center nx-pop-in" :style="medalStyle">
                 <text style="font-size: 26px">🏅</text>
@@ -244,11 +243,11 @@
       </view>
     </NxSheet>
     <template #pageFixed>
-      <view v-if="promotionRoute && promotionCheckout?.footer" class="checkout-sticky">
+      <view v-if="promotionRoute && promotionCheckout?.footer" class="checkout-sticky nx-glass-bar">
         <view class="checkout-sticky-copy"><CheckoutAmount class="checkout-total" :value="promotionCheckout.footer.amountValue" :currency="promotionCheckout.footer.currency" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="promotionCheckout.footer.disabled" :label="promotionCheckout.footer.label" @click="promotionCheckout.footer.action" />
       </view>
-      <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky">
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCheckoutCreate && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <view class="checkout-sticky-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || paymentFlowBusy || checkoutLeaving" :busy="checkoutWalletRefreshing || quantitySwitching || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
@@ -2947,12 +2946,6 @@ const centerTitleStyle: CSSProperties = {
   fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
 };
-const celebrateGlowStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "radial-gradient(60% 70% at 50% 0%, var(--v5-brand-soft), transparent 70%)",
-  pointerEvents: "none",
-};
 const medalStyle: CSSProperties = {
   width: "56px",
   height: "56px",
@@ -3079,10 +3072,10 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-voucher-choices { padding:var(--v5-space-1) var(--v5-space-4) var(--v5-space-1) 64px; }
 .checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; min-height:44px; padding:6px 0 6px 8px; color:var(--v5-brand); font-size:13px; }
 .checkout-payment { cursor:pointer; transition:background 180ms ease; }
-.checkout-payment--active { background:linear-gradient(90deg,color-mix(in srgb,var(--v5-brand) 12%,transparent),color-mix(in srgb,var(--v5-brand) 2%,transparent)); box-shadow:inset 3px 0 0 var(--v5-brand); }
+.checkout-payment--active { background:color-mix(in srgb,var(--v5-brand) 7%,transparent); box-shadow:inset 3px 0 0 var(--v5-brand); }
 .checkout-payment--active .checkout-icon { color:var(--v5-brand); }
 .checkout-radio { flex:none; width:20px; height:20px; border-radius:50%; border:1.5px solid var(--v5-ink-4); background:var(--v5-ink); }
-.checkout-radio--active { border-color:var(--v5-brand); background:radial-gradient(circle,var(--v5-brand) 0 55%,transparent 62%); }
+.checkout-radio--active { box-sizing:border-box; padding:4px; border-color:var(--v5-brand); background:var(--v5-brand); background-clip:content-box; }
 .checkout-fees { padding:6px 0; }
 .checkout-fee { gap:var(--v5-space-4); min-height:40px; padding:6px 16px; }
 .checkout-fee :deep(uni-text),.checkout-fee :deep(text) { font-size:14px !important; line-height:20px; }
@@ -3109,7 +3102,7 @@ button.checkout-policy-link::after { border:0; }
 .checkout-policy-title { display:block; margin-bottom:6px; color:var(--v5-ink); font-weight:600; }
 .checkout-policy-links { border-top:1px solid var(--v5-border); }
 .checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
-.checkout-sticky { position:absolute; bottom:0; left:0; right:0; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:100px; padding:var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background:linear-gradient(180deg,color-mix(in srgb,var(--ui-ticket-top) 70%,transparent),color-mix(in srgb,var(--ui-ticket-bottom) 94%,transparent)); border-top:1px solid color-mix(in srgb,var(--v5-ink) 5%,transparent); backdrop-filter:blur(18px) saturate(160%); -webkit-backdrop-filter:blur(18px) saturate(160%); }
+.checkout-sticky { position:absolute; bottom:0; left:0; right:0; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:100px; padding:var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .checkout-sticky-copy { min-width:0; }
 .checkout-total { display:block; font:600 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:1 0 150px; min-width:150px; min-height:48px; font-size:var(--ui-type-button); box-shadow:0 8px 22px color-mix(in srgb,var(--v5-brand) 30%,transparent),inset 0 1px 0 var(--v5-liquid-highlight); }
