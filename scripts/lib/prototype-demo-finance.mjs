@@ -47,5 +47,5 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       feeUsdt: policy.feeUsdt, feeUsdtExact: policy.feeUsdtExact, minDepositUsdt: policy.minDepositUsdt,
       minDepositUsdtExact: policy.minDepositUsdtExact, confirmations: policy.confirmations };
   }
-  if (p === "/api/deposits") return empty ? [] : [{ depositId: "CR-77", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdt: 50.123456, creditedUsdt: 50, confirmations: 15, status: "CREDITED", createdAt: now }];
+  if (p === "/api/deposits") return empty ? [] : [{ depositId: "CR-77", network: "BEP20", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdt: 50.123456, grossAmountUsdtExact: "50.123456", creditedUsdt: 50, creditedUsdtExact: "50", confirmations: 15, status: "CREDITED", createdAt: now }];
 };
