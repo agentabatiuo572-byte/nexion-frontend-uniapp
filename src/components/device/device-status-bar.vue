@@ -107,9 +107,16 @@ onUnmounted(() => {
   mask-image: linear-gradient(to bottom, #000 0%, transparent 55%);
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 55%);
 }
+/* Uniform page-colour tint; its lower edge fades with the same mask as the 10px blur layer. */
 .nx-statusbar-material::after {
   content: "";
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--v5-bg) 56%, transparent) 0%, color-mix(in srgb, var(--v5-bg) 28%, transparent) 40%, transparent 100%);
+  background: color-mix(in srgb, var(--v5-bg) 56%, transparent);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 15%, transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 15%, transparent 70%);
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .nx-statusbar-material > view { display: none; }
+  .nx-statusbar-material::after { background: var(--v5-surface-2); mask-image: none; -webkit-mask-image: none; }
 }
 .nx-statusbar__inner {
   position: absolute;
