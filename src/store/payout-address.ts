@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, onScopeDispose, ref } from "vue";
-import { payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
+import type { ApiRuntimeConfig } from "@/api/runtime-config";
 import {
   payoutAddressEpochMs,
   type PayoutAddressNetwork,
@@ -17,7 +18,7 @@ import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import {
   applyAddAddress,
   applyChangeAddress,
@@ -198,7 +199,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     return writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, boundKey, book.value);
   }
 
-  type PayoutRemoteRequest = RemoteAccountRequest & { commerceRun: RuntimeRevisionScope };
+  type PayoutRemoteRequest = RemoteAccountRequest & { apiOrigin: ApiRuntimeConfig };
   const remoteReadState = ref<{ scope: PayoutRemoteRequest; status: PayoutAddressReadStatus } | null>(null);
   let remoteReadInFlight: { scope: PayoutRemoteRequest; promise: Promise<boolean> } | null = null;
 
@@ -212,16 +213,17 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   }
 
   function requestScope(): PayoutRemoteRequest {
-    return { ...remoteAccountEpoch.snapshot(), commerceRun: captureRuntimeRevision() };
+    return { ...remoteAccountEpoch.snapshot(), apiOrigin: { ...apiRuntimeConfig } };
   }
 
   function scopeIsCurrent(request: PayoutRemoteRequest): boolean {
     return remoteAccountEpoch.isCurrent(request) && request.accountKey === boundKey
-      && isCurrentRuntimeRevision(request.commerceRun);
+      && request.apiOrigin.environment === apiRuntimeConfig.environment
+      && request.apiOrigin.baseUrl === apiRuntimeConfig.baseUrl;
   }
 
   // A superseded refresh returning true is not proof of a successful read.
-  // Consumers observe the latest read for their current account/runtime instead.
+  // Consumers observe the latest read for their current account/API origin instead.
   function readStatusFor(accountKey: string): PayoutAddressReadStatus {
     if (!payoutAddressServerEnabled) return "ready";
     const state = remoteReadState.value;
@@ -237,6 +239,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
    *  权威不可达自吞返 false(resilience 门);被更新调用顶替(superseded)不是失败事实,返 true。 */
   function refreshRemote(): Promise<boolean> {
     if (!payoutAddressServerEnabled) return Promise.resolve(true);
+    if (remoteReadState.value && !scopeIsCurrent(remoteReadState.value.scope)) clearRemoteSnapshot();
     if (remoteReadInFlight && scopeIsCurrent(remoteReadInFlight.scope)) return remoteReadInFlight.promise;
     const version = ++remoteLoadVersion;
     const request = requestScope();
@@ -267,11 +270,11 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     return promise;
   }
 
-  // Cold-session catalogue publication advances the runtime after bindAccount's
-  // read has started (or even finished). Invalidate its snapshot and read the
-  // new scope once; stale responses still pass through the original fences.
+  // prepareProductCatalog also notifies API-origin changes through this channel.
+  // Catalog publications/failures do not change the address book's authority:
+  // keep both the snapshot and any in-flight read when its scope is still current.
   onScopeDispose(subscribeRuntimeRevision(() => {
-    if (!payoutAddressServerEnabled || !remoteReadState.value) return;
+    if (!payoutAddressServerEnabled || !remoteReadState.value || scopeIsCurrent(remoteReadState.value.scope)) return;
     clearRemoteSnapshot();
     void refreshRemote();
   }));
