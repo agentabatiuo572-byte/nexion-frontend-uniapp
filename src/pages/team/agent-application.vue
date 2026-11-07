@@ -111,7 +111,7 @@
           <text v-else class="detail-note">{{ pack.statement || '—' }}</text>
         </view>
 
-        <view v-if="editing && pack.materialState === 'NEEDS_MORE'" class="detail-section">
+        <view v-if="editing && canLowerBudget" class="detail-section">
           <view class="detail-section__head"><text class="detail-section__title">{{ c.lowerBudget }}</text><text class="detail-section__sub">{{ c.optional }}</text></view>
           <view class="detail-card detail-card--pad">
             <view class="detail-control">
@@ -128,7 +128,7 @@
     <template #pageFixed>
       <AmbassadorActionBar v-if="pack && row && editing">
         <view class="amb-bar__row">
-          <NxButton v-if="editedBeyondCategory || editRequested" variant="secondary" :label="c.discard" :disabled="saving || picking" @click="discardChanges" />
+          <NxButton v-if="editedBeyondCategory || editRequested" variant="secondary" :label="c.discard" :disabled="saving || picking || !!pendingSubmission" @click="discardChanges" />
           <NxButton class="amb-bar__main" variant="primary" :label="saving ? c.saving : c.submit" :disabled="!!submitBlocker" :busy="saving" @click="save" />
         </view>
         <text v-if="submitError" class="amb-bar__why detail-bar-error" role="alert">{{ submitError }}</text>
@@ -226,6 +226,7 @@ const pending = computed(() => row.value?.status === "PENDING" && !locked.value 
 // Closed but the list has not caught up: show no guessed decision until the status is reread.
 const statusKnown = computed(() => pending.value || row.value?.status !== "PENDING");
 const editable = computed(() => auth.isAuthenticated && pending.value && pack.value?.canSubmit === true && !pack.value.legacyApproved);
+const canLowerBudget = computed(() => !!pack.value && [pack.value.businessReview, pack.value.financeReview].some(review => review.status === "NEEDS_MORE"));
 // Nothing submitted yet, returned for more, or a missing category: the page opens ready to edit.
 const editing = computed(() => editable.value && (editRequested.value || !pack.value?.bucket || pack.value.materialState === "NOT_SUBMITTED" || pack.value.materialState === "NEEDS_MORE"));
 const busy = computed(() => saving.value || picking.value || upload.value?.state === "uploading");
@@ -342,8 +343,8 @@ function resetDraft() {
   budget.value = value ? String(value.budgetUsdt) : ""; bucket.value = value?.bucket ?? undefined;
 }
 function discardChanges() {
-  if (saving.value || picking.value) return;
-  resetDraft(); editRequested.value = false; pendingSubmission.value = null;
+  if (saving.value || picking.value || pendingSubmission.value) return;
+  resetDraft(); editRequested.value = false;
 }
 function enterEdit() { if (editable.value) editRequested.value = true; }
 /** A known decision is final; a late read of the same application never reopens it. */
@@ -400,14 +401,22 @@ async function load(): Promise<boolean> {
       const drafts = draftsForScope(), draft = drafts.get(id);
       acceptPack(value); resetDraft();
       if (draft && !closed && draft.materialRevision === value.materialRevision) {
-        attachments.value = draft.attachments; statement.value = draft.statement; budget.value = draft.budget; bucket.value = draft.bucket;
-        editRequested.value = draft.editRequested; submitError.value = draft.submitError; pendingSubmission.value = draft.pendingSubmission;
+        attachments.value = draft.attachments; statement.value = draft.statement; budget.value = canLowerBudget.value ? draft.budget : String(value.budgetUsdt); bucket.value = draft.bucket;
+        editRequested.value = draft.editRequested || dirty.value; pendingSubmission.value = draft.pendingSubmission;
+        submitError.value = draft.pendingSubmission ? c.value.saveUnknown : draft.submitError;
       } else if (draft?.pendingSubmission) {
         // A landed command can be confirmed by the newer server packet; other stale drafts are dropped.
         pendingSubmission.value = draft.pendingSubmission;
         settlePendingSubmission(value, closed);
-        pendingSubmission.value = null;
+        if (pendingSubmission.value) { editRequested.value = true; submitError.value = c.value.saveUnknown; }
       }
+    }
+    // Reviews can change without a material revision. Keep edits, but use the current review facts.
+    if (pack.value?.materialRevision === value.materialRevision) {
+      const wasEditing = editing.value;
+      acceptPack(value);
+      if (!canLowerBudget.value) budget.value = String(value.budgetUsdt);
+      if (wasEditing && dirty.value) editRequested.value = true;
     }
     if (pendingSubmission.value) settlePendingSubmission(value, closed);
     else if (closed || (!busy.value && !dirty.value)) { if (acceptPack(value)) resetDraft(); if (closed) editRequested.value = false; }
@@ -510,6 +519,7 @@ async function retryUpload() {
 }
 const SAVE_ERRORS = ["MATERIAL_REVISION_STALE", "APPLICATION_BUCKET_REQUIRED"] as const;
 async function save() {
+  if (pack.value && !canLowerBudget.value) budget.value = String(pack.value.budgetUsdt);
   if (!editing.value || busy.value || upload.value || !dirty.value || !pack.value || !bucket.value || !attachments.value.length || !statement.value.trim()) return;
   const amount = Number(budget.value);
   if (!/^\d+(?:\.\d+)?$/.test(budget.value) || !Number.isFinite(amount) || amount <= 0 || amount > pack.value.budgetUsdt) {
@@ -518,14 +528,16 @@ async function save() {
   const id = pack.value.applicationId, current = scope(), account = app.accountKey;
   const input: AmbassadorMaterialsInput = { expectedMaterialRevision: pack.value.materialRevision,
     attachments: attachments.value.map(({ fileId, kind }) => ({ fileId, kind })), statement: statement.value.trim(),
-    ...(amount !== pack.value.budgetUsdt ? { budgetUsdt: amount } : {}), ...(!pack.value.bucket ? { bucket: bucket.value } : {}) };
+    ...(canLowerBudget.value && amount !== pack.value.budgetUsdt ? { budgetUsdt: amount } : {}), ...(!pack.value.bucket ? { bucket: bucket.value } : {}) };
   const identity = JSON.stringify(["materials", id, input]);
-  saving.value = true; submitError.value = ""; pendingSubmission.value = null;
+  saving.value = true; submitError.value = "";
   try {
     const key = acquireAmbassadorCommandKey(account, identity);
+    pendingSubmission.value = { account, identity, input };
     const value = await ambassadorApplicationApi.submitMaterials(id, input, key);
     if (!current()) return;
     finishAmbassadorCommand(account, identity);
+    pendingSubmission.value = null;
     // Reads that started before this confirmation carry older facts.
     readSeq++;
     acceptPack(value); resetDraft(); editRequested.value = false;
@@ -533,20 +545,20 @@ async function save() {
     if (row.value?.status === "PENDING") { statusStale.value = true; void recoverStatus(); }
   } catch (cause) {
     if (!current()) return;
-    const settled = isSettledRejection(cause);
     const code = asApiError(cause).message;
+    const mapped = code === "AMBASSADOR_BUDGET_INVALID" || (SAVE_ERRORS as readonly string[]).includes(code);
+    const settled = isSettledRejection(cause) || mapped || code === "APPLICATION_NOT_PENDING";
     if (code === "APPLICATION_NOT_PENDING") {
       // The application was decided meanwhile: stop editing now and show the decision the server holds.
       finishAmbassadorCommand(account, identity);
+      pendingSubmission.value = null;
       locked.value = true; editRequested.value = false; statusStale.value = true;
       toast.error(c.value.saveErrors.APPLICATION_NOT_PENDING, "");
       void load();
       return;
     }
-    if (settled) finishAmbassadorCommand(account, identity);
-    const mapped = code === "AMBASSADOR_BUDGET_INVALID" || (SAVE_ERRORS as readonly string[]).includes(code);
+    if (settled) { finishAmbassadorCommand(account, identity); pendingSubmission.value = null; }
     // Unknown outcome: keep the draft and the original key; later reads settle it, nothing is resent.
-    if (!settled && !mapped) pendingSubmission.value = { account, identity, input };
     // A definite refusal says so; anything else is unconfirmed, never a failure the user should repeat.
     submitError.value = code === "AMBASSADOR_BUDGET_INVALID" ? c.value.invalidBudget
       : mapped ? c.value.saveErrors[code as typeof SAVE_ERRORS[number]]
