@@ -351,7 +351,7 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 /* First-binding review sheet */
 .review-sheet-root { position: fixed; inset: 0; z-index: 790; display: flex; align-items: flex-end; }
 .review-scrim { position: absolute; inset: 0; background: var(--v5-bg-color-mask); }
-.review-sheet { position: relative; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 8px 16px calc(16px + var(--nx-overlay-safe-bottom, 0px)); border-radius: 28px 28px 0 0; background: var(--v5-surface); }
+.review-sheet { position: relative; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 8px 16px calc(16px + var(--nx-overlay-safe-bottom, 0px)); border-radius: 28px 28px 0 0; }
 .sheet-handle { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 18%, transparent); align-self: center; }
 .sheet-head { display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 0; }
 .sheet-actions { display: flex; flex-direction: column; gap: 8px; }
