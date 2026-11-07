@@ -641,11 +641,10 @@ const monotonicNow = ref<number | null>(readTrustedMonotonicNowMs());
 const clockFault = ref(false);
 const readApiOrigin = ref({ ...apiRuntimeConfig });
 const remoteReadStatus = computed(() => payout.readStatusFor(app.accountKey));
-watch(remoteReadStatus, status => {
-  if (status !== "ready" || !cooldownRefused.value) return;
-  // An empty snapshot cannot supersede a known cooldown refusal. Keep that
-  // reason and block confirmation until its time is known or the draft changes.
-  if (cooldownRefused.value && payout.stateFor(network.value).nextChangeAt === null) return;
+watch([() => step.value !== "unknown", () => payout.stateFor(network.value).nextChangeAt], ([displayReady, at]) => {
+  // Use the page's display gate: address and policy must both be ready, so the
+  // recorded refusal and the normal overview swap in the same render.
+  if (!displayReady || !cooldownRefused.value || at === null) return;
   backToBase();
 }, { flush: "sync" });
 const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
