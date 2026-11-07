@@ -7,7 +7,7 @@
       <view v-else-if="pageReadState === 'loading' && !policy" class="agent-loading" role="status" aria-busy="true"><text>{{ t.agent.loading }}</text></view>
       <CardStagger v-if="policy" class="agent-content">
         <!-- The page focus: headline, the V1→V5 track and eligibility share one soft-glass card. -->
-        <view class="agent-hero nx-frosted-button">
+        <view class="agent-hero nx-soft-glass">
           <view>
             <text class="agent-headline">{{ t.agent.heroHeadline }}</text>
             <text class="agent-intro">{{ fmt(t.agent.heroBody, { rank: requiredRankLabel }) }}</text>
@@ -498,9 +498,8 @@ useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAge
 .agent-page { color: var(--v5-ink); }
 .agent-loading { padding: var(--v5-space-8) var(--v5-space-4) 0; text-align: center; color: var(--v5-ink-3); }
 .agent-content { display: flex; flex-direction: column; padding-top: var(--v5-space-4); }
-/* Focus card: soft glass with a uniform fill (design system 01 §1.1.2); solid where transparency is reduced. */
-.agent-hero { display: flex; flex-direction: column; gap: var(--v5-space-4); margin: 0 var(--v5-space-4); padding: var(--ui-space-inset-hero); border-radius: var(--v5-radius-2xl); background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .agent-hero { background: var(--v5-surface-2); } }
+/* Focus card: the shared soft glass (design system 01 §1.1.2); layout only here. */
+.agent-hero { display: flex; flex-direction: column; gap: var(--v5-space-4); margin: 0 var(--v5-space-4); padding: var(--ui-space-inset-hero); border-radius: var(--v5-radius-2xl); }
 .agent-headline { display: block; font: var(--ui-type-page-title-weight, 600) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); color: var(--v5-ink); white-space: pre-line; text-wrap: balance; overflow-wrap: anywhere; }
 .agent-intro { display: block; margin-top: var(--v5-space-1); font: var(--ui-type-description-weight, 400) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); }
 .agent-track { display: flex; align-items: center; }
@@ -511,7 +510,7 @@ useAutoRecovery({ failed: () => pageReadState.value === "error", retry: retryAge
 .agent-track__node > text { display: grid; place-items: center; width: calc(100% - 2px); height: calc(100% - 2px); clip-path: inherit; background: var(--v5-surface-2); }
 .agent-track__node--done { color: var(--v5-brand); }
 .agent-track__node--current { background: var(--v5-ink-3); color: var(--v5-brand); }
-.agent-track__node--goal { width: 40px; height: 44px; color: var(--v5-brand-2); }
+.agent-track__node--goal { width: 40px; height: 44px; color: var(--v5-brand-2-ink); }
 .agent-track__label { display: block; min-height: 20px; max-width: 64px; font: 500 11px/14px var(--font-v5); text-align: center; color: var(--v5-ink-3); }
 .agent-track__stop--current .agent-track__label { color: var(--v5-brand); }
 .agent-track__stop--goal .agent-track__label { color: var(--v5-brand-2-ink); }
