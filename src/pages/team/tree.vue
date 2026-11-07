@@ -144,7 +144,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 @media (max-width: 374px) { .team-tree-content { padding-inline: var(--v5-space-4); } .tree-rosters :deep(.member-trigger .team-rank-emblem) { flex-shrink: 0; } }
 .tree-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--v5-space-2); }
-.tree-stat { --accent: var(--v5-ink); display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--ui-space-inline); border-radius: 20px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.tree-stat { --accent: var(--v5-ink); display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--ui-space-inline); border-radius: 20px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .tree-stat > text:first-child, .tree-stat .tree-total > text { overflow: hidden; font: 600 22px/28px var(--font-metric); color: var(--accent); white-space: nowrap; text-overflow: ellipsis; }
 .tree-stat--brand { --accent: var(--v5-brand); }
 .tree-stat > text.tree-points { max-width: 100%; overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }

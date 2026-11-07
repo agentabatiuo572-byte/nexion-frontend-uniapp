@@ -559,11 +559,6 @@ function toolIconStyle(_bg: string): CSSProperties {
 }
 const toolTitleStyle: CSSProperties = { marginTop: "14px", fontSize: "var(--ui-type-subheading)", fontWeight: "var(--ui-type-subheading-weight)", lineHeight: 1.4 };
 const toolSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.35 };
-const orbDotStyle: CSSProperties = {
-  width: "18px",
-  height: "18px",
-  background: "radial-gradient(circle at 30% 30%, var(--v5-brand) 0%, var(--v5-tech-cyan) 70%, transparent 100%)",
-};
 
 import TeamSummaryCard from "@/components/team/team-summary-card.vue";
 const inviteCard = ref<InstanceType<typeof InviteEarnCard> | null>(null);
@@ -594,7 +589,7 @@ useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !rec
 </script>
 
 <style scoped>
-.team-rank { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--v5-space-2); min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); border-radius: 24px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.team-rank { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--v5-space-2); min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .team-rank__header { display: flex; align-items: center; justify-content: space-between; min-height: 24px; gap: 4px; }
 .team-rank__title { font: 600 14px/20px var(--font-v5); }
 .team-rank__chev { font-size: 18px; color: var(--v5-ink-4); }
@@ -620,12 +615,12 @@ useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !rec
 .team-estimate__label { font: 400 11px/1.4 var(--font-v5); color: var(--v5-ink-3); }
 /* Reward cards (P-41): flat surface with a faint accent tint, accent icon and a mini visual. */
 .team-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-inline); }
-.team-bento__card { --accent: var(--v5-brand); position: relative; display: flex; flex-direction: column; gap: var(--ui-space-inline); min-width: 0; min-height: 168px; box-sizing: border-box; padding: var(--ui-space-inset); overflow: hidden; border-radius: var(--ui-radius-surface); background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.team-bento__card { --accent: var(--v5-brand); position: relative; display: flex; flex-direction: column; gap: var(--ui-space-inline); min-width: 0; min-height: 168px; box-sizing: border-box; padding: var(--ui-space-inset); overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .team-bento__card--wide { grid-column: span 2; min-height: 132px; }
 .team-bento__card--gold { --accent: var(--v5-warning); }
 .team-bento__card--brand { --accent: var(--v5-brand); }
 .team-bento__card--cyan { --accent: var(--ui-device-ink); }
-.team-bento__card--violet { --accent: var(--v5-nex); background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-warning) 12%, transparent), transparent 60%), var(--v5-surface); }
+.team-bento__card--violet { --accent: var(--v5-nex); }
 .team-bento__card:focus-visible, .team-tool:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .team-bento__head { display: flex; align-items: center; justify-content: space-between; }
 .team-bento__icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }

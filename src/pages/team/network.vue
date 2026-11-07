@@ -6,7 +6,7 @@
       <view class="network-content">
         <EmptyState v-if="remoteApiEnabled && network.remoteStatus === 'error' && !network.hasRemoteSnapshot" kind="recoverable-error" :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.network.retry" @cta="network.refreshCanonicalNetwork()" />
         <template v-else>
-        <view class="network-overview nx-viz-press">
+        <view class="network-overview nx-frosted-button nx-viz-press">
           <view class="network-overview__head">
             <text class="network-overview__split">{{ visibility.mask(metricsUnavailable ? '—' : ringSplitText) }}</text>
             <text class="network-overview__total"><text class="nx-num-metric">{{ visibility.mask(metricsUnavailable ? '—' : members.length) }}</text> {{ peopleUnit }}</text>
@@ -252,7 +252,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 
 <style scoped>
 .network-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
-.network-overview { padding: 0 var(--v5-space-4) var(--v5-space-4); border: 0; border-radius: 28px; background: radial-gradient(120% 90% at 50% 40%, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.network-overview { padding: 0 var(--v5-space-4) var(--v5-space-4); border: 0; border-radius: 28px; }
 .network-overview__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-space-inline); padding-top: var(--ui-space-inset); font: 600 12px/18px var(--font-v5); color: var(--v5-ink-2); }
 .network-overview__split { min-width: 0; overflow-wrap: anywhere; }
 .network-overview__total { flex: none; color: var(--v5-ink); }
@@ -261,7 +261,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 .network-orbit__ring { position: absolute; border-radius: 999px; border: 1px dashed color-mix(in srgb, var(--v5-ink) 14%, transparent); }
 .network-orbit__ring--outer { inset: 5%; }
 .network-orbit__ring--inner { inset: 25%; border-color: color-mix(in srgb, var(--v5-brand) 30%, transparent); }
-.network-orbit__center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 999px; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 16%, transparent), transparent); }
+.network-orbit__center { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 999px; background: var(--v5-surface-2); }
 .network-orbit__you { font: 600 11px/14px var(--font-v5); color: var(--v5-brand); }
 .network-orbit__center:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .network-orbit__dot { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 999px; box-shadow: 0 0 0 3px var(--v5-surface); font: 600 10px/1 var(--font-v5); color: var(--v5-on-brand); }

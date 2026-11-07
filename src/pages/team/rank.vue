@@ -3,7 +3,7 @@
     <view class="rank-page">
       <SubPageHeader back="/pages/team/team" :title="t.rank.pageTitle" plain design :action-label="copy.rankRules" :action="() => go('/pages/team/rank-how')" />
       <view class="rank-content">
-        <view v-if="rankAvailable" class="rank-spotlight">
+        <view v-if="rankAvailable" class="rank-spotlight nx-frosted-button">
           <view class="rank-identity">
             <view class="rank-identity__emblem"><TeamRankEmblem v-if="!visibility.hidden" :rank="myRank" :size="96" /><view v-else class="rank-private-emblem" aria-hidden="true">••••</view></view>
             <view class="rank-identity__copy"><text class="rank-caption">{{ t.rank.currentRank }}</text><text class="rank-current-name">{{ visibility.mask(rankLabel(myRank,locale.code,rankDefs)) }}</text></view>
@@ -250,12 +250,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-scope-link > svg { flex:none; }
 .rank-scope-link:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 .rank-content { padding:12px 16px 0; }
-.rank-spotlight { position:relative;isolation:isolate;overflow:hidden;padding:20px 18px 18px;border:1px solid var(--v5-border);border-radius:22px;background:radial-gradient(55% 45% at 18% 18%,color-mix(in srgb,var(--v5-brand) 22%,transparent),transparent 70%),radial-gradient(60% 50% at 100% 0%,color-mix(in srgb,var(--v5-ink) 6%,transparent),transparent 60%),linear-gradient(180deg,var(--ui-spotlight-top),var(--ui-ticket-bottom));margin-bottom:22px; }
-.rank-spotlight::before { content:'';position:absolute;inset:0;z-index:-1;background-image:radial-gradient(color-mix(in srgb,var(--v5-ink) 6%,transparent) 1px,transparent 1px);background-size:14px 14px;-webkit-mask-image:radial-gradient(70% 60% at 85% 10%,#000,transparent 75%);mask-image:radial-gradient(70% 60% at 85% 10%,#000,transparent 75%);pointer-events:none; }
+.rank-spotlight { position:relative;isolation:isolate;overflow:hidden;padding:20px 18px 18px;border:1px solid var(--v5-border);border-radius:22px;margin-bottom:22px; }
 .rank-identity { position:relative;display:flex;align-items:center;gap:16px;margin-bottom:18px; }
 .rank-identity__emblem { position:relative;isolation:isolate;display:flex;flex:none;flex-direction:column;align-items:center;width:76px;gap:2px; }
 .rank-private-emblem { width:76px;height:76px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--v5-surface-3);color:var(--v5-ink-2);font-size:18px; }
-.rank-identity__emblem::before { content:'';position:absolute;inset:-10px -10px 14px;z-index:-1;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-brand) 40%,transparent),transparent);filter:blur(8px);pointer-events:none; }
 .rank-identity__copy { flex:1;min-width:0; }
 .rank-current-level { display:block;padding:0 9px;border:1px solid var(--v5-brand-border);border-radius:999px;background:var(--v5-surface);color:var(--ui-lime-soft);font:600 12.5px/20px var(--font-v5);font-variant-numeric:tabular-nums; }
 .rank-current-name { display:block;margin-top:2px;font:600 26px/32px var(--font-v5);overflow-wrap:anywhere; }
@@ -288,7 +286,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-ladder-row:first-child::before { top:32px; }
 .rank-ladder-row:last-child::before { bottom:calc(100% - 32px); }
 .rank-ladder-row[data-status="done"]::before { background:color-mix(in srgb,var(--v5-brand) 55%,var(--v5-surface)); }
-.rank-ladder-row[data-status="current"] { background:linear-gradient(90deg,color-mix(in srgb,var(--v5-brand) 10%,transparent),color-mix(in srgb,var(--v5-brand) 2%,transparent)); }
+.rank-ladder-row[data-status="current"] { background:color-mix(in srgb,var(--v5-brand) 6%,transparent); }
 .rank-row-heading { position:relative;display:flex;align-items:center;gap:12px;min-height:64px;box-sizing:border-box;padding:10px 16px;cursor:pointer; }
 .rank-row-heading :deep(.team-rank-emblem) { background:var(--v5-surface);border-radius:12px; }
 .rank-ladder-row[data-status="current"] .rank-row-heading :deep(.team-rank-emblem) { box-shadow:0 0 0 4px color-mix(in srgb,var(--v5-brand) 14%,transparent),0 6px 18px color-mix(in srgb,var(--v5-brand) 25%,transparent); }
@@ -320,8 +318,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 @media(max-width:350px) { .rank-identity { gap:12px; }.rank-condition__value { flex-wrap:wrap; }.rank-details { padding-left:48px; }.rank-perk { padding-inline:8px; } }
 @media(prefers-reduced-motion:reduce) { .rank-row-chevron { transition:none; } }
 /* P-42: hero rings for the next rank, a horizontal rank track and one details card below it. */
-.rank-spotlight { padding:20px;border:0;border-radius:28px;background:radial-gradient(120% 90% at 20% 0%,color-mix(in srgb,var(--v5-brand) 14%,transparent),transparent 60%),var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
-.rank-spotlight::before { display:none; }
+.rank-spotlight { padding:20px;border:0;border-radius:28px; }
 .rank-next-progress { padding-top:0;border-top:0; }
 .rank-rings { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px; }
 .rank-condition--ring { display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:0;text-align:center;min-width:0; }
@@ -361,7 +358,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-ladder-row[data-status="done"] .rank-row-sub { color:var(--v5-ink-3); }
 .rank-perk-value { font:600 22px/26px var(--font-metric);color:var(--v5-brand); }
 .rank-perk + .rank-perk .rank-perk-value { color:var(--v5-nex); }
-.rank-reward-item { padding:14px;border-radius:16px;background:radial-gradient(120% 120% at 100% 0%,color-mix(in srgb,var(--v5-warning) 14%,transparent),transparent 60%),color-mix(in srgb,var(--v5-ink) 3%,transparent); }
+.rank-reward-item { padding:14px;border-radius:16px;background:color-mix(in srgb,var(--v5-ink) 3%,transparent); }
 .rank-reward-summary { justify-content:space-between; }
 .rank-reward-title { font:600 13px/18px var(--font-v5);color:var(--v5-ink); }
 .rank-reward-amount { font:600 16px/20px var(--font-metric);color:var(--v5-nex); }

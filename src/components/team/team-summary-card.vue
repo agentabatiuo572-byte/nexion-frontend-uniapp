@@ -28,7 +28,7 @@ const countUnits=computed(()=>Math.max(1, totalText.value.length * .7));
 function open(){if(canOpen.value)emit('open');}
 </script>
 <style scoped>
-.team-summary { container: team-summary / inline-size; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); color: var(--v5-ink); border-radius: 24px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--ui-device-ink) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.team-summary { container: team-summary / inline-size; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); color: var(--v5-ink); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .team-summary__header { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; min-height: 24px; gap: 4px; }
 .team-summary__title { min-width: 0; overflow-wrap: anywhere; font: 600 14px/20px var(--font-v5); }
 .team-summary__arrow { flex: none; font-size: 18px; color: var(--v5-ink-4); }

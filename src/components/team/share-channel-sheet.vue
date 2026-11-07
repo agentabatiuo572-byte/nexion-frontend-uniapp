@@ -263,7 +263,7 @@ useDialogA11y(computed(() => props.open), ".ss-root", () => emit("close"));
 .ss-rules-support text { margin:0;color:var(--v5-ink-2); }
 .ss-sheet [tabindex="0"]:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
 /* P-42: reward strip, code card and two-column channel tiles. */
-.ss-reward { flex-direction:row !important;align-items:center !important;gap:14px !important;padding:14px 16px !important;margin-bottom:var(--ui-space-inset);border-radius:20px;background:radial-gradient(120% 120% at 0% 0%,color-mix(in srgb,var(--v5-brand) 14%,transparent),transparent 60%),color-mix(in srgb,var(--v5-ink) 3%,transparent);text-align:left !important; }
+.ss-reward { flex-direction:row !important;align-items:center !important;gap:14px !important;padding:14px 16px !important;margin-bottom:var(--ui-space-inset);border-radius:20px;background:color-mix(in srgb,var(--v5-ink) 3%,transparent);text-align:left !important; }
 .ss-reward :deep(.team-art) { --team-art-size:88px; flex:none; }
 .ss-reward__copy { display:flex;flex-direction:column;gap:2px;min-width:0; }
 .ss-reward__copy .ss-reward__t--amount { font:600 28px/34px var(--font-amount);color:var(--v5-brand);white-space:nowrap; }
