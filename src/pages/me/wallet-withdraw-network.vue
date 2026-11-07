@@ -65,7 +65,6 @@ async function load() {
   const currentRevision = ++revision, account = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
   const current = () => visible && currentRevision === revision && account === app.accountKey && epoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime);
   readFailed.value = false; loading.value = true;
-  if (remoteApiEnabled) void payout.refreshRemote();
   try {
     const next = await withdrawalApi.policy(); if (!current()) return;
     policy.value = next;
@@ -75,9 +74,12 @@ async function load() {
 useAutoRecovery({ failed: () => readFailed.value && !loading.value, retry: load });
 useAutoRecovery({ failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error", retry: () => payout.refreshRemote() });
 function reset() { revision++; policy.value = null; readFailed.value = false; if (visible) void load(); }
-watch(() => [app.accountKey, app.accountBindingEpoch] as const, reset);
+watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
+  if (visible && remoteApiEnabled) void payout.refreshRemote();
+  reset();
+});
 const stopRuntime = subscribeRuntimeRevision(reset);
-onShow(() => { visible = true; void load(); });
+onShow(() => { visible = true; if (remoteApiEnabled) void payout.refreshRemote(); void load(); });
 onHide(() => { visible = false; revision++; });
 onUnload(() => { visible = false; revision++; stopRuntime(); });
 function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/pages/me/wallet-withdraw?network=${id}`); }
