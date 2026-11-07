@@ -67,7 +67,7 @@
       </view>
     </view>
     <template #pageFixed>
-      <view v-if="displayCourse && !displayCompleted && !error && (!displayResultDetails || displayResultDetails.passed)" class="course-sticky">
+      <view v-if="displayCourse && !displayCompleted && !error && (!displayResultDetails || displayResultDetails.passed)" class="course-sticky nx-frosted-button">
         <NxButton class="course-submit" variant="primary" size="large" :disabled="!canSubmit" :label="displayCourse.questions.length ? t.learning.submitQuiz : t.learning.completeCourse" @click="finish" />
       </view>
     </template>
@@ -648,13 +648,13 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-result-header__close:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .course-result-header__title { overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 600; line-height: 24px; }
 .course-result { display: flex; flex-direction: column; align-items: center; padding: 56px 24px 0; text-align: center; }
-.course-result__badge { display: grid; place-items: center; flex: none; width: 84px; height: 84px; border-radius: 50%; color: var(--v5-on-brand); background: linear-gradient(160deg, var(--ui-lime-pale), var(--v5-brand)); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 10%, transparent), 0 0 0 22px color-mix(in srgb, var(--v5-brand) 5%, transparent), 0 14px 40px color-mix(in srgb, var(--v5-brand) 35%, transparent); }
+.course-result__badge { display: grid; place-items: center; flex: none; width: 84px; height: 84px; border-radius: 50%; color: var(--v5-on-brand); background: var(--v5-brand); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 10%, transparent), 0 0 0 22px color-mix(in srgb, var(--v5-brand) 5%, transparent); }
 .course-result__title { display: block; margin-top: 18px; font-size: var(--v5-type-h2); font-weight: 600; line-height: 38px; overflow-wrap: anywhere; }
 .course-result__summary { display: block; margin-top: 6px; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); font-variant-numeric: tabular-nums; text-wrap: pretty; }
 .course-result__reward { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 32px; margin-top: var(--v5-space-4); padding: var(--v5-space-1) 14px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--learning-reward) 16%, transparent); color: var(--learning-reward); font-size: 14px; font-weight: 600; line-height: 24px; font-variant-numeric: tabular-nums; }
 .course-result__reward--pending { background: var(--v5-surface); color: var(--v5-ink-3); }
 .course-next-section { padding: var(--v5-space-10) var(--v5-space-4) 0; }
-.course-next { position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: radial-gradient(60% 70% at 100% 0%, color-mix(in srgb, var(--v5-brand) 16%, transparent), transparent 65%), linear-gradient(180deg, var(--ui-spotlight-top), var(--ui-ticket-bottom)); }
+.course-next { position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
 .course-next__label { display: block; font-size: 12.5px; font-weight: 500; line-height: 18px; color: var(--v5-brand); }
 .course-next__title { display: block; margin-top: 6px; font-size: 18px; font-weight: 600; line-height: 24px; overflow-wrap: anywhere; }
 .course-next__meta { margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); overflow-wrap: anywhere; }
@@ -680,7 +680,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-lesson__meta { display:flex; align-items:center; flex-wrap:wrap; gap:var(--v5-space-2); margin-top:10px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .course-lesson__reward { padding: var(--v5-space-1) 8px; border-radius: var(--v5-radius-full); color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 18%,transparent); }
 .course-lesson__body { display:block; white-space:pre-line; margin-top:var(--v5-space-5); font:400 15px/24px var(--font-v5); color:var(--v5-ink-2); }
-.course-sticky { position:absolute; left:0; right:0; bottom:0; z-index:36; display:flex; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); background:linear-gradient(180deg,color-mix(in srgb,var(--ui-ticket-top) 70%,transparent),color-mix(in srgb,var(--ui-ticket-bottom) 94%,transparent)); border-top:1px solid var(--v5-border); backdrop-filter:blur(18px) saturate(160%); }.course-sticky > * { flex:1; }
+.course-sticky { position:absolute; left:0; right:0; bottom:0; z-index:36; display:flex; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); }.course-sticky > * { flex:1; }
 .course-lesson [role="radio"] { position:relative; padding:var(--v5-space-3); border-radius:14px; background:color-mix(in srgb,var(--v5-ink) 6%,transparent); }.course-lesson [role="radio"][aria-checked="true"] { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent); color:var(--v5-brand); }
 
 /* Approved growth board geometry and material. */

@@ -68,7 +68,6 @@
       </view>
       <view v-else-if="phase === 'result'" key="result" class="cn-phase anim-up">
         <view class="cn-score cn-score--hex" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore} ${t.onboarding.phoneComputeUnit}`">
-          <view class="cn-score__aurora" aria-hidden="true" />
           <svg class="cn-score__hex" viewBox="0 0 220 220" aria-hidden="true" focusable="false">
             <path class="cn-score__ring cn-score__ring--halo" :d="scoreHexPath" />
             <path class="cn-score__ring cn-score__ring--edge" :d="scoreHexPath" />
@@ -773,7 +772,7 @@ onUnmounted(() => {
 .cn-test__track { margin-top: 10px; height: 4px; border-radius: 9999px; background: var(--v5-surface-2); overflow: hidden; }
 .cn-test__fill { height: 100%; border-radius: 9999px; transition: width 0.15s linear; }
 
-.cn-score { position: relative; overflow: hidden; border-radius: 16px; padding: 20px; text-align: center; background: radial-gradient(70% 80% at 50% 0%, color-mix(in oklab, var(--v5-brand) 18%, transparent) 0%, transparent 60%), var(--v5-surface); border: 1px solid var(--v5-border); box-shadow: var(--v5-card-shadow-lift-strong); }
+.cn-score { position: relative; overflow: hidden; border-radius: 16px; padding: 20px; text-align: center; background: var(--v5-surface); border: 1px solid var(--v5-border); box-shadow: var(--v5-card-shadow-lift-strong); }
 .cn-score__cap { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-score__cap-t { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.18em; color: var(--v5-brand); }
 .cn-score__num { margin-top: 12px; display: flex; align-items: baseline; justify-content: center; gap: 4px; }
@@ -827,7 +826,6 @@ onUnmounted(() => {
 @keyframes cn-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 .cn-score--hex { --score-size: clamp(184px, 32vh, 306px); width: 100%; height: var(--score-size); box-sizing: border-box; display: grid; place-items: center; border: 0; background: transparent; box-shadow: none; padding: 0; overflow: visible; isolation: isolate; }
-.cn-score__aurora { grid-area: 1 / 1; width: min(70vw, 220px); height: min(70vw, 220px); border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--v5-brand) 42%, transparent), transparent 64%); filter: blur(24px); animation: cn-aurora 5s ease-in-out infinite alternate; }
 .cn-score__hex { grid-area: 1 / 1; width: calc(var(--score-size) - 16px); height: calc(var(--score-size) - 16px); animation: cn-hex-breathe 7s ease-in-out infinite; }
 .cn-score__ring { fill: none; stroke-linejoin: round; }
 .cn-score__ring--halo { stroke: color-mix(in oklab, var(--v5-brand) 18%, transparent); stroke-width: 8; }
@@ -837,7 +835,6 @@ onUnmounted(() => {
 .cn-policy-float__button { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); background: var(--v5-surface); }
 .cn-policy-float__list { position: absolute; right: 0; bottom: 54px; width: min(280px, calc(100vw - 40px)); box-sizing: border-box; padding: 16px; border-radius: 14px; background: var(--v5-surface-2); display: flex; flex-direction: column; gap: 8px; }
 .cn-policy-float__title { color: var(--v5-ink); font-size: 12px; font-weight: 600; }
-@keyframes cn-aurora { from { transform: scale(.95); opacity: .7; } to { transform: scale(1.08); opacity: 1; } }
 @keyframes cn-hex-breathe { 0%, 100% { transform: scale(.97) rotate(0deg); } 50% { transform: scale(1.03) rotate(3deg); } }
-@media (prefers-reduced-motion: reduce) { .cn-score__aurora, .cn-score__hex { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .cn-score__hex { animation: none; } }
 </style>

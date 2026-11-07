@@ -449,14 +449,12 @@ const heroCardStyle: CSSProperties = {
 const vipCardStyle: CSSProperties = {
   padding: "22px",
   borderRadius: "var(--v5-radius-xl)",
-  background: "radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 24%, transparent), transparent 48%), linear-gradient(135deg, var(--v5-surface), var(--v5-surface-2))",
-  boxShadow: "0 14px 36px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 12%, transparent)",
 };
 const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
   borderRadius: "var(--v5-radius-m)",
-  background: "linear-gradient(135deg, var(--v5-genesis-gold-on-dark) 0%, #E2C97C 100%)",
+  background: "var(--v5-genesis-gold-on-dark)",
   boxShadow: "0 4px 12px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 25%, transparent)",
 };
 const heroLabelStyle: CSSProperties = {

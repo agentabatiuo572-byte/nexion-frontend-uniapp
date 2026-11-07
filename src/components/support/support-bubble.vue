@@ -74,7 +74,6 @@ onMounted(() => {
 .nx-support-bubble--dimmed .nx-support-motion,
 .nx-support-bubble--dimmed .nx-support-beat { animation-play-state: paused; }
 .nx-support-bubble--light .nx-support-btn {
-  background: linear-gradient(155deg, #fff, #eef2e5);
   box-shadow: 0 3px 12px rgba(42, 53, 24, .14), inset 0 0 0 1px #dde4d3;
 }
 /* Unread: a steady amber glow on the button plus an outward ring every 2s. */
