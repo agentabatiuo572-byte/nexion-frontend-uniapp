@@ -38,7 +38,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       const enabled = state.topupChannels !== 'usdt-off' && !(state.topupChannels === 'erc20-off' && network === 'ERC20')
         && state.paymentState !== 'usdt-off' && !(state.paymentState === 'erc20-off' && network === 'ERC20');
       const feeUsdt = .123456;
-      return { network, enabled, disabledReason: enabled ? null : 'NOT_CONFIGURED', confirmations: 15,
+      return { network, enabled, disabledReason: enabled ? null : 'NETWORK_SWITCH_OFF', confirmations: 15,
         feeUsdt, feeUsdtExact: String(feeUsdt), minDepositUsdt: 50, minDepositUsdtExact: '50' };
     });
     if (p === "/api/deposits/policy") return { networks };
