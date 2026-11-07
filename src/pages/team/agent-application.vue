@@ -632,7 +632,6 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-review__status--wait { color: var(--v5-ink-3); }
 .detail-review__time { display: block; min-height: 16px; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
 .detail-review__metric { margin-top: auto; padding-top: var(--ui-space-inline); border-top: 1px solid var(--v5-border); }
-.detail-review__time + .detail-review__metric { margin-top: var(--ui-space-inline); }
 .detail-review__metric-key { display: block; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-review__metric-value { display: block; margin-top: var(--v5-space-1); font: 500 20px/26px var(--font-metric); color: var(--v5-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .detail-review__metric-unit { margin-left: var(--v5-space-1); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); }
@@ -677,7 +676,8 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-add { display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); width: 100%; min-height: 44px; margin-top: var(--v5-space-2); box-sizing: border-box; border-radius: var(--v5-radius-s); border: 1.5px dashed color-mix(in srgb, var(--v5-ink) 18%, transparent); font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-ink-2); cursor: pointer; }
 .detail-add[aria-disabled="true"] { opacity: .5; cursor: default; }
 .detail-add__plus { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--v5-ink); }
-.detail-textarea { display: block; width: 100%; min-height: 96px; word-break: normal; overflow-wrap: break-word; box-sizing: border-box; padding: var(--ui-space-inline); border-radius: var(--v5-radius-s); background: var(--v5-surface-3); font: var(--ui-type-input-weight, 400) var(--ui-type-input)/var(--ui-type-input-lh) var(--font-v5); color: var(--v5-ink); }
+/* uni-textarea's inner wrapper inherits min-height as its content minimum; subtract the padding so the field is 96px. */
+.detail-textarea { display: block; width: 100%; min-height: calc(96px - 2 * var(--ui-space-inline)); word-break: normal; overflow-wrap: break-word; box-sizing: border-box; padding: var(--ui-space-inline); border-radius: var(--v5-radius-s); background: var(--v5-surface-3); font: var(--ui-type-input-weight, 400) var(--ui-type-input)/var(--ui-type-input-lh) var(--font-v5); color: var(--v5-ink); }
 .detail-placeholder { color: var(--v5-ink-3); }
 .detail-counter { display: flex; justify-content: space-between; margin-top: var(--v5-space-2); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
 .detail-note { display: block; margin: 0 var(--v5-space-4); padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: anywhere; white-space: pre-line; }
