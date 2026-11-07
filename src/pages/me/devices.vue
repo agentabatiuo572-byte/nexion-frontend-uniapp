@@ -424,7 +424,7 @@ function goStore() {
 /* Over the stage aura the shared frosted blur only applied during the page-enter animation (bright, then
    dim); a fixed, slightly denser fill keeps the brighter look without the flash. */
 [data-theme="dark"] .device-bay-slot__plus { --ui-button-fill: color-mix(in srgb, var(--v5-ink) 14%, transparent); }
-.device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
+.device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, var(--v5-surface-2)); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .device-bay-slot--loading { background: linear-gradient(100deg, color-mix(in srgb, var(--v5-ink) 4%, transparent) 30%, color-mix(in srgb, var(--v5-ink) 10%, transparent) 50%, color-mix(in srgb, var(--v5-ink) 4%, transparent) 70%); background-size: 300% 100%; animation: device-shimmer 1.6s linear infinite; }
 .device-inventory-section { margin-top: var(--ui-space-section-gap, 32px); min-width: 0; }
 .device-inventory-section__head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; margin-bottom: 12px; }

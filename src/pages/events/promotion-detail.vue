@@ -682,7 +682,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-target__image { width: 74px; height: 74px; }
 .lp-target__name { display: block; margin-top: 2px; font: var(--ui-type-chip-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
 /* The UVT tag sits on a near-opaque ring of the slab colour so the dashed slot never shows through. */
-.lp-target__tag { position: absolute; right: -10px; top: -12px; display: flex; border-radius: 999px; background: color-mix(in srgb, var(--v5-surface) 90%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--v5-surface) 90%, transparent); }
+.lp-target__tag { position: absolute; right: -10px; top: -12px; display: flex; border-radius: 999px; background: var(--v5-surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--v5-surface) 90%, transparent); }
 .lp-slab__solo { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 .lp-slab__solo:first-child { margin-top: 0; }
 .lp-slab__solo--muted .lp-target { flex: 0 1 88px; min-width: 0; }
