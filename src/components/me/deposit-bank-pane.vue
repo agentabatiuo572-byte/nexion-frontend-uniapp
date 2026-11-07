@@ -38,8 +38,7 @@
         </view>
         <!-- Amount on a liquid-glass slab over a soft aura; preset amounts sit under it (selected = brand glass, others flat). -->
         <view class="nx-bank-stage">
-          <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
-          <view class="nx-bank-slab">
+          <view class="nx-bank-slab nx-frosted-button">
             <text class="nx-bank-k">{{ t.bankPane.amountLabel }}</text>
             <view class="nx-bank-amtrow">
               <input
@@ -87,8 +86,7 @@
         <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
         <template v-if='intent.paymentMode === "hosted"'>
           <view class="nx-bank-stage">
-            <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
-            <view class="nx-bank-slab nx-bank-pay">
+            <view class="nx-bank-slab nx-bank-pay nx-frosted-button">
               <template v-if="!hostedRejected">
                 <view class="nx-bank-ring" role="timer" :aria-label="`${t.bankPane.remainingLabel} ${countdownText}`">
                   <svg width="148" height="148" viewBox="0 0 148 148" aria-hidden="true">
@@ -1054,23 +1052,12 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 </style>
 
 <style scoped>
-/* P-44 top-up form: amount on a liquid-glass slab over a two-tone aura, presets, and a recessed facts well. */
+/* P-44 top-up form: amount on the step's soft-glass slab, presets, and a recessed facts well. */
 .nx-bank-stage { position: relative; margin: 4px -2px 0; }
-.nx-bank-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
-.nx-bank-stage__aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
-.nx-bank-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
-.nx-bank-stage__aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent); }
-/* The glass carries its own copy of the aura so the colour reads through it as on the board.
-   No backdrop-filter: it only took effect while the page-enter animation composited the page,
-   so the slab rendered brighter for ~300ms and then dimmed. The tint below is the brighter look. */
-.nx-bank-slab { position: relative; padding: 23px 20px 20px; border-radius: 24px;
-  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 22%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent), transparent 70%), rgba(255,255,255,.13);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
-}
-[data-theme="light"] .nx-bank-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
-[data-theme="light"] .nx-bank-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
-[data-theme="light"] .nx-bank-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
-  box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
+/* No backdrop-filter: the slab sits on the plain page floor, and the blur only took effect while the
+   page-enter animation composited the page, so the slab flashed brighter and then dimmed. */
+.nx-bank-slab { position: relative; padding: 23px 20px 20px; border-radius: 24px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+[data-theme="light"] .nx-bank-slab { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .nx-bank-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .nx-bank-amtrow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
 .nx-bank-amt { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 74px); height: 52px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand);
@@ -1100,8 +1087,6 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 /* Order/credited stages open right under the header (switch and rate line hidden); 15px clears its collapsing 12px margin as on the board. */
 .nx-step-in > .nx-bank-stage:first-child { margin-top: 15px; }
 .nx-bank-pay { padding: 28px 20px 22px; text-align: center; }
-.nx-bank-slab.nx-bank-pay { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 6%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent), transparent 70%), rgba(255,255,255,.045); }
-[data-theme="light"] .nx-bank-slab.nx-bank-pay { background: rgba(255,255,255,.58); }
 .nx-bank-ring { position: relative; width: 148px; height: 148px; margin: 0 auto; }
 .nx-bank-ring > svg { position: absolute; inset: 0; transform: rotate(-90deg); }
 .nx-bank-ring__track { fill: none; stroke: color-mix(in srgb, var(--v5-ink) 9%, transparent); stroke-width: 8; }
@@ -1119,7 +1104,6 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-sum__v--text { font: 500 14px/20px var(--font-v5); }
 /* Credited: medal pops once and rings once; amount in the success ink. */
 .nx-bank-done { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -5px; padding: 28px 20px 8px; text-align: center; }
-.nx-bank-done::before { content: ""; position: absolute; left: 50%; top: 70px; width: 300px; height: 180px; margin-left: -150px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 20%, transparent), transparent); pointer-events: none; }
 .nx-bank-done__medal { position: relative; width: 88px; height: 88px; display: grid; place-items: center; border-radius: 50%; background: var(--v5-success-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-success) 35%, transparent); animation: nx-viz-pop 520ms cubic-bezier(.2,1.4,.4,1) 120ms both; }
 .nx-bank-done__medal::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 2px solid var(--v5-success); opacity: 0; animation: nx-bank-ring-out 900ms 620ms ease-out both; }
 .nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: 600 20px/28px var(--font-v5); }

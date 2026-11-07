@@ -168,7 +168,7 @@
     </view>
     <!-- 金额无效 / 本次兑换在途时点了没用 → 显式 aria-disabled + 置灰;主操作在底部固定栏(DS-30)。 -->
     <template #pageFixed>
-      <view class="ex-bar">
+      <view class="ex-bar nx-frosted-button">
         <view class="ex-confirm" :class="{ 'ex-confirm--on': ctaEnabled }" role="button" tabindex="0" :aria-disabled="ctaEnabled ? 'false' : 'true'" @click="handleConfirm">
           <text>{{ t.exchange.confirm }}</text>
         </view>
@@ -1146,7 +1146,7 @@ const historyEmptyStyle: CSSProperties = {
 .ex-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); background: var(--v5-nex-soft); color: var(--v5-nex-ink); }
 .ex-row__p { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; }
 .ex-bar-space { height: 110px; }
-.ex-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.ex-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .ex-confirm { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
 .ex-confirm--on { opacity: 1; cursor: pointer; }
 .ex-confirm--on:active { transform: scale(.98); }
