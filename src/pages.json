@@ -206,6 +206,14 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/team/agent-applications",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/agent-application",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/team/rank",
       "style": { "navigationStyle": "custom" }
     },

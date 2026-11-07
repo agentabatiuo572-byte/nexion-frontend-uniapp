@@ -627,6 +627,8 @@ export const ru: Messages = {
     teamLeaderboard: "Рейтинг приглашений",
     teamQuota: "Квота",
     teamAgent: "Региональный амбассадор",
+    teamAgentApplications: "Мои заявки",
+    teamAgentApplication: "Заявка",
     storeCheckout: "Оформление",
     storeOrders: "Заказы",
     storeProduct: "Товар",
@@ -4926,7 +4928,7 @@ export const ru: Messages = {
     buckets: {
       venue: {
         title: "Офлайн-площадка",
-        rule: "От 100 гостей по QR-регистрации",
+        rule: "≥ 100 подтверждённых участников",
       },
       kol: {
         title: "Блогеры",
@@ -4952,7 +4954,7 @@ export const ru: Messages = {
     toastV5RequiredSub: "Подача заявок — с ранга {rank}",
     toastMissingFields: "Заполните все поля",
     toastSubmitted: "Заявка отправлена",
-    toastSubmittedSub: "{city} · ${budget} на рассмотрении (3–5 рабочих дней)",
+    toastSubmittedSub: "{city} · {budget}. Далее загрузите материалы.",
     toastRemoteFailed: "Статус заявки не подтверждён",
     serverApplication: "Моя заявка",
     applicationStatuses: {
