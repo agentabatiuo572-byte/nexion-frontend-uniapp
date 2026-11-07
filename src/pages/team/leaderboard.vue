@@ -16,7 +16,7 @@
           <template v-else>
             <view v-if="!pointsRankingAvailable" class="leader-state" role="status"><text>{{ pointsCopy.unavailable }}</text></view>
             <view v-else class="leader-list">
-              <view v-for="group in rankingGroups" :key="group.id" :ref="group.featured ? setPodiumRef : undefined" :class="group.featured ? 'leader-podium nx-frosted-button nx-viz-motion nx-viz-press' : 'leader-flat nx-viz-press'">
+              <view v-for="group in rankingGroups" :key="group.id" :ref="group.featured ? setPodiumRef : undefined" :class="group.featured ? 'leader-podium nx-soft-glass nx-viz-motion nx-viz-press' : 'leader-flat nx-viz-press'">
               <view v-for="row in group.rows" :key="row.rank" class="leader-row" :class="group.featured ? `leader-row--podium leader-row--p${row.rank}` : ''" :data-rank="visibility.hidden ? undefined : row.rank">
                 <template v-if="group.featured">
                   <view class="leader-podium__badge">

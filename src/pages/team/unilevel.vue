@@ -8,7 +8,7 @@
         <template v-else>
         <view v-if="remoteState !== 'ready' && !remoteSnapshot" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
         <template v-else-if="remoteSnapshot">
-          <RewardHero class="nx-unilevel-hero nx-frosted-button nx-viz-press" kind="members">
+          <RewardHero class="nx-unilevel-hero nx-soft-glass nx-viz-press" kind="members">
             <text class="block nx-unilevel-hero-title">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : t.directReferral.purchaseTotal }} · {{ visibility.mask(remoteGroupCount) }} {{ t.directReferral.settlementGroups }}</text>
             <view class="nx-royalty-totals" :class="{ 'nx-royalty-totals-large': wideAmount(remoteTotalUSDT) || wideAmount(remoteTotalNEX) }">
               <view><text class="block nx-num-amount nx-direct-amount nx-unilevel-main-amount"><text class="nx-unilevel-dollar">$</text>{{ totalAmountParts[0] }}<text v-if="totalAmountParts[1]" class="nx-unilevel-decimals">.{{ totalAmountParts[1] }}</text></text></view>

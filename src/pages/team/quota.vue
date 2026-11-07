@@ -13,7 +13,7 @@
         <NxButton variant="secondary" :label="t.store.gateLockedCta" @click="go(focusedProductHref)"><text>{{ t.store.gateLockedCta }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></NxButton>
       </view>
       <view v-else class="quota-content">
-        <view class="quota-hero nx-frosted-button nx-viz-press">
+        <view class="quota-hero nx-soft-glass nx-viz-press">
           <view v-if="heroTier && focusedProductId" class="quota-hero__main"><view class="quota-hero__copy"><text class="quota-headline">{{ heroTier.name }}</text><view class="quota-hero__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ heroPriceParts[0] }}</text><text v-if="heroPriceParts[1]" class="quota-price-fraction">.{{ heroPriceParts[1] }}</text></view></view><image v-if="heroImage" :src="heroImage" mode="aspectFit" class="quota-hero__image" :alt="heroTier?.name" /><TeamArt v-else kind="members" :size="112" /></view>
           <view class="quota-invite-count">
             <view ref="inviteRingRef" class="quota-ring" :style="{ '--nx-viz-ring': inviteRingInView === false ? 0 : inviteRingPct, transition: inviteRingInView === false ? 'none' : VIZ_RING_TRANSITION }"><view class="quota-ring__hole nx-num-metric"><text class="quota-invite-count__number">{{ visibility.mask(activeDirectText) }}</text><text>{{ visibility.hidden ? '' : remoteApiEnabled && !remoteSnapshot ? '/—' : `/${directInvites}` }}</text></view></view>

@@ -3,7 +3,7 @@
     <view class="rank-page">
       <SubPageHeader back="/pages/team/team" :title="t.rank.pageTitle" plain design :action-label="copy.rankRules" :action="() => go('/pages/team/rank-how')" />
       <view class="rank-content">
-        <view v-if="rankAvailable" class="rank-spotlight nx-frosted-button">
+        <view v-if="rankAvailable" class="rank-spotlight nx-soft-glass">
           <view class="rank-identity">
             <view class="rank-identity__emblem"><TeamRankEmblem v-if="!visibility.hidden" :rank="myRank" :size="96" /><view v-else class="rank-private-emblem" aria-hidden="true">••••</view></view>
             <view class="rank-identity__copy"><text class="rank-caption">{{ t.rank.currentRank }}</text><text class="rank-current-name">{{ visibility.mask(rankLabel(myRank,locale.code,rankDefs)) }}</text></view>
