@@ -225,6 +225,13 @@ function retryEligibility() {
   --hb-fill:rgba(255,255,255,.58);--hb-rim:rgba(73,94,125,.12);--hb-highlight:rgba(255,255,255,.95);
   --hb-bottom:rgba(87,115,155,.16);--hb-sheen:rgba(255,255,255,.30);--hb-shadow:0 2px 8px rgba(20,16,8,.05);
 }
+/* Same fallbacks as the shared glass: surface-2 solid without sheen under reduced transparency or high contrast; system colours under forced colours. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .hb-half,.hb-wv,.hb-wt { background:var(--v5-surface-2); }
+}
+@media (forced-colors: active) {
+  .hb-half,.hb-wv,.hb-wt { background:Canvas;box-shadow:none;outline:1px solid CanvasText;outline-offset:-1px;backdrop-filter:none;-webkit-backdrop-filter:none; }
+}
 
 .hb-amount { display:block;font-weight:500;letter-spacing:-.02em;color:var(--v5-brand);white-space:nowrap; }
 .hb-amount__minor { font-size:max(12px,.55em);color:var(--v5-ink-3); }

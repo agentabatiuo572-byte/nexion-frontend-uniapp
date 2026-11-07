@@ -958,6 +958,7 @@ body {
 @media (forced-colors: active) {
   .nx-frosted-button, .promotion-action, .reward-cta { color:ButtonText;background:ButtonFace;box-shadow:none;outline:1px solid ButtonText;outline-offset:-1px;backdrop-filter:none;-webkit-backdrop-filter:none; }
   .nx-home-arrow { box-shadow:none;outline:1px solid ButtonText;outline-offset:-1px; }
+  .nx-soft-glass, .nx-glass-bar { background:Canvas;box-shadow:none;outline:1px solid CanvasText;outline-offset:-1px;backdrop-filter:none;-webkit-backdrop-filter:none; }
 }
 .nx-home-empty-plinth { position: absolute; width: 92%; height: 26px; bottom: 14px; left: 4%; border-radius: 50%; background: var(--v5-surface-2); box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--v5-ink-3) 40%, transparent), inset 0 1px 1px var(--v5-liquid-highlight), inset 0 -3px 1px var(--v5-liquid-rim), 0 8px 12px color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 @media (prefers-reduced-motion: reduce) {
