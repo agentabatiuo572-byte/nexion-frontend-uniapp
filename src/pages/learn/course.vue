@@ -67,7 +67,7 @@
       </view>
     </view>
     <template #pageFixed>
-      <view v-if="displayCourse && !displayCompleted && !error && (!displayResultDetails || displayResultDetails.passed)" class="course-sticky nx-frosted-button">
+      <view v-if="displayCourse && !displayCompleted && !error && (!displayResultDetails || displayResultDetails.passed)" class="course-sticky nx-glass-bar">
         <NxButton class="course-submit" variant="primary" size="large" :disabled="!canSubmit" :label="displayCourse.questions.length ? t.learning.submitQuiz : t.learning.completeCourse" @click="finish" />
       </view>
     </template>

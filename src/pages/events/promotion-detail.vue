@@ -182,7 +182,7 @@
     <PromotionTerms v-if="activity" :open="termsOpen" :title="localized(activity.title, locale.code)" :terms="promotionTermsText(activity, t.promotion, locale.code)" :rules="promotionTermsRules(activity, t.promotion, productName)" :disclosures="promotionDisclosures(activity)" @close="termsOpen = false" />
 
     <template #pageFixed>
-      <view v-if="bar" class="lp-bar nx-frosted-button" :class="{ 'lp-bar--wide': bar.wide }">
+      <view v-if="bar" class="lp-bar nx-glass-bar" :class="{ 'lp-bar--wide': bar.wide }">
         <view v-if="!bar.wide" class="lp-bar__info">
           <text v-if="bar.hint" class="lp-bar__hint">{{ bar.hint }}</text>
           <template v-else-if="barSummary">

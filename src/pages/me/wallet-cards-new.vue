@@ -87,7 +87,7 @@
     </view>
     <!-- The binding flow's main action (change / next / confirm) in the fixed bottom bar (DS-30). -->
     <template #pageFixed>
-      <view v-if="!cardBindingAvailable && binding?.primaryAction" class="bind-bar nx-frosted-button">
+      <view v-if="!cardBindingAvailable && binding?.primaryAction" class="bind-bar nx-glass-bar">
         <view class="bind-bar__btn" :class="{ 'bind-bar__btn--on': binding.primaryAction.enabled }" role="button" :tabindex="binding.primaryAction.enabled ? 0 : -1" :data-testid="binding.primaryAction.testid" :aria-disabled="!binding.primaryAction.enabled" @click="binding.primaryAction.enabled && binding.primaryAction.run()" @keydown.enter.prevent="binding.primaryAction.enabled && binding.primaryAction.run()" @keydown.space.prevent="binding.primaryAction.enabled && binding.primaryAction.run()">
           <text>{{ binding.primaryAction.label }}</text>
         </view>

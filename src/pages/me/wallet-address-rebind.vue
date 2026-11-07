@@ -223,7 +223,7 @@
     </view>
     <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <template #pageFixed>
-      <view v-if="step === 'form'" class="rb-bar nx-frosted-button">
+      <view v-if="step === 'form'" class="rb-bar nx-glass-bar">
         <view class="nx-rebind-cancel-link rb-bar__btn rb-bar__btn--ghost nx-frosted-button" role="button" tabindex="0" @click="cancelForm" @keydown.enter.prevent="cancelForm" @keydown.space.prevent="cancelForm">
           <text>{{ t.addrRebind.cancelCta }}</text>
         </view>

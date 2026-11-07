@@ -168,7 +168,7 @@
     </view>
     <!-- 金额无效 / 本次兑换在途时点了没用 → 显式 aria-disabled + 置灰;主操作在底部固定栏(DS-30)。 -->
     <template #pageFixed>
-      <view class="ex-bar nx-frosted-button">
+      <view class="ex-bar nx-glass-bar">
         <view class="ex-confirm" :class="{ 'ex-confirm--on': ctaEnabled }" role="button" tabindex="0" :aria-disabled="ctaEnabled ? 'false' : 'true'" @click="handleConfirm">
           <text>{{ t.exchange.confirm }}</text>
         </view>
