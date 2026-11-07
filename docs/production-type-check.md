@@ -1,6 +1,6 @@
 # 生产类型检查
 
-`npm run type-check` 使用 `tsconfig.app.json` 检查全部生产 TypeScript 和 Vue，保留原编译器规则，仅将测试入口、测试辅助和 `src/test` 从生产检查根文件拆出。沿用CI现有 `NODE_OPTIONS=--max-old-space-size=2560`，不改变CI容器预算、共享构建脚本或额外降低类型检查heap；1792MiB仅继续用于既有H5打包。
+`npm run type-check` 使用 `tsconfig.app.json` 检查全部生产 TypeScript 和 Vue，保留原编译器规则，仅将测试入口、测试辅助和 `src/test` 从生产检查根文件拆出。沿用CI现有 `NODE_OPTIONS=--max-old-space-size=2560`，不改变CI容器预算、共享构建脚本或额外降低类型检查heap。2026-11-07 App376 的类型检查通过、H5 打包触及原 1792MiB 堆上限；打包改用 2304MiB，仍在现有 3GiB CI 容器预算内，新的 CI 结果单独记录。
 
 原含测试的完整类型检查保留为 `npm run type-check:all`，原 `tsconfig.json` 不变；按任务需要运行。测试行为继续通过相应Vitest用例验证，本轮名称展示覆盖79项，不能用生产类型通过代替测试行为或TEST页面验收。
 
