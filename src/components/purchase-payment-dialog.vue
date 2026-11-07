@@ -5,7 +5,7 @@
 
   <!-- Step sheet: method → network / bank confirmation. -->
   <view v-if="sheetOpen" class="pp-mask nx-sheet-fade-in" @click.self="payment.close">
-    <view id="pp-sheet" class="pp-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="sheetTitle">
+    <view id="pp-sheet" class="pp-sheet nx-glass-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="sheetTitle">
       <view class="pp-head">
         <view v-if="s.step !== 'methods'" class="pp-circ nx-frosted-button" role="button" tabindex="0" :aria-label="copy.backToMethods" @click="payment.back" @keydown.enter.prevent="payment.back">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
@@ -408,7 +408,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 </script>
 <style scoped>
 .pp-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: var(--v5-bg-color-mask); }
-.pp-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) calc(var(--nx-overlay-safe-bottom) + 10px); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; background: var(--v5-surface); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink); }
+.pp-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) calc(var(--nx-overlay-safe-bottom) + 10px); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; color: var(--v5-ink); }
 .pp-head { flex: none; display: flex; align-items: center; gap: var(--v5-space-3); }
 .pp-head__text { flex: 1; min-width: 0; }
 .pp-title { display: block; font: 600 var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
