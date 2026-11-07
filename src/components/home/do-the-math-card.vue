@@ -121,7 +121,7 @@ function goStore() {
 /* Same neutral placeholder as the catalogue uses for a SKU without an approved image. */
 .dc-device--placeholder { display:grid; place-items:center; color:var(--v5-ink-3); }
 .dc-pillar { position:relative; width:64px; border-radius:12px 12px 3px 3px; overflow:hidden; transform-origin:50% 100%; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); animation:dc-pillar-rise 1100ms cubic-bezier(.16,1,.3,1) both; }
-.dc-col--target .dc-pillar { animation-delay:120ms; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-tech-cyan) 72%,transparent),color-mix(in srgb,var(--v5-aura-sky) 20%,transparent)); box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 14px 30px -10px color-mix(in srgb,var(--v5-tech-cyan) 60%,transparent); }
+.dc-col--target .dc-pillar { animation-delay:120ms; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-tech-cyan) 72%,transparent),color-mix(in srgb,var(--v5-aura-sky) 20%,transparent)); box-shadow:inset 0 1px 0 rgba(255,255,255,.45); }
 .dc-card--masked .dc-col--target .dc-pillar { background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); box-shadow:none; }
 .dc-pillar__sweep { position:absolute; top:-10%; bottom:-10%; left:-70%; width:45%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); transform:skewX(-18deg); animation:dc-sweep 6.8s 1.8s ease-in-out infinite; }
 /* The arc is drawn by a left-to-right reveal: dashes cannot follow pathLength under a non-scaling stroke
