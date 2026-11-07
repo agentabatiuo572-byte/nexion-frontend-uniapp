@@ -21,7 +21,6 @@
   <view v-if="show" class="mx-4">
     <view class="nx-glass-card block relative overflow-hidden active:opacity-90" :style="rootStyle" role="link" tabindex="0" @click="goStore">
       <!-- Subtle background glow on the right -->
-      <view class="absolute inset-0 pointer-events-none" :style="glowStyle" />
 
       <!-- Header label -->
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
@@ -204,9 +203,6 @@ function goStore() {
 
 const rootStyle: CSSProperties = {
   padding: "16px",
-};
-const glowStyle: CSSProperties = {
-  background: "radial-gradient(60% 80% at 92% 50%, color-mix(in srgb, var(--v5-brand-2) 16%, transparent), transparent 70%)",
 };
 const labelStyle: CSSProperties = {
   fontSize: "12px",
