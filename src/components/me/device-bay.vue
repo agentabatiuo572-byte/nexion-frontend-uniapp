@@ -24,7 +24,7 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 </script>
 
 <style scoped>
-.device-bay { position: relative; height: 112px; overflow: hidden; border-radius: var(--v5-radius-m); background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: var(--device-bay-well), inset 0 0 0 1px var(--v5-border); animation: nx-viz-light 320ms cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 40ms); }
+.device-bay { position: relative; height: 112px; overflow: hidden; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); box-shadow: var(--device-bay-well), inset 0 0 0 1px var(--v5-border); animation: nx-viz-light 320ms cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 40ms); }
 .device-bay__led { position: absolute; z-index: 1; top: 10px; left: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success); }
 .device-bay__led--off { background: var(--v5-ink-4); animation: none; }
 .device-bay__badge { position: absolute; z-index: 1; top: 8px; right: 8px; padding: 1px 5px; border-radius: 6px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 10px/14px var(--font-v5); }
