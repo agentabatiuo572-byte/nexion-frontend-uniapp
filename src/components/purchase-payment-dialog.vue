@@ -269,7 +269,7 @@ const fees = computed(() => s.intent ?? s.quote);
 const isBank = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'HDPAY_BANK');
 const received = computed(() => s.intent?.status === 'FUNDS_CONFIRMED');
 const ready = computed(() => timing.value.canPay && (isBank.value ? !!s.intent?.paymentUrl : !!s.intent?.address));
-const networkName = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod ?? s.method) === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20);
+const networkName = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod ?? s.pausedPaymentMethod) === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20);
 const methodName = computed(() => isBank.value ? copy.value.bank : networkName.value);
 const pageTitle = computed(() => received.value ? copy.value.resultTitle : isBank.value ? copy.value.bankTitle : copy.value.usdtPage);
 const cashierUrl = computed(() => timing.value.canPay && s.intent?.paymentUrl ? validateHostedPaymentUrl(s.intent.paymentUrl) ?? '' : '');
