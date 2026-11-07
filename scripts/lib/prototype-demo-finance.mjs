@@ -1,5 +1,6 @@
 // Isolated loopback financial read models. No real network or financial submissions.
 import {demoWithdrawalFacts} from './prototype-demo-secondary.mjs';
+import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
 const day=86400000;
 export function financeDemo(url,state,request){if(request.method()!=='GET'&&url.pathname!=='/api/withdrawals/eligibility')return undefined;const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',walletAmount=empty?0:state.walletBalance??52800.64; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
 const caps = { ...proof, source: "G2/G3 server configuration", asset: "UVT", currency: "USDT", currentPrice: .125, userDailyCapUsdt: 5000, platformDailyCapUsdt: 100000, feePct: .1, feeMinUsdt: .1, minUsdt: .1, minNex: 1, queueMode: "QUEUE", swapEnabled: true };
@@ -35,10 +36,9 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/deposits/policy" || p === "/api/deposits/address") {
     // Policy and address share the same terms and existing payment availability switches.
     const networks = ['BEP20', 'ERC20'].map(network => {
-      const enabled = state.topupChannels !== 'usdt-off' && !(state.topupChannels === 'erc20-off' && network === 'ERC20')
-        && state.paymentState !== 'usdt-off' && !(state.paymentState === 'erc20-off' && network === 'ERC20');
+      const disabledReason = demoDepositNetworkDisabledReason(state, network);
       const feeUsdt = .123456;
-      return { network, enabled, disabledReason: enabled ? null : 'NETWORK_SWITCH_OFF', confirmations: 15,
+      return { network, enabled: disabledReason === null, disabledReason, confirmations: 15,
         feeUsdt, feeUsdtExact: String(feeUsdt), minDepositUsdt: 50, minDepositUsdtExact: '50' };
     });
     if (p === "/api/deposits/policy") return { networks };
