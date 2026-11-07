@@ -20,18 +20,6 @@
       boxShadow: 'var(--nx-glass-edge)',
     }"
   >
-    <!-- Internal aurora — brand-2 + tech-cyan glow marks the special trial device -->
-    <view
-      class="absolute inset-0 pointer-events-none"
-      :style="{
-        background:
-          'radial-gradient(55% 60% at 0% 0%, color-mix(in oklab, var(--v5-brand-2) 22%, transparent) 0%, transparent 60%),' +
-          'radial-gradient(45% 55% at 100% 100%, color-mix(in oklab, var(--v5-tech-cyan) 18%, transparent) 0%, transparent 65%)',
-        filter: 'blur(14px)',
-        opacity: 0.9,
-      }"
-    />
-
     <view class="relative p-4">
       <!-- Header — device identity + on-trial badge + countdown -->
       <view class="flex flex-wrap items-center gap-2.5">
