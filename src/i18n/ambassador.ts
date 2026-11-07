@@ -5,7 +5,7 @@ import type { AmbassadorStatusKey, AmbassadorStepKey } from "@/lib/ambassador-di
 type Count = string | { one: string; few?: string; other: string };
 
 interface AmbassadorCopy {
-  currentApplication: string; myApplications: string; allRecords: string; chooseOne: string; bucketRange: string;
+  currentApplication: string; myApplications: string; allRecords: string; chooseOne: string; bucketRange: string; budgetLabel: string; failedUploadHint: string;
   applyHint: string; pendingHint: string; uploadMaterials: string; supplementMaterials: string; viewProgress: string;
   amount: string; approvedAmount: string; eventOn: string; eventDate: string; noBucket: string; progress: string; openDetail: string;
   statuses: Record<AmbassadorStatusKey, string>;
@@ -31,6 +31,7 @@ interface AmbassadorCopy {
 
 const copy: Record<UiLocale, AmbassadorCopy> = {
   zh: {
+    budgetLabel: "申请预算", failedUploadHint: "重试或取消后可继续添加",
     currentApplication: "当前申请", myApplications: "我的申请", allRecords: "全部记录", chooseOne: "选择一类", bucketRange: "{bucket}可申请 {range}",
     applyHint: "可以提前申请。提交后上传材料，活动结束并通过核验后才会批准。", pendingHint: "当前申请处理完成后，可以提交新申请。",
     uploadMaterials: "上传申请材料", supplementMaterials: "补交材料", viewProgress: "查看申请进度",
@@ -62,6 +63,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "活动签到与到场人数", activity: "活动发生证明", expense: "费用凭证", promotion: "推广内容", traffic: "流量数据", materials: "物料清单", quota: "配额使用说明", requirements: "需求说明", work_hours: "工时记录", acceptance: "交付验收" },
   },
   en: {
+    budgetLabel: "Requested budget", failedUploadHint: "Retry or cancel to add more files",
     currentApplication: "Current application", myApplications: "My applications", allRecords: "All records", chooseOne: "Choose one", bucketRange: "{bucket}: {range}",
     applyHint: "You can apply in advance. Upload materials after you submit. Approval follows once the event ends and the reviews pass.", pendingHint: "You can submit a new application once the current one is completed.",
     uploadMaterials: "Upload materials", supplementMaterials: "Add requested materials", viewProgress: "View progress",
@@ -93,6 +95,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "Attendance and unique participants", activity: "Evidence of the event", expense: "Expense receipts", promotion: "Promotional content", traffic: "Traffic data", materials: "Material inventory", quota: "Quota usage", requirements: "Requirements", work_hours: "Work logs", acceptance: "Delivery acceptance" },
   },
   vi: {
+    budgetLabel: "Ngân sách đề nghị", failedUploadHint: "Thử lại hoặc hủy để thêm tệp khác",
     currentApplication: "Đơn hiện tại", myApplications: "Đơn của tôi", allRecords: "Xem tất cả", chooseOne: "Chọn một loại", bucketRange: "{bucket}: {range}",
     applyHint: "Có thể đăng ký trước. Sau khi gửi đơn, hãy tải tài liệu lên; đơn chỉ được thông qua khi sự kiện đã kết thúc và xác minh đạt.", pendingHint: "Bạn có thể gửi đơn mới sau khi đơn hiện tại được xử lý xong.",
     uploadMaterials: "Tải tài liệu lên", supplementMaterials: "Bổ sung tài liệu", viewProgress: "Xem tiến độ đơn",
@@ -124,6 +127,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "Điểm danh và số người không trùng", activity: "Bằng chứng hoạt động", expense: "Chứng từ chi phí", promotion: "Nội dung quảng bá", traffic: "Dữ liệu lưu lượng", materials: "Danh sách vật liệu", quota: "Sử dụng hạn mức", requirements: "Yêu cầu", work_hours: "Nhật ký giờ làm", acceptance: "Nghiệm thu bàn giao" },
   },
   id: {
+    budgetLabel: "Anggaran diajukan", failedUploadHint: "Coba lagi atau batalkan untuk menambah berkas lain",
     currentApplication: "Pengajuan saat ini", myApplications: "Pengajuan saya", allRecords: "Semua riwayat", chooseOne: "Pilih satu", bucketRange: "{bucket}: {range}",
     applyHint: "Anda boleh mengajukan lebih awal. Setelah mengirim, unggah dokumen. Persetujuan diberikan setelah acara selesai dan verifikasi lulus.", pendingHint: "Anda dapat mengirim pengajuan baru setelah pengajuan saat ini selesai diproses.",
     uploadMaterials: "Unggah dokumen", supplementMaterials: "Lengkapi dokumen", viewProgress: "Lihat progres pengajuan",
@@ -155,6 +159,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "Kehadiran dan peserta unik", activity: "Bukti kegiatan", expense: "Bukti biaya", promotion: "Konten promosi", traffic: "Data trafik", materials: "Daftar bahan", quota: "Penggunaan kuota", requirements: "Kebutuhan", work_hours: "Catatan jam kerja", acceptance: "Penerimaan hasil" },
   },
   ms: {
+    budgetLabel: "Bajet dipohon", failedUploadHint: "Cuba lagi atau batalkan untuk menambah fail lain",
     currentApplication: "Permohonan semasa", myApplications: "Permohonan saya", allRecords: "Semua rekod", chooseOne: "Pilih satu", bucketRange: "{bucket}: {range}",
     applyHint: "Anda boleh memohon lebih awal. Selepas menghantar, muat naik bahan. Kelulusan diberi selepas acara tamat dan pengesahan lulus.", pendingHint: "Anda boleh menghantar permohonan baharu selepas permohonan semasa selesai diproses.",
     uploadMaterials: "Muat naik bahan", supplementMaterials: "Tambah bahan", viewProgress: "Lihat kemajuan permohonan",
@@ -186,6 +191,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "Kehadiran dan peserta unik", activity: "Bukti aktiviti", expense: "Resit perbelanjaan", promotion: "Kandungan promosi", traffic: "Data trafik", materials: "Senarai bahan", quota: "Penggunaan kuota", requirements: "Keperluan", work_hours: "Rekod waktu kerja", acceptance: "Penerimaan hasil" },
   },
   fil: {
+    budgetLabel: "Hinihinging budget", failedUploadHint: "Subukan ulit o kanselahin para makapagdagdag pa",
     currentApplication: "Kasalukuyang aplikasyon", myApplications: "Aking mga aplikasyon", allRecords: "Lahat ng tala", chooseOne: "Pumili ng isa", bucketRange: "{bucket}: {range}",
     applyHint: "Maaaring mag-apply nang maaga. Pagkatapos magsumite, i-upload ang mga dokumento. Maaaprubahan ito kapag tapos na ang event at pasado ang pagsusuri.", pendingHint: "Makakapagsumite ka ng bagong aplikasyon kapag tapos na ang kasalukuyan.",
     uploadMaterials: "Mag-upload ng dokumento", supplementMaterials: "Magdagdag ng dokumento", viewProgress: "Tingnan ang progreso",
@@ -217,6 +223,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "Attendance at natatanging kalahok", activity: "Patunay ng aktibidad", expense: "Mga resibo ng gastos", promotion: "Nilalaman ng promosyon", traffic: "Datos ng trapiko", materials: "Listahan ng materyales", quota: "Paggamit ng quota", requirements: "Mga kinakailangan", work_hours: "Tala ng oras ng trabaho", acceptance: "Pagtanggap ng natapos na gawain" },
   },
   ru: {
+    budgetLabel: "Запрошенный бюджет", failedUploadHint: "Повторите или отмените загрузку, чтобы добавить ещё",
     currentApplication: "Текущая заявка", myApplications: "Мои заявки", allRecords: "Все заявки", chooseOne: "Выберите одну", bucketRange: "{bucket}: {range}",
     applyHint: "Подать заявку можно заранее. После отправки загрузите материалы. Одобрение — после завершения мероприятия и успешной проверки.", pendingHint: "Новую заявку можно подать после завершения текущей.",
     uploadMaterials: "Загрузить материалы", supplementMaterials: "Дополнить материалы", viewProgress: "Посмотреть ход заявки",
@@ -248,6 +255,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "Регистрация и уникальные участники", activity: "Подтверждение мероприятия", expense: "Документы о расходах", promotion: "Рекламные материалы", traffic: "Данные трафика", materials: "Перечень материалов", quota: "Использование квоты", requirements: "Требования", work_hours: "Учёт рабочего времени", acceptance: "Приёмка результата" },
   },
   kk: {
+    budgetLabel: "Сұралған бюджет", failedUploadHint: "Тағы қосу үшін қайталаңыз не болдырмаңыз",
     currentApplication: "Ағымдағы өтінім", myApplications: "Менің өтінімдерім", allRecords: "Барлық жазба", chooseOne: "Біреуін таңдаңыз", bucketRange: "{bucket}: {range}",
     applyHint: "Алдын ала өтінім беруге болады. Жібергеннен кейін материалдарды жүктеңіз. Іс-шара аяқталып, тексеруден өткен соң мақұлданады.", pendingHint: "Ағымдағы өтінім аяқталған соң жаңа өтінім бере аласыз.",
     uploadMaterials: "Материалдарды жүктеу", supplementMaterials: "Материал толықтыру", viewProgress: "Өтінім барысын көру",
@@ -279,6 +287,7 @@ const copy: Record<UiLocale, AmbassadorCopy> = {
     kinds: { attendance: "Тіркелу және қайталанбайтын қатысушылар", activity: "Іс-шара дәлелі", expense: "Шығын түбіртектері", promotion: "Жарнама мазмұны", traffic: "Трафик деректері", materials: "Материалдар тізімі", quota: "Квотаны пайдалану", requirements: "Талаптар", work_hours: "Жұмыс уақыты есебі", acceptance: "Нәтижені қабылдау" },
   },
   uz: {
+    budgetLabel: "Soʻralgan byudjet", failedUploadHint: "Yana qoʻshish uchun qayta urining yoki bekor qiling",
     currentApplication: "Joriy ariza", myApplications: "Mening arizalarim", allRecords: "Barcha yozuvlar", chooseOne: "Bittasini tanlang", bucketRange: "{bucket}: {range}",
     applyHint: "Oldindan ariza berish mumkin. Yuborgandan soʻng hujjatlarni yuklang. Tadbir tugab, tekshiruvdan oʻtgach tasdiqlanadi.", pendingHint: "Joriy ariza yakunlangach, yangi ariza yuborishingiz mumkin.",
     uploadMaterials: "Hujjatlarni yuklash", supplementMaterials: "Hujjat qoʻshish", viewProgress: "Ariza holatini koʻrish",
