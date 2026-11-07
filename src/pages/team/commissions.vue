@@ -16,7 +16,7 @@
         />
         <template v-if="!remoteApiEnabled || ledger !== null">
 
-        <RewardHero class="commission-overview nx-frosted-button" kind="ledger" panel :label="designCopy.monthRewards">
+        <RewardHero class="commission-overview nx-soft-glass" kind="ledger" panel :label="designCopy.monthRewards">
           <text class="reward-amount"><text v-if="monthAmount.currency" class="reward-amount__currency">$</text>{{ monthAmount.integer }}<text v-if="monthAmount.fraction" class="reward-amount__fraction">.{{ monthAmount.fraction }}</text></text>
           <text class="block reward-income-uvt">{{ (monthTotals.nex ?? 0) > 0 && !visibility.hidden ? '+' : '' }}{{ assetTotal(monthTotals.nex, 'uvt') }}</text>
           <view v-if="settlementSplit" class="commission-split" aria-hidden="true"><view :style="{ flexGrow: settlementSplit.unlocked }" /><view :style="{ flexGrow: settlementSplit.cooling }" /></view>
@@ -369,8 +369,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 
 <style scoped>
 .commission-overview.reward-hero--panel { position: relative; box-sizing: border-box; border: 0; padding: 20px; border-radius: 28px; }
-/* Light glass on the cream floor: the shared 7% ink fill leaves ink-3 at 4.2:1, so the hero takes a lighter uniform fill (ink-3 5.2:1, warning-ink 4.8:1). */
-[data-theme="light"] .commission-overview { --ui-button-fill: color-mix(in srgb, var(--v5-surface) 58%, transparent); }
 .commission-overview :deep(.reward-hero__art) { display: none; }
 .commission-overview__rules { position: absolute; right: 12px; top: 10px; display: flex; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-width: 44px; min-height: 44px; padding: 0 10px; color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); isolation: isolate; }
 .commission-overview__rules::before { content: ""; position: absolute; inset: 8px 0; z-index: -1; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }

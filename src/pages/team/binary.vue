@@ -11,7 +11,7 @@
           <view v-else-if="remoteApiEnabled && pageState.primary === 'loading' && !snapshot" class="binary-loading"
             role="status" aria-live="polite" aria-busy="true" />
             <view v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)" class="binary-comparison-section">
-            <view class="binary-hero nx-frosted-button nx-viz-press">
+            <view class="binary-hero nx-soft-glass nx-viz-press">
               <view class="binary-hero-heading">
                 <text class="binary-label">{{ binaryCopy.contributions }}</text>
                 <view class="binary-rule-link" role="button" tabindex="0" :aria-label="t.binary.howItWorksEntry"
