@@ -92,7 +92,7 @@ function goCommissions() {
 .team-ledger__amount { display: flex; align-items: baseline; gap: 2px; flex-wrap: nowrap; min-height: 1.1em; font-family: var(--font-amount); font-size: 48px; line-height: 1.1; font-weight: 600; letter-spacing: -.03em; white-space: nowrap; overflow-x: auto; }
 .team-ledger__amount > text { flex: none; }
 .team-ledger__currency { font-size: 20px; color: var(--v5-ink-3); }
-.team-ledger__fraction { color: var(--v5-ink-4); }
+.team-ledger__fraction { color: var(--v5-ink-3); }
 .team-ledger__nex { display: block; margin-top: calc(var(--v5-space-2) * -1); font: 500 15px/20px var(--font-metric); color: var(--v5-brand); white-space: nowrap; overflow-x: auto; }
 .team-ledger__settlement { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-inline); }
 .team-ledger__settlement > view { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; padding: var(--ui-space-inline); border-radius: 16px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); }
