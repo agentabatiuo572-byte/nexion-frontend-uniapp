@@ -1,5 +1,5 @@
 <template>
-  <view class="invite-card nx-viz-press">
+  <view class="invite-card nx-frosted-button nx-viz-press">
     <view class="invite-card__art" aria-hidden="true"><TeamArt kind="invite" :size="140" /></view>
     <view class="invite-card__header">
       <text class="invite-card__title">{{ copy.inviteHeadline }}</text>
@@ -155,7 +155,7 @@ const stopRuntimeRefresh=subscribeRuntimeRevision(scope=>{
 onUnmounted(stopRuntimeRefresh);
 </script>
 <style scoped>
-.invite-card { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-5); border-radius: 28px; background: radial-gradient(110% 90% at 90% 10%, color-mix(in srgb, var(--v5-brand) 12%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.invite-card { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-5); border-radius: 28px; }
 .invite-card__art { position: absolute; top: 6px; right: -8px; width: 150px; pointer-events: none; }
 .invite-card__art :deep(.team-art) { width: 100%; height: auto; aspect-ratio: 4 / 3; }
 /* Pills sit above the title; each keeps a 44px hit area around a 28px pill. */

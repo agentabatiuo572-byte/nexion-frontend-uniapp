@@ -16,7 +16,7 @@
           <template v-else>
             <view v-if="!pointsRankingAvailable" class="leader-state" role="status"><text>{{ pointsCopy.unavailable }}</text></view>
             <view v-else class="leader-list">
-              <view v-for="group in rankingGroups" :key="group.id" :ref="group.featured ? setPodiumRef : undefined" :class="group.featured ? 'leader-podium nx-viz-motion nx-viz-press' : 'leader-flat nx-viz-press'">
+              <view v-for="group in rankingGroups" :key="group.id" :ref="group.featured ? setPodiumRef : undefined" :class="group.featured ? 'leader-podium nx-frosted-button nx-viz-motion nx-viz-press' : 'leader-flat nx-viz-press'">
               <view v-for="row in group.rows" :key="row.rank" class="leader-row" :class="group.featured ? `leader-row--podium leader-row--p${row.rank}` : ''" :data-rank="visibility.hidden ? undefined : row.rank">
                 <template v-if="group.featured">
                   <view class="leader-podium__badge">
@@ -281,7 +281,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && remoteState.value === "error
 .leader-caption { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .leader-me .leader-caption { color: var(--v5-ink); font-size: 13px; font-weight: 600; }
 /* Podium: top three on pedestals, 2-1-3 visual order (DOM stays 1-2-3), faint gold tint. */
-.leader-podium { display: flex; align-items: flex-end; gap: var(--v5-space-2); padding: 28px var(--ui-space-inline) var(--ui-space-inset); border-radius: 28px; background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--v5-warning) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.leader-podium { display: flex; align-items: flex-end; gap: var(--v5-space-2); padding: 28px var(--ui-space-inline) var(--ui-space-inset); border-radius: 28px; }
 .leader-row.leader-row--podium { flex: 1; min-width: 0; border-top: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .leader-row--p1 { order: 2; --step: 124px; --tone: var(--v5-warning); }
 .leader-row--p2 { order: 1; --step: 92px; --tone: var(--v5-ink-2); }
