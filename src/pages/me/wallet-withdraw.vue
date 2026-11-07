@@ -1593,7 +1593,7 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 [data-theme="light"] .wd-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-brand-2) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
   box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
 .wd-slab__head { display: flex; align-items: center; justify-content: space-between; }
-.wd-max { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.wd-max { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .wd-max::after { content: ""; position: absolute; inset: -6px -8px; }
 .wd-max[aria-disabled="true"] { opacity: .5; }
 .wd-amtrow { display: flex; align-items: baseline; margin-top: 4px; }
