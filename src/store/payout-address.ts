@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, onScopeDispose, ref } from "vue";
 import { payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
 import {
   payoutAddressEpochMs,
@@ -17,7 +17,7 @@ import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { captureRuntimeRevision, isCurrentRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
+import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import {
   applyAddAddress,
   applyChangeAddress,
@@ -200,6 +200,16 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   type PayoutRemoteRequest = RemoteAccountRequest & { commerceRun: RuntimeRevisionScope };
   const remoteReadState = ref<{ scope: PayoutRemoteRequest; status: PayoutAddressReadStatus } | null>(null);
+  let remoteReadInFlight: { scope: PayoutRemoteRequest; promise: Promise<boolean> } | null = null;
+
+  function clearRemoteSnapshot() {
+    book.value = emptyBook();
+    remoteChangeCooldownDays.value = null;
+    remoteEffectiveDelayHours.value = null;
+    remoteProvenance.value = null;
+    remoteServerClock.value = null;
+    remoteReadState.value = null;
+  }
 
   function requestScope(): PayoutRemoteRequest {
     return { ...remoteAccountEpoch.snapshot(), commerceRun: captureRuntimeRevision() };
@@ -225,28 +235,46 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   /** Remote mode is fail-closed: only a validated server snapshot may populate the book.
    *  权威不可达自吞返 false(resilience 门);被更新调用顶替(superseded)不是失败事实,返 true。 */
-  async function refreshRemote(): Promise<boolean> {
-    if (!payoutAddressServerEnabled) return true;
+  function refreshRemote(): Promise<boolean> {
+    if (!payoutAddressServerEnabled) return Promise.resolve(true);
+    if (remoteReadInFlight && scopeIsCurrent(remoteReadInFlight.scope)) return remoteReadInFlight.promise;
     const version = ++remoteLoadVersion;
     const request = requestScope();
-    remoteReadState.value = { scope: request, status: "loading" };
-    try {
-      const snapshot = await payoutAddressApi.list();
+    // Publish the shared promise before reactive loading updates can reenter.
+    const promise = Promise.resolve().then(async () => {
       if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
-      if (!runtimeProvenanceValid(snapshot)) {
+      try {
+        const snapshot = await payoutAddressApi.list();
+        if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
+        if (!runtimeProvenanceValid(snapshot)) {
+          remoteReadState.value = { scope: request, status: "error" };
+          return false;
+        }
+        applyRemoteSnapshot(snapshot, request);
+        return true;
+      } catch {
+        // A stale failure belongs to the previous account/request and must not
+        // surface an error or clear the current account's canonical state.
+        if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
         remoteReadState.value = { scope: request, status: "error" };
         return false;
       }
-      applyRemoteSnapshot(snapshot, request);
-      return true;
-    } catch {
-      // A stale failure belongs to the previous account/request and must not
-      // surface an error or clear the current account's canonical state.
-      if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
-      remoteReadState.value = { scope: request, status: "error" };
-      return false;
-    }
+    }).finally(() => {
+      if (remoteReadInFlight?.promise === promise) remoteReadInFlight = null;
+    });
+    remoteReadInFlight = { scope: request, promise };
+    remoteReadState.value = { scope: request, status: "loading" };
+    return promise;
   }
+
+  // Cold-session catalogue publication advances the runtime after bindAccount's
+  // read has started (or even finished). Invalidate its snapshot and read the
+  // new scope once; stale responses still pass through the original fences.
+  onScopeDispose(subscribeRuntimeRevision(() => {
+    if (!payoutAddressServerEnabled || !remoteReadState.value) return;
+    clearRemoteSnapshot();
+    void refreshRemote();
+  }));
 
   async function sendRemoteOtp() {
     if (!payoutAddressServerEnabled) throw new Error("PAYOUT_ADDRESS_SERVER_DISABLED_IN_SANDBOX");
@@ -311,12 +339,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     remoteAccountEpoch.bind(boundKey);
     remoteLoadVersion += 1;
     if (payoutAddressServerEnabled) {
-      book.value = emptyBook();
-      remoteChangeCooldownDays.value = null;
-      remoteEffectiveDelayHours.value = null;
-      remoteProvenance.value = null;
-      remoteServerClock.value = null;
-      remoteReadState.value = null;
+      clearRemoteSnapshot();
       void refreshRemote();
     } else {
       book.value = hydrate(boundKey);
