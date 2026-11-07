@@ -117,7 +117,7 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__cancel { display:flex; align-items:center; justify-content:center; min-height:44px; margin-top:8px; border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:400 12px/18px var(--font-v5); }
 .trial-device-row--home .trial-device-row__heading { min-height:64px; padding:10px 16px; gap:12px; }
 .trial-device-row--home .trial-device-row__main { gap:12px; }
-.trial-device-row--home .trial-device-row__art { width:48px; height:48px; border-radius:14px; overflow:visible; background:radial-gradient(80% 70% at 50% 70%,color-mix(in srgb,var(--v5-ink) 6%,transparent),transparent); }
+.trial-device-row--home .trial-device-row__art { width:48px; height:48px; border-radius:14px; overflow:visible; background:var(--v5-surface-2); }
 .trial-device-row--home .trial-device-row__name { font-weight:500; line-height:20px; }
 .trial-device-row--home .trial-device-row__status { margin-top:2px; }
 .trial-device-row--home .trial-device-row__summary { gap:12px; }

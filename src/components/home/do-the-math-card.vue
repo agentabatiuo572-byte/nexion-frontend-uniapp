@@ -110,8 +110,8 @@ function goStore() {
 
 <style scoped>
 .dc-card { position:relative; isolation:isolate; box-sizing:border-box; padding:12px 12px 8px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); border:1px solid var(--v5-border); box-shadow:var(--v5-glass-shadow); overflow:hidden; }
-/* Recessed stage with a faint cyan glow behind the target. */
-.dc-stage { --dc-well:inset 0 2px 10px rgba(0,0,0,.55); position:relative; height:208px; border-radius:16px; overflow:hidden; background:radial-gradient(55% 65% at 75% 92%,color-mix(in srgb,var(--v5-tech-cyan) 18%,transparent),transparent 72%),var(--v5-surface-2); box-shadow:var(--dc-well); }
+/* Recessed solid stage (no glow behind the target). */
+.dc-stage { --dc-well:inset 0 2px 10px rgba(0,0,0,.55); position:relative; height:208px; border-radius:16px; overflow:hidden; background:var(--v5-surface-2); box-shadow:var(--dc-well); }
 :global([data-theme="light"] .dc-stage) { --dc-well:inset 0 1px 4px rgba(20,16,8,.08); }
 .dc-stage__label { position:absolute; left:12px; top:10px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .dc-stage__floor { position:absolute; left:12px; right:12px; bottom:22px; height:1px; background:var(--v5-border-strong); }
