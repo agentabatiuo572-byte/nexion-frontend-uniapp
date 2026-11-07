@@ -21,7 +21,6 @@
         <EmptyState v-if="overview.courses.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
         <view v-if="featuredCourse" class="learning-section">
           <view class="course-feature">
-            <view class="course-feature__glow" aria-hidden="true" />
             <text class="course-feature__label">{{ featuredCourse.progress > 0 ? recommendationCopy.resume : t.learning.featuredLabel }}</text>
             <text class="course-feature__name">{{ featuredCourse.title }}</text>
             <view class="course-feature__meta"><text>{{ courseMetaLead(featuredCourse) }} · {{ pageCopy.reward }}</text><text class="learning-reward" style="margin-left:3px">{{ formatAmount(featuredCourse.rewardNex) }} UVT</text></view>
@@ -212,8 +211,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!error.value && !loading.va
 .learning-summary__bar { height: 6px; margin-top: 10px; border-radius: var(--v5-radius-full); background: var(--v5-surface-3); overflow: hidden; }
 .learning-summary__bar > view { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--v5-brand-deep), var(--ui-lime-soft)); box-shadow: 0 0 10px color-mix(in srgb, var(--v5-brand) 45%, transparent); }
 .learning-section { padding: var(--v5-space-6) var(--v5-space-4) 0; }
-.course-feature { position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: radial-gradient(55% 65% at 90% 28%, color-mix(in srgb, var(--v5-brand) 22%, transparent), transparent 65%), linear-gradient(180deg, var(--ui-spotlight-top), var(--ui-ticket-bottom)); }
-.course-feature__glow { position: absolute; right: 14px; top: 96px; width: 96px; height: 16px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--ui-lime-soft) 40%, transparent), transparent); pointer-events: none; }
+.course-feature { position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
 .course-feature__label { position: relative; display: block; font-size: 12.5px; font-weight: 500; line-height: 18px; color: var(--ui-lime-soft); }
 .course-feature__name { position: relative; display: block; max-width: 200px; margin-top: 6px; font-size: 19px; font-weight: 600; line-height: 25px; overflow-wrap: anywhere; }
 .course-feature__meta { position: relative; margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); overflow-wrap: anywhere; }
@@ -248,7 +246,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!error.value && !loading.va
 .learning-summary__progress { font: 600 20px/28px var(--font-v5); }.learning-summary__earned { margin-top: var(--v5-space-1); font: 400 12px/16px var(--font-v5); }
 .learning-summary :deep(.growth-progress__center) { font: 500 14px/18px var(--font-metric); }.learning-reward { font-family: var(--font-metric); }
 .learning-section { padding-top: 20px; }.course-feature { padding: 18px 16px 16px; border: none; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 1px 0 var(--v5-brand); }
-.course-feature__glow { display: none; }.course-feature__label { font: 400 12px/16px var(--font-v5); color: var(--v5-brand); }.course-feature__name { margin-top: var(--v5-space-1); max-width: none; font: 600 18px/24px var(--font-v5); }
+.course-feature__label { font: 400 12px/16px var(--font-v5); color: var(--v5-brand); }.course-feature__name { margin-top: var(--v5-space-1); max-width: none; font: 600 18px/24px var(--font-v5); }
 .course-feature__meta { margin-top: var(--v5-space-1); font: 400 12px/16px var(--font-v5); }.course-feature__progress { display: block; margin-top: var(--v5-space-3); }.course-progress { height: 6px; }.course-progress__label { display: block; margin-top: 14px; padding-right: 46%; font: 400 12px/16px var(--font-v5); }
 .learning-center .course-feature__cta { width: auto; display: flex; margin: -30px 0 0 auto; max-width: 52%; font-weight: 500; }.course-feature__cta :deep(.nx-button__surface) { box-shadow: var(--ui-glass-edge-shadow); }
 .course-list__heading { justify-content: space-between; margin: 0 4px 12px; min-height: 24px; }.course-list { border: none; border-radius: var(--ui-radius-surface); }.course-row { min-height: 68px; }.course-status { width: 36px; height: 36px; font-family: var(--font-metric); }.course-row__meta { font: 400 12px/16px var(--font-v5); transform:translateY(1.5px); }

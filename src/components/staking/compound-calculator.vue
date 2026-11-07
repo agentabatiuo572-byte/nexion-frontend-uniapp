@@ -135,27 +135,6 @@ const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
   borderRadius: "var(--nx-glass-radius)",
 };
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 80% 20%, var(--v5-tech-cyan-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 80%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.25) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
-  animation: "v5-aurora-drift 14s ease-in-out infinite",
-};
-const gridStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  backgroundImage:
-    "linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)," +
-    "linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)",
-  backgroundSize: "24px 24px",
-  pointerEvents: "none",
-};
 const headStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "var(--ui-type-card-title)",

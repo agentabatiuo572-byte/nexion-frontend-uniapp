@@ -43,7 +43,7 @@
           </svg>
           <text class="est-loading__t">{{ detectingText }}</text>
         </view>
-        <view v-else key="reveal" class="est-phone anim-up">
+        <view v-else key="reveal" class="est-phone nx-frosted-button anim-up">
           <view class="est-phone__pill">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text class="est-phone__pill-t">{{ t.onboarding.detected }}</text>
@@ -481,13 +481,11 @@ async function deferPhoneActivation() {
 }
 .est-phone {
   position: relative;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--v5-brand) 12%, transparent), var(--v5-surface) 60%);
   border-radius: 12px;
   padding: 14px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 0 24px -4px rgba(198, 255, 58, 0.35);
 }
 .est-phone__pill {
   position: absolute;
@@ -618,7 +616,7 @@ async function deferPhoneActivation() {
   padding-top: 24px;
   margin-right: 4px;
   margin-left: 4px;
-  background: linear-gradient(to bottom, transparent, var(--v5-bg) 24px);
+  background: var(--v5-bg);
 }
 .est-go {
   width: 100%;

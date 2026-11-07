@@ -1062,8 +1062,8 @@ onUnmounted(() => cleanup());
 .rg-iconbtn:active, .rg-phone__cc:active { opacity: 0.6; }
 .rg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .rg-top__sp { }
-.rg-sponsor { margin-top: 16px; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; background: radial-gradient(80% 60% at 0% 0%, rgba(198,255,58,0.12) 0%, transparent 65%), var(--v5-surface); }
-.rg-sponsor__av { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: linear-gradient(135deg, var(--v5-brand), var(--v5-tech-cyan)); }
+.rg-sponsor { margin-top: 16px; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; background: var(--v5-surface); }
+.rg-sponsor__av { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--v5-brand); }
 .rg-sponsor__av-t { color: var(--v5-on-brand); font-family: var(--font-v5); font-weight: 600; font-size: 20px; }
 .rg-sponsor__body { flex: 1; min-width: 0; }
 .rg-sponsor__name { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

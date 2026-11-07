@@ -8,8 +8,6 @@
 -->
 <template>
   <StandalonePageShell class="ref-root" :style="rootStyle">
-    <view :style="cornerGlowStyle" />
-
     <view class="relative" style="padding: 16px">
       <!-- Brand -->
       <view class="flex items-center" style="gap: 8px; margin-bottom: 16px">
@@ -286,20 +284,6 @@ function goTerms() {
 }
 
 const rootStyle: CSSProperties = { position: "relative", minHeight: "100vh", background: "var(--v5-bg)" };
-const cornerGlowStyle: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  top: 0,
-  height: "260px",
-  pointerEvents: "none",
-  // Source glow is lemon-purple (rgba(124,92,255) + rgba(198,255,58)). In v5
-  // dark the purple accent token is --v5-tech-cyan (#8E72FF), not --brand-2
-  // (orange) — fixed the prior orange drift so the glow reads purple as in the
-  // prototype.
-  background:
-    "radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent) 0%, transparent 70%), radial-gradient(80% 60% at 50% 100%, color-mix(in srgb, var(--v5-brand) 10%, transparent) 0%, transparent 70%)",
-};
 const refChipStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "10px",
@@ -323,7 +307,7 @@ const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
   borderRadius: "999px",
-  background: "linear-gradient(135deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%)",
+  background: "var(--v5-brand)",
 };
 const avatarTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "26px", color: "var(--v5-on-brand)" };
 const sponsorNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
@@ -362,7 +346,7 @@ const ctaStyle: CSSProperties = {
   padding: "8px 12px",
   marginLeft: "auto",
   borderRadius: "999px",
-  background: "linear-gradient(90deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 80%, var(--v5-warning)))",
+  background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
