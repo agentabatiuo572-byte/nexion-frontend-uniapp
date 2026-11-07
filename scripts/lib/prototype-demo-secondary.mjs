@@ -4,14 +4,17 @@ const day=86400000;
 // One rule for every withdrawal read (EarningsReleaseService.withdrawableAmount, AppWithdrawalService.maximumWithdrawable
 // and bankCapacity): every earnings bucket is credited to the wallet, so pending and locked amounts sit inside the balance
 // and come off it before the ratio. USDT and bank withdrawals are rows of one table, so they share one daily count.
-export function demoWithdrawalFacts(state){
+export function demoWithdrawalFacts(state,now=Date.now()){
   const empty=state.dataState==='empty',walletUsdt=empty?0:state.walletBalance??52800.64,pendingReview=empty?0:12.5,bonusLocked=empty?0:50,balanceMaxRatio=1,dailyLimitCount=2;
   const released=Math.max(0,Math.round((walletUsdt-pendingReview-bonusLocked)*1e6)/1e6);
+  // WithdrawalDayWindow: Vietnam UTC+7 midnight, with an inclusive start and exclusive end.
+  const start=Math.floor((now+7*3600000)/day)*day-7*3600000,dailyCountResetAt=start+day;
+  const used=Object.values(state.bankDemo?.orders??{}).filter(row=>row.createdAt>=start&&row.createdAt<dailyCountResetAt).length;
   return {walletUsdt,pendingReview,bonusLocked,balanceMaxRatio,released,maxWithdrawableUsdt:Math.round(released*balanceMaxRatio*1e6)/1e6,dailyLimitCount,
-    dailyRemainingCount:Math.max(0,dailyLimitCount-Object.keys(state.bankDemo?.orders??{}).length)};
+    dailyRemainingCount:Math.max(0,dailyLimitCount-used),dailyCountResetAt};
 }
 export function secondaryDemo(url,state,request){
-  const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state);
+  const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now);
   const page=Number(url.searchParams.get('page')||1),pageSize=Number(url.searchParams.get('pageSize')||20);
   const paginate=items=>({page,pageSize,totalRows:items.length,events:items.slice((page-1)*pageSize,page*pageSize)});
   if(p==='/api/app/profile/nickname-candidates')return {candidates:['Bright Fox 21','Calm Star 32','Swift Owl 43','Lunar Wolf 54','Amber Moon 65','Quiet Pine 76']};
@@ -21,7 +24,7 @@ export function secondaryDemo(url,state,request){
     if(request.method()==='PATCH')Object.assign(state.notificationPreferences,request.postDataJSON(),{system:true});
     return state.notificationPreferences;
   }
-  if(p==='/api/withdrawals/bank/config')return {enabled:true,banks:[],bankCodeRequired:false,bindingOtpRequired:!empty,bankSelection:'ACCOUNT_ROUTED',bankRoutingVerified:true,payType:'BANKQR',unresolvedIntent:null,beneficiary:empty?null:{bankCode:'',bankName:'ACCOUNT_ROUTED',maskedAccount:'••••4242',effectiveAt:iso,nextChangeAt:iso,beneficiaryNo:'DEMO-BANK-1',canWithdraw:true,bankRoutingVerified:true},policy:{version:1,minAmountUsd:10,maxAmountUsd:10000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:100},capacity:{maxWithdrawableUsdt:facts.maxWithdrawableUsdt,dailyRemainingCount:facts.dailyRemainingCount,dailyLimitCount:facts.dailyLimitCount,dailyCountResetAt:new Date(now+day).toISOString(),withdrawalEnabled:true}};
+  if(p==='/api/withdrawals/bank/config')return {enabled:true,banks:[],bankCodeRequired:false,bindingOtpRequired:!empty,bankSelection:'ACCOUNT_ROUTED',bankRoutingVerified:true,payType:'BANKQR',unresolvedIntent:null,beneficiary:empty?null:{bankCode:'',bankName:'ACCOUNT_ROUTED',maskedAccount:'••••4242',effectiveAt:iso,nextChangeAt:iso,beneficiaryNo:'DEMO-BANK-1',canWithdraw:true,bankRoutingVerified:true},policy:{version:1,minAmountUsd:10,maxAmountUsd:10000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:100},capacity:{maxWithdrawableUsdt:facts.maxWithdrawableUsdt,dailyRemainingCount:facts.dailyRemainingCount,dailyLimitCount:facts.dailyLimitCount,dailyCountResetAt:new Date(facts.dailyCountResetAt).toISOString(),withdrawalEnabled:true}};
   if(p==='/api/payment-methods')return {serverCanonical:true,cards:empty?[]:[{tokenId:'9001',version:1,brand:'visa',last4:'4242',expiry:'12/30',holder:'ALEX DEMO',status:'BOUND',isDefault:true,boundAt:iso,source:'mock',sandbox:true,providerCanonical:false}]};
   if(p.startsWith('/api/goals')){
     state.goals??=[{id:1,targetUsdt:1000,deadlineAt:now+30*day,createdAt:now-10*day,achieved:false,achievedAt:null,progressPct:37.5,lifetimeEarningsUsdt:375},{id:2,targetUsdt:100,deadlineAt:now-day,createdAt:now-40*day,achieved:true,achievedAt:now-2*day,progressPct:100,lifetimeEarningsUsdt:375}];
