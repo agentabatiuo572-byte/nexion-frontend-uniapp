@@ -13,7 +13,7 @@
           <text>{{ fmt(copy.revision, { n: pack.materialRevision }) }} · {{ copy.states[pack.materialState] }}</text>
           <button class="amb-materials__action" :disabled="busy" @click="refresh">{{ copy.refresh }}</button>
         </view>
-        <text class="amb-materials__hint">{{ pack.legacyApproved ? copy.legacy : copy.flowHint }}</text>
+        <text v-if="pack.legacyApproved || pending" class="amb-materials__hint">{{ pack.legacyApproved ? copy.legacy : copy.flowHint }}</text>
         <template v-if="!pack.legacyApproved">
           <view v-for="stage in reviews" :key="stage.label" class="amb-materials__review">
             <view class="amb-materials__heading"><text>{{ stage.label }}</text><text :class="{ 'amb-materials__warning': stage.review.status === 'NEEDS_MORE' }">{{ copy.states[stage.review.status] }}</text></view>
@@ -22,9 +22,11 @@
             <text v-if="stage.review.verifiedAttendees != null">{{ copy.attendees }} · {{ visibility.mask(stage.review.verifiedAttendees) }}</text>
             <text v-if="stage.review.recognizedBudgetUsdt != null">{{ copy.recognized }} · {{ visibility.mask(String(stage.review.recognizedBudgetUsdt)) }} USDT</text>
           </view>
-          <view v-if="missingKinds.length" class="amb-materials__warning" role="status">{{ copy.missing }} · {{ missingKinds.map(kindLabel).join(' / ') }}</view>
-          <text v-else-if="requirements.length" class="amb-materials__hint">{{ copy.complete }}</text>
-          <text v-for="blocker in blockerLabels" :key="blocker" class="amb-materials__hint">{{ blocker }}</text>
+          <template v-if="pending">
+            <view v-if="missingKinds.length" class="amb-materials__warning" role="status">{{ copy.missing }} · {{ missingKinds.map(kindLabel).join(' / ') }}</view>
+            <text v-else-if="requirements.length && (pack.businessReview.status !== 'PASSED' || pack.financeReview.status !== 'PASSED')" class="amb-materials__hint">{{ copy.complete }}</text>
+            <text v-for="blocker in blockerLabels" :key="blocker" class="amb-materials__hint">{{ blocker }}</text>
+          </template>
         </template>
 
         <view v-if="editable && !pack.bucket" class="amb-materials__stack">
@@ -131,7 +133,9 @@ function blockerLabel(code: string): string {
   return copy.value.blockers[code] ?? copy.value.blocked;
 }
 const blockerLabels = computed(() => [...new Set((pack.value?.approvalBlockers ?? []).map(blockerLabel))]);
-const editable = computed(() => auth.isAuthenticated && props.application.status === "PENDING" && pack.value?.canSubmit === true && !pack.value.legacyApproved);
+const pending = computed(() => props.application.status === "PENDING"
+  && !pack.value?.approvalBlockers.includes("APPLICATION_NOT_PENDING"));
+const editable = computed(() => auth.isAuthenticated && pending.value && pack.value?.canSubmit === true && !pack.value.legacyApproved);
 const dirty = computed(() => !!pack.value && (statement.value !== pack.value.statement || budget.value !== String(pack.value.budgetUsdt)
   || (bucket.value ?? null) !== pack.value.bucket || JSON.stringify(attachments.value.map(file => [file.fileId, file.kind])) !== JSON.stringify(pack.value.attachments.map(file => [file.fileId, file.kind]))));
 interface UploadDraft { kind: string; path: string; name: string; key: string; state: "uploading" | "failed" }
