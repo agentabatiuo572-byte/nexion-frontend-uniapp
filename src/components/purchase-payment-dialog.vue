@@ -181,10 +181,10 @@
       </view>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30). -->
-    <view v-if="!received && isBank && !conclusion" class="pp-bar">
+    <view v-if="!received && isBank && !conclusion" class="pp-bar nx-glass-bar">
       <NxButton class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
     </view>
-    <view v-if="networkPaused && s.orderNo" class="pp-bar">
+    <view v-if="networkPaused && s.orderNo" class="pp-bar nx-glass-bar">
       <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
     </view>
   </view>
@@ -408,7 +408,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 </script>
 <style scoped>
 .pp-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: var(--v5-bg-color-mask); }
-.pp-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) calc(var(--nx-overlay-safe-bottom) + 10px); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; background: linear-gradient(155deg, color-mix(in srgb, var(--v5-ink) 4%, transparent), transparent 55%), var(--v5-surface); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink); }
+.pp-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) calc(var(--nx-overlay-safe-bottom) + 10px); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; background: var(--v5-surface); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink); }
 .pp-head { flex: none; display: flex; align-items: center; gap: var(--v5-space-3); }
 .pp-head__text { flex: 1; min-width: 0; }
 .pp-title { display: block; font: 600 var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
@@ -470,7 +470,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .pp-pay { display: flex; flex-direction: column; gap: var(--v5-space-3); padding: var(--v5-space-6) var(--v5-space-4) var(--v5-space-8); }
 .pp-card { padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
-.pp-hero { padding: var(--v5-space-5); background: radial-gradient(260px 200px at 100% 0%, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent 72%), var(--v5-surface); }
+.pp-hero { padding: var(--v5-space-5); }
 .pp-hero__lab { display: block; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-hero__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-1); }
 .pp-hero__amt { min-width: 0; font: 500 32px/40px var(--font-amount); letter-spacing: -.02em; white-space: nowrap; color: var(--v5-ink); }
@@ -498,7 +498,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-wait.is-paused { justify-content: center; text-align: center; }
 .pp-wait.is-paused .pp-wait__s { text-align: center; }
 .pp-pay.has-bar { padding-bottom: 120px; }
-.pp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.pp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .pp-reopen { display: flex; flex: 1; }
 .pp-div { height: 1px; margin: 6px 0; background: var(--v5-border); }
 .pp-warn { display: flex; gap: var(--v5-space-2); padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: color-mix(in srgb, var(--v5-warning-soft) 60%, transparent); color: var(--v5-warning); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
@@ -506,7 +506,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 
 .pp-done { display: flex; flex-direction: column; padding: 48px var(--v5-space-4) var(--v5-space-8); }
 .pp-done__hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 var(--v5-space-2); }
-.pp-done__badge { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-brand); background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--v5-brand) 26%, transparent), color-mix(in srgb, var(--v5-brand) 10%, transparent) 70%); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 6%, transparent), 0 0 60px color-mix(in srgb, var(--v5-brand) 22%, transparent); }
+.pp-done__badge { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 18%, transparent); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 6%, transparent); }
 .pp-done__title { display: block; margin-top: var(--v5-space-6); font: 600 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); }
 .pp-done__desc { display: block; margin-top: var(--v5-space-2); color: var(--v5-ink-2); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .pp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 36px; }

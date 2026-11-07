@@ -21,6 +21,6 @@ watch(ready, value => emit('ready', value), { immediate: true, flush: 'sync' });
 :where(.catalog-machine-image) { position:relative; }
 .catalog-machine-image__image { position:absolute; inset:0; width:100%; height:100%; opacity:0; }
 .catalog-machine-image__image--ready { opacity:1; }
-.catalog-machine-image__placeholder { position:absolute; inset:12%; display:grid; place-items:center; border:1px solid var(--v5-border-strong); border-radius:18px; color:var(--v5-ink-3); background:linear-gradient(145deg,var(--ui-content-surface-3),var(--ui-content-surface-2)); }
+.catalog-machine-image__placeholder { position:absolute; inset:12%; display:grid; place-items:center; border:1px solid var(--v5-border-strong); border-radius:18px; color:var(--v5-ink-3); background:var(--ui-content-surface-2); }
 .catalog-machine-image__placeholder svg { width:60%; height:60%; max-width:56px; max-height:56px; }
 </style>
