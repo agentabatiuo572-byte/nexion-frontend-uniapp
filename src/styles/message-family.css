@@ -8,7 +8,7 @@
 .message-family .family-control[aria-disabled="true"] { opacity: .45; cursor: default; }
 .message-family .family-control--primary, .message-family .nx-glass-option--selected, .message-family .family-control[aria-checked="true"] { color: var(--v5-bg); }
 .message-family .nx-liquid-glass--selection { --v5-liquid-selected: transparent; }
-.message-family .nx-liquid-glass--selection .nx-liquid-tint { background: linear-gradient(155deg, color-mix(in srgb, var(--v5-ink) 98%, var(--v5-surface)), color-mix(in srgb, var(--v5-ink) 65%, var(--v5-surface))); }
+.message-family .nx-liquid-glass--selection .nx-liquid-tint { background: color-mix(in srgb, var(--v5-ink) 98%, var(--v5-surface)); }
 .message-family .nx-glass-option__label { font-size: 13px; }
 .message-family .nx-glass-segments .nx-glass-option { padding-inline: 16px; }
 .message-family input, .message-family textarea { box-sizing: border-box; font-family: var(--font-v5); }
