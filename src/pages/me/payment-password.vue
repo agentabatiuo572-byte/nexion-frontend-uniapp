@@ -1,6 +1,6 @@
 <template>
   <AppChassis active="me">
-    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" :back-action="leavePage" />
+    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" />
     <view class="payment-pin-page">
       <text v-if="!state || state.configured" class="payment-pin-page__note">{{ t.paymentPin.purpose }}</text>
       <view v-if="loading" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>
@@ -47,7 +47,7 @@ import PaymentPasswordInput from "@/components/payment-password-input.vue";
 import { usePaymentPassword, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navBack, navTo } from "@/lib/route";
+import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
 import { sessionVault } from "@/api/runtime";
 const pin = usePaymentPassword(); const ui = pin.ui; const state = computed(() => ui.state); const t = useT();
@@ -70,8 +70,6 @@ const lockMessage = computed(() => {
 const canSave = computed(() => complete.value && !validation.value && !ui.busy && !state.value?.lockedUntil && !ui.pendingOperation);
 function clear() { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; }
 async function load() {
-  await pin.waitForQuery();
-  if (!active.value) return;
   const generation = pageGeneration;
   loading.value = true; ui.changeError = "";
   if (!sessionVault.read()) return;
@@ -87,7 +85,6 @@ useAutoRecovery({
     return pin.query(() => active.value && generation === pageGeneration && !ui.visible);
   }, repeatMs: 15_000,
 });
-async function leavePage() { await pin.waitForQuery(); if (active.value) navBack("/pages/me/me"); }
 async function setup() { await pin.waitForQuery(); if (!await pin.setup()) await load(); }
 async function recover() { await pin.waitForQuery(); if (ui.busy) return; clear(); if (!await pin.recover()) await load(); }
 async function save() {

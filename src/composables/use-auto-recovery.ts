@@ -76,7 +76,7 @@ export function useAutoRecovery(options: { failed: () => boolean; retry: () => P
   function show() {
     shown.value = true;
     release();
-    release = registerPageRecovery({ failed: options.failed, pending: () => inFlight !== null, retry });
+    release = registerPageRecovery({ failed: options.failed, pending: () => inFlight !== null, retry, quiet: options.repeatMs !== undefined });
     attempts = 0;
     // Foreground/reconnect reads are jittered separately from normal backoff.
     schedule(300 + Math.random() * 700);

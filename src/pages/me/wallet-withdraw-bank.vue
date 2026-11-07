@@ -224,7 +224,6 @@ const displayIntents = computed(() => displayConfig.value?.unresolvedIntent?.sta
 const accountStatus = computed(() => displayConfig.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(displayConfig.value.beneficiary)] : "");
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));
-const terminalOrderStatuses = ["CONFIRMED", "FAILED", "REFUNDED", "REVIEW_REJECTED"];
 const statusLabel = computed(() => c.value[outcome.value]);
 const recipient = computed(() => order.value?.bank ?? quote.value ?? displayConfig.value?.beneficiary);
 const canContinue = computed(() => bankCanQuote(config.value) && !!config.value?.policy && !!config.value?.capacity && config.value.capacity.withdrawalEnabled);
@@ -252,18 +251,13 @@ function format(template: string, values: Record<string, string | number>) { ret
 function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.value = "amount"; }
 function useMax() { if (!busy.value && canContinue.value && maxAmount.value > 0) amount.value = maxAmount.value.toFixed(6).replace(/\.?0+$/, ""); }
 function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.value = !accepted.value; }
-async function goBack() {
-  await orderRead?.catch(() => {}); // A failed background read must not discard navigation.
-  if (!canReadVisibleBankPage()) return;
+function goBack() {
   if (busy.value || uncertain.value) return;
   if (quote.value) { void abandon(); return; }
   if (!order.value && formStep.value === "amount") { formStep.value = "account"; return; }
   navBack("/pages/me/wallet-withdraw-method");
 }
-async function backToWallet() {
-  await orderRead?.catch(() => {});
-  if (canReadVisibleBankPage() && !busy.value) navTo("/pages/me/me");
-}
+function backToWallet() { if (!busy.value) navTo("/pages/me/me"); }
 function scope() {
   const id = ++revision, owner = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
   return () => alive && revision === id && app.accountKey === owner && app.accountBindingEpoch === epoch && isCurrentRuntimeRevision(runtime);
@@ -319,7 +313,7 @@ function canReadVisibleBankPage(): boolean {
 
 function canPollOrder(): boolean {
   return canReadVisibleBankPage() && !!order.value
-    && !terminal.value && !terminalOrderStatuses.includes(order.value.status);
+    && !terminal.value;
 }
 
 function canRecoverQuote(): boolean {
@@ -433,9 +427,7 @@ async function abandon() {
     }
   });
 }
-async function startNew() {
-  await orderRead?.catch(() => {});
-  if (!canReadVisibleBankPage()) return;
+function startNew() {
   if (!terminal.value || busy.value) return;
   order.value = null; quote.value = null; requestedOrder = null; amount.value = ""; formStep.value = "account"; accepted.value = false; void load();
 }

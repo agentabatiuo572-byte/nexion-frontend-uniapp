@@ -230,8 +230,7 @@ function onAmountInput(e: Event) {
 function setMax() {
   amount.value = normalizeCommandAmount(staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt);
 }
-async function emitClose() {
-  await openRead?.catch(() => {});
+function emitClose() {
   // Invalidate before the parent applies v-model, including close/reopen in one tick.
   sheetOpenGeneration += 1;
   emit("update:open", false);
@@ -244,11 +243,11 @@ onShow(() => { pageVisible.value = true; });
 onHide(() => { pageVisible.value = false; sheetOpenGeneration++; });
 function readPendingOpen(): Promise<void> {
   if (openRead) return openRead;
-  if (!props.open || !pageVisible.value || remotePending.value || !pendingOpen.value || recoveryBlocked.value) return Promise.resolve();
+  if (!pageVisible.value || remotePending.value || !pendingOpen.value || recoveryBlocked.value) return Promise.resolve();
   const original = pendingOpen.value, account = app.accountKey, epoch = app.accountBindingEpoch;
   const generation = sheetOpenGeneration, runtime = captureRuntimeRevision();
   const current = () => account === app.accountKey && epoch === app.accountBindingEpoch
-    && generation === sheetOpenGeneration && props.open && pageVisible.value && isCurrentRuntimeRevision(runtime);
+    && generation === sheetOpenGeneration && pageVisible.value && isCurrentRuntimeRevision(runtime);
   const lease = remoteGate.lookup(account, "open", original);
   if (!lease || lease.pending) return Promise.resolve();
   readingOpen.value = true;
@@ -270,7 +269,8 @@ function readPendingOpen(): Promise<void> {
   return read;
 }
 useAutoRecovery({
-  failed: () => props.open && pageVisible.value && !staking.isMockMode && !!pendingOpen.value
+  // The sheet stays mounted on the page, so a closed sheet still learns the result.
+  failed: () => pageVisible.value && !staking.isMockMode && !!pendingOpen.value
     && !recoveryBlocked.value && !remotePending.value && !readingOpen.value,
   retry: readPendingOpen, repeatMs: 15_000,
 });
