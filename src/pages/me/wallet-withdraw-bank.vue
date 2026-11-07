@@ -252,7 +252,9 @@ function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.v
 function useMax() { if (!busy.value && canContinue.value && maxAmount.value > 0) amount.value = maxAmount.value.toFixed(6).replace(/\.?0+$/, ""); }
 function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.value = !accepted.value; }
 function goBack() {
-  if (busy.value || uncertain.value) return;
+  if (busy.value) return;
+  // The quote reference is saved, so leaving is safe; the result is read again on return.
+  if (uncertain.value) { navBack("/pages/me/wallet-withdraw-method"); return; }
   if (quote.value) { void abandon(); return; }
   if (!order.value && formStep.value === "amount") { formStep.value = "account"; return; }
   navBack("/pages/me/wallet-withdraw-method");
