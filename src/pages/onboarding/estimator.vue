@@ -43,7 +43,7 @@
           </svg>
           <text class="est-loading__t">{{ detectingText }}</text>
         </view>
-        <view v-else key="reveal" class="est-phone nx-frosted-button anim-up">
+        <view v-else key="reveal" class="est-phone nx-soft-glass anim-up">
           <view class="est-phone__pill">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text class="est-phone__pill-t">{{ t.onboarding.detected }}</text>
