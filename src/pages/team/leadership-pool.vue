@@ -9,7 +9,7 @@
 
         <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="retryRemotePool" />
         <template v-else>
-        <view class="pool-hero nx-frosted-button nx-viz-press">
+        <view class="pool-hero nx-soft-glass nx-viz-press">
           <view class="pool-share">
             <view ref="shareRingRef" class="pool-ring" :class="{ 'pool-ring--capped': !visibility.hidden && !(remoteApiEnabled && !remotePool) && myShare > 0 }" :style="{ '--nx-viz-ring': shareRingInView === false || visibility.hidden || (remoteApiEnabled && !remotePool) ? 0 : Math.min(100, Math.max(0, myShare * 100)), transition: shareRingInView === false || visibility.hidden ? 'none' : VIZ_RING_TRANSITION }"><view class="pool-ring__hole"><text class="pool-ring__pct">{{ visibility.mask(shareLabel) }}</text><text class="pool-ring__label">{{ t.pool.myShare }}</text></view></view>
             <view class="pool-share__copy">

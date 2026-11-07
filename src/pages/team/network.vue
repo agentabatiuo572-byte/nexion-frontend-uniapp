@@ -6,7 +6,7 @@
       <view class="network-content">
         <EmptyState v-if="remoteApiEnabled && network.remoteStatus === 'error' && !network.hasRemoteSnapshot" kind="recoverable-error" :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.network.retry" @cta="network.refreshCanonicalNetwork()" />
         <template v-else>
-        <view class="network-overview nx-frosted-button nx-viz-press">
+        <view class="network-overview nx-soft-glass nx-viz-press">
           <view class="network-overview__head">
             <text class="network-overview__split">{{ visibility.mask(metricsUnavailable ? '—' : ringSplitText) }}</text>
             <text class="network-overview__total"><text class="nx-num-metric">{{ visibility.mask(metricsUnavailable ? '—' : members.length) }}</text> {{ peopleUnit }}</text>
