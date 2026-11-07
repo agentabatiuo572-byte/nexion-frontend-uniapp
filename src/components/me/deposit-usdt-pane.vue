@@ -21,7 +21,7 @@
           <view class="nx-dep-net__nm">
             <text class="nx-dep-net__name">{{ nw.label }}</text>
             <text v-if="nw.id === 'usdt-trc20'" class="nx-dep-net__sub">{{ t.topupChrome.netRecommended }}</text>
-            <text v-else class="nx-dep-net__sub">{{ fmt(t.topupChrome.netFee, { fee: (addressRefreshFailed || (fundsServerEnabled && (!serverEnabled || nw.id !== net))) ? "—" : formatAmount(fundsServerEnabled ? feeUsdt : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
+            <text v-else class="nx-dep-net__sub">{{ fmt(t.topupChrome.netFee, { fee: formatAmount(fundsServerEnabled ? networkPolicies.find((policy) => policy.network === nw.label)?.feeUsdtExact : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
           </view>
           <view class="nx-dep-net__ck" aria-hidden="true" />
         </view>
@@ -163,7 +163,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount as formatBaseAmount } from "@/lib/amount-display";
-import { exactDepositAmount } from "@/api/cregis-deposit-api";
+import { exactDepositAmount, type CregisNetworkPolicy } from "@/api/cregis-deposit-api";
 const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 2);
 import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
@@ -221,12 +221,11 @@ const CHANNEL_SHORT: Record<DepositChannel, string> = {
 const CONFIRM_DELAY_NOTE_MS = 30 * 60 * 1000;
 
 const net = ref<ChainDepositChannel>(fundsServerEnabled ? "usdt-bep20" : "usdt-trc20");
-// Networks the server reported as not configured or turned off are not shown.
-// The address read is the only per-network signal, so a network is known only once it has been read.
-// The list is forgotten when the page shows again or the user retries, so a network turned back on returns;
-// only the selected network is read (reading allocates an address).
-const offNets = ref<ChainDepositChannel[]>([]);
-const visibleNets = computed(() => NETWORKS.filter((nw) => fundsServerEnabled ? !offNets.value.includes(nw.id) : dep.chainChannelEnabled[nw.id] === true));
+// Policy is read without allocating addresses, including before the first selection.
+const networkPolicies = ref<CregisNetworkPolicy[]>([]);
+const visibleNets = computed(() => NETWORKS.filter((nw) => fundsServerEnabled
+  ? networkPolicies.value.some((policy) => policy.network === nw.label && policy.enabled)
+  : dep.chainChannelEnabled[nw.id] === true));
 
 // ── 正式模式从服务端获取地址与记录；失败时只显示重试，不回退到模拟地址。──
 const phase = ref<"loading" | "preparing" | "error" | "ready">("loading");
@@ -260,7 +259,6 @@ const minDeposit = ref<string | number | null>(fundsServerEnabled ? null : MIN_D
 const feeUsdt = ref<string | number | null>(fundsServerEnabled ? null : 0);
 const confirmations = ref(CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"]);
 function refresh(background = false): Promise<void> {
-  offNets.value = [];
   return load(background);
 }
 async function refreshBankHistory(): Promise<void> {
@@ -280,33 +278,34 @@ async function load(background = false): Promise<void> {
     nextPollAt = Number.POSITIVE_INFINITY;
     const account = app.accountKey;
     const bindingEpoch = app.accountBindingEpoch;
-    const selectedNetwork = net.value === "usdt-erc20" ? "ERC20" : "BEP20";
     await (async () => {
+      let policyRead = false;
       try {
-        const snapshot = await cregisDepositApi.address(selectedNetwork);
+        const policies = await cregisDepositApi.policy();
         if (generation !== loadGeneration || account !== app.accountKey
             || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
-        if (snapshot.enabled && (snapshot.minDepositUsdt == null || !Number.isSafeInteger(Number(snapshot.minDepositUsdt))
-            || Number(snapshot.minDepositUsdt) <= 0 || snapshot.feeUsdt == null || snapshot.confirmations == null)) throw new Error('CREGIS_DEPOSIT_POLICY_UNAVAILABLE');
-        const selected = net.value;
-        if (snapshot.enabled || snapshot.reason === "CREGIS_ADDRESS_PREPARING") {
-          if (offNets.value.includes(selected)) offNets.value = offNets.value.filter((id) => id !== selected);
-        } else {
-          offNets.value = [...offNets.value.filter((id) => id !== selected), selected];
-          const next = visibleNets.value[0];
-          if (next) {
-            pickNet(next.id);
-            return;
-          }
+        networkPolicies.value = policies;
+        policyRead = true;
+        const selected = visibleNets.value.find((nw) => nw.id === net.value) ?? visibleNets.value[0];
+        if (!selected || selected.id !== net.value) {
+          serverAddress.value = "";
+          serverEnabled.value = false;
+          serverCreditEnabled.value = false;
+          copied.value = false;
         }
+        if (selected) net.value = selected.id;
+        const policy = policies.find((row) => row.enabled && row.network === selected?.label);
+        minDeposit.value = policy?.minDepositUsdtExact ?? null;
+        feeUsdt.value = policy?.feeUsdtExact ?? null;
+        confirmations.value = policy?.confirmations ?? CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"];
+        const snapshot = policy ? await cregisDepositApi.address(policy.network) : null;
+        if (generation !== loadGeneration || account !== app.accountKey
+            || bindingEpoch !== app.accountBindingEpoch || !remoteSessionReady.value) return;
         addressRefreshFailed.value = false;
-        serverEnabled.value = snapshot.enabled;
-        serverCreditEnabled.value = snapshot.creditEnabled === true;
-        serverAddress.value = snapshot.enabled ? snapshot.address ?? "" : "";
-        minDeposit.value = snapshot.minDepositUsdt == null ? null : exactDepositAmount(snapshot.minDepositUsdt, snapshot.minDepositUsdtExact);
-        feeUsdt.value = snapshot.feeUsdt == null ? null : exactDepositAmount(snapshot.feeUsdt, snapshot.feeUsdtExact);
-        confirmations.value = snapshot.confirmations ?? CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"];
-        phase.value = !snapshot.enabled && snapshot.reason === "CREGIS_ADDRESS_PREPARING" ? "preparing" : "ready";
+        serverEnabled.value = snapshot?.enabled === true;
+        serverCreditEnabled.value = snapshot?.creditEnabled === true;
+        serverAddress.value = snapshot?.enabled ? snapshot.address ?? "" : "";
+        phase.value = snapshot?.reason === "CREGIS_ADDRESS_PREPARING" && !snapshot.enabled ? "preparing" : "ready";
         if (phase.value === "preparing") {
           nextPollAt = Date.now() + pollDelay(phase.value);
           return;
@@ -343,7 +342,7 @@ async function load(background = false): Promise<void> {
             : row.status === "CONFIRMING" ? "confirming" : "dust_hold",
           createdAt: row.createdAt, creditedAt: row.creditedAt ?? undefined,
         }));
-        phase.value = !snapshot.enabled && snapshot.reason === "CREGIS_ADDRESS_PREPARING" ? "preparing" : "ready";
+        phase.value = "ready";
         pollFailures = 0;
         nextPollAt = Date.now() + pollDelay(phase.value);
       } catch {
@@ -352,6 +351,7 @@ async function load(background = false): Promise<void> {
           serverAddress.value = "";
           serverEnabled.value = false;
           serverCreditEnabled.value = false;
+          if (!policyRead) networkPolicies.value = [];
           copied.value = false;
           addressRefreshFailed.value = hadSnapshot;
           phase.value = hadSnapshot ? "ready" : "error";
@@ -384,7 +384,7 @@ watch([remoteSessionReady, () => app.accountKey, () => app.accountBindingEpoch],
   serverEnabled.value = false;
   serverCreditEnabled.value = false;
   serverRecords.value = [];
-  offNets.value = [];
+  networkPolicies.value = [];
   chainHistoryLoaded.value = false;
   chainHistoryFailed.value = false;
   addressRefreshFailed.value = false;
@@ -421,7 +421,7 @@ const activeNet = computed<ChainDepositChannel | null>(() => {
 });
 const activeLabel = computed(() => (activeNet.value ? CHANNEL_SHORT[activeNet.value] : ""));
 function pickNet(id: ChainDepositChannel) {
-  if (id === net.value) return;
+  if (id === net.value || !visibleNets.value.some((nw) => nw.id === id)) return;
   net.value = id;
   if (fundsServerEnabled) {
     serverAddress.value = ""; serverEnabled.value = false; serverCreditEnabled.value = false; copied.value = false;
