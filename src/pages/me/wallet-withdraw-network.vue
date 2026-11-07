@@ -78,7 +78,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (visible && remoteApiEnabled) void payout.refreshRemote();
   reset();
 });
-const stopRuntime = subscribeRuntimeRevision(reset);
+const stopRuntime = subscribeRuntimeRevision(() => { revision++; if (visible) void load(); });
 onShow(() => { visible = true; if (remoteApiEnabled) void payout.refreshRemote(); void load(); });
 onHide(() => { visible = false; revision++; });
 onUnload(() => { visible = false; revision++; stopRuntime(); });
