@@ -298,7 +298,9 @@ function reset() {
   pack.value = null; attachments.value = []; statement.value = ""; budget.value = ""; bucket.value = undefined;
   loading.value = false; saving.value = false; picking.value = false; submitError.value = ""; loadError.value = false;
 }
-watch(() => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl, props.application.applicationId], () => { reset(); opened.value = false; });
+// A history reread can replace the application object without changing its owner or id.
+watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.isAuthenticated,
+  () => apiRuntimeConfig.environment, () => apiRuntimeConfig.baseUrl, () => props.application.applicationId], () => { reset(); opened.value = false; });
 onShow(() => { if (opened.value && !busy.value && !dirty.value) void load(); }, pageOwner);
 onHide(() => { closePreview(); previewController?.abort(); }, pageOwner);
 onBeforeUnmount(() => { disposed = true; reset(); });
