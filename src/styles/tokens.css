@@ -935,10 +935,15 @@ body {
   --ui-button-bottom: rgba(87,115,155,.18);
   --ui-button-sheen: rgba(255,255,255,.30);
 }
-/* Focal soft-glass card (01 §1.1.2) on the plain page floor: the shared fill, sheen and edge; no backdrop blur,
-   since there is nothing behind it to blur. Light adds the general light shadow. */
-.nx-soft-glass { backdrop-filter: none; -webkit-backdrop-filter: none; }
-[data-theme="light"] .nx-soft-glass { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+/* Focal soft-glass card (01 §1.1.2) on the plain page floor: the approved check-in / welfare card fill (white 4.5% dark,
+   58% light) under the shared sheen and edge; no backdrop blur, since there is nothing behind it to blur. Light adds the
+   general light shadow. The fill has its own variable: --ui-button-fill would be inherited by controls inside the card. */
+.nx-soft-glass {
+  --ui-soft-glass-fill: rgba(255,255,255,.045);
+  background: linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),var(--ui-soft-glass-fill);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+[data-theme="light"] .nx-soft-glass { --ui-soft-glass-fill: rgba(255,255,255,.58); box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 /* Fixed bottom action bar (04 §4.0): soft glass — uniform fill, shared edge, blur; no top hairline. */
 .nx-glass-bar {
   background: var(--v5-sticky-bar-bg);
