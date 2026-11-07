@@ -627,6 +627,8 @@ export const ms: Messages = {
     teamLeaderboard: "Carta jemputan",
     teamQuota: "Kuota",
     teamAgent: "Duta wilayah",
+    teamAgentApplications: "Permohonan saya",
+    teamAgentApplication: "Butiran permohonan",
     storeCheckout: "Pembayaran",
     storeOrders: "Pesanan",
     storeProduct: "Produk",
@@ -4931,7 +4933,7 @@ export const ms: Messages = {
     buckets: {
       venue: {
         title: "Tempat acara",
-        rule: "Kehadiran ≥ 100 disahkan melalui QR daftar",
+        rule: "≥ 100 peserta disahkan",
       },
       kol: {
         title: "Promosi KOL",
@@ -4957,7 +4959,7 @@ export const ms: Messages = {
     toastV5RequiredSub: "Naik ke {rank} untuk menghantar permohonan",
     toastMissingFields: "Medan tidak lengkap",
     toastSubmitted: "Permohonan dihantar",
-    toastSubmittedSub: "{city} · ${budget} sedang diproses (3-5 hari bekerja)",
+    toastSubmittedSub: "{city} · {budget}. Seterusnya, muat naik bahan permohonan.",
     toastRemoteFailed: "Status permohonan belum disahkan",
     serverApplication: "Permohonan saya",
     applicationStatuses: {
