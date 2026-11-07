@@ -201,17 +201,6 @@ const accentLineStyle: CSSProperties = {
   opacity: 0.7,
   pointerEvents: "none",
 };
-const washStyle: CSSProperties = {
-  position: "absolute",
-  top: "-50px",
-  right: "-50px",
-  width: "120px",
-  height: "120px",
-  borderRadius: "50%",
-  background: "radial-gradient(circle, var(--v5-brand-soft), transparent 70%)",
-  opacity: 0.55,
-  pointerEvents: "none",
-};
 const labelStyle: CSSProperties = {
   gap: "8px",
   fontFamily: "var(--font-v5)",
@@ -282,19 +271,6 @@ const promoChipStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   fontWeight: 500,
-};
-const claimStyle: CSSProperties = {
-  gap: "6px",
-  height: "44px",
-  padding: "0 16px",
-  borderRadius: "var(--v5-radius-full)",
-  background: "linear-gradient(90deg, var(--v5-brand), var(--v5-success))",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13px",
-  letterSpacing: "-0.005em",
-  whiteSpace: "nowrap",
 };
 
 

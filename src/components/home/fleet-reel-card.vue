@@ -55,7 +55,6 @@ function go() {
 [data-theme="light"] .fleet-reel-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .fleet-reel-card:active { opacity: .85; }
 .fleet-reel-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.fleet-reel-card--online::before { content: ""; position: absolute; left: 0; right: 0; top: 22px; height: 128px; background: radial-gradient(55% 50% at 50% 55%, color-mix(in srgb, var(--v5-success) 13%, transparent), transparent 72%); pointer-events: none; }
 .fleet-reel-card__status { position: relative; display: flex; align-items: center; gap: 6px; height: 16px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .fleet-reel-card__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .fleet-reel-card__dot.nx-online-dot { background: var(--v5-success); }

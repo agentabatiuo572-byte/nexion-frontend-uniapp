@@ -3,7 +3,7 @@
   <NxSection v-if="offerCount + pendingCount > 0" :title="copy.benefits" class="home-benefits" data-home-section="benefits">
     <view class="hb-stack" :class="{ 'hb-stack--enter': entering }">
       <view v-if="offerCount" class="hb-row" :class="{ 'hb-row--pair': offerCount === 2 }">
-        <view v-if="voucherOffer" class="hb-card hb-glow-warn vb-card" :class="offerCount === 2 ? 'hb-half' : 'hb-wv'" :style="{ '--hb-i': 0 }" role="button" tabindex="0" :aria-label="fmt(copy.benefitVoucherAria, { v: offerFace.label })" @click="openVoucher" @keydown.enter.prevent="openVoucher" @keydown.space.prevent="openVoucher">
+        <view v-if="voucherOffer" class="hb-card vb-card" :class="offerCount === 2 ? 'hb-half' : 'hb-wv'" :style="{ '--hb-i': 0 }" role="button" tabindex="0" :aria-label="fmt(copy.benefitVoucherAria, { v: offerFace.label })" @click="openVoucher" @keydown.enter.prevent="openVoucher" @keydown.space.prevent="openVoucher">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art" :src="COUPON_ART" mode="aspectFit" aria-hidden="true" /></view>
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text v-if="offerFace.money" class="hb-amount__minor">$</text>{{ offerFace.text }}</text><text class="hb-half__sub">{{ copy.benefitVoucherSub }}</text></view>
@@ -17,7 +17,7 @@
             <view class="hb-wv__stub"><text class="hb-pill nx-frosted-button">{{ t.trial.homeClaimShort }}</text></view>
           </template>
         </view>
-        <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="status" role="button" :tabindex="trialOfferEnabled ? 0 : -1" :aria-disabled="trialOfferEnabled ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
+        <view v-if="trialOffer" class="hb-card" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="status" role="button" :tabindex="trialOfferEnabled ? 0 : -1" :aria-disabled="trialOfferEnabled ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
             <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
@@ -211,16 +211,13 @@ function retryEligibility() {
 .hb-card:active:not([aria-disabled="true"]) { transform:scale(.97);transition-duration:100ms; }
 .hb-card[aria-disabled="true"] { cursor:default; }
 .hb-card:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
-.hb-glow-warn { --hb-glow:color-mix(in srgb,var(--v5-warning) 17%,transparent); }
-.hb-glow-cyan { --hb-glow:color-mix(in srgb,var(--v5-tech-cyan) 17%,transparent); }
 /* Offer cards: liquid-glass soft-edge card, the check-in card's material (04.1 签到); pending cards stay solid.
-   The corner glow is a background layer under the sheen, so the sheen, inner rim and highlight paint over it.
    The transparent border keeps the layout and the forced-colors outline; the fill stops inside it so the rim is the outer edge. */
 .hb-half,.hb-wv,.hb-wt {
   --hb-fill:rgba(255,255,255,.045);--hb-rim:rgba(255,255,255,.10);--hb-highlight:rgba(255,255,255,.20);
   --hb-bottom:rgba(0,0,0,.40);--hb-sheen:rgba(255,255,255,.06);--hb-shadow:0 12px 32px rgba(0,0,0,.35);
   border-color:transparent;
-  background:linear-gradient(145deg,var(--hb-sheen),transparent 40%,transparent 70%,var(--hb-sheen)),radial-gradient(circle 110px at 40px 30px,var(--hb-glow),transparent),var(--hb-fill);
+  background:linear-gradient(145deg,var(--hb-sheen),transparent 40%,transparent 70%,var(--hb-sheen)),var(--hb-fill);
   background-clip:padding-box;
   box-shadow:inset 0 0 0 1px var(--hb-rim),inset 0 7px 10px -7px var(--hb-highlight),inset 3px 0 12px -8px var(--hb-highlight),inset 0 -8px 14px -8px var(--hb-bottom),var(--hb-shadow);
 }

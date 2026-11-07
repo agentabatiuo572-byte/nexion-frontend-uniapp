@@ -327,17 +327,6 @@ const bonusRowStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-success-soft)",
   background: "var(--v5-success-soft)",
 };
-const bonusBtnStyle: CSSProperties = {
-  gap: "6px",
-  height: "44px",
-  borderRadius: "var(--v5-radius-full)",
-  background: "linear-gradient(90deg, var(--v5-success), var(--v5-warning))",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13px",
-  letterSpacing: "-0.005em",
-};
 const bonusDoneStyle: CSSProperties = {
   gap: "8px",
   borderTop: "1px solid var(--v5-success-soft)",
@@ -353,13 +342,10 @@ const bonusDoneTextStyle: CSSProperties = {
 </script>
 
 <style scoped>
-.weekly-claimable { position: relative; overflow: hidden; }.weekly-claimable::before { content:''; position: absolute; inset:0; background: linear-gradient(105deg,transparent 30%,color-mix(in srgb,var(--v5-brand) 16%,transparent),transparent 70%); transform: translateX(-100%); animation: weekly-sheen 800ms ease-out 200ms both; pointer-events:none; }
-@keyframes weekly-sheen { to { transform: translateX(100%); } }
-@media (prefers-reduced-motion: reduce) { .weekly-claimable::before { animation:none; display:none; } }
+.weekly-claimable { position: relative; overflow: hidden; }
 
 /* Approved growth board geometry and material. */
  .weekly-completed-count { font:600 12px/16px var(--font-metric); color:var(--v5-ink); }
-.weekly-claimable::before { background:linear-gradient(105deg,transparent 30%,color-mix(in srgb,var(--v5-warning) 16%,transparent),transparent 70%); }
 .weekly-claimable :deep(.nx-button--brand > .nx-button__surface) { --ui-button-ink:var(--v5-ink); }
 .weekly-claimable, .weekly-claimable ~ view { min-height:60px; }
 
