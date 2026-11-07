@@ -178,16 +178,11 @@ onUnmounted(()=>{closed=true;generation++;clearSkeleton();if(finishTimer)clearTi
 .cs-x { width: 44px; height: 44px; margin: -12px -12px 0 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
 .cs-x:active { opacity: 0.7; }
 
-.cs-puzzle { position: relative; margin-top: 12px; height: 150px; border-radius: 14px; overflow: hidden; background:
-    radial-gradient(120px 80px at 20% 30%, color-mix(in srgb, var(--v5-brand) 22%, transparent), transparent 70%),
-    radial-gradient(140px 90px at 75% 65%, color-mix(in srgb, var(--v5-brand-2) 16%, transparent), transparent 70%),
-    radial-gradient(90px 70px at 55% 20%, color-mix(in srgb, var(--v5-tech-cyan) 14%, transparent), transparent 70%),
-    var(--v5-surface-2);
-}
+.cs-puzzle { position: relative; margin-top: 12px; height: 150px; border-radius: 14px; overflow: hidden; background: var(--v5-surface-2); }
 .cs-puzzle--skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent); animation: cs-shimmer 1.2s infinite; }
 @keyframes cs-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .cs-slot { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; border: 2px dashed rgba(255, 255, 255, 0.5); background: rgba(0, 0, 0, 0.35); box-sizing: border-box; }
-.cs-piece { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--v5-brand) 90%, transparent), color-mix(in srgb, var(--v5-brand) 65%, transparent)); border: 1px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
+.cs-piece { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 80%, transparent); border: 1px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
 .cs-refresh { position: absolute; right: 4px; top: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .cs-refresh:active { opacity: 0.7; }
 /* ⑤ 网络失败态:soft tint 重试 pill(零 border,tap ≥44,rest 态自带 affordance) */

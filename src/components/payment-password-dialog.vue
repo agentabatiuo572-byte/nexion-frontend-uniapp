@@ -55,6 +55,7 @@
         </template>
         <text v-if="errorMessage" class="payment-pin-error" role="alert">{{ errorMessage }}</text>
         <view v-if="!standalone" class="payment-pin-link payment-pin-link--muted" role="button" tabindex="0" @click="pin.cancel">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
+        <view v-else class="payment-pin-bar nx-glass-bar" aria-hidden="true" />
       </view>
     </view>
   </view>
@@ -169,7 +170,7 @@ useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
 </style>
 
 <style scoped>
-.payment-pin-mask--standalone .payment-pin-body::after { content:""; position:absolute; left:0; right:0; bottom:0; height:91px; box-sizing:border-box; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-surface) 70%,transparent),color-mix(in srgb,var(--v5-surface) 94%,transparent)); border-top:1px solid color-mix(in srgb,var(--v5-ink) 5%,transparent); z-index:0; pointer-events:none; }
+.payment-pin-mask--standalone .payment-pin-bar { position:absolute; left:0; right:0; bottom:0; height:91px; box-sizing:border-box; z-index:0; pointer-events:none; }
 .payment-pin-mask--standalone .payment-pin-next { z-index:1; }
 .payment-pin-mask--standalone .payment-pin-close { box-shadow:var(--ui-glass-edge-shadow); }
 </style>
