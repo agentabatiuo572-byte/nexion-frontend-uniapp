@@ -28,9 +28,11 @@ function sameBeneficiary(a: BankBeneficiary | null, b: BankBeneficiary): boolean
 /** Recipient and change OTP stay in page memory only; ambiguous writes replay the exact request. */
 export function createBankBindingForm(api: BindingApi, identity: () => string, clock = Date.now) {
   const state = reactive({ config: null as BankConfig | null, account: "", holder: "",
-    busy: false, phase: "details" as Phase, error: "", code: "", challengeNo: "", otpExpiresAt: 0, resendAt: 0 });
+    busy: false, reading: false, hasReceipt: false, phase: "details" as Phase, error: "", code: "", challengeNo: "", otpExpiresAt: 0, resendAt: 0 });
   let revision = 0;
   let pending: { body: BindBody; key: string; receipt: BankBeneficiary | null } | null = null;
+  let outcomeRead: Promise<void> | null = null;
+  async function waitForRead() { await outcomeRead?.catch(() => {}); }
   const canContinue = () => !state.busy && state.phase === "details" && directBankBindingAvailable(state.config)
     && (!state.config?.beneficiary || (!!state.challengeNo && /^[0-9]{6}$/.test(state.code) && state.otpExpiresAt > clock()))
     && validBankRecipient(state);
@@ -41,7 +43,7 @@ export function createBankBindingForm(api: BindingApi, identity: () => string, c
     return () => id === revision && owner === identity();
   }
   function clearOtp() { state.code = ""; state.challengeNo = ""; state.otpExpiresAt = 0; }
-  function clearDraft() { state.account = ""; state.holder = ""; clearOtp(); state.resendAt = 0; pending = null; }
+  function clearDraft() { state.account = ""; state.holder = ""; clearOtp(); state.resendAt = 0; pending = null; state.hasReceipt = false; }
   function reset() {
     revision++; clearDraft(); state.config = null; state.phase = "details"; state.busy = false; state.error = "";
   }
@@ -69,6 +71,7 @@ export function createBankBindingForm(api: BindingApi, identity: () => string, c
     } finally { if (current()) state.busy = false; }
   }
   async function submit(accountRoutingConfirmed = false) {
+    await waitForRead();
     if (state.busy || (state.phase !== "uncertain" && (!accountRoutingConfirmed || !canContinue()))) return;
     if (state.phase === "uncertain" && !pending) return;
     if (!pending) {
@@ -82,11 +85,11 @@ export function createBankBindingForm(api: BindingApi, identity: () => string, c
     try {
       if (!operation.receipt) {
         const receipt = await api.bind({ ...operation.body }, operation.key); if (!current()) return;
-        operation.receipt = receipt;
+        operation.receipt = receipt; state.hasReceipt = true;
       }
       const config = await api.config(); if (!current()) return;
       if (!sameBeneficiary(config.beneficiary, operation.receipt)) throw new Error("BANK_BIND_READBACK_MISMATCH");
-      state.config = config; clearDraft(); state.phase = "saved";
+      state.config = config; clearDraft(); state.phase = "saved"; state.error = "";
     } catch (error) {
       if (!current()) return;
       if (operation.receipt || isAmbiguousOutcome(error)) { state.phase = "uncertain"; state.error = "unknown"; }
@@ -96,5 +99,21 @@ export function createBankBindingForm(api: BindingApi, identity: () => string, c
       }
     } finally { if (current()) state.busy = false; }
   }
-  return { state, canContinue, canSendOtp, sendOtp, load, reset, submit };
+  function readOutcome(readAllowed: () => boolean): Promise<void> {
+    if (outcomeRead) return outcomeRead;
+    if (state.busy || state.phase !== "uncertain" || !pending?.receipt || !readAllowed()) return Promise.resolve();
+    const operation = pending, receipt = pending.receipt, token = revision, owner = identity();
+    const current = () => token === revision && owner === identity() && pending === operation && readAllowed();
+    state.reading = true;
+    const read = Promise.resolve().then(async () => {
+      if (!current()) return;
+      const config = await api.config();
+      if (!current()) return;
+      if (!sameBeneficiary(config.beneficiary, receipt)) throw new Error("BANK_BIND_READBACK_MISMATCH");
+      state.config = config; clearDraft(); state.phase = "saved"; state.error = "";
+    }).finally(() => { if (outcomeRead === read) { outcomeRead = null; state.reading = false; } });
+    outcomeRead = read;
+    return read;
+  }
+  return { state, readOutcome, waitForRead, canContinue, canSendOtp, sendOtp, load, reset, submit };
 }

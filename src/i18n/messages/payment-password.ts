@@ -13,7 +13,7 @@ export const paymentPinEN = {
   due: "Amount due", autoSubmit: "Completing the PIN will submit this payment.", autoConfirm: "Completing the PIN will confirm this purchase or trade-in.", details: "Show details", hideDetails: "Hide details",
   readFailed: "Unable to read payment PIN status. Please retry.", failed: "Unable to complete this action. Please retry.", mismatch: "The two new PINs do not match. Please enter it again.", simple: "Choose a PIN without repeated or consecutive numbers.", incorrect: "Incorrect payment PIN. {n} attempts remaining.",
   locked: "Too many incorrect attempts. Try again in {time}.", lockedLabel: "Temporarily locked", versionChanged: "Your payment PIN has changed. Read its current status and try again.", samePassword: "Your new PIN must differ from your current PIN.",
-  pending: "Confirming the PIN update. Please do not submit another change.", query: "Check result", retry: "Retry", returnMe: "Return to personal center",
+  pending: "Confirming the PIN update. Please do not submit another change.", retry: "Retry", returnMe: "Return to personal center",
   recoveryIntro: "Verify your identity to set a new payment PIN.", code: "SMS verification code", sendCode: "Send verification code", resend: "Resend", verify: "Verify identity", phoneUnavailable: "Phone unavailable", recoveryUnavailable: "SMS verification is unavailable. Please contact support to verify your identity.", support: "Contact support", codeInvalid: "Unable to verify this code. Please check it or request a new one.", proofExpired: "Identity verification has expired. Please verify again.", newTitle: "Set new payment PIN", confirmNewTitle: "Confirm new payment PIN", confirmReset: "Confirm reset", entered: "{n} of 6 digits entered",
 };
 export const paymentPinZH: typeof paymentPinEN = {
@@ -27,7 +27,7 @@ export const paymentPinZH: typeof paymentPinEN = {
   current: "当前支付密码", new: "新支付密码", confirmNew: "确认新支付密码", save: "保存修改", forgot: "忘记支付密码", close: "关闭", cancel: "取消支付", back: "返回", incomplete: "请输入完整的 6 位数字",
   due: "应付", autoSubmit: "输入完成后将提交支付", autoConfirm: "输入完成后将确认购买／置换", details: "展开明细", hideDetails: "收起明细",
   readFailed: "暂时无法读取支付密码状态，请重试", failed: "暂时无法完成操作，请重试", mismatch: "两次输入的新支付密码不一致，请重新输入", simple: "请勿使用重复或连续的简单数字。", incorrect: "支付密码不正确，还可尝试 {n} 次", locked: "输入错误次数过多，请在 {time} 后重试", lockedLabel: "暂时锁定", versionChanged: "支付密码已发生变化，请重新读取状态后再试", samePassword: "新支付密码不能与当前支付密码相同",
-  pending: "正在确认设置结果，请勿重复提交修改", query: "查询结果", retry: "重试", returnMe: "返回个人中心",
+  pending: "正在确认设置结果，请勿重复提交修改", retry: "重试", returnMe: "返回个人中心",
   recoveryIntro: "验证身份后，可设置新的支付密码", code: "短信验证码", sendCode: "获取验证码", resend: "重新发送", verify: "验证身份", phoneUnavailable: "手机不可用", recoveryUnavailable: "当前无法通过短信验证，请联系客服协助核实身份", support: "联系客服", codeInvalid: "验证码验证失败，请检查或重新获取验证码", proofExpired: "身份验证已过期，请重新验证身份", newTitle: "设置新支付密码", confirmNewTitle: "确认新支付密码", confirmReset: "确认重置", entered: "已输入 {n} 位，共 6 位",
 };
 export const paymentPinVI: typeof paymentPinEN = {
@@ -41,6 +41,6 @@ export const paymentPinVI: typeof paymentPinEN = {
   current: "Mã PIN thanh toán hiện tại", new: "Mã PIN thanh toán mới", confirmNew: "Xác nhận mã PIN thanh toán mới", save: "Lưu thay đổi", forgot: "Quên mã PIN thanh toán", close: "Đóng", cancel: "Hủy thanh toán", back: "Quay lại", incomplete: "Vui lòng nhập đủ 6 chữ số.",
   due: "Số tiền cần trả", autoSubmit: "Nhập đủ mã PIN sẽ gửi thanh toán.", autoConfirm: "Nhập đủ mã PIN sẽ xác nhận mua hoặc đổi thiết bị.", details: "Xem chi tiết", hideDetails: "Thu gọn chi tiết",
   readFailed: "Không thể đọc trạng thái mã PIN. Vui lòng thử lại.", failed: "Không thể hoàn tất thao tác. Vui lòng thử lại.", mismatch: "Hai mã PIN mới không khớp. Vui lòng nhập lại.", simple: "Không dùng các chữ số lặp lại hoặc liên tiếp.", incorrect: "Mã PIN không đúng. Còn {n} lần thử.", locked: "Sai quá nhiều lần. Vui lòng thử lại sau {time}.", lockedLabel: "Tạm khóa", versionChanged: "Mã PIN đã thay đổi. Vui lòng đọc lại trạng thái rồi thử lại.", samePassword: "Mã PIN mới phải khác mã PIN hiện tại.",
-  pending: "Đang xác nhận kết quả cập nhật mã PIN. Vui lòng không gửi thay đổi khác.", query: "Kiểm tra kết quả", retry: "Thử lại", returnMe: "Về trang cá nhân",
+  pending: "Đang xác nhận kết quả cập nhật mã PIN. Vui lòng không gửi thay đổi khác.", retry: "Thử lại", returnMe: "Về trang cá nhân",
   recoveryIntro: "Xác minh danh tính để thiết lập mã PIN mới.", code: "Mã xác minh SMS", sendCode: "Lấy mã xác minh", resend: "Gửi lại", verify: "Xác minh danh tính", phoneUnavailable: "Không dùng được điện thoại", recoveryUnavailable: "Không thể xác minh qua SMS. Vui lòng liên hệ hỗ trợ để xác minh danh tính.", support: "Liên hệ hỗ trợ", codeInvalid: "Không thể xác minh mã. Vui lòng kiểm tra hoặc yêu cầu mã mới.", proofExpired: "Xác minh danh tính đã hết hạn. Vui lòng xác minh lại.", newTitle: "Thiết lập mã PIN mới", confirmNewTitle: "Xác nhận mã PIN mới", confirmReset: "Xác nhận đặt lại", entered: "Đã nhập {n} trên 6 chữ số",
 };
