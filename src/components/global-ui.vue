@@ -182,8 +182,6 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   flex-direction: column;
   padding: 28px 24px 12px;
   border-radius: var(--v5-radius-2xl);
-  background: var(--v5-surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-ink) 8%, transparent);
   text-align: center;
 }
 .nx-modal > * { flex-shrink: 0; }
@@ -216,8 +214,7 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 .nx-btn--danger { background: var(--v5-danger); }
 .nx-btn--ghost { min-height: 44px; background: transparent; }
 /* Detail confirm (P-45): the same centred dialog with a badge and recessed rows. */
-.nx-modal--detail { padding: 24px 20px 12px; background: color-mix(in srgb, var(--v5-surface) 50%, var(--v5-surface-2)); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
-[data-theme="light"] .nx-modal--detail { background: var(--v5-surface); }
+.nx-modal--detail { padding: 24px 20px 12px; }
 .nx-modal__cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
 .nx-modal__dec { color: var(--v5-ink-3); }
 .nx-modal__glyph { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; background: var(--v5-brand-soft); color: var(--v5-brand); }
