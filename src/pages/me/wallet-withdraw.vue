@@ -77,7 +77,7 @@
 
       <!-- Amount on a liquid-glass slab over the aura; the minimum sits right under it. -->
       <view class="wd-stage mx-4">
-        <view class="wd-slab nx-frosted-button">
+        <view class="wd-slab nx-soft-glass">
           <view class="wd-slab__head">
             <text class="wd-k">{{ t.wallet.amountLabel }}</text>
             <view class="wd-max" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax"  @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
@@ -1585,10 +1585,8 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-locks__i { display: inline-flex; align-items: center; gap: 4px; }
 .wd-locks__v { color: var(--v5-ink-2); font: 500 12px/16px var(--font-metric); }
 .wd-stage { position: relative; margin-top: 12px; }
-/* Step focus block: shared soft glass. No backdrop-filter (same as the top-up slab): it sits on the plain
-   page floor and the blur only applied while the page-enter animation composited the page. */
-.wd-slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); backdrop-filter: none; -webkit-backdrop-filter: none; }
-[data-theme="light"] .wd-slab { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+/* Step focus block on the shared soft glass. */
+.wd-slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
 .wd-slab__head { display: flex; align-items: center; justify-content: space-between; }
 .wd-max { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .wd-max::after { content: ""; position: absolute; inset: -6px -8px; }

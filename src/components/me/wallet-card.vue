@@ -1,7 +1,7 @@
 <!-- Balances retain their existing sources; the summary follows the approved wallet design. -->
 <template>
   <view class="nx-wallet" :class="{'nx-wallet--compact': compact}">
-    <view class="nx-wallet-summary" :class="compact ? 'nx-frosted-button' : 'nx-glass-card nx-glass-hero'">
+    <view class="nx-wallet-summary" :class="compact ? 'nx-soft-glass' : 'nx-glass-card nx-glass-hero'">
       <view class="nx-wallet-particles" aria-hidden="true">
         <view v-for="(dot, i) in DATA_DOTS" :key="i" class="nx-wallet-particle" data-wallet-particle :style="dotStyle(dot)" />
       </view>

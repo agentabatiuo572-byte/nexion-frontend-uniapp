@@ -14,7 +14,7 @@
     <view class="growth-goals" :class="{ 'growth-goals--featured': !!featuredGoal }" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.goals.navTitle" />
 
-      <view v-if="featuredGoal" class="goal-hero nx-frosted-button mx-4">
+      <view v-if="featuredGoal" class="goal-hero nx-soft-glass mx-4">
         <view class="goal-hero__heading"><text>{{ fmt(t.growthUi.goalTerm, {days: Math.max(1, Math.round((featuredGoal.deadlineMs - featuredGoal.createdAt) / ONE_DAY_MS)), amount:formatAmount(featuredGoal.targetUSDT)}) }}</text><text class="goal-hero__term">{{ deadlineLine(featuredGoal.deadlineMs) }}</text></view>
         <GrowthProgress ring :size="176" :radius="45.4545" :stroke="7" :value="goalPct(featuredGoal.targetUSDT)" :label="`${formatAmount(lifeTimeEarnings)} / ${formatAmount(featuredGoal.targetUSDT)}`">
           <text class="goal-hero__amount"><text class="amount-cur">$</text>{{ formatAmount(lifeTimeEarnings).split('.')[0] }}<text class="amount-dec">{{ '.' + formatAmount(lifeTimeEarnings).split('.')[1] }}</text></text><text class="goal-hero__of">/ ${{ formatAmount(featuredGoal.targetUSDT) }}</text><text class="goal-hero__pct">{{ goalPct(featuredGoal.targetUSDT).toFixed(0) }}%</text>

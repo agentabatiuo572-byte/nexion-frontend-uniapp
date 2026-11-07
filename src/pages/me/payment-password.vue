@@ -12,7 +12,7 @@
         <NxButton variant="primary" class="payment-pin-page__primary" @click="load">{{ t.paymentPin.retry }}</NxButton>
       </template>
       <template v-else-if="!state.configured">
-        <view class="payment-vault-stage"><view class="payment-vault nx-frosted-button">
+        <view class="payment-vault-stage"><view class="payment-vault nx-soft-glass">
           <view class="payment-vault-lock" aria-hidden="true"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14.5v2.5"/></svg></view>
           <view class="payment-vault-dots" aria-hidden="true"><view v-for="n in 6" :key="n" :style="{ animationDelay: `${n * 80}ms` }" /></view>
           <text class="payment-vault-title">{{ t.paymentPin.title }}</text><text class="payment-vault-status">{{ t.paymentPin.notConfigured }}</text><text class="payment-vault-purpose">{{ t.paymentPin.purpose }}</text>
