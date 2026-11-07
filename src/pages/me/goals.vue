@@ -117,7 +117,7 @@
       </view>
     </view>
     <template #pageFixed>
-      <view class="goal-sticky nx-frosted-button"><NxButton variant="primary" size="large" :label="t.goals.saveCta" :disabled="saveBlocked" :busy="savePending" @click="onSave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg><text>{{ t.goals.saveCta }}</text></NxButton></view>
+      <view class="goal-sticky nx-glass-bar"><NxButton variant="primary" size="large" :label="t.goals.saveCta" :disabled="saveBlocked" :busy="savePending" @click="onSave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg><text>{{ t.goals.saveCta }}</text></NxButton></view>
     </template>
   </AppChassis>
 </template>

@@ -33,7 +33,7 @@
         <view class="payment-pin-page__link" role="button" tabindex="0" :aria-disabled="ui.busy" @click="recover">{{ t.paymentPin.forgot }}</view>
       </template>
     </view>
-    <template #pageFixed><view v-if="!loading && state && !state.configured && !ui.pendingOperation" class="payment-pin-page__dock nx-frosted-button"><NxButton variant="primary" @click="setup">{{ t.paymentPin.setup }}</NxButton></view></template>
+    <template #pageFixed><view v-if="!loading && state && !state.configured && !ui.pendingOperation" class="payment-pin-page__dock nx-glass-bar"><NxButton variant="primary" @click="setup">{{ t.paymentPin.setup }}</NxButton></view></template>
   </AppChassis>
 </template>
 <script setup lang="ts">

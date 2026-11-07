@@ -272,7 +272,7 @@
     </view>
     <!-- 主操作在底部固定栏(DS-30);不可提交时原因写在按钮上方。 -->
     <template #pageFixed>
-      <view class="wd-bar nx-frosted-button">
+      <view class="wd-bar nx-glass-bar">
         <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why">{{ submitDisabledReason }}</text>
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
         <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
