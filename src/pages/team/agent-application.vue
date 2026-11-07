@@ -40,7 +40,7 @@
             </view>
           </view>
           <view v-for="stage in opinions" :key="stage.key" class="detail-opinion" role="note">
-            <view class="detail-opinion__head" :class="{ 'detail-opinion__head--active': pending }"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg><text>{{ c.opinion[stage.key] }}</text></view>
+            <view class="detail-opinion__head" :class="{ 'detail-opinion__head--active': pending && stage.review.status === 'NEEDS_MORE' }"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg><text>{{ c.opinion[stage.key] }}</text></view>
             <text class="detail-opinion__body">{{ stage.review.reason }}</text>
           </view>
           <view v-for="hint in approvalHints" :key="hint" class="detail-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg><text>{{ hint }}</text></view>
@@ -177,7 +177,7 @@ import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { navTo, takeNavigationQuery } from "@/lib/route";
-import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { AMBASSADOR_BUCKET_IDS, AMBASSADOR_ROUTES, ambassadorAmountText, ambassadorPacketFacts, ambassadorPresentation, type AmbassadorBucketId } from "@/lib/ambassador-display";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -249,10 +249,10 @@ function filesOf(kind: string) { return shownAttachments.value.filter(file => fi
 function kindLabel(kind: string): string {
   return c.value.kinds[kind] ?? requirements.value.find(item => item.kind === kind)?.label ?? "—";
 }
-/** A kind the review returned for more stays flagged until a new version is submitted. */
+/** Submitted packets: a kind the server still lists as missing stays flagged (with or without files) until a new version is submitted. */
 function requirementState(kind: string): "flagged" | "done" | "empty" {
-  if (!filesOf(kind).length) return "empty";
-  return pack.value?.bucket && pack.value.materialRevision > 0 && pack.value.missingKinds.includes(kind) ? "flagged" : "done";
+  if (pack.value?.bucket && pack.value.materialRevision > 0 && pack.value.missingKinds.includes(kind)) return "flagged";
+  return filesOf(kind).length ? "done" : "empty";
 }
 function fileSize(size: number): string { return `${Math.max(0.1, size / 1024 / 1024).toFixed(1)} MB`; }
 function reviewTime(value: string | null): string {
@@ -273,10 +273,11 @@ const stages = computed(() => {
     { key: "business" as const, label: c.value.business, review: value.businessReview, status: status(value.businessReview), tone: tone(value.businessReview),
       metric: attendees != null || (pending.value && value.bucket === "venue") ? { label: c.value.attendees, value: attendees != null ? visibility.mask(attendees) : "—", unit: attendees != null && !visibility.hidden ? c.value.people : "" } : null },
     { key: "finance" as const, label: c.value.finance, review: value.financeReview, status: status(value.financeReview), tone: tone(value.financeReview),
-      metric: recognized != null || pending.value ? { label: c.value.recognized, value: recognized != null ? visibility.mask(formatFinanceAmount(recognized).replace(/\.00$/, "")) : "—", unit: recognized != null ? "USDT" : "" } : null },
+      metric: recognized != null || pending.value ? { label: c.value.recognized, value: recognized != null ? visibility.mask(formatGroupedAmount(recognized, "full")) : "—", unit: recognized != null ? "USDT" : "" } : null },
   ];
 });
-const opinions = computed(() => stages.value.filter(stage => stage.review.status === "NEEDS_MORE" && stage.review.reason));
+// Every recorded review carries a reason; returns read as a warning while the application is open.
+const opinions = computed(() => stages.value.filter(stage => stage.review.reason));
 // Facts already on screen (track, review cells, requirement rows) are not repeated as hints. Admin-side
 // approval rules are never shown; an amount or attendance hint appears only once a reviewer recorded a figure.
 const SILENT_BLOCKERS = new Set(["APPLICATION_NOT_PENDING", "APPLICATION_BUCKET_REQUIRED", "MATERIALS_NOT_SUBMITTED", "AMBASSADOR_REQUIRED_MATERIAL_MISSING", "BUSINESS_REVIEW_REQUIRED",
