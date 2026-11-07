@@ -327,7 +327,8 @@ async function submit() {
           : cause.reason === "disclosure" ? t.value.stakingV3.sheet.disclosureRejectedHint : undefined);
         return;
       }
-      toast.error(unsent ? t.value.staking.remoteUnavailableClosed : t.value.stakingV3.toast.openFailedTitle);
+      if (unsent) toast.error(t.value.staking.remoteUnavailableClosed);
+      else toast.warn(t.value.stakingV3.sheet.pendingHint);
     } finally {
       if (lease) staking.releasePreparedOpen(lease);
       if (expectedAccountKey === app.accountKey && expectedBindingEpoch === app.accountBindingEpoch) restorePendingOpen();
