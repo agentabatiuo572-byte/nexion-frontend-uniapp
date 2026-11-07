@@ -134,26 +134,31 @@ function rawStatusReads(ast, template, file) {
     return path.posix.normalize(target).replace(/\.(?:ts|js)$/, "") === "src/store/free-trial";
   };
   // ponytail: follow declaration initializers, not arbitrary cross-function data flow.
-  const fromTrial = (node, factory = false, seen = new Set()) => {
+  const fromTrial = (node, kind = "store", seen = new Set()) => {
     while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
       || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node)) node = node.expression;
-    if (!factory && ts.isCallExpression(node)) return fromTrial(node.expression, true, seen);
-    if (factory && ts.isPropertyAccessExpression(node) && node.name.text === "useFreeTrial") {
-      const declaration = checker.getSymbolAtLocation(node.expression)?.declarations?.[0];
-      return !!declaration && ts.isNamespaceImport(declaration) && trialImport(declaration);
-    }
+    if (kind === "store" && ts.isCallExpression(node)) return fromTrial(node.expression, "factory", seen);
+    if (kind === "factory" && ((ts.isPropertyAccessExpression(node) && node.name.text === "useFreeTrial")
+      || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === "useFreeTrial")))
+      return fromTrial(node.expression, "namespace", seen);
     if (!ts.isIdentifier(node)) return false;
     const symbol = checker.getSymbolAtLocation(node);
     if (!symbol || seen.has(symbol)) return false;
     seen.add(symbol);
     const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
     if (!declaration) return false;
-    if (factory && ts.isImportSpecifier(declaration)) return !declaration.isTypeOnly
+    if (kind === "namespace" && ts.isNamespaceImport(declaration)) return trialImport(declaration);
+    if (kind === "factory" && ts.isImportSpecifier(declaration)) return !declaration.isTypeOnly
       && (declaration.propertyName || declaration.name).text === "useFreeTrial" && trialImport(declaration);
+    if (kind === "factory" && ts.isBindingElement(declaration) && ts.isObjectBindingPattern(declaration.parent) && !declaration.dotDotDotToken) {
+      const name = declaration.propertyName || declaration.name, owner = declaration.parent.parent;
+      return (ts.isIdentifier(name) || ts.isStringLiteral(name)) && name.text === "useFreeTrial"
+        && ts.isVariableDeclaration(owner) && !!owner.initializer && fromTrial(owner.initializer, "namespace", seen);
+    }
     if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
-    if (factory && file === "src/store/free-trial.ts" && declaration.name.getText(bound) === "useFreeTrial"
+    if (kind === "factory" && file === "src/store/free-trial.ts" && declaration.name.getText(bound) === "useFreeTrial"
       && declaration.parent.parent.parent === bound) return true;
-    return fromTrial(declaration.initializer, factory, seen);
+    return fromTrial(declaration.initializer, kind, seen);
   };
   const hits = [];
   (function visit(node) {
