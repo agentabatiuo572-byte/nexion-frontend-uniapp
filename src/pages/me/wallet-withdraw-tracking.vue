@@ -105,7 +105,7 @@
     </view>
     <!-- Back to wallet is the page's main action, in the fixed bottom bar (DS-30). -->
     <template #pageFixed>
-      <view v-if="wd && !trackingReadPending && !trackingReadError" class="tr-bar nx-frosted-button">
+      <view v-if="wd && !trackingReadPending && !trackingReadError" class="tr-bar nx-glass-bar">
         <view class="tr-bar__btn" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @click.stop="goWallet" @keydown.enter.prevent="goWallet" @keydown.space.prevent="goWallet">
           <text>{{ t.wallet.trackBackToWallet }}</text>
         </view>
