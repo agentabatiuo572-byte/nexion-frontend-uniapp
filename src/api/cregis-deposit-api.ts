@@ -2,6 +2,16 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 
 export type CregisNetwork = "BEP20" | "ERC20";
+export interface CregisNetworkPolicy {
+  network: CregisNetwork;
+  enabled: boolean;
+  disabledReason: string | null;
+  confirmations: number;
+  feeUsdt: number;
+  feeUsdtExact: string;
+  minDepositUsdt: number;
+  minDepositUsdtExact: string;
+}
 export interface CregisAddress {
   enabled: boolean;
   creditEnabled?: boolean;
@@ -39,6 +49,26 @@ export function exactDepositAmount(value: number, exact?: string): string | null
 
 export function createCregisDepositApi(client: ApiClient) {
   return {
+    async policy(): Promise<CregisNetworkPolicy[]> {
+      const value = await client.request<{ networks?: unknown }>({ method: "GET", path: "/api/deposits/policy" });
+      const networks = value?.networks;
+      if (!Array.isArray(networks) || networks.length !== 2
+          || new Set(networks.map((row) => row?.network)).size !== 2
+          || networks.some((row) => !row || typeof row !== "object"
+            || (row.network !== "BEP20" && row.network !== "ERC20")
+            || typeof row.enabled !== "boolean"
+            || (row.disabledReason !== null && typeof row.disabledReason !== "string")
+            || !Number.isSafeInteger(row.confirmations) || row.confirmations < 15
+            || typeof row.feeUsdt !== "number" || !Number.isFinite(row.feeUsdt) || row.feeUsdt < 0
+            || typeof row.feeUsdtExact !== "string" || exactDepositAmount(row.feeUsdt, row.feeUsdtExact) === null
+            || Number(row.feeUsdtExact) !== row.feeUsdt
+            || typeof row.minDepositUsdt !== "number" || !Number.isFinite(row.minDepositUsdt) || row.minDepositUsdt <= 0
+            || typeof row.minDepositUsdtExact !== "string" || exactDepositAmount(row.minDepositUsdt, row.minDepositUsdtExact) === null
+            || Number(row.minDepositUsdtExact) !== row.minDepositUsdt)) {
+        throw new ApiError({ kind: "protocol", message: "CREGIS_DEPOSIT_POLICY_INVALID" });
+      }
+      return networks as CregisNetworkPolicy[];
+    },
     async address(network: CregisNetwork = "BEP20"): Promise<CregisAddress> {
       if (network !== "BEP20" && network !== "ERC20") throw new ApiError({ kind: "protocol", message: "CREGIS_NETWORK_INVALID" });
       const value = await client.request<CregisAddress>({

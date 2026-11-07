@@ -127,6 +127,7 @@ const LEDGER = {
   "GET /api/payout-addresses": "包 E 提现地址直管新接口,服务端已按 payout-addresses 资源实现",
   "PUT /api/payout-addresses/{network}": "TBD-NAME: 同上 —— 原子更换(在途单拦截 / 频控 / 冻结由服务端裁决)",
   "GET /api/deposits": "PRD §9.2.8",
+  "GET /api/deposits/policy": "PRD §9.2.3",
   "GET /api/deposits/address": "PRD §9.2.8",
   "POST /api/deposits/bank-intents": "PRD §9.2.8",
   "POST /api/deposits/card": "PRD §9.2.8",

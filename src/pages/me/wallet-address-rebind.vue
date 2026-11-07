@@ -33,7 +33,7 @@
       </view>
 
       <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 2px">
-        <text class="block" :style="stateBodyStyle">{{ remoteReadFailed ? copy.addressUnavailable : copy.addressLoading }}</text>
+        <text class="block" :style="stateBodyStyle">{{ networkPolicyStatus === 'ready' && !NETWORKS.length ? t.wallet.withdrawalChannelsClosed : remoteReadFailed ? copy.addressUnavailable : copy.addressLoading }}</text>
         <view v-if="remoteReadFailed" class="nx-rebind-read-retry w-full grid place-items-center" :style="primaryCtaStyle" role="button" :aria-disabled="remoteRefreshPending" :tabindex="remoteRefreshPending ? -1 : 0" @click="retryRemoteSnapshot" @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"><text>{{ remoteRefreshPending ? copy.addressLoading : copy.retry }}</text></view>
       </view>
       <!-- ── 成功态 ── -->
@@ -248,7 +248,8 @@ import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, wa
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { asApiError } from "@/api/errors";
-import { payoutAddressServerEnabled } from "@/api/runtime";
+import { payoutAddressServerEnabled, withdrawalApi } from "@/api/runtime";
+import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
@@ -276,12 +277,20 @@ const ui = useUI();
 const confirmationOwner = `payout-address-${getCurrentInstance()?.uid}`;
 
 // ── 网络选择(标签为链名专有名词,非文案)──
-const NETWORKS: { id: ChainDepositChannel; label: string }[] = [
+const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
   { id: "usdt-trc20", label: "TRC20" },
   { id: "usdt-bep20", label: "BEP20" },
   { id: "usdt-erc20", label: "ERC20" },
 ];
+const networkPolicy = ref<WithdrawalPolicy | null>(null);
+const networkPolicyStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
+const NETWORKS = computed(() => payoutAddressServerEnabled
+  ? ALL_NETWORKS.filter((nw) => nw.id !== "usdt-trc20"
+    && networkPolicy.value?.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
+  : ALL_NETWORKS);
 const network = ref<ChainDepositChannel>("usdt-trc20");
+const networkAvailable = computed(() => !payoutAddressServerEnabled
+  || (networkPolicyStatus.value === "ready" && NETWORKS.value.some((nw) => nw.id === network.value)));
 
 onLoad((options) => {
   const q = (options as Record<string, string> | undefined)?.network;
@@ -299,7 +308,7 @@ const history = computed(() => payout.stateFor(network.value).history);
 const historyDesc = computed(() => [...history.value].reverse());
 const historyOpen = ref(false);
 const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
-  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance)) return "unknown";
+  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance || !networkAvailable.value)) return "unknown";
   if (explicitStep.value === "otp") return "otp";
   if (explicitStep.value === "success") return "success";
   if (explicitStep.value === "form") return "form";
@@ -307,7 +316,7 @@ const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
 });
 // base 态推导 mode:空槽 = add;显式进入更换 = change。
 function switchNetwork(id: ChainDepositChannel) {
-  if (network.value === id) return;
+  if (network.value === id || !NETWORKS.value.some((nw) => nw.id === id)) return;
   invalidatePageCommand();
   network.value = id;
   explicitStep.value = "base";
@@ -318,8 +327,8 @@ function switchNetwork(id: ChainDepositChannel) {
   historyOpen.value = false;
 }
 function moveNetwork(delta: number) {
-  const index = NETWORKS.findIndex((item) => item.id === network.value);
-  const next = NETWORKS[(index + delta + NETWORKS.length) % NETWORKS.length];
+  const index = NETWORKS.value.findIndex((item) => item.id === network.value);
+  const next = NETWORKS.value[(index + delta + NETWORKS.value.length) % NETWORKS.value.length];
   if (!next) return;
   switchNetwork(next.id);
   void nextTick(() => {
@@ -331,7 +340,7 @@ function moveNetwork(delta: number) {
 const newAddress = ref("");
 const addrError = ref("");
 const addressPlaceholder = computed(() => (network.value === "usdt-trc20" ? "TR7NHq..." : "0x..."));
-const canProceed = computed(() => newAddress.value.trim().length > 0);
+const canProceed = computed(() => networkAvailable.value && newAddress.value.trim().length > 0);
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
@@ -353,7 +362,7 @@ const changeBlock = computed(() => {
 });
 function startChange() {
   // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
-  if (changeBlock.value) return;
+  if (!networkAvailable.value || changeBlock.value) return;
   mode.value = "change";
   explicitStep.value = "form";
 }
@@ -390,7 +399,7 @@ const resendLabelParts = computed(() => t.value.addrRebind.otpResendIn.split("{s
 const resendDigits = ref(2);
 const showCaptcha = ref(false);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
-const otpReady = computed(() => otpCode.value.trim().length === 6 && !!otpRequestId.value);
+const otpReady = computed(() => networkAvailable.value && otpCode.value.trim().length === 6 && !!otpRequestId.value);
 function onOtpInput(e: Event) {
   otpCode.value = detailVal(e).replace(/[^0-9]/g, "").slice(0, 6);
   otpError.value = "";
@@ -614,18 +623,19 @@ const remoteReadStatus = computed(() => {
   void readRuntimeScope.value;
   return payout.readStatusFor(app.accountKey);
 });
-const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading");
-const remoteReadFailed = computed(() => remoteReadStatus.value === "error");
+const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
+const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 let pageVisible = true;
 let commandGeneration = 0;
+let policyGeneration = 0;
 
 function captureCommandScope() {
   return { accountKey: app.accountKey, bindingEpoch: app.accountBindingEpoch,
     generation: commandGeneration, runtime: captureRuntimeRevision() };
 }
 function commandIsCurrent(scope: ReturnType<typeof captureCommandScope>) {
-  return pageVisible && scope.generation === commandGeneration
+  return pageVisible && networkAvailable.value && scope.generation === commandGeneration
     && scope.accountKey === app.accountKey && scope.bindingEpoch === app.accountBindingEpoch
     && isCurrentRuntimeRevision(scope.runtime);
 }
@@ -644,14 +654,43 @@ watch(() => payout.serverClock, (anchor) => {
 
 useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
 async function retryRemoteSnapshot() {
-  if (!payoutAddressServerEnabled || !pageVisible || remoteRefreshPending.value) return;
+  if (!payoutAddressServerEnabled || !pageVisible) return;
   // Store-owned account/runtime/version guards decide the final read status,
   // including reads started by account hydration rather than by this page.
-  await payout.refreshRemote();
+  await Promise.all([
+    remoteReadStatus.value === "loading" ? Promise.resolve() : payout.refreshRemote(),
+    networkPolicyStatus.value === "loading" ? Promise.resolve() : refreshNetworkPolicy(),
+  ]);
+}
+async function refreshNetworkPolicy() {
+  const generation = ++policyGeneration;
+  const accountKey = app.accountKey;
+  const bindingEpoch = app.accountBindingEpoch;
+  const runtime = captureRuntimeRevision();
+  const isCurrent = () => generation === policyGeneration && pageVisible
+    && accountKey === app.accountKey && bindingEpoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime);
+  networkPolicyStatus.value = "loading";
+  try {
+    const policy = await withdrawalApi.policy();
+    if (!isCurrent()) return;
+    networkPolicy.value = policy;
+    networkPolicyStatus.value = "ready";
+    if (!networkAvailable.value && NETWORKS.value[0]) switchNetwork(NETWORKS.value[0].id);
+  } catch {
+    if (!isCurrent()) return;
+    networkPolicy.value = null;
+    networkPolicyStatus.value = "error";
+  }
+}
+function clearNetworkPolicy() {
+  policyGeneration++;
+  networkPolicy.value = null;
+  networkPolicyStatus.value = "idle";
 }
 const stopRuntimeRead = subscribeRuntimeRevision(scope => {
   readRuntimeScope.value = scope;
   invalidatePageCommand();
+  clearNetworkPolicy();
   if (pageVisible) void retryRemoteSnapshot();
 });
 onShow(() => {
@@ -661,9 +700,11 @@ onShow(() => {
 onHide(() => {
   pageVisible = false;
   invalidatePageCommand();
+  clearNetworkPolicy();
 });
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   invalidatePageCommand();
+  clearNetworkPolicy();
   void retryRemoteSnapshot();
 }, { flush: "sync" });
 onMounted(() => {
@@ -682,6 +723,7 @@ onMounted(() => {
 onUnmounted(() => {
   pageVisible = false;
   invalidatePageCommand();
+  clearNetworkPolicy();
   stopRuntimeRead();
   if (tickTimer) clearInterval(tickTimer);
   if (resendTimer) clearInterval(resendTimer);
