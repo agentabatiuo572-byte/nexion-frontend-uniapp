@@ -1,8 +1,8 @@
 <!--
   WalletWithdraw — 提现页，按网络直管提现地址。
   Top→bottom: dev-only ?dev=1 地址重置 → 换址冻结横幅(24h 倒计时,按所选网络)→
-  compliance-hold banner (P5+) → amount input (Use Max) → network chips(可选,
-  每网络独立当前地址)→ 地址行(掩码中段 + 「管理」入口)/ 空态引导卡(添加提现地址)
+  compliance-hold banner (P5+) → amount input (Use Max) → 网络(只读标签,来自「选择提现网络」页的
+  ?network=,每网络独立当前地址)→ 地址行(掩码中段 + 「管理」入口)/ 空态引导卡(添加提现地址)
   → fee summary (single network-confirm fee row + "?" fee-why bottom sheet) → warnings →
   StakeAlternativeCard (configured minimum) → NEX offset toggle (default OFF) → sticky submit.
 
@@ -17,13 +17,13 @@
   bill rows (postReceiptForAccount, numbers taken from the server receipt), because the
   bills store is still the app's only user-facing ledger.
   Then → withdraw-tracking. <AppChassis active="me">.
-  Header is the shared sticky <SubPageHeader> (back=/pages/me/me, title=t.wallet.withdraw,
+  Header is the shared sticky <SubPageHeader> (back=/pages/me/wallet-withdraw-network, title=t.wallet.withdraw,
   subtitle="USDT").
 -->
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/me" :title="t.wallet.withdraw" subtitle="USDT" />
+      <SubPageHeader back="/pages/me/wallet-withdraw-network" :title="t.wallet.withdraw" subtitle="USDT" />
       <view v-if="pendingAttempt" class="mx-4 mb-3 flex items-start" :style="holdBannerStyle">
         <view class="flex-1 min-w-0">
           <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 600">{{ t.walletV3.withdrawAmbiguousExitTitle }}</text>
@@ -110,23 +110,11 @@
         </view>
       </view>
 
-      <!-- 收款信息卡:网络单选(选中=品牌标签)+ 当前网络地址掩码 + 「管理」;未设置 → 卡内引导(RM01a ③⑤) -->
+      <!-- 收款信息卡:网络只读标签(在「选择提现网络」页选定)+ 当前网络地址掩码 + 「管理」;未设置 → 卡内引导(RM01a ③⑤) -->
       <view class="wd-route mx-4">
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.networkLabel }}</text>
-          <view class="wd-nets" role="radiogroup" :aria-label="t.wallet.networkLabel">
-            <view
-              v-for="nw in NETWORKS"
-              :key="nw.id"
-              :class="['nx-withdraw-network-radio', `nx-withdraw-net-${nw.id.slice(5)}`, 'wd-net', { 'wd-net--on': network === nw.id }]"
-              role="radio" :tabindex="network === nw.id ? 0 : -1"
-              :aria-checked="network === nw.id"
-              @click="pickNetwork(nw.id)"
-              @keydown.enter.prevent="pickNetwork(nw.id)" @keydown.space.prevent="pickNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
-            >
-              <text>{{ nw.label }}</text>
-            </view>
-          </view>
+          <text class="wd-net" data-testid="withdraw-network-tag">{{ network.slice(5) }}</text>
           <text class="wd-route__note">{{ networkHint(network) }}</text>
         </view>
         <view class="wd-route__r">
@@ -170,8 +158,11 @@
           <view :style="feeSkeletonValueStyle" />
         </view>
       </view>
-      <view v-else-if="withdrawalPolicyCurrent && NETWORKS.length === 0" class="wd-fee__msg">
-        <text class="wd-warn">{{ t.wallet.withdrawalChannelsClosed }}</text>
+      <view v-else-if="networkClosed" class="wd-fee__msg">
+        <text class="wd-warn" role="status">{{ NETWORKS.length === 0 ? t.wallet.withdrawalChannelsClosed : t.bankWithdrawal.networkUnavailable }}</text>
+        <view v-if="NETWORKS.length > 0" class="wd-link" role="button" tabindex="0" @click="chooseNetworkAgain" @keydown.enter.prevent="chooseNetworkAgain" @keydown.space.prevent="chooseNetworkAgain">
+          <text>{{ t.bankWithdrawal.rechooseNetwork }}</text>
+        </view>
       </view>
       <view v-else-if="!feeConfigUsable" class="wd-fee__msg">
         <view class="flex items-center justify-between">
@@ -298,7 +289,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { ref, computed, nextTick, onUnmounted, watch, type CSSProperties } from "vue";
+import { ref, computed, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
@@ -309,7 +300,7 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
-import { navTo } from "@/lib/route";
+import { navTo, takeNavigationQuery } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { computeWithdrawalMaximum, formatWithdrawalRatioPercent, resolveWithdrawalUseMax } from "@/lib/withdrawal-use-max";
 import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
@@ -451,7 +442,9 @@ async function loadWithdrawalPolicy(): Promise<void> {
       requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
     )) return;
     withdrawalPolicy.value = policy;
-    if (!NETWORKS.value.some((item) => item.id === network.value) && NETWORKS.value[0]) {
+    // A network the user chose stays put even when the server has closed it (networkClosed explains it);
+    // only the page's own default moves to an open network.
+    if (!networkChosen && !NETWORKS.value.some((item) => item.id === network.value) && NETWORKS.value[0]) {
       network.value = NETWORKS.value[0].id;
     }
   } catch (cause) {
@@ -636,7 +629,7 @@ const dailyUsageText = computed(() => fmt(t.value.wallet.dailyWithdrawalUsage, {
 const withdrawalChannelStatusText = computed(() => {
   const policy = withdrawalPolicy.value;
   if (!policy) return "";
-  // Only a closed channel needs a line; the open network is already the selected chip above.
+  // Only a closed channel needs a line; the chosen network is already the tag above.
   return !policy.withdrawalEnabled || policy.enabledNetworks.length === 0 ? t.value.wallet.withdrawalChannelsClosed : "";
 });
 /**
@@ -692,14 +685,26 @@ const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: f
 const devMode = ref(false);
 onLoad((options) => {
   devMode.value = import.meta.env.DEV && options?.dev === "1";
-  // 默认选中后端允许且已设地址的网络。
+  // 网络由「选择提现网络」页带入(只读);无有效参数(深链 / 刷新 / 无栈返回)才用默认:后端允许且已设地址的网络。
+  const chosen = ALL_NETWORKS.find((n) => n.id === (options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-withdraw")).get("network")));
+  if (chosen) {
+    network.value = chosen.id;
+    networkChosen = true;
+    return;
+  }
   const withAddr = NETWORKS.value.find((n) => payout.currentFor(fromWithdrawNetwork(n.id)));
   if (withAddr) network.value = withAddr.id;
 });
 
 const amount = ref("");
-// 提现网络可选;地址 = 该网络当前提现地址(payout-address store 单源,RM01a)。
+// 提现网络只读;地址 = 该网络当前提现地址(payout-address store 单源,RM01a)。
 const network = ref<CryptoNetwork>("USDT-BEP20");
+let networkChosen = false;
+// Policy read and the network is not open: no quote, no eligibility request, submit stays disabled.
+const networkClosed = computed(() => withdrawalPolicyCurrent.value && !NETWORKS.value.some((item) => item.id === network.value));
+function chooseNetworkAgain() {
+  navTo("/pages/me/wallet-withdraw-network");
+}
 const chainNetwork = computed(() => fromWithdrawNetwork(network.value));
 const boundAddress = computed(() => payout.currentFor(chainNetwork.value)?.address ?? "");
 // 掩码中段:与地址管理页共用 core.maskAddressMid 同一实现,不各写一份。
@@ -722,7 +727,7 @@ watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, withdrawal
   remoteEligibility.value = null;
   remoteEligibilityFailed.value = false;
   const policyVersion = withdrawalPolicy.value?.policyVersion;
-  if (!policyVersion || NETWORKS.value.length === 0 || !shouldRequestWithdrawalEligibility({
+  if (!policyVersion || networkClosed.value || !shouldRequestWithdrawalEligibility({
     remote: remoteApiEnabled,
     factsFresh: withdrawalActionsFresh.value,
     policyVersion,
@@ -750,24 +755,6 @@ watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, withdrawal
     }
   }
 }, { immediate: true });
-
-// 网络也是报价/地址的输入 —— 提交在途一律冻结,与 useMax/toggleOffset
-// 同一纪律(审计 P2:评估窗口内切网络会让本可成功的提交被确认后校验无谓拒绑)。
-function pickNetwork(id: CryptoNetwork) {
-  if (inputsLocked.value) return;
-  network.value = id;
-}
-
-function moveNetwork(delta: number) {
-  if (inputsLocked.value || NETWORKS.value.length < 2) return;
-  const index = NETWORKS.value.findIndex((item) => item.id === network.value);
-  const next = NETWORKS.value[(index + delta + NETWORKS.value.length) % NETWORKS.value.length];
-  if (!next) return;
-  pickNetwork(next.id);
-  void nextTick(() => {
-    if (typeof document !== "undefined") document.querySelector<HTMLElement>(".nx-withdraw-network-radio[tabindex=\"0\"]")?.focus();
-  });
-}
 
 // ── 地址管理入口 + 换址后 24h 冻结(RM01a ⑤)──────────────────────
 // 管理入口常开:在途单 / 频控拦截由地址管理页与 store 的**同一个**判据呈现
@@ -1049,6 +1036,7 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   if (!withdrawalActionsFresh.value) return withdrawalActionStatusText.value;
   if (withdrawalPolicyError.value) return withdrawalPolicyError.value;
   if (NETWORKS.value.length === 0) return t.value.wallet.withdrawalChannelsClosed;
+  if (networkClosed.value) return t.value.bankWithdrawal.networkUnavailable;
   // 费率可读与通道开放是两个独立事实。总开关关闭时仍展示服务端报价，
   // 但提交必须明确说明通道关闭，不能伪装成费率拉取失败。
   if (!feeConfigUsable.value) return t.value.walletV3.submitReasonFeeConfigUnavailable;
@@ -1449,7 +1437,6 @@ async function handleSubmit() {
 
 // ── styles ──
 // 空态引导卡(brand soft tint,非报错态;卡内嵌套零 border)。
-// 网络 chips(与地址管理页同语汇;选中 brand-soft,未选 surface)。
 const resetBtnStyle: CSSProperties = {
   height: "28px",
   padding: "0 8px",
@@ -1607,11 +1594,8 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-route__r { display: flex; align-items: center; gap: 12px; min-height: 52px; }
 .wd-route__r + .wd-route__r { border-top: 1px solid var(--v5-border); }
 .wd-route__k { flex: none; width: 52px; }
-.wd-nets { display: flex; flex: none; gap: 6px; }
-.wd-net { position: relative; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-ink) 6%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); cursor: pointer; }
-.wd-net::after { content: ""; position: absolute; inset: -10px -2px; }
-.wd-net--on { background: var(--v5-brand-soft); color: var(--v5-brand); }
-.wd-net:focus-visible, .wd-manage:focus-visible, .wd-add:focus-visible, .wd-submit:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.wd-net { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-v5); }
+.wd-manage:focus-visible, .wd-add:focus-visible, .wd-submit:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .wd-route__note { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-route__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
 .wd-route__a--empty { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }

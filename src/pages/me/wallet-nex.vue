@@ -296,7 +296,7 @@ const breakdownRows = computed(() => [
 
 const useTiles = computed(() => [
   { href: "/pages/me/wallet-exchange", icon: tintIcon(ICON.refresh, "var(--v5-success)"), label: t.value.nexWallet.useNex.exchange, sub: t.value.nexWallet.useNex.exchangeSub },
-  { href: "/pages/me/wallet-withdraw", icon: tintIcon(ICON.percent, "var(--v5-brand-2)"), label: t.value.nexWallet.useNex.feeOffset, sub: t.value.nexWallet.useNex.feeOffsetSub },
+  { href: "/pages/me/wallet-withdraw-network", icon: tintIcon(ICON.percent, "var(--v5-brand-2)"), label: t.value.nexWallet.useNex.feeOffset, sub: t.value.nexWallet.useNex.feeOffsetSub },
 ]);
 
 function tintIcon(svg: string, color: string): string {
