@@ -52,9 +52,6 @@ const MONEY_PATHS = [
   "src/store/account-cloud.ts",
 ];
 
-/** 直接读原始状态的形态。注释行会先被剥掉,避免注释里的说明文字哄红。 */
-const RAW_READ = /\bfreeTrial\s*\.\s*status\b|\buseFreeTrial\s*\(\s*\)\s*\.\s*status\b/;
-
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const full = path.join(dir, name);
@@ -64,20 +61,121 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** 保留旧剥注释语义,同时映射到原文位置;不能因证明节点而漏掉同行的其他读取。 */
-function stripComments(text, withOffsets = false) {
-  let body = text, offsets = withOffsets ? Array.from({ length: text.length }, (_, i) => i) : [];
-  for (const pattern of [/\/\*[\s\S]*?\*\//g, /^[ \t]*\/\/.*$/gm]) {
-    if (!withOffsets) { body = body.replace(pattern, ""); continue; }
-    const ranges = [];
-    let start = 0;
-    for (const match of body.matchAll(pattern)) { ranges.push([start, match.index]); start = match.index + match[0].length; }
-    ranges.push([start, body.length]);
-    const nextOffsets = ranges.flatMap(([from, to]) => offsets.slice(from, to));
-    body = ranges.map(([from, to]) => body.slice(from, to)).join("");
-    offsets = nextOffsets;
+function parseSource(source, file) {
+  let script = source, template;
+  if (file.endsWith(".vue")) {
+    const { descriptor, errors } = parseSfc(source, { filename: file });
+    if (errors.length) throw new Error(`${file}: ${errors[0]}`);
+    template = descriptor.template?.ast;
+    script = source.replace(/[^\r\n]/g, " ");
+    for (const block of [descriptor.script, descriptor.scriptSetup].filter(Boolean)) {
+      script = script.slice(0, block.loc.start.offset) + block.content + script.slice(block.loc.end.offset);
+    }
   }
-  return { body, offsets };
+  return { ast: parseScript(script, file), template };
+}
+
+function rawStatusReads(ast, template, file) {
+  let text = ast.text;
+  const spans = [];
+  const append = expression => {
+    spans.push([text.length, text.length + expression.content.length, expression.loc.start.offset]);
+    text += expression.content;
+  };
+  const emit = (expression, event = false) => {
+    if (!expression?.content) return;
+    text += event ? "\n;(($event) => {" : "\n;(";
+    append(expression);
+    text += event ? "\n});" : "\n);";
+  };
+  // Bind template expressions in the same module, retaining Vue's local scopes.
+  // These generated nodes are only for discovery; authority proofs use the original AST.
+  (function visitTemplate(node) {
+    if (node.type === 5) emit(node.content);
+    const props = node.props || [];
+    const loop = props.find(prop => prop.type === 7 && prop.name === "for");
+    const slot = props.find(prop => prop.type === 7 && prop.name === "slot" && prop.exp);
+    for (const prop of props) if (prop.type === 7 && prop.name === "if") emit(prop.exp);
+    if (loop) {
+      if (!loop.forParseResult) throw new Error(`${file}: invalid v-for expression`);
+      emit(loop.forParseResult.source);
+      text += "\n;((";
+      [loop.forParseResult.value, loop.forParseResult.key, loop.forParseResult.index].filter(Boolean).forEach((alias, i) => {
+        if (i) text += ", ";
+        append(alias);
+      });
+      text += ") => {";
+    }
+    if (slot) { text += "\n;(("; append(slot.exp); text += ") => {"; }
+    for (const prop of props) if (prop.type === 7) {
+      if (!["for", "slot", "if"].includes(prop.name)) emit(prop.exp, prop.name === "on");
+      if (prop.arg?.isStatic === false) emit(prop.arg);
+    }
+    for (const child of node.children || []) visitTemplate(child);
+    if (slot) text += "\n});";
+    if (loop) text += "\n});";
+  })(template || {});
+
+  const virtualFile = path.join(ROOT, `${file}.ts`);
+  const bound = parseScript(text, virtualFile);
+  const options = { noLib: true, noResolve: true };
+  const program = ts.createProgram([virtualFile], options, {
+    ...ts.createCompilerHost(options),
+    getSourceFile: name => path.normalize(name) === virtualFile ? bound : undefined,
+  });
+  const checker = program.getTypeChecker();
+  const trialImport = declaration => {
+    let parent = declaration.parent;
+    while (parent && !ts.isImportDeclaration(parent)) parent = parent.parent;
+    if (!parent || parent.importClause?.isTypeOnly) return false;
+    const name = parent.moduleSpecifier.text;
+    const target = name.startsWith("@/") ? `src/${name.slice(2)}`
+      : name.startsWith(".") ? path.posix.join(path.posix.dirname(file), name) : "";
+    return path.posix.normalize(target).replace(/\.(?:ts|js)$/, "") === "src/store/free-trial";
+  };
+  // ponytail: follow declaration initializers, not arbitrary cross-function data flow.
+  const fromTrial = (node, factory = false, seen = new Set()) => {
+    while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
+      || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node)) node = node.expression;
+    if (!factory && ts.isCallExpression(node)) return fromTrial(node.expression, true, seen);
+    if (factory && ts.isPropertyAccessExpression(node) && node.name.text === "useFreeTrial") {
+      const declaration = checker.getSymbolAtLocation(node.expression)?.declarations?.[0];
+      return !!declaration && ts.isNamespaceImport(declaration) && trialImport(declaration);
+    }
+    if (!ts.isIdentifier(node)) return false;
+    const symbol = checker.getSymbolAtLocation(node);
+    if (!symbol || seen.has(symbol)) return false;
+    seen.add(symbol);
+    const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
+    if (!declaration) return false;
+    if (factory && ts.isImportSpecifier(declaration)) return !declaration.isTypeOnly
+      && (declaration.propertyName || declaration.name).text === "useFreeTrial" && trialImport(declaration);
+    if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
+    if (factory && file === "src/store/free-trial.ts" && declaration.name.getText(bound) === "useFreeTrial"
+      && declaration.parent.parent.parent === bound) return true;
+    return fromTrial(declaration.initializer, factory, seen);
+  };
+  const hits = [];
+  (function visit(node) {
+    let receiver;
+    if ((ts.isPropertyAccessExpression(node) && node.name.text === "status")
+      || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === "status")) receiver = node.expression;
+    if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent) && !node.dotDotDotToken) {
+      const name = node.propertyName || node.name, owner = node.parent.parent;
+      if ((ts.isIdentifier(name) || ts.isStringLiteral(name)) && name.text === "status"
+        && (ts.isVariableDeclaration(owner) || ts.isParameter(owner))) receiver = owner.initializer;
+    }
+    if (receiver && fromTrial(receiver)) {
+      const offset = node.getStart(bound);
+      if (offset < ast.text.length) hits.push(offset);
+      else {
+        const span = spans.find(([start, end]) => offset >= start && offset < end);
+        if (span) hits.push(span[2] + offset - span[0]);
+      }
+    }
+    ts.forEachChild(node, visit);
+  })(bound);
+  return hits.sort((a, b) => a - b);
 }
 
 const printer = ts.createPrinter({ removeComments: true });
@@ -185,17 +283,8 @@ const quoteTemplate = [
 const expressionKey = (text) => snippets(`const value = (${text});`)[0].text;
 
 function provenAuthorityReads(source, file) {
-  let script = source, template;
-  if (file.endsWith(".vue")) {
-    const { descriptor, errors } = parseSfc(source, { filename: file });
-    if (errors.length) throw new Error(`${file}: ${errors[0]}`);
-    template = descriptor.template?.ast;
-    script = source.replace(/[^\r\n]/g, " ");
-    for (const block of [descriptor.script, descriptor.scriptSetup].filter(Boolean)) {
-      script = script.slice(0, block.loc.start.offset) + block.content + script.slice(block.loc.end.offset);
-    }
-  }
-  const ast = parseScript(script, file), nodes = [], identifiers = [], bindings = new Map(), rawNodes = [];
+  const { ast, template } = parseSource(source, file);
+  const nodes = [], identifiers = [], bindings = new Map(), rawNodes = [];
   const conditionalRegions = [], starts = [];
   for (const match of source.matchAll(/^[ \t]*(?:\/\/|<!--)[ \t]*#(ifdef|ifndef|endif)\b[^\r\n]*/gm)) {
     if (match[1] !== "endif") starts.push(match.index);
@@ -298,20 +387,14 @@ let provenHits = 0;
 for (const full of files) {
   const rel = path.relative(ROOT, full).replace(/\\/g, "/");
   const raw = readFileSync(full, "utf8");
-  const { body } = stripComments(raw);
-  const rawHits = [], hitLines = new Set();
-  let offset = 0;
-  body.split(/(?<=\n)/).forEach((line, i) => {
-    if (RAW_READ.test(line)) for (const match of line.matchAll(new RegExp(RAW_READ.source, "g"))) {
-      rawHits.push({ offset: offset + match.index, line: i + 1 }); hitLines.add(i + 1);
-    }
-    offset += line.length;
-  });
+  // Other platform SFCs can contain mutually exclusive script blocks; only the
+  // trial definition and files naming its import module need this TS/Vue binder.
+  if (!RESOLVER_FILES.includes(rel) && !/\bfree-trial(?:\.(?:ts|js))?["']/.test(raw)) continue;
+  const { ast, template } = parseSource(raw, rel);
+  const rawHits = rawStatusReads(ast, template, rel).map(offset => ({ offset, line: raw.slice(0, offset).split("\n").length }));
   if (!rawHits.length) continue;
-  scannedHits += hitLines.size;
+  scannedHits += new Set(rawHits.map(hit => hit.line)).size;
   if (RESOLVER_FILES.includes(rel)) continue; // 定义面,不算消费者
-  const { offsets } = stripComments(raw, true);
-  for (const hit of rawHits) { hit.offset = offsets[hit.offset]; hit.line = raw.slice(0, hit.offset).split("\n").length; }
   const proven = provenAuthorityReads(raw, rel);
   const hits = [...new Set(rawHits.filter(hit => !proven.has(hit.offset)).map(hit => hit.line))];
   provenHits += rawHits.filter(hit => proven.has(hit.offset)).length;
