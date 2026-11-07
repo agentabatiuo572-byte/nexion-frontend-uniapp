@@ -2,6 +2,7 @@ import { uiLocale, type UiLocale } from '@/i18n';
 
 // Purchase payment copy. Never name a payment provider or its domain in the App.
 const zh = {
+  networkPausedTitle: '{network} 已暂停收款', networkPaused: '该网络已暂停收款，请勿向原收款地址转账。',
   confirming: '付款确认中', confirmWait: '付款时间已结束，正在确认截止前的付款，请勿再次转账或重复付款。',
   title: '选择支付方式', closesIn: '剩 {t} 订单自动关闭', orderNo: '订单号', methodLabel: '付款方式', close: '关闭', back: '返回',
   wallet: '钱包余额', walletAvailable: '可用 {amt} USDT', walletUnavailable: '暂时无法读取余额，可选择其他方式', short: '余额不足，还差 {amt} USDT', topup: '去充值',
@@ -43,6 +44,7 @@ const zh = {
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
 const en: typeof zh = {
+  networkPausedTitle: 'Payments on {network} are paused', networkPaused: 'This network is not accepting payments. Do not send funds to the previous payment address.',
   confirming: 'Confirming your payment', confirmWait: 'The payment window has ended. We are checking payments sent before the deadline. Do not send another payment.',
   title: 'Payment method', closesIn: 'Order closes in {t}', orderNo: 'Order no.', methodLabel: 'Pay with', close: 'Close', back: 'Back',
   wallet: 'Wallet balance', walletAvailable: '{amt} USDT available', walletUnavailable: 'Balance unavailable. Choose another method.', short: 'Insufficient balance. {amt} USDT short', topup: 'Top up',
@@ -84,6 +86,7 @@ const en: typeof zh = {
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
+  networkPausedTitle: 'Tạm ngừng nhận thanh toán qua {network}', networkPaused: 'Mạng này đang tạm ngừng nhận thanh toán. Vui lòng không chuyển tiền đến địa chỉ nhận trước đó.',
   confirming: 'Đang xác nhận thanh toán', confirmWait: 'Đã hết thời gian thanh toán. Chúng tôi đang kiểm tra khoản tiền gửi trước hạn. Vui lòng không thanh toán thêm.',
   title: 'Phương thức thanh toán', closesIn: 'Đơn tự đóng sau {t}', orderNo: 'Mã đơn', methodLabel: 'Thanh toán bằng', close: 'Đóng', back: 'Quay lại',
   wallet: 'Số dư ví', walletAvailable: 'Khả dụng {amt} USDT', walletUnavailable: 'Chưa đọc được số dư. Vui lòng chọn cách khác.', short: 'Số dư không đủ, còn thiếu {amt} USDT', topup: 'Nạp tiền',
@@ -125,6 +128,7 @@ const vi: typeof zh = {
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
+  networkPausedTitle: 'Penerimaan pembayaran di {network} dijeda', networkPaused: 'Jaringan ini sedang tidak menerima pembayaran. Jangan kirim dana ke alamat pembayaran sebelumnya.',
   confirming: 'Mengonfirmasi pembayaran Anda', confirmWait: 'Waktu pembayaran sudah berakhir. Kami sedang mengecek pembayaran yang dikirim sebelum batas waktu. Jangan kirim pembayaran lagi.',
   title: 'Metode pembayaran', closesIn: 'Pesanan ditutup dalam {t}', orderNo: 'No. pesanan', methodLabel: 'Bayar dengan', close: 'Tutup', back: 'Kembali',
   wallet: 'Saldo dompet', walletAvailable: '{amt} USDT tersedia', walletUnavailable: 'Saldo tidak tersedia. Pilih metode lain.', short: 'Saldo tidak cukup. Kurang {amt} USDT', topup: 'Top up',
@@ -166,6 +170,7 @@ const id: typeof zh = {
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
+  networkPausedTitle: 'Penerimaan bayaran melalui {network} dihentikan sementara', networkPaused: 'Rangkaian ini tidak menerima bayaran buat sementara waktu. Jangan hantar dana ke alamat bayaran sebelum ini.',
   confirming: 'Mengesahkan bayaran anda', confirmWait: 'Tempoh bayaran telah tamat. Kami sedang menyemak bayaran yang dihantar sebelum tarikh akhir. Jangan hantar bayaran lain.',
   title: 'Kaedah pembayaran', closesIn: 'Ditutup automatik dalam {t}', orderNo: 'No. pesanan', methodLabel: 'Bayar dengan', close: 'Tutup', back: 'Kembali',
   wallet: 'Baki dompet', walletAvailable: '{amt} USDT tersedia', walletUnavailable: 'Baki tidak tersedia. Pilih kaedah lain.', short: 'Baki tidak mencukupi. Kurang {amt} USDT', topup: 'Tambah nilai',
@@ -207,6 +212,7 @@ const ms: typeof zh = {
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
+  networkPausedTitle: 'Pansamantalang hindi tumatanggap ng bayad sa {network}', networkPaused: 'Pansamantalang hindi tumatanggap ng bayad ang network na ito. Huwag magpadala ng pera sa dating address ng pagbabayad.',
   confirming: 'Kinukumpirma ang bayad mo', confirmWait: 'Tapos na ang oras ng bayad. Sinusuri namin ang mga bayad na naipadala bago ang deadline. Huwag nang magpadala ulit.',
   title: 'Paraan ng pagbabayad', closesIn: 'Magsasara ang order sa {t}', orderNo: 'No. ng order', methodLabel: 'Magbayad gamit ang', close: 'Isara', back: 'Bumalik',
   wallet: 'Balanse ng wallet', walletAvailable: '{amt} USDT ang available', walletUnavailable: 'Hindi available ang balanse. Pumili ng ibang paraan.', short: 'Kulang ang balanse. Kulang ng {amt} USDT', topup: 'Mag-top up',
@@ -248,6 +254,7 @@ const fil: typeof zh = {
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
+  networkPausedTitle: 'Приём платежей в сети {network} приостановлен', networkPaused: 'Эта сеть временно не принимает платежи. Не переводите средства на прежний адрес оплаты.',
   confirming: 'Подтверждаем оплату', confirmWait: 'Время на оплату истекло. Проверяем платежи, отправленные до срока. Не отправляйте повторный платёж.',
   title: 'Способ оплаты', closesIn: 'Закроется через {t}', orderNo: 'Заказ №', methodLabel: 'Оплата', close: 'Закрыть', back: 'Назад',
   wallet: 'Баланс кошелька', walletAvailable: 'Доступно {amt} USDT', walletUnavailable: 'Баланс недоступен. Выберите другой способ.', short: 'Недостаточно средств. Не хватает {amt} USDT', topup: 'Пополнить',
@@ -289,6 +296,7 @@ const ru: typeof zh = {
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
 const kk: typeof zh = {
+  networkPausedTitle: '{network} желісінде төлем қабылдау тоқтатылды', networkPaused: 'Бұл желіде төлем қабылдау уақытша тоқтатылды. Бұрынғы төлем мекенжайына қаражат жібермеңіз.',
   confirming: 'Төлеміңіз расталуда', confirmWait: 'Төлем уақыты аяқталды. Мерзімге дейін жіберілген төлемдерді тексеріп жатырмыз. Қайта төлемеңіз.',
   title: 'Төлем әдісі', closesIn: 'Тапсырыстың жабылуына: {t}', orderNo: 'Тапсырыс №', methodLabel: 'Төлеу әдісі', close: 'Жабу', back: 'Артқа',
   wallet: 'Әмиян балансы', walletAvailable: 'Қолжетімді: {amt} USDT', walletUnavailable: 'Баланс қолжетімсіз. Басқа әдісті таңдаңыз.', short: 'Баланс жеткіліксіз. Жетпейді: {amt} USDT', topup: 'Толтыру',
@@ -330,6 +338,7 @@ const kk: typeof zh = {
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
+  networkPausedTitle: '{network} orqali toʻlovlarni qabul qilish toʻxtatildi', networkPaused: 'Bu tarmoqda toʻlovlarni qabul qilish vaqtincha toʻxtatildi. Avvalgi toʻlov manziliga mablagʻ yubormang.',
   confirming: 'Toʻlovingiz tasdiqlanmoqda', confirmWait: 'Toʻlov vaqti tugadi. Muddatgacha yuborilgan toʻlovlar tekshirilmoqda. Qayta toʻlamang.',
   title: 'Toʻlov usuli', closesIn: 'Buyurtma yopilishiga {t}', orderNo: 'Buyurtma №', methodLabel: 'Toʻlov usuli', close: 'Yopish', back: 'Orqaga',
   wallet: 'Hamyon balansi', walletAvailable: 'Mavjud: {amt} USDT', walletUnavailable: 'Balansni yuklab boʻlmadi. Boshqa usulni tanlang.', short: 'Balans yetarli emas. Yana {amt} USDT kerak', topup: 'Toʻldirish',

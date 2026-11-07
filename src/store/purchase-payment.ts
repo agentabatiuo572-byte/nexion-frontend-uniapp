@@ -1,6 +1,7 @@
 import { reactive } from 'vue';
 import { apiClient } from '@/api/runtime';
-import { asApiError } from '@/api/errors';
+import { asApiError, isApiRefusal } from '@/api/errors';
+import { createCregisDepositApi } from '@/api/cregis-deposit-api';
 import { createPurchasePaymentApi, type ExternalPaymentMethod, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote } from '@/api/purchase-payment-api';
 import { useApp } from './app';
 import { readAccountRow, writeAccountRow, acquireAccountCommandKey, releaseAccountCommandKey } from './account-scoped-storage';
@@ -20,13 +21,14 @@ type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: st
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
-export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone';
+export type PurchaseNotice = '' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused';
 const TABLE = 'uvel-purchase-payment-accounts-v1', KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 'PAYMENT_BEFORE_ALLOCATION', 'PAYMENT_REORG_REVIEW', 'PAYMENT_TIME_UNVERIFIED', 'PAYMENT_REFUNDED_REVIEW'];
 const ORDER_REFUSALS: Record<string, PurchaseNotice> = { ORDER_PAYMENT_EXPIRED: 'orderExpired', ORDER_NOT_PAYABLE: 'orderClosed', ORDER_NOT_FOUND: 'orderMissing' };
 const TRIAL_REFUSALS = ['TRIAL_QUOTE_CHANGED', 'TRIAL_AMOUNT_MISMATCH'];
 const api = createPurchasePaymentApi(apiClient);
+const deposits = createCregisDepositApi(apiClient);
 const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', image: '', deadlineAt: null as number | null,
   policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, notice: '' as PurchaseNotice, cashier: false,
@@ -132,15 +134,35 @@ function schedule(version: number, accountKey: string, failed: boolean) {
 }
 async function loadPolicy() {
   const accountKey = state.accountKey;
-  try {
-    const policy = await api.policy();
-    if (state.open && state.accountKey === accountKey) { state.policy = policy; reconcileChannel(); }
-  } catch { /* Without the policy every channel stays selectable; its quote reports an unconfigured channel. */ }
+  const [fees, networks] = await Promise.allSettled([api.policy(), deposits.policy()]);
+  if (!state.open || state.accountKey !== accountKey) return;
+  // A failed read leaves the existing quote-led availability behaviour in place.
+  const policy = fees.status === 'fulfilled' ? fees.value : { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true };
+  if (networks.status === 'fulfilled') for (const row of networks.value) {
+    const method = row.network === 'ERC20' ? 'CREGIS_USDT_ERC20' : 'CREGIS_USDT_BSC';
+    policy[method] = policy[method] === true && row.enabled;
+  }
+  // A quote/create refusal remains authoritative if it arrived while the policies were loading.
+  for (const method of ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'] as const) {
+    if (state.policy?.[method] === false) policy[method] = false;
+  }
+  state.policy = policy;
+  reconcileChannel();
 }
 function available(method: PurchaseMethod) { return method === 'WALLET' || !state.policy || state.policy[method] === true; }
-/** Before an intent exists, leave an unconfigured channel and try another payment method. */
+function channelUnavailable(error: unknown, method: PurchaseMethod) {
+  return isApiRefusal(error, 503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED')
+    || (method === 'CREGIS_USDT_ERC20' || method === 'CREGIS_USDT_BSC')
+      && (isApiRefusal(error, 409, 'CREGIS_DIRECT_PAYMENT_PAUSED') || isApiRefusal(error, 503, 'CREGIS_DIRECT_PAYMENT_UNAVAILABLE'));
+}
+function hideChannel(method: ExternalPaymentMethod) {
+  state.policy = { ...(state.policy ?? { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true }), [method]: false };
+  state.notice = ''; reviewedQuote = confirmedQuote = null;
+}
+/** Before an intent exists, leave an unavailable channel and try another payment method. */
 function reconcileChannel() {
   if (state.pending || state.step === 'methods' || available(state.method)) return;
+  state.notice = ''; reviewedQuote = confirmedQuote = null;
   const other = state.method === 'CREGIS_USDT_ERC20' ? 'CREGIS_USDT_BSC' : state.method === 'CREGIS_USDT_BSC' ? 'CREGIS_USDT_ERC20' : null;
   if (other && available(other)) void select(other);
   else choose('WALLET');
@@ -175,9 +197,8 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     if (error instanceof Error && error.message === 'PURCHASE_CONTEXT_CHANGED') { state.notice = 'changed'; return; }
     const cause = asApiError(error);
-    if (cause.status === 503 && cause.message === 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED') {
-      // An unknown policy keeps the other channels selectable; only this one is known to be unconfigured.
-      state.policy = { ...(state.policy ?? { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true }), [method]: false };
+    if (channelUnavailable(cause, method)) {
+      hideChannel(method);
       reconcileChannel();
       return;
     }
@@ -196,7 +217,7 @@ function deadlinePassed() { if (state.kind === 'ORDER_PAY') conclude('orderExpir
 function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
-  // ERC20 is the default network; BEP20 only when ERC20 is not configured.
+  // ERC20 is the default network; BEP20 only when ERC20 is unavailable.
   const network: ExternalPaymentMethod = !available('CREGIS_USDT_ERC20') && available('CREGIS_USDT_BSC') ? 'CREGIS_USDT_BSC' : 'CREGIS_USDT_ERC20';
   void select(network, 'network');
 }
@@ -256,10 +277,10 @@ async function submitOriginal() {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
-      const rejectedQuote = cause.kind === 'http' && cause.status === cause.code
+      const unavailable = channelUnavailable(cause, pending.paymentMethod ?? state.method);
+      const rejectedQuote = unavailable || cause.kind === 'http' && cause.status === cause.code
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
-          || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND'
-          || cause.status === 503 && cause.message === 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
+          || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND');
       if (!pending.intentNo && (rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message))) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
         const refusal = pending.kind === 'ORDER_PAY' ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined;
@@ -280,16 +301,21 @@ async function submitOriginal() {
         if (existing) accept(existing, pending);
         else if (refusal) { release(pending); Object.assign(state, { pending: null, quote: null, intent: null }); conclude(refusal); }
         else {
-          const unconfigured = cause.status === 503 && cause.message === 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED';
-          if (unconfigured) retire(pending, accountKey); else release(pending);
+          if (unavailable) retire(pending, accountKey); else release(pending);
           Object.assign(state, { pending: null, quote: null, intent: null });
-          // Channel-not-configured keeps its existing fallback. A cold resume has no caller to quote or confirm again.
-          if (state.coldResume) conclude('changed'); else requote = true;
+          if (unavailable) hideChannel(pending.paymentMethod ?? (state.method as ExternalPaymentMethod));
+          // A cold resume has no caller to quote again; return through the existing order exit.
+          if (state.coldResume) conclude(unavailable && cause.message !== 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED' ? 'networkPaused' : 'changed');
+          else requote = true;
         }
       }
     }
   } finally {
-    if (owns(version, accountKey)) { state.busy = false; if (requote) void select(state.method); else schedule(version, accountKey, failed); }
+    if (owns(version, accountKey)) {
+      state.busy = false;
+      if (requote) { if (available(state.method)) void select(state.method); else reconcileChannel(); }
+      else schedule(version, accountKey, failed);
+    }
   }
 }
 async function confirm() {
@@ -340,7 +366,7 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'orderNo'
   const accountKey = account();
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
   reviewedQuote = confirmedQuote = null;
-  Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
+  Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: pending?.paymentMethod ?? 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null, policy: null, notice: '', cashier: false,
     quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });
 }
