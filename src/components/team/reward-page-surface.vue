@@ -6,7 +6,6 @@
   color: var(--v5-ink); padding-bottom: 28px; overflow-wrap: anywhere;
 }
 .reward-page :deep(.reward-summary-panel) { padding: 0 18px 16px; border: 1px solid var(--reward-panel-edge); border-radius: 20px; }
-.reward-page :deep(.reward-summary-panel), .reward-page :deep(.reward-hero--panel) { --v5-ink: #f7f8fa; --v5-ink-2: #cdd3da; --v5-ink-3: #a1a9b3; --v5-border: rgba(223, 228, 235, .14); color: var(--v5-ink); }
 /* Reward CTAs share the neutral glass material from tokens.css (design system 03 §3.1):
    an in-card entry is M (40px surface, 44px hit area, arrow to the next page); the wide
    return action is L (48px, full width, no arrow). Retries use the text button instead. */
