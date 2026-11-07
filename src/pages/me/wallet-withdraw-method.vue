@@ -83,7 +83,8 @@ const stopRuntime = subscribeRuntimeRevision(reset);
 onShow(() => { visible = true; void load(); });
 onHide(() => { visible = false; revision++; });
 onUnload(() => { visible = false; revision++; stopRuntime(); });
-function openUsdt() { if (canOpenUsdt.value) navTo("/pages/me/wallet-withdraw"); }
+// An unresolved USDT attempt resumes on the withdraw page itself (it restores the frozen network); otherwise choose a network first.
+function openUsdt() { if (canOpenUsdt.value) navTo(pending.value ? "/pages/me/wallet-withdraw" : "/pages/me/wallet-withdraw-network"); }
 function openBank() {
   pending.value = readWithdrawAttempt(app.accountKey);
   if (canOpenBank.value) navTo("/pages/me/wallet-withdraw-bank");
