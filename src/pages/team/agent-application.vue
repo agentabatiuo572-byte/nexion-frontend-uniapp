@@ -92,6 +92,7 @@
                 <view v-if="upload.state === 'uploading'" class="detail-file__action" role="button" tabindex="0" @click="cancelUpload" @keydown.enter.prevent="cancelUpload" @keydown.space.prevent="cancelUpload"><text>{{ c.cancel }}</text></view>
                 <view v-else class="detail-file__remove" role="button" tabindex="0" :aria-label="fmt(c.remove, { name: upload.name })" @click="cancelUpload" @keydown.enter.prevent="cancelUpload" @keydown.space.prevent="cancelUpload"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></view>
               </view>
+              <text v-if="editing && upload?.state === 'failed' && upload.kind === requirement.kind" class="detail-file-hint">{{ c.failedUploadHint }}</text>
               <view v-if="editing && !(upload?.state === 'uploading' && upload.kind === requirement.kind)" class="detail-add" role="button" :tabindex="addLocked ? -1 : 0" :aria-disabled="addLocked" @click="chooseFile(requirement.kind)" @keydown.enter.prevent="chooseFile(requirement.kind)" @keydown.space.prevent="chooseFile(requirement.kind)">
                 <view class="detail-add__plus nx-frosted-button" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></view>
                 <text>{{ filesOf(requirement.kind).length && requirementState(requirement.kind) !== 'flagged' ? c.add : addFirstLabel }}</text>
@@ -673,6 +674,8 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-file__action:last-child { margin-right: var(--v5-space-1); }
 .detail-file__remove { display: grid; place-items: center; flex: none; width: 44px; height: 44px; color: var(--v5-ink-3); cursor: pointer; }
 .detail-file__action[aria-disabled="true"], .detail-file__remove[aria-disabled="true"] { opacity: .5; cursor: default; }
+/* Why the add buttons are dimmed while a failed upload is listed (design system 03 §3.4). */
+.detail-file-hint { display: block; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-add { display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); width: 100%; min-height: 44px; margin-top: var(--v5-space-2); box-sizing: border-box; border-radius: var(--v5-radius-s); border: 1.5px dashed color-mix(in srgb, var(--v5-ink) 18%, transparent); font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-ink-2); cursor: pointer; }
 .detail-add[aria-disabled="true"] { opacity: .5; cursor: default; }
 .detail-add__plus { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--v5-ink); }
