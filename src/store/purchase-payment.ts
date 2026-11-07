@@ -274,7 +274,6 @@ async function submitOriginal() {
   } catch (error) {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
-      state.error = true;
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
@@ -282,14 +281,19 @@ async function submitOriginal() {
       const rejectedQuote = unavailable || cause.kind === 'http' && cause.status === cause.code
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
           || cause.status === 404 && cause.message === 'ORDER_NOT_FOUND');
-      if (!pending.intentNo && (rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message))) {
+      const definiteRefusal = !pending.intentNo && (rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
+      state.error = !definiteRefusal;
+      if (definiteRefusal) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
         const refusal = pending.kind === 'ORDER_PAY' ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined;
         let existing: PurchasePaymentIntent | null;
         try { existing = await api.find(pending.kind, pending.commandKey); }
         catch {
           // Only a read can prove no intent exists: the record stays, and the refusal still stands for the user.
-          if (refusal && owns(version, accountKey)) conclude(refusal);
+          if (owns(version, accountKey)) {
+            state.error = true;
+            if (refusal) conclude(refusal);
+          }
           return;
         }
         if (!owns(version, accountKey)) return;
