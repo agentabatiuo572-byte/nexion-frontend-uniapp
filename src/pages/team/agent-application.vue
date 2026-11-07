@@ -215,11 +215,10 @@ const editable = computed(() => auth.isAuthenticated && pending.value && pack.va
 const editing = computed(() => editable.value && (editRequested.value || !pack.value?.bucket || pack.value.materialState === "NOT_SUBMITTED" || pack.value.materialState === "NEEDS_MORE"));
 const busy = computed(() => saving.value || picking.value || upload.value?.state === "uploading");
 // Unsubmitted work includes an upload that is still running or has failed: a refresh would drop it.
-const dirty = computed(() => !!pack.value && (!!upload.value || statement.value !== pack.value.statement || budget.value !== String(pack.value.budgetUsdt)
-  || (bucket.value ?? null) !== pack.value.bucket || JSON.stringify(attachments.value.map(file => [file.fileId, file.kind])) !== JSON.stringify(pack.value.attachments.map(file => [file.fileId, file.kind]))));
 // Choosing the missing category alone is not offered for discarding; files, notes and amounts are.
 const editedBeyondCategory = computed(() => !!pack.value && (!!upload.value || statement.value !== pack.value.statement || budget.value !== String(pack.value.budgetUsdt)
   || JSON.stringify(attachments.value.map(file => [file.fileId, file.kind])) !== JSON.stringify(pack.value.attachments.map(file => [file.fileId, file.kind]))));
+const dirty = computed(() => editedBeyondCategory.value || (!!pack.value && (bucket.value ?? null) !== pack.value.bucket));
 const bucketLocked = computed(() => busy.value || attachments.value.length > 0 || !!upload.value);
 const addLocked = computed(() => busy.value || !!upload.value || attachments.value.length >= 12);
 const shownAttachments = computed(() => editing.value ? attachments.value : pack.value?.attachments ?? []);
