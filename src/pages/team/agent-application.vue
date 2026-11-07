@@ -9,12 +9,12 @@
         <view class="detail-hero nx-frosted-button">
           <view class="detail-hero__top">
             <view class="detail-hero__category"><AmbassadorBucketIcon :bucket="pack.bucket" size="small" /><text>{{ pack.bucket ? t.agent.buckets[pack.bucket].title : c.noBucket }}</text></view>
-            <NxTag :tone="presentation.tone" :label="c.statuses[presentation.status]" />
+            <NxTag v-if="statusKnown" :tone="presentation.tone" :label="c.statuses[presentation.status]" />
           </view>
           <text class="detail-hero__title">{{ row.city }}</text>
           <text class="detail-hero__date">{{ fmt(c.eventDate, { date: pack.eventDate }) }}</text>
           <view class="detail-hero__amount"><text class="detail-hero__key">{{ row.status === 'APPROVED' ? c.approvedAmount : c.amount }}</text><AmbassadorAmount :value="pack.budgetUsdt" size="hero" /></view>
-          <AmbassadorTrack v-if="!pack.legacyApproved" size="hero" :presentation="presentation" :labels="c.steps" :label="c.progress" />
+          <AmbassadorTrack v-if="statusKnown && !pack.legacyApproved" size="hero" :presentation="presentation" :labels="c.steps" :label="c.progress" />
           <view class="detail-hero__meta"><text>{{ c.applicationId }}</text><text class="detail-hero__id">{{ pack.applicationId }}</text></view>
         </view>
         <view v-if="pack.legacyApproved" class="detail-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg><text>{{ c.legacy }}</text></view>
@@ -203,13 +203,21 @@ const readState = ref<"loading" | "ready" | "error">("loading");
 const attachments = ref<AmbassadorMaterialAttachment[]>([]);
 const statement = ref(""), budget = ref(""), bucket = ref<AmbassadorBucketId>();
 const saving = ref(false), picking = ref(false), submitError = ref(""), editRequested = ref(false);
+// A submission whose outcome is unknown: its draft and command key stay until a server read settles it.
+const pendingSubmission = ref<{ account: string; identity: string; input: AmbassadorMaterialsInput } | null>(null);
+// The server refused the submission because the application is closed: no more editing on this page.
+const locked = ref(false);
+// The application's own status must be reread (after new materials, or when the packet says it closed).
+const statusStale = ref(false);
 interface UploadDraft { kind: string; path: string; name: string; key: string; state: "uploading" | "failed" }
 const upload = ref<UploadDraft | null>(null);
 const previewFile = ref<AmbassadorMaterialAttachment | null>(null), previewSrc = ref(""), previewBusy = ref(false);
 
 const presentation = computed(() => ambassadorPresentation(pack.value && row.value ? ambassadorPacketFacts(row.value.status, pack.value) : { status: "PENDING", bucket: null }));
 // A packet that says the application is no longer pending is final even before the list catches up.
-const pending = computed(() => row.value?.status === "PENDING" && !pack.value?.approvalBlockers.includes("APPLICATION_NOT_PENDING"));
+const pending = computed(() => row.value?.status === "PENDING" && !locked.value && !pack.value?.approvalBlockers.includes("APPLICATION_NOT_PENDING"));
+// Closed but the list has not caught up: show no guessed decision until the status is reread.
+const statusKnown = computed(() => pending.value || row.value?.status !== "PENDING");
 const editable = computed(() => auth.isAuthenticated && pending.value && pack.value?.canSubmit === true && !pack.value.legacyApproved);
 // Nothing submitted yet, returned for more, or a missing category: the page opens ready to edit.
 const editing = computed(() => editable.value && (editRequested.value || !pack.value?.bucket || pack.value.materialState === "NOT_SUBMITTED" || pack.value.materialState === "NEEDS_MORE"));
@@ -296,6 +304,9 @@ const approvalHints = computed(() => {
 });
 
 let visible = false, disposed = false, generation = 0;
+// Reads are ordered on their own: a later read or a confirmed submission overtakes an earlier read
+// without touching uploads (those follow `generation`, which only changes with the account or environment).
+let readSeq = 0;
 let uploadController: AbortController | null = null, previewController: AbortController | null = null;
 function scope() {
   const account = app.accountKey, binding = app.accountBindingEpoch, id = applicationId.value;
@@ -324,7 +335,7 @@ function resetDraft() {
 }
 function discardChanges() {
   if (saving.value || picking.value) return;
-  resetDraft(); editRequested.value = false;
+  resetDraft(); editRequested.value = false; pendingSubmission.value = null;
 }
 function enterEdit() { if (editable.value) editRequested.value = true; }
 /** A known decision is final; a late read of the same application never reopens it. */
@@ -332,24 +343,58 @@ function applyRow(found: AmbassadorApplication) {
   row.value = row.value && row.value.status !== "PENDING" && found.status === "PENDING" ? { ...found, status: row.value.status } : found;
 }
 
+/** Show a packet unless a newer revision is already confirmed on this page. */
+function acceptPack(value: AmbassadorMaterials): boolean {
+  if (pack.value && value.materialRevision < pack.value.materialRevision) return false;
+  pack.value = value;
+  return true;
+}
+function sameMaterials(value: AmbassadorMaterials, input: AmbassadorMaterialsInput): boolean {
+  const files = (list: { fileId: string; kind: string }[]) => list.map(file => `${file.kind}:${file.fileId}`).sort().join("|");
+  return files(value.attachments) === files(input.attachments) && value.statement === input.statement
+    && (input.budgetUsdt === undefined || value.budgetUsdt === input.budgetUsdt) && (input.bucket === undefined || value.bucket === input.bucket);
+}
+/**
+ * An unconfirmed submission is settled only by server facts: a newer revision with the same files,
+ * notes and amount means it landed. Nothing is resent automatically.
+ */
+function settlePendingSubmission(value: AmbassadorMaterials, closed: boolean) {
+  const sent = pendingSubmission.value;
+  if (!sent) return;
+  if (value.materialRevision > sent.input.expectedMaterialRevision && sameMaterials(value, sent.input)) {
+    finishAmbassadorCommand(sent.account, sent.identity);
+    pendingSubmission.value = null;
+    acceptPack(value); resetDraft(); editRequested.value = false;
+    toast.success(c.value.saved, "");
+    if (row.value?.status === "PENDING") { statusStale.value = true; void recoverStatus(); }
+  } else if (closed) {
+    // A closed application refuses any further submission; its packet is the final fact.
+    finishAmbassadorCommand(sent.account, sent.identity);
+    pendingSubmission.value = null;
+    acceptPack(value); resetDraft(); editRequested.value = false;
+  }
+}
+
 /** Resolves false only when this read failed. Unsubmitted edits keep their packet until they are discarded. */
 async function load(): Promise<boolean> {
   const id = applicationId.value;
   if (id === null || !auth.isAuthenticated) return true;
-  const current = scope();
+  const current = scope(), seq = ++readSeq;
   if (!pack.value) readState.value = "loading";
   try {
     const [rows, value] = await Promise.all([ambassadorApplicationApi.history(), ambassadorApplicationApi.materials(id)]);
-    if (!current()) return true;
+    if (!current() || seq !== readSeq) return true;
     const found = rows.find(item => item.applicationId === id);
     if (!found) throw new Error("AMBASSADOR_APPLICATION_NOT_FOUND");
     applyRow(found);
     const closed = row.value?.status !== "PENDING" || value.approvalBlockers.includes("APPLICATION_NOT_PENDING");
-    if (closed || (!busy.value && !dirty.value)) { pack.value = value; resetDraft(); if (closed) editRequested.value = false; }
+    if (pendingSubmission.value) settlePendingSubmission(value, closed);
+    else if (closed || (!busy.value && !dirty.value)) { if (acceptPack(value)) resetDraft(); if (closed) editRequested.value = false; }
+    statusStale.value = row.value?.status === "PENDING" && value.approvalBlockers.includes("APPLICATION_NOT_PENDING");
     readState.value = "ready";
     return true;
   } catch {
-    if (!current()) return true;
+    if (!current() || seq !== readSeq) return true;
     readState.value = "error";
     return false;
   }
@@ -357,23 +402,21 @@ async function load(): Promise<boolean> {
 function retry() { void load(); }
 async function pullRefresh() {
   if (saving.value || picking.value) return;
-  if (dirty.value) {
+  // An unconfirmed submission is checked against the server without discarding its draft.
+  if (dirty.value && !pendingSubmission.value) {
     const discard = await confirm({ owner: DIALOG_OWNER, title: c.value.discardPrompt, confirmLabel: c.value.discard, cancelLabel: c.value.cancel });
     if (!discard) return;
     discardChanges();
   }
   if (!await load()) throw new Error("AMBASSADOR_DETAIL_REFRESH_FAILED");
 }
-/** After new materials, the list row is the only source of the application's own status. */
-async function refreshStatus() {
-  if (row.value?.status !== "PENDING") return;
+/** The list row is the only source of the application's own status; failures stay with automatic recovery. */
+async function refreshStatus(): Promise<void> {
   const current = scope(), id = applicationId.value;
-  try {
-    const found = (await ambassadorApplicationApi.history()).find(item => item.applicationId === id);
-    if (current() && found && row.value?.status === "PENDING") applyRow(found);
-  } catch {
-    if (current() && row.value?.status === "PENDING") toast.error(t.value.agent.loadError, "");
-  }
+  const found = (await ambassadorApplicationApi.history()).find(item => item.applicationId === id);
+  if (!current() || !found) return;
+  applyRow(found);
+  statusStale.value = row.value?.status === "PENDING" && (locked.value || !!pack.value?.approvalBlockers.includes("APPLICATION_NOT_PENDING"));
 }
 
 function chooseBucket(id: AmbassadorBucketId) { if (editing.value && !pack.value?.bucket && !bucketLocked.value) bucket.value = id; }
@@ -444,7 +487,7 @@ async function retryUpload() {
     if ([413, 415].includes(asApiError(cause).status ?? 0)) toast.error(c.value.invalidFile, "");
   } finally { if (uploadController === controller) uploadController = null; }
 }
-const SAVE_ERRORS = ["MATERIAL_REVISION_STALE", "APPLICATION_BUCKET_REQUIRED", "APPLICATION_NOT_PENDING"] as const;
+const SAVE_ERRORS = ["MATERIAL_REVISION_STALE", "APPLICATION_BUCKET_REQUIRED"] as const;
 async function save() {
   if (!editing.value || busy.value || upload.value || !dirty.value || !pack.value || !bucket.value || !attachments.value.length || !statement.value.trim()) return;
   const amount = Number(budget.value);
@@ -456,23 +499,36 @@ async function save() {
     attachments: attachments.value.map(({ fileId, kind }) => ({ fileId, kind })), statement: statement.value.trim(),
     ...(amount !== pack.value.budgetUsdt ? { budgetUsdt: amount } : {}), ...(!pack.value.bucket ? { bucket: bucket.value } : {}) };
   const identity = JSON.stringify(["materials", id, input]);
-  saving.value = true; submitError.value = "";
+  saving.value = true; submitError.value = ""; pendingSubmission.value = null;
   try {
     const key = acquireAmbassadorCommandKey(account, identity);
     const value = await ambassadorApplicationApi.submitMaterials(id, input, key);
     if (!current()) return;
     finishAmbassadorCommand(account, identity);
-    pack.value = value; resetDraft(); editRequested.value = false;
+    // Reads that started before this confirmation carry older facts.
+    readSeq++;
+    acceptPack(value); resetDraft(); editRequested.value = false;
     toast.success(c.value.saved, "");
-    void refreshStatus();
+    if (row.value?.status === "PENDING") { statusStale.value = true; void recoverStatus(); }
   } catch (cause) {
     if (!current()) return;
     const settled = isSettledRejection(cause);
-    if (settled) finishAmbassadorCommand(account, identity);
     const code = asApiError(cause).message;
+    if (code === "APPLICATION_NOT_PENDING") {
+      // The application was decided meanwhile: stop editing now and show the decision the server holds.
+      finishAmbassadorCommand(account, identity);
+      locked.value = true; editRequested.value = false; statusStale.value = true;
+      toast.error(c.value.saveErrors.APPLICATION_NOT_PENDING, "");
+      void load();
+      return;
+    }
+    if (settled) finishAmbassadorCommand(account, identity);
+    const mapped = code === "AMBASSADOR_BUDGET_INVALID" || (SAVE_ERRORS as readonly string[]).includes(code);
+    // Unknown outcome: keep the draft and the original key; later reads settle it, nothing is resent.
+    if (!settled && !mapped) pendingSubmission.value = { account, identity, input };
     // A definite refusal says so; anything else is unconfirmed, never a failure the user should repeat.
     submitError.value = code === "AMBASSADOR_BUDGET_INVALID" ? c.value.invalidBudget
-      : (SAVE_ERRORS as readonly string[]).includes(code) ? c.value.saveErrors[code as typeof SAVE_ERRORS[number]]
+      : mapped ? c.value.saveErrors[code as typeof SAVE_ERRORS[number]]
       : settled ? c.value.saveRejected : c.value.saveUnknown;
   } finally { if (current()) saving.value = false; }
 }
@@ -512,6 +568,7 @@ function reset() {
   generation++; cancelUpload(); previewController?.abort(); previewController = null; previewBusy.value = false; closePreview();
   row.value = null; pack.value = null; attachments.value = []; statement.value = ""; budget.value = ""; bucket.value = undefined;
   saving.value = false; picking.value = false; submitError.value = ""; editRequested.value = false; readState.value = "loading";
+  pendingSubmission.value = null; locked.value = false; statusStale.value = false; readSeq++;
 }
 onLoad((options) => {
   const query = new URLSearchParams(takeNavigationQuery("/pages/team/agent-application"));
@@ -536,6 +593,10 @@ watch(foregroundReadAllowed, (allowed, wasAllowed) => { if (allowed && !wasAllow
 onHide(() => { visible = false; releaseActiveRefresh(); closePreview(); previewController?.abort(); });
 onUnload(() => { visible = false; disposed = true; releaseActiveRefresh(); useUI().clearConfirmsBy(DIALOG_OWNER); reset(); });
 useAutoRecovery({ failed: () => readState.value === "error" && applicationId.value !== null, retry: load });
+// Status rereads after new materials or a closed packet recover like any read: backoff, foreground and pull-down.
+const { retry: recoverStatus } = useAutoRecovery({ failed: () => statusStale.value, retry: refreshStatus });
+// An unconfirmed submission keeps being checked read-only while the page is shown (DS 03 §3.5.2), at a low rate.
+useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.value, retry: load, repeatMs: 30_000 });
 </script>
 
 <style scoped>
