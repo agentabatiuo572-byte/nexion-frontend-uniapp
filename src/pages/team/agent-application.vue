@@ -35,7 +35,7 @@
               <text class="detail-review__time">{{ reviewTime(stage.review.reviewedAt) }}</text>
               <view v-if="stage.metric" class="detail-review__metric">
                 <text class="detail-review__metric-key">{{ stage.metric.label }}</text>
-                <text class="detail-review__metric-value">{{ stage.metric.value }}<text class="detail-review__metric-unit">{{ stage.metric.unit }}</text></text>
+                <view class="detail-review__metric-value" :class="{ 'detail-review__metric-value--long': stage.metric.value.length > 8 }"><text class="detail-review__metric-number">{{ stage.metric.value }}</text><text class="detail-review__metric-unit">{{ stage.metric.unit }}</text></view>
               </view>
             </view>
           </view>
@@ -172,6 +172,7 @@ import { ambassadorApplicationApi, apiRuntimeConfig } from "@/api/runtime";
 import type { AmbassadorApplication, AmbassadorMaterialAttachment, AmbassadorMaterialReview, AmbassadorMaterials, AmbassadorMaterialsInput } from "@/api/ambassador-application-api";
 import { asApiError, isSettledRejection } from "@/api/errors";
 import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/ambassador-command-key";
+import { ambassadorMaterialDraftCache, type AmbassadorMaterialDraft } from "@/lib/ambassador-draft-session";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { createAbortController } from "@/lib/abort-controller-compat";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
@@ -205,7 +206,7 @@ const attachments = ref<AmbassadorMaterialAttachment[]>([]);
 const statement = ref(""), budget = ref(""), bucket = ref<AmbassadorBucketId>();
 const saving = ref(false), picking = ref(false), submitError = ref(""), editRequested = ref(false);
 // A submission whose outcome is unknown: its draft and command key stay until a server read settles it.
-const pendingSubmission = ref<{ account: string; identity: string; input: AmbassadorMaterialsInput } | null>(null);
+const pendingSubmission = ref<AmbassadorMaterialDraft['pendingSubmission']>(null);
 // The server refused the submission because the application is closed: no more editing on this page.
 const locked = ref(false);
 // The application's own status must be reread (after new materials, or when the packet says it closed).
@@ -213,6 +214,11 @@ const statusStale = ref(false);
 interface UploadDraft { kind: string; path: string; name: string; key: string; state: "uploading" | "failed" }
 const upload = ref<UploadDraft | null>(null);
 const previewFile = ref<AmbassadorMaterialAttachment | null>(null), previewSrc = ref(""), previewBusy = ref(false);
+function draftsForScope() {
+  return ambassadorMaterialDraftCache.forScope({ accountKey: app.accountKey, accountEpoch: app.accountBindingEpoch,
+    authenticated: auth.isAuthenticated, environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl });
+}
+ambassadorMaterialDraftCache.observeScope(app, auth, apiRuntimeConfig);
 
 const presentation = computed(() => ambassadorPresentation(pack.value && row.value ? ambassadorPacketFacts(row.value.status, pack.value) : { status: "PENDING", bucket: null }));
 // A packet that says the application is no longer pending is final even before the list catches up.
@@ -330,6 +336,7 @@ function cancelUpload() {
 /** Back to the submitted packet: drops local edits and any upload draft. */
 function resetDraft() {
   const value = pack.value;
+  if (value) draftsForScope().delete(value.applicationId);
   cancelUpload(); submitError.value = "";
   attachments.value = value ? [...value.attachments] : []; statement.value = value?.statement ?? "";
   budget.value = value ? String(value.budgetUsdt) : ""; bucket.value = value?.bucket ?? undefined;
@@ -389,6 +396,19 @@ async function load(): Promise<boolean> {
     if (!found) throw new Error("AMBASSADOR_APPLICATION_NOT_FOUND");
     applyRow(found);
     const closed = row.value?.status !== "PENDING" || value.approvalBlockers.includes("APPLICATION_NOT_PENDING");
+    if (!pack.value) {
+      const drafts = draftsForScope(), draft = drafts.get(id);
+      acceptPack(value); resetDraft();
+      if (draft && !closed && draft.materialRevision === value.materialRevision) {
+        attachments.value = draft.attachments; statement.value = draft.statement; budget.value = draft.budget; bucket.value = draft.bucket;
+        editRequested.value = draft.editRequested; submitError.value = draft.submitError; pendingSubmission.value = draft.pendingSubmission;
+      } else if (draft?.pendingSubmission) {
+        // A landed command can be confirmed by the newer server packet; other stale drafts are dropped.
+        pendingSubmission.value = draft.pendingSubmission;
+        settlePendingSubmission(value, closed);
+        pendingSubmission.value = null;
+      }
+    }
     if (pendingSubmission.value) settlePendingSubmission(value, closed);
     else if (closed || (!busy.value && !dirty.value)) { if (acceptPack(value)) resetDraft(); if (closed) editRequested.value = false; }
     statusStale.value = row.value?.status === "PENDING" && value.approvalBlockers.includes("APPLICATION_NOT_PENDING");
@@ -579,6 +599,7 @@ onLoad((options) => {
   if (applicationId.value === null) readState.value = "error";
 });
 watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.isAuthenticated, () => apiRuntimeConfig.environment, () => apiRuntimeConfig.baseUrl], () => {
+  draftsForScope();
   reset();
   if (visible) void load();
 }, { flush: "sync" });
@@ -592,7 +613,16 @@ onShow(() => {
 });
 watch(foregroundReadAllowed, (allowed, wasAllowed) => { if (allowed && !wasAllowed && visible) void load(); });
 onHide(() => { visible = false; releaseActiveRefresh(); closePreview(); previewController?.abort(); });
-onUnload(() => { visible = false; disposed = true; releaseActiveRefresh(); useUI().clearConfirmsBy(DIALOG_OWNER); reset(); });
+onUnload(() => {
+  if (pack.value && pending.value && (dirty.value || editRequested.value || pendingSubmission.value)) {
+    draftsForScope().set(pack.value.applicationId, { materialRevision: pack.value.materialRevision,
+      attachments: [...attachments.value], statement: statement.value, budget: budget.value, bucket: bucket.value,
+      editRequested: editRequested.value, submitError: submitError.value, pendingSubmission: pendingSubmission.value });
+  }
+  visible = false; disposed = true; releaseActiveRefresh(); useUI().clearConfirmsBy(DIALOG_OWNER);
+  // reset() releases uploads and page state; the detached draft keeps only completed files and material edits.
+  reset();
+});
 useAutoRecovery({ failed: () => readState.value === "error" && applicationId.value !== null, retry: load });
 // Status rereads after new materials or a closed packet recover like any read: backoff, foreground and pull-down.
 const { retry: recoverStatus } = useAutoRecovery({ failed: () => statusStale.value, retry: refreshStatus });
@@ -634,8 +664,10 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-review__time { display: block; min-height: 16px; margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
 .detail-review__metric { margin-top: auto; padding-top: var(--ui-space-inline); border-top: 1px solid var(--v5-border); }
 .detail-review__metric-key { display: block; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.detail-review__metric-value { display: block; margin-top: var(--v5-space-1); font: 500 20px/26px var(--font-metric); color: var(--v5-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.detail-review__metric-unit { margin-left: var(--v5-space-1); font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); }
+.detail-review__metric-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--v5-space-1); margin-top: var(--v5-space-1); font: 500 20px/26px var(--font-metric); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
+.detail-review__metric-value--long { font-size: 14px; line-height: 20px; }
+.detail-review__metric-number { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.detail-review__metric-unit { font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-opinion { margin: var(--ui-space-inline) var(--v5-space-4) 0; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .detail-opinion__head { display: flex; align-items: center; gap: var(--v5-space-2); font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-opinion__head--active { color: var(--v5-warning-ink); }
