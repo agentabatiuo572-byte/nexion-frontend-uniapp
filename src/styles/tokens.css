@@ -983,6 +983,13 @@ body {
     animation-delay: -1ms !important;
     transition-delay: 0s !important;
   }
+  /* uni-h5 measures the wheel immediately after setting its padding. The
+     catch-all duration would transition that padding from 0 and clamp the
+     selected value against a short scroll range. Keep only the wheel's
+     transform transition, still reduced to 0.01ms by the rule above. */
+  .uni-picker-container .uni-picker-view-content {
+    transition-property: transform !important;
+  }
 }
 
 /* ── 根字号锁定 —— 修「间距/圆角随视口等比拉伸」(2026-07-23 B1,主人批「按建议做」)──
