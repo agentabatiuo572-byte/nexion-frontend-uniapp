@@ -125,7 +125,7 @@
         <!-- Repurchase: owned devices on a glass slab, then the empty slot to fill. -->
         <template v-if="kind === 'repurchase' && slab">
           <view class="lp-slab-wrap">
-            <view class="lp-slab nx-frosted-button lp-rise lp-d2">
+            <view class="lp-slab nx-soft-glass lp-rise lp-d2">
               <view v-if="slab.count !== null" class="lp-slab__head"><text class="lp-slab__label">{{ c.myDevices }}</text><text class="lp-slab__count"><text class="lp-slab__count-number">{{ slab.count }}</text> {{ c.deviceUnit }}</text></view>
               <view v-if="slab.fleetRow" class="lp-slab__fleet">
                 <view v-for="(device, index) in slab.thumbs" :key="device.id" class="lp-owned lp-own" :class="'lp-own--' + index">
@@ -668,7 +668,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 
 /* Repurchase slab: the shared frosted material with the board's fill, rim and light shadow only. */
 .lp-slab-wrap { position: relative; margin-top: 20px; }
-.lp-slab.nx-frosted-button { position: relative; display: block; padding: 18px; border-radius: 26px; color: var(--v5-ink); box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+.lp-slab.nx-soft-glass { position: relative; display: block; padding: 18px; border-radius: 26px; color: var(--v5-ink); }
 .lp-slab__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .lp-slab__label { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-slab__count { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
@@ -714,7 +714,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-bar--wide .lp-cta { flex: 1; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .lp-cta--neutral.promotion-action { background: var(--v5-surface-2); }
-  .lp-slab.nx-frosted-button { background: var(--v5-surface); }
+  .lp-slab.nx-soft-glass { background: var(--v5-surface); }
 }
 
 /* UVT units stay purple wherever they sit (01.1.1); declared after the unit roles above. */
