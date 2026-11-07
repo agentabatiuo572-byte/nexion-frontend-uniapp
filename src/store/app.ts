@@ -456,6 +456,11 @@ export const useApp = defineStore("app", () => {
   const remoteWithdrawalListStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteWithdrawalListHasSnapshot = ref(!remoteApiEnabled);
   let remoteWithdrawalListRefreshSequence = 0;
+  let remoteWithdrawalListInFlight: {
+    account: RemoteAccountRequest;
+    runtime: ReturnType<typeof captureRuntimeRevision>;
+    promise: Promise<boolean>;
+  } | null = null;
   const remoteWalletReceiptHasSnapshot = ref(false);
   const remoteAssignmentStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteAssignmentError = ref("");
@@ -1218,37 +1223,43 @@ export const useApp = defineStore("app", () => {
   }
 
   /** Refreshes the canonical withdrawal list for a wallet entry or explicit action. */
-  async function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
-    if (!remoteApiEnabled || expectedAccountKey !== accountKey.value) return false;
+  function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
+    if (!remoteApiEnabled || expectedAccountKey !== accountKey.value) return Promise.resolve(false);
+    const activeSession = sessionVault.read();
+    if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return Promise.resolve(false);
+    if (remoteWithdrawalListInFlight && remoteAccountEpoch.isCurrent(remoteWithdrawalListInFlight.account)
+      && isCurrentRuntimeRevision(remoteWithdrawalListInFlight.runtime)) return remoteWithdrawalListInFlight.promise;
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
-    const activeSession = sessionVault.read();
-    if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
     const refreshSequence = ++remoteWithdrawalListRefreshSequence;
-    remoteWithdrawalListStatus.value = "loading";
-    try {
-      const rows = await withdrawalApi.list();
-      if (!remoteAccountEpoch.isCurrent(request)
-        || !isCurrentRuntimeRevision(runScope)
-        || expectedAccountKey !== accountKey.value
-        || refreshSequence !== remoteWithdrawalListRefreshSequence) return false;
-      const canonical = rows.map((row) => toCanonicalWithdrawal(row, row.targetAddress ?? "", row.createdAt));
-      withdrawals.value = canonical;
-      lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: canonical };
-      remoteWithdrawalListHasSnapshot.value = true;
-      remoteWithdrawalListStatus.value = "ready";
-      return true;
-    } catch {
-      if (remoteAccountEpoch.isCurrent(request)
-        && isCurrentRuntimeRevision(runScope)
-        && expectedAccountKey === accountKey.value
-        && refreshSequence === remoteWithdrawalListRefreshSequence) {
-        // Keep a prior same-account list readable, but make its age explicit to
-        // consumers; first-read failures have no snapshot and stay unknown.
-        remoteWithdrawalListStatus.value = "error";
+    const current = () => remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope)
+      && expectedAccountKey === accountKey.value && refreshSequence === remoteWithdrawalListRefreshSequence;
+    // Install the shared promise before publishing loading, which can reenter.
+    const promise = Promise.resolve().then(async () => {
+      if (!current()) return false;
+      try {
+        const rows = await withdrawalApi.list();
+        if (!current()) return false;
+        const canonical = rows.map((row) => toCanonicalWithdrawal(row, row.targetAddress ?? "", row.createdAt));
+        withdrawals.value = canonical;
+        lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: canonical };
+        remoteWithdrawalListHasSnapshot.value = true;
+        remoteWithdrawalListStatus.value = "ready";
+        return true;
+      } catch {
+        if (current()) {
+          // Keep a prior same-account list readable, but make its age explicit to
+          // consumers; first-read failures have no snapshot and stay unknown.
+          remoteWithdrawalListStatus.value = "error";
+        }
+        return false;
       }
-      return false;
-    }
+    }).finally(() => {
+      if (remoteWithdrawalListInFlight?.promise === promise) remoteWithdrawalListInFlight = null;
+    });
+    remoteWithdrawalListInFlight = { account: request, runtime: runScope, promise };
+    remoteWithdrawalListStatus.value = "loading";
+    return promise;
   }
 
   function tick(deltaMs: number) {
