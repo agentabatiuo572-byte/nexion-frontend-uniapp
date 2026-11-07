@@ -5512,6 +5512,7 @@ openSeaErrorPool: {
     inFlightBlocked: "A withdrawal is in progress. You can change the address once it completes.",
     inFlightGoCta: "View withdrawal progress",
     cooldownUntil: "You can change it again after {time}.",
+    cooldownActive: "The address change cooldown is still active. Please try again later.",
     freezeBanner: "New withdrawal address protection window · {t} left",
     timeStatusUnavailable: "We cannot confirm the protection-window status yet. Refresh and try again.",
     refreshTimeStatusCta: "Refresh status",

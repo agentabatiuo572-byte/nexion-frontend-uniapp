@@ -5724,6 +5724,7 @@ export const ms: Messages = {
     inFlightBlocked: "Pengeluaran sedang diproses. Anda boleh menukar alamat selepas ia selesai.",
     inFlightGoCta: "Lihat kemajuan pengeluaran",
     cooldownUntil: "Anda boleh menukarnya semula selepas {time}.",
+    cooldownActive: "Tempoh menunggu untuk menukar alamat masih belum tamat. Sila cuba lagi kemudian.",
     freezeBanner: "Tempoh perlindungan alamat pengeluaran baharu · {t} lagi",
     timeStatusUnavailable: "Kami belum dapat mengesahkan status tempoh perlindungan. Muat semula dan cuba lagi.",
     refreshTimeStatusCta: "Muat semula status",
