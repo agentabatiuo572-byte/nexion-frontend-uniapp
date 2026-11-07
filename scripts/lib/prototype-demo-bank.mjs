@@ -44,7 +44,7 @@ export function bankDemo(url, state, request) {
     // The panel decides how an open order ends; once ended that is its fact. A rejected payout returns the funds.
     if (!row.outcome && ['settled', 'rejected'].includes(state.bankState)) {
       row.outcome = state.bankState;
-      if (row.outcome === 'rejected') state.walletBalance = Math.round((demoWithdrawalFacts(state).walletUsdt + row.bank.amountUsdt) * 1e6) / 1e6;
+      if (row.outcome === 'rejected') state.walletBalance = Math.round((demoWithdrawalFacts(state, now).walletUsdt + row.bank.amountUsdt) * 1e6) / 1e6;
     }
     const settled = row.outcome === 'settled', rejected = row.outcome === 'rejected';
     return { ...snapshot(row), providerState: settled ? 'PAID' : rejected ? 'FAILED' : 'PENDING',
@@ -86,7 +86,7 @@ export function bankDemo(url, state, request) {
     if (!row || row.abandoned || Date.parse(row.quote.expiresAt) <= now) fail('BANK_QUOTE_EXPIRED');
     if (row.order) return orderView(row.order);
     // AppWithdrawalService.reserveBank: one daily count with USDT withdrawals, and the funds leave the wallet here.
-    const facts = demoWithdrawalFacts(state);
+    const facts = demoWithdrawalFacts(state, now);
     if (facts.dailyRemainingCount === 0) fail('WITHDRAWAL_DAILY_LIMIT_EXCEEDED');
     if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
     state.walletBalance = Math.round((facts.walletUsdt - row.quote.amountUsdt) * 1e6) / 1e6;
