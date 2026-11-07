@@ -960,7 +960,7 @@ async function handleConfirm() {
         }
         if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
         remoteError.value = "G2_SWAP_OUTCOME_UNKNOWN";
-        toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.error(
+        toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.warn(
           t.value.exchange.outcomeUnknownTitle,
           t.value.exchange.outcomeUnknownBody,
         ));
