@@ -627,6 +627,8 @@ export const uz: Messages = {
     teamLeaderboard: "Takliflar reytingi",
     teamQuota: "Kvota",
     teamAgent: "Hududiy elchi",
+    teamAgentApplications: "Mening arizalarim",
+    teamAgentApplication: "Ariza tafsilotlari",
     storeCheckout: "Toʻlov",
     storeOrders: "Buyurtmalar",
     storeProduct: "Mahsulot",
@@ -4926,7 +4928,7 @@ export const uz: Messages = {
     buckets: {
       venue: {
         title: "Oflayn tadbir joyi",
-        rule: "Kamida 100 qatnashchining kelishi QR orqali tasdiqlanishi kerak",
+        rule: "≥ 100 nafar tasdiqlangan qatnashchi",
       },
       kol: {
         title: "Bloger reklamasi",
@@ -4952,7 +4954,7 @@ export const uz: Messages = {
     toastV5RequiredSub: "Ariza yuborish uchun {rank} darajasiga yeting",
     toastMissingFields: "Maydonlar boʻsh",
     toastSubmitted: "Ariza yuborildi",
-    toastSubmittedSub: "{city} · ${budget} koʻrib chiqilmoqda (3-5 ish kuni)",
+    toastSubmittedSub: "{city} · {budget}. Keyingi qadam: hujjatlarni yuklang.",
     toastRemoteFailed: "Ariza holati tasdiqlanmadi",
     serverApplication: "Arizam",
     applicationStatuses: {
