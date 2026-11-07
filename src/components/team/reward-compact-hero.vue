@@ -19,7 +19,7 @@ withDefaults(defineProps<{ kind: 'members' | 'balance' | 'ledger'; label?: strin
 <style scoped>
 .reward-hero { padding: 14px 0 18px; border-bottom: 1px solid var(--v5-border); }
 .reward-hero--guide { margin: 0 16px; }
-.reward-hero--panel { padding: 18px; border: 1px solid var(--reward-panel-edge); border-radius: 20px; background: var(--reward-panel); }
+.reward-hero--panel { padding: 18px; border: 1px solid var(--reward-panel-edge); border-radius: 20px; }
 .reward-hero__top { display: flex; align-items: center; gap: var(--ui-space-inline); }
 .reward-hero__copy { flex: 1; min-width: 0; }
 .reward-hero__art { flex: 0 0 88px; pointer-events: none; }
