@@ -152,7 +152,7 @@ const props = defineProps<{ active: boolean; returnTo: string }>();
 const t = useT(), c = computed(() => t.value.bankBinding), app = useApp();
 const copy = useFinanceReviewCopy();
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`;
-const form = createBankBindingForm(createBankWithdrawalApi(apiClient), identity);
+const form = createBankBindingForm(createBankWithdrawalApi(apiClient), identity, () => app.accountKey);
 const state = form.state, now = ref(Date.now());
 const pageVisible = ref(true);
 let readGeneration = 0;
@@ -175,6 +175,8 @@ const changing = ref(false);
 const changeStep = ref<1 | 2>(1);
 const savedAfterChange = ref(false);
 const screen = computed(() => state.phase === "saved" ? "saved"
+  // The server has accepted this binding, so an empty form would only invite a second one.
+  : state.phase === "uncertain" && state.hasReceipt ? "confirming"
   : !state.config?.beneficiary ? "first"
   : !changing.value ? "overview" : changeStep.value === 1 ? "details" : "verify");
 // A pending quote or withdrawal blocks a change; the server rejects one as well.
