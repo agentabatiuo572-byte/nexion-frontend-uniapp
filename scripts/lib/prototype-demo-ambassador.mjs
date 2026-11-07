@@ -142,7 +142,14 @@ export function ambassadorDemo(url, state, request, locale = 'zh') {
   const method = request.method();
   if (materials) {
     const id = Number(materials[1]), app = owned(data, id), record = data.materials[id];
-    if (method === 'GET') return packet(app, record, data.files, locale);
+    if (method === 'GET') {
+      // An admin re-reviews the same revision: material edits remain based on that revision.
+      if (state.ambassadorIoState === 'rereview-finance-once') {
+        state.ambassadorIoState = 'normal';
+        record.finance = review('PASSED', new Date().toISOString(), { stage: 'FINANCE', recognizedBudgetUsdt: app.budgetUsdt });
+      }
+      return packet(app, record, data.files, locale);
+    }
     if (method !== 'POST') return undefined;
     const key = header(request, 'Idempotency-Key');
     if (!key) reject('IDEMPOTENCY_KEY_REQUIRED', 400);
