@@ -229,7 +229,7 @@ const finalScore = computed(() => canonical.value?.computeValue ?? 0);
 let mounted = true;
 const pageVisible = ref(true);
 onShow(() => { pageVisible.value = true; });
-onHide(() => { pageVisible.value = false; requestGeneration++; });
+onHide(() => { pageVisible.value = false; });
 let accountEpoch = 0;
 let requestGeneration = 0;
 function accountKey(): string { return auth.accountId || auth.email || "default"; }
@@ -238,7 +238,7 @@ function currentScope(): RequestScope {
   return { accountKey: accountKey(), accountEpoch, generation: requestGeneration, remote: captureAccountScope() };
 }
 function scopeIsCurrent(scope: RequestScope): boolean {
-  return mounted && pageVisible.value && auth.isAuthenticated && isCurrentAccountScope(scope.remote)
+  return mounted && auth.isAuthenticated && isCurrentAccountScope(scope.remote)
     && isCurrentOnboardingCalibrationScope(scope, currentScope());
 }
 function acceptCurrentCanonical(scope: RequestScope, result: OnboardingCalibration): boolean {
@@ -279,10 +279,7 @@ const activateText = computed(() => (isRecal.value ? t.value.onboarding.recalAct
 const iosPending = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION" && canonical.value.signals?.platform === "ios");
 const iosSteps = computed(() => [t.value.onboarding.iosStepIdentify, t.value.onboarding.iosStepResult, t.value.onboarding.iosStepActivate]
   .map((label, index) => ({ label, running: index === 0, state: index === 0 ? t.value.onboarding.iosStepRunning : t.value.onboarding.iosStepWaiting })));
-async function contactSupport() {
-  await activationRead?.catch(() => {});
-  if (!activationBusy.value) navTo("/pages/support/messages");
-}
+function contactSupport() { if (!activationBusy.value) navTo("/pages/support/messages"); }
 const failureFeedback = computed(() => phoneActivationFeedback(failureCode.value));
 const supportRequired = computed(() => activationOutcome.value === "idle" && failureFeedback.value?.action === "support");
 const failureActionText = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSyncAction
@@ -498,7 +495,7 @@ async function readActivationOutcome(idempotencyKey: string, deviceId: string, s
 }
 
 /** Apply only a confirmed activation; shared by explicit submission and GET recovery. */
-function acceptActivation(activated: OnboardingCalibration, scope: RequestScope, reportOnline = true) {
+function acceptActivation(activated: OnboardingCalibration, scope: RequestScope) {
   if (activationCompleted || !acceptCurrentCanonical(scope, activated)) return;
   // Server success survives local persistence errors; retry synchronizes this result without another POST.
   canonical.value = activated;
@@ -508,7 +505,7 @@ function acceptActivation(activated: OnboardingCalibration, scope: RequestScope,
     throw new Error("PHONE_ACTIVATION_LOCAL_COMMIT_FAILED");
   }
   const app = useApp();
-  app.acceptPhoneActivation({ reportOnline });
+  app.acceptPhoneActivation();
   void app.refreshRemoteFleet();
   if (isRecal.value) app.resumeMining();
   activationCompleted = true;
@@ -522,14 +519,14 @@ function recoverActivation(): Promise<void> {
   const command = activationIntent, before = canonical.value;
   if (!pageVisible.value || activationBusy.value || activationOutcome.value !== "unconfirmed" || !command?.submitted || !before) return Promise.resolve();
   const scope = currentScope(), runtime = captureRuntimeRevision();
-  const current = () => scopeIsCurrent(scope) && isCurrentRuntimeRevision(runtime) && activationIntent === command;
+  const current = () => pageVisible.value && scopeIsCurrent(scope) && isCurrentRuntimeRevision(runtime) && activationIntent === command;
   readingActivation.value = true;
   const read = Promise.resolve().then(async () => {
     if (!current()) return;
     const outcome = await readActivationOutcome(command.idempotencyKey, before.deviceId, scope);
     if (!current()) return;
     if (outcome.result) {
-      try { acceptActivation(outcome.result, scope, false); }
+      try { acceptActivation(outcome.result, scope); }
       catch (cause) {
         failureCode.value = cause instanceof Error ? cause.message : "";
         failedAction.value = "activate"; phase.value = "error";
@@ -701,9 +698,7 @@ async function deferPhoneActivation() {
     if (isCurrentOnboardingCalibrationScope(requestScope, currentScope())) activationBusy.value = false;
   }
 }
-async function leaveConnect() {
-  await activationRead?.catch(() => {});
-  if (!pageVisible.value || activationCompleted) return;
+function leaveConnect() {
   if (activationBusy.value || phase.value === "calibrating") return;
   requestGeneration += 1;
   // #ifdef H5
