@@ -1,4 +1,4 @@
-.store-voucher-ticket { position:relative; display:flex; align-items:center; gap:14px; min-height:88px; box-sizing:border-box; padding:6px 18px; overflow:hidden; border:1px solid var(--v5-border); border-radius:22px; background:radial-gradient(60% 120% at 100% 50%,color-mix(in srgb,var(--v5-brand) 18%,transparent),transparent 65%),linear-gradient(90deg,var(--ui-ticket-top),var(--ui-ticket-bottom)); }
+.store-voucher-ticket { position:relative; display:flex; align-items:center; gap:14px; min-height:88px; box-sizing:border-box; padding:6px 18px; overflow:hidden; border:1px solid var(--v5-border); border-radius:22px; background:var(--v5-surface); }
 .store-voucher-ticket::before,.store-voucher-ticket::after { content:''; position:absolute; top:50%; width:18px; height:18px; margin-top:-9px; border-radius:50%; background:var(--v5-bg); border:1px solid var(--v5-border); }
 .store-voucher-ticket::before { left:-10px; }.store-voucher-ticket::after { right:-10px; }
 .store-voucher-ticket__value { display:flex; align-items:baseline; gap:2px; flex:none; font:600 30px/34px var(--font-v5); letter-spacing:-.02em; color:var(--ui-lime-pale); font-variant-numeric:tabular-nums; }

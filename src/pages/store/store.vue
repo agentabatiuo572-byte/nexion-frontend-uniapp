@@ -445,7 +445,7 @@ const goalFocusRetryStyle: CSSProperties = {
 <style scoped>
 .store-content { padding:12px 16px 16px; color:var(--v5-ink); }
 .store-content > * + * { margin-top:16px; }
-.store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); box-shadow:none; background:radial-gradient(70% 90% at 82% 72%,color-mix(in srgb,var(--v5-brand) 24%,transparent),transparent 62%),linear-gradient(135deg,var(--ui-spotlight-top),var(--ui-ticket-bottom)); }
+.store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); box-shadow:none; background:var(--v5-surface); }
 .store-campaign :deep(.entry-label) { top:18px; left:18px; padding:0; border:0; background:transparent; color:var(--ui-lime-soft); font:500 12.5px/18px var(--font-v5); }
 .store-campaign :deep(.entry-title) { font-size:19px; line-height:25px; }
 .store-catalogue { margin-top:20px; }
@@ -454,7 +454,7 @@ const goalFocusRetryStyle: CSSProperties = {
 .store-product-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:stretch; }
 .store-estimate-note { display:block; margin-top:10px; padding:0 2px; font:400 12.5px/1.6 var(--font-v5); color:var(--v5-ink-3); }
 .store-more__icon { display:grid; place-items:center; width:36px; height:36px; border-radius:12px; background:var(--ui-content-surface-2); }
-.store-more__icon--gold { color:var(--v5-warning-ink); background:linear-gradient(160deg,color-mix(in srgb,var(--v5-warning) 32%,transparent),color-mix(in srgb,var(--v5-warning) 8%,transparent)); box-shadow:inset 0 1px 0 color-mix(in srgb,var(--v5-warning) 35%,transparent); }
+.store-more__icon--gold { color:var(--v5-warning-ink); background:color-mix(in srgb,var(--v5-warning) 18%,transparent); }
 .store-more :deep(.nx-list-row__subtitle) { color:var(--v5-ink-3); }
 .store-locked-list { display:flex; flex-direction:column; gap:10px; }
 .store-bundle-entry { display:flex; align-items:center; justify-content:flex-end; gap:6px; min-height:44px; padding:0 2px; color:var(--v5-brand); font:500 var(--ui-type-list-subtitle)/18px var(--font-v5); cursor:pointer; }
