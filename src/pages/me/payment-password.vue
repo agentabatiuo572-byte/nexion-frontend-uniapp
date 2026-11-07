@@ -131,7 +131,6 @@ onUnmounted(() => { clear(); clearInterval(timer); unsubscribe?.(); if (typeof d
 .payment-vault-dots > view { width:12px; height:12px; border-radius:50%; background:var(--v5-brand); animation:nx-viz-pop 360ms both; }
 .payment-vault-title { margin-top:22px; font-size:20px; line-height:28px; font-weight:600; }
 .payment-vault-status { margin-top:var(--v5-space-2); height:24px; box-sizing:border-box; padding:var(--v5-space-1) 8px; border-radius:var(--v5-radius-full); background:color-mix(in srgb,var(--v5-warning) 16%,transparent); color:var(--v5-warning-ink); font-size:12px; line-height:16px; font-weight:500; }
-:global([data-theme="light"] .payment-vault-status) { color:var(--v5-ink); }
 .payment-vault-purpose { margin-top:var(--v5-space-3); font-size:13px; line-height:20px; color:var(--v5-ink-3); }
 .payment-pin-page__dock { position:fixed; bottom:0; left:0; right:0; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); }
 .payment-pin-page__dock > .nx-button { width:100%; }
