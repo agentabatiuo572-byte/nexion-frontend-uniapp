@@ -5719,6 +5719,7 @@ export const ru: Messages = {
     inFlightBlocked: "Идёт вывод. Сменить адрес можно после его завершения.",
     inFlightGoCta: "Статус вывода",
     cooldownUntil: "Сменить снова можно после {time}.",
+    cooldownActive: "Срок ожидания перед сменой адреса ещё не истёк. Повторите попытку позже.",
     freezeBanner: "Защитный период нового адреса · осталось {t}",
     timeStatusUnavailable: "Не удалось проверить статус защитного периода. Обновите и повторите.",
     refreshTimeStatusCta: "Обновить статус",

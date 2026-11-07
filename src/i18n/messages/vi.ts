@@ -5408,6 +5408,7 @@ openSeaErrorPool: {
     inFlightBlocked: "Có lệnh rút đang xử lý, hoàn tất xong mới có thể đổi địa chỉ",
     inFlightGoCta: "Xem tiến độ rút tiền",
     cooldownUntil: "Có thể đổi lại sau {time}.",
+    cooldownActive: "Vẫn đang trong thời gian chờ đổi địa chỉ. Vui lòng thử lại sau.",
     freezeBanner: "Địa chỉ rút tiền mới đang trong thời gian bảo vệ · còn {t}",
     timeStatusUnavailable: "Chưa thể xác nhận trạng thái thời gian bảo vệ. Hãy làm mới rồi thử lại.",
     refreshTimeStatusCta: "Làm mới trạng thái",
