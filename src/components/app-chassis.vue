@@ -163,7 +163,7 @@
 
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, type CSSProperties, getCurrentInstance } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, getCurrentInstance } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
 // #ifdef APP-PLUS
@@ -620,17 +620,6 @@ const tabs = computed(() => [
   { key: "team", route: "/pages/team/team", label: t.value.tabs.team, icon: "M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", icon2: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M22 20v-2a4 4 0 0 0-3-3.8" },
   { key: "me", route: "/pages/me/me", label: t.value.tabs.me, icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", icon2: "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" },
 ]);
-
-// Liquid-Glass active-tab gradient pill (faithful to prototype tab-bar.tsx).
-const activeTabStyle: CSSProperties = {
-  color: "var(--v5-brand)",
-  background:
-    "linear-gradient(180deg, color-mix(in srgb, var(--v5-brand) 22%, transparent) 0%, color-mix(in srgb, var(--v5-brand) 8%, transparent) 100%)",
-  boxShadow:
-    "inset 0 1px 0 rgba(255,255,255,0.22)," +
-    "inset 0 0 16px color-mix(in srgb, var(--v5-brand) 14%, transparent)," +
-    "0 0 0 0.5px color-mix(in srgb, var(--v5-brand) 28%, transparent)",
-};
 
 function go(tab: { key: string; route: string }, reason = "activation") {
   if (props.tabHost) {

@@ -3,7 +3,7 @@
 .nx-glass-sheet,
 .nx-glass-action {
   --nx-glass-radius: 24px;
-  --nx-glass-fill: linear-gradient(145deg, color-mix(in srgb, var(--v5-ink) 4%, transparent), transparent 65%), color-mix(in srgb, var(--v5-surface) 94%, transparent);
+  --nx-glass-fill: color-mix(in srgb, var(--v5-surface) 94%, transparent);
   --nx-glass-edge: inset 0 0 0 1px color-mix(in srgb, var(--v5-liquid-rim) 45%, transparent), inset 0 1px 1px color-mix(in srgb, var(--v5-liquid-highlight) 45%, transparent), inset 0 -1px 1px var(--v5-liquid-bottom);
 }
 /* Keep the existing content class as a compatibility hook, but make it flat. */
@@ -25,7 +25,7 @@
 }
 .nx-glass-sheet {
   --nx-glass-radius: 28px;
-  --nx-glass-fill: linear-gradient(155deg, color-mix(in srgb, var(--v5-ink) 4%, transparent), transparent 55%), color-mix(in srgb, var(--v5-surface) 98%, transparent);
+  --nx-glass-fill: color-mix(in srgb, var(--v5-surface) 98%, transparent);
 }
 /* Only the decorative layer springs; text, focus and hit targets stay still. */
 .nx-glass-action { position: relative; isolation: isolate; border-radius: var(--nx-glass-radius); }
