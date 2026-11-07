@@ -27,7 +27,7 @@
       </view>
 
       <view class="reward-grid">
-        <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-frosted-button': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
+        <view v-for="c in displayCats" :key="c.key" class="reward-tile" :class="[`reward-tile--${c.key}`, {'nx-soft-glass': c.key === 'usdt'}]" role="button" tabindex="0" :aria-label="c.label" @click="openCat(c.key)">
           <view v-if="c.key === 'promotion'" class="reward-gift" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h18v4H3zM5 12v9h14v-9M12 8v13M12 8H7.5a2.5 2.5 0 1 1 2.4-3.2L12 8Zm0 0h4.5a2.5 2.5 0 1 0-2.4-3.2L12 8Z" /></svg></view>
           <view class="reward-tile__body">
             <text class="reward-tile__title">{{ c.label }}</text>
@@ -289,7 +289,7 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 <style scoped>
 .reward-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin: 0 16px; }
 .reward-tile { position: relative; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); color: var(--v5-ink); cursor: pointer; animation: reward-enter 480ms cubic-bezier(.16,1,.3,1) both; }
-.reward-tile:not(.nx-frosted-button) { background: var(--v5-surface); }
+.reward-tile:not(.nx-soft-glass) { background: var(--v5-surface); }
 .reward-tile:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .reward-tile__title { display: block; font: 500 15px/22px var(--font-v5); }
 .reward-tile__amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: var(--v5-space-2); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; }
