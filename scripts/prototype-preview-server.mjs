@@ -191,6 +191,13 @@ const server=http.createServer(async(req,res)=>{
       if(bankTopupEndpoint&&state.dataState==='error')return sendJson(res,{code:503,message:url.pathname.endsWith('/config')?'PAYMENT_CONFIG_UNAVAILABLE':url.pathname.endsWith('/fx-quote')?'FX_QUOTE_UNAVAILABLE':'VIETQR_RUNTIME_PROFILE_INVALID',data:null},503);
       if(businessRead&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
       if(businessRead&&state.dataState==='loading')await new Promise(resolve=>setTimeout(resolve,5000));
+      // A material read that answers late with the facts it saw when it arrived (simulates a GET overtaken by a POST).
+      if(req.method==='GET'&&state.ambassadorIoState==='late-read-once'&&/^\/api\/app\/team\/ambassador-applications\/\d+\/materials$/.test(url.pathname)){
+        state.ambassadorIoState='normal';
+        const data=fixtureFor(url,{method:()=>'GET',postDataJSON:()=>({}),headers:()=>req.headers});
+        await new Promise(resolve=>setTimeout(resolve,4000));
+        return sendJson(res,{code:0,message:'OK',data});
+      }
       // Material uploads (multipart) and private material files carry raw bytes.
       const ambassadorBinary=ambassadorBinaryRoute(url.pathname,req.method);
       if(ambassadorBinary){
