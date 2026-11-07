@@ -3,6 +3,7 @@
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
 import {demoAccountOrders,demoFixture,demoOrderFitsCapacity,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
+import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
 
 const base = '/api/app/purchase-payment';
 const cents = value => Math.round(Number(value) * 100);
@@ -19,9 +20,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   let sequence = 0;
   // D1 switch closure leaves fee configuration intact (PurchasePaymentPolicyService.current).
   const configured = method => !(state.paymentState === 'bank-off' && method === 'HDPAY_BANK');
-  const networkOpen = method => !(state.paymentState === 'erc20-off' && method === 'CREGIS_USDT_ERC20'
-    || state.paymentState === 'usdt-off' && method !== 'HDPAY_BANK');
   const refused = (status, message) => ({status, message, data: null});
+  const networkGate = method => {
+    if (method === 'HDPAY_BANK') return null;
+    const reason = demoDepositNetworkDisabledReason(state, method === 'CREGIS_USDT_ERC20' ? 'ERC20' : 'BEP20');
+    if (reason === 'NOT_CONFIGURED') return refused(503, 'CREGIS_DIRECT_PAYMENT_UNAVAILABLE');
+    return reason === 'NETWORK_SWITCH_OFF' ? refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED') : null;
+  };
   const handles = path => path.startsWith(base);
   const commandKinds = {ORDER_PAY:'order-pay',TRIAL_CONVERT:'trial-convert',TRADE_IN:'trade-in',CAPACITY_REPLACE:'capacity-replace',CAPACITY_KEEP:'capacity-keep'};
   // The account's one order list.
@@ -93,7 +98,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (intent.paidAt >= intent.deadline) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_LATE_REVIEW'});
     // Observation continues during closure; deliver()/cregisGate records the refusal for manual review.
     // Reopening alone does not revalidate a MANUAL_REVIEW intent or erase its observed arrival.
-    if (!networkOpen(intent.paymentMethod)) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CREGIS_DIRECT_PAYMENT_PAUSED', reconciliationStatus: 'REVIEW'});
+    if (networkGate(intent.paymentMethod)) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CREGIS_DIRECT_PAYMENT_PAUSED', reconciliationStatus: 'REVIEW'});
     if (age < DELIVER_AFTER) return Object.assign(intent, {status: 'FUNDS_CONFIRMED'});
     if (scenario === 'delivery-failed') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
     if (intent.kind === 'TRIAL_CONVERT') return deliverTrial(intent);
@@ -118,7 +123,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
     const {createdAt, orderNo, deadline, origin, payload, payloadKey, pricingAt, paidAt, ...row} = advance(intent), open = Date.now() < deadline;
-    const networkEnabled = networkOpen(row.paymentMethod);
+    const networkEnabled = networkGate(row.paymentMethod) === null;
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
   function paymentCommand(kind, key) {
@@ -142,7 +147,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (path === `${base}-policy` && method === 'GET') return {status: 200, message: 'OK', data: {version: 3, channels: ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'].map(paymentMethod => ({paymentMethod, configured: configured(paymentMethod)}))}};
     if (path === `${base}-quotes` && method === 'POST') {
       const body = request.postDataJSON(), order = ordersOf(url.origin).find(row => row.orderNo === body.payload?.orderNo);
-      if (!networkOpen(body.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
+      const gate = networkGate(body.paymentMethod);
+      if (gate) return gate;
       // Like PurchasePaymentService.quote: an order payment is quoted only for an existing unpaid order; an expired
       // one has already been closed by the deadline task, so it is not payable either.
       if (body.kind === 'ORDER_PAY' && !order) return {status: 404, message: 'ORDER_NOT_FOUND', data: null};
@@ -186,7 +192,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!source) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const {subject, deadline} = source, known = [...intents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (known) return known.paymentQuoteId === quoteId ? {status: 200, message: 'OK', data: view(known)} : refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
-      if (!networkOpen(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
+      const gate = networkGate(source.quote.paymentMethod);
+      if (gate) return gate;
       // Like PurchasePaymentService.create: the quote is checked again before an intent exists.
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
