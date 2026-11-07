@@ -43,7 +43,7 @@ function activate() {
   --v5-liquid-shadow: 0 0 0 transparent;
   margin-top: 7px; max-width: 100%; min-height: 44px; font-size: 12px; font-weight: 500;
 }
-.earn-way-card__action :deep(.nx-button__surface) { min-height: 32px; padding: 6px 16px; background: radial-gradient(ellipse at 95% 95%, color-mix(in srgb, var(--v5-brand) 18%, transparent), transparent 68%), linear-gradient(170deg, rgba(255,255,255,.04), rgba(255,255,255,.015)); }
+.earn-way-card__action :deep(.nx-button__surface) { min-height: 32px; padding: 6px 16px; background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
 .earn-way-card__action :deep(.nx-button__content) { gap: 6px; }
 .earn-way-card__arrow { flex-shrink: 0; }
 /* Use the approved artwork unchanged: each 360×270 window contains only the
