@@ -1,5 +1,5 @@
 <template>
-  <view class="invite-card nx-frosted-button nx-viz-press">
+  <view class="invite-card nx-soft-glass nx-viz-press">
     <view class="invite-card__art" aria-hidden="true"><TeamArt kind="invite" :size="140" /></view>
     <view class="invite-card__header">
       <text class="invite-card__title">{{ copy.inviteHeadline }}</text>
