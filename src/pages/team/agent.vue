@@ -149,6 +149,7 @@
                 <text class="agent-application-budget">{{ t.agent.budgetRequested }} · {{ visibility.mask(applicationBudget(application.budgetUsdt)) }}</text>
                 <text>{{ applicationIdLabel }} · {{ application.applicationId ?? '—' }}</text>
               </view>
+              <AmbassadorMaterials v-if="application.applicationId" :application="application" @updated="updateApplicationMaterials" />
             </view>
           </view>
         </view>
@@ -183,6 +184,7 @@ import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import AmbassadorMaterials from "@/components/team/ambassador-materials.vue";
 import { useVRank } from "@/store/v-rank";
 import { rankLabel } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
@@ -196,7 +198,7 @@ import { useAuth } from '@/store/auth';
 import { useApp } from "@/store/app";
 import { ambassadorApplicationApi, apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
 import { subscribeRuntimeRevision } from "@/api/order-api";
-import type { AmbassadorApplication, AmbassadorApplicationInput, AmbassadorPolicy,
+import type { AmbassadorApplication, AmbassadorApplicationInput, AmbassadorPolicy, AmbassadorMaterials as AmbassadorMaterialPacket,
   AmbassadorPolicyBucket } from "@/api/ambassador-application-api";
 import { isAmbassadorApplicationPending } from "@/api/ambassador-application-api";
 import { isSettledRejection } from "@/api/errors";
@@ -312,6 +314,11 @@ const latestApplication = ref<AmbassadorApplication>({ applicationId: null, stat
   eventDate: null, budgetUsdt: null, bucket: null, submittedAt: null, source: "server",
   sourceEnvironment: "PRODUCTION", runId: "" });
 const applications = ref<AmbassadorApplication[]>([]);
+function updateApplicationMaterials(materials: AmbassadorMaterialPacket) {
+  const application = applications.value.find(row => row.applicationId === materials.applicationId);
+  if (application) Object.assign(application, { budgetUsdt: materials.budgetUsdt, bucket: materials.bucket,
+    materialRevision: materials.materialRevision, materialState: materials.materialState });
+}
 
 const applicationStatusText = (application: AmbassadorApplication) => t.value.agent.applicationStatuses[application.status];
 const applicationIdLabel = computed(() => ({ zh: '申请编号', en: 'Application ID', vi: 'Mã đơn đề nghị', id: 'ID pengajuan', ms: 'ID permohonan', fil: 'ID ng application', ru: 'Номер заявки', kk: 'Өтінім ID', uz: 'Ariza raqami' })[uiLocale(locale.code)]);
