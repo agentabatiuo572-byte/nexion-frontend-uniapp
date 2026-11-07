@@ -2422,7 +2422,7 @@ export const useApp = defineStore("app", () => {
    * 远端模式的**替代品**:把服务端单据状态镜像回本地(GET /api/withdrawals/:id,
    * PRD §9.11f)。没有这一步,单纯关掉本地推进会把一个缺陷换成另一个 ——
    * 在途单永不终结 → occupiesWithdrawalSlot 恒真 → 收款地址换绑入口
-   * (payout-address.hasInFlightWithdrawalOn)与「同时只能有一笔」的下一笔提现
+   * (payout-address.changeBlockReason)与「同时只能有一笔」的下一笔提现
    * **永久**被拦,账单行也永远停在处理中。
    *
    * 只读不裁决:状态、到账时刻全取服务端值;拉不到就保持原样(下一拍再试),
@@ -2467,11 +2467,13 @@ export const useApp = defineStore("app", () => {
       const retriableChanged = remote.retriable !== null && remote.retriable !== w.retriable;
       const nexRefundedChanged = remote.nexRefunded !== null && remote.nexRefunded !== w.nexRefunded;
       const nexRefundedAtChanged = remote.nexRefundedAt !== null && remote.nexRefundedAt !== w.nexRefundedAt;
+      const payoutBlockChanged = remote.payoutAddressChangeBlocked !== w.payoutAddressChangeBlocked;
       if (remote.status === w.status && !reasonChanged && !retriableChanged
-          && !nexRefundedChanged && !nexRefundedAtChanged) return;
+          && !nexRefundedChanged && !nexRefundedAtChanged && !payoutBlockChanged) return;
       patches.set(w.id, {
         ...w,
         status: remote.status,
+        payoutAddressChangeBlocked: remote.payoutAddressChangeBlocked,
         // 🔴 盖上「这份结论是什么时候从服务端问来的」。没有它,三路合并在平局时只能留磁盘旧行,
         // 上面那套判据就全是空转(独立审计实测:同状态改原因 100% 丢失)。
         // 用本机时钟即可:它只在**本机自己的两份快照之间**比大小,不与服务端时间对齐。
