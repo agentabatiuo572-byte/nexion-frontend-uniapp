@@ -314,10 +314,23 @@ const latestApplication = ref<AmbassadorApplication>({ applicationId: null, stat
   eventDate: null, budgetUsdt: null, bucket: null, submittedAt: null, source: "server",
   sourceEnvironment: "PRODUCTION", runId: "" });
 const applications = ref<AmbassadorApplication[]>([]);
-function updateApplicationMaterials(materials: AmbassadorMaterialPacket) {
+async function updateApplicationMaterials(materials: AmbassadorMaterialPacket) {
   const application = applications.value.find(row => row.applicationId === materials.applicationId);
-  if (application) Object.assign(application, { budgetUsdt: materials.budgetUsdt, bucket: materials.bucket,
+  if (!application) return;
+  Object.assign(application, { budgetUsdt: materials.budgetUsdt, bucket: materials.bucket,
     materialRevision: materials.materialRevision, materialState: materials.materialState });
+  if (application.status !== "PENDING") return;
+  const requestScope = captureAgentRequest();
+  if (!requestIsCurrent(requestScope)) return;
+  try {
+    const refreshed = (await ambassadorApplicationApi.history()).find(row => row.applicationId === materials.applicationId);
+    if (!requestIsCurrent(requestScope)) return;
+    const current = applications.value.find(row => row.applicationId === materials.applicationId);
+    if (current?.status === "PENDING" && refreshed) current.status = refreshed.status;
+  } catch {
+    const current = applications.value.find(row => row.applicationId === materials.applicationId);
+    if (current?.status === "PENDING" && requestIsCurrent(requestScope)) toast.error(t.value.agent.loadError, "");
+  }
 }
 
 const applicationStatusText = (application: AmbassadorApplication) => t.value.agent.applicationStatuses[application.status];
