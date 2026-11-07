@@ -126,7 +126,10 @@ async function checkIn() {
   --ci-bottom: rgba(87,115,155,.16); --ci-sheen: rgba(255,255,255,.30); --ci-shadow: 0 2px 8px rgba(20,16,8,.05);
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .daily-check-in-row { background:var(--v5-surface); backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .daily-check-in-row { background:var(--v5-surface-2); backdrop-filter:none; -webkit-backdrop-filter:none; }
+}
+@media (forced-colors: active) {
+  .daily-check-in-row { background:Canvas;box-shadow:none;outline:1px solid CanvasText;outline-offset:-1px;backdrop-filter:none;-webkit-backdrop-filter:none; }
 }
 .daily-check-in-row__reward-flight { position:absolute; z-index:4; inset-inline:0; top:-42px; height:calc(50% + 24px); display:flex; align-items:flex-start; justify-content:center; pointer-events:none; animation:check-in-reward-rise 1900ms linear both; }
 .daily-check-in-row__reward { color:var(--v5-brand); font:600 20px/24px var(--font-v5); white-space:nowrap; }
