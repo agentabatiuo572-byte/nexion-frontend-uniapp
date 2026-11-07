@@ -112,10 +112,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }
-  // Payment details stop at the deadline (PurchasePaymentService.view).
+  // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
     const {createdAt, orderNo, deadline, origin, payload, payloadKey, pricingAt, paidAt, ...row} = advance(intent), open = Date.now() < deadline;
-    return {...row, paymentAllowed: row.status === 'AWAITING_PAYMENT' && open, address: open ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
+    const networkOpen = row.paymentMethod === 'HDPAY_BANK' || configured(row.paymentMethod);
+    return {...row, paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkOpen, address: open && networkOpen ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
   function paymentCommand(kind, key) {
     sync();
@@ -181,6 +182,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!source) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const {subject, deadline} = source, known = [...intents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (known) return known.paymentQuoteId === quoteId ? {status: 200, message: 'OK', data: view(known)} : refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
+      if (source.quote.paymentMethod !== 'HDPAY_BANK' && !configured(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       // Like PurchasePaymentService.create: the quote is checked again before an intent exists.
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
