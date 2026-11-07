@@ -223,7 +223,7 @@
     </view>
     <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <template #pageFixed>
-      <view v-if="step === 'form'" class="rb-bar">
+      <view v-if="step === 'form'" class="rb-bar nx-frosted-button">
         <view class="nx-rebind-cancel-link rb-bar__btn rb-bar__btn--ghost nx-frosted-button" role="button" tabindex="0" @click="cancelForm" @keydown.enter.prevent="cancelForm" @keydown.space.prevent="cancelForm">
           <text>{{ t.addrRebind.cancelCta }}</text>
         </view>
@@ -1004,7 +1004,7 @@ const successRowValStyle: CSSProperties = {
 .rb-lock { display: flex; align-items: center; gap: 8px; margin: 12px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .rb-lock > svg { flex: none; }
 .rb-bar-space { height: 110px; }
-.rb-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.rb-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
 .rb-bar__btn--on, .rb-bar__btn--ghost { opacity: 1; cursor: pointer; }
 .rb-bar__btn--ghost.nx-frosted-button { background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-ink) 7%, transparent); box-shadow: var(--ui-glass-edge-shadow); color: var(--v5-ink); }
