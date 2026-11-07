@@ -32,6 +32,7 @@ const deposits = createCregisDepositApi(apiClient);
 const state = reactive({ open: false, coldResume: false, accountKey: '', summary: '', amount: '' as string | number, method: 'WALLET' as PurchaseMethod,
   step: 'methods' as PurchaseStep, kind: 'ORDER_PAY' as PurchaseKind, orderNo: '', image: '', deadlineAt: null as number | null,
   policy: null as Partial<Record<ExternalPaymentMethod, boolean>> | null, notice: '' as PurchaseNotice, cashier: false,
+  pausedPaymentMethod: null as ExternalPaymentMethod | null,
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
   loading: false, retrying: false, busy: false, error: false, unavailable: false, pendingReadError: false, concluded: false, revision: 0 });
 let context: PurchasePaymentContext | null = null;
@@ -301,11 +302,15 @@ async function submitOriginal() {
         if (existing) accept(existing, pending);
         else if (refusal) { release(pending); Object.assign(state, { pending: null, quote: null, intent: null }); conclude(refusal); }
         else {
-          if (unavailable) retire(pending, accountKey); else release(pending);
+          release(pending);
           Object.assign(state, { pending: null, quote: null, intent: null });
           if (unavailable) hideChannel(pending.paymentMethod ?? (state.method as ExternalPaymentMethod));
           // A cold resume has no caller to quote again; return through the existing order exit.
-          if (state.coldResume) conclude(unavailable && cause.message !== 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED' ? 'networkPaused' : 'changed');
+          if (state.coldResume) {
+            const networkPaused = unavailable && cause.message !== 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED';
+            if (networkPaused) state.pausedPaymentMethod = pending.paymentMethod ?? null;
+            conclude(networkPaused ? 'networkPaused' : 'changed');
+          }
           else requote = true;
         }
       }
@@ -366,9 +371,9 @@ function open(value: Pick<PurchasePaymentContext, 'summary' | 'kind' | 'orderNo'
   const accountKey = account();
   stopTimers(); requestVersion++; quoteFailures = pollFailures = 0; paused = false; openCashierOnReady = false;
   reviewedQuote = confirmedQuote = null;
-  Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: pending?.paymentMethod ?? 'WALLET', step: 'methods', kind: value.kind,
+  Object.assign(state, { open: true, coldResume: context === null, accountKey, summary: value.summary, amount: value.amount ?? '', method: 'WALLET', step: 'methods', kind: value.kind,
     orderNo: value.orderNo ?? '', image: value.image ?? '', deadlineAt: value.deadlineAt ?? null, policy: null, notice: '', cashier: false,
-    quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });
+    pausedPaymentMethod: null, quote: null, intent: null, pending, loading: false, retrying: false, busy: false, error: false, unavailable: false, concluded: false });
 }
 export function requestPurchasePayment(value: PurchasePaymentContext): Promise<PurchaseChoice | null> {
   if (state.open) throw new Error('PURCHASE_PAYMENT_ALREADY_OPEN');
