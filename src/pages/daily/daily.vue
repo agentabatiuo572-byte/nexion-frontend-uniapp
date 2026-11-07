@@ -20,7 +20,7 @@
 
 
       <!-- Streak energy ring -->
-      <view class="dly-hero" :class="{ 'dly-hero--glow': dailyFactsVisible }" :role="dailyFactsVisible ? undefined : 'status'" :aria-label="t.daily.activeStreak">
+      <view class="dly-hero" :role="dailyFactsVisible ? undefined : 'status'" :aria-label="t.daily.activeStreak">
         <view ref="ringRef" class="dly-rw" :class="{ 'nx-loops-paused': !ringLoops.running.value }">
           <svg v-if="!dailyFactsVisible" class="dly-ring" width="248" height="248" viewBox="0 0 248 248" aria-hidden="true"><circle class="dly-ring__ph" cx="124" cy="124" r="104" /></svg>
           <svg v-else class="dly-ring" width="248" height="248" viewBox="0 0 248 248" role="img" :aria-label="ringLabel">
@@ -92,7 +92,6 @@
             </template>
             <view v-for="(m, i) in (dailyFactsVisible ? milestones : [])" v-else :key="m.day" class="dly-rail__item" :style="{ '--i': i }">
               <view class="dly-tk" :class="{ 'dly-tk--got': isMilestoneClaimed(m), 'dly-tk--can': isMilestoneUnlocked(m) && !isMilestoneClaimed(m) }">
-                <view v-if="isMilestoneUnlocked(m) && !isMilestoneClaimed(m)" class="dly-tk__sheen" aria-hidden="true"><view /></view>
                 <view class="dly-tk__tp">
                   <view class="dly-tk__d">
                     <text>{{ m.labelText ?? t.daily.milestones[m.labelKey] }}</text>
@@ -213,7 +212,7 @@
 
     <!-- Check-in sits in the thumb zone (DS-30). -->
     <template #pageFixed>
-      <view class="dly-bar">
+      <view class="dly-bar nx-glass-bar">
         <!-- The ring is scrolled away: the same reward rises above the bar instead. -->
         <view v-if="successFx && !successFx.atRing" :key="`bf${successFx.key}`" class="dly-fly dly-fly--bar" role="status">
           <view class="dly-fly__pill"><text>+{{ successFx.amount }}</text><text class="dly-fly__u">UVT</text><text v-if="successFx.multiplier > 1" class="dly-fly__u">{{ successFx.multiplier }}×</text></view>
@@ -231,7 +230,6 @@
         </view>
         <view v-else-if="!checkInStateConfirmed" class="dly-cta dly-cta--sync" role="status"><text>{{ t.daily.checkInUnconfirmed }}</text></view>
         <view v-else class="dly-cta active:opacity-90" role="button" tabindex="0" :aria-busy="checkInSubmitting ? 'true' : 'false'" :aria-disabled="lastSignedToday || remoteRefreshing || checkInSubmitting || !checkInStateConfirmed ? 'true' : 'false'" @click="handleCheckIn" @keydown.enter.prevent="handleCheckIn" @keydown.space.prevent="handleCheckIn">
-          <view class="dly-cta__sheen" aria-hidden="true" />
           <view v-if="checkInSubmitting" class="dly-cta__spin" aria-hidden="true" />
           <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
           <text>{{ checkInCtaText }}</text>
@@ -871,8 +869,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 
 <style scoped>
 /* Design: uvel-docs P-65 boards (Main / DailyLight / DailySigned / DailyStates). One aura only — behind the ring. */
-.dly { --dly-glow: 30%; --dly-glow2: 14%; --dly-dash: color-mix(in srgb, var(--v5-ink) 16%, transparent); --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 50%, transparent); padding-bottom: calc(84px + env(safe-area-inset-bottom)); font-family: var(--font-v5); color: var(--v5-ink); }
-[data-theme="light"] .dly { --dly-glow: 20%; --dly-glow2: 9%; --dly-dash: var(--v5-border-strong); --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-ink) 10%, transparent); }
+.dly { --dly-dash: color-mix(in srgb, var(--v5-ink) 16%, transparent); --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 50%, transparent); padding-bottom: calc(84px + env(safe-area-inset-bottom)); font-family: var(--font-v5); color: var(--v5-ink); }
+[data-theme="light"] .dly { --dly-dash: var(--v5-border-strong); --dly-well: inset 0 1px 3px color-mix(in srgb, var(--v5-ink) 10%, transparent); }
 .dly-card { position: relative; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .dly-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .dly-sec { display: block; margin-top: var(--ui-space-section-gap); }
@@ -891,7 +889,6 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 
 /* Ring */
 .dly-hero { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: 4px; text-align: center; animation: dly-rise 520ms cubic-bezier(.16, 1, .3, 1) both; }
-.dly-hero--glow::before { content: ""; position: absolute; left: 50%; top: -34px; width: 380px; height: 330px; margin-left: -190px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-warning) var(--dly-glow), transparent), color-mix(in srgb, var(--v5-brand-2) var(--dly-glow2), transparent) 62%, transparent); filter: blur(6px); pointer-events: none; }
 .dly-rw { position: relative; width: 248px; height: 248px; }
 .dly-ring { position: absolute; inset: 0; overflow: visible; }
 .dly-ring circle { fill: none; stroke-width: 14; }
@@ -967,8 +964,6 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-tk--can::before { left: -9.5px; }
 .dly-tk--can::after { right: -9.5px; }
 .dly-tk--can .dly-tk__d { color: var(--v5-warning-ink); }
-.dly-tk__sheen { position: absolute; inset: 0; overflow: hidden; border-radius: 16px; pointer-events: none; }
-.dly-tk__sheen > view { position: absolute; top: 0; bottom: 0; left: 0; width: 46px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .16), transparent); transform: translateX(-120%) skewX(-18deg); animation: dly-sheen 1100ms ease-out 1000ms 1 both; }
 .dly-tk--got .dly-tk__u, .dly-tk--got .dly-tk__v { color: var(--v5-ink-3); }
 .dly-tk--sk { background: transparent; box-shadow: none; border: 1.5px dashed var(--dly-dash); }
 .dly-tk--sk::before, .dly-tk--sk::after { display: none; }
@@ -1052,10 +1047,9 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-hr__dl--p { color: var(--v5-success-ink); }
 
 /* Bottom action bar (DS-30) */
-.dly-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: 12px 16px max(34px, calc(env(safe-area-inset-bottom) + 14px)); background: var(--v5-sticky-bar-bg); box-shadow: inset 0 1px 0 var(--v5-sticky-bar-border); -webkit-backdrop-filter: blur(16px) saturate(125%); backdrop-filter: blur(16px) saturate(125%); animation: dly-barup 520ms cubic-bezier(.16, 1, .3, 1) 300ms both; }
+.dly-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: 12px 16px max(34px, calc(env(safe-area-inset-bottom) + 14px)); animation: dly-barup 520ms cubic-bezier(.16, 1, .3, 1) 300ms both; }
 .dly-cta { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; padding: 6px 20px; box-sizing: border-box; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); text-align: center; overflow: hidden; cursor: pointer; }
 .dly-cta svg { flex: none; }
-.dly-cta__sheen { position: absolute; top: 0; bottom: 0; left: 0; width: 60px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .28), transparent); transform: translateX(-120%) skewX(-18deg); animation: dly-sheen 1200ms ease-out 900ms 1 both; pointer-events: none; }
 .dly-cta__spin { flex: none; width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: dly-spin 800ms linear infinite; }
 .dly-cta--sync { background: none; color: var(--v5-ink); }
 .dly-cta--sync svg { color: var(--v5-warning-ink); }
@@ -1070,7 +1064,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 }
 
 /* Retained page shown again: no second entrance. */
-.dly--instant .dly-hero, .dly--instant .dly-ring__dn, .dly--instant .dly-rail__item > .dly-tk, .dly--instant .dly-tk__sheen > view { animation: none; }
+.dly--instant .dly-hero, .dly--instant .dly-ring__dn, .dly--instant .dly-rail__item > .dly-tk { animation: none; }
 
 @keyframes dly-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes dly-slidein { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
@@ -1078,7 +1072,6 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 @keyframes dly-breathe { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 @keyframes dly-breathe-light { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
 @keyframes dly-barup { from { transform: translateY(100%); } to { transform: none; } }
-@keyframes dly-sheen { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(420%) skewX(-18deg); } }
 @keyframes dly-spin { to { transform: rotate(360deg); } }
 @keyframes dly-burst { 0% { opacity: 0; transform: scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.2); } }
 /* 07 签到成功奖励: rise from the streak number to the flame spot, hold, then drift 12px up and out (clear of the gift). */
@@ -1087,9 +1080,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 @keyframes dly-fly-fade { 0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .dly-hero, .dly-ring__dn, .dly-rail__item > .dly-tk, .dly-tk__sheen > view, .dly-cta__sheen, .dly-bar, .dly-burst { animation: none; }
+  .dly-hero, .dly-ring__dn, .dly-rail__item > .dly-tk, .dly-bar, .dly-burst { animation: none; }
   .dly-ring__td--breathe, [data-theme="light"] .dly-ring__td--breathe { opacity: 1; animation: none; }
-  .dly-tk__sheen, .dly-cta__sheen { display: none; }
   /* The reward stays readable for the full 1900ms, fading in place (overrides the global reduce catch-all). */
   .dly .dly-fly, .dly-bar .dly-fly { animation: dly-fly-fade 1900ms linear both !important; animation-delay: 0s !important; }
 }
