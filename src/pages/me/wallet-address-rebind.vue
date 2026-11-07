@@ -261,6 +261,7 @@ import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { usePayoutAddress } from "@/store/payout-address";
+import { productCatalogState } from "@/store/product-catalog";
 import { mockServerNow } from "@/store/server-time";
 import { otpSend, otpVerify } from "@/store/auth-otp";
 import { CHAIN_TO_WITHDRAW_NETWORK, formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
@@ -424,6 +425,11 @@ function resetOtp() {
 }
 async function sendCode(captchaTicket?: string) {
   if (otpSending.value) return;
+  if (changeBlock.value === "withdrawal-in-flight") {
+    if (step.value === "otp") otpError.value = t.value.addrRebind.inFlightBlocked;
+    else addrError.value = t.value.addrRebind.inFlightBlocked;
+    return;
+  }
   if (!requireAccountPhone()) return;
   const scope = captureCommandScope();
   if (!commandIsCurrent(scope)) return;
@@ -564,10 +570,11 @@ async function applyAfterOtp(scope = captureCommandScope()) {
       if (!draftIsCurrent()) return;
       const error = asApiError(cause);
       if (error.message === "PAYOUT_ADDRESS_OTP_INVALID") otpError.value = t.value.addrRebind.startFailed;
-      else if (error.message === "PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL") toast.error(t.value.addrRebind.inFlightBlocked);
-      else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") toast.error(cooldownUntilText.value);
-      else if (error.message === "PAYOUT_ADDRESS_FORMAT_INVALID") addrError.value = t.value.addrRebind.invalidAddress;
-      else toast.error(t.value.addrRebind.startFailed);
+      else if (error.message === "PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL") otpError.value = t.value.addrRebind.inFlightBlocked;
+      else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") otpError.value = cooldownUntilText.value;
+      else if (error.message === "PAYOUT_ADDRESS_FORMAT_INVALID") otpError.value = t.value.addrRebind.invalidAddress;
+      else if (error.message === "PAYOUT_ADDRESS_NETWORK_INVALID" || error.message === "WITHDRAWAL_NETWORK_DISABLED") otpError.value = t.value.bankWithdrawal.networkUnavailable;
+      else otpError.value = t.value.addrRebind.startFailed;
     }
     return;
   }
@@ -658,8 +665,19 @@ watch(() => payout.serverClock, (anchor) => {
 }, { immediate: true, flush: "sync" });
 
 useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
+function refreshWithdrawalListOnEntry() {
+  // Cold-session catalogue publication advances the runtime and would discard
+  // an earlier list response. Wait for that existing read, without holding UI.
+  if (!payoutAddressServerEnabled || !pageVisible || productCatalogState.status === "loading"
+    || app.remoteWithdrawalListHasSnapshot || app.remoteWithdrawalListStatus !== "idle") return;
+  void app.refreshRemoteWithdrawalList(app.accountKey);
+}
+watch(() => productCatalogState.status, refreshWithdrawalListOnEntry, { flush: "post" });
 async function retryRemoteSnapshot() {
   if (!payoutAddressServerEnabled || !pageVisible) return;
+  // Account binding clears list state synchronously. Dispatch after that batch
+  // so entry hooks share one read; a slow/failed read never holds the form.
+  void nextTick(refreshWithdrawalListOnEntry);
   // Store-owned account/runtime/version guards decide the final read status,
   // including reads started by account hydration rather than by this page.
   await Promise.all([

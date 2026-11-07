@@ -256,6 +256,10 @@ async function refreshPayoutForCurrentAccount() {
   await payout.refreshRemote().catch(() => undefined);
   if (!isCurrentProfileRequest(pageScope, accountScope, accountKey)) return;
 }
+useAutoRecovery({
+  failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error",
+  retry: () => payout.refreshRemote(),
+});
 
 onShow(() => {
   profilePageVisible = true;
