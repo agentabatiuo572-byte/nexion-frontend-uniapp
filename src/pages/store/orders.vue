@@ -451,7 +451,6 @@ const browseBtnStyle: CSSProperties = {
 .orders-list { display: flex; flex-direction: column; gap: var(--ui-space-card-gap); margin: 0 16px; }
 .order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-content-surface); cursor: pointer; transition: transform 160ms ease; }
 [data-theme="light"] .order-card { box-shadow: var(--v5-glass-shadow); }
-.order-card--pending { background: radial-gradient(220px 160px at 100% 0%, color-mix(in srgb, var(--v5-warning-ink) 9%, transparent), transparent 72%), var(--v5-content-surface); }
 .order-card:active { transform: scale(.98); }
 .order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .order-card__row { display: flex; gap: 14px; }
