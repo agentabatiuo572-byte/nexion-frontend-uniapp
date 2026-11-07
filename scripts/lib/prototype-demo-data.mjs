@@ -27,7 +27,7 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-export const demoDefaults = {trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
   promoState:[['normal','常规促销（无类型）'],['hardware','Mobile GPU Server（DEVICE）'],['server','Mobile GPU Server（后端原始 SERVER）'],['share','Mobile Cloud Share（SHARE）'],['phone','iphone15（DEVICE 手机 SKU · 首页横幅与购机活动）'],['phone-gift','手机赠品：买 S1 送 iphone15 / 邀请礼送 iphone15 / 组合礼 S1 规则送 iphone15']],
@@ -60,7 +60,9 @@ export const demoOptions = {
   bankState:[['pending','银行提现 · 处理中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
   streakState:[['normal','连续签到'],['first','首次签到·连续 0 天'],['broken','断签·可使用复活卡']],
-  ambassadorState:[['none','尚未申请'],['pending','申请审核中'],['approved','申请已通过'],['rejected','申请未通过']],
+  ambassadorState:[['none','尚未申请'],['draft','进行中 · 待提交材料（M0）'],['review','核验中 · 业务通过、费用待核（M3）'],['more-finance','需补材料 · 费用退回、可下调（M6）'],['more-business','需补材料 · 业务退回（M5）'],['passed','两项通过 · 待批准（M7）'],['passed-short','两项通过 · 认可金额不足（M8）'],['future','两项通过 · 活动未到（M9）'],['bucket','历史待审缺类别（M10）'],['approved','最近一份已通过（M13）'],['rejected','最近一份未通过（M13）']],
+  ambassadorIoState:[['normal','材料读写正常'],['upload-slow','上传慢（每次 4 秒）'],['upload-fail-once','下一次上传失败一次'],['save-reject-once','下一次提交被拒绝一次（422）'],['save-unknown-once','下一次提交结果未知一次（503）']],
+  ambassadorRank:[['follow','跟随“最高等级 V8”开关'],['v5','V5（刚满足资格）']],
   promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],
   sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
   promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
@@ -389,7 +391,7 @@ export function demoFixture(url,locale,state,request) {
   const finance=financeDemo(url,state,request);if(finance!==undefined)return finance;
   const rankPolicy=rankPolicyDemo(url,locale);if(rankPolicy!==undefined)return rankPolicy;
   const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request));if(teamGuides!==undefined)return teamGuides;
-  const ambassador=ambassadorDemo(url,state,request);if(ambassador!==undefined)return ambassador;
+  const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const auxiliary=auxiliaryDemo(url,locale,state,request);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
@@ -402,7 +404,7 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/team/rank') {
     const data=structuredClone(base());
-    return {...data,progress:{...data.progress,selfComputePoints:empty?0:state.highestRank?64000:1280,teamComputePoints:empty?0:state.highestRank?3200000:12800}};
+    return {...data,...(state.ambassadorRank==='v5'&&!empty?{rankCode:'V5'}:{}),progress:{...data.progress,selfComputePoints:empty?0:state.highestRank?64000:1280,teamComputePoints:empty?0:state.highestRank?3200000:12800}};
   }
   if(pathname==='/api/team/binary')return {...authority,source:'server',runId:null,asOfDate:iso.slice(0,10),trackA:empty?0:2800,trackB:empty?0:2400,trackAMembers:empty?0:4,trackBMembers:empty?0:4,autoPlacedMembers:0,matchRate:.1,threshold:1000,dailyCap:5000,periodCap:150000,estimatedAmountUsdt:empty?0:240,settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason:empty?'BOTH_TRACKS_BELOW_THRESHOLD':'',recentMatches:empty?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'unlocked',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];

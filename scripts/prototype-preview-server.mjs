@@ -4,6 +4,7 @@ import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoOptions } from './lib/prototype-demo-data.mjs';
+import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
@@ -67,7 +68,7 @@ function previewScenarioPage(scenario,keys){
 const scenarioSeed=()=>'<script>('+previewScenarioPage+')('+JSON.stringify(scenarioId())+','+JSON.stringify(scenarioStorageKeys)+');</script>';
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
-const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
+const modeledWrite=/^\/(auth\/users\/refresh|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
 const server=http.createServer(async(req,res)=>{
   // A write belongs to the scenario it started in: one whose body arrives after a scenario change is refused, and so
   // is any request from a page of another scenario (checked below).
@@ -105,7 +106,7 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
-        if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','sampleOrdersAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','deviceIds','deviceSequence','commands','quotes','walletBalance','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -119,7 +120,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}
         if(update.withdrawLimitState)delete state.withdrawLimitCreatedAt;
         if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}
-        if(update.ambassadorState)for(const key of ['ambassadorSubmission','ambassadorCommands'])delete state[key];
+        if(update.ambassadorState)delete state.ambassadorDemo;
         if(update.eventState)for(const key of ['eventStatuses','reminders','spun','spinHistory','raffleEntries'])delete state[key];
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         if(update.promotionTiming)state.promotionTimingAt=Date.now();
@@ -190,6 +191,15 @@ const server=http.createServer(async(req,res)=>{
       if(bankTopupEndpoint&&state.dataState==='error')return sendJson(res,{code:503,message:url.pathname.endsWith('/config')?'PAYMENT_CONFIG_UNAVAILABLE':url.pathname.endsWith('/fx-quote')?'FX_QUOTE_UNAVAILABLE':'VIETQR_RUNTIME_PROFILE_INVALID',data:null},503);
       if(businessRead&&state.dataState==='error')return sendJson(res,{code:503,message:'暂时无法加载，请重试',data:null},503);
       if(businessRead&&state.dataState==='loading')await new Promise(resolve=>setTimeout(resolve,5000));
+      // Material uploads (multipart) and private material files carry raw bytes.
+      const ambassadorBinary=ambassadorBinaryRoute(url.pathname,req.method);
+      if(ambassadorBinary){
+        const chunks=[];for await(const chunk of req)chunks.push(chunk);
+        if(staleWrite())return refuseStale();
+        const result=await ambassadorBinaryResponse(url,state,{method:req.method,headers:req.headers,body:Buffer.concat(chunks)},locale);
+        if(result.file){res.writeHead(200,{'Content-Type':result.file.contentType,'Content-Disposition':"inline; filename*=UTF-8''"+encodeURIComponent(result.file.name),'X-Content-Type-Options':'nosniff','X-Preview-Scenario':scenarioId()});return res.end(result.file.bytes);}
+        return sendJson(res,{code:0,message:'OK',data:result.data});
+      }
       let body='';for await(const chunk of req)body+=chunk;
       if(staleWrite())return refuseStale();
       if(conversationDelete) {
