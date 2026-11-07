@@ -33,7 +33,7 @@
       <view class="genesis-section"><text>{{ t.genesis.faq.title }}</text></view>
       <view class="genesis-faq"><view v-for="k in faqKeys" :key="k" class="genesis-faq-row"><view class="genesis-faq-question" role="button" tabindex="0" :aria-expanded="expandedFaq === k" @click="expandedFaq = expandedFaq === k ? null : k"><text>{{ t.genesis.faq[k] }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" :style="{ transform: expandedFaq === k ? 'rotate(180deg)' : 'none' }"><path d="m6 9 6 6 6-6"/></svg></view><text v-if="expandedFaq === k" class="genesis-faq-answer">{{ faqAnswer(k) }}</text></view></view>
     </view>
-    <template #pageFixed><view class="nx-genesis-dock"><NxButton variant="primary" :disabled="dockDisabled" @click="openSheet"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z"/></svg><text>{{ dockCtaText }}</text><text v-if="preSale && showTime" class="genesis-dock-number"> · {{ countdownDisplay }}</text><text v-else-if="dockShowsPrice" class="genesis-dock-number"> · ${{ priceText }}</text></NxButton></view></template>
+    <template #pageFixed><view class="nx-genesis-dock nx-frosted-button"><NxButton variant="primary" :disabled="dockDisabled" @click="openSheet"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z"/></svg><text>{{ dockCtaText }}</text><text v-if="preSale && showTime" class="genesis-dock-number"> · {{ countdownDisplay }}</text><text v-else-if="dockShowsPrice" class="genesis-dock-number"> · ${{ priceText }}</text></NxButton></view></template>
     <GenesisPurchaseSheet v-model:open="sheetOpen" />
     <GenesisEligibilitySheet v-model:open="eligSheetOpen" @subscribe="onEligSubscribe" />
   </AppChassis>
@@ -388,7 +388,7 @@ function goMarketplace() {
 .genesis-faq-question { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:52px; padding:0 16px; font-size:15px; line-height:22px; font-weight:500; }
 .genesis-faq-question svg { flex:none; }
 .genesis-faq-answer { display:block; padding:0 16px 14px; font-size:13px; line-height:20px; color:var(--v5-ink-2); }
-.nx-genesis-dock { position:fixed; left:0; right:0; bottom:0; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); background:linear-gradient(180deg,color-mix(in srgb,var(--v5-surface) 70%,transparent),color-mix(in srgb,var(--v5-surface) 94%,transparent)); border-top:1px solid color-mix(in srgb,var(--v5-ink) 5%,transparent); backdrop-filter:blur(18px) saturate(160%); }
+.nx-genesis-dock { position:fixed; left:0; right:0; bottom:0; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); }
 .nx-genesis-dock .nx-button { width:100%; }
 .genesis-dock-number { font-family:var(--font-metric); }
 @media(prefers-reduced-motion:reduce) { .genesis-meter > view > view { transition:none; } }
