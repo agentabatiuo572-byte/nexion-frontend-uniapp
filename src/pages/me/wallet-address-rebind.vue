@@ -662,11 +662,13 @@ watch(() => payout.serverClock, (anchor) => {
 }, { immediate: true, flush: "sync" });
 
 useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
+let withdrawalListEntryPending = true;
 function refreshWithdrawalListOnEntry() {
   // Cold-session catalogue publication advances the runtime and would discard
   // an earlier list response. Wait for that existing read, without holding UI.
-  if (!payoutAddressServerEnabled || !pageVisible || productCatalogState.status === "loading"
-    || app.remoteWithdrawalListHasSnapshot || app.remoteWithdrawalListStatus !== "idle") return;
+  if (!payoutAddressServerEnabled || !pageVisible || !withdrawalListEntryPending
+    || productCatalogState.status === "loading") return;
+  withdrawalListEntryPending = false;
   void app.refreshRemoteWithdrawalList(app.accountKey);
 }
 watch(() => productCatalogState.status, refreshWithdrawalListOnEntry, { flush: "post" });
@@ -716,6 +718,7 @@ const stopRuntimeRead = subscribeRuntimeRevision(() => {
 });
 onShow(() => {
   pageVisible = true;
+  withdrawalListEntryPending = true;
   void retryRemoteSnapshot();
 });
 onHide(() => {
@@ -724,6 +727,7 @@ onHide(() => {
   clearNetworkPolicy();
 });
 watch(() => [app.accountKey, app.accountBindingEpoch, readApiOrigin.value] as const, () => {
+  withdrawalListEntryPending = true;
   invalidatePageCommand();
   clearNetworkPolicy();
   explicitStep.value = "base";
