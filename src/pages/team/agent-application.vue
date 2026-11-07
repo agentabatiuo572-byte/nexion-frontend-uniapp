@@ -6,7 +6,7 @@
       <view v-else-if="!pack || !row" class="detail-loading" role="status" aria-busy="true"><text>{{ t.agent.loading }}</text></view>
       <CardStagger v-else class="detail-content">
         <!-- Page focus: soft-glass hero with the status tag, the amount and the four-node progress. -->
-        <view class="detail-hero nx-frosted-button">
+        <view class="detail-hero nx-soft-glass">
           <view class="detail-hero__top">
             <view class="detail-hero__category"><AmbassadorBucketIcon :bucket="pack.bucket" size="small" /><text>{{ pack.bucket ? t.agent.buckets[pack.bucket].title : c.noBucket }}</text></view>
             <NxTag v-if="statusKnown" :tone="presentation.tone" :label="c.statuses[presentation.status]" />
@@ -603,8 +603,7 @@ useAutoRecovery({ failed: () => pendingSubmission.value !== null && !saving.valu
 .detail-page { color: var(--v5-ink); }
 .detail-loading { padding: var(--v5-space-8) var(--v5-space-4) 0; text-align: center; color: var(--v5-ink-3); }
 .detail-content { display: flex; flex-direction: column; padding-top: var(--v5-space-4); }
-.detail-hero { display: block; margin: 0 var(--v5-space-4); padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { .detail-hero { background: var(--v5-surface-2); } }
+.detail-hero { display: block; margin: 0 var(--v5-space-4); padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); }
 .detail-hero__top { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); }
 .detail-hero__category { display: inline-flex; align-items: center; gap: var(--v5-space-2); min-width: 0; font: var(--ui-type-description-weight, 400) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .detail-hero__title { display: block; margin-top: var(--ui-space-inline); font: 600 20px/28px var(--font-v5); color: var(--v5-ink); overflow-wrap: anywhere; }
