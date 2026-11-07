@@ -2,11 +2,10 @@
 <style scoped>
 .reward-page {
   --reward-accent: #c5f45a;
-  --reward-panel: linear-gradient(135deg, rgba(40, 43, 46, .88), rgba(17, 19, 21, .94));
   --reward-panel-edge: rgba(210, 216, 224, .16);
   color: var(--v5-ink); padding-bottom: 28px; overflow-wrap: anywhere;
 }
-.reward-page :deep(.reward-summary-panel) { padding: 0 18px 16px; border: 1px solid var(--reward-panel-edge); border-radius: 20px; background: var(--reward-panel); }
+.reward-page :deep(.reward-summary-panel) { padding: 0 18px 16px; border: 1px solid var(--reward-panel-edge); border-radius: 20px; }
 .reward-page :deep(.reward-summary-panel), .reward-page :deep(.reward-hero--panel) { --v5-ink: #f7f8fa; --v5-ink-2: #cdd3da; --v5-ink-3: #a1a9b3; --v5-border: rgba(223, 228, 235, .14); color: var(--v5-ink); }
 /* Reward CTAs share the neutral glass material from tokens.css (design system 03 §3.1):
    an in-card entry is M (40px surface, 44px hit area, arrow to the next page); the wide

@@ -12,14 +12,6 @@
     preserveAspectRatio="xMidYMid meet"
     :style="rootStyle"
   >
-    <defs>
-      <radialGradient id="orbCenterGlow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.32" />
-        <stop offset="60%" stop-color="var(--v5-brand)" stop-opacity="0.08" />
-        <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
-      </radialGradient>
-    </defs>
-
     <circle :cx="CENTER" :cy="CENTER" :r="DIRECT_RADIUS" fill="none" stroke="var(--v5-brand)" stroke-opacity="0.22" stroke-width="0.8" />
 
     <!-- Extended orbit + outer dots rotate slowly clockwise -->
@@ -43,12 +35,6 @@
           :dur="i === 0 ? '2.2s' : '2.6s'" :begin="i === 0 ? '0s' : '0.6s'" repeatCount="indefinite" />
       </circle>
     </g>
-
-    <!-- Center glow — breathing -->
-    <circle :cx="CENTER" :cy="CENTER" r="50" fill="url(#orbCenterGlow)">
-      <animate attributeName="r" values="46;54;46" dur="4.4s" repeatCount="indefinite" />
-      <animate attributeName="opacity" values="0.75;1;0.75" dur="4.4s" repeatCount="indefinite" />
-    </circle>
   </svg>
 </template>
 
