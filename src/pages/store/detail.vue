@@ -67,7 +67,6 @@
       <template v-else>
         <!-- === Section 1: Hero === -->
         <view class="mx-4 nx-glass-card overflow-hidden relative detail-hero">
-          <view aria-hidden :style="auroraStyle" />
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
             <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
@@ -767,16 +766,6 @@ const heroCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderColor: "var(--v5-border)",
 };
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background:
-    "radial-gradient(40% 50% at 80% 20%, var(--v5-tech-cyan-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 80%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.18) 0%, transparent 60%)",
-  pointerEvents: "none",
-  opacity: 0.7,
-};
 const ribbonStyle: CSSProperties = {
   top: 0,
   left: "16px",
@@ -966,14 +955,17 @@ const faqQStyle: CSSProperties = {
 .product-detail-page :deep(.scb-outer) { overflow:hidden; }
 .product-detail-page :deep(.scb-bar) {
   position:relative;isolation:isolate;
-  background:transparent !important;border-top-color:transparent !important;
+  background:transparent !important;box-shadow:none !important;
   backdrop-filter:none !important;-webkit-backdrop-filter:none !important;
 }
 .product-detail-page :deep(.scb-bar::before) {
-  content:"";position:absolute;inset:-1px 0 0;z-index:-1;pointer-events:none;
-  background:color-mix(in srgb, var(--v5-surface) 76%, transparent);
-  backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);
-  box-shadow:inset 0 1px 0 var(--v5-sticky-bar-border);
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:var(--v5-sticky-bar-bg);
+  backdrop-filter:blur(12px) saturate(125%);-webkit-backdrop-filter:blur(12px) saturate(125%);
+  box-shadow:var(--ui-glass-edge-shadow);
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .product-detail-page :deep(.scb-bar::before) { background:var(--v5-surface-2);backdrop-filter:none;-webkit-backdrop-filter:none; }
 }
 .promotion-quantity-stepper { display:flex;align-items:center;border:1px solid var(--v5-border);border-radius:999px;overflow:hidden; }
 .promotion-quantity-stepper view { min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--v5-surface-2); }

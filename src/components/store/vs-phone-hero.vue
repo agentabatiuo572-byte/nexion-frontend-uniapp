@@ -1,13 +1,12 @@
 <!--
   VsPhoneHero — phone-vs-S1 yield contrast (ported from store/page.tsx
-  VsPhoneHeroV5). $0.06/d ↔ 117× more ↔ $7.00/d, with NEX/d sublines. Brand +
-  brand-2 radial ambient. Drives the core "117× your phone" conversion hook.
+  VsPhoneHeroV5). $0.06/d ↔ 117× more ↔ $7.00/d, with NEX/d sublines. Solid
+  card. Drives the core "117× your phone" conversion hook.
   Both sides are estimate comparisons, so figures use the metric font (DS-27);
   device names and "/d" stay in the interface font.
 -->
 <template>
   <view class="nx-glass-card relative overflow-hidden" :style="rootStyle">
-    <view aria-hidden :style="auroraStyle" />
     <view class="relative grid gap-2.5 items-center" style="grid-template-columns: 1fr auto 1fr">
       <!-- Base device label resolves from DeviceKind at render time (lib/device-copy.ts):
            the stored name is English ("Your phone") and would freeze that locale into
@@ -61,17 +60,6 @@ const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
 const deviceStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-meta)", lineHeight: "var(--ui-type-meta-lh)", color: "var(--v5-ink-3)" };
 const unitStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-list-subtitle)", fontWeight: 400, color: "var(--v5-ink-3)" };
 const subUnitStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 400, color: "var(--v5-ink-3)" };
-
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 90% 50%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 50%, var(--v5-brand-2-soft) 0%, transparent 60%)",
-  filter: "blur(12px)",
-  opacity: 0.4,
-  pointerEvents: "none",
-};
 
 const phoneNumStyle: CSSProperties = {
   fontFamily: "var(--font-metric)",

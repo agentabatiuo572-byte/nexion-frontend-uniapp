@@ -48,10 +48,8 @@
       </view>
       <template v-else>
 
-      <!-- Hero — filled commercial spotlight (border dropped; aurora stays clipped
-           inside the surface + overflow-hidden, so it's not a page-floor glow). -->
-      <view class="nx-glass-card mx-4 relative overflow-hidden" :style="heroStyle">
-        <view aria-hidden :style="heroAuroraStyle" />
+      <!-- Hero — the page's focal soft-glass card (01 §1.1.2); the total card below stays solid. -->
+      <view class="nx-soft-glass mx-4 relative overflow-hidden" style="padding: 18px; border-radius: 20px">
         <view class="relative">
           <view class="flex items-center" style="gap: 6px; margin-bottom: 8px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
@@ -136,7 +134,6 @@
 
       <!-- Total summary -->
       <view v-if="products.length > 0" class="nx-glass-card mx-4 mt-3 relative overflow-hidden" :style="heroStyle">
-        <view aria-hidden :style="totalAuroraStyle" />
         <view class="relative">
           <!-- Subtotal -->
           <view class="flex items-center justify-between" style="min-height: 24px">
@@ -826,27 +823,6 @@ const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "18px",
   borderRadius: "var(--nx-glass-radius)",
   background: "var(--nx-glass-fill)",
-};
-const heroAuroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 80% 20%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 80%, var(--v5-success-soft) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
-};
-const totalAuroraStyle: CSSProperties = {
-  position: "absolute",
-  top: "-40px",
-  left: "-40px",
-  width: "140px",
-  height: "140px",
-  borderRadius: "50%",
-  background: "radial-gradient(circle, var(--v5-brand-2-soft), transparent 70%)",
-  opacity: 0.6,
-  pointerEvents: "none",
 };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
