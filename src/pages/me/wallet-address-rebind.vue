@@ -11,7 +11,7 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet-withdraw" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
+      <SubPageHeader :back="withdrawReturnUrl" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
       <!-- ── 网络:上下排列的单选行(选中 = 品牌描边 + 实心点),与充值页同语汇 ── -->
       <view class="mx-4 rb-nets-wrap">
@@ -26,7 +26,7 @@
             @click="switchNetwork(nw.id)"
             @keydown.enter.prevent="switchNetwork(nw.id)" @keydown.space.prevent="switchNetwork(nw.id)" @keydown.left.prevent="moveNetwork(-1)" @keydown.right.prevent="moveNetwork(1)"
           >
-            <view class="rb-net__nm"><text class="rb-net__name">{{ nw.label }}</text><text v-if="nw.id === 'usdt-trc20'" class="rb-net__sub">{{ t.topupChrome.netRecommended }}</text></view>
+            <view class="rb-net__nm"><text class="rb-net__name">{{ nw.label }}</text></view>
             <view class="rb-net__ck" aria-hidden="true" />
           </view>
         </view>
@@ -255,7 +255,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
-import { navBack, navTo } from "@/lib/route";
+import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { requireAccountPhone } from "@/lib/require-account-phone";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { useApp } from "@/store/app";
@@ -263,7 +263,7 @@ import { useConfig } from "@/store/config";
 import { usePayoutAddress } from "@/store/payout-address";
 import { mockServerNow } from "@/store/server-time";
 import { otpSend, otpVerify } from "@/store/auth-otp";
-import { formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
+import { CHAIN_TO_WITHDRAW_NETWORK, formatClock, isChainAddressValid, maskAddressMid } from "@/store/payout-address-core";
 import { advanceMonotonicHighWater, deadlineRemainingMs, projectServerNow, readTrustedMonotonicNowMs } from "@/lib/server-deadline-clock";
 import type { ChainDepositChannel } from "@/store/types";
 import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
@@ -285,15 +285,15 @@ const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
 const networkPolicy = ref<WithdrawalPolicy | null>(null);
 const networkPolicyStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 const NETWORKS = computed(() => payoutAddressServerEnabled
-  ? ALL_NETWORKS.filter((nw) => nw.id !== "usdt-trc20"
-    && networkPolicy.value?.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
+  ? ALL_NETWORKS.filter((nw) => networkPolicy.value?.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
   : ALL_NETWORKS);
 const network = ref<ChainDepositChannel>("usdt-trc20");
+const withdrawReturnUrl = computed(() => `/pages/me/wallet-withdraw?network=${CHAIN_TO_WITHDRAW_NETWORK[network.value]}`);
 const networkAvailable = computed(() => !payoutAddressServerEnabled
   || (networkPolicyStatus.value === "ready" && NETWORKS.value.some((nw) => nw.id === network.value)));
 
 onLoad((options) => {
-  const q = (options as Record<string, string> | undefined)?.network;
+  const q = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-address-rebind")).get("network");
   if (q === "usdt-trc20" || q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
 });
 
@@ -625,6 +625,11 @@ const remoteReadStatus = computed(() => {
 });
 const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
 const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
+watch(() => [networkPolicyStatus.value, remoteReadStatus.value] as const, ([policyStatus, addressStatus]) => {
+  if (policyStatus !== "ready" || addressStatus !== "ready" || networkAvailable.value) return;
+  const fallback = NETWORKS.value.find((nw) => payout.currentFor(nw.id)) ?? NETWORKS.value[0];
+  if (fallback) switchNetwork(fallback.id);
+});
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 let pageVisible = true;
 let commandGeneration = 0;
@@ -675,7 +680,6 @@ async function refreshNetworkPolicy() {
     if (!isCurrent()) return;
     networkPolicy.value = policy;
     networkPolicyStatus.value = "ready";
-    if (!networkAvailable.value && NETWORKS.value[0]) switchNetwork(NETWORKS.value[0].id);
   } catch {
     if (!isCurrent()) return;
     networkPolicy.value = null;
@@ -771,11 +775,11 @@ const holdActive = computed(() => {
 // ── 动作 ──
 function leave() {
   invalidatePageCommand();
-  navBack("/pages/me/wallet-withdraw");
+  navBack(withdrawReturnUrl.value);
 }
 function finish() {
   invalidatePageCommand();
-  navBack("/pages/me/wallet-withdraw"); // 完成后返回提现页,地址由响应式 store 即时回填
+  navBack(withdrawReturnUrl.value); // 无页面栈时保留当前网络,地址由响应式 store 即时回填
 }
 
 // ── styles ──
@@ -926,7 +930,6 @@ const successRowValStyle: CSSProperties = {
 .rb-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .rb-net__name { color: var(--v5-ink); font: 500 15px/20px var(--font-v5); }
 .rb-net--on .rb-net__name { color: var(--v5-brand); }
-.rb-net__sub { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .rb-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .rb-net--on .rb-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
 .rb-net--on .rb-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
