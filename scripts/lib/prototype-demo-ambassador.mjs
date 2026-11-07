@@ -62,6 +62,8 @@ function seed(scenario, empty) {
     const app = { applicationId: 7, status: 'PENDING', city: { zh: '胡志明市 · 第一郡', en: 'Ho Chi Minh City · District 1', vi: 'TP. Hồ Chí Minh · Quận 1' }, eventDate: businessDay(future ? 7 : -6), budgetUsdt: 3000, bucket: 'venue', submittedAt: new Date(Date.now() - 9 * day).toISOString() };
     if (materialState === 'draft') return { app, rec: { revision: 0 } };
     const rec = { revision: 1, attachments: venueFiles(7, 'f7'), statement };
+    // Submitted without two required kinds: the server lists them as missing although no file exists.
+    if (materialState === 'partial') return { app, rec: { ...rec, attachments: rec.attachments.slice(0, 1), business: null, finance: null } };
     const businessPassed = (n) => review('PASSED', at(-4, '14:20'), { reason: { zh: '签到表与现场照片一致。', en: 'The sign-in sheet matches the venue photos.', vi: 'Bảng điểm danh khớp với ảnh hiện trường.' }, verifiedAttendees: n });
     const financePassed = (amount) => review('PASSED', at(-3, '10:05'), { stage: 'FINANCE', reason: { zh: '发票已核对。', en: 'Invoices checked.', vi: 'Đã đối chiếu hóa đơn.' }, recognizedBudgetUsdt: amount });
     if (materialState === 'review') Object.assign(rec, { business: businessPassed(128), finance: review('PENDING', null, { stage: 'FINANCE' }) });
@@ -69,6 +71,7 @@ function seed(scenario, empty) {
     if (materialState === 'more-business') Object.assign(rec, { business: review('NEEDS_MORE', at(-4, '14:20'), { reason: { zh: '现场照片看不出活动名称，请补充带横幅或签到台的照片。', en: 'The photos do not show the event name. Add photos with the banner or sign-in desk.', vi: 'Ảnh hiện trường không thấy tên sự kiện. Hãy bổ sung ảnh có băng rôn hoặc bàn điểm danh.' }, verifiedAttendees: 0, missingKinds: ['activity'] }), finance: financePassed(3000) });
     if (materialState === 'passed' || materialState === 'future') Object.assign(rec, { business: businessPassed(146), finance: financePassed(3000) });
     if (materialState === 'passed-short') Object.assign(rec, { business: businessPassed(146), finance: financePassed(2000) });
+    if (materialState === 'passed-precise') Object.assign(rec, { business: businessPassed(146), finance: financePassed(2999.999999) });
     return { app, rec };
   };
   let rows = [];
@@ -148,6 +151,8 @@ export function ambassadorDemo(url, state, request, locale = 'zh') {
     if (data.commands[key]) return data.commands[key].hash === hash ? structuredClone(data.commands[key].result) : reject('IDEMPOTENCY_KEY_CONFLICT', 409);
     if (state.ambassadorIoState === 'save-unknown-once') { state.ambassadorIoState = 'normal'; reject('暂时无法连接，请稍后再试', 503); }
     if (state.ambassadorIoState === 'save-reject-once') { state.ambassadorIoState = 'normal'; reject('AMBASSADOR_MATERIAL_SUBMISSION_INVALID', 422); }
+    // The application is decided while the user edits: the server refuses the new version.
+    if (state.ambassadorIoState === 'close-on-submit-once') { state.ambassadorIoState = 'normal'; app.status = 'REJECTED'; reject('APPLICATION_NOT_PENDING', 409); }
     if (app.status !== 'PENDING') reject('APPLICATION_NOT_PENDING', 409);
     if (input.expectedMaterialRevision !== record.revision) reject('MATERIAL_REVISION_STALE', 409);
     const statement = typeof input.statement === 'string' ? input.statement.trim() : '';
@@ -175,6 +180,8 @@ export function ambassadorDemo(url, state, request, locale = 'zh') {
     data.materials[id] = { revision: record.revision + 1, attachments: ids, statement, business: null, finance: null };
     const result = packet(app, data.materials[id], data.files, locale);
     data.commands[key] = { hash, result };
+    // The new version is stored, but the reply is lost on the way back.
+    if (state.ambassadorIoState === 'save-lands-unknown-once') { state.ambassadorIoState = 'normal'; reject('暂时无法连接，请稍后再试', 503); }
     return structuredClone(result);
   }
   const views = () => data.applications.map(app => applicationView(app, data.materials[app.applicationId], data.files, locale));
@@ -197,6 +204,7 @@ export function ambassadorDemo(url, state, request, locale = 'zh') {
     return structuredClone(result);
   }
   if (method !== 'GET') return undefined;
+  if (pathname === base && state.ambassadorIoState === 'history-fail-once') { state.ambassadorIoState = 'normal'; reject('暂时无法加载，请重试', 503); }
   const rows = views();
   if (pathname === base + '/latest') return rows[0] ?? { ...proof, applicationId: null, status: 'NONE' };
   const pageNum = Math.max(1, Number(url.searchParams.get('pageNum') || 1)), pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize') || 20)));
