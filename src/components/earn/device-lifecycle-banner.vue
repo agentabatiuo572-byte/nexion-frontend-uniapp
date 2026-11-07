@@ -15,7 +15,6 @@
 <template>
   <view v-if="summaries.length > 0" class="mx-4">
     <view class="nx-glass-card block relative overflow-hidden rounded-2xl" :style="rootStyle" @click="goDevices">
-      <view class="absolute inset-0 pointer-events-none" :style="glowStyle" />
 
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="accent" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
@@ -113,9 +112,6 @@ const rootStyle = computed<CSSProperties>(() => ({ borderRadius: "var(--nx-glass
   border: "none",
   background: "var(--nx-glass-fill)",
   padding: "16px",
-}));
-const glowStyle = computed<CSSProperties>(() => ({
-  background: `radial-gradient(60% 80% at 95% 50%, color-mix(in srgb, ${accent.value} 14%, transparent), transparent 70%)`,
 }));
 const labelStyle: CSSProperties = {
   fontSize: "12px",
