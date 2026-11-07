@@ -92,6 +92,7 @@ import type { AmbassadorApplication, AmbassadorMaterialAttachment, AmbassadorMat
 import { asApiError, isSettledRejection } from "@/api/errors";
 import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/ambassador-command-key";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { createAbortController } from "@/lib/abort-controller-compat";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
@@ -238,7 +239,7 @@ async function retryUpload() {
   const draft = upload.value;
   if (!editable.value || !draft || draft.state === "uploading" || !props.application.applicationId) return;
   const current = scope(), id = props.application.applicationId;
-  const controller = new AbortController(); uploadController = controller; draft.state = "uploading";
+  const controller = createAbortController(); uploadController = controller; draft.state = "uploading";
   try {
     const file = await ambassadorApplicationApi.uploadMaterialFile(id, draft.path, draft.kind, draft.key, controller.signal);
     if (!current() || upload.value !== draft) return;
@@ -278,7 +279,7 @@ async function save() {
 }
 async function viewFile(file: AmbassadorMaterialAttachment) {
   if (previewBusy.value || !props.application.applicationId) return;
-  const current = scope(), controller = new AbortController(); previewController = controller; previewBusy.value = true;
+  const current = scope(), controller = createAbortController(); previewController = controller; previewBusy.value = true;
   try {
     const path = await ambassadorApplicationApi.materialFile(props.application.applicationId, file.fileId, controller.signal);
     if (!current()) { releasePath(path); return; }
