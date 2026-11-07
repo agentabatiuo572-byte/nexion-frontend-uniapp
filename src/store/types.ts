@@ -319,6 +319,8 @@ export interface Withdrawal {
   address: string;
   fee: WithdrawalFeeSnapshot;
   status: WithdrawalStatus;
+  /** Server status evaluated with the payout-address mapper's account-wide unsettled rule. */
+  payoutAddressChangeBlocked?: boolean;
   riskRoute?: WithdrawalRiskRoute;
   riskReasons?: string[];
   /** FEAT-WD01a:本单是否命中小额免审快车道。 */

@@ -19,6 +19,7 @@ import { recordWithdrawAddressUse } from "./risk-identity";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { subscribeRuntimeRevision } from "@/api/order-api";
+import { occupiesWithdrawalSlot } from "./withdrawal-arrival-core";
 import {
   applyAddAddress,
   applyChangeAddress,
@@ -369,23 +370,18 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   /** 任一网络已设地址(钱包面「管理」入口态)。 */
   const hasAnyAddress = computed(() => PAYOUT_NETWORKS.some((network) => book.value[network]?.current));
 
-  /**
-   * 该网络是否有在途提现单。
-   * 🔴 问**整张在途列表**(occupiesWithdrawalSlot 筛出的非终态集合)再按网络过滤,
-   * 不读 latestWithdrawal —— 只看最新一笔时,一张在途单 + 一张更新的已到账单
-   * 会把闸静默架空,收款地址能在放款前被换掉(2026-08-01 审计,资金安全级)。
-   */
-  function hasInFlightWithdrawalOn(network: ChainDepositChannel): boolean {
-    return useApp().inFlightWithdrawals.some((w) => w.network === CHAIN_TO_WITHDRAW_NETWORK[network]);
-  }
-
   /** 更换前的禁止动作判定(null = 可更换;页面与提交动作共用同一判据)。 */
   function changeBlockReason(
     network: ChainDepositChannel,
     serverNowEpochMs?: number | null,
   ): PayoutAddressChangeBlockReason | null {
+    // Backend checks every withdrawal of this account, including BANK-VND.
+    // Retain its raw-status verdict: display statuses can collapse a blocked
+    // REVIEW_REJECTED and a settled REJECTED into the same client status.
+    const hasInFlightWithdrawal = useApp().withdrawals.some((w) =>
+      w.payoutAddressChangeBlocked ?? occupiesWithdrawalSlot(w.status));
     if (payoutAddressServerEnabled) {
-      if (hasInFlightWithdrawalOn(network)) return "withdrawal-in-flight";
+      if (hasInFlightWithdrawal) return "withdrawal-in-flight";
       // A response from a pre-clock server is still safe to display, but may not
       // make a time-gated change appear available.
       if (!remoteServerClock.value || serverNowEpochMs == null
@@ -396,7 +392,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     }
     return payoutChangeBlockReason({
       now: serverNowEpochMs ?? mockServerNow(),
-      hasInFlightWithdrawal: hasInFlightWithdrawalOn(network),
+      hasInFlightWithdrawal,
       nextChangeAt: stateFor(network).nextChangeAt,
     });
   }
