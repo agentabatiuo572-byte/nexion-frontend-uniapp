@@ -7,13 +7,13 @@
     · Link → <view @click> + shared navTo (P-036: no native <button>/<a>)
     · lucide ArrowRight → inline <svg stroke="currentColor">
     · useHaptic("medium") → uni.vibrateShort
-    · frosted gradient via existing --v5-sticky-bar-bg / -border tokens
+    · soft glass via the shared .nx-glass-bar material (tokens.css)
   All display text (amount / subtext / buttonLabel) is caller-supplied via the
   payload; the price eyebrow is static via i18n (t.stickyCta.priceLabel).
 -->
 <template>
   <view v-if="cta" class="scb-outer" :style="outerStyle">
-    <view class="scb-bar" :style="barStyle">
+    <view class="scb-bar nx-glass-bar" :style="barStyle">
       <view class="scb-info">
         <!-- Eyebrow — explicitly labels the number as PRICE so it isn't
              confused with yield/earnings shown elsewhere on the page. -->
@@ -79,9 +79,6 @@ const barStyle = computed<CSSProperties>(() => ({
   // SKILL Sheets > iOS home indicator safe area: bottom padding clears the
   // 20px home indicator + finger margin = 38px.
   padding: "14px 16px calc(env(safe-area-inset-bottom) + 38px)",
-  background: "var(--v5-sticky-bar-bg)",
-  backdropFilter: "blur(22px) saturate(180%)",
-  borderTop: "1px solid var(--v5-sticky-bar-border)",
 }));
 const subtextStyle = computed<CSSProperties>(() => ({ color: subColor.value }));
 const ctaStyle = computed<CSSProperties>(() => ({ background: accentColor.value }));
