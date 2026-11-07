@@ -44,7 +44,7 @@ function open() { if (props.application.applicationId) void navTo(AMBASSADOR_ROU
 .amb-row__title, .amb-row__meta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .amb-row__title { font: var(--ui-type-list-title-weight, 500) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .amb-row__meta { margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.amb-row__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; text-align: end; }
+.amb-row__side { flex: 0 1 auto; min-width: 0; max-width: 60%; display: flex; flex-direction: column; align-items: flex-end; text-align: end; }
 .amb-row__status { margin-top: var(--v5-space-1); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .amb-row__status--success { color: var(--v5-success-ink); }
 .amb-row__status--danger { color: var(--v5-danger); }
