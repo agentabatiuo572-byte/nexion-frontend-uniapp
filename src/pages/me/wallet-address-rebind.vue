@@ -34,6 +34,7 @@
 
       <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 2px">
         <text class="block" :style="stateBodyStyle">{{ networkPolicyStatus === 'ready' && !NETWORKS.length ? t.wallet.withdrawalChannelsClosed : remoteReadFailed ? copy.addressUnavailable : copy.addressLoading }}</text>
+        <text v-if="otpError" class="block nx-rebind-refusal" :style="errorTextStyle">{{ otpError }}</text>
         <view v-if="remoteReadFailed" class="nx-rebind-read-retry w-full grid place-items-center" :style="primaryCtaStyle" role="button" :aria-disabled="remoteRefreshPending" :tabindex="remoteRefreshPending ? -1 : 0" @click="retryRemoteSnapshot" @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"><text>{{ remoteRefreshPending ? copy.addressLoading : copy.retry }}</text></view>
       </view>
       <!-- ── 成功态 ── -->
@@ -347,13 +348,14 @@ function detailVal(e: Event): string {
 }
 // Paste from the clipboard into the address well; validation runs on proceed exactly as for typed input.
 function pasteAddress() {
-  uni.getClipboardData({ success: (result) => { newAddress.value = String(result.data ?? "").trim(); addrError.value = ""; }, fail: () => {} });
+  uni.getClipboardData({ success: (result) => { newAddress.value = String(result.data ?? "").trim(); addrError.value = ""; clearOtpError(); }, fail: () => {} });
 }
 // Cancel in the fixed bar: back to the current address when changing, otherwise leave the page.
 function cancelForm() { if (mode.value === "change") backToBase(); else leave(); }
 function onAddressInput(e: Event) {
   newAddress.value = detailVal(e);
   addrError.value = "";
+  clearOtpError();
 }
 const effectiveMode = computed<"add" | "change">(() => (current.value ? mode.value : "add"));
 
@@ -389,6 +391,7 @@ const otpBodyText = computed(() =>
 const otpRequestId = ref<string | null>(null);
 const otpCode = ref("");
 const otpError = ref("");
+const cooldownRefused = ref(false);
 const otpSending = ref(false);
 const otpVerifying = ref(false);
 // 码已核验但事务未落(用户取消了二次确认弹窗)→ 再次点确认不重复消费验证码。
@@ -400,10 +403,16 @@ const resendLabelParts = computed(() => t.value.addrRebind.otpResendIn.split("{s
 const resendDigits = ref(2);
 const showCaptcha = ref(false);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
-const otpReady = computed(() => networkAvailable.value && otpCode.value.trim().length === 6 && !!otpRequestId.value);
+const otpReady = computed(() => networkAvailable.value && !cooldownRefused.value
+  && (!payoutAddressServerEnabled || remoteReadStatus.value === "ready")
+  && otpCode.value.trim().length === 6 && !!otpRequestId.value);
+function clearOtpError() {
+  otpError.value = "";
+  cooldownRefused.value = false;
+}
 function onOtpInput(e: Event) {
   otpCode.value = detailVal(e).replace(/[^0-9]/g, "").slice(0, 6);
-  otpError.value = "";
+  clearOtpError();
 }
 function startResendCountdown(sec: number) {
   resendDigits.value = Math.max(2, String(Math.ceil(sec)).length);
@@ -417,7 +426,7 @@ function startResendCountdown(sec: number) {
 function resetOtp() {
   otpRequestId.value = null;
   otpCode.value = "";
-  otpError.value = "";
+  clearOtpError();
   otpVerifiedOnce.value = false;
   otpCommandKey.value = null;
   resendLeft.value = 0;
@@ -572,6 +581,8 @@ async function applyAfterOtp(scope = captureCommandScope()) {
       if (error.message === "PAYOUT_ADDRESS_OTP_INVALID") otpError.value = t.value.addrRebind.startFailed;
       else if (error.message === "PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL") otpError.value = t.value.addrRebind.inFlightBlocked;
       else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") {
+        cooldownRefused.value = true;
+        otpError.value = t.value.addrRebind.cooldownActive;
         await payout.refreshRemote();
         if (!draftIsCurrent()) return;
         otpError.value = remoteReadStatus.value === "ready" ? cooldownUntilText.value : t.value.addrRebind.cooldownActive;
@@ -630,6 +641,13 @@ const monotonicNow = ref<number | null>(readTrustedMonotonicNowMs());
 const clockFault = ref(false);
 const readApiOrigin = ref({ ...apiRuntimeConfig });
 const remoteReadStatus = computed(() => payout.readStatusFor(app.accountKey));
+watch(remoteReadStatus, status => {
+  if (status !== "ready" || !cooldownRefused.value) return;
+  // An empty snapshot cannot supersede a known cooldown refusal. Keep that
+  // reason and block confirmation until its time is known or the draft changes.
+  if (cooldownRefused.value && payout.stateFor(network.value).nextChangeAt === null) return;
+  backToBase();
+}, { flush: "sync" });
 const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
 const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
 watch(() => [networkPolicyStatus.value, remoteReadStatus.value] as const, ([policyStatus, addressStatus]) => {
@@ -738,6 +756,7 @@ onShow(() => {
 });
 onHide(() => {
   pageVisible = false;
+  if (otpError.value) backToBase();
   invalidatePageCommand();
   clearNetworkPolicy();
 });
