@@ -64,6 +64,7 @@ export interface WithdrawalPolicy {
 
 /** 单据状态镜像 —— GET /api/withdrawals/:id (PRD §9.11f 的按 id 读单通式)。 */
 export interface WithdrawalStatusSnapshot {
+  payoutAddressChangeBlocked: boolean;
   withdrawalNo: string;
   status: WithdrawalStatus;
   /** 服务端记的实际到账时刻(仅 confirmed 有值);缺省由调用方回落到单据预计到账。 */
@@ -416,6 +417,11 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
   };
 }
 
+// AppPayoutAddressMapper.unsettledWithdrawalCount: independent of display/slot status.
+function blocksPayoutAddressChange(status: string): boolean {
+  return !["COMPLETED", "CONFIRMED", "SUCCESS", "REFUNDED", "REJECTED", "CANCELLED", "FAILED"].includes(status.toUpperCase());
+}
+
 function canonicalStatus(status: string, chain?: string): WithdrawalStatus {
   // These provider channels retain the reservation while the original transfer is being reconciled.
   if (status.trim().toUpperCase() === "TX_ORPHANED" && (chain === "BANK-VND" || chain === "USDT-BEP20" || chain === "USDT-ERC20")) return "frozen";
@@ -561,6 +567,7 @@ export function toCanonicalWithdrawal(
       ...(submission.penaltyFee > 0 ? { penaltyUsd: submission.penaltyFee } : {}),
     },
     status,
+    payoutAddressChangeBlocked: blocksPayoutAddressChange(submission.status),
     riskRoute: canonicalRiskRoute(submission.riskRoute),
     riskReasons: [],
     submittedAt,
@@ -651,6 +658,7 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
   const nexRefundedAt = positive(row.nexRefundedAt);
   return {
     withdrawalNo, status: canonicalStatus(status, typeof row.chain === "string" ? row.chain : undefined), confirmedAt, terminalReason, retriable,
+    payoutAddressChangeBlocked: blocksPayoutAddressChange(status),
     nexRefunded, nexRefundedAt,
   };
 }
