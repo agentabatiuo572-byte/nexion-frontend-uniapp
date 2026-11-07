@@ -175,7 +175,7 @@ onUnmounted(stopRuntimeRefresh);
 .invite-card__description:first-child { display: block; }
 .invite-card__description.is-active { display: block; visibility: visible; }
 .invite-card__description > text { display: block; }
-.invite-card__code { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 48px; padding: 0 var(--v5-space-1) 0 var(--v5-space-4); border-radius: 16px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.invite-card__code { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 48px; padding: 0 var(--v5-space-1) 0 var(--v5-space-4); border-radius: 16px; background: var(--v5-surface-2); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .invite-card__code-label { flex: none; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .invite-card__code-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 17px/22px var(--font-metric); letter-spacing: 2px; }
 .invite-card__copy { flex: none; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--v5-brand); font: 600 12px/16px var(--font-v5); cursor: pointer; }
