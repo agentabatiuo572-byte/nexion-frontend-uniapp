@@ -225,7 +225,7 @@ function nodeLabel(member: NetworkMember): string {
   return `${member.name} · ${visibility.mask(rankLabel(member.vRank, locale.code, vRank.ladder))} · ${relation} · ${networkReauditCopy(locale.code)[member.status]} · ${t.value.network.monthVolume} ${visibility.mask(formatComputePoints(member.monthComputePoints, locale.code))}`;
 }
 function statusColor(status: MemberStatus): string {
-  return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning)" : "var(--v5-ink-4)";
+  return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning-ink)" : "var(--v5-ink-3)";
 }
 
 const errorStateStyle: CSSProperties = { padding: "12px 0", borderBottom: "1px solid var(--v5-border)", color: "var(--v5-ink)" };

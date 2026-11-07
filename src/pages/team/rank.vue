@@ -351,7 +351,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-upcoming { display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:14px;padding:10px 14px; }
 .rank-upcoming .rank-caption { color:var(--v5-ink-2); }
 .rank-upcoming .rank-perk-tags { margin-top:0; }
-.rank-upcoming .rank-perk-tag { min-height:0;padding:0;border:0;background:none;color:var(--v5-nex);font-weight:600; }
+.rank-upcoming .rank-perk-tag { min-height:0;padding:0;border:0;background:none;color:var(--v5-nex-ink);font-weight:600; }
 .rank-upcoming .rank-scope-link { min-height:24px;margin:0 0 0 auto; }
 .rank-ladder-row + .rank-ladder-row::after { content:"";position:absolute;left:-6px;top:26px;width:6px;height:2px;background:var(--v5-surface-3); }
 .rank-ladder-row[data-status="done"] + .rank-ladder-row::after,.rank-ladder-row[data-status="current"]::after { background:var(--v5-brand); }
