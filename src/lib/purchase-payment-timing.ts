@@ -7,7 +7,10 @@ export function purchasePaymentTiming(intent: PurchasePaymentIntent | null, now:
   const cutoff = ends.length ? Math.min(...ends) : null;
   const pending = !!intent && ['CREATING', 'SUBMIT_UNKNOWN', 'AWAITING_PAYMENT'].includes(intent.status);
   const pastDeadline = cutoff !== null && now >= cutoff;
+  const networkPaused = intent?.status === 'AWAITING_PAYMENT' && intent.paymentMethod !== 'HDPAY_BANK'
+    && intent.paymentAllowed === false && !pastDeadline;
   return { cutoff, left: cutoff === null ? null : Math.max(0, cutoff - now),
     canPay: !!intent && intent.status === 'AWAITING_PAYMENT' && intent.paymentAllowed !== false && !pastDeadline,
-    confirming: pending && (pastDeadline || intent?.status === 'AWAITING_PAYMENT' && intent.paymentAllowed === false) };
+    networkPaused,
+    confirming: pending && (pastDeadline || intent?.status === 'AWAITING_PAYMENT' && intent.paymentAllowed === false && !networkPaused) };
 }

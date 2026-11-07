@@ -130,7 +130,7 @@
       </view>
     </view>
 
-    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': isBank && !conclusion }">
+    <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': isBank && !conclusion || networkPaused && s.orderNo }">
       <view class="pp-card pp-hero">
         <text class="pp-hero__lab">{{ conclusion ? copy.total : copy.payable }}</text>
         <view class="pp-hero__row">
@@ -148,7 +148,7 @@
       </view>
 
       <view class="pp-card">
-        <view class="pp-wait" :class="{ 'is-alone': isBank || conclusion, 'is-concluded': conclusion }" role="status" :style="{ '--pp-st': waitTone }">
+        <view class="pp-wait" :class="{ 'is-alone': isBank || conclusion, 'is-concluded': conclusion, 'is-paused': networkPaused }" role="status" :style="{ '--pp-st': waitTone }">
           <view v-if="!conclusion" class="pp-wait__spin" aria-hidden="true" />
           <text class="pp-wait__t">{{ conclusion ? conclusion.title : waitTitle }}<template v-if="urgent && ready"> · <text class="pp-wait__em">{{ copy.urgentTag }}</text></template></text>
           <text v-if="conclusion" class="pp-wait__s">{{ conclusion.body }}</text>
@@ -183,6 +183,9 @@
     <!-- The page's main action sits in the thumb zone (DS-30). -->
     <view v-if="!received && isBank && !conclusion" class="pp-bar">
       <NxButton class="pp-reopen" :label="copy.reopen" variant="primary" :disabled="!ready" @click="payment.openCashier" />
+    </view>
+    <view v-if="networkPaused && s.orderNo" class="pp-bar">
+      <NxButton :label="copy.viewOrder" variant="secondary" @click="payment.openOrder" />
     </view>
   </view>
 
@@ -266,7 +269,7 @@ const fees = computed(() => s.intent ?? s.quote);
 const isBank = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'HDPAY_BANK');
 const received = computed(() => s.intent?.status === 'FUNDS_CONFIRMED');
 const ready = computed(() => timing.value.canPay && (isBank.value ? !!s.intent?.paymentUrl : !!s.intent?.address));
-const networkName = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20);
+const networkName = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod ?? s.method) === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20);
 const methodName = computed(() => isBank.value ? copy.value.bank : networkName.value);
 const pageTitle = computed(() => received.value ? copy.value.resultTitle : isBank.value ? copy.value.bankTitle : copy.value.usdtPage);
 const cashierUrl = computed(() => timing.value.canPay && s.intent?.paymentUrl ? validateHostedPaymentUrl(s.intent.paymentUrl) ?? '' : '');
@@ -281,6 +284,7 @@ const quoteLeft = computed(() => s.quote ? Math.max(0, Date.parse(s.quote.expire
 const timing = computed(() => purchasePaymentTiming(s.intent, now.value, s.deadlineAt));
 const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
+const networkPaused = computed(() => timing.value.networkPaused);
 const urgent = computed(() => payLeft.value !== null && payLeft.value < URGENT_MS);
 const waitTone = computed(() => s.error || conclusion.value ? 'var(--v5-warning)' : urgent.value && ready.value ? 'var(--v5-danger)' : 'var(--v5-brand)');
 const waitTitle = computed(() => s.error ? copy.value.offline : confirming.value ? copy.value.confirming : ready.value ? copy.value.waiting : copy.value.creating);
@@ -311,7 +315,11 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'review': return { icon: 'info', tone: 'warning', title: c.reviewTitle, body: s.intent?.reason === 'PAYMENT_AMOUNT_MISMATCH' ? c.reviewMismatch : c.reviewOther, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
-    case 'leave': return { icon: 'alert', tone: 'warning', title: c.leaveTitle, body: c.leaveBody, primary: c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: payment.close };
+    case 'leave': return { icon: 'alert', tone: 'warning', title: networkPaused.value ? fill(c.networkPausedTitle, { network: networkName.value }) : c.leaveTitle,
+      body: networkPaused.value ? c.networkPaused : c.leaveBody, primary: networkPaused.value ? c.back : c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: payment.close };
+    case 'networkPaused': return { icon: 'info', tone: 'warning', title: fill(c.networkPausedTitle, { network: networkName.value }), body: c.networkPaused,
+      primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
+      ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
     case 'quoteChanged': return { icon: 'info', tone: 'warning', title: c.changedTitle,
       body: s.quote ? `${c.changed} ${c.total}: ${s.method === 'HDPAY_BANK' ? '$' : ''}${amount(s.quote.totalUsdt)}${s.method === 'HDPAY_BANK' ? '' : ' USDT'}` : c.changed,
       primary: c.ok, onPrimary: dismiss, onSecondary: dismiss };
@@ -330,15 +338,17 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
 }
 const notice = computed(() => noticeFor(s.notice));
 const acknowledgementOnly = computed(() => !!notice.value && !notice.value.secondary
-  && (s.notice === 'timeout' || s.notice === 'gone' || s.notice === 'changed' || s.notice === 'orderMissing'));
+  && (s.notice === 'timeout' || s.notice === 'gone' || s.notice === 'changed' || s.notice === 'orderMissing' || s.notice === 'networkPaused'));
 watch(() => active.value && s.open && acknowledgementOnly.value, show => {
   if (!show || !notice.value) return;
   const { title, body } = notice.value;
   payment.close();
   toast.warn(title, body);
 }, { immediate: true });
-// A concluded payment page says what the notice says; nothing on it may still ask for payment.
-const conclusion = computed(() => noticeFor(purchaseConclusion(s.intent)));
+// Both final results and a reversible network pause hide all instructions to send funds.
+const conclusion = computed(() => networkPaused.value
+  ? { title: fill(copy.value.networkPausedTitle, { network: networkName.value }), body: copy.value.networkPaused }
+  : noticeFor(purchaseConclusion(s.intent)));
 
 function amount(value: string | number) { return formatGroupedAmount(value); }
 function clock(ms: number) { const total = Math.ceil(ms / 1000); return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`; }
@@ -485,6 +495,8 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-wait.is-alone { margin: 0; padding: 0 2px; border: 0; }
 .pp-wait.is-concluded .pp-wait__t { white-space: normal; }
 .pp-wait.is-concluded .pp-wait__s { width: 100%; margin-left: 0; text-align: left; }
+.pp-wait.is-paused { justify-content: center; text-align: center; }
+.pp-wait.is-paused .pp-wait__s { text-align: center; }
 .pp-pay.has-bar { padding-bottom: 120px; }
 .pp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
 .pp-reopen { display: flex; flex: 1; }
