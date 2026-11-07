@@ -295,7 +295,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && remoteState.value === "error
 /* Pedestals rise 3rd → 2nd → 1st as the podium renders; the crown lands last (DS-29). */
 .leader-podium__track { position: relative; width: 100%; height: var(--step); }
 .leader-podium__step { position: absolute; bottom: 0; display: flex; justify-content: center; width: 100%; min-height: 0; overflow: hidden; box-sizing: border-box; padding: 0; border-radius: 16px 16px 6px 6px; background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 40%, transparent), color-mix(in srgb, var(--tone) 4%, transparent)); }
-.leader-podium__step .leader-position { margin-top: var(--ui-space-row-y); font: 600 26px/30px var(--font-metric); color: var(--tone); }
+.leader-podium__step .leader-position { margin-top: var(--ui-space-row-y); font: 600 26px/30px var(--font-metric); color: var(--v5-ink); }
 .leader-flat { margin-top: var(--v5-space-4); padding: 0 var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .leader-flat > .leader-row:first-child { border-top: 0; }
 .leader-row { display: flex; align-items: center; gap: var(--ui-space-inline); border-top: 1px solid var(--v5-border); min-height: 64px; }
