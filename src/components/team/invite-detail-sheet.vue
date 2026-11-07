@@ -88,7 +88,7 @@ useDialogA11y(computed(() => props.open), '.invite-detail', () => emit('close'))
 .invite-detail__body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-top: 16px; font: 400 14px/1.6 var(--font-v5); }
 .invite-detail__grab { flex: none; width: 40px; height: 5px; margin: 0 auto 10px; border-radius: 999px; background: var(--v5-surface-3); }
 .invite-detail__support { width: 100%; margin-top: 18px; }
-.invite-detail__fraction { color: var(--v5-ink-4); }
+.invite-detail__fraction { color: var(--v5-ink-3); }
 .invite-detail__count-n { color: var(--v5-ink); font: 600 13px/16px var(--font-metric); }
 .invite-detail__record-icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
 .invite-detail__record-icon--pending { color: var(--v5-warning); background: color-mix(in srgb, var(--v5-warning) 16%, transparent); }
