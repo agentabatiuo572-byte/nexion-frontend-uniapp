@@ -300,7 +300,7 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
-import { navTo, takeNavigationQuery } from "@/lib/route";
+import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { computeWithdrawalMaximum, formatWithdrawalRatioPercent, resolveWithdrawalUseMax } from "@/lib/withdrawal-use-max";
 import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
@@ -442,11 +442,6 @@ async function loadWithdrawalPolicy(): Promise<void> {
       requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
     )) return;
     withdrawalPolicy.value = policy;
-    // A network the user chose stays put even when the server has closed it (networkClosed explains it);
-    // only the page's own default moves to an open network.
-    if (!networkChosen && !NETWORKS.value.some((item) => item.id === network.value) && NETWORKS.value[0]) {
-      network.value = NETWORKS.value[0].id;
-    }
   } catch (cause) {
     if (!isCurrentWithdrawalFactsScope(
       requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
@@ -554,6 +549,7 @@ function invalidateWithdrawalFacts(): void {
   remoteEligibility.value = null;
   remoteEligibilityFailed.value = false;
   refreshedConflictVersion = "";
+  defaultNetworkSettled = false;
 }
 
 // Cold entry retries as soon as session restore binds the visible page's account.
@@ -685,25 +681,39 @@ const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: f
 const devMode = ref(false);
 onLoad((options) => {
   devMode.value = import.meta.env.DEV && options?.dev === "1";
-  // 网络由「选择提现网络」页带入(只读);无有效参数(深链 / 刷新 / 无栈返回)才用默认:后端允许且已设地址的网络。
-  const chosen = ALL_NETWORKS.find((n) => n.id === (options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-withdraw")).get("network")));
+  // 网络由「选择提现网络」页带入(只读);无有效参数(深链 / 刷新 / 无栈返回)才用默认,见 settleDefaultNetwork。
+  const requested = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-withdraw")).get("network");
+  const chosen = ALL_NETWORKS.find((n) => n.id === requested);
   if (chosen) {
     network.value = chosen.id;
     networkChosen = true;
     return;
   }
-  const withAddr = NETWORKS.value.find((n) => payout.currentFor(fromWithdrawNetwork(n.id)));
-  if (withAddr) network.value = withAddr.id;
+  settleDefaultNetwork();
 });
 
 const amount = ref("");
 // 提现网络只读;地址 = 该网络当前提现地址(payout-address store 单源,RM01a)。
 const network = ref<CryptoNetwork>("USDT-BEP20");
-let networkChosen = false;
+let networkChosen = false, defaultNetworkSettled = false;
 // Policy read and the network is not open: no quote, no eligibility request, submit stays disabled.
 const networkClosed = computed(() => withdrawalPolicyCurrent.value && !NETWORKS.value.some((item) => item.id === network.value));
 function chooseNetworkAgain() {
-  navTo("/pages/me/wallet-withdraw-network");
+  navBack("/pages/me/wallet-withdraw-network");
+}
+// The only place that picks a network the user did not choose. Once the policy and this account's address book
+// are both known it settles once: first open network with an address, else the first open one. Otherwise it only
+// moves off a network the server closed. A chosen network is never touched, nor is anything changed while a submit
+// is in flight.
+function settleDefaultNetwork() {
+  const open = NETWORKS.value;
+  if (networkChosen || inputsLocked.value || open.length === 0) return;
+  if (!defaultNetworkSettled && payout.readStatusFor(app.accountKey) === "ready") {
+    network.value = (open.find((n) => payout.currentFor(fromWithdrawNetwork(n.id))) ?? open[0]).id;
+    defaultNetworkSettled = true;
+  } else if (!open.some((item) => item.id === network.value)) {
+    network.value = open[0].id;
+  }
 }
 const chainNetwork = computed(() => fromWithdrawNetwork(network.value));
 const boundAddress = computed(() => payout.currentFor(chainNetwork.value)?.address ?? "");
@@ -971,6 +981,8 @@ const confirmingSubmit = ref(false);
  * 但页面会立刻显示与刚确认的弹窗不同的数字,同一个提交出现两个口径。
  */
 const inputsLocked = computed(() => submitting.value || confirmingSubmit.value);
+// The default network settles as soon as the policy and address book are known, and waits out a submit.
+watch([NETWORKS, () => payout.readStatusFor(app.accountKey), () => inputsLocked.value], settleDefaultNetwork);
 /** 提交链结束(成功 / 任一拒单分支)统一解冻:三个状态必须成对清,漏一个页面就永久卡在冻结报价上。 */
 function clearSubmitFreeze() {
   submitting.value = false;

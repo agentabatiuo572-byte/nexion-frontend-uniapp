@@ -4,7 +4,7 @@
     <!-- One route card per USDT network the server currently opens; tapping one opens the withdraw page with that network fixed. -->
     <view class="withdraw-networks">
       <text class="intro">{{ t.bankWithdrawal.chooseNetworkHint }}</text>
-      <view v-for="item in cards" :key="item.id" class="method" role="button" tabindex="0" :data-testid="`withdraw-network-${item.label}`" @click="open(item.id)" @keydown.enter.prevent="open(item.id)" @keydown.space.prevent="open(item.id)">
+      <view v-for="item in cards" :key="item.id" class="method" role="button" tabindex="0" :data-testid="`withdraw-network-${item.label}`" :aria-disabled="loading" @click="open(item.id)" @keydown.enter.prevent="open(item.id)" @keydown.space.prevent="open(item.id)">
         <view class="method-top">
           <view class="method-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 8h8M12 8v9M8.5 11.5c2 .8 5 .8 7 0" /></svg></view>
           <view class="method-copy"><text class="method-title">{{ fmt(t.bankWithdrawal.usdtNetwork, { network: item.label }) }}</text><text class="method-note">{{ fmt(t.bankWithdrawal.networkFee, { fee: formatFinanceAmount(item.fee) }) }}</text></view>
@@ -76,7 +76,7 @@ const stopRuntime = subscribeRuntimeRevision(reset);
 onShow(() => { visible = true; void load(); });
 onHide(() => { visible = false; revision++; });
 onUnload(() => { visible = false; revision++; stopRuntime(); });
-function open(id: SupportedWithdrawalNetwork) { navTo(`/pages/me/wallet-withdraw?network=${id}`); }
+function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/pages/me/wallet-withdraw?network=${id}`); }
 </script>
 
 <style scoped>
@@ -99,6 +99,8 @@ function open(id: SupportedWithdrawalNetwork) { navTo(`/pages/me/wallet-withdraw
 .route-to--empty { color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .status { display: block; margin: var(--v5-space-1) var(--v5-space-1) 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .reload { display: inline-flex; align-items: center; min-height: 44px; margin-left: var(--v5-space-1); color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.method[aria-disabled="true"] { opacity: .5; cursor: default; }
+.method[aria-disabled="true"]:active { transform: none; }
 .method:focus-visible, .reload:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .method { transition: none; } .method:active { transform: none; } }
 </style>
