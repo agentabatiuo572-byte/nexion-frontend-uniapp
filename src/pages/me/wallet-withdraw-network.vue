@@ -18,6 +18,7 @@
       <text v-if="!policy && loading" class="status" role="status">{{ t.bankWithdrawal.loading }}</text>
       <text v-else-if="readFailed" class="status" role="status">{{ t.bankWithdrawal.recoveryUnavailable }}</text>
       <text v-else-if="policy && cards.length === 0" class="status" role="status">{{ t.wallet.withdrawalChannelsClosed }}</text>
+      <text v-else-if="remoteApiEnabled && payout.readStatusFor(app.accountKey) === 'error'" class="status" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
       <view v-if="readFailed && !loading" class="reload" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
     </view>
   </AppChassis>
@@ -32,6 +33,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 import { useApp } from "@/store/app";
 import { usePayoutAddress } from "@/store/payout-address";
 import { fromWithdrawNetwork } from "@/store/payout-address-core";
@@ -44,6 +46,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 const NETWORK_ORDER: SupportedWithdrawalNetwork[] = ["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"];
 
 const t = useT(), app = useApp(), payout = usePayoutAddress();
+const payoutReadCopy = useFinanceReviewCopy();
 const policy = ref<WithdrawalPolicy | null>(null);
 const loading = ref(false), readFailed = ref(false);
 const cards = computed(() => {
@@ -70,6 +73,7 @@ async function load() {
   finally { if (current()) loading.value = false; }
 }
 useAutoRecovery({ failed: () => readFailed.value && !loading.value, retry: load });
+useAutoRecovery({ failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error", retry: () => payout.refreshRemote() });
 function reset() { revision++; policy.value = null; readFailed.value = false; if (visible) void load(); }
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, reset);
 const stopRuntime = subscribeRuntimeRevision(reset);
