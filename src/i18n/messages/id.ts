@@ -627,6 +627,8 @@ export const id: Messages = {
     teamLeaderboard: "Peringkat pengundang",
     teamQuota: "Kuota",
     teamAgent: "Duta regional",
+    teamAgentApplications: "Pengajuan saya",
+    teamAgentApplication: "Detail pengajuan",
     storeCheckout: "Checkout",
     storeOrders: "Pesanan",
     storeProduct: "Produk",
@@ -4931,7 +4933,7 @@ export const id: Messages = {
     buckets: {
       venue: {
         title: "Tempat acara",
-        rule: "Kehadiran ≥ 100 orang, diverifikasi lewat QR check-in",
+        rule: "≥ 100 peserta terverifikasi",
       },
       kol: {
         title: "Promosi kreator",
@@ -4957,7 +4959,7 @@ export const id: Messages = {
     toastV5RequiredSub: "Naik ke {rank} untuk mengirim pengajuan",
     toastMissingFields: "Kolom belum lengkap",
     toastSubmitted: "Pengajuan terkirim",
-    toastSubmittedSub: "{city} · ${budget} sedang diproses (3-5 hari kerja)",
+    toastSubmittedSub: "{city} · {budget}. Selanjutnya, unggah dokumen pengajuan.",
     toastRemoteFailed: "Status pengajuan belum terkonfirmasi",
     serverApplication: "Pengajuan saya",
     applicationStatuses: {

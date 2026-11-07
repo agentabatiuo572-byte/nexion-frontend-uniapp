@@ -61,6 +61,8 @@ const ROUTE_TITLE_KEY: Record<string, HeaderTitleKey> = {
   "pages/team/leaderboard": "teamLeaderboard",
   "pages/team/quota": "teamQuota",
   "pages/team/agent": "teamAgent",
+  "pages/team/agent-applications": "teamAgentApplications",
+  "pages/team/agent-application": "teamAgentApplication",
   // Genesis subtree
   "pages/genesis/marketplace": "genesisMarketplace",
   "pages/genesis/holder": "genesisHolder",

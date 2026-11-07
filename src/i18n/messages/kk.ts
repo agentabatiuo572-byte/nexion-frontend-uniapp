@@ -627,6 +627,8 @@ export const kk: Messages = {
     teamLeaderboard: "Шақыру рейтингі",
     teamQuota: "Квота",
     teamAgent: "Өңірлік амбассадор",
+    teamAgentApplications: "Менің өтінімдерім",
+    teamAgentApplication: "Өтінім мәліметі",
     storeCheckout: "Рәсімдеу",
     storeOrders: "Тапсырыстар",
     storeProduct: "Тауар",
@@ -4931,7 +4933,7 @@ export const kk: Messages = {
     buckets: {
       venue: {
         title: "Іс-шара орны",
-        rule: "Тіркеу QR арқылы расталған ≥ 100 қатысушы",
+        rule: "≥ 100 расталған қатысушы",
       },
       kol: {
         title: "Блогерлер",
@@ -4957,7 +4959,7 @@ export const kk: Messages = {
     toastV5RequiredSub: "Өтінім жіберу үшін {rank} дәрежесіне жетіңіз",
     toastMissingFields: "Өрістер толмаған",
     toastSubmitted: "Өтінім жіберілді",
-    toastSubmittedSub: "{city} · ${budget} өңделуде (3-5 жұмыс күні)",
+    toastSubmittedSub: "{city} · {budget}. Келесі қадам: материалдарды жүктеңіз.",
     toastRemoteFailed: "Өтінім күйі расталмады",
     serverApplication: "Менің өтінімім",
     applicationStatuses: {

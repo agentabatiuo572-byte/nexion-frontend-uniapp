@@ -627,6 +627,8 @@ export const fil: Messages = {
     teamLeaderboard: "Leaderboard ng imbita",
     teamQuota: "Quota",
     teamAgent: "Ambassador ng rehiyon",
+    teamAgentApplications: "Aking mga aplikasyon",
+    teamAgentApplication: "Detalye ng aplikasyon",
     storeCheckout: "Checkout",
     storeOrders: "Mga order",
     storeProduct: "Produkto",
@@ -4931,7 +4933,7 @@ export const fil: Messages = {
     buckets: {
       venue: {
         title: "Venue ng event",
-        rule: "Attendance ≥ 100, beripikado sa sign-in QR",
+        rule: "≥ 100 beripikadong dumalo",
       },
       kol: {
         title: "Promo ng creator",
@@ -4957,7 +4959,7 @@ export const fil: Messages = {
     toastV5RequiredSub: "Umabot sa {rank} para makapagsumite ng application",
     toastMissingFields: "Kulang ang field",
     toastSubmitted: "Naisumite ang application",
-    toastSubmittedSub: "{city} · ${budget} pinoproseso (3-5 business day)",
+    toastSubmittedSub: "{city} · {budget}. Susunod: i-upload ang mga dokumento.",
     toastRemoteFailed: "Hindi kumpirmado ang status ng application",
     serverApplication: "Aking application",
     applicationStatuses: {
