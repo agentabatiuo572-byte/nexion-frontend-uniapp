@@ -511,6 +511,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .bcard__nm { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
 .bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success-ink); font: 500 12px/16px var(--font-v5); }
 .bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning-ink); }
+/* Light: semantic ink on its own soft tint stays under 4.5:1 at 12px, so the label takes primary ink; the tint keeps the state. */
+[data-theme="light"] .bcard__tag { color: var(--v5-ink); }
 .bcard__bot { position: relative; display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; }
 .bcard__lb { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .bcard__no { display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; }
