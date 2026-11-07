@@ -5724,6 +5724,7 @@ export const uz: Messages = {
     inFlightBlocked: "Pul yechish jarayonda. U yakunlangach, manzilni almashtirishingiz mumkin.",
     inFlightGoCta: "Pul yechish holatini koʻrish",
     cooldownUntil: "Keyingi almashtirish vaqti: {time}.",
+    cooldownActive: "Manzilni o‘zgartirish uchun kutish muddati hali tugamagan. Keyinroq qayta urinib ko‘ring.",
     freezeBanner: "Yangi yechish manzili himoya davrida · {t} qoldi",
     timeStatusUnavailable: "Himoya davri holatini hozircha tasdiqlab boʻlmaydi. Yangilab, qayta urining.",
     refreshTimeStatusCta: "Holatni yangilash",

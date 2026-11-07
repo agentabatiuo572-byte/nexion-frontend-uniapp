@@ -264,7 +264,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   // hold ever existed. Accept only that terminal historical shape, require its
   // real creation timestamp, and normalize the retired `pass` spelling. New
   // and non-terminal submissions still require the server hold timestamp.
-  const legacyConfirmedFastPass = status?.toUpperCase() === "CONFIRMED"
+  const legacyConfirmedFastPass = (status?.toUpperCase() === "CONFIRMED" || status?.toUpperCase() === "COMPLETED")
     && (riskRoute?.toLowerCase() === "pass" || riskRoute?.toLowerCase() === "fast-pass")
     && !holdUntil
     && createdAt !== undefined
@@ -440,9 +440,11 @@ function canonicalStatus(status: string, chain?: string): WithdrawalStatus {
     case "CHAIN_SUBMITTED":
       return "sent";
     case "CONFIRMED":
+    case "COMPLETED":
     case "SUCCESS":
       return "confirmed";
     case "REJECTED":
+    case "CANCELLED":
     case "REVIEW_REJECTED":
       return "review-rejected";
     case "FROZEN":

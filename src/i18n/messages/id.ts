@@ -5724,6 +5724,7 @@ export const id: Messages = {
     inFlightBlocked: "Ada penarikan yang sedang diproses. Anda bisa mengganti alamat setelah selesai.",
     inFlightGoCta: "Lihat progres penarikan",
     cooldownUntil: "Anda bisa menggantinya lagi setelah {time}.",
+    cooldownActive: "Masa tunggu penggantian alamat masih berlaku. Silakan coba lagi nanti.",
     freezeBanner: "Masa perlindungan alamat penarikan baru · sisa {t}",
     timeStatusUnavailable: "Status masa perlindungan belum dapat dikonfirmasi. Muat ulang, lalu coba lagi.",
     refreshTimeStatusCta: "Muat ulang status",

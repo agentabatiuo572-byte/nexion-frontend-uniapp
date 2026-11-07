@@ -5724,6 +5724,7 @@ export const fil: Messages = {
     inFlightBlocked: "May withdrawal na pinoproseso. Mapapalitan mo ang address kapag tapos na ito.",
     inFlightGoCta: "Progreso ng withdrawal",
     cooldownUntil: "Mapapalitan mo ulit pagkatapos ng {time}.",
+    cooldownActive: "Hindi pa tapos ang panahon ng paghihintay para palitan ang address. Subukan ulit mamaya.",
     freezeBanner: "Panahon ng proteksyon ng bagong address ng withdrawal · {t} natitira",
     timeStatusUnavailable: "Hindi pa makumpirma ang status ng panahon ng proteksyon. Mag-refresh at subukan ulit.",
     refreshTimeStatusCta: "I-refresh ang status",
