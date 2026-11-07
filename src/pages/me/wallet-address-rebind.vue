@@ -246,9 +246,9 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
-import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { subscribeRuntimeRevision } from "@/api/order-api";
 import { asApiError } from "@/api/errors";
-import { payoutAddressServerEnabled, withdrawalApi } from "@/api/runtime";
+import { apiRuntimeConfig, payoutAddressServerEnabled, withdrawalApi } from "@/api/runtime";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -624,12 +624,8 @@ function backToBase() {
 const mockNow = ref(mockServerNow());
 const monotonicNow = ref<number | null>(readTrustedMonotonicNowMs());
 const clockFault = ref(false);
-const readRuntimeScope = ref(captureRuntimeRevision());
-const remoteReadStatus = computed(() => {
-  // Runtime revisions are published outside Vue; subscribing makes scope checks reactive.
-  void readRuntimeScope.value;
-  return payout.readStatusFor(app.accountKey);
-});
+const readApiOrigin = ref({ ...apiRuntimeConfig });
+const remoteReadStatus = computed(() => payout.readStatusFor(app.accountKey));
 const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
 const remoteReadFailed = computed(() => remoteReadStatus.value === "error" || networkPolicyStatus.value === "error");
 watch(() => [networkPolicyStatus.value, remoteReadStatus.value] as const, ([policyStatus, addressStatus]) => {
@@ -644,12 +640,13 @@ let policyGeneration = 0;
 
 function captureCommandScope() {
   return { accountKey: app.accountKey, bindingEpoch: app.accountBindingEpoch,
-    generation: commandGeneration, runtime: captureRuntimeRevision() };
+    generation: commandGeneration, apiOrigin: { ...apiRuntimeConfig } };
 }
 function commandIsCurrent(scope: ReturnType<typeof captureCommandScope>) {
   return pageVisible && networkAvailable.value && scope.generation === commandGeneration
     && scope.accountKey === app.accountKey && scope.bindingEpoch === app.accountBindingEpoch
-    && isCurrentRuntimeRevision(scope.runtime);
+    && scope.apiOrigin.environment === apiRuntimeConfig.environment
+    && scope.apiOrigin.baseUrl === apiRuntimeConfig.baseUrl;
 }
 function invalidatePageCommand() {
   commandGeneration += 1;
@@ -678,7 +675,7 @@ async function retryRemoteSnapshot() {
   // Account binding clears list state synchronously. Dispatch after that batch
   // so entry hooks share one read; a slow/failed read never holds the form.
   void nextTick(refreshWithdrawalListOnEntry);
-  // Store-owned account/runtime/version guards decide the final read status,
+  // Store-owned account/API-origin/version guards decide the final read status,
   // including reads started by account hydration rather than by this page.
   await Promise.all([
     remoteReadStatus.value === "loading" ? Promise.resolve() : payout.refreshRemote(),
@@ -689,9 +686,10 @@ async function refreshNetworkPolicy() {
   const generation = ++policyGeneration;
   const accountKey = app.accountKey;
   const bindingEpoch = app.accountBindingEpoch;
-  const runtime = captureRuntimeRevision();
+  const apiOrigin = { ...apiRuntimeConfig };
   const isCurrent = () => generation === policyGeneration && pageVisible
-    && accountKey === app.accountKey && bindingEpoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime);
+    && accountKey === app.accountKey && bindingEpoch === app.accountBindingEpoch
+    && apiOrigin.environment === apiRuntimeConfig.environment && apiOrigin.baseUrl === apiRuntimeConfig.baseUrl;
   networkPolicyStatus.value = "loading";
   try {
     const policy = await withdrawalApi.policy();
@@ -709,11 +707,12 @@ function clearNetworkPolicy() {
   networkPolicy.value = null;
   networkPolicyStatus.value = "idle";
 }
-const stopRuntimeRead = subscribeRuntimeRevision(scope => {
-  readRuntimeScope.value = scope;
-  invalidatePageCommand();
-  clearNetworkPolicy();
-  if (pageVisible) void retryRemoteSnapshot();
+const stopRuntimeRead = subscribeRuntimeRevision(() => {
+  // This channel also reports API-origin changes. Catalog events leave the
+  // address/policy/command scope intact, including a pending OTP or save.
+  if (readApiOrigin.value.environment === apiRuntimeConfig.environment
+      && readApiOrigin.value.baseUrl === apiRuntimeConfig.baseUrl) return;
+  readApiOrigin.value = { ...apiRuntimeConfig };
 });
 onShow(() => {
   pageVisible = true;
@@ -724,9 +723,14 @@ onHide(() => {
   invalidatePageCommand();
   clearNetworkPolicy();
 });
-watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
+watch(() => [app.accountKey, app.accountBindingEpoch, readApiOrigin.value] as const, () => {
   invalidatePageCommand();
   clearNetworkPolicy();
+  explicitStep.value = "base";
+  mode.value = "add";
+  newAddress.value = "";
+  addrError.value = "";
+  resetOtp();
   void retryRemoteSnapshot();
 }, { flush: "sync" });
 onMounted(() => {
