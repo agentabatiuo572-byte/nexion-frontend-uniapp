@@ -80,13 +80,12 @@ export function fromWithdrawNetwork(network: Withdrawal["network"]): ChainDeposi
 // ── 校验 / 展示 ────────────────────────────────────────────────────
 
 /**
- * 链地址格式校验(全站单源,禁两套正则)。TRC20 = T + 33 字符;ERC20/BEP20 = 0x + 40 hex。
- * ponytail: mock 派生地址是「近似 base58 大写」形态,故 TRON 位用宽松字母数字而非严格
- * base58;PROD 换链上校验库。永不做静默截断或自动纠正(规格 ② 异常1)。
+ * 链地址格式校验(全站单源,与服务端一致)。TRC20 = T + 33 位 Base58;
+ * ERC20/BEP20 = 0x + 40 hex。永不做静默截断或自动纠正(规格 ② 异常1)。
  */
 export function isChainAddressValid(network: ChainDepositChannel, address: string): boolean {
   const a = address.trim();
-  if (network === "usdt-trc20") return /^T[A-Za-z0-9]{33}$/.test(a);
+  if (network === "usdt-trc20") return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
   return /^0x[0-9a-fA-F]{40}$/.test(a);
 }
 
