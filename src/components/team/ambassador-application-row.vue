@@ -11,7 +11,7 @@
       <AmbassadorAmount :value="application.budgetUsdt" />
       <text class="amb-row__status" :class="`amb-row__status--${presentation.tone}`">{{ statusText }}</text>
     </view>
-    <svg v-if="chevron" class="amb-row__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+    <svg v-if="chevron" class="amb-row__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
   </view>
 </template>
 
@@ -38,7 +38,8 @@ function open() { if (props.application.applicationId) void navTo(AMBASSADOR_ROU
 </script>
 
 <style scoped>
-.amb-row { display: flex; align-items: center; gap: var(--ui-space-inline); min-height: 44px; padding: 14px 0; color: var(--v5-ink); cursor: pointer; }
+/* The 44px minimum is the row content; the 14px padding sits outside it (row ≈ 73px with its divider). */
+.amb-row { display: flex; align-items: center; gap: var(--ui-space-inline); box-sizing: content-box; min-height: 44px; padding: 14px 0; color: var(--v5-ink); cursor: pointer; }
 .amb-row__titles { flex: 1; min-width: 0; }
 .amb-row__title, .amb-row__meta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .amb-row__title { font: var(--ui-type-list-title-weight, 500) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
