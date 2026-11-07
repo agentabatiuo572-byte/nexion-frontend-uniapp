@@ -44,7 +44,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   let environmentInvalidated = false;
   const ui = reactive({
     visible: false, stage: "loading" as Stage, context: null as PaymentPasswordContext | null,
-    state: null as PaymentPasswordState | null, busy: false, error: "" as ErrorKey,
+    state: null as PaymentPasswordState | null, busy: false, reading: false, rejectedRevision: 0, error: "" as ErrorKey,
     notice: "" as "" | "setupDonePay" | "resetDonePay", challenge: null as PaymentPasswordChallenge | null,
     resendAt: 0, now: Date.now(), revision: 0,
     completedOperation: "" as "" | "setup" | "change" | "reset", completedRevision: 0,
@@ -59,6 +59,12 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   let pending: (PendingCommand & { owner: string }) | null = null;
   let lastPaymentError: ErrorKey = "";
   let serverOffset = 0;
+  let receiptRead: Promise<void> | null = null;
+  async function waitForQuery() { await receiptRead?.catch(() => {}); }
+  function restorePendingRead() {
+    if (!ui.visible) owner = identity();
+    restorePending();
+  }
 
   function clearSecrets() { firstPassword = ""; proof = null; ui.challenge = null; ui.resendAt = 0; ui.revision++; }
   function clearInputs() { firstPassword = ""; ui.revision++; }
@@ -122,16 +128,18 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     } finally { if (epoch === displayReadEpoch && account === identity()) display.loading = false; }
   }
   function displayLocked(): boolean { return !!display.state?.lockedUntil && Date.parse(display.state.lockedUntil) > ui.now; }
-  async function refreshStatus(): Promise<PaymentPasswordState | null> {
+  async function refreshStatus(options: { isCurrent?: () => boolean; silent?: boolean } = {}): Promise<PaymentPasswordState | null> {
     const account = identity(), token = generation;
-    try { const result = await api.status(); if (account !== identity() || token !== generation) return null; setState(result); return result; }
-    catch { if (account === identity() && token === generation) ui.state = null; return null; }
+    const currentRead = () => account === identity() && token === generation && (options.isCurrent?.() ?? true);
+    if (!currentRead()) return null;
+    try { const result = await api.status(); if (!currentRead()) return null; setState(result); return result; }
+    catch { if (currentRead() && !options.silent) ui.state = null; return null; }
   }
   async function load() {
     const token = generation; ui.stage = "loading"; ui.busy = true; ui.error = "";
     try {
       restorePending();
-      if (pending?.owner === owner) { ui.stage = "pending"; ui.busy = false; await query(); return; }
+      if (pending?.owner === owner) { ui.stage = "pending"; return; }
       const state = await api.status(); if (!current(token)) return; setState(state);
       if (state.configured && !ui.context) { const done = personalResolve; personalResolve = null; ui.visible = false; done?.(false); return; }
       ui.stage = state.configured ? "pay" : "setup";
@@ -152,7 +160,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     catch { ui.changeError = "failed"; return false; }
     if (!pending) return false;
     if (!ui.visible) { cancel(); owner = identity(); ui.visible = true; ui.stage = "pending"; }
-    await query(); return true;
+    await query().catch(() => { ui.error = "failed"; }); return true;
   }
   async function recover(): Promise<boolean> {
     cancel(); owner = identity(); ui.visible = true;
@@ -206,23 +214,33 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
       }
     } finally { if (current(token)) ui.busy = false; }
   }
-  async function query() {
-    if (!pending || ui.busy) return;
-    const token = generation; ui.busy = true; ui.error = "";
-    try {
-      const result = await api.receipt(pending.commandKey); if (!current(token)) return;
+  function query(readAllowed: () => boolean = () => true): Promise<void> {
+    if (receiptRead) return receiptRead;
+    if (!pending || ui.busy || !readAllowed()) return Promise.resolve();
+    const command = pending, token = generation;
+    const currentRead = () => current(token) && pending === command && readAllowed();
+    ui.reading = true;
+    const read = Promise.resolve().then(async () => {
+      if (!currentRead()) return;
+      const result = await api.receipt(command.commandKey);
+      if (!currentRead()) return;
       if (finishMutation(result)) return;
       if (result.status === "REJECTED") {
-        const operation = pending.operation;
-        if (!retirePending()) { ui.error = "failed"; return; }
+        if (!retirePending()) throw new Error("PAYMENT_PASSWORD_COMMAND_RETIRE_FAILED");
         clearSecrets();
         ui.error = paymentPasswordErrorKey(new ApiError({ kind: "business", message: result.message ?? "PAYMENT_PASSWORD_UPDATE_REJECTED" }));
-        if (operation === "change") { ui.changeError = ui.error; ui.visible = false; await refreshStatus(); return; }
-        ui.stage = operation === "reset" ? "recovery" : "setup";
+        ui.rejectedRevision++;
+        if (command.operation === "change" || !ui.visible) {
+          ui.changeError = ui.error; ui.visible = false; await refreshStatus({ isCurrent: readAllowed, silent: true }); return;
+        }
+        ui.stage = command.operation === "reset" ? "recovery" : "setup";
       }
-      // NOT_SEEN is not proof of a failed command. Only query or leave is safe.
-    } catch { if (current(token)) ui.error = "failed"; }
-    finally { if (current(token)) ui.busy = false; }
+      // NOT_SEEN does not settle the command. Leave its key and form untouched.
+    }).finally(() => {
+      if (receiptRead === read) { receiptRead = null; ui.reading = false; }
+    });
+    receiptRead = read;
+    return read;
   }
   function authorize(password: string) {
     if (ui.stage !== "pay" || ui.busy || !validPaymentPassword(password) || !ui.state?.configured || ui.state.lockedUntil !== null) return;
@@ -282,7 +300,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     lastPaymentError = paymentPasswordErrorKey(error); return true;
   }
   function tick() { ui.now = Date.now() + serverOffset; }
-  return { ui, display, ensureStatus, displayLocked, cancel, accountChanged, refreshStatus, request, setup, recover, resumePending, load, next, restart, confirm, query, authorize, startRecovery, unavailableRecovery, sendChallenge, verify, change, report, locked, tick };
+  return { ui, display, waitForQuery, restorePendingRead, ensureStatus, displayLocked, cancel, accountChanged, refreshStatus, request, setup, recover, resumePending, load, next, restart, confirm, query, authorize, startRecovery, unavailableRecovery, sendChallenge, verify, change, report, locked, tick };
 }
 
 const coordinator = createPaymentPasswordCoordinator(createPaymentPasswordApi(apiClient), () => {

@@ -18,7 +18,6 @@
           <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
           <view v-if="terminal && order.settlementEvidence?.checkedAt" class="row"><text>{{ c.confirmedAt }}</text><text>{{ displayDate(order.settlementEvidence.checkedAt) }}</text></view>
         </view>
-        <view class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refresh }}</text></view>
         <view v-if="terminal" class="action secondary" role="button" tabindex="0" data-testid="bank-new" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" @keydown.enter.prevent="startNew" @keydown.space.prevent="startNew"><text>{{ c.newWithdrawal }}</text></view>
         <view class="action secondary" role="button" tabindex="0" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" @keydown.enter.prevent="backToWallet" @keydown.space.prevent="backToWallet"><text>{{ c.backToWallet }}</text></view>
       </template>
@@ -27,7 +26,7 @@
         <text class="screen-title">{{ c.title }}</text>
         <view v-if="!busy || !uncertain" class="notice" role="alert"><text>{{ displayIntents.length ? c.multipleIntents : uncertain ? c.unknown : c.recoveryUnavailable }}</text></view>
         <view v-for="intent in displayIntents" :key="intent.quoteNo" class="action secondary" role="button" tabindex="0" :aria-disabled="busy" @click="openIntent(intent)" @keydown.enter.prevent="openIntent(intent)" @keydown.space.prevent="openIntent(intent)"><text>{{ intent.withdrawalNo || intent.quoteNo }}</text></view>
-        <view class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
+        <view v-if="!uncertain" class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
       </template>
 
       <template v-else-if="displayConfig">
@@ -164,6 +163,8 @@
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, ref, watch } from "vue";
+import { toast } from "@/store/ui";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CopyCodeButton from "@/components/copy-code-button.vue";
@@ -199,6 +200,7 @@ const displayConfig = computed(() => {
   return config.value ?? (busy.value && !error.value ? snapshot.value : null);
 });
 const uncertain = ref(false);
+const pendingQuoteNo = ref<string | null>(null);
 const amount = ref("");
 const formStep = ref<"account" | "amount">("account");
 const accepted = ref(false);
@@ -250,13 +252,18 @@ function format(template: string, values: Record<string, string | number>) { ret
 function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.value = "amount"; }
 function useMax() { if (!busy.value && canContinue.value && maxAmount.value > 0) amount.value = maxAmount.value.toFixed(6).replace(/\.?0+$/, ""); }
 function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.value = !accepted.value; }
-function goBack() {
+async function goBack() {
+  await orderRead?.catch(() => {}); // A failed background read must not discard navigation.
+  if (!canReadVisibleBankPage()) return;
   if (busy.value || uncertain.value) return;
   if (quote.value) { void abandon(); return; }
   if (!order.value && formStep.value === "amount") { formStep.value = "account"; return; }
   navBack("/pages/me/wallet-withdraw-method");
 }
-function backToWallet() { if (!busy.value) navTo("/pages/me/me"); }
+async function backToWallet() {
+  await orderRead?.catch(() => {});
+  if (canReadVisibleBankPage() && !busy.value) navTo("/pages/me/me");
+}
 function scope() {
   const id = ++revision, owner = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
   return () => alive && revision === id && app.accountKey === owner && app.accountBindingEpoch === epoch && isCurrentRuntimeRevision(runtime);
@@ -266,6 +273,8 @@ function report(_err: unknown) {
   error.value = c.value.error;
 }
 async function run(action: (current: () => boolean) => Promise<void>, quietRead = false) {
+  await orderRead?.catch(() => {}); // Continue the explicit action even when the read failed.
+  if (!canReadVisibleBankPage()) return;
   if (busy.value) return;
   const current = scope(); busy.value = true; silentRead.value = quietRead; error.value = "";
   inFlight = { current, orderNo: requestedOrder ?? order.value?.withdrawalNo ?? null };
@@ -285,7 +294,7 @@ async function load() {
     }
     const pending: unknown = uni.getStorageSync(pendingKey());
     if (typeof pending === "string" && /^BQ-[a-f0-9]{32}$/.test(pending)) {
-      uncertain.value = true;
+      uncertain.value = true; pendingQuoteNo.value = pending;
       const recovered = await api.recover(pending); if (!current()) return;
       applyRecovery(recovered);
       if (recovered.state === "COMMITTED") return;
@@ -295,7 +304,7 @@ async function load() {
     if (loaded.unresolvedIntent?.state === "MULTIPLE") { quote.value = null; uncertain.value = true; return; }
     const intent = loaded.unresolvedIntent?.intents[0];
     if (intent) {
-      uncertain.value = true;
+      uncertain.value = true; pendingQuoteNo.value = intent.quoteNo;
       const recovered = await api.recover(intent.quoteNo); if (!current()) return;
       applyRecovery(recovered);
     } else if (loaded.unresolvedIntent === null) {
@@ -309,36 +318,68 @@ function canReadVisibleBankPage(): boolean {
 }
 
 function canPollOrder(): boolean {
-  return canReadVisibleBankPage() && !!order.value && !terminalOrderStatuses.includes(order.value.status);
+  return canReadVisibleBankPage() && !!order.value
+    && !terminal.value && !terminalOrderStatuses.includes(order.value.status);
 }
 
-let pollingOrder = false;
-async function pollOrder(): Promise<void> {
-  const snapshot = order.value;
+function canRecoverQuote(): boolean {
+  return canReadVisibleBankPage() && uncertain.value && !order.value && !!pendingQuoteNo.value && !multipleIntents.value.length;
+}
+const readingOrder = ref(false);
+let orderRead: Promise<void> | null = null;
+let orderReadGeneration = 0;
+function pollOrder(): Promise<void> {
+  if (orderRead) return orderRead;
+  const snapshot = order.value, quoteNo = pendingQuoteNo.value;
   const session = sessionVault.read();
-  if (!snapshot || !canPollOrder() || busy.value || pollingOrder
-      || !session?.accessToken || app.accountKey !== `user:${session.user.userId}`) return;
+  if ((!canPollOrder() && !canRecoverQuote()) || busy.value
+      || !session?.accessToken || app.accountKey !== `user:${session.user.userId}`) return Promise.resolve();
   const readRevision = revision;
-  const runtime = captureRuntimeRevision();
-  pollingOrder = true;
-  try {
-    const loaded = await api.get(snapshot.withdrawalNo);
-    if (canPollOrder() && order.value === snapshot && revision === readRevision
-        && isCurrentRuntimeRevision(runtime)) order.value = loaded;
-  } catch { /* Keep the last known order state during a passive read failure. */ }
-  finally { pollingOrder = false; }
+  const generation = orderReadGeneration;
+  const runtime = captureRuntimeRevision(), owner = app.accountKey, epoch = app.accountBindingEpoch;
+  const current = () => generation === orderReadGeneration && (canPollOrder() || canRecoverQuote())
+    && order.value === snapshot && pendingQuoteNo.value === quoteNo
+    && revision === readRevision && app.accountKey === owner && app.accountBindingEpoch === epoch
+    && isCurrentRuntimeRevision(runtime);
+  readingOrder.value = true;
+  const read = Promise.resolve().then(async () => {
+    if (!current()) return;
+    if (snapshot) {
+      const loaded = await api.get(snapshot.withdrawalNo);
+      if (!current()) return;
+      order.value = loaded;
+      if (terminal.value) toast.success(statusLabel.value);
+    } else if (quoteNo) {
+      const recovered = await api.recover(quoteNo);
+      if (!current()) return;
+      if (recovered.state !== "COMMITTED" && !config.value) {
+        const loaded = await api.config();
+        if (!current()) return;
+        config.value = loaded; configPresentation.value = { owner, epoch, value: loaded };
+      }
+      applyRecovery(recovered); error.value = "";
+      if (recovered.state === "COMMITTED") toast.info(statusLabel.value);
+      else if (recovered.state === "NOT_SUBMITTED") toast.info(c.value.confirmTitle, c.value.confirmHint);
+      else toast.info(c.value.intentClosed);
+    }
+  }).finally(() => {
+    if (orderRead === read) { orderRead = null; readingOrder.value = false; }
+  });
+  orderRead = read;
+  return read;
 }
 
-watch(canPollOrder, (enabled, _, onCleanup) => {
-  if (!enabled) return;
-  const timer = setInterval(() => { void pollOrder(); }, 30_000);
-  onCleanup(() => clearInterval(timer));
+useAutoRecovery({
+  failed: () => (canPollOrder() || canRecoverQuote()) && !busy.value && !readingOrder.value,
+  retry: pollOrder,
+  repeatMs: 15_000,
 });
 
 watch([visible, foregroundReadAllowed, () => auth.isAuthenticated], ([isVisible, allowed, authenticated], [wasVisible]) => {
   if (!isVisible || !allowed || !authenticated) return;
-  if (!wasVisible || (!order.value && !config.value && !quote.value)) void load();
-  else if (canPollOrder()) void pollOrder();
+  // Orders and unknown results have one read owner; load() would reset consent.
+  if (order.value || uncertain.value) return;
+  if (!wasVisible || (!config.value && !quote.value)) void load();
 });
 
 function applyRecovery(recovered: BankRecovery) {
@@ -346,11 +387,13 @@ function applyRecovery(recovered: BankRecovery) {
   if (recovered.state === "COMMITTED") { order.value = recovered; quote.value = null; uni.removeStorageSync(pendingKey()); }
   else if (recovered.state === "NOT_SUBMITTED") quote.value = recovered.quote;
   else { quote.value = null; uni.removeStorageSync(pendingKey()); if (config.value) config.value.unresolvedIntent = undefined; }
-  uncertain.value = false;
+  uncertain.value = false; pendingQuoteNo.value = null;
 }
 async function openIntent(intent: BankIntent) {
   await run(async current => {
-    uncertain.value = true;
+    uncertain.value = true; pendingQuoteNo.value = intent.quoteNo;
+    if (config.value) config.value.unresolvedIntent = { state: intent.state, intents: [intent],
+      quoteNo: intent.quoteNo, withdrawalNo: intent.withdrawalNo };
     const recovered = await api.recover(intent.quoteNo); if (!current()) return;
     applyRecovery(recovered);
   });
@@ -369,16 +412,16 @@ async function submit() {
     const no = quote.value!.quoteNo;
     uni.setStorageSync(pendingKey(), no); // Recovery reference only; never persist bank details, OTPs or balances.
     if (uni.getStorageSync(pendingKey()) !== no) throw new Error("BANK_RECOVERY_NOT_DURABLE");
-    uncertain.value = true;
+    uncertain.value = true; pendingQuoteNo.value = no;
     const value = await api.submit(no, `bank-submit:${no}`);
     if (!current()) return;
-    order.value = value; quote.value = null; uncertain.value = false; uni.removeStorageSync(pendingKey());
+    order.value = value; quote.value = null; uncertain.value = false; pendingQuoteNo.value = null; uni.removeStorageSync(pendingKey());
   });
 }
 async function abandon() {
   if (!quote.value || busy.value || uncertain.value) return;
   await run(async current => {
-    uncertain.value = true;
+    uncertain.value = true; pendingQuoteNo.value = quote.value!.quoteNo;
     const recovered = await api.abandon(quote.value!.quoteNo); if (!current()) return;
     applyRecovery(recovered);
     if (recovered.state === "ABANDONED" || recovered.state === "EXPIRED") {
@@ -390,11 +433,14 @@ async function abandon() {
     }
   });
 }
-function startNew() {
+async function startNew() {
+  await orderRead?.catch(() => {});
+  if (!canReadVisibleBankPage()) return;
   if (!terminal.value || busy.value) return;
   order.value = null; quote.value = null; requestedOrder = null; amount.value = ""; formStep.value = "account"; accepted.value = false; void load();
 }
 function clearScope() {
+  pendingQuoteNo.value = null; orderReadGeneration++;
   revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }
@@ -420,7 +466,7 @@ function stopTimer() { if (timer) clearInterval(timer); timer = undefined; }
 onShow(() => {
   visible.value = true; now.value = Date.now(); stopTimer(); timer = setInterval(() => { now.value = Date.now(); }, 1000);
 });
-onHide(() => { visible.value = false; stopTimer(); });
+onHide(() => { visible.value = false; orderReadGeneration++; stopTimer(); });
 onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(); revision++; });
 </script>
 
