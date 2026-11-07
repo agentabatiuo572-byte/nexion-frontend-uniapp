@@ -119,10 +119,12 @@
         </view>
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.withdrawAddressLabel }}</text>
-          <text v-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
+          <text v-if="payoutReadStatus === 'error'" class="wd-route__a wd-route__a--empty wd-route__a--error" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
+          <text v-else-if="payoutReadStatus !== 'ready'" class="wd-route__a wd-route__a--empty">—</text>
+          <text v-else-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else class="wd-route__a wd-route__a--empty">{{ t.addrRebind.emptyGuideTitle }}</text>
           <view
-            v-if="boundAddress"
+            v-if="payoutReadStatus === 'ready' && boundAddress"
             class="nx-withdraw-manage-entry wd-manage nx-frosted-button"
             role="button" tabindex="0"
             :aria-label="t.addrRebind.manageCta"
@@ -133,7 +135,7 @@
           </view>
         </view>
         <!-- 空状态引导(一次设置长期使用;非报错态) -->
-        <view v-if="!boundAddress" class="wd-route__guide">
+        <view v-if="payoutReadStatus === 'ready' && !boundAddress" class="wd-route__guide">
           <text class="wd-route__guide-body">{{ t.addrRebind.emptyGuideBody }}</text>
           <view class="nx-withdraw-add-address-cta wd-add nx-frosted-button" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage"  @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
             <text>{{ t.addrRebind.addCta }}</text>
@@ -314,6 +316,7 @@ import { earningsReleaseHasSnapshot, earningsReleaseSnapshot, earningsReleaseSta
 import { postReceiptForAccount } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { usePayoutAddress } from "@/store/payout-address";
+import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 import { fundsServerEnabled, remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { useAuth } from "@/store/auth";
@@ -343,6 +346,8 @@ const t = useT();
 const app = useApp();
 const auth = useAuth();
 const payout = usePayoutAddress();
+const payoutReadStatus = computed(() => payout.readStatusFor(app.accountKey));
+const payoutReadCopy = useFinanceReviewCopy();
 const phase = useProductPhase();
 const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
@@ -536,6 +541,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteFleetStatus === "e
 useAutoRecovery({ failed: () => remoteApiEnabled && earningsReleaseStatus.value === "error", retry: () => refreshEarningsReleaseStatus(app.accountKey) });
 useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteWithdrawalListStatus === "error", retry: () => app.refreshRemoteWithdrawalList(app.accountKey) });
 useAutoRecovery({ failed: () => remoteApiEnabled && !!withdrawalPolicyError.value && !withdrawalPolicyLoading.value, retry: loadWithdrawalPolicy });
+useAutoRecovery({ failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error", retry: () => payout.refreshRemote() });
 
 function invalidateWithdrawalFacts(): void {
   // A retained policy/eligibility belongs to the previous account or bearer
@@ -1053,6 +1059,8 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   // 但提交必须明确说明通道关闭，不能伪装成费率拉取失败。
   if (!feeConfigUsable.value) return t.value.walletV3.submitReasonFeeConfigUnavailable;
   if (withdrawalPolicy.value?.withdrawalEnabled !== true) return t.value.walletV3.submitReasonWithdrawalClosed;
+  if (payoutReadStatus.value === "error") return payoutReadCopy.value.addressUnavailable;
+  if (payoutReadStatus.value !== "ready") return payoutReadCopy.value.addressLoading;
   // RM01a:该网络未设提现地址 → 最根本的前置,先说它(页面上方是引导卡,不是报错)。
   if (boundAddress.value.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
   // No eligibility request is made until these inputs exist. Missing input is
@@ -1611,6 +1619,7 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-route__note { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-route__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
 .wd-route__a--empty { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.wd-route__a--error { color: var(--v5-danger); white-space: normal; }
 .wd-manage, .wd-add { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .wd-manage::after, .wd-add::after { content: ""; position: absolute; inset: -6px -2px; }
 .wd-route__guide { padding: 0 0 14px; }
