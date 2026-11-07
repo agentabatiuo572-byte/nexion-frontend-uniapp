@@ -18,7 +18,7 @@
           </view>
         </view>
 
-        <view class="entry-visual" aria-hidden="true">
+        <view class="entry-visual nx-soft-glass" aria-hidden="true">
           <svg class="entry-visual-svg" viewBox="0 0 236 236" fill="none">
             <rect x="52" y="18" width="132" height="200" rx="26" fill="var(--v5-surface)" stroke="var(--v5-border-strong)" stroke-width="2" />
             <rect x="68" y="44" width="100" height="148" rx="10" fill="var(--v5-bg)" stroke="var(--v5-border)" />
@@ -202,10 +202,6 @@ function go(href: string) {
   justify-content: center;
   min-height: 160px;
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--v5-surface) 82%, transparent), color-mix(in srgb, var(--v5-surface-2) 68%, transparent)),
-    var(--v5-surface);
-  box-shadow: var(--v5-card-shadow-lift);
 }
 
 .entry-visual-svg {

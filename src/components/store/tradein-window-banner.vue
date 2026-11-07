@@ -7,7 +7,6 @@
 <template>
   <view class="mb-3">
     <view class="nx-glass-card block relative overflow-hidden active:opacity-90" :style="rootStyle" role="button" tabindex="0" :aria-label="w.cta" @click.stop="go" @keydown.enter.stop.prevent="go" @keydown.space.stop.prevent="go">
-      <view class="absolute inset-0 pointer-events-none" :style="radialStyle" />
 
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
@@ -138,11 +137,6 @@ const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "16px",
   background:
     "var(--nx-glass-fill)",
-};
-
-const radialStyle: CSSProperties = {
-  background:
-    "radial-gradient(60% 80% at 95% 0%, color-mix(in srgb, var(--v5-brand-2) 20%, transparent), transparent 70%)",
 };
 
 const labelStyle: CSSProperties = {

@@ -344,7 +344,7 @@ const cardStyle: CSSProperties = {
 const renderWrapStyle: CSSProperties = {
   width: "100%",
   aspectRatio: "1.45",
-  background: "radial-gradient(70% 22% at 50% 86%, color-mix(in srgb, var(--ui-lime-soft) 30%, transparent), transparent 70%), radial-gradient(90% 85% at 50% 58%, var(--ui-content-surface-3), var(--ui-content-surface-2) 55%, var(--ui-content-surface) 100%)",
+  background: "var(--ui-content-surface-2)",
 };
 const vignetteStyle: CSSProperties = {
   position: "absolute",

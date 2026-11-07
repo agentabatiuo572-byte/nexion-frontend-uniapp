@@ -54,7 +54,7 @@
       <template v-else-if="order">
         <!-- Status hero (DS-28): the progress track is the page's main visual;
              the card's next step sits at its foot. -->
-        <view class="order-hero" :style="{ '--order-tone': statusColor }" data-testid="order-hero">
+        <view class="order-hero nx-soft-glass" :style="{ '--order-tone': statusColor }" data-testid="order-hero">
           <view class="order-hero__top">
             <view class="order-hero__text">
               <NxTag :tone="statusTone" :label="statusLabel(order.status)" />
@@ -149,7 +149,7 @@
     </view>
     <template #pageFixed>
       <!-- The order's next actions sit in the thumb zone at the bottom of the page (DS-30), whatever its state. -->
-      <view v-if="order && stickyActionsVisible" class="order-sticky">
+      <view v-if="order && stickyActionsVisible" class="order-sticky nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
           <NxButton class="order-hero__cancel" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
           <NxButton v-if="remoteApiEnabled && !paymentExpired" class="order-hero__pay" variant="primary" :label="pendingPaymentChecking ? pendingCopy.checking : externalPayment ? t.orders.paymentInProgressContinue : t.orders.pendingContinue" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment()" />
@@ -1099,10 +1099,10 @@ const sectionLabelStyle: CSSProperties = {
 </script>
 
 <style scoped>
-/* Status hero (DS-28): solid surface with one 9% tone glow behind the machine art. */
-.order-hero { position: relative; overflow: hidden; margin: 0 16px; padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); background: radial-gradient(260px 220px at 100% 0%, color-mix(in srgb, var(--order-tone) 9%, transparent), transparent 72%), var(--v5-content-surface); }
+/* Status hero (DS-28): the page's focal soft-glass card (01 §1.1.2); the blocks below stay solid. */
+.order-hero { position: relative; overflow: hidden; margin: 0 16px; padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); }
 .order-block { margin: var(--ui-space-card-gap) 16px 0; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-content-surface); color: var(--v5-ink); }
-[data-theme="light"] .order-hero, [data-theme="light"] .order-block { box-shadow: var(--v5-glass-shadow); }
+[data-theme="light"] .order-block { box-shadow: var(--v5-glass-shadow); }
 .order-hero__top { display: flex; align-items: center; gap: 12px; }
 .order-hero__text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
 .order-hero__title { margin-top: 8px; color: var(--v5-ink); overflow-wrap: anywhere; font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
@@ -1118,7 +1118,7 @@ const sectionLabelStyle: CSSProperties = {
 /* Buttons sit side by side while their labels fit, otherwise each takes a full row. */
 /* 40px basis = the L button's side padding, so a 1:2 pair splits the remaining width like the design. */
 .order-hero__pay { flex-grow: 2; }
-.order-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-wrap: wrap; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.order-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-wrap: wrap; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
 .order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
 /* Paired buttons share a card row, so they take the M side padding (16px) to fit two labels. */

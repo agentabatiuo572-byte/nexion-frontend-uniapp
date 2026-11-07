@@ -70,7 +70,7 @@ watch(() => productCatalogState.status, status => {
 function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.target.id)); }
 </script>
 <style scoped>
-.upgrade-spotlight { position:relative; overflow:hidden; padding:18px; border:1px solid var(--v5-border); border-radius:22px; background:radial-gradient(60% 55% at 78% 46%,color-mix(in srgb,var(--v5-brand) 20%,transparent),transparent 70%),linear-gradient(180deg,var(--ui-ticket-top),var(--ui-ticket-bottom)); }
+.upgrade-spotlight { position:relative; overflow:hidden; padding:18px; border:1px solid var(--v5-border); border-radius:22px; background:var(--v5-surface); }
 .upgrade-eyebrow { display:block; font:500 12.5px/18px var(--font-v5); color:var(--ui-lime-soft); }
 .upgrade-title { margin-top:6px; overflow-wrap:anywhere; }
 .upgrade-title__base { display:block; color:var(--v5-ink-2); font:500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
@@ -82,7 +82,7 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-art__arrow { position:absolute; left:43%; top:44px; width:46px; height:32px; transform:translateX(-50%); background:url('/static/promotion/upgrade-arrow-dark.png') center/contain no-repeat; pointer-events:none; }
 :global([data-theme="light"] .upgrade-art__arrow) { background-image:url('/static/promotion/upgrade-arrow-light.png'); }
 .upgrade-art__base-shadow { position:absolute; left:16px; bottom:12px; width:86px; height:14px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-ink) 18%,transparent),transparent); }
-.upgrade-art__target-shadow { position:absolute; right:6px; bottom:8px; width:150px; height:22px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--ui-lime-soft) 45%,transparent),transparent); }
+.upgrade-art__target-shadow { position:absolute; right:6px; bottom:8px; width:150px; height:22px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-ink) 18%,transparent),transparent); }
 .upgrade-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:4px; }
 .upgrade-comparison__label { display:block; font:400 12.5px/18px var(--font-v5); color:var(--v5-ink-3); }
 .upgrade-comparison__value { display:block; margin-top:2px; font:600 16px/22px var(--font-metric); font-variant-numeric:tabular-nums; }
