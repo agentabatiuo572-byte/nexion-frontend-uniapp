@@ -26,7 +26,6 @@
 
       <!-- ═══ active / grace — running cycle ═══ -->
       <view v-else-if="isActiveCycle" class="trial-state" :class="{ 'trial-state--grace': isGrace }">
-        <view class="trial-glow trial-glow--hero" aria-hidden="true" />
         <view class="trial-hero trial-rise">
           <view class="trial-hero__top">
             <NxTag :tone="isGrace ? 'warning' : 'brand'">{{ ribbon }}</NxTag>
@@ -127,7 +126,6 @@
 
       <!-- ═══ none — claim intro ═══ -->
       <view v-else-if="claimVisible" class="trial-state trial-state--terminal">
-        <view class="trial-glow trial-glow--claim" aria-hidden="true" />
         <view class="trial-slot trial-rise">
           <view class="trial-slot__ring" aria-hidden="true" />
           <CatalogMachineImage class="trial-slot__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-claim" />
@@ -168,7 +166,6 @@
 
       <!-- ═══ converted — owned terminal ═══ -->
       <view v-else class="trial-state trial-state--terminal">
-        <view class="trial-glow trial-glow--owned" aria-hidden="true" />
         <view class="trial-ring trial-ring--terminal trial-ring--owned trial-rise">
           <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true"><circle class="trial-ring__full" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg>
           <CatalogMachineImage class="trial-ring__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-owned" />
@@ -513,20 +510,11 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-read-skeleton > view:first-child { height:100px;width:100%;border-radius:20px; }
 .trial-read-retry { min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--v5-surface-2);color:var(--v5-ink);font:600 13px/20px var(--font-v5); }
 
-/* ── Page frame: each state is a full-width column; its one ambient glow is clipped to the page. ── */
+/* ── Page frame: each state is a full-width column on the plain page floor. ── */
 .trial-page { color:var(--v5-ink); }
 .trial-state { position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;font-variant-numeric:tabular-nums; }
 .trial-state > * { position:relative; }
 .trial-state--terminal { padding-top:48px; }
-.trial-glow { position:absolute !important;left:50%;border-radius:50%;pointer-events:none;animation:trial-fade 1.2s ease-out both; }
-.trial-glow--hero { top:-8px;width:360px;height:360px;margin-left:-180px;background:radial-gradient(closest-side, color-mix(in srgb, var(--v5-tech-cyan) 24%, transparent), transparent); }
-.trial-state--grace .trial-glow--hero { background:radial-gradient(closest-side, color-mix(in srgb, var(--v5-warning) 12%, transparent), transparent); }
-.trial-glow--claim { top:22px;width:380px;height:380px;margin-left:-190px;background:radial-gradient(closest-side, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent), transparent); }
-.trial-glow--owned { top:-8px;width:360px;height:360px;margin-left:-180px;background:radial-gradient(closest-side, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent), transparent); }
-:global([data-theme="light"] .trial-glow--hero),
-:global([data-theme="light"] .trial-glow--claim),
-:global([data-theme="light"] .trial-glow--owned) { background:radial-gradient(closest-side, color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent), transparent); }
-:global([data-theme="light"] .trial-state--grace .trial-glow--hero) { background:radial-gradient(closest-side, color-mix(in srgb, var(--v5-warning) 10%, transparent), transparent); }
 
 /* ── Hero: status row, countdown ring with the device inside, remaining time ── */
 .trial-hero { align-self:stretch;display:flex;flex-direction:column;align-items:center;padding:0 16px; }
@@ -647,12 +635,11 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-rise--3 { animation-delay:.16s; }
 .trial-rise--4 { animation-delay:.24s; }
 @keyframes trial-rise { from { opacity:0;transform:translateY(14px); } to { opacity:1;transform:none; } }
-@keyframes trial-fade { from { opacity:0; } to { opacity:1; } }
 @keyframes trial-ring-draw { from { stroke-dashoffset:603.19; } }
 @keyframes trial-bar-in { from { transform:translateY(100%); } to { transform:none; } }
 @keyframes trial-pop { 0% { opacity:0;transform:scale(.6); } 70% { opacity:1;transform:scale(1.08); } 100% { opacity:1;transform:scale(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .trial-rise, .trial-glow, .trial-ring__arc, .trial-ring__check, .trial-bar { animation:none; }
+  .trial-rise, .trial-ring__arc, .trial-ring__check, .trial-bar { animation:none; }
 }
 
 .trs-root {
