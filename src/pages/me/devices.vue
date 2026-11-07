@@ -35,8 +35,7 @@
 
       <!-- Slot chassis: a liquid-glass panel whose bays show which device holds each compute slot. -->
       <view v-if="!inventoryError" class="device-stage mx-4">
-        <view class="device-stage__aura" aria-hidden="true"><view /><view /></view>
-        <view class="device-hero" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
+        <view class="device-hero nx-frosted-button" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
           <view class="device-hero__top">
             <view>
               <text class="device-hero__title">{{ t.myDevices.inventorySlotsLabel }}</text>
@@ -167,7 +166,7 @@
               <text class="device-phone-card__body">{{ phoneActivationGuidance.body }}</text>
               <NxButton v-if="nativePhoneAvailable" class="device-phone-card__cta" variant="brand" size="medium" :label="t.myDevices.phoneActivationCta" @click="goPhoneActivation" />
             </view>
-            <view class="device-phone-card__art" aria-hidden="true"><image class="device-phone-card__img" src="/static/img/home-glass-20260928/phone.webp" mode="aspectFit" /><view class="device-phone-card__floor" /></view>
+            <view class="device-phone-card__art" aria-hidden="true"><image class="device-phone-card__img" src="/static/img/home-glass-20260928/phone.webp" mode="aspectFit" /></view>
           </view>
         </view>
       </view>
@@ -182,7 +181,7 @@
     />
     <!-- Buying more devices is the page's main action, in the thumb zone (DS-30). -->
     <template #pageFixed>
-      <view class="device-page__bar"><NxButton class="device-page__bar-btn" variant="primary" :label="t.myDevices.inventoryCtaGoStore" @click="goStore"><view class="device-page__bar-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg><text>{{ t.myDevices.inventoryCtaGoStore }}</text></view></NxButton></view>
+      <view class="device-page__bar nx-frosted-button"><NxButton class="device-page__bar-btn" variant="primary" :label="t.myDevices.inventoryCtaGoStore" @click="goStore"><view class="device-page__bar-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg><text>{{ t.myDevices.inventoryCtaGoStore }}</text></view></NxButton></view>
     </template>
   </AppChassis>
 </template>
@@ -400,20 +399,10 @@ function goStore() {
 
 <style scoped>
 .device-stage { position: relative; margin-top: 15px; }
-.device-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
-.device-stage__aura > view { position: absolute; width: 190px; height: 150px; border-radius: 50%; filter: blur(42px); }
-.device-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent); }
-.device-stage__aura > view:last-child { right: -14px; bottom: 20px; background: color-mix(in srgb, var(--v5-aura-sky) 28%, transparent); }
-[data-theme="light"] .device-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
-[data-theme="light"] .device-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-aura-sky) 18%, transparent); }
-/* Liquid-glass soft edge: tinted fill carrying a copy of the stage aura, soft inner rim; bays sit in it
-   as recessed wells. No backdrop-filter: it only applied while the page-enter animation composited the
-   page, so the hero flashed brighter, then dimmed. The tint is the brighter look. */
-.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl);
-  background: radial-gradient(220px 170px at 12% 60px, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent), transparent 70%), radial-gradient(220px 170px at 88% calc(100% - 70px), color-mix(in srgb, var(--v5-aura-sky) 26%, transparent), transparent 70%), rgba(255,255,255,.055);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35); }
-[data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); background: rgba(255,255,255,.58);
-  box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
+/* Page focus block: shared soft glass; bays sit in it as recessed wells. No backdrop-filter: the hero sits on
+   the plain page floor, and the blur only applied while the page-enter animation composited the page. */
+.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl); backdrop-filter: none; -webkit-backdrop-filter: none; }
+[data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .device-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .device-hero__title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .device-hero__count { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
@@ -451,10 +440,8 @@ function goStore() {
 .device-phone-card__cta { display: inline-flex; margin-top: 12px; }
 .device-phone-card__art { position: relative; width: 84px; height: 72px; }
 .device-phone-card__img { position: absolute; left: 3px; top: 2px; width: 78px; height: 64px; }
-.device-phone-card__floor { position: absolute; left: 20%; right: 20%; bottom: 2px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
-[data-theme="light"] .device-phone-card__floor { background: radial-gradient(closest-side, rgba(20,16,8,.20), transparent); }
 .device-page__bar-space { height: calc(110px + env(safe-area-inset-bottom)); }
-.device-page__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.device-page__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .device-page__bar-btn { display: flex; flex: 1; }
 .device-page__bar-label { display: flex; align-items: center; gap: 6px; }
 @keyframes device-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
