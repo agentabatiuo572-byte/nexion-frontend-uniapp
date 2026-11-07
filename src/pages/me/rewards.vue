@@ -288,13 +288,14 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 
 <style scoped>
 .reward-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--v5-space-3); margin: 0 16px; }
-.reward-tile { position: relative; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); color: var(--v5-ink); cursor: pointer; animation: reward-enter 480ms cubic-bezier(.16,1,.3,1) both; }
+.reward-tile { position: relative; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); color: var(--v5-ink); cursor: pointer; animation: reward-enter 480ms cubic-bezier(.16,1,.3,1) both; }
+.reward-tile:not(.nx-frosted-button) { background: var(--v5-surface); }
 .reward-tile:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .reward-tile__title { display: block; font: 500 15px/22px var(--font-v5); }
 .reward-tile__amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: var(--v5-space-2); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; }
 .reward-tile__unit { font: 500 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 .reward-tile__desc { display: block; margin-top: 6px; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); overflow-wrap: anywhere; }
-.reward-tile--usdt { grid-column: 1 / -1; padding: 18px; background: color-mix(in srgb,var(--v5-ink) 5%,var(--v5-surface)); box-shadow: var(--ui-glass-edge-shadow); }
+.reward-tile--usdt { grid-column: 1 / -1; padding: 18px; }
 .reward-tile--usdt .reward-tile__amount { font-size: 40px; line-height: 48px; margin-top: 6px; padding-right: 28px; }
 .reward-tile--usdt .reward-tile__desc { font-size: 13px; line-height: 20px; }
 .reward-arrow { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; }
@@ -308,15 +309,11 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-gift { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 18px; color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 18%,transparent); }
 @keyframes reward-enter { from { transform: translateY(12px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .reward-tile { animation: none; } }
-.reward-tile--usdt { background: radial-gradient(ellipse at 15% 20%,color-mix(in srgb,var(--v5-warning) 12%,transparent),transparent 65%),radial-gradient(ellipse at 90% 80%,color-mix(in srgb,var(--v5-brand-2) 12%,transparent),transparent 65%),color-mix(in srgb,var(--v5-surface) 78%,transparent); backdrop-filter:blur(16px) saturate(140%); }
 
 /* Approved growth board geometry and material. */
  .amount-cur { font-size:.55em; color:var(--v5-ink-3); margin-right:2px; letter-spacing:0; }.amount-dec { color:var(--v5-ink-3); }
 .reward-tile { box-shadow:var(--v5-glass-shadow); }
-.reward-tile--usdt { isolation:isolate; background:color-mix(in srgb,var(--v5-ink) 4.5%,transparent); box-shadow:var(--ui-glass-edge-shadow); padding:18px; }
-.reward-tile--usdt::before,.reward-tile--usdt::after { content:''; position:absolute; width:180px; height:140px; border-radius:50%; filter:blur(42px); pointer-events:none; z-index:-1; }
-.reward-tile--usdt::before { left:-4px; top:0px; background:color-mix(in srgb,var(--v5-brand) 40%,transparent); }
-.reward-tile--usdt::after { right:-8px; bottom:12px; background:color-mix(in srgb,var(--v5-brand-2) 45%,transparent); }
+.reward-tile--usdt { box-shadow:var(--ui-glass-edge-shadow); padding:18px; }
 .reward-tile--usdt .reward-arrow { box-shadow:var(--ui-glass-edge-shadow); background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-ink) 7%,transparent); }
 .reward-tile--uvt { box-shadow:var(--v5-glass-shadow); }
 .reward-tile--uvt::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 210deg,transparent 0 45%,color-mix(in srgb,var(--v5-warning) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
@@ -325,9 +322,7 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-tile--usdt .reward-tile__amount { margin-top:6px; }.reward-tile--usdt .reward-tile__desc { margin-top:4px; }
 
 
-:global([data-theme="light"] .reward-tile--usdt) {background:color-mix(in srgb,var(--v5-surface) 58%,transparent);box-shadow:var(--ui-glass-edge-shadow),var(--v5-glass-shadow);}
-:global([data-theme="light"] .reward-tile--usdt::before) {background:color-mix(in srgb,var(--v5-brand) 14%,transparent);}
-:global([data-theme="light"] .reward-tile--usdt::after) {background:color-mix(in srgb,var(--v5-brand-2) 16%,transparent);}
+:global([data-theme="light"] .reward-tile--usdt) {box-shadow:var(--ui-glass-edge-shadow),var(--v5-glass-shadow);}
 .reward-tile--uvt .reward-tile__amount,.reward-tile--uvt .reward-tile__unit {color:var(--v5-nex-ink);}
 
 .reward-tile__amount { font-variant-numeric:tabular-nums; }

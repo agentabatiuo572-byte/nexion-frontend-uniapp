@@ -14,7 +14,7 @@
     <view class="growth-goals" :class="{ 'growth-goals--featured': !!featuredGoal }" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.goals.navTitle" />
 
-      <view v-if="featuredGoal" class="goal-hero mx-4">
+      <view v-if="featuredGoal" class="goal-hero nx-frosted-button mx-4">
         <view class="goal-hero__heading"><text>{{ fmt(t.growthUi.goalTerm, {days: Math.max(1, Math.round((featuredGoal.deadlineMs - featuredGoal.createdAt) / ONE_DAY_MS)), amount:formatAmount(featuredGoal.targetUSDT)}) }}</text><text class="goal-hero__term">{{ deadlineLine(featuredGoal.deadlineMs) }}</text></view>
         <GrowthProgress ring :size="176" :radius="45.4545" :stroke="7" :value="goalPct(featuredGoal.targetUSDT)" :label="`${formatAmount(lifeTimeEarnings)} / ${formatAmount(featuredGoal.targetUSDT)}`">
           <text class="goal-hero__amount"><text class="amount-cur">$</text>{{ formatAmount(lifeTimeEarnings).split('.')[0] }}<text class="amount-dec">{{ '.' + formatAmount(lifeTimeEarnings).split('.')[1] }}</text></text><text class="goal-hero__of">/ ${{ formatAmount(featuredGoal.targetUSDT) }}</text><text class="goal-hero__pct">{{ goalPct(featuredGoal.targetUSDT).toFixed(0) }}%</text>
@@ -117,7 +117,7 @@
       </view>
     </view>
     <template #pageFixed>
-      <view class="goal-sticky"><NxButton variant="primary" size="large" :label="t.goals.saveCta" :disabled="saveBlocked" :busy="savePending" @click="onSave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg><text>{{ t.goals.saveCta }}</text></NxButton></view>
+      <view class="goal-sticky nx-frosted-button"><NxButton variant="primary" size="large" :label="t.goals.saveCta" :disabled="saveBlocked" :busy="savePending" @click="onSave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></svg><text>{{ t.goals.saveCta }}</text></NxButton></view>
     </template>
   </AppChassis>
 </template>
@@ -644,7 +644,7 @@ const emptyStateStyle: CSSProperties = {
 <style scoped>
 .growth-goals { --ui-growth-selection: color-mix(in srgb,var(--v5-bg) 50%,transparent); padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
 :global([data-theme="light"]) .growth-goals { --ui-growth-selection: color-mix(in srgb,var(--v5-ink) 7%,transparent); }
-.goal-hero { position: relative; padding: 18px 16px 20px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+.goal-hero { position: relative; padding: 18px 16px 20px; border-radius: var(--ui-radius-surface); }
 .goal-hero__heading { display: flex; justify-content: space-between; gap: var(--v5-space-2); align-items: center; font: 500 15px/22px var(--font-v5); }
 .goal-hero__term { flex: none; color: var(--v5-brand); background: var(--v5-brand-soft); padding: var(--v5-space-1) 8px; border-radius: var(--v5-radius-full); font: 500 12px/16px var(--font-v5); }
 .goal-hero :deep(.growth-progress) { margin: var(--v5-space-3) auto 0; }
@@ -652,13 +652,13 @@ const emptyStateStyle: CSSProperties = {
 .goal-intro { margin-top: var(--v5-space-8); }.goal-deadlines { padding: var(--v5-space-1); border-radius: var(--v5-radius-full); position: relative; }
 .nx-goal-target-preset, .nx-goal-deadline-preset { position: relative; cursor: pointer; }.nx-goal-target-preset::after, .nx-goal-deadline-preset::after { content:''; position:absolute; inset:-6px 0; }
 .nx-goal-target-preset:focus-visible, .nx-goal-deadline-preset:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.goal-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg,color-mix(in srgb,var(--ui-ticket-top) 70%,transparent),color-mix(in srgb,var(--ui-ticket-bottom) 94%,transparent)); border-top: 1px solid var(--v5-border); backdrop-filter: blur(18px) saturate(160%); }.goal-sticky > * { flex: 1; }
+.goal-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); }.goal-sticky > * { flex: 1; }
 .goal-daily { display:block; margin-top:6px; font:500 24px/30px var(--font-metric); letter-spacing:-.01em; }.goal-device-name { flex:1; font:500 15px/22px var(--font-v5); color:var(--v5-ink); }
 .goal-device-name {margin-right:12px;}.goal-builder ~ view [aria-label] .goal-device-name {font-weight:500;}
 
 /* Approved growth board geometry and material. */
  .amount-cur { font-size:.55em; color:var(--v5-ink-3); margin-right:2px; letter-spacing:0; }.amount-dec { color:var(--v5-ink-3); }
-.goal-hero { overflow:hidden; }.goal-hero::after { content:''; position:absolute; left:50%; top:150px; width:260px; height:80px; margin-left:-130px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-brand) 22%,transparent),transparent); pointer-events:none; }
+.goal-hero { overflow:hidden; }
 .goal-hero :deep(.growth-progress) { position:relative; z-index:1; }
 .goal-device-well { box-sizing:border-box; width:100%; min-height:66px !important; gap:12px !important; padding:10px 12px; border-radius:14px; background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent),inset 0 0 0 1px var(--v5-border); }
 .goal-device-copy { flex:1; min-width:0; }.goal-device-label { display:block; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.goal-device-name { display:block; margin:0; font:500 15px/22px var(--font-v5); }
