@@ -369,16 +369,18 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 
 <style scoped>
 .commission-overview.reward-hero--panel { position: relative; box-sizing: border-box; border: 0; padding: 20px; border-radius: 28px; }
+/* Light glass on the cream floor: the shared 7% ink fill leaves ink-3 at 4.2:1, so the hero takes a lighter uniform fill (ink-3 5.2:1, warning-ink 4.8:1). */
+[data-theme="light"] .commission-overview { --ui-button-fill: color-mix(in srgb, var(--v5-surface) 58%, transparent); }
 .commission-overview :deep(.reward-hero__art) { display: none; }
 .commission-overview__rules { position: absolute; right: 12px; top: 10px; display: flex; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-width: 44px; min-height: 44px; padding: 0 10px; color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); isolation: isolate; }
 .commission-overview__rules::before { content: ""; position: absolute; inset: 8px 0; z-index: -1; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
 .reward-income-uvt { margin-top: 2px; font: 500 14px/18px var(--font-metric); color: var(--v5-brand); font-variant-numeric: tabular-nums; }
 .commission-overview .reward-amount { font: 600 44px/48px var(--font-amount); letter-spacing: -.03em; }
 .reward-amount__currency { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
-.reward-amount__fraction { color: var(--v5-ink-4); }
+.reward-amount__fraction { color: var(--v5-ink-3); }
 .reward-income-summary > view > text:first-child::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; vertical-align: middle; background: var(--v5-brand); }
 .reward-income-summary > view + view > text:first-child::before { background: var(--v5-warning); }
-.reward-income-summary > view + view > text:last-child { color: var(--v5-warning); }
+.reward-income-summary > view + view > text:last-child { color: var(--v5-warning-ink); }
 .reward-income-summary > view:first-child > text:last-child { font-family: var(--font-metric); }
 .reward-income-lifetime__amounts > text + text::before { content: "· "; }
 /* Data-visual entrance (DS-29): the split reveals left to right once its data arrives. Its segments are
