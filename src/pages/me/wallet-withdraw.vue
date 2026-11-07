@@ -77,8 +77,7 @@
 
       <!-- Amount on a liquid-glass slab over the aura; the minimum sits right under it. -->
       <view class="wd-stage mx-4">
-        <view class="wd-aura" aria-hidden="true"><view /><view /></view>
-        <view class="wd-slab">
+        <view class="wd-slab nx-frosted-button">
           <view class="wd-slab__head">
             <text class="wd-k">{{ t.wallet.amountLabel }}</text>
             <view class="wd-max" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax"  @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
@@ -273,7 +272,7 @@
     </view>
     <!-- 主操作在底部固定栏(DS-30);不可提交时原因写在按钮上方。 -->
     <template #pageFixed>
-      <view class="wd-bar">
+      <view class="wd-bar nx-frosted-button">
         <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why">{{ submitDisabledReason }}</text>
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
         <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
@@ -1586,19 +1585,10 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-locks__i { display: inline-flex; align-items: center; gap: 4px; }
 .wd-locks__v { color: var(--v5-ink-2); font: 500 12px/16px var(--font-metric); }
 .wd-stage { position: relative; margin-top: 12px; }
-.wd-aura { position: absolute; inset: -8px -6px; pointer-events: none; }
-.wd-aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
-.wd-aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
-.wd-aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-brand-2) 26%, transparent); }
-[data-theme="light"] .wd-aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
-[data-theme="light"] .wd-aura > view:last-child { background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
-/* No backdrop-filter (same as the top-up slab): it only applied while the page-enter animation
-   composited the page, so the slab flashed brighter, then dimmed. The tint is the brighter look. */
-.wd-slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl);
-  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 22%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-brand-2) 22%, transparent), transparent 70%), rgba(255,255,255,.13);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35); }
-[data-theme="light"] .wd-slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-brand-2) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
-  box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
+/* Step focus block: shared soft glass. No backdrop-filter (same as the top-up slab): it sits on the plain
+   page floor and the blur only applied while the page-enter animation composited the page. */
+.wd-slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); backdrop-filter: none; -webkit-backdrop-filter: none; }
+[data-theme="light"] .wd-slab { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .wd-slab__head { display: flex; align-items: center; justify-content: space-between; }
 .wd-max { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .wd-max::after { content: ""; position: absolute; inset: -6px -8px; }
@@ -1641,7 +1631,7 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-quota__pip { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .wd-quota__pip--used { background: var(--v5-ink-3); box-shadow: none; }
 .wd-bar-space { height: 120px; }
-.wd-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.wd-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .wd-bar__why { position: absolute; left: 16px; right: 16px; top: -28px; text-align: center; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
 .wd-submit--on { opacity: 1; cursor: pointer; }

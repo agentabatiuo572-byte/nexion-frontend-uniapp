@@ -33,7 +33,7 @@
         <text class="vh" role="heading" aria-level="1">{{ title }}</text>
         <!-- P-45 account step: the bound account as a physical bank card, then the binding rule. -->
         <template v-if="!quote && formStep === 'account'">
-          <view class="bcard" :aria-label="`${c.recipientTitle} ${recipient?.maskedAccount ?? '—'}`">
+          <view class="bcard nx-frosted-button" :aria-label="`${c.recipientTitle} ${recipient?.maskedAccount ?? '—'}`">
             <view class="bcard__top">
               <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
               <text class="bcard__nm">{{ c.recipientSubtitle }}</text>
@@ -56,8 +56,7 @@
 
         <template v-if="quote">
           <view class="stage">
-            <view class="aura" aria-hidden="true"><view /><view /></view>
-            <view class="slab">
+            <view class="slab nx-frosted-button">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
               <text class="slab__amt">{{ money(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
               <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text>
@@ -98,8 +97,7 @@
 
         <template v-else>
           <view class="stage">
-            <view class="aura" aria-hidden="true"><view /><view /></view>
-            <view class="slab">
+            <view class="slab nx-frosted-button">
               <view class="slab__head">
                 <text class="k">{{ c.amount }}</text>
                 <view class="use-max" role="button" tabindex="0" data-testid="bank-max" :aria-disabled="busy || !canContinue || maxAmount <= 0" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax"><text>{{ c.all }}</text></view>
@@ -145,7 +143,7 @@
     </view>
     <!-- Main actions in the fixed bottom bar (DS-30): account → change + continue; amount → quote; quote → confirm. -->
     <template #pageFixed>
-      <view v-if="displayConfig && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar">
+      <view v-if="displayConfig && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-frosted-button">
         <template v-if="quote">
           <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit"><text>{{ c.confirm }}</text></view>
         </template>
@@ -507,20 +505,17 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .hint { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .hint.pad { margin: 12px 4px 0; }
-.bcard { position: relative; display: flex; flex-direction: column; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: color-mix(in srgb, white 96%, transparent);
-  background: linear-gradient(150deg, #2B2E35, #17191D 55%, #0F1013); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 8px 12px -10px rgba(255,255,255,.35), 0 16px 36px rgba(0,0,0,.40); }
-.bcard::before { content: ""; position: absolute; right: -70px; top: -90px; width: 300px; height: 300px; border-radius: 50%; background: repeating-radial-gradient(circle, rgba(255,255,255,.055) 0 1px, transparent 1px 9px); pointer-events: none; }
-.bcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.16) 50%, transparent 65%); transform: translateX(-110%); animation: bcard-sweep 1200ms 480ms cubic-bezier(.4,0,.2,1) both; pointer-events: none; }
-@keyframes bcard-sweep { to { transform: translateX(110%); } }
+.bcard { position: relative; display: flex; flex-direction: column; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: var(--v5-ink); }
+[data-theme="light"] .bcard { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
-.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); }
-.bcard__nm { flex: 1; min-width: 0; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
-.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success); font: 500 12px/16px var(--font-v5); }
-.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning); }
+.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--v5-surface-2); }
+.bcard__nm { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
+.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success-ink); font: 500 12px/16px var(--font-v5); }
+.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning-ink); }
 .bcard__bot { position: relative; display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; }
-.bcard__lb { display: block; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-v5); }
+.bcard__lb { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .bcard__no { display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; }
-.bcard__cur { color: color-mix(in srgb, white 55%, transparent); font: 500 12px/16px var(--font-metric); letter-spacing: .08em; }
+.bcard__cur { color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); letter-spacing: .08em; }
 .note { display: flex; align-items: flex-start; gap: 8px; margin: 14px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .note > svg { flex: none; margin-top: 2px; }
 .acct { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-top: 15px; padding: 8px 14px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
@@ -528,18 +523,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .acct__grow { flex: 1; min-width: 0; }
 .acct__no { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); }
 .stage { position: relative; margin-top: 12px; }
-.aura { position: absolute; inset: -8px -6px; pointer-events: none; }
-.aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
-.aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
-.aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-brand-2) 26%, transparent); }
-[data-theme="light"] .aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
-[data-theme="light"] .aura > view:last-child { background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
-.slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl);
-  background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 15%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-brand-2) 16%, transparent), transparent 70%), rgba(255,255,255,.085);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), inset 0 7px 10px -7px rgba(255,255,255,.20), inset 3px 0 12px -8px rgba(255,255,255,.20), inset 0 -8px 14px -8px rgba(0,0,0,.40), 0 12px 32px rgba(0,0,0,.35);
-  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); }
-[data-theme="light"] .slab { background: radial-gradient(200px 150px at 12% 50px, color-mix(in srgb, var(--v5-warning) 3.5%, transparent), transparent 70%), radial-gradient(200px 150px at 88% calc(100% - 45px), color-mix(in srgb, var(--v5-brand-2) 3.5%, transparent), transparent 70%), rgba(255,255,255,.58);
-  box-shadow: inset 0 0 0 1px rgba(73,94,125,.12), inset 0 7px 10px -7px rgba(255,255,255,.95), inset 3px 0 12px -8px rgba(255,255,255,.95), inset 0 -8px 14px -8px rgba(87,115,155,.16), var(--v5-glass-shadow); }
+.slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
+[data-theme="light"] .slab { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .slab__head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
@@ -574,8 +559,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .consent .checkbox { width: 22px; height: 22px; border-radius: 7px; font-size: 13px; }
 .text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }
-.bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .bar .action { flex: 1 1 0; min-height: 48px; margin: 0; padding: 0 20px; font: 500 15px/20px var(--font-v5); }
 .bar .secondary.nx-frosted-button { background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-ink) 7%, transparent); box-shadow: var(--ui-glass-edge-shadow); color: var(--v5-ink); }
-@media (prefers-reduced-motion: reduce) { .bcard::after { animation: none; opacity: 0; } .cdw__val { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .cdw__val { transition: none; } }
 </style>
