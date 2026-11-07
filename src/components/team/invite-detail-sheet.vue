@@ -93,7 +93,7 @@ useDialogA11y(computed(() => props.open), '.invite-detail', () => emit('close'))
 .invite-detail__record-icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
 .invite-detail__record-icon--pending { color: var(--v5-warning); background: color-mix(in srgb, var(--v5-warning) 16%, transparent); }
 .invite-detail__record-copy { flex: 1; }
-.invite-detail__hero { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; padding: 18px; border-radius: 24px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-brand) 10%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.invite-detail__hero { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; padding: 18px; border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .invite-detail__total { display: flex; flex-direction: column; gap: 4px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-2); }
 .invite-detail__amount { font: 600 40px/44px var(--font-amount); letter-spacing: -.03em; color: var(--v5-ink); overflow-wrap: anywhere; }
 .invite-detail__unit { font: 600 15px/20px var(--font-metric); letter-spacing: 0; color: var(--v5-brand); }

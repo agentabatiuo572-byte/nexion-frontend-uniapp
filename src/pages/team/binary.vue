@@ -11,7 +11,7 @@
           <view v-else-if="remoteApiEnabled && pageState.primary === 'loading' && !snapshot" class="binary-loading"
             role="status" aria-live="polite" aria-busy="true" />
             <view v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)" class="binary-comparison-section">
-            <view class="binary-hero nx-viz-press">
+            <view class="binary-hero nx-frosted-button nx-viz-press">
               <view class="binary-hero-heading">
                 <text class="binary-label">{{ binaryCopy.contributions }}</text>
                 <view class="binary-rule-link" role="button" tabindex="0" :aria-label="t.binary.howItWorksEntry"
@@ -357,7 +357,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 <style scoped>
 .binary-content { display: flex; flex-direction: column; gap: 28px; padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
 .binary-loading { height: 156px; border-radius: 20px; background: var(--v5-surface-2); }
-.binary-hero { padding: var(--v5-space-2) var(--v5-space-4) var(--v5-space-4); border-radius: 28px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--ui-device-ink) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.binary-hero { padding: var(--v5-space-2) var(--v5-space-4) var(--v5-space-4); border-radius: 28px; }
 .binary-hero-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-4); }
 .binary-label { display: block; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); }
 .binary-hero-heading > .binary-label { flex: 1; min-width: 0; }

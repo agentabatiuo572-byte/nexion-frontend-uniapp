@@ -8,7 +8,7 @@
         <template v-else>
         <view v-if="remoteState !== 'ready' && !remoteSnapshot" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
         <template v-else-if="remoteSnapshot">
-          <RewardHero class="nx-unilevel-hero nx-viz-press" kind="members">
+          <RewardHero class="nx-unilevel-hero nx-frosted-button nx-viz-press" kind="members">
             <text class="block nx-unilevel-hero-title">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : t.directReferral.purchaseTotal }} · {{ visibility.mask(remoteGroupCount) }} {{ t.directReferral.settlementGroups }}</text>
             <view class="nx-royalty-totals" :class="{ 'nx-royalty-totals-large': wideAmount(remoteTotalUSDT) || wideAmount(remoteTotalNEX) }">
               <view><text class="block nx-num-amount nx-direct-amount nx-unilevel-main-amount"><text class="nx-unilevel-dollar">$</text>{{ totalAmountParts[0] }}<text v-if="totalAmountParts[1]" class="nx-unilevel-decimals">.{{ totalAmountParts[1] }}</text></text></view>
@@ -247,7 +247,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 <style scoped>
 .nx-direct-amount { overflow-wrap: anywhere; }
 /* Hero (P-41): flat surface with a faint brand tint; USDT total in the amount font, UVT in metric. */
-:deep(.nx-unilevel-hero) { padding: var(--v5-space-5); border: 0; border-radius: 28px; background: radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent 60%), var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+:deep(.nx-unilevel-hero) { padding: var(--v5-space-5); border: 0; border-radius: 28px; }
 .nx-unilevel-hero-title { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--v5-ink-2); }
 :deep(.nx-unilevel-hero .reward-hero__art) { display: none; }
 .nx-royalty-totals { display: flex; flex-direction: column; gap: 2px; margin-top: var(--ui-space-row-y); }
