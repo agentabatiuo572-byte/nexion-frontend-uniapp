@@ -1,8 +1,13 @@
-// Isolated loopback financial read models. No real network or financial submissions.
+// Isolated loopback financial models. No real network or financial submissions.
+import {randomUUID} from 'node:crypto';
 import {demoWithdrawalFacts} from './prototype-demo-secondary.mjs';
 import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
 const day=86400000;
-export function financeDemo(url,state,request){if(request.method()!=='GET'&&url.pathname!=='/api/withdrawals/eligibility')return undefined;const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',walletAmount=empty?0:state.walletBalance??52800.64; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
+// HdPayHostedDepositService / AppVietQrIntentService: hosted capacity is unknown, not a manual bank pool.
+const bankConfig={enabled:true,paymentMode:'hosted',dailyCapacityKnown:false,minDepositUsdt:50,maxDepositUsdt:5000,todayRemainingDepositUsdt:0,todayRemainingVnd:0,toleranceVnd:1000,graceMinutes:10,version:1,feeVnd:0,feeUsdt:0};
+const bankFx={baseRateVndPerUsdt:25000,buySpreadPct:0,quoteRateVndPerUsdt:25000,lockWindowMinutes:15,version:1};
+const refuse=(status,message)=>{throw Object.assign(new Error(message),{status});};
+export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',walletAmount=empty?0:state.walletBalance??52800.64; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
 const caps = { ...proof, source: "G2/G3 server configuration", asset: "UVT", currency: "USDT", currentPrice: .125, userDailyCapUsdt: 5000, platformDailyCapUsdt: 100000, feePct: .1, feeMinUsdt: .1, minUsdt: .1, minNex: 1, queueMode: "QUEUE", swapEnabled: true };
 const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_item + nx_emergency_control_setting" };
   if (p === "/api/config/exchange/caps") return caps;
@@ -21,18 +26,66 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/withdrawals/eligibility" && !withdrawNetworks.includes(request.postDataJSON()?.chain)) return { canSubmit: false, maxWithdrawableUsdt: 0, route: "reject", riskReasons: ["network-disabled"], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
   if (p === "/api/withdrawals/eligibility") return { canSubmit: facts.dailyRemainingCount > 0, maxWithdrawableUsdt: facts.maxWithdrawableUsdt, route: "pass", riskReasons: [], fastLaneApplied: true, waivedGates: [], dailyLimitReached: facts.dailyRemainingCount === 0, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
   if (p === "/api/payout-addresses") return { ...proof, addresses: empty ? [] : [{ ...proof, network: "USDT-BEP20", address: `0x${"1".repeat(40)}`, status: "ACTIVE", effectiveAt: new Date(now - 86400000).toISOString(), createdAt: new Date(now - 8 * 86400000).toISOString(), nextChangeAllowedAt: iso, changePending: false }], serverNowEpochMs: now, changeCooldownDays: 7, effectiveDelayHours: 24, inFlightWithdrawalBlocked: true };
-  if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { enabled: state.topupChannels !== "bank-off", paymentMode: "manual", dailyCapacityKnown: true, minDepositUsdt: 50, maxDepositUsdt: 5000, todayRemainingDepositUsdt: 5000, todayRemainingVnd: 125000000, toleranceVnd: 1000, graceMinutes: 10, version: 1, feeVnd: 0, feeUsdt: .123456 } };
-  if (p === "/api/app/payments/fx-quote") return { ...proof, source: "nx_finance_fx_quote_config", baseRateVndPerUsdt: 25000, buySpreadPct: 0, quoteRateVndPerUsdt: 25000, lockWindowMinutes: 15, version: 1, asOf: iso };
-  if (p === "/api/app/deposits/vietqr/intents") {
-    // Prototype-only hosted bank order: paying (link created) or credited. The link is never followed in previews.
-    const created = now - 28 * 1000, paying = state.topupState === "paying", credited = state.topupState === "credited";
-    // The empty account has no top-ups at all: its lists stay empty like its deposits and receipts.
-    if (empty || (!paying && !credited)) return { items: [] };
-    return { items: [{ intentNo: "VQR-DEMO-P44", usdtAmount: 500, fxRate: 25000, vndAmount: 12500000, status: credited ? "credited" : "awaiting_payment",
-      expiresAt: new Date(created + 15 * 60000).toISOString(), createdAt: new Date(created).toISOString(), creditedUsdt: credited ? 500 : 0, feeVnd: 0, feeUsdt: 0, version: credited ? 3 : 1,
-      paymentMode: "hosted", providerStatus: "created", ...(paying ? { paymentUrl: "https://api.hdpayadmin.com/pay/demo-preview-only" } : { matchedAt: new Date(now - 60000).toISOString() }) }] };
+  if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { ...bankConfig, enabled: state.topupChannels !== "bank-off" } };
+  if (p === "/api/app/payments/fx-quote") {
+    if(url.searchParams.get('fiat')?.toUpperCase()!=='VND'||url.searchParams.get('asset')?.toUpperCase()!=='USDT')refuse(422,'FX_PAIR_NOT_SUPPORTED');
+    return { ...proof, source: "nx_finance_fx_quote_config", ...bankFx, asOf: iso };
   }
-  if (p === "/api/app/deposits/vietqr/receipts") return { items: empty ? [] : [{ receiptNo: "DEMO-BANK-RECEIPT", intentNo: "VQR-DEMO123456", viewType: "credit", status: "credited", payableVnd: 1250000, receivedVnd: 1250000, lockedFxRate: 25000, creditedUsdt: 50.123456, createdAt: iso }], nextOffset: null };
+  if(bankIntent){
+    // Seed once per scenario; reloads and polling read the same timestamps, amounts and command results.
+    const bank=state.bankTopupDemo??={items:[],commands:{}};
+    if(!bank.seeded){
+      bank.seeded=true;
+      if(!empty&&['paying','credited'].includes(state.topupState)){
+        const credited=state.topupState==='credited',created=now-28000;
+        bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:500*bankFx.quoteRateVndPerUsdt,
+          status:credited?'credited':'awaiting_payment',expiresAt:new Date(created+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:new Date(created).toISOString(),
+          creditedUsdt:credited?500:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:credited?1:0,paymentMode:'hosted',providerStatus:'created',
+          ...(credited?{receivedVnd:500*bankFx.quoteRateVndPerUsdt,matchedAt:new Date(created+14000).toISOString()}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})});
+      }
+    }
+    // Like get/list: expire awaiting rows once, and remove a hosted URL from terminal reads.
+    if(method==='GET')for(const item of bank.items)if(item.status==='awaiting_payment'&&Date.parse(item.expiresAt)<=now){item.status='expired';item.version++;delete item.paymentUrl;}
+    const intentNo=bankIntent[1]?.trim();
+    if(intentNo){
+      if(!/^[A-Za-z0-9:_-]{8,64}$/.test(intentNo))refuse(422,'VIETQR_INTENT_NO_INVALID');
+      const item=bank.items.find(row=>row.intentNo===intentNo);
+      if(!item)refuse(404,'VIETQR_INTENT_NOT_FOUND');
+      // A submitted HDPAY order cannot be cancelled, even when the client sends the current version.
+      if(method==='POST'&&bankIntent[2])refuse(409,'HDPAY_PROVIDER_ORDER_NOT_CANCELLABLE');
+      if(method==='GET'&&!bankIntent[2])return item;
+    }else if(method==='POST'){
+      // Lite's unconfigured bank channel fails before recording or replaying a create command.
+      if(state.topupChannels==='bank-off')refuse(503,'HDPAY_CONFIGURATION_INCOMPLETE');
+      const key=(request.headers()['idempotency-key']??'').trim();
+      if(!/^[A-Za-z0-9:_-]{8,128}$/.test(key))refuse(400,'IDEMPOTENCY_KEY_INVALID');
+      const amount=request.postDataJSON()?.usdtAmount;
+      if(amount===undefined||amount===null)refuse(422,'VIETQR_AMOUNT_REQUIRED');
+      // The HTTP boundary accepts JSON numbers (or decimal strings, as Jackson does); new orders use whole USDT.
+      const usdtAmount=Number(amount);
+      if(!['number','string'].includes(typeof amount)||!Number.isFinite(usdtAmount)||usdtAmount<=0||usdtAmount>10000||Math.abs(usdtAmount*100-Math.round(usdtAmount*100))>1e-8)refuse(422,'VIETQR_AMOUNT_SCALE_INVALID');
+      const replay=Object.hasOwn(bank.commands,key)?bank.commands[key]:undefined;
+      if(replay){
+        if(replay.usdtAmount!==usdtAmount)refuse(409,'IDEMPOTENCY_REQUEST_CONFLICT');
+        if(replay.status==='expired')refuse(503,'HDPAY_ORDER_STATE_INVALID');
+        return replay;
+      }
+      if(!Number.isInteger(usdtAmount))refuse(422,'VIETQR_AMOUNT_SCALE_INVALID');
+      if(usdtAmount<bankConfig.minDepositUsdt||usdtAmount>bankConfig.maxDepositUsdt)refuse(422,'VIETQR_AMOUNT_OUT_OF_RANGE');
+      if(bank.items.filter(row=>row.status==='awaiting_payment'&&Date.parse(row.expiresAt)>now).length>=5)refuse(409,'VIETQR_ACTIVE_INTENT_LIMIT_REACHED');
+      const item={intentNo:'VQR-'+randomUUID().replaceAll('-','').slice(0,20).toUpperCase(),usdtAmount,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:usdtAmount*bankFx.quoteRateVndPerUsdt,
+        status:'awaiting_payment',expiresAt:new Date(now+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:iso,creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,
+        version:0,paymentMode:'hosted',providerStatus:'created',paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'};
+      bank.items.unshift(item);bank.commands[key]=item;state.topupState='paying';
+      return item;
+    }else if(method==='GET'){
+      const limit=Number(url.searchParams.get('limit')??20);
+      if(!Number.isInteger(limit)||limit<-2147483648||limit>2147483647)refuse(400,'REQUEST_PARAMETER_INVALID');
+      return {items:bank.items.slice(0,Math.max(1,Math.min(50,limit)))};
+    }
+  }
+  // Hosted settlement credits the intent; its INFLIGHT reconciliation is excluded by the receipts endpoint.
+  if (p === "/api/app/deposits/vietqr/receipts") return { items: [], nextOffset: null };
   if (p === "/api/deposits/policy" || p === "/api/deposits/address") {
     // Policy and address share the same terms and existing payment availability switches.
     const networks = ['BEP20', 'ERC20'].map(network => {
