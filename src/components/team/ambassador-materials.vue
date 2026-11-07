@@ -171,7 +171,7 @@ async function load() {
   try {
     const value = await ambassadorApplicationApi.materials(id);
     if (!current()) return;
-    pack.value = value; discard();
+    pack.value = value; discard(); emit("updated", value);
   } catch { if (current()) loadError.value = true; }
   finally { if (current()) loading.value = false; }
 }
