@@ -40,8 +40,8 @@
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30): back to the order once it is covered, otherwise the bank pane's create action. -->
     <template #pageFixed>
-      <view v-if="orderFunded" class="topup-sticky"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
-      <view v-else-if="bankAction" class="topup-sticky">
+      <view v-if="orderFunded" class="topup-sticky nx-frosted-button"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
+      <view v-else-if="bankAction" class="topup-sticky nx-frosted-button">
         <NxButton v-if="bankSecondary" :class="['topup-sticky__btn', bankSecondary.className]" variant="secondary" :label="bankSecondary.label" @click="bankSecondary.run()" />
         <NxButton :class="['topup-sticky__btn', bankAction.className]" variant="primary" :label="bankAction.label" :disabled="!bankAction.enabled" @click="bankAction.run()">
           <view class="topup-sticky__label">
@@ -201,15 +201,15 @@ const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
 })));
 </script>
 <style scoped>
-.topup-order { margin: 0 16px 16px; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: radial-gradient(240px 160px at 100% 0%, color-mix(in srgb, var(--v5-warning) 9%, transparent), transparent 72%), var(--v5-surface); }
-.topup-order.is-done { background: radial-gradient(240px 160px at 100% 0%, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent 72%), var(--v5-surface); }
+.topup-order { margin: 0 16px 16px; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+[data-theme="light"] .topup-order { box-shadow: var(--v5-glass-shadow); }
 .topup-order__t { display: flex; align-items: center; gap: var(--v5-space-2); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .topup-order__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-warning); }
 .topup-order.is-done .topup-order__dot { background: var(--v5-brand); }
 .topup-order__d { display: block; margin-top: 6px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .topup-order__b { font-weight: 500; color: var(--v5-ink); }
 .topup-order__cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-2); color: var(--v5-warning); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.topup-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, color-mix(in srgb, var(--ui-ticket-top) 70%, transparent), color-mix(in srgb, var(--ui-ticket-bottom) 94%, transparent)); border-top: 1px solid color-mix(in srgb, var(--v5-ink) 5%, transparent); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.topup-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .topup-sticky { gap: 12px; }
 .topup-sticky__btn { display: flex; flex: 1 1 0; }
 .topup-sticky__label { display: inline-flex; align-items: center; gap: 8px; }

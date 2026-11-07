@@ -24,7 +24,7 @@
       <!-- Bound account overview: change entry, or why it is locked. -->
       <template v-else-if="screen === 'overview' && state.config?.beneficiary">
         <!-- P-52: the bound account as a physical bank card; rules as a numbered list; the change action sits in the page bar. -->
-        <view class="bcard" :aria-label="`${c.currentAccount} ${state.config.beneficiary.maskedAccount}`">
+        <view class="bcard nx-frosted-button" :aria-label="`${c.currentAccount} ${state.config.beneficiary.maskedAccount}`">
           <view class="bcard__top">
             <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
             <text class="bcard__nm">{{ t.bankWithdrawal.recipientSubtitle }}</text>
@@ -75,7 +75,7 @@
       <template v-else-if="screen === 'first' || screen === 'details'">
         <!-- Change step 1 (P-52): step track, a live preview card of the new account, then the two fields in wells. -->
         <view v-if="screen === 'details'" class="steps2" :aria-label="`1 / 2 ${c.stepNew}`"><view class="steps2__on"><text class="steps2__i">1</text><text>{{ c.stepNew }}</text></view><view class="steps2__ln" aria-hidden="true" /><view class="steps2__off" aria-hidden="true" /></view>
-        <view v-if="screen === 'details'" class="bcard bcard--preview" aria-hidden="true">
+        <view v-if="screen === 'details'" class="bcard bcard--preview nx-frosted-button" aria-hidden="true">
           <text class="bcard__lb">{{ c.newAccount }}</text>
           <text class="bcard__no">{{ groupedAccount || "—" }}</text>
           <text class="bcard__ho">{{ state.holder.trim().toUpperCase() || "—" }}</text>
@@ -359,27 +359,23 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 /* P-52 bank account: physical bank card, numbered rules, change step track + live preview, fields as wells. */
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .binding-body { padding-top: 3px; }
-.bcard { position: relative; display: flex; flex-direction: column; height: 208px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: color-mix(in srgb, white 96%, transparent);
-  background: linear-gradient(150deg, #2B2E35, #17191D 55%, #0F1013); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 8px 12px -10px rgba(255,255,255,.35), 0 16px 36px rgba(0,0,0,.40); }
-.bcard::before { content: ""; position: absolute; right: -70px; top: -90px; width: 300px; height: 300px; border-radius: 50%; background: repeating-radial-gradient(circle, rgba(255,255,255,.055) 0 1px, transparent 1px 9px); pointer-events: none; }
-.bcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.16) 50%, transparent 65%); transform: translateX(-110%); animation: bcard-sweep 1200ms 480ms cubic-bezier(.4,0,.2,1) both; pointer-events: none; }
-@keyframes bcard-sweep { to { transform: translateX(110%); } }
+.bcard { position: relative; display: flex; flex-direction: column; height: 208px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: var(--v5-ink); }
+[data-theme="light"] .bcard { box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
 .bcard--preview { height: 160px; padding: 18px 20px; justify-content: flex-start; }
 .bcard--preview .bcard__no { margin-top: auto; font-size: 24px; line-height: 30px; }
 .bcard--preview .bcard__ho { font-family: var(--font-metric); }
-.bcard--preview::before { right: -70px; top: -90px; width: 280px; height: 280px; }
-.bcard--preview::after { inset: 0; transform: none; animation: none; border-radius: inherit; padding: 1.5px; background: conic-gradient(from 120deg, transparent 0 50%, color-mix(in srgb, var(--v5-brand) 80%, transparent) 72%, transparent 94%);
+.bcard--preview::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; padding: 1.5px; background: conic-gradient(from 120deg, transparent 0 50%, color-mix(in srgb, var(--v5-brand) 80%, transparent) 72%, transparent 94%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
-.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); }
-.bcard__nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
-.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success); font: 500 12px/16px var(--font-v5); }
-.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning); }
+.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--v5-surface-2); }
+.bcard__nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
+.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success-ink); font: 500 12px/16px var(--font-v5); }
+.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning-ink); }
 .bcard__bot { position: relative; display: flex; flex-direction: column; margin-top: auto; }
-.bcard__lb { position: relative; display: block; padding-top: 2px; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-v5); }
+.bcard__lb { position: relative; display: block; padding-top: 2px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .bcard__no { position: relative; display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; }
-.bcard__eff { display: block; margin-top: 6px; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-metric); }
-.bcard__ho { position: relative; display: block; margin-top: 6px; color: color-mix(in srgb, white 72%, transparent); font: 500 13px/18px var(--font-v5); letter-spacing: .06em; }
+.bcard__eff { display: block; margin-top: 6px; color: var(--v5-ink-3); font: 400 12px/16px var(--font-metric); }
+.bcard__ho { position: relative; display: block; margin-top: 6px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); letter-spacing: .06em; }
 .sec-title { display: block; margin: 16px 4px -4px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
 .rules-card { padding: 4px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .rule-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; }
@@ -399,5 +395,4 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .field-block .field-row > .field { display: flex; align-items: center; min-height: 52px; height: 52px; padding: 0 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); font: 500 16px/24px var(--font-v5); }
 [data-theme="light"] .field-block .field-row > .field { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .field-block .field-row > .field.mono { font-family: var(--font-metric); letter-spacing: .04em; }
-@media (prefers-reduced-motion: reduce) { .bcard::after { animation: none; opacity: 0; } }
 </style>
