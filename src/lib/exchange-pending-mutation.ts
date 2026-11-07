@@ -43,6 +43,10 @@ export interface ExchangePendingStorage {
   write(value: PersistedExchangePending): void;
 }
 
+export class ExchangeRejectedError extends Error {
+  constructor() { super("EXCHANGE_SWAP_FAILED"); }
+}
+
 export class ExchangeOutcomeUnknownError extends Error {
   readonly authoritativeState?: ExchangeStateLike;
 
@@ -201,14 +205,20 @@ export async function recoverExchangeSwap<T extends ExchangeStateLike>(
   if (!current()) throw new ExchangeOutcomeUnknownError();
   try {
     const receipt = await options.recover(lease);
-    if (!current() || receipt.status !== "SUCCEEDED" || !receipt.order || !matchesIntent(receipt.order, lease.intent)) {
+    if (!current()) throw new ExchangeOutcomeUnknownError();
+    if (receipt.status === "FAILED") {
+      options.pending.forget(lease.fingerprint);
+      throw new ExchangeRejectedError();
+    }
+    if (receipt.status !== "SUCCEEDED" || !receipt.order || !matchesIntent(receipt.order, lease.intent)) {
       throw new ExchangeOutcomeUnknownError();
     }
     const snapshot = await options.fetchState();
     if (!current()) throw new ExchangeOutcomeUnknownError();
     options.pending.forget(lease.fingerprint);
     return { snapshot, order: receipt.order, recovered: true };
-  } catch {
+  } catch (cause) {
+    if (cause instanceof ExchangeRejectedError) throw cause;
     throw new ExchangeOutcomeUnknownError();
   }
 }

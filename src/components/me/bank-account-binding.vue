@@ -140,9 +140,12 @@ import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-ap
 import { formatBankDateTime } from "@/lib/bank-date";
 import { createBankBindingForm, directBankBindingAvailable, validBankRecipient } from "@/lib/bank-binding-form";
 import { bankAccountNotice } from "@/lib/bank-withdrawal-state";
-import { navReplace, navTo } from "@/lib/route";
+import { navBack, navReplace, navTo } from "@/lib/route";
 import { requireAccountPhone } from "@/lib/require-account-phone";
 import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
+import { onShow, onHide } from "@dcloudio/uni-app";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{ active: boolean; returnTo: string }>();
@@ -151,6 +154,20 @@ const copy = useFinanceReviewCopy();
 const identity = () => `${app.accountKey}:${app.accountBindingEpoch}:${captureRuntimeRevision().epoch}`;
 const form = createBankBindingForm(createBankWithdrawalApi(apiClient), identity);
 const state = form.state, now = ref(Date.now());
+const pageVisible = ref(true);
+let readGeneration = 0;
+onShow(() => { pageVisible.value = true; });
+onHide(() => { pageVisible.value = false; readGeneration++; });
+useAutoRecovery({
+  failed: () => props.active && pageVisible.value && state.phase === "uncertain" && state.hasReceipt && !state.busy && !state.reading,
+  retry: () => {
+    const generation = readGeneration;
+    return form.readOutcome(() => props.active && pageVisible.value && generation === readGeneration);
+  }, repeatMs: 15_000,
+});
+watch(() => state.phase, (phase, previous) => {
+  if (props.active && pageVisible.value && phase === "saved" && previous === "uncertain") toast.success(t.value.bankWithdrawal.bound);
+});
 const review = ref<{ account: string; holder: string; code: string; challengeNo: string; owner: string; config: typeof state.config } | null>(null);
 // A bound account opens on its overview; changing it is an explicit two-step flow
 // (new account, then review + SMS). First binding needs no SMS.
@@ -174,7 +191,7 @@ const canGoNext = computed(() => !fieldsDisabled.value && validBankRecipient(sta
 const resendSeconds = computed(() => Math.max(0, Math.ceil((state.resendAt - now.value) / 1000)));
 const otpMinutesLeft = computed(() => Math.max(1, Math.ceil((state.otpExpiresAt - now.value) / 60000)));
 function sendOtp() { if (canSendOtp.value && requireAccountPhone()) void form.sendOtp(); }
-const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, routingUnverified: c.value.routingUnverified, bind: c.value.bindError, unknown: c.value.unknown, otpSend: c.value.otpSendError, otpInvalid: c.value.otpInvalid, otpRateLimited: c.value.otpRateLimited }[state.error] || c.value.bindError));
+const errorMessage = computed(() => ({ load: c.value.loadError, unsupported: c.value.unsupported, routingUnverified: c.value.routingUnverified, bind: c.value.bindError, unknown: state.hasReceipt ? c.value.confirming : c.value.unknown, otpSend: c.value.otpSendError, otpInvalid: c.value.otpInvalid, otpRateLimited: c.value.otpRateLimited }[state.error] || c.value.bindError));
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 function focusTestId(id: string) {
   void nextTick(() => { if (typeof document !== "undefined") document.querySelector<HTMLElement>(`[data-testid="${id}"]`)?.focus(); });
@@ -190,6 +207,7 @@ function goVerify() {
 }
 // Header back walks the change flow one step at a time; outside it, the page goes back.
 const headerBack = computed(() => {
+  if (state.phase === "uncertain") return async () => { await form.waitForRead(); navBack("/pages/me/me"); };
   if (state.phase !== "details" || !changing.value) return undefined;
   return () => { if (changeStep.value === 2) changeStep.value = 1; else changing.value = false; };
 });
@@ -212,6 +230,7 @@ function dots(masked: string): string { return masked.replace(/^[*•]+/, "•�
 // Each screen's main action, rendered by the page in its fixed bottom bar (DS-30); same test ids as before.
 type BindingAction = { testid: string; label: string; enabled: boolean; run: () => void };
 const primaryAction = computed<BindingAction | null>(() => {
+  if (state.phase === "uncertain" && state.hasReceipt) return null;
   const loading = t.value.bankWithdrawal.loading;
   if (screen.value === "overview" && state.config?.beneficiary) {
     if (changeLocked.value) return { testid: "bank-change", label: c.value.locked, enabled: false, run: () => {} };
@@ -249,8 +268,8 @@ function reset() {
 watch(() => [props.active, app.accountKey, app.accountBindingEpoch] as const, reset, { immediate: true });
 const stopRuntime = subscribeRuntimeRevision(reset);
 onBeforeUnmount(() => { stopRuntime(); if (timer) clearInterval(timer); form.reset(); });
-function done() { void navReplace(props.returnTo === "/pages/me/wallet-cards" ? "/pages/me/me" : props.returnTo); }
-function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
+async function done() { await form.waitForRead(); void navReplace(props.returnTo === "/pages/me/wallet-cards" ? "/pages/me/me" : props.returnTo); }
+async function goWithdraw() { await form.waitForRead(); navTo("/pages/me/wallet-withdraw-bank"); }
 </script>
 
 <style scoped>

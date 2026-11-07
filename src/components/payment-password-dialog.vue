@@ -3,7 +3,7 @@
     <view class="payment-pin-sheet" @click.stop>
       <view class="payment-pin-header">
         <text class="payment-pin-title" role="heading" aria-level="2" aria-live="polite">{{ title }}</text>
-        <view class="payment-pin-close" :class="{ 'nx-frosted-button': standalone }" role="button" tabindex="0" :aria-label="t.paymentPin.close" @click="pin.cancel">
+        <view class="payment-pin-close" :class="{ 'nx-frosted-button': standalone }" role="button" tabindex="0" :aria-label="t.paymentPin.close" @click="cancel">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path :d="standalone ? 'm15 18-6-6 6-6' : 'm6 6 12 12M18 6 6 18'" /></svg>
         </view>
       </view>
@@ -22,7 +22,6 @@
         <text v-if="ui.stage === 'loading'" class="payment-pin-note" role="status">{{ t.paymentPin.loading }}</text>
         <template v-else-if="ui.stage === 'pending'">
           <text class="payment-pin-note" role="status">{{ t.paymentPin.pending }}</text>
-          <view class="payment-pin-primary" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.query">{{ t.paymentPin.query }}</view>
           <view class="payment-pin-link" role="button" tabindex="0" @click="support">{{ t.paymentPin.support }}</view>
         </template>
         <view v-else-if="ui.stage === 'read-error'" class="payment-pin-primary" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.load">{{ t.paymentPin.retry }}</view>
@@ -55,7 +54,7 @@
           </template>
         </template>
         <text v-if="errorMessage" class="payment-pin-error" role="alert">{{ errorMessage }}</text>
-        <view v-if="!standalone" class="payment-pin-link payment-pin-link--muted" role="button" tabindex="0" @click="pin.cancel">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
+        <view v-if="!standalone" class="payment-pin-link payment-pin-link--muted" role="button" tabindex="0" @click="cancel">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
       </view>
     </view>
   </view>
@@ -69,6 +68,7 @@ import PaymentPasswordInput from "@/components/payment-password-input.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { usePaymentPassword, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { usePaymentPinViewport } from '@/composables/use-payment-pin-viewport';
 import { useT } from "@/i18n/use-t";
@@ -79,6 +79,11 @@ const active = ref(true); const password = ref(""); const code = ref(""); const 
 const standalone = computed(() => !ui.context && (ui.stage === "setup" || ui.stage === "confirm"));
 const statusHeight = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const open = computed(() => ui.visible && active.value);
+useAutoRecovery({
+  failed: () => open.value && ui.stage === "pending" && !!ui.pendingOperation && !ui.busy && !ui.reading,
+  retry: () => pin.query(() => active.value), repeatMs: 15_000,
+});
+async function cancel() { await pin.waitForQuery(); pin.cancel(); }
 const viewportStyle = usePaymentPinViewport(open);
 const confirming = computed(() => ui.stage === "confirm" || ui.stage === "reset-confirm");
 const completePin = computed(() => validPaymentPassword(password.value));
@@ -107,14 +112,14 @@ watch(() => [ui.stage, ui.revision, ui.visible], () => { password.value = ""; co
 watch(() => ui.visible, () => { expanded.value = false; });
 function complete(value: string) { if (ui.stage === "pay") { password.value = ""; uni.hideKeyboard(); pin.authorize(value); } }
 function submit() { if (!canContinue.value) return; if (confirming.value) void pin.confirm(password.value); else pin.next(password.value); }
-function support() { pin.cancel(); navTo("/me/support"); }
+async function support() { await cancel(); navTo("/me/support"); }
 function hide() { if (active.value && ui.visible) pin.cancel(); active.value = false; password.value = ""; code.value = ""; }
 function visibility() { if (typeof document !== "undefined" && document.hidden) { if (active.value && ui.visible) pin.cancel(); password.value = ""; code.value = ""; } }
 onShow(() => { active.value = true; }); onHide(hide);
 let timer: ReturnType<typeof setInterval>;
 onMounted(() => { timer = setInterval(pin.tick, 1000); if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
 onUnmounted(() => { clearInterval(timer); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
-useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
+useDialogA11y(open, ".payment-pin-mask", cancel, true, 5);
 </script>
 <style scoped>
 .payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden; padding: var(--nx-overlay-top) var(--v5-space-3) var(--nx-overlay-bottom); background: var(--v5-bg-color-mask); }
