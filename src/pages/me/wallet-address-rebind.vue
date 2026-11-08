@@ -287,7 +287,8 @@ const ALL_NETWORKS: { id: ChainDepositChannel; label: string }[] = [
 const networkPolicy = ref<WithdrawalPolicy | null>(null);
 const networkPolicyStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
 const NETWORKS = computed(() => payoutAddressServerEnabled
-  ? ALL_NETWORKS.filter((nw) => networkPolicy.value?.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
+  ? ALL_NETWORKS.filter((nw) => networkPolicy.value?.withdrawalEnabled === true
+    && networkPolicy.value.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id))
   : ALL_NETWORKS);
 const network = ref<ChainDepositChannel>("usdt-trc20");
 const withdrawReturnUrl = computed(() => `/pages/me/wallet-withdraw?network=${CHAIN_TO_WITHDRAW_NETWORK[network.value]}`);

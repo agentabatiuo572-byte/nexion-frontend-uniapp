@@ -297,7 +297,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
         || typeof row.complianceHoldApplies !== "boolean"
         || complianceHoldDays === null || !Number.isInteger(complianceHoldDays)
         || (!row.complianceHoldApplies && complianceHoldDays !== 0)
-        || (!row.complianceReviewRequired && row.complianceHoldApplies)))
+        || (chain !== "USDT-TRC20" && !row.complianceReviewRequired && row.complianceHoldApplies)))
       || Math.abs(networkConfirmUsd - networkFee) > 0.000001
       || Math.abs(networkFee + penaltyFee - grossFee) > 0.000001
       || Math.abs(grossFee - feeWaived - actualFee) > 0.000001
@@ -359,7 +359,7 @@ function parseSubmissionPage(value: unknown): {
     snapshotId: parseHistorySnapshotId(page!.snapshotId) };
 }
 
-function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
+function parseEligibility(value: unknown, chain: SupportedWithdrawalNetwork): WithdrawalEligibilitySnapshot {
   const row = record(value);
   const route = text(row?.route)?.toLowerCase();
   const reasons = row?.riskReasons;
@@ -377,7 +377,7 @@ function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
       || typeof row.complianceReviewRequired !== "boolean" || typeof row.complianceHoldApplies !== "boolean"
       || complianceHoldDays === null || !Number.isInteger(complianceHoldDays)
       || (!row.complianceHoldApplies && complianceHoldDays !== 0)
-      || (!row.complianceReviewRequired && row.complianceHoldApplies)
+      || (chain !== "USDT-TRC20" && !row.complianceReviewRequired && row.complianceHoldApplies)
       || (row.complianceReviewRequired && row.fastLaneApplied)
       || reset === null || !configVersion) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_ELIGIBILITY_RESPONSE_INVALID" });
@@ -462,8 +462,8 @@ function blocksPayoutAddressChange(status: string): boolean {
 }
 
 function canonicalStatus(status: string, chain?: string): WithdrawalStatus {
-  // These provider channels retain the reservation while the original transfer is being reconciled.
-  if (status.trim().toUpperCase() === "TX_ORPHANED" && (chain === "BANK-VND" || chain === "USDT-BEP20" || chain === "USDT-ERC20")) return "frozen";
+  // Provider channels retain the reservation while the original transfer is being reconciled.
+  if (status.trim().toUpperCase() === "TX_ORPHANED" && (chain === "BANK-VND" || chain === "USDT-BEP20" || chain === "USDT-ERC20" || chain === "USDT-TRC20")) return "frozen";
   switch (status.trim().toUpperCase()) {
     case "REVIEW_PENDING":
     case "REVIEWING":
@@ -763,7 +763,7 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
         method: "POST", path: "/api/withdrawals/eligibility",
         body: input,
         timeoutMs: 30_000,
-      }));
+      }), input.chain);
     },
     get: async (withdrawalNo) => parseWithdrawalDetail(await client.request({
       method: "GET",
