@@ -2280,7 +2280,7 @@ export const kk: Messages = {
   store: {
     title: "Дүкен",
     subtitle: "UVEL толық басқаратын арнайы есептеу құрылғылары.",
-    allProducts: "Құрылғылар",
+    allProducts: "Сатылымда",
     annualYield: "Болж. жылдық сыйақы мөлшерлемесі",
     price: "Баға",
     viewDetails: "Толығырақ қарау",

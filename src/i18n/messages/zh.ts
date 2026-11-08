@@ -1822,7 +1822,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
   store: {
     title: "商城",
     subtitle: "由 UVEL 全托管的专用算力设备。",
-    allProducts: "设备列表",
+    allProducts: "在售",
     annualYield: "参考年奖励率",
     price: "售价",
     viewDetails: "查看详情",

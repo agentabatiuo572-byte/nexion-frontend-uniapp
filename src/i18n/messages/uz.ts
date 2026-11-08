@@ -2280,7 +2280,7 @@ export const uz: Messages = {
   store: {
     title: "Doʻkon",
     subtitle: "UVEL toʻliq boshqaradigan maxsus hisoblash qurilmalari.",
-    allProducts: "Qurilmalar",
+    allProducts: "Sotuvda",
     annualYield: "Taxminiy yillik mukofot (%)",
     price: "Narx",
     viewDetails: "Batafsil",

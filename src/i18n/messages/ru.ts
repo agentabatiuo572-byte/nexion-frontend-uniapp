@@ -2280,7 +2280,7 @@ export const ru: Messages = {
   store: {
     title: "Магазин",
     subtitle: "Специальные вычислительные устройства под полным управлением UVEL.",
-    allProducts: "Устройства",
+    allProducts: "В продаже",
     annualYield: "Ориентир. годовая ставка наград",
     price: "Цена",
     viewDetails: "Подробнее",

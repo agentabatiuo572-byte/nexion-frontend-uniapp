@@ -2280,7 +2280,7 @@ export const fil: Messages = {
   store: {
     title: "Store",
     subtitle: "Mga dedicated compute device na ganap na pinamamahalaan ng UVEL.",
-    allProducts: "Mga device",
+    allProducts: "Ibinebenta",
     annualYield: "Tinatayang taunang rate ng reward",
     price: "Presyo",
     viewDetails: "Detalye",
