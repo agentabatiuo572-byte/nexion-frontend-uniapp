@@ -1718,6 +1718,10 @@ export const fil: Messages = {
     checkoutOutcomeUnknown: "Hindi pa kumpirmado ang resulta ng order ng bundle. Panatilihin ang bundle na ito at subukan ulit.",
     policyChanged: "Nagbago ang bundle pricing. Suriin ang bagong total bago mag-order.",
     checkoutBillMemo: "Bundle purchase · {count} device",
+    slotsShortTitle: "Kulang ang bakanteng slot",
+    slotsShortBody: "{count} device ang napili at may {free} bakanteng slot. Mag-deactivate ng device sa Imbentaryo ng device, o magbawas ng device sa bundle.",
+    slotsShortManage: "Buksan ang Imbentaryo",
+    slotsShortAdjust: "Baguhin ang bundle",
   },
   tx: {
     navTitle: "Detalye ng transaksyon",
