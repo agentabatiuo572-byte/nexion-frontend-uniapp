@@ -4392,6 +4392,8 @@ export const ru: Messages = {
     withdrawFeeStale: "Комиссия изменилась — повторите попытку",
     withdrawContextStale: "Аккаунт или адрес для выплат изменились — отправьте заново",
     withdrawHandledElsewhere: "Исходный запрос на вывод обработан на другой странице. Проверьте историю вывода средств.",
+    withdrawEarlierOutcome: "Предыдущий запрос: {outcome}",
+    withdrawOtherPending: "Сейчас на странице показан другой вывод в процессе обработки. Проверьте его.",
     withdrawResendTitle: "Повторить исходный вывод",
     withdrawResendBody: "Результат вывода ${amount} на адрес {address} в сети {network} не подтверждён. Повтор продолжит исходный запрос без создания нового вывода.",
     withdrawResendCta: "Повторить запрос",

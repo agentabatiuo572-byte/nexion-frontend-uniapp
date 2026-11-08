@@ -3969,6 +3969,8 @@ timeHoursAgo: "{n} giờ",
     withdrawFeeStale: "Mức phí đã được cập nhật, vui lòng thử lại",
     withdrawContextStale: "Tài khoản hoặc địa chỉ nhận đã thay đổi, vui lòng gửi lại",
     withdrawHandledElsewhere: "Yêu cầu rút tiền ban đầu đã được xử lý ở trang khác. Vui lòng kiểm tra lịch sử rút tiền.",
+    withdrawEarlierOutcome: "Yêu cầu trước đó: {outcome}",
+    withdrawOtherPending: "Trang hiện đang hiển thị một giao dịch rút tiền khác đang xử lý. Vui lòng kiểm tra.",
     withdrawResendTitle: "Thử lại yêu cầu rút tiền ban đầu",
     withdrawResendBody:
       "Kết quả lệnh rút ${amount} tới địa chỉ {network} {address} chưa được xác nhận. Thử lại sẽ tiếp tục yêu cầu ban đầu, không tạo lệnh rút mới.",
