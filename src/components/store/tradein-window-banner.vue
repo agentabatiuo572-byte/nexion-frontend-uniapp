@@ -6,7 +6,7 @@
 -->
 <template>
   <view class="mb-3">
-    <view class="nx-glass-card nx-tint block relative overflow-hidden active:opacity-90" :style="rootStyle" role="button" tabindex="0" :aria-label="w.cta" @click.stop="go" @keydown.enter.stop.prevent="go" @keydown.space.stop.prevent="go">
+    <view class="nx-glass-card block relative overflow-hidden active:opacity-90" :style="rootStyle" role="button" tabindex="0" :aria-label="w.cta" @click.stop="go" @keydown.enter.stop.prevent="go" @keydown.space.stop.prevent="go">
 
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
@@ -132,12 +132,12 @@ const body = computed(() =>
     : w.value.emptyBody,
 );
 
-// Tinted solid in the banner's own brand-2 hue (it used to come from a corner glow).
-const rootStyle: CSSProperties = {
-  "--nx-tint": "var(--v5-brand-2)",
+const rootStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   borderRadius: "var(--nx-glass-radius)",
   padding: "16px",
-} as CSSProperties;
+  background:
+    "var(--nx-glass-fill)",
+};
 
 const labelStyle: CSSProperties = {
   fontSize: "12px",
