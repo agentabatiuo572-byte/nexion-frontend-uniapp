@@ -1,6 +1,6 @@
 <template>
   <view class="invite-rules-content" role="status" aria-live="polite" :aria-busy="loading">
-    <view class="invite-rules__overview">
+    <view class="invite-rules__overview nx-tint">
       <view class="invite-rules__summary">
         <template v-if="state === 'ready'">
           <text class="invite-rules__label">{{ copy.inviteRulePerFriend }}</text>
@@ -81,7 +81,7 @@ onMounted(() => {
 <style scoped>
 /* Rule-guide roles (design system 4.7): overview card, then numbered steps. */
 .invite-rules-content { display: flex; flex-direction: column; gap: 18px; font-family: var(--font-v5); }
-.invite-rules__overview { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: 20px; background: var(--v5-surface-2); }
+.invite-rules__overview { --nx-tint: var(--v5-brand); display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: 20px; }
 .invite-rules__summary { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
 .invite-rules__label { display: block; color: var(--v5-ink-2); font: 400 14px/20px var(--font-v5); }
 .invite-rules__amount { display: block; color: var(--v5-brand); font: 600 20px/24px var(--font-metric); }

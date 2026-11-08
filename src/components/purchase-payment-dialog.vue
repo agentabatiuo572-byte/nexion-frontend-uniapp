@@ -131,7 +131,7 @@
     </view>
 
     <view v-else class="pp-scroll pp-pay" :class="{ 'has-bar': isBank && !conclusion || networkPaused && s.orderNo }">
-      <view class="pp-card pp-hero">
+      <view class="pp-card pp-hero nx-tint">
         <text class="pp-hero__lab">{{ conclusion ? copy.total : copy.payable }}</text>
         <view class="pp-hero__row">
           <CheckoutAmount class="pp-hero__amt" :value="fees?.totalUsdt ?? null" :currency="isBank ? 'USD' : 'USDT'" />
@@ -469,8 +469,10 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-nav__gap { flex: none; width: 36px; height: 36px; }
 .pp-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .pp-pay { display: flex; flex-direction: column; gap: var(--v5-space-3); padding: var(--v5-space-6) var(--v5-space-4) var(--v5-space-8); }
-.pp-card { padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
-.pp-hero { padding: var(--v5-space-5); }
+.pp-card { padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); }
+.pp-card:not(.nx-tint) { background: var(--v5-surface); }
+/* Amount card: tinted brand (its colour used to come from a corner glow). */
+.pp-hero { --nx-tint: var(--v5-brand); padding: var(--v5-space-5); }
 .pp-hero__lab { display: block; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .pp-hero__row { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-1); }
 .pp-hero__amt { min-width: 0; font: 500 32px/40px var(--font-amount); letter-spacing: -.02em; white-space: nowrap; color: var(--v5-ink); }
@@ -506,7 +508,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 
 .pp-done { display: flex; flex-direction: column; padding: 48px var(--v5-space-4) var(--v5-space-8); }
 .pp-done__hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 var(--v5-space-2); }
-.pp-done__badge { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 18%, transparent); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 6%, transparent); }
+.pp-done__badge { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-brand); background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--v5-brand) 26%, transparent), color-mix(in srgb, var(--v5-brand) 10%, transparent) 70%); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 6%, transparent), 0 0 60px color-mix(in srgb, var(--v5-brand) 22%, transparent); }
 .pp-done__title { display: block; margin-top: var(--v5-space-6); font: 600 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); }
 .pp-done__desc { display: block; margin-top: var(--v5-space-2); color: var(--v5-ink-2); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .pp-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 36px; }
