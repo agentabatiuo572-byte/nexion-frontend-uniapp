@@ -4,6 +4,10 @@
     <view class="bank-withdraw" :aria-busy="busy">
       <view v-if="error" class="notice danger" role="alert"><text>{{ error }}</text></view>
       <text v-if="busy && !silentRead" class="muted loading" role="status">{{ c.loading }}</text>
+      <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
+        <text>{{ c.resumeUsdt }}</text>
+        <view class="action secondary" role="button" tabindex="0" data-testid="bank-resume-usdt" :aria-disabled="busy" @click="openUsdt" @keydown.enter.prevent="openUsdt" @keydown.space.prevent="openUsdt"><text>USDT</text></view>
+      </view>
 
       <template v-if="order">
         <view class="status-mark" aria-hidden="true"><text>{{ outcome === 'paid' ? '✓' : outcome === 'refunded' ? '↶' : '⋯' }}</text></view>
@@ -18,7 +22,7 @@
           <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
           <view v-if="terminal && order.settlementEvidence?.checkedAt" class="row"><text>{{ c.confirmedAt }}</text><text>{{ displayDate(order.settlementEvidence.checkedAt) }}</text></view>
         </view>
-        <view v-if="terminal" class="action secondary" role="button" tabindex="0" data-testid="bank-new" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" @keydown.enter.prevent="startNew" @keydown.space.prevent="startNew"><text>{{ c.newWithdrawal }}</text></view>
+        <view v-if="terminal" class="action secondary" role="button" tabindex="0" data-testid="bank-new" :aria-disabled="busy || !newWithdrawalAllowed" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" @keydown.enter.prevent="startNew" @keydown.space.prevent="startNew"><text>{{ c.newWithdrawal }}</text></view>
         <view class="action secondary" role="button" tabindex="0" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" @keydown.enter.prevent="backToWallet" @keydown.space.prevent="backToWallet"><text>{{ c.backToWallet }}</text></view>
       </template>
 
@@ -29,7 +33,7 @@
         <view v-if="!uncertain" class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
       </template>
 
-      <template v-else-if="displayConfig">
+      <template v-else-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote)">
         <text class="vh" role="heading" aria-level="1">{{ title }}</text>
         <!-- P-45 account step: the bound account as a physical bank card, then the binding rule. -->
         <template v-if="!quote && formStep === 'account'">
@@ -125,7 +129,7 @@
         <view v-if="error || (!quote && displayConfig.enabled && (!displayConfig.policy || !displayConfig.capacity))" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
         <view class="bar-space" />
       </template>
-      <template v-else-if="requestedOrder === null">
+      <template v-else-if="requestedOrder === null && !pendingAttempt">
         <text class="screen-title" role="heading" aria-level="1">{{ title }}</text>
         <text class="intro">{{ formStep === 'amount' ? c.amountHint : c.recipientSubtitle }}</text>
         <template v-if="formStep === 'account'">
@@ -145,7 +149,7 @@
     </view>
     <!-- Main actions in the fixed bottom bar (DS-30): account → change + continue; amount → quote; quote → confirm. -->
     <template #pageFixed>
-      <view v-if="displayConfig && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-glass-bar">
+      <view v-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote) && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-glass-bar">
         <template v-if="quote">
           <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit"><text>{{ c.confirm }}</text></view>
         </template>
@@ -173,7 +177,9 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
-import { apiClient, sessionVault } from "@/api/runtime";
+import { apiClient, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { binarySessionReady } from "@/lib/binary-session-ready";
+import { readWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { createBankWithdrawalApi, hasVerifiedBankIdentity, type BankConfig, type BankQuote, type BankOrder, type BankIntent, type BankRecovery } from "@/api/bank-withdrawal-api";
@@ -186,6 +192,19 @@ const c = computed(() => useTranslations.value.bankWithdrawal);
 const useTranslations = useT();
 const app = useApp();
 const auth = useAuth();
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
+const pendingAttempt = ref(remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null);
+const newWithdrawalAllowed = computed(() => remoteSessionReady.value && !pendingAttempt.value);
+function refreshPendingAttempt() {
+  pendingAttempt.value = remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null;
+}
+watch([() => app.accountKey, () => app.accountBindingEpoch, remoteSessionReady], refreshPendingAttempt, { flush: "sync" });
 const api = createBankWithdrawalApi(apiClient);
 const config = ref<BankConfig | null>(null);
 const quote = ref<BankQuote | null>(null);
@@ -216,7 +235,7 @@ const pendingKey = () => `nexgrid.bank-withdraw.pending:${app.accountKey}`;
 const money = (value: number) => formatAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
-const canSubmit = computed(() => accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
+const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
   && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE"
   && bankBeneficiaryReady(config.value.beneficiary) && hasVerifiedBankIdentity(quote.value));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
@@ -226,7 +245,7 @@ const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "re
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));
 const statusLabel = computed(() => c.value[outcome.value]);
 const recipient = computed(() => order.value?.bank ?? quote.value ?? displayConfig.value?.beneficiary);
-const canContinue = computed(() => bankCanQuote(config.value) && !!config.value?.policy && !!config.value?.capacity && config.value.capacity.withdrawalEnabled);
+const canContinue = computed(() => newWithdrawalAllowed.value && bankCanQuote(config.value) && !!config.value?.policy && !!config.value?.capacity && config.value.capacity.withdrawalEnabled);
 const amountProblem = computed(() => bankAmountError(amount.value, config.value));
 const maxAmount = computed(() => bankMaximumAmount(config.value));
 // Card/row tail as "•••• 1234"; the masked prefix comes from the server.
@@ -260,6 +279,7 @@ function goBack() {
   navBack("/pages/me/wallet-withdraw-method");
 }
 function backToWallet() { if (!busy.value) navTo("/pages/me/me"); }
+function openUsdt() { if (!busy.value && remoteSessionReady.value && pendingAttempt.value) navTo("/pages/me/wallet-withdraw"); }
 function scope() {
   const id = ++revision, owner = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
   return () => alive && revision === id && app.accountKey === owner && app.accountBindingEpoch === epoch && isCurrentRuntimeRevision(runtime);
@@ -310,7 +330,7 @@ async function load() {
 }
 
 function canReadVisibleBankPage(): boolean {
-  return visible.value && auth.isAuthenticated && foregroundReadAllowed();
+  return visible.value && remoteSessionReady.value && auth.isAuthenticated && foregroundReadAllowed();
 }
 
 function canPollOrder(): boolean {
@@ -371,8 +391,8 @@ useAutoRecovery({
   repeatMs: 15_000,
 });
 
-watch([visible, foregroundReadAllowed, () => auth.isAuthenticated], ([isVisible, allowed, authenticated], [wasVisible]) => {
-  if (!isVisible || !allowed || !authenticated) return;
+watch([visible, foregroundReadAllowed, remoteSessionReady, () => auth.isAuthenticated], ([isVisible, allowed, sessionReady, authenticated], [wasVisible]) => {
+  if (!isVisible || !allowed || !sessionReady || !authenticated) return;
   // Orders and unknown results have one read owner; load() would reset consent.
   if (order.value || uncertain.value) return;
   if (!wasVisible || (!config.value && !quote.value)) void load();
@@ -396,15 +416,21 @@ async function openIntent(intent: BankIntent) {
 }
 function manageBank() { if (!busy.value && !quote.value && !uncertain.value && !multipleIntents.value.length) navTo("/pages/me/wallet-cards-new?returnTo=%2Fpages%2Fme%2Fwallet-withdraw-bank"); }
 async function getQuote() {
+  refreshPendingAttempt();
   if (!canContinue.value || amountProblem.value || uncertain.value || quote.value) return;
   await run(async current => {
+    refreshPendingAttempt();
+    if (!newWithdrawalAllowed.value) return;
     const value = await api.quote(amount.value.trim().replace(",", "."));
     if (current()) { quote.value = value; accepted.value = false; }
   });
 }
 async function submit() {
+  refreshPendingAttempt();
   if (!canSubmit.value || uncertain.value) return;
   await run(async current => {
+    refreshPendingAttempt();
+    if (!newWithdrawalAllowed.value) return;
     const no = quote.value!.quoteNo;
     uni.setStorageSync(pendingKey(), no); // Recovery reference only; never persist bank details, OTPs or balances.
     if (uni.getStorageSync(pendingKey()) !== no) throw new Error("BANK_RECOVERY_NOT_DURABLE");
@@ -430,7 +456,8 @@ async function abandon() {
   });
 }
 function startNew() {
-  if (!terminal.value || busy.value) return;
+  refreshPendingAttempt();
+  if (!newWithdrawalAllowed.value || !terminal.value || busy.value) return;
   order.value = null; quote.value = null; requestedOrder = null; amount.value = ""; formStep.value = "account"; accepted.value = false; void load();
 }
 function clearScope() {
@@ -458,6 +485,7 @@ watch(now, () => {
 });
 function stopTimer() { if (timer) clearInterval(timer); timer = undefined; }
 onShow(() => {
+  refreshPendingAttempt();
   visible.value = true; now.value = Date.now(); stopTimer(); timer = setInterval(() => { now.value = Date.now(); }, 1000);
 });
 onHide(() => { visible.value = false; orderReadGeneration++; stopTimer(); });
