@@ -488,7 +488,7 @@ async function deferPhoneActivation() {
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 0 24px -4px rgba(198, 255, 58, 0.35);
+  box-shadow: var(--ui-glass-edge-shadow), 0 0 24px -4px rgba(198, 255, 58, 0.35);
 }
 .est-phone__pill {
   position: absolute;

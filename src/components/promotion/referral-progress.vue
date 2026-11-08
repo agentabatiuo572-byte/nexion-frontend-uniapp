@@ -139,8 +139,8 @@ useAutoRecovery({
 <style scoped>
 .referral-progress { min-width: 0; }
 .referral-refresh-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* Both cards keep their original brand-2 hue as a tinted solid (01 §1.1.2); the rim stays their own. */
-.referral-activity { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: var(--v5-space-5); border-radius: 28px; box-shadow: inset 0 0 0 1px var(--v5-border); }
+/* Both cards keep their original brand-2 hue as a tinted solid with its shared rim (01 §1.1.2). */
+.referral-activity { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: var(--v5-space-5); border-radius: 28px; }
 .referral-activity + .referral-activity { margin-top: var(--ui-space-inset); }
 .referral-hero { position: relative; display: flex; align-items: center; min-height: 84px; margin-top: -4px; }
 .referral-meta { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--v5-space-2); }
@@ -160,7 +160,7 @@ useAutoRecovery({
 .referral-actions > .referral-progress-link { flex: 1; }
 .referral-progress-link { max-width: 100%; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
-.referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; box-shadow: inset 0 0 0 1px var(--v5-border); }
+.referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; }
 .referral-share { margin-top: var(--v5-space-2); box-shadow: 0 8px 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
 .referral-summary__art { top: -6px; right: -10px; width: 132px; height: 132px; }
 .referral-summary > .referral-count { position: relative; margin-top: auto; }
