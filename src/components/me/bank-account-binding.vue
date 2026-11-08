@@ -360,8 +360,12 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .binding-body { padding-top: 3px; }
 .bcard { position: relative; display: flex; flex-direction: column; height: 208px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: color-mix(in srgb, white 96%, transparent);
-  background: linear-gradient(150deg, #2B2E35, #17191D 55%, #0F1013); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 8px 12px -10px rgba(255,255,255,.35), 0 16px 36px rgba(0,0,0,.40); }
-.bcard::before { content: ""; position: absolute; right: -70px; top: -90px; width: 300px; height: 300px; border-radius: 50%; background: repeating-radial-gradient(circle, rgba(255,255,255,.055) 0 1px, transparent 1px 9px); pointer-events: none; }
+  --bcard-ok: #9EDC1D; --bcard-warn: #FFCB4D;
+  background: radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,.09), transparent 55%), linear-gradient(150deg, #2B2E35, #17191D 55%, #0F1013);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 8px 12px -10px rgba(255,255,255,.35), inset 0 -12px 18px -14px rgba(0,0,0,.6), 0 16px 36px rgba(0,0,0,.40); }
+/* The card stays dark in both themes; on a light page a lighter, cooler drop shadow keeps it from looking heavy. */
+[data-theme="light"] .bcard { box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 8px 12px -10px rgba(255,255,255,.35), inset 0 -12px 18px -14px rgba(0,0,0,.6), 0 2px 4px rgba(15,17,22,.10), 0 18px 32px -14px rgba(15,17,22,.40); }
+.bcard::before { content: ""; position: absolute; right: -70px; top: -90px; width: 300px; height: 300px; border-radius: 50%; background: repeating-radial-gradient(circle, rgba(255,255,255,.07) 0 1px, transparent 1px 9px); -webkit-mask-image: radial-gradient(circle, #000 0 30%, transparent 71%); mask-image: radial-gradient(circle, #000 0 30%, transparent 71%); pointer-events: none; }
 .bcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.16) 50%, transparent 65%); transform: translateX(-110%); animation: bcard-sweep 1200ms 480ms cubic-bezier(.4,0,.2,1) both; pointer-events: none; }
 @keyframes bcard-sweep { to { transform: translateX(110%); } }
 .bcard--preview { height: 160px; padding: 18px 20px; justify-content: flex-start; }
@@ -371,13 +375,13 @@ function goWithdraw() { navTo("/pages/me/wallet-withdraw-bank"); }
 .bcard--preview::after { inset: 0; transform: none; animation: none; border-radius: inherit; padding: 1.5px; background: conic-gradient(from 120deg, transparent 0 50%, color-mix(in srgb, var(--v5-brand) 80%, transparent) 72%, transparent 94%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
-.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); }
+.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
 .bcard__nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
-.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success); font: 500 12px/16px var(--font-v5); }
-.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning); }
+.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--bcard-ok) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcard-ok) 24%, transparent); color: var(--bcard-ok); font: 500 12px/16px var(--font-v5); }
+.bcard__tag.warn { background: color-mix(in srgb, var(--bcard-warn) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcard-warn) 24%, transparent); color: var(--bcard-warn); }
 .bcard__bot { position: relative; display: flex; flex-direction: column; margin-top: auto; }
 .bcard__lb { position: relative; display: block; padding-top: 2px; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-v5); }
-.bcard__no { position: relative; display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; }
+.bcard__no { position: relative; display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; text-shadow: 0 1px 0 rgba(0,0,0,.45); }
 .bcard__eff { display: block; margin-top: 6px; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-metric); }
 .bcard__ho { position: relative; display: block; margin-top: 6px; color: color-mix(in srgb, white 72%, transparent); font: 500 13px/18px var(--font-v5); letter-spacing: .06em; }
 .sec-title { display: block; margin: 16px 4px -4px; color: var(--v5-ink); font: 600 17px/24px var(--font-v5); }
