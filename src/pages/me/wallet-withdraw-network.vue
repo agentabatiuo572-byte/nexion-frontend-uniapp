@@ -4,7 +4,7 @@
     <!-- One route card per USDT network the server currently opens; tapping one opens the withdraw page with that network fixed. -->
     <view class="withdraw-networks">
       <text class="intro">{{ t.bankWithdrawal.chooseNetworkHint }}</text>
-      <view v-for="item in cards" :key="item.id" class="method" role="button" tabindex="0" :data-testid="`withdraw-network-${item.label}`" :aria-disabled="loading" @click="open(item.id)" @keydown.enter.prevent="open(item.id)" @keydown.space.prevent="open(item.id)">
+      <view v-for="item in cards" :key="item.id" class="method" role="button" tabindex="0" :data-testid="`withdraw-network-${item.label}`" :aria-label="item.accessibleName" :aria-disabled="loading" @click="open(item.id)" @keydown.enter.prevent="open(item.id)" @keydown.space.prevent="open(item.id)">
         <view class="method-top">
           <view class="method-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 8h8M12 8v9M8.5 11.5c2 .8 5 .8 7 0" /></svg></view>
           <view class="method-copy"><text class="method-title">{{ fmt(t.bankWithdrawal.usdtNetwork, { network: item.label }) }}</text><text class="method-note">{{ fmt(t.bankWithdrawal.networkFee, { fee: formatFinanceAmount(item.fee) }) }}</text></view>
@@ -56,8 +56,13 @@ const cards = computed(() => {
   const addressesKnown = payout.readStatusFor(app.accountKey) === "ready";
   return NETWORK_ORDER.filter(id => current.enabledNetworks.includes(id)).map(id => {
     const label = id.slice(5), address = payout.currentFor(fromWithdrawNetwork(id))?.address ?? "";
-    return { id, label, fee: current.networkConfirmFeeUsd[label.toLowerCase() as keyof WithdrawalPolicy["networkConfirmFeeUsd"]],
-      to: !addressesKnown ? null : address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address };
+    const fee = current.networkConfirmFeeUsd[label.toLowerCase() as keyof WithdrawalPolicy["networkConfirmFeeUsd"]];
+    const to = !addressesKnown ? null : address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
+    return { id, label, fee, to, accessibleName: [
+      fmt(t.value.bankWithdrawal.usdtNetwork, { network: label }),
+      fmt(t.value.bankWithdrawal.networkFee, { fee: formatFinanceAmount(fee) }),
+      ...(to === null ? [] : [to || t.value.bankWithdrawal.noAddress]),
+    ].join(", ") };
   });
 });
 let revision = 0, visible = false;

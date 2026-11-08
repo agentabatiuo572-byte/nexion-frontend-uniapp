@@ -120,8 +120,7 @@ import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
-import { remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
-import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { apiRuntimeConfig, remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
 import { toCanonicalWithdrawal, type WithdrawalDetailSnapshot, type WithdrawalPolicy } from "@/api/withdrawal-api";
 import { mockServerNow } from "@/store/server-time";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
@@ -179,7 +178,7 @@ function trackingReadScope(): WithdrawalTrackingReadScope | null {
     accountKey: app.accountKey,
     accountBindingEpoch: app.accountBindingEpoch,
     sessionRevision: sessionVault.revision(),
-    runtimeEpoch: captureRuntimeRevision().epoch,
+    apiOrigin: { ...apiRuntimeConfig },
     pageEpoch: trackingPageEpoch,
   };
 }
@@ -190,7 +189,7 @@ function applyTrackedWithdrawal(detail: WithdrawalDetailSnapshot): void {
   trackedWithdrawal.value = {
     ...canonical,
     status: detail.status,
-    ...(detail.confirmedAt !== null ? { confirmedAt: detail.confirmedAt } : {}),
+    confirmedAt: detail.confirmedAt,
     ...(detail.terminalReason !== null ? { terminalReason: detail.terminalReason } : {}),
     ...(detail.retriable !== null ? { retriable: detail.retriable } : {}),
     ...(detail.nexRefunded !== null
@@ -278,7 +277,7 @@ watch([trackingPageVisible, foregroundReadAllowed, () => auth.isAuthenticated], 
 });
 
 watch(
-  () => [trackedId.value, app.accountKey, app.accountBindingEpoch] as const,
+  () => [trackedId.value, app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const,
   ([, account, epoch], [, previousAccount, previousEpoch]) => {
     trackedWithdrawal.value = null;
     storeRowAtTrackedRead.value = null;
@@ -287,16 +286,8 @@ watch(
     refreshTrackedWithdrawal();
     if (account !== previousAccount || epoch !== previousEpoch) void loadWithdrawalPolicy();
   },
+  { flush: "sync" },
 );
-
-const stopTrackingRuntimeWatch = subscribeRuntimeRevision(() => {
-  if (!trackingPageVisible.value) return;
-  trackingPageEpoch += 1;
-  trackedWithdrawal.value = null;
-  storeRowAtTrackedRead.value = null;
-  trackedWithdrawalRead.invalidate();
-  refreshTrackedWithdrawal();
-});
 
 const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>(() => [
   { key: "submitted", label: t.value.wallet.submitted, hint: t.value.wallet.trackSubmittedHint },
@@ -323,7 +314,9 @@ const failedTitle = computed(() => {
 // 🔴 拦截/异常态一律要有客服出口。原判据只看 riskRoute,而 frozen 也可能由后台对一张
 // pass 路由的在途单事后冻结(types.ts 明写「K3 route freeze 或 D2 处置」)——
 // 那种单文案叫用户联系客服,页面上却没有客服入口。
-const routeHeld = computed(() => !isTerminalDone.value && !!wd.value?.riskRoute && wd.value.riskRoute !== "pass");
+const routeHeld = computed(() => !!wd.value
+  && (wd.value.status === "review-pending" || wd.value.status === "frozen"
+    || (wd.value.status === "submitted" && !!wd.value.riskRoute && wd.value.riskRoute !== "pass")));
 const needsSupport = computed(() => routeHeld.value || isFrozenHold.value || isFailedEnd.value);
 // 终态:5 步全部走满,最后一步不能还转圈 —— 转圈代表「进行中」,
 // 钱都到账了还转,用户会以为卡住了。
@@ -403,7 +396,6 @@ onUnmounted(() => {
   trackingPageEpoch += 1;
   trackedWithdrawalRead.invalidate();
   stopDayTimer();
-  stopTrackingRuntimeWatch();
 }); // 兜底:onHide 不触发的场景(直接销毁)仍要清
 
 // app.withdrawals 本身是响应源,提交完回到本页会自动重算 —— 不再需要 `void wd.value` 那种手动挂依赖。
@@ -434,7 +426,7 @@ const againReasonText = computed(() => {
   return fmt(t.value.walletV3.dailyLimitReached, { time: stamp });
 });
 // SPEC-7: freeze 路由/冻结状态用独立危险态文案;manual/delay 用审核中文案。
-const isFrozenHold = computed(() => !isTerminalDone.value && (wd.value?.riskRoute === "freeze" || wd.value?.status === "frozen"));
+const isFrozenHold = computed(() => wd.value?.status === "frozen");
 // 命中原因 → 业务话术(工程 reason code 不直出;R5: 展示存单快照的服务端结论)。
 const heldReasonLines = computed(() => {
   if (!routeHeld.value) return [] as string[];
@@ -492,11 +484,21 @@ const etaSub = computed(() => {
   // 失败终态不给「预计到账」——钱没走成,给的是原因 + 客服出口(见 needsSupport)。
   if (isFailedEnd.value) return t.value.wallet.trackFailedBody;
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
-  if (routeHeld.value) return t.value.wallet.withdrawRouteHeldSub;
+  if (routeHeld.value) {
+    const current = wd.value!;
+    if (current.complianceReviewRequired) {
+      return current.complianceHoldApplies && (current.complianceHoldDays ?? 0) > 0
+        && typeof current.reviewHoldUntil === "number" && Number.isFinite(current.reviewHoldUntil)
+        ? fmt(t.value.walletV3.complianceHoldUntilBody, { time: absTime(current.reviewHoldUntil) })
+        : t.value.walletV3.complianceReviewRequired;
+    }
+    return t.value.wallet.withdrawRouteHeldSub;
+  }
   // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
   if (isTerminalDone.value && wd.value) {
-    const at = wd.value.confirmedAt ?? wd.value.estimatedCompletion;
-    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.trackReviewNote;
+    const at = wd.value.confirmedAt;
+    return typeof at === "number" && Number.isFinite(at)
+      ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.confirmed;
   }
   const at = wd.value?.estimatedCompletion;
   return Number.isFinite(at) ? fmt(t.value.wallet.trackExpectedAt, { time: absTime(at as number) }) : t.value.wallet.trackReviewNote;
@@ -515,8 +517,9 @@ function stepTimeText(i: number): string {
   const w = wd.value;
   if (!w) return "";
   if (isTerminalDone.value && i === steps.value.length - 1) {
-    const at = w.confirmedAt ?? w.estimatedCompletion;
-    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : "";
+    const at = w.confirmedAt;
+    return typeof at === "number" && Number.isFinite(at)
+      ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : "";
   }
   // 🔴 只给单据里**真有**的时刻:提交(第 1 步)与实际到账(末步)。
   // 中间三步没有任何时间戳,原先用 3.5 秒假阶梯现编 —— 跨整点时会渲染成

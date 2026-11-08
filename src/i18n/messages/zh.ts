@@ -4037,8 +4037,12 @@ timeHoursAgo: "{n}小时前",
 
     feeConfigRetry: "重试",
     // Sprint 3 — 合规审查 banner(用户视角:监管要求,不暴露 phase 概念)
-    complianceHoldTitle: "提现安全确认中",
-    complianceHoldBody: "预计 {days} 天内完成，期间资金保留在你的账户。",
+    complianceHoldTitle: "提现合规复核",
+    complianceHoldBody: "本笔提现需人工复核，并附加 {days} 天审查窗口；到期不代表到账。",
+    complianceReviewBody: "提现需人工复核，小额免审暂停。输入金额后可查看是否另加审查窗口。",
+    complianceReviewNoHoldBody: "本笔提现需人工复核，不附加大额审查等待；到账以实际处理结果为准。",
+    complianceReviewRequired: "本笔提现需人工合规复核。",
+    complianceHoldUntilBody: "本笔提现需人工复核，审查窗口截至 {time}；到期不代表到账。",
     // 提现页 CTA + 合规 hero
     resetAddrLabel: "重置地址",
     resetAddrTitle: "清空提现地址?",
