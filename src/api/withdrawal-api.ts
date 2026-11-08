@@ -16,6 +16,10 @@ export interface WithdrawalSubmission {
   status: string;
   /** Review deadline, not arrival time. The server clears it when a hold ends. */
   holdUntil?: string;
+  /** Server processing estimate, independent of the review deadline. */
+  payoutDueAt?: string;
+  /** Actual completion evidence only; absent timestamps stay unknown. */
+  confirmedAt?: number | null;
   networkConfirmUsd: number;
   networkFee: number;
   penaltyFee: number;
@@ -71,7 +75,7 @@ export interface WithdrawalStatusSnapshot {
   payoutAddressChangeBlocked: boolean;
   withdrawalNo: string;
   status: WithdrawalStatus;
-  /** 服务端记的实际到账时刻(仅 confirmed 有值);缺省由调用方回落到单据预计到账。 */
+  /** 服务端记的实际到账时刻；缺失保持未知，不回落到预计时间。 */
   confirmedAt: number | null;
   /** 终态原因(仅终态有值)。null = 服务端没给 / 非终态 —— 页面据此决定要不要出原因行。 */
   terminalReason: WithdrawalTerminalReason | null;
@@ -226,6 +230,11 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const createdAtRaw = text(row?.createdAt);
   const createdAt = createdAtRaw ? parseServerTimestamp(createdAtRaw) ?? undefined : undefined;
   const holdUntil = text(row?.holdUntil);
+  const payoutDueAt = text(row?.payoutDueAt);
+  const rawConfirmedAt = row?.confirmedAt;
+  const confirmedAt = typeof rawConfirmedAt === "number"
+    ? Number.isFinite(rawConfirmedAt) && rawConfirmedAt > 0 ? rawConfirmedAt : null
+    : parseServerTimestamp(rawConfirmedAt);
   const riskRoute = text(row?.riskRoute);
   const amount = number(row?.amount, Number.EPSILON);
   const networkConfirmUsd = number(row?.networkConfirmUsd);
@@ -271,15 +280,10 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     "strong-review",
     "freeze",
   ]);
-  // Old, already-confirmed fast-pass rows have no hold timestamp because no
-  // hold ever existed. Normalize their retired `pass` spelling using the
-  // original creation timestamp. Current orders may lose holdUntil on release.
-  const legacyConfirmedFastPass = (status?.toUpperCase() === "CONFIRMED" || status?.toUpperCase() === "COMPLETED")
-    && (riskRoute?.toLowerCase() === "pass" || riskRoute?.toLowerCase() === "fast-pass")
-    && !holdUntil
-    && createdAt !== undefined
-    && Number.isFinite(createdAt);
-  const canonicalRiskRoute = legacyConfirmedFastPass && riskRoute?.toLowerCase() === "pass"
+  // Only terminal legacy history may use the retired `pass` spelling.
+  // Its status is evidence of completion, never of a missing completion time.
+  const canonicalRiskRoute = ["CONFIRMED", "COMPLETED", "SUCCESS"].includes(status?.toUpperCase() ?? "")
+    && riskRoute?.toLowerCase() === "pass"
     ? "fast-pass"
     : riskRoute;
   if (!row || !withdrawalNo || !status || !canonicalRiskRoute
@@ -308,6 +312,8 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     chain: chain as WithdrawalSubmission["chain"],
     status: status!,
     ...(holdUntil ? { holdUntil } : {}),
+    ...(payoutDueAt ? { payoutDueAt } : {}),
+    confirmedAt,
     networkConfirmUsd: networkConfirmUsd!,
     networkFee: networkFee!,
     penaltyFee: penaltyFee!,
@@ -572,17 +578,9 @@ export function toCanonicalWithdrawal(
   submittedAt = submission.createdAt ?? Date.now(),
 ): Withdrawal {
   const status = canonicalStatus(submission.status, submission.chain);
-  // A confirmed legacy row without a historical hold has no future estimate to
-  // display. Its server-created timestamp is the only truthful terminal anchor;
-  // never substitute the browser clock or manufacture a hold deadline.
-  const estimatedCompletion = submission.holdUntil
-    ? submission.complianceReviewRequired
-      ? parseServerTimestamp(submission.holdUntil) ?? NaN
-      : Date.parse(submission.holdUntil)
-    : status === "confirmed" && !submission.complianceReviewRequired
-      && submission.createdAt !== undefined && Number.isFinite(submission.createdAt)
-      ? submission.createdAt
-      : NaN;
+  // Review cutoff, processing estimate and completion are separate server facts.
+  // No timestamp is reconstructed from another deadline or the browser clock.
+  const estimatedCompletion = parseServerTimestamp(submission.payoutDueAt) ?? NaN;
   if (!address.trim()) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
   }
@@ -618,6 +616,8 @@ export function toCanonicalWithdrawal(
       && submission.createdAt > 0 && Number.isFinite(submission.createdAt)
       && Number.isFinite(new Date(submission.createdAt).getTime()) ? submission.createdAt : null,
     estimatedCompletion,
+    reviewHoldUntil: parseServerTimestamp(submission.holdUntil),
+    confirmedAt: submission.confirmedAt ?? null,
     // 🔴 顶层带出,不进 `fee`(fee 是报价快照,请求/响应同构;退款是事后事件)。
     // 提交回执上它**几乎恒为 0** —— 提交那一刻就被拒的单按规格是「零副作用、不烧 NEX」,
     // 没 NEX 可退。真正会带非 0 值的是**状态回查**端点。
@@ -668,14 +668,14 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
   if (withdrawalNo !== expectedWithdrawalNo) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
   }
-  // 到账时刻:毫秒数或 ISO 串。读不出来就当没给 —— 它只用来显示「几点到的」,
-  // 而调用方对 null 本来就有回落(取预计到账)。`0` 是服务端最常见的「未设置」哨兵值,
+  // 到账时刻:毫秒数或服务端时间串。读不出来就保持未知，不取预计到账。
+  // `0` 是服务端最常见的「未设置」哨兵值,
   // 上一版把它判成协议错并抛,一个哨兵值就能把整张单据锁死(R2 审计)。
   const rawConfirmedAt = row.confirmedAt;
   let confirmedAt: number | null = null;
   if (rawConfirmedAt !== null && rawConfirmedAt !== undefined && rawConfirmedAt !== "") {
-    const parsed = typeof rawConfirmedAt === "number" ? rawConfirmedAt : Date.parse(String(rawConfirmedAt));
-    confirmedAt = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    const parsed = typeof rawConfirmedAt === "number" ? rawConfirmedAt : parseServerTimestamp(rawConfirmedAt);
+    confirmedAt = parsed !== null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
   // 终态原因:只认字符串码;非字符串(对象 / 数组 / 数字)一律当没给,**不当成码吞掉**
   // ——「不认识的码回落 other」说的是码,不是「任何垃圾都是码」。

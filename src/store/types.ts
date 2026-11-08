@@ -336,8 +336,10 @@ export interface Withdrawal {
   /** Read-only server creation time for display; absent legacy evidence stays unknown. */
   displaySubmittedAt?: number | null;
   estimatedCompletion: number;
+  /** Server holdUntil; null explicitly clears an expired review window. */
+  reviewHoldUntil?: number | null;
   /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
-  confirmedAt?: number;
+  confirmedAt?: number | null;
   /** 终态原因(服务端 GET /api/withdrawals/:id 镜像回来,仅终态有值)。
    *  🔴 必须随单落盘,不能只在内存:客服要查的正是这个,而用户刷新一次页面就该还在。
    *  与 riskReasons / waivedGates 同源同去处(码不直出,渲染时经 lib/risk-reason-text 翻成话术)。 */

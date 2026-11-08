@@ -2460,6 +2460,8 @@ export const useApp = defineStore("app", () => {
       const serverOrder = toCanonicalWithdrawal(remote.withdrawal,
         remote.withdrawal.targetAddress ?? w.address, w.submittedAt);
       const orderSnapshotChanged = serverOrder.riskRoute !== w.riskRoute
+        || (serverOrder.reviewHoldUntil ?? null) !== (w.reviewHoldUntil ?? null)
+        || serverOrder.confirmedAt !== w.confirmedAt
         || (serverOrder.complianceReviewRequired !== undefined
           && (serverOrder.complianceReviewRequired !== w.complianceReviewRequired
             || serverOrder.complianceHoldApplies !== w.complianceHoldApplies
@@ -2483,6 +2485,7 @@ export const useApp = defineStore("app", () => {
         ...w,
         riskRoute: serverOrder.riskRoute,
         estimatedCompletion: serverOrder.estimatedCompletion,
+        reviewHoldUntil: serverOrder.reviewHoldUntil,
         ...(serverOrder.complianceReviewRequired !== undefined ? {
           complianceReviewRequired: serverOrder.complianceReviewRequired,
           complianceHoldApplies: serverOrder.complianceHoldApplies,
@@ -2494,10 +2497,8 @@ export const useApp = defineStore("app", () => {
         // 🔴 盖上「这份结论是什么时候从服务端问来的」。没有它,三路合并在平局时只能留磁盘旧行,
         // 上面那套判据就全是空转(独立审计实测:同状态改原因 100% 丢失)。
         // 用本机时钟即可:它只在**本机自己的两份快照之间**比大小,不与服务端时间对齐。
-        // 合规单的截止时间只代表审查窗口，不能回填为实际到账时间。
-        ...(remote.status === "confirmed"
-          ? { confirmedAt: remote.confirmedAt ?? (serverOrder.complianceReviewRequired ? undefined : w.estimatedCompletion) }
-          : {}),
+        // 实际到账时间只取服务端证据，缺失时清除旧的推算值。
+        confirmedAt: remote.confirmedAt,
         // 🔴 `null`(没给)与 `false`/具体码是两回事:没给就**保留已存的旧值**,不覆盖成空。
         // 覆盖的话,一次「服务端这拍没带原因」就把客服唯一能查的那条线索抹了。
         ...(remote.terminalReason !== null ? { terminalReason: remote.terminalReason } : {}),
