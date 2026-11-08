@@ -297,6 +297,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
         || typeof row.complianceHoldApplies !== "boolean"
         || complianceHoldDays === null || !Number.isInteger(complianceHoldDays)
         || (!row.complianceHoldApplies && complianceHoldDays !== 0)
+        // Legacy TRC20 submission audits remain immutable on history and original-command recovery.
         || (chain !== "USDT-TRC20" && !row.complianceReviewRequired && row.complianceHoldApplies)))
       || Math.abs(networkConfirmUsd - networkFee) > 0.000001
       || Math.abs(networkFee + penaltyFee - grossFee) > 0.000001
@@ -359,7 +360,7 @@ function parseSubmissionPage(value: unknown): {
     snapshotId: parseHistorySnapshotId(page!.snapshotId) };
 }
 
-function parseEligibility(value: unknown, chain: SupportedWithdrawalNetwork): WithdrawalEligibilitySnapshot {
+function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
   const row = record(value);
   const route = text(row?.route)?.toLowerCase();
   const reasons = row?.riskReasons;
@@ -377,7 +378,7 @@ function parseEligibility(value: unknown, chain: SupportedWithdrawalNetwork): Wi
       || typeof row.complianceReviewRequired !== "boolean" || typeof row.complianceHoldApplies !== "boolean"
       || complianceHoldDays === null || !Number.isInteger(complianceHoldDays)
       || (!row.complianceHoldApplies && complianceHoldDays !== 0)
-      || (chain !== "USDT-TRC20" && !row.complianceReviewRequired && row.complianceHoldApplies)
+      || (!row.complianceReviewRequired && row.complianceHoldApplies)
       || (row.complianceReviewRequired && row.fastLaneApplied)
       || reset === null || !configVersion) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_ELIGIBILITY_RESPONSE_INVALID" });
@@ -763,7 +764,7 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
         method: "POST", path: "/api/withdrawals/eligibility",
         body: input,
         timeoutMs: 30_000,
-      }), input.chain);
+      }));
     },
     get: async (withdrawalNo) => parseWithdrawalDetail(await client.request({
       method: "GET",

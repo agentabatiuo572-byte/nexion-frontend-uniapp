@@ -58,7 +58,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
         </view>
         <view class="flex-1 min-w-0" style="margin-left: 10px">
-          <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ network === 'USDT-TRC20' ? t.walletV3.stageWaitTitle : t.walletV3.complianceHoldTitle }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ t.walletV3.complianceHoldTitle }}</text>
           <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ holdBody }}</text>
         </view>
       </view>
@@ -827,15 +827,10 @@ const freezeBannerText = computed(() =>
 
 const complianceHoldEnabled = computed(() =>
   !pendingAttempt.value
-  && (network.value === "USDT-TRC20" ? !!withdrawalPolicy.value
-    : (remoteEligibility.value?.complianceReviewRequired ?? withdrawalPolicy.value?.complianceHoldEnabled === true)),
+  && (remoteEligibility.value?.complianceReviewRequired ?? withdrawalPolicy.value?.complianceHoldEnabled === true),
 );
 const holdBody = computed(() => {
   const policy = withdrawalPolicy.value;
-  if (network.value === "USDT-TRC20") {
-    const days = remoteEligibility.value?.complianceHoldDays ?? policy?.cooldownDays ?? 0;
-    return days > 0 ? fmt(t.value.walletV3.stageWaitBody, { days }) : t.value.walletV3.stageNoWaitBody;
-  }
   if (!policy || amountNum.value <= 0) return t.value.walletV3.complianceReviewBody;
   // This is policy-based guidance until the server returns this amount's decision.
   // Submission continues to require a fresh eligibility response.
