@@ -234,10 +234,13 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-status.nx-inline-recovery { display:grid; align-items:center; gap:12px; }
 .entry-status.nx-inline-recovery .promotion-title { text-wrap: balance; }
 .entry-advert,.entry-event { position: relative; overflow: hidden; border: 1px solid var(--v5-border); border-radius: 24px; background: var(--v5-surface); }
-.entry-advert { min-height: 146px; border: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
-.entry-advert[data-color-scheme="light"] { --promotion-copy-ink: var(--v5-ink); box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+.entry-advert { min-height: 146px; border: 0; background: radial-gradient(70% 90% at 82% 72%,rgba(158,220,29,.24),transparent 62%),radial-gradient(50% 70% at 100% 0%,rgba(255,255,255,.08),transparent 60%),linear-gradient(135deg,#171717,#101010); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+.entry-advert[data-color-scheme="light"] { --promotion-copy-ink: var(--v5-ink); background: radial-gradient(70% 90% at 82% 72%,color-mix(in srgb,var(--v5-brand) 12%,transparent),transparent 64%),linear-gradient(135deg,var(--ui-spotlight-top),var(--ui-ticket-bottom)); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.entry-advert[data-color-scheme="light"]::before { background-image: radial-gradient(circle,color-mix(in srgb,var(--v5-brand) 12%,transparent) 1px,transparent 1px); }
 .entry-advert[data-color-scheme="light"] .entry-label { color: var(--v5-brand); }
 .entry-advert[data-color-scheme="light"] .entry-home-deadline { color: var(--v5-ink-3); }
+.entry-advert[data-color-scheme="light"] .entry-product-art::before { background: radial-gradient(ellipse,color-mix(in srgb,var(--v5-brand) 22%,transparent),transparent 70%); }
+.entry-advert::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle,rgba(255,255,255,.07) 1px,transparent 1px) 0 0/14px 14px; mask-image: linear-gradient(90deg,transparent 30%,#000 75%); pointer-events: none; }
 .entry-advert-target { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
 .entry-advert-target:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -3px; }
 .entry-artwork { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -259,6 +262,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-advert--banner .entry-remaining { padding:2px 7px;border-radius:6px;background:var(--v5-surface); }
 .entry-advert--banner .entry-home-deadline { padding-inline:8px;border-radius:8px;background:var(--v5-surface);color:var(--v5-ink-2); }
 .entry-product-art { position: absolute; right: 0; width: 160px; inset-block: 0; pointer-events: none; }
+.entry-product-art::before { content: ''; position: absolute; right: 18px; bottom: 16px; width: 120px; height: 20px; background: radial-gradient(ellipse,rgba(200,242,90,.4),transparent 70%); }
 .entry-main-image { position: absolute; right: 34px; top: 30px; width: 108px; height: 108px; animation: promotion-float 4.2s ease-in-out infinite; }
 .entry-gift-image { position: absolute; right: 12px; bottom: 10px; width: 76px; height: 76px; animation: promotion-float 4.2s ease-in-out -1.6s infinite; }
 @keyframes promotion-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
@@ -267,6 +271,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-event-copy { position: relative; z-index: 1; grid-column: 1; grid-row: 1; }
 .entry-event-art { display: flex; align-items: center; justify-content: center; grid-column: 2; grid-row: 1; pointer-events: none; }
 .entry-event-art :deep(.team-art) { max-width: none; }
+.entry-event.entry-kind-gift { background: radial-gradient(ellipse at 88% 40%,color-mix(in srgb,var(--v5-brand) 9%,transparent),transparent 56%),var(--v5-surface); }
 .entry-event.entry-kind-gift .entry-event-art { align-self: center; }
 .entry-benefits { margin-top: var(--ui-space-inline); }
 .entry-benefit-row + .entry-benefit-row { margin-top: var(--ui-space-inline); }
