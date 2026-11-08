@@ -72,6 +72,8 @@ export interface Device {
   id: string;
   /** Exact owned SKU from the canonical fleet; retained separately from its display family. */
   productCode?: string;
+  /** Explicit device target fact; absent on legacy rows. */
+  monthlyTargetActive?: boolean;
   /** Server CAS version. Remote mutations must send this exact value. */
   rowVersion?: number;
   /** Independent server runtime fact; absent on local simulation rows. */
