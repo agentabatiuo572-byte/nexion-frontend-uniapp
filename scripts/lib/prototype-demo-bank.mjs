@@ -19,7 +19,7 @@ export function bankDemo(url, state, request) {
     if (!key) fail('IDEMPOTENCY_KEY_REQUIRED', 400);
     const id = name + ':' + key, body = JSON.stringify(input());
     if (demo.commands[id]) {
-      if (demo.commands[id].body !== body) fail('IDEMPOTENCY_CONFLICT');
+      if (demo.commands[id].body !== body) fail('IDEMPOTENCY_KEY_PAYLOAD_MISMATCH');
       return snapshot(demo.commands[id].result);
     }
     const result = action();
@@ -86,9 +86,9 @@ export function bankDemo(url, state, request) {
     const row = demo.quotes[quoteMatch[1]];
     if (!row) fail('BANK_QUOTE_NOT_FOUND', 404);
     if (row.order) return orderView(row.order);
+    if (!row.abandoned && Date.parse(row.quote.expiresAt) <= now) return { state: 'EXPIRED' };
     if (quoteMatch[2] && method === 'POST') row.abandoned = true;
     if (row.abandoned) return { state: 'ABANDONED' };
-    if (Date.parse(row.quote.expiresAt) <= now) return { state: 'EXPIRED' };
     return { state: 'NOT_SUBMITTED', quote: snapshot(row.quote) };
   }
   if (path === '/api/withdrawals/bank/orders' && method === 'POST') {
