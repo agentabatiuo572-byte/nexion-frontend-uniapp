@@ -1,6 +1,6 @@
 // Isolated loopback financial models. No real network or financial submissions.
 import {randomUUID} from 'node:crypto';
-import {demoWithdrawalFacts} from './prototype-demo-secondary.mjs';
+import {demoWithdrawalFacts, settleDemoBankWithdrawals} from './prototype-demo-secondary.mjs';
 const day=86400000;
 const minWithdrawal = 20; // AppWithdrawalService.MIN_WITHDRAWAL, shared by policy and eligibility.
 // HdPayHostedDepositService / AppVietQrIntentService: hosted capacity is unknown, not a manual bank pool.
@@ -15,6 +15,7 @@ export function demoPayoutAddresses(state, now = Date.now()) {
 }
 // AppPayoutAddressMapper checks all withdrawal networks, including BANK-VND.
 export function demoWithdrawals(state, now = Date.now()) {
+  settleDemoBankWithdrawals(state);
   const sampleAt = state.withdrawalSamplesAt ??= now;
   // A rejected withdrawal whose full 100 USDT reserve was returned is REFUNDED, not an unsettled REVIEW_REJECTED.
   // Like the backend, retain the submission's fee/net-receive quote; it is not a successful payout or a new UVT refund.
@@ -22,14 +23,13 @@ export function demoWithdrawals(state, now = Date.now()) {
   withdrawals.unshift(...Object.values(state.bankDemo?.orders??{}).map(row=>({withdrawalNo:row.withdrawalNo,targetAddress:'BANK-VND:'+row.beneficiaryNo,amount:row.bank.amountUsdt,chain:'BANK-VND',status:row.outcome==='settled'?'CONFIRMED':row.outcome==='rejected'?'REFUNDED':'PROCESSING',holdUntil:new Date(row.createdAt).toISOString(),createdAt:new Date(row.createdAt).toISOString(),networkConfirmUsd:row.bank.feeUsdt,networkFee:row.bank.feeUsdt,penaltyFee:0,grossFee:row.bank.feeUsdt,nexBurned:0,feeWaived:0,actualFee:row.bank.feeUsdt,netReceive:row.bank.netUsdt,policyVersion:'money-policy',useNexFeeOffset:false,riskRoute:'fast-pass',idSource:'server'})));
   return withdrawals;
 }
-export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',walletAmount=empty?0:state.walletBalance??52800.64; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
+export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now),walletAmount=facts.walletUsdt; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
 const caps = { ...proof, source: "G2/G3 server configuration", asset: "UVT", currency: "USDT", currentPrice: .125, userDailyCapUsdt: 5000, platformDailyCapUsdt: 100000, feePct: .1, feeMinUsdt: .1, minUsdt: .1, minNex: 1, queueMode: "QUEUE", swapEnabled: true };
 const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_item + nx_emergency_control_setting" };
   if (p === "/api/config/exchange/caps") return caps;
   if (p === "/api/exchange") return { ...proof, caps, wallet: { usdtAvailable: walletAmount, nexAvailable: 789.000001 }, todayUserUsedUsdt: 50, todayPlatformUsedUsdt: 1000, lifetimeExchangedUsdt: 50.123456, ordersPage: { total: empty ? 0 : 1, pageNum: Number(url.searchParams.get("pageNum") || 1), pageSize: Number(url.searchParams.get("pageSize") || 20) }, orders: empty ? [] : [{ exchangeNo: "EX-DEMO123456", fromAsset: "USDT", toAsset: "UVT", fromAmount: 50.123456, toAmount: 400.987648, rate: .125, status: "COMPLETED", createdAt: iso }] };
   if (p === "/api/config/repurchase") return { ...repurchaseProof, product: "repurchase", asset: "USDT", pointsReward: false, apyPct: 35, lockDays: 90, nurtureMultiplier: 1, h1ReinvestMultiplier: 1, effectiveNurtureMultiplier: 1, ticketPerOrder: 1, presets: [50, 200, 1000], earlyPenaltyPct: 10, minAmountUsdt: 50, enabled: true, disclosureRequired: false, currentNexPriceUsdt: .125, g4LotteryCapacity: 1000, g4TicketsIssuedThisMonth: 1 };
   if (p === "/api/repurchase/orders") return { ...repurchaseProof, walletBalanceUsdt: walletAmount, serverTime: iso, ordersPage: { total: empty ? 0 : 1, pageNum: 1, pageSize: 50 }, orders: empty ? [] : [{ orderNo: "RPS-DEMO123456", amountUsdt: 50.123456, apyPct: 35, earlyPenaltyPct: 10, lockDays: 90, lockedAt: new Date(now - 86400000).toISOString(), unlockAt: new Date(now + 89 * 86400000).toISOString(), estimatedInterestUsdt: 4.325671, status: "ACTIVE" }] };
-  const facts=demoWithdrawalFacts(state,now);
   const withdrawals=demoWithdrawals(state,now);
   if(p==='/api/withdrawals')return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawals,page:{pageNum:1,pageSize:50,total:withdrawals.length,hasMore:false}};
   if(/^\/api\/withdrawals\/WD-DEMO-?\d+$/.test(p))return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawal:withdrawals.find(row=>row.withdrawalNo===p.split('/').pop())};
@@ -44,13 +44,14 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     const riskReasons = [];
     let payoutReady = false;
     const strong = amount >= 5000, fast = amount <= 100 && !strong;
+    // The fixture models passing K3 / low K4: finalRiskRoute still sends every non-fast amount to manual.
     if (strong) riskReasons.push('A3_STRONG_REVIEW_THRESHOLD');
     if (!payout?.address) riskReasons.push('PAYOUT_ADDRESS_REQUIRED');
     else if (!payout.effectiveAt || Date.parse(payout.effectiveAt) > now) riskReasons.push('PAYOUT_ADDRESS_CHANGE_PENDING');
     // AppWithdrawalService only folds EVM letter case for ERC20 when checking eligibility.
     else if (chain === 'USDT-ERC20' ? address.toLowerCase() !== payout.address.toLowerCase() : address !== payout.address) riskReasons.push('PAYOUT_ADDRESS_MISMATCH');
     else payoutReady = true;
-    return { canSubmit: amount >= minWithdrawal && amount <= facts.maxWithdrawableUsdt && facts.dailyRemainingCount > 0 && payoutReady, maxWithdrawableUsdt: facts.maxWithdrawableUsdt, route: strong ? 'manual' : 'pass', riskReasons, fastLaneApplied: fast, waivedGates: fast ? ['first-withdrawal-review'] : [], dailyLimitReached: facts.dailyRemainingCount === 0, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
+    return { canSubmit: amount >= minWithdrawal && amount <= facts.maxWithdrawableUsdt && facts.dailyRemainingCount > 0 && payoutReady, maxWithdrawableUsdt: facts.maxWithdrawableUsdt, route: fast ? 'pass' : 'manual', riskReasons, fastLaneApplied: fast, waivedGates: fast ? ['first-withdrawal-review'] : [], dailyLimitReached: facts.dailyRemainingCount === 0, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
   }
   if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: 7, effectiveDelayHours: 24, inFlightWithdrawalBlocked: true };
   if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { ...bankConfig } };

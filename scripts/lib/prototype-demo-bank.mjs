@@ -1,7 +1,7 @@
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
-import { demoWithdrawalFacts, secondaryDemo } from './prototype-demo-secondary.mjs';
+import { demoWithdrawalFacts, secondaryDemo, settleDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
 import { demoPayoutAddresses, demoWithdrawalNetworks, demoWithdrawals } from './prototype-demo-finance.mjs';
 
 const DAY = 86400000;
@@ -42,11 +42,7 @@ export function bankDemo(url, state, request) {
     return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: !intents.length ? null : { state: intents.length > 1 ? 'MULTIPLE' : 'NOT_SUBMITTED', intents, quoteNo: intents.length === 1 ? intents[0].quoteNo : null, withdrawalNo: null } };
   };
   const orderView = row => {
-    // The panel decides how an open order ends; once ended that is its fact. A rejected payout returns the funds.
-    if (!row.outcome && ['settled', 'rejected'].includes(state.bankState)) {
-      row.outcome = state.bankState;
-      if (row.outcome === 'rejected') state.walletBalance = Math.round((demoWithdrawalFacts(state, now).walletUsdt + row.bank.amountUsdt) * 1e6) / 1e6;
-    }
+    settleDemoBankWithdrawals(state);
     const settled = row.outcome === 'settled', rejected = row.outcome === 'rejected';
     return { ...snapshot(row), providerState: settled ? 'PAID' : rejected ? 'FAILED' : 'PENDING',
       withdrawal: { ...row.withdrawal, status: settled ? 'CONFIRMED' : rejected ? 'REFUNDED' : 'PROCESSING' },
@@ -110,12 +106,13 @@ export function bankDemo(url, state, request) {
     if (!addressValid) fail('PAYOUT_ADDRESS_FORMAT_INVALID', 422);
     if (!demoWithdrawalNetworks(state).includes(network)) fail('WITHDRAWAL_NETWORK_DISABLED');
     validateOtp('address');
+    // verifyAndConsume commits in REQUIRES_NEW: later in-flight/cooldown refusals still burn this code.
+    delete demo.addressOtp;
     // Keep the backend's exact terminal set: REFUNDED is settled; REVIEW_REJECTED alone still blocks changes.
     const terminal = ['COMPLETED', 'CONFIRMED', 'SUCCESS', 'REFUNDED', 'REJECTED', 'CANCELLED', 'FAILED'];
     if (demoWithdrawals(state, now).some(row => !terminal.includes(row.status.toUpperCase()))) fail('PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL');
     const current = demoPayoutAddresses(state, now).find(row => row.network === network);
     if (current && Date.parse(current.nextChangeAllowedAt) > now) fail('PAYOUT_ADDRESS_CHANGE_COOLDOWN');
-    delete demo.addressOtp;
     if (current && (network === 'USDT-TRC20' ? address === current.address : address.toLowerCase() === current.address.toLowerCase())) return snapshot(current);
     demo.addresses ??= {};
     demo.addresses[network] = { ...proof, network, address, status: 'ACTIVE', effectiveAt: new Date(now + DAY).toISOString(), createdAt: current?.createdAt ?? new Date(now).toISOString(), nextChangeAllowedAt: new Date(now + 7 * DAY).toISOString(), changePending: true };
