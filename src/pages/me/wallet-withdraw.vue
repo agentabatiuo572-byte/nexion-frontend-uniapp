@@ -1369,6 +1369,15 @@ async function handleSubmit() {
   // 🔴 写不进去就**不发**(fail closed):落盘失败 = 这一次没有重放保护,超时之后再也认不回
   // 那个键,用户一重试就是第二张单。宁可这一笔发不出去(钱一分没动、原因和下一步都给了),
   // 也不发一笔「出了事没人认得回来」的。
+  // BUG-398: another tab may have changed the shared attempt while confirmation / eligibility awaited.
+  // Adopt its current command; never overwrite it or resurrect a replay that has already been resolved.
+  const storedAttempt = readWithdrawAttempt(snap.account);
+  if (storedAttempt?.key !== pending?.key) {
+    pendingAttempt.value = storedAttempt;
+    clearSubmitFreeze();
+    toast.info(storedAttempt ? t.value.bankWithdrawal.resumeUsdt : t.value.walletV3.withdrawContextStale);
+    return;
+  }
   if (!rememberWithdrawAttempt(snap.account, {
     key: snap.idempotencyKey,
     amount: snap.amount,
