@@ -343,10 +343,13 @@ const bonusDoneTextStyle: CSSProperties = {
 </script>
 
 <style scoped>
-.weekly-claimable { position: relative; overflow: hidden; }
+.weekly-claimable { position: relative; overflow: hidden; }.weekly-claimable::before { content:''; position: absolute; inset:0; background: linear-gradient(105deg,transparent 30%,color-mix(in srgb,var(--v5-brand) 16%,transparent),transparent 70%); transform: translateX(-100%); animation: weekly-sheen 800ms ease-out 200ms both; pointer-events:none; }
+@keyframes weekly-sheen { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .weekly-claimable::before { animation:none; display:none; } }
 
 /* Approved growth board geometry and material. */
  .weekly-completed-count { font:600 12px/16px var(--font-metric); color:var(--v5-ink); }
+.weekly-claimable::before { background:linear-gradient(105deg,transparent 30%,color-mix(in srgb,var(--v5-warning) 16%,transparent),transparent 70%); }
 .weekly-claimable :deep(.nx-button--brand > .nx-button__surface) { --ui-button-ink:var(--v5-ink); }
 .weekly-claimable, .weekly-claimable ~ view { min-height:60px; }
 
