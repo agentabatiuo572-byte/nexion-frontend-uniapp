@@ -1,7 +1,10 @@
 <template>
   <AppChassis active="me">
     <SubPageHeader back="/pages/me/wallet-withdraw-method" :title="c.title" :back-action="goBack" />
-    <view class="bank-withdraw" :aria-busy="busy">
+    <view v-if="!remoteSessionReady" class="bank-withdraw" aria-busy="true">
+      <text class="muted loading" role="status">{{ c.loading }}</text>
+    </view>
+    <view v-else class="bank-withdraw" :aria-busy="busy">
       <view v-if="error" class="notice danger" role="alert"><text>{{ error }}</text></view>
       <text v-if="busy && !silentRead" class="muted loading" role="status">{{ c.loading }}</text>
       <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
