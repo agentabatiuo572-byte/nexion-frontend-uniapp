@@ -658,7 +658,7 @@ const emptyStateStyle: CSSProperties = {
 
 /* Approved growth board geometry and material. */
  .amount-cur { font-size:.55em; color:var(--v5-ink-3); margin-right:2px; letter-spacing:0; }.amount-dec { color:var(--v5-ink-3); }
-.goal-hero { overflow:hidden; }
+.goal-hero { overflow:hidden; }.goal-hero::after { content:''; position:absolute; left:50%; top:150px; width:260px; height:80px; margin-left:-130px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-brand) 22%,transparent),transparent); pointer-events:none; }
 .goal-hero :deep(.growth-progress) { position:relative; z-index:1; }
 .goal-device-well { box-sizing:border-box; width:100%; min-height:66px !important; gap:12px !important; padding:10px 12px; border-radius:14px; background:color-mix(in srgb,var(--v5-ink) 4%,transparent); box-shadow:inset 0 2px 8px color-mix(in srgb,var(--v5-bg) 45%,transparent),inset 0 0 0 1px var(--v5-border); }
 .goal-device-copy { flex:1; min-width:0; }.goal-device-label { display:block; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.goal-device-name { display:block; margin:0; font:500 15px/22px var(--font-v5); }
