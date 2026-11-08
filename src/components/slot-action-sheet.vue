@@ -60,7 +60,7 @@
             </view>
             <view class="sas-device-meta">
               <text class="sas-device-name">{{ deviceName(t, d) }}</text>
-              <text class="sas-device-rate">{{ d.kind === "cloud-share" ? `${formatAmount(d.baseRateNEX)} UVT${t.store.cardPerDaySuffix}` : `$${formatAmount(d.baseRate)}${t.store.cardPerDaySuffix}` }}</text>
+              <text class="sas-device-rate"><template v-if="d.kind !== 'cloud-share' || d.hasTarget">${{ formatAmount(d.dailyRateNow) }}{{ t.store.cardPerDaySuffix }}</template><template v-if="d.kind === 'cloud-share'">{{ d.hasTarget ? ' · ' : '' }}{{ formatAmount(d.dailyNexNow) }} UVT{{ t.store.cardPerDaySuffix }}</template></text>
             </view>
             <view class="sas-device-power">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
@@ -90,6 +90,8 @@ import { navTo } from "@/lib/route";
 import { computed, ref, watch } from "vue";
 import { useSlotActionSheet } from "@/store/slot-action-sheet";
 import { useApp } from "@/store/app";
+import { getLifecycleSummary } from "@/store/device-lifecycle";
+import { productCatalogPresentation } from "@/store/product-catalog";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -118,7 +120,12 @@ watch(
   },
 );
 
-const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice));
+const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableInventoryDevice).map((device) => {
+  const lifecycle = getLifecycleSummary(device);
+  const product = productCatalogPresentation.value?.products.find((product) => product.id === (device.productCode ?? device.kind).toLowerCase());
+  return { ...device, dailyRateNow: lifecycle.dailyRateNow, dailyNexNow: device.baseRateNEX * lifecycle.efficiency,
+    hasTarget: product?.monthlyEstimateUsdt != null };
+}));
 const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
 const activeCount = computed(() => app.activeSlotCount);
 const trialPresentation = useTrialPresentation();

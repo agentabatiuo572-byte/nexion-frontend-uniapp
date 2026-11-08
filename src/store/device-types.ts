@@ -1,7 +1,7 @@
 import type { GpuTier } from "./config-types";
 import type { Device, DeviceKind } from "./types";
 import { pickRandomTask } from "@/mock/tasks";
-import { getEfficiency, getMonthsOwned, isDegradable } from "./device-lifecycle";
+import { getEfficiency, getLifecycleSummary, getMonthsOwned, isDegradable } from "./device-lifecycle";
 import { ONE_MONTH_MS } from "./server-time";
 import { getCachedCapability, fallbackCapability } from "@/lib/device-capability";
 import { getDeviceId } from "@/lib/device-id";
@@ -235,9 +235,10 @@ export function derivePromoUpgrade(devices: Device[]): {
     };
   }
   // BASE = highest-yield active device.
-  const dailyComparable = actives.filter((d) => d.kind !== "cloud-share" && d.baseRate > 0);
+  const dailyComparable = actives.map((d) => ({ ...d, dailyRateNow: getLifecycleSummary(d).dailyRateNow }))
+    .filter((d) => d.kind !== "cloud-share" && d.dailyRateNow > 0);
   if (dailyComparable.length === 0) return derivePromoUpgrade([]);
-  const base = dailyComparable.reduce((m, d) => (d.baseRate > m.baseRate ? d : m), dailyComparable[0]);
+  const base = dailyComparable.reduce((m, d) => (d.dailyRateNow > m.dailyRateNow ? d : m), dailyComparable[0]);
   const idx = UPGRADE_LADDER.indexOf(base.kind);
   const atTop = idx === UPGRADE_LADDER.length - 1;
   const targetKind: DeviceKind = atTop
@@ -246,11 +247,11 @@ export function derivePromoUpgrade(devices: Device[]): {
       ? UPGRADE_LADDER[idx + 1]
       : "stellarbox-s1"; // off-ladder (cloud-share) → promote to entry box S1
   const targetSpec = DEVICE_SPECS[targetKind];
-  const multiplier = atTop ? 0 : Math.round(targetSpec.baseRate / base.baseRate);
+  const multiplier = atTop ? 0 : Math.round(targetSpec.baseRate / base.dailyRateNow);
   return {
     baseKind: base.kind,
     baseName: base.name,
-    baseDaily: base.baseRate,
+    baseDaily: base.dailyRateNow,
     targetKind,
     targetName: targetSpec.name,
     targetDaily: targetSpec.baseRate,
