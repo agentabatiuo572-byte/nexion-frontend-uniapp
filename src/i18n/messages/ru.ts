@@ -2323,7 +2323,7 @@ export const ru: Messages = {
     coRecoverOriginalOrder: "Проверяем исходный заказ. Не оформляйте новый, пока результат не подтверждён.",
     detQuantity: "Количество для расчёта",
     detEstReturns: "Ожидаемый доход",
-    detEstReturnsMeta: "Среднее за 30 дней",
+    detEstReturnsMeta: "Итог — по фактическим выплатам",
     detMonthly: "≈ в месяц",
     detVsPhone: "против телефона {n}",
     detHardware: "Оборудование",

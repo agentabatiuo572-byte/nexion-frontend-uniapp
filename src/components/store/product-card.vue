@@ -43,12 +43,12 @@
         <!-- Eyebrow -->
         <view class="font-mono-tabular inline-flex items-center gap-1.5" :style="earnEyebrowStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text>{{ isShare ? t.store.shareReferenceAnnual : t.store.cardYouEarn }}</text>
+          <text>{{ isShare ? dailyEstimate ? t.bundle.estimatedDaily : t.store.shareReferenceAnnual : t.store.cardYouEarn }}</text>
         </view>
 
         <!-- Line 1: daily earn -->
         <view class="mt-1 flex items-baseline gap-2 flex-wrap">
-          <text v-if="isShare" class="tabular-nums" :style="bigEarnStyle">{{ shareYieldText }}</text>
+          <text v-if="isShare && !dailyEstimate" class="tabular-nums" :style="bigEarnStyle">{{ shareYieldText }}</text>
           <text v-else class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: var(--ui-type-list-title); color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
           <!-- 「/天」单位后缀恒用弱化色,不跟数字的强调色走 —— 与同行美元侧同一档 ink-3
                (主人 2026-08-17:两侧 /天 字色必须一致) -->
@@ -93,7 +93,7 @@
       <text class="product-compact-tagline">{{ copy.tagline }}</text>
       <view class="product-compact-bottom">
         <text class="product-compact-price">{{ fmtMoney(product.price).replace(/\.00$/, '') }}</text>
-        <text class="product-compact-estimate" :aria-label="(isShare ? t.store.shareReferenceAnnual : t.store.cardYouEarn) + ' · ' + (isShare ? shareYieldText : fmtMoney(product.dailyEarn) + t.store.cardPerDaySuffix)">{{ isShare ? t.store.shareReferenceAnnual + ' · ' + shareYieldText : estimateLabel + ' · ' + fmtMoney(product.dailyEarn).replace(/\.00$/, '') + t.store.cardPerDaySuffix }}</text>
+        <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.text }}</text>
       </view>
       <text v-if="stockUnavailable || catalogUnavailable || (remoteApiEnabled && eligibility.status === 'ready' && !eligibility.eligible)" class="product-compact-status">{{ buyLabel }}</text>
     </view>
@@ -120,6 +120,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
+import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import type { DeviceKind } from "@/store/types";
@@ -304,10 +305,30 @@ function toggleGateDetails() {
 }
 
 // Text helpers (toFixed / toLocaleString / fmt) — kept out of template for clarity
-const dailyEarnText = computed(() => formatAmount(props.product.dailyEarn));
+const dailyEstimate = computed(() => productDailyEstimateRange(props.product));
+const dailyEarnText = computed(() => {
+  const estimate = dailyEstimate.value;
+  if (!estimate) return "";
+  if (!isShare.value) return formatAmount(estimate.low);
+  const low = formatAmount(estimate.low, 6), high = formatAmount(estimate.high, 6);
+  return low === high ? low : `${low}–${high}`;
+});
 const shareYieldText = computed(() => props.product.shareYieldMin != null && props.product.shareYieldMax != null
   ? `${props.product.shareYieldMin}%–${props.product.shareYieldMax}%`
   : t.value.store.shareAnnualUnavailable);
+const compactEstimate = computed(() => {
+  if (isShare.value) {
+    const text = dailyEstimate.value
+      ? `${t.value.bundle.estimatedDaily} · $${dailyEarnText.value}${t.value.store.cardPerDaySuffix}`
+      : `${t.value.store.shareReferenceAnnual} · ${shareYieldText.value}`;
+    return { text, ariaLabel: text };
+  }
+  const daily = fmtMoney(props.product.dailyEarn);
+  return {
+    text: `${estimateLabel.value} · ${daily.replace(/\.00$/, "")}${t.value.store.cardPerDaySuffix}`,
+    ariaLabel: `${t.value.store.cardYouEarn} · ${daily}${t.value.store.cardPerDaySuffix}`,
+  };
+});
 const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: formatAmount(props.product.dailyEarnNEX) }));
 const tradeCreditText = computed(() =>
   fmt(t.value.store.cardTradeCredit, { n: formatAmount(bestTradeinCredit.value) }),

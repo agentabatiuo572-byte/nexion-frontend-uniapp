@@ -2323,7 +2323,7 @@ export const kk: Messages = {
     coRecoverOriginalOrder: "Бастапқы тапсырыс тексерілуде. Нәтижесі расталғанша басқа тапсырыс бермеңіз.",
     detQuantity: "Есепке алынатын саны",
     detEstReturns: "Болжамды табыс",
-    detEstReturnsMeta: "30 күндік орташа",
+    detEstReturnsMeta: "Нақты төлем өзгеше болуы мүмкін",
     detMonthly: "Болж. айлық",
     detVsPhone: "салыстыру: телефоныңыз {n}",
     detHardware: "Жабдық",

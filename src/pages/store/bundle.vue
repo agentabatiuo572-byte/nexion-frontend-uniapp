@@ -156,7 +156,7 @@
           <!-- Combined daily -->
           <view class="flex items-center justify-between" style="min-height: 24px">
             <text :style="rowLabelStyle(false)">{{ t.bundle.estimatedDaily }}</text>
-            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">${{ formatAmount(cumulativeDailyEarn) }}{{ t.store.cardPerDaySuffix }}</text>
+            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">${{ cumulativeDailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
           </view>
           <!-- Checkout CTA — 结算不可用时置灰 + 换文案(禁用原因),下一步走 CTA 下方那句 hint。
                箭头 / 上传图标一并撤掉:禁用态上留着「向前」的箭头是反语义的。 -->
@@ -193,6 +193,7 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -301,9 +302,26 @@ const bundleQuote = computed(() => quoteBundleAmountUsdt(
 const subtotal = computed(() => bundleQuote.value?.subtotalUsdt ?? Number.NaN);
 const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN);
 const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
-const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + (p.productType === "SHARE" ? 0 : p.dailyEarn), 0));
+const cumulativeDailyEarnText = computed(() => {
+  let low = 0, high = 0, hasShareEstimate = false;
+  for (const product of products.value) {
+    const estimate = productDailyEstimateRange(product);
+    if (!estimate) continue;
+    low += estimate.low;
+    high += estimate.high;
+    hasShareEstimate ||= product.productType === "SHARE";
+  }
+  const lowText = hasShareEstimate ? formatPlainAmount(low, 6) : formatAmount(low);
+  const highText = hasShareEstimate ? formatPlainAmount(high, 6) : formatAmount(high);
+  return lowText === highText ? lowText : `${lowText}–${highText}`;
+});
 function bundleProductYieldText(p: Product): string {
-  if (p.productType !== "SHARE") return `${t.value.bundle.estimatedDaily} · $${formatAmount(p.dailyEarn)}`;
+  const estimate = productDailyEstimateRange(p);
+  if (estimate) {
+    const low = p.productType === "SHARE" ? formatPlainAmount(estimate.low, 6) : formatAmount(estimate.low);
+    const high = p.productType === "SHARE" ? formatPlainAmount(estimate.high, 6) : formatAmount(estimate.high);
+    return `${t.value.bundle.estimatedDaily} · $${low === high ? low : `${low}–${high}`}`;
+  }
   const range = p.shareYieldMin != null && p.shareYieldMax != null
     ? `${p.shareYieldMin}%–${p.shareYieldMax}%`
     : t.value.store.shareAnnualUnavailable;
