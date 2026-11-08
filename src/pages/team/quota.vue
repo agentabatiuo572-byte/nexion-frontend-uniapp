@@ -355,7 +355,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-state.nx-inline-recovery { display:grid; align-items:center; gap:var(--v5-space-3); }
 .quota-route { display:flex;justify-content:space-between;align-items:center;gap:14px;padding:var(--ui-space-inset) 0;min-height:44px;font:500 var(--ui-type-list-subtitle)/1.6 var(--font-v5);color:var(--v5-ink-2);cursor:pointer; }.quota-route + .quota-route { border-top:1px solid var(--v5-border); }.quota-route > view { flex:1;min-width:0;overflow-wrap:anywhere; }.quota-route svg { flex:none; }.quota-route:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 /* Tiers are separate sections; conditions remain inside their owning product. */
-.quota-content :deep(.quota-tier) { padding: 26px 0; margin: 0; background: transparent; border: 0; border-bottom: 1px solid var(--v5-border); border-radius: 0; }
+.quota-content :deep(.quota-tier) { padding: 26px 0; margin: 0; border: 0; border-bottom: 1px solid var(--v5-border); border-radius: 0; }
 .quota-content :deep(.quota-product__name) { font-size: var(--ui-type-subheading); line-height: var(--ui-type-subheading-lh); }
 .quota-content :deep(.quota-product__price) { font-size:18px; line-height:24px; }
 .quota-content :deep(.quota-product__qualification) { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
@@ -388,10 +388,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-price-fraction { color:var(--v5-ink-3); }
 .quota-carousel { display: flex; gap: var(--ui-space-inline); margin: var(--ui-space-inset) -20px 0; padding: 0 var(--v5-space-5) var(--v5-space-1); overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--v5-space-5); scrollbar-width: none; }
 .quota-carousel::-webkit-scrollbar { display: none; }
-.quota-content .quota-carousel :deep(.quota-tier) { flex: none; width: 260px; box-sizing: border-box; padding: var(--ui-space-inset); border: 0; border-radius: 28px; scroll-snap-align: start; background: color-mix(in srgb, var(--v5-brand) 7%, var(--v5-surface)); box-shadow: inset 0 0 0 1px var(--v5-border); }
-/* Tier cards are tinted brand at the .nx-tint strength (P-41 tinted carousel; it used to be a top glow). quota-tier-card.vue
-   owns the card background, so the tint is set here rather than through the .nx-tint class. */
-[data-theme="light"] .quota-content .quota-carousel :deep(.quota-tier) { background: color-mix(in srgb, var(--v5-brand) 5%, var(--v5-surface)); }
+.quota-content .quota-carousel :deep(.quota-tier) { flex: none; width: 260px; box-sizing: border-box; padding: var(--ui-space-inset); border: 0; border-radius: 28px; scroll-snap-align: start; }
 .quota-content .quota-carousel :deep(.quota-product) { flex-direction: column; align-items: flex-start; gap: var(--v5-space-2); }
 .quota-content .quota-carousel :deep(.quota-product__image) { align-self: center; width: 100%; height: 120px; }
 .quota-content .quota-carousel :deep(.quota-product__arrow) { display: none; }
