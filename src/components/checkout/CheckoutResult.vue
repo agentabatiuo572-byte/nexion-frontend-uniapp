@@ -3,6 +3,7 @@
     <view class="checkout-result__body">
       <view class="checkout-result__art" :class="'is-' + phase">
         <view v-if="celebrating" class="checkout-result__celebration" aria-hidden="true"><view v-for="spark in sparks" :key="spark.index" class="checkout-result__spark" :style="spark.style" /></view>
+        <view v-if="(celebrating && phase === 'confirmed') || popped" :key="phase" class="checkout-result__halo" aria-hidden="true" />
         <image v-if="productImage && !imageFailed" class="checkout-result__image" :src="productImage" :alt="productName || copy.device" mode="aspectFit" @error="imageFailed = true" />
         <view v-else class="checkout-result__fallback" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="16" y="8" width="32" height="44" rx="4"/><path d="M24 18h16M24 26h16M24 34h16M20 56h24"/><circle cx="32" cy="43" r="2"/></svg></view>
         <view v-if="state === 'activated' && phase === 'activating'" class="checkout-result__orbit" aria-hidden="true" />
@@ -40,7 +41,7 @@ const emit = defineEmits<{ (event: 'devices'): void }>();
 const locale = useLocaleStore();
 const copy = computed(() => checkoutFlowCopy(locale.code));
 const phase = ref<'confirmed' | 'activating' | 'complete'>('complete');
-// Confetti for the purchase itself; a check pop when activation completes.
+// Confetti for the purchase itself; a check pop and halo when activation completes.
 const celebrating = ref(false);
 const popped = ref(false);
 const imageFailed = ref(false);
@@ -132,6 +133,7 @@ onBeforeUnmount(() => {
 .checkout-result__check { position: absolute; z-index: 3; right: calc(50% - 76px); bottom: var(--v5-space-2); display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--v5-brand); color: var(--v5-on-brand); pointer-events: none; }
 .checkout-result__check svg { width: 24px; height: 24px; }
 .checkout-result__check.is-pop { animation: checkout-success-pop 500ms cubic-bezier(.16, 1, .3, 1) both; }
+.checkout-result__halo { position: absolute; z-index: 0; left: 50%; top: 50%; width: 216px; max-width: 100%; height: 180px; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-brand) 24%, transparent), var(--v5-brand-soft) 40%, transparent 72%); opacity: 0; transform: translate(-50%, -50%); animation: checkout-success-halo 3200ms ease-out both; pointer-events: none; }
 .checkout-result__celebration { position: absolute; z-index: 2; inset: calc(-1 * var(--v5-space-4)) calc(-1 * var(--v5-space-2)) calc(-1 * var(--v5-space-6)); overflow: hidden; pointer-events: none; }
 .checkout-result__spark { position: absolute; left: var(--x); top: 30%; width: 9px; height: 4px; border-radius: calc(var(--v5-space-1) / 4); background: var(--v5-brand); opacity: 0; animation: checkout-spark-fall var(--duration) linear var(--delay) both; pointer-events: none; }
 .checkout-result__spark:nth-child(3n + 2) { background: var(--v5-ink); }
@@ -143,10 +145,11 @@ onBeforeUnmount(() => {
 @keyframes checkout-device-breathe { 50% { transform: translateY(-4px); } }
 @keyframes checkout-orbit-spin { to { transform: rotate(360deg); } }
 @keyframes checkout-success-pop { from { opacity: 0; transform: scale(.6) rotate(-12deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes checkout-success-halo { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: .8; transform: translate(-50%, -50%) scale(1); } 45% { opacity: .45; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.12); } }
 @keyframes checkout-spark-fall { 0% { opacity: 0; transform: translate3d(0, -8px, 0) rotate(0) scale(.75); } 12% { opacity: .95; } 28% { transform: translate3d(calc(var(--dx) * .45), calc(var(--dy) * .12 - 16px), 0) rotate(calc(var(--spin) * .3)) scale(1); } 75% { opacity: .7; } 100% { opacity: 0; transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--spin)) scale(.45); } }
 @media (prefers-reduced-motion: reduce) {
   .checkout-result *, .checkout-result *::before, .checkout-result *::after { animation: none !important; transition: none !important; }
-  .checkout-result__celebration, .checkout-result__orbit { display: none !important; }
+  .checkout-result__celebration, .checkout-result__halo, .checkout-result__orbit { display: none !important; }
   .checkout-result__fill { width: 100%; }
 }
 </style>
