@@ -812,8 +812,8 @@ const noteStyle: CSSProperties = {
 <style scoped>
 .gh-empty-link { display: block; margin-top: 10px; color: var(--v5-brand); font-size: 13px; font-weight: 600; }
 .gh-empty-trust { display: flex; align-items: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); }
-.gh-chassis--owned { background-image: url("/static/img/genesis/obsidian-light.webp") !important; background-size: cover !important; background-position: center !important; }
-:global(html[data-theme="dark"] .gh-chassis--owned) { background-image: url("/static/img/genesis/obsidian-dark.webp") !important; }
+.gh-chassis--owned { background-image: url("@/static/img/genesis/obsidian-light.webp") !important; background-size: cover !important; background-position: center !important; }
+:global(html[data-theme="dark"] .gh-chassis--owned) { background-image: url("@/static/img/genesis/obsidian-dark.webp") !important; }
 .gh-chassis--owned :deep(.nx-top-chrome) { background: transparent; }
 .gh-page { padding-bottom: 32px; color: var(--v5-ink); font-family: var(--font-v5); }
 .gh-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-4); }

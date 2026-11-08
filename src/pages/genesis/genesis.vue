@@ -345,8 +345,8 @@ function goMarketplace() {
 
 <style scoped>
 .genesis-page { padding:3px 16px 120px; color:var(--v5-ink); --genesis-soft:color-mix(in srgb,var(--v5-genesis-gold) 16%,transparent); }
-.genesis-main-art { display:block; width:calc(100% + 32px); margin:0 -16px; aspect-ratio:1366 / 1254; background:url("/static/img/genesis/genesis-card-dark.webp") center / contain no-repeat; }
-[data-theme="light"] .genesis-main-art { background-image:url("/static/img/genesis/genesis-card-light.webp"); }
+.genesis-main-art { display:block; width:calc(100% + 32px); margin:0 -16px; aspect-ratio:1366 / 1254; background:url("@/static/img/genesis/genesis-card-dark.webp") center / contain no-repeat; }
+[data-theme="light"] .genesis-main-art { background-image:url("@/static/img/genesis/genesis-card-light.webp"); }
 .genesis-seat { position:relative; margin:-24px 12px 0; padding:18px 18px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }
 .genesis-edge::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 160deg,transparent 0 40%,color-mix(in srgb,var(--v5-genesis-gold) 85%,transparent) 66%,transparent 92%); mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); mask-composite:exclude; pointer-events:none; }
 .genesis-crown-chip { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; border-radius:var(--v5-radius-full); background:var(--genesis-soft); color:var(--v5-genesis-gold); font-size:12px; line-height:16px; font-weight:500; }
