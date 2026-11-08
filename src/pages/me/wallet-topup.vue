@@ -11,7 +11,7 @@
       <SubPageHeader back="/pages/me/me" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
 
       <!-- Topping up for an unpaid order: what is missing, when the order closes, and the way back once funds arrive. -->
-      <view v-if="orderTopup" class="topup-order" :class="{ 'is-done': orderTopupLeft <= 0 }" role="status">
+      <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': orderTopupLeft <= 0 }" role="status">
         <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ orderTopupLeft > 0 ? payCopy.topupFor : payCopy.topupDone }}</text></view>
         <text v-if="orderTopupLeft > 0 && balanceKnown" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft) }} USDT</text>{{ payCopy.topupNeedTail }}</text>
         <text v-else-if="orderTopupLeft <= 0" class="topup-order__d">{{ fillCopy(payCopy.topupEnough, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
@@ -201,8 +201,9 @@ const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
 })));
 </script>
 <style scoped>
-.topup-order { margin: 0 16px 16px; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
-[data-theme="light"] .topup-order { box-shadow: var(--v5-glass-shadow); }
+/* The order card keeps its corner hue as one uniform tint (.nx-tint): amber while short, brand once covered. */
+.topup-order { --nx-tint: var(--v5-warning); margin: 0 16px 16px; padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); }
+.topup-order.is-done { --nx-tint: var(--v5-brand); }
 .topup-order__t { display: flex; align-items: center; gap: var(--v5-space-2); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); }
 .topup-order__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-warning); }
 .topup-order.is-done .topup-order__dot { background: var(--v5-brand); }
