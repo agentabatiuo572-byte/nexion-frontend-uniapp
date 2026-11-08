@@ -327,12 +327,12 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 
 ### 3.F 平台运营阶段(Phase Dial — 后台引擎,UI 不暴露)— §13.4
 
-- **2026-11-08 TRC20 增量**：充值和共用购买支付弹窗按服务端显式能力增加 TRC20，覆盖商城、组合、原单续付、试用／换购／活动；旧接口缺该网络时隐藏，读取政策不建址。TRON Base58Check 地址保持大小写，原生 txID 为无 0x 的 64 位十六进制。提现每笔按 H1 N 天等待（N0无额外等待），不受加强合规开关／1000门槛影响，小额免审和 K3/K4 保留；原单阶段等待与人工审核独立，审核／到期均不等于到账。九语、原恢复与 App/Lite 入口边界保留，详见[TRC20 收付增量](UVEL_TRC20收付与阶段等待_20261108.md)。
+- **2026-11-08 TRC20 增量（B42 更新提现规则）**：充值和共用购买支付弹窗按服务端显式能力增加 TRC20，覆盖商城、组合、原单续付、试用／换购／活动；旧接口缺该网络时隐藏，读取政策不建址。TRON Base58Check 地址保持大小写，原生 txID 为无 0x 的 64 位十六进制。提现与 BEP20/ERC20 共用下述加强合规规则，不再每笔独立等待；审核／到期均不等于到账。九语、原恢复与 App/Lite 入口边界保留，详见[TRC20 收付增量](UVEL_TRC20收付与阶段等待_20261108.md)。
 - **当前 phase** = `useProductPhaseOverride.pinned ?? getPhaseForMonth(getMonthsSince(joinedAt))`。
 - **月段**:P1 0-2月/P2 2-4/P3 4-6/P4 6-8/P5 8-10/P6 10+。
 - **7 时变 dial**:`inviteBonusMultiplier`(P1=2.0/P2=1.5/P3+=1.0)· `withdrawalPointsPer100`(P1-4=10/P5-6=20)· `withdrawalCooldownDays`(P1-4=30d/P5-6=45d)· `binaryDailyCapUSD`(P1-3=$5000/P4-6=$2000)· `premiumSubscriptionAvailable`(P4+)· `nexV2LockAvailable`(P6)· `complianceHoldEnabled`(P5+)。
 - **约束**:server 权威(pages 不 hardcode 门槛);phase id/name 永不在用户 UI 出现。
-- **2026-11-08 BEP20/ERC20 合规覆盖**：提现页合规开关、窗口与大额门槛读取服务端提现 policy，实际本笔人工／等待取 eligibility；开启时所有新 BEP20/ERC20 提现人工复核、小额免审暂停，严格超过服务端门槛（本轮 1,000 USDT）才附加 N 天，N=0 仍人工。小额不显示 N 天，窗口到期不代表到账。追踪消费原单快照与实际状态；没有截止／到账时间时保持未知，不用本机时间补值。App／H5 Lite 九语与各自测试分支同步，银行卡页面不变，详见主文档 §9.3.5–9.3.6。
+- **2026-11-08 TRC20/BEP20/ERC20 统一合规（B42）**：提现页合规开关、窗口与大额门槛读取服务端提现 policy，实际本笔人工／等待取 eligibility；关闭时按普通小额免审、强审门槛及 K3/K4 处理，无额外固定 N 天等待；开启时三网所有新提现均人工复核、小额免审暂停，本金严格超过服务端门槛（本轮 1,000 USDT）才从原提交时刻起附加 N 天，N=0 仍人工。小额不显示 N 天，审核通过或窗口到期不代表到账。追踪保留原单审计并服从当前状态与服务端截止；旧 TRC20 原审计可读，但截止清空后不继续显示原等待，也不由旧审计虚构当前强制人工。没有截止／到账时间时保持未知，不用本机时间补值。App／H5 Lite 九语与各自测试分支同步，费用、地址、开放网络和银行卡页面不变；仅本次新版客户端，详见主文档 §9.3.5–9.3.6。
 
 ### 3.G NEX↔USDT 兑换 — §9.4.2
 - **汇率**:`1 NEX = $0.171`(实时,可 refresh)。
