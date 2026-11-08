@@ -320,7 +320,7 @@ const routeHeld = computed(() => !!wd.value
 // Original flags are historical evidence; only a future USDT server deadline is a current review window.
 const reviewWindowHeld = computed(() => !!wd.value && wd.value.network !== "BANK-VND"
   && typeof wd.value.reviewHoldUntil === "number" && Number.isFinite(wd.value.reviewHoldUntil)
-  && wd.value.reviewHoldUntil > Math.max(nowTick.value, mockServerNow())
+  && wd.value.reviewHoldUntil > Math.ceil(Math.max(nowTick.value, mockServerNow()) / 1000) * 1000
   && ["submitted", "review-pending", "review-passed"].includes(wd.value.status));
 const needsSupport = computed(() => routeHeld.value || isFrozenHold.value || isFailedEnd.value);
 // 终态:5 步全部走满,最后一步不能还转圈 —— 转圈代表「进行中」,
