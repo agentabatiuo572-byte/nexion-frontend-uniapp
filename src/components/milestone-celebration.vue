@@ -12,10 +12,12 @@
          Tap-to-dismiss lives HERE (the full-screen scrim), not on the overlay root:
          the medal card then needs no @click.stop swallow handler — a no-op click
          listener made the card a "tap target without :active feedback" for the
-         tap-feedback probe (tester-F R2 / 包 ax). Confetti is pointer-events:none,
+         tap-feedback probe (tester-F R2 / 包 ax). Halo + confetti are pointer-events:none,
          so taps there fall through to this scrim exactly as before. -->
     <view class="ms-backdrop" @click="m.dismiss()" />
 
+    <!-- Glow halo behind the medal card. -->
+    <view class="ms-halo" />
 
     <!-- CSS confetti burst — fixed particle set, varied via per-particle style. -->
     <view class="ms-confetti">
@@ -281,6 +283,31 @@ useDialogA11y(computed(() => m.active !== null), ".ms-overlay", () => m.dismiss(
   backdrop-filter: blur(8px) saturate(120%);
   -webkit-backdrop-filter: blur(8px) saturate(120%);
 }
+
+/* Radial glow halo centered behind the card. */
+.ms-halo {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(
+    45% 45% at 50% 50%,
+    color-mix(in oklab, var(--v5-brand) 55%, transparent),
+    color-mix(in oklab, var(--v5-brand-2) 18%, transparent) 45%,
+    transparent 78%
+  );
+  animation: ms-halo-pulse 3.2s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes ms-halo-pulse {
+  0% { opacity: 0; transform: scale(0.6); }
+  12% { opacity: 0.9; transform: scale(1); }
+  45% { opacity: 0.5; }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+/* Reduced motion: no pulsing light; the medal card and its copy carry the moment. */
+@media (prefers-reduced-motion: reduce) { .ms-halo { display: none; } }
 
 /* ── Confetti ── */
 .ms-confetti {

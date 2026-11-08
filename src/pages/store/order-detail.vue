@@ -54,7 +54,7 @@
       <template v-else-if="order">
         <!-- Status hero (DS-28): the progress track is the page's main visual;
              the card's next step sits at its foot. -->
-        <view class="order-hero nx-soft-glass" :style="{ '--order-tone': statusColor }" data-testid="order-hero">
+        <view class="order-hero nx-tint" :style="{ '--order-tone': statusColor }" data-testid="order-hero">
           <view class="order-hero__top">
             <view class="order-hero__text">
               <NxTag :tone="statusTone" :label="statusLabel(order.status)" />
@@ -1099,8 +1099,8 @@ const sectionLabelStyle: CSSProperties = {
 </script>
 
 <style scoped>
-/* Status hero (DS-28): the page's focal soft-glass card (01 §1.1.2); the blocks below stay solid. */
-.order-hero { position: relative; overflow: hidden; margin: 0 16px; padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); }
+/* Status hero (DS-28): the page's focal card, tinted in its status tone (it used to be a tone glow); the blocks below stay solid. */
+.order-hero { --nx-tint: var(--order-tone); position: relative; overflow: hidden; margin: 0 16px; padding: var(--ui-space-inset-hero); border-radius: var(--ui-radius-surface); }
 .order-block { margin: var(--ui-space-card-gap) 16px 0; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-content-surface); color: var(--v5-ink); }
 [data-theme="light"] .order-block { box-shadow: var(--v5-glass-shadow); }
 .order-hero__top { display: flex; align-items: center; gap: 12px; }
