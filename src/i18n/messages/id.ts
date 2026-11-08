@@ -1718,6 +1718,10 @@ export const id: Messages = {
     checkoutOutcomeUnknown: "Hasil pesanan paket belum terkonfirmasi. Jangan ubah paket ini, lalu coba lagi.",
     policyChanged: "Harga paket berubah. Tinjau total terbaru sebelum memesan.",
     checkoutBillMemo: "Pembelian paket · {count} perangkat",
+    slotsShortTitle: "Slot kosong tidak cukup",
+    slotsShortBody: "{count} perangkat dipilih, slot kosong tersisa {free}. Nonaktifkan perangkat di Inventaris perangkat, atau kurangi perangkat dalam paket.",
+    slotsShortManage: "Buka Inventaris perangkat",
+    slotsShortAdjust: "Ubah paket",
   },
   tx: {
     navTitle: "Detail transaksi",

@@ -1235,6 +1235,10 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
     checkoutOutcomeUnknown: "Chưa xác nhận được kết quả đơn combo. Hãy giữ nguyên combo và thử lại.",
     policyChanged: "Giá combo đã thay đổi. Vui lòng kiểm tra tổng tiền mới trước khi đặt đơn.",
     checkoutBillMemo: "Mua combo · {count} thiết bị",
+    slotsShortTitle: "Không đủ khe trống",
+    slotsShortBody: "Bạn đã chọn {count} thiết bị, hiện còn {free} khe trống. Hãy ngừng kích hoạt thiết bị trong Kho thiết bị, hoặc bớt thiết bị trong combo.",
+    slotsShortManage: "Mở Kho thiết bị",
+    slotsShortAdjust: "Sửa combo",
   },
 
   tx: {

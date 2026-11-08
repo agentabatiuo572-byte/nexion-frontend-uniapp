@@ -1718,6 +1718,10 @@ export const ms: Messages = {
     checkoutOutcomeUnknown: "Keputusan pesanan pakej belum disahkan. Simpan pakej ini dan cuba lagi.",
     policyChanged: "Harga pakej berubah. Semak jumlah terkini sebelum membuat pesanan.",
     checkoutBillMemo: "Pembelian pakej · {count} peranti",
+    slotsShortTitle: "Slot kosong tidak mencukupi",
+    slotsShortBody: "{count} peranti dipilih, slot kosong: {free}. Nyahaktifkan peranti di Inventori peranti, atau kurangkan peranti dalam pakej.",
+    slotsShortManage: "Buka Inventori peranti",
+    slotsShortAdjust: "Ubah pakej",
   },
   tx: {
     navTitle: "Butiran transaksi",
