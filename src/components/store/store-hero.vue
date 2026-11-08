@@ -5,11 +5,10 @@
 -->
 <template>
   <view
-    ref="heroRef"
     class="nx-soft-glass relative overflow-hidden grid items-center"
     :style="rootStyle"
   >
-    <view aria-hidden class="store-hero__aurora" :class="{ 'is-paused': !heroInView }" />
+    <view ref="auroraRef" aria-hidden class="store-hero__aurora" :class="{ 'is-paused': !auroraLoop.running.value }" />
     <view class="relative min-w-0">
       <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink)">{{ t.store.heroEyebrow }}</text>
       <text v-if="multiplier !== null" class="block" :style="titleStyle">{{ t.store.heroTitlePre }} <text style="color: var(--v5-brand-2-ink)">{{ multiplierText }}</text> {{ t.store.heroTitlePost }}</text>
@@ -37,13 +36,14 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const t = useT();
 const props = defineProps<{ multiplier: number | null }>();
 const multiplierText = computed(() => props.multiplier === null ? "—×" : `${props.multiplier}×`);
-// The aurora drifts only while the hero is on screen.
-const { elRef: heroRef, inView: heroInView } = useScrollGrowProgress({ threshold: 0.01 });
+// The aurora drifts only while it is on screen and the page is shown.
+const auroraLoop = useLoopsInView(".store-hero__aurora");
+const auroraRef = auroraLoop.elRef;
 
 const rootStyle: CSSProperties = {
   borderRadius: "20px",
