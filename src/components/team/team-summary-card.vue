@@ -1,5 +1,5 @@
 <template>
-  <view class="team-summary nx-tint nx-viz-press" data-testid="team-summary" :role="canOpen ? 'link' : undefined" :tabindex="canOpen ? 0 : undefined" :aria-label="canOpen ? t.team.summaryView : undefined" :aria-busy="status === 'idle' || status === 'loading'" @click="open" @keydown.enter.prevent="open">
+  <view class="team-summary nx-viz-press" data-testid="team-summary" :role="canOpen ? 'link' : undefined" :tabindex="canOpen ? 0 : undefined" :aria-label="canOpen ? t.team.summaryView : undefined" :aria-busy="status === 'idle' || status === 'loading'" @click="open" @keydown.enter.prevent="open">
     <view class="team-summary__header"><text class="team-summary__title">{{ copy.myTeam }}</text><text class="team-summary__arrow" :style="{ visibility: canOpen ? 'visible' : 'hidden' }" aria-hidden="true">›</text></view>
     <view class="team-summary__body" :class="{ 'team-summary__body--long-count': readable && !visibility.hidden && String(total).length > 6 }"><TeamArt kind="members" :size="56" /><view class="team-summary__metrics"><text class="team-summary__number" :style="{ '--team-summary-count-units': countUnits }">{{ totalText }}</text><text class="team-summary__label">{{ copy.peopleUnit }}</text></view></view>
     <view class="team-summary__direct"><text>{{ copy.directInvited }}</text><text>{{ visibility.mask(readable ? direct : '—') }}</text><text v-if="readable && total > direct" class="team-summary__team">{{ teamLabel }} <text>{{ visibility.mask(total - direct) }}</text></text></view>
@@ -28,7 +28,7 @@ const countUnits=computed(()=>Math.max(1, totalText.value.length * .7));
 function open(){if(canOpen.value)emit('open');}
 </script>
 <style scoped>
-.team-summary { container: team-summary / inline-size; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); color: var(--v5-ink); border-radius: 24px; --nx-tint: var(--ui-device-ink); }
+.team-summary { container: team-summary / inline-size; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); color: var(--v5-ink); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .team-summary__header { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; min-height: 24px; gap: 4px; }
 .team-summary__title { min-width: 0; overflow-wrap: anywhere; font: 600 14px/20px var(--font-v5); }
 .team-summary__arrow { flex: none; font-size: 18px; color: var(--v5-ink-4); }
