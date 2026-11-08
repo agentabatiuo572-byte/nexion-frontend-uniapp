@@ -22,6 +22,6 @@ const emblemStyle = computed(() => {
 
 <style scoped>
 .team-rank-emblem { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-.team-rank-emblem__art { background-image: url('/static/img/team-20261025/rank-badges-atlas.png'); background-repeat: no-repeat; }
+.team-rank-emblem__art { background-image: url('@/static/img/team-20261025/rank-badges-atlas.png'); background-repeat: no-repeat; }
 .team-rank-emblem--unknown { display: grid; place-items: center; background-image: none; font: 600 16px/1 var(--font-v5); color: var(--v5-ink-2); }
 </style>
