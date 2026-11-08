@@ -33,7 +33,7 @@
         <text class="vh" role="heading" aria-level="1">{{ title }}</text>
         <!-- P-45 account step: the bound account as a physical bank card, then the binding rule. -->
         <template v-if="!quote && formStep === 'account'">
-          <view class="bcard nx-soft-glass" :aria-label="`${c.recipientTitle} ${recipient?.maskedAccount ?? '—'}`">
+          <view class="bcard" :aria-label="`${c.recipientTitle} ${recipient?.maskedAccount ?? '—'}`">
             <view class="bcard__top">
               <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
               <text class="bcard__nm">{{ c.recipientSubtitle }}</text>
@@ -505,16 +505,20 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .hint { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .hint.pad { margin: 12px 4px 0; }
-.bcard { position: relative; display: flex; flex-direction: column; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: var(--v5-ink); }
+.bcard { position: relative; display: flex; flex-direction: column; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: color-mix(in srgb, white 96%, transparent);
+  background: linear-gradient(150deg, #2B2E35, #17191D 55%, #0F1013); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 8px 12px -10px rgba(255,255,255,.35), 0 16px 36px rgba(0,0,0,.40); }
+.bcard::before { content: ""; position: absolute; right: -70px; top: -90px; width: 300px; height: 300px; border-radius: 50%; background: repeating-radial-gradient(circle, rgba(255,255,255,.055) 0 1px, transparent 1px 9px); pointer-events: none; }
+.bcard::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.16) 50%, transparent 65%); transform: translateX(-110%); animation: bcard-sweep 1200ms 480ms cubic-bezier(.4,0,.2,1) both; pointer-events: none; }
+@keyframes bcard-sweep { to { transform: translateX(110%); } }
 .bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
-.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--v5-surface-2); }
-.bcard__nm { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 13px/18px var(--font-v5); }
-.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success-ink); font: 500 12px/16px var(--font-v5); }
-.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning-ink); }
+.bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); }
+.bcard__nm { flex: 1; min-width: 0; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
+.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-success) 18%, transparent); color: var(--v5-success); font: 500 12px/16px var(--font-v5); }
+.bcard__tag.warn { background: color-mix(in srgb, var(--v5-warning) 18%, transparent); color: var(--v5-warning); }
 .bcard__bot { position: relative; display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; }
-.bcard__lb { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.bcard__lb { display: block; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-v5); }
 .bcard__no { display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; }
-.bcard__cur { color: var(--v5-ink-3); font: 500 12px/16px var(--font-metric); letter-spacing: .08em; }
+.bcard__cur { color: color-mix(in srgb, white 55%, transparent); font: 500 12px/16px var(--font-metric); letter-spacing: .08em; }
 .note { display: flex; align-items: flex-start; gap: 8px; margin: 14px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .note > svg { flex: none; margin-top: 2px; }
 .acct { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-top: 15px; padding: 8px 14px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
@@ -560,5 +564,5 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
 .bar .action { flex: 1 1 0; min-height: 48px; margin: 0; padding: 0 20px; font: 500 15px/20px var(--font-v5); }
 .bar .secondary.nx-frosted-button { background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-ink) 7%, transparent); box-shadow: var(--ui-glass-edge-shadow); color: var(--v5-ink); }
-@media (prefers-reduced-motion: reduce) { .cdw__val { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .bcard::after { animation: none; opacity: 0; } .cdw__val { transition: none; } }
 </style>
