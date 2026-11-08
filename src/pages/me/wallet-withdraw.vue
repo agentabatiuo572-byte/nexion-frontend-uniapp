@@ -1338,8 +1338,14 @@ async function handleSubmit() {
       return;
     }
   }
+  // Check account ownership before adopting anything from its storage row.
+  if (app.accountKey !== snap.account) {
+    clearSubmitFreeze();
+    toast.error(t.value.walletV3.withdrawContextStale);
+    return;
+  }
   // BUG-398: another tab may have changed the shared attempt while confirmation / eligibility awaited.
-  // Decide this before live identity checks: adopting that command can change the displayed network / address.
+  // Decide this before live network / address checks: adopting that command can change those displayed values.
   // Keep the path from this final storage read to rememberWithdrawAttempt synchronous.
   const storedAttempt = readWithdrawAttempt(snap.account);
   if (storedAttempt?.key !== pending?.key) {
@@ -1355,7 +1361,7 @@ async function handleSubmit() {
   //     重放例外只放在**收款地址**这一项上:冻结件里的地址就是上一次真正发出去的那个,
   //     期间换绑过地址不改变「那笔可能已经落库」这个事实,拿新地址去否掉重放,等于把
   //     唯一的收口路径锁死 —— 而重放的地址由服务端按原键的原 body 认。账号与网络不放行。
-  if (app.accountKey !== snap.account || network.value !== snap.network || (!pending && boundAddress.value !== snap.address)) {
+  if (network.value !== snap.network || (!pending && boundAddress.value !== snap.address)) {
     clearSubmitFreeze();
     toast.error(t.value.walletV3.withdrawContextStale);
     return;
