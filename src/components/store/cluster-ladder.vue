@@ -38,6 +38,7 @@ import { useT } from "@/i18n/use-t";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import SectionHeader from "./section-header.vue";
 import { storefrontUsd, storefrontUsdFull, type StoreYieldAuthority, type StoreYieldLadderRow } from "@/lib/store-yield-authority";
+import { getLifecycleSummary } from "@/store/device-lifecycle";
 
 const t = useT();
 const { elRef: ladderEl, inView } = useScrollGrowProgress();
@@ -69,7 +70,8 @@ const tiers = computed<Tier[]>(() => {
   };
   const rows: Tier[] = props.authority.ladder.map((row: StoreYieldLadderRow, index) => {
     const you = kindForRow[row.id] === props.owned?.kind;
-    const amount = you && props.owned ? { usd: props.owned.baseRate, nex: props.owned.baseRateNEX } : row.amount;
+    const lifecycle = you && props.owned ? getLifecycleSummary(props.owned) : null;
+    const amount = lifecycle && props.owned ? { usd: lifecycle.dailyRateNow, nex: props.owned.baseRateNEX * lifecycle.efficiency } : row.amount;
     return {
       id: row.id,
       label: labels[row.id],

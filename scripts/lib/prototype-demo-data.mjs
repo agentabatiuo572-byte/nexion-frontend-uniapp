@@ -69,7 +69,7 @@ export const demoOptions = {
   promotionRewardType:[['reward','首购 / 复购发 UVT'],['discount','首购 / 复购为订单立减'],['gift-discount','购机赠礼为订单立减']],
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
-  fleetState:[['normal','默认设备'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含仓库未激活设备'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
+  fleetState:[['normal','默认设备'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款结果读取失败'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['late','宽限结束后到账·订单已取消（示例 001 剩 1 分钟）'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','后台关闭 ERC20'],['usdt-off','后台关闭 USDT 两个网络'],['low-balance','钱包余额不足（820.64 USDT）']],
 };
 const skuDefinitions = [
@@ -79,7 +79,7 @@ const skuDefinitions = [
   ['stellarbox-pro-v2','UVELBox Pro v2','Pro',5999,858,18,'8 × RTX 5090','256 GB',2200],
   ['stellarrack-p1','UVELRack P1','Flagship',12999,1350,30,'8 × A100','640 GB',3200],
   ['stellarrack-p2','UVELRack P2','Flagship',19999,2250,50,'8 × H100','1,024 GB',4000],
-  ['cloud-share','Cloud Share','Share',19.9,18,0,'Distributed','—',0],
+  ['cloud-share','Cloud Share','Share',19.9,18,3,'Distributed','—',0],
 ];
 export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
   const products=skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
@@ -168,7 +168,7 @@ function genesisPublic(now) {
 // quote): occupied = activated formal devices + slots held by paid orders awaiting a device + one effective trial
 // (ACTIVE/GRACE) <= cap. demoFleetFacts computes it from the retained state; reads and commands all use it.
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
-  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false).state)?1:0;
+  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,demoProducts(state,url.origin,locale)).state)?1:0;
 // Session orders plus the state-sample rows that belong to the scenario. The paid (002) and provisioning (003)
 // samples hold slots, so they appear only in fleetState=reserved, where they are its reservations; replace's
 // two-slot cap keeps one of them (002), leaving a slot for a device, the trial or its conversion. The activated
@@ -212,22 +212,36 @@ const demoOrderSlots=(orders,orderNo)=>orders
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
 // full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
 // Nothing ever exceeds the cap and the cap is never raised.
-function demoSeedFleet(state,template,cap,occupied,retired) {
-  const clone=(id,code,name,daily,paid,extra)=>({...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra});
+function demoSeedFleet(state,template,products,capacitySchedule,cap,occupied,retired) {
+  const clone=(id,code,name,daily,paid,extra)=>{
+    const product=products.find(product=>product.id.toUpperCase()===code);
+    return {...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,
+      ...(product?{dailyNex:product.dailyEarnNEX*(extra?.capacityPct??template.capacityPct)/100,todayEarningsNex:0}:{}),
+      actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra};
+  };
   const live=device=>!retired.includes(device.id);
   if(state.dataState==='empty')return [];
   // Lite's hidden phones are owned devices of the scenario: seeded here and holding slots like any activated device.
   // They follow device 41, so a two-slot seed keeps one while a visible device stays first (the trade-in quote's
-  // source). Ids are unique under any knob combination: phones 43 / 52, fillers 44–50, the idle Rack 51.
+  // source). Ids are unique under any knob combination: phones 43 / 52, fillers 44–50, idle Rack / Share 51, idle S1 53.
   const phones=state.fleetState==='phone-history'?[clone(43,'PHONE','Demo PHONE',1,0,{deviceType:'PHONE'}),clone(52,'MOBILE','Demo MOBILE',1,0,{deviceType:'MOBILE'})]
     :state.scopeState==='mixed'?[{...template,id:43,instanceNo:'DEMO-PHONE',name:'Phone',deviceType:'PHONE',productCode:'PHONE',dailyUsdt:0.1,dailyNex:0,todayEarningsUsdt:0,todayEarningsNex:0,actualPaidUsdt:0}]:[];
   // Device 42 is the account's second device. Lite's compute modes (computeState other than app) review a Cloud Share
   // reward cycle, so in those scenarios the account owns a Cloud Share there from the start (its kind, catalog price and
   // trade-in facts agree); the App mode owns a UVELBox Pro.
   const second=(state.computeState??'app')==='app'?{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}
-    :clone(42,'CLOUD-SHARE','Cloud Share',0.6,19.9,{instanceNo:'DEMO-CLOUD',deviceType:'CLOUD',dailyNex:0,todayEarningsUsdt:.2,todayEarningsNex:0});
+    :clone(42,'CLOUD-SHARE','Cloud Share',0.6,19.9,{instanceNo:'DEMO-CLOUD',deviceType:'CLOUD',todayEarningsUsdt:.2,todayEarningsNex:0});
   let devices=state.fleetState==='none'?[]:[template,...phones,second];
   if(state.fleetState==='inventory')devices.push(clone(51,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
+  if(state.fleetState==='decayed'){
+    const purchased=new Date();purchased.setDate(1);purchased.setMonth(purchased.getMonth()-3);
+    // Three completed device months at the preview's published early E3 band.
+    const older={purchasedAt:purchased.getTime(),activatedAt:purchased.getTime(),capacityAgeMonths:3,
+      capacityPct:Number((100*(1+Number(capacitySchedule.capacityBand1DeltaPct)/100)**3).toFixed(6)),capacitySubsidized:false,capacitySubsidyRemainingDays:0,capacitySubsidyEndsAt:purchased.getTime()+template.capacitySubsidyDays*day};
+    devices=[clone(41,'STELLARBOX-S1','UVELBox S1',6.2,1299,older),...phones,
+      clone(53,'STELLARBOX-S1','UVELBox S1',6.2,1299,{...older,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}),
+      clone(51,'CLOUD-SHARE','Cloud Share',.6,19.9,{deviceType:'CLOUD',capacityConfigKey:'capacityApplyToCloudShare',status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',capacityAgeMonths:0,purchasedAt:Date.now(),capacitySubsidized:true,capacitySubsidyRemainingDays:template.capacitySubsidyDays,capacitySubsidyEndsAt:Date.now()+template.capacitySubsidyDays*day})];
+  }
   devices=devices.filter(live);
   if(state.fleetState==='full'||state.trialState==='capacity-full'||state.checkoutState==='replace'){
     const fillers=[clone(44,'STELLARBOX-PRO-V2','UVELBox Pro v2',28.6,5999,{todayEarningsUsdt:8.1}),clone(45,'STELLARRACK-P1','UVELRack P1',45,12999,{todayEarningsUsdt:20.4}),
@@ -244,7 +258,8 @@ export function demoFleetFacts(url,locale,state) {
   // Read the trial first: a converted trial books its order, which then lists as a device below.
   const trialSlotCount=demoTrialSlots(url,locale,state);
   const now=Date.now(),products=demoProducts(state,url.origin,locale),orders=demoScenarioOrders(products,state,now,false);
-  const template={...reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'}).devices[0],runtimeStatus:'ONLINE'};
+  const seed=reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
+  const template={...seed.devices[0],runtimeStatus:'ONLINE'};
   const slotCap=state.checkoutState==='replace'?2:6,retired=state.retiredDeviceIds||[],session=[];
   // DEMO-ORDER-004 is seeded device 41's own order, also once checkout has adopted it: it never adds a device.
   for(const order of orders)if(order.orderNo!=='DEMO-ORDER-004'&&['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
@@ -261,7 +276,7 @@ export function demoFleetFacts(url,locale,state) {
       ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
   }
   const reservedSlotCount=demoOrderSlots(orders);
-  state.fleetSeed??=demoSeedFleet(state,template,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
+  state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
   const devices=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id))
     // Lite's stop action (compute scenarios) is a lifecycle event: a stopped device frees its slot.
     .map(device=>state.stoppedDevices?.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device)
@@ -269,7 +284,7 @@ export function demoFleetFacts(url,locale,state) {
       const product=products.find(product=>product.id.toUpperCase()===device.productCode);
       // Hidden phones keep their own earnings and never receive a monthly target projection.
       if(product?.monthlyEstimateUsdt==null)return device;
-      return {...device,dailyUsdt:product.dailyEarn*device.capacityPct/100,dailyNex:product.dailyEarnNEX*device.capacityPct/100};
+      return {...device,dailyUsdt:Number((product.dailyEarn*device.capacityPct/100).toFixed(6))};
     });
   // serverNow is this read's time: the shared review fixture's clock stops at server start.
   return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
@@ -330,7 +345,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname.startsWith('/api/growth/day-one/page-observations/'))return {accepted:true,recorded:true};
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
-    return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap);
+    return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,products);
   }
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
   const remember=(operation,targetId,response,order)=>{
@@ -391,7 +406,8 @@ export function demoFixture(url,locale,state,request) {
         {rank:2,kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2,bestFor:null},
         {rank:3,kind:'phone',name:null,dailyUsdt:.06,bestFor:null},
       ]};
-      overview.doTheMath={basis:'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',base:{kind:'stellarbox-s1',name:'UVELBox S1',dailyUsdt:6.2},target:{kind:'stellarbox-pro',productNo:'stellarbox-pro',name:'UVELBox Pro',dailyUsdt:22.4,priceUsdt:4999},multiplier:4,paybackDays:223};
+      const current=demoFleetFacts(url,locale,state).devices.find(device=>device.productCode==='STELLARBOX-S1'&&device.activatedAt!==null),next=products.find(product=>product.id==='stellarbox-pro');
+      overview.doTheMath=current?{basis:'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',base:{kind:'stellarbox-s1',name:current.name,dailyUsdt:current.dailyUsdt},target:{kind:next.id,productNo:next.id,name:next.name,dailyUsdt:next.dailyEarn,priceUsdt:next.price},multiplier:Math.round(next.dailyEarn/current.dailyUsdt),paybackDays:Math.round(next.price/next.dailyEarn)}:null;
       overview.onGrid={clients:[{id:'demo-grid-1',name:'Demo Studio',model:'SDXL Turbo',city:'Tokyo',gpus:30},{id:'demo-grid-2',name:'Demo Lab',model:'Llama 70B',city:'Singapore',gpus:57}],activeDevices:3206,activeJobs:128,perSecUsdt:.028};
     }
     return overview;
