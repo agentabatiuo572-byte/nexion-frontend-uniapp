@@ -25,7 +25,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products){
   // BUG-081 samples keep their labelled early prices through a zero offset cap;
   // settled earnings are paid out after purchase and use the same catalog rate as a default claim.
   const precision=['precision','half-cent','precision-repriced'].includes(pricing);
-  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='half-cent'?'402.135':precision?'402.123456':pricing==='excess-offset'?'25':'1000',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
+  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='half-cent'?'402.135':precision?'402.123456':pricing==='excess-offset'?'15':'1000',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
   if(pricing==='precision-repriced')cfg.discountCapUSD='49.999999';
   const unclaimedConfig=structuredClone(cfg);

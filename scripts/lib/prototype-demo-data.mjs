@@ -1,7 +1,7 @@
 import { computeDemo } from "./prototype-demo-compute.mjs";
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
-import { fixture as reviewFixture } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
 import { learningDemo } from './prototype-demo-learning.mjs';
@@ -40,7 +40,7 @@ export const demoOptions = {
   setupGateState:[['open','正常写入'],['setup-required','服务端拒绝：需完成初始设置（试用领取 / 首日浏览商店任务 / 课程开始）']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
   computeState:[['app','App 默认（v1 任务）'],['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
-  trialQuoteState:[['default','默认报价'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位报价 · 342.123456'],['half-cent','半分报价 · 342.135 → 342.14'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣（配合到期·抵扣有效）']],
+  trialQuoteState:[['default','默认报价'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位报价 · 342.123456'],['half-cent','半分报价 · 342.135 → 342.14'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['read-error','试用读取失败'],['capacity-full','队列已满']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（重试原消息）'],['timeout','确认超时（15 秒转待确认）']],
@@ -216,7 +216,7 @@ function demoSeedFleet(state,template,products,capacitySchedule,cap,occupied,ret
   const clone=(id,code,name,daily,paid,extra)=>{
     const product=products.find(product=>product.id.toUpperCase()===code);
     return {...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,
-      ...(product?{dailyNex:product.dailyEarnNEX*(extra?.capacityPct??template.capacityPct)/100,todayEarningsNex:0}:{}),
+      ...(product?{dailyNex:product.dailyEarnNEX*previewCapacity({...template,productCode:code,...extra},capacitySchedule,Date.now()).capacityPct/100,todayEarningsNex:0}:{}),
       actualPaidUsdt:paid,todayEarningsUsdt:0,cumulativeOutputUsdt:0,...extra};
   };
   const live=device=>!retired.includes(device.id);
@@ -235,12 +235,10 @@ function demoSeedFleet(state,template,products,capacitySchedule,cap,occupied,ret
   if(state.fleetState==='inventory')devices.push(clone(51,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='decayed'){
     const purchased=new Date();purchased.setDate(1);purchased.setMonth(purchased.getMonth()-3);
-    // Three completed device months at the preview's published early E3 band.
-    const older={purchasedAt:purchased.getTime(),activatedAt:purchased.getTime(),capacityAgeMonths:3,
-      capacityPct:Number((100*(1+Number(capacitySchedule.capacityBand1DeltaPct)/100)**3).toFixed(6)),capacitySubsidized:false,capacitySubsidyRemainingDays:0,capacitySubsidyEndsAt:purchased.getTime()+template.capacitySubsidyDays*day};
+    const older={purchasedAt:purchased.getTime(),activatedAt:purchased.getTime()};
     devices=[clone(41,'STELLARBOX-S1','UVELBox S1',6.2,1299,older),...phones,
       clone(53,'STELLARBOX-S1','UVELBox S1',6.2,1299,{...older,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}),
-      clone(51,'CLOUD-SHARE','Cloud Share',.6,19.9,{deviceType:'CLOUD',capacityConfigKey:'capacityApplyToCloudShare',status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',capacityAgeMonths:0,purchasedAt:Date.now(),capacitySubsidized:true,capacitySubsidyRemainingDays:template.capacitySubsidyDays,capacitySubsidyEndsAt:Date.now()+template.capacitySubsidyDays*day})];
+      clone(51,'CLOUD-SHARE','Cloud Share',.6,19.9,{deviceType:'CLOUD',capacityConfigKey:'capacityApplyToCloudShare',status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',purchasedAt:Date.now()})];
   }
   devices=devices.filter(live);
   if(state.fleetState==='full'||state.trialState==='capacity-full'||state.checkoutState==='replace'){
@@ -268,11 +266,9 @@ export function demoFleetFacts(url,locale,state) {
     const instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
     state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
     if(retired.includes(state.deviceIds[instanceNo]))continue;
-    // A session device starts its own history at its order, not the seeded device's. Its capacity subsidy runs from
-    // activation, and the days left follow from that end, as the App's fleet read requires.
-    const subsidyEndsAt=(order.activatedAt??now)+template.capacitySubsidyDays*day,subsidyDaysLeft=Math.max(0,Math.ceil((subsidyEndsAt-now)/day));
+    // A session device starts its own purchase history at its paid order.
     session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name:product.name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:tradein?Number(order.amountUsdt):product.price,
-      activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,capacityAgeMonths:0,capacitySubsidized:subsidyDaysLeft>0,capacitySubsidyRemainingDays:subsidyDaysLeft,capacitySubsidyEndsAt:subsidyEndsAt,
+      activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
       ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
   }
   const reservedSlotCount=demoOrderSlots(orders);
@@ -282,9 +278,11 @@ export function demoFleetFacts(url,locale,state) {
     .map(device=>state.stoppedDevices?.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device)
     .map(device=>{
       const product=products.find(product=>product.id.toUpperCase()===device.productCode);
+      const capacity=previewCapacity(device,seed.capacitySchedule,now);
+      const projected={...device,...capacity,monthlyTargetActive:product?.monthlyEstimateUsdt!=null};
       // Hidden phones keep their own earnings and never receive a monthly target projection.
-      if(product?.monthlyEstimateUsdt==null)return device;
-      return {...device,dailyUsdt:Number((product.dailyEarn*device.capacityPct/100).toFixed(6))};
+      if(!projected.monthlyTargetActive)return projected;
+      return {...projected,dailyUsdt:Number((product.dailyEarn*capacity.capacityPct/100).toFixed(6))};
     });
   // serverNow is this read's time: the shared review fixture's clock stops at server start.
   return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
