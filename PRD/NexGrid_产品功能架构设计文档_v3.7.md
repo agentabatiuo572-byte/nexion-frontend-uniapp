@@ -1888,15 +1888,15 @@ flowchart TD
 
 ### 8.1 团队主页 `/team`
 
-汇总枢纽,显示:
-- 邀请 hero(ReferralHero,见 §8.1.1)
-- 3-stat 行:Direct(自直推人数)/ Network(直推+扩展总数)/ Today(今日团队收益)
-- V 级 hero + 升阶进度条 + 等级奖励 chip(培育奖 NEX)
-- 5-track Team programs 卡(V-Rank ladder / Influence Royalty / Dual-Track Binary / Leadership Pool / Regional Ambassador)— 每行 icon + label + sub + 右侧 value;value 按 §8.1.0 规则分类显示
-- 团队收益卡(TeamLedgerCard,见 §8.1.2)— 本月 + 累计 + Direct/Extended 拆分 + 可提现/冷却 + 提现入口(单一聚合卡,替代原"团队 lifetime 卡 + 月份佣金卡"的拆分布局,消除 lifetime $195.09 与本月数据重复显示)
-- Influence Network 入口(链 §8.7 orbit live map)/ Genealogy 入口(链 §8.8)
-- Genesis FOMO 卡:销售进度 + 剩余配额 + 链 Genesis 详情
-- Leaderboard preview:Top Inviters + 自己排名 + ↑N 周变化 + 链 §8.11
+汇总枢纽，自上而下：
+- 本月团队奖励卡（TeamLedgerCard，见 §8.1.2）：本月金额与 UVT、已到账／待到账、累计奖励构成条，「明细」进入团队收益。
+- 邀请好友卡（见 §8.1.1）：每位好友达标奖励、邀请码复制、「邀请好友」主按钮、分享海报与复制链接，顶部「奖励记录」「规则」。
+- 我的团队（人数、直接邀请／团队）与我的等级（当前 V 级、距下一级还差几项、自购／好友／团队进度）两列并排。
+- 推荐活动卡（有进行中的推荐活动时显示）：截止时间、活动说明、已完成笔数、「查看进度」。
+- 我的奖励（本期）：冲榜赢奖励（邀请榜 · 本周）、团队奖励 · 团队成员、团队平衡奖励 · 预估、本周团队激励池（预估金额与我的占比）。
+- 更多功能：硬件配额、区域大使、团队分布、成员列表。
+
+卡片颜色（2026-11-08）：全页只有两张卡带淡整体底色——邀请好友卡用品牌色（首屏唯一焦点），推荐活动卡用珊瑚色（限时活动）；本月团队奖励、我的团队、我的等级和「我的奖励」四个入口为中性纯色卡，颜色只放在图标块、进度条、圆环、奖台和插画上。
 
 #### 8.1.0 ProgramRow value 字段分类
 
