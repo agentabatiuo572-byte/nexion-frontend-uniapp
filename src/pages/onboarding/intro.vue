@@ -1,5 +1,12 @@
 <template>
   <StandalonePageShell class="intro-root">
+    <!-- Backdrop: radial brand glow (center above page top) -->
+    <view class="intro-glow" />
+    <!-- Top-blend vignette under header edge -->
+    <view class="intro-vignette" />
+    <!-- Lime dot grid -->
+    <view class="intro-dotgrid dot-grid" />
+
     <!-- Floating nodes (deterministic positions) -->
     <view
       v-for="(p, i) in positions"
@@ -29,8 +36,14 @@
       </view>
       <view class="intro-orb-area">
         <view class="intro-orb anim-orb">
+          <view class="orb-glow" />
           <svg viewBox="0 0 240 240" class="orb-svg" aria-hidden="true">
             <defs>
+              <radialGradient id="orb-core" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.55" />
+                <stop offset="55%" stop-color="var(--v5-brand)" stop-opacity="0.12" />
+                <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
+              </radialGradient>
               <filter id="orb-soft" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur stdDeviation="1.2" />
               </filter>
@@ -76,6 +89,8 @@
                  取 border(不是 border-strong):原值在黑底上几乎看不见,是「结构线」不是「装饰线」,
                  轨道的视觉重量该留给 brand 色的卫星与脉冲环。 -->
             <circle cx="120" cy="120" r="72" fill="none" stroke="var(--v5-border)" stroke-width="1" />
+            <!-- Center radial glow -->
+            <circle cx="120" cy="120" r="56" fill="url(#orb-core)" />
 
           </svg>
           <!-- 中心品牌标(走 BrandLockup,全站 logo 的唯一出口)。
@@ -233,6 +248,40 @@ function goPrivacy() {
   overflow-y: auto;
   background: var(--v5-bg);
 }
+/* 🔴 本页三层背景此前全是**为纯黑底调的写死值**(遗留品牌绿 + 纯黑渐变),浅色主题下
+   分别表现为:顶部一条突兀的黑色渐变、柠檬绿雾霭糊在米色上。主人 2026-08-18 拍板
+   本页浅色不再豁免,故三层一律改走 token,由主题决定色。暗色侧取值与原写死值等价
+   (--v5-bg 就是 #000),观感不变。 */
+.intro-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--v5-brand) 18%, transparent), transparent 60%);
+}
+.intro-vignette {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 180px;
+  pointer-events: none;
+  /* 作用是把页顶融进状态栏边缘,所以要跟的是**页面底色**而不是黑色 */
+  background: linear-gradient(
+    180deg,
+    var(--v5-bg) 0%,
+    color-mix(in srgb, var(--v5-bg) 85%, transparent) 25%,
+    color-mix(in srgb, var(--v5-bg) 45%, transparent) 60%,
+    transparent 100%
+  );
+}
+.intro-dotgrid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  /* 覆盖全局 .dot-grid 的遗留柠檬绿 —— 那个全局类还被商品实拍图衬底用着,
+     而那处按基线**必须**跟图不跟主题(见 THEME-CONSTANT-BASELINE),所以只在本页覆盖。 */
+  background-image:
+    radial-gradient(circle at center, color-mix(in srgb, var(--v5-brand) 14%, transparent) 1px, transparent 1.5px);
+}
 .intro-node {
   position: absolute;
   width: 4px;
@@ -370,6 +419,17 @@ function goPrivacy() {
   position: relative;
   width: clamp(104px, calc(100vh - 510px), 240px);
   height: clamp(104px, calc(100vh - 510px), 240px);
+}
+.orb-glow {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: 170px;
+  height: 34px;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--v5-brand) 20%, transparent);
+  filter: blur(28px);
 }
 .orb-svg {
   position: absolute;
