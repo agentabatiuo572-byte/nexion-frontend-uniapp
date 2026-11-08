@@ -522,6 +522,7 @@ export const id: Messages = {
     expires: "Penawaran berakhir",
     confirm: "Konfirmasi penarikan",
     confirmNotice: "Setelah dikirim, jumlah USDT ini tidak bisa dipakai sampai penarikan selesai diproses. Jangan kirim ganda.",
+    notSubmitted: "Penawaran belum dikirim.",
     intentClosed: "Penawaran ini sudah tidak aktif.",
     reload: "Muat ulang",
     unknown: "Hasil pengiriman sedang dikonfirmasi otomatis. Jangan buat penarikan lain.",

@@ -380,10 +380,12 @@ function pollOrder(): Promise<void> {
         if (!current()) return;
         config.value = loaded; configPresentation.value = { owner, epoch, value: loaded };
       }
-      applyRecovery(recovered, quoteNo); error.value = "";
-      if (recovered.state === "COMMITTED") toast.info(statusLabel.value);
-      else if (recovered.state === "NOT_SUBMITTED") toast.info(c.value.confirmTitle, c.value.confirmHint);
-      else toast.info(c.value.intentClosed);
+      const switched = applyRecovery(recovered, quoteNo); error.value = "";
+      // The page may now show another quote; this message still belongs to this receipt.
+      const title = recovered.state === "COMMITTED" ? c.value[bankOrderOutcome(recovered)]
+        : recovered.state === "NOT_SUBMITTED" ? switched ? c.value.notSubmitted : c.value.confirmTitle : c.value.intentClosed;
+      toast.info(switched ? format(useTranslations.value.walletV3.withdrawEarlierOutcome, { outcome: title }) : title,
+        switched ? useTranslations.value.walletV3.withdrawOtherPending : recovered.state === "NOT_SUBMITTED" ? c.value.confirmHint : undefined);
     }
   }).finally(() => {
     if (orderRead === read) { orderRead = null; readingOrder.value = false; }
@@ -414,8 +416,12 @@ function applyRecovery(recovered: BankRecovery, quoteNo: string) {
   uncertain.value = false; pendingQuoteNo.value = null;
   const pending = readPendingQuoteNo();
   if (pending && pending !== quoteNo) {
+    // Recover the adopted reference with fresh configuration, just like opening its page.
+    config.value = null; configPresentation.value = null; amount.value = ""; formStep.value = "account";
     order.value = null; quote.value = null; uncertain.value = true; pendingQuoteNo.value = pending;
+    return true;
   }
+  return false;
 }
 async function openIntent(intent: BankIntent) {
   await run(async current => {
@@ -446,8 +452,13 @@ async function submit() {
     const no = quote.value!.quoteNo;
     const pending = readPendingQuoteNo();
     if (pending && pending !== no) {
+      config.value = null; configPresentation.value = null; amount.value = ""; formStep.value = "account";
       quote.value = null; accepted.value = false; uncertain.value = true; pendingQuoteNo.value = pending;
       const recovered = await api.recover(pending); if (!current()) return;
+      if (recovered.state !== "COMMITTED") {
+        const loaded = await api.config(); if (!current()) return;
+        config.value = loaded; configPresentation.value = { owner: app.accountKey, epoch: app.accountBindingEpoch, value: loaded };
+      }
       applyRecovery(recovered, pending);
       return;
     }
@@ -465,8 +476,8 @@ async function abandon() {
     const no = quote.value!.quoteNo;
     uncertain.value = true; pendingQuoteNo.value = no;
     const recovered = await api.abandon(no); if (!current()) return;
-    applyRecovery(recovered, no);
-    if (recovered.state === "ABANDONED" || recovered.state === "EXPIRED") {
+    const switched = applyRecovery(recovered, no);
+    if (!switched && (recovered.state === "ABANDONED" || recovered.state === "EXPIRED")) {
       config.value = null; formStep.value = "amount";
       const owner = app.accountKey, epoch = app.accountBindingEpoch;
       const loaded = await api.config(); if (current()) {

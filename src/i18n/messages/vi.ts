@@ -159,6 +159,7 @@ export const vi: Messages = {
     effective: "Có hiệu lực từ", amount: "Số tiền rút (USDT)", quote: "Lấy báo giá", fee: "Phí (USDT)",
     net: "Số tiền quy đổi (USDT)", rate: "VND cho mỗi USDT", receive: "Số tiền ngân hàng nhận (VND)", expires: "Báo giá hết hạn", confirm: "Xác nhận rút tiền",
     confirmNotice: "Sau khi gửi, khoản USDT này sẽ chưa khả dụng cho đến khi xử lý rút tiền hoàn tất. Không gửi trùng lặp.",
+    notSubmitted: "Báo giá chưa được gửi.",
     intentClosed: "Báo giá này không còn hiệu lực.",
     reload: "Tải lại", unknown: "Hệ thống đang tự động xác nhận kết quả gửi. Không tạo lệnh rút khác.",
     review: "Đang chờ xử lý", processing: "Đang chuyển tiền ngân hàng", paid: "Tiền đã đến tài khoản", failed: "Rút tiền thất bại",
