@@ -56,7 +56,8 @@
 
         <template v-if="quote">
           <view class="stage">
-            <view class="slab nx-soft-glass">
+            <view class="aura" aria-hidden="true"><view /><view /></view>
+            <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
               <text class="slab__amt">{{ money(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
               <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text>
@@ -97,7 +98,8 @@
 
         <template v-else>
           <view class="stage">
-            <view class="slab nx-soft-glass">
+            <view class="aura" aria-hidden="true"><view /><view /></view>
+            <view class="slab nx-tint">
               <view class="slab__head">
                 <text class="k">{{ c.amount }}</text>
                 <view class="use-max" role="button" tabindex="0" data-testid="bank-max" :aria-disabled="busy || !canContinue || maxAmount <= 0" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax"><text>{{ c.all }}</text></view>
@@ -530,7 +532,14 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(
 .acct__grow { flex: 1; min-width: 0; }
 .acct__no { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); }
 .stage { position: relative; margin-top: 12px; }
-.slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
+.aura { position: absolute; inset: -8px -6px; pointer-events: none; }
+.aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
+.aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
+.aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-brand-2) 26%, transparent); }
+[data-theme="light"] .aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
+[data-theme="light"] .aura > view:last-child { background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
+/* Amount slab: its amber as one uniform tint (.nx-tint) over the outer aura. */
+.slab { --nx-tint: var(--v5-warning); position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
 .slab__head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
