@@ -111,7 +111,7 @@ export function bankDemo(url, state, request) {
     if (!addressValid) fail('PAYOUT_ADDRESS_FORMAT_INVALID', 422);
     if (!demoWithdrawalNetworks(state).includes(network)) fail('WITHDRAWAL_NETWORK_DISABLED');
     validateOtp('address');
-    // Keep the backend's exact terminal set: REVIEW_REJECTED in the default list still blocks changes.
+    // Keep the backend's exact terminal set: REFUNDED is settled; REVIEW_REJECTED alone still blocks changes.
     const terminal = ['COMPLETED', 'CONFIRMED', 'SUCCESS', 'REFUNDED', 'REJECTED', 'CANCELLED', 'FAILED'];
     if (demoWithdrawals(state, now).some(row => !terminal.includes(row.status.toUpperCase()))) fail('PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL');
     const current = demoPayoutAddresses(state, now).find(row => row.network === network);
