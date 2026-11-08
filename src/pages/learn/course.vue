@@ -24,7 +24,7 @@
           <text v-if="displayResultDetails" class="course-result__reward" :class="{ 'course-result__reward--pending': !displayResultDetails.rewardGranted }">{{ completionReward }}</text>
         </view>
         <view class="course-next-section">
-          <view v-if="recommendedNext" class="course-next">
+          <view v-if="recommendedNext" class="course-next nx-tint">
             <text class="course-next__label">{{ auditCopy.nextCourse }}</text>
             <text class="course-next__title">{{ recommendedNext.title }}</text>
             <view class="course-next__meta"><text>{{ nextCourseMeta }} · {{ completionCopy.reward }} </text><text class="course-next__reward">{{ formatAmount(recommendedNext.rewardNex) }} UVT</text></view>
@@ -648,13 +648,13 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-result-header__close:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .course-result-header__title { overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 600; line-height: 24px; }
 .course-result { display: flex; flex-direction: column; align-items: center; padding: 56px 24px 0; text-align: center; }
-.course-result__badge { display: grid; place-items: center; flex: none; width: 84px; height: 84px; border-radius: 50%; color: var(--v5-on-brand); background: var(--v5-brand); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 10%, transparent), 0 0 0 22px color-mix(in srgb, var(--v5-brand) 5%, transparent); }
+.course-result__badge { display: grid; place-items: center; flex: none; width: 84px; height: 84px; border-radius: 50%; color: var(--v5-on-brand); background: linear-gradient(160deg, var(--ui-lime-pale), var(--v5-brand)); box-shadow: 0 0 0 10px color-mix(in srgb, var(--v5-brand) 10%, transparent), 0 0 0 22px color-mix(in srgb, var(--v5-brand) 5%, transparent), 0 14px 40px color-mix(in srgb, var(--v5-brand) 35%, transparent); }
 .course-result__title { display: block; margin-top: 18px; font-size: var(--v5-type-h2); font-weight: 600; line-height: 38px; overflow-wrap: anywhere; }
 .course-result__summary { display: block; margin-top: 6px; font-size: 13.5px; line-height: 20px; color: var(--v5-ink-3); font-variant-numeric: tabular-nums; text-wrap: pretty; }
 .course-result__reward { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 32px; margin-top: var(--v5-space-4); padding: var(--v5-space-1) 14px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--learning-reward) 16%, transparent); color: var(--learning-reward); font-size: 14px; font-weight: 600; line-height: 24px; font-variant-numeric: tabular-nums; }
 .course-result__reward--pending { background: var(--v5-surface); color: var(--v5-ink-3); }
 .course-next-section { padding: var(--v5-space-10) var(--v5-space-4) 0; }
-.course-next { position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+.course-next { --nx-tint: var(--v5-brand); position: relative; overflow: hidden; padding: 18px; border: 1px solid var(--v5-border); border-radius: var(--ui-radius-surface); }
 .course-next__label { display: block; font-size: 12.5px; font-weight: 500; line-height: 18px; color: var(--v5-brand); }
 .course-next__title { display: block; margin-top: 6px; font-size: 18px; font-weight: 600; line-height: 24px; overflow-wrap: anywhere; }
 .course-next__meta { margin-top: 6px; font-size: 12.5px; line-height: 18px; color: var(--v5-ink-3); overflow-wrap: anywhere; }
