@@ -1338,6 +1338,16 @@ async function handleSubmit() {
       return;
     }
   }
+  // BUG-398: another tab may have changed the shared attempt while confirmation / eligibility awaited.
+  // Decide this before live identity checks: adopting that command can change the displayed network / address.
+  // Keep the path from this final storage read to rememberWithdrawAttempt synchronous.
+  const storedAttempt = readWithdrawAttempt(snap.account);
+  if (storedAttempt?.key !== pending?.key) {
+    pendingAttempt.value = storedAttempt;
+    clearSubmitFreeze();
+    toast.info(storedAttempt ? t.value.bankWithdrawal.resumeUsdt : t.value.walletV3.withdrawHandledElsewhere);
+    return;
+  }
   // 🔴 **确认后校验** —— 快照纪律的另一半。冻结件与当前权威值不符即拒单,绝不静默按新值扣款。
   //  ① 身份三元组(账号 / 网络 / 收款地址)。确认期间换号 → 下面的 debitNex 与账单会全落到
   //     新账号,而弹窗展示的是旧账号的数字;地址 / 网络若变了,等于把钱打到用户没确认过的地方。
@@ -1369,15 +1379,6 @@ async function handleSubmit() {
   // 🔴 写不进去就**不发**(fail closed):落盘失败 = 这一次没有重放保护,超时之后再也认不回
   // 那个键,用户一重试就是第二张单。宁可这一笔发不出去(钱一分没动、原因和下一步都给了),
   // 也不发一笔「出了事没人认得回来」的。
-  // BUG-398: another tab may have changed the shared attempt while confirmation / eligibility awaited.
-  // Adopt its current command; never overwrite it or resurrect a replay that has already been resolved.
-  const storedAttempt = readWithdrawAttempt(snap.account);
-  if (storedAttempt?.key !== pending?.key) {
-    pendingAttempt.value = storedAttempt;
-    clearSubmitFreeze();
-    toast.info(storedAttempt ? t.value.bankWithdrawal.resumeUsdt : t.value.walletV3.withdrawHandledElsewhere);
-    return;
-  }
   if (!rememberWithdrawAttempt(snap.account, {
     key: snap.idempotencyKey,
     amount: snap.amount,
