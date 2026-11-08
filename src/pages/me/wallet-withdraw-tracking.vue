@@ -190,7 +190,7 @@ function applyTrackedWithdrawal(detail: WithdrawalDetailSnapshot): void {
   trackedWithdrawal.value = {
     ...canonical,
     status: detail.status,
-    ...(detail.confirmedAt !== null ? { confirmedAt: detail.confirmedAt } : {}),
+    confirmedAt: detail.confirmedAt,
     ...(detail.terminalReason !== null ? { terminalReason: detail.terminalReason } : {}),
     ...(detail.retriable !== null ? { retriable: detail.retriable } : {}),
     ...(detail.nexRefunded !== null
@@ -499,18 +499,18 @@ const etaSub = computed(() => {
     const current = wd.value!;
     if (current.complianceReviewRequired) {
       return current.complianceHoldApplies && (current.complianceHoldDays ?? 0) > 0
-        && Number.isFinite(current.estimatedCompletion)
-        ? fmt(t.value.walletV3.complianceHoldUntilBody, { time: absTime(current.estimatedCompletion) })
+        && typeof current.reviewHoldUntil === "number" && Number.isFinite(current.reviewHoldUntil)
+        ? fmt(t.value.walletV3.complianceHoldUntilBody, { time: absTime(current.reviewHoldUntil) })
         : t.value.walletV3.complianceReviewRequired;
     }
     return t.value.wallet.withdrawRouteHeldSub;
   }
   // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
   if (isTerminalDone.value && wd.value) {
-    const at = wd.value.confirmedAt ?? (wd.value.complianceReviewRequired ? NaN : wd.value.estimatedCompletion);
-    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.confirmed;
+    const at = wd.value.confirmedAt;
+    return typeof at === "number" && Number.isFinite(at)
+      ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.confirmed;
   }
-  if (wd.value?.complianceReviewRequired) return steps.value[currentIdx.value]?.hint ?? t.value.wallet.trackReviewNote;
   const at = wd.value?.estimatedCompletion;
   return Number.isFinite(at) ? fmt(t.value.wallet.trackExpectedAt, { time: absTime(at as number) }) : t.value.wallet.trackReviewNote;
 });
@@ -528,8 +528,9 @@ function stepTimeText(i: number): string {
   const w = wd.value;
   if (!w) return "";
   if (isTerminalDone.value && i === steps.value.length - 1) {
-    const at = w.confirmedAt ?? (w.complianceReviewRequired ? NaN : w.estimatedCompletion);
-    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : "";
+    const at = w.confirmedAt;
+    return typeof at === "number" && Number.isFinite(at)
+      ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : "";
   }
   // 🔴 只给单据里**真有**的时刻:提交(第 1 步)与实际到账(末步)。
   // 中间三步没有任何时间戳,原先用 3.5 秒假阶梯现编 —— 跨整点时会渲染成
