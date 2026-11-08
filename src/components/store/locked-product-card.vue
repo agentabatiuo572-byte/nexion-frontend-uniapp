@@ -6,8 +6,8 @@
 -->
 <template>
   <view ref="cardRef" class="nx-glass-card relative overflow-hidden" :style="rootStyle">
-    <!-- aurora drift bg (paused off screen) -->
-    <view aria-hidden class="locked-card__aurora" :class="{ 'is-paused': !cardInView }" />
+    <!-- aurora drift bg (paused off screen or while the page is hidden) -->
+    <view ref="auroraRef" aria-hidden class="locked-card__aurora" :class="{ 'is-paused': !auroraLoop.running.value }" />
     <!-- 24px grid overlay -->
     <view aria-hidden class="locked-card__grid" />
 
@@ -61,6 +61,7 @@ import { productNotificationApi, remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { productCopy, specText } from "@/lib/product-copy";
 
@@ -98,6 +99,8 @@ const queue = computed(() =>
 const queueText = computed(() => (queue.value ?? 0).toLocaleString());
 
 const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
+const auroraLoop = useLoopsInView(".locked-card__aurora");
+const auroraRef = auroraLoop.elRef;
 
 function requestIsCurrent(scope: ReturnType<typeof captureAccountScope>, epoch: number, accountKey: string, runScope: RuntimeRevisionScope, productNo: string): boolean {
   return notificationMounted
