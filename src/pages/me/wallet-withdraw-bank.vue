@@ -381,11 +381,11 @@ function pollOrder(): Promise<void> {
         config.value = loaded; configPresentation.value = { owner, epoch, value: loaded };
       }
       const switched = applyRecovery(recovered, quoteNo); error.value = "";
-      // The page may now show another quote; this message still belongs to this receipt.
-      const title = recovered.state === "COMMITTED" ? c.value[bankOrderOutcome(recovered)]
-        : recovered.state === "NOT_SUBMITTED" ? switched ? c.value.notSubmitted : c.value.confirmTitle : c.value.intentClosed;
-      toast.info(switched ? format(useTranslations.value.walletV3.withdrawEarlierOutcome, { outcome: title }) : title,
-        switched ? useTranslations.value.walletV3.withdrawOtherPending : recovered.state === "NOT_SUBMITTED" ? c.value.confirmHint : undefined);
+      if (!switched) {
+        const title = recovered.state === "COMMITTED" ? c.value[bankOrderOutcome(recovered)]
+          : recovered.state === "NOT_SUBMITTED" ? c.value.confirmTitle : c.value.intentClosed;
+        toast.info(title, recovered.state === "NOT_SUBMITTED" ? c.value.confirmHint : undefined);
+      }
     }
   }).finally(() => {
     if (orderRead === read) { orderRead = null; readingOrder.value = false; }
@@ -419,6 +419,11 @@ function applyRecovery(recovered: BankRecovery, quoteNo: string) {
     // Recover the adopted reference with fresh configuration, just like opening its page.
     config.value = null; configPresentation.value = null; amount.value = ""; formStep.value = "account";
     order.value = null; quote.value = null; uncertain.value = true; pendingQuoteNo.value = pending;
+    // Every recovery entry point reports this receipt once, before the adopted reference recovers.
+    const title = recovered.state === "COMMITTED" ? c.value[bankOrderOutcome(recovered)]
+      : recovered.state === "NOT_SUBMITTED" ? c.value.notSubmitted : c.value.intentClosed;
+    toast.info(format(useTranslations.value.walletV3.withdrawEarlierOutcome, { outcome: title }),
+      useTranslations.value.walletV3.withdrawOtherPending);
     return true;
   }
   return false;
