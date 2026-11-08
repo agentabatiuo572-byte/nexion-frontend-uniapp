@@ -1242,6 +1242,10 @@ trustReserve: "No verifiable reserve information available.",
     checkoutOutcomeUnknown: "The bundle order result is not confirmed yet. Keep this bundle and retry.",
     policyChanged: "Bundle pricing changed. Review the updated total before placing the order.",
     checkoutBillMemo: "Bundle purchase · {count} devices",
+    slotsShortTitle: "Not enough free slots",
+    slotsShortBody: "{count} devices selected. Free slots: {free}. Deactivate a device in Device inventory, or remove devices from this bundle.",
+    slotsShortManage: "Open Device inventory",
+    slotsShortAdjust: "Edit bundle",
   },
 
   tx: {

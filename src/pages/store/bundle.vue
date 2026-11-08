@@ -227,6 +227,8 @@ import { navTo,takeNavigationQuery } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import { PROMOTION_CHECKOUT_TABLE, selectPromotionCheckoutRecord, type PromotionCheckoutRecord } from "@/lib/promotion-checkout-session";
+import { readCapacityPending } from "@/lib/capacity-command-recovery";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
@@ -541,7 +543,32 @@ async function openBundleReview(list:Product[]):Promise<boolean> {
       if(commands[bundleFingerprint(list)])return false;
       toast.warn(t.value.bundle.checkoutOutcomeUnknown);void navTo('/pages/store/orders');return true;
     }
-    await navTo(promotionCheckoutHref(list.map(product=>({productNo:product.id,quantity:1}))));
+    const items=list.map(product=>({productNo:product.id,quantity:1}));
+    // Unresolved originals (a checkout command, an unpaid original order, a
+    // capacity KEEP/REPLACE command) resume in the checkout before any
+    // new-purchase gate. If they cannot be read, the checkout shows that state.
+    let original=true;
+    try{
+      const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:'',items});
+      original=!!record?.pending||record?.order?.paymentStatus==='PENDING'
+        ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
+    }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
+    // Every device and Cloud Share takes one slot; the server refuses a bundle
+    // larger than the free slots, so say so before the review page.
+    const used=app.remoteSlotsUsed;
+    if(!original&&used!==null&&list.length>app.slotCap-used){
+      const scope=captureAccountScope();
+      const manage=await confirm({
+        title:t.value.bundle.slotsShortTitle,
+        message:fmt(t.value.bundle.slotsShortBody,{count:list.length,free:Math.max(0,app.slotCap-used)}),
+        confirmLabel:t.value.bundle.slotsShortManage,
+        cancelLabel:t.value.bundle.slotsShortAdjust,
+        icon:'warn',
+      });
+      if(manage&&isCurrentAccountScope(scope))void navTo('/pages/me/devices');
+      return true;
+    }
+    await navTo(promotionCheckoutHref(items));
   }catch{toast.warn(t.value.bundle.checkoutOutcomeUnknown);}
   finally{submitting.value=false;}
   return true;

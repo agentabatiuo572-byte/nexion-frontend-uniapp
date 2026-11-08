@@ -1227,6 +1227,10 @@ trustReserve: "暂无可核验的储备资料。",
     checkoutOutcomeUnknown: "套餐订单结果暂未确认，请保持当前套餐后重试",
     policyChanged: "套餐折扣已更新，请确认新的合计金额后再下单。",
     checkoutBillMemo: "套餐购买 · {count} 台设备",
+    slotsShortTitle: "空闲槽位不足",
+    slotsShortBody: "已选 {count} 台设备，空闲槽位 {free} 个。请先到设备仓库停用设备，或减少套餐里的设备。",
+    slotsShortManage: "去设备仓库",
+    slotsShortAdjust: "调整套餐",
   },
 
   tx: {
