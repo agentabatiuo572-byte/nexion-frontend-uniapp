@@ -43,6 +43,9 @@ export interface WithdrawalEligibility {
   riskReasons: string[];
   /** FEAT-WD01a:本次是否命中小额免审快车道。 */
   fastLaneApplied: boolean;
+  complianceReviewRequired: boolean;
+  complianceHoldApplies: boolean;
+  complianceHoldDays: number;
   /** FEAT-WD01a:被快车道免掉的闸名(本会命中但因小额而未生效的);未命中时为空数组。 */
   waivedGates: string[];
   /** FEAT-WD01b:今日笔数是否已用完 */
@@ -123,6 +126,9 @@ export function evaluateWithdrawal(
     // FEAT-WD01a:是否走了小额快车道 + 被免掉的闸名(审计与客服解释用)。
     // PROD:server 权威回传,client 仅 UI cache。
     fastLaneApplied: decision.fastLaneApplied,
+    complianceReviewRequired: false,
+    complianceHoldApplies: false,
+    complianceHoldDays: 0,
     waivedGates: decision.waivedGates,
     dailyLimitReached: decision.dailyLimitReached,
     dailyCountResetAt: nextDayResetAt(mockServerNow()),
@@ -188,6 +194,9 @@ export function requestWithdrawalEligibility(
       route: snapshot.route,
       riskReasons: snapshot.riskReasons,
       fastLaneApplied: snapshot.fastLaneApplied,
+      complianceReviewRequired: snapshot.complianceReviewRequired,
+      complianceHoldApplies: snapshot.complianceHoldApplies,
+      complianceHoldDays: snapshot.complianceHoldDays,
       waivedGates: snapshot.waivedGates,
       dailyLimitReached: snapshot.dailyLimitReached,
       dailyCountResetAt: snapshot.dailyCountResetAt,

@@ -87,7 +87,7 @@
           </view>
           <view class="wd-amtrow">
             <text class="wd-amtrow__cur">$</text>
-            <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
+            <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="remoteSessionReady ? amount : ''" :placeholder="remoteSessionReady ? '0.00' : ''" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
             <text class="wd-amtrow__unit">USDT</text>
           </view>
           <view class="wd-k wd-min"><text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}</text><text v-else>—</text></view>
@@ -114,17 +114,19 @@
       <view class="wd-route mx-4">
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.networkLabel }}</text>
-          <text class="wd-net" data-testid="withdraw-network-tag">{{ network.slice(5) }}</text>
-          <text class="wd-route__note">{{ networkHint(network) }}</text>
+          <text class="wd-net" data-testid="withdraw-network-tag">{{ remoteSessionReady ? network.slice(5) : '—' }}</text>
+          <text v-if="remoteSessionReady" class="wd-route__note">{{ networkHint(network) }}</text>
         </view>
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.withdrawAddressLabel }}</text>
-          <text v-if="payoutReadStatus === 'error'" class="wd-route__a wd-route__a--empty wd-route__a--error" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
+          <text v-if="!remoteSessionReady" class="wd-route__a wd-route__a--empty">—</text>
+          <text v-else-if="pendingAttempt" class="wd-route__a">{{ boundAddressShort }}</text>
+          <text v-else-if="payoutReadStatus === 'error'" class="wd-route__a wd-route__a--empty wd-route__a--error" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
           <text v-else-if="payoutReadStatus !== 'ready'" class="wd-route__a wd-route__a--empty">—</text>
           <text v-else-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else class="wd-route__a wd-route__a--empty">{{ t.addrRebind.emptyGuideTitle }}</text>
           <view
-            v-if="payoutReadStatus === 'ready' && boundAddress"
+            v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && boundAddress"
             class="nx-withdraw-manage-entry wd-manage nx-frosted-button"
             role="button" tabindex="0"
             :aria-label="t.addrRebind.manageCta"
@@ -135,7 +137,7 @@
           </view>
         </view>
         <!-- 空状态引导(一次设置长期使用;非报错态) -->
-        <view v-if="payoutReadStatus === 'ready' && !boundAddress" class="wd-route__guide">
+        <view v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && !boundAddress" class="wd-route__guide">
           <text class="wd-route__guide-body">{{ t.addrRebind.emptyGuideBody }}</text>
           <view class="nx-withdraw-add-address-cta wd-add nx-frosted-button" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage"  @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
             <text>{{ t.addrRebind.addCta }}</text>
@@ -160,7 +162,7 @@
           <view :style="feeSkeletonValueStyle" />
         </view>
       </view>
-      <view v-else-if="networkClosed" class="wd-fee__msg">
+      <view v-else-if="networkClosed && !pendingAttempt" class="wd-fee__msg">
         <text class="wd-warn" role="status">{{ NETWORKS.length === 0 ? t.wallet.withdrawalChannelsClosed : t.bankWithdrawal.networkUnavailable }}</text>
         <view v-if="NETWORKS.length > 0" class="wd-link" role="button" tabindex="0" @click="chooseNetworkAgain" @keydown.enter.prevent="chooseNetworkAgain" @keydown.space.prevent="chooseNetworkAgain">
           <text>{{ t.bankWithdrawal.rechooseNetwork }}</text>
@@ -205,7 +207,7 @@
             class="nx-fee-offset-switch grid place-items-center shrink-0"
             role="switch"
             :aria-checked="offsetWithNex ? 'true' : 'false'"
-            :aria-disabled="offsetToggleDisabled ? 'true' : 'false'"
+            :aria-disabled="inputsLocked || offsetToggleDisabled ? 'true' : 'false'"
             :aria-label="t.walletV3.feeOffsetToggle"
             tabindex="0"
             :style="switchHitStyle"
@@ -345,6 +347,15 @@ const ALL_NETWORKS: { id: CryptoNetwork; label: string }[] = [
 const t = useT();
 const app = useApp();
 const auth = useAuth();
+// H5 restores its session before this page knows which account's attempt it must render.
+// Reuse the protected-read gate for both loading that command and showing the form.
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
 const payout = usePayoutAddress();
 const payoutReadStatus = computed(() => payout.readStatusFor(app.accountKey));
 const payoutReadCopy = useFinanceReviewCopy();
@@ -353,12 +364,13 @@ const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
 const withdrawalPolicyError = ref("");
 let withdrawalPolicyRefreshSequence = 0;
-const pendingAttempt = ref(readWithdrawAttempt(app.accountKey));
+const pendingAttempt = ref(remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null);
 const abandoningAttempt = ref(false);
 
 function refreshPendingAttempt() {
-  pendingAttempt.value = readWithdrawAttempt(app.accountKey);
+  pendingAttempt.value = remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null;
 }
+watch([() => app.accountKey, remoteSessionReady], refreshPendingAttempt, { flush: "sync" });
 
 async function abandonPendingAttempt() {
   const accountKey = app.accountKey;
@@ -508,17 +520,6 @@ const withdrawalReadStatusText = computed(() => {
   const failed = [withdrawalFactsState.value, dailyFactsState.value].find(state => state === "unavailable" || state === "stale");
   return failed ? factsStatusText(failed) : withdrawalActionStatusText.value;
 });
-
-// Same cold-session fence the F3 pages use (binary / daily / unilevel): the
-// H5 vault binds only after its HttpOnly-cookie restore, and a protected read
-// issued before that returns AUTH_REQUIRED.
-const remoteSessionReady = computed(() => binarySessionReady({
-  remote: remoteApiEnabled,
-  authenticated: auth.isAuthenticated,
-  accountId: auth.accountId,
-  appAccountKey: app.accountKey,
-  sessionUserId: sessionVault.read()?.user.userId ?? null,
-}));
 
 const withdrawalPageVisible = ref(false);
 let withdrawalEntryReadPending = true;
@@ -691,20 +692,23 @@ onLoad((options) => {
   const requested = options?.network ?? new URLSearchParams(takeNavigationQuery("/pages/me/wallet-withdraw")).get("network");
   const chosen = ALL_NETWORKS.find((n) => n.id === requested);
   if (chosen) {
-    network.value = chosen.id;
+    selectedNetwork.value = chosen.id;
     networkChosen = true;
     return;
   }
   settleDefaultNetwork();
 });
 
-const amount = ref("");
-// 提现网络只读;地址 = 该网络当前提现地址(payout-address store 单源,RM01a)。
-const network = ref<CryptoNetwork>("USDT-BEP20");
+const amount = ref(pendingAttempt.value?.amount.toFixed(2) ?? "");
+// The unresolved command owns the displayed route, including a closed network. Keep the query/default
+// selection separately so resolving that command restores the ordinary network rules.
+const selectedNetwork = ref<CryptoNetwork>("USDT-BEP20");
+const network = computed(() => pendingAttempt.value?.network ?? selectedNetwork.value);
 let networkChosen = false, defaultNetworkSettled = false;
-// Policy read and the network is not open: no quote, no eligibility request, submit stays disabled.
+// A closed network blocks new submissions; an unresolved command still has its exact replay path.
 const networkClosed = computed(() => withdrawalPolicyCurrent.value && !NETWORKS.value.some((item) => item.id === network.value));
 function chooseNetworkAgain() {
+  if (pendingAttempt.value) return;
   navBack("/pages/me/wallet-withdraw-network");
 }
 // The only place that picks a network the user did not choose. Once the policy and this account's address book
@@ -715,14 +719,14 @@ function settleDefaultNetwork() {
   const open = NETWORKS.value;
   if (networkChosen || inputsLocked.value || open.length === 0) return;
   if (!defaultNetworkSettled && payout.readStatusFor(app.accountKey) === "ready") {
-    network.value = (open.find((n) => payout.currentFor(fromWithdrawNetwork(n.id))) ?? open[0]).id;
+    selectedNetwork.value = (open.find((n) => payout.currentFor(fromWithdrawNetwork(n.id))) ?? open[0]).id;
     defaultNetworkSettled = true;
   } else if (!open.some((item) => item.id === network.value)) {
-    network.value = open[0].id;
+    selectedNetwork.value = open[0].id;
   }
 }
 const chainNetwork = computed(() => fromWithdrawNetwork(network.value));
-const boundAddress = computed(() => payout.currentFor(chainNetwork.value)?.address ?? "");
+const boundAddress = computed(() => pendingAttempt.value?.address ?? payout.currentFor(chainNetwork.value)?.address ?? "");
 // 掩码中段:与地址管理页共用 core.maskAddressMid 同一实现,不各写一份。
 const boundAddressShort = computed(() => (boundAddress.value ? maskAddressMid(boundAddress.value) : "—"));
 
@@ -731,7 +735,7 @@ const remoteEligibility = ref<WithdrawalEligibility | null>(null);
 const remoteEligibilityFailed = ref(false);
 let refreshedConflictVersion = "";
 let remoteEligibilityEpoch = 0;
-watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, withdrawalActionsFresh, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
+watch([amountNum, network, boundAddress, pendingAttempt, maxWithdrawable, dailyFacts, withdrawalActionsFresh, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
   // A changed amount/network/address invalidates the previous server decision
   // immediately. Keeping the old accepted decision visible until the next
   // request settles can briefly re-enable submit for inputs the server has
@@ -743,7 +747,7 @@ watch([amountNum, network, boundAddress, maxWithdrawable, dailyFacts, withdrawal
   remoteEligibility.value = null;
   remoteEligibilityFailed.value = false;
   const policyVersion = withdrawalPolicy.value?.policyVersion;
-  if (!policyVersion || networkClosed.value || !shouldRequestWithdrawalEligibility({
+  if (pendingAttempt.value || !policyVersion || networkClosed.value || !shouldRequestWithdrawalEligibility({
     remote: remoteApiEnabled,
     factsFresh: withdrawalActionsFresh.value,
     policyVersion,
@@ -821,8 +825,22 @@ const freezeBannerText = computed(() =>
   fmt(t.value.addrRebind.freezeBanner, { t: formatClock(freezeLeftMs.value, { hours: true }) }),
 );
 
-const complianceHoldEnabled = computed(() => withdrawalPolicy.value?.complianceHoldEnabled === true);
-const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days: withdrawalPolicy.value?.cooldownDays ?? 0 }));
+const complianceHoldEnabled = computed(() =>
+  !pendingAttempt.value
+  && (remoteEligibility.value?.complianceReviewRequired ?? withdrawalPolicy.value?.complianceHoldEnabled === true),
+);
+const holdBody = computed(() => {
+  const policy = withdrawalPolicy.value;
+  if (!policy || amountNum.value <= 0) return t.value.walletV3.complianceReviewBody;
+  // This is policy-based guidance until the server returns this amount's decision.
+  // Submission continues to require a fresh eligibility response.
+  const applies = remoteEligibility.value?.complianceHoldApplies
+    ?? amountNum.value > policy.complianceReviewThresholdUsdt;
+  const days = remoteEligibility.value?.complianceHoldDays ?? (applies ? policy.cooldownDays : 0);
+  return days > 0
+    ? fmt(t.value.walletV3.complianceHoldBody, { days })
+    : t.value.walletV3.complianceReviewNoHoldBody;
+});
 
 // ── Fee model (FEAT-WD02): fixed per-network confirm fee + OPT-IN NEX offset ──
 // fee = withdrawRules.networkConfirmFeeUsd[network](后台 D5 单源,[0,25]);
@@ -836,7 +854,16 @@ const submittingNexBalance = ref<number | null>(null);
 const nexBalance = computed(() => submittingNexBalance.value ?? app.user.nexBalance);
 const nexFeeOffsetRate = computed(() => withdrawalPolicy.value?.nexFeeOffsetRate ?? 0);
 /** FEAT-WD02:NEX 抵扣开关(规格 ③:默认关;server 侧无此意图永不烧 NEX)。 */
-const offsetWithNex = ref(false);
+const offsetWithNex = ref(pendingAttempt.value?.offset ?? false);
+watch(pendingAttempt, (pending, previous) => {
+  if (pending) {
+    amount.value = pending.amount.toFixed(2);
+    offsetWithNex.value = pending.offset;
+  } else if (previous) {
+    amount.value = "";
+    offsetWithNex.value = false;
+  }
+}, { flush: "sync" });
 /** 按当前绑定网络取网络确认费键(网络派生自 pairing 响应式 —— 换绑回本页即时刷新)。 */
 const NETWORK_FEE_KEY: Record<CryptoNetwork, WithdrawNetworkKey> = {
   "USDT-TRC20": "trc20",
@@ -880,8 +907,9 @@ function quoteStillValid(fee: WithdrawalFeeSnapshot, offset: boolean, net: Crypt
 // 与汇率牌价同口径:fx.ts 的 fxAvailable = !syncFailed && isFxQuoteUsable(...)。
 const feeConfigUsable = computed(() => {
   const policy = withdrawalPolicy.value;
+  // Replay still displays this network's fee; its original policyVersion remains the server's pricing authority.
   return policy !== null
-    && policy.enabledNetworks.includes(network.value)
+    && (!!pendingAttempt.value || policy.enabledNetworks.includes(network.value))
     && policy.nexFeeOffsetRate > 0;
 });
 // 重试出口(规格 ⑤ 报错态必须给下一步)。PROD:重拉 GET /api/config/platform。
@@ -958,6 +986,7 @@ const eligibility = computed(() => {
       maxWithdrawableUsdt: 0,
       route: "manual" as const,
       riskReasons: ["server-eligibility-pending"], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false,
+      complianceReviewRequired: false, complianceHoldApplies: false, complianceHoldDays: 0,
       dailyCountResetAt: Date.now(), configVersion: "remote-pending",
     };
   }
@@ -966,6 +995,7 @@ const eligibility = computed(() => {
 // 冻结期不重复挂风控横幅(专属冻结横幅已在顶部,避免双横幅噪声)。
 const withdrawalRiskNotice = computed(
   () =>
+    !pendingAttempt.value &&
     (!remoteApiEnabled || remoteEligibility.value !== null) &&
     !frozenNow.value &&
     boundAddress.value.length > 10 &&
@@ -981,12 +1011,12 @@ const submitting = ref(false);
 // 连点 CTA 会叠出第二个弹窗,两次确认 = 双重建单(mask 盖住 CTA 是第二道,这是第一道)。
 const confirmingSubmit = ref(false);
 /**
- * 🔴 输入面冻结判据 = 提交中 **或** 确认弹窗打开中。
+ * 🔴 输入面冻结判据 = 账号绑定未就绪 **或** 未收口尝试 **或** 提交中 **或** 确认弹窗打开中。
  * 只看 submitting 的话,弹窗那几秒 submitting 还是 false —— 改金额的入口(输入框、
  * 「全部提现」、降额 CTA、抵扣开关)全都还活着,只靠 mask 挡手。快照已让改动动不了钱,
  * 但页面会立刻显示与刚确认的弹窗不同的数字,同一个提交出现两个口径。
  */
-const inputsLocked = computed(() => submitting.value || confirmingSubmit.value);
+const inputsLocked = computed(() => !remoteSessionReady.value || !!pendingAttempt.value || submitting.value || confirmingSubmit.value);
 // The default network settles as soon as the policy and address book are known, and waits out a submit.
 watch([NETWORKS, () => payout.readStatusFor(app.accountKey), () => inputsLocked.value], settleDefaultNetwork);
 /** 提交链结束(成功 / 任一拒单分支)统一解冻:三个状态必须成对清,漏一个页面就永久卡在冻结报价上。 */
@@ -1020,7 +1050,7 @@ function amountParts(value: number): [string, string] {
 // server eligibility round-trip below. Initial/failed reads have no readable
 // snapshot and therefore remain blocked from numeric quote rendering.
 const quoteDisplayBlocked = computed(() =>
-  amountNum.value > 0
+  !pendingAttempt.value && amountNum.value > 0
   && !withdrawalQuoteRefreshing.value
   && submitDisabledReason.value !== "",
 );
@@ -1084,7 +1114,7 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
 }
 const submitDisabledReason = computed(() => disabledReasonFor(amountNum.value, eligibility.value));
 // Read/fee failures and invalid entered quotes already have an inline explanation.
-const submitHintVisible = computed(() => Boolean(submitDisabledReason.value)
+const submitHintVisible = computed(() => !pendingAttempt.value && Boolean(submitDisabledReason.value)
   && withdrawalActionsFresh.value && feeConfigUsable.value
   && (amountNum.value <= 0 || !quoteBlocked.value));
 
@@ -1093,7 +1123,7 @@ function fmtNex(n: number): string {
 }
 
 const canSubmit = computed(() => submitDisabledReason.value === "");
-const canSubmitAction = computed(() => !inputsLocked.value && (!!pendingAttempt.value || canSubmit.value));
+const canSubmitAction = computed(() => remoteSessionReady.value && !submitting.value && !confirmingSubmit.value && (!!pendingAttempt.value || canSubmit.value));
 
 function networkHint(id: CryptoNetwork): string {
   switch (id) {
@@ -1154,13 +1184,14 @@ async function handleResetAddresses() {
 }
 
 async function handleSubmit() {
-  if (submitting.value || confirmingSubmit.value) return;
+  if (!remoteSessionReady.value || submitting.value || confirmingSubmit.value) return;
   // 🔴 **上一次没确认结果的提交,必须先收口,才允许开始新的一笔**(2026-08-11 独立审计 P0)。
   // 幂等键此前在本函数里每次点击现铸 → 超时重试 = 服务端第二张单,而幂等键存在的唯一场景
   // 正是这个场景。键与它那一次的 body 一起冻在 lib/withdraw-attempt(落盘,理由见该文件),
   // 存在未收口尝试时,本次提交 = **原样重放那一笔**,不是按当前输入开新的一笔:
   // 这样用户改金额/换网络/切抵扣开关也无法绕过幂等键去建第二张单。
   const pending = readWithdrawAttempt(app.accountKey);
+  pendingAttempt.value = pending;
   // 重放路径绕开 canSubmit:它判的是「当前输入能不能开新的一笔」(费率拉不到、金额被清空、
   // 今日额度用完都会为 false),而重放要发的是一笔**已经通过过这道门**的旧请求 ——
   // 拿新意图的门去锁旧请求,等于把唯一的收口路径锁死。
@@ -1169,11 +1200,8 @@ async function handleSubmit() {
     return;
   }
   if (pending) {
-    // 表单回填到冻结件:发出去的是上一次那笔,页面就必须显示上一次那笔,
-    // 否则弹窗/明细与真正发出的不是同一笔(地址是按网络派生的 computed,回填不了,
-    // 故弹窗里显式打出冻结的那个地址)。
+    // Re-read storage at submit and keep the displayed inputs on that same frozen command.
     amount.value = pending.amount.toFixed(2);
-    network.value = pending.network;
     offsetWithNex.value = pending.offset;
   }
   // 🔴 **一份提交快照收全族**(2026-08-04 R2 三条 P1 同一个根:跨 await 的状态漂移)。
@@ -1225,7 +1253,7 @@ async function handleSubmit() {
     { label: t.value.walletV3.withdrawRowAmount, value: `$${formatAmount(snap.amount)} USDT` },
     { label: t.value.walletV3.feeConfirmRow, value: `−$${formatAmount(snap.quote.networkConfirmUsd)}` },
     ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+$${formatAmount(snap.quote.feeWaived)} · ${fmtNex(snap.quote.nexBurned)} UVT` }] : []),
-    { label: t.value.wallet.networkLabel, value: NETWORKS.value.find((nw) => nw.id === snap.network)?.label ?? "" },
+    { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label },
     { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address) },
     { label: t.value.wallet.receiveLabel, value: `$${formatAmount(snap.quote.netReceive)}`, amount: true },
   ];
@@ -1235,7 +1263,7 @@ async function handleSubmit() {
   const resendBody = pending
     ? fmt(t.value.walletV3.withdrawResendBody, {
         amount: formatAmount(snap.amount),
-        network: NETWORKS.value.find((nw) => nw.id === snap.network)?.label ?? "",
+        network: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label,
         address: maskAddressMid(snap.address),
       })
     : "";
