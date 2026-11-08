@@ -1,4 +1,5 @@
 import { asApiError, ApiError } from "@/api/errors";
+import type { ApiRuntimeConfig } from "@/api/runtime-config";
 
 export type WithdrawalTrackingReadStatus = "waiting" | "loading" | "ready" | "error" | "not-found";
 
@@ -8,8 +9,7 @@ export interface WithdrawalTrackingReadScope {
   accountBindingEpoch: number;
   /** Advances whenever the in-memory bearer session is replaced or cleared. */
   sessionRevision: number;
-  /** Advances when the authenticated runtime is refreshed or invalidated. */
-  runtimeEpoch: number;
+  apiOrigin: ApiRuntimeConfig;
   pageEpoch: number;
 }
 
@@ -57,16 +57,10 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
   options: WithdrawalTrackingReadOptions<T>,
 ) {
   let requestEpoch = 0;
-  let inFlight: { request: number; scopeKey: string } | null = null;
-  let pendingRequest: number | null = null;
   // The recovery lock is request-owned. An invalidated older request may
   // finish after a newer one has started; it must never unlock that newer
   // recovery chain.
   let automaticScopeRecovery: { sourceRequest: number; recoveryRequest: number | null } | null = null;
-
-  function scopeKey(scope: WithdrawalTrackingReadScope): string {
-    return `${scope.withdrawalNo}|${scope.accountKey}|${scope.accountBindingEpoch}|${scope.sessionRevision}|${scope.runtimeEpoch}|${scope.pageEpoch}`;
-  }
 
   function isCurrent(scope: WithdrawalTrackingReadScope, request: number): boolean {
     const active = options.currentScope();
@@ -75,14 +69,13 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
       && active.accountKey === scope.accountKey
       && active.accountBindingEpoch === scope.accountBindingEpoch
       && active.sessionRevision === scope.sessionRevision
-      && active.runtimeEpoch === scope.runtimeEpoch
+      && active.apiOrigin.environment === scope.apiOrigin.environment
+      && active.apiOrigin.baseUrl === scope.apiOrigin.baseUrl
       && active.pageEpoch === scope.pageEpoch;
   }
 
   async function refresh(quiet = false, automaticScopeRetry = false): Promise<void> {
-    if (pendingRequest !== null) return;
     const request = ++requestEpoch;
-    pendingRequest = request;
     if (automaticScopeRetry && automaticScopeRecovery?.recoveryRequest === null) {
       automaticScopeRecovery.recoveryRequest = request;
     }
@@ -106,9 +99,6 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
       }
       if (!scope || request !== requestEpoch) return;
 
-      const activeScopeKey = scopeKey(scope);
-      if (inFlight?.scopeKey === activeScopeKey) return;
-      inFlight = { request, scopeKey: activeScopeKey };
       if (!quiet) options.setStatus("loading");
       try {
         const result = await options.read(scope.withdrawalNo);
@@ -128,14 +118,11 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
         }
         if (asApiError(error).status === 404) options.setStatus("not-found");
         else if (!quiet) options.setStatus("error");
-      } finally {
-        if (inFlight?.request === request) inFlight = null;
       }
     } finally {
-      if (pendingRequest === request) pendingRequest = null;
       // sessionVault.revision() is intentionally non-reactive. If a bearer is
       // replaced while this request is outstanding, re-evaluate the live
-      // visible scope after releasing its in-flight slot. A hidden page returns
+      // visible scope after this request settles. A hidden page returns
       // null and therefore never starts background reads.
       const ownsAutomaticRecovery = automaticScopeRecovery?.recoveryRequest === request;
       if (retryForChangedScope && options.currentScope() !== null && automaticScopeRecovery === null) {
@@ -155,8 +142,6 @@ export function createWithdrawalTrackingRead<T extends { withdrawalNo: string }>
 
   function invalidate(): void {
     requestEpoch += 1;
-    pendingRequest = null;
-    inFlight = null;
     automaticScopeRecovery = null;
   }
 

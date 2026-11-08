@@ -120,8 +120,7 @@ import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
-import { remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
-import { captureRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
+import { apiRuntimeConfig, remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
 import { toCanonicalWithdrawal, type WithdrawalDetailSnapshot, type WithdrawalPolicy } from "@/api/withdrawal-api";
 import { mockServerNow } from "@/store/server-time";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
@@ -179,7 +178,7 @@ function trackingReadScope(): WithdrawalTrackingReadScope | null {
     accountKey: app.accountKey,
     accountBindingEpoch: app.accountBindingEpoch,
     sessionRevision: sessionVault.revision(),
-    runtimeEpoch: captureRuntimeRevision().epoch,
+    apiOrigin: { ...apiRuntimeConfig },
     pageEpoch: trackingPageEpoch,
   };
 }
@@ -278,7 +277,7 @@ watch([trackingPageVisible, foregroundReadAllowed, () => auth.isAuthenticated], 
 });
 
 watch(
-  () => [trackedId.value, app.accountKey, app.accountBindingEpoch] as const,
+  () => [trackedId.value, app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const,
   ([, account, epoch], [, previousAccount, previousEpoch]) => {
     trackedWithdrawal.value = null;
     storeRowAtTrackedRead.value = null;
@@ -287,16 +286,8 @@ watch(
     refreshTrackedWithdrawal();
     if (account !== previousAccount || epoch !== previousEpoch) void loadWithdrawalPolicy();
   },
+  { flush: "sync" },
 );
-
-const stopTrackingRuntimeWatch = subscribeRuntimeRevision(() => {
-  if (!trackingPageVisible.value) return;
-  trackingPageEpoch += 1;
-  trackedWithdrawal.value = null;
-  storeRowAtTrackedRead.value = null;
-  trackedWithdrawalRead.invalidate();
-  refreshTrackedWithdrawal();
-});
 
 const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>(() => [
   { key: "submitted", label: t.value.wallet.submitted, hint: t.value.wallet.trackSubmittedHint },
@@ -405,7 +396,6 @@ onUnmounted(() => {
   trackingPageEpoch += 1;
   trackedWithdrawalRead.invalidate();
   stopDayTimer();
-  stopTrackingRuntimeWatch();
 }); // 兜底:onHide 不触发的场景(直接销毁)仍要清
 
 // app.withdrawals 本身是响应源,提交完回到本页会自动重算 —— 不再需要 `void wd.value` 那种手动挂依赖。
