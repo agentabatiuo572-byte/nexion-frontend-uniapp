@@ -9,29 +9,34 @@ const min=(a,b)=>a<b?a:b,max=(a,b)=>a>b?a:b;
 const capped=(amount,cap)=>String(cap??'').trim()===''?amount:min(amount,units(cap));
 const day=86400000,proof={sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
-export function trialDemo(url,locale,state,request,capacityFull){
+export function trialDemo(url,locale,state,request,capacityFull,products){
   if(!url.pathname.startsWith('/api/trial/'))return undefined;
   const now=Date.now(),mode=state.trialState||'follow';
   const data=structuredClone(fixture(new URL('/api/trial/state',url.origin),locale,{offers:true},request));
   if(mode==='read-error')refuse('TRIAL_STATE_UNAVAILABLE');
   const cfg=data.config;
+  cfg.shadowDailyUSD=String(products.find(product=>product.id===cfg.trialProductId).dailyEarn);
   // FEAT-TRIAL05 mirror of the Java quote: inside the original term the full claimed term is
   // settled and a fixed discount comes off what is left to pay; 0 switches the rule off.
   cfg.earlyPurchaseDiscountUSD??=String(state.trialEarlyDiscount??'10');
   // P-59 / backend B13-B14: the trial discount caps at $50; an empty offset cap is JSON null in App responses.
   cfg.discountCapUSD='50';cfg.trialOffsetCapUSD=null;
   const pricing=state.trialQuoteState||'default';
-  // BUG-081 samples keep their labelled early prices as real accrual advances: a zero claim cap
-  // pays all settled earnings out after purchase; lowering the sample price by $30 preserves the total.
+  // BUG-081 samples keep their labelled early prices through a zero offset cap;
+  // settled earnings are paid out after purchase and use the same catalog rate as a default claim.
   const precision=['precision','half-cent','precision-repriced'].includes(pricing);
-  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='half-cent'?'402.135':precision?'402.123456':pricing==='excess-offset'?'25':'1000',shadowDailyUSD:'10',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
+  if(pricing!=='default')Object.assign(cfg,{trialPriceUSD:pricing==='half-cent'?'402.135':precision?'402.123456':pricing==='excess-offset'?'25':'1000',shadowDailyNEX:'5',trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
   if(pricing==='precision-repriced')cfg.discountCapUSD='49.999999';
-  const duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
+  const unclaimedConfig=structuredClone(cfg);
+  // Claimed rates, terms and prices are snapshots; only the live promo cap can be repriced.
+  if(state.trialRow?.claimConfig)Object.assign(cfg,state.trialRow.claimConfig,{discountCapUSD:unclaimedConfig.discountCapUSD});
+  let duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
   const scenario=mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
   if(!state.trialRow){
     const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day:scenario==='ended'?duration+grace+day:day);
     state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE':['ended','eligible-again'].includes(scenario)?'FAILED':['converted','refunded'].includes(scenario)?'REDEEMED':'ELIGIBLE',startedAt};
+    if(state.trialRow.state!=='ELIGIBLE')state.trialRow.claimConfig=structuredClone(cfg);
   }
   const row=state.trialRow;
   function accruedAt(at){
@@ -101,7 +106,11 @@ export function trialDemo(url,locale,state,request,capacityFull){
   if(url.pathname==='/api/trial/start'){
     if(mode==='claim-error'&&!state.trialStartFailed){state.trialStartFailed=true;refuse('TRIAL_SERVICE_UNAVAILABLE');}
     if(snapshot().eligibilityReason==='capacity-full')refuse('TRIAL_CAPACITY_FULL');
-    if(snapshot().canStart)Object.assign(row,{state:'ACTIVE',startedAt:now,version:(row.version||1)+1});
+    if(snapshot().canStart){
+      Object.assign(cfg,unclaimedConfig);
+      duration=Number(cfg.trialDays)*day;grace=Number(cfg.graceDays)*day;
+      Object.assign(row,{state:'ACTIVE',startedAt:now,claimConfig:structuredClone(cfg),version:(row.version||1)+1});
+    }
     return remember(snapshot());
   }
   if(url.pathname==='/api/trial/cancel'){

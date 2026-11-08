@@ -1354,7 +1354,7 @@ APP 普通登录及冷启动会话恢复直接进入首页或既有合法返回�
 | NexGridRack P2 | active | $7,499 | $75.00 | 500 | 1,250× |
 | Cloud Share | active | $19.9 | $0.19 | 3 | 3× |
 
-上表为历史原型示意，当前价格和收益读取服务端商品目录。硬件商品卡使用 `dailyEarn`；Cloud Share 下发 `dailyEstimateLowUsdt` / `dailyEstimateHighUsdt` 时，商品卡改显示「预估每日收益」及该 USDT 区间，否则保留参考年奖励率。收益均以实际到账为准；日/月来源、数量及旧数据回退见 §7.2.1。
+上表为历史原型示意，当前价格和收益读取服务端商品目录；日/月来源、数量及旧数据回退见 §7.2.1。
 
 **经典款(市场售卖状态)**:S1 / Pro / Rack P1 标 `status="legacy"`(目录较早上架的型号,与置换资格**正交**),ProductCard 左下角显示「经典款 / Classic」chip(i18n `store.cardLegacyBadge`)。仍正常售卖;§6.8 产能递减 + §7.5 阶梯抵扣共同引导升级更高算力。
 
@@ -1434,7 +1434,7 @@ flowchart TD
 
 **卡片 ROI-first hero metric**(自上而下):
 
-1. **大字日产**:USDT 主数字(如 `$7.00/d`)+ 同行 `+N NEX` 副字(双币)。Cloud Share 同为入门级日产出设备,显示 `$0.19/d` + `+3 NEX/d`,与硬件同形(无年化 / 份额 / 锁仓语义)。
+1. **收益主数字**：硬件显示目录 `dailyEarn` 的预估 USDT 日值及独立 UVT 日值。Cloud Share 有 `dailyEstimateLowUsdt` / `dailyEstimateHighUsdt` 时，显示「预估每日收益」及服务端 USDT 日区间；无完整日区间时，保留目录 `shareYieldMin` / `shareYieldMax` 的「参考年奖励率」分支。Share 的独立 UVT 日值保持不变；收益以实际到账为准。
 2. **倍数徽章**(卡片右上角):`NNN×` + 副字 `vs phone`(= round(dailyEarn / 0.06),如 S1 117× / Pro 217× / Rack P1 750×)。
 3. **价格行**:`Price $649 · $60/mo × 11` 小字。Cloud Share 改 `$19.9`。
 4. **AI Performance 行**(已有):chip,展示 SDXL img/min · LLM tok/s · 解锁池信息。
