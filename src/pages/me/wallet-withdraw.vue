@@ -372,6 +372,12 @@ function refreshPendingAttempt() {
 }
 watch([() => app.accountKey, remoteSessionReady], refreshPendingAttempt, { flush: "sync" });
 
+function showWithdrawReceipt(kind: "info" | "error", key: string, title: string, body?: string) {
+  const otherAttempt = pendingAttempt.value && pendingAttempt.value.key !== key;
+  toast[kind](otherAttempt ? fmt(t.value.walletV3.withdrawEarlierOutcome, { outcome: title }) : title,
+    otherAttempt ? [body, t.value.walletV3.withdrawOtherPending].filter(Boolean).join(" ") : body);
+}
+
 async function abandonPendingAttempt() {
   const accountKey = app.accountKey;
   const bindingEpoch = app.accountBindingEpoch;
@@ -403,18 +409,18 @@ async function abandonPendingAttempt() {
       forgetWithdrawAttempt(accountKey, pending.key);
       refreshPendingAttempt();
       if (result.state === "COMMITTED") {
-        toast.info(t.value.walletV3.withdrawAbandonAlreadyCommitted);
+        showWithdrawReceipt("info", pending.key, t.value.walletV3.withdrawAbandonAlreadyCommitted);
         await app.refreshRemoteFleet();
         if (!scopeIsCurrent()) return;
         navTo(`/pages/me/wallet-withdraw-tracking?id=${encodeURIComponent(result.withdrawal.withdrawalNo)}`);
       } else {
-        toast.info(t.value.walletV3.withdrawAbandonSuccess);
+        showWithdrawReceipt("info", pending.key, t.value.walletV3.withdrawAbandonSuccess);
       }
     } else {
       if (!scopeIsCurrent()) return;
       forgetWithdrawAttempt(accountKey, pending.key);
       refreshPendingAttempt();
-      toast.info(t.value.walletV3.withdrawAbandonSuccess);
+      showWithdrawReceipt("info", pending.key, t.value.walletV3.withdrawAbandonSuccess);
     }
   } catch {
     if (!scopeIsCurrent()) return;
@@ -1477,22 +1483,22 @@ async function handleSubmit() {
     if (verdict.refreshPolicy) await loadWithdrawalPolicy();
     switch (verdict.kind) {
       case "daily-limit":
-        toast.error(verdict.fate === "keep" ? dailyLimitReachedWithPendingText.value : dailyLimitReachedText.value);
+        showWithdrawReceipt("error", snap.idempotencyKey, verdict.fate === "keep" ? dailyLimitReachedWithPendingText.value : dailyLimitReachedText.value);
         return;
       case "geo":
-        toast.error(geo ?? t.value.walletV3.withdrawDeclinedTitle, t.value.geoPolicy.fundsSafeNote);
+        showWithdrawReceipt("error", snap.idempotencyKey, geo ?? t.value.walletV3.withdrawDeclinedTitle, t.value.geoPolicy.fundsSafeNote);
         return;
       case "business":
-        toast.error(t.value.walletV3.submitReasonReviewBlocked);
+        showWithdrawReceipt("error", snap.idempotencyKey, t.value.walletV3.submitReasonReviewBlocked);
         return;
       case "resend-declined":
-        toast.error(t.value.walletV3.withdrawResendDeclinedTitle, t.value.walletV3.withdrawResendDeclinedBody);
+        showWithdrawReceipt("error", snap.idempotencyKey, t.value.walletV3.withdrawResendDeclinedTitle, t.value.walletV3.withdrawResendDeclinedBody);
         return;
       case "declined":
-        toast.error(t.value.walletV3.withdrawDeclinedTitle, t.value.walletV3.withdrawDeclinedBody);
+        showWithdrawReceipt("error", snap.idempotencyKey, t.value.walletV3.withdrawDeclinedTitle, t.value.walletV3.withdrawDeclinedBody);
         return;
       default:
-        toast.error(t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
+        showWithdrawReceipt("error", snap.idempotencyKey, t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
     }
     return;
   }
