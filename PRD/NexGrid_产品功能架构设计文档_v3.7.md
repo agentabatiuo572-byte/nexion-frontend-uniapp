@@ -4561,6 +4561,7 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
   basePower: number;            // W
   baseRate: number;             // daily USDT 基准(满效率,参 §6.8 设备生命周期)
   baseRateNEX: number;          // daily NEX 基准(平台代币,spec §8.1 静态收益 80%)
+  monthlyTargetActive?: boolean; // /api/devices/earnings 的设备目标事实；缺省按 false
   purchasedAt: number;          // epoch ms,购买/入网时间。驱动 §6.8 任务产能节奏 + 新机补贴期
   activatedAt: number | null;   // epoch ms 激活进槽位的时刻;null = 已购未激活(库存中)
   lastSettledAt?: number | null; // epoch ms 收益结算锚点(= 登记时刻);收益按 now−lastSettledAt 墙钟结算(§6.11);null = 当前不计产(未激活 / 冻结),恢复时重锚不回溯
@@ -4620,7 +4621,7 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 **激活生命周期 (`activatedAt`)** — 购买成功由服务端同步自动激活；已购实例之后可以正常停用、重新启用。`useApp.devices[]` 同时承载可选择库存（权威确认未激活或已停用）与 Online 设备（权威确认激活且未停用），不能用技术心跳替代业务激活状态。两类 derived selectors:
 
-- `selectActiveDevices(s)` / `selectInactiveDevices(s)` — 派生过滤
+- `selectActiveDevices(s)` / `selectInactiveDevices(s)` — 派生过滤；Share 库存按设备 `monthlyTargetActive` 显示当前 USDT 与独立 UVT，缺省为 false 时保留旧 UVT 分支；不从在售目录或金额真假值推断目标状态。
 - `selectActiveCount(s)` — 槽位占用数
 - `selectActivePhone(s)` — 手机激活状态(可能因用户在 `/me/devices` 取消激活而为 undefined)
 - `derivePromoUpgrade(devices)` — pure helper,返回 `{ baseKind, baseName, baseDaily, targetKind, targetName, targetDaily, multiplier, targetPayback }`,推广文本(weekly quest / Home upsell / EmptySlotsHint / MissedIncomeBanner)动态接此 helper；首页 `DoTheMathCard` 仅消费服务端投影，见 §5.8b。**base(`base*` 字段 = 最高日收益活跃真实设备)+ targetPayback(目标设备按其日收益的回本天数)详见 §13.2a**
