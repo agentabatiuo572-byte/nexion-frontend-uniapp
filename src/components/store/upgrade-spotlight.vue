@@ -1,5 +1,5 @@
 <template>
-  <view class="upgrade-spotlight nx-tint" :data-images-ready="baseReady && targetReady">
+  <view class="upgrade-spotlight" :data-images-ready="baseReady && targetReady">
     <text class="upgrade-eyebrow">{{ copy.upgrade }}</text>
     <view class="upgrade-title"><text class="upgrade-title__base">{{ base.name }}</text><text class="upgrade-title__target">→ {{ target.name }}</text></view>
     <view class="upgrade-art" aria-hidden="true">
@@ -70,8 +70,8 @@ watch(() => productCatalogState.status, status => {
 function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.target.id)); }
 </script>
 <style scoped>
-/* Tinted solid in brand (its colour used to come from a glow wash); the target device keeps its lime floor light. */
-.upgrade-spotlight { --nx-tint:var(--v5-brand); position:relative; overflow:hidden; padding:18px; border:1px solid var(--v5-border); border-radius:22px; }
+/* Plain card (04 §4.2: one tinted card per screen region); the target device keeps its lime floor light. */
+.upgrade-spotlight { position:relative; overflow:hidden; padding:18px; border:1px solid var(--v5-border); border-radius:22px; background:var(--v5-surface); }
 .upgrade-eyebrow { display:block; font:500 12.5px/18px var(--font-v5); color:var(--ui-lime-soft); }
 .upgrade-title { margin-top:6px; overflow-wrap:anywhere; }
 .upgrade-title__base { display:block; color:var(--v5-ink-2); font:500 var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
