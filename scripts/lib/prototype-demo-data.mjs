@@ -73,32 +73,35 @@ export const demoOptions = {
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['waiting','一直等待到账'],['read-error','原付款结果读取失败'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['late','宽限结束后到账·订单已取消（示例 001 剩 1 分钟）'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','后台关闭 ERC20'],['usdt-off','后台关闭 USDT 两个网络'],['low-balance','钱包余额不足（820.64 USDT）']],
 };
 const skuDefinitions = [
-  ['stellarbox-s1','UVELBox S1','Entry',1299,6.2,3,'4 × RTX 4090','96 GB',1200],
-  ['stellarbox-pro','UVELBox Pro','Pro',4999,22.4,12,'8 × RTX 4090','192 GB',2400],
-  ['stellarbox-pro-v2','UVELBox Pro v2','Pro',5999,28.6,18,'8 × RTX 5090','256 GB',2200],
-  ['stellarrack-p1','UVELRack P1','Flagship',12999,45,30,'8 × A100','640 GB',3200],
-  ['stellarrack-p2','UVELRack P2','Flagship',19999,75,50,'8 × H100','1,024 GB',4000],
-  ['cloud-share','Cloud Share','Share',19.9,0,0,'Distributed','—',0],
+  // Per-unit monthly USDT estimates; daily values are projections of these amounts.
+  ['stellarbox-s1','UVELBox S1','Entry',1299,186,3,'4 × RTX 4090','96 GB',1200],
+  ['stellarbox-pro','UVELBox Pro','Pro',4999,672,12,'8 × RTX 4090','192 GB',2400],
+  ['stellarbox-pro-v2','UVELBox Pro v2','Pro',5999,858,18,'8 × RTX 5090','256 GB',2200],
+  ['stellarrack-p1','UVELRack P1','Flagship',12999,1350,30,'8 × A100','640 GB',3200],
+  ['stellarrack-p2','UVELRack P2','Flagship',19999,2250,50,'8 × H100','1,024 GB',4000],
+  ['cloud-share','Cloud Share','Share',19.9,18,0,'Distributed','—',0],
 ];
 export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
-  const products=skuDefinitions.map(([id,name,tier,price,dailyEarn,dailyEarnNEX,gpu,vram,watts],index)=>{
+  const products=skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
-    return {id,name,tier,price,dailyEarn,dailyEarnNEX,computePoints:Math.round(price*10),gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,vram,power:watts?watts+' W':null,hashRate:null,
+    const dailyEarn=monthlyEstimateUsdt/30,b=.1;
+    return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,vram,power:watts?watts+' W':null,hashRate:null,
       tagline:localized(locale,['入门款 · 70B 大模型推理','旗舰款 · 训练与 405B 推理','进阶款 · 高性能推理','机架款 · 多任务并行','旗舰机架 · 大型算力作业','云算力 · 灵活参与'][index],['Starter · 70B model inference','Flagship · Training & 405B inference','Advanced · High-performance inference','Rack · Parallel workloads','Flagship rack · Large compute jobs','Cloud compute · Flexible access'][index],['Cơ bản · Suy luận mô hình 70B','Cao cấp · Huấn luyện và suy luận 405B','Nâng cao · Suy luận hiệu năng cao','Máy chủ · Tác vụ song song','Máy chủ cao cấp · Tác vụ tính toán lớn','Điện toán đám mây · Tham gia linh hoạt'][index]),badge:index===0?localized(locale,'推荐','Recommended','Đề xuất'):index===1?localized(locale,'热销','Best seller','Bán chạy'):null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock:share?null:state.catalogState==='soldout'&&index===0?0:60-index*7,sold:42+index*13,
       features:[],ai:null,datacenter:localized(locale,'新加坡','Singapore','Singapore'),uptime:'99.9%',warranty:share?undefined:localized(locale,'36 个月','36 months','36 tháng'),status:'active',available:!upcoming,
       releaseState:upcoming?'LOCKED':'RELEASED',releasePhaseId:upcoming?'phase-next':'phase-current',unlocksAtPhase:null,purchaseGate:null,
-      ...(share?{shareYieldMin:8,shareYieldMax:12}:{}),
+      ...(share?{dailyEstimateLowUsdt:monthlyEstimateUsdt*(1-b)/30,dailyEstimateHighUsdt:monthlyEstimateUsdt*(1+b)/30,
+        shareYieldMin:Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)),shareYieldMax:Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4))}:{}),
     };
   }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?undefined:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
   // Lite scope scenarios change the catalog itself, so purchase validation, orders and fleet devices all read the
   // same list: mixed adds a phone SKU, review renames the Pro and adds Mobile Cloud Share and iPhone15.
-  if(state.scopeState==='mixed') products.push({...products[0],id:'phone-basic',name:localized(locale,'手机算力设备','Phone compute device','Thiết bị điện thoại'),price:99});
+  if(state.scopeState==='mixed') products.push({...products[0],id:'phone-basic',name:localized(locale,'手机算力设备','Phone compute device','Thiết bị điện thoại'),price:99,monthlyEstimateUsdt:undefined});
   if(state.scopeState==='review') {
     products.find(p=>p.id==='stellarbox-pro').name='Mobile GPU Server';
     products.push(
       {...products.find(p=>p.productType==='SHARE'),id:'mobile-cloud-share',name:'Mobile Cloud Share'},
-      {...products[0],id:'iphone15',name:'iPhone15',price:99});
+      {...products[0],id:'iphone15',name:'iPhone15',price:99,monthlyEstimateUsdt:undefined});
   }
   return products;
 }
@@ -261,7 +264,13 @@ export function demoFleetFacts(url,locale,state) {
   state.fleetSeed??=demoSeedFleet(state,template,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
   const devices=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id))
     // Lite's stop action (compute scenarios) is a lifecycle event: a stopped device frees its slot.
-    .map(device=>state.stoppedDevices?.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device);
+    .map(device=>state.stoppedDevices?.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device)
+    .map(device=>{
+      const product=products.find(product=>product.id.toUpperCase()===device.productCode);
+      // Hidden phones keep their own earnings and never receive a monthly target projection.
+      if(product?.monthlyEstimateUsdt==null)return device;
+      return {...device,dailyUsdt:product.dailyEarn*device.capacityPct/100,dailyNex:product.dailyEarnNEX*device.capacityPct/100};
+    });
   // serverNow is this read's time: the shared review fixture's clock stops at server start.
   return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
 }
@@ -731,7 +740,9 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/devices/earnings') {
     const facts=demoFleetFacts(url,locale,state);
-    const data=base();data.walletUsdt=state.walletBalance??52800.64;data.walletNex=empty?0:1280;data.dailyUsdt=empty?0:28.6;data.dailyNex=empty?0:15;
+    const active=facts.devices.filter(device=>device.activatedAt!==null);
+    const data=base();data.walletUsdt=state.walletBalance??52800.64;data.walletNex=empty?0:1280;
+    data.dailyUsdt=active.reduce((sum,device)=>sum+device.dailyUsdt,0);data.dailyNex=active.reduce((sum,device)=>sum+device.dailyNex,0);
     Object.assign(data,facts);
     return data;
   }
