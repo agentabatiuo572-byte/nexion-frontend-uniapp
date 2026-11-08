@@ -2280,7 +2280,7 @@ export const id: Messages = {
   store: {
     title: "Toko",
     subtitle: "Perangkat komputasi khusus, dikelola penuh oleh UVEL.",
-    allProducts: "Perangkat",
+    allProducts: "Dijual",
     annualYield: "Est. hadiah tahunan (%)",
     price: "Harga",
     viewDetails: "Lihat detail",
