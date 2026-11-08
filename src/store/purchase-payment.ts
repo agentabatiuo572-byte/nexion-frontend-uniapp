@@ -138,22 +138,28 @@ async function loadPolicy() {
   const [fees, networks] = await Promise.allSettled([api.policy(), deposits.policy()]);
   if (!state.open || state.accountKey !== accountKey) return;
   // A failed read leaves the existing quote-led availability behaviour in place.
-  const policy = fees.status === 'fulfilled' ? fees.value : { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true };
+  const policy: Partial<Record<ExternalPaymentMethod, boolean>> = fees.status === 'fulfilled' ? fees.value : { HDPAY_BANK: true, CREGIS_USDT_BSC: true, CREGIS_USDT_ERC20: true };
+  // TRC20 needs both explicit channel configuration and a current open-network policy.
+  policy.CREGIS_USDT_TRC20 = policy.CREGIS_USDT_TRC20 === true && networks.status === 'fulfilled'
+    && networks.value.some(row => row.network === 'TRC20' && row.enabled);
   if (networks.status === 'fulfilled') for (const row of networks.value) {
-    const method = row.network === 'ERC20' ? 'CREGIS_USDT_ERC20' : 'CREGIS_USDT_BSC';
+    const method = row.network === 'TRC20' ? 'CREGIS_USDT_TRC20' : row.network === 'ERC20' ? 'CREGIS_USDT_ERC20' : 'CREGIS_USDT_BSC';
     policy[method] = policy[method] === true && row.enabled;
   }
   // A quote/create refusal remains authoritative if it arrived while the policies were loading.
-  for (const method of ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20'] as const) {
+  for (const method of ['HDPAY_BANK', 'CREGIS_USDT_BSC', 'CREGIS_USDT_ERC20', 'CREGIS_USDT_TRC20'] as const) {
     if (state.policy?.[method] === false) policy[method] = false;
   }
   state.policy = policy;
   reconcileChannel();
 }
-function available(method: PurchaseMethod) { return method === 'WALLET' || !state.policy || state.policy[method] === true; }
+function available(method: PurchaseMethod) {
+  if (method === 'CREGIS_USDT_TRC20') return state.policy?.[method] === true;
+  return method === 'WALLET' || !state.policy || state.policy[method] === true;
+}
 function channelUnavailable(error: unknown, method: PurchaseMethod) {
   return isApiRefusal(error, 503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED')
-    || (method === 'CREGIS_USDT_ERC20' || method === 'CREGIS_USDT_BSC')
+    || (method === 'CREGIS_USDT_ERC20' || method === 'CREGIS_USDT_BSC' || method === 'CREGIS_USDT_TRC20')
       && (isApiRefusal(error, 409, 'CREGIS_DIRECT_PAYMENT_PAUSED') || isApiRefusal(error, 503, 'CREGIS_DIRECT_PAYMENT_UNAVAILABLE'));
 }
 function hideChannel(method: ExternalPaymentMethod) {
@@ -164,7 +170,8 @@ function hideChannel(method: ExternalPaymentMethod) {
 function reconcileChannel() {
   if (state.pending || state.step === 'methods' || available(state.method)) return;
   state.notice = ''; reviewedQuote = confirmedQuote = null;
-  const other = state.method === 'CREGIS_USDT_ERC20' ? 'CREGIS_USDT_BSC' : state.method === 'CREGIS_USDT_BSC' ? 'CREGIS_USDT_ERC20' : null;
+  const other = state.method === 'HDPAY_BANK' ? null : (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC', 'CREGIS_USDT_TRC20'] as const)
+    .find(method => method !== state.method && available(method));
   if (other && available(other)) void select(other);
   else choose('WALLET');
 }
@@ -218,8 +225,9 @@ function deadlinePassed() { if (state.kind === 'ORDER_PAY') conclude('orderExpir
 function choose(option: 'WALLET' | 'HDPAY_BANK' | 'USDT') {
   if (option === 'WALLET') { state.step = 'methods'; void select('WALLET'); return; }
   if (option === 'HDPAY_BANK') { void select('HDPAY_BANK', 'bank'); return; }
-  // ERC20 is the default network; BEP20 only when ERC20 is unavailable.
-  const network: ExternalPaymentMethod = !available('CREGIS_USDT_ERC20') && available('CREGIS_USDT_BSC') ? 'CREGIS_USDT_BSC' : 'CREGIS_USDT_ERC20';
+  // Preserve ERC20/BEP20 priority; TRC20 is selectable only when explicitly open.
+  const network = (['CREGIS_USDT_ERC20', 'CREGIS_USDT_BSC', 'CREGIS_USDT_TRC20'] as const)
+    .find(available) ?? 'CREGIS_USDT_ERC20';
   void select(network, 'network');
 }
 function samePaymentTerms(left: PurchaseQuote, right: PurchaseQuote) {

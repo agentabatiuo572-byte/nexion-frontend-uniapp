@@ -1,6 +1,6 @@
 <!--
   DepositUsdtPane — 充值页「USDT 链上」通道段(PAY-规格 [FEAT-PAY01] ⑤⑥)。
-  正式模式支持 BEP20 / ERC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
+  正式模式支持 BEP20 / ERC20 / TRC20 → 专属地址 QR + 复制 + 服务端费/最低额/确认数
   → 常驻错网络警示 → 指引/工单入口 → 最近入金
   列表(confirming n/N 实时进度 · credited / dust_hold / returned 态)。
   4 态:骨架(匹配形状)/ 空列表 / 断网 inline 重试;服务端报告未配置或已关闭的网络不显示。
@@ -20,7 +20,7 @@
         >
           <view class="nx-dep-net__nm">
             <text class="nx-dep-net__name">{{ nw.label }}</text>
-            <text v-if="nw.id === 'usdt-trc20'" class="nx-dep-net__sub">{{ t.topupChrome.netRecommended }}</text>
+            <text v-if="!fundsServerEnabled && nw.id === 'usdt-trc20'" class="nx-dep-net__sub">{{ t.topupChrome.netRecommended }}</text>
             <text v-else class="nx-dep-net__sub">{{ fmt(t.topupChrome.netFee, { fee: formatAmount(fundsServerEnabled ? networkPolicies.find((policy) => policy.network === nw.label)?.feeUsdtExact : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
           </view>
           <view class="nx-dep-net__ck" aria-hidden="true" />
@@ -205,6 +205,7 @@ const remoteSessionReady = computed(() => {
 const NETWORKS: { id: ChainDepositChannel; label: string }[] = fundsServerEnabled ? [
   { id: "usdt-bep20", label: "BEP20" },
   { id: "usdt-erc20", label: "ERC20" },
+  { id: "usdt-trc20", label: "TRC20" },
 ] : [
   { id: "usdt-trc20", label: "TRC20" },
   { id: "usdt-bep20", label: "BEP20" },
@@ -326,7 +327,7 @@ async function load(background = false): Promise<void> {
         chainHistoryLoaded.value = true;
         chainHistoryFailed.value = false;
         serverRecords.value = deposits.map((row) => ({
-          depositId: row.depositId, channel: row.network === "ERC20" ? "usdt-erc20" : "usdt-bep20", txHash: row.txHash,
+          depositId: row.depositId, channel: row.network === "TRC20" ? "usdt-trc20" : row.network === "ERC20" ? "usdt-erc20" : "usdt-bep20", txHash: row.txHash,
           address: row.address, grossAmountUsdt: row.grossAmountUsdt,
           grossExact: exactDepositAmount(row.grossAmountUsdt, row.grossAmountUsdtExact),
           creditedExact: exactDepositAmount(row.creditedUsdt, row.creditedUsdtExact),

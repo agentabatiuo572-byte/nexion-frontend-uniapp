@@ -1,6 +1,7 @@
 import type { ChainDepositChannel, Withdrawal } from "./types";
+import { isTronAddressValid } from "@/lib/tron-address";
 
-// 提现地址直管纯逻辑。零依赖(vue/pinia/uni 均不引),
+// 提现地址直管纯逻辑，不依赖 vue/pinia/uni，
 // payout-address store 与 scripts/selfcheck-rebind.mjs 共用同一实现。
 //
 // 用户按网络直接维护提现地址。
@@ -80,12 +81,12 @@ export function fromWithdrawNetwork(network: Withdrawal["network"]): ChainDeposi
 // ── 校验 / 展示 ────────────────────────────────────────────────────
 
 /**
- * 链地址格式校验(全站单源,与服务端一致)。TRC20 = T + 33 位 Base58;
+ * 链地址格式校验(全站单源,与服务端一致)。TRC20 = TRON Base58Check;
  * ERC20/BEP20 = 0x + 40 hex。永不做静默截断或自动纠正(规格 ② 异常1)。
  */
 export function isChainAddressValid(network: ChainDepositChannel, address: string): boolean {
   const a = address.trim();
-  if (network === "usdt-trc20") return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
+  if (network === "usdt-trc20") return isTronAddressValid(a);
   return /^0x[0-9a-fA-F]{40}$/.test(a);
 }
 
