@@ -4396,6 +4396,7 @@ export const fil: Messages = {
   walletV3: {
     withdrawFeeStale: "Na-update ang fee rate — subukan ulit",
     withdrawContextStale: "Nagbago ang account o payout address mo — isumite ulit",
+    withdrawHandledElsewhere: "Naproseso na ang orihinal na request ng withdrawal sa ibang page. Tingnan ang history ng withdrawal mo.",
     withdrawResendTitle: "Ulitin ang orihinal na request ng withdrawal",
     withdrawResendBody: "Hindi kumpirmado ang resulta ng ${amount} na withdrawal sa {network} address {address}. Kapag inulit, itutuloy ang orihinal na request nang walang bagong withdrawal.",
     withdrawResendCta: "Ulitin ang orihinal na request",

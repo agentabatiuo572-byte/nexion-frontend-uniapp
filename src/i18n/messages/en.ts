@@ -4055,6 +4055,7 @@ timeHoursAgo: "{n}h ago",
   walletV3: {
     withdrawFeeStale: "The fee rate has been updated — please try again",
     withdrawContextStale: "Your account or payout address changed — please submit again",
+    withdrawHandledElsewhere: "The original withdrawal request was handled on another page. Check your withdrawal history.",
     withdrawResendTitle: "Retry original withdrawal request",
     withdrawResendBody:
       "The result of the ${amount} withdrawal to {network} address {address} is unconfirmed. Retrying continues the original request without creating another withdrawal.",
