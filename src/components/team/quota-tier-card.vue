@@ -1,5 +1,5 @@
 <template>
-  <view class="quota-tier nx-viz-press nx-viz-motion" :aria-busy="pending">
+  <view class="quota-tier nx-tint nx-viz-press nx-viz-motion" :aria-busy="pending">
     <view class="quota-tier__top">
       <text class="quota-product__qualification" :class="{ 'quota-product__qualification--met': !visibility.hidden && !pending && unlocked }"><svg v-if="!visibility.hidden && !pending && unlocked" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>{{ visibility.mask(pending ? '—' : unlocked ? t.quota.unlocked : t.quota.locked) }}</text>
       <view ref="stockBarRef" class="quota-stock" :aria-label="`${fmt(t.quota.leftLabel, { n: pending ? '—' : stockLeft })} · ${fmt(t.quota.soldPct, { pct: pending ? '—' : Math.round(stockPct * 100) })}`">
@@ -102,7 +102,8 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 </script>
 <style scoped>
 .quota-pending-action :deep(.nx-button--disabled), .quota-pending-action { opacity: 1; }
-.quota-tier { padding:var(--ui-space-section) 18px 22px;margin-bottom:18px;border:1px solid var(--v5-border);border-radius:24px;background:var(--v5-surface);color:var(--v5-ink); }
+/* P-41 tinted tier card: the shared tinted solid in brand (it used to be a top glow). */
+.quota-tier { --nx-tint:var(--v5-brand);padding:var(--ui-space-section) 18px 22px;margin-bottom:18px;border:1px solid var(--v5-border);border-radius:24px;color:var(--v5-ink); }
 .quota-product { display:flex;align-items:center;gap:14px;min-height:80px;cursor:pointer; }
 .quota-product__image { width:76px;height:80px;flex:none; }.quota-product__copy { min-width:0;flex:1; }
 .quota-product__name { display:block;font:600 17px/1.4 var(--font-v5);overflow-wrap:anywhere; }.quota-product__price { display:block;margin-top:var(--v5-space-1);font:500 14px/1.5 var(--font-v5);color:var(--v5-ink-2); }
