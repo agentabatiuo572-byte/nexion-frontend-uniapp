@@ -2285,7 +2285,7 @@ export const ms: Messages = {
   store: {
     title: "Kedai",
     subtitle: "Peranti pengkomputeran khusus, diurus sepenuhnya oleh UVEL.",
-    allProducts: "Peranti",
+    allProducts: "Dijual",
     annualYield: "Kadar ganjaran tahunan angg.",
     price: "Harga",
     viewDetails: "Lihat butiran",
