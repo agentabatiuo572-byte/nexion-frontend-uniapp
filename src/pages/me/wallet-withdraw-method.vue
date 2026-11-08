@@ -14,14 +14,10 @@
       <view class="method" role="button" tabindex="0" data-testid="withdraw-method-bank" :aria-disabled="!canOpenBank" @click="openBank" @keydown.enter.prevent="openBank" @keydown.space.prevent="openBank">
         <view class="method-top">
           <view class="method-icon method-icon--bank" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
-          <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ checking ? t.bankWithdrawal.loading : !recoveryKnown ? t.bankWithdrawal.recoveryUnavailable : bankIntent ? t.bankWithdrawal.resumeBank : bankUnavailable ? t.bankWithdrawal.unavailable : pending ? t.bankWithdrawal.resumeUsdt : t.bankWithdrawal.bankMethodHint }}</text></view>
+          <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ checking ? t.bankWithdrawal.loading : !recoveryKnown ? t.bankWithdrawal.recoveryUnavailable : bankIntent ? t.bankWithdrawal.resumeBank : bankUnavailable ? t.bankWithdrawal.unavailable : t.bankWithdrawal.bankMethodHint }}</text></view>
           <svg v-if="canOpenBank" class="method-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
       </view>
-      <text v-if="pending" class="status" role="status">{{ t.bankWithdrawal.resumeUsdt }}</text>
-      <text v-if="checking" class="status" role="status">{{ t.bankWithdrawal.loading }}</text>
-      <text v-else-if="!recoveryKnown" class="status" role="status">{{ t.bankWithdrawal.recoveryUnavailable }}</text>
-      <text v-else-if="bankIntent" class="status" role="status">{{ t.bankWithdrawal.resumeBank }}</text>
       <view v-if="!checking && !recoveryKnown" class="reload" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
     </view>
   </AppChassis>
@@ -37,9 +33,8 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { readWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { navTo } from "@/lib/route";
-import { apiClient } from "@/api/runtime";
+import { apiClient, apiRuntimeConfig } from "@/api/runtime";
 import { createBankWithdrawalApi } from "@/api/bank-withdrawal-api";
-import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 
 const t = useT(), app = useApp();
 const pending = ref(readWithdrawAttempt(app.accountKey));
@@ -51,8 +46,10 @@ const canOpenUsdt = computed(() => !!pending.value || (!checking.value && recove
 const bankUnavailable = computed(() => recoveryKnown.value && !bankIntent.value && !bankEnabled.value);
 const canOpenBank = computed(() => (!pending.value || bankIntent.value || !recoveryKnown.value) && !checking.value && !bankUnavailable.value);
 async function load() {
-  const currentRevision = ++revision, account = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
-  const current = () => visible && currentRevision === revision && account === app.accountKey && epoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime);
+  const currentRevision = ++revision, account = app.accountKey, epoch = app.accountBindingEpoch;
+  const { environment, baseUrl } = apiRuntimeConfig;
+  const current = () => visible && currentRevision === revision && account === app.accountKey && epoch === app.accountBindingEpoch
+    && environment === apiRuntimeConfig.environment && baseUrl === apiRuntimeConfig.baseUrl;
   readFailed.value = false;
   pending.value = readWithdrawAttempt(account); checking.value = true; recoveryKnown.value = false; bankIntent.value = false; bankEnabled.value = false;
   try {
@@ -63,11 +60,10 @@ async function load() {
 }
 useAutoRecovery({ failed: () => readFailed.value && !checking.value, retry: load });
 function reset() { revision++; recoveryKnown.value = false; bankIntent.value = false; pending.value = readWithdrawAttempt(app.accountKey); if (visible) void load(); }
-watch(() => [app.accountKey, app.accountBindingEpoch] as const, reset);
-const stopRuntime = subscribeRuntimeRevision(reset);
+watch(() => [app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, reset);
 onShow(() => { visible = true; void load(); });
 onHide(() => { visible = false; revision++; });
-onUnload(() => { visible = false; revision++; stopRuntime(); });
+onUnload(() => { visible = false; revision++; });
 // An unresolved USDT attempt resumes on the withdraw page itself (it restores the frozen network); otherwise choose a network first.
 function openUsdt() { if (canOpenUsdt.value) navTo(pending.value ? "/pages/me/wallet-withdraw" : "/pages/me/wallet-withdraw-network"); }
 function openBank() {
@@ -89,7 +85,6 @@ function openBank() {
 .method-title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .method-note { display: block; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .method-chev { flex: none; color: var(--v5-ink-4); }
-.status { display: block; margin: 4px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .reload { display: inline-flex; align-items: center; min-height: 44px; margin-left: 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .method[aria-disabled="true"] { opacity: .5; cursor: default; }
 .method[aria-disabled="true"]:active { transform: none; }
