@@ -522,6 +522,7 @@ export const uz: Messages = {
     expires: "Narx muddati",
     confirm: "Yechishni tasdiqlash",
     confirmNotice: "Yuborilgach, bu USDT summasi pul yechish yakunlanguncha band boʻladi. Takror yubormang.",
+    notSubmitted: "Kotirovka hali yuborilmagan.",
     intentClosed: "Bu kotirovka endi amal qilmaydi.",
     reload: "Yangilash",
     unknown: "Yuborish natijasi avtomatik tasdiqlanmoqda. Boshqa yechish soʻrovini boshlamang.",

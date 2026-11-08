@@ -522,6 +522,7 @@ export const fil: Messages = {
     expires: "Expiry ng quote",
     confirm: "Kumpirmahin",
     confirmNotice: "Pagkasumite, hindi magagamit ang halagang USDT na ito hangga't hindi tapos ang withdrawal. Huwag magsumite ng doble.",
+    notSubmitted: "Hindi pa naisusumite ang quote.",
     intentClosed: "Hindi na aktibo ang quote na ito.",
     reload: "I-reload",
     unknown: "Awtomatikong kinukumpirma ang resulta ng pagsusumite. Huwag magsimula ng ibang withdrawal.",

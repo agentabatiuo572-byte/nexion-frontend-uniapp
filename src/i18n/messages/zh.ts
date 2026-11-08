@@ -159,6 +159,7 @@ export const zh: Messages = {
     effective: "生效时间", amount: "提现金额（USDT）", quote: "获取报价", fee: "手续费（USDT）",
     net: "兑换金额（USDT）", rate: "每 USDT 兑换 VND", receive: "银行到账金额（VND）", expires: "报价到期时间", confirm: "确认提现",
     confirmNotice: "提交后，本笔 USDT 暂不可用，直至提现处理完成。请勿重复提交。",
+    notSubmitted: "报价尚未提交。",
     intentClosed: "原报价已结束。",
     reload: "重新加载", unknown: "正在自动确认原提交结果，请勿重复发起提现。",
     review: "等待处理", processing: "银行转账处理中", paid: "已到账", failed: "提现失败",
