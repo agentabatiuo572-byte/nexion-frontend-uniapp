@@ -14,7 +14,7 @@
 -->
 <template>
   <view>
-    <view class="nx-glass-card relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
+    <view class="nx-glass-card nx-tint relative overflow-hidden active:scale-[0.98]" :style="cardStyle" role="button" tabindex="0" :aria-label="ctaText" :aria-busy="supplyRetrying ? 'true' : 'false'" @click="onCardTap">
 
       <view class="relative" style="z-index: 1">
         <GenesisArtwork style="border-radius: 12px; margin-bottom: 14px" />
@@ -201,11 +201,12 @@ async function onCardTap() {
 }
 
 // ── styles（金色 = genesis 域例外,见文件头;其余走 --v5-* token,零 border 卡）──
-const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  background: "var(--nx-glass-fill)",
+// Tinted solid in genesis gold (its colour used to come from a corner aurora).
+const cardStyle: CSSProperties = {
+  "--nx-tint": "var(--v5-genesis-gold)",
   borderRadius: "var(--nx-glass-radius)",
   padding: "18px 16px 16px",
-};
+} as CSSProperties;
 const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   letterSpacing: "0.08em",

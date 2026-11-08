@@ -48,8 +48,9 @@
       </view>
       <template v-else>
 
-      <!-- Hero — the page's focal soft-glass card (01 §1.1.2); the total card below stays solid. -->
-      <view class="nx-soft-glass mx-4 relative overflow-hidden" style="padding: 18px; border-radius: 20px">
+      <!-- Hero — the page's focal card, tinted brand (its colour used to come from an aurora wash);
+           the total card below takes a brand-2 tint from its old corner glow. -->
+      <view class="nx-tint mx-4 relative overflow-hidden" style="--nx-tint: var(--v5-brand); padding: 18px; border-radius: 20px">
         <view class="relative">
           <view class="flex items-center" style="gap: 6px; margin-bottom: 8px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
@@ -133,7 +134,7 @@
       </view>
 
       <!-- Total summary -->
-      <view v-if="products.length > 0" class="nx-glass-card mx-4 mt-3 relative overflow-hidden" :style="heroStyle">
+      <view v-if="products.length > 0" class="nx-glass-card nx-tint mx-4 mt-3 relative overflow-hidden" :style="heroStyle">
         <view class="relative">
           <!-- Subtotal -->
           <view class="flex items-center justify-between" style="min-height: 24px">
@@ -819,11 +820,11 @@ const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-r
   padding: "24px 20px",
   background: "var(--nx-glass-fill)",
 };
-const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
+const heroStyle: CSSProperties = {
+  "--nx-tint": "var(--v5-brand-2)",
   padding: "18px",
   borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-};
+} as CSSProperties;
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",

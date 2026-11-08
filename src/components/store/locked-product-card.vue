@@ -1,11 +1,16 @@
 <!--
   LockedProductCard (inline variant) — "Coming soon" gen-2 phase-locked card
   (ported from store/page.tsx via locked-product-card.tsx inline branch).
-  Anticipation surface: solid card + Lock badge.
+  Anticipation surface: brand-2 aurora drift + 24px grid texture + Lock badge.
   Detailed specs, progress, queue proof and Notify CTA stay collapsed by default.
 -->
 <template>
   <view ref="cardRef" class="nx-glass-card relative overflow-hidden" :style="rootStyle">
+    <!-- aurora drift bg (paused off screen) -->
+    <view aria-hidden class="locked-card__aurora" :class="{ 'is-paused': !cardInView }" />
+    <!-- 24px grid overlay -->
+    <view aria-hidden class="locked-card__grid" />
+
     <view class="relative" style="padding: 16px">
       <!-- Top row — Lock badge + identity + ETA chip -->
       <view class="flex items-start" style="gap: 12px">
@@ -202,7 +207,8 @@ const lockBoxStyle: CSSProperties = {
   width: "44px",
   height: "44px",
   borderRadius: "12px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
+  background:
+    "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand-2) 10%, transparent), color-mix(in srgb, var(--v5-tech-cyan) 8%, transparent))",
 };
 
 const lockDotStyle: CSSProperties = {
@@ -270,3 +276,21 @@ const notifyBtnStyle: CSSProperties = {
 
 
 </script>
+<style scoped>
+.locked-card__aurora {
+  position: absolute; inset: -20%; pointer-events: none; opacity: .7; filter: blur(10px);
+  background:
+    radial-gradient(40% 50% at 85% 15%, var(--v5-brand-2-soft) 0%, transparent 60%),
+    radial-gradient(35% 45% at 15% 85%, var(--v5-tech-cyan-soft) 0%, transparent 60%);
+  animation: v5-aurora-drift 14s ease-in-out infinite;
+}
+.locked-card__aurora.is-paused { animation-play-state: paused; }
+/* Grid lines follow ink so the texture shows on the themed card surface in both themes. */
+.locked-card__grid {
+  position: absolute; inset: 0; pointer-events: none; background-size: 24px 24px;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px);
+}
+@media (prefers-reduced-motion: reduce) { .locked-card__aurora { animation: none; } }
+</style>

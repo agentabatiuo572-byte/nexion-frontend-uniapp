@@ -16,7 +16,7 @@
       </view>
       <template v-else-if="!publicOnly">
         <view v-if="voucherContext.voucherId" class="promotion promotion-flat"><text class="promotion-title">{{ t.promotion.eventVoucher }}</text><text class="promotion-copy">{{ t.promotion.eventVoucherTerms }}</text><view class="promotion-link" role="button" tabindex="0" @click="clearPromotion" @keydown.enter.prevent="clearPromotion" @keydown.space.prevent="clearPromotion"><text>{{ t.promotion.scopeClear }}</text></view></view>
-        <view v-if="voucherOffers.length&&!voucherContext.voucherId" class="store-voucher-ticket" data-testid="store-voucher-ticket" role="button" tabindex="0" @click="openStoreVouchers" @keydown.enter.prevent="openStoreVouchers" @keydown.space.prevent="openStoreVouchers">
+        <view v-if="voucherOffers.length&&!voucherContext.voucherId" class="store-voucher-ticket nx-tint" data-testid="store-voucher-ticket" role="button" tabindex="0" @click="openStoreVouchers" @keydown.enter.prevent="openStoreVouchers" @keydown.space.prevent="openStoreVouchers">
           <view class="store-voucher-ticket__value"><text v-if="voucherBenefit.amount != null" class="store-voucher-ticket__currency">$</text><text>{{ voucherBenefit.amount != null ? fmtMoney(voucherBenefit.amount).replace(/^\$/, '').replace(/\.00$/, '') : voucherBenefit.percent != null ? voucherBenefit.percent + '%' : '–' }}</text></view>
           <view class="store-voucher-ticket__rule" aria-hidden="true" />
           <view class="store-voucher-ticket__copy"><text class="store-voucher-ticket__title">{{ auditCopy.voucherShort }} · {{ fmt(auditCopy.voucherShortCount,{n:voucherOffers.length}) }}</text><view class="store-voucher-ticket__hint"><view v-if="voucherBenefit.amount == null">{{ auditCopy.voucherDiscount }}</view><view>{{ voucherClaimable.length ? auditCopy.claimToUse : auditCopy.autoApplyVoucher }}</view></view></view>
@@ -445,7 +445,9 @@ const goalFocusRetryStyle: CSSProperties = {
 <style scoped>
 .store-content { padding:12px 16px 16px; color:var(--v5-ink); }
 .store-content > * + * { margin-top:16px; }
-.store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); box-shadow:none; background:var(--v5-surface); }
+.store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); box-shadow:none; background:color-mix(in srgb,var(--v5-brand) 7%,var(--v5-surface)); }
+/* The campaign entry lives in PromotionEntry, so it takes the .nx-tint values (7% dark / 5% light, brand) here. */
+[data-theme="light"] .store-campaign :deep(.entry-advert) { background:color-mix(in srgb,var(--v5-brand) 5%,var(--v5-surface)); }
 .store-campaign :deep(.entry-label) { top:18px; left:18px; padding:0; border:0; background:transparent; color:var(--ui-lime-soft); font:500 12.5px/18px var(--font-v5); }
 .store-campaign :deep(.entry-title) { font-size:19px; line-height:25px; }
 .store-catalogue { margin-top:20px; }
