@@ -66,7 +66,8 @@
       <!-- Full detail -->
       <template v-else>
         <!-- === Section 1: Hero === -->
-        <view class="mx-4 nx-glass-card overflow-hidden relative detail-hero">
+        <!-- Tinted brand: the hero's colour used to come from a three-layer aurora wash. -->
+        <view class="mx-4 nx-glass-card nx-tint overflow-hidden relative detail-hero" style="--nx-tint: var(--v5-brand)">
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
             <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
