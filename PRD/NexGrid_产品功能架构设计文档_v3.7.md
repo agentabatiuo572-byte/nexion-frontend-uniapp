@@ -1327,6 +1327,8 @@ APP 普通登录及冷启动会话恢复直接进入首页或既有合法返回�
 | NexGridRack P2 | active | $7,499 | $75.00 | 500 | 1,250× |
 | Cloud Share | active | $19.9 | $0.19 | 3 | 3× |
 
+上表为历史原型示意，当前价格和收益读取服务端商品目录。硬件商品卡使用 `dailyEarn`；Cloud Share 下发 `dailyEstimateLowUsdt` / `dailyEstimateHighUsdt` 时，商品卡改显示「预估每日收益」及该 USDT 区间，否则保留参考年奖励率。收益均以实际到账为准；日/月来源、数量及旧数据回退见 §7.2.1。
+
 **经典款(市场售卖状态)**:S1 / Pro / Rack P1 标 `status="legacy"`(目录较早上架的型号,与置换资格**正交**),ProductCard 左下角显示「经典款 / Classic」chip(i18n `store.cardLegacyBadge`)。仍正常售卖;§6.8 产能递减 + §7.5 阶梯抵扣共同引导升级更高算力。
 
 **升级置换(设备级,无固定映射)**:任何已购付费设备可随时下架,按其累计产出落阶梯折抵购买**任何更高价 SKU**(默认规则;详见 §7.5)。
@@ -1437,49 +1439,38 @@ flowchart TD
    - **团队算力点(2026-11-03 P-66)**:销售数据正下方一行提示「[三节点图标] 每台为团队增加 12,990 算力点」,Cloud Share 为「每份为团队增加 … 算力点」(英文 `Each unit/share adds {n} compute pts to your team`,越南语 `Mỗi máy/phần cộng {n} điểm tính toán cho nhóm`)。数值读目录 `computePoints`(单件计入团队的算力点,与后端 `nx_product.compute_points` 同值),按语言千分位(越南语用「.」);数字用统计数字字体,其余为 12px 弱化正文,无分隔线、无强调色、不可点击。只在商品详情显示,商品卡和结算页不显示;`computePoints` 缺失、null 或为 0 时整行隐藏;不受「隐藏数据」遮盖(商品信息,非个人数据);窄屏可折成两行,不得溢出。目录下发该字段前此行不显示。
 2. **活动 / 代金券提示**:从活动或代金券入口进入时,在 Hero 下方显示活动状态或代金券条款。
 3. **Cloud Share 收益卡**(仅 Cloud Share):见下方 Cloud Share variant。
-4. **预估收益**(仅硬件,非活动入口):「预估每日收益」「预估每月」两格,来自当前目录日产;不显示回本天数、年化或首年净利,也不显示与手机的对比(Lite 详情页没有手机收益条或倍数)。
+4. **预估收益**(仅硬件,非活动入口):「预估每日收益」「预估每月」两格。日值读取当前目录 `dailyEarn`，月值优先读取精确的 `monthlyEstimateUsdt`，各乘所选数量一次；月字段缺省或为 null 才回退 `dailyEarn × 30 × 数量`。标题旁显示「以实际到账为准」，不再写「近 30 天平均」；不显示回本天数、年化、首年净利或与手机的对比（Lite 详情页没有手机收益条或倍数）。
 5. **硬件规格** / **AI 性能**:见本节开头「硬件规格、AI 性能与相关资料」。
 6. **信任资料**:合作方与本商品相关资料。
 7. **FAQ**。
 8. **底部固定购买栏**:价格、预估每日收益(硬件)、数量步进和「立即购买」;资格与配额状态见上方「当前资格交互」。
 
-Cloud Share variant:Cloud Share 是数字份额(`productType=SHARE`,`inventoryMode=UNLIMITED`,不占实物库存)。详情页不显示预估收益两格,改为「预估每日收益」卡:USDT 日收益按当前价格、所选份数与目录参考年奖励率区间(`shareYieldMin`–`shareYieldMax`)折算成区间,另列 UVT 日收益和「参考年奖励率」,附「以实际到账为准」说明;不显示本周剩余。走立即购买流程。
+Cloud Share variant:Cloud Share 是数字份额(`productType=SHARE`,`inventoryMode=UNLIMITED`,不占实物库存)。详情页不显示硬件预估收益两格，沿用「预估每日收益」卡：目录下发 `dailyEstimateLowUsdt` / `dailyEstimateHighUsdt` 时直接显示该日区间，并在同一卡内显示 `monthlyEstimateUsdt` 对应的「预估每月」，均乘所选份数一次。参考年奖励率仅作另一项参考，不反推新字段的金额。未下发完整日区间时，保留原先按当前价格、所选份数与 `shareYieldMin`–`shareYieldMax` 折算日区间的分支，不新增月值。UVT 日收益继续读取 `dailyEarnNEX × 份数`；附「以实际到账为准」说明，不显示本周剩余，走立即购买流程。
 
-#### 7.2.1 ROI Calculator
+#### 7.2.1 预估每日与每月
 
-放在详情页底部,允许用户调整数量(1-10)实时重算。
+硬件详情保留「预估每日收益」「预估每月」两格，Cloud Share 使用上文的专用收益卡。数量使用底部购买栏已有步进和服务端购买上限；调整数量只改变合计，不重复应用数量或设备产能。页面不再显示旧原型的 ROI、回本、首年净利、12 月累计图或「实际收益 ±15%」说明。
 
-**结构**:
+**目录与显示规则（H5 Lite，2026-11-09；移植自 App 提交 a66385a7、42703bb5）**：
 
-- 标题 `CALCULATE YOUR RETURNS`(verify.sh 关键文案断言)
-- 数量 stepper(`− 1 +`)— 仅硬件 SKU;Cloud Share(入门设备 · 日产微量)不含此计算器(见 §7.2 Cloud Share variant)
-- `Total investment: $X,XXX` 即时小行
-- **5 ROI block**(2 列 grid + 第 5 块 col-span-2):
-  - Est. Daily
-  - Est. Monthly
-  - Est. Annual + 副字 `+N NEX/yr`(双币年度展示)
-  - Payback(显示 `N d` 或 `X.X mo`)
-  - **Year 1 Net**(col-span-2 突出,`+$XX,XXX`)
-- **12-Month Cumulative Return Chart**(仅非 Share):
-  - 标题 `12-MONTH CUMULATIVE RETURN` + 右上角终值 `$XX,XXX`
-  - 12 根柱(月累计收益,profitable 月 / 未回本月)
-  - `Purchase price` 水平虚线(对应 totalPrice)
-  - `▲ Break-even M{n}` 竖虚线 marker(标第几月回本)
-  - 底部 legend(Purchase price 点 / Profitable 点)
-- Footer 免责声明:"Projections use current network parameters (live). Actual earnings fluctuate ±15%. ROI excludes electricity (covered by managed hosting)."
+- `GET /api/store/catalog` 增加 `monthlyEstimateUsdt`、`dailyEstimateLowUsdt`、`dailyEstimateHighUsdt`。允许数值或十进制字符串，在目录解析边界转成数值；缺省或 null 表示沿用旧展示，合法 0 必须保留。
+- 有月收益配置时，服务端下发精确月值 `monthlyEstimateUsdt = T`、`dailyEarn = T / 30`；Share 另下发日区间 `T × (1∓b) / 30`。客户端只消费服务端派生金额，不从舍入后的日值或参考年奖励率反算月值。T、b 及计算方式仅为内部合同说明，不展示给用户。
+- 无月收益配置时，新增字段为空，硬件沿用日值乘 30 的旧月估算，Share 沿用原参考年奖励率分支。`dailyEarnNEX` 不变，Cloud Share 原有每日 3 UVT 权益独立保留。手机不纳入月目标；Lite 设备视图继续隐藏手机，账号资金记录仍完整包含手机收益（§5.0）。
+- 商品卡、详情与组合套餐使用同一目录日值；套餐分别合计各商品的日区间两端，硬件日值计入两端。旧 Share 无日区间时仍只展示参考年奖励率，不计入套餐日合计。套餐每个已选 SKU 计一次；详情按所选数量计一次。
+- 估算文案保留「预估／预计，以实际到账为准」。九种语言的 `detEstReturnsMeta` 复用各语言 `shareYieldDisclaimer`，仅去掉末尾句号，不再表示历史 30 天平均。
 
-**计算公式**:
+**金额来源**：
 
-| 量 | 公式 |
+| 展示 | 来源 |
 |---|---|
-| daily | `product.dailyEarn × qty` |
-| monthly | `daily × 30` |
-| annual | `daily × 365` |
-| paybackDays | `round(totalPrice / daily)` |
-| year1Net | `annual − totalPrice` |
-| annualNEX | `product.dailyEarnNEX × qty × 365` |
-| 月柱值 cumulative[i] | `daily × 30 × (i + 1)`, i ∈ [0, 11] |
-| breakEvenMonth | `ceil(paybackDays / 30)` |
+| 硬件预估每日 | `dailyEarn × qty` |
+| 硬件预估每月 | `(monthlyEstimateUsdt ?? dailyEarn × 30) × qty` |
+| Share 新日区间 | `dailyEstimateLowUsdt × qty` – `dailyEstimateHighUsdt × qty` |
+| Share 新月估值 | `monthlyEstimateUsdt × qty` |
+| Share 旧日区间 | `price × shareYieldMin/Max ÷ 100 ÷ 365 × qty` |
+| Share UVT 日值 | `dailyEarnNEX × qty` |
+
+金额先按源值合计再格式化：月值沿用两位小数金额展示，Share 日区间最多六位小数。不将显示舍入后的值重新参与估算。当前设备日产为 `T / 30 × 当前产能`；设备列表消费服务端已含产能的 `dailyUsdt`，沿用 Lite 现有还原满产能再投影流程，不再次乘产能。新商品仍显示目录满产能估值。Lite 的注册成功页、手机隐藏、网页风控标识与其他 §5.0 差异保持原规则。
 
 #### 7.2.2 LiveSocialProof 实时购买动态
 
