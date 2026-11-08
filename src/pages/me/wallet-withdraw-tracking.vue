@@ -317,9 +317,10 @@ const failedTitle = computed(() => {
 const routeHeld = computed(() => !!wd.value
   && (wd.value.status === "review-pending" || wd.value.status === "frozen"
     || (wd.value.status === "submitted" && !!wd.value.riskRoute && wd.value.riskRoute !== "pass")));
-// A TRC20 phase wait is independent of a manual-review route, including small fast-lane orders.
-const stageHeld = computed(() => wd.value?.network === "USDT-TRC20" && wd.value.complianceHoldApplies === true
-  && (wd.value.complianceHoldDays ?? 0) > 0
+// Original flags are historical evidence; only a future USDT server deadline is a current review window.
+const reviewWindowHeld = computed(() => !!wd.value && wd.value.network !== "BANK-VND"
+  && typeof wd.value.reviewHoldUntil === "number" && Number.isFinite(wd.value.reviewHoldUntil)
+  && wd.value.reviewHoldUntil > nowTick.value
   && ["submitted", "review-pending", "review-passed"].includes(wd.value.status));
 const needsSupport = computed(() => routeHeld.value || isFrozenHold.value || isFailedEnd.value);
 // 终态:5 步全部走满,最后一步不能还转圈 —— 转圈代表「进行中」,
@@ -476,8 +477,8 @@ const etaTitle = computed(() =>
       ? failedTitle.value
       : isFrozenHold.value
       ? t.value.wallet.routeHeldFrozenTitle
-      : stageHeld.value
-        ? t.value.walletV3.stageWaitTitle
+      : reviewWindowHeld.value
+        ? t.value.walletV3.complianceHoldTitle
       : routeHeld.value
         ? t.value.wallet.withdrawRouteHeldTitle
         // 🔴 标题必须用**不带插值**的 key。这里原来直接取 trackEtaPending,而那条
@@ -490,20 +491,15 @@ const etaSub = computed(() => {
   // 失败终态不给「预计到账」——钱没走成,给的是原因 + 客服出口(见 needsSupport)。
   if (isFailedEnd.value) return t.value.wallet.trackFailedBody;
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
-  if (stageHeld.value) {
+  if (reviewWindowHeld.value) {
     const current = wd.value!;
-    return typeof current.reviewHoldUntil === "number" && Number.isFinite(current.reviewHoldUntil)
-      ? fmt(t.value.walletV3.stageWaitUntilBody, { time: absTime(current.reviewHoldUntil) })
-      : fmt(t.value.walletV3.stageWaitPendingBody, { days: current.complianceHoldDays! });
+    return fmt(current.complianceReviewRequired && current.status !== "review-passed"
+      ? t.value.walletV3.complianceHoldUntilBody : t.value.walletV3.reviewWindowUntilBody,
+    { time: absTime(current.reviewHoldUntil!) });
   }
   if (routeHeld.value) {
     const current = wd.value!;
-    if (current.complianceReviewRequired) {
-      return current.complianceHoldApplies && (current.complianceHoldDays ?? 0) > 0
-        && typeof current.reviewHoldUntil === "number" && Number.isFinite(current.reviewHoldUntil)
-        ? fmt(t.value.walletV3.complianceHoldUntilBody, { time: absTime(current.reviewHoldUntil) })
-        : t.value.walletV3.complianceReviewRequired;
-    }
+    if (current.complianceReviewRequired) return t.value.walletV3.complianceReviewRequired;
     return t.value.wallet.withdrawRouteHeldSub;
   }
   // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
