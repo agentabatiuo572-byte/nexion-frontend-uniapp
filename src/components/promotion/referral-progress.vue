@@ -36,7 +36,7 @@
       </NxSheet>
     </view>
     <!-- Lite: phone-only offers stay hidden; previously earned rewards remain readable. -->
-    <view v-for="activity in earnedRecords" :key="'records:'+activity.activityId" class="referral-activity referral-records nx-tint" :data-activity-id="activity.activityId">
+    <view v-for="activity in earnedRecords" :key="'records:'+activity.activityId" class="referral-activity referral-records" :data-activity-id="activity.activityId">
       <text class="referral-activity-title">{{ copy.myGifts }}</text>
       <RewardRows v-if="progress[activity.activityId]" :rewards="progress[activity.activityId].ownRewards" :value-mask="visibility.hidden ? visibility.mask('') : undefined" />
       <text v-else class="promotion-copy" role="status">{{ progressBusy[activity.activityId] ? t.promotion.loading : '—' }}</text>
@@ -155,6 +155,8 @@ useAutoRecovery({
 .referral-refresh-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Both cards keep their original brand-2 hue as a tinted solid with its shared rim (01 §1.1.2). */
 .referral-activity { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: var(--v5-space-5); border-radius: 28px; }
+/* Earned records are data, not a running campaign: a plain card, so only the campaign carries the tint (04 §4.3). */
+.referral-records { background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .referral-activity + .referral-activity { margin-top: var(--ui-space-inset); }
 .referral-hero { position: relative; display: flex; align-items: center; min-height: 84px; margin-top: -4px; }
 .referral-meta { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--v5-space-2); }
