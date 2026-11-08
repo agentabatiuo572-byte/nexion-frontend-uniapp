@@ -35,7 +35,8 @@
 
       <!-- Slot chassis: a liquid-glass panel whose bays show which device holds each compute slot. -->
       <view v-if="!inventoryError" class="device-stage mx-4">
-        <view class="device-hero nx-soft-glass" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
+        <view class="device-stage__aura" aria-hidden="true"><view /><view /></view>
+        <view class="device-hero nx-tint" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
           <view class="device-hero__top">
             <view>
               <text class="device-hero__title">{{ t.myDevices.inventorySlotsLabel }}</text>
@@ -371,8 +372,14 @@ function goStore() {
 
 <style scoped>
 .device-stage { position: relative; margin-top: 15px; }
-/* Page focus block on the shared soft glass; bays sit in it as recessed wells. */
-.device-hero { --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl); }
+.device-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
+.device-stage__aura > view { position: absolute; width: 190px; height: 150px; border-radius: 50%; filter: blur(42px); }
+.device-stage__aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent); }
+.device-stage__aura > view:last-child { right: -14px; bottom: 20px; background: color-mix(in srgb, var(--v5-aura-sky) 28%, transparent); }
+[data-theme="light"] .device-stage__aura > view:first-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
+[data-theme="light"] .device-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-aura-sky) 18%, transparent); }
+/* Page focus block: the stage's cyan as one uniform tint (.nx-tint) over the outer aura; bays sit in it as recessed wells. */
+.device-hero { --nx-tint: var(--v5-tech-cyan); --device-bay-well: inset 0 2px 8px rgba(0,0,0,.45); position: relative; padding: 20px; border-radius: var(--v5-radius-xl); }
 [data-theme="light"] .device-hero { --device-bay-well: inset 0 1px 4px rgba(20,16,8,.10); }
 .device-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .device-hero__title { display: block; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
@@ -396,7 +403,7 @@ function goStore() {
 /* Over the stage aura the shared frosted blur only applied during the page-enter animation (bright, then
    dim); a fixed, slightly denser fill keeps the brighter look without the flash. */
 [data-theme="dark"] .device-bay-slot__plus { --ui-button-fill: color-mix(in srgb, var(--v5-ink) 14%, transparent); }
-.device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, var(--v5-surface-2)); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
+.device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .device-bay-slot--loading { background: linear-gradient(100deg, color-mix(in srgb, var(--v5-ink) 4%, transparent) 30%, color-mix(in srgb, var(--v5-ink) 10%, transparent) 50%, color-mix(in srgb, var(--v5-ink) 4%, transparent) 70%); background-size: 300% 100%; animation: device-shimmer 1.6s linear infinite; }
 .device-inventory-section { margin-top: var(--ui-space-section-gap, 32px); min-width: 0; }
 .device-inventory-section__head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; margin-bottom: 12px; }
