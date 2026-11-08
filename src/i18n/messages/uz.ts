@@ -1723,6 +1723,10 @@ export const uz: Messages = {
     checkoutOutcomeUnknown: "Toʻplam buyurtmasi natijasi hali tasdiqlanmadi. Toʻplamni saqlab, qayta urining.",
     policyChanged: "Toʻplam narxi oʻzgardi. Buyurtma berishdan oldin yangi jami summani tekshiring.",
     checkoutBillMemo: "Toʻplam xaridi · {count} ta qurilma",
+    slotsShortTitle: "Boʻsh slot yetarli emas",
+    slotsShortBody: "{count} ta qurilma tanlandi, boʻsh slot: {free} ta. Qurilmalar omborida qurilmani oʻchiring yoki toʻplamdan qurilmalarni olib tashlang.",
+    slotsShortManage: "Qurilmalar omborini ochish",
+    slotsShortAdjust: "Toʻplamni oʻzgartirish",
   },
   tx: {
     navTitle: "Tranzaksiya tafsilotlari",
