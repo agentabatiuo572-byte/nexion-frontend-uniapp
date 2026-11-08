@@ -388,10 +388,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-price-fraction { color:var(--v5-ink-3); }
 .quota-carousel { display: flex; gap: var(--ui-space-inline); margin: var(--ui-space-inset) -20px 0; padding: 0 var(--v5-space-5) var(--v5-space-1); overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--v5-space-5); scrollbar-width: none; }
 .quota-carousel::-webkit-scrollbar { display: none; }
-.quota-content .quota-carousel :deep(.quota-tier) { flex: none; width: 260px; box-sizing: border-box; padding: var(--ui-space-inset); border: 0; border-radius: 28px; scroll-snap-align: start; background: color-mix(in srgb, var(--v5-brand) 7%, var(--v5-surface)); box-shadow: inset 0 0 0 1px var(--v5-border); }
-/* Tier cards are tinted brand at the .nx-tint strength (P-41 tinted carousel; it used to be a top glow). quota-tier-card.vue
-   owns the card background, so the tint is set here rather than through the .nx-tint class. */
-[data-theme="light"] .quota-content .quota-carousel :deep(.quota-tier) { background: color-mix(in srgb, var(--v5-brand) 5%, var(--v5-surface)); }
+.quota-content .quota-carousel :deep(.quota-tier) { flex: none; width: 260px; box-sizing: border-box; padding: var(--ui-space-inset); border: 0; border-radius: 28px; scroll-snap-align: start; }
 .quota-content .quota-carousel :deep(.quota-product) { flex-direction: column; align-items: flex-start; gap: var(--v5-space-2); }
 .quota-content .quota-carousel :deep(.quota-product__image) { align-self: center; width: 100%; height: 120px; }
 .quota-content .quota-carousel :deep(.quota-product__arrow) { display: none; }
