@@ -1,7 +1,8 @@
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
-import { demoWithdrawalFacts, secondaryDemo } from './prototype-demo-secondary.mjs';
+import { demoWithdrawalFacts, secondaryDemo, settleDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
+import { demoPayoutAddresses, demoWithdrawalNetworks, demoWithdrawals } from './prototype-demo-finance.mjs';
 
 const DAY = 86400000;
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
@@ -27,13 +28,13 @@ export function bankDemo(url, state, request) {
   };
   const challenge = type => {
     if(state.authUser&&!state.authUser.phone)fail(type==='address'?'PAYOUT_ADDRESS_PHONE_INVALID':'USER_PHONE_REQUIRED',422);
-    const challengeNo = type === 'bank' ? 'PAYOUT-BANK-' + randomBytes(16).toString('hex') : 'PAYOUT-' + randomBytes(12).toString('hex').toUpperCase();
+    const challengeNo = type === 'bank' ? 'PAYOUT-BANK-' + randomBytes(16).toString('hex') : 'PAYOUT-' + randomBytes(16).toString('hex').toUpperCase();
     demo[type + 'Otp'] = { challengeNo, expiresAt: now + 300000 };
     return { ...proof, challengeNo, expiresInSeconds: 300, retryAfterSeconds: 60 };
   };
   const validateOtp = type => {
     const challenge = demo[type + 'Otp'];
-    if (!challenge || challenge.expiresAt <= now || input().challengeNo !== challenge.challengeNo || input().code !== '123456') fail('OTP_INVALID', 400);
+    if (!challenge || challenge.expiresAt <= now || input().challengeNo !== challenge.challengeNo || input().code !== '123456') fail(type === 'address' ? 'PAYOUT_ADDRESS_OTP_INVALID' : 'OTP_INVALID', type === 'address' ? 422 : 400);
   };
   const config = () => {
     const base = secondaryDemo(new URL('/api/withdrawals/bank/config', url.origin), state, { method: () => 'GET' });
@@ -42,11 +43,7 @@ export function bankDemo(url, state, request) {
     return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: !intents.length ? null : { state: intents.length > 1 ? 'MULTIPLE' : 'NOT_SUBMITTED', intents, quoteNo: intents.length === 1 ? intents[0].quoteNo : null, withdrawalNo: null } };
   };
   const orderView = row => {
-    // The panel decides how an open order ends; once ended that is its fact. A rejected payout returns the funds.
-    if (!row.outcome && ['settled', 'rejected'].includes(state.bankState)) {
-      row.outcome = state.bankState;
-      if (row.outcome === 'rejected') state.walletBalance = Math.round((demoWithdrawalFacts(state, now).walletUsdt + row.bank.amountUsdt) * 1e6) / 1e6;
-    }
+    settleDemoBankWithdrawals(state);
     const settled = row.outcome === 'settled', rejected = row.outcome === 'rejected';
     return { ...snapshot(row), providerState: settled ? 'PAID' : rejected ? 'FAILED' : 'PENDING',
       withdrawal: { ...row.withdrawal, status: settled ? 'CONFIRMED' : rejected ? 'REFUNDED' : 'PROCESSING' },
@@ -103,15 +100,23 @@ export function bankDemo(url, state, request) {
   }
   if (path === '/api/payout-addresses/otp/send' && method === 'POST') return challenge('address');
   if (path === '/api/payout-addresses' && method === 'PUT') return command('address', () => {
-    validateOtp('address');
     const body = input();
-    const addressValid = body.network === 'USDT-TRC20'
-      ? /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(body.address)
-      : ['USDT-BEP20', 'USDT-ERC20'].includes(body.network) && /^0x[0-9a-fA-F]{40}$/.test(body.address);
-    if (!addressValid) fail('PAYOUT_ADDRESS_INVALID', 400);
-    demo.address = { ...proof, network: body.network, address: body.address, status: 'ACTIVE', effectiveAt: new Date(now + DAY).toISOString(), createdAt: new Date(now).toISOString(), nextChangeAllowedAt: new Date(now + 7 * DAY).toISOString(), changePending: true };
+    const network = String(body.network ?? '').trim().toUpperCase(), address = String(body.address ?? '').trim();
+    if (!['USDT-TRC20', 'USDT-BEP20', 'USDT-ERC20'].includes(network)) fail('PAYOUT_ADDRESS_NETWORK_INVALID', 422);
+    const addressValid = network === 'USDT-TRC20' ? /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address) : /^0x[0-9a-fA-F]{40}$/.test(address);
+    if (!addressValid) fail('PAYOUT_ADDRESS_FORMAT_INVALID', 422);
+    if (!demoWithdrawalNetworks(state).includes(network)) fail('WITHDRAWAL_NETWORK_DISABLED');
+    validateOtp('address');
+    // verifyAndConsume commits in REQUIRES_NEW: later in-flight/cooldown refusals still burn this code.
     delete demo.addressOtp;
-    return snapshot(demo.address);
+    // Keep the backend's exact terminal set: REFUNDED is settled; REVIEW_REJECTED alone still blocks changes.
+    const terminal = ['COMPLETED', 'CONFIRMED', 'SUCCESS', 'REFUNDED', 'REJECTED', 'CANCELLED', 'FAILED'];
+    if (demoWithdrawals(state, now).some(row => !terminal.includes(row.status.toUpperCase()))) fail('PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL');
+    const current = demoPayoutAddresses(state, now).find(row => row.network === network);
+    if (current && Date.parse(current.nextChangeAllowedAt) > now) fail('PAYOUT_ADDRESS_CHANGE_COOLDOWN');
+    if (current && (network === 'USDT-TRC20' ? address === current.address : address.toLowerCase() === current.address.toLowerCase())) return snapshot(current);
+    demo.addresses ??= {};
+    demo.addresses[network] = { ...proof, network, address, status: 'ACTIVE', effectiveAt: new Date(now + DAY).toISOString(), createdAt: current?.createdAt ?? new Date(now).toISOString(), nextChangeAllowedAt: new Date(now + 7 * DAY).toISOString(), changePending: true };
+    return snapshot(demo.addresses[network]);
   });
-  if (path === '/api/payout-addresses' && method === 'GET' && demo.address) return { ...proof, addresses: [snapshot(demo.address)], serverNowEpochMs: now, changeCooldownDays: 7, effectiveDelayHours: 24, inFlightWithdrawalBlocked: true };
 }

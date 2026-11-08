@@ -1,10 +1,24 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
+// The panel's terminal result applies to every withdrawal read, not just the bank detail page.
+export function settleDemoBankWithdrawals(state) {
+  if (!['settled', 'rejected'].includes(state.bankState)) return;
+  for (const row of Object.values(state.bankDemo?.orders ?? {})) {
+    if (row.outcome) continue;
+    row.outcome = state.bankState;
+    // Once ended, keep that outcome and return a rejected withdrawal's reserve exactly once.
+    if (row.outcome === 'rejected') {
+      const walletUsdt = state.dataState === 'empty' ? 0 : state.walletBalance ?? 52800.64;
+      state.walletBalance = Math.round((walletUsdt + row.bank.amountUsdt) * 1e6) / 1e6;
+    }
+  }
+}
 // One rule for every withdrawal read (EarningsReleaseService.withdrawableAmount, AppWithdrawalService.maximumWithdrawable
 // and bankCapacity): every earnings bucket is credited to the wallet, so pending and locked amounts sit inside the balance
 // and come off it before the ratio. USDT and bank withdrawals are rows of one table, so they share one daily count.
 export function demoWithdrawalFacts(state,now=Date.now()){
+  settleDemoBankWithdrawals(state);
   const empty=state.dataState==='empty',walletUsdt=empty?0:state.walletBalance??52800.64,pendingReview=empty?0:12.5,bonusLocked=empty?0:50,balanceMaxRatio=1;
   // The used-limit scene seeds one USDT withdrawal; its fixed creation time also controls the bank count.
   const limitUsed=state.withdrawLimitState==='used',dailyLimitCount=limitUsed?1:2;
