@@ -1823,7 +1823,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
   store: {
     title: "Cửa hàng",
     subtitle: "Thiết bị tính toán chuyên dụng, do UVEL vận hành trọn gói.",
-    allProducts: "Thiết bị",
+    allProducts: "Đang bán",
     annualYield: "Tỷ lệ thưởng năm tham khảo",
     price: "Giá",
     viewDetails: "Xem chi tiết",

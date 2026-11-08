@@ -1846,7 +1846,7 @@ chooseMethod: "Choose how to join the UVEL network",
   store: {
     title: "Store",
     subtitle: "Dedicated compute devices, fully managed by UVEL.",
-    allProducts: "Devices",
+    allProducts: "Available",
     annualYield: "Est. annual reward rate",
     price: "Price",
     viewDetails: "View details",
