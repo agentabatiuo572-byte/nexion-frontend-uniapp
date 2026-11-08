@@ -4397,6 +4397,8 @@ export const ms: Messages = {
     withdrawFeeStale: "Kadar caj telah dikemas kini — sila cuba lagi",
     withdrawContextStale: "Akaun atau alamat penerima anda telah berubah — sila hantar semula",
     withdrawHandledElsewhere: "Permintaan pengeluaran asal telah dikendalikan di halaman lain. Semak sejarah pengeluaran anda.",
+    withdrawEarlierOutcome: "Permintaan terdahulu: {outcome}",
+    withdrawOtherPending: "Halaman ini kini memaparkan pengeluaran lain yang sedang diproses. Sila semak.",
     withdrawResendTitle: "Cuba semula permintaan pengeluaran asal",
     withdrawResendBody: "Keputusan pengeluaran ${amount} ke alamat {network} {address} belum disahkan. Mencuba semula akan meneruskan permintaan asal tanpa membuat pengeluaran lain.",
     withdrawResendCta: "Cuba semula permintaan asal",
