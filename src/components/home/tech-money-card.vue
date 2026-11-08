@@ -2,11 +2,13 @@
   TechMoneyCard — home hero "Today's earnings" (design system 04.1 首页收益, P-57).
   CROSS-STREAM aggregate: device mining, team commission, and staking accrual.
   (Genesis 已移出每日 USD 聚合——分红延期改造后它是上所后 NEX 排放，见 holder 页。)
-  Open layout directly on the page floor: no floor glow, grid or other
-  background gradient (04.1 首页收益).
+  Open layout on the page: an amber floor glow that reaches under the glass
+  check-in card, and a flat brand grid behind the amount only.
 -->
 <template>
   <view class="earn-hero">
+    <view class="earn-hero__bg" aria-hidden="true"><view class="earn-hero__glow" /></view>
+    <view class="earn-hero__grid" aria-hidden="true" />
 
     <view class="earn-hero__head">
       <view class="earn-hero__label"><text>{{ t.home.techTodaysEarnings }}</text><DataVisibilityToggle /></view>
@@ -85,6 +87,12 @@ const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\
 
 <style scoped>
 .earn-hero { position:relative; isolation:isolate; }
+/* Amber floor glow: from the amount's lower left down under the glass check-in card, fading out at the bottom. */
+.earn-hero__bg { position:absolute; left:-16px; right:-16px; top:-24px; bottom:-84px; z-index:-1; pointer-events:none; overflow:hidden; -webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent); mask-image:linear-gradient(to bottom,#000 70%,transparent); }
+.earn-hero__glow { position:absolute; left:-22%; width:100%; bottom:-24px; height:240px; border-radius:50%; background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-warning) 30%,transparent),transparent); filter:blur(12px); animation:earn-glow-in 1200ms cubic-bezier(.16,1,.3,1) both; }
+:global([data-theme="light"] .earn-hero__glow) { background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-warning) 22%,transparent),transparent); }
+/* Flat 20px brand grid behind the amount only (8px above the 12px label margin, which does not collapse in this flex item). */
+.earn-hero__grid { position:absolute; inset:4px -2px -12px; z-index:-1; pointer-events:none; background-image:linear-gradient(to right,color-mix(in oklab,var(--v5-brand) 9%,transparent) 1px,transparent 1px),linear-gradient(to bottom,color-mix(in oklab,var(--v5-brand) 9%,transparent) 1px,transparent 1px); background-size:20px 20px; -webkit-mask-image:radial-gradient(ellipse 62% 72% at 40% 52%,#000 25%,transparent 72%); mask-image:radial-gradient(ellipse 62% 72% at 40% 52%,#000 25%,transparent 72%); animation:earn-grid-in 900ms ease-out both; }
 .earn-hero__head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; height:20px; }
 .earn-hero__label { display:flex; align-items:center; gap:2px; min-width:0; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .earn-hero__label :deep(.data-visibility-toggle) { margin:-12px -10px; }
@@ -99,6 +107,8 @@ const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\
 .earnings-feedback__value.is-up { color:var(--v5-success-ink); }
 .earnings-feedback__value.is-down { color:var(--v5-danger); }
 .earnings-feedback__value.is-none { color:var(--v5-ink-3); }
+@keyframes earn-glow-in { from { opacity:0; transform:translateY(60px) scale(.8); } }
+@keyframes earn-grid-in { from { opacity:0; } }
 @keyframes earn-rise { from { opacity:0; transform:translateY(8px); } }
 @media (max-width:339px) {
   .earn-hero__cur { font-size:20px; }
@@ -108,6 +118,6 @@ const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\
 .earn-hero__amount--long .earn-hero__int { font-size:48px; }
 .earn-hero__amount--long .earn-hero__dec { font-size:30px; }
 @media (prefers-reduced-motion:reduce) {
-  .earnings-feedback { animation:none; }
+  .earn-hero__glow, .earn-hero__grid, .earnings-feedback { animation:none; }
 }
 </style>

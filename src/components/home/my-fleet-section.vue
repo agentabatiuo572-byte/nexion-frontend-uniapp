@@ -144,7 +144,7 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 .hf-dock__sub { display: block; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
 
 .hf-avatars { display: flex; align-items: center; flex: none; }
-.hf-av { position: relative; flex: none; width: 38px; height: 38px; margin-left: -10px; border-radius: 50%; box-sizing: border-box; background: var(--v5-surface-2); box-shadow: 0 0 0 2.5px var(--v5-surface), inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 45%, transparent); animation: hf-pop 360ms cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.hf-av { position: relative; flex: none; width: 38px; height: 38px; margin-left: -10px; border-radius: 50%; box-sizing: border-box; background: radial-gradient(80% 70% at 50% 72%, color-mix(in srgb, var(--v5-ink) 10%, transparent), transparent), var(--v5-surface-2); box-shadow: 0 0 0 2.5px var(--v5-surface), inset 0 1px 3px color-mix(in srgb, var(--v5-bg) 45%, transparent); animation: hf-pop 360ms cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
 [data-theme="light"] .hf-av { box-shadow: 0 0 0 2.5px var(--v5-surface), inset 0 1px 3px color-mix(in srgb, var(--v5-ink) 10%, transparent); }
 .hf-av:first-child { margin-left: 0; }
 .hf-av__art { position: absolute; left: 3px; top: 4px; width: 32px; height: 28px; }
@@ -177,6 +177,7 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 .hf-card { position: relative; display: flex; flex-direction: column; width: 164px; min-height: 220px; height: 100%; box-sizing: border-box; padding: 12px; border-radius: 22px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; cursor: pointer; }
 [data-theme="light"] .hf-card { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .hf-card:active { opacity: .85; }
+.hf-card--online::before { content: ""; position: absolute; left: 0; right: 0; top: 22px; height: 128px; background: radial-gradient(55% 50% at 50% 55%, color-mix(in srgb, var(--v5-success) 13%, transparent), transparent 72%); pointer-events: none; }
 .hf-card__status { position: relative; display: flex; align-items: center; gap: 6px; height: 16px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .hf-card__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--v5-ink-4); }
 .hf-card__dot.nx-online-dot { background: var(--v5-success); }
