@@ -51,7 +51,7 @@
         <!-- ══ Holder · 上所前 ══ -->
         <template v-else-if="!dividendsOpen">
           <!-- Allocation hero -->
-          <view class="gh-hero gh-surface" :style="vipCardStyle">
+          <view class="gh-hero gh-surface nx-tint" :style="vipCardStyle">
             <GenesisArtwork context="holding" class="gh-hero-art" />
             <view class="flex items-start" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="avatarStyle">
@@ -454,7 +454,7 @@ const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
   borderRadius: "var(--v5-radius-m)",
-  background: "var(--v5-genesis-gold-on-dark)",
+  background: "linear-gradient(135deg, var(--v5-genesis-gold-on-dark) 0%, #E2C97C 100%)",
   boxShadow: "0 4px 12px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 25%, transparent)",
 };
 const heroLabelStyle: CSSProperties = {
@@ -817,9 +817,11 @@ const noteStyle: CSSProperties = {
 .gh-chassis--owned :deep(.nx-top-chrome) { background: transparent; }
 .gh-page { padding-bottom: 32px; color: var(--v5-ink); font-family: var(--font-v5); }
 .gh-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-4); }
-.gh-surface { background: color-mix(in srgb, var(--v5-surface) 96%, transparent); border-radius: var(--v5-radius-xl); padding: var(--v5-space-4); }
+.gh-surface:not(.nx-tint) { background: color-mix(in srgb, var(--v5-surface) 96%, transparent); }
+.gh-surface { border-radius: var(--v5-radius-xl); padding: var(--v5-space-4); }
 /* Aggregate holding artwork carries no fixed serial; account content stays live. */
-.gh-hero { --gh-logo-width: 128px; position: relative; padding: var(--v5-space-3) 20px 16px; border-radius: 18px; background: var(--v5-surface); }
+.gh-hero { --gh-logo-width: 128px; position: relative; padding: var(--v5-space-3) 20px 16px; border-radius: 18px; }
+.gh-hero:not(.nx-tint) { background: var(--v5-surface); }
 .gh-hero-art { margin-bottom: var(--v5-space-3); border-radius:var(--ui-radius-icon); }
 .gh-identity, .gh-summary, .gh-stats, .gh-emissions { position: relative; z-index: 1; }
 .gh-identity { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 44px; margin-bottom: var(--v5-space-3); }
@@ -907,4 +909,6 @@ const noteStyle: CSSProperties = {
 .gh-empty-facts > view > view + view > text:nth-child(2) { font:500 15px/26px var(--font-v5)!important; color:var(--v5-ink-2)!important; }
 .gh-empty-disclosure { margin:var(--v5-space-2) 12px 0; text-align:center; color:var(--v5-ink-3); font-size:12px; line-height:18px; }
 .gh-empty-disclosure .gh-empty-trust { margin-top:-3px; min-height:44px; display:flex; justify-content:center; align-items:center; color:var(--v5-ink-3); font-size:13px; font-weight:500; }
+/* VIP card: tinted genesis gold (it used to come from a gold corner glow). */
+.gh-hero.nx-tint { --nx-tint: var(--v5-genesis-gold-on-dark); }
 </style>

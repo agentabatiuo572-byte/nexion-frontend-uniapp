@@ -34,7 +34,7 @@
           v-for="o in filteredOrders"
           :key="o.id"
           class="order-card"
-          :class="{ 'order-card--pending': o.kind === 'commerce' && o.status === 'placed' }"
+          :class="{ 'order-card--pending nx-tint': o.kind === 'commerce' && o.status === 'placed' }"
           role="button"
           tabindex="0"
           :aria-label="`${commerceOrderTitle(o,locale.code)} ${o.id}${pendingCloseMinutes(o) ? ' · ' + fmt(t.orders.pendingCloseIn, { min: pendingCloseMinutes(o)! }) : ''}`"
@@ -449,8 +449,11 @@ const browseBtnStyle: CSSProperties = {
 .orders-filter__badge { min-width: 18px; height: 18px; box-sizing: border-box; margin-left: 1px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); font: 600 11px/18px var(--font-v5); }
 /* Order cards (DS-28): solid surface, machine art as the anchor; the pending card adds one faint warning glow. */
 .orders-list { display: flex; flex-direction: column; gap: var(--ui-space-card-gap); margin: 0 16px; }
-.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-content-surface); cursor: pointer; transition: transform 160ms ease; }
-[data-theme="light"] .order-card { box-shadow: var(--v5-glass-shadow); }
+.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); cursor: pointer; transition: transform 160ms ease; }
+.order-card:not(.nx-tint) { background: var(--v5-content-surface); }
+[data-theme="light"] .order-card:not(.nx-tint) { box-shadow: var(--v5-glass-shadow); }
+/* Awaiting payment: tinted warning (it used to be a corner glow). */
+.order-card--pending { --nx-tint: var(--v5-warning); }
 .order-card:active { transform: scale(.98); }
 .order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .order-card__row { display: flex; gap: 14px; }

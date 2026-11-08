@@ -178,6 +178,7 @@
         <!-- === confirmed === -->
         <view v-else-if="step === 'confirmed'" class="nx-glass-card mx-4 rounded-2xl text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
           <template v-if="firstOrderCelebrating">
+            <view aria-hidden :style="celebrateGlowStyle" />
             <view class="relative">
               <view class="mx-auto grid place-items-center nx-pop-in" :style="medalStyle">
                 <text style="font-size: 26px">🏅</text>
@@ -2958,6 +2959,13 @@ const centerTitleStyle: CSSProperties = {
   fontSize: "var(--ui-type-card-title)",
   fontWeight: "var(--ui-type-card-title-weight)",
   color: "var(--v5-ink)",
+};
+// First-order celebration light behind the medal.
+const celebrateGlowStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  background: "radial-gradient(60% 70% at 50% 0%, var(--v5-brand-soft), transparent 70%)",
+  pointerEvents: "none",
 };
 const medalStyle: CSSProperties = {
   width: "56px",

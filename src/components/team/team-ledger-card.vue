@@ -1,5 +1,5 @@
 <template>
-  <view class="team-ledger nx-viz-press" :aria-busy="loading && !failed">
+  <view class="team-ledger nx-tint nx-viz-press" :aria-busy="loading && !failed">
     <view class="team-ledger__header">
       <text class="team-ledger__title">{{ copy.monthIncome }}</text>
       <DataVisibilityToggle />
@@ -83,7 +83,7 @@ function goCommissions() {
 </script>
 
 <style scoped>
-.team-ledger { display: flex; flex-direction: column; gap: var(--ui-space-inline); padding: var(--v5-space-5); border-radius: 28px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.team-ledger { --nx-tint: var(--v5-brand); display: flex; flex-direction: column; gap: var(--ui-space-inline); padding: var(--v5-space-5); border-radius: 28px; }
 .team-ledger__header { display: flex; align-items: center; gap: var(--v5-space-1); min-height: 32px; }
 .team-ledger__title { font: 500 13px/18px var(--font-v5); color: var(--v5-ink-2); }
 .team-ledger__details { display: flex; align-items: center; gap: var(--v5-space-1); min-height: 32px; margin-left: auto; padding: 0 var(--ui-space-inline); border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); white-space: nowrap; }
