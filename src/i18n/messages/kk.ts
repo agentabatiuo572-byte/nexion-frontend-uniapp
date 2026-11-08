@@ -4391,6 +4391,7 @@ export const kk: Messages = {
   walletV3: {
     withdrawFeeStale: "Комиссия мөлшерлемесі жаңартылды — қайталап көріңіз",
     withdrawContextStale: "Аккаунт немесе төлем мекенжайы өзгерді — қайта жіберіңіз",
+    withdrawHandledElsewhere: "Бастапқы ақша шығару сұрауы басқа бетте өңделді. Ақша шығару тарихын тексеріңіз.",
     withdrawResendTitle: "Бастапқы шығару сұрауын қайталау",
     withdrawResendBody: "{network} желісіндегі {address} мекенжайына ${amount} шығару нәтижесі расталмады. Қайталау жаңа шығару жасамай, бастапқы сұрауды жалғастырады.",
     withdrawResendCta: "Бастапқы сұрауды қайталау",

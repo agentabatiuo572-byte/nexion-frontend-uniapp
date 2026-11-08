@@ -4391,6 +4391,7 @@ export const uz: Messages = {
   walletV3: {
     withdrawFeeStale: "Komissiya stavkasi yangilandi — qayta urining",
     withdrawContextStale: "Akkaunt yoki qabul manzili oʻzgardi — qayta yuboring",
+    withdrawHandledElsewhere: "Asl pul yechish soʻrovi boshqa sahifada koʻrib chiqildi. Pul yechish tarixini tekshiring.",
     withdrawResendTitle: "Asl soʻrovni takrorlash",
     withdrawResendBody: "${amount} summani {network} tarmogʻidagi {address} manziliga yechish natijasi tasdiqlanmagan. Takrorlash yangi soʻrov yaratmaydi, asl soʻrovni davom ettiradi.",
     withdrawResendCta: "Asl soʻrovni takrorlash",

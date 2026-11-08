@@ -3982,6 +3982,7 @@ timeHoursAgo: "{n}小时前",
   walletV3: {
     withdrawFeeStale: "费率已更新,请重试",
     withdrawContextStale: "账户或收款地址已变化,请重新提交",
+    withdrawHandledElsewhere: "原提现请求已在其他页面处理，请查看提现记录。",
     withdrawResendTitle: "重试原提现请求",
     withdrawResendBody:
       "${amount} 提现至 {network} 地址 {address} 的结果待确认。重试将继续处理原请求，不会新增提现。",
