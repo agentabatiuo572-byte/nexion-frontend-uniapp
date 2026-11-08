@@ -110,8 +110,8 @@ function goStore() {
 
 <style scoped>
 .dc-card { position:relative; isolation:isolate; box-sizing:border-box; padding:12px 12px 8px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); border:1px solid var(--v5-border); box-shadow:var(--v5-glass-shadow); overflow:hidden; }
-/* Recessed solid stage (no glow behind the target). */
-.dc-stage { --dc-well:inset 0 2px 10px rgba(0,0,0,.55); position:relative; height:208px; border-radius:16px; overflow:hidden; background:var(--v5-surface-2); box-shadow:var(--dc-well); }
+/* Recessed stage with a faint cyan glow behind the target. */
+.dc-stage { --dc-well:inset 0 2px 10px rgba(0,0,0,.55); position:relative; height:208px; border-radius:16px; overflow:hidden; background:radial-gradient(55% 65% at 75% 92%,color-mix(in srgb,var(--v5-tech-cyan) 18%,transparent),transparent 72%),var(--v5-surface-2); box-shadow:var(--dc-well); }
 :global([data-theme="light"] .dc-stage) { --dc-well:inset 0 1px 4px rgba(20,16,8,.08); }
 .dc-stage__label { position:absolute; left:12px; top:10px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .dc-stage__floor { position:absolute; left:12px; right:12px; bottom:22px; height:1px; background:var(--v5-border-strong); }
@@ -123,7 +123,7 @@ function goStore() {
 /* Same neutral placeholder as the catalogue uses for a SKU without an approved image. */
 .dc-device--placeholder { display:grid; place-items:center; color:var(--v5-ink-3); }
 .dc-pillar { position:relative; width:64px; border-radius:12px 12px 3px 3px; overflow:hidden; transform-origin:50% 100%; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); animation:dc-pillar-rise 1100ms cubic-bezier(.16,1,.3,1) both; }
-.dc-col--target .dc-pillar { animation-delay:120ms; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-tech-cyan) 72%,transparent),color-mix(in srgb,var(--v5-aura-sky) 20%,transparent)); box-shadow:inset 0 1px 0 rgba(255,255,255,.45); }
+.dc-col--target .dc-pillar { animation-delay:120ms; background:linear-gradient(180deg,color-mix(in srgb,var(--v5-tech-cyan) 72%,transparent),color-mix(in srgb,var(--v5-aura-sky) 20%,transparent)); box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 14px 30px -10px color-mix(in srgb,var(--v5-tech-cyan) 60%,transparent); }
 .dc-card--masked .dc-col--target .dc-pillar { background:linear-gradient(180deg,color-mix(in srgb,var(--v5-ink) 18%,transparent),color-mix(in srgb,var(--v5-ink) 6%,transparent)); box-shadow:none; }
 .dc-pillar__sweep { position:absolute; top:-10%; bottom:-10%; left:-70%; width:45%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent); transform:skewX(-18deg); animation:dc-sweep 6.8s 1.8s ease-in-out infinite; }
 /* The arc is drawn by a left-to-right reveal: dashes cannot follow pathLength under a non-scaling stroke
