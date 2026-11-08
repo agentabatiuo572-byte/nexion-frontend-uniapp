@@ -77,7 +77,8 @@
 
       <!-- Amount on a liquid-glass slab over the aura; the minimum sits right under it. -->
       <view class="wd-stage mx-4">
-        <view class="wd-slab nx-soft-glass">
+        <view class="wd-aura" aria-hidden="true"><view /><view /></view>
+        <view class="wd-slab nx-tint">
           <view class="wd-slab__head">
             <text class="wd-k">{{ t.wallet.amountLabel }}</text>
             <view class="wd-max" role="button" tabindex="0" :aria-disabled="inputsLocked || !withdrawalActionsFresh" :aria-label="t.wallet.useMax" @click="useMax"  @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax">
@@ -1600,8 +1601,14 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-locks__i { display: inline-flex; align-items: center; gap: 4px; }
 .wd-locks__v { color: var(--v5-ink-2); font: 500 12px/16px var(--font-metric); }
 .wd-stage { position: relative; margin-top: 12px; }
-/* Step focus block on the shared soft glass. */
-.wd-slab { position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
+.wd-aura { position: absolute; inset: -8px -6px; pointer-events: none; }
+.wd-aura > view { position: absolute; width: 180px; height: 140px; border-radius: 50%; filter: blur(42px); }
+.wd-aura > view:first-child { left: -10px; top: -6px; background: color-mix(in srgb, var(--v5-warning) 22%, transparent); }
+.wd-aura > view:last-child { right: -14px; bottom: 10px; background: color-mix(in srgb, var(--v5-brand-2) 26%, transparent); }
+[data-theme="light"] .wd-aura > view:first-child { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); }
+[data-theme="light"] .wd-aura > view:last-child { background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
+/* Step focus block: its amber as one uniform tint (.nx-tint) over the outer aura. */
+.wd-slab { --nx-tint: var(--v5-warning); position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
 .wd-slab__head { display: flex; align-items: center; justify-content: space-between; }
 .wd-max { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 4px; color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .wd-max::after { content: ""; position: absolute; inset: -6px -8px; }
