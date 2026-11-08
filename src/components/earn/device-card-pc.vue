@@ -1068,6 +1068,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 /* Earn device stage (P-62). Shared device blocks keep their 20px inline padding, so the stage pads only its own rows. */
 .earn-stage { position: relative; overflow: hidden; padding: 16px 0 6px; border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); animation: earn-stage-in 280ms ease-out backwards; }
 [data-theme="light"] .earn-stage { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+.earn-stage--online::before { content: ""; position: absolute; left: 50%; top: 70px; width: 260px; height: 190px; margin-left: -130px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 13%, transparent), transparent); pointer-events: none; }
 .earn-stage__body { position: relative; animation: none; }
 .earn-stage__top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 18px; }
 .earn-stage__id { min-width: 0; }

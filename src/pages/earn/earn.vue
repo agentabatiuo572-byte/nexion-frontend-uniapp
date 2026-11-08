@@ -24,7 +24,7 @@
 
       <!-- ===== Bento: device earnings, completed jobs, latest settlement ===== -->
       <view class="earn-bento">
-        <view class="earn-tile earn-tile--hero nx-soft-glass" role="group" :aria-label="auditCopy.deviceRevenue">
+        <view class="earn-tile earn-tile--hero nx-tint" role="group" :aria-label="auditCopy.deviceRevenue">
           <view class="earn-hero__row">
             <view class="earn-hero__label"><text>{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text><DataVisibilityToggle class="earn-hero__eye" /></view>
             <text class="earn-scope">{{ auditCopy.revenueScope }}</text>
@@ -281,11 +281,11 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 <style scoped>
 .earn-page > .earn-bento { margin-top: 16px; }
 .earn-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 16px; }
-.earn-tile { position: relative; min-width: 0; box-sizing: border-box; overflow: hidden; border-radius: 22px; }
-.earn-tile:not(.nx-soft-glass) { background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
-[data-theme="light"] .earn-tile:not(.nx-soft-glass) { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-/* Earn's focal block: the big tile is the page's one soft-glass card (01 §1.1.2); the other tiles stay solid. */
-.earn-tile--hero { grid-column: 1 / -1; padding: 16px 18px 18px; border-radius: 24px; }
+.earn-tile { position: relative; min-width: 0; box-sizing: border-box; overflow: hidden; border-radius: 22px; box-shadow: inset 0 0 0 1px var(--v5-border); }
+.earn-tile:not(.nx-tint) { background: var(--v5-surface); }
+[data-theme="light"] .earn-tile { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
+/* Earn's focal block: the big tile keeps its original amber as a tinted solid (01 §1.1.2); the other tiles stay neutral. */
+.earn-tile--hero { --nx-tint: var(--v5-warning); grid-column: 1 / -1; padding: 16px 18px 18px; border-radius: 24px; }
 .earn-hero__row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .earn-hero__label { display: flex; align-items: center; gap: 2px; min-width: 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
 .earn-hero__eye { margin: -12px 0; color: var(--v5-ink-3); }
