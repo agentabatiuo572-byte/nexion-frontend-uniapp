@@ -12,7 +12,7 @@
         <NxButton variant="primary" class="payment-pin-page__primary" @click="load">{{ t.paymentPin.retry }}</NxButton>
       </template>
       <template v-else-if="!state.configured">
-        <view class="payment-vault-stage"><view class="payment-vault nx-soft-glass">
+        <view class="payment-vault-stage"><view class="payment-vault-aura payment-vault-aura--outer" aria-hidden="true" /><view class="payment-vault nx-tint">
           <view class="payment-vault-lock" aria-hidden="true"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14.5v2.5"/></svg></view>
           <view class="payment-vault-dots" aria-hidden="true"><view v-for="n in 6" :key="n" :style="{ animationDelay: `${n * 80}ms` }" /></view>
           <text class="payment-vault-title">{{ t.paymentPin.title }}</text><text class="payment-vault-status">{{ t.paymentPin.notConfigured }}</text><text class="payment-vault-purpose">{{ t.paymentPin.purpose }}</text>
@@ -125,7 +125,15 @@ onUnmounted(() => { clear(); clearInterval(timer); unsubscribe?.(); if (typeof d
 <style scoped>
 .payment-pin-page { padding: 3px 16px 100px; }
 .payment-vault-stage { position:relative; isolation:isolate; }
-.payment-vault { display:flex; flex-direction:column; align-items:center; text-align:center; padding:var(--v5-space-8) 20px 26px; border-radius:var(--v5-radius-xl); }
+/* The outer halo fades uniformly; the vault keeps the halo's cyan as one uniform tint (.nx-tint). */
+.payment-vault-aura.payment-vault-aura--outer { opacity:.5; z-index:-2; }
+.payment-vault-aura { position:absolute; z-index:-1; inset:-8px -6px; pointer-events:none; }
+.payment-vault-aura::before,.payment-vault-aura::after { content:""; position:absolute; width:180px; height:140px; border-radius:50%; filter:blur(42px); }
+.payment-vault-aura::before { left:-10px; top:-6px; background:color-mix(in srgb,var(--v5-aura-sky) 40%,transparent); }
+.payment-vault-aura::after { right:-14px; bottom:10px; background:color-mix(in srgb,var(--v5-tech-cyan) 43%,transparent); }
+:global([data-theme="light"] .payment-vault-aura::before) { background:color-mix(in srgb,var(--v5-aura-sky) 14%,transparent); }
+:global([data-theme="light"] .payment-vault-aura::after) { background:color-mix(in srgb,var(--v5-tech-cyan) 16%,transparent); }
+.payment-vault { --nx-tint:var(--v5-tech-cyan); display:flex; flex-direction:column; align-items:center; text-align:center; padding:var(--v5-space-8) 20px 26px; border-radius:var(--v5-radius-xl); }
 .payment-vault-lock { display:grid; place-items:center; width:88px; height:88px; border-radius:var(--v5-radius-2xl); background:var(--v5-brand-soft); color:var(--v5-brand); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-brand) 35%,transparent); animation:nx-viz-pop 520ms both; }
 .payment-vault-dots { display:flex; gap:10px; margin-top:22px; }
 .payment-vault-dots > view { width:12px; height:12px; border-radius:50%; background:var(--v5-brand); animation:nx-viz-pop 360ms both; }
