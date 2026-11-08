@@ -177,11 +177,10 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
-import { apiClient, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { apiClient, apiRuntimeConfig, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { readWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
-import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from "@/api/order-api";
 import { createBankWithdrawalApi, hasVerifiedBankIdentity, type BankConfig, type BankQuote, type BankOrder, type BankIntent, type BankRecovery } from "@/api/bank-withdrawal-api";
 import { parseServerTimestamp } from "@/api/server-time";
 import { formatBankDateTime } from "@/lib/bank-date";
@@ -228,7 +227,6 @@ let timer: ReturnType<typeof setInterval> | undefined;
 let requestedOrder: string | null = null;
 let lastCapacityResetRead = "";
 let revision = 0;
-let inFlight: { current: () => boolean; orderNo: string | null } | null = null;
 let alive = true;
 const visible = ref(false);
 const pendingKey = () => `nexgrid.bank-withdraw.pending:${app.accountKey}`;
@@ -281,8 +279,10 @@ function goBack() {
 function backToWallet() { if (!busy.value) navTo("/pages/me/me"); }
 function openUsdt() { if (!busy.value && remoteSessionReady.value && pendingAttempt.value) navTo("/pages/me/wallet-withdraw"); }
 function scope() {
-  const id = ++revision, owner = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
-  return () => alive && revision === id && app.accountKey === owner && app.accountBindingEpoch === epoch && isCurrentRuntimeRevision(runtime);
+  const id = ++revision, owner = app.accountKey, epoch = app.accountBindingEpoch;
+  const { environment, baseUrl } = apiRuntimeConfig;
+  return () => alive && revision === id && app.accountKey === owner && app.accountBindingEpoch === epoch
+    && apiRuntimeConfig.environment === environment && apiRuntimeConfig.baseUrl === baseUrl;
 }
 function report(_err: unknown) {
   if (!config.value) configPresentation.value = null;
@@ -293,9 +293,8 @@ async function run(action: (current: () => boolean) => Promise<void>, quietRead 
   if (!canReadVisibleBankPage()) return;
   if (busy.value) return;
   const current = scope(); busy.value = true; silentRead.value = quietRead; error.value = "";
-  inFlight = { current, orderNo: requestedOrder ?? order.value?.withdrawalNo ?? null };
   try { await action(current); } catch (err) { if (current()) report(err); }
-  finally { if (inFlight?.current === current) inFlight = null; if (current()) { busy.value = false; silentRead.value = false; } }
+  finally { if (current()) { busy.value = false; silentRead.value = false; } }
 }
 async function load() {
   await run(async current => {
@@ -352,11 +351,12 @@ function pollOrder(): Promise<void> {
       || !session?.accessToken || app.accountKey !== `user:${session.user.userId}`) return Promise.resolve();
   const readRevision = revision;
   const generation = orderReadGeneration;
-  const runtime = captureRuntimeRevision(), owner = app.accountKey, epoch = app.accountBindingEpoch;
+  const owner = app.accountKey, epoch = app.accountBindingEpoch;
+  const { environment, baseUrl } = apiRuntimeConfig;
   const current = () => generation === orderReadGeneration && (canPollOrder() || canRecoverQuote())
     && order.value === snapshot && pendingQuoteNo.value === quoteNo
     && revision === readRevision && app.accountKey === owner && app.accountBindingEpoch === epoch
-    && isCurrentRuntimeRevision(runtime);
+    && apiRuntimeConfig.environment === environment && apiRuntimeConfig.baseUrl === baseUrl;
   readingOrder.value = true;
   const read = Promise.resolve().then(async () => {
     if (!current()) return;
@@ -466,13 +466,11 @@ function clearScope() {
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }
 function invalidate() {
-  if (busy.value && inFlight?.current() && inFlight.orderNo === (requestedOrder ?? order.value?.withdrawalNo ?? null)) return;
   clearScope();
   if (alive && canReadVisibleBankPage()) void load();
 }
-watch(() => [app.accountKey, app.accountBindingEpoch] as const, clearScope, { flush: "sync" });
-watch(() => [app.accountKey, app.accountBindingEpoch] as const, invalidate);
-const stopRuntime = subscribeRuntimeRevision(invalidate);
+watch(() => [app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, clearScope, { flush: "sync" });
+watch(() => [app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, invalidate);
 onLoad(params => {
   const fallback = new URLSearchParams(takeNavigationQuery("/pages/me/wallet-withdraw-bank")).get("order");
   const value = params?.order ?? fallback;
@@ -489,7 +487,7 @@ onShow(() => {
   visible.value = true; now.value = Date.now(); stopTimer(); timer = setInterval(() => { now.value = Date.now(); }, 1000);
 });
 onHide(() => { visible.value = false; orderReadGeneration++; stopTimer(); });
-onUnload(() => { alive = false; visible.value = false; stopTimer(); stopRuntime(); revision++; });
+onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; });
 </script>
 
 <style scoped>
