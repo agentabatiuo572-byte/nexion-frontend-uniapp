@@ -35,15 +35,20 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if(/^\/api\/withdrawals\/WD-DEMO-?\d+$/.test(p))return {source:'nx_withdrawal_order',sourceEnvironment:'PRODUCTION',withdrawal:withdrawals.find(row=>row.withdrawalNo===p.split('/').pop())};
   // Open USDT payout networks follow the preview option; eligibility refuses a closed one like the server does.
   const withdrawNetworks = demoWithdrawalNetworks(state);
-  if (p === "/api/withdrawals/policy") return { minAmount: minWithdrawal, dailyLimitCount: facts.dailyLimitCount, balanceMaxRatio: facts.balanceMaxRatio, smallAmountThresholdUsd: 100, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24, networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1, policyVersion: "money-policy", cooldownDays: 7, complianceHoldEnabled: false, withdrawalEnabled: true, enabledNetworks: withdrawNetworks, currentPhase: "P1", currentMonth: 1, gateSource: "J1", source: "D5+H1" };
+  // WithdrawalCompliancePolicy: review on BEP20/ERC20 while H1 hold is on; a hold of cooldownDays above 1000 USDT.
+  const complianceHoldEnabled = false;
+  const compliance = (chain, amount) => { const review = complianceHoldEnabled && ["USDT-BEP20", "USDT-ERC20"].includes(chain), hold = review && amount > 1000; return { complianceReviewRequired: review, complianceHoldApplies: hold, complianceHoldDays: hold ? 7 : 0 }; };
+  if (p === "/api/withdrawals/policy") return { minAmount: minWithdrawal, dailyLimitCount: facts.dailyLimitCount, balanceMaxRatio: facts.balanceMaxRatio, smallAmountThresholdUsd: 100, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24, networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1, policyVersion: "money-policy", cooldownDays: 7, complianceHoldEnabled, complianceReviewThresholdUsdt: 1000, withdrawalEnabled: true, enabledNetworks: withdrawNetworks, currentPhase: "P1", currentMonth: 1, gateSource: "J1", source: "D5+H1" };
   if (p === "/api/withdrawals/eligibility") {
     const input = method === 'GET' ? Object.fromEntries(url.searchParams) : request.postDataJSON();
     const chain = String(input?.chain ?? '').trim().toUpperCase(), address = String(input?.address ?? '').trim(), amount = Number(input?.amount);
-    if (!withdrawNetworks.includes(chain)) return { canSubmit: false, maxWithdrawableUsdt: 0, route: "reject", riskReasons: ["network-disabled"], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
+    if (!withdrawNetworks.includes(chain)) return { canSubmit: false, maxWithdrawableUsdt: 0, route: "reject", riskReasons: ["network-disabled"], fastLaneApplied: false, complianceReviewRequired: false, complianceHoldApplies: false, complianceHoldDays: 0, waivedGates: [], dailyLimitReached: false, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
     const payout = demoPayoutAddresses(state, now).find(row => row.network === chain && row.status === 'ACTIVE');
     const riskReasons = [];
     let payoutReady = false;
-    const strong = amount >= 5000, fast = amount <= 100 && !strong;
+    const review = compliance(chain, amount);
+    const strong = amount >= 5000, fast = amount <= 100 && !strong && !review.complianceReviewRequired;
+    if (review.complianceReviewRequired) riskReasons.push('H1_COMPLIANCE_REVIEW_REQUIRED');
     // The fixture models passing K3 / low K4: finalRiskRoute still sends every non-fast amount to manual.
     if (strong) riskReasons.push('A3_STRONG_REVIEW_THRESHOLD');
     if (!payout?.address) riskReasons.push('PAYOUT_ADDRESS_REQUIRED');
@@ -51,7 +56,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     // AppWithdrawalService only folds EVM letter case for ERC20 when checking eligibility.
     else if (chain === 'USDT-ERC20' ? address.toLowerCase() !== payout.address.toLowerCase() : address !== payout.address) riskReasons.push('PAYOUT_ADDRESS_MISMATCH');
     else payoutReady = true;
-    return { canSubmit: amount >= minWithdrawal && amount <= facts.maxWithdrawableUsdt && facts.dailyRemainingCount > 0 && payoutReady, maxWithdrawableUsdt: facts.maxWithdrawableUsdt, route: fast ? 'pass' : 'manual', riskReasons, fastLaneApplied: fast, waivedGates: fast ? ['first-withdrawal-review'] : [], dailyLimitReached: facts.dailyRemainingCount === 0, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
+    return { canSubmit: amount >= minWithdrawal && amount <= facts.maxWithdrawableUsdt && facts.dailyRemainingCount > 0 && payoutReady, maxWithdrawableUsdt: facts.maxWithdrawableUsdt, route: fast ? 'pass' : 'manual', riskReasons, fastLaneApplied: fast, ...review, waivedGates: fast ? ['first-withdrawal-review'] : [], dailyLimitReached: facts.dailyRemainingCount === 0, dailyCountResetAt: facts.dailyCountResetAt, configVersion: "money-policy" };
   }
   if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: 7, effectiveDelayHours: 24, inFlightWithdrawalBlocked: true };
   if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { ...bankConfig } };
