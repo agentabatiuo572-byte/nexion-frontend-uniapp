@@ -2323,7 +2323,7 @@ export const fil: Messages = {
     coRecoverOriginalOrder: "Sinusuri ang orihinal na order. Huwag munang mag-order ulit habang kinukumpirma ang resulta nito.",
     detQuantity: "Dami para sa tantiya",
     detEstReturns: "Tinatayang kita",
-    detEstReturnsMeta: "Average sa 30 araw",
+    detEstReturnsMeta: "Batay sa aktuwal na payout",
     detMonthly: "Tantiya kada buwan",
     detVsPhone: "vs iyong phone {n}",
     detHardware: "Hardware",

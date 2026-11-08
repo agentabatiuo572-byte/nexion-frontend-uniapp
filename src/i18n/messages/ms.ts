@@ -2323,7 +2323,7 @@ export const ms: Messages = {
     coRecoverOriginalOrder: "Menyemak pesanan asal. Jangan buat pesanan lain sementara keputusannya disahkan.",
     detQuantity: "Kuantiti anggaran",
     detEstReturns: "Anggaran pendapatan",
-    detEstReturnsMeta: "Purata 30 hari",
+    detEstReturnsMeta: "Bayaran sebenar mungkin berbeza",
     detMonthly: "Angg. bulanan",
     detVsPhone: "berbanding telefon anda {n}",
     detHardware: "Perkakasan",
