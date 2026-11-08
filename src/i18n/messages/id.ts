@@ -4392,6 +4392,8 @@ export const id: Messages = {
     withdrawFeeStale: "Tarif biaya telah diperbarui — coba lagi",
     withdrawContextStale: "Akun atau alamat penerima Anda berubah — kirim ulang",
     withdrawHandledElsewhere: "Permintaan penarikan awal telah ditangani di halaman lain. Periksa riwayat penarikan Anda.",
+    withdrawEarlierOutcome: "Permintaan sebelumnya: {outcome}",
+    withdrawOtherPending: "Halaman ini sekarang menampilkan penarikan lain yang sedang diproses. Silakan periksa.",
     withdrawResendTitle: "Ulangi permintaan penarikan awal",
     withdrawResendBody: "Hasil penarikan ${amount} ke alamat {network} {address} belum terkonfirmasi. Mengulang akan melanjutkan permintaan awal tanpa membuat penarikan baru.",
     withdrawResendCta: "Ulangi permintaan awal",

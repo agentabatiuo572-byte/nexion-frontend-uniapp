@@ -14,10 +14,12 @@
       <view class="method" role="button" tabindex="0" data-testid="withdraw-method-bank" :aria-disabled="!canOpenBank" @click="openBank" @keydown.enter.prevent="openBank" @keydown.space.prevent="openBank">
         <view class="method-top">
           <view class="method-icon method-icon--bank" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
-          <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ checking ? t.bankWithdrawal.loading : !recoveryKnown ? t.bankWithdrawal.recoveryUnavailable : bankIntent ? t.bankWithdrawal.resumeBank : bankUnavailable ? t.bankWithdrawal.unavailable : t.bankWithdrawal.bankMethodHint }}</text></view>
+          <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ bankNote }}</text></view>
           <svg v-if="canOpenBank" class="method-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
       </view>
+      <!-- Use a view: uni-app wraps text in a span that escapes the existing clip pattern. -->
+      <view class="method-sr-only" role="status" aria-live="polite" aria-atomic="true">{{ bankNote }}</view>
       <view v-if="!checking && !recoveryKnown" class="reload" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
     </view>
   </AppChassis>
@@ -44,6 +46,10 @@ const readFailed = ref(false);
 let revision = 0, visible = false;
 const canOpenUsdt = computed(() => !!pending.value || (!checking.value && recoveryKnown.value && !bankIntent.value));
 const bankUnavailable = computed(() => recoveryKnown.value && !bankIntent.value && !bankEnabled.value);
+const bankNote = computed(() => checking.value ? t.value.bankWithdrawal.loading
+  : !recoveryKnown.value ? t.value.bankWithdrawal.recoveryUnavailable
+  : bankIntent.value ? t.value.bankWithdrawal.resumeBank
+  : bankUnavailable.value ? t.value.bankWithdrawal.unavailable : t.value.bankWithdrawal.bankMethodHint);
 const canOpenBank = computed(() => (!pending.value || bankIntent.value || !recoveryKnown.value) && !checking.value && !bankUnavailable.value);
 async function load() {
   const currentRevision = ++revision, account = app.accountKey, epoch = app.accountBindingEpoch;
@@ -74,6 +80,7 @@ function openBank() {
 
 <style scoped>
 .withdraw-methods { padding: 0 16px 32px; color: var(--v5-ink); }
+.method-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .intro { display: block; margin: -1px 4px 12px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .method { position: relative; display: block; margin-bottom: 12px; padding: 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
 .method:active { transform: scale(.97); }

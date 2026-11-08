@@ -4392,6 +4392,8 @@ export const kk: Messages = {
     withdrawFeeStale: "Комиссия мөлшерлемесі жаңартылды — қайталап көріңіз",
     withdrawContextStale: "Аккаунт немесе төлем мекенжайы өзгерді — қайта жіберіңіз",
     withdrawHandledElsewhere: "Бастапқы ақша шығару сұрауы басқа бетте өңделді. Ақша шығару тарихын тексеріңіз.",
+    withdrawEarlierOutcome: "Алдыңғы сұрау: {outcome}",
+    withdrawOtherPending: "Қазір бетте басқа өңделіп жатқан ақша шығару көрсетілген. Оны тексеріңіз.",
     withdrawResendTitle: "Бастапқы шығару сұрауын қайталау",
     withdrawResendBody: "{network} желісіндегі {address} мекенжайына ${amount} шығару нәтижесі расталмады. Қайталау жаңа шығару жасамай, бастапқы сұрауды жалғастырады.",
     withdrawResendCta: "Бастапқы сұрауды қайталау",

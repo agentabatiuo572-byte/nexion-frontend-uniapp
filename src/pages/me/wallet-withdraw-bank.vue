@@ -233,6 +233,10 @@ let revision = 0;
 let alive = true;
 const visible = ref(false);
 const pendingKey = () => `nexgrid.bank-withdraw.pending:${app.accountKey}`;
+function readPendingQuoteNo(): string | null {
+  const pending: unknown = uni.getStorageSync(pendingKey());
+  return typeof pending === "string" && /^BQ-[a-f0-9]{32}$/.test(pending) ? pending : null;
+}
 const money = (value: number) => formatAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
@@ -310,12 +314,12 @@ async function load() {
       if (current()) { order.value = loadedOrder; uncertain.value = false; }
       return;
     }
-    const pending: unknown = uni.getStorageSync(pendingKey());
-    if (typeof pending === "string" && /^BQ-[a-f0-9]{32}$/.test(pending)) {
+    const pending = readPendingQuoteNo();
+    if (pending) {
       uncertain.value = true; pendingQuoteNo.value = pending;
       const recovered = await api.recover(pending); if (!current()) return;
-      applyRecovery(recovered);
-      if (recovered.state === "COMMITTED") return;
+      applyRecovery(recovered, pending);
+      if (recovered.state === "COMMITTED" || uncertain.value) return;
     }
     const loaded = await api.config(); if (!current()) return; config.value = loaded;
     configPresentation.value = { owner, epoch, value: loaded };
@@ -324,7 +328,7 @@ async function load() {
     if (intent) {
       uncertain.value = true; pendingQuoteNo.value = intent.quoteNo;
       const recovered = await api.recover(intent.quoteNo); if (!current()) return;
-      applyRecovery(recovered);
+      applyRecovery(recovered, intent.quoteNo);
     } else if (loaded.unresolvedIntent === null) {
       quote.value = null; uncertain.value = false;
     }
@@ -376,7 +380,7 @@ function pollOrder(): Promise<void> {
         if (!current()) return;
         config.value = loaded; configPresentation.value = { owner, epoch, value: loaded };
       }
-      applyRecovery(recovered); error.value = "";
+      applyRecovery(recovered, quoteNo); error.value = "";
       if (recovered.state === "COMMITTED") toast.info(statusLabel.value);
       else if (recovered.state === "NOT_SUBMITTED") toast.info(c.value.confirmTitle, c.value.confirmHint);
       else toast.info(c.value.intentClosed);
@@ -401,12 +405,17 @@ watch([visible, foregroundReadAllowed, remoteSessionReady, () => auth.isAuthenti
   if (!wasVisible || (!config.value && !quote.value)) void load();
 });
 
-function applyRecovery(recovered: BankRecovery) {
+function applyRecovery(recovered: BankRecovery, quoteNo: string) {
   accepted.value = false;
-  if (recovered.state === "COMMITTED") { order.value = recovered; quote.value = null; uni.removeStorageSync(pendingKey()); }
+  if (recovered.state !== "NOT_SUBMITTED" && uni.getStorageSync(pendingKey()) === quoteNo) uni.removeStorageSync(pendingKey());
+  if (recovered.state === "COMMITTED") { order.value = recovered; quote.value = null; }
   else if (recovered.state === "NOT_SUBMITTED") quote.value = recovered.quote;
-  else { quote.value = null; uni.removeStorageSync(pendingKey()); if (config.value) config.value.unresolvedIntent = undefined; }
+  else { quote.value = null; if (config.value) config.value.unresolvedIntent = undefined; }
   uncertain.value = false; pendingQuoteNo.value = null;
+  const pending = readPendingQuoteNo();
+  if (pending && pending !== quoteNo) {
+    order.value = null; quote.value = null; uncertain.value = true; pendingQuoteNo.value = pending;
+  }
 }
 async function openIntent(intent: BankIntent) {
   await run(async current => {
@@ -414,7 +423,7 @@ async function openIntent(intent: BankIntent) {
     if (config.value) config.value.unresolvedIntent = { state: intent.state, intents: [intent],
       quoteNo: intent.quoteNo, withdrawalNo: intent.withdrawalNo };
     const recovered = await api.recover(intent.quoteNo); if (!current()) return;
-    applyRecovery(recovered);
+    applyRecovery(recovered, intent.quoteNo);
   });
 }
 function manageBank() { if (!busy.value && !quote.value && !uncertain.value && !multipleIntents.value.length) navTo("/pages/me/wallet-cards-new?returnTo=%2Fpages%2Fme%2Fwallet-withdraw-bank"); }
@@ -435,20 +444,28 @@ async function submit() {
     refreshPendingAttempt();
     if (!newWithdrawalAllowed.value) return;
     const no = quote.value!.quoteNo;
+    const pending = readPendingQuoteNo();
+    if (pending && pending !== no) {
+      quote.value = null; accepted.value = false; uncertain.value = true; pendingQuoteNo.value = pending;
+      const recovered = await api.recover(pending); if (!current()) return;
+      applyRecovery(recovered, pending);
+      return;
+    }
     uni.setStorageSync(pendingKey(), no); // Recovery reference only; never persist bank details, OTPs or balances.
     if (uni.getStorageSync(pendingKey()) !== no) throw new Error("BANK_RECOVERY_NOT_DURABLE");
     uncertain.value = true; pendingQuoteNo.value = no;
     const value = await api.submit(no, `bank-submit:${no}`);
     if (!current()) return;
-    order.value = value; quote.value = null; uncertain.value = false; pendingQuoteNo.value = null; uni.removeStorageSync(pendingKey());
+    applyRecovery(value, no);
   });
 }
 async function abandon() {
   if (!quote.value || busy.value || uncertain.value) return;
   await run(async current => {
-    uncertain.value = true; pendingQuoteNo.value = quote.value!.quoteNo;
-    const recovered = await api.abandon(quote.value!.quoteNo); if (!current()) return;
-    applyRecovery(recovered);
+    const no = quote.value!.quoteNo;
+    uncertain.value = true; pendingQuoteNo.value = no;
+    const recovered = await api.abandon(no); if (!current()) return;
+    applyRecovery(recovered, no);
     if (recovered.state === "ABANDONED" || recovered.state === "EXPIRED") {
       config.value = null; formStep.value = "amount";
       const owner = app.accountKey, epoch = app.accountBindingEpoch;

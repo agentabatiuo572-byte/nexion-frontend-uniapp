@@ -4051,6 +4051,8 @@ timeHoursAgo: "{n}h ago",
     withdrawFeeStale: "The fee rate has been updated — please try again",
     withdrawContextStale: "Your account or payout address changed — please submit again",
     withdrawHandledElsewhere: "The original withdrawal request was handled on another page. Check your withdrawal history.",
+    withdrawEarlierOutcome: "Earlier request: {outcome}",
+    withdrawOtherPending: "This page now shows another withdrawal in progress. Please check it.",
     withdrawResendTitle: "Retry original withdrawal request",
     withdrawResendBody:
       "The result of the ${amount} withdrawal to {network} address {address} is unconfirmed. Retrying continues the original request without creating another withdrawal.",
