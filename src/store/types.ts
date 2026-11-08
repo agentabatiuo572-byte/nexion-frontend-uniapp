@@ -323,6 +323,10 @@ export interface Withdrawal {
   payoutAddressChangeBlocked?: boolean;
   riskRoute?: WithdrawalRiskRoute;
   riskReasons?: string[];
+  /** Original submission's compliance snapshot, never derived from current policy. */
+  complianceReviewRequired?: boolean;
+  complianceHoldApplies?: boolean;
+  complianceHoldDays?: number;
   /** FEAT-WD01a:本单是否命中小额免审快车道。 */
   fastLaneApplied?: boolean;
   /** FEAT-WD01a:被快车道免掉的闸名。必须随单落盘 —— 只算不存 = 事后审计与客服
