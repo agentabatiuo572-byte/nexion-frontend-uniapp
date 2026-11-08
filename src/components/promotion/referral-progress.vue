@@ -2,7 +2,7 @@
   <text v-if="loading && listRead && !activities.length" class="referral-refresh-status" role="status" aria-live="polite">{{ t.promotion.loading }}</text>
   <view v-if="(loading && !listRead) || activities.length || error || hasMore" class="promotion referral-progress" data-testid="referral-progress">
     <text v-if="loading && !listRead && !activities.length" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-    <view v-for="activity in activities" :key="activity.activityId" class="referral-activity" :data-activity-id="activity.activityId">
+    <view v-for="activity in activities" :key="activity.activityId" class="referral-activity nx-tint" :data-activity-id="activity.activityId">
       <view class="referral-meta">
         <text v-if="deadlineText(activity)" class="referral-deadline">{{ deadlineText(activity) }}</text>
         <view class="referral-rule-pill" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
@@ -18,7 +18,7 @@
       <!-- Progress opens as a sheet; expandedActivity stays the single source of which one is open. -->
       <NxSheet :open="expandedActivity===activity.activityId" :title="localized(activity.title,locale.code) || copy.firstPurchase" @close="expandedActivity=null">
         <view class="referral-details">
-          <view class="referral-summary">
+          <view class="referral-summary nx-tint">
             <view class="referral-art referral-summary__art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /></view>
             <text v-if="deadlineText(activity)" class="referral-deadline">{{ deadlineText(activity) }}</text>
             <view class="referral-count"><text class="referral-number">{{ visibility.mask(qualifyingCount(activity.activityId)) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
@@ -35,7 +35,7 @@
         </view>
       </NxSheet>
     </view>
-    <view v-if="error && !activities.length" class="referral-activity"><text class="referral-title">{{ copy.firstPurchase }}</text><text class="referral-number">—</text></view>
+    <view v-if="error && !activities.length" class="referral-activity nx-tint"><text class="referral-title">{{ copy.firstPurchase }}</text><text class="referral-number">—</text></view>
     <NxButton v-if="hasMore" class="referral-cta referral-more" size="medium" :busy="loading" :label="t.promotion.more" @click="loadActivities(false)"><text>{{ t.promotion.more }}</text><text aria-hidden="true">→</text></NxButton>
     <PromotionTerms :open="!!termsActivity" :title="localized(termsActivity?.title,locale.code)" :terms="localized(termsActivity?.terms,locale.code)" :disclosures="promotionDisclosures(termsActivity)" @close="termsActivity=null" />
   </view>
@@ -139,7 +139,8 @@ useAutoRecovery({
 <style scoped>
 .referral-progress { min-width: 0; }
 .referral-refresh-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.referral-activity { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: var(--v5-space-5); border-radius: 28px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+/* Both cards keep their original brand-2 hue as a tinted solid with its shared rim (01 §1.1.2). */
+.referral-activity { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: var(--v5-space-5); border-radius: 28px; }
 .referral-activity + .referral-activity { margin-top: var(--ui-space-inset); }
 .referral-hero { position: relative; display: flex; align-items: center; min-height: 84px; margin-top: -4px; }
 .referral-meta { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--v5-space-2); }
@@ -159,7 +160,7 @@ useAutoRecovery({
 .referral-actions > .referral-progress-link { flex: 1; }
 .referral-progress-link { max-width: 100%; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
-.referral-summary { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; }
 .referral-share { margin-top: var(--v5-space-2); box-shadow: 0 8px 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
 .referral-summary__art { top: -6px; right: -10px; width: 132px; height: 132px; }
 .referral-summary > .referral-count { position: relative; margin-top: auto; }

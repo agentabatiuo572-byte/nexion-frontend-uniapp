@@ -43,7 +43,7 @@
           </svg>
           <text class="est-loading__t">{{ detectingText }}</text>
         </view>
-        <view v-else key="reveal" class="est-phone nx-soft-glass anim-up">
+        <view v-else key="reveal" class="est-phone nx-tint anim-up">
           <view class="est-phone__pill">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text class="est-phone__pill-t">{{ t.onboarding.detected }}</text>
@@ -479,13 +479,16 @@ async function deferPhoneActivation() {
   background: var(--v5-brand);
   color: var(--v5-on-brand);
 }
+/* Detected phone: its original brand hue as a tinted solid (01 §1.1.2) with the success halo. */
 .est-phone {
+  --nx-tint: var(--v5-brand);
   position: relative;
   border-radius: 12px;
   padding: 14px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
+  box-shadow: var(--ui-glass-edge-shadow), 0 0 24px -4px rgba(198, 255, 58, 0.35);
 }
 .est-phone__pill {
   position: absolute;

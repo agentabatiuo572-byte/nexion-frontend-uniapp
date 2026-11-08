@@ -30,7 +30,9 @@
         <!-- Purchase gift: the purchased model leads, the gift follows (04.2). -->
         <template v-if="kind === 'gift' && stage">
           <view class="lp-stage" :class="'lp-stage--' + stageMode">
+            <template v-if="stageMode !== 'ended'"><view class="lp-glow lp-glow--cyan" aria-hidden="true" /><view class="lp-glow lp-glow--amber" aria-hidden="true" /></template>
             <view class="lp-stage__machines">
+              <view v-if="stageMode === 'full'" class="lp-stage__floor" aria-hidden="true" />
               <view class="lp-stage__main lp-enter-main"><CatalogMachineImage class="lp-fill" :sku="stage.mainSku" :image-url="productImage(stage.mainSku)" :scope-key="activity.activityId + ':stage-main'" /></view>
               <view v-if="stage.giftSku" class="lp-stage__gift lp-enter-gift"><CatalogMachineImage class="lp-fill" :sku="stage.giftSku" :image-url="productImage(stage.giftSku)" :scope-key="activity.activityId + ':stage-gift'" /></view>
               <view v-else class="lp-stage__reward lp-enter-gift"><text class="lp-amount lp-stage__amount" :class="amountSize(stage.parts.amount)">{{ stage.parts.amount }}</text><text class="lp-unit" :class="{ 'lp-unit--uvt': stage.parts.asset === 'UVT' }">{{ stage.parts.unit }}</text></view>
@@ -125,6 +127,8 @@
         <!-- Repurchase: owned devices on a glass slab, then the empty slot to fill. -->
         <template v-if="kind === 'repurchase' && slab">
           <view class="lp-slab-wrap">
+            <view class="lp-glow lp-glow--sky" aria-hidden="true" />
+            <view v-if="!slab.refused" class="lp-glow lp-glow--teal" aria-hidden="true" />
             <view class="lp-slab nx-soft-glass lp-rise lp-d2">
               <view v-if="slab.count !== null" class="lp-slab__head"><text class="lp-slab__label">{{ c.myDevices }}</text><text class="lp-slab__count"><text class="lp-slab__count-number">{{ slab.count }}</text> {{ c.deviceUnit }}</text></view>
               <view v-if="slab.fleetRow" class="lp-slab__fleet">
@@ -511,8 +515,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 
 <style src="../../components/promotion/promotion.css"></style>
 <style scoped>
-/* Theme strengths from the P-58 boards: ambient light, the device slab and the stage floor. */
-.lp { position: relative; overflow-x: clip; color: var(--v5-ink); }
+/* Theme strengths from the P-58 boards: ambient light and the stage floor. */
+.lp { --lp-glow: 12%; --lp-sky: 16%; --lp-teal: 16%; --lp-floor: 6%; position: relative; overflow-x: clip; color: var(--v5-ink); }
+:global([data-theme="light"] .lp) { --lp-glow: 10%; --lp-sky: 14%; --lp-teal: 16%; --lp-floor: 10%; }
 .lp-body { position: relative; padding: 0 16px; }
 .lp-fill { position: absolute; inset: 0; }
 .lp-card { background: var(--v5-surface); border-radius: var(--ui-radius-surface); box-shadow: var(--v5-glass-shadow); }
@@ -558,12 +563,22 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-line-icon { flex: none; margin-top: 1px; color: var(--v5-ink-3); }
 .lp-footnote { display: block; margin-top: 16px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 
+/* Ambient light sits behind the page's one hero: the gift stage or the device slab. */
+.lp-glow { position: absolute; border-radius: 50%; pointer-events: none; }
+.lp-glow--cyan { left: -76px; top: -52px; width: 330px; height: 330px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-tech-cyan) var(--lp-glow), transparent), transparent 64%); }
+.lp-glow--amber { right: -86px; top: 28px; width: 280px; height: 280px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-warning) var(--lp-glow), transparent), transparent 64%); }
+.lp-stage--signin .lp-glow--cyan { top: -28px; }
+.lp-stage--signin .lp-glow--amber { top: 32px; }
+.lp-glow--sky { left: -40px; top: -30px; width: 260px; height: 260px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-aura-sky) var(--lp-sky), transparent), transparent 64%); }
+.lp-glow--teal { right: -50px; bottom: -40px; width: 240px; height: 240px; background: radial-gradient(circle, color-mix(in srgb, var(--v5-tech-cyan) var(--lp-teal), transparent), transparent 64%); }
+
 /* Gift stage: 222/140 devices on one shared floor; sign-in 210/134; ended 200/128, dimmed. */
 .lp-stage { position: relative; height: 268px; margin-top: 4px; }
 .lp-stage--signin { height: 250px; }
 .lp-stage--ended { height: 226px; }
 .lp-stage__machines { position: absolute; inset: 0; }
 .lp-stage--ended .lp-stage__machines { opacity: .55; filter: grayscale(.7); }
+.lp-stage__floor { position: absolute; left: 26px; right: 22px; top: 206px; height: 22px; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--v5-ink) var(--lp-floor), transparent), transparent 70%); }
 .lp-stage__main { position: absolute; left: 0; top: 6px; width: 222px; height: 222px; }
 .lp-stage__gift { position: absolute; right: 4px; top: 86px; width: 140px; height: 140px; }
 .lp-stage--signin .lp-stage__main { width: 210px; height: 210px; }
@@ -742,6 +757,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
   .lp-stage--ended { height: calc(26px + 54vw); }
   .lp-stage__main, .lp-stage--signin .lp-stage__main, .lp-stage--ended .lp-stage__main { width: 60%; height: auto; aspect-ratio: 1; }
   .lp-stage__gift, .lp-stage--signin .lp-stage__gift, .lp-stage--ended .lp-stage__gift { width: 38%; height: auto; aspect-ratio: 1; }
+  .lp-stage__floor { top: calc(.6 * (100vw - 32px) - 16px); }
   .lp-stage__badge.nx-frosted-button { left: 53%; }
   .lp-product__art { width: 88px; height: 88px; }
   .lp-ticket { grid-template-columns: minmax(0, 1fr) 96px; }
