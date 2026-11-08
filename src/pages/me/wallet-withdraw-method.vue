@@ -14,12 +14,12 @@
       <view class="method" role="button" tabindex="0" data-testid="withdraw-method-bank" :aria-disabled="!canOpenBank" @click="openBank" @keydown.enter.prevent="openBank" @keydown.space.prevent="openBank">
         <view class="method-top">
           <view class="method-icon method-icon--bank" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
-          <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ bankIntent ? t.bankWithdrawal.resumeBank : pending ? t.bankWithdrawal.resumeUsdt : bankUnavailable ? t.bankWithdrawal.unavailable : t.bankWithdrawal.bankMethodHint }}</text></view>
+          <view class="method-copy"><text class="method-title">{{ t.bankWithdrawal.bankMethod }}</text><text class="method-note">{{ checking ? t.bankWithdrawal.loading : !recoveryKnown ? t.bankWithdrawal.recoveryUnavailable : bankIntent ? t.bankWithdrawal.resumeBank : bankUnavailable ? t.bankWithdrawal.unavailable : pending ? t.bankWithdrawal.resumeUsdt : t.bankWithdrawal.bankMethodHint }}</text></view>
           <svg v-if="canOpenBank" class="method-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </view>
       </view>
       <text v-if="pending" class="status" role="status">{{ t.bankWithdrawal.resumeUsdt }}</text>
-      <text v-else-if="checking" class="status" role="status">{{ t.bankWithdrawal.loading }}</text>
+      <text v-if="checking" class="status" role="status">{{ t.bankWithdrawal.loading }}</text>
       <text v-else-if="!recoveryKnown" class="status" role="status">{{ t.bankWithdrawal.recoveryUnavailable }}</text>
       <text v-else-if="bankIntent" class="status" role="status">{{ t.bankWithdrawal.resumeBank }}</text>
       <view v-if="!checking && !recoveryKnown" class="reload" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
@@ -49,7 +49,7 @@ const readFailed = ref(false);
 let revision = 0, visible = false;
 const canOpenUsdt = computed(() => !!pending.value || (!checking.value && recoveryKnown.value && !bankIntent.value));
 const bankUnavailable = computed(() => recoveryKnown.value && !bankIntent.value && !bankEnabled.value);
-const canOpenBank = computed(() => (!pending.value || bankIntent.value) && !checking.value && !bankUnavailable.value);
+const canOpenBank = computed(() => (!pending.value || bankIntent.value || !recoveryKnown.value) && !checking.value && !bankUnavailable.value);
 async function load() {
   const currentRevision = ++revision, account = app.accountKey, epoch = app.accountBindingEpoch, runtime = captureRuntimeRevision();
   const current = () => visible && currentRevision === revision && account === app.accountKey && epoch === app.accountBindingEpoch && isCurrentRuntimeRevision(runtime);
