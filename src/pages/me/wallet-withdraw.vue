@@ -86,7 +86,7 @@
           </view>
           <view class="wd-amtrow">
             <text class="wd-amtrow__cur">$</text>
-            <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
+            <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="remoteSessionReady ? amount : ''" :placeholder="remoteSessionReady ? '0.00' : ''" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
             <text class="wd-amtrow__unit">USDT</text>
           </view>
           <view class="wd-k wd-min"><text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}</text><text v-else>—</text></view>
@@ -113,18 +113,19 @@
       <view class="wd-route mx-4">
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.networkLabel }}</text>
-          <text class="wd-net" data-testid="withdraw-network-tag">{{ network.slice(5) }}</text>
-          <text class="wd-route__note">{{ networkHint(network) }}</text>
+          <text class="wd-net" data-testid="withdraw-network-tag">{{ remoteSessionReady ? network.slice(5) : '—' }}</text>
+          <text v-if="remoteSessionReady" class="wd-route__note">{{ networkHint(network) }}</text>
         </view>
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.withdrawAddressLabel }}</text>
-          <text v-if="pendingAttempt" class="wd-route__a">{{ boundAddressShort }}</text>
+          <text v-if="!remoteSessionReady" class="wd-route__a wd-route__a--empty">—</text>
+          <text v-else-if="pendingAttempt" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else-if="payoutReadStatus === 'error'" class="wd-route__a wd-route__a--empty wd-route__a--error" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
           <text v-else-if="payoutReadStatus !== 'ready'" class="wd-route__a wd-route__a--empty">—</text>
           <text v-else-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else class="wd-route__a wd-route__a--empty">{{ t.addrRebind.emptyGuideTitle }}</text>
           <view
-            v-if="!pendingAttempt && payoutReadStatus === 'ready' && boundAddress"
+            v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && boundAddress"
             class="nx-withdraw-manage-entry wd-manage nx-frosted-button"
             role="button" tabindex="0"
             :aria-label="t.addrRebind.manageCta"
@@ -135,7 +136,7 @@
           </view>
         </view>
         <!-- 空状态引导(一次设置长期使用;非报错态) -->
-        <view v-if="!pendingAttempt && payoutReadStatus === 'ready' && !boundAddress" class="wd-route__guide">
+        <view v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && !boundAddress" class="wd-route__guide">
           <text class="wd-route__guide-body">{{ t.addrRebind.emptyGuideBody }}</text>
           <view class="nx-withdraw-add-address-cta wd-add nx-frosted-button" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage"  @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
             <text>{{ t.addrRebind.addCta }}</text>
@@ -345,6 +346,15 @@ const ALL_NETWORKS: { id: CryptoNetwork; label: string }[] = [
 const t = useT();
 const app = useApp();
 const auth = useAuth();
+// H5 restores its session before this page knows which account's attempt it must render.
+// Reuse the protected-read gate for both loading that command and showing the form.
+const remoteSessionReady = computed(() => binarySessionReady({
+  remote: remoteApiEnabled,
+  authenticated: auth.isAuthenticated,
+  accountId: auth.accountId,
+  appAccountKey: app.accountKey,
+  sessionUserId: sessionVault.read()?.user.userId ?? null,
+}));
 const payout = usePayoutAddress();
 const payoutReadStatus = computed(() => payout.readStatusFor(app.accountKey));
 const payoutReadCopy = useFinanceReviewCopy();
@@ -353,13 +363,13 @@ const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
 const withdrawalPolicyError = ref("");
 let withdrawalPolicyRefreshSequence = 0;
-const pendingAttempt = ref(readWithdrawAttempt(app.accountKey));
+const pendingAttempt = ref(remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null);
 const abandoningAttempt = ref(false);
 
 function refreshPendingAttempt() {
-  pendingAttempt.value = readWithdrawAttempt(app.accountKey);
+  pendingAttempt.value = remoteSessionReady.value ? readWithdrawAttempt(app.accountKey) : null;
 }
-watch(() => app.accountKey, refreshPendingAttempt, { flush: "sync" });
+watch([() => app.accountKey, remoteSessionReady], refreshPendingAttempt, { flush: "sync" });
 
 async function abandonPendingAttempt() {
   const accountKey = app.accountKey;
@@ -509,17 +519,6 @@ const withdrawalReadStatusText = computed(() => {
   const failed = [withdrawalFactsState.value, dailyFactsState.value].find(state => state === "unavailable" || state === "stale");
   return failed ? factsStatusText(failed) : withdrawalActionStatusText.value;
 });
-
-// Same cold-session fence the F3 pages use (binary / daily / unilevel): the
-// H5 vault binds only after its HttpOnly-cookie restore, and a protected read
-// issued before that returns AUTH_REQUIRED.
-const remoteSessionReady = computed(() => binarySessionReady({
-  remote: remoteApiEnabled,
-  authenticated: auth.isAuthenticated,
-  accountId: auth.accountId,
-  appAccountKey: app.accountKey,
-  sessionUserId: sessionVault.read()?.user.userId ?? null,
-}));
 
 const withdrawalPageVisible = ref(false);
 let withdrawalEntryReadPending = true;
@@ -1011,12 +1010,12 @@ const submitting = ref(false);
 // 连点 CTA 会叠出第二个弹窗,两次确认 = 双重建单(mask 盖住 CTA 是第二道,这是第一道)。
 const confirmingSubmit = ref(false);
 /**
- * 🔴 输入面冻结判据 = 未收口尝试 **或** 提交中 **或** 确认弹窗打开中。
+ * 🔴 输入面冻结判据 = 账号绑定未就绪 **或** 未收口尝试 **或** 提交中 **或** 确认弹窗打开中。
  * 只看 submitting 的话,弹窗那几秒 submitting 还是 false —— 改金额的入口(输入框、
  * 「全部提现」、降额 CTA、抵扣开关)全都还活着,只靠 mask 挡手。快照已让改动动不了钱,
  * 但页面会立刻显示与刚确认的弹窗不同的数字,同一个提交出现两个口径。
  */
-const inputsLocked = computed(() => !!pendingAttempt.value || submitting.value || confirmingSubmit.value);
+const inputsLocked = computed(() => !remoteSessionReady.value || !!pendingAttempt.value || submitting.value || confirmingSubmit.value);
 // The default network settles as soon as the policy and address book are known, and waits out a submit.
 watch([NETWORKS, () => payout.readStatusFor(app.accountKey), () => inputsLocked.value], settleDefaultNetwork);
 /** 提交链结束(成功 / 任一拒单分支)统一解冻:三个状态必须成对清,漏一个页面就永久卡在冻结报价上。 */
@@ -1123,7 +1122,7 @@ function fmtNex(n: number): string {
 }
 
 const canSubmit = computed(() => submitDisabledReason.value === "");
-const canSubmitAction = computed(() => !submitting.value && !confirmingSubmit.value && (!!pendingAttempt.value || canSubmit.value));
+const canSubmitAction = computed(() => remoteSessionReady.value && !submitting.value && !confirmingSubmit.value && (!!pendingAttempt.value || canSubmit.value));
 
 function networkHint(id: CryptoNetwork): string {
   switch (id) {
@@ -1184,7 +1183,7 @@ async function handleResetAddresses() {
 }
 
 async function handleSubmit() {
-  if (submitting.value || confirmingSubmit.value) return;
+  if (!remoteSessionReady.value || submitting.value || confirmingSubmit.value) return;
   // 🔴 **上一次没确认结果的提交,必须先收口,才允许开始新的一笔**(2026-08-11 独立审计 P0)。
   // 幂等键此前在本函数里每次点击现铸 → 超时重试 = 服务端第二张单,而幂等键存在的唯一场景
   // 正是这个场景。键与它那一次的 body 一起冻在 lib/withdraw-attempt(落盘,理由见该文件),
