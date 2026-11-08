@@ -9,7 +9,7 @@
 
         <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="retryRemotePool" />
         <template v-else>
-        <view class="pool-hero nx-soft-glass nx-viz-press">
+        <view class="pool-hero nx-tint nx-viz-press">
           <view class="pool-share">
             <view ref="shareRingRef" class="pool-ring" :class="{ 'pool-ring--capped': !visibility.hidden && !(remoteApiEnabled && !remotePool) && myShare > 0 }" :style="{ '--nx-viz-ring': shareRingInView === false || visibility.hidden || (remoteApiEnabled && !remotePool) ? 0 : Math.min(100, Math.max(0, myShare * 100)), transition: shareRingInView === false || visibility.hidden ? 'none' : VIZ_RING_TRANSITION }"><view class="pool-ring__hole"><text class="pool-ring__pct">{{ visibility.mask(shareLabel) }}</text><text class="pool-ring__label">{{ t.pool.myShare }}</text></view></view>
             <view class="pool-share__copy">
@@ -333,7 +333,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 
 <style scoped>
 .pool-content { display: flex; flex-direction: column; gap: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
-.pool-hero { position: relative; padding: var(--v5-space-5); border-radius: 28px; }
+.pool-hero { --nx-tint: var(--v5-warning); position: relative; padding: var(--v5-space-5); border-radius: 28px; }
 .pool-label { color: var(--v5-ink); font-size: 13px; line-height: 18px; font-weight: 600; }
 .pool-hero .reward-amount { display: block; margin: var(--v5-space-1) 0 6px; font-size: 32px; line-height: 40px; font-weight: 550; letter-spacing: -.03em; overflow-wrap: anywhere; }
 .pool-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
