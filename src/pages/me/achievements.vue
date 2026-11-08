@@ -29,12 +29,14 @@
             <text class="block" :style="catHeadStyle">{{ grp.label }}</text>
             <view v-if="grp.key === 'daily' && remoteSnapshot.dailyMilestones.length" class="achievement-track">
               <text class="block achievement-track__caption">{{ t.growthUi.streakPrefix }} <text class="nx-num-metric achievement-streak">{{ remoteSnapshot.streak.currentStreak }}</text> {{ t.growthUi.streakSuffix }}</text>
-              <view class="achievement-track__rail">
+              <view class="achievement-track__rail" :class="{'achievement-track__rail--claimable': remoteSnapshot.dailyMilestones[currentDailyIndex]?.status === 'CLAIMABLE'}">
                 <GrowthProgress class="achievement-track__bar" :value="dailyTrackPct" :label="w.serverDailyMilestones" />
-                <view v-for="(milestone, mi) in remoteSnapshot.dailyMilestones" :key="milestone.milestoneId" class="achievement-node" :class="{'achievement-node--current': mi === currentDailyIndex, 'achievement-node--done': milestone.status !== 'LOCKED'}" :style="{left: remoteSnapshot.dailyMilestones.length === 4 ? ['24%', '50%', '75%', 'calc(100% - 8px)'][mi] : `${remoteSnapshot.dailyMilestones.length === 1 ? 50 : (mi + 1) / remoteSnapshot.dailyMilestones.length * 100}%`}">
-                  <view class="achievement-node__dot" />
-                  <view v-if="milestone.status !== 'LOCKED' || mi === currentDailyIndex" class="achievement-node__label"><text>{{ fmt(t.growthUi.milestoneDay, {n:milestone.milestoneDay}) }}</text><text class="achievement-node__reward">{{ dailyMilestoneRewardText(milestone, dailyRewardLabels(t.daily.milestones)) }}</text><NxButton v-if="milestone.status === 'CLAIMABLE'" variant="brand" size="small" :disabled="!!remoteBusy" :label="w.claim" @click="claimRemote(grp.rows[mi])" /></view>
-                </view>
+                <template v-for="(milestone, mi) in remoteSnapshot.dailyMilestones" :key="milestone.milestoneId">
+                  <view class="achievement-node" :class="{'achievement-node--current': mi === currentDailyIndex, 'achievement-node--done': milestone.status !== 'LOCKED'}" :style="{left: dailyNodePosition(mi)}">
+                    <view class="achievement-node__dot" />
+                  </view>
+                  <view v-if="mi === currentDailyIndex" class="achievement-node__label" :style="{left: `clamp(0px, calc(${dailyNodePosition(mi)} - 50px), calc(100% - 100px))`}"><text>{{ fmt(t.growthUi.milestoneDay, {n:milestone.milestoneDay}) }}</text><text class="achievement-node__reward">{{ dailyMilestoneRewardText(milestone, dailyRewardLabels(t.daily.milestones)) }}</text><NxButton v-if="milestone.status === 'CLAIMABLE'" variant="brand" size="small" :disabled="!!remoteBusy" :label="w.claim" @click="claimRemote(grp.rows[mi])" /></view>
+                </template>
               </view>
             </view>
             <view v-else class="nx-glass-card" :class="{'achievement-badges': grp.key === 'badges'}" :style="listStyle">
@@ -319,8 +321,14 @@ const currentDailyIndex = computed(() => {
   const rows = remoteSnapshot.value?.dailyMilestones ?? [];
   const claimable = rows.findIndex(row => row.status === 'CLAIMABLE');
   if (claimable >= 0) return claimable;
-  return rows.findIndex(row => row.status === 'LOCKED');
+  const locked = rows.findIndex(row => row.status === 'LOCKED');
+  return locked >= 0 ? locked : rows.length - 1;
 });
+function dailyNodePosition(index: number): string {
+  const count = remoteSnapshot.value!.dailyMilestones.length;
+  return count === 4 ? ['24%', '50%', '75%', 'calc(100% - 8px)'][index]
+    : `${count === 1 ? 50 : (index + 1) / count * 100}%`;
+}
 const dailyTrackPct = computed(() => {
   const snapshot = remoteSnapshot.value;
   if (!snapshot || !snapshot.dailyMilestones.length) return 0;
@@ -558,7 +566,7 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
 .achievement-summary { display:flex; align-items:center; gap:18px; padding:18px 16px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); margin-top:var(--v5-space-3); }.achievement-summary__count { font:500 32px/38px var(--font-metric); letter-spacing:-.02em; }.achievement-summary__count text { font-size:16px; color:var(--v5-ink-3); }
 .achievement-track { padding:18px 24px 14px; border-radius:var(--ui-radius-surface); background:var(--v5-surface); }.achievement-track__caption { font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.achievement-track__rail { position:relative; height:90px; margin:var(--v5-space-4) 8px 0; }.achievement-track__bar { position:absolute; left:0; right:0; top:7px; height:4px; }
 .achievement-node { position:absolute; top:0; width:18px; height:18px; margin-left:-9px; display:grid; place-items:center; border-radius:50%; }.achievement-node__dot { width:8px; height:8px; border-radius:50%; background:var(--v5-ink-4); }.achievement-node--done .achievement-node__dot { background:var(--v5-brand); }.achievement-node--current { box-shadow:inset 0 0 0 2px var(--v5-brand); background:var(--v5-brand-soft); }.achievement-node--current .achievement-node__dot { background:var(--v5-brand); animation: achievement-pulse 2s ease-in-out infinite; }
-.achievement-node__label { position:absolute; top:24px; left:50%; transform:translateX(-50%); text-align:center; width:100px; font:500 12px/16px var(--font-v5); color:var(--v5-brand); }.achievement-node:last-child .achievement-node__label { transform:translateX(-85%); }.achievement-node__reward { display:block; font:500 11px/14px var(--font-metric); color:var(--v5-nex); }
+.achievement-node__label { position:relative; text-align:center; width:100px; font:500 12px/16px var(--font-v5); color:var(--v5-brand); }.achievement-node__reward { display:block; font:500 11px/14px var(--font-metric); color:var(--v5-nex); }
 .achievement-row--ready { position:relative; overflow:hidden; background:color-mix(in srgb,var(--v5-brand) 8%,transparent); }.achievement-row--ready::before { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(105deg,transparent,color-mix(in srgb,var(--v5-brand) 16%,transparent),transparent); animation:achievement-sheen 800ms ease-out both; }.achievement-row--locked { opacity:.55; }
 .achievement-badges { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--v5-space-2); background:transparent !important; box-shadow:none !important; }
 .achievement-row--badge { display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 6px 12px; border-radius:18px; background:var(--v5-surface); text-align:center; animation:nx-viz-pop 420ms cubic-bezier(.2,1.4,.4,1) var(--ui-growth-delay) both; }.achievement-row--badge.achievement-row--locked { border:1.5px dashed var(--v5-border-strong); background:transparent; }.achievement-row--badge > view { flex:none !important; }.achievement-row--badge > view:first-child {width:44px !important;height:44px !important;border-radius:50% !important;}.achievement-row--badge > view:last-child { text-align:center; }.achievement-row--badge > view:nth-child(2) > text:first-child { font:500 13px/18px var(--font-v5) !important; }.achievement-row--badge > view:nth-child(2) > text:nth-child(2), .achievement-row--badge > view:last-child > text:nth-child(2) { display:none; }
@@ -573,11 +581,12 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
 .achievement-row--badge.achievement-row--locked > view:first-child { box-shadow:none; }
 .achievement-row--badge > view:last-child > text:first-child { font:500 11px/14px var(--font-metric) !important; color:var(--v5-success-ink) !important; }
 .achievement-row--badge.achievement-row--locked > view:last-child > text:first-child { color:var(--v5-ink-4) !important; }
-.achievement-row :deep(.nx-button--brand > .nx-button__surface), .achievement-node :deep(.nx-button--brand > .nx-button__surface) { --ui-button-ink:var(--v5-ink) !important; }
+.achievement-row :deep(.nx-button--brand > .nx-button__surface), .achievement-node__label :deep(.nx-button--brand > .nx-button__surface) { --ui-button-ink:var(--v5-ink) !important; }
 
 .achievement-row--badge.achievement-row--locked {opacity:1;}.achievement-row--badge.achievement-row--locked > view:nth-child(2) > text:first-child {color:var(--v5-ink-3) !important;}
 
-.achievement-track__rail { margin:12px 0 0; height:50px; }
+.achievement-track__rail { margin:12px 0 0; height:50px; padding-top:24px; box-sizing:border-box; }
+.achievement-track__rail--claimable { height:auto; }
 .achievement-track__bar { left:8px; right:8px; }
 .achievement-summary { min-height:120px; box-sizing:border-box; }
 .achievement-summary > view:last-child { transform:translate(2px,2.5px); }
