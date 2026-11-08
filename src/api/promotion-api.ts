@@ -4,7 +4,7 @@ import { readPaymentCommand } from './payment-command-api';
 import type { PublicPromotion, PublicPromotionPage, Quote, QuoteInput, Reward, RewardPage, ReferralProgress, OrderReceipt as ContractOrderReceipt, CommandReceipt } from './promotion-contracts';
 export type { PublicPromotion, Quote, Reward, ExpectedReward, PublicRewardSpec, RewardSpec, RewardState } from './promotion-contracts';
 // The shared order projection also carries these; the generated promotion OpenAPI types do not list them yet.
-const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USDT_BSC','CREGIS_USDT_ERC20'] as const;
+const PAYMENT_METHODS=['WALLET','UVEL_WALLET','VOUCHER','HDPAY_BANK','CREGIS_USDT_BSC','CREGIS_USDT_ERC20','CREGIS_USDT_TRC20'] as const;
 export type OrderReceipt=ContractOrderReceipt&{paymentMethod?:typeof PAYMENT_METHODS[number]|null;paidTotalUsdt?:string|null;recoveredQuoteId?:string};
 export const PROMOTION_CAPABILITIES: QuoteInput['clientCapabilities']=['PROMOTION_QUOTE_V1','ORDER_ITEM_QUANTITIES_V1','PROMOTION_REWARDS_V1'];
 export type PromotionItem = { productNo:string; quantity:number };

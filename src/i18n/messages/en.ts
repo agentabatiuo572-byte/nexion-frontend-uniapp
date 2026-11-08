@@ -4109,6 +4109,11 @@ timeHoursAgo: "{n}h ago",
 
     feeConfigRetry: "Retry",
     // Sprint 3 — Compliance hold banner(用户视角:监管收紧导致额度审查延长,不暴露 phase 概念)
+    stageWaitTitle: "TRC20 withdrawal rules",
+    stageWaitBody: "Every withdrawal in this phase has a {days}-day wait. Small-amount exemptions and risk reviews still apply. Expiry or review approval does not mean funds have arrived.",
+    stageNoWaitBody: "This phase adds no extra wait. Small-amount exemptions and risk reviews still apply. Arrival depends on actual processing.",
+    stageWaitUntilBody: "This withdrawal’s phase wait ends at {time}. Small-amount exemptions and risk reviews still apply. Expiry or review approval does not mean funds have arrived.",
+    stageWaitPendingBody: "This withdrawal has a {days}-day phase wait. Small-amount exemptions and risk reviews still apply. Expiry or review approval does not mean funds have arrived.",
     complianceHoldTitle: "Withdrawal compliance review",
     complianceHoldBody: "This withdrawal requires manual review plus a {days}-day review window. The end of the window does not mean the funds have arrived.",
     complianceReviewBody: "Withdrawals require manual review; small-amount auto approval is paused. Enter an amount to see whether an extra review window applies.",

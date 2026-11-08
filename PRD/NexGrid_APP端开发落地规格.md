@@ -326,11 +326,13 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **终态**:failed/cancelled → shadow 归零不入账;终态后 `cooldownDays=30` cooldown(`canStart()=false`)。
 
 ### 3.F 平台运营阶段(Phase Dial — 后台引擎,UI 不暴露)— §13.4
+
+- **2026-11-08 TRC20 增量**：充值和共用购买支付弹窗按服务端显式能力增加 TRC20，覆盖商城、组合、原单续付、试用／换购／活动；旧接口缺该网络时隐藏，读取政策不建址。TRON Base58Check 地址保持大小写，原生 txID 为无 0x 的 64 位十六进制。提现每笔按 H1 N 天等待（N0无额外等待），不受加强合规开关／1000门槛影响，小额免审和 K3/K4 保留；原单阶段等待与人工审核独立，审核／到期均不等于到账。九语、原恢复与 App/Lite 入口边界保留，详见[TRC20 收付增量](UVEL_TRC20收付与阶段等待_20261108.md)。
 - **当前 phase** = `useProductPhaseOverride.pinned ?? getPhaseForMonth(getMonthsSince(joinedAt))`。
 - **月段**:P1 0-2月/P2 2-4/P3 4-6/P4 6-8/P5 8-10/P6 10+。
 - **7 时变 dial**:`inviteBonusMultiplier`(P1=2.0/P2=1.5/P3+=1.0)· `withdrawalPointsPer100`(P1-4=10/P5-6=20)· `withdrawalCooldownDays`(P1-4=30d/P5-6=45d)· `binaryDailyCapUSD`(P1-3=$5000/P4-6=$2000)· `premiumSubscriptionAvailable`(P4+)· `nexV2LockAvailable`(P6)· `complianceHoldEnabled`(P5+)。
 - **约束**:server 权威(pages 不 hardcode 门槛);phase id/name 永不在用户 UI 出现。
-- **2026-11-08 USDT 合规覆盖**：提现页合规开关、窗口与大额门槛读取服务端提现 policy，实际本笔人工／等待取 eligibility；开启时所有新 USDT 提现人工复核、小额免审暂停，严格超过服务端门槛（本轮 1,000 USDT）才附加 N 天，N=0 仍人工。小额不显示 N 天，窗口到期不代表到账。追踪消费原单快照与实际状态；没有截止／到账时间时保持未知，不用本机时间补值。App／H5 Lite 九语与各自测试分支同步，银行卡页面不变，详见主文档 §9.3.5–9.3.6。
+- **2026-11-08 BEP20/ERC20 合规覆盖**：提现页合规开关、窗口与大额门槛读取服务端提现 policy，实际本笔人工／等待取 eligibility；开启时所有新 BEP20/ERC20 提现人工复核、小额免审暂停，严格超过服务端门槛（本轮 1,000 USDT）才附加 N 天，N=0 仍人工。小额不显示 N 天，窗口到期不代表到账。追踪消费原单快照与实际状态；没有截止／到账时间时保持未知，不用本机时间补值。App／H5 Lite 九语与各自测试分支同步，银行卡页面不变，详见主文档 §9.3.5–9.3.6。
 
 ### 3.G NEX↔USDT 兑换 — §9.4.2
 - **汇率**:`1 NEX = $0.171`(实时,可 refresh)。
@@ -512,7 +514,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 
 ### 5.2 Checkout 结账（§7.3）
 
-确认订单→原单资格/期限→统一方式选择。钱包确认后进入§4.6.6 PIN，外部HDPAY/BSC直接确认完整报价并创建唯一收款意图，不调用PIN状态或验证。全部购买分支保留原业务报价及命令标识，后端执行/到款交付事务原子复核库存、槽位、期限和置换来源。未付不预占；外部不充值/扣钱包。零元走钱包PIN权益确认。恢复、费用与充值规则见[现行统一支付增量](UVEL_统一支付与钱包支付密码_20261031.md)。
+确认订单→原单资格/期限→统一方式选择。钱包确认后进入§4.6.6 PIN，外部HDPAY/BEP20/ERC20/TRC20直接确认完整报价并创建唯一收款意图，不调用PIN状态或验证。全部购买分支保留原业务报价及命令标识，后端执行/到款交付事务原子复核库存、槽位、期限和置换来源。未付不预占；外部不充值/扣钱包。零元走钱包PIN权益确认。恢复、费用与充值规则见[现行统一支付增量](UVEL_统一支付与钱包支付密码_20261031.md)。
 
 只有权威已激活才呈现成功/激活过程，查看设备进入原仓库；原支付未知只查原结果，不换键或跨通道重付。
 

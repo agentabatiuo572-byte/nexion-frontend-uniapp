@@ -2,6 +2,11 @@ import { uiLocale, type UiLocale } from '@/i18n';
 
 // Purchase payment copy. Never name a payment provider or its domain in the App.
 const zh = {
+  trc20: "USDT（TRC20）",
+  trc20Chain: "TRON 链",
+  gasTrc20: "TRC20 网络确认费已计入总额，外部钱包可能另收 TRX／能量费。",
+  remindTrc20: "仅通过 USDT（TRC20）· TRON 链转入，金额需为 {amt} USDT。网络或金额错误将无法自动到账。外部钱包可能另收 TRX／能量费。",
+  warnTrc20: "仅通过 USDT（TRC20）· TRON 链转入，金额与应付金额一致；网络错误将无法找回。外部钱包可能另收 TRX／能量费。",
   networkPausedTitle: '{network} 已暂停收款', networkPaused: '该网络已暂停收款，请勿向原收款地址转账。',
   confirming: '付款确认中', confirmWait: '付款时间已结束，正在确认截止前的付款，请勿再次转账或重复付款。',
   title: '选择支付方式', closesIn: '剩 {t} 订单自动关闭', orderNo: '订单号', methodLabel: '付款方式', close: '关闭', back: '返回',
@@ -44,6 +49,11 @@ const zh = {
   resume: '有一笔付款进行中', view: '查看付款进度', review: '付款正在确认中', ended: '本次付款已结束', delivered: '付款已完成',
 };
 const en: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "TRON chain",
+  gasTrc20: "The TRC20 confirmation fee is included in the total. Your wallet may charge TRX or energy fees separately.",
+  remindTrc20: "Send exactly {amt} USDT via TRON (TRC20) only. A wrong network or amount prevents automatic credit. Your wallet may charge TRX or energy fees separately.",
+  warnTrc20: "Send the exact USDT amount due via TRON (TRC20) only. Funds sent on the wrong network cannot be recovered. Your wallet may charge TRX or energy fees separately.",
   networkPausedTitle: 'Payments on {network} are paused', networkPaused: 'This network is not accepting payments. Do not send funds to the previous payment address.',
   confirming: 'Confirming your payment', confirmWait: 'The payment window has ended. We are checking payments sent before the deadline. Do not send another payment.',
   title: 'Payment method', closesIn: 'Order closes in {t}', orderNo: 'Order no.', methodLabel: 'Pay with', close: 'Close', back: 'Back',
@@ -86,6 +96,11 @@ const en: typeof zh = {
   resume: 'A payment is in progress', view: 'View payment', review: 'Confirming your payment', ended: 'This payment has ended', delivered: 'Payment completed',
 };
 const vi: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "Mạng TRON",
+  gasTrc20: "Phí xác nhận TRC20 đã nằm trong tổng tiền. Ví ngoài có thể thu thêm phí TRX hoặc năng lượng.",
+  remindTrc20: "Chỉ gửi đúng {amt} USDT qua TRON (TRC20). Sai mạng hoặc số tiền sẽ không được ghi nhận tự động. Ví ngoài có thể thu thêm phí TRX hoặc năng lượng.",
+  warnTrc20: "Chỉ gửi đúng số USDT cần trả qua TRON (TRC20). Tiền gửi sai mạng không thể thu hồi. Ví ngoài có thể thu thêm phí TRX hoặc năng lượng.",
   networkPausedTitle: 'Tạm ngừng nhận thanh toán qua {network}', networkPaused: 'Mạng này đang tạm ngừng nhận thanh toán. Vui lòng không chuyển tiền đến địa chỉ nhận trước đó.',
   confirming: 'Đang xác nhận thanh toán', confirmWait: 'Đã hết thời gian thanh toán. Chúng tôi đang kiểm tra khoản tiền gửi trước hạn. Vui lòng không thanh toán thêm.',
   title: 'Phương thức thanh toán', closesIn: 'Đơn tự đóng sau {t}', orderNo: 'Mã đơn', methodLabel: 'Thanh toán bằng', close: 'Đóng', back: 'Quay lại',
@@ -128,6 +143,11 @@ const vi: typeof zh = {
   resume: 'Có một khoản thanh toán đang diễn ra', view: 'Xem tiến độ', review: 'Đang xác nhận thanh toán', ended: 'Lần thanh toán này đã kết thúc', delivered: 'Đã thanh toán xong',
 };
 const id: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "Jaringan TRON",
+  gasTrc20: "Biaya konfirmasi TRC20 sudah termasuk dalam total. Dompet Anda dapat mengenakan biaya TRX atau energi terpisah.",
+  remindTrc20: "Kirim tepat {amt} USDT hanya melalui TRON (TRC20). Jaringan atau jumlah yang salah tidak dapat dikreditkan otomatis. Dompet dapat mengenakan biaya TRX atau energi terpisah.",
+  warnTrc20: "Kirim jumlah USDT yang harus dibayar hanya melalui TRON (TRC20). Dana di jaringan yang salah tidak dapat dipulihkan. Dompet dapat mengenakan biaya TRX atau energi terpisah.",
   networkPausedTitle: 'Penerimaan pembayaran di {network} dijeda', networkPaused: 'Jaringan ini sedang tidak menerima pembayaran. Jangan kirim dana ke alamat pembayaran sebelumnya.',
   confirming: 'Mengonfirmasi pembayaran Anda', confirmWait: 'Waktu pembayaran sudah berakhir. Kami sedang mengecek pembayaran yang dikirim sebelum batas waktu. Jangan kirim pembayaran lagi.',
   title: 'Metode pembayaran', closesIn: 'Pesanan ditutup dalam {t}', orderNo: 'No. pesanan', methodLabel: 'Bayar dengan', close: 'Tutup', back: 'Kembali',
@@ -170,6 +190,11 @@ const id: typeof zh = {
   resume: 'Ada pembayaran yang sedang berjalan', view: 'Lihat pembayaran', review: 'Mengonfirmasi pembayaran Anda', ended: 'Pembayaran ini sudah berakhir', delivered: 'Pembayaran selesai',
 };
 const ms: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "Rangkaian TRON",
+  gasTrc20: "Fi pengesahan TRC20 termasuk dalam jumlah. Dompet anda mungkin mengenakan fi TRX atau tenaga berasingan.",
+  remindTrc20: "Hantar tepat {amt} USDT melalui TRON (TRC20) sahaja. Rangkaian atau amaun yang salah tidak dikreditkan secara automatik. Dompet mungkin mengenakan fi TRX atau tenaga berasingan.",
+  warnTrc20: "Hantar amaun USDT yang perlu dibayar melalui TRON (TRC20) sahaja. Dana pada rangkaian salah tidak dapat dipulihkan. Dompet mungkin mengenakan fi TRX atau tenaga berasingan.",
   networkPausedTitle: 'Penerimaan bayaran melalui {network} dihentikan sementara', networkPaused: 'Rangkaian ini tidak menerima bayaran buat sementara waktu. Jangan hantar dana ke alamat bayaran sebelum ini.',
   confirming: 'Mengesahkan bayaran anda', confirmWait: 'Tempoh bayaran telah tamat. Kami sedang menyemak bayaran yang dihantar sebelum tarikh akhir. Jangan hantar bayaran lain.',
   title: 'Kaedah pembayaran', closesIn: 'Ditutup automatik dalam {t}', orderNo: 'No. pesanan', methodLabel: 'Bayar dengan', close: 'Tutup', back: 'Kembali',
@@ -212,6 +237,11 @@ const ms: typeof zh = {
   resume: 'Ada bayaran sedang berjalan', view: 'Lihat bayaran', review: 'Mengesahkan bayaran anda', ended: 'Bayaran ini telah tamat', delivered: 'Bayaran selesai',
 };
 const fil: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "TRON network",
+  gasTrc20: "Kasama sa kabuuan ang TRC20 confirmation fee. Maaaring may hiwalay na singil sa TRX o energy ang wallet mo.",
+  remindTrc20: "Ipadala ang eksaktong {amt} USDT sa TRON (TRC20) lang. Hindi awtomatikong maikakredito ang maling network o halaga. Maaaring may hiwalay na singil sa TRX o energy ang wallet mo.",
+  warnTrc20: "Ipadala ang eksaktong USDT na babayaran sa TRON (TRC20) lang. Hindi mababawi ang pondong ipinadala sa maling network. Maaaring may hiwalay na singil sa TRX o energy ang wallet mo.",
   networkPausedTitle: 'Pansamantalang hindi tumatanggap ng bayad sa {network}', networkPaused: 'Pansamantalang hindi tumatanggap ng bayad ang network na ito. Huwag magpadala ng pera sa dating address ng pagbabayad.',
   confirming: 'Kinukumpirma ang bayad mo', confirmWait: 'Tapos na ang oras ng bayad. Sinusuri namin ang mga bayad na naipadala bago ang deadline. Huwag nang magpadala ulit.',
   title: 'Paraan ng pagbabayad', closesIn: 'Magsasara ang order sa {t}', orderNo: 'No. ng order', methodLabel: 'Magbayad gamit ang', close: 'Isara', back: 'Bumalik',
@@ -254,6 +284,11 @@ const fil: typeof zh = {
   resume: 'May bayad na isinasagawa', view: 'Tingnan ang bayad', review: 'Kinukumpirma ang bayad mo', ended: 'Nag-expire ang transaksyong ito', delivered: 'Tapos na ang bayad',
 };
 const ru: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "Сеть TRON",
+  gasTrc20: "Комиссия за подтверждение TRC20 включена в итог. Кошелёк может отдельно списать TRX или плату за энергию.",
+  remindTrc20: "Отправьте ровно {amt} USDT только через TRON (TRC20). При неверной сети или сумме автоматическое зачисление невозможно. Кошелёк может отдельно списать TRX или плату за энергию.",
+  warnTrc20: "Отправьте точную сумму USDT только через TRON (TRC20). Средства, отправленные в другой сети, вернуть нельзя. Кошелёк может отдельно списать TRX или плату за энергию.",
   networkPausedTitle: 'Приём платежей в сети {network} приостановлен', networkPaused: 'Эта сеть временно не принимает платежи. Не переводите средства на прежний адрес оплаты.',
   confirming: 'Подтверждаем оплату', confirmWait: 'Время на оплату истекло. Проверяем платежи, отправленные до срока. Не отправляйте повторный платёж.',
   title: 'Способ оплаты', closesIn: 'Закроется через {t}', orderNo: 'Заказ №', methodLabel: 'Оплата', close: 'Закрыть', back: 'Назад',
@@ -296,6 +331,11 @@ const ru: typeof zh = {
   resume: 'Идёт оплата', view: 'Ход оплаты', review: 'Подтверждаем оплату', ended: 'Этот платёж закрыт', delivered: 'Оплата завершена',
 };
 const kk: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "TRON желісі",
+  gasTrc20: "TRC20 растау ақысы жалпы сомаға кіреді. Әмиян TRX немесе энергия ақысын бөлек алуы мүмкін.",
+  remindTrc20: "Тек TRON (TRC20) арқылы дәл {amt} USDT жіберіңіз. Желі не сома қате болса, төлем автоматты есептелмейді. Әмиян TRX немесе энергия ақысын бөлек алуы мүмкін.",
+  warnTrc20: "Тек TRON (TRC20) арқылы төленетін USDT сомасын дәл жіберіңіз. Қате желімен жіберілген қаражатты қайтару мүмкін емес. Әмиян TRX немесе энергия ақысын бөлек алуы мүмкін.",
   networkPausedTitle: '{network} желісінде төлем қабылдау тоқтатылды', networkPaused: 'Бұл желіде төлем қабылдау уақытша тоқтатылды. Бұрынғы төлем мекенжайына қаражат жібермеңіз.',
   confirming: 'Төлеміңіз расталуда', confirmWait: 'Төлем уақыты аяқталды. Мерзімге дейін жіберілген төлемдерді тексеріп жатырмыз. Қайта төлемеңіз.',
   title: 'Төлем әдісі', closesIn: 'Тапсырыстың жабылуына: {t}', orderNo: 'Тапсырыс №', methodLabel: 'Төлеу әдісі', close: 'Жабу', back: 'Артқа',
@@ -338,6 +378,11 @@ const kk: typeof zh = {
   resume: 'Төлем жүріп жатыр', view: 'Төлемді қарау', review: 'Төлеміңіз расталуда', ended: 'Бұл төлем аяқталды', delivered: 'Төлем аяқталды',
 };
 const uz: typeof zh = {
+  trc20: "USDT (TRC20)",
+  trc20Chain: "TRON tarmogʻi",
+  gasTrc20: "TRC20 tasdiqlash haqi jami summaga kiradi. Hamyon TRX yoki energiya haqini alohida olishi mumkin.",
+  remindTrc20: "Faqat TRON (TRC20) orqali aniq {amt} USDT yuboring. Tarmoq yoki summa xato boʻlsa, avtomatik hisobga tushmaydi. Hamyon TRX yoki energiya haqini alohida olishi mumkin.",
+  warnTrc20: "Faqat TRON (TRC20) orqali toʻlanadigan USDT summasini aniq yuboring. Boshqa tarmoqqa yuborilgan mablagʻni qaytarib boʻlmaydi. Hamyon TRX yoki energiya haqini alohida olishi mumkin.",
   networkPausedTitle: '{network} orqali toʻlovlarni qabul qilish toʻxtatildi', networkPaused: 'Bu tarmoqda toʻlovlarni qabul qilish vaqtincha toʻxtatildi. Avvalgi toʻlov manziliga mablagʻ yubormang.',
   confirming: 'Toʻlovingiz tasdiqlanmoqda', confirmWait: 'Toʻlov vaqti tugadi. Muddatgacha yuborilgan toʻlovlar tekshirilmoqda. Qayta toʻlamang.',
   title: 'Toʻlov usuli', closesIn: 'Buyurtma yopilishiga {t}', orderNo: 'Buyurtma №', methodLabel: 'Toʻlov usuli', close: 'Yopish', back: 'Orqaga',

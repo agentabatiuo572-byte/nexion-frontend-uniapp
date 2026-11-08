@@ -1,7 +1,11 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
+import { isTronAddressValid } from "@/lib/tron-address";
 
-export type CregisNetwork = "BEP20" | "ERC20";
+export type CregisNetwork = "BEP20" | "ERC20" | "TRC20";
+const NETWORKS: CregisNetwork[] = ["BEP20", "ERC20", "TRC20"];
+const validAddress = (network: CregisNetwork | undefined, address: string) => network === "TRC20"
+  ? isTronAddressValid(address) : /^0x[0-9a-f]{40}$/i.test(address);
 export interface CregisNetworkPolicy {
   network: CregisNetwork;
   enabled: boolean;
@@ -52,10 +56,12 @@ export function createCregisDepositApi(client: ApiClient) {
     async policy(): Promise<CregisNetworkPolicy[]> {
       const value = await client.request<{ networks?: unknown }>({ method: "GET", path: "/api/deposits/policy" });
       const networks = value?.networks;
-      if (!Array.isArray(networks) || networks.length !== 2
-          || new Set(networks.map((row) => row?.network)).size !== 2
+      // Two-network legacy servers omit TRC20; omission never enables a channel.
+      if (!Array.isArray(networks) || networks.length < 2 || networks.length > 3
+          || new Set(networks.map((row) => row?.network)).size !== networks.length
+          || !["BEP20", "ERC20"].every((network) => networks.some((row) => row?.network === network))
           || networks.some((row) => !row || typeof row !== "object"
-            || (row.network !== "BEP20" && row.network !== "ERC20")
+            || !NETWORKS.includes(row.network)
             || typeof row.enabled !== "boolean"
             || (row.disabledReason !== null && typeof row.disabledReason !== "string")
             || !Number.isSafeInteger(row.confirmations) || row.confirmations < 15
@@ -70,7 +76,7 @@ export function createCregisDepositApi(client: ApiClient) {
       return networks as CregisNetworkPolicy[];
     },
     async address(network: CregisNetwork = "BEP20"): Promise<CregisAddress> {
-      if (network !== "BEP20" && network !== "ERC20") throw new ApiError({ kind: "protocol", message: "CREGIS_NETWORK_INVALID" });
+      if (!NETWORKS.includes(network)) throw new ApiError({ kind: "protocol", message: "CREGIS_NETWORK_INVALID" });
       const value = await client.request<CregisAddress>({
         method: "GET", path: `/api/deposits/address?network=${network}`,
       });
@@ -78,7 +84,7 @@ export function createCregisDepositApi(client: ApiClient) {
           || (value.creditEnabled !== undefined && typeof value.creditEnabled !== "boolean")
           || (value.reason !== undefined && typeof value.reason !== "string")
           || (value.enabled && (typeof value.address !== "string"
-              || !/^0x[0-9a-f]{40}$/i.test(value.address)
+              || !validAddress(network, value.address)
               || typeof value.confirmations !== "number"
               || !Number.isInteger(value.confirmations) || value.confirmations < 15
               || typeof value.feeUsdt !== "number" || !Number.isFinite(value.feeUsdt) || value.feeUsdt < 0
@@ -92,10 +98,10 @@ export function createCregisDepositApi(client: ApiClient) {
     async list(): Promise<CregisDeposit[]> {
       const rows = await client.request<unknown>({ method: "GET", path: "/api/deposits" });
       if (!Array.isArray(rows) || rows.some((row) => !row || typeof row !== "object"
-          || (row.network !== undefined && row.network !== "BEP20" && row.network !== "ERC20")
+          || (row.network !== undefined && !NETWORKS.includes(row.network))
           || typeof row.depositId !== "string" || !/^CR-[0-9]+$/.test(row.depositId)
-          || typeof row.txHash !== "string" || !/^0x[0-9a-f]{64}$/i.test(row.txHash)
-          || typeof row.address !== "string" || !/^0x[0-9a-f]{40}$/i.test(row.address)
+          || typeof row.txHash !== "string" || !(row.network === "TRC20" ? /^[0-9a-f]{64}$/i : /^0x[0-9a-f]{64}$/i).test(row.txHash)
+          || typeof row.address !== "string" || !validAddress(row.network, row.address)
           || typeof row.grossAmountUsdt !== "number" || !Number.isFinite(row.grossAmountUsdt) || row.grossAmountUsdt <= 0
           || (row.grossAmountUsdtExact !== undefined && (exactDepositAmount(row.grossAmountUsdt, row.grossAmountUsdtExact) === null || Number(row.grossAmountUsdtExact) <= 0))
           || typeof row.creditedUsdt !== "number" || !Number.isFinite(row.creditedUsdt) || row.creditedUsdt < 0

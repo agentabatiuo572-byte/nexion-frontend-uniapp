@@ -318,6 +318,10 @@ const failedTitle = computed(() => {
 const routeHeld = computed(() => !!wd.value
   && (wd.value.status === "review-pending" || wd.value.status === "frozen"
     || (wd.value.status === "submitted" && !!wd.value.riskRoute && wd.value.riskRoute !== "pass")));
+// A TRC20 phase wait is independent of a manual-review route, including small fast-lane orders.
+const stageHeld = computed(() => wd.value?.network === "USDT-TRC20" && wd.value.complianceHoldApplies === true
+  && (wd.value.complianceHoldDays ?? 0) > 0
+  && ["submitted", "review-pending", "review-passed"].includes(wd.value.status));
 const needsSupport = computed(() => routeHeld.value || isFrozenHold.value || isFailedEnd.value);
 // 终态:5 步全部走满,最后一步不能还转圈 —— 转圈代表「进行中」,
 // 钱都到账了还转,用户会以为卡住了。
@@ -473,6 +477,8 @@ const etaTitle = computed(() =>
       ? failedTitle.value
       : isFrozenHold.value
       ? t.value.wallet.routeHeldFrozenTitle
+      : stageHeld.value
+        ? t.value.walletV3.stageWaitTitle
       : routeHeld.value
         ? t.value.wallet.withdrawRouteHeldTitle
         // 🔴 标题必须用**不带插值**的 key。这里原来直接取 trackEtaPending,而那条
@@ -485,6 +491,12 @@ const etaSub = computed(() => {
   // 失败终态不给「预计到账」——钱没走成,给的是原因 + 客服出口(见 needsSupport)。
   if (isFailedEnd.value) return t.value.wallet.trackFailedBody;
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
+  if (stageHeld.value) {
+    const current = wd.value!;
+    return typeof current.reviewHoldUntil === "number" && Number.isFinite(current.reviewHoldUntil)
+      ? fmt(t.value.walletV3.stageWaitUntilBody, { time: absTime(current.reviewHoldUntil) })
+      : fmt(t.value.walletV3.stageWaitPendingBody, { days: current.complianceHoldDays! });
+  }
   if (routeHeld.value) {
     const current = wd.value!;
     if (current.complianceReviewRequired) {
