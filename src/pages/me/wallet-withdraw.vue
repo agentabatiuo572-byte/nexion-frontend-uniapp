@@ -820,8 +820,22 @@ const freezeBannerText = computed(() =>
   fmt(t.value.addrRebind.freezeBanner, { t: formatClock(freezeLeftMs.value, { hours: true }) }),
 );
 
-const complianceHoldEnabled = computed(() => withdrawalPolicy.value?.complianceHoldEnabled === true);
-const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days: withdrawalPolicy.value?.cooldownDays ?? 0 }));
+const complianceHoldEnabled = computed(() =>
+  !pendingAttempt.value
+  && (remoteEligibility.value?.complianceReviewRequired ?? withdrawalPolicy.value?.complianceHoldEnabled === true),
+);
+const holdBody = computed(() => {
+  const policy = withdrawalPolicy.value;
+  if (!policy || amountNum.value <= 0) return t.value.walletV3.complianceReviewBody;
+  // This is policy-based guidance until the server returns this amount's decision.
+  // Submission continues to require a fresh eligibility response.
+  const applies = remoteEligibility.value?.complianceHoldApplies
+    ?? amountNum.value > policy.complianceReviewThresholdUsdt;
+  const days = remoteEligibility.value?.complianceHoldDays ?? (applies ? policy.cooldownDays : 0);
+  return days > 0
+    ? fmt(t.value.walletV3.complianceHoldBody, { days })
+    : t.value.walletV3.complianceReviewNoHoldBody;
+});
 
 // ── Fee model (FEAT-WD02): fixed per-network confirm fee + OPT-IN NEX offset ──
 // fee = withdrawRules.networkConfirmFeeUsd[network](后台 D5 单源,[0,25]);
@@ -957,6 +971,7 @@ const eligibility = computed(() => {
       maxWithdrawableUsdt: 0,
       route: "manual" as const,
       riskReasons: ["server-eligibility-pending"], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false,
+      complianceReviewRequired: false, complianceHoldApplies: false, complianceHoldDays: 0,
       dailyCountResetAt: Date.now(), configVersion: "remote-pending",
     };
   }

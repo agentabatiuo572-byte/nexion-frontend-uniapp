@@ -4109,8 +4109,12 @@ timeHoursAgo: "{n}h ago",
 
     feeConfigRetry: "Retry",
     // Sprint 3 — Compliance hold banner(用户视角:监管收紧导致额度审查延长,不暴露 phase 概念)
-    complianceHoldTitle: "Withdrawal security check",
-    complianceHoldBody: "This is expected to finish within {days} days. Your funds stay in your account in the meantime.",
+    complianceHoldTitle: "Withdrawal compliance review",
+    complianceHoldBody: "This withdrawal requires manual review plus a {days}-day review window. The end of the window does not mean the funds have arrived.",
+    complianceReviewBody: "Withdrawals require manual review; small-amount auto approval is paused. Enter an amount to see whether an extra review window applies.",
+    complianceReviewNoHoldBody: "This withdrawal requires manual review with no extra large-amount review window. Arrival depends on the actual processing result.",
+    complianceReviewRequired: "This withdrawal requires manual compliance review.",
+    complianceHoldUntilBody: "This withdrawal requires manual review. The review window ends at {time}; its end does not mean the funds have arrived.",
     // Withdraw page CTAs + compliance hero
     resetAddrLabel: "Reset address",
     resetAddrTitle: "Clear withdrawal addresses?",
