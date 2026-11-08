@@ -22,7 +22,7 @@
           <view class="store-voucher-ticket__copy"><text class="store-voucher-ticket__title">{{ auditCopy.voucherShort }} · {{ fmt(auditCopy.voucherShortCount,{n:voucherOffers.length}) }}</text><view class="store-voucher-ticket__hint"><view v-if="voucherBenefit.amount == null">{{ auditCopy.voucherDiscount }}</view><view>{{ voucherClaimable.length ? auditCopy.claimToUse : auditCopy.autoApplyVoucher }}</view></view></view>
           <image class="store-voucher-ticket__art" src="/static/img/home-glass-20260928/coupon.webp" mode="aspectFit" aria-hidden="true" />
         </view>
-        <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" />
+        <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" tinted />
         <UpgradeSpotlight v-if="upgrade&&!voucherContext.voucherId" :base="upgrade.base" :base-image-url="upgradeBaseImageUrl" :target="upgrade.target" />
         <template v-if="!voucherContext.voucherId">
           <StoreHero :multiplier="yieldAuthority.multiplier" />
@@ -446,9 +446,7 @@ const goalFocusRetryStyle: CSSProperties = {
 <style scoped>
 .store-content { padding:12px 16px 16px; color:var(--v5-ink); }
 .store-content > * + * { margin-top:16px; }
-.store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); box-shadow:none; background:color-mix(in srgb,var(--v5-brand) 7%,var(--v5-surface)); }
-/* The campaign entry lives in PromotionEntry, so it takes the .nx-tint values (7% dark / 5% light, brand) here. */
-[data-theme="light"] .store-campaign :deep(.entry-advert) { background:color-mix(in srgb,var(--v5-brand) 5%,var(--v5-surface)); }
+.store-campaign :deep(.entry-advert) { --promotion-copy-ink:var(--v5-ink); height:auto; min-height:146px; padding:0; border-radius:22px; border:1px solid var(--v5-border); --nx-tint:var(--v5-brand); }
 .store-campaign :deep(.entry-label) { top:18px; left:18px; padding:0; border:0; background:transparent; color:var(--ui-lime-soft); font:500 12.5px/18px var(--font-v5); }
 .store-campaign :deep(.entry-title) { font-size:19px; line-height:25px; }
 .store-catalogue { margin-top:20px; }
