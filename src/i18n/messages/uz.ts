@@ -2328,7 +2328,7 @@ export const uz: Messages = {
     coRecoverOriginalOrder: "Asl buyurtma tekshirilmoqda. Natija tasdiqlanmaguncha yangi buyurtma bermang.",
     detQuantity: "Hisoblash uchun soni",
     detEstReturns: "Taxminiy daromad",
-    detEstReturnsMeta: "30 kunlik oʻrtacha",
+    detEstReturnsMeta: "Toʻlov farq qilishi mumkin",
     detMonthly: "Taxminan oyiga",
     detVsPhone: "Telefoningiz bilan: {n}",
     detHardware: "Qurilma",

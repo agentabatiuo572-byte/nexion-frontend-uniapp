@@ -64,6 +64,11 @@ function optionalNumber(value: unknown, minimum = 0): number | undefined {
   return finiteNumber(value, minimum);
 }
 
+function optionalEstimate(value: unknown): number | undefined {
+  const parsed = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+  return optionalNumber(parsed);
+}
+
 function integer(value: unknown, minimum = 0): number {
   const parsed = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
   if (typeof parsed !== "number" || !Number.isInteger(parsed) || parsed < minimum) return invalid();
@@ -203,6 +208,9 @@ function product(value: unknown): CatalogProduct {
     warranty: displayString(source.warranty),
     dailyEarn: finiteNumber(source.dailyEarn),
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
+    monthlyEstimateUsdt: optionalEstimate(source.monthlyEstimateUsdt),
+    dailyEstimateLowUsdt: optionalEstimate(source.dailyEstimateLowUsdt),
+    dailyEstimateHighUsdt: optionalEstimate(source.dailyEstimateHighUsdt),
     shareYieldMin,
     shareYieldMax,
     computePoints: optionalInteger(source.computePoints),
