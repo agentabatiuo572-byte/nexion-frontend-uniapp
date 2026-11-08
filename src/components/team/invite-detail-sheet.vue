@@ -10,7 +10,7 @@
           <NxButton class="invite-detail__support" variant="secondary" :label="copy.contactSupport" @click="contactSupport" />
         </template>
         <template v-else>
-            <view class="invite-detail__hero">
+            <view class="invite-detail__hero nx-tint">
             <view class="invite-detail__total"><text>{{ copy.totalInviteRewards }}</text><text class="invite-detail__amount">{{ totalParts[0] }}<text v-if="totalParts[1]" class="invite-detail__fraction">.{{ totalParts[1] }}</text><text class="invite-detail__unit"> UVT</text></text></view>
             <view v-if="rewardDots.length" class="invite-detail__dots" aria-hidden="true"><view v-for="(dot, index) in rewardDots" :key="index" class="invite-detail__dot" :class="{ 'invite-detail__dot--pending': dot === 'pending' }" /></view>
             <view class="invite-detail__counts"><view class="invite-detail__count"><view class="invite-detail__legend" /><text>{{ copy.settled }} <text class="invite-detail__count-n">{{ visibility.mask(recordsPresentation?.settledCount ?? '—') }}</text>{{ countUnit }}</text></view><view class="invite-detail__count"><view class="invite-detail__legend invite-detail__legend--pending" /><text>{{ copy.pending }} <text class="invite-detail__count-n">{{ visibility.mask(recordsPresentation?.pendingCount ?? '—') }}</text>{{ countUnit }}</text></view></view>
@@ -93,7 +93,7 @@ useDialogA11y(computed(() => props.open), '.invite-detail', () => emit('close'))
 .invite-detail__record-icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
 .invite-detail__record-icon--pending { color: var(--v5-warning); background: color-mix(in srgb, var(--v5-warning) 16%, transparent); }
 .invite-detail__record-copy { flex: 1; }
-.invite-detail__hero { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; padding: 18px; border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.invite-detail__hero { --nx-tint: var(--v5-brand); display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; padding: 18px; border-radius: 24px; }
 .invite-detail__total { display: flex; flex-direction: column; gap: 4px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink-2); }
 .invite-detail__amount { font: 600 40px/44px var(--font-amount); letter-spacing: -.03em; color: var(--v5-ink); overflow-wrap: anywhere; }
 .invite-detail__unit { font: 600 15px/20px var(--font-metric); letter-spacing: 0; color: var(--v5-brand); }

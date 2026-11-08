@@ -11,7 +11,7 @@
           <view v-else-if="remoteApiEnabled && pageState.primary === 'loading' && !snapshot" class="binary-loading"
             role="status" aria-live="polite" aria-busy="true" />
             <view v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)" class="binary-comparison-section">
-            <view class="binary-hero nx-soft-glass nx-viz-press">
+            <view class="binary-hero nx-tint nx-viz-press">
               <view class="binary-hero-heading">
                 <text class="binary-label">{{ binaryCopy.contributions }}</text>
                 <view class="binary-rule-link" role="button" tabindex="0" :aria-label="t.binary.howItWorksEntry"
@@ -357,7 +357,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 <style scoped>
 .binary-content { display: flex; flex-direction: column; gap: 28px; padding: var(--v5-space-3) var(--v5-space-5) var(--v5-space-6); }
 .binary-loading { height: 156px; border-radius: 20px; background: var(--v5-surface-2); }
-.binary-hero { padding: var(--v5-space-2) var(--v5-space-4) var(--v5-space-4); border-radius: 28px; }
+.binary-hero { --nx-tint: var(--ui-device-ink); padding: var(--v5-space-2) var(--v5-space-4) var(--v5-space-4); border-radius: 28px; }
 .binary-hero-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-4); }
 .binary-label { display: block; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-2); }
 .binary-hero-heading > .binary-label { flex: 1; min-width: 0; }
@@ -378,7 +378,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-comparison { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px; margin-top: 6px; padding: 0 var(--v5-space-3); }
 .binary-contribution { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
 .binary-group-heading { display: flex; align-items: center; justify-content: center; min-height: 24px; color: var(--v5-ink-2); }
-.binary-group-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 2px var(--ui-space-row-y); border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
+.binary-group-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 2px var(--ui-space-row-y); border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .binary-weak { background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); color: var(--ui-device-ink); }
 .binary-group-name { color: var(--v5-ink-2); font-size: 13px; line-height: 18px; }
 .binary-points { display: block; color: var(--v5-ink); font: 600 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

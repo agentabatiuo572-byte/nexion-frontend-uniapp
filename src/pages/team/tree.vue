@@ -8,9 +8,9 @@
         <template v-else>
         <!-- P-41: three stat tiles, then a member search above the two roster cards. -->
         <view class="tree-stats">
-          <view class="tree-stat nx-viz-press"><view class="tree-total"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : members.length) }}</text></view><text class="tree-stat__label">{{ t.tree.totalNetwork }}</text></view>
-          <view class="tree-stat tree-stat--brand nx-viz-press"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : direct.length) }}</text><text class="tree-stat__label">{{ t.tree.directTitle }}</text></view>
-          <view class="tree-stat tree-stat--cyan nx-viz-press"><text class="tree-points nx-num-metric" :aria-label="visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code))">{{ visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code).split(' ')[0]) }}</text><text class="tree-stat__label">{{ t.tree.monthlyVolume }}</text></view>
+          <view class="tree-stat nx-tint nx-viz-press"><view class="tree-total"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : members.length) }}</text></view><text class="tree-stat__label">{{ t.tree.totalNetwork }}</text></view>
+          <view class="tree-stat nx-tint tree-stat--brand nx-viz-press"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : direct.length) }}</text><text class="tree-stat__label">{{ t.tree.directTitle }}</text></view>
+          <view class="tree-stat nx-tint tree-stat--cyan nx-viz-press"><text class="tree-points nx-num-metric" :aria-label="visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code))">{{ visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code).split(' ')[0]) }}</text><text class="tree-stat__label">{{ t.tree.monthlyVolume }}</text></view>
         </view>
         <view v-if="networkReadable && members.length" class="tree-search">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
@@ -144,7 +144,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "er
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 @media (max-width: 374px) { .team-tree-content { padding-inline: var(--v5-space-4); } .tree-rosters :deep(.member-trigger .team-rank-emblem) { flex-shrink: 0; } }
 .tree-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--v5-space-2); }
-.tree-stat { --accent: var(--v5-ink); display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--ui-space-inline); border-radius: 20px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.tree-stat { --accent: var(--v5-ink); display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--ui-space-inline); border-radius: 20px; --nx-tint: var(--accent); }
 .tree-stat > text:first-child, .tree-stat .tree-total > text { overflow: hidden; font: 600 22px/28px var(--font-metric); color: var(--accent); white-space: nowrap; text-overflow: ellipsis; }
 .tree-stat--brand { --accent: var(--v5-brand); }
 .tree-stat > text.tree-points { max-width: 100%; overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }

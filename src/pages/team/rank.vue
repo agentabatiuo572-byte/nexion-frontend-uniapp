@@ -3,7 +3,7 @@
     <view class="rank-page">
       <SubPageHeader back="/pages/team/team" :title="t.rank.pageTitle" plain design :action-label="copy.rankRules" :action="() => go('/pages/team/rank-how')" />
       <view class="rank-content">
-        <view v-if="rankAvailable" class="rank-spotlight nx-soft-glass">
+        <view v-if="rankAvailable" class="rank-spotlight nx-tint">
           <view class="rank-identity">
             <view class="rank-identity__emblem"><TeamRankEmblem v-if="!visibility.hidden" :rank="myRank" :size="96" /><view v-else class="rank-private-emblem" aria-hidden="true">••••</view></view>
             <view class="rank-identity__copy"><text class="rank-caption">{{ t.rank.currentRank }}</text><text class="rank-current-name">{{ visibility.mask(rankLabel(myRank,locale.code,rankDefs)) }}</text></view>
@@ -43,7 +43,7 @@
               <view v-if="expandedRank === r.v" :id="`rank-details-${r.v}`" class="rank-details">
                 <text class="rank-detail-label">{{ t.rank.conditionsLabel }}</text><view v-for="condition in conditionItems(r)" :key="condition" class="rank-condition-copy"><view class="rank-condition-dot" aria-hidden="true" /><text>{{ condition }}</text></view><text v-if="r.v>1" class="rank-detail-hint">{{ t.rank.previousConditions }}</text>
                 <text class="rank-detail-label rank-detail-label--spaced">{{ t.rank.benefitsLabel }}</text><view class="rank-perk-grid"><view v-for="perk in benefitItems(r)" :key="perk.label" class="rank-perk"><text class="rank-caption">{{ perk.label }}</text><text class="rank-perk-value">{{ perk.value }}</text></view></view><view v-if="r.unilevelDepth > 0" class="rank-scope-link" role="link" tabindex="0" @click="go('/pages/team/rank-how')" @keydown.enter.prevent="go('/pages/team/rank-how')"><text>{{ guideCopy.rewardScope }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view>
-                <text class="rank-detail-label rank-detail-label--spaced">{{ t.rank.rewardsLabel }}</text><view v-for="(reward,rewardIndex) in r.rewards" :key="rewardIndex" class="rank-reward-item"><template v-if="cultivationReward(reward)"><view class="rank-reward-summary"><text class="rank-reward-title">{{ cultivationCopy.title }}</text><text class="rank-reward-amount">{{ rewardText(reward) }}</text></view><text class="rank-reward-description">{{ fmt(cultivationCopy.trigger, { n: r.v, amount: rewardText(reward) }) }}</text><text class="rank-reward-note">{{ cultivationCopy.recipient }}</text></template><text v-else class="rank-reward">{{ rewardText(reward) }}</text></view><text v-if="!r.rewards.length" class="rank-reward-note">{{ t.rank.noRewards }}</text>
+                <text class="rank-detail-label rank-detail-label--spaced">{{ t.rank.rewardsLabel }}</text><view v-for="(reward,rewardIndex) in r.rewards" :key="rewardIndex" class="rank-reward-item nx-tint"><template v-if="cultivationReward(reward)"><view class="rank-reward-summary"><text class="rank-reward-title">{{ cultivationCopy.title }}</text><text class="rank-reward-amount">{{ rewardText(reward) }}</text></view><text class="rank-reward-description">{{ fmt(cultivationCopy.trigger, { n: r.v, amount: rewardText(reward) }) }}</text><text class="rank-reward-note">{{ cultivationCopy.recipient }}</text></template><text v-else class="rank-reward">{{ rewardText(reward) }}</text></view><text v-if="!r.rewards.length" class="rank-reward-note">{{ t.rank.noRewards }}</text>
               </view>
           </template>
         </view>
@@ -253,6 +253,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-spotlight { position:relative;isolation:isolate;overflow:hidden;padding:20px 18px 18px;border:1px solid var(--v5-border);border-radius:22px;margin-bottom:22px; }
 .rank-identity { position:relative;display:flex;align-items:center;gap:16px;margin-bottom:18px; }
 .rank-identity__emblem { position:relative;isolation:isolate;display:flex;flex:none;flex-direction:column;align-items:center;width:76px;gap:2px; }
+.rank-identity__emblem::before { content:'';position:absolute;inset:-10px -10px 14px;z-index:-1;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--v5-brand) 40%,transparent),transparent);filter:blur(8px);pointer-events:none; }
 .rank-private-emblem { width:76px;height:76px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--v5-surface-3);color:var(--v5-ink-2);font-size:18px; }
 .rank-identity__copy { flex:1;min-width:0; }
 .rank-current-level { display:block;padding:0 9px;border:1px solid var(--v5-brand-border);border-radius:999px;background:var(--v5-surface);color:var(--ui-lime-soft);font:600 12.5px/20px var(--font-v5);font-variant-numeric:tabular-nums; }
@@ -318,7 +319,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 @media(max-width:350px) { .rank-identity { gap:12px; }.rank-condition__value { flex-wrap:wrap; }.rank-details { padding-left:48px; }.rank-perk { padding-inline:8px; } }
 @media(prefers-reduced-motion:reduce) { .rank-row-chevron { transition:none; } }
 /* P-42: hero rings for the next rank, a horizontal rank track and one details card below it. */
-.rank-spotlight { padding:20px;border:0;border-radius:28px; }
+.rank-spotlight { --nx-tint:var(--v5-brand);padding:20px;border:0;border-radius:28px; }
 .rank-next-progress { padding-top:0;border-top:0; }
 .rank-rings { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px; }
 .rank-condition--ring { display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:0;text-align:center;min-width:0; }
@@ -358,8 +359,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-ladder-row[data-status="done"] .rank-row-sub { color:var(--v5-ink-3); }
 .rank-perk-value { font:600 22px/26px var(--font-metric);color:var(--v5-brand); }
 .rank-perk + .rank-perk .rank-perk-value { color:var(--v5-nex); }
-.rank-reward-item { padding:14px;border-radius:16px;background:color-mix(in srgb,var(--v5-ink) 3%,transparent); }
+.rank-reward-item { --nx-tint:var(--v5-warning);padding:14px;border-radius:16px; }
 .rank-reward-summary { justify-content:space-between; }
 .rank-reward-title { font:600 13px/18px var(--font-v5);color:var(--v5-ink); }
-.rank-reward-amount { font:600 16px/20px var(--font-metric);color:var(--v5-nex); }
+.rank-reward-amount { font:600 16px/20px var(--font-metric);color:var(--v5-nex-ink); }
 </style>
