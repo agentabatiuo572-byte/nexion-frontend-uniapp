@@ -330,6 +330,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **月段**:P1 0-2月/P2 2-4/P3 4-6/P4 6-8/P5 8-10/P6 10+。
 - **7 时变 dial**:`inviteBonusMultiplier`(P1=2.0/P2=1.5/P3+=1.0)· `withdrawalPointsPer100`(P1-4=10/P5-6=20)· `withdrawalCooldownDays`(P1-4=30d/P5-6=45d)· `binaryDailyCapUSD`(P1-3=$5000/P4-6=$2000)· `premiumSubscriptionAvailable`(P4+)· `nexV2LockAvailable`(P6)· `complianceHoldEnabled`(P5+)。
 - **约束**:server 权威(pages 不 hardcode 门槛);phase id/name 永不在用户 UI 出现。
+- **2026-11-08 USDT 合规覆盖**：提现页合规开关、窗口与大额门槛读取服务端提现 policy，实际本笔人工／等待取 eligibility；开启时所有新 USDT 提现人工复核、小额免审暂停，严格超过服务端门槛（本轮 1,000 USDT）才附加 N 天，N=0 仍人工。小额不显示 N 天，窗口到期不代表到账。追踪消费原单快照与实际状态；没有截止／到账时间时保持未知，不用本机时间补值。App／H5 Lite 九语与各自测试分支同步，银行卡页面不变，详见主文档 §9.3.5–9.3.6。
 
 ### 3.G NEX↔USDT 兑换 — §9.4.2
 - **汇率**:`1 NEX = $0.171`(实时,可 refresh)。

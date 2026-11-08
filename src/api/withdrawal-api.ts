@@ -14,8 +14,7 @@ export interface WithdrawalSubmission {
   amount: number;
   chain: SupportedWithdrawalNetwork | "BANK-VND";
   status: string;
-  /** Required for current non-terminal submissions. Legacy confirmed fast-pass
-   * history predates the hold column and carries no synthetic replacement. */
+  /** Review deadline, not arrival time. The server clears it when a hold ends. */
   holdUntil?: string;
   networkConfirmUsd: number;
   networkFee: number;
@@ -39,6 +38,10 @@ export interface WithdrawalSubmission {
   policyVersion: string;
   useNexFeeOffset: boolean;
   riskRoute: string;
+  /** Original order's server snapshot; absent on legacy and bank withdrawals. */
+  complianceReviewRequired?: boolean;
+  complianceHoldApplies?: boolean;
+  complianceHoldDays?: number;
   idSource: "server";
 }
 
@@ -48,6 +51,7 @@ export interface WithdrawalPolicy {
   balanceMaxRatio: number;
   smallAmountThresholdUsd: number;
   strongReviewThresholdUsdt: number;
+  complianceReviewThresholdUsdt: number;
   payoutSlaHours: number;
   networkConfirmFeeUsd: Record<"trc20" | "bep20" | "erc20", number>;
   nexFeeOffsetRate: number;
@@ -138,6 +142,9 @@ export interface WithdrawalEligibilitySnapshot {
   route: "pass" | "delay" | "manual" | "freeze" | "reject";
   riskReasons: string[];
   fastLaneApplied: boolean;
+  complianceReviewRequired: boolean;
+  complianceHoldApplies: boolean;
+  complianceHoldDays: number;
   waivedGates: string[];
   dailyLimitReached: boolean;
   dailyCountResetAt: number;
@@ -251,6 +258,10 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const actualFee = number(row?.actualFee);
   const netReceive = number(row?.netReceive);
   const policyVersion = text(row?.policyVersion);
+  const hasComplianceSnapshot = row?.complianceReviewRequired !== undefined
+    || row?.complianceHoldApplies !== undefined || row?.complianceHoldDays !== undefined;
+  const complianceHoldDays = typeof row?.complianceHoldDays === "number"
+    ? number(row.complianceHoldDays) : null;
   const allowedRiskRoutes = new Set([
     "fast-pass",
     "delay",
@@ -261,9 +272,8 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     "freeze",
   ]);
   // Old, already-confirmed fast-pass rows have no hold timestamp because no
-  // hold ever existed. Accept only that terminal historical shape, require its
-  // real creation timestamp, and normalize the retired `pass` spelling. New
-  // and non-terminal submissions still require the server hold timestamp.
+  // hold ever existed. Normalize their retired `pass` spelling using the
+  // original creation timestamp. Current orders may lose holdUntil on release.
   const legacyConfirmedFastPass = (status?.toUpperCase() === "CONFIRMED" || status?.toUpperCase() === "COMPLETED")
     && (riskRoute?.toLowerCase() === "pass" || riskRoute?.toLowerCase() === "fast-pass")
     && !holdUntil
@@ -272,13 +282,18 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const canonicalRiskRoute = legacyConfirmedFastPass && riskRoute?.toLowerCase() === "pass"
     ? "fast-pass"
     : riskRoute;
-  if (!row || !withdrawalNo || !status || (!holdUntil && !legacyConfirmedFastPass) || !canonicalRiskRoute
+  if (!row || !withdrawalNo || !status || !canonicalRiskRoute
       || !allowedRiskRoutes.has(canonicalRiskRoute.toLowerCase())
       || !["USDT-TRC20", "USDT-BEP20", "USDT-ERC20", "BANK-VND"].includes(String(chain))
       || amount === null || networkConfirmUsd === null || networkFee === null || penaltyFee === null || grossFee === null
       || nexBurned === null || feeWaived === null || actualFee === null || netReceive === null
       || !policyVersion || typeof row.useNexFeeOffset !== "boolean"
       || row.idSource !== "server"
+      || (hasComplianceSnapshot && (typeof row.complianceReviewRequired !== "boolean"
+        || typeof row.complianceHoldApplies !== "boolean"
+        || complianceHoldDays === null || !Number.isInteger(complianceHoldDays)
+        || (!row.complianceHoldApplies && complianceHoldDays !== 0)
+        || (!row.complianceReviewRequired && row.complianceHoldApplies)))
       || Math.abs(networkConfirmUsd - networkFee) > 0.000001
       || Math.abs(networkFee + penaltyFee - grossFee) > 0.000001
       || Math.abs(grossFee - feeWaived - actualFee) > 0.000001
@@ -306,6 +321,11 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     policyVersion: policyVersion!,
     useNexFeeOffset: row!.useNexFeeOffset as boolean,
     riskRoute: canonicalRiskRoute,
+    ...(hasComplianceSnapshot ? {
+      complianceReviewRequired: row!.complianceReviewRequired as boolean,
+      complianceHoldApplies: row!.complianceHoldApplies as boolean,
+      complianceHoldDays: complianceHoldDays!,
+    } : {}),
     idSource: "server",
   };
 }
@@ -341,17 +361,27 @@ function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
   const max = number(row?.maxWithdrawableUsdt);
   const reset = number(row?.dailyCountResetAt, 1);
   const configVersion = text(row?.configVersion);
+  const complianceHoldDays = typeof row?.complianceHoldDays === "number"
+    ? number(row.complianceHoldDays) : null;
   if (!row || typeof row.canSubmit !== "boolean" || max === null
       || !route || !["pass", "delay", "manual", "freeze", "reject"].includes(route)
       || !Array.isArray(reasons) || reasons.some((item) => typeof item !== "string")
       || !Array.isArray(waived) || waived.some((item) => typeof item !== "string")
       || typeof row.fastLaneApplied !== "boolean" || typeof row.dailyLimitReached !== "boolean"
+      || typeof row.complianceReviewRequired !== "boolean" || typeof row.complianceHoldApplies !== "boolean"
+      || complianceHoldDays === null || !Number.isInteger(complianceHoldDays)
+      || (!row.complianceHoldApplies && complianceHoldDays !== 0)
+      || (!row.complianceReviewRequired && row.complianceHoldApplies)
+      || (row.complianceReviewRequired && row.fastLaneApplied)
       || reset === null || !configVersion) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_ELIGIBILITY_RESPONSE_INVALID" });
   }
   return {
     canSubmit: row.canSubmit, maxWithdrawableUsdt: max, route: route as WithdrawalEligibilitySnapshot["route"],
     riskReasons: reasons as string[], fastLaneApplied: row.fastLaneApplied,
+    complianceReviewRequired: row.complianceReviewRequired,
+    complianceHoldApplies: row.complianceHoldApplies,
+    complianceHoldDays,
     waivedGates: waived as string[], dailyLimitReached: row.dailyLimitReached,
     dailyCountResetAt: reset, configVersion,
   };
@@ -364,6 +394,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
   const balanceMaxRatio = number(row?.balanceMaxRatio, Number.EPSILON);
   const smallAmountThresholdUsd = number(row?.smallAmountThresholdUsd);
   const strongReviewThresholdUsdt = number(row?.strongReviewThresholdUsdt, Number.EPSILON);
+  const complianceReviewThresholdUsdt = number(row?.complianceReviewThresholdUsdt, Number.EPSILON);
   const payoutSlaHours = number(row?.payoutSlaHours, 1);
   const networkFees = record(row?.networkConfirmFeeUsd);
   const trc20 = number(networkFees?.trc20);
@@ -383,6 +414,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
       || balanceMaxRatio === null || balanceMaxRatio > 1
       || smallAmountThresholdUsd === null || smallAmountThresholdUsd > 500
       || strongReviewThresholdUsdt === null || strongReviewThresholdUsdt > 10000000
+      || complianceReviewThresholdUsdt === null
       || payoutSlaHours === null || payoutSlaHours > 168 || !Number.isInteger(payoutSlaHours)
       || trc20 === null || bep20 === null || erc20 === null
       || trc20 > 25 || bep20 > 25 || erc20 > 25
@@ -402,6 +434,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
     balanceMaxRatio,
     smallAmountThresholdUsd,
     strongReviewThresholdUsdt,
+    complianceReviewThresholdUsdt,
     payoutSlaHours,
     networkConfirmFeeUsd: { trc20, bep20, erc20 },
     nexFeeOffsetRate,
@@ -543,11 +576,14 @@ export function toCanonicalWithdrawal(
   // display. Its server-created timestamp is the only truthful terminal anchor;
   // never substitute the browser clock or manufacture a hold deadline.
   const estimatedCompletion = submission.holdUntil
-    ? Date.parse(submission.holdUntil)
-    : status === "confirmed" && submission.createdAt !== undefined && Number.isFinite(submission.createdAt)
+    ? submission.complianceReviewRequired
+      ? parseServerTimestamp(submission.holdUntil) ?? NaN
+      : Date.parse(submission.holdUntil)
+    : status === "confirmed" && !submission.complianceReviewRequired
+      && submission.createdAt !== undefined && Number.isFinite(submission.createdAt)
       ? submission.createdAt
       : NaN;
-  if (!address.trim() || !Number.isFinite(estimatedCompletion)) {
+  if (!address.trim()) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
   }
   return {
@@ -571,7 +607,12 @@ export function toCanonicalWithdrawal(
     status,
     payoutAddressChangeBlocked: blocksPayoutAddressChange(submission.status),
     riskRoute: canonicalRiskRoute(submission.riskRoute),
-    riskReasons: [],
+    riskReasons: submission.complianceReviewRequired ? ["H1_COMPLIANCE_REVIEW_REQUIRED"] : [],
+    ...(submission.complianceReviewRequired !== undefined ? {
+      complianceReviewRequired: submission.complianceReviewRequired,
+      complianceHoldApplies: submission.complianceHoldApplies,
+      complianceHoldDays: submission.complianceHoldDays,
+    } : {}),
     submittedAt,
     displaySubmittedAt: typeof submission.createdAt === "number"
       && submission.createdAt > 0 && Number.isFinite(submission.createdAt)

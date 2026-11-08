@@ -2518,6 +2518,15 @@ export const useApp = defineStore("app", () => {
       // 抹掉即永久。(合并层同状态按字段合并是第二道网,这里是第一道:别先把值弄丢。)
       const w = withdrawals.value.find((row) => row.id === target.id);
       if (!w) return; // 这段时间里单据没了(换账号 / 被合并掉)——本拍的结论不再适用
+      const serverOrder = toCanonicalWithdrawal(remote.withdrawal,
+        remote.withdrawal.targetAddress ?? w.address, w.submittedAt);
+      const orderSnapshotChanged = serverOrder.riskRoute !== w.riskRoute
+        || (serverOrder.complianceReviewRequired !== undefined
+          && (serverOrder.complianceReviewRequired !== w.complianceReviewRequired
+            || serverOrder.complianceHoldApplies !== w.complianceHoldApplies
+            || serverOrder.complianceHoldDays !== w.complianceHoldDays))
+        || Number.isFinite(serverOrder.estimatedCompletion) !== Number.isFinite(w.estimatedCompletion)
+        || (Number.isFinite(serverOrder.estimatedCompletion) && serverOrder.estimatedCompletion !== w.estimatedCompletion);
       // 🔴 判「变没变」要把**三个字段**都算上,不能只看 status:状态没动、只有终态原因
       // 或可重试判定变了的那一拍,只比 status 会被整个丢掉。
       // 这样写是为了**不依赖一个没写进契约的服务端假设**(「原因一定和终态状态同一个响应发」)。
@@ -2530,18 +2539,25 @@ export const useApp = defineStore("app", () => {
       const nexRefundedAtChanged = remote.nexRefundedAt !== null && remote.nexRefundedAt !== w.nexRefundedAt;
       const payoutBlockChanged = remote.payoutAddressChangeBlocked !== w.payoutAddressChangeBlocked;
       if (remote.status === w.status && !reasonChanged && !retriableChanged
-          && !nexRefundedChanged && !nexRefundedAtChanged && !payoutBlockChanged) return;
+          && !nexRefundedChanged && !nexRefundedAtChanged && !payoutBlockChanged && !orderSnapshotChanged) return;
       patches.set(w.id, {
         ...w,
+        riskRoute: serverOrder.riskRoute,
+        estimatedCompletion: serverOrder.estimatedCompletion,
+        ...(serverOrder.complianceReviewRequired !== undefined ? {
+          complianceReviewRequired: serverOrder.complianceReviewRequired,
+          complianceHoldApplies: serverOrder.complianceHoldApplies,
+          complianceHoldDays: serverOrder.complianceHoldDays,
+          riskReasons: [...new Set([...(w.riskReasons ?? []), ...(serverOrder.riskReasons ?? [])])],
+        } : {}),
         status: remote.status,
         payoutAddressChangeBlocked: remote.payoutAddressChangeBlocked,
         // 🔴 盖上「这份结论是什么时候从服务端问来的」。没有它,三路合并在平局时只能留磁盘旧行,
         // 上面那套判据就全是空转(独立审计实测:同状态改原因 100% 丢失)。
         // 用本机时钟即可:它只在**本机自己的两份快照之间**比大小,不与服务端时间对齐。
-        // 服务端没给到账时刻就不编一个:仍按「到点即已到」记 estimatedCompletion,
-        // 与 mock 推进同口径(见 advanceArrival 的 confirmedAt 注释)。
+        // 合规单的截止时间只代表审查窗口，不能回填为实际到账时间。
         ...(remote.status === "confirmed"
-          ? { confirmedAt: remote.confirmedAt ?? w.estimatedCompletion }
+          ? { confirmedAt: remote.confirmedAt ?? (serverOrder.complianceReviewRequired ? undefined : w.estimatedCompletion) }
           : {}),
         // 🔴 `null`(没给)与 `false`/具体码是两回事:没给就**保留已存的旧值**,不覆盖成空。
         // 覆盖的话,一次「服务端这拍没带原因」就把客服唯一能查的那条线索抹了。
