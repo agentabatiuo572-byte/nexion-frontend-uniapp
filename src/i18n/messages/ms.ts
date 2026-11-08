@@ -522,6 +522,7 @@ export const ms: Messages = {
     expires: "Sebut harga tamat",
     confirm: "Sahkan pengeluaran",
     confirmNotice: "Selepas dihantar, jumlah USDT ini tidak tersedia sehingga pemprosesan pengeluaran selesai. Jangan hantar permintaan yang sama lagi.",
+    notSubmitted: "Sebut harga belum dihantar.",
     intentClosed: "Sebut harga ini tidak lagi aktif.",
     reload: "Muat semula",
     unknown: "Keputusan penghantaran sedang disahkan secara automatik. Jangan mulakan pengeluaran lain.",

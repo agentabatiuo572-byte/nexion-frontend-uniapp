@@ -36,16 +36,28 @@ export function bankDemo(url, state, request) {
     const challenge = demo[type + 'Otp'];
     if (!challenge || challenge.expiresAt <= now || input().challengeNo !== challenge.challengeNo || input().code !== '123456') fail(type === 'address' ? 'PAYOUT_ADDRESS_OTP_INVALID' : 'OTP_INVALID', type === 'address' ? 422 : 400);
   };
-  const config = () => {
-    const base = secondaryDemo(new URL('/api/withdrawals/bank/config', url.origin), state, { method: () => 'GET' });
+  // BankWithdrawalService.currentIntent: live quotes and orders without settlement proof share one gate.
+  const currentIntent = () => {
+    settleDemoBankWithdrawals(state);
     const active = Object.values(demo.quotes).filter(row => !row.abandoned && !row.order && Date.parse(row.quote.expiresAt) > now);
     const intents = active.map(({ quote }) => ({ state: 'NOT_SUBMITTED', quoteNo: quote.quoteNo, withdrawalNo: null, expiresAt: quote.expiresAt, providerState: null }));
-    return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: !intents.length ? null : { state: intents.length > 1 ? 'MULTIPLE' : 'NOT_SUBMITTED', intents, quoteNo: intents.length === 1 ? intents[0].quoteNo : null, withdrawalNo: null } };
+    intents.push(...Object.values(demo.orders).filter(row => !row.outcome).map(row => ({
+      state: 'COMMITTED', quoteNo: row.bank.quoteNo, withdrawalNo: row.withdrawalNo,
+      expiresAt: row.bank.expiresAt, providerState: row.providerState,
+    })));
+    const single = intents.length === 1 ? intents[0] : null;
+    return !intents.length ? null : { state: single?.state ?? 'MULTIPLE', intents,
+      quoteNo: single?.quoteNo ?? null, withdrawalNo: single?.withdrawalNo ?? null };
+  };
+  const config = () => {
+    const base = secondaryDemo(new URL('/api/withdrawals/bank/config', url.origin), state, { method: () => 'GET' });
+    return { ...base, ...(demo.beneficiary ? { beneficiary: demo.beneficiary } : {}), unresolvedIntent: currentIntent() };
   };
   const orderView = row => {
     settleDemoBankWithdrawals(state);
     const settled = row.outcome === 'settled', rejected = row.outcome === 'rejected';
-    return { ...snapshot(row), providerState: settled ? 'PAID' : rejected ? 'FAILED' : 'PENDING',
+    // The refund option models a D2 refund before dispatch (READY + REFUNDED + refund proof).
+    return { ...snapshot(row), providerState: settled ? 'PAID' : rejected ? 'READY' : 'PENDING',
       withdrawal: { ...row.withdrawal, status: settled ? 'CONFIRMED' : rejected ? 'REFUNDED' : 'PROCESSING' },
       settlementEvidence: { status: settled ? 'paid' : rejected ? 'refunded' : 'unconfirmed', evidenceRef: settled || rejected ? 'DEMO-' + row.withdrawalNo : null, providerOrderId: settled ? 'DEMO-PROVIDER-' + row.withdrawalNo : null, providerStatus: settled ? 3 : null, checkedAt: new Date(now).toISOString(), amountUsdt: row.bank.amountUsdt } };
   };
@@ -60,6 +72,7 @@ export function bankDemo(url, state, request) {
     return { beneficiary: snapshot(demo.beneficiary) };
   });
   if (path === '/api/withdrawals/bank/quotes' && method === 'POST') {
+    if (currentIntent()) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
     const bank = config().beneficiary, amountUsdt = Number(input().amountUsdt);
     const { policy, capacity } = config();
     if (!bank?.canWithdraw || !Number.isFinite(amountUsdt) || amountUsdt < policy.minAmountUsd || amountUsdt > policy.maxAmountUsd || amountUsdt > capacity.maxWithdrawableUsdt) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
@@ -79,20 +92,29 @@ export function bankDemo(url, state, request) {
     if (Date.parse(row.quote.expiresAt) <= now) return { state: 'EXPIRED' };
     return { state: 'NOT_SUBMITTED', quote: snapshot(row.quote) };
   }
-  if (path === '/api/withdrawals/bank/orders' && method === 'POST') return command('withdraw', () => {
-    const row = demo.quotes[input().quoteNo];
-    if (!row || row.abandoned || Date.parse(row.quote.expiresAt) <= now) fail('BANK_QUOTE_EXPIRED');
-    if (row.order) return orderView(row.order);
-    // AppWithdrawalService.reserveBank: one daily count with USDT withdrawals, and the funds leave the wallet here.
-    const facts = demoWithdrawalFacts(state, now);
-    if (facts.dailyRemainingCount === 0) fail('WITHDRAWAL_DAILY_LIMIT_EXCEEDED');
-    if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
-    state.walletBalance = Math.round((facts.walletUsdt - row.quote.amountUsdt) * 1e6) / 1e6;
-    const withdrawalNo = 'WD-DEMO' + (Object.keys(demo.orders).length + 1);
-    row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo: config().beneficiary.beneficiaryNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
-    demo.orders[withdrawalNo] = row.order;
-    return orderView(row.order);
-  });
+  if (path === '/api/withdrawals/bank/orders' && method === 'POST') {
+    const quoteNo = input().quoteNo;
+    if (typeof quoteNo !== 'string' || !/^BQ-[a-f0-9]{32}$/.test(quoteNo)) fail('BANK_QUOTE_INVALID', 422);
+    const receipt = command('withdraw', () => {
+      const row = demo.quotes[quoteNo];
+      if (!row) fail('BANK_QUOTE_NOT_FOUND', 404);
+      if (row.order) return orderView(row.order);
+      if (row.abandoned) fail('BANK_QUOTE_ABANDONED');
+      if (Date.parse(row.quote.expiresAt) <= now) fail('BANK_QUOTE_EXPIRED');
+      const intent = currentIntent();
+      if (intent?.state !== 'NOT_SUBMITTED' || intent.quoteNo !== quoteNo) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
+      // AppWithdrawalService.reserveBank: one daily count with USDT withdrawals, and the funds leave the wallet here.
+      const facts = demoWithdrawalFacts(state, now);
+      if (facts.dailyRemainingCount === 0) fail('WITHDRAWAL_DAILY_LIMIT_EXCEEDED');
+      if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
+      state.walletBalance = Math.round((facts.walletUsdt - row.quote.amountUsdt) * 1e6) / 1e6;
+      const withdrawalNo = 'WD-DEMO' + (Object.keys(demo.orders).length + 1);
+      row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo: config().beneficiary.beneficiaryNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
+      demo.orders[withdrawalNo] = row.order;
+      return orderView(row.order);
+    });
+    return orderView(demo.orders[receipt.withdrawalNo]);
+  }
   if (path.startsWith('/api/withdrawals/bank/orders/') && method === 'GET') {
     const row = demo.orders[path.split('/').pop()];
     if (!row) fail('BANK_ORDER_NOT_FOUND', 404);

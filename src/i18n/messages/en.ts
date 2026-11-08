@@ -158,6 +158,7 @@ export const en = {
     effective: "Effective from", amount: "Withdrawal amount (USDT)", quote: "Get quote", fee: "Fee (USDT)",
     net: "Amount converted (USDT)", rate: "VND per USDT", receive: "Bank receives (VND)", expires: "Quote expires", confirm: "Confirm withdrawal",
     confirmNotice: "After submission, this USDT amount is unavailable until withdrawal processing is complete. Do not submit duplicates.",
+    notSubmitted: "The quote has not been submitted.",
     intentClosed: "This quote is no longer active.",
     reload: "Reload", unknown: "The submission result is being confirmed automatically. Do not start another withdrawal.",
     review: "Awaiting review", processing: "Bank transfer processing", paid: "Received by bank", failed: "Withdrawal failed",
