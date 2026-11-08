@@ -87,7 +87,7 @@
           <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" />
         </view>
         <template v-if="s.step !== 'methods'">
-          <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
+          <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_TRC20' ? copy.gasTrc20 : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
           <view v-if="s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying }" aria-hidden="true" /><text>{{ s.retrying ? copy.retrying : s.quote && quoteLeft !== null ? fill(copy.quoteValid, { t: clock(quoteLeft) }) : copy.loadingFees }}</text></view>
         </template>
         <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="s.step === 'methods' ? !walletEnough : !s.quote || s.loading" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
@@ -177,7 +177,7 @@
 
       <view v-if="!conclusion" class="pp-warn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-        <text>{{ isBank ? copy.warnBank : (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'CREGIS_USDT_ERC20' ? copy.warnErc20 : copy.warnBep20 }}</text>
+        <text>{{ isBank ? copy.warnBank : (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'CREGIS_USDT_TRC20' ? copy.warnTrc20 : (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'CREGIS_USDT_ERC20' ? copy.warnErc20 : copy.warnBep20 }}</text>
       </view>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30). -->
@@ -256,10 +256,11 @@ const cashierFootPad = (() => { try { return Math.max(uni.getSystemInfoSync().sa
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.user.usdtBalance >= 0 && app.remoteFleetHasSnapshot);
 const walletEnough = computed(() => Number(s.amount) === 0 || balanceKnown.value && app.user.usdtBalance >= Number(s.amount));
 const shortfall = computed(() => balanceKnown.value ? Math.max(0, Number(s.amount) - app.user.usdtBalance) : 0);
-const usdtAvailable = computed(() => payment.available('CREGIS_USDT_BSC') || payment.available('CREGIS_USDT_ERC20'));
+const usdtAvailable = computed(() => payment.available('CREGIS_USDT_BSC') || payment.available('CREGIS_USDT_ERC20') || payment.available('CREGIS_USDT_TRC20'));
 const networks = computed(() => [
   { id: 'CREGIS_USDT_ERC20' as const, title: copy.value.erc20, chain: copy.value.erc20Chain },
   { id: 'CREGIS_USDT_BSC' as const, title: copy.value.bep20, chain: copy.value.bep20Chain },
+  { id: 'CREGIS_USDT_TRC20' as const, title: copy.value.trc20, chain: copy.value.trc20Chain },
 ].filter(tab => payment.available(tab.id)));
 // A concluded payment has nothing left to offer behind its notice.
 const sheetOpen = computed(() => active.value && s.open && !s.pending && !s.concluded);
@@ -269,7 +270,10 @@ const fees = computed(() => s.intent ?? s.quote);
 const isBank = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod) === 'HDPAY_BANK');
 const received = computed(() => s.intent?.status === 'FUNDS_CONFIRMED');
 const ready = computed(() => timing.value.canPay && (isBank.value ? !!s.intent?.paymentUrl : !!s.intent?.address));
-const networkName = computed(() => (s.intent?.paymentMethod ?? s.pending?.paymentMethod ?? s.pausedPaymentMethod) === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20);
+const networkName = computed(() => {
+  const method = s.intent?.paymentMethod ?? s.pending?.paymentMethod ?? s.pausedPaymentMethod;
+  return method === 'CREGIS_USDT_TRC20' ? copy.value.trc20 : method === 'CREGIS_USDT_ERC20' ? copy.value.erc20 : copy.value.bep20;
+});
 const methodName = computed(() => isBank.value ? copy.value.bank : networkName.value);
 const pageTitle = computed(() => received.value ? copy.value.resultTitle : isBank.value ? copy.value.bankTitle : copy.value.usdtPage);
 const cashierUrl = computed(() => timing.value.canPay && s.intent?.paymentUrl ? validateHostedPaymentUrl(s.intent.paymentUrl) ?? '' : '');
@@ -302,7 +306,7 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
   switch (kind) {
     case 'reminder': return s.method === 'HDPAY_BANK'
       ? { icon: 'shield', tone: 'brand', title: c.remindBankTitle, body: c.remindBank, primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss }
-      : { icon: 'shield', tone: 'brand', title: c.remindUsdtTitle, body: fill(s.method === 'CREGIS_USDT_ERC20' ? c.remindErc20 : c.remindBep20, { amt: s.quote ? amount(s.quote.totalUsdt) : '—' }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss };
+      : { icon: 'shield', tone: 'brand', title: c.remindUsdtTitle, body: fill(s.method === 'CREGIS_USDT_TRC20' ? c.remindTrc20 : s.method === 'CREGIS_USDT_ERC20' ? c.remindErc20 : c.remindBep20, { amt: s.quote ? amount(s.quote.totalUsdt) : '—' }), primary: c.remindOk, secondary: c.back, onPrimary: payment.confirm, onSecondary: dismiss };
     case 'timeShort': return { icon: 'clock', tone: 'warning', title: c.timeShortTitle, body: fill(c.timeShort, { n: Math.max(1, Math.ceil((deadlineLeft.value ?? 0) / 60000)) }), primary: c.useWallet, secondary: c.continueAnyway, onPrimary: () => { dismiss(); payment.back(); }, onSecondary: () => payment.notify('reminder') };
     case 'timeout': return order
       ? s.coldResume

@@ -4042,6 +4042,11 @@ timeHoursAgo: "{n}小时前",
 
     feeConfigRetry: "重试",
     // Sprint 3 — 合规审查 banner(用户视角:监管要求,不暴露 phase 概念)
+    stageWaitTitle: "TRC20 提现规则",
+    stageWaitBody: "本阶段每笔提现附加 {days} 天等待。小额免审与风控审核仍按规则处理；到期或审核通过不代表到账。",
+    stageNoWaitBody: "本阶段无额外等待。小额免审与风控审核仍按规则处理；以实际到账为准。",
+    stageWaitUntilBody: "本笔阶段等待截至 {time}。小额免审与风控审核仍按规则处理；到期或审核通过不代表到账。",
+    stageWaitPendingBody: "本笔适用 {days} 天阶段等待。小额免审与风控审核仍按规则处理；到期或审核通过不代表到账。",
     complianceHoldTitle: "提现合规复核",
     complianceHoldBody: "本笔提现需人工复核，并附加 {days} 天审查窗口；到期不代表到账。",
     complianceReviewBody: "提现需人工复核，小额免审暂停。输入金额后可查看是否另加审查窗口。",
