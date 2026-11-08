@@ -4107,11 +4107,12 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 #### 11.12.1 套餐结算 `/store/bundle`(Sprint A-2 / B.3)
 
 - **目的**:多商品组合下单 + 阶梯折扣,补充单商品 checkout 的转化路径
-- **折扣 tier**:2 件 5% / 3 件 8% / 4+ 件 12%(`BUNDLE_DISCOUNT_TIERS`)
-- **结算**:点「结算」余额直付——复用单品 checkout 下单内核,一次为组合内每个商品建单(`orders.createOrder`,组合折扣按单价比例分摊)、按组合总价扣平台余额(`app.debitBalance`,余额不足则拦截报错)、写一条组合购买账单、清空组合车、跳 `/store/orders`。账本单源 = 扣款 = 账单 = 组合总价
+- **折扣 tier**:由服务端 `GET /api/store/bundle-discount` 下发(PC E1 套餐折扣配置),页面按套餐内件数点亮对应档位;读取失败显示错误与重试,不用本地默认值报价
+- **结算**:套餐内至少 2 台设备时底部按钮为「继续购买」,打开统一结账 `/store/checkout?items=…`(§7.3),在那里确认订单、选择付款方式并输入支付密码;金额以服务端报价和订单为准。同一账号有未完成的旧组合命令时先按原命令恢复,不发起新购买。本地 mock 模式仍为余额直付(按商品建单、按组合总价扣余额并写一条组合购买账单)
+- **空闲槽位提醒(2026-11-08)**:点「继续购买」时,如套餐内设备数(每台设备、每份 Cloud Share 各占一槽)超过当前空闲槽位(`slotCap − slotsUsed`,`slotsUsed` 已含订单与试用预留),先弹窗「空闲槽位不足」:「已选 {count} 台设备,空闲槽位 {free} 个。请先到设备仓库停用设备,或减少套餐里的设备。」主按钮「去设备仓库」进入 `/me/devices`,次按钮「调整套餐」关闭弹窗留在本页,均不进入结账。设备数不超过空闲槽位时直接进入结账;账号在统一结账中有未完成的原命令或未付原单、套餐内设备有未完成的容量置换(KEEP/REPLACE)原命令,或这些记录读取失败时,也不弹窗,直接进入结账先恢复原交易或显示其恢复入口(§7.3.1,六槽专题);槽位占用未读到时不弹窗,由服务端报价和建单按容量校验(超槽仍被拒绝,§7.3)。不改变六槽规则和服务端容量校验
 - **UI**:Hero 折扣 tier grid + In-bundle 列表 + Suggestions(剩余产品)+ 底部 Subtotal/Discount/Total 卡 + 合并日产能
-- **Store**:`useCart` zustand persist(`nexgrid-cart-v1`)— `items: string[]` + add/remove/clear/has
-- **i18n**:`bundle.*` namespace ~14 keys
+- **Store**:`useCart`(Pinia,按账号分行持久化 `nexgrid-cart-accounts-v1`)— `items: string[]` + add/remove/clear/has
+- **i18n**:`bundle.*` namespace,九种语言
 
 #### 11.12.2 交易详情 `/tx/[hash]`(Sprint A-2 / A.4)
 
