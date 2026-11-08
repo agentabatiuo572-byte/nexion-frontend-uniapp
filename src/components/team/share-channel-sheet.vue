@@ -5,7 +5,7 @@
       <view class="ss-grab" />
       <view class="ss-head"><text class="ss-head__t">{{ copy.inviteFriends }}</text><view class="ss-head__x" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')"><LiquidGlass :radius="22" tone="control" /><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></view></view>
       <view class="ss-body">
-        <view class="ss-reward"><TeamArt kind="invite" :size="100" /><view class="ss-reward__copy"><text class="ss-reward__t" :class="{ 'ss-reward__t--amount': rewardHint }">{{ rewardLineText }}</text><text v-if="rewardHint" class="ss-reward__hint">{{ rewardHint }}</text></view></view>
+        <view class="ss-reward nx-tint"><TeamArt kind="invite" :size="100" /><view class="ss-reward__copy"><text class="ss-reward__t" :class="{ 'ss-reward__t--amount': rewardHint }">{{ rewardLineText }}</text><text v-if="rewardHint" class="ss-reward__hint">{{ rewardHint }}</text></view></view>
         <view v-if="statusMessage" class="ss-status" role="status" aria-live="polite" :aria-busy="loading"><text class="ss-status__text">{{ statusMessage }}</text><view v-if="!loading || retrying" class="ss-retry nx-frosted-button" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" :aria-busy="retrying" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry"><text>{{ t.share.retry }}</text></view></view>
         <view class="ss-actions">
           <view class="ss-code__copy" :class="{ 'ss-row--pending': loading }" role="button" :aria-label="t.share.copyCode" :tabindex="codeDisabled ? -1 : 0" :aria-disabled="codeDisabled" :aria-busy="channelBusy" @click="onCopyCode" @keydown.enter.prevent="onCopyCode" @keydown.space.prevent="onCopyCode"><text class="ss-code__label">{{ copy.myInviteCode }}</text><text class="ss-code__value">{{ referralCode || codePresentation || '—' }}</text><view class="ss-code__pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><text>{{ t.share.copyCode }}</text></view></view>
@@ -263,7 +263,7 @@ useDialogA11y(computed(() => props.open), ".ss-root", () => emit("close"));
 .ss-rules-support text { margin:0;color:var(--v5-ink-2); }
 .ss-sheet [tabindex="0"]:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
 /* P-42: reward strip, code card and two-column channel tiles. */
-.ss-reward { flex-direction:row !important;align-items:center !important;gap:14px !important;padding:14px 16px !important;margin-bottom:var(--ui-space-inset);border-radius:20px;background:var(--v5-surface-2);text-align:left !important; }
+.ss-reward { flex-direction:row !important;align-items:center !important;gap:14px !important;padding:14px 16px !important;margin-bottom:var(--ui-space-inset);border-radius:20px;--nx-tint:var(--v5-brand);text-align:left !important; }
 .ss-reward :deep(.team-art) { --team-art-size:88px; flex:none; }
 .ss-reward__copy { display:flex;flex-direction:column;gap:2px;min-width:0; }
 .ss-reward__copy .ss-reward__t--amount { font:600 28px/34px var(--font-amount);color:var(--v5-brand);white-space:nowrap; }

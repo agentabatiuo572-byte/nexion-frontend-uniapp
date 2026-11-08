@@ -13,7 +13,7 @@
         <NxButton variant="secondary" :label="t.store.gateLockedCta" @click="go(focusedProductHref)"><text>{{ t.store.gateLockedCta }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></NxButton>
       </view>
       <view v-else class="quota-content">
-        <view class="quota-hero nx-soft-glass nx-viz-press">
+        <view class="quota-hero nx-tint nx-viz-press">
           <view v-if="heroTier && focusedProductId" class="quota-hero__main"><view class="quota-hero__copy"><text class="quota-headline">{{ heroTier.name }}</text><view class="quota-hero__price nx-num-amount"><text class="quota-price-symbol">$</text><text>{{ heroPriceParts[0] }}</text><text v-if="heroPriceParts[1]" class="quota-price-fraction">.{{ heroPriceParts[1] }}</text></view></view><image v-if="heroImage" :src="heroImage" mode="aspectFit" class="quota-hero__image" :alt="heroTier?.name" /><TeamArt v-else kind="members" :size="112" /></view>
           <view class="quota-invite-count">
             <view ref="inviteRingRef" class="quota-ring" :style="{ '--nx-viz-ring': inviteRingInView === false ? 0 : inviteRingPct, transition: inviteRingInView === false ? 'none' : VIZ_RING_TRANSITION }"><view class="quota-ring__hole nx-num-metric"><text class="quota-invite-count__number">{{ visibility.mask(activeDirectText) }}</text><text>{{ visibility.hidden ? '' : remoteApiEnabled && !remoteSnapshot ? '/—' : `/${directInvites}` }}</text></view></view>
@@ -367,7 +367,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-invite-count > text { padding-top: var(--v5-space-2); flex: 1; }
 @media(max-width:374px) { .quota-content { padding-inline:var(--v5-space-4); } .quota-hero__image { height:112px; } }
 /* P-41: hero card with the invite ring; tiers as a horizontal carousel of tinted product cards. */
-.quota-hero { margin-top: var(--v5-space-1); padding: var(--v5-space-5); border: 0; border-radius: 28px; }
+.quota-hero { --nx-tint: var(--v5-brand); margin-top: var(--v5-space-1); padding: var(--v5-space-5); border: 0; border-radius: 28px; }
 .quota-invite-count { align-items: center; }
 .quota-invite-count > .quota-ring { display:grid; place-items:center; align-items:center; justify-content:center; gap:0; max-width:none; text-align:initial; }
 .quota-ring { display: grid; place-items: center; flex: none; width: 72px; height: 72px; border-radius: 999px; background: conic-gradient(var(--v5-brand) calc(var(--nx-viz-ring) * 1%), var(--v5-surface-3) 0); }
@@ -388,7 +388,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && conditionsOnly.value && cond
 .quota-price-fraction { color:var(--v5-ink-3); }
 .quota-carousel { display: flex; gap: var(--ui-space-inline); margin: var(--ui-space-inset) -20px 0; padding: 0 var(--v5-space-5) var(--v5-space-1); overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--v5-space-5); scrollbar-width: none; }
 .quota-carousel::-webkit-scrollbar { display: none; }
-.quota-content .quota-carousel :deep(.quota-tier) { flex: none; width: 260px; box-sizing: border-box; padding: var(--ui-space-inset); border: 0; border-radius: 28px; scroll-snap-align: start; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.quota-content .quota-carousel :deep(.quota-tier) { flex: none; width: 260px; box-sizing: border-box; padding: var(--ui-space-inset); border: 0; border-radius: 28px; scroll-snap-align: start; background: color-mix(in srgb, var(--v5-brand) 7%, var(--v5-surface)); box-shadow: inset 0 0 0 1px var(--v5-border); }
+/* Tier cards are tinted brand at the .nx-tint strength (P-41 tinted carousel; it used to be a top glow). quota-tier-card.vue
+   owns the card background, so the tint is set here rather than through the .nx-tint class. */
+[data-theme="light"] .quota-content .quota-carousel :deep(.quota-tier) { background: color-mix(in srgb, var(--v5-brand) 5%, var(--v5-surface)); }
 .quota-content .quota-carousel :deep(.quota-product) { flex-direction: column; align-items: flex-start; gap: var(--v5-space-2); }
 .quota-content .quota-carousel :deep(.quota-product__image) { align-self: center; width: 100%; height: 120px; }
 .quota-content .quota-carousel :deep(.quota-product__arrow) { display: none; }
