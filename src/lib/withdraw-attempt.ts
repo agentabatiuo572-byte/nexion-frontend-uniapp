@@ -59,8 +59,9 @@ export function rememberWithdrawAttempt(accountKey: string, attempt: WithdrawAtt
   return writeAccountRow<WithdrawAttempt>(TABLE_KEY, accountKey, attempt);
 }
 
-/** 退役。只在结果**定局**时调用:成功、服务端明确拒绝、或 409(键已被服务端占用)。 */
-export function forgetWithdrawAttempt(accountKey: string): void {
+/** 只退役本回执所属的尝试;另一标签页留下的新键必须保留。仅在结果定局时调用。 */
+export function forgetWithdrawAttempt(accountKey: string, receiptKey: string): void {
+  if (readAccountRow<Pick<WithdrawAttempt, "key">>(TABLE_KEY, accountKey)?.key !== receiptKey) return;
   writeAccountRow<Record<string, never>>(TABLE_KEY, accountKey, {});
 }
 
