@@ -10,6 +10,7 @@ export function riskReasonLines(t: Messages, codes: readonly string[] | undefine
     ...(t.wallet.riskReasons as Record<string, string>),
     "new-address-large-amount": t.addrRebind.reasonNewAddressAge,
     "rebind-freeze": t.addrRebind.submitFrozenReason,
+    H1_COMPLIANCE_REVIEW_REQUIRED: t.walletV3.complianceReviewRequired,
   };
   const lines = (codes ?? []).map((code) => dict[code]).filter((line): line is string => Boolean(line));
   // 2026-08-15 焦虑文案收敛:多个侦测码共用同一句「行为异常」话术 —— 必须去重,

@@ -2785,21 +2785,29 @@ future = amount × (1 + APY × days / 365)
 
 `handleSubmit` 前置守卫:`useRiskDisclosure().accepted === false` 时,跳 `/me/risk-disclosure?return=/me/wallet/withdraw`,接受后通过 query 自动回原页。Staking lock 同理(同一 store)。详见 §11.X。
 
-#### 9.3.5 Compliance hold banner(Sprint 3,phase 派发)
+#### 9.3.5 USDT 加强合规复核与大额审查窗口（2026-11-08）
 
-当 `useProductPhase().complianceHoldEnabled === true`(P5 + P6)时,在 KYC-Express verified 卡之后、Amount input 之前显示 AlertTriangle banner:
+App 与 H5 Lite 的提现页沿用原横幅位置、布局和字号，按服务端政策及本笔金额提示；不以本地产品阶段决定合规准入，不改银行卡提现页面。
 
-- 标题:`Extended compliance review`
-- 副文(模板):`Platform reached its lock-in phase. Withdrawals over $1,000 enter a {days}-day enhanced review window before settlement. Smaller amounts still settle on the standard timeline.`
-- `{days}` 从 `phase.withdrawalCooldownDays` 派发(P5+ = 45)
+| 服务端规则／本笔金额 | 提现页提示与实际约束 |
+|---|---|
+| 加强合规关闭 | 不显示合规横幅；沿用普通小额免审与现有风控，不附加 H1 大额等待 |
+| 加强合规开启、尚未输入金额 | 提示必须人工复核、小额免审暂停，输入金额后可查看是否另加窗口 |
+| 开启、金额 ≤ 门槛 | 人工复核，不附加大额审查等待，不显示 N 天 |
+| 开启、金额严格 > 门槛且 N > 0 | 人工复核并附加 N 天审查窗口，明确到期不代表到账 |
+| 开启、N = 0 | 仍需人工复核，不附加大额审查等待，不显示“0 天到账” |
 
-P1-P4 阶段不渲染 banner(无 phase gate)。提现惩罚费率 / NEX 抵扣率 / 冷却均随 phase 派发(见 §13.3 / §13.4.2),不硬编码常量。
+门槛由 `GET /api/withdrawals/policy.complianceReviewThresholdUsdt` 返回（本轮服务端规则为 1,000 USDT），前端不写死数值；开关和天数分别取同一响应的 `complianceHoldEnabled`、`cooldownDays`。取得本笔 eligibility 后优先使用服务端的 `complianceReviewRequired`、`complianceHoldApplies`、`complianceHoldDays`，展示判断不授予提交或出款权限。合规开启时小额免审不得绕过，K3 冻结／延迟及 K4 审核继续有效。
+
+新政策／资格字段缺失或无效时沿用原恢复提示、禁止新提交；H1 开关／窗口／阶段改变会更新 `policyVersion`，旧版本被服务端拒绝后重新读取。按钮与确认保留“提交提现”，不承诺小额自动通过；新增提示覆盖九种已上线语言。
 
 #### 9.3.6 提现追踪 `/me/wallet/withdraw/tracking`
 
 5 状态:`submitted → review-passed → processing → sent → confirmed`
 
-每状态显示时间戳 + 进度条 + 预计完成时间。
+显示实际状态、进度及服务端已有的事件时间；不以审查截止时间推断到账。合规提示只读取原单提交快照，历史未提供的字段保持未知，不按当前开关追改旧单。
+
+待审核（含旧自动审核单被重新送回人工）与冻结按当前单据状态显示等待；审核通过、处理中、已发送后退出人工等待说明，继续查询原单。大额仍在等待且原单保留 `holdUntil` 时显示审查窗口截止，并明确到期不代表到账；服务端到期或解冻后清空截止时间仍可正常读单，继续显示人工复核。实际到账只由服务端到账状态确认；合规单缺实际到账时间时不将窗口截止或本机时间填为到账时间。
 
 「再提一笔」按服务端提现政策的每日笔数上限判断，用完时置灰并说明何时可再次提交；政策读不到时不置灰（最终由提现页与服务端拦截）。H5 刷新后在登录会话恢复、账号绑定后与提现记录一起读取政策。
 
