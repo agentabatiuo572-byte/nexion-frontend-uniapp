@@ -10,7 +10,7 @@
       <CatalogMachineImage class="upgrade-art__target" :class="{ 'upgrade-art__target--ready': targetReady }" v-bind="targetImageProps" />
     </view>
     <view class="upgrade-comparison">
-      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">{{ fmtMoney(base.baseRate) }}{{ t.store.cardPerDaySuffix }}</text></view>
+      <view><text class="upgrade-comparison__label">{{ comparisonCopy.current }}</text><text class="upgrade-comparison__value">{{ fmtMoney(baseDaily) }}{{ t.store.cardPerDaySuffix }}</text></view>
       <view><text class="upgrade-comparison__label">{{ comparisonCopy.upgraded }}</text><text class="upgrade-comparison__value upgrade-comparison__value--target">{{ fmtMoney(target.dailyEarn) }}{{ t.store.cardPerDaySuffix }}</text></view>
     </view>
     <text class="upgrade-note">{{ t.store.cardYouEarn }}</text>
@@ -29,9 +29,11 @@ import { useLocaleStore } from '@/store/locale';
 import { fmtMoney } from '@/i18n/format';
 import { navTo } from '@/lib/route';
 import NxButton from '@/components/ui/nx-button.vue';
-import type { DeviceKind } from '@/store/types';
+import type { Device } from '@/store/types';
+import { getLifecycleSummary } from '@/store/device-lifecycle';
 import { uiLocale } from '@/i18n';
-const props = defineProps<{ base: { kind: DeviceKind; name: string; baseRate: number }; baseImageUrl?: string | null; target: { id: string; name: string; imageUrl?: string | null; dailyEarn: number } }>();
+const props = defineProps<{ base: Device; baseImageUrl?: string | null; target: { id: string; name: string; imageUrl?: string | null; dailyEarn: number } }>();
+const baseDaily = computed(() => getLifecycleSummary(props.base).dailyRateNow);
 const copy = useAuditUiCopy(), t = useT();
 const locale = useLocaleStore();
 const comparisonCopy = computed(() => ({
