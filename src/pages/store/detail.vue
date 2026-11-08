@@ -134,6 +134,10 @@
               <text class="share-returns__currency">UVT</text>
               <text class="share-returns__value font-mono-tabular">{{ shareDailyUvtText }}</text>
             </view>
+            <view v-if="shareDailyEstimate && product.monthlyEstimateUsdt != null" class="share-returns__row">
+              <text class="share-returns__currency">{{ t.store.detMonthly }}</text>
+              <text class="share-returns__value font-mono-tabular">{{ monthlyYieldText }} USDT</text>
+            </view>
           </view>
           <view class="share-returns__reference">
             <text>{{ t.store.shareReferenceAnnual }}</text>
@@ -231,6 +235,7 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
@@ -460,7 +465,7 @@ watch(maxQuantity, max => { if (max > 0 && qty.value > max) qty.value = max; });
 const openFaq = ref(0);
 
 const dailyYield = computed(() => (product.value?.dailyEarn ?? 0) * qty.value);
-const monthlyYield = computed(() => dailyYield.value * 30);
+const monthlyYield = computed(() => (product.value?.monthlyEstimateUsdt ?? (product.value?.dailyEarn ?? 0) * 30) * qty.value);
 const annualYield = computed(() => dailyYield.value * 365);
 const totalPrice = computed(() => (product.value?.price ?? 0) * qty.value);
 
@@ -554,7 +559,13 @@ const dailyEarnText = computed(() => formatAmount(product.value?.dailyEarn ?? 0)
 const shareYieldText = computed(() => product.value?.shareYieldMin != null && product.value?.shareYieldMax != null
   ? `${product.value.shareYieldMin}%–${product.value.shareYieldMax}%`
   : t.value.store.shareAnnualUnavailable);
+const shareDailyEstimate = computed(() => product.value && isShare.value ? productDailyEstimateRange(product.value) : null);
 const shareDailyUsdt = computed(() => {
+  const estimate = shareDailyEstimate.value;
+  if (estimate) return {
+    min: formatPlainAmount(estimate.low * qty.value, 6),
+    max: formatPlainAmount(estimate.high * qty.value, 6),
+  };
   const current = product.value;
   if (!current || current.shareYieldMin == null || current.shareYieldMax == null) return null;
   const dailyBase = current.price * qty.value / 100 / 365;

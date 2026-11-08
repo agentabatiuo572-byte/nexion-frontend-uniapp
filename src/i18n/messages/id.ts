@@ -2328,7 +2328,7 @@ export const id: Messages = {
     coRecoverOriginalOrder: "Memeriksa pesanan awal. Jangan buat pesanan lain selama hasilnya dikonfirmasi.",
     detQuantity: "Jumlah simulasi",
     detEstReturns: "Perkiraan pendapatan",
-    detEstReturnsMeta: "Rata-rata 30 hari",
+    detEstReturnsMeta: "Pembayaran aktual bisa berbeda",
     detMonthly: "Est. bulanan",
     detVsPhone: "vs ponsel Anda {n}",
     detHardware: "Spesifikasi",

@@ -52,8 +52,13 @@ export interface Product {
   warranty?: string;
   phoneDailyEarn?: string;
   phoneDailyEarnNEX?: string;
-  dailyEarn: number;        // USDT/day for DEVICE; zero protocol placeholder for SHARE
+  dailyEarn: number;        // USDT/day; target SKUs receive T/30 (legacy SHARE may be zero)
   dailyEarnNEX: number;     // NEX/day (spec §3.1)
+  /** Exact server monthly estimate; absent when the SKU has no monthly target. */
+  monthlyEstimateUsdt?: number;
+  /** Server daily USDT range for SHARE; never reconstructed from reference annual rates. */
+  dailyEstimateLowUsdt?: number;
+  dailyEstimateHighUsdt?: number;
   /** E1 reference annual range for SHARE; this is not a settlement guarantee. */
   shareYieldMin?: number;
   shareYieldMax?: number;
