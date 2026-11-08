@@ -61,6 +61,7 @@ import {
   withdrawalApi,
 } from "@/api/runtime";
 import type { AppHomeOverview } from "@/api/app-home-api";
+import type { ApiRuntimeConfig } from "@/api/runtime-config";
 import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
@@ -440,6 +441,11 @@ export const useApp = defineStore("app", () => {
       remoteSlotUsage.value = null;
       remoteAssignmentHasSnapshot.value = false;
       remotePendingEarned.value = null;
+      withdrawals.value = [];
+      lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: [] };
+      remoteWithdrawalListRefreshSequence += 1;
+      remoteWithdrawalListStatus.value = "idle";
+      remoteWithdrawalListHasSnapshot.value = false;
     }, { flush: "sync" });
   }
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
@@ -1278,19 +1284,27 @@ export const useApp = defineStore("app", () => {
     persistAccountSnapshot();
   }
 
-  /** Refreshes the canonical withdrawal list for a wallet entry or explicit action. */
+  type WithdrawalRemoteRequest = RemoteAccountRequest & { apiOrigin: ApiRuntimeConfig };
+  function withdrawalRequestScope(): WithdrawalRemoteRequest {
+    return { ...remoteAccountEpoch.snapshot(), apiOrigin: { ...apiRuntimeConfig } };
+  }
+  function withdrawalScopeIsCurrent(request: WithdrawalRemoteRequest): boolean {
+    return remoteAccountEpoch.isCurrent(request) && request.accountKey === accountKey.value
+      && request.apiOrigin.environment === apiRuntimeConfig.environment
+      && request.apiOrigin.baseUrl === apiRuntimeConfig.baseUrl;
+  }
+
+  /** Account/API-origin scoped: catalogue events do not invalidate withdrawal reads. */
   async function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
     if (!remoteApiEnabled || expectedAccountKey !== accountKey.value) return false;
-    const request = remoteAccountEpoch.snapshot();
-    const runScope = captureRuntimeRevision();
+    const request = withdrawalRequestScope();
     const activeSession = sessionVault.read();
     if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
     const refreshSequence = ++remoteWithdrawalListRefreshSequence;
     remoteWithdrawalListStatus.value = "loading";
     try {
       const rows = await withdrawalApi.list();
-      if (!remoteAccountEpoch.isCurrent(request)
-        || !isCurrentRuntimeRevision(runScope)
+      if (!withdrawalScopeIsCurrent(request)
         || expectedAccountKey !== accountKey.value
         || refreshSequence !== remoteWithdrawalListRefreshSequence) return false;
       const canonical = rows.map((row) => toCanonicalWithdrawal(row, row.targetAddress ?? "", row.createdAt));
@@ -1300,8 +1314,7 @@ export const useApp = defineStore("app", () => {
       remoteWithdrawalListStatus.value = "ready";
       return true;
     } catch {
-      if (remoteAccountEpoch.isCurrent(request)
-        && isCurrentRuntimeRevision(runScope)
+      if (withdrawalScopeIsCurrent(request)
         && expectedAccountKey === accountKey.value
         && refreshSequence === remoteWithdrawalListRefreshSequence) {
         // Keep a prior same-account list readable, but make its age explicit to
@@ -2492,10 +2505,12 @@ export const useApp = defineStore("app", () => {
    */
   async function refreshRemoteWithdrawals(): Promise<string[]> {
     if (!remoteApiEnabled) return [];
+    const request = withdrawalRequestScope();
     const expectedAccountKey = accountKey.value;
     // List is the durable source of truth; a fresh session may have no local rows
     // at all, so hydrate it before polling in-flight snapshots.
     await refreshRemoteWithdrawalList(expectedAccountKey);
+    if (!withdrawalScopeIsCurrent(request)) return [];
     // 注:本包一度加过一道「同一实例内只许一拍在途」的闸,已按主人 2026-08-12 的范围决定撤回。
     // 撤回理由不是它没用,而是它**解决不了它声称的问题、却新引进一个**:闸是 store 实例级的,
     // 跨标签页/跨 webview 原样敞开(那正是并发的真实来源);而它没有超时兜底,
@@ -2507,7 +2522,7 @@ export const useApp = defineStore("app", () => {
     if (!targets.length) return [];
     const mirrors = await Promise.all(targets.map((w) =>
       withdrawalApi.get(w.id).catch(() => null)));
-    if (expectedAccountKey !== accountKey.value) return [];
+    if (!withdrawalScopeIsCurrent(request)) return [];
     const patches = new Map<string, Withdrawal>();
     targets.forEach((target, i) => {
       const remote = mirrors[i];

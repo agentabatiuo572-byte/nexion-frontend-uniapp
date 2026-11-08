@@ -684,18 +684,12 @@ watch(() => payout.serverClock, (anchor) => {
 
 useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
 let withdrawalListEntryPending = true;
-let withdrawalListEntryRead: Promise<boolean> | null = null;
 function refreshWithdrawalListOnEntry() {
-  // Cold-session catalogue publication advances the runtime and would discard
-  // an earlier list response. Wait for that existing read, without holding UI.
+  // Keep one read per entry after the existing cold-session catalogue read.
   if (!payoutAddressServerEnabled || !pageVisible || !withdrawalListEntryPending
     || productCatalogState.status === "loading") return;
   withdrawalListEntryPending = false;
-  const read = app.refreshRemoteWithdrawalList(app.accountKey);
-  withdrawalListEntryRead = read;
-  void read.finally(() => {
-    if (withdrawalListEntryRead === read) withdrawalListEntryRead = null;
-  });
+  void app.refreshRemoteWithdrawalList(app.accountKey);
 }
 watch(() => productCatalogState.status, refreshWithdrawalListOnEntry, { flush: "post" });
 async function retryRemoteSnapshot() {
@@ -736,12 +730,6 @@ function clearNetworkPolicy() {
   networkPolicyStatus.value = "idle";
 }
 const stopRuntimeRead = subscribeRuntimeRevision(() => {
-  // The list still uses the commerce revision. Replace this entry's pending
-  // read after publication; an old completion must not retire the replacement.
-  if (pageVisible && withdrawalListEntryRead) {
-    withdrawalListEntryPending = true;
-    void nextTick(refreshWithdrawalListOnEntry);
-  }
   // This channel also reports API-origin changes. Catalog events leave the
   // address/policy/command scope intact, including a pending OTP or save.
   if (readApiOrigin.value.environment === apiRuntimeConfig.environment

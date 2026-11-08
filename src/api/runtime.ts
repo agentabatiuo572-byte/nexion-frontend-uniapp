@@ -1,3 +1,4 @@
+import { reactive } from "vue";
 import { createAccountApi } from "./account-api";
 import { createUniHttpTransport } from "./api-client";
 import { createAuthApi } from "./auth-api";
@@ -73,7 +74,7 @@ import { getDeviceId } from "@/lib/device-id";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { revokeNativePush, resumeNativePush } from "@/services/native-push";
 
-export const apiRuntimeConfig = readApiRuntimeConfig();
+export const apiRuntimeConfig = reactive(readApiRuntimeConfig());
 /** Immutable identity of the client constructed below; mutable UI config cannot rebind it. */
 export const apiRuntimeClientOrigin = Object.freeze({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl });
 export const expectedApiEnvironment: ApiEnvironment = apiRuntimeConfig.environment;
