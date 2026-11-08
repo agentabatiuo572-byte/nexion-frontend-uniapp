@@ -56,3 +56,9 @@
 
 /* Explicit content bands share their parent glass; never apply to all descendants. */
 .nx-glass-inset { background: transparent; }
+
+/* Tinted solid (01 §1.1.2): a card whose colour used to come from corner glows or a wash keeps that hue as one uniform
+   base over the surface, instead of going black. Set --nx-tint to the card's own hue token; text keeps its roles. */
+.nx-tint { background: color-mix(in srgb, var(--nx-tint, var(--v5-brand)) 12%, var(--v5-surface)); box-shadow: var(--ui-glass-edge-shadow); }
+[data-theme="light"] .nx-tint { background: color-mix(in srgb, var(--nx-tint, var(--v5-brand)) 8%, var(--v5-surface)); box-shadow: var(--ui-glass-edge-shadow), var(--v5-glass-shadow); }
+@media (forced-colors: active) { .nx-tint { background: Canvas; box-shadow: none; outline: 1px solid CanvasText; outline-offset: -1px; } }
