@@ -27,6 +27,7 @@
       </view>
       <template v-else>
         <view class="tcs-hero">
+          <view aria-hidden="true" class="tcs-hero-grid" />
           <view class="tcs-hero-row"><text class="tcs-hero-label">{{ copy.estimateLabel }}</text></view>
           <view class="tcs-hero-num-row"><text class="tcs-hero-num">{{ estimateText }}</text></view>
           <text class="tcs-estimate-note">{{ estimateNote }}</text>
@@ -200,6 +201,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-device-name { font:600 19px/1.3 var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }
 .tcs-device-duration { font:500 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-brand);overflow-wrap:anywhere; }
 .tcs-hero { margin-top:16px;border-radius:16px;padding:16px;position:relative;overflow:hidden;background:color-mix(in srgb,var(--v5-brand) 6%,var(--v5-surface-2));border:none; }
+.tcs-hero-grid { position:absolute;inset:0;pointer-events:none;opacity:.04;background-image:linear-gradient(var(--v5-brand) 1px,transparent 1px),linear-gradient(90deg,var(--v5-brand) 1px,transparent 1px);background-size:16px 16px; }
 .tcs-hero-row,.tcs-hero-num-row { position:relative; }
 .tcs-hero-label { font:500 12px/1.5 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }
 .tcs-hero-num-row { margin-top:8px; }
