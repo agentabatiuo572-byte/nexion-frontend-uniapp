@@ -112,7 +112,7 @@ async function checkIn() {
 }
 </script>
 <style scoped>
-/* Liquid-glass soft-edge card (04.1 签到): frosted fill directly on the page floor. */
+/* Liquid-glass soft-edge card (04.1 签到): frosted fill over the earnings floor glow. */
 .daily-check-in-row {
   --ci-fill: rgba(255,255,255,.045); --ci-rim: rgba(255,255,255,.10); --ci-highlight: rgba(255,255,255,.20);
   --ci-bottom: rgba(0,0,0,.40); --ci-sheen: rgba(255,255,255,.06); --ci-shadow: 0 12px 32px rgba(0,0,0,.35);

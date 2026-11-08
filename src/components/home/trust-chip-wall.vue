@@ -36,7 +36,7 @@
           <text class="home-trust__payout-value"><text class="nx-num-metric">{{ formatGroupedAmount(display.paid) }}</text><text class="home-trust__unit">USDT</text></text>
         </view>
       </template>
-      <view class="home-trust__pitch">
+      <view class="home-trust__pitch nx-tint">
         <text class="home-trust__slogan">{{ t.home.trustSnapshotSlogan }}</text>
         <text class="home-trust__pitch-note">{{ t.home.trustSnapshotSloganNote }}</text>
       </view>
@@ -113,7 +113,8 @@ onUnmounted(() => {
 .home-trust__dot { width:6px;height:6px;border-radius:50%;background:var(--v5-genesis-gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--v5-genesis-gold) 20%,transparent); }
 .home-trust__payout-value { font:500 16px/22px var(--font-metric);white-space:nowrap; }
 .home-trust__unit { margin-left:4px;font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
-.home-trust__pitch { display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:16px;background:var(--v5-surface-2); }
+/* Tinted solid in the pitch's original gold (01 §1.1.2). */
+.home-trust__pitch { --nx-tint:var(--v5-genesis-gold);display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:16px; }
 .home-trust__slogan { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);color:var(--v5-genesis-gold-hi);text-wrap:balance; }
 .home-trust__pitch-note { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-2);text-wrap:balance; }
 @media (max-width: 374px) {

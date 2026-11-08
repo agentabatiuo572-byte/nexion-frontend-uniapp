@@ -198,6 +198,7 @@ const metrics = computed<Cell[]>(() => {
 <style scoped>
 .network-rank-explanation { display: block; white-space: pre-line; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); }
 .network-compact {position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:16px 0;border-radius:22px;border:1px solid var(--v5-border);background:var(--v5-surface);}
+.network-compact::before {content:'';position:absolute;inset:0;background-image:radial-gradient(color-mix(in srgb,var(--v5-brand) 10%,transparent) 1px,transparent 1.2px);background-size:10px 10px;mask-image:radial-gradient(80% 120% at 70% 50%,#000,transparent 75%);pointer-events:none;}
 .network-compact__cell {position:relative;min-width:0;padding:0 14px;border-left:1px solid var(--v5-border);}
 .network-compact__cell:first-child {border:0;padding-left:16px;}
 .network-compact__label,.network-compact__retry {display:block;font:400 12.5px/18px var(--font-v5);color:var(--v5-ink-3);}
