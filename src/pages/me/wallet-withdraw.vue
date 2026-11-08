@@ -400,7 +400,7 @@ async function abandonPendingAttempt() {
         useNexFeeOffset: pending.offset,
       });
       if (!scopeIsCurrent()) return;
-      forgetWithdrawAttempt(accountKey);
+      forgetWithdrawAttempt(accountKey, pending.key);
       refreshPendingAttempt();
       if (result.state === "COMMITTED") {
         toast.info(t.value.walletV3.withdrawAbandonAlreadyCommitted);
@@ -412,7 +412,7 @@ async function abandonPendingAttempt() {
       }
     } else {
       if (!scopeIsCurrent()) return;
-      forgetWithdrawAttempt(accountKey);
+      forgetWithdrawAttempt(accountKey, pending.key);
       refreshPendingAttempt();
       toast.info(t.value.walletV3.withdrawAbandonSuccess);
     }
@@ -1375,7 +1375,7 @@ async function handleSubmit() {
   if (storedAttempt?.key !== pending?.key) {
     pendingAttempt.value = storedAttempt;
     clearSubmitFreeze();
-    toast.info(storedAttempt ? t.value.bankWithdrawal.resumeUsdt : t.value.walletV3.withdrawContextStale);
+    toast.info(storedAttempt ? t.value.bankWithdrawal.resumeUsdt : t.value.walletV3.withdrawHandledElsewhere);
     return;
   }
   if (!rememberWithdrawAttempt(snap.account, {
@@ -1406,7 +1406,7 @@ async function handleSubmit() {
       fresh?.fastLaneApplied ?? false,
       fresh?.waivedGates ?? [],
     );
-    forgetWithdrawAttempt(snap.account);
+    forgetWithdrawAttempt(snap.account, snap.idempotencyKey);
     refreshPendingAttempt();
     clearSubmitFreeze();
     // (这里原本有一条 `if (!wd)` 的余额不足分支。submitWithdrawal 自 2026-08-10 起
@@ -1465,7 +1465,7 @@ async function handleSubmit() {
       isGeo: geo !== null,
     });
     if (verdict.fate === "retire") {
-      forgetWithdrawAttempt(snap.account);
+      forgetWithdrawAttempt(snap.account, snap.idempotencyKey);
       refreshPendingAttempt();
     } else {
       refreshPendingAttempt();

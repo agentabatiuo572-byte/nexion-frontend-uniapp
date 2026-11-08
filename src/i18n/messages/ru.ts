@@ -4391,6 +4391,7 @@ export const ru: Messages = {
   walletV3: {
     withdrawFeeStale: "Комиссия изменилась — повторите попытку",
     withdrawContextStale: "Аккаунт или адрес для выплат изменились — отправьте заново",
+    withdrawHandledElsewhere: "Исходный запрос на вывод обработан на другой странице. Проверьте историю вывода средств.",
     withdrawResendTitle: "Повторить исходный вывод",
     withdrawResendBody: "Результат вывода ${amount} на адрес {address} в сети {network} не подтверждён. Повтор продолжит исходный запрос без создания нового вывода.",
     withdrawResendCta: "Повторить запрос",
