@@ -145,18 +145,6 @@ function purchaseGate(value: unknown): PurchaseGate | undefined {
   };
 }
 
-function ai(value: unknown): Product["ai"] {
-  if (value === null || value === undefined) return undefined;
-  const source = record(value);
-  return {
-    imageGenPerMin: optionalNumber(source.imageGenPerMin),
-    llmTokensPerSec: optionalNumber(source.llmTokensPerSec),
-    videoMinPerHour: optionalNumber(source.videoMinPerHour),
-    fineTuneMins: optionalNumber(source.fineTuneMins),
-    unlocks: optionalString(source.unlocks),
-  };
-}
-
 function phase(value: unknown): PhaseId | undefined {
   const raw = optionalString(value);
   if (!raw) return undefined;
@@ -221,7 +209,6 @@ function product(value: unknown): CatalogProduct {
     inventoryMode,
     stock: optionalInteger(source.stock),
     features: [...source.features],
-    ai: ai(source.ai),
     status: lifecycle as Product["status"],
     available: booleanValue(source.available),
     releaseState: optionalString(source.releaseState),

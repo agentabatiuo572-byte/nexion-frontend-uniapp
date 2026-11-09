@@ -6,8 +6,7 @@
   Distinct from home's MarketBoardCard (different data + layout). Static mock
   numbers; workload names/units come from t.market.workloads (shared with Task
   Center + device cards). Model names stay untranslated. Ranking rows with an href
-  route to that tier's store detail. Conversion role: feeds the tier-locked
-  tasks banner below it on /earn.
+  route to that tier's store detail. Rankings show earnings estimates only.
 -->
 <template>
   <view class="nx-earn-market-board">
@@ -48,7 +47,7 @@
         >
           <text class="earn-ranking-row__no">#{{ d.rank }}</text>
           <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.kind ? getProductMedia(d.kind)?.src ?? null : null" />
-          <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text><text v-if="d.bestFor" class="earn-ranking-row__best">{{ d.bestFor }}</text></view>
+          <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text></view>
           <view class="earn-ranking-value">
             <text class="earn-ranking-value__amount">{{ d.dailyEarn === null ? "—" : `$${formatAmount(d.dailyEarn)}${t.coreReview.perDay}` }}</text>
             <view class="earn-ranking-value__track" aria-hidden="true"><view v-viz-inview class="earn-ranking-value__fill nx-viz-grow" :style="{ width: `${rankShare(d)}%` }" /></view>
@@ -90,7 +89,6 @@ interface DeviceRanking {
   rank: number;
   /** 商品品牌名(不翻译);手机档没有商品名,走 t.market.yourPhone。 */
   name?: string;
-  bestFor: string | null;
   dailyEarn: number | null;
   isPhone?: boolean;
   kind?: Exclude<DeviceKind, "phone">;
@@ -112,10 +110,10 @@ const PRICE_INDEX: WorkloadPrice[] = [
 ];
 
 const DEVICE_RANKINGS: DeviceRanking[] = [
-  { rank: 1, name: "UVELRack P1", dailyEarn: 45, bestFor: "rackP1", kind: "stellarrack-p1" },
-  { rank: 2, name: "UVELBox Pro", dailyEarn: 13, bestFor: "boxPro", kind: "stellarbox-pro" },
-  { rank: 3, name: "UVELBox S1", dailyEarn: 7, bestFor: "boxS1", kind: "stellarbox-s1" },
-  { rank: 4, dailyEarn: 0.06, bestFor: "phone", isPhone: true },
+  { rank: 1, name: "UVELRack P1", dailyEarn: 45, kind: "stellarrack-p1" },
+  { rank: 2, name: "UVELBox Pro", dailyEarn: 13, kind: "stellarbox-pro" },
+  { rank: 3, name: "UVELBox S1", dailyEarn: 7, kind: "stellarbox-s1" },
+  { rank: 4, dailyEarn: 0.06, isPhone: true },
 ];
 
 const priceIndex = computed<WorkloadPrice[]>(() => remoteApiEnabled
@@ -126,7 +124,7 @@ const workloadCopy = (row: WorkloadPrice) => {
   return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
 };
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, bestFor: row.bestFor, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
   : DEVICE_RANKINGS);
 
 function arrow(w: WorkloadPrice): string {
@@ -197,7 +195,6 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 .earn-ranking-row__art { width: 28px; height: 24px; }
 .earn-ranking-row__identity { display: flex; flex-direction: column; min-width: 0; }
 .earn-ranking-row__name { min-width: 0; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.earn-ranking-row__best { min-width: 0; font: 400 11px/14px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .earn-ranking-value { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .earn-ranking-value__amount { font: 500 12px/16px var(--font-metric); color: var(--v5-warning-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .earn-ranking-value__track { position: relative; width: 96px; height: 3px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }

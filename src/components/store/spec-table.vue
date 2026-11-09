@@ -1,7 +1,6 @@
 <!--
-  SpecTable — key/value spec rows (Hardware specs + AI performance) on the
+  SpecTable — key/value hardware spec rows on the
   product detail page. Ported from store/[productId]/_client.tsx SpecTable.
-  Value is ink (hardware) or brand (`brandValue`, for AI throughput rows).
 -->
 <template>
   <view class="nx-glass-card mx-4 rounded-2xl overflow-hidden" :style="rootStyle">
@@ -18,12 +17,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import type { CSSProperties } from "vue";
 
-const props = withDefaults(
-  defineProps<{ rows: { k: string; v: string }[]; brandValue?: boolean }>(),
-  { brandValue: false },
-);
+const props = defineProps<{ rows: { k: string; v: string }[] }>();
 
 const rootStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
@@ -35,12 +31,12 @@ function rowStyle(i: number): CSSProperties {
     borderBottom: i < props.rows.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }
-const valueStyle = computed<CSSProperties>(() => ({
+const valueStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13px",
   fontWeight: 500,
-  color: props.brandValue ? "var(--v5-brand)" : "var(--v5-ink)",
-}));
+  color: "var(--v5-ink)",
+};
 
 
 </script>

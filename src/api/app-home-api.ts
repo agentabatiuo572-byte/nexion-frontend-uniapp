@@ -24,7 +24,6 @@ export interface AppHomeDeviceRanking {
   rank: number;
   name: string | null;
   kind: DeviceKind | null;
-  bestFor: string | null;
   dailyUsdt: number | null;
 }
 
@@ -134,7 +133,7 @@ function ranking(v: unknown): AppHomeDeviceRanking {
   const kind = v.kind == null ? null : (typeof v.kind === "string" && DEVICE_KINDS.has(v.kind as DeviceKind) ? v.kind as DeviceKind : null);
   const dailyUsdt = v.dailyUsdt == null ? null : nonNegative(v.dailyUsdt);
   if (rank === null || rank < 1 || (v.kind != null && kind === null) || (v.dailyUsdt != null && dailyUsdt === null)) return invalid();
-  return { rank, name: text(v.name), kind, bestFor: text(v.bestFor), dailyUsdt };
+  return { rank, name: text(v.name), kind, dailyUsdt };
 }
 function client(v: unknown): AppHomeOnGridClient {
   if (!isRow(v)) return invalid();
