@@ -3577,6 +3577,8 @@ flowchart LR
 
 **停用与停止任务（2026-11-03 与 App 一致）**：空闲设备确认后停用；有任务时可选等当前任务完成后停用，或立即停止并放弃未完成任务的收益。服务端任务周期设备通过 `POST /api/tasks/simulated/stop`（`deviceId`、`afterCurrent`）停止；安装 ID 请求头只用于手机设备（Lite 不展示手机，因此不会发送），请求不再携带 `expectedVersion`。返回 `CLOSING` 表示服务端仍在确认已完成收益，设备继续占槽直到实际停用；浏览器不自行结束周期或释放槽位。其他设备沿用设备命令接口（带行版本与幂等键）。
 
+直接停用回执（2026-11-09 F2）：非 SIM 当前任务的强制停用通过 `/api/device/{id}/deactivate` 提交，`DEACTIVATED`（`alreadyDeactivated`）与 `PENDING_DEACTIVATE`（`alreadyPending`）均为成功。回读仍激活且 `pendingDeactivate=true` 时，复用「等任务完成后自动取消」的成功提示与等待 chip，保留当前任务、Online 和槽位占用，不提前宣称已停用；回读确认未激活后才显示已停用。请求异常后的权威回读使用同一判断。
+
 停用只改变运行状态，不删除库存、订单和历史收益。重新激活后等待服务端下发任务；首页、Earn 与详情刷新同一个权威状态，不在本地随机挑任务。
 
 ### 11.2 消息中心 `/me/notifications`
