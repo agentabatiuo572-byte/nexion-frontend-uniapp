@@ -3315,7 +3315,9 @@ export const id: Messages = {
     cancelDeletionMessage: "Hanya permintaan penghapusan saat ini yang dibatalkan. Anda bisa mengajukan lagi nanti.",
     cancelDeletionSuccess: "Permintaan penghapusan dibatalkan",
     deleteAccountBlocked: "Penghapusan tertahan: {reason}",
-    deleteAccountPendingReason: "transaksi dana atau pesanan masih diproses",
+    deleteAccountPendingReason: "Dana atau pesanan belum diselesaikan, sehingga penghapusan akun belum selesai. Silakan selesaikan pesanan serta tarik atau tukarkan saldo yang memenuhi syarat sendiri. Tunggu staking berakhir lalu klaim dana Anda. Hubungi dukungan untuk sisa saldo kecil yang tidak dapat Anda selesaikan sendiri. Setelah semuanya selesai, hubungi dukungan untuk peninjauan ulang, atau batalkan permintaan ini dan ajukan yang baru.",
+    deleteAccountStateUnavailableReason: "Status keuangan tidak dapat diverifikasi saat itu, sehingga penghapusan akun belum selesai. Silakan hubungi dukungan untuk peninjauan ulang.",
+    deleteAccountUnknownReason: "Penghapusan akun belum selesai. Silakan hubungi dukungan untuk informasi dan peninjauan ulang.",
   },
   help: {
     loadMore: "Muat FAQ lainnya",

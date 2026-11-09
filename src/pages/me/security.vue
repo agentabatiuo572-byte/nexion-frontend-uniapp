@@ -136,7 +136,7 @@
           <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionStatus.blockReason ?? deletionStatus.reason ?? t.security.deleteAccountPendingReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ remoteApiEnabled && !remoteSecurity ? "—" : deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionBlockedReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
     <NxSheet :open="editingPwd" :title="t.security.passwordTitle" @close="cancelPwd" class="security-half-sheet"><view class="security-sheet-form">
           <input class="w-full" :style="pwdInputStyle" password :value="current" :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" :focus="pwdFocusField === PWD_FIELD_CURRENT" :aria-invalid="pwdErrorField === PWD_FIELD_CURRENT ? 'true' : 'false'" :aria-describedby="pwdErrorField === PWD_FIELD_CURRENT ? 'security-pwd-error-current' : undefined" @input="onCurrent" />
@@ -299,6 +299,15 @@ const phoneError = ref("");
 const deletionStatus = ref<AccountDeletionStatus>({ status: "NONE" });
 const deletionPending = computed(() => deletionStatus.value.status !== "NONE"
   && (deletionStatus.value.status === "REQUESTED" || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED"));
+const deletionBlockedReason = computed(() => {
+  const request = deletionStatus.value;
+  if (request.status !== "BLOCKED") return "";
+  switch (request.blockReason ?? request.reason) {
+    case "UNSETTLED_FUNDS_OR_ORDERS": return t.value.security.deleteAccountPendingReason;
+    case "UNSETTLED_STATE_UNAVAILABLE": return t.value.security.deleteAccountStateUnavailableReason;
+    default: return t.value.security.deleteAccountUnknownReason;
+  }
+});
 const deletionCanCancel = computed(() => deletionStatus.value.status === "REQUESTED"
   || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED");
 const oauthBusy = ref(false);
