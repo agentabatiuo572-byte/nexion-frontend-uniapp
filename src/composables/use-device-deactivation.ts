@@ -171,9 +171,21 @@ export function useDeviceDeactivation() {
     const key = acquireDeviceCommandKey(accountKey, operation, d.id, version);
     const expectedActive = operation === "activate";
     const confirmed = () => {
-      if (!isCurrentAccountScope(scope) || accountKey !== app.accountKey) return false;
+      if (!isCurrentAccountScope(scope) || accountKey !== app.accountKey) return null;
       const current = app.devices.find((entry) => entry.id === d.id);
-      return Boolean(current) && (current!.activatedAt !== null) === expectedActive;
+      if (!current) return null;
+      if (expectedActive) return current.activatedAt !== null ? "ACTIVE" : null;
+      if (current.activatedAt === null) return "DEACTIVATED";
+      return current.pendingDeactivate ? "PENDING_DEACTIVATE" : null;
+    };
+    const finish = (status: "ACTIVE" | "PENDING_DEACTIVATE" | "DEACTIVATED") => {
+      finishDeviceCommand(accountKey, operation, d.id, version);
+      const message = status === "ACTIVE"
+        ? fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) })
+        : status === "PENDING_DEACTIVATE"
+          ? fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) })
+          : fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) });
+      toast.success(message);
     };
     let simulatedClosing = false;
     try {
@@ -193,26 +205,20 @@ export function useDeviceDeactivation() {
         if (isCurrentAccountScope(scope)) toast.info(computeCopy.value.stopping);
         return true;
       }
-      if (!confirmed()) throw new Error(operation === "activate"
+      const status = confirmed();
+      if (!status) throw new Error(operation === "activate"
         ? "DEVICE_ACTIVATION_NOT_CONFIRMED"
         : "DEVICE_DEACTIVATION_NOT_CONFIRMED");
-      finishDeviceCommand(accountKey, operation, d.id, version);
-      const message = operation === "activate"
-        ? fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) })
-        : fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) });
-      toast.success(message);
+      finish(status);
       return true;
     } catch (cause) {
       if (!isCurrentAccountScope(scope) || accountKey !== app.accountKey) return false;
       app.invalidateRemoteTaskAssignments();
       try {
         await app.refreshRemoteFleet();
-        if (confirmed()) {
-          finishDeviceCommand(accountKey, operation, d.id, version);
-          const message = operation === "activate"
-            ? fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) })
-            : fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) });
-          toast.success(message);
+        const status = confirmed();
+        if (status) {
+          finish(status);
           return true;
         }
       } catch {

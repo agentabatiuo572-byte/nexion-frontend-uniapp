@@ -3753,12 +3753,12 @@ flowchart LR
 **顶部 slot meter（2026-10-30 容量投影）**:`slotsUsed / slotCap` 双色进度条(6 格)+ 文字 mono 标识。总占用`C=实际激活N+有效订单预留+有效试用预留`；原后端容量上限保持6。`GET /api/devices/earnings` 数据顶层与Home overview的`onboarding`均提供 `reservedSlotCount`、`trialSlotCount`、`slotsUsed`及既有`slotCap`，实际激活N由同一fleet真实激活实例统计，Home的`onboarding.activeDevices`仍为N。试用领取或取消成功读回后立即重新读取该fleet，槽位条不等其他页面刷新（2026-11-03）。槽位条、空槽与普通新增容量守卫用同一fleet epoch/revision接收的权威C，不能再次叠加本地试用或被Home独立旧快照覆盖；Online列表与执行仍按真实激活实例，订单预留不生成设备、额外任务或收益。等待停用在实际停用前仍计N。旧后端缺字段时兼容原有`N+已确认试用预留`回退，容量事实未知不当零并关闭新增动作；复用账号epoch/revision隔离，迟到结果不能跨账号、覆盖较新投影或放行操作。抵扣升级位置继承、试用预留交换和原交易恢复不变，详见[六槽专题](UVEL_算力激活队列与六槽_20261029.md)。
 
 **Actions**:
-- `激活`:调 `useApp.activateDevice(id)`,失败条件:槽位满 / 设备不存在 / 已激活;成功 toast `已激活 {name}`
+- `激活`:远端提交设备激活命令并回读确认，后端校验槽位、归属与版本；本地预览调 `useApp.activateDevice(id)`；成功 toast `已激活 {name}`。
 - `取消激活`:**根据当前任务状态分支**
-  - 若设备 `currentTask === null`(空闲态)→ `confirm()` 二次确认("取消后该设备停止贡献收益与任务进度,可随时重新激活"),确认后立即调 `useApp.deactivateDevice(id)`
+  - 若设备 `currentTask === null`(空闲态)→ `confirm()` 二次确认("取消后该设备停止贡献收益与任务进度,可随时重新激活"),确认后提交停用命令并回读；本地预览调 `useApp.deactivateDevice(id)`。
   - 若设备 `currentTask !== null`(进行中任务)→ 弹专用 3 选 sheet(`useDeactivateSheet`):
-    - **等任务完成后自动取消**(主 CTA):调 `useApp.scheduleDeactivation(id)`,设备保持激活直到 tick 检测任务完成并自动出槽
-    - **强制取消(放弃当前任务奖励)**(次 CTA):立即调 `useApp.deactivateDevice(id)`,当前任务奖励不发放
+    - **等任务完成后自动取消**(主 CTA):远端提交 `deactivate-after-task`；本地预览调 `useApp.scheduleDeactivation(id)`。等待期间设备保持激活并占槽，任务完成、服务端确认停用后出槽。
+    - **强制取消(放弃当前任务奖励)**(次 CTA):SIM 任务沿用模拟任务停止命令；非 SIM 当前任务提交 `/api/device/{id}/deactivate`。直接停用接口的 `DEACTIVATED`（`alreadyDeactivated`）与 `PENDING_DEACTIVATE`（`alreadyPending`）均为成功。回读仍激活且 `pendingDeactivate=true` 时，复用「等任务完成后自动取消」的成功提示与等待 chip，保留当前任务、Online 和槽位占用，不提前宣称已停用；回读确认未激活后才显示已停用。本地预览仍立即停用并放弃当前任务奖励。（2026-11-09 F2）
     - **返回**:cancel,不动状态
   - Sheet 内显示当前任务实时进度(model / client / 奖励 / progress% / ETA)
 - 列表项 chip:`pendingDeactivate=true` 时显示"任务完成后自动取消" warning chip(Clock icon)

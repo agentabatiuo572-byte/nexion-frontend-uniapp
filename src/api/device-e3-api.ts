@@ -752,7 +752,7 @@ export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "pro
         path: `/api/device/${deviceId}/deactivate`,
         body: { expectedVersion: integer(expectedVersion) },
         idempotencyKey: key,
-      }), "DEACTIVATED");
+      }), ["PENDING_DEACTIVATE", "DEACTIVATED"]);
       if (result.deviceId !== id || result.rowVersion < expectedVersion) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
       return result;
     },
