@@ -306,7 +306,7 @@ const deletionBlockedReason = computed(() => {
   switch (reason) {
     case "UNSETTLED_FUNDS_OR_ORDERS": return t.value.security.deleteAccountPendingReason;
     case "UNSETTLED_STATE_UNAVAILABLE": return t.value.security.deleteAccountStateUnavailableReason;
-    default: return !reason || /^[A-Z0-9_]+$/.test(reason)
+    default: return !reason || /^[A-Z0-9]+(?:_[A-Z0-9]+)+$/.test(reason)
       ? t.value.security.deleteAccountUnknownReason : reason;
   }
 });
