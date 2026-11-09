@@ -176,8 +176,7 @@ function product(value: unknown): CatalogProduct {
   const shareYieldMax = optionalNumber(source.shareYieldMax);
   if (productType === "SHARE" && ((shareYieldMin === undefined) !== (shareYieldMax === undefined)
     || (shareYieldMin !== undefined && (shareYieldMin <= 0 || shareYieldMax! < shareYieldMin)))) return invalid();
-  const taskLevels = source.taskLevels ?? [];
-  if (!Array.isArray(taskLevels) || !taskLevels.every((entry) => typeof entry === "number")) return invalid();
+  const taskLevels: unknown[] = Array.isArray(source.taskLevels) ? source.taskLevels : [];
 
   return {
     id: nonEmptyString(source.id),
