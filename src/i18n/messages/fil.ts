@@ -2440,7 +2440,7 @@ export const fil: Messages = {
     taskLevelsLine: "Antas ng gawaing AI: {levels}",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Personal na AI inference box · ganap na pinamamahalaan",
+        tagline: "Device na ganap na pinamamahalaan",
         badge: "Pinakamabenta",
       },
       "stellarbox-pro": {

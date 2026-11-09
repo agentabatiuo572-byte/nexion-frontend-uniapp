@@ -2440,7 +2440,7 @@ export const ms: Messages = {
     taskLevelsLine: "Peringkat tugasan AI: {levels}",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Kotak inferens AI peribadi · diurus sepenuhnya",
+        tagline: "Peranti diurus sepenuhnya",
         badge: "Terlaris",
       },
       "stellarbox-pro": {

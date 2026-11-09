@@ -84,7 +84,7 @@ export interface AppHomeOverview {
 }
 
 type Row = Record<string, unknown>;
-const APP_HOME_SOURCE = "server:nx_compute_receipt,nx_compute_task,nx_user_device,nx_compute_datacenter,nx_product,nx_growth_promo_banner";
+const APP_HOME_SOURCE = "server:nx_compute_receipt,nx_compute_task,nx_user_device.dc_location,nx_product,nx_growth_promo_banner";
 const APP_HOME_ACCOUNT_SCOPE = "authenticated-account";
 const TASKS = new Set<TaskCategory>(["IG", "VG", "LL", "FT", "EM", "SP"]);
 const DEVICE_KINDS = new Set<DeviceKind>(["phone", "cloud-share", "pc-gpu", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"]);

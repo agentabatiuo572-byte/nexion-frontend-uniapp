@@ -2012,7 +2012,7 @@ chooseMethod: "Choose how to join the UVEL network",
     taskLevelsLine: "Runs {levels} AI compute tasks",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Personal AI inference box · fully managed",
+        tagline: "Fully managed device",
         badge: "Best Seller",
       },
       "stellarbox-pro": {

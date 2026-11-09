@@ -1988,7 +1988,7 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     taskLevelsLine: "可运行{levels} AI 算力任务",
     catalog: {
       "stellarbox-s1": {
-        tagline: "个人 AI 推理机 · 全托管",
+        tagline: "全托管设备",
         badge: "热销",
       },
       "stellarbox-pro": {

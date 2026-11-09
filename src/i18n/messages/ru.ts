@@ -2440,7 +2440,7 @@ export const ru: Messages = {
     taskLevelsLine: "Уровни задач ИИ: {levels}",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Персональное устройство для AI-инференса · под ключ",
+        tagline: "Устройство с полным обслуживанием",
         badge: "Хит продаж",
       },
       "stellarbox-pro": {
