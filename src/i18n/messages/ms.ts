@@ -2436,6 +2436,8 @@ export const ms: Messages = {
     notifyToast: "Pemberitahuan akan dihantar apabila {name} tersedia.",
     comingSoonHeading: "Akan tiba",
     releaseComingToast: "Model ini akan tiba tidak lama lagi — nantikan",
+    taskLevelLabels: {"1":"asas","2":"pertengahan","3":"lanjutan","4":"utama"},
+    taskLevelsLine: "Peringkat tugasan AI: {levels}",
     catalog: {
       "stellarbox-s1": {
         tagline: "Kotak inferens AI peribadi · diurus sepenuhnya",

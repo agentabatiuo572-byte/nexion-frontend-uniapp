@@ -2436,6 +2436,8 @@ export const uz: Messages = {
     notifyToast: "{name} sotuvga chiqqanda xabar beramiz.",
     comingSoonHeading: "Tez orada",
     releaseComingToast: "Bu model tez orada sotuvga chiqadi — kuzatib boring",
+    taskLevelLabels: {"1":"boshlangʻich","2":"oʻrta","3":"yuqori","4":"flagman"},
+    taskLevelsLine: "AI vazifalari darajalari: {levels}",
     catalog: {
       "stellarbox-s1": {
         tagline: "Shaxsiy AI inference qurilmasi · toʻliq boshqariladi",
