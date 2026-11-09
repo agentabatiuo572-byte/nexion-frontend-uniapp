@@ -172,9 +172,8 @@
         <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
       </view>
 
-      <!-- FEAT-DEV01 异常1:产能触底 → 独立升级主 CTA(直达商城,权重提升;规格 ⑥ 矩阵第 6 行)。
-           触底且有锁定任务清单时由下方 loss-ad 承载主 CTA(其样式随 floored 升权),此处不重复渲染 -->
-      <view v-if="phoneFactsReady && capacityFloored && !hwTeasers.length" style="padding: 0 20px 12px">
+      <!-- Capacity floor keeps its existing store entry. -->
+      <view v-if="phoneFactsReady && capacityFloored" style="padding: 0 20px 12px">
         <view class="w-full grid place-items-center active:scale-[0.98]" :style="flooredCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw"  @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
           <text :style="flooredCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
         </view>
@@ -360,62 +359,6 @@
       </view>
     </view>
 
-    <!-- Phone: VRAM-gated task examples (no personal earnings projection). -->
-    <view v-if="phoneFactsReady && device.kind === 'phone' && phoneLockedVisible && phoneTeasers.length" style="padding: 12px 20px 4px">
-      <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-        <text>{{ t.earn.lockedTasksTitle }}</text>
-      </view>
-      <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px; line-height: 1.35">{{ t.earn.lockedPotentialDisclaimer }}</text>
-      <view class="space-y-1.5">
-        <view v-for="(it, i) in phoneTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
-          <view class="flex items-center gap-1.5 min-w-0 flex-1">
-            <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            <view class="min-w-0"><text class="block truncate">{{ it.type }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
-          </view>
-          <view class="flex items-center gap-2 shrink-0 ml-2">
-            <!-- spec-sentinel-ok: workload VRAM requirement from lockedTeasers, not a catalog Product field -->
-            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5)">{{ it.minVRAM }} GB</text>
-          </view>
-        </view>
-      </view>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0" @click="goUnlock"  @keydown.enter.stop.prevent="goUnlock" @keydown.space.stop.prevent="goUnlock">
-        <text :style="unlockCtaLabelStyle">{{ unlockText }}</text>
-      </view>
-    </view>
-
-    <view v-else-if="phoneFactsReady && device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
-      <text class="block" :style="sectionLabelStyle">{{ t.earn.deviceCapabilityTitle }}</text>
-      <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.deviceCapabilityBody }}</text>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0"
-        @click="goUnlockHw"  @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
-        <text :style="unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
-      </view>
-    </view>
-
-    <!-- FEAT-DEV01: hardware VRAM-gated task examples. -->
-    <view v-if="phoneFactsReady && hwTeasers.length" style="padding: 12px 20px 4px">
-      <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-        <text>{{ t.earn.lockedTasksTitle }}</text>
-      </view>
-      <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px; line-height: 1.35">{{ t.earn.lockedPotentialDisclaimer }}</text>
-      <view class="space-y-1.5">
-        <view v-for="(it, i) in hwTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
-          <view class="flex items-center gap-1.5 min-w-0 flex-1">
-            <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            <view class="min-w-0"><text class="block truncate">{{ it.type }}</text><text class="block truncate" style="color: var(--v5-ink-4)">{{ it.unlockTier }}</text></view>
-          </view>
-          <view class="flex items-center gap-2 shrink-0 ml-2">
-            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5)">{{ it.minVRAM }} GB</text>
-          </view>
-        </view>
-      </view>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="capacityFloored ? flooredCtaStyle : unlockCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw"  @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
-        <text :style="capacityFloored ? flooredCtaLabelStyle : unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
-      </view>
-    </view>
-
     <!-- Earnings — today only (est-this-hour removed per accordion redesign) -->
     <view v-if="!stage && phoneFactsReady && !detailPage" style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
@@ -469,7 +412,6 @@ import { useSession } from "@/store/session";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { useConfig } from "@/store/config";
-import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind } from "@/store/types";
 import { awaitsExecutionResultConfirmation } from "@/lib/task-result-confirmation";
 import { deviceTaskRecovering, deviceTaskRunning, taskProgressPercent } from "@/lib/task-progress";
@@ -479,8 +421,6 @@ import TaskV2Status from "@/components/earn/task-v2-status.vue";
 import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
-import type { LockedTeaser } from "@/mock/tasks";
-import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
 import { useTradeinStrip } from "@/composables/use-tradein-strip";
@@ -504,8 +444,6 @@ const t = useT();
 const liteDeviceVisible = computed(() => props.device.kind !== "phone");
 const statisticsCopy = useDeviceStatisticsCapabilityCopy();
 const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
-prepareEarnConfig();
-const earnConfig = useEarnConfig();
 
 // Device identity is resolved from `kind` too — the stored name/gpu/location
 // are English and persist per account. See lib/device-copy.ts.
@@ -717,15 +655,6 @@ const sparkPoints = computed(() => {
     .join(" ");
 });
 
-// Locked task examples use the server VRAM gate, not category throughput as income.
-const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
-const phoneLockedVisible = computed(() => app.remoteComputeProtocolVersion !== 3 && promo.value.baseKind === "phone");
-const phoneTeasers = computed<LockedTeaser[]>(() => earnConfig.lockedTeasers(props.device.vramTotal, 3));
-const unlockText = computed(() => t.value.earn.unlockNMoreTasks.replace("{n}", String(phoneTeasers.value.length)));
-function goUnlock() {
-  navTo(`/pages/store/detail?id=${promo.value.targetKind}`);
-}
-
 // Lifecycle chip
 const degradable = computed(() => isDegradable(props.device.kind));
 const lifecycle = computed(() => {
@@ -740,7 +669,7 @@ const monthsLabel = computed(() => {
   return s.monthsOwned < 1 ? fmt(t.value.earn.lifecycleAgeDays,{n:Math.floor(s.monthsOwned * 30)}) : fmt(t.value.earn.lifecycleAgeMonths,{n:s.monthsOwned.toFixed(1)});
 });
 
-// ── FEAT-DEV01: 任务产能口径(补贴 badge / 产能行 / 硬件 loss-ad / W-CAP1 入口)──
+// ── FEAT-DEV01: 任务产能口径(补贴 badge / 产能行 / W-CAP1 入口)──
 const explainer = useCapacityExplainer();
 function openExplainer() {
   explainer.open();
@@ -792,26 +721,16 @@ const stageCapacityText = computed(() => !phoneFactsReady.value ? "—" : inSubs
   : !degradable.value || lifecycle.value ? `${capacityPct.value}%` : "—");
 const capacityTappable = computed(() => phoneFactsReady.value && degradable.value);
 const capacityFloored = computed(() => !!lifecycle.value && lifecycle.value.efficiency <= CAPACITY_FLOOR + 1e-9);
-// 展示派生:今日接单 ≈ 当前日产 ÷ 可接任务均价(单源 tasks.ts,确定性、不落库)。
-const tasksToday = computed(() => {
-  const s = lifecycle.value;
-  if (!s) return 0;
-  return Math.max(1, Math.min(999, Math.round(s.dailyRateNow / Math.max(earnConfig.averageEligibleReward(props.device.vramTotal), 1e-6))));
-});
 const capacityRowText = computed(() =>
   capacityFloored.value
     ? fmt(t.value.earn.capacityRowFloored, { pct: visibility.mask(capacityPct.value) })
-    : fmt(t.value.earn.capacityRow, { pct: visibility.mask(capacityPct.value), n: visibility.mask(tasksToday.value) }),
+    : `${t.value.earn.jobCapacity} ${visibility.mask(capacityPct.value)}%`,
 );
 const capacityRowStyle = computed<CSSProperties>(() => ({
   fontSize: "12px",
   color: capacityFloored.value ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
   fontWeight: capacityFloored.value ? 600 : 400,
 }));
-// 硬件版高阶任务示例:VRAM 门控,补贴期内不渲染。
-const hwTeasers = computed<LockedTeaser[]>(() =>
-  degradable.value && !inSubsidy.value ? earnConfig.lockedTeasers(props.device.vramTotal, 3) : [],
-);
 function goUnlockHw() {
   navTo("/pages/store/store");
 }
@@ -983,16 +902,6 @@ function togglePillStyle(on: boolean): CSSProperties {
     background: on ? "color-mix(in oklab, var(--v5-brand) 14%, transparent)" : "var(--v5-surface-2)",
   };
 }
-const unlockCtaStyle: CSSProperties = {
-  height: "48px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-};
-const unlockCtaLabelStyle: CSSProperties = {
-  color: "var(--v5-on-brand)",
-  fontSize: "13px",
-  fontWeight: 600,
-};
 
 import DeviceSlot from "@/components/home/device-slot.vue";
 import DeviceArt from "@/components/device-art.vue";
