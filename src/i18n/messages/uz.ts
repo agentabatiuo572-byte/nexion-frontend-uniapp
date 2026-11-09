@@ -3310,6 +3310,7 @@ export const uz: Messages = {
     deleteAccountViewWithdrawals: "Pul yechish tarixi",
     deleteAccountBlockedByWithdrawal: "Pul yechish soʻrovi bajarilmoqda. U yakunlangach yoki bajarilmasa, akkauntni oʻchirish soʻrovini yuboring.",
     deleteAccountToast: "Oʻchirish soʻrovi yuborildi — akkauntdan chiqdingiz",
+    deleteAccountCancelledReplay: "Hisobni o‘chirish bo‘yicha oldingi so‘rovingiz bekor qilingan. Yangi so‘rov yuboring.",
     cancelDeletionRequest: "Oʻchirish soʻrovini bekor etish",
     cancelDeletionMessage: "Faqat joriy oʻchirish soʻrovi bekor qilinadi. Keyinroq yangi soʻrov yuborish mumkin.",
     cancelDeletionSuccess: "Oʻchirish soʻrovi bekor qilindi",
