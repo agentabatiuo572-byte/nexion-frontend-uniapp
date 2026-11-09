@@ -26,7 +26,8 @@ export function accountDemo(url, locale, state, request) {
   if (path === '/api/app/security/account-deletion' || path === '/api/app/security/account-deletion/cancel') {
     const history = state.accountDeletionDemo ??= { requests: [], commands: {} };
     const blockedReason = { 'blocked-funds': 'UNSETTLED_FUNDS_OR_ORDERS',
-      'blocked-unavailable': 'UNSETTLED_STATE_UNAVAILABLE', 'blocked-unknown': 'DEMO_UNKNOWN_BLOCK_REASON' }[state.accountDeletionState];
+      'blocked-unavailable': 'UNSETTLED_STATE_UNAVAILABLE', 'blocked-unknown': 'DEMO_UNKNOWN_BLOCK_REASON',
+      'blocked-operator': 'HD-C2D-04 工单资料尚未核齐，由运营拒绝申请' }[state.accountDeletionState];
     if (blockedReason && history.blockedScene !== state.accountDeletionState) {
       history.requests.push({ requestNo: 'ADR-' + randomUUID().replaceAll('-', ''), status: 'BLOCKED', version: 2,
         requestedAt: new Date(Date.now() - 60000).toISOString(), reviewedAt: new Date().toISOString(),
