@@ -3305,6 +3305,7 @@ export const ru: Messages = {
     deleteAccountViewWithdrawals: "История выводов",
     deleteAccountBlockedByWithdrawal: "Идёт обработка вывода. Отправьте заявку на удаление после его завершения или отказа.",
     deleteAccountToast: "Заявка на удаление отправлена — вы вышли из аккаунта",
+    deleteAccountCancelledReplay: "Предыдущая заявка на удаление аккаунта отменена. Подайте новую заявку.",
     cancelDeletionRequest: "Отменить заявку на удаление",
     cancelDeletionMessage: "Отменится только текущая заявка на удаление. Новую можно отправить позже.",
     cancelDeletionSuccess: "Заявка на удаление отменена",

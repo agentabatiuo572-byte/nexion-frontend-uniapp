@@ -23,8 +23,9 @@ export function demoWithdrawals(state, now = Date.now()) {
   const withdrawals=state.dataState==='empty'&&!accountDeletionWallet(state)?[]:['CONFIRMED','REFUNDED'].map((status,i)=>({withdrawalNo:'WD-DEMO-'+(i+1),targetAddress:`0x${'1'.repeat(40)}`,amount:100,chain:'USDT-BEP20',status,holdUntil:new Date(sampleAt-day).toISOString(),createdAt:new Date(sampleAt-(i+2)*day).toISOString(),fee:1,networkConfirmUsd:1,networkFee:1,penaltyFee:0,grossFee:1,nexBurned:0,nexRefunded:0,nexRefundedAt:null,feeWaived:0,actualFee:1,netReceive:99,policyVersion:'money-policy',useNexFeeOffset:false,riskRoute:'fast-pass',idSource:'server'}));
   withdrawals.unshift(...Object.values(state.bankDemo?.orders??{}).map(row=>({withdrawalNo:row.withdrawalNo,targetAddress:'BANK-VND:'+row.beneficiaryNo,amount:row.bank.amountUsdt,chain:'BANK-VND',status:row.outcome==='settled'?'CONFIRMED':row.outcome==='rejected'?'REFUNDED':'PROCESSING',holdUntil:new Date(row.createdAt).toISOString(),createdAt:new Date(row.createdAt).toISOString(),networkConfirmUsd:row.bank.feeUsdt,networkFee:row.bank.feeUsdt,penaltyFee:0,grossFee:row.bank.feeUsdt,nexBurned:0,feeWaived:0,actualFee:row.bank.feeUsdt,netReceive:row.bank.netUsdt,policyVersion:'money-policy',useNexFeeOffset:false,riskRoute:'fast-pass',idSource:'server'})));
   const wallet = accountDeletionWallet(state);
-  if (wallet) return ['withdrawal','clear'].includes(state.accountDeletionState)
-    ? [{...withdrawals[0],status:wallet.pendingWithdraw > 0?'PROCESSING':'COMPLETED'}] : [];
+  if (wallet) return state.accountDeletionState === 'withdrawal'
+    ? [{...withdrawals[0],status:'PROCESSING'}]
+    : state.accountDeletionState === 'history' ? [withdrawals[0]] : [];
   return withdrawals;
 }
 export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now),walletAmount=facts.walletUsdt; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
@@ -138,5 +139,5 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       feeUsdt: policy.feeUsdt, feeUsdtExact: policy.feeUsdtExact, minDepositUsdt: policy.minDepositUsdt,
       minDepositUsdtExact: policy.minDepositUsdtExact, confirmations: policy.confirmations };
   }
-  if (p === "/api/deposits") return empty ? [] : [{ depositId: "CR-77", network: "BEP20", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdt: 50.123456, grossAmountUsdtExact: "50.123456", creditedUsdt: 50, creditedUsdtExact: "50", confirmations: 15, status: "CREDITED", createdAt: now }];
+  if (p === "/api/deposits") return empty || state.accountDeletionState === 'clear' ? [] : [{ depositId: "CR-77", network: "BEP20", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdt: 50.123456, grossAmountUsdtExact: "50.123456", creditedUsdt: 50, creditedUsdtExact: "50", confirmations: 15, status: "CREDITED", createdAt: now }];
 };
