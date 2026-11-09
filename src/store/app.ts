@@ -725,16 +725,29 @@ export const useApp = defineStore("app", () => {
   }
 
   function canonicalKind(device: CanonicalE3Device): DeviceKind {
-    const raw = `${device.productCode} ${device.deviceType}`.toLowerCase();
-    if (raw.includes("phone") || raw.includes("mobile")) return "phone";
-    if (raw.includes("pc-gpu") || raw.includes("compute-share")) return "pc-gpu";
-    if (raw.includes("cloud")) return "cloud-share";
-    if (raw.includes("rack") && raw.includes("p2")) return "stellarrack-p2";
-    if (raw.includes("rack")) return "stellarrack-p1";
-    if (raw.includes("pro-v2") || raw.includes("pro_v2")) return "stellarbox-pro-v2";
-    if (raw.includes("pro")) return "stellarbox-pro";
-    if (raw.includes("s1")) return "stellarbox-s1";
-    throw new Error("E3_DEVICE_KIND_UNSUPPORTED");
+    // The fleet already carries E3DeviceCapacityPolicy.classify's result.
+    switch (device.capacityConfigKey) {
+      case "capacityApplyToPhone": return "phone";
+      case "capacityApplyToCloudShare": return "cloud-share";
+      case "capacityApplyToPcGpu": return "pc-gpu";
+      case "capacityApplyToRackP2": return "stellarrack-p2";
+      case "capacityApplyToRackP1": return "stellarrack-p1";
+      case "capacityApplyToProV2": return "stellarbox-pro-v2";
+      case "capacityApplyToPro": return "stellarbox-pro";
+      case "capacityApplyToS1": return "stellarbox-s1";
+    }
+    // Keep normalization and precedence identical to the backend classifier.
+    const identity = `${device.productCode} ${device.deviceType}`.toLowerCase().replace(/_/g, "-");
+    if (identity.includes("phone") || identity.includes("mobile")) return "phone";
+    if (identity.includes("cloud")) return "cloud-share";
+    if (identity.includes("pc") || identity.includes("gpu")) return "pc-gpu";
+    if (identity.includes("share")) return "cloud-share";
+    if (identity.includes("rack-p2") || identity.includes("rackp2")) return "stellarrack-p2";
+    if (identity.includes("rack-p1") || identity.includes("rackp1") || identity.includes("rack")) return "stellarrack-p1";
+    if (identity.includes("pro-v2") || identity.includes("prov2")) return "stellarbox-pro-v2";
+    if (identity.includes("pro")) return "stellarbox-pro";
+    if (identity.includes("s1") || identity.includes("box")) return "stellarbox-s1";
+    return "unknown";
   }
 
   function canonicalDevice(
