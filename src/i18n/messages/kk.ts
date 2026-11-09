@@ -2440,7 +2440,7 @@ export const kk: Messages = {
     taskLevelsLine: "AI тапсырмаларының деңгейлері: {levels}",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Жеке AI инференс құрылғысы · толық басқарылады",
+        tagline: "Толық қызмет көрсетілетін құрылғы",
         badge: "Хит",
       },
       "stellarbox-pro": {

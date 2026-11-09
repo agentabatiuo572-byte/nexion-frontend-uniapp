@@ -2440,7 +2440,7 @@ export const uz: Messages = {
     taskLevelsLine: "AI vazifalari darajalari: {levels}",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Shaxsiy AI inference qurilmasi · toʻliq boshqariladi",
+        tagline: "Toʻliq xizmat koʻrsatiladigan qurilma",
         badge: "Xit",
       },
       "stellarbox-pro": {

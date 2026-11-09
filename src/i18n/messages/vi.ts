@@ -1982,7 +1982,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     taskLevelsLine: "Hỗ trợ tác vụ điện toán AI ở mức {levels}",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Hộp suy luận AI cá nhân · vận hành trọn gói",
+        tagline: "Thiết bị được quản lý toàn diện",
         badge: "Bán chạy",
       },
       "stellarbox-pro": {
