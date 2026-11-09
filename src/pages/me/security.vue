@@ -224,6 +224,7 @@ import { useConversations } from "@/store/conversations";
 import { useApp } from "@/store/app";
 // 注销提交前核实锁定本金，未结清时引导用户先处理质押。
 import { useStaking } from "@/store/staking";
+import { useConfig } from "@/store/config";
 import { navReset, navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
 import { nexGridBrandText } from "@/lib/brand-copy";
@@ -260,6 +261,7 @@ const security = useSecurity();
 const auth = useAuth();
 const app = useApp();
 const staking = useStaking();
+const config = useConfig();
 const session = useSession();
 const ui = useUI();
 const securityPageFence = createP318AccountPageFence(
@@ -939,16 +941,17 @@ async function handleDeleteAccount() {
   //   (含刷新等待与确认弹窗停留),所有出口统一由 finally 放闸 —— 不靠每条 return 记得复位。
   securityBusy.value = true;
   try {
-    // 刷新余额和质押；读取失败不能按零余额放行。
+    // 余额、提现列表和质押均须读取成功，未知状态不能按已结清放行。
     if (remoteApiEnabled) {
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      const [fleet, , stake] = await Promise.allSettled([
-        app.refreshRemoteFleet(), app.refreshRemoteWithdrawals(), staking.syncRemote(),
+      const [fleet, withdrawals, stake] = await Promise.allSettled([
+        app.refreshRemoteFleet(), app.refreshRemoteWithdrawalList(), staking.syncRemote(),
       ]);
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       const fleetOk = fleet.status === "fulfilled" && fleet.value === true;
+      const withdrawalsOk = withdrawals.status === "fulfilled" && withdrawals.value === true;
       const stakeOk = stake.status === "fulfilled" && stake.value === true;
-      if (!fleetOk || !stakeOk) {
+      if (!fleetOk || !withdrawalsOk || !stakeOk) {
         toast.error(t.value.security.deleteAccountVerifyFailed);
         return;
       }
@@ -962,7 +965,8 @@ async function handleDeleteAccount() {
         owner: securityConfirmOwner,
       });
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      if (view) navTo("/pages/me/wallet-withdraw-tracking");
+      if (view && !(await navTo("/pages/me/wallet-withdraw-tracking"))
+        && isCurrentSecurityRequest(pageScope, accountScope, accountKey)) toast.error(t.value.ui.navigationFailed);
       return;
     }
     // 本金尚未回到可用余额的质押，包括已到期但未领取的部分。
@@ -970,14 +974,16 @@ async function handleDeleteAccount() {
       .filter((p) => p.status === "pending-lock" || p.status === "active" || p.status === "matured")
       .reduce((s, p) => s + p.amountUSDT, 0);
     if (lockedPrincipal > 0) {
+      const stakingVisible = config.isEnabled("stakingVisible");
       const view = await uiConfirm({
         title: t.value.security.deleteAccount,
-        message: fmt(t.value.security.deleteAccountBlockedByPrincipal, { principal: formatAmount(lockedPrincipal, "full") }),
-        confirmLabel: t.value.security.deleteAccountViewStaking,
+        message: fmt(stakingVisible ? t.value.security.deleteAccountBlockedByPrincipal : t.value.security.deleteAccountBlockedByHiddenStaking, { principal: formatAmount(lockedPrincipal, "full") }),
+        confirmLabel: stakingVisible ? t.value.security.deleteAccountViewStaking : t.value.help.contactSupport,
         owner: securityConfirmOwner,
       });
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      if (view) navTo("/pages/staking/staking");
+      if (view && !(await navTo(stakingVisible ? "/pages/staking/staking" : "/pages/support/chat?start=support"))
+        && isCurrentSecurityRequest(pageScope, accountScope, accountKey)) toast.error(t.value.ui.navigationFailed);
       return;
     }
     if (app.user.usdtBalance > 0 || app.user.nexBalance > 0) {
@@ -991,7 +997,8 @@ async function handleDeleteAccount() {
         owner: securityConfirmOwner,
       });
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-      if (view) navTo(hasNex ? "/pages/me/wallet-exchange" : "/pages/me/wallet-withdraw-method");
+      if (view && !(await navTo(hasNex ? "/pages/me/wallet-exchange" : "/pages/me/wallet-withdraw-method"))
+        && isCurrentSecurityRequest(pageScope, accountScope, accountKey)) toast.error(t.value.ui.navigationFailed);
       return;
     }
     const ok = await uiConfirm({
