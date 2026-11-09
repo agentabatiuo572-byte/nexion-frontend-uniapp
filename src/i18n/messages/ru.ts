@@ -2430,6 +2430,8 @@ export const ru: Messages = {
     notifyToast: "Мы сообщим, когда {name} станет доступно.",
     comingSoonHeading: "Скоро в продаже",
     releaseComingToast: "Модель скоро появится в продаже — следите за новостями",
+    taskLevelLabels: {"1":"начальный","2":"средний","3":"продвинутый","4":"флагманский"},
+    taskLevelsLine: "Уровни задач ИИ: {levels}",
     catalog: {
       "stellarbox-s1": {
         tagline: "Персональное устройство для AI-инференса · под ключ",

@@ -4,6 +4,8 @@
 
 import type { PhaseId } from "@/store/product-phase";
 
+export type ProductTaskLevel = 1 | 2 | 3 | 4;
+
 // Per-user purchase gate (rank/condition + quota lock). Backend-configurable:
 // operator picks a gate shape at SKU 上架 (单活跃直推 / 单 V 级 / 组合) and the
 // thresholds; server-canonical (mirrors GET /api/store/catalog). All fields
@@ -70,6 +72,8 @@ export interface Product {
   // don't carry 72 dead key-pairs across en/zh/vi. If a spec sheet ever renders
   // these, move them into `store.catalog.<id>` alongside tagline/badge first.
   features: string[];
+  /** Published task-pool levels; describes capability, never earnings. */
+  taskLevels: ProductTaskLevel[];
   // Sprint 2 second phase: catalog lifecycle status
   status?: "active" | "legacy"; // legacy = older catalog listing (still owned & serviced)
   // Remote catalog authority: E1 ids are database identities rather than H1
@@ -110,6 +114,7 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 4821,
     stock: 47,
+    taskLevels: [],
     features: [
       "Fully managed by UVEL",
       "Real-time remote monitoring",
@@ -136,6 +141,7 @@ export const PRODUCTS: Product[] = [
     stock: 23,
     // 购买门(后台可改):单活跃直推 ≥5 + 硬锁额(remaining = cap−sold = 23,对齐 stock)。
     purchaseGate: { activeDirectMin: 5, mode: "all", quotaCap: 1000, quotaSold: 977, quotaPeriod: "month", enforce: true },
+    taskLevels: [],
     features: [
       "8× RTX 4090 GPUs",
       "Priority task allocation",
@@ -160,6 +166,7 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 412,
     stock: 38,
+    taskLevels: [],
     features: [
       "8× RTX 5090 — top-bin silicon",
       "2.5× S1 throughput on AI workloads",
@@ -188,6 +195,7 @@ export const PRODUCTS: Product[] = [
     stock: 8,
     // 购买门(后台可改):组合 either —— V≥3 或 ≥15 活跃直推 或 ≥$20K 团队业绩 + 硬锁额(remaining=8)。
     purchaseGate: { rankMin: 3, activeDirectMin: 15, teamComputePointsMin: 200000, mode: "either", quotaCap: 100, quotaSold: 92, quotaPeriod: "month", enforce: true },
+    taskLevels: [],
     features: [
       "Enterprise A100 GPUs",
       "Dedicated tier-3 datacenter slot",
@@ -213,6 +221,7 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 64,
     stock: 4,
+    taskLevels: [],
     features: [
       "8× H100 SXM5 — datacenter-grade Hopper",
       "Upgrade trade-in: retire an owned device for checkout credit",
@@ -238,6 +247,7 @@ export const PRODUCTS: Product[] = [
     shareYieldMax: 12,
     price: 19.9,
     sold: 12483,
+    taskLevels: [],
     features: [
       "Instant activation",
       "Buy as little as $19.90",
