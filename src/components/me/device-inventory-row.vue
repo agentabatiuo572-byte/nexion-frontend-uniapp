@@ -1,6 +1,7 @@
 <!-- Device warehouse card (P-43): device art, live state, today's earnings, the current job and the card actions in one view. -->
 <template>
-  <view class="device-inventory-row" :class="{ 'device-inventory-row--idle': !active }" :id="`device-card-${device.id}`" :data-device-key="`device:${device.id}`">
+  <DeviceUnclassifiedCard v-if="device.kind === 'unknown'" :device="device" />
+  <view v-else class="device-inventory-row" :class="{ 'device-inventory-row--idle': !active }" :id="`device-card-${device.id}`" :data-device-key="`device:${device.id}`">
     <view class="device-inventory-row__head">
       <view class="device-inventory-row__art" :class="{ 'device-inventory-row__art--inactive': !active }">
         <image v-if="imageSrc" class="device-inventory-row__image" :src="imageSrc" mode="aspectFit" @error="imageError" />
@@ -66,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+import DeviceUnclassifiedCard from "@/components/device-unclassified-card.vue";
 import { computed, ref } from "vue";
 import type { Device } from "@/store/types";
 import NxButton from "@/components/ui/nx-button.vue";

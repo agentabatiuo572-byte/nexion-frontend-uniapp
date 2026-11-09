@@ -13,12 +13,12 @@ export const MAX_DEVICES = 6;
 
 // ───── Device specs (design doc §7.1 base rates) ─────
 const DEVICE_SPECS: Record<
-  DeviceKind,
+  Exclude<DeviceKind, "unknown">,
   Pick<Device, "gpu" | "vramTotal" | "basePower" | "baseRate" | "baseRateNEX" | "name"> & {
     hashRate?: number;
     location?: string;
   }
-> = {
+> & { unknown?: never } = {
   phone: { name: "Your phone", gpu: "Mobile NPU · ~28 TOPS", vramTotal: 8, basePower: 0, baseRate: 0.06, baseRateNEX: 10 },
   "pc-gpu": { name: "Computer GPU", gpu: "Computer GPU · shared", vramTotal: 12, basePower: 320, baseRate: 0.34, baseRateNEX: 56.7, hashRate: 620, location: "Linked computer" },
   "stellarbox-s1": { name: "UVELBox S1", gpu: "4× RTX 4090", vramTotal: 96, basePower: 1200, baseRate: 7, baseRateNEX: 40, hashRate: 1240, location: "Singapore Data Center" },
@@ -30,7 +30,7 @@ const DEVICE_SPECS: Record<
 };
 
 // Device retail price (USDT) — catalog price single source. MOCK-ONLY (prod: GET /api/store/catalog).
-export const DEVICE_PRICE_USDT: Record<DeviceKind, number> = {
+export const DEVICE_PRICE_USDT: Record<Exclude<DeviceKind, "unknown">, number> & { unknown?: never } = {
   phone: 0,
   "pc-gpu": 0,
   "stellarbox-s1": 649,
@@ -52,6 +52,7 @@ export interface CreateDeviceOptions {
 
 // ───── Default device factory ─────
 export function createDevice(kind: DeviceKind, id: string, options: CreateDeviceOptions = {}): Device {
+  if (kind === "unknown") throw new Error("DEVICE_KIND_UNAVAILABLE");
   const pcGpuModel = options.gpuModel?.trim() || "NVIDIA GeForce RTX 4070";
   const pcGpuTier = kind === "pc-gpu"
     ? options.gpuTier ?? matchGpuTier(pcGpuModel, options.gpuTiers)
@@ -99,7 +100,7 @@ export function createDevice(kind: DeviceKind, id: string, options: CreateDevice
     todayEarnings: 0,
     todayEarningsNEX: 0,
     cumulativeEarningsUsdt: 0,
-    paidPriceUsdt: options.paidPriceUsdt ?? DEVICE_PRICE_USDT[kind],
+    paidPriceUsdt: options.paidPriceUsdt ?? DEVICE_PRICE_USDT[kind] ?? 0,
     hashRate: spec.hashRate,
     location: spec.location,
     dayCount: 47,
@@ -190,7 +191,7 @@ export { DEVICE_SPECS };
  *
  * Ported from Nexion-prototype/lib/store/index.ts derivePromoUpgrade.
  */
-const UPGRADE_LADDER: DeviceKind[] = ["phone", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"];
+const UPGRADE_LADDER: Exclude<DeviceKind, "unknown">[] = ["phone", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"];
 
 export const PURCHASED_HARDWARE_KINDS: DeviceKind[] = [
   "stellarbox-s1",
@@ -239,10 +240,10 @@ export function derivePromoUpgrade(devices: Device[]): {
     .filter((d) => d.kind !== "cloud-share" && d.dailyRateNow > 0);
   if (dailyComparable.length === 0) return derivePromoUpgrade([]);
   const base = dailyComparable.reduce((m, d) => (d.dailyRateNow > m.dailyRateNow ? d : m), dailyComparable[0]);
-  const idx = UPGRADE_LADDER.indexOf(base.kind);
+  const idx = UPGRADE_LADDER.findIndex((kind) => kind === base.kind);
   const atTop = idx === UPGRADE_LADDER.length - 1;
-  const targetKind: DeviceKind = atTop
-    ? base.kind
+  const targetKind = atTop
+    ? UPGRADE_LADDER[idx]
     : idx >= 0
       ? UPGRADE_LADDER[idx + 1]
       : "stellarbox-s1"; // off-ladder (cloud-share) → promote to entry box S1
