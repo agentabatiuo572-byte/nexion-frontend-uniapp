@@ -25,8 +25,9 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-export const demoDefaults = {checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
+  accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·已结清'],['read-error','注销·余额读取失败']],
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
   powerUpState:[['default','默认连签增益'],['staking','含质押活动入口（/wallet/staking）']],
   trialQuoteState:[['default','默认报价'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位报价 · 342.123456'],['half-cent','半分报价 · 342.135 → 342.14'],['precision-repriced','六位报价变更 · 确认金额仍 342.12']],
@@ -634,7 +635,9 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/devices/earnings') {
     const facts=demoFleetFacts(url,locale,state);
     const active=facts.devices.filter(device=>device.activatedAt!==null);
-    const data=base();data.walletUsdt=state.walletBalance??52800.64;data.walletNex=empty?0:1280;
+    if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
+    const deletionScene=state.accountDeletionState&&state.accountDeletionState!=='follow';
+    const data=base();data.walletUsdt=deletionScene?(state.accountDeletionState==='usdt'?12.34:0):state.walletBalance??52800.64;data.walletNex=deletionScene?(state.accountDeletionState==='nex'?0.000001:0):empty?0:1280;
     data.dailyUsdt=active.reduce((sum,device)=>sum+device.dailyUsdt,0);data.dailyNex=active.reduce((sum,device)=>sum+device.dailyNex,0);
     Object.assign(data,facts);
     return data;
