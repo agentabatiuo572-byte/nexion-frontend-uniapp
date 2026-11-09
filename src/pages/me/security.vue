@@ -302,10 +302,12 @@ const deletionPending = computed(() => deletionStatus.value.status !== "NONE"
 const deletionBlockedReason = computed(() => {
   const request = deletionStatus.value;
   if (request.status !== "BLOCKED") return "";
-  switch (request.blockReason ?? request.reason) {
+  const reason = request.blockReason ?? request.reason;
+  switch (reason) {
     case "UNSETTLED_FUNDS_OR_ORDERS": return t.value.security.deleteAccountPendingReason;
     case "UNSETTLED_STATE_UNAVAILABLE": return t.value.security.deleteAccountStateUnavailableReason;
-    default: return t.value.security.deleteAccountUnknownReason;
+    default: return !reason || /^[A-Z0-9_]+$/.test(reason)
+      ? t.value.security.deleteAccountUnknownReason : reason;
   }
 });
 const deletionCanCancel = computed(() => deletionStatus.value.status === "REQUESTED"
