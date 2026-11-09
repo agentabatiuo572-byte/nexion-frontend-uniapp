@@ -327,7 +327,7 @@ const LEDGER = {
   "/api/app/profile": "PRD §11.0B(个人资料:整页无自由文本输入,昵称走预置候选)",
   "/api/app/profile/nickname-candidates": "PRD §11.0B(昵称预置词库构造器,唯一改名路径 = 候选挑选)",
   "/api/app/profile/avatar": "PRD §11.0B(头像)",
-  "/api/app/security/account-deletion": "PRD §4.5a(账号注销:余额与锁仓本金均不退、在途提现禁止提交、数据留存 1 个月;主人 2026-08-14 拍板)",
+  "/api/app/security/account-deletion": "PRD §4.5.3(账号注销 B 规则：先结清余额、质押及订单，余额不作废；资金和提现状态读取失败禁止提交)",
   "/api/earnings/milestones/evaluate": "TBD-NAME: 里程碑达成评估;PRD §11.3a 定义了里程碑庆祝但未定义该评估端点",
   "/api/team/rank": "TBD-NAME: 团队等级读;同上",
   "/api/tasks/route": "TBD-NAME: 按显存派发任务路由;PRD §6.8 有容量概念,未定义该端点",
