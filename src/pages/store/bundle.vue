@@ -90,6 +90,7 @@
               <text style="color: var(--v5-ink-4)">{{ t.uiChrome.price }} </text>${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">{{ bundleProductYieldText(p) }}</text>
             </text>
             <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
+            <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
             <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.purchaseEligibilityIneligible }}</text>
           </view>
@@ -124,6 +125,7 @@
               </text>
               <text v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status !== 'ready'" class="block" :style="itemMetaStyle">{{ purchaseEligibilityStore.state(p.id).status === 'error' ? t.store.purchaseEligibilityError : t.store.purchaseEligibilityLoading }}</text>
               <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ t.store.gateBlockedToast }}</text>
+              <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: anywhere">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
             </view>
             <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
               <svg v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
@@ -194,6 +196,7 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 }
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
+import { productTaskLevelsText } from "@/lib/product-copy";
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";

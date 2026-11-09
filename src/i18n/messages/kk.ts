@@ -2436,6 +2436,8 @@ export const kk: Messages = {
     notifyToast: "{name} қолжетімді болғанда хабарлаймыз.",
     comingSoonHeading: "Жақында келеді",
     releaseComingToast: "Бұл модель жақында келеді — күте тұрыңыз",
+    taskLevelLabels: {"1":"бастапқы","2":"орта","3":"жоғары","4":"флагмандық"},
+    taskLevelsLine: "AI тапсырмаларының деңгейлері: {levels}",
     catalog: {
       "stellarbox-s1": {
         tagline: "Жеке AI инференс құрылғысы · толық басқарылады",
