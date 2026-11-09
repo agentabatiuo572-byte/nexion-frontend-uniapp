@@ -241,7 +241,7 @@ import type { AccountDeletionStatus, PhoneNumberChangePolicy, PhoneNumberChangeC
 import { ApiError } from "@/api/errors";
 import { createP318AccountPageFence, type P318AccountPageScope } from "./p3-18-account-page-fence";
 import { accountErrorMessageKey } from "@/lib/account-error-message";
-import { acquireAccountCommandKey, releaseAccountCommandKey } from "@/store/account-scoped-storage";
+import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey } from "@/store/account-scoped-storage";
 
 const SECURITY_COMMAND_TABLE = "nexgrid-security-command-accounts-v1";
 
@@ -1022,10 +1022,15 @@ async function handleDeleteAccount() {
         try {
           const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
           if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
-          useConversations().discardHumanOutbox();
           releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, deletionCommandKey.value);
-          toast.success(t.value.security.deleteAccountToast, request.requestNo);
           deletionCommandKey.value = "";
+          if (request.status === "CANCELLED") {
+            deletionStatus.value = request;
+            toast.info(t.value.security.deleteAccountCancelledReplay);
+            return;
+          }
+          useConversations().discardHumanOutbox();
+          toast.success(t.value.security.deleteAccountToast, request.requestNo);
           const logoutRevision = sessionVault.revision();
           app.interruptAllTasks("logged-out");
           await app.pauseLocalPhoneRuntimeBeforeSignOut();
@@ -1101,7 +1106,12 @@ async function handleCancelAccountDeletion() {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
     if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+    if (deletionStatus.value.status !== "CANCELLED") throw new Error("SECURITY_READBACK_FAILED");
     releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, intent, key);
+    const requestKey = readAccountRow<{ commands: Record<string, string> }>(SECURITY_COMMAND_TABLE, accountKey)
+      ?.commands["account-deletion-request"];
+    if (requestKey) releaseAccountCommandKey(SECURITY_COMMAND_TABLE, accountKey, "account-deletion-request", requestKey);
+    deletionCommandKey.value = "";
     toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
     if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;

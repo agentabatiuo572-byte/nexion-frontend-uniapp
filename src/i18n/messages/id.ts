@@ -3305,6 +3305,7 @@ export const id: Messages = {
     deleteAccountViewWithdrawals: "Lihat penarikan",
     deleteAccountBlockedByWithdrawal: "Ada penarikan yang sedang diproses. Ajukan penghapusan akun setelah penarikan selesai atau gagal.",
     deleteAccountToast: "Permintaan penghapusan terkirim — Anda sudah keluar",
+    deleteAccountCancelledReplay: "Permintaan penghapusan akun sebelumnya telah dibatalkan. Silakan ajukan permintaan baru.",
     cancelDeletionRequest: "Batalkan permintaan penghapusan",
     cancelDeletionMessage: "Hanya permintaan penghapusan saat ini yang dibatalkan. Anda bisa mengajukan lagi nanti.",
     cancelDeletionSuccess: "Permintaan penghapusan dibatalkan",

@@ -3305,6 +3305,7 @@ export const fil: Messages = {
     deleteAccountViewWithdrawals: "Tingnan ang withdrawal",
     deleteAccountBlockedByWithdrawal: "May withdrawal na pinoproseso. Isumite ang request na i-delete ang account pagkatapos itong matapos o mabigo.",
     deleteAccountToast: "Naisumite ang request na i-delete — na-log out ka na",
+    deleteAccountCancelledReplay: "Nakansela na ang iyong nakaraang kahilingan sa pagtanggal ng account. Magsumite ng bagong kahilingan.",
     cancelDeletionRequest: "I-cancel ang request na i-delete",
     cancelDeletionMessage: "Ang kasalukuyang request lang ang kakanselahin. Puwede kang magsumite ulit mamaya.",
     cancelDeletionSuccess: "Kinansela ang request na i-delete",

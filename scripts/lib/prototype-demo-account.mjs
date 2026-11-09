@@ -30,7 +30,6 @@ export function accountDemo(url, locale, state, request) {
     if (method !== 'POST') reject('METHOD_NOT_ALLOWED', 405);
     const key = request.headers()['idempotency-key'];
     if (!key) reject('IDEMPOTENCY_KEY_INVALID', 422);
-    if (history.commands[key]) return structuredClone(history.commands[key]);
     const input = body();
     if (path.endsWith('/cancel')) {
       if (!current) reject('ACCOUNT_DELETION_REQUEST_NOT_FOUND', 404);
@@ -41,17 +40,18 @@ export function accountDemo(url, locale, state, request) {
         cancelledAt: new Date().toISOString(), reason: input.reason || 'USER_REQUESTED_CANCEL' });
       // The backend cancel endpoint returns the full row, including management fields.
       const response = { ...current, userId: 900001, reviewedBy: null };
-      history.commands[key] = structuredClone(response);
       return response;
     }
     if (input.confirmation !== 'DELETE') reject('ACCOUNT_DELETION_CONFIRMATION_REQUIRED', 422);
     if (input.currentPassword !== 'Local404Pass!') reject('USER_CURRENT_PASSWORD_INVALID', 422);
+    const retained = history.requests.find(row => row.requestNo === history.commands[key]);
+    if (retained) return retained;
     if (current && ['REQUESTED', 'IN_REVIEW', 'BLOCKED', 'COMPLETED'].includes(current.status)) return current;
     const row = { requestNo: 'ADR-' + randomUUID().replaceAll('-', ''), status: 'REQUESTED', version: 0,
       requestedAt: new Date().toISOString(), reviewedAt: null, completedAt: null, cancelledAt: null,
       reason: null, blockReason: null, originalReason: input.reason ?? null };
     history.requests.push(row);
-    history.commands[key] = structuredClone(row);
+    history.commands[key] = row.requestNo;
     return row;
   }
   if (path === '/api/app/profile') {
