@@ -1973,7 +1973,7 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     // bản gốc tiếng Anh nằm ở src/mock/products.ts). Trường name là tên thương
     // hiệu, KHÔNG bao giờ dịch. verify.sh kiểm tra mọi id trong PRODUCTS đều có ở đây.
     taskLevelLabels: {"1": "cơ bản", "2": "trung cấp", "3": "nâng cao", "4": "hàng đầu"},
-    taskLevelsLine: "Chạy tác vụ điện toán AI cấp {levels}",
+    taskLevelsLine: "Hỗ trợ tác vụ điện toán AI ở mức {levels}",
     catalog: {
       "stellarbox-s1": {
         tagline: "Hộp suy luận AI cá nhân · vận hành trọn gói",
