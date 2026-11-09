@@ -25,6 +25,14 @@ export function accountDemo(url, locale, state, request) {
   if (path === '/auth/users/logout' && method === 'POST') return null;
   if (path === '/api/app/security/account-deletion' || path === '/api/app/security/account-deletion/cancel') {
     const history = state.accountDeletionDemo ??= { requests: [], commands: {} };
+    const blockedReason = { 'blocked-funds': 'UNSETTLED_FUNDS_OR_ORDERS',
+      'blocked-unavailable': 'UNSETTLED_STATE_UNAVAILABLE', 'blocked-unknown': 'DEMO_UNKNOWN_BLOCK_REASON' }[state.accountDeletionState];
+    if (blockedReason && history.blockedScene !== state.accountDeletionState) {
+      history.requests.push({ requestNo: 'ADR-' + randomUUID().replaceAll('-', ''), status: 'BLOCKED', version: 2,
+        requestedAt: new Date(Date.now() - 60000).toISOString(), reviewedAt: new Date().toISOString(),
+        completedAt: null, cancelledAt: null, reason: blockedReason, blockReason: blockedReason, originalReason: null });
+    }
+    history.blockedScene = state.accountDeletionState;
     const current = history.requests.at(-1);
     if (method === 'GET' && path.endsWith('/account-deletion')) return current ?? { status: 'NONE' };
     if (method !== 'POST') reject('METHOD_NOT_ALLOWED', 405);

@@ -3310,7 +3310,9 @@ export const uz: Messages = {
     cancelDeletionMessage: "Faqat joriy oʻchirish soʻrovi bekor qilinadi. Keyinroq yangi soʻrov yuborish mumkin.",
     cancelDeletionSuccess: "Oʻchirish soʻrovi bekor qilindi",
     deleteAccountBlocked: "Oʻchirish toʻxtatildi: {reason}",
-    deleteAccountPendingReason: "moliyaviy yoki buyurtma hisob-kitobi tugallanmagan",
+    deleteAccountPendingReason: "Mablag‘lar yoki buyurtmalar bo‘yicha hisob-kitob tugamagan, shu sababli hisob o‘chirilmagan. Buyurtmalarni yakunlang, yechib olish yoki ayirboshlash mumkin bo‘lgan qoldiqni o‘zingiz qayta ishlang. Steyking tugashini kutib, mablag‘ni oling. O‘zingiz bartaraf eta olmaydigan kichik qoldiq uchun yordam xizmatiga murojaat qiling. Hisob-kitob tugagach, qayta ko‘rib chiqish uchun yordam xizmatiga murojaat qiling yoki ushbu so‘rovni bekor qilib, yangisini yuboring.",
+    deleteAccountStateUnavailableReason: "O‘sha paytda moliyaviy holatni tekshirib bo‘lmadi, shu sababli hisob o‘chirilmagan. Qayta ko‘rib chiqish uchun yordam xizmatiga murojaat qiling.",
+    deleteAccountUnknownReason: "Hisob o‘chirilmagan. Tafsilotlar va qayta ko‘rib chiqish uchun yordam xizmatiga murojaat qiling.",
   },
   help: {
     loadMore: "Yana savollar yuklash",
