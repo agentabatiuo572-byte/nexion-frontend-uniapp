@@ -10,7 +10,8 @@ export type DeviceKind =
   | "stellarbox-pro-v2"
   | "stellarrack-p1"
   | "stellarrack-p2"
-  | "cloud-share";
+  | "cloud-share"
+  | "unknown";
 
 // "paused" was removed when manual device pause was dropped (a node is either
 // running or involuntarily interrupted — no user opt-in pause). Involuntary

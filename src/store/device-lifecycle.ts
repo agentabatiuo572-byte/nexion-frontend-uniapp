@@ -51,7 +51,7 @@ export let SUBSIDY_DAYS = 30;
  *  「参与任务递减」switches. */
 export let CAPACITY_EXEMPT_KINDS: readonly DeviceKind[] = ["phone", "cloud-share", "pc-gpu"];
 
-const APPLY_KEY_BY_KIND: Record<DeviceKind, string> = {
+const APPLY_KEY_BY_KIND: Record<Exclude<DeviceKind, "unknown">, string> = {
   phone: "capacityApplyToPhone",
   "cloud-share": "capacityApplyToCloudShare",
   "pc-gpu": "capacityApplyToPcGpu",
@@ -83,7 +83,7 @@ export function installCanonicalLifecycleConfig(config: Record<string, string>):
     { throughMonth: mid, monthlyDeltaPct: requiredNumber(config, "capacityBand2DeltaPct") },
     { throughMonth: null, monthlyDeltaPct: requiredNumber(config, "capacityBand3DeltaPct") },
   ];
-  const exempt = (Object.keys(APPLY_KEY_BY_KIND) as DeviceKind[]).filter((kind) => {
+  const exempt = (Object.keys(APPLY_KEY_BY_KIND) as (keyof typeof APPLY_KEY_BY_KIND)[]).filter((kind) => {
     const raw = config[APPLY_KEY_BY_KIND[kind]];
     if (raw !== "true" && raw !== "false") throw new Error("E3_LIFECYCLE_CONFIG_INVALID");
     return raw === "false";
@@ -96,7 +96,7 @@ export function installCanonicalLifecycleConfig(config: Record<string, string>):
 
 /** Frozen consumer API — true when the kind follows the capacity schedule. */
 export function isDegradable(kind: DeviceKind): boolean {
-  return !CAPACITY_EXEMPT_KINDS.includes(kind);
+  return kind !== "unknown" && !CAPACITY_EXEMPT_KINDS.includes(kind);
 }
 
 /**
@@ -153,7 +153,7 @@ export interface DeviceLifecycleSummary {
 }
 
 export function hasServerLifecycleProjection(device: Device): boolean {
-  return device.capacitySource === "server"
+  return device.kind !== "unknown" && device.capacitySource === "server"
     && typeof device.capacityPct === "number"
     && Number.isFinite(device.capacityPct)
     && device.capacityPct >= 0

@@ -15,7 +15,8 @@
   pointer events). Movement, touchcancel and unmount cancel the pending hold.
 -->
 <template>
-  <view v-if="liteDeviceVisible" ref="loopRef" class="nx-device-card select-none" :class="{ 'earn-stage': stage, 'earn-stage--online': stage && statusOnline && !stageOffline && !visibility.hidden, 'nx-loops-paused': stage && !loops.running.value }" :style="rowStyle" :role="stage ? 'tabpanel' : undefined" :aria-label="stage ? displayName : undefined" :data-device-id="device.id" :data-online="statusOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
+  <DeviceUnclassifiedCard v-if="liteDeviceVisible && device.kind === 'unknown'" :device="device" />
+  <view v-else-if="liteDeviceVisible" ref="loopRef" class="nx-device-card select-none" :class="{ 'earn-stage': stage, 'earn-stage--online': stage && statusOnline && !stageOffline && !visibility.hidden, 'nx-loops-paused': stage && !loops.running.value }" :style="rowStyle" :role="stage ? 'tabpanel' : undefined" :aria-label="stage ? displayName : undefined" :data-device-id="device.id" :data-online="statusOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchmove="onPressEnd" @touchend="onPressEnd" @touchcancel="onPressEnd">
     <!-- Long-press quick menu (full-viewport bottom sheet).
          🔴 z 790 = 业务半屏带(秩序表单源见 captcha-slider.vue)。原值 200 低于里程碑
          庆祝(780),菜单开着时庆祝盖在上面并吞掉「以旧换新 / 统计」的点击。 -->
@@ -394,6 +395,7 @@
 </template>
 
 <script setup lang="ts">
+import DeviceUnclassifiedCard from "@/components/device-unclassified-card.vue";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { formatTaskReward } from "@/lib/task-reward-display";
@@ -471,7 +473,7 @@ onUnmounted(() => {
   if (typeof document !== "undefined") document.removeEventListener("keydown", onDocumentMenuKeydown, true);
 });
 
-const KIND_ICON_PATHS: Record<DeviceKind, string> = {
+const KIND_ICON_PATHS: Partial<Record<DeviceKind, string>> = {
   phone: "M5 2h14a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 18h.01",
   "pc-gpu": "M4 5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-6l1 3H9l1-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM8 21h8",
   "stellarbox-s1": "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",
