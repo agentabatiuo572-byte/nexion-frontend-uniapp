@@ -3310,6 +3310,7 @@ export const kk: Messages = {
     deleteAccountViewWithdrawals: "Шығаруларды қарау",
     deleteAccountBlockedByWithdrawal: "Ақша шығару өңделуде. Аккаунтты жою сұрауын ол аяқталғаннан немесе сәтсіз болғаннан кейін жіберіңіз.",
     deleteAccountToast: "Жою сұрауы жіберілді — аккаунттан шықтыңыз",
+    deleteAccountCancelledReplay: "Алдыңғы аккаунтты жою өтінішіңіз тоқтатылды. Жаңа өтініш жіберіңіз.",
     cancelDeletionRequest: "Жою сұрауынан бас тарту",
     cancelDeletionMessage: "Тек ағымдағы жою сұрауынан бас тартылады. Жаңа сұрауды кейін жіберуге болады.",
     cancelDeletionSuccess: "Жою сұрауынан бас тартылды",

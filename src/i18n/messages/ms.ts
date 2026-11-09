@@ -3310,6 +3310,7 @@ export const ms: Messages = {
     deleteAccountViewWithdrawals: "Lihat pengeluaran",
     deleteAccountBlockedByWithdrawal: "Ada pengeluaran sedang diproses. Hantar permohonan pemadaman akaun selepas ia selesai atau gagal.",
     deleteAccountToast: "Permohonan pemadaman dihantar — anda telah dilog keluar",
+    deleteAccountCancelledReplay: "Permohonan pemadaman akaun anda sebelum ini telah dibatalkan. Sila hantar permohonan baharu.",
     cancelDeletionRequest: "Batal permohonan pemadaman",
     cancelDeletionMessage: "Hanya permohonan pemadaman semasa akan dibatalkan. Permohonan baharu boleh dihantar kemudian.",
     cancelDeletionSuccess: "Permohonan pemadaman dibatalkan",
