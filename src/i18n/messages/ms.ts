@@ -3310,7 +3310,9 @@ export const ms: Messages = {
     cancelDeletionMessage: "Hanya permohonan pemadaman semasa akan dibatalkan. Permohonan baharu boleh dihantar kemudian.",
     cancelDeletionSuccess: "Permohonan pemadaman dibatalkan",
     deleteAccountBlocked: "Pemadaman disekat: {reason}",
-    deleteAccountPendingReason: "pembayaran kewangan atau pesanan belum selesai",
+    deleteAccountPendingReason: "Dana atau pesanan masih belum diselesaikan, jadi pemadaman akaun belum selesai. Sila selesaikan pesanan serta keluarkan atau tukar baki yang layak sendiri. Tunggu staking tamat, kemudian tuntut dana anda. Hubungi sokongan untuk baki kecil yang tidak dapat anda selesaikan sendiri. Selepas semuanya selesai, hubungi sokongan untuk semakan semula, atau batalkan permohonan ini dan hantar permohonan baharu.",
+    deleteAccountStateUnavailableReason: "Status kewangan tidak dapat disahkan pada masa itu, jadi pemadaman akaun belum selesai. Sila hubungi sokongan untuk semakan semula.",
+    deleteAccountUnknownReason: "Pemadaman akaun belum selesai. Sila hubungi sokongan untuk maklumat lanjut dan semakan semula.",
   },
   help: {
     loadMore: "Muat lagi soalan lazim",

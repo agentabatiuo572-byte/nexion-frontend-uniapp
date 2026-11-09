@@ -3310,7 +3310,9 @@ export const fil: Messages = {
     cancelDeletionMessage: "Ang kasalukuyang request lang ang kakanselahin. Puwede kang magsumite ulit mamaya.",
     cancelDeletionSuccess: "Kinansela ang request na i-delete",
     deleteAccountBlocked: "Hindi ma-delete: {reason}",
-    deleteAccountPendingReason: "may pending na financial o order settlement",
+    deleteAccountPendingReason: "May mga pondo o order pang hindi naaayos, kaya hindi nakumpleto ang pagtanggal ng account. Ayusin muna ang mga order at ikaw mismo ang mag-withdraw o magpalit ng balanseng puwedeng iproseso. Hintaying matapos ang staking at i-claim ang pondo. Makipag-ugnayan sa suporta para sa maliit na natitirang balanseng hindi mo maayos nang mag-isa. Kapag naayos na ang lahat, makipag-ugnayan sa suporta para sa muling pagsusuri, o kanselahin ang kahilingang ito at magsumite ng bago.",
+    deleteAccountStateUnavailableReason: "Hindi natiyak ang kalagayan ng iyong mga pondo noong oras na iyon, kaya hindi nakumpleto ang pagtanggal ng account. Makipag-ugnayan sa suporta para sa muling pagsusuri.",
+    deleteAccountUnknownReason: "Hindi nakumpleto ang pagtanggal ng account. Makipag-ugnayan sa suporta para sa detalye at muling pagsusuri.",
   },
   help: {
     loadMore: "Mag-load pa ng FAQ",
