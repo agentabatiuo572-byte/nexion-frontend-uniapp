@@ -1,4 +1,5 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
+import { accountDeletionWallet } from './prototype-demo-account.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 // The panel's terminal result applies to every withdrawal read, not just the bank detail page.
@@ -19,7 +20,8 @@ export function settleDemoBankWithdrawals(state) {
 // and come off it before the ratio. USDT and bank withdrawals are rows of one table, so they share one daily count.
 export function demoWithdrawalFacts(state,now=Date.now()){
   settleDemoBankWithdrawals(state);
-  const empty=state.dataState==='empty',walletUsdt=empty?0:state.walletBalance??52800.64,pendingReview=empty?0:12.5,bonusLocked=empty?0:50,balanceMaxRatio=1,dailyLimitCount=2;
+  const wallet=accountDeletionWallet(state);
+  const empty=state.dataState==='empty',walletUsdt=wallet?.usdtAvailable??(empty?0:state.walletBalance??52800.64),pendingReview=wallet||empty?0:12.5,bonusLocked=wallet||empty?0:50,balanceMaxRatio=1,dailyLimitCount=2;
   const released=Math.max(0,Math.round((walletUsdt-pendingReview-bonusLocked)*1e6)/1e6);
   // WithdrawalDayWindow: Vietnam UTC+7 midnight, with an inclusive start and exclusive end.
   const start=Math.floor((now+7*3600000)/day)*day-7*3600000,dailyCountResetAt=start+day;
@@ -54,7 +56,7 @@ export function secondaryDemo(url,state,request){
     if(p==='/api/tasks/receipts')return {...proof,items,nextOffset:null,nextCursor:null,total:items.length};
     return items.find(r=>r.receiptNo===p.split('/').pop());
   }
-  if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},assets:{USDT:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},UVT:{withdrawable:empty?0:1280,pending_review:empty?0:10,bonus_locked:0}},releaseMode:'attest_or_manual',attestedOnlineSeconds:3600,requiredAttestationSeconds:86400,clusterRestricted:false};
+  if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},assets:{USDT:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},UVT:{withdrawable:accountDeletionWallet(state)?.nexAvailable??(empty?0:1280),pending_review:accountDeletionWallet(state)||empty?0:10,bonus_locked:0}},releaseMode:'attest_or_manual',attestedOnlineSeconds:3600,requiredAttestationSeconds:86400,clusterRestricted:false};
   if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
   if(p==='/api/app/team/insights/commissions'){
     const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other'];

@@ -50,6 +50,7 @@ export interface AccountDeletionRequest {
   completedAt: string | null;
   reason: string | null;
   blockReason: string | null;
+  originalReason: string | null;
   cancelledAt: string | null;
 }
 
@@ -173,6 +174,7 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
     cancelledAt: null,
     reason: null,
     blockReason: null,
+    originalReason: null,
     ...raw,
   };
   const allowed = ["REQUESTED", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"];
@@ -185,12 +187,21 @@ function parseAccountDeletion(value: unknown): AccountDeletionRequest {
       || (source.cancelledAt !== null && !validDate(source.cancelledAt))
       || (source.reason !== null && typeof source.reason !== "string")
       || (source.blockReason !== null && typeof source.blockReason !== "string")
-      || Object.keys(source).some((key) => ![
-        "requestNo", "status", "version", "requestedAt", "reviewedAt", "completedAt", "reason", "blockReason", "cancelledAt",
-      ].includes(key))) {
+      || (source.originalReason !== null && typeof source.originalReason !== "string")) {
     throw new ApiError({ kind: "protocol", message: "ACCOUNT_DELETION_RESPONSE_INVALID" });
   }
-  return source as unknown as AccountDeletionRequest;
+  return {
+    requestNo: source.requestNo,
+    status: source.status as AccountDeletionRequest["status"],
+    requestedAt: source.requestedAt,
+    version: source.version,
+    reviewedAt: source.reviewedAt,
+    completedAt: source.completedAt,
+    cancelledAt: source.cancelledAt,
+    reason: source.reason,
+    blockReason: source.blockReason,
+    originalReason: source.originalReason,
+  };
 }
 
 function parseAccountDeletionStatus(value: unknown): AccountDeletionStatus {
