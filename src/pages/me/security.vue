@@ -222,7 +222,7 @@ import { captureAccountScope, isCurrentAccountScope, rebindAccountScopedStores }
 import { useAuth } from "@/store/auth";
 import { useConversations } from "@/store/conversations";
 import { useApp } from "@/store/app";
-// ↓ 注销的提交前明示要用锁仓本金(PRD §4.5a.1:提交前逐条明示,金额取提交时刻真实数值)
+// 注销提交前核实锁定本金，未结清时引导用户先处理质押。
 import { useStaking } from "@/store/staking";
 import { navReset, navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
@@ -939,15 +939,7 @@ async function handleDeleteAccount() {
   //   (含刷新等待与确认弹窗停留),所有出口统一由 finally 放闸 —— 不靠每条 return 记得复位。
   securityBusy.value = true;
   try {
-    // ── PRD §4.5a.1:提交前逐条明示 + 在途提现拦截 ──────────────────────────────
-    // 🔴 独立审计(BLOCK,2×P0)后的修法,教训记在这儿:
-    //   第一版「刷一遍然后直接读」在远端刷新**失败**时会拿到清零态 —— refreshRemoteFleet
-    //   的 catch 把 usdtBalance 置 0、staking.syncRemote 的 catch 把 positions 清空,
-    //   于是弹窗会写「Balance $0.00 — 不退」而真实余额分文未动,锁仓那行则整行消失。
-    //   披露页显示一个具体、格式规整、**错误**的数字,比不显示更糟。
-    //   修:两个驱动金额的刷新按返回值判成败,**核不动就阻断提交**(fail-closed:
-    //   宁可让用户稍后重试,不让他对着错误披露确认永久放弃)。提现列表刷新失败不阻断 ——
-    //   它失败时保留旧值(回源核过),且服务端状态机另有「已阻断」兜底。
+    // 刷新余额和质押；读取失败不能按零余额放行。
     if (remoteApiEnabled) {
       if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
       const [fleet, , stake] = await Promise.allSettled([
@@ -961,10 +953,7 @@ async function handleDeleteAccount() {
         return;
       }
     }
-    // 🔴 存在任一在途提现单 ⇒ 禁止提交(不是「提交了再被服务端打回」——规格要的是入口拦截)。
-    //   判据复用 app 的 inFlightWithdrawals(按占槽状态过滤),不在页面自造第二套「在途」定义。
-    //   PRD §4.5a.1 明文要求「并给出去提现记录的入口」—— 所以是带跳转的确认框,不是一条会
-    //   自动消失的 toast(审计 P1:只提示不给路径,用户被拦下后只能自己翻)。
+    // 沿用提现记录的在途判据和处理入口。
     if (app.inFlightWithdrawals.length > 0) {
       const view = await uiConfirm({
         title: t.value.security.deleteAccount,
@@ -976,22 +965,38 @@ async function handleDeleteAccount() {
       if (view) navTo("/pages/me/wallet-withdraw-tracking");
       return;
     }
-    // 🔴 「不退」必须是提交前的显式告知,不是事后条款:逐条列出具体金额,用户看着数字确认。
-    //   锁仓口径 = 本金还没回到余额的每一笔(pending-lock / active / matured 未领取)——
-    //   store 的 totalLocked() 只数 active,那是收益展示口径;放弃披露少报即漏报,这里不用它。
-    const forfeitPrincipal = staking.positions
+    // 本金尚未回到可用余额的质押，包括已到期但未领取的部分。
+    const lockedPrincipal = staking.positions
       .filter((p) => p.status === "pending-lock" || p.status === "active" || p.status === "matured")
       .reduce((s, p) => s + p.amountUSDT, 0);
-    const forfeitLines = [
-      t.value.security.deleteAccountForfeitLead,
-      fmt(t.value.security.deleteAccountForfeitBalance, { balance: `${formatAmount(app.user.usdtBalance)}` }),
-      ...(forfeitPrincipal > 0
-        ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `${formatAmount(forfeitPrincipal)}` })]
-        : []),
-    ];
+    if (lockedPrincipal > 0) {
+      const view = await uiConfirm({
+        title: t.value.security.deleteAccount,
+        message: fmt(t.value.security.deleteAccountBlockedByPrincipal, { principal: formatAmount(lockedPrincipal, "full") }),
+        confirmLabel: t.value.security.deleteAccountViewStaking,
+        owner: securityConfirmOwner,
+      });
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+      if (view) navTo("/pages/staking/staking");
+      return;
+    }
+    if (app.user.usdtBalance > 0 || app.user.nexBalance > 0) {
+      const hasNex = app.user.nexBalance > 0;
+      const view = await uiConfirm({
+        title: t.value.security.deleteAccount,
+        message: fmt(t.value.security.deleteAccountBlockedByBalance, {
+          usdt: formatAmount(app.user.usdtBalance, "full"), nex: formatAmount(app.user.nexBalance, "full"),
+        }),
+        confirmLabel: hasNex ? t.value.security.deleteAccountViewExchange : t.value.security.deleteAccountWithdrawBalance,
+        owner: securityConfirmOwner,
+      });
+      if (!isCurrentSecurityRequest(pageScope, accountScope, accountKey)) return;
+      if (view) navTo(hasNex ? "/pages/me/wallet-exchange" : "/pages/me/wallet-withdraw-method");
+      return;
+    }
     const ok = await uiConfirm({
       title: t.value.security.deleteAccount,
-      message: `${forfeitLines.join("\n")}\n\n${t.value.security.deleteAccountConfirm}`,
+      message: `${t.value.security.deleteAccountSettlementRequirements}\n\n${t.value.security.deleteAccountConfirm}`,
       danger: true,
       confirmLabel: t.value.security.deleteAccount,
       owner: securityConfirmOwner,

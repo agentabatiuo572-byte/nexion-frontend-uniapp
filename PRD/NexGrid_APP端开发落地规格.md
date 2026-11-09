@@ -409,7 +409,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 | `/api/auth/refresh` | POST | access token 静默刷新+rotate refresh | 失败→强制登出 | §4.5.2 |
 | `/api/auth/logout` · `/sessions/:id/revoke` · `/sessions/revoke-others` | POST | 登出/撤销 session | revocation list | §4.5.2 |
 | `/api/auth/2fa/{enroll,confirm,verify,disable,regenerate-codes}` | POST | 2FA 全流程 | 真实 2FA 态在 session claim(防伪造) | §4.5.1 |
-| `DELETE /api/account` | DELETE | 注销账户 | server 清记录 | §4.5 |
+| `POST /api/app/security/account-deletion` | POST | 提交注销申请 | 当前密码、DELETE 确认与幂等键；提交前拦截已知未结清资金，完成时须结清，不作废余额；依法保留记录 | §4.5.3 |
 | `/api/sponsorship/bind` | POST | 绑 sponsor(反多账户三层检测,first-wins) | gift 按 userId.created 幂等 | §9.11e.1 |
 | `/api/kyc/status` | GET | KYC 状态单源(提现 endpoint 二次 enforce) | SC | §9.11d.2 |
 | `/api/onboarding/calibrate` · `/result` · `/activate` · `/defer` | POST/GET | 保存/回读服务端校准事实，幂等绑定或暂缓手机设备 | SC + revision/CAS + Idempotency-Key；奖励写入复核 ACTIVE 校准与绑定设备 | §4.7.3 |
