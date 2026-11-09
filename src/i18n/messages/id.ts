@@ -2434,7 +2434,7 @@ export const id: Messages = {
     taskLevelsLine: "Tingkat tugas AI: {levels}",
     catalog: {
       "stellarbox-s1": {
-        tagline: "Mesin inferensi AI pribadi · dikelola penuh",
+        tagline: "Perangkat yang dikelola penuh",
         badge: "Terlaris",
       },
       "stellarbox-pro": {

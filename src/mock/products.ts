@@ -101,7 +101,7 @@ export const PRODUCTS: Product[] = [
     id: "stellarbox-s1",
     name: "UVELBox S1",
     tier: "Entry",
-    tagline: "Personal AI inference box · fully managed",
+    tagline: "Fully managed device",
     badge: "Best Seller",
     gpu: "4× RTX 4090",
     vram: "96GB VRAM",
