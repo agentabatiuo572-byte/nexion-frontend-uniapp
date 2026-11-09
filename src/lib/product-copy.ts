@@ -14,13 +14,14 @@ import { en, type Messages } from "@/i18n/messages/en";
 import { vi } from "@/i18n/messages/vi";
 import { zh } from "@/i18n/messages/zh";
 import { uiLocale, type LocaleCode } from "@/i18n";
-import type { Product } from "@/mock/products";
+import type { Product, ProductTaskLevel } from "@/mock/products";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { fmt } from "@/i18n/format";
 
 export interface ProductCopy {
   tagline: string;
   badge: string;
+  taskLevels: string;
 }
 
 type CatalogEntry = { tagline: string; badge: string };
@@ -64,15 +65,23 @@ function serverTagline(t: Messages, p: Product, locale?: LocaleCode): string {
   return p.tagline;
 }
 
+export function productTaskLevelsText(t: Messages, levels: readonly ProductTaskLevel[]): string {
+  return levels.length ? fmt(t.store.taskLevelsLine, {
+    levels: levels.map((level) => t.store.taskLevelLabels[level]).join(" / "),
+  }) : "";
+}
+
 export function productCopy(t: Messages, p: Product, serverCatalog = false, locale?: LocaleCode): ProductCopy {
   if (serverCatalog) return {
     tagline: serverTagline(t, p, locale),
     badge: serverBadge(t, p.badge),
+    taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];
   return {
     tagline: entry?.tagline ?? p.tagline,
     badge: entry?.badge ?? p.badge ?? "",
+    taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
 }
 

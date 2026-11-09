@@ -79,12 +79,14 @@
           <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5); min-height: 44px; display: flex; align-items: center" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
+      <text v-if="copy.taskLevels" class="block mt-1.5" style="font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; color: var(--v5-ink-3)">{{ copy.taskLevels }}</text>
       <PromotionProduct v-if="marketingPromotion" :activity="marketingPromotion" :product-no="product.id" />
     </view>
 
     <view v-if="compact" class="product-compact-body">
       <text class="product-compact-name">{{ (product.name) }}</text>
       <text class="product-compact-tagline">{{ copy.tagline }}</text>
+      <text v-if="copy.taskLevels" class="product-compact-levels">{{ copy.taskLevels }}</text>
       <view class="product-compact-bottom">
         <text class="product-compact-price">{{ fmtMoney(product.price).replace(/\.00$/, '') }}</text>
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel">{{ compactEstimate.text }}</text>
@@ -560,6 +562,7 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-body { flex:1; display:flex; flex-direction:column; padding:10px 14px 14px; }
 .product-compact-name { font:600 14px/19px var(--font-v5); color:var(--v5-ink); overflow-wrap:anywhere; }
 .product-compact-tagline { margin-top:2px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
+.product-compact-levels { display:block; margin-top:6px; font:400 12px/17px var(--font-v5); color:var(--v5-ink-3); overflow-wrap:anywhere; }
 .product-compact-bottom { display:grid; grid-template-columns:minmax(0,1fr); align-content:end; gap:3px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
 .product-compact-price { color:var(--v5-ink); font:600 16px/21px var(--font-v5); }
 .product-compact-estimate { font:400 12px/16px var(--font-v5); color:var(--v5-brand); }

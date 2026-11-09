@@ -1978,6 +1978,8 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     releaseComingToast: "该机型即将上架,敬请期待",
     // 按 SKU 的营销文案,以 Product.id 为键(数据结构与英文源在 src/mock/products.ts)。
     // 商品 `name` 是品牌名,永不翻译。verify.sh 断言每个 PRODUCTS id 在此都有条目。
+    taskLevelLabels: {"1": "初级", "2": "中级", "3": "高级", "4": "旗舰"},
+    taskLevelsLine: "可运行{levels} AI 算力任务",
     catalog: {
       "stellarbox-s1": {
         tagline: "个人 AI 推理机 · 全托管",

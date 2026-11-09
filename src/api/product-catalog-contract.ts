@@ -1,4 +1,4 @@
-import type { Product, PurchaseGate } from "@/mock/products";
+import type { Product, ProductTaskLevel, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
 
 export type CatalogProduct = Product;
@@ -26,6 +26,7 @@ const GATE_MODES = new Set<PurchaseGate["mode"]>(["all", "either"]);
 const GATE_PERIODS = new Set<NonNullable<PurchaseGate["quotaPeriod"]>>(["month", "lifetime"]);
 const PRODUCT_TYPES = new Set<NonNullable<Product["productType"]>>(["DEVICE", "SHARE"]);
 const INVENTORY_MODES = new Set<NonNullable<Product["inventoryMode"]>>(["FINITE", "UNLIMITED"]);
+const TASK_LEVELS: readonly ProductTaskLevel[] = [1, 2, 3, 4];
 
 function invalid(): never {
   throw new ProductCatalogContractError();
@@ -175,6 +176,8 @@ function product(value: unknown): CatalogProduct {
   const shareYieldMax = optionalNumber(source.shareYieldMax);
   if (productType === "SHARE" && ((shareYieldMin === undefined) !== (shareYieldMax === undefined)
     || (shareYieldMin !== undefined && (shareYieldMin <= 0 || shareYieldMax! < shareYieldMin)))) return invalid();
+  const taskLevels = source.taskLevels ?? [];
+  if (!Array.isArray(taskLevels) || !taskLevels.every((entry) => typeof entry === "number")) return invalid();
 
   return {
     id: nonEmptyString(source.id),
@@ -209,6 +212,7 @@ function product(value: unknown): CatalogProduct {
     inventoryMode,
     stock: optionalInteger(source.stock),
     features: [...source.features],
+    taskLevels: TASK_LEVELS.filter((level) => taskLevels.includes(level)),
     status: lifecycle as Product["status"],
     available: booleanValue(source.available),
     releaseState: optionalString(source.releaseState),

@@ -2002,6 +2002,8 @@ chooseMethod: "Choose how to join the UVEL network",
     // Per-SKU marketing copy, keyed by Product.id (src/mock/products.ts holds the
     // data shape + English source). Product name is a brand mark and is NEVER
     // translated. verify.sh asserts every PRODUCTS id has an entry here.
+    taskLevelLabels: {"1": "entry-level", "2": "intermediate", "3": "advanced", "4": "flagship"},
+    taskLevelsLine: "Runs {levels} AI compute tasks",
     catalog: {
       "stellarbox-s1": {
         tagline: "Personal AI inference box · fully managed",

@@ -2430,6 +2430,8 @@ export const fil: Messages = {
     notifyToast: "Aabisuhan ka kapag available na ang {name}.",
     comingSoonHeading: "Darating na",
     releaseComingToast: "Malapit nang dumating ang model na ito — abangan",
+    taskLevelLabels: {"1":"panimula","2":"katamtaman","3":"mataas","4":"pangunahing"},
+    taskLevelsLine: "Antas ng gawaing AI: {levels}",
     catalog: {
       "stellarbox-s1": {
         tagline: "Personal na AI inference box · ganap na pinamamahalaan",

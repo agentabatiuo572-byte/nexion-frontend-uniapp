@@ -183,6 +183,7 @@
         <!-- === Section 5: Hardware spec === -->
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detHardware" /></view>
         <SpecTable :rows="hardwareSpecs" />
+        <view v-if="copy.taskLevels" class="mx-4" style="padding: 12px 16px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; color: var(--v5-ink-3)"><text>{{ copy.taskLevels }}</text></view>
 
 
         <!-- === Section 7: Trust material === -->
@@ -425,7 +426,7 @@ const copy = computed(() =>
     ? remoteApiEnabled
       ? productCopy(t.value, product.value, true, locale.code)
       : productCopy(t.value, product.value, false, locale.code)
-    : { tagline: "", badge: "" },
+    : { tagline: "", badge: "", taskLevels: "" },
 );
 
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
