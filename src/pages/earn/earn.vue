@@ -53,7 +53,7 @@
       <view class="earn-fleet-head">
         <text class="earn-fleet-head__title" role="heading" aria-level="2">{{ t.home.myFleet }}</text>
         <SlotRing />
-        <LoopScope class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.taskPoolLineTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
+        <LoopScope class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.capExplainTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
           <svg class="earn-capacity-info__glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <g class="earn-capacity-info__rocket">
               <path d="M8 14 5 17v3l4-2m7-4 3 3v3l-4-2" />

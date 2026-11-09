@@ -2,7 +2,7 @@
 // kept only so historical receipts still render after the legacy identity flow was removed).
 //
 // The data layer bakes an English `type` string — store/types.ts
-// TASK_CATEGORY_LABEL feeds CurrentTask.type / LockedTeaser.type / Receipt.type
+// TASK_CATEGORY_LABEL feeds CurrentTask.type / Receipt.type
 // — because a real backend would return one, and the mock keeps the shape
 // backend-replaceable. The UI must not render it: receipts are persisted, so a
 // baked label would freeze whatever language the job happened to run in, and

@@ -4,8 +4,6 @@
 //
 // VRAM gating (P0-3, 2026-05-15): each model variant declares minVRAM.
 // pickRandomTask(maxVram) filters templates+models to those that fit.
-// getLockedTeasers(maxVram) returns examples a device CAN'T run, used
-// by Task Center "Upgrade Unlocks" section to drive §1.3 Phase 3 conversion.
 
 import type { CurrentTask, TaskCategory } from "../store/types";
 import { TASK_CATEGORY_LABEL } from "../store/types";
@@ -168,65 +166,4 @@ function buildTask(tpl: TaskTemplate, model: ModelVariant): CurrentTask {
     startedAt: Date.now(),
     reward: +reward.toFixed(3),
   };
-}
-
-// FEAT-DEV01: mean per-task reward across the templates a device of `maxVram`
-// can actually book — display-only denominator for the device card's
-// "≈N tasks booked today" line (tasksToday = dailyRateNow ÷ this). Derived from
-// the same TASK_TEMPLATES the simulator draws from (single source), never
-// persisted, deterministic (no RNG).
-export function avgEligibleReward(maxVram?: number): number {
-  const pools = TASK_TEMPLATES.map((tpl) => ({
-    tpl,
-    eligible: !maxVram || maxVram <= 0 ? tpl.models : tpl.models.filter((m) => m.minVRAM <= maxVram),
-  })).filter((e) => e.eligible.length > 0);
-  if (!pools.length) return (TASK_TEMPLATES[0].minReward + TASK_TEMPLATES[0].maxReward) / 2;
-  const sum = pools.reduce((s, e) => s + (e.tpl.minReward + e.tpl.maxReward) / 2, 0);
-  return sum / pools.length;
-}
-
-// ───── Upgrade Unlocks (locked-tier teasers for §5.2.4 Task Center) ─────
-
-export interface LockedTeaser {
-  category: TaskCategory;
-  type: string;        // human label
-  model: string;       // most attractive locked model in this category
-  minVRAM: number;     // VRAM the user lacks
-  rewardHint: string;  // e.g. "$0.18-$1.80" — per-task range
-  unlockTier: string;  // e.g. "UVELBox S1 (96GB)"
-}
-
-// Map a VRAM requirement to the cheapest device tier that satisfies it.
-function unlockTierFor(minVRAM: number): string {
-  if (minVRAM <= 24) return "RTX 4090 PC (24GB)";
-  if (minVRAM <= 96) return "UVELBox S1 (96GB)";
-  if (minVRAM <= 192) return "UVELBox Pro (192GB)";
-  return "UVELRack P1 (640GB)";
-}
-
-// Return up to `count` locked teasers — one per category that has at least
-// one model currently out of reach. Prioritizes the highest-paying model in
-// each locked category (most aspirational teaser).
-export function getLockedTeasers(maxVram: number, count = 3): LockedTeaser[] {
-  const teasers: LockedTeaser[] = [];
-  for (const tpl of TASK_TEMPLATES) {
-    const lockedModels = tpl.models.filter((m) => m.minVRAM > maxVram);
-    if (lockedModels.length === 0) continue;
-    // Pick the highest-VRAM locked model — usually the largest, most
-    // attractive variant (Llama 405B over Llama 70B etc.)
-    const top = lockedModels.reduce((best, m) =>
-      m.minVRAM > best.minVRAM ? m : best
-    );
-    teasers.push({
-      category: tpl.category,
-      type: TASK_CATEGORY_LABEL[tpl.category],
-      model: top.name,
-      minVRAM: top.minVRAM,
-      rewardHint: `$${tpl.minReward.toFixed(2)}-$${tpl.maxReward.toFixed(2)}`,
-      unlockTier: unlockTierFor(top.minVRAM),
-    });
-  }
-  // Sort by minVRAM ascending so the cheapest-to-unlock appears first.
-  teasers.sort((a, b) => a.minVRAM - b.minVRAM);
-  return teasers.slice(0, count);
 }

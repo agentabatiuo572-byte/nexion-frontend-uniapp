@@ -4,17 +4,6 @@
 
 import type { PhaseId } from "@/store/product-phase";
 
-// AI workload throughput per device — replaces "MH/s" hash rate in the
-// hero spec card, drives the v3.1 "you can power LLM 70B inference" narrative.
-export interface AIPerformance {
-  imageGenPerMin?: number;     // SDXL or Flux throughput, images/min
-  llmTokensPerSec?: number;    // LLM inference, tokens/sec (at advertised model size)
-  videoMinPerHour?: number;    // Video gen, output minutes per render hour
-  fineTuneMins?: number;       // LoRA fine-tune turnaround, minutes
-  unlocks?: string;            // e.g. "LLM 70B inference pool", "Flagship compute pool"
-  bestForCategory?: ("IG" | "VG" | "LL" | "FT" | "EM" | "SP")[];
-}
-
 // Per-user purchase gate (rank/condition + quota lock). Backend-configurable:
 // operator picks a gate shape at SKU 上架 (单活跃直推 / 单 V 级 / 组合) and the
 // thresholds; server-canonical (mirrors GET /api/store/catalog). All fields
@@ -79,10 +68,8 @@ export interface Product {
   stock?: number;
   // ponytail: NOT rendered anywhere today — deliberately left untranslated so we
   // don't carry 72 dead key-pairs across en/zh/vi. If a spec sheet ever renders
-  // these, move them into `store.catalog.<id>` alongside tagline/badge/unlocks first.
+  // these, move them into `store.catalog.<id>` alongside tagline/badge first.
   features: string[];
-  // v3.1 AI workload throughput specs (§5.3.1)
-  ai?: AIPerformance;
   // Sprint 2 second phase: catalog lifecycle status
   status?: "active" | "legacy"; // legacy = older catalog listing (still owned & serviced)
   // Remote catalog authority: E1 ids are database identities rather than H1
@@ -128,14 +115,6 @@ export const PRODUCTS: Product[] = [
       "Real-time remote monitoring",
       "Free shipping & installation",
     ],
-    ai: {
-      imageGenPerMin: 320,
-      llmTokensPerSec: 12400,
-      videoMinPerHour: 18,
-      fineTuneMins: 6,
-      unlocks: "LLM 70B inference pool",
-      bestForCategory: ["IG", "LL"],
-    },
     status: "legacy",
   },
   {
@@ -162,21 +141,13 @@ export const PRODUCTS: Product[] = [
       "Priority task allocation",
       "Hardware insurance included",
     ],
-    ai: {
-      imageGenPerMin: 720,           // SDXL or 480 Flux/min
-      llmTokensPerSec: 38000,        // at 70B; ~4,200 at 405B
-      videoMinPerHour: 12,           // 4K
-      fineTuneMins: 20,              // LoRA-70B
-      unlocks: "Tasks matched to device VRAM and current requirements",
-      bestForCategory: ["LL", "FT", "VG"],
-    },
     status: "legacy",
   },
   {
     id: "stellarbox-pro-v2",
     name: "UVELBox Pro v2",
     tier: "Pro",
-    tagline: "2.5× S1 throughput — built for higher-tier task pools.",
+    tagline: "2.5× S1 throughput",
     badge: "Upgrade Pick",
     gpu: "8× RTX 5090",
     vram: "256GB VRAM",
@@ -195,14 +166,6 @@ export const PRODUCTS: Product[] = [
       "Upgrade trade-in: retire an owned device for checkout credit",
       "Hardware insurance + 5-year warranty",
     ],
-    ai: {
-      imageGenPerMin: 1080,
-      llmTokensPerSec: 56000,
-      videoMinPerHour: 24,
-      fineTuneMins: 12,
-      unlocks: "Flagship AI + multi-tenant 405B",
-      bestForCategory: ["LL", "FT", "VG"],
-    },
     status: "active",
     unlocksAtPhase: "P3",
   },
@@ -231,14 +194,6 @@ export const PRODUCTS: Product[] = [
       "VIP support · 24/7 hotline",
       "5-year extended warranty",
     ],
-    ai: {
-      imageGenPerMin: 1800,
-      llmTokensPerSec: 128000,       // 405B full precision
-      videoMinPerHour: 60,           // Sora-class long-form ready
-      fineTuneMins: 8,               // full fine-tune capable
-      unlocks: "Training pool (RLHF / from-scratch 8B)",
-      bestForCategory: ["LL", "FT", "VG"],
-    },
     status: "legacy",
   },
   {
@@ -264,14 +219,6 @@ export const PRODUCTS: Product[] = [
       "Dedicated tier-3 DC slot · 24/7 VIP support",
       "10-year extended warranty + insurance",
     ],
-    ai: {
-      imageGenPerMin: 3600,
-      llmTokensPerSec: 256000,       // 405B mixed-batch + Llama-3 8B from-scratch
-      videoMinPerHour: 120,          // Sora long-form + native 8K
-      fineTuneMins: 4,               // full fine-tune 70B in minutes
-      unlocks: "Training pool (RLHF / 70B from-scratch)",
-      bestForCategory: ["LL", "FT", "VG"],
-    },
     status: "active",
     unlocksAtPhase: "P5",
   },
@@ -297,10 +244,6 @@ export const PRODUCTS: Product[] = [
       "Reference annual range; returns are not guaranteed",
       "Distributed across global data centers",
     ],
-    ai: {
-      unlocks: "Task allocation follows current compute eligibility",
-      bestForCategory: ["IG", "EM", "SP"],
-    },
     status: "active",
   },
 ];

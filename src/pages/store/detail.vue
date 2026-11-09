@@ -5,7 +5,7 @@
   Wrapped in <AppChassis active="store">. Top→bottom:
     in-page header (back + product name) → Hero (ProductRender + ribbon +
     LiveSocialProof + name/tagline/mult + trust chips) → Vs-phone strip →
-    ROI (qty stepper + 4-cell grid) → Hardware spec → AI perf spec →
+    ROI (qty stepper + 4-cell grid) → Hardware spec →
     Trust badges → FAQ accordion → sticky bottom Buy CTA.
 
   Phase-gated products (unlocksAtPhase not yet reached) render the shared
@@ -168,11 +168,6 @@
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detHardware" /></view>
         <SpecTable :rows="hardwareSpecs" />
 
-        <!-- === Section 6: AI performance spec === -->
-        <template v-if="aiPerfRows.length">
-          <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detAiPerf" /></view>
-          <SpecTable :rows="aiPerfRows" brand-value />
-        </template>
 
         <!-- === Section 7: Trust material === -->
         <template v-if="!remoteApiEnabled">
@@ -409,9 +404,9 @@ const stockUnavailable = computed(() => product.value?.inventoryMode === "FINITE
 const copy = computed(() =>
   product.value
     ? remoteApiEnabled
-      ? productCopy(t.value, product.value, true, locale.code, earnConfig.taskPricing.value?.taskClasses)
+      ? productCopy(t.value, product.value, true, locale.code)
       : productCopy(t.value, product.value, false, locale.code)
-    : { tagline: "", badge: "", unlocks: "" },
+    : { tagline: "", badge: "" },
 );
 
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
@@ -484,24 +479,6 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
   ].filter((r): r is SpecRow => r !== null);
 });
 
-// AI perf rows from product.ai. `unlocks` is per-SKU marketing copy → resolved
-// through productCopy() alongside tagline/badge, not read raw off the mock.
-const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
-  const ai = product.value?.ai;
-  if (isShare.value && !ai) return [];
-  const s = t.value.store;
-  const rows: { k: string; v: string }[] = [];
-  const metric = (value: number | undefined, unit: string, scale = 1) => value == null
-    ? "-" : `${value / scale} ${unit}`;
-  if (!isShare.value) {
-    rows.push({ k: s.aiRowImageGen, v: metric(ai?.imageGenPerMin, s.aiUnitImgMin) });
-    rows.push({ k: s.aiRowLlm, v: metric(ai?.llmTokensPerSec, s.aiUnitTokSec, 1000) });
-    rows.push({ k: s.aiRowVideo, v: metric(ai?.videoMinPerHour, s.aiUnitMinHour) });
-    rows.push({ k: s.aiRowFineTune, v: metric(ai?.fineTuneMins, s.aiUnitMin) });
-  }
-  rows.push({ k: s.aiRowUnlocks, v: copy.value.unlocks || "-" });
-  return rows;
-});
 const bundleActivityVisible = computed(()=>(productCatalogPresentation.value?.products??[]).filter(p=>p.productType!=='SHARE'&&activity.value?.productNos.includes(p.id)&&isProductAvailable(p,phase.value)).length>=2);
 const canBundleActivity = computed(() => promotionAvailable.value && bundleActivityVisible.value);
 

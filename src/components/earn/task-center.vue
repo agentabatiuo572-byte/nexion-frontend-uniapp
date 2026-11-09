@@ -1,9 +1,7 @@
 <!--
   TaskCenter — ported from Nexion-prototype/app/components/task-center.tsx.
-  Single merged view (no tabs): "Upgrade Unlocks" locked-tier teasers
-  (VRAM-gated, route to /store) on top, followed by the task History list
-  (last 10 completed across devices). The currently-processing section and the
-  Current/History tab switcher were removed per product direction.
+  Completed task history across devices. Task eligibility and upgrade examples
+  are not shown; actual history and receipt navigation remain unchanged.
 
   Receipt detail: each completed row and its document icon open the ported
   ReceiptModal. Formal remote mode resolves receiptNo through the authenticated
@@ -27,41 +25,8 @@
     </view>
     <view v-if="historyOpen" class="earn-tc__panel">
 
-    <!-- Upgrade Unlocks -->
-    <view v-if="lockedTeasers.length > 0">
-      <view class="pt-1 pb-1">
-        <view class="flex items-center gap-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-          <text>{{ t.earn.upgradeUnlocks }}</text>
-        </view>
-        <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ t.earn.upgradeUnlocksHint }}</text>
-      </view>
-      <view class="pt-1.5 pb-2 space-y-1">
-        <view
-          v-for="teaser in lockedTeasers"
-          :key="teaser.category"
-          class="flex items-center gap-3 py-2 rounded-lg active:opacity-80"
-          @click="goStore"
-        >
-          <view class="rounded-lg grid place-items-center shrink-0" style="width: 32px; height: 32px; background: color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="categoryIconPath(teaser.category)" /></svg>
-          </view>
-          <view class="flex-1 min-w-0">
-            <text class="block truncate" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: var(--v5-ink-2)">{{ teaser.type }}</text>
-            <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ t.earn.requires }} <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-tech-cyan-ink)">{{ teaser.minVRAM }}GB VRAM</text><template v-if="!remoteApiEnabled"> · {{ teaser.unlockTier }}</template></text>
-          </view>
-          <view class="text-right shrink-0">
-            <view class="flex items-center justify-end gap-0.5" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 4px">
-              <text>{{ t.earn.upgradeNow }}</text>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
-
     <!-- Task History (merged single list) -->
-    <view class="pb-2" :style="historyHeadStyle">
+    <view class="pb-2">
       <view class="flex items-center justify-between">
         <text style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.taskHistory.tabHistory }}</text>
         <view class="earn-history-all flex items-center active:opacity-60" style="gap: 2px; padding: 0 0 0 16px; min-height: 44px" role="button" tabindex="0" @click="goReceipts"  @keydown.enter.stop.prevent="goReceipts" @keydown.space.stop.prevent="goReceipts">
@@ -123,14 +88,13 @@
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatTaskReward } from "@/lib/task-reward-display";
 import { navTo } from "@/lib/route";
-import { computed, inject, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, inject, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
-import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
-import type { TaskCategory, CompletedTask } from "@/store/types";
+import type { CompletedTask } from "@/store/types";
 import { taskCenterReceiptKey, useReceipts } from "@/store/receipts";
 import type { Receipt } from "@/mock/receipt";
 import { remoteApiEnabled, taskAssignmentApi } from "@/api/runtime";
@@ -163,8 +127,6 @@ onHide(() => {
   receiptPageEpoch += 1;
   receiptRequestEpoch += 1;
 });
-prepareEarnConfig();
-const earnConfig = useEarnConfig();
 const activeJobsText = computed(() => app.activeJobsDisplay?.toLocaleString() ?? "—");
 function receiptFor(id: string): Receipt | undefined {
   return receipts?.byId(id);
@@ -236,42 +198,9 @@ watch(allRecent, (tasks) => {
   if (selectedTask.value) selectedTask.value = tasks.find((task) => task.id === selectedTask.value?.id) ?? selectedTask.value;
 });
 
-// Cloud Share has no user-owned physical VRAM, but the server routes its
-// rented pool as an 8 GB equivalent for task eligibility and claim execution.
-const CLOUD_SHARE_ROUTING_VRAM_GB = 8;
-const maxVram = computed(() => app.visibleDevices.filter(device => device.kind !== "phone").reduce(
-  (m, d) => Math.max(m, d.kind === "cloud-share" ? CLOUD_SHARE_ROUTING_VRAM_GB : d.vramTotal),
-  0,
-));
-const lockedTeasers = computed(() => app.remoteComputeProtocolVersion === 3 ? [] : earnConfig.lockedTeasers(maxVram.value, 3));
-
 const historyHintText = computed(() =>
   t.value.taskHistory.historyHint.replace("{n}", visibility.mask(allRecent.value.length)),
 );
-
-// Divider above History only when the Upgrade Unlocks block precedes it.
-const historyHeadStyle = computed<CSSProperties>(() => ({
-  borderTop:
-    lockedTeasers.value.length > 0
-      ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)"
-      : "none",
-}));
-
-const CATEGORY_ICON_PATHS: Record<TaskCategory, string> = {
-  IG: "M3 3h18v18H3zM3 16l5-5 4 4 5-5 4 4", // image
-  VG: "M14 4v16M10 4v16M4 8h4M4 16h4M16 8h4M16 16h4M4 4h16v16H4z", // film
-  LL: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", // message
-  FT: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.7-2.7z", // wrench
-  EM: "M3 5a9 3 0 0 0 18 0a9 3 0 0 0-18 0M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0", // database
-  SP: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3M19 10v2a7 7 0 0 1-14 0v-2M12 19v3", // mic
-};
-function categoryIconPath(category: TaskCategory): string {
-  return CATEGORY_ICON_PATHS[category] ?? CATEGORY_ICON_PATHS.IG;
-}
-
-function goStore() {
-  navTo("/pages/store/store");
-}
 
 function goReceipts() {
   navTo("/pages/me/receipts");
