@@ -17,16 +17,13 @@ import { uiLocale, type LocaleCode } from "@/i18n";
 import type { Product } from "@/mock/products";
 import { SPEC_UNAVAILABLE } from "@/api/product-catalog-contract";
 import { fmt } from "@/i18n/format";
-import type { EarnTaskClass } from "@/api/earn-config-api";
 
 export interface ProductCopy {
   tagline: string;
   badge: string;
-  /** AI pool this SKU books tasks from (product.ai.unlocks). "" when the SKU has none. */
-  unlocks: string;
 }
 
-type CatalogEntry = { tagline: string; badge: string; unlocks: string };
+type CatalogEntry = { tagline: string; badge: string };
 
 const badgeSources = [en.store, vi.store, zh.store];
 
@@ -67,24 +64,15 @@ function serverTagline(t: Messages, p: Product, locale?: LocaleCode): string {
   return p.tagline;
 }
 
-export function productPoolLabel(t: Messages, pool: string | undefined, tasks: readonly EarnTaskClass[] = []): string {
-  if (!pool || pool === SPEC_UNAVAILABLE) return "";
-  const selected = tasks.find((task) => task.taskId === pool);
-  if (selected) return selected.enabled ? t.market.workloads[selected.taskClass]?.label ?? selected.taskName : "";
-  return t.market.workloads[pool as keyof typeof t.market.workloads]?.label ?? "";
-}
-
-export function productCopy(t: Messages, p: Product, serverCatalog = false, locale?: LocaleCode, tasks: readonly EarnTaskClass[] = []): ProductCopy {
+export function productCopy(t: Messages, p: Product, serverCatalog = false, locale?: LocaleCode): ProductCopy {
   if (serverCatalog) return {
     tagline: serverTagline(t, p, locale),
     badge: serverBadge(t, p.badge),
-    unlocks: productPoolLabel(t, p.ai?.unlocks, tasks),
   };
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];
   return {
     tagline: entry?.tagline ?? p.tagline,
     badge: entry?.badge ?? p.badge ?? "",
-    unlocks: entry?.unlocks ?? p.ai?.unlocks ?? "",
   };
 }
 
