@@ -301,9 +301,8 @@ const LEDGER = {
   "/api/app/referral-rewards": "TBD-NAME: /api/app/* 族,推荐奖励发放面;另有 /api/config/referral-rewards 读配置",
   "/api/app/profile/language": "BACKEND: AppUserProfileController 已实现;账户语言跨设备同步",
 
-  // ── PRD 里找得到的(7 条,逐条核过原文不是正则假命中)──────────────
+  // ── PRD 里找得到的(6 条,逐条核过原文不是正则假命中)──────────────
   "/api/devices/activate": "PRD §9.11d.2(server enforce 活跃槽位上限,client 限制纯 UI)",
-  "/api/config/task-pricing": "PRD §9.11c.1(Task pricing 表 server 下发)",
   "/api/genesis/state": "PRD §9.11c.1(供应 / 单价 / 排放比例)",
   "GET /api/genesis/state": "PRD §9.11c.1(注释带 method 的同一 canonical 投影)",
   "/api/notifications": "PRD §11.2.4(分页拉取,支持按优先级过滤)",
