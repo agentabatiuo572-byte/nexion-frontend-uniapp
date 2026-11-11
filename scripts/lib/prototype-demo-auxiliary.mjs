@@ -8,14 +8,6 @@ export function auxiliaryDemo(url,locale,state,request) {
   const text=(zh,en,vi)=>lang==='zh'?zh:lang==='vi'?vi:en;
   // No published overrides in this demo: keep the App's bundled dictionary.
   if(p==='/api/content/i18n')return {namespace:'*',locale:{zh:'zh-CN',en:'en-US',vi:'vi-VN'}[lang],messages:{},serverCanonical:true};
-  if(p==='/api/config/task-pricing'){
-    // Snapshot of the first model and reward/duration ranges in src/mock/tasks.ts.
-    // The 0.35 saturation and daily-potential formula are PRD §7.1 demo estimates, never a payout feed.
-    const queueSaturation=empty?0:.35;
-    const taskClasses=[['IG','Image generation','SDXL Turbo 512²',4,.0001,.045,105],['VG','Video generation','Luma Dream Machine',16,.45,1.8,210],['LL','Language inference','Phi-3-mini',4,.00005,.85,255],['FT','Fine-tuning','QLoRA · Mistral 7B',16,.06,.42,1140],['EM','Embeddings','MobileBERT',4,.00001,.09,480],['SP','Speech processing','Whisper-tiny',4,.00005,.072,135]]
-      .map(([taskClass,taskName,model,minVRAM,minReward,maxReward,avgSec])=>({taskId:'demo-'+taskClass,taskClass,taskName,models:[model],minVRAM,minReward,maxReward,avgSec,enabled:!empty,dailyPotential:Math.round(86400/avgSec*queueSaturation*(minReward+maxReward)/2*10000)/10000}));
-    return {taskClasses,queueSaturation,teaser:[],effectiveAt:iso,sources:['Local prototype demo: src/mock/tasks.ts; PRD §7.1']};
-  }
   // Existing src/store/commission.ts mock rates; other fields mirror the public projection's shipped defaults.
   if(p==='/api/config/commission/rates'&&url.searchParams.get('schemaVersion')==='2')return {...proof,source:'Local prototype demo: src/store/commission.ts',serverCanonical:true,runId:null,schemaVersion:2,unilevel:[10,5,3,2,1,.5,.5].map((usdtPct,i)=>({level:'L'+(i+1),usdtPct,nexReward:[50,20,10,5,2.5,1,1][i]})),unilevelPaused:Object.fromEntries([1,2,3,4,5,6,7].map(i=>['L'+i,false])),partnerTiersJson:{standard:0,verified:5000,premium:50000,diamond:500000},influenceClampMin:1,influenceClampMax:5,coolingDays:null,promoMultiplier:1};
   const sample=text('原型演示资料，正式内容以发布版本为准。','Prototype sample. Refer to the published version for formal content.','Tài liệu nguyên mẫu. Nội dung chính thức theo phiên bản công bố.');
