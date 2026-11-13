@@ -1170,7 +1170,7 @@ export const useApp = defineStore("app", () => {
         if (fleetResult.status === "rejected") throw fleetResult.reason;
         const fleet = fleetResult.value;
         slotCap.value = fleet.slotCap;
-        installCanonicalLifecycleConfig(fleet.capacitySchedule);
+        if (fleet.devices.length > 0) installCanonicalLifecycleConfig(fleet.capacitySchedule);
         const capacitySnapshotReceivedAt = readMonotonicNowMs();
         const canonicalDevices = fleet.devices.map((device) => canonicalDevice(
           device,
