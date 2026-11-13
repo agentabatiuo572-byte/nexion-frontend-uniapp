@@ -150,19 +150,21 @@ function parseTestPreview(value: unknown): WithdrawalTestPreview {
   const numeric = ["walletUsdt", "minAmount", "networkFeeUsdt", "dailyLimitCount", "dailyCount", "balanceMaxRatio"] as const;
   if (!row || row.testPreview !== true || row.readOnly !== true || row.canSubmit !== false
       || row.network !== "USDT-BEP20" || row.validationScope !== "amount-fee-balance-limits-only"
-      || numeric.some((key) => number(row[key]) === null)
-      || (row.amount !== null && number(row.amount) === null)
-      || (row.netReceiveUsdt !== null && number(row.netReceiveUsdt) === null)
+      || numeric.some((key) => typeof row[key] !== "number" || !Number.isFinite(row[key]) || (row[key] as number) < 0)
+      || !Number.isSafeInteger(row.dailyLimitCount) || (row.dailyLimitCount as number) <= 0
+      || !Number.isSafeInteger(row.dailyCount) || (row.balanceMaxRatio as number) <= 0 || (row.balanceMaxRatio as number) > 1
+      || (row.amount !== null && (typeof row.amount !== "number" || !Number.isFinite(row.amount) || row.amount <= 0))
+      || (row.netReceiveUsdt !== null && (typeof row.netReceiveUsdt !== "number" || !Number.isFinite(row.netReceiveUsdt) || row.netReceiveUsdt < 0))
       || (row.validationPassed !== null && typeof row.validationPassed !== "boolean")
       || !Array.isArray(row.reasons) || row.reasons.some((reason) => typeof reason !== "string")) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_TEST_PREVIEW_INVALID" });
   }
   return {
     testPreview: true, readOnly: true, canSubmit: false, network: "USDT-BEP20",
-    walletUsdt: number(row.walletUsdt)!, minAmount: number(row.minAmount)!, networkFeeUsdt: number(row.networkFeeUsdt)!,
-    dailyLimitCount: number(row.dailyLimitCount)!, dailyCount: number(row.dailyCount)!, balanceMaxRatio: number(row.balanceMaxRatio)!,
-    amount: row.amount === null ? null : number(row.amount)!,
-    netReceiveUsdt: row.netReceiveUsdt === null ? null : number(row.netReceiveUsdt)!,
+    walletUsdt: row.walletUsdt as number, minAmount: row.minAmount as number, networkFeeUsdt: row.networkFeeUsdt as number,
+    dailyLimitCount: row.dailyLimitCount as number, dailyCount: row.dailyCount as number, balanceMaxRatio: row.balanceMaxRatio as number,
+    amount: row.amount as number | null,
+    netReceiveUsdt: row.netReceiveUsdt as number | null,
     validationPassed: row.validationPassed as boolean | null, reasons: row.reasons as string[],
   };
 }
