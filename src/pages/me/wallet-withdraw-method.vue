@@ -8,6 +8,10 @@
         <text class="method-title">测试提现（不会出款）</text>
         <text class="method-note">仅预览参数，不扣余额，不创建提现单。</text>
       </view>
+      <view v-if="previewMetaError" class="method" role="status">
+        <text class="method-note">{{ previewMetaError }}</text>
+        <NxButton :disabled="previewDiscovering" label="重试测试预览" @click="loadPreview()">重试测试预览</NxButton>
+      </view>
       <view class="method" role="button" tabindex="0" data-testid="withdraw-method-usdt" :aria-disabled="!canOpenUsdt" @click="openUsdt" @keydown.enter.prevent="openUsdt" @keydown.space.prevent="openUsdt">
         <view class="method-top">
           <view class="method-icon method-icon--usdt" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 8h8M12 8v9M8.5 11.5c2 .8 5 .8 7 0" /></svg></view>
@@ -64,6 +68,7 @@ import { createBankWithdrawalApi } from "@/api/bank-withdrawal-api";
 import { createWithdrawalApi, type WithdrawalTestPreview } from "@/api/withdrawal-api";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import { ApiError } from "@/api/errors";
 
 const t = useT(), app = useApp();
 const pending = ref(readWithdrawAttempt(app.accountKey));
@@ -73,6 +78,7 @@ const readFailed = ref(false);
 let revision = 0, visible = false;
 const preview = ref<WithdrawalTestPreview | null>(null), previewOpen = ref(false);
 const previewAmount = ref(""), previewError = ref(""), previewChecking = ref(false), previewChecked = ref(false);
+const previewMetaError = ref(""), previewDiscovering = ref(false);
 let previewRevision = 0;
 function closePreview() { previewOpen.value = false; previewRevision++; previewChecking.value = false; previewChecked.value = false; previewError.value = ""; }
 function invalidatePreviewAmount() { previewRevision++; previewChecking.value = false; previewChecked.value = false; previewError.value = ""; }
@@ -86,15 +92,20 @@ async function loadPreview(amount?: string) {
   const current = () => visible && sequence === previewRevision && account === app.accountKey && epoch === app.accountBindingEpoch
     && environment === apiRuntimeConfig.environment && baseUrl === apiRuntimeConfig.baseUrl;
   if (amount !== undefined) previewChecking.value = true;
+  else previewDiscovering.value = true;
   try {
     const result = await createWithdrawalApi(apiClient).testPreview(amount);
     if (!current()) return;
-    preview.value = result; previewChecked.value = amount !== undefined;
-  } catch {
+    preview.value = result; previewChecked.value = amount !== undefined; previewMetaError.value = "";
+  } catch (cause) {
     if (!current()) return;
-    if (amount === undefined) preview.value = null; // Disabled/404 metadata keeps the optional entry hidden.
-    else previewError.value = "预览读取失败，请重试；未创建提现单。";
-  } finally { if (current()) previewChecking.value = false; }
+    previewChecked.value = false;
+    if (cause instanceof ApiError && (cause.status === 404 || cause.code === 404)) {
+      closePreview(); preview.value = null; previewMetaError.value = ""; previewDiscovering.value = false;
+    } else if (amount === undefined) {
+      preview.value = null; previewMetaError.value = "测试预览暂不可用，请重试；未创建提现单。";
+    } else previewError.value = "预览读取失败，请重试；未创建提现单。";
+  } finally { if (current()) { previewChecking.value = false; previewDiscovering.value = false; } }
 }
 function checkPreview() {
   const value = previewAmount.value.trim();
@@ -126,7 +137,7 @@ async function load() {
   finally { if (current()) checking.value = false; }
 }
 useAutoRecovery({ failed: () => readFailed.value && !checking.value, retry: load });
-function reset() { revision++; closePreview(); preview.value = null; previewAmount.value = ""; recoveryKnown.value = false; bankIntent.value = false; pending.value = readWithdrawAttempt(app.accountKey); if (visible) void load(); }
+function reset() { revision++; closePreview(); preview.value = null; previewAmount.value = ""; previewMetaError.value = ""; previewDiscovering.value = false; recoveryKnown.value = false; bankIntent.value = false; pending.value = readWithdrawAttempt(app.accountKey); if (visible) void load(); }
 watch(() => [app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, reset);
 onShow(() => { visible = true; void load(); });
 onHide(() => { visible = false; revision++; closePreview(); preview.value = null; });
