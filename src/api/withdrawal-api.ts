@@ -107,7 +107,6 @@ export interface WithdrawalDetailSnapshot extends WithdrawalStatusSnapshot {
 }
 
 export interface WithdrawalApi {
-  testPreview(amount?: string): Promise<WithdrawalTestPreview>;
   list(): Promise<WithdrawalSubmission[]>;
   policy(): Promise<WithdrawalPolicy>;
   eligibility(input: {
@@ -126,47 +125,6 @@ export interface WithdrawalApi {
     useNexFeeOffset: boolean,
     idempotencyKey: string,
   ): Promise<WithdrawalSubmission>;
-}
-
-export interface WithdrawalTestPreview {
-  testPreview: true;
-  readOnly: true;
-  canSubmit: false;
-  network: "USDT-BEP20";
-  walletUsdt: number;
-  minAmount: number;
-  networkFeeUsdt: number;
-  dailyLimitCount: number;
-  dailyCount: number;
-  balanceMaxRatio: number;
-  amount: number | null;
-  netReceiveUsdt: number | null;
-  validationPassed: boolean | null;
-  reasons: string[];
-}
-
-function parseTestPreview(value: unknown): WithdrawalTestPreview {
-  const row = record(value);
-  const numeric = ["walletUsdt", "minAmount", "networkFeeUsdt", "dailyLimitCount", "dailyCount", "balanceMaxRatio"] as const;
-  if (!row || row.testPreview !== true || row.readOnly !== true || row.canSubmit !== false
-      || row.network !== "USDT-BEP20" || row.validationScope !== "amount-fee-balance-limits-only"
-      || numeric.some((key) => typeof row[key] !== "number" || !Number.isFinite(row[key]) || (row[key] as number) < 0)
-      || !Number.isSafeInteger(row.dailyLimitCount) || (row.dailyLimitCount as number) <= 0
-      || !Number.isSafeInteger(row.dailyCount) || (row.balanceMaxRatio as number) <= 0 || (row.balanceMaxRatio as number) > 1
-      || (row.amount !== null && (typeof row.amount !== "number" || !Number.isFinite(row.amount) || row.amount <= 0))
-      || (row.netReceiveUsdt !== null && (typeof row.netReceiveUsdt !== "number" || !Number.isFinite(row.netReceiveUsdt) || row.netReceiveUsdt < 0))
-      || (row.validationPassed !== null && typeof row.validationPassed !== "boolean")
-      || !Array.isArray(row.reasons) || row.reasons.some((reason) => typeof reason !== "string")) {
-    throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_TEST_PREVIEW_INVALID" });
-  }
-  return {
-    testPreview: true, readOnly: true, canSubmit: false, network: "USDT-BEP20",
-    walletUsdt: row.walletUsdt as number, minAmount: row.minAmount as number, networkFeeUsdt: row.networkFeeUsdt as number,
-    dailyLimitCount: row.dailyLimitCount as number, dailyCount: row.dailyCount as number, balanceMaxRatio: row.balanceMaxRatio as number,
-    amount: row.amount as number | null,
-    netReceiveUsdt: row.netReceiveUsdt as number | null,
-    validationPassed: row.validationPassed as boolean | null, reasons: row.reasons as string[],
-  };
 }
 
 export interface WithdrawalAttemptAbandonInput {
@@ -766,9 +724,6 @@ function parseWithdrawalDetail(value: unknown, expectedWithdrawalNo: string): Wi
 
 export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
   return {
-    testPreview: async (amount) => parseTestPreview(await client.request({
-      method: "GET", path: `/api/withdrawals/test-preview${amount === undefined ? "" : `?amount=${encodeURIComponent(amount)}`}`,
-    })),
     list: async () => {
       const first = parseSubmissionPage(await client.request({
         method: "GET", path: "/api/withdrawals?pageNum=1&pageSize=50",
