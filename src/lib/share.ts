@@ -91,9 +91,9 @@ export function channelIntentUrl(def: ShareChannelDef, link: string, text: strin
 }
 
 // 渠道可见性([FEAT-SHARE3] 平台矩阵):enabled 过滤;H5 上 system 需
-// navigator.share 支持。scheme 当前只有复制降级，不冒充可用的外部渠道。
+// navigator.share 支持。scheme 型(Zalo / Messenger)照常展示,点击走「复制文案 + 引导到该 App 粘贴」。
 export function visibleChannels(): ShareChannelDef[] {
-  const list = useConfig().config.share.channels.filter((c) => c.enabled && c.intentType !== "scheme");
+  const list = useConfig().config.share.channels.filter((c) => c.enabled);
   // #ifdef H5
   return list.filter(
     (c) => c.intentType !== "system" || (typeof navigator !== "undefined" && typeof navigator.share === "function"),
