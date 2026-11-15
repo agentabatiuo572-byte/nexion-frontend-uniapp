@@ -1934,7 +1934,7 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
    - **海报**:打开分享海报面板——canvas 生成 750×1000 海报,含**可扫二维码**(payload = 分享链接)、邀请码、可开关的用户名;模板轮播:新人礼(恒可用)/ 我的产出(取用户设备今日实际产出,无设备自动隐藏)/ 我的网络;海报仅承载被邀方向价值(新人礼 + 产品故事),**不出现邀请人向金额**;面板含被邀方奖励说明行、底部渠道行、保存图片(受限浏览器降级为长按保存引导)、复制链接;生成中 / 失败态禁分享与保存,失败可重试。
    - **邀请码 / 链接**:复制到剪贴板;复制失败不展示成功态、不计分享事件。
    - **立即分享**:打开渠道面板——顶部邀请人奖励说明行(数额随 §8.1.1.1 阶段倍率)+ 渠道 grid(`share.channels` 配置驱动,顺序即展示序,§13.3)+ 弱化「取消」。渠道行为:web intent 型直接唤起并预填文案 + 链接(被拦截自动复制降级);无网页直发口的渠道(Zalo / Messenger)在 H5 走「复制文案 + 引导到该 App 粘贴」;系统分享项仅在浏览器支持时显示;渠道配置为空时兜底「复制 + 海报」两项,面板永不空。分享文案模板含礼包金额占位,与 `rewards.welcomeGift` 同源。
-   - **分享事件与任务接线**:任一入口的成功分享动作(复制成功 / 唤起渠道 / 保存海报)记录分享事件(server-canonical `share.performed`),并幂等触发首日任务 `invite_friend` 完成(§5.15.3,仅首次发奖,重复分享不重复计酬)。
+   - **分享事件与任务接线**:任一入口的成功分享动作(复制成功 / 唤起渠道 / 保存海报)记录分享事件(server-canonical `share.performed`),并幂等触发新手任务 `invite_friend` 完成(§5.15.3,仅首次发奖,重复分享不重复计酬)。
 
 ```mermaid
 flowchart LR
@@ -3306,7 +3306,7 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 | Deposit write path | topup PSP webhook | `POST /api/wallet/topup` (TBD; candidate) | PSP webhook → server tx 写 bill + 更 cumulativeDepositUsdt |
 | Wallet 提现限额 + fee 公式 + 日额度 | `app/(main)/me/wallet/withdraw/page.tsx:55,69,209,311` | `GET /api/config/wallet/withdraw-limits` | 监管 / 风控调阈值 |
 | Bundle 折扣 ladder(4 件 12% / 3 件 8% / 2 件 5%)| `lib/store/cart.ts:22-26` | `GET /api/config/cart/bundle-discount` | 促销活动 |
-| Day-One quest 时窗 + 奖励(24h / 72h grace / 500 NEX / 200 NEX)| `lib/mock/quest.ts:33-38` | `GET /api/config/quest/day-one` | 新人转化最核心钩子 |
+| 新手任务期限 + 奖励 | 无前端常量;服务端在任务行下发 `eligibleUntil`、`rewardNex`,组奖励 `dayOneRewardNex`、需完成数 `dayOneRequiredTaskCount` | `GET /api/quests/state`(已接入) | 新人转化最核心钩子;期限由后台配置,不固定为注册当天 |
 | 平台 marketing stats(activeDevices / activeJobs / nodes / countries / uptime + 资金口径由日发放锚派生)| `src/store/app.ts:createInitialGlobal` + `src/lib/platform-stats.ts`(单源锚) | SSE `/api/platform/stats` | 首页/globe/trust 信任数字,server broadcast;服务端沿用同一恒等式(在线设备 × 公布档 = 日发放) |
 | Nova push cadence(10 channel × `{enabled, tickMs, cooldownMs, …}`,见 §11.0A.1)| `lib/v3/_config/stella-cadence.ts` | `GET/PUT /api/admin/stella/cadence-config` (TBD; candidate) + SSE `/api/stella/config-invalidate` 推变更 | 运营 throttle AI 推送频率(per cohort / phase / risk regime),每条 channel 独立 kill-switch |
 | 用户多 range 收益聚合(today / week / month / all)| `useApp.earnings.{today,thisWeek,thisMonth,total}` | `GET /api/me/earnings?range={today\|week\|month\|all}` (TBD; candidate) + SSE `/api/me/earnings/stream` 推 today 滚动 | 4 个 range 独立 server 计算,客户端只渲染;Earn hero 4-tab toggle 全部 streaming |
@@ -3325,7 +3325,7 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 | Events(8 类活动:flash sale / refer / wheel / regional PK)| `lib/mock/events.ts` | `GET /api/events?status=ongoing&region=` | 季度活动滚动 |
 | Weekly quests(Tier1 / Tier2 ID 表) | `lib/mock/weekly-quests.ts` | `GET /api/quests/weekly?weekKey=` | 周更新 |
 | Monthly challenge(5 个 ChallengeId + monthsFrom/To) | `lib/mock/monthly-challenge.ts:11-18` | `GET /api/quests/monthly` | 月主题轮换 |
-| Day-One quest tasks(Stella 推送 + 任务文案) | `lib/mock/stella-templates.ts:253-273` + `lib/mock/quest.ts` | `GET /admin/onboarding/quest-tasks` | A/B 引导文案 |
+| 新手任务清单与任务名 | 无前端清单;服务端按语言下发任务名 | `GET /api/quests/state?locale=`(已接入) | A/B 引导文案 |
 | Marketing namespace(home / tradein / milestones)| `lib/i18n/messages/{en,zh}.ts` 内对应 namespace | `GET /i18n/{namespace}?locale=` | 运营 A/B 多版 |
 
 #### 9.11c.3 核心数字口径三端同源
@@ -4445,18 +4445,16 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 #### 11.13.2 Mission Center `/missions`
 
-5 个 section(自上而下):
+顶部返回标题栏「任务中心」,下方 4 个分段(今日 / 本周 / 活动 / 成就),默认今日:
 
-| Section | 内容 |
+| 分段 | 内容 |
 |---|---|
-| Hero | Trophy + `ALL MISSIONS` 标签 + 标题 + 副文 |
-| **Today** | 链 `/daily` — 每日签到 + streak |
-| **This Week** | 内嵌 `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
-| Day-One Quest | 链 `/`(回 Home 顶部继续 quest)— **仅当 phase ∈ {active, grace} 时显示**(参 §5.15) |
-| Events | 链 `/events` — 显示 `{N} ongoing · {M} joined · {K} claimable` 动态 stat,K > 0 时显示圆 badge(参 §11.10.6)|
-| Achievements | 链 `/me/achievements` — 勋章 closure |
+| **今日** | 每日签到行 + 新手任务卡(`DayOneQuestCard`,任务、期限与奖励均由 `GET /api/quests/state` 下发;无任务时显示「未参加新手任务」说明)+ 推荐课程卡 |
+| **本周** | 内嵌 `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
+| 活动 | 内嵌活动列表(参 §11.10.6)|
+| 成就 | 内嵌成就页 |
 
-每 section 用 `<Section heading icon>` 包装 + `<RouteRow>` 行(圆 icon + label + value + ArrowRight)。
+新手任务在 App 内统一称「新手任务」,九种语言各用一个词:en `New user tasks`、vi `Nhiệm vụ người mới`、id `Misi pengguna baru`、ms `Tugasan pengguna baharu`、fil `Task ng bagong user`、ru `Задания для новичков`、kk `Бастапқы тапсырмалар`、uz `Boshlangʻich vazifalar`;首页待办行、任务中心卡片标题、领取按钮(「领取新手任务奖励」)同名;领取按钮在 390 宽屏内保持一行。任务中心卡片右上角的倒计时不与标题、任务数重叠,语言较长时任务数换到标题下一行。
 
 #### 11.13.3 Weekly Quests Tier 1 派发器(`dispatchTier1`)
 
@@ -4847,30 +4845,25 @@ Conversation:
 }
 ```
 
-### 12.11 Quest(useQuest,persist key `nexgrid-quest-v1`)
+### 12.11 Quest(useQuest)
 
-2026-11-06（BUG-158）任务领取的 HTTP 409、code 409 若明确为 `QUEST_ALREADY_CLAIMED`、`QUEST_INSTANCE_NOT_FOUND`、`QUEST_DEFINITION_INACTIVE`、`QUEST_EXPIRED`、`QUEST_NOT_COMPLETED`，结束对应实例的拒绝命令并读取当前任务，再显示既有本地化状态提示。周任务须先识别这五种回执，再处理其他冲突的未确认恢复。任务中心、首日任务卡及资料保存后的任务奖励共用该提示；拒绝不触发新奖励或成功庆祝。未知回执和失败读回保留原恢复路径。成功 HTTP 非零业务 envelope 的未知冲突、限流和服务错误同样按 envelope code 的歧义语义保留原键，不落入普通业务拒绝的直接收口分支。
+2026-11-06（BUG-158）任务领取的 HTTP 409、code 409 若明确为 `QUEST_ALREADY_CLAIMED`、`QUEST_INSTANCE_NOT_FOUND`、`QUEST_DEFINITION_INACTIVE`、`QUEST_EXPIRED`、`QUEST_NOT_COMPLETED`，结束对应实例的拒绝命令并读取当前任务，再显示既有本地化状态提示。周任务须先识别这五种回执，再处理其他冲突的未确认恢复。任务中心、新手任务卡及资料保存后的任务奖励共用该提示；拒绝不触发新奖励或成功庆祝。未知回执和失败读回保留原恢复路径。成功 HTTP 非零业务 envelope 的未知冲突、限流和服务错误同样按 envelope code 的歧义语义保留原键，不落入普通业务拒绝的直接收口分支。
 
 ```
 {
-  completed: QuestTaskId[];     // 已完成任务 id 数组(持久化,幂等)
-  claimedFinal: boolean;        // 是否已领取全部完成奖励
-  startedAt: number | null;     // quest 24h 窗口起算 epoch ms;首次 ensureStarted 时锁定
-  markComplete(id): QuestCompleteResult;   // 首次完成返回该任务奖励;已完成返回 firstTime:false / 奖励 0(幂等,不重复派奖)
-  claimFinal(): boolean;        // 领取最终 +500 NEX + Day-One Hero badge
-  ensureStarted(): number;      // 若 startedAt === null 则 set Date.now(),否则返回现有值(幂等)
-  isComplete(id): boolean;
-  reset(): void;                // 清空 completed / claimedFinal / startedAt
+  remoteQuests: CanonicalQuest[];        // GET /api/quests/state 的任务行:新手任务(layer DAY_ONE)与每周任务(WEEKLY_T1 / WEEKLY_T2),
+                                         // 含 status(PENDING/COMPLETED/CLAIMABLE/CLAIMED/EXPIRED)、eligibleFrom、eligibleUntil、rewardNex、instanceKey
+  dayOneRewardNex: number;               // 新手任务组奖励(服务端下发)
+  dayOneRequiredTaskCount: number | null;// 新手任务需完成数(服务端在入组时冻结)
+  dayOneSnapshotStatus: "SNAPSHOT" | "EMPTY" | "LEGACY_UNVERIFIED";
+  remoteStatus: "idle" | "loading" | "ready" | "error";
+  refreshRemote(): Promise<boolean>;     // 读取任务状态;到最早的 eligibleUntil 时自动重读
+  claimDayOne(): Promise<boolean>;       // 领取新手任务组奖励:先重读确认仍可领,再 POST /api/quests/{questCode}/claim,成功后读回
+  claimRemote(questCode): Promise<boolean>;  // 领取单项任务奖励
 }
-
-QuestCompleteResult = { firstTime: boolean; rewardNex: number; rewardUsdt: number }
-
-QuestTaskId =
-  "bind_bank_card" | "visit_earn" | "visit_store" |
-  "view_product_roi" | "setup_profile" | "invite_friend"
 ```
 
-各任务奖励见 §5.15.3 任务清单;路由型任务的自动完成 + 派奖编排见 §5.15.7。`markComplete` 只返回是否首次完成 + 应派金额,余额 / 账单写入由调用方编排(store 不互相 import)。
+新手任务的期限不是前端常量,也不固定为注册当天:每项任务的 `eligibleUntil` 由后台配置并下发,首页待办行与任务中心卡片的倒计时据此计算。任务完成事实、奖励金额和领取状态均以服务端为准;页面访问只触发重新读取,前端不自行判定完成或派奖,奖励入账在钱包流水显示为「任务奖励」(`presentationCode=questReward`)。
 
 ### 12.12 NEX 水龙头(useNexFaucet,persist key `nexgrid-nex-faucet`)
 
@@ -5327,9 +5320,8 @@ progressPct = avg(checks);
 | Nova tradein 推送节奏 | 60 min cooldown | `tradein-nudge` cooldownKey;触发条件 = 车队平均产能 < 65% 且持有可置换设备;文案钩子 = 产能/月损 + CTA 跳设备仓库置换入口(§11.0A.2a)|
 | 提现惩罚费率 / NEX 抵扣率 | 费率 P1-P4 20% · P5 25% · P6 30%;抵扣率 $0.40 / NEX(恒定) | `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`,`computeWithdrawFee()`,phase 派发(§9.3.2 / §13.4.1)|
 | Nova ambient 总频率 | 30-60 min cooldown(per channel,§11.0A.1 / §11.0A.2a 表)| v3 收敛后 30 分钟主动浏览 1-3 次,事件触发类(quest / weekly refresh / wrapped)按日历滚动不入此口径 |
-| `QUEST_WINDOW_MS` | 86,400,000(24h) | 首日任务活动窗口 |
-| `QUEST_FINAL_BONUS_NEX` | 500 | 全部 6 任务完成奖励 |
-| `QUEST_BADGE_ID` | `day_one_hero` | 完成解锁的 achievement id |
+| 新手任务期限 | 服务端下发 | 每项任务的 `eligibleUntil`(`GET /api/quests/state`),由后台配置,不固定为注册当天;前端无固定窗口常量 |
+| 新手任务奖励 | 服务端下发 | 组奖励 `dayOneRewardNex`、单项 `rewardNex`、需完成数 `dayOneRequiredTaskCount`;全部完成后在新手任务卡领取 |
 | Lucky 1.5× 概率 | 15% | 签到 Lucky multiplier 1.5× 触发 |
 | Lucky 2× 概率 | 5% | 签到 Lucky multiplier 2× 触发 |
 | 签到基础发放 | +2 NEX / 天 | 每日签到水龙头基础量(§9.8.1)|
@@ -5346,8 +5338,7 @@ progressPct = avg(checks);
 | Genesis 单节点排放参考等值 | 上所后 NEX 排放,展示等值 ≈ 平台日交易额 × 0.1% ÷ 1000 | NEX 计价参考(非保证),上所前不派发;保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4 |
 | 收益里程碑阈值 / 奖励 | $100/$500/$1k/$5k/$10k → +100/250/500/1500/3000 NEX | 累计收益(life-to-date)跨档各触发一次自动派奖 + 庆祝(§11.3a),firedIds 持久化幂等 |
 | 里程碑监听节奏 | 每 4s 一拍 | 跨档检测一次推一档(cascade),`nexgrid-milestones-v1` 持久化已触发档 |
-| 首日路由任务奖励 | visit_earn +30 / visit_store +50 / view_product_roi +100 NEX | 路由型任务首次落地页自动完成派奖(§5.15.7),`nexgrid-quest-v1` 持久化幂等 |
-| 首日路由监听节奏 | 每 1s 一拍 | 读当前页映射任务 id,页面变化才判定 |
+| 新手任务页面访问 | 页面变化时重新读取 | 访问任务对应页面只触发 `GET /api/quests/state` 重读,完成与奖励以服务端为准,前端不派奖 |
 | 订单自动履约节奏 | 每 6s 一拍(全局)/ 每 3s(详情页) | `paid → provisioning → activated` 逐段推进,到 activated 自动生成并激活设备(§7.4)|
 | Initial USDT balance | $24,856.56 | mock user 启动余额(够买 1 张二级 Genesis 留出余量)|
 | 代金券弹窗节流 | 不再自动调度 | `VOUCHER_POPUP` 历史延迟、冷却及单会话次数不触发领取弹层；代金券和试用领取弹层仅由用户点击打开，无自动弹出优先级(§7.7.1)|
