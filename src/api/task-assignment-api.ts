@@ -456,7 +456,7 @@ export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment)
     async state(preferV2 = false) {
       const current = state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
       if (current.protocolVersion === 3) return current;
-      if (preferV2) {
+      if (preferV2 && current.devices.length > 0) {
         try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments" }), mode, true); }
         catch (cause) {
           if (!(cause instanceof ApiError) || cause.kind !== "http" || (cause.status !== 404 && cause.status !== 501)) throw cause;
