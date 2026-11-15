@@ -554,6 +554,8 @@ const toggleStyle: CSSProperties = {
 .newcomer-task--mission .newcomer-task__unit { margin-left:0!important; }
 .newcomer-task--mission .newcomer-task__top { position:relative; }
 .newcomer-task--mission .newcomer-task__clock { position:absolute; right:0; top:12px; transform:translateY(-50%); }
+/* The countdown is absolutely placed; keep the title and task count clear of it, wrapping the count when a language runs long. */
+.newcomer-task--mission .newcomer-task__top > view:first-child { padding-right:80px; }
 .newcomer-task--mission .newcomer-task__progress-copy { margin-top:9.5px!important; }
 .newcomer-task--mission .newcomer-task__summary > view:nth-child(3) > view > view:last-child { display:flex; align-items:center; justify-content:flex-end; }
 

@@ -32,7 +32,7 @@
 > 这 12 条贯穿全站。源 PRD §9.11d/e/f(防篡改/原子性/状态机权威)是其总纲。
 
 ### 0.1 server-canonical(client 仅 UI cache,绝不本地推进)
-所有核心状态机(Trial/Order/Withdrawal/Staking/Device 激活/Commission/Genesis/Phase)、资金值、风控值 **server 唯一权威**;client 通过 `GET /api/{module}/:id` 或 SSE 订阅获取,**绝不本地推进**(§9.11f / §9.11d.2)。首页介绍页数字允许按服务端随机批次进行本地逐秒展示，不本地生成随机数或改变资金状态（见本轮补充 §4）。仅 Day-One Quest(引导)、Notification(UI 态)、Device 衰减展示数字可前端推进。
+所有核心状态机(Trial/Order/Withdrawal/Staking/Device 激活/Commission/Genesis/Phase)、资金值、风控值 **server 唯一权威**;client 通过 `GET /api/{module}/:id` 或 SSE 订阅获取,**绝不本地推进**(§9.11f / §9.11d.2)。首页介绍页数字允许按服务端随机批次进行本地逐秒展示，不本地生成随机数或改变资金状态（见本轮补充 §4）。仅 Notification(UI 态)、Device 衰减展示数字可前端推进;新手任务的完成、期限与奖励同样以服务端为准。
 
 ### 0.2 Idempotency-Key(所有 mutation 必带)
 全部资金/状态 mutation 携 `Idempotency-Key` header(client mint UUIDv4,server dedup 24h):sign-in(login/otp-verify/password-reset)、trial start/redeem-early、staking open/claim/early-withdraw、wallet reinvest、withdrawals。**源 PRD 强调当前 client mutation 均无幂等,网络抖动 retry 会重复扣款/开仓**(§9.11e)。
@@ -113,7 +113,7 @@ trade-in/replace composer 等跨 store 操作:任一步失败全 rollback(设备
 | NetworkPulse | 2×2 metrics+sparkline | 网络 metrics | §5.12 |
 | MathCard | phone vs S1 收益对比 | 常量 | §5.13 |
 | TrustChipWall | 信任 chip 墙 | — | §5.14 |
-| DayOneQuestCard | 3 phase 状态机新用户任务 | `useQuest`(persist v2)、`lib/mock/quest.ts`、`useAchievements`、`useStella` | active/grace/expired;6 任务路由型自动 markComplete;allDone claim 发 NEX+badge | §5.15 |
+| DayOneQuestCard | 新手任务卡 | `useQuest`(`GET /api/quests/state`) | 任务、期限(`eligibleUntil`)与奖励由服务端下发;全部完成后「领取新手任务奖励」(`POST /api/quests/{questCode}/claim`)| §5.11 |
 
 ### 1.4 Earn(`/earn`,§6;单页多组件)
 
@@ -381,8 +381,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 ### 3.M 任务/Quest/激活 — §6/§5.15/§13.3
 - **锁定任务日潜在** = `(86400/avgSec) × QUEUE_SATURATION × avgReward`;`QUEUE_SATURATION=0.35`。
 - **月度任务锁定** = `MONTHLY_LOCKED_TASK_USD[phase] × monthProgress` + 历史累加;`MONTHLY_LOCKED_TASK_USD`:P1-2 $40/P3-4 $140/P5-6 $450。
-- **首日任务最终奖**:全 6 任务 → +500 NEX(`QUEST_FINAL_BONUS_NEX`)+`day_one_hero` badge;`QUEST_WINDOW_MS=86,400,000`(24h)/grace 至 72h。
-- **首日 6 任务单项**:bind_bank_card +50/visit_earn +30/visit_store +50/...(§5.15.4)。
+- **新手任务奖励与期限**:任务清单、单项 `rewardNex`、组奖励 `dayOneRewardNex`、需完成数 `dayOneRequiredTaskCount` 与每项 `eligibleUntil` 均由 `GET /api/quests/state` 下发;期限由后台配置,不固定为注册当天,前端无窗口常量。
 - **Quest 层最大奖**:L1 Daily 100 NEX(streak +500)/L2 Weekly 3,000/L3 Monthly 10,000+勋章。
 - **Lucky Spin**:每日免费 1 次(UTC 日桶,`eventId×userId×spinDate` 计次)+Day-30 里程碑券;8 档 server RNG,概率和 100%;真实奖三护栏+兑付红线自动降级。
 - **设备激活槽位守卫**：`activateDevice()` 守卫 `激活数 + 有效真实预留 < MAX_DEVICES=6`。Cloud Share 按真实份数计槽，手机、PC 算力、Box、Rack 按实例各占一槽，同款多台分别计数；未激活、取消激活或已回收设备不占槽。未付订单不预占库存/槽位，已付待履约、有效试用及已承诺赠送的真实预留仍计入；付款未知先查原结果，不据未知释放。首页、赚取、仓库及选择弹窗共用该口径，满槽时所有型号均不能新增激活。
@@ -546,8 +545,8 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 ### 5.10 Phase 12 月节奏(§13.4,6 phase)
 `getPhaseForMonth(getMonthsSince(joinedAt))` 单调推进 P1→P6(`pinned` 可锁);每 phase 派 7 dial(见 §3.F)。server 权威,phase id/name 永不在用户 UI 出现。
 
-### 5.11 Day-One Quest(§5.15,3 phase · **client 可推进**)
-`active(0-24h·500NEX)→grace(24-72h·200NEX)→expired(72h+·0,不渲染)`;`{active,grace}→claimed`(全 6 任务,creditNex+badge)。纯函数+zustand persist(引导任务非资金权威);expired 整卡 return null。
+### 5.11 新手任务(server 权威)
+任务行状态 `PENDING→COMPLETED/CLAIMABLE→CLAIMED`,超过 `eligibleUntil` 为 `EXPIRED`;期限由后台配置并随任务行下发,不固定为注册当天。全部需完成任务均已完成且仍在期限内时,新手任务卡显示「领取新手任务奖励」,领取前重读确认,领取后读回;奖励入账显示在钱包流水「任务奖励」。前端不本地推进完成或派奖。
 
 ### 5.12 其他状态机(精简)
 - **Commission**(§12.5):`cooling(30d)→unlocked→withdrawn`。
@@ -558,7 +557,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **校准与激活**(§4.7.3):`intro→calibrating(12s)→result→ACTIVE`；检测/绑定失败进入 `error`，可用同一意图重试或 `DEFERRED` 暂缓。首次检测尚未写入校准行时，服务端以 revision 0 持久化不含能力数据的 `DEFERRED`；完成注册不等于获得手机奖励资格。
 
 ### 5.13 横切守卫清单
-1. server canonical:Trial/Order/Withdrawal/Staking/Device 激活/Commission/Genesis/Phase 一律服务端权威;client 可推进仅 Day-One Quest/Notification UI/Device 衰减展示。
+1. server canonical:Trial/Order/Withdrawal/Staking/Device 激活/Commission/Genesis/Phase 一律服务端权威;client 可推进仅 Notification UI/Device 衰减展示。
 2. 失败/退款态欠缺:Order/Withdrawal/Staking 真后台必须扩展(见各节);仅 FreeTrial 7 态完整。
 3. 跨 store mutation 必 rollback+confirmingRef;资金不入余额(salvage/trial shadow);二次确认(trial 购买/取消激活有任务/提现 risk gate)。
 

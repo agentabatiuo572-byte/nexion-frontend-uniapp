@@ -5028,14 +5028,14 @@ openSeaErrorPool: {
   },
 
   quest: {
-    title: "首日任务",
+    title: "新手任务",
     completed: "{n}/{n} 完成",
     expired: "已过期",
     progress: "已完成 {done} / {total}",
     expand: "查看 {n} 项任务",
     collapse: "收起任务",
     routeToast: "任务完成 · +{n} UVT",
-    bindCardMemo: "首日任务 · 绑定银行卡",
+    bindCardMemo: "新手任务 · 绑定银行卡",
 
     routeMemo: "新手任务 · {task}",
     t_bind_bank_card: "绑定银行卡",
@@ -5145,7 +5145,7 @@ openSeaErrorPool: {
     linkUnavailable: "邀请链接暂不可用，请检查网络后重试",
     copyFailed: "复制失败,请重试",
     shareText: "我在用 UVEL 参与 AI 算力任务。用我的链接注册，可领 ${usd} + {nex} UVT 新人礼 → {link}",
-    questRewardMemo: "首日任务 · 邀请好友",
+    questRewardMemo: "新手任务 · 邀请好友",
     questRewardToast: "任务完成:邀请好友",
     eventFailed: "分享已发出，任务奖励稍后更新。",
     posterGiftCap: "WELCOME GIFT",

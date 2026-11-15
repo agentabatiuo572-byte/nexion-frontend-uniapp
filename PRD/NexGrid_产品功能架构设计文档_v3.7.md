@@ -971,7 +971,7 @@ H5 Lite 首页采用本节的 App 结构与视觉（P-56 / P-57 / P-62），只�
 - **待办**（§5.5）：不出现手机绑定 / 校准待办，H5 不提供手机执行入口。
 - **设备对比**（§5.8b）：不以手机为基准，也不展示手机升级对比；服务端投影以手机为基准时整个区块隐藏。
 - **App 下载横幅**：仅 H5、已登录时在每日签到下方显示通用 App 下载横幅，「下载 App」进入 `/pages/register/success?download=1` 下载专用模式（§4.1.1）。
-- **新手 / 周任务**：正式模式读取服务器首次进入时冻结的任务组，不在客户端重建任务或逐项发奖。显示时隐藏手机连接、校准、激活及购买任务；`stakingVisible=false` 时同时隐藏质押 / 复投任务。首页待办里的新手任务摘要（完成数、奖励与可领取状态）、任务页和周任务转换横幅一致过滤；服务端组数量与领取判定保持原样。若首日任务组有成员因 Lite 范围被过滤，整组显示「该任务组包含网页版不可用的任务，暂时无法在此完成或领取」，隐藏进度和领取入口，不把剩余任务展示成完成。浏览类任务的进度记录被服务端以“需完成初始设置”（`USER_ONBOARDING_REQUIRED`）拒绝时，任务下方显示「任务进度暂时无法记录，请联系客服。」，操作为「联系客服」（进入 `/support/messages`）与「重新访问任务」，不出现设置文案（2026-11-03 BUG-068）。
+- **新手 / 周任务**：正式模式读取服务器首次进入时冻结的任务组，不在客户端重建任务或逐项发奖。显示时隐藏手机连接、校准、激活及购买任务；`stakingVisible=false` 时同时隐藏质押 / 复投任务。首页待办里的新手任务摘要（完成数、奖励与可领取状态）、任务页和周任务转换横幅一致过滤；服务端组数量与领取判定保持原样。若新手任务组有成员因 Lite 范围被过滤，整组显示「该任务组包含网页版不可用的任务，暂时无法在此完成或领取」，隐藏进度和领取入口，不把剩余任务展示成完成。浏览类任务的进度记录被服务端以“需完成初始设置”（`USER_ONBOARDING_REQUIRED`）拒绝时，任务下方显示「任务进度暂时无法记录，请联系客服。」，操作为「联系客服」（进入 `/support/messages`）与「重新访问任务」，不出现设置文案（2026-11-03 BUG-068）。
 - **资金记录**：今日收益、收益流水、最近收入等金额记录完整包含手机收益，不套用设备列表过滤。
 - **网络实况**（§5.8）：只显示注册用户与在线设备两栏，不显示「设备排名」栏及其排名说明（App 的排名按当前绑定手机的有效算力计算，Lite 不承载手机算力），也不读取个人排名接口；两栏任一不可用时整卡隐藏。
 - **活动位**（§5.7）：活动按 §11.10 的明确身份规则展示，只含手机商品的活动不出现；赠品为手机的规则（`DEVICE` 奖励的 `giftProductNo` 是手机身份）同样算手机规则，赠品名称、图片与权益都不展示（2026-11-03 BUG-078）。混合活动去掉手机商品和手机规则后不再使用运营上传的活动图（图上可能是手机），改用商品与奖励卡片；某商品的规则全部被去掉时，该商品也退出这场活动，仍作为普通商品在商城出售；所有规则都被去掉的活动不出现。按活动编号打开的商城、商品详情与组合页同样适用，被整场过滤的活动按不存在处理。团队页的邀请购机卡不再宣传被整场过滤的邀请活动，但用户在该活动已获得的奖励记录（如 USDT / UVT）仍显示在「我的购机礼」，可进入奖励详情；该活动的进度首次读取失败时，这一栏显示「信息暂不可用」与「重新加载」，不会让记录无提示地消失（2026-11-03 BUG-083）。
@@ -1306,9 +1306,9 @@ H5 Lite 不展示手机设备、不采集或校准手机；本节只记录 App �
 
 ### 6.11 APP 与 H5 的手机执行资格
 
-H5 Lite 是唯一网页产品线。手机号注册和带注册回执的第三方注册进入注册成功页（§4.1.1），由「继续网页版」进入首页，不经过任何手机激活或暂缓步骤；登录、注册恢复、试用、充值及任务恢复均不进入 `/onboarding/connect` 或 `/onboarding/estimator`，两页不注册进 Lite 路由；旧 `entry-surfaces/index|signed|h5|white` 三端走查页也从 Lite 路由移除，不再通过旧链接展示手机算力或原生入口。直接打开、刷新任何未注册的页面地址（含上述旧链接与 `/pages/tabs/tabs`），或在已打开的网页里把地址栏改成这类地址时，都回到首页（未登录再由首页进入登录），不停在空白页（2026-11-03 BUG-077）。是否已注册与网页路由的匹配方式完全一致：不区分大小写，允许带查询参数和一个结尾斜杠，不解码编码字符、不合并重复斜杠。地址栏改成 `/pages/STORE/store` 或 `/pages/store/store?x=1` 时正常打开该页，不回首页（2026-11-03 BUG-083）；改成 `/pages/%73tore/store` 这类含编码字符或重复斜杠、网页路由打不开的地址时回到首页（2026-11-03 BUG-086）。Lite 没有初始设置步骤：结算、试用领取、首日任务进度与课程开始遇到服务端“需完成初始设置”（`USER_ONBOARDING_REQUIRED`）时，统一提示该操作暂时无法进行并提供「联系客服」（`/support/messages`），不出现“完成初始设置”文案（2026-11-03 BUG-068）。首页保留通用 App 下载横幅，下载页保留 iOS / Android / 官网链接。
+H5 Lite 是唯一网页产品线。手机号注册和带注册回执的第三方注册进入注册成功页（§4.1.1），由「继续网页版」进入首页，不经过任何手机激活或暂缓步骤；登录、注册恢复、试用、充值及任务恢复均不进入 `/onboarding/connect` 或 `/onboarding/estimator`，两页不注册进 Lite 路由；旧 `entry-surfaces/index|signed|h5|white` 三端走查页也从 Lite 路由移除，不再通过旧链接展示手机算力或原生入口。直接打开、刷新任何未注册的页面地址（含上述旧链接与 `/pages/tabs/tabs`），或在已打开的网页里把地址栏改成这类地址时，都回到首页（未登录再由首页进入登录），不停在空白页（2026-11-03 BUG-077）。是否已注册与网页路由的匹配方式完全一致：不区分大小写，允许带查询参数和一个结尾斜杠，不解码编码字符、不合并重复斜杠。地址栏改成 `/pages/STORE/store` 或 `/pages/store/store?x=1` 时正常打开该页，不回首页（2026-11-03 BUG-083）；改成 `/pages/%73tore/store` 这类含编码字符或重复斜杠、网页路由打不开的地址时回到首页（2026-11-03 BUG-086）。Lite 没有初始设置步骤：结算、试用领取、新手任务进度与课程开始遇到服务端“需完成初始设置”（`USER_ONBOARDING_REQUIRED`）时，统一提示该操作暂时无法进行并提供「联系客服」（`/support/messages`），不出现“完成初始设置”文案（2026-11-03 BUG-068）。首页保留通用 App 下载横幅，下载页保留 iOS / Android / 官网链接。
 
-Lite 不展示手机设备、激活 / 校准卡、手机收益方式、重新校准动作或扫码邀请入口；首页、Earn、设备仓库、详情和搜索只展示可在网页管理的设备。隐藏手机仍保留在服务器设备账本中并占用原槽位，不以可见卡片数重算容量。设备与实时任务视图同时排除 PHONE / MOBILE；账号级结算汇总、批次及明细、任务 / 周期凭证历史仍完整包含手机收益（§6.3、§11.5.1），不套用设备列表过滤。试用独占一槽，服务器 slotsUsed 已包含试用与预留时不再叠加（§6.4）。服务端任务以明确手机动作路由、任务码或中英越文标题识别并隐藏；账号手机号任务先按稳定代码（如 `bind_mobile` / `bind_phone` / `verify_phone`）或资料 / 安全页动作路由豁免，不依赖标题翻译判断。商品只按明确身份过滤：结构化 `productType=SHARE` 与已知硬件 SKU 优先保留，包括 Mobile Cloud Share，以及 ID 为 `stellarbox-pro`、名为 Mobile GPU Server 的设备。其余仅在明确 `kind=phone` 或已知手机 SKU ID / code（`phone`、`phone-basic`、`iphone15`，不区分大小写）时隐藏，绝不按显示名称推断手机；目标推荐共用此规则并可读取现有目录类型。当前目录只有 DEVICE / SHARE，没有手机专属 device kind；未知 SKU 保留，后台仍需约束手机发布并补充结构化身份。首页促销在 API 边界先将后端原始 `SERVER` 归一为 `DEVICE`，再校验并保留 `productType`；`SERVER` 不得导致首日 / 周任务快照整体失效。随后选取周任务来源和生成卡片时共用同一份身份过滤结果；`targetDevice` 仅精确匹配已知 SKU，不对自由名称作手机判断。活动 SHARE 无论名称都保留，未下发类型的旧促销仍兼容。首日任务的原始组条件、数量和奖励不改写，若服务器组仍要求隐藏任务，应由服务器调整发布。无法识别的运营自由文案需后台清理，不猜测不透明标识。公开法律文本及手机号身份、验证码功能保留。
+Lite 不展示手机设备、激活 / 校准卡、手机收益方式、重新校准动作或扫码邀请入口；首页、Earn、设备仓库、详情和搜索只展示可在网页管理的设备。隐藏手机仍保留在服务器设备账本中并占用原槽位，不以可见卡片数重算容量。设备与实时任务视图同时排除 PHONE / MOBILE；账号级结算汇总、批次及明细、任务 / 周期凭证历史仍完整包含手机收益（§6.3、§11.5.1），不套用设备列表过滤。试用独占一槽，服务器 slotsUsed 已包含试用与预留时不再叠加（§6.4）。服务端任务以明确手机动作路由、任务码或中英越文标题识别并隐藏；账号手机号任务先按稳定代码（如 `bind_mobile` / `bind_phone` / `verify_phone`）或资料 / 安全页动作路由豁免，不依赖标题翻译判断。商品只按明确身份过滤：结构化 `productType=SHARE` 与已知硬件 SKU 优先保留，包括 Mobile Cloud Share，以及 ID 为 `stellarbox-pro`、名为 Mobile GPU Server 的设备。其余仅在明确 `kind=phone` 或已知手机 SKU ID / code（`phone`、`phone-basic`、`iphone15`，不区分大小写）时隐藏，绝不按显示名称推断手机；目标推荐共用此规则并可读取现有目录类型。当前目录只有 DEVICE / SHARE，没有手机专属 device kind；未知 SKU 保留，后台仍需约束手机发布并补充结构化身份。首页促销在 API 边界先将后端原始 `SERVER` 归一为 `DEVICE`，再校验并保留 `productType`；`SERVER` 不得导致新手 / 周任务快照整体失效。随后选取周任务来源和生成卡片时共用同一份身份过滤结果；`targetDevice` 仅精确匹配已知 SKU，不对自由名称作手机判断。活动 SHARE 无论名称都保留，未下发类型的旧促销仍兼容。新手任务的原始组条件、数量和奖励不改写，若服务器组仍要求隐藏任务，应由服务器调整发布。无法识别的运营自由文案需后台清理，不猜测不透明标识。公开法律文本及手机号身份、验证码功能保留。
 
 以下各段为 App 原生端的手机执行与校准规则，Lite 不实现这些流程，仅供对照。
 
@@ -1859,7 +1859,7 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
    - **海报**:打开分享海报面板——canvas 生成 750×1000 海报,含**可扫二维码**(payload = 分享链接)、邀请码、可开关的用户名;模板轮播:新人礼(恒可用)/ 我的产出(取用户设备今日实际产出,无设备自动隐藏)/ 我的网络;海报仅承载被邀方向价值(新人礼 + 产品故事),**不出现邀请人向金额**;面板含被邀方奖励说明行、底部渠道行、保存图片(受限浏览器降级为长按保存引导)、复制链接;生成中 / 失败态禁分享与保存,失败可重试。
    - **邀请码 / 链接**:复制到剪贴板;复制失败不展示成功态、不计分享事件。
    - **立即分享**:打开渠道面板——顶部邀请人奖励说明行(数额随 §8.1.1.1 阶段倍率)+ 渠道 grid(`share.channels` 配置驱动,顺序即展示序,§13.3)+ 弱化「取消」。渠道行为:web intent 型直接唤起并预填文案 + 链接(被拦截自动复制降级);无网页直发口的渠道(Zalo / Messenger)在 H5 走「复制文案 + 引导到该 App 粘贴」;系统分享项仅在浏览器支持时显示;渠道配置为空时兜底「复制 + 海报」两项,面板永不空。分享文案模板含礼包金额占位,与 `rewards.welcomeGift` 同源。
-   - **分享事件与任务接线**:任一入口的成功分享动作(复制成功 / 唤起渠道 / 保存海报)记录分享事件(server-canonical `share.performed`),并幂等触发首日任务 `invite_friend` 完成(新手任务见 §5.0「新手 / 周任务」与 §5.5,以服务端任务组为准;仅首次发奖,重复分享不重复计酬)。
+   - **分享事件与任务接线**:任一入口的成功分享动作(复制成功 / 唤起渠道 / 保存海报)记录分享事件(server-canonical `share.performed`),并幂等触发新手任务 `invite_friend` 完成(新手任务见 §5.0「新手 / 周任务」与 §5.5,以服务端任务组为准;仅首次发奖,重复分享不重复计酬)。
 
 ```mermaid
 flowchart LR
@@ -2730,7 +2730,7 @@ i18n keys 在 `exchangeHowItWorks.*` namespace ~35 keys。
 
 ### 9.6 Staking 质押(USDT 锁仓)`/staking`
 
-**Lite 可见性**：采用 App `45f60a23` / `d4cae8b9` 及后续修正的 `featureFlags.stakingVisible`。服务端字段缺省视为开启，未取得配置前不显示。关闭时隐藏首页快捷入口、提现替代卡、签到质押增益、首日 / 周任务与转换横幅、搜索、活动、Genesis 增益入口、钱包复投入口；拒绝 `/pages/staking/*` 及复投页导航。直接打开这些页面也重读开关并回首页，页面在前台期间每 15 秒重读，关闭已有弹层。Lite 既有 Earn 模板没有 App 的收益方式卡，不新增手机或质押卡。
+**Lite 可见性**：采用 App `45f60a23` / `d4cae8b9` 及后续修正的 `featureFlags.stakingVisible`。服务端字段缺省视为开启，未取得配置前不显示。关闭时隐藏首页快捷入口、提现替代卡、签到质押增益、新手 / 周任务与转换横幅、搜索、活动、Genesis 增益入口、钱包复投入口；拒绝 `/pages/staking/*` 及复投页导航。直接打开这些页面也重读开关并回首页，页面在前台期间每 15 秒重读，关闭已有弹层。Lite 既有 Earn 模板没有 App 的收益方式卡，不新增手机或质押卡。
 
 正式模式的期限、参考年奖励率、最低金额及提前退出规则由服务端 G1 方案提供；下表仅为旧本地演示示例，不覆盖服务器配置。
 
@@ -3125,7 +3125,7 @@ Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则
 | Deposit write path | topup PSP webhook | `POST /api/wallet/topup` (TBD; candidate) | PSP webhook → server tx 写 bill + 更 cumulativeDepositUsdt |
 | Wallet 提现限额 + fee 公式 + 日额度 | `app/(main)/me/wallet/withdraw/page.tsx:55,69,209,311` | `GET /api/config/wallet/withdraw-limits` | 监管 / 风控调阈值 |
 | Bundle 折扣 ladder(4 件 12% / 3 件 8% / 2 件 5%)| `lib/store/cart.ts:22-26` | `GET /api/config/cart/bundle-discount` | 促销活动 |
-| Day-One quest 时窗 + 奖励(24h / 72h grace / 500 NEX / 200 NEX)| `lib/mock/quest.ts:33-38` | `GET /api/config/quest/day-one` | 新人转化最核心钩子 |
+| 新手任务期限 + 奖励 | 无前端常量;服务端在任务行下发 `eligibleUntil`、`rewardNex`,组奖励 `dayOneRewardNex`、需完成数 `dayOneRequiredTaskCount` | `GET /api/quests/state`(已接入) | 新人转化最核心钩子;期限由后台配置,不固定为注册当天 |
 | 平台 marketing stats(activeDevices / activeJobs / nodes / countries / uptime + 资金口径由日发放锚派生)| `src/store/app.ts:createInitialGlobal` + `src/lib/platform-stats.ts`(单源锚) | SSE `/api/platform/stats` | 首页/globe/trust 信任数字,server broadcast;服务端沿用同一恒等式(在线设备 × 公布档 = 日发放) |
 | Nova push cadence(10 channel × `{enabled, tickMs, cooldownMs, …}`,见 §11.0A.1)| `lib/v3/_config/stella-cadence.ts` | `GET/PUT /api/admin/stella/cadence-config` (TBD; candidate) + SSE `/api/stella/config-invalidate` 推变更 | 运营 throttle AI 推送频率(per cohort / phase / risk regime),每条 channel 独立 kill-switch |
 | 用户多 range 收益聚合(today / week / month / all)| `useApp.earnings.{today,thisWeek,thisMonth,total}` | `GET /api/me/earnings?range={today\|week\|month\|all}` (TBD; candidate) + SSE `/api/me/earnings/stream` 推 today 滚动 | 4 个 range 独立 server 计算,客户端只渲染;Earn hero 4-tab toggle 全部 streaming |
@@ -3144,7 +3144,7 @@ Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则
 | Events(8 类活动:flash sale / refer / wheel / regional PK)| `lib/mock/events.ts` | `GET /api/events?status=ongoing&region=` | 季度活动滚动 |
 | Weekly quests(Tier1 / Tier2 ID 表) | `lib/mock/weekly-quests.ts` | `GET /api/quests/weekly?weekKey=` | 周更新 |
 | Monthly challenge(5 个 ChallengeId + monthsFrom/To) | `lib/mock/monthly-challenge.ts:11-18` | `GET /api/quests/monthly` | 月主题轮换 |
-| Day-One quest tasks(Stella 推送 + 任务文案) | `lib/mock/stella-templates.ts:253-273` + `lib/mock/quest.ts` | `GET /admin/onboarding/quest-tasks` | A/B 引导文案 |
+| 新手任务清单与任务名 | 无前端清单;服务端按语言下发任务名 | `GET /api/quests/state?locale=`(已接入) | A/B 引导文案 |
 | Marketing namespace(home / tradein / milestones)| `lib/i18n/messages/{en,zh}.ts` 内对应 namespace | `GET /i18n/{namespace}?locale=` | 运营 A/B 多版 |
 
 #### 9.11c.3 核心数字口径三端同源
@@ -4227,18 +4227,16 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 #### 11.13.2 Mission Center `/missions`
 
-5 个 section(自上而下):
+顶部返回标题栏「任务中心」,下方 4 个分段(今日 / 本周 / 活动 / 成就),默认今日:
 
-| Section | 内容 |
+| 分段 | 内容 |
 |---|---|
-| Hero | Trophy + `ALL MISSIONS` 标签 + 标题 + 副文 |
-| **Today** | 链 `/daily` — 每日签到 + streak |
-| **This Week** | 内嵌 `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
-| Day-One Quest | 链 `/`(回 Home 顶部继续 quest)— **仅当 phase ∈ {active, grace} 时显示**(参 §5.0、§5.5) |
-| Events | 链 `/events` — 显示 `{N} ongoing · {M} joined · {K} claimable` 动态 stat,K > 0 时显示圆 badge(参 §11.10.6)|
-| Achievements | 链 `/me/achievements` — 勋章 closure |
+| **今日** | 每日签到行 + 新手任务卡(`DayOneQuestCard`,任务、期限与奖励均由 `GET /api/quests/state` 下发;无任务时显示「未参加新手任务」说明)+ 推荐课程卡;Lite 的过滤规则见 §5.0「新手 / 周任务」|
+| **本周** | 内嵌 `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
+| 活动 | 内嵌活动列表(参 §11.10.6)|
+| 成就 | 内嵌成就页 |
 
-每 section 用 `<Section heading icon>` 包装 + `<RouteRow>` 行(圆 icon + label + value + ArrowRight)。
+新手任务在 H5 Lite 内统一称「新手任务」,九种语言各用一个词:en `New user tasks`、vi `Nhiệm vụ người mới`、id `Misi pengguna baru`、ms `Tugasan pengguna baharu`、fil `Task ng bagong user`、ru `Задания для новичков`、kk `Бастапқы тапсырмалар`、uz `Boshlangʻich vazifalar`;首页待办行、任务中心卡片标题、领取按钮(「领取新手任务奖励」)同名;领取按钮在 390 宽屏内保持一行。任务中心卡片右上角的倒计时不与标题、任务数重叠,语言较长时任务数换到标题下一行。
 
 #### 11.13.3 Weekly Quests Tier 1 派发器(`dispatchTier1`)
 
@@ -4629,30 +4627,25 @@ Conversation:
 }
 ```
 
-### 12.11 Quest(useQuest,persist key `nexgrid-quest-v1`)
+### 12.11 Quest(useQuest)
 
-2026-11-06（BUG-158）任务领取的 HTTP 409、code 409 若明确为 `QUEST_ALREADY_CLAIMED`、`QUEST_INSTANCE_NOT_FOUND`、`QUEST_DEFINITION_INACTIVE`、`QUEST_EXPIRED`、`QUEST_NOT_COMPLETED`，结束对应实例的拒绝命令并读取当前任务，再显示既有本地化状态提示。周任务须先识别这五种回执，再处理其他冲突的未确认恢复。任务中心、首日任务卡及资料保存后的任务奖励共用该提示；拒绝不触发新奖励或成功庆祝。未知回执和失败读回保留原恢复路径。成功 HTTP 非零业务 envelope 的未知冲突、限流和服务错误同样按 envelope code 的歧义语义保留原键，不落入普通业务拒绝的直接收口分支。
+2026-11-06（BUG-158）任务领取的 HTTP 409、code 409 若明确为 `QUEST_ALREADY_CLAIMED`、`QUEST_INSTANCE_NOT_FOUND`、`QUEST_DEFINITION_INACTIVE`、`QUEST_EXPIRED`、`QUEST_NOT_COMPLETED`，结束对应实例的拒绝命令并读取当前任务，再显示既有本地化状态提示。周任务须先识别这五种回执，再处理其他冲突的未确认恢复。任务中心、新手任务卡及资料保存后的任务奖励共用该提示；拒绝不触发新奖励或成功庆祝。未知回执和失败读回保留原恢复路径。成功 HTTP 非零业务 envelope 的未知冲突、限流和服务错误同样按 envelope code 的歧义语义保留原键，不落入普通业务拒绝的直接收口分支。
 
 ```
 {
-  completed: QuestTaskId[];     // 已完成任务 id 数组(持久化,幂等)
-  claimedFinal: boolean;        // 是否已领取全部完成奖励
-  startedAt: number | null;     // quest 24h 窗口起算 epoch ms;首次 ensureStarted 时锁定
-  markComplete(id): QuestCompleteResult;   // 首次完成返回该任务奖励;已完成返回 firstTime:false / 奖励 0(幂等,不重复派奖)
-  claimFinal(): boolean;        // 领取最终 +500 NEX + Day-One Hero badge
-  ensureStarted(): number;      // 若 startedAt === null 则 set Date.now(),否则返回现有值(幂等)
-  isComplete(id): boolean;
-  reset(): void;                // 清空 completed / claimedFinal / startedAt
+  remoteQuests: CanonicalQuest[];        // GET /api/quests/state 的任务行:新手任务(layer DAY_ONE)与每周任务(WEEKLY_T1 / WEEKLY_T2),
+                                         // 含 status(PENDING/COMPLETED/CLAIMABLE/CLAIMED/EXPIRED)、eligibleFrom、eligibleUntil、rewardNex、instanceKey
+  dayOneRewardNex: number;               // 新手任务组奖励(服务端下发)
+  dayOneRequiredTaskCount: number | null;// 新手任务需完成数(服务端在入组时冻结)
+  dayOneSnapshotStatus: "SNAPSHOT" | "EMPTY" | "LEGACY_UNVERIFIED";
+  remoteStatus: "idle" | "loading" | "ready" | "error";
+  refreshRemote(): Promise<boolean>;     // 读取任务状态;到最早的 eligibleUntil 时自动重读
+  claimDayOne(): Promise<boolean>;       // 领取新手任务组奖励:先重读确认仍可领,再 POST /api/quests/{questCode}/claim,成功后读回
+  claimRemote(questCode): Promise<boolean>;  // 领取单项任务奖励
 }
-
-QuestCompleteResult = { firstTime: boolean; rewardNex: number; rewardUsdt: number }
-
-QuestTaskId =
-  "bind_bank_card" | "visit_earn" | "visit_store" |
-  "view_product_roi" | "setup_profile" | "invite_friend"
 ```
 
-正式模式的任务与奖励由服务端冻结任务组下发(§5.0「新手 / 周任务」、§5.5);本 store 的六项清单与路由型自动完成只用于本地演示。`markComplete` 只返回是否首次完成 + 应派金额,余额 / 账单写入由调用方编排(store 不互相 import)。
+新手任务的期限不是前端常量,也不固定为注册当天:每项任务的 `eligibleUntil` 由后台配置并下发,首页待办行与任务中心卡片的倒计时据此计算。任务完成事实、奖励金额和领取状态均以服务端为准;页面访问只触发重新读取,前端不自行判定完成或派奖,奖励入账在钱包流水显示为「任务奖励」(`presentationCode=questReward`)。Lite 的任务过滤与整组不可领规则见 §5.0「新手 / 周任务」、§5.5。
 
 ### 12.12 NEX 水龙头(useNexFaucet,persist key `nexgrid-nex-faucet`)
 
@@ -5109,9 +5102,8 @@ progressPct = avg(checks);
 | Nova tradein 推送节奏 | 60 min cooldown | `tradein-nudge` cooldownKey;触发条件 = 车队平均产能 < 65% 且持有可置换设备;文案钩子 = 产能/月损 + CTA 跳设备仓库置换入口(§11.0A.2a)|
 | 提现惩罚费率 / NEX 抵扣率 | 费率 P1-P4 20% · P5 25% · P6 30%;抵扣率 $0.40 / NEX(恒定) | `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`,`computeWithdrawFee()`,phase 派发(§9.3.2 / §13.4.1)|
 | Nova ambient 总频率 | 30-60 min cooldown(per channel,§11.0A.1 / §11.0A.2a 表)| v3 收敛后 30 分钟主动浏览 1-3 次,事件触发类(quest / weekly refresh / wrapped)按日历滚动不入此口径 |
-| `QUEST_WINDOW_MS` | 86,400,000(24h) | 首日任务活动窗口 |
-| `QUEST_FINAL_BONUS_NEX` | 500 | 全部 6 任务完成奖励 |
-| `QUEST_BADGE_ID` | `day_one_hero` | 完成解锁的 achievement id |
+| 新手任务期限 | 服务端下发 | 每项任务的 `eligibleUntil`(`GET /api/quests/state`),由后台配置,不固定为注册当天;前端无固定窗口常量 |
+| 新手任务奖励 | 服务端下发 | 组奖励 `dayOneRewardNex`、单项 `rewardNex`、需完成数 `dayOneRequiredTaskCount`;全部完成后在新手任务卡领取 |
 | Lucky 1.5× 概率 | 15% | 签到 Lucky multiplier 1.5× 触发 |
 | Lucky 2× 概率 | 5% | 签到 Lucky multiplier 2× 触发 |
 | 签到基础发放 | +2 NEX / 天 | 每日签到水龙头基础量(§9.8.1)|
@@ -5128,8 +5120,7 @@ progressPct = avg(checks);
 | Genesis 单节点排放参考等值 | 上所后 NEX 排放,展示等值 ≈ 平台日交易额 × 0.1% ÷ 1000 | NEX 计价参考(非保证),上所前不派发;保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4 |
 | 收益里程碑阈值 / 奖励 | $100/$500/$1k/$5k/$10k → +100/250/500/1500/3000 NEX | 累计收益(life-to-date)跨档各触发一次自动派奖 + 庆祝(§11.3a),firedIds 持久化幂等 |
 | 里程碑监听节奏 | 每 4s 一拍 | 跨档检测一次推一档(cascade),`nexgrid-milestones-v1` 持久化已触发档 |
-| 首日路由任务奖励 | visit_earn +30 / visit_store +50 / view_product_roi +100 NEX | 路由型任务首次落地页自动完成派奖(仅本地演示;正式模式由服务端判定,§5.0),`nexgrid-quest-v1` 持久化幂等 |
-| 首日路由监听节奏 | 每 1s 一拍 | 读当前页映射任务 id,页面变化才判定 |
+| 新手任务页面访问 | 页面变化时重新读取 | 访问任务对应页面只触发 `GET /api/quests/state` 重读,完成与奖励以服务端为准,前端不派奖 |
 | 订单自动履约节奏 | 每 6s 一拍(全局)/ 每 3s(详情页) | `paid → provisioning → activated` 逐段推进,到 activated 自动生成并激活设备(§7.4)|
 | Initial USDT balance | $24,856.56 | mock user 启动余额(够买 1 张二级 Genesis 留出余量)|
 | 代金券弹窗节流 | 延迟 1,300ms / 冷却 24h / 单会话 1 次 | `VOUCHER_POPUP`;首页 voucher 弹窗延迟早于试用(1,500ms)→ 优先弹券,无可领券时让位试用(§7.7.1)|
