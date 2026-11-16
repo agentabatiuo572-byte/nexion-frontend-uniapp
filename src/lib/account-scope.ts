@@ -1,3 +1,4 @@
+import { revokeAcceptedTabSnapshots } from "./tab-first-screen-snapshot";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useGenesis } from "@/store/genesis";
 import { useVRank } from "@/store/v-rank";
@@ -76,6 +77,7 @@ export function isCurrentAccountScope(request: RemoteAccountRequest): boolean {
  * sponsorship 的推荐归因也按账号重绑，避免同设备不同账号串展示/串礼。
  */
 export function rebindAccountScopedStores(accountKey: string): void {
+  revokeAcceptedTabSnapshots();
   useMessageDrawer().bindAccount();
   remoteAccountScope.bind(accountKey);
   const accountScope = remoteAccountScope.snapshot();

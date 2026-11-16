@@ -1,3 +1,5 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { earningsReleaseApi } from "@/api/runtime";
 import type { EarningsReleaseStatus } from "@/api/earnings-release-api";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
@@ -44,6 +46,7 @@ export function refreshEarningsReleaseStatus(
     return Promise.reject(new Error("EARNINGS_RELEASE_ACCOUNT_CHANGED"));
   }
   const readScope = passiveTabReadScope();
+  const snapshotWrite = captureTabSnapshotWrite();
   const runScope = captureRuntimeRevision();
   const owner = JSON.stringify([requestedAccountKey, earningsReleaseRefreshSequence, readScope, runScope.epoch]);
   if (earningsReleasePending?.owner === owner) return earningsReleasePending.promise;
@@ -63,6 +66,7 @@ export function refreshEarningsReleaseStatus(
       earningsReleaseSnapshot.value = status;
       earningsReleaseHasSnapshot.value = true;
       earningsReleaseStatus.value = "ready";
+      saveTabSnapshot(snapshotWrite, "release", { pending: status.buckets.pending_review, locked: status.buckets.bonus_locked }, null);
       return status;
     } catch (error) {
       if (activeEarningsReleaseAccountKey === requestedAccountKey
@@ -71,6 +75,7 @@ export function refreshEarningsReleaseStatus(
         // This store is read directly by wallet surfaces that do not consume the
         // status ref. Do not leave a failed quote visible for them to present as
         // current; a refresh may retain its snapshot only while it is loading.
+        if (!isTransientReadFailure(error)) invalidateTabSnapshots(["release"], snapshotWrite);
         earningsReleaseSnapshot.value = null;
         earningsReleaseHasSnapshot.value = false;
         earningsReleaseStatus.value = "error";

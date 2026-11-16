@@ -8,7 +8,7 @@
       </view>
     </view>
     <view class="team-ledger__amount tabular-nums"><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__currency">{{ monthUSDTParts.prefix }}</text><text>{{ visibility.mask(intPart) }}</text><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__fraction">.{{ fracPart }}</text></view>
-    <text class="team-ledger__nex tabular-nums">{{ visibility.mask(hasAmounts ? '+' + formatAmount(props.monthNEX) : '—') }} UVT</text>
+    <text class="team-ledger__nex tabular-nums">{{ visibility.mask(hasAmounts && props.monthNEX !== null ? '+' + formatAmount(props.monthNEX) : '—') }} UVT</text>
     <view class="team-ledger__settlement" :aria-label="copy.settlementScope">
       <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot" aria-hidden="true" /><text>{{ t.teamV3.settled }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(props.unlockedUSDT) : '—') }}</text></view>
       <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot team-ledger__dot--cooling" aria-hidden="true" /><text>{{ t.teamV3.coolingDown }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(props.coolingUSDT) : '—') }}</text></view>
@@ -33,6 +33,7 @@
 </template>
 
 <script setup lang="ts">
+import { remoteApiEnabled } from "@/api/runtime";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd, formatUsdOverviewParts } from '@/lib/usd-display';
 import { navTo } from "@/lib/route";
@@ -47,14 +48,15 @@ import { useCountUp } from '@/composables/use-count-up';
 
 const props = withDefaults(defineProps<{
   available?: boolean;
+  snapshotDisplay?: boolean;
   loading?: boolean;
   failed?: boolean;
   totalUSDTLifetime: number;
   contributors: number;
   directUSDT: number;
   extendedUSDT: number;
-  monthUSDT: number;
-  monthNEX: number;
+  monthUSDT: number | null;
+  monthNEX: number | null;
   unlockedUSDT: number;
   coolingUSDT: number;
 }>(), { available: true, loading: false, failed: false });
@@ -68,7 +70,7 @@ const hasAmounts = computed(() => props.available);
 
 
 // Only the month USDT headline counts up once when it first becomes readable; the sub-figures and lifetime composition stay static.
-const shownMonthUSDT = useCountUp(() => hasAmounts.value ? props.monthUSDT : null);
+const shownMonthUSDT = useCountUp(() => hasAmounts.value ? props.monthUSDT : null, { skip: () => remoteApiEnabled || props.snapshotDisplay });
 const monthUSDTParts = computed(() => hasAmounts.value ? formatUsdOverviewParts(shownMonthUSDT.value) : null);
 const intPart = computed(() => monthUSDTParts.value?.integer ?? '—');
 const fracPart = computed(() => monthUSDTParts.value?.fraction ?? '');

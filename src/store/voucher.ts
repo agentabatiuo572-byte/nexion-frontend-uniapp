@@ -1,3 +1,5 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { ref, computed, onScopeDispose } from "vue";
@@ -174,6 +176,7 @@ export const useVoucher = defineStore("voucher", () => {
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
+    const snapshotWrite = captureTabSnapshotWrite();
     remoteStatus.value = "loading";
     remoteError.value = "";
     try {
@@ -181,11 +184,15 @@ export const useVoucher = defineStore("voucher", () => {
       if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
       retryAt = 0;
       applyRemoteSnapshot(snapshot);
+      saveTabSnapshot(snapshotWrite, "vouchers", presentationOffers.value.filter(offer => !presentationClaimable.value.some(item => item.id === offer.id) || voucherSupportsSurface(offer, "store")).map(offer => ({
+        id: offer.id, startAt: offer.startAt, endAt: offer.endAt, claimableOnStore: presentationClaimable.value.some(item => item.id === offer.id && voucherSupportsSurface(item, "store")),
+        type: offer.type, amountUSD: offer.amountUSD ?? null, percent: offer.percent ?? null, maxDiscountUSD: offer.maxDiscountUSD ?? null,
+      })), null);
       return true;
     } catch (cause) {
       if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
       if (cause instanceof ApiError && cause.status === 429) retryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
-      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) clearRemoteFacts();
+      if (!isTransientReadFailure(cause)) { clearRemoteFacts(); invalidateTabSnapshots(["vouchers"], snapshotWrite); }
       // 拉取失败也算「等到头了」:再等下去只会把自动弹层无限期卡住,让位给下一个候选。
       catalogReady.value = true;
       remoteStatus.value = "error";

@@ -1,3 +1,4 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
@@ -992,6 +993,7 @@ export const useApp = defineStore("app", () => {
     }
     if (Date.now() < homeTruthRetryAt) return Promise.resolve(false);
     const ownerEpoch = homeTruthOwnerEpoch;
+    const snapshotWrite = captureTabSnapshotWrite();
     const current = () => remoteAccountEpoch.isCurrent(request) && ownerEpoch === homeTruthOwnerEpoch
       && !homeTruthEnvironmentInvalidated;
     const key = `${request.accountKey}:${request.epoch}:${ownerEpoch}`;
@@ -1011,6 +1013,7 @@ export const useApp = defineStore("app", () => {
 
         homeTruthRetryAt = 0;
         homeTruthStatus.value = "ready";
+        saveTabSnapshot(snapshotWrite, "home", { earnings: { today: projection.earnings.today, week: projection.earnings.week, month: projection.earnings.month, all: projection.earnings.all }, latest: projection.earningsLedger[0] ?? null }, projection.generatedAt);
         return true;
       } catch (cause) {
         if (current()) {
@@ -1023,7 +1026,7 @@ export const useApp = defineStore("app", () => {
           homeTruthRateLimited.value = limited;
           homeTruthTransientFailure.value = !!error && !denied && (limited || error.kind === "network"
             || (error.kind === "http" && error.status !== undefined && error.status >= 500 && error.status <= 599));
-          if (!homeTruthTransientFailure.value) homeTruth.value = null;
+          if (!homeTruthTransientFailure.value) { homeTruth.value = null; invalidateTabSnapshots(["home"], snapshotWrite); }
           homeTruthStatus.value = "error";
           homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
         }
@@ -1060,6 +1063,7 @@ export const useApp = defineStore("app", () => {
     if (!remoteApiEnabled) return true;
     if (homeTruthEnvironmentInvalidated) return false;
     const expectedAccountKey = request.accountKey;
+    const snapshotWrite = captureTabSnapshotWrite();
     const runScope = captureRuntimeRevision();
     const scope = {
       accountKey: request.accountKey,
@@ -1141,6 +1145,7 @@ export const useApp = defineStore("app", () => {
         remoteRealizedToday.value = { usdt: fleet.realizedTodayUsdt, nex: fleet.realizedTodayNex };
         remoteWalletReceiptHasSnapshot.value = false;
         remoteFleetStatus.value = "ready";
+        saveTabSnapshot(snapshotWrite, "wallet", { usdt: fleet.walletUsdt, nex: fleet.walletNex, today: { usdt: fleet.realizedTodayUsdt, nex: fleet.realizedTodayNex } }, new Date(fleet.serverNow).toISOString());
         return true;
       } catch (cause) {
         // A catalog publish advances the runtime revision while this read is in flight (production starts both
@@ -1162,6 +1167,7 @@ export const useApp = defineStore("app", () => {
           remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
           if (isHttpReadRateLimit(cause)) remoteFleetRetryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
           if (!isTransientReadFailure(cause)) {
+            invalidateTabSnapshots(["wallet"], snapshotWrite);
             remoteFleetHasSnapshot.value = false;
             remoteRealizedToday.value = null;
             remoteSlotUsage.value = null;

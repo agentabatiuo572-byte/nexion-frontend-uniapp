@@ -1,3 +1,4 @@
+import { captureTabSnapshotWrite, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { serverSessionContext, isUserSession, type ApiResult, type AuthSessionResponse } from "./contracts";
 import { ApiError, asApiError, parseRetryAfterMs } from "./errors";
 import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
@@ -182,6 +183,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     const path = request.url.slice(baseUrl.length).split("?")[0];
     // These live POST reads/socket tickets do not change displayed business facts.
     if (request.method === "POST" && ["/api/app/trade-in/eligibility", "/api/app/trade-in/quote",
+      "/api/app/trade-in/capacity-quote", "/api/orders/quote", "/api/withdrawals/eligibility",
       "/api/app/support/realtime-ticket"].includes(path)) return false;
     // Browsing observations and phone runtime reporting keep their own cadence.
     return !/^\/api\/(?:app\/analytics\/events|tasks\/phone\/runtime|growth\/day-one\/page-observations|store\/products\/[^/]+\/detail-observation|genesis\/secondary-market\/observation|share\/event)(?:$|\/)/.test(path)
@@ -192,6 +194,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     request: HttpRequest,
     acceptedResponses: ApiRequest["acceptedResponses"] = [],
   ): Promise<T> {
+    const snapshotWrite = captureTabSnapshotWrite();
     const key = request.method === "GET" ? cooldownKey(request) : null;
     const cooldown = key ? readCooldowns.get(key) : undefined;
     if (cooldown && Date.now() < cooldown.until) throw new ApiError({ ...cooldown.error,
@@ -263,7 +266,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         retryAfterMs,
       });
     }
-    if (businessWrite(request)) invalidatePassiveTabReads();
+    if (businessWrite(request)) { invalidatePassiveTabReads(); invalidateTabSnapshots(undefined, snapshotWrite); }
     return envelope.data as T;
   }
 

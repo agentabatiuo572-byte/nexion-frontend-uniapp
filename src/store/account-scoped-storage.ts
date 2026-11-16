@@ -34,6 +34,18 @@ export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T)
   }
 }
 
+/** Remove one display row without disturbing other account rows. */
+export function removeAccountRow(tableKey: string, accountKey: string): boolean {
+  try {
+    const raw = uni.getStorageSync(tableKey) as Record<string, unknown> | "";
+    if (!raw || typeof raw !== "object") return true;
+    const table = { ...raw };
+    delete table[normalizeAccountKey(accountKey)];
+    uni.setStorageSync(tableKey, table);
+    return true;
+  } catch { return false; }
+}
+
 interface AccountCommandRow {
   commands: Record<string, string>;
 }

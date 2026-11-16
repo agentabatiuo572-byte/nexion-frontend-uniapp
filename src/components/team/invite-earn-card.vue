@@ -34,6 +34,7 @@
   <InviteDetailSheet :open="detailOpen" :mode="detailMode" @close="detailOpen=false" />
 </template>
 <script setup lang="ts">
+import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatAmount } from '@/lib/amount-display';
 import { ref, computed, onUnmounted, watch } from 'vue';
 import { onShow, onHide } from '@/composables/use-tab-page-lifecycle';
@@ -71,7 +72,8 @@ watch([displayCatalogValid,()=>rewards.snapshot,()=>rewards.snapshot?.inviterRew
     && Number.isFinite(snapshot.inviterRewardNex) && snapshot.inviterRewardNex>=0 ? snapshot.rewardEnabled ? 'enabled' : 'disabled' : null;
   rewardPresentation.value=rewardRead.value==='enabled' ? snapshot.inviterRewardNex : null;
 },{immediate:true,flush:'sync'});
-const rewardPresentationText=computed(()=>rewardPresentation.value===null||(rewards.error&&!rewards.transientFailure)?'—':formatAmount(rewardPresentation.value).replace(/\.00$/,''));
+const displayedReward=computed(()=>rewardRead.value==='disabled' ? null : rewardPresentation.value ?? (readTabSnapshot("referral")?.enabled ? readTabSnapshot("referral")!.amount : null));
+const rewardPresentationText=computed(()=>displayedReward.value===null||(rewards.error&&!rewards.transientFailure)?'—':formatAmount(displayedReward.value).replace(/\.00$/,''));
 const detailOpen=ref(false), detailMode=ref<'rules'|'records'>('rules');
 const rewardReady=computed(()=>!!rewards.snapshot && !rewards.error && !rewards.loading);
 const rewardEnabled=computed(()=>rewards.snapshot?.rewardEnabled===true);
@@ -79,7 +81,7 @@ const nexReward=computed(()=>rewards.snapshot?.inviterRewardNex ?? 0);
 const rewardAmount=computed(()=>formatAmount(nexReward.value).replace(/\.00$/, ''));
 const referralCode=computed(()=>remoteApiEnabled ? rewards.referralCode : app.user.referralCode);
 const rewardCaption=computed(()=>rewards.error ? 'unknown' : !rewards.loading && rewards.snapshot && !referralCode.value ? 'unavailable'
-  : rewardRead.value==='disabled' ? 'disabled' : 'qualified');
+  : rewardRead.value==='disabled' || (rewardRead.value===null && readTabSnapshot('referral')?.enabled===false) ? 'disabled' : 'qualified');
 const copiedCode = ref(false);
 const copiedLink = ref(false);
 const posterOpen = ref(false);

@@ -1,3 +1,5 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
+import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { reactive, shallowRef, shallowReadonly, watch } from "vue";
 import type { ProductCatalogSnapshot } from "@/api/product-catalog-api";
@@ -69,6 +71,7 @@ subscribeRuntimeRevision((scope: RuntimeRevisionScope) => {
   if (publishing === scope && isCurrentRuntimeRevision(scope)) return;
   invalidatePassiveTabRead("product-catalog");
   publishedCatalogSignature = null;
+  invalidateTabSnapshots(["catalogYield", "commission", "network", "rank", "referral"]);
   displayProof.value = null;
 
   productCatalogState.serverCanonical = false;
@@ -155,6 +158,7 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
   }
   if (refreshInFlight) return refreshInFlight;
 
+  const snapshotWrite = captureTabSnapshotWrite();
   const requestEpoch = catalogEpoch;
   const requestRuntime = captureRuntimeRevision();
   const requestBinding = catalogBindingEpoch;
@@ -194,13 +198,17 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       const signature = JSON.stringify(snapshot);
       // An identical directory read is an observation, not a business revision.
       const published = signature === publishedCatalogSignature || publishCatalogRuntime();
-      if (published) publishedCatalogSignature = signature;
+      if (published) {
+        publishedCatalogSignature = signature;
+        const { entry, pro, rack, ladder } = buildStoreYieldAuthority(snapshot.products, [], snapshot);
+        saveTabSnapshot(snapshotWrite, "catalogYield", { entry, pro, rack, ladder }, null);
+      }
       return published && requestEpoch === catalogEpoch && requestBinding === catalogBindingEpoch;
     })
     .catch((error: unknown) => {
       if (!current()) return false;
       if (transientCatalogRead(error) && error instanceof ApiError && error.kind === "http" && error.status === 429) retryAt = Date.now() + (error.retryAfterMs ?? 30_000);
-      if (!transientCatalogRead(error)) displayProof.value = null;
+      if (!transientCatalogRead(error)) { displayProof.value = null; invalidateTabSnapshots(["catalogYield", "commission", "network", "rank", "referral"], snapshotWrite); }
       if (!current()) return false;
       if (error instanceof ApiError && (error.kind === "auth" || error.status === 401 || error.status === 403 || error.code === 401 || error.code === 403)) presentation.value = null;
       if (!current()) return false;

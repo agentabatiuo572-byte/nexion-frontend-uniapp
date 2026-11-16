@@ -1,3 +1,5 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
+import { teamRankProgress } from "@/lib/team-rank-progress";
 import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { onScopeDispose, ref, watch } from "vue";
@@ -290,6 +292,7 @@ export const useVRank = defineStore("vRank", () => {
   ) {
     if (!remoteApiEnabled) return;
     const generation = ++refreshGeneration;
+    const snapshotWrite = captureTabSnapshotWrite();
     const isCurrent = () => generation === refreshGeneration
       && remoteAccountEpoch.isCurrent(request)
       && isCurrentRuntimeRevision(runScope);
@@ -310,6 +313,9 @@ export const useVRank = defineStore("vRank", () => {
       ) as Record<VRank, number>;
       remoteReady.value = true;
       remoteError.value = null; retryAt = 0; remoteRateLimited.value = false; remoteTransientFailure.value = false;
+      const progress = teamRankProgress({ myRank: myRank.value, selfComputePoints: selfComputePoints.value, directRefs: directRefs.value, teamComputePoints: teamComputePoints.value, vDownlineCounts: vDownlineCounts.value }, ladder.value);
+      saveTabSnapshot(snapshotWrite, "rank", { rank: myRank.value, next: progress.next?.v ?? null, missing: progress.missing.length,
+        bars: progress.rows.filter(row => row.tier === progress.next?.v).map(row => ({ key: row.key, kind: row.kind, vLevel: row.vLevel ?? null, percent: row.status === "unknown" ? null : row.required === 0 ? 100 : Math.min(100, Math.round(row.current! / row.required * 100)) })) }, null);
     };
     let strictFailure = false, failureRecorded = false, pairGeneration = 0;
     const isLocalSessionPending = (cause: ReturnType<typeof asApiError>) => cause.kind === "auth"
@@ -318,7 +324,7 @@ export const useVRank = defineStore("vRank", () => {
       if (!isCurrent()) return;
       const transient = isTransientReadFailure(failure), limited = isHttpReadRateLimit(failure);
       if (isHttpReadRateLimit(failure)) retryAt = Math.max(retryAt, Date.now() + (failure.retryAfterMs ?? 30_000));
-      if (!transient) strictFailure = true;
+      if (!transient) { strictFailure = true; invalidateTabSnapshots(["rank"], snapshotWrite); }
       remoteRateLimited.value = limited && !strictFailure;
       remoteTransientFailure.value = transient && !strictFailure;
       clearRemoteFacts(); remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";

@@ -62,6 +62,7 @@
   </NxSheet>
 </template>
 <script setup lang="ts">
+import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { useDataVisibility } from "@/store/data-visibility";
@@ -95,9 +96,11 @@ watch(() => [app.homeTruthStatus, app.homeTruth] as const, ([status, snapshot]) 
 const earningsRecoveryVisible = computed(() => remoteApiEnabled && (homeEarningsReadFailed.value || commission.eventsReadFailed
   || app.homeTruthStatus === "error" || commission.eventsStatus === "error"
   || (!earningsReadPending.value && allTimeEarned.value === null)));
-const bucketsReadable = computed(() => !remoteApiEnabled || (earningsReleaseHasSnapshot.value
+const liveBucketsReadable = computed(() => !remoteApiEnabled || (earningsReleaseHasSnapshot.value
   && earningsReleaseSnapshot.value?.serverCanonical === true
   && (earningsReleaseStatus.value === "ready" || earningsReleaseStatus.value === "loading")));
+
+const bucketsReadable = computed(() => liveBucketsReadable.value || readTabSnapshot("release") !== null);
 
 if (props.section !== "recovery") {
   useAutoRecovery({ failed: () => remoteApiEnabled && cfg.configStatus === "failed" && !cfg.loading, retry: () => cfg.load() });
@@ -135,28 +138,37 @@ function showLockedSheet() {
 }
 
 const buckets = computed(() => ({
-  pendingReviewUsdt: earningsReleaseSnapshot.value?.buckets.pending_review
+  pendingReviewUsdt: (liveBucketsReadable.value ? earningsReleaseSnapshot.value?.buckets.pending_review : readTabSnapshot("release")?.pending)
     ?? app.user.earningBuckets.pendingReviewUsdt,
-  bonusLockedUsdt: earningsReleaseSnapshot.value?.buckets.bonus_locked
+  bonusLockedUsdt: (liveBucketsReadable.value ? earningsReleaseSnapshot.value?.buckets.bonus_locked : readTabSnapshot("release")?.locked)
     ?? app.user.earningBuckets.bonusLockedUsdt,
 }));
-const todayEarnings = computed(() => resolveWalletTodayEarnings({
-  remoteApiEnabled,
-  homeTruthStatus: app.homeTruthStatus,
-  homeTodayUsdt: app.homeTruth?.earnings.today.usdt ?? null,
-  localTodayUsdt: app.earnings.today,
-}));
+const todayEarnings = computed(() => {
+  if (remoteApiEnabled) {
+    if (!app.homeTruth) return tabSnapshotPeriodCurrent("home", "today") ? readTabSnapshot("home")?.earnings.today.usdt ?? null : null;
+    if (app.homeTruthStatus === "loading" || (app.homeTruthStatus === "error" && app.homeTruthTransientFailure)) return app.homeTruth.earnings.today.usdt;
+  }
+  return resolveWalletTodayEarnings({
+    remoteApiEnabled,
+    homeTruthStatus: app.homeTruthStatus,
+    homeTodayUsdt: app.homeTruth?.earnings.today.usdt ?? null,
+    localTodayUsdt: app.earnings.today,
+  });
+});
 const todayEarningsText = computed(() => visibility.mask(todayEarnings.value === null ? "—" : `+$${formatAmount(todayEarnings.value)}`));
 const pendingReview = computed(() => buckets.value.pendingReviewUsdt);
 const lockedRewards = computed(() => buckets.value.bonusLockedUsdt);
-const miningLifetimeUSD = computed(() => !remoteApiEnabled ? app.earnings.total
-  : app.homeTruthStatus === "ready" || app.homeTruthStatus === "loading"
-    || (app.homeTruthStatus === "error" && app.homeTruthTransientFailure) ? app.homeTruth?.earnings.all.usdt ?? null : null);
+const miningLifetimeUSD = computed(() => {
+  if (!remoteApiEnabled) return app.earnings.total;
+  if (!app.homeTruth) return readTabSnapshot("home")?.earnings.all.usdt ?? null;
+  return app.homeTruthStatus === "ready" || app.homeTruthStatus === "loading"
+    || (app.homeTruthStatus === "error" && app.homeTruthTransientFailure) ? app.homeTruth.earnings.all.usdt : null;
+});
 const teamLifetimeUSD = computed(() => !remoteApiEnabled ? commission.totalUSDTLifetime()
   : commission.eventsStatus === "ready" ? commission.eventsEvidence?.aggregate.totalUSDT ?? null
   : commission.eventsStatus === "idle" || commission.eventsStatus === "loading"
     || (commission.eventsStatus === "error" && commission.eventsTransientFailure)
-      ? commission.eventsLifetimeDisplayUSDT ?? (commission.eventsStatus === "loading" ? commission.eventsEvidence?.aggregate.totalUSDT : null) ?? null : null);
+      ? commission.eventsLifetimeDisplayUSDT ?? readTabSnapshot("commission")?.totalUSDT ?? (commission.eventsStatus === "loading" ? commission.eventsEvidence?.aggregate.totalUSDT : null) ?? null : null);
 const allTimeEarned = computed(() => miningLifetimeUSD.value === null || teamLifetimeUSD.value === null
   ? null : miningLifetimeUSD.value + teamLifetimeUSD.value);
 const hasReadRecovery = computed(() => configSyncFailed.value || fundsAuthorityUnavailable.value || releaseAuthorityUnavailable.value

@@ -1,3 +1,4 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { ref, watch } from "vue";
@@ -50,6 +51,7 @@ export const useReferralReward = defineStore("referralReward", () => {
     const request: RemoteAccountRequest = accountScope.snapshot();
     const runScope: RuntimeRevisionScope = captureRuntimeRevision();
     const generation = ++refreshGeneration;
+    const snapshotWrite = captureTabSnapshotWrite();
     loading.value = true;
     // 🔴 error **不在 await 之前清**。清早了的后果:出错态的「点击重试」是靠 error 渲染的,
     //   用户一点,这一句同步把 error 置空 → 下一次 flush 就把那个按钮从 DOM 上换掉,
@@ -63,12 +65,13 @@ export const useReferralReward = defineStore("referralReward", () => {
       if (request.accountKey !== "default" && savedReferralCode !== next.referralCode
           && writeAccountRow(codeCacheKey, request.accountKey, { code: next.referralCode })) savedReferralCode = next.referralCode;
       error.value = null; retryAt = 0; rateLimited.value = false; transientFailure.value = false;
+      saveTabSnapshot(snapshotWrite, "referral", { enabled: next.rewardEnabled, amount: next.inviterRewardNex, invited: next.invitedCount }, next.refreshedAt);
       return true;
     } catch (cause) {
       if (generation === refreshGeneration && accountScope.isCurrent(request) && isCurrentRuntimeRevision(runScope)) {
         rateLimited.value = isHttpReadRateLimit(cause);
         transientFailure.value = isTransientReadFailure(cause);
-        if (!transientFailure.value) snapshot.value = null;
+        if (!transientFailure.value) { snapshot.value = null; invalidateTabSnapshots(["referral"], snapshotWrite); }
         if (isHttpReadRateLimit(cause)) retryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
         error.value = cause instanceof Error ? cause.message : "REFERRAL_REWARD_LOAD_FAILED";
       } else if (generation === refreshGeneration) {

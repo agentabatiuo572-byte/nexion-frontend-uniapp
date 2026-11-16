@@ -65,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { useDataVisibility } from "@/store/data-visibility";
 import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
@@ -96,22 +97,25 @@ const fundsReadable = computed(() => remoteAuthorityStatus({
   hasSnapshot: app.remoteFleetHasSnapshot,
   hasError: app.remoteFleetStatus === "error",
 }) === "ready");
-const usdtBalanceReadable = computed(() => fundsReadable.value || app.remoteWalletReceiptHasSnapshot);
-const bucketsReadable = computed(() => !remoteApiEnabled || (earningsReleaseHasSnapshot.value
+const liveUsdtReadable = computed(() => fundsReadable.value || app.remoteWalletReceiptHasSnapshot);
+const walletSnapshot = computed(() => readTabSnapshot("wallet"));
+const usdtBalanceReadable = computed(() => liveUsdtReadable.value || walletSnapshot.value !== null);
+const liveBucketsReadable = computed(() => !remoteApiEnabled || (earningsReleaseHasSnapshot.value
   && earningsReleaseSnapshot.value?.serverCanonical === true
   && (earningsReleaseStatus.value === "ready" || earningsReleaseStatus.value === "loading")));
 
+const bucketsReadable = computed(() => liveBucketsReadable.value || readTabSnapshot("release") !== null);
 const buckets = computed(() => ({
-  pendingReviewUsdt: earningsReleaseSnapshot.value?.buckets.pending_review
+  pendingReviewUsdt: (liveBucketsReadable.value ? earningsReleaseSnapshot.value?.buckets.pending_review : readTabSnapshot("release")?.pending)
     ?? app.user.earningBuckets.pendingReviewUsdt,
-  bonusLockedUsdt: earningsReleaseSnapshot.value?.buckets.bonus_locked
+  bonusLockedUsdt: (liveBucketsReadable.value ? earningsReleaseSnapshot.value?.buckets.bonus_locked : readTabSnapshot("release")?.locked)
     ?? app.user.earningBuckets.bonusLockedUsdt,
 }));
 // 2026-07-31:与 wallet.vue / wallet-withdraw 同源 —— 可提口径 = 总余额(held 两桶账外)。
-const usdt = computed(() => app.user.usdtBalance);
+const usdt = computed(() => liveUsdtReadable.value ? app.user.usdtBalance : walletSnapshot.value?.usdt ?? 0);
 const usdtText = computed(() => formatAmount(usdt.value));
 // Only the shown digits count up; the label and fit size keep the final balance so the size does not jump.
-const shownUsdt = useCountUp(() => usdtBalanceReadable.value ? usdt.value : null);
+const shownUsdt = useCountUp(() => usdtBalanceReadable.value ? usdt.value : null, { skip: remoteApiEnabled });
 const shownUsdtText = computed(() => formatAmount(shownUsdt.value ?? usdt.value));
 const intPart = computed(() => shownUsdtText.value.split(".")[0]);
 const fracPart = computed(() => shownUsdtText.value.split(".")[1]);
@@ -122,9 +126,9 @@ const pendingLine = computed(() => {
   return [buckets.value.pendingReviewUsdt > 0 ? `${auditCopy.value.confirming} ${fmtMoney(buckets.value.pendingReviewUsdt)}` : '', buckets.value.bonusLockedUsdt > 0 ? `${auditCopy.value.locked} ${fmtMoney(buckets.value.bonusLockedUsdt)}` : ''].filter(Boolean).join(' · ');
 });
 
-const nex = computed(() => app.user.nexBalance);
-const nexLabel = computed(() => visibility.mask(fundsReadable.value ? formatAmount(nex.value) : "—"));
-const marketReady = computed(() => market.isMockMode || market.remoteReady);
+const nex = computed(() => fundsReadable.value ? app.user.nexBalance : walletSnapshot.value?.nex ?? null);
+const nexLabel = computed(() => visibility.mask(nex.value !== null ? formatAmount(nex.value) : "—"));
+const marketReady = computed(() => market.isMockMode || market.remoteReady || readTabSnapshot("market") !== null);
 const nexChangeLabel = computed(() => {
   if (!marketReady.value || !market.change24hAvailable) return "—";
   const change = market.change24hPct;
@@ -132,8 +136,8 @@ const nexChangeLabel = computed(() => {
 });
 const nexMarketLabel = computed(() => {
   if (!marketReady.value) return "≈ — USDT · 1 UVT = — USDT";
-  const price = market.nexPriceUSDT;
-  return `≈ ${visibility.mask(fundsReadable.value ? formatAmount(nex.value * price) : "—")} USDT · 1 UVT = ${price.toFixed(3)} USDT`;
+  const price = market.isMockMode || market.remoteReady ? market.nexPriceUSDT : readTabSnapshot("market")!.price;
+  return `≈ ${visibility.mask(nex.value !== null ? formatAmount(nex.value * price) : "—")} USDT · 1 UVT = ${price.toFixed(3)} USDT`;
 });
 
 const trialReady = computed(() => !remoteApiEnabled || trial.authorityStatus === "ready"

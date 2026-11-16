@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { refreshActivePage } from "@/lib/active-page-refresh";
@@ -27,7 +28,7 @@ import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
-import { hasPersistedServerAuthenticatedAccountTrace, useAuth } from "@/store/auth";
+import { hasPersistedServerAuthenticatedAccountTrace, readPersistedServerAuthenticatedAccountId, useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useProfile } from "@/store/profile";
 import { useTheme } from "@/store/theme";
@@ -127,6 +128,7 @@ function startTick() {
   lastTick = Date.now();
   tickTimer = setInterval(() => {
     const now = Date.now();
+    advanceTabSnapshotClock(now);
     useApp().tick(now - lastTick);
     lastTick = now;
   }, 1000);
@@ -660,6 +662,7 @@ function beginServerSessionRestore(): Promise<boolean> {
     const preserveCurrentRoute = preserveRouteDuringSessionRestore(route);
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
+      snapshotReason: "resume",
       returnTo: preserveCurrentRoute ? `/${route}` : "/pages/index/index",
       onboardingComplete: restored.user.onboardingComplete,
       serverProfile: restored.user,
@@ -806,6 +809,12 @@ function checkAuthGuard(): boolean {
  * Server task and settlement state stays untouched and is read after sign-in.
  */
 function clearInvalidRemoteSessionState(auth: ReturnType<typeof useAuth>): void {
+  // A cold H5 restore starts with default auth and an empty vault. The old
+  // routing hint identifies only the row to delete, never an accepted session.
+  const candidateSession = sessionVault.read();
+  const snapshotAccount = auth.accountId !== "default" ? auth.accountId
+    : candidateSession ? `user:${candidateSession.user.userId}` : readPersistedServerAuthenticatedAccountId();
+  if (snapshotAccount) forgetTabSnapshotAccount(snapshotAccount);
   useConversations().suspendForReauthentication();
   try {
     sessionVault.clear();
@@ -1256,6 +1265,7 @@ onLaunch(() => {
   installFieldNaming();
   const auth = useAuth();
   installForegroundReadSignals();
+  installTabSnapshotLifecycle(sessionVault, () => ({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl, locale: useLocaleStore().code }));
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler(() => {
       // Preserve only the non-secret trace long enough to choose the login explanation.
@@ -1333,6 +1343,7 @@ window.addEventListener("hashchange", () => {
 });
 // #endif
 onShow(() => {
+  advanceTabSnapshotClock();
   appReadForeground.value = true;
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
