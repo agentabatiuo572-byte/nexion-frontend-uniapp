@@ -10,17 +10,26 @@ import { useConfig } from "@/store/config";
 export function useRegisteredUsersEstimate() {
   const cfg = useConfig(), now = ref(Date.now());
   let timer: ReturnType<typeof setTimeout> | undefined, visible = true;
-  const estimate = computed(() => derivedRegisteredUsers(cfg.config.publicStats, now.value));
-  const available = computed(() => !cfg.syncFailed && publicStatsHealth(cfg.config.publicStats).membersOk && Number.isSafeInteger(estimate.value) && estimate.value >= 0);
+  const cadenceAvailable = computed(() => publicStatsHealth(cfg.config.publicStats).membersOk);
+  const estimate = computed(() => {
+    const ps = cfg.config.publicStats;
+    if (cadenceAvailable.value) return derivedRegisteredUsers(ps, now.value);
+    // Legacy monthly growth is already projected by the server; never invent a local cadence.
+    const monthlyOnly = ps.registeredUsersTickIntervalSec === undefined
+      && ps.registeredUsersTickStepMin === undefined && ps.registeredUsersTickStepMax === undefined
+      && ps.registeredUsersMonthlyGrowthPct >= 0 && ps.registeredUsersMonthlyGrowthPct <= 50;
+    return monthlyOnly ? cfg.config.networkPulse?.registeredUsers ?? Number.NaN : Number.NaN;
+  });
+  const available = computed(() => !cfg.syncFailed && Number.isSafeInteger(estimate.value) && estimate.value >= 0);
   function stop() { if (timer) clearTimeout(timer); timer = undefined; }
   function tick() {
     stop(); now.value = Date.now();
-    if (!visible || !available.value) return;
+    if (!visible || !available.value || !cadenceAvailable.value) return;
     const ps = cfg.config.publicStats, period = ps.registeredUsersTickIntervalSec! * 1000;
     const delay = period - Math.max(0, now.value - ps.registeredUsersAnchorAt) % period;
     timer = setTimeout(tick, delay);
   }
-  watch(() => [cfg.config.publicStats, cfg.loading, cfg.syncFailed], tick, { immediate: true, deep: true });
+  watch(() => [cfg.config.publicStats, cfg.config.networkPulse, cfg.loading, cfg.syncFailed], tick, { immediate: true, deep: true });
   onShow(() => { visible = true; tick(); });
   onHide(() => { visible = false; stop(); });
   onUnmounted(stop);
