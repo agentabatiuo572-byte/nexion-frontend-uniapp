@@ -7,11 +7,10 @@
       </view>
       <DailyCheckInRow />
       <!-- #ifdef H5 -->
-      <view v-if="auth.isAuthenticated" class="phone-policy-notice nx-home-glass-item" role="status" data-testid="home-app-download-banner">
-        <view class="nx-home-glass-panel" aria-hidden="true" />
-        <svg class="phone-policy-icon" width="24" height="32" viewBox="0 0 24 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="4" y="2" width="16" height="28" rx="4" /><path d="M10 5h4m-4 22h4" /></svg>
+      <view v-if="auth.isAuthenticated" class="phone-policy-notice" role="status" data-testid="home-app-download-banner">
+        <view class="phone-policy-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="2" width="13" height="20" rx="3" /><path d="M12 7v7m-3-3 3 3 3-3M10.5 18.5h3" /></svg></view>
         <text class="phone-policy-copy">{{ t.phonePolicy.webNotice }}</text>
-        <view class="phone-policy-action nx-home-pill" role="button" tabindex="0" @click="goAppDownload" @keydown.enter.prevent="goAppDownload" @keydown.space.prevent="goAppDownload"><text>{{ t.phonePolicy.download }}</text></view>
+        <view class="phone-policy-action" role="button" tabindex="0" @click="goAppDownload" @keydown.enter.prevent="goAppDownload" @keydown.space.prevent="goAppDownload"><text class="phone-policy-pill nx-frosted-button">{{ t.phonePolicy.download }}</text></view>
       </view>
       <!-- #endif -->
       <HomeBenefits />
@@ -121,9 +120,14 @@ watch(() => [app.accountKey, app.accountBindingEpoch, locale.code], () => { fenc
 .home-promotion-skeleton { min-height:180px;box-sizing:border-box;padding:20px;border-radius:22px;background:var(--v5-surface);border:1px solid var(--v5-border); }
 .home-promotion-skeleton > view { width:70%;height:18px;margin-bottom:14px;border-radius:8px;background:var(--v5-surface-2); }
 .home-promotion-skeleton > view + view { width:45%;height:44px;margin-top:36px; }
-.phone-policy-notice { min-height: 176px; padding: 18px; border-radius: var(--v5-radius-2xl); color: var(--v5-ink-2); font: 400 13px/1.6 var(--font-v5); text-align: center; cursor: default; }
-.phone-policy-icon { position: relative; display: block; width: 24px; height: 32px; margin: 0 auto 10px; color: var(--v5-ink); }
-.phone-policy-copy { position: relative; display: block; max-width: 24em; margin: 0 auto; text-wrap: balance; }
-.phone-policy-action { margin-top: 14px; width: 100%; padding: 10px 16px; font-size: 15px; line-height: 24px; }
-.phone-policy-action:focus-visible { outline: 2px solid var(--v5-ink); outline-offset: 3px; }
+/* Download reminder: one compact strip in the plain content-card material — sky icon block, one message, brand glass S.
+   Long languages drop the button to its own right-aligned line instead of squeezing the message. */
+.phone-policy-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; box-sizing: border-box; min-height: 56px; padding: 5px 6px 5px 12px; border-radius: 18px; background: var(--v5-surface); border: 1px solid var(--v5-border); box-shadow: var(--v5-glass-shadow); }
+.phone-policy-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: color-mix(in srgb, var(--v5-aura-sky) 14%, transparent); color: var(--v5-aura-sky); }
+.phone-policy-copy { flex: 1 1 10em; min-width: 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink); text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
+.phone-policy-action { flex: none; display: flex; margin-left: auto; align-items: center; min-height: 44px; border-radius: var(--v5-radius-full); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.phone-policy-action:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.phone-policy-pill { --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); --ui-button-solid: color-mix(in srgb, var(--v5-brand) 12%, var(--v5-surface)); display: inline-flex; align-items: center; min-height: 32px; box-sizing: border-box; padding: 7px 12px; border-radius: var(--v5-radius-full); font: 500 13px/18px var(--font-v5); white-space: nowrap; transition: transform 200ms ease; }
+.phone-policy-action:active .phone-policy-pill { transform: scale(.97); transition-duration: 100ms; }
+@media (prefers-reduced-motion: reduce) { .phone-policy-action:active .phone-policy-pill { transform: none; } }
 </style>
