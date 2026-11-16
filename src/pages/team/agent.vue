@@ -279,7 +279,7 @@ function invalidateAgentRequests(): void {
   agentRequestGeneration += 1;
 }
 function clearAgentFormState(form: AmbassadorAgentFormState = {
-  date: "", city: "", budgetText: "3000", bucketId: "", bucketTitle: "",
+  date: "", city: "", budgetText: String(policy.value?.defaultBudgetUsdt ?? 3000), bucketId: "", bucketTitle: "",
 }): void {
   clearAmbassadorDraft(draft.value);
   Object.assign(draft.value.form, form);
@@ -404,7 +404,7 @@ async function submit() {
     endAmbassadorDraftSubmit(submittedDraft, submitToken);
   }
   toast.success(t.value.agent.toastSubmitted, fmt(t.value.agent.toastSubmittedSub, { city: input.city, budget: visibility.mask(ambassadorAmountText(input.budgetUsdt)) }));
-  const settled = successfulAmbassadorApplicationState(latestApplication.value);
+  const settled = successfulAmbassadorApplicationState(latestApplication.value, policy.value?.defaultBudgetUsdt ?? 3000);
   latestApplication.value = settled.receipt;
   clearAgentFormState(settled.form);
 }

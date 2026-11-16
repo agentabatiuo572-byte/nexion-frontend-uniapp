@@ -84,11 +84,11 @@ export function parseAmbassadorApplicationDraft(
 }
 
 /** A successful POST clears only the draft; the returned server receipt remains renderable. */
-export function successfulAmbassadorApplicationState(receipt: AmbassadorApplication): {
+export function successfulAmbassadorApplicationState(receipt: AmbassadorApplication, defaultBudgetUsdt = 3000): {
   receipt: AmbassadorApplication;
   form: AmbassadorAgentFormState;
 } {
-  return { receipt, form: { date: "", city: "", budgetText: "3000", bucketId: "", bucketTitle: "" } };
+  return { receipt, form: { date: "", city: "", budgetText: String(defaultBudgetUsdt), bucketId: "", bucketTitle: "" } };
 }
 
 /**
