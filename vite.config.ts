@@ -40,7 +40,22 @@ export default defineConfig(({ mode }) => {
     define: {
       __UVEL_RESOURCE_VERSION__: JSON.stringify({ versionName: manifest.versionName, versionCode: manifest.versionCode }),
     },
-    plugins: [nativeSvgIcons(), uni(), UnoCSS(), { name: "liquid-glass-notices", generateBundle() { this.emitFile({ type: "asset", fileName: "LIQUID-GLASS-NOTICES.txt", source: readFileSync(new URL("./docs/LIQUID-GLASS-NOTICES.txt", import.meta.url), "utf8") }); } }],
+    plugins: [nativeSvgIcons(), uni(), UnoCSS(), {
+      name: "retry-failed-preload-css",
+      apply: "build",
+      enforce: "post",
+      transform(source, id) {
+        if (process.env.UNI_PLATFORM !== "h5" || id !== "\0vite/preload-helper.js") return;
+        // Vite 5.2.8 shares this cache between idle imports and route loaders.
+        // A failed speculative stylesheet must be requested again on entry.
+        const rejectCss = "link.addEventListener('error', () => rej(new Error(`Unable to preload CSS for ${dep}`)));";
+        if (!source.includes(rejectCss)) this.error("Vite CSS preload helper changed; review failed-stylesheet cleanup.");
+        return {
+          code: source.replace(rejectCss, "link.addEventListener('error', () => { delete seen[dep]; link.remove(); rej(new Error(`Unable to preload CSS for ${dep}`)); });"),
+          map: null,
+        };
+      },
+    }, { name: "liquid-glass-notices", generateBundle() { this.emitFile({ type: "asset", fileName: "LIQUID-GLASS-NOTICES.txt", source: readFileSync(new URL("./docs/LIQUID-GLASS-NOTICES.txt", import.meta.url), "utf8") }); } }],
     // 只被懒编译页面引用的依赖必须在这里显式预打包:uni 的按需编译让启动扫描
     // 抓不到它们,首个访客触发运行时依赖重打包 → 在途模块请求 500 + 整页 reload,
     // uni 异步页面组件等满 60s 直接弹「连接服务器超时」。入口链上的依赖
