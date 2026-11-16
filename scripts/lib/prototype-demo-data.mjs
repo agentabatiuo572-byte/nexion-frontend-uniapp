@@ -427,7 +427,7 @@ export function demoFixture(url,locale,state,request) {
   const referralPreview=pathname.match(/^\/api\/public\/referrals\/([^/]+)\/preview$/);
   if(referralPreview){
     const code=decodeURIComponent(referralPreview[1]);
-    const gift={status:'POSTED',usdtAmount:5,nexAmount:20};
+    const gift={status:'PENDING_REVIEW',usdtAmount:5,nexAmount:20};
     if(code==='NX8K2M4Q')return {code,kind:'USER',sourceEnvironment:'PRODUCTION',sponsor:{displayName:'M•••',vRank:'V3'},gift};
     if(code==='CS7K4MPQ')return {code,kind:'ADVISOR',sourceEnvironment:'PRODUCTION',sponsor:{displayName:'L•••',vRank:null},gift};
     const error=new Error('REFERRAL_PREVIEW_NOT_FOUND');error.status=404;throw error;
