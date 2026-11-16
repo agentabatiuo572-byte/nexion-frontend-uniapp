@@ -46,7 +46,7 @@
           <text :style="giftAmountStyle">${{ formatAmount(giftUsdt) }}</text>
           <text :style="giftNexStyle">+ {{ formatAmount(giftNex) }} UVT</text>
         </view>
-        <text class="block" :style="giftSubStyle">{{ t.ref.welcomeGiftSub }}</text>
+        <text class="ref-gift-sub block" :style="giftSubStyle">{{ t.ref.welcomeGiftSub }}</text>
       </view>
 
       <!-- What you get -->
@@ -388,6 +388,8 @@ const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", display: "inl
 </script>
 
 <style scoped>
+/* Balanced so a narrow screen never leaves one word alone on the last line of the gift note. */
+.ref-gift-sub { text-wrap: balance; }
 .ref-signin-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 6px; }
 .ref-preview-status { display: flex; align-items: center; gap: 12px; padding: 16px 0; font-size: 13px; line-height: 1.55; color: var(--v5-ink-3); }
 .ref-preview-status > text { flex: 1; }
