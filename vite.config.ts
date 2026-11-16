@@ -4,6 +4,7 @@ import uniPlugin from "@dcloudio/vite-plugin-uni";
 import { parseJson } from "@dcloudio/uni-cli-shared/dist/json/json";
 import UnoCSS from "unocss/vite";
 import { nativeSvgIcons } from "./scripts/native-svg-icons.mjs";
+import { uniH5PickerSnap } from "./scripts/uni-h5-picker-snap.mjs";
 import { mustBlockDevelopmentOAuthProxy, trustedPreviewProxyOrigin } from "./src/lib/dev-preview-auth-boundary";
 
 // @dcloudio/vite-plugin-uni ships as CJS. With "type":"module" in package.json
@@ -40,7 +41,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __UVEL_RESOURCE_VERSION__: JSON.stringify({ versionName: manifest.versionName, versionCode: manifest.versionCode }),
     },
-    plugins: [nativeSvgIcons(), uni(), UnoCSS(), {
+    plugins: [nativeSvgIcons(), uniH5PickerSnap(), uni(), UnoCSS(), {
       name: "retry-failed-preload-css",
       apply: "build",
       enforce: "post",
