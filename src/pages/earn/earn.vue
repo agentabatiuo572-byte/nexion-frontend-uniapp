@@ -70,12 +70,6 @@
       <EarningsLedgerCard class="mx-4 earn-block" />
       <MarketBoard class="earn-block" />
       <TaskCenter class="earn-block" />
-      <NxSection class="mx-4 earn-block earn-more-ways" :title="auditCopy.moreWays">
-        <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
-          artwork="phone" :action="nativePhoneAvailable ? remainderCopy.earnWays.phoneAction : remainderCopy.earnWays.phoneReadOnly" @click="goPhoneCompute" />
-        <EarnWayCard v-if="stakingVisible" eyebrow="UVT" :title="remainderCopy.stakingTitle" :body="remainderCopy.earnWays.stakingBody"
-          artwork="staking" :action="remainderCopy.stakingAction" @click="goStaking" />
-      </NxSection>
       <!-- FEAT-DEV01: W-CAP1 任务产能说明弹层(单实例;设备卡/补贴 badge/提示线共用入口) -->
       <CapacityExplainerSheet />
     </CardStagger>
@@ -92,13 +86,8 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useEarnConfig } from "@/store/earn-config";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
-import NxSection from "@/components/ui/nx-section.vue";
-import EarnWayCard from "@/components/earn/earn-way-card.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
-import { useRemainderUiCopy } from "@/i18n/remainder-ui";
-import { useConfig } from "@/store/config";
-import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
 import { navTo } from "@/lib/route";
 import { useCountUp } from "@/composables/use-count-up";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
@@ -126,18 +115,6 @@ const app = useApp();
 const t = useT();
 const visibility = useDataVisibility();
 const auditCopy = useAuditUiCopy();
-const remainderCopy = useRemainderUiCopy();
-const config = useConfig();
-const stakingVisible = computed(() => config.configStatus === "ready" && config.isEnabled("stakingVisible"));
-const nativePhoneAvailable = hasNativePhoneRuntime();
-
-// The web line is H5 Lite; this App's H5 build is its preview and follows the App without a phone runtime.
-function goPhoneCompute() {
-  navTo(nativePhoneAvailable ? "/pages/onboarding/connect?mode=recalibrate" : "/pages/me/devices");
-}
-function goStaking() {
-  if (stakingVisible.value) navTo("/pages/staking/staking");
-}
 const range = ref<Range>("Today");
 const freeTrial = useFreeTrial();
 let earnPageVisible = false;
@@ -334,14 +311,10 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 @keyframes earn-rocket-exhaust { 0% { transform:translateY(0); opacity:0; } 25% { opacity:.65; } 100% { transform:translateY(2.5px); opacity:0; } }
 @media (prefers-reduced-motion:reduce) { .earn-capacity-info :deep(.earn-capacity-info__rocket),.earn-capacity-info :deep(.earn-capacity-info__flame),.earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:none; }.earn-capacity-info :deep(.earn-capacity-info__exhaust) { opacity:0; } }
 .earn-capacity-info:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; border-radius:12px; }
-.earn-more-ways :deep(.nx-section__title) { font-size: 20px; line-height: 1.25; }
-/* The section heading box adds its own room above the title; 22px matches the board's gap. */
-.earn-page > .earn-more-ways { margin-top: 22px; }
 /* Short period names stay on one line (vi "Hôm nay" broke at 320). */
 .earn-range :deep(.nx-glass-option__label) { white-space: nowrap; overflow-wrap: normal; }
 @media (max-width: 374px) {
   .earn-fleet-head, .earn-block { margin-top: 24px; }
-  .earn-page > .earn-more-ways { margin-top: 14px; }
   .earn-hero__int { font-size: 46px; }
 }
 </style>
