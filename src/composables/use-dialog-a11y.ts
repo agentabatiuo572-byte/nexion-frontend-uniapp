@@ -8,7 +8,7 @@ type Dialog = { close?: () => void; priority: number };
 type DialogPage = { stack: Dialog[]; visible: boolean; backRegistered: boolean };
 const dialogPages = new WeakMap<object, DialogPage>();
 
-function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
+export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
   // Uni invokes page hooks on the page root, not on a nested sheet component.
   const owner = getCurrentInstance()?.root;
   if (!owner) return;

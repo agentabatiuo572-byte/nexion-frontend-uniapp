@@ -42,10 +42,17 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
+// #ifdef APP-PLUS
+import { registerNativeDialog } from "@/composables/use-dialog-a11y";
+// #endif
 import { PHONE_COUNTRIES, type PhoneCountryProfile } from "@/auth/phone-number";
 
 const props = defineProps<{ open: boolean; modelValue: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "select", code: string): void }>();
+// #ifdef APP-PLUS
+// Above page sheets (0), below global masks (10/11). Keep this sheet's existing focus/keyboard handling.
+registerNativeDialog(computed(() => props.open), () => emit("close"), true, 1);
+// #endif
 const t = useT();
 type FocusableRef = { $el?: HTMLElement; focus?: () => void };
 const closeRef = ref<FocusableRef | null>(null);
