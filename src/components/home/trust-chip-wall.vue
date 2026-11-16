@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
 import { apiClient } from "@/api/runtime";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
@@ -59,6 +59,7 @@ import { formatGroupedAmount } from "@/lib/amount-display";
 import { useTrustDocuments } from "@/composables/use-trust-documents";
 import { createHomeDisplayPlayer, parseHomeDisplayBatch, type homeDisplayAt } from "@/lib/home-display-player";
 import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import NxSection from "@/components/ui/nx-section.vue";
 
 const t = useT();
@@ -68,7 +69,9 @@ const { documents, status, refresh } = useTrustDocuments();
 const profile = computed(() => documents.value?.profile ?? null);
 const goTrust = () => navTo("/pages/trust/trust");
 
-// Same published display feed as the intro page and the home on-grid card; it ticks while home is visible.
+// Same published feed; run only while this card and its page are visible.
+const instance = getCurrentInstance()!;
+const { elRef, running } = useLoopsInView(".home-trust__card");
 const display = ref<ReturnType<typeof homeDisplayAt>>(null);
 const player = createHomeDisplayPlayer({
   fetch: async () => parseHomeDisplayBatch(await apiClient.request({ path: "/api/config/home-display", authenticated: false })),
@@ -77,7 +80,7 @@ const player = createHomeDisplayPlayer({
 });
 let pageVisible = false;
 function syncPlayer() {
-  if (pageVisible && (typeof document === "undefined" || !document.hidden)) player.start();
+  if (pageVisible && running.value && (typeof document === "undefined" || !document.hidden)) player.start();
   else player.stop();
 }
 onShow(() => {
@@ -86,9 +89,14 @@ onShow(() => {
   if (status.value === "idle" || status.value === "error") void refresh();
 });
 onHide(() => { pageVisible = false; syncPlayer(); });
+watch(running, syncPlayer);
 defineExpose({ refresh: () => Promise.allSettled([refresh(), player.refresh()]) });
 
 onMounted(() => {
+  // Resolve the existing card without changing its markup. Native observation uses the instance selector.
+  elRef.value = typeof IntersectionObserver === "undefined"
+    ? instance.proxy as unknown as HTMLElement
+    : instance.proxy!.$el.querySelector(".home-trust__card");
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", syncPlayer);
 });
 onUnmounted(() => {
