@@ -14,11 +14,9 @@ export function useRegisteredUsersEstimate() {
   const estimate = computed(() => {
     const ps = cfg.config.publicStats;
     if (cadenceAvailable.value) return derivedRegisteredUsers(ps, now.value);
-    // Legacy monthly growth is already projected by the server; never invent a local cadence.
-    const monthlyOnly = ps.registeredUsersTickIntervalSec === undefined
-      && ps.registeredUsersTickStepMin === undefined && ps.registeredUsersTickStepMax === undefined
-      && ps.registeredUsersMonthlyGrowthPct >= 0 && ps.registeredUsersMonthlyGrowthPct <= 50;
-    return monthlyOnly ? cfg.config.networkPulse?.registeredUsers ?? Number.NaN : Number.NaN;
+    // Legacy monthly growth stays private; only an entirely omitted input group uses the public projection.
+    return ps.registeredUsersEstimateProvided === false
+      ? cfg.config.networkPulse?.registeredUsers ?? Number.NaN : Number.NaN;
   });
   const available = computed(() => !cfg.syncFailed && Number.isSafeInteger(estimate.value) && estimate.value >= 0);
   function stop() { if (timer) clearTimeout(timer); timer = undefined; }

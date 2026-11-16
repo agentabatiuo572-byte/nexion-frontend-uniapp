@@ -229,13 +229,15 @@ export interface PublicStatsConfig {
   onlineRatePct: number;
   /** 在线数展示抖动幅度(台)。**只影响视觉呼吸感,不参与任何金额派生**。[0, 500]。 */
   onlineJitter: number;
+  /** Boundary presence: false only when the entire public member-estimate input group is absent. */
+  registeredUsersEstimateProvided?: boolean;
   /** 注册用户展示基数。[0, 100000000]。 */
   registeredUsersBase: number;
-  /** 注册用户月增速(%)。前端按时间锚派生当前值 —— **推算不累加**,故刷新不回退。[0, 50]。 */
+  /** 兼容旧本地配置；正式公开投影不下发月增速，不能以它判断公开人数是否可用。 */
   registeredUsersMonthlyGrowthPct: number;
   /** 派生起点(ms epoch)。运营改基数即重置锚点。 */
   registeredUsersAnchorAt: number;
-  /** 注册用户跳动间隔(秒)。与每次增加人数范围一起下发,未设置时缺省并隐藏估算。[1, 86400]。 */
+  /** 注册用户跳动间隔(秒)。与基数、锚点和每次增加人数范围成组下发；整组缺省时采用服务端公布人数。[1, 86400]。 */
   registeredUsersTickIntervalSec?: number;
   /** 每次跳动最少增加的注册用户数。[0, 100000000]。 */
   registeredUsersTickStepMin?: number;

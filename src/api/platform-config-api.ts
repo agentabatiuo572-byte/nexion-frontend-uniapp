@@ -350,7 +350,11 @@ function parseVerifiedStats(value: unknown): PlatformVerifiedStats | null {
   };
 }
 
-const optionalNumber = (value: unknown): number | undefined => (typeof value === "number" ? value : undefined);
+function optionalEstimateNumber(row: Record<string, unknown>, key: string): number | undefined {
+  if (!(key in row)) return undefined;
+  const value = row[key];
+  return typeof value === "number" ? value : Number.NaN;
+}
 
 function parsePublicStats(value: unknown): PublicStatsConfig {
   const projection = record(value);
@@ -366,13 +370,15 @@ function parsePublicStats(value: unknown): PublicStatsConfig {
     fleetDevices: 0,
     onlineRatePct: 0,
     onlineJitter: -1,
-    registeredUsersBase: typeof estimateValues.registeredUsersBase === "number" ? estimateValues.registeredUsersBase : -1,
-    registeredUsersMonthlyGrowthPct: typeof estimateValues.registeredUsersMonthlyGrowthPct === "number" ? estimateValues.registeredUsersMonthlyGrowthPct : -1,
-    registeredUsersAnchorAt: typeof estimateValues.registeredUsersAnchorAt === "number" ? estimateValues.registeredUsersAnchorAt : -1,
-    registeredUsersTickIntervalSec: typeof estimateValues.registeredUsersTickIntervalSec === "number" ? estimateValues.registeredUsersTickIntervalSec : undefined,
+    registeredUsersEstimateProvided: ["registeredUsersBase", "registeredUsersAnchorAt", "registeredUsersTickIntervalSec",
+      "registeredUsersTickStepMin", "registeredUsersTickStepMax", "registeredUsersTickStep"].some(key => key in estimateValues),
+    registeredUsersBase: optionalEstimateNumber(estimateValues, "registeredUsersBase") ?? -1,
+    registeredUsersMonthlyGrowthPct: -1,
+    registeredUsersAnchorAt: optionalEstimateNumber(estimateValues, "registeredUsersAnchorAt") ?? -1,
+    registeredUsersTickIntervalSec: optionalEstimateNumber(estimateValues, "registeredUsersTickIntervalSec"),
     // A server from the first cadence release sends one fixed step; read it as min = max.
-    registeredUsersTickStepMin: optionalNumber(estimateValues.registeredUsersTickStepMin ?? estimateValues.registeredUsersTickStep),
-    registeredUsersTickStepMax: optionalNumber(estimateValues.registeredUsersTickStepMax ?? estimateValues.registeredUsersTickStep),
+    registeredUsersTickStepMin: optionalEstimateNumber(estimateValues, "registeredUsersTickStepMin" in estimateValues ? "registeredUsersTickStepMin" : "registeredUsersTickStep"),
+    registeredUsersTickStepMax: optionalEstimateNumber(estimateValues, "registeredUsersTickStepMax" in estimateValues ? "registeredUsersTickStepMax" : "registeredUsersTickStep"),
     // Display-only base added to real active jobs; anything outside B21's 0..100,000,000 integers means unpublished.
     activeJobsBase: Number.isSafeInteger(estimateValues.activeJobsBase) && (estimateValues.activeJobsBase as number) >= 0
       && (estimateValues.activeJobsBase as number) <= 100_000_000 ? estimateValues.activeJobsBase as number : null,
