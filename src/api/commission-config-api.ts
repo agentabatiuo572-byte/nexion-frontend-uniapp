@@ -206,7 +206,7 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
       || !["monthlyClear", "perPairClear", "carryForward"].includes(residualPolicy)) return invalid();
   const trackA = number(source.trackA);
   const trackB = number(source.trackB);
-  const matchRate = number(source.matchRate, 0.0000001, 1);
+  const matchRate = number(source.matchRate, Number.MIN_VALUE, 1);
   const threshold = number(source.threshold, 0.0000001);
   const dailyCap = number(source.dailyCap, 0.0000001);
   const periodCap = number(source.periodCap, dailyCap);

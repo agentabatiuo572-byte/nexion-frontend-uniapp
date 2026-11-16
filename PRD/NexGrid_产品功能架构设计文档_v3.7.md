@@ -2114,6 +2114,8 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 
 **用户端命名**:Balance Match · Dual-Track Growth(中文"平衡匹配 · 双轨成长")。UI 一律称"轨道 Track A / Track B",**不暴露**"翼 wing / 左 / 右 / 空降 spillover / 上线 / 下线"等 MLM 词汇;内部 enum 仍用 `binary: "left" | "right"` 字段,网络数学层不变。
 
+平衡奖励比例读取接受后端合法的极小正数，不因展示精度不足拒绝整份配置。后端按百分数校验 `0 < p ≤ 20`、最多 10 位小数，再除以 100 下发比例；前端不额外设 1e-7 下限，也不收紧既有接收上限（2026-11-17，BUG-430）。
+
 #### 8.4.0 设计动机
 
 ##### 8.4.0.1 在团队体系中的角色
