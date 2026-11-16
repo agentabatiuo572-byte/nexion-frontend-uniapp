@@ -4853,7 +4853,7 @@ openSeaErrorPool: {
   ref: {
     invitedYou: "邀请了你",
     welcomeGift: "一次性欢迎礼包",
-    welcomeGiftSub: "激活手机后到账，无需购买设备。",
+    welcomeGiftSub: "礼包状态以注册回执为准，无需购买设备。",
     perks: {
       gift: "${usd} USDT + {nex} UVT 注册礼包",
       day1: "在手机 App 校准并激活手机算力",

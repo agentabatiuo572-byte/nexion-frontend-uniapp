@@ -5193,7 +5193,7 @@ export const fil: Messages = {
   ref: {
     invitedYou: "inimbitahan ka",
     welcomeGift: "Isang beses na regalo",
-    welcomeGiftSub: "Papasok kapag na-activate mo ang phone mo. Hindi kailangang bumili ng device.",
+    welcomeGiftSub: "Tingnan sa resibo ng registration ang status ng regalo. Hindi kailangang bumili ng device.",
     perks: {
       gift: "${usd} USDT + {nex} UVT na regalo sa pag-sign up",
       day1: "I-calibrate at i-activate ang compute ng phone sa app",

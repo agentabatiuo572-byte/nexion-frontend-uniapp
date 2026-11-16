@@ -5193,7 +5193,7 @@ export const id: Messages = {
   ref: {
     invitedYou: "mengundang Anda",
     welcomeGift: "Hadiah selamat datang satu kali",
-    welcomeGiftSub: "Masuk setelah Anda mengaktifkan ponsel. Tanpa perlu membeli perangkat.",
+    welcomeGiftSub: "Cek status hadiah di bukti pendaftaran Anda. Tanpa perlu membeli perangkat.",
     perks: {
       gift: "Hadiah daftar ${usd} USDT + {nex} UVT",
       day1: "Kalibrasi dan aktifkan komputasi ponsel di aplikasi ponsel",

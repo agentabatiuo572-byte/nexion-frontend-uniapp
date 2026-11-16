@@ -4843,7 +4843,7 @@ openSeaErrorPool: {
   ref: {
     invitedYou: "đã mời bạn",
     welcomeGift: "Quà chào mừng một lần",
-    welcomeGiftSub: "Được ghi nhận sau khi kích hoạt điện thoại. Không cần mua thiết bị.",
+    welcomeGiftSub: "Trạng thái quà được ghi trên xác nhận đăng ký. Không cần mua thiết bị.",
     perks: {
       gift: "Quà đăng ký ${usd} USDT + {nex} UVT",
       day1: "Hiệu chỉnh và bật tính toán trên ứng dụng điện thoại",

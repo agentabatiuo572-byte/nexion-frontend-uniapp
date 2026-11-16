@@ -5193,7 +5193,7 @@ export const uz: Messages = {
   ref: {
     invitedYou: "taklif qildi",
     welcomeGift: "Bir martalik sovgʻa",
-    welcomeGiftSub: "Telefoningizni faollashtirganingizda tushadi. Qurilma sotib olish shart emas.",
+    welcomeGiftSub: "Sovgʻa holatini roʻyxatdan oʻtish tasdigʻida koʻring. Qurilma sotib olish shart emas.",
     perks: {
       gift: "${usd} USDT + {nex} UVT sovgʻa",
       day1: "Telefon ilovasida telefon quvvatini kalibrlang va faollashtiring",
