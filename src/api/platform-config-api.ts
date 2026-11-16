@@ -367,7 +367,7 @@ function parsePublicStats(value: unknown): PublicStatsConfig {
     onlineRatePct: 0,
     onlineJitter: -1,
     registeredUsersBase: typeof estimateValues.registeredUsersBase === "number" ? estimateValues.registeredUsersBase : -1,
-    registeredUsersMonthlyGrowthPct: -1,
+    registeredUsersMonthlyGrowthPct: typeof estimateValues.registeredUsersMonthlyGrowthPct === "number" ? estimateValues.registeredUsersMonthlyGrowthPct : -1,
     registeredUsersAnchorAt: typeof estimateValues.registeredUsersAnchorAt === "number" ? estimateValues.registeredUsersAnchorAt : -1,
     registeredUsersTickIntervalSec: typeof estimateValues.registeredUsersTickIntervalSec === "number" ? estimateValues.registeredUsersTickIntervalSec : undefined,
     // A server from the first cadence release sends one fixed step; read it as min = max.
