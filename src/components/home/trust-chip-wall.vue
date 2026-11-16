@@ -36,9 +36,13 @@
           <text class="home-trust__payout-value"><text class="nx-num-metric">{{ formatGroupedAmount(display.paid) }}</text><text class="home-trust__unit">USDT</text></text>
         </view>
       </template>
-      <view class="home-trust__pitch nx-tint">
-        <text class="home-trust__slogan">{{ t.home.trustSnapshotSlogan }}</text>
-        <text class="home-trust__pitch-note">{{ t.home.trustSnapshotSloganNote }}</text>
+      <view class="home-trust__rule" />
+      <view class="home-trust__pitch">
+        <view class="home-trust__pitch-copy">
+          <text class="home-trust__slogan">{{ t.home.trustSnapshotSlogan }}</text>
+          <text class="home-trust__pitch-note">{{ t.home.trustSnapshotSloganNote }}</text>
+        </view>
+        <svg class="home-trust__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
       </view>
     </view>
   </NxSection>
@@ -113,8 +117,10 @@ onUnmounted(() => {
 .home-trust__dot { width:6px;height:6px;border-radius:50%;background:var(--v5-genesis-gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--v5-genesis-gold) 20%,transparent); }
 .home-trust__payout-value { font:500 16px/22px var(--font-metric);white-space:nowrap; }
 .home-trust__unit { margin-left:4px;font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
-/* Tinted solid in the pitch's original gold (01 §1.1.2). */
-.home-trust__pitch { --nx-tint:var(--v5-genesis-gold);display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:16px; }
+/* Closing row on the card floor: a rule above, the gold slogan, and a list-row chevron for the card's link. */
+.home-trust__pitch { display:flex;align-items:center;gap:var(--ui-space-inline); }
+.home-trust__pitch-copy { flex:1;min-width:0;display:flex;flex-direction:column;gap:4px; }
+.home-trust__chevron { flex:none;color:var(--v5-ink-4); }
 .home-trust__slogan { font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);color:var(--v5-genesis-gold-hi);text-wrap:balance; }
 .home-trust__pitch-note { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-2);text-wrap:balance; }
 @media (max-width: 374px) {
