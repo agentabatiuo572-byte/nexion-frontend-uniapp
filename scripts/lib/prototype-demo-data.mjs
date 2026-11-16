@@ -25,7 +25,7 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-export const demoDefaults = {accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'enabled',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
@@ -43,7 +43,7 @@ export const demoOptions = {
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
-  stakingState:[['enabled','正常开放'],['delisted','功能下架'],['error','质押读取失败（其他正常）']],
+  stakingState:[['delisted','功能下架'],['error','质押读取失败（其他正常）']],
   stakingOpenState:[['unmodeled','开仓未配置（演示拒绝）'],['disclosure','开仓拒绝·需风险确认（HTTP 200 / code 409）']],
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
   withdrawNetworksState:[['bep20-erc20','提现网络 · BEP20 和 ERC20'],['bep20','提现网络 · 仅 BEP20'],['erc20','提现网络 · 仅 ERC20'],['closed','提现网络 · 全部关闭']],
@@ -355,7 +355,7 @@ export function demoFixture(url,locale,state,request) {
   if(request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
-    config.featureFlags.stakingVisible=state.stakingState!=='delisted';
+    config.featureFlags.stakingVisible=false;
     config.featureFlags.homeWeeklyPromoEnabled=true;
     config.share.baseUrl='https://demo.uvel.example/ref/';
     Object.assign(config.publicStats,{registeredUsersBase:12480,registeredUsersAnchorAt:demoStartedAt,registeredUsersTickIntervalSec:60,registeredUsersTickStepMin:3,registeredUsersTickStepMax:10,virtualUserCount:0,activeJobsBase:state.jobsBaseState==='published'?1000:null});

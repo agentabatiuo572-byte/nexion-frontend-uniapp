@@ -71,14 +71,8 @@
       <MarketBoard class="earn-block" />
       <TaskCenter class="earn-block" />
       <NxSection class="mx-4 earn-block earn-more-ways" :title="auditCopy.moreWays">
-        <!-- #ifdef H5 -->
-        <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
-          artwork="phone" :action="remainderCopy.downloadApp" @click="goPhoneDownload" />
-        <!-- #endif -->
-        <!-- #ifndef H5 -->
         <EarnWayCard eyebrow="ANDROID" :title="remainderCopy.earnWays.phoneTitle" :body="remainderCopy.earnWays.phoneBody"
           artwork="phone" :action="nativePhoneAvailable ? remainderCopy.earnWays.phoneAction : remainderCopy.earnWays.phoneReadOnly" @click="goPhoneCompute" />
-        <!-- #endif -->
         <EarnWayCard v-if="stakingVisible" eyebrow="UVT" :title="remainderCopy.stakingTitle" :body="remainderCopy.earnWays.stakingBody"
           artwork="staking" :action="remainderCopy.stakingAction" @click="goStaking" />
       </NxSection>
@@ -137,15 +131,10 @@ const config = useConfig();
 const stakingVisible = computed(() => config.configStatus === "ready" && config.isEnabled("stakingVisible"));
 const nativePhoneAvailable = hasNativePhoneRuntime();
 
-// H5 exposes a download guide, never a phone calibration or execution action.
-// #ifdef H5
-function goPhoneDownload() { navTo("/pages/register/success?download=1"); }
-// #endif
-// #ifndef H5
+// The web line is H5 Lite; this App's H5 build is its preview and follows the App without a phone runtime.
 function goPhoneCompute() {
   navTo(nativePhoneAvailable ? "/pages/onboarding/connect?mode=recalibrate" : "/pages/me/devices");
 }
-// #endif
 function goStaking() {
   if (stakingVisible.value) navTo("/pages/staking/staking");
 }
