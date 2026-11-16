@@ -62,7 +62,7 @@ const displayCatalogValid=computed(()=>!displayEnvironmentInvalidated.value && p
 watch(()=>[app.accountKey,app.accountBindingEpoch,apiRuntimeConfig.environment,apiRuntimeConfig.baseUrl,locale.code],()=>{rewardPresentation.value=null;rewardRead.value=null;},{flush:'sync'});
 watch(()=>locale.code,()=>rewards.invalidateReadOwner(),{flush:'sync'});
 watch(displayCatalogValid,valid=>{if(!valid){rewardPresentation.value=null;rewardRead.value=null;}},{flush:'sync'});
-watch([()=>rewards.snapshot,()=>rewards.snapshot?.inviterRewardNex,()=>rewards.snapshot?.rewardEnabled,()=>rewards.loading,()=>rewards.error,()=>rewards.transientFailure],()=>{
+watch([displayCatalogValid,()=>rewards.snapshot,()=>rewards.snapshot?.inviterRewardNex,()=>rewards.snapshot?.rewardEnabled,()=>rewards.loading,()=>rewards.error,()=>rewards.transientFailure],()=>{
   if(rewards.snapshot?.rewardEnabled===false){rewardPresentation.value=null;rewardRead.value='disabled';}
   if(rewards.error){if(!rewards.transientFailure)rewardPresentation.value=null;return;}
   const snapshot=rewards.snapshot;

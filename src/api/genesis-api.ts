@@ -472,6 +472,12 @@ export function parseGenesisAccountState(
 }
 
 export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod") {
+  const stateSummary = async () => parseGenesisPublicState(await client.request({
+    method: "GET", path: "/api/genesis/state", authenticated: false,
+  }), mode);
+  const accountSummary = async () => parseGenesisAccountState(await client.request({
+    method: "GET", path: "/api/genesis/account", authenticated: true,
+  }), mode);
   async function accountHistoryPage<T>(kind: "orders" | "emissions", parser: (v: unknown) => T, cursor?: string) {
     if (cursor !== undefined && !/^[1-9][0-9]{0,18}$/.test(cursor)) return invalid();
     const row = record(await client.request({ method: "GET", authenticated: true,
@@ -503,22 +509,21 @@ export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod
     });
   }
   return {
+    stateSummary,
+    accountSummary,
     transactionPage,
     orderPage: (cursor?: string) => accountHistoryPage("orders", parseTransaction, cursor),
     emissionPage: (cursor?: string) => accountHistoryPage("emissions", parseEmission, cursor),
-    state: async () => {
-      const state = parseGenesisPublicState(await client.request({
-      method: "GET", path: "/api/genesis/state", authenticated: false,
-      }), mode);
-      const [listings, transactions] = await Promise.all([history("listings", parseListing), transactionPage()]);
+    state: async (readSummary = stateSummary) => {
+      const [state, listings, transactions] = await Promise.all([
+        readSummary(), history("listings", parseListing), transactionPage(),
+      ]);
       return { ...state, listings, transactions: transactions.items, transactionsNextCursor: transactions.nextCursor };
     },
     account: async () => {
-      const state = parseGenesisAccountState(await client.request({
-      method: "GET", path: "/api/genesis/account", authenticated: true,
-      }), mode);
-      const [orders, emissions] = await Promise.all([
-        accountHistoryPage("orders", parseTransaction), accountHistoryPage("emissions", parseEmission)]);
+      const [state, orders, emissions] = await Promise.all([
+        accountSummary(), accountHistoryPage("orders", parseTransaction), accountHistoryPage("emissions", parseEmission),
+      ]);
       return { ...state, orders: orders.items, emissions: emissions.items,
         ordersNextCursor: orders.nextCursor, emissionsNextCursor: emissions.nextCursor };
     },

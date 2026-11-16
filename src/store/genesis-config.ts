@@ -1,9 +1,29 @@
-import { invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
+import { invalidateBeforePassiveTabRead, passiveTabReadScope, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Listing } from "@/components/genesis/listing-card.vue";
 import type { ActivityEvent } from "@/components/genesis/activity-row.vue";
 import { genesisApi, remoteApiEnabled } from "@/api/runtime";
+import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
+
+let publicSummaryPending: { owner: string; promise: ReturnType<typeof genesisApi.stateSummary> } | null = null;
+
+/** Fresh detail/config reads also join the same owner's public GET in flight. */
+export function readGenesisPublicSummary() {
+  const owner = JSON.stringify([passiveTabReadScope(), captureRuntimeRevision()]);
+  if (publicSummaryPending?.owner === owner) return publicSummaryPending.promise;
+  invalidateBeforePassiveTabRead("genesis-public-summary");
+  const promise = genesisApi.stateSummary().finally(() => {
+    if (publicSummaryPending?.promise === promise) publicSummaryPending = null;
+  });
+  publicSummaryPending = { owner, promise };
+  return promise;
+}
+
+/** Config and first-screen facts share this public display read. */
+export function ensureGenesisPublicSummary() {
+  return runPassiveTabRead("genesis-public-summary", readGenesisPublicSummary, captureRuntimeRevision());
+}
 
 /**
  * Genesis config — 创世节点的「后台可控」参数(阶梯定价 / 预售倒计时 / 权益文案 /
@@ -381,9 +401,11 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
    *      动钱前**必再读一次**,这是 mock 期对「服务端拒单」的忠实模拟:
    *      判定读的不再是构造时的内存快照,而是当下的权威源。
    */
-  async function refresh() {
+  async function refresh(passive = false) {
     invalidateBeforePassiveTabRead("genesis-config");
     const generation = ++refreshGeneration;
+    const readScope = passiveTabReadScope();
+    const runScope = captureRuntimeRevision();
     // 🔴🔴 mock 模式没有服务端可读,而下面的 catch 是 **fail-closed**(把市场钉成 closed、
     //   loaded 置 false)。少了这个分支,mock 下 refresh 必然走进 catch ⇒
     //   `genesisPurchaseBlock` 先判 `!configLoaded → configUnavailable`,创世**整条流程**
@@ -396,8 +418,8 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
       return;
     }
     try {
-      const state = await genesisApi.state();
-      if (generation !== refreshGeneration) return;
+      const state = await (passive ? ensureGenesisPublicSummary() : readGenesisPublicSummary());
+      if (generation !== refreshGeneration || readScope !== passiveTabReadScope() || !isCurrentRuntimeRevision(runScope)) return;
       config.value = {
         ...config.value,
         halted: state.halted,
@@ -414,7 +436,7 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
       };
       loaded.value = true;
     } catch {
-      if (generation !== refreshGeneration) return;
+      if (generation !== refreshGeneration || readScope !== passiveTabReadScope() || !isCurrentRuntimeRevision(runScope)) return;
       config.value = {
         ...config.value,
         halted: true,
@@ -428,5 +450,9 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
     }
   }
 
-  return { config, loaded, refresh };
+  function ensure() {
+    return runPassiveTabRead("genesis-config", () => refresh(true), captureRuntimeRevision(), () => loaded.value);
+  }
+
+  return { config, loaded, refresh, ensure };
 });

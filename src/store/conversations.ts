@@ -16,6 +16,8 @@ import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
 import { restoreSupportPending, persistSupportPending, clearSupportPending } from "@/lib/support-pending-storage";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { useConfig } from "@/store/config";
+import { passiveTabReadScope } from "@/lib/passive-tab-read";
+import { captureRuntimeRevision } from "@/api/order-api";
 
 /** The server asks for a customer reply before this send; not an ambiguous delivery. */
 function isSupportReplyRequired(cause: unknown): boolean {
@@ -308,7 +310,7 @@ export const useConversations = defineStore("conversations", () => {
     instance = new ConversationRealtime({
       url: `${apiRuntimeConfig.baseUrl.replace(/^http/, "ws").replace(/\/$/, "")}/ws/conversations`,
       ticket: signal => apiClient.request({ method: "POST", path: "/api/app/support/realtime-ticket", signal }), socket: createUniRealtimeSocket,
-      reconcile: async signal => { const active = () => current() && !signal.aborted; if (!active()) return; await refresh(active); if (active() && watchedId) { const id=watchedId; await open(id,()=>active()&&watchedId===id); } },
+      reconcile: async signal => { const active = () => current() && !signal.aborted; if (!active()) return; await refresh(active, true); if (active() && watchedId) { const id=watchedId; await open(id,()=>active()&&watchedId===id); } },
       state: (ready, _terminal, unavailable) => { if (current()) { realtimeReady.value = ready; realtimeFallback.value = unavailable; } },
       presence: value => { if (!current()) return; clearTimeout(typingExpiry); if (!value) { typingIds.value={}; onlineIds.value={}; return; } onlineIds.value[value.conversationNo]=value.online; typingIds.value[value.conversationNo]=value.typing; typingExpiry=setTimeout(()=>{if(current())typingIds.value[value.conversationNo]=false;},value.expiresIn??5000); },
       authRejected: () => { if (current()) maintainRemoteSession(true); },
@@ -368,6 +370,7 @@ export const useConversations = defineStore("conversations", () => {
   let pendingRunId = "unverified";
   const openGeneration = new Map<string, number>();
   let listRequestGeneration = 0;
+  let listPending: { owner: string; active: Array<() => boolean>; dispatched: boolean; promise: Promise<void> } | null = null;
   let categoryRequestGeneration = 0;
 
   async function preparePendingRun(): Promise<void> {
@@ -591,32 +594,51 @@ export const useConversations = defineStore("conversations", () => {
   /** A delayed page may add an absent row, but cannot erase or regress a newer live snapshot. */
   function mergeConversations(items: Conversation[]) { for (const conversation of items) replace(conversation); }
 
-  async function refresh(active:()=>boolean=()=>true): Promise<void> {
-    const epoch = accountEpoch;
-    const requestGeneration = ++listRequestGeneration;
-    loading.value = true;
-    error.value = null;
-    try {
-      await preparePendingRun();
-      const scope = snapshotScope();
-      if (scope.epoch !== epoch || requestGeneration !== listRequestGeneration || !active()) return;
-      await reconcilePending();
-      if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration || !active()) return;
-      deletionAvailable.value = false;
-      const [page, dismissals, capability] = await Promise.all([supportApi.conversations(), supportApi.conversationDismissals(), supportApi.conversationManagement?.()]);
-      if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration && active()) {
-        for (const marker of capability?.clearedPeers ?? []) applyUserClear(marker);
-        mergeConversations(page.items); mergeDismissals(dismissals);
-        deletionAvailable.value = capability?.clearUserHistory === true;
-      }
-    } catch (cause) {
-      if (epoch === accountEpoch && requestGeneration === listRequestGeneration && active()) {
-        error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
-      }
-      throw cause;
-    } finally {
-      if (epoch === accountEpoch && requestGeneration === listRequestGeneration) loading.value = false;
+  function refresh(active:()=>boolean=()=>true, fresh = false): Promise<void> {
+    const owner = JSON.stringify([accountKeyValue, accountEpoch, scopeInvalidated.value, passiveTabReadScope(), captureRuntimeRevision().epoch]);
+    const previous = listPending?.owner === owner ? listPending : null;
+    if (previous && (!fresh || !previous.dispatched)) {
+      previous.active.push(active);
+      return previous.promise;
     }
+    const readers = [active];
+    const current = () => owner === JSON.stringify([accountKeyValue, accountEpoch, scopeInvalidated.value, passiveTabReadScope(), captureRuntimeRevision().epoch])
+      && readers.some(isActive => isActive());
+    const epoch = accountEpoch;
+    const promise = Promise.resolve().then(async () => {
+      // An event cannot be reconciled by a GET issued before that event.
+      // Queued readers share the next read even if the preceding read failed.
+      if (previous) await Promise.allSettled([previous.promise]);
+      if (!current()) return;
+      const requestGeneration = ++listRequestGeneration;
+      loading.value = true;
+      error.value = null;
+      try {
+        await preparePendingRun();
+        const scope = snapshotScope();
+        if (scope.epoch !== epoch || requestGeneration !== listRequestGeneration || !current()) return;
+        await reconcilePending();
+        if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration || !current()) return;
+        deletionAvailable.value = false;
+        pending.dispatched = true;
+        const [page, dismissals, capability] = await Promise.all([supportApi.conversations(), supportApi.conversationDismissals(), supportApi.conversationManagement?.()]);
+        if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration && current()) {
+          for (const marker of capability?.clearedPeers ?? []) applyUserClear(marker);
+          mergeConversations(page.items); mergeDismissals(dismissals);
+          deletionAvailable.value = capability?.clearUserHistory === true;
+        }
+      } catch (cause) {
+        if (epoch === accountEpoch && requestGeneration === listRequestGeneration && current()) {
+          error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
+        }
+        throw cause;
+      } finally {
+        if (epoch === accountEpoch && requestGeneration === listRequestGeneration) loading.value = false;
+      }
+    }).finally(() => { if (listPending?.promise === promise) listPending = null; });
+    const pending = { owner, active: readers, dispatched: false, promise };
+    listPending = pending;
+    return promise;
   }
 
   async function refreshCategories(active: () => boolean = () => true): Promise<CategoryRefreshOutcome> {

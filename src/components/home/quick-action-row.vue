@@ -119,7 +119,7 @@ const dailySubtitle = computed(() => factSubtitle(
 ));
 const genesisSubtitle = computed(() => {
   const supply = quickNumericFact(remoteApiEnabled,
-    genesis.remoteSupplyKnown ? genesis.remotePublicReadState
+    genesis.remoteSupplyKnown ? "ready"
       : genesis.remotePublicReadState === "ready" ? "unavailable" : genesis.remotePublicReadState,
     genesis.totalSlots - genesis.soldSlots);
   if (supply.state !== "ready") return factSubtitle(supply, n => fmt(t.value.home.quickGenesisLeft, { n }));
