@@ -135,4 +135,10 @@ onUnmounted(() => {
   .home-trust__tags { gap:6px; }
   .home-trust__tag { padding:0 6px; }
 }
+/* PRD §5.5a keeps the three tags on one row; at 320 the longest set (Russian) needs this tier. */
+@media (max-width: 359px) {
+  .home-trust__tags { gap:4px; }
+  .home-trust__tag { gap:3px;padding:0 5px;font-size:11px; }
+  .home-trust__tag svg { width:12px;height:12px; }
+}
 </style>
