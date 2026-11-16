@@ -178,7 +178,7 @@ async function refreshVisibleStore() {
   if (!storePageVisible) return;
   if (publicOnly.value) { await refreshPromotion(); return; }
   await Promise.allSettled([
-    voucher.revalidateRemote(), runPassiveTabRead('genesis-state', () => genesis.syncRemote()),
+    voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     runPassiveTabRead('product-phase', () => refreshServerProductPhase(true)),
     revalidateProductCatalog(), earnConfig.ensure(), app.ensureRemoteFleet(), refreshPromotion(),
   ]);
@@ -193,12 +193,12 @@ onShow(() => {
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshVisibleStore);
   if(publicOnly.value)return;
-  void runPassiveTabRead('genesis-config', () => genesisCfg.refresh(), undefined, () => genesisCfg.loaded);
+  void genesisCfg.ensure();
   void voucher.revalidateRemote();
   // G4's public state owns supply independently of the configuration fields.
   // Re-read it whenever the store becomes visible so a prior failed 0/0
   // bootstrap can recover without an account rebind or a Genesis-detail visit.
-  void runPassiveTabRead('genesis-state', () => genesis.syncRemote());
+  void genesis.ensureSummary();
   void runPassiveTabRead('product-phase', () => refreshServerProductPhase(true));
   void revalidateProductCatalog();
   void earnConfig.ensure();

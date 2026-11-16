@@ -337,7 +337,7 @@ const networkItems = computed(() => quickSections.value.find(section => section.
 const settingSections = computed(() => quickSections.value.filter(section => !['network','devices'].includes(section.key)).map(section => ({ ...section, items: section.items.filter(item => !frequentKeys.some(key => key === item.key) && item.key !== 'profile') })));
 
 async function refreshRemoteFunds() {
-  await runPassiveTabRead('deposits-bank-history', () => deposits.refreshRemoteVietQrDeposits(), undefined, () => deposits.remoteReceiptInitialStatus === 'ready');
+  await runPassiveTabRead('deposits-bank-history', () => deposits.refreshRemoteVietQrDeposits(), undefined, () => deposits.serverStatus === 'ready' && deposits.remoteReceiptInitialStatus === 'ready');
 }
 
 async function refreshRemoteOrders(passive: unknown = false) {
@@ -390,7 +390,13 @@ async function refreshRemoteMe() {
     ["home", () => app.homeTruthStatus === "error" ? undefined : app.ensureHomeTruth()],
     ["commission", () => commission.eventsStatus === "error" ? undefined : commission.ensureCanonicalEvents()],
     ["withdrawals", () => app.remoteWithdrawalListStatus === "error" ? undefined : runPassiveTabRead('withdrawals', () => app.refreshRemoteWithdrawalList())],
-    ["fleet", async () => { await revalidateProductCatalog(); if (app.remoteFleetStatus !== "error") await app.ensureRemoteFleet(); if (earningsReleaseStatus.value !== "error") await ensureEarningsReleaseStatus(); }],
+    ["fleet", async () => {
+      await revalidateProductCatalog();
+      await Promise.all([
+        app.remoteFleetStatus !== "error" ? app.ensureRemoteFleet() : undefined,
+        earningsReleaseStatus.value !== "error" ? ensureEarningsReleaseStatus() : undefined,
+      ]);
+    }],
     ["funds", refreshRemoteFunds],
     ["orders", () => remoteOrdersFailed.value ? undefined : refreshRemoteOrders(true)],
     ["security", refreshRemoteSecurity],
@@ -399,7 +405,7 @@ async function refreshRemoteMe() {
     ["trial", () => trial.refreshVisible(true)],
     ["vouchers", () => voucher.revalidateRemote()],
     ["rank", () => vrank.ensureCanonicalVRank()],
-    ["genesis", () => runPassiveTabRead('genesis-state', () => genesis.syncRemote())],
+    ["genesis", () => genesis.ensureSummary()],
     ["bills", () => runPassiveTabRead('bills-summary', () => bills.refreshSummary(), undefined, () => bills.summaryStatus === 'ready')],
     ["market", () => runPassiveTabRead('market', () => market.syncRemote())],
     ["config", () => config.configStatus === "failed" ? undefined : config.revalidate()],

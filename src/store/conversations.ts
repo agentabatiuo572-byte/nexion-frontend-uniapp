@@ -16,6 +16,8 @@ import { opaqueSupportIntentSlot } from "@/lib/support-intent-slot";
 import { restoreSupportPending, persistSupportPending, clearSupportPending } from "@/lib/support-pending-storage";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { useConfig } from "@/store/config";
+import { passiveTabReadScope } from "@/lib/passive-tab-read";
+import { captureRuntimeRevision } from "@/api/order-api";
 
 /** The server asks for a customer reply before this send; not an ambiguous delivery. */
 function isSupportReplyRequired(cause: unknown): boolean {
@@ -368,6 +370,7 @@ export const useConversations = defineStore("conversations", () => {
   let pendingRunId = "unverified";
   const openGeneration = new Map<string, number>();
   let listRequestGeneration = 0;
+  let listPending: { owner: string; active: Array<() => boolean>; promise: Promise<void> } | null = null;
   let categoryRequestGeneration = 0;
 
   async function preparePendingRun(): Promise<void> {
@@ -591,32 +594,45 @@ export const useConversations = defineStore("conversations", () => {
   /** A delayed page may add an absent row, but cannot erase or regress a newer live snapshot. */
   function mergeConversations(items: Conversation[]) { for (const conversation of items) replace(conversation); }
 
-  async function refresh(active:()=>boolean=()=>true): Promise<void> {
+  function refresh(active:()=>boolean=()=>true): Promise<void> {
+    const owner = JSON.stringify([accountKeyValue, accountEpoch, scopeInvalidated.value, passiveTabReadScope(), captureRuntimeRevision().epoch]);
+    if (listPending?.owner === owner) {
+      listPending.active.push(active);
+      return listPending.promise;
+    }
+    const readers = [active];
+    const current = () => owner === JSON.stringify([accountKeyValue, accountEpoch, scopeInvalidated.value, passiveTabReadScope(), captureRuntimeRevision().epoch])
+      && readers.some(isActive => isActive());
     const epoch = accountEpoch;
     const requestGeneration = ++listRequestGeneration;
-    loading.value = true;
-    error.value = null;
-    try {
-      await preparePendingRun();
-      const scope = snapshotScope();
-      if (scope.epoch !== epoch || requestGeneration !== listRequestGeneration || !active()) return;
-      await reconcilePending();
-      if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration || !active()) return;
-      deletionAvailable.value = false;
-      const [page, dismissals, capability] = await Promise.all([supportApi.conversations(), supportApi.conversationDismissals(), supportApi.conversationManagement?.()]);
-      if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration && active()) {
-        for (const marker of capability?.clearedPeers ?? []) applyUserClear(marker);
-        mergeConversations(page.items); mergeDismissals(dismissals);
-        deletionAvailable.value = capability?.clearUserHistory === true;
+    const promise = Promise.resolve().then(async () => {
+      if (!current()) return;
+      loading.value = true;
+      error.value = null;
+      try {
+        await preparePendingRun();
+        const scope = snapshotScope();
+        if (scope.epoch !== epoch || requestGeneration !== listRequestGeneration || !current()) return;
+        await reconcilePending();
+        if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration || !current()) return;
+        deletionAvailable.value = false;
+        const [page, dismissals, capability] = await Promise.all([supportApi.conversations(), supportApi.conversationDismissals(), supportApi.conversationManagement?.()]);
+        if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration && current()) {
+          for (const marker of capability?.clearedPeers ?? []) applyUserClear(marker);
+          mergeConversations(page.items); mergeDismissals(dismissals);
+          deletionAvailable.value = capability?.clearUserHistory === true;
+        }
+      } catch (cause) {
+        if (epoch === accountEpoch && requestGeneration === listRequestGeneration && current()) {
+          error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
+        }
+        throw cause;
+      } finally {
+        if (epoch === accountEpoch && requestGeneration === listRequestGeneration) loading.value = false;
       }
-    } catch (cause) {
-      if (epoch === accountEpoch && requestGeneration === listRequestGeneration && active()) {
-        error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
-      }
-      throw cause;
-    } finally {
-      if (epoch === accountEpoch && requestGeneration === listRequestGeneration) loading.value = false;
-    }
+    }).finally(() => { if (listPending?.promise === promise) listPending = null; });
+    listPending = { owner, active: readers, promise };
+    return promise;
   }
 
   async function refreshCategories(active: () => boolean = () => true): Promise<CategoryRefreshOutcome> {
