@@ -8,7 +8,7 @@
   <view class="nx-glass-card overflow-hidden" :style="cardStyle">
     <view class="flex items-center justify-center relative" :style="artStyle">
       <GenesisArtwork context="holding" :serial="tokenId" style="position: absolute; inset: 0" />
-      <view v-if="isListed" class="absolute inline-flex items-center" :style="listedBadgeStyle">
+      <view v-if="isListed" class="my-token-listed absolute inline-flex items-center" :style="listedBadgeStyle">
         <view :style="listedBadgeDotStyle" />
         <text>{{ t.marketplace.listedBadge }}</text>
       </view>
@@ -264,8 +264,9 @@ const listedBadgeStyle: CSSProperties = {
   gap: "4px",
   padding: "2px 7px",
   borderRadius: "6px",
-  background: "rgba(196,131,22,0.22)",
-  color: "var(--v5-warning)",
+  // Light swaps in the opaque status-tag fill below; dark keeps this tint.
+  background: "var(--my-token-listed-bg, rgba(196,131,22,0.22))",
+  color: "var(--v5-warning-ink)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
   fontWeight: 500,
@@ -387,3 +388,8 @@ const listBtnStyle = computed<CSSProperties>(() => (listBlocked.value ? listBtnB
 
 import GenesisArtwork from "@/components/genesis/genesis-artwork.vue";
 </script>
+
+<style scoped>
+/* Light: warning-soft under warning-ink like NxTag, so 挂单中 clears 4.5:1 (BUG-392). */
+[data-theme="light"] .my-token-listed { --my-token-listed-bg: var(--v5-warning-soft); }
+</style>
