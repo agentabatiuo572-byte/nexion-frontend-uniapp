@@ -11,7 +11,7 @@
         </view>
       </view>
       <view class="home-trust__copy">
-        <text class="home-trust__headline">{{ center.headline }}</text>
+        <text v-if="profile" class="home-trust__headline">{{ center.headline }}</text>
         <text class="home-trust__body">{{ profile ? t.home.trustSnapshotBody : t.home.trustSnapshotUnavailable }}</text>
       </view>
       <!-- The documents response always carries all three registrations; each tag mirrors one of them. -->
