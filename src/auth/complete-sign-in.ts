@@ -1,3 +1,5 @@
+import { beginTabSnapshotBinding, acceptTabSnapshotBinding } from "@/lib/tab-first-screen-snapshot";
+import { useLocaleStore } from "@/store/locale";
 import { navReset } from "@/lib/route";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
@@ -8,7 +10,7 @@ import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-accou
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { useProfile } from "@/store/profile";
-import { authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { apiRuntimeConfig, authApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { afterLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
@@ -17,6 +19,7 @@ import { resolvePostSignInRoute } from "@/auth/post-sign-in-route";
 
 interface CompleteSignInOptions {
   identity: string;
+  snapshotReason?: "resume" | "new-login";
   returnTo?: string | null;
   sponsorCode?: string | null;
   idempotencyKey?: string | null;
@@ -139,6 +142,12 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     if (!auth.signIn(options.identity, onboardingComplete)) {
       return remoteApiEnabled ? failRemoteCompletion("sign_in_storage_unavailable") : { ok: false, error: "sign_in_storage_unavailable" };
     }
+    const confirmedSession = remoteApiEnabled ? sessionVault.read() : null;
+    if (confirmedSession?.accessToken && options.identity === `user:${confirmedSession.user.userId}`) {
+      beginTabSnapshotBinding(options.identity, options.snapshotReason ?? "new-login", confirmedSession, {
+        environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl, locale: useLocaleStore().code,
+      });
+    }
     app.bindAccount(options.identity);
     rebindAccountScopedStores(options.identity);
     if (completed) {
@@ -171,6 +180,11 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     // selection made during this read wins; a device default never overwrites
     // the account preference merely because the user signed in.
     hydrateCurrentProfileLocale(options.registrationLocale);
+    const confirmedSession = sessionVault.read();
+    if (confirmedSession?.accessToken && auth.isAuthenticated && auth.accountId === options.identity
+      && app.accountKey === options.identity && options.identity === `user:${confirmedSession.user.userId}`) {
+      acceptTabSnapshotBinding(options.snapshotReason === "resume");
+    }
     // Logout disarms the phone poll. A same-process login can reLaunch without
     // another App.onShow, so rearm only after this server session is accepted.
     app.setRemoteTaskForeground(true);

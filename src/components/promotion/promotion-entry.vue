@@ -23,24 +23,24 @@
         <text class="entry-title">{{ localized(activity.title,locale.code) }}</text>
         <text v-if="homeRewardSummary(activity)" class="entry-benefit">{{ homeRewardSummary(activity) }}</text>
         </template>
-        <text class="entry-home-deadline" role="button" tabindex="0" :aria-label="t.promotion.homeRulesLink" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity">{{ t.promotion.homeRulesLink }} ›</text>
+        <text class="entry-home-deadline" role="button" tabindex="0" :aria-label="t.promotion.homeRulesLink" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)">{{ t.promotion.homeRulesLink }} ›</text>
       </view>
       <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-copy">
         <text class="entry-eyebrow">{{ t.promotion.activityBadge }}</text>
         <text class="entry-title">{{ localized(activity.title,locale.code) }}</text>
-        <view v-if="activity.rewardRules.length" class="entry-benefits">
-          <view v-for="rule in activity.rewardRules" :key="rule.ruleId" class="entry-benefit-row">
+        <view v-if="(liveActivity(activity)?.rewardRules.length ?? 0)" class="entry-benefits">
+          <view v-for="rule in liveActivity(activity)?.rewardRules ?? []" :key="rule.ruleId" class="entry-benefit-row">
             <text v-if="activityKind(activity)==='spark'" class="entry-condition">{{ t.promotion.rulePer }} {{ rule.minBuyQty }}</text>
             <text class="entry-benefit">{{ rewardSummary(rule.buyerReward,t.promotion,rule.buyerReward.disclosure.deviceName) }}</text>
             <text v-if="rule.inviterReward" class="entry-inviter-benefit">{{ t.promotion.inviter }} · {{ rewardSummary(rule.inviterReward,t.promotion,rule.inviterReward.disclosure.deviceName) }}</text>
           </view>
         </view>
-        <text v-if="activity.eligibilityMessage" class="promotion-copy entry-eligibility">{{ localized(activity.eligibilityMessage,locale.code) }}</text>
+        <text v-if="liveActivity(activity)?.eligibilityMessage" class="promotion-copy entry-eligibility">{{ localized(liveActivity(activity)?.eligibilityMessage,locale.code) }}</text>
       </view>
       <view v-if="mode==='events'&&!eventLanding(activity)" class="entry-event-footer">
         <text class="entry-deadline">{{ t.promotion.deadline }} · {{ displayDeadline(activity.endsAt,locale.code) }}</text>
         <view class="entry-event-actions">
-          <view class="promotion-link" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
+          <view class="promotion-link" role="button" tabindex="0" @click="openTerms(activity)" @keydown.enter.prevent="openTerms(activity)" @keydown.space.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
           <NxButton class="entry-cta" size="medium" :label="t.promotion.browse" @click="navTo(promotionStoreHref(activity.activityId))"><text>{{ t.promotion.browse }}</text><text aria-hidden="true">→</text></NxButton>
         </view>
       </view>
@@ -66,9 +66,9 @@
         <view v-if="card.kind!=='gift'" class="entry-card__body">
           <view class="entry-card__head"><text class="entry-card__title">{{ localized(activity.title,locale.code) }}</text><NxTag tone="warning">{{ homeRemaining(activity) }}</NxTag></view>
           <text class="entry-card__note">{{ card.kind==='first' ? (card.discount ? landing.cardFirstNoteDiscount : landing.cardFirstNote) : fmt(landing.cardRepurchaseNote,{name:card.buyName}) }}</text>
-          <view class="entry-card__link" role="button" tabindex="0" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }} ›</text></view>
+          <view class="entry-card__link" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }} ›</text></view>
         </view>
-        <view v-else class="entry-card__link entry-card__link--corner" role="button" tabindex="0" @click.stop="termsActivity=activity" @keydown.enter.stop.prevent="termsActivity=activity" @keydown.space.stop.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }} ›</text></view>
+        <view v-else class="entry-card__link entry-card__link--corner" role="button" tabindex="0" @click.stop="openTerms(activity)" @keydown.enter.stop.prevent="openTerms(activity)" @keydown.space.stop.prevent="openTerms(activity)"><text>{{ t.promotion.rulesLink }} ›</text></view>
       </view>
     </view>
     </view></view>
@@ -80,6 +80,8 @@
   </view>
 </template>
 <script setup lang="ts">
+import { readTabSnapshot, invalidateTabSnapshots, type PromotionEntrySnapshot } from "@/lib/tab-first-screen-snapshot";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { toast } from "@/store/ui";
 import { fmt } from '@/i18n/format';
@@ -110,48 +112,55 @@ const app=useApp(),locale=useLocaleStore(),theme=useTheme(),t=useT();
 const landing=computed(()=>landingCopy(locale.code));
 const initialPage=props.activities===undefined&&props.mode==='home'?getHomePromotions(`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`,!!sessionVault.read()):null;
 const initialItems=props.activities??initialPage?.items;
-const items=ref<PublicPromotion[]>((initialItems??[]).filter(isPromotionActive)),status=ref<'idle'|'loading'|'ready'|'error'>(initialItems!==undefined?'ready':'idle');
-const listRead=ref(initialItems!==undefined);
+const liveItems=ref<PublicPromotion[]>((initialItems??[]).filter(isPromotionActive)),status=ref<'idle'|'loading'|'ready'|'error'>(initialItems!==undefined?'ready':'idle');
+const liveListRead=ref(initialItems!==undefined);
 useAutoRecovery({ failed: () => props.active && status.value === "error", retry: () => load(true) });
+type EntryPromotion = PublicPromotion | PromotionEntrySnapshot;
+const cachedItems=computed(()=>props.activities===undefined&&props.mode==='home'?readTabSnapshot('promotions'):null);
+const items=computed<EntryPromotion[]>(()=>liveListRead.value?liveItems.value:cachedItems.value??liveItems.value);
+const listRead=computed(()=>liveListRead.value||cachedItems.value!==null);
+function liveActivity(activity:EntryPromotion):PublicPromotion|null{return 'displayOnly' in activity?null:activity;}
 const cursor=ref<string|null>(initialPage?.nextCursor??null),hasMore=ref(initialPage?.hasMore??false),activeIndex=ref(0),termsActivity=ref<PublicPromotion|null>(null);
 const loadedBanners=ref(new Set<string>()),imageRefresh=ref(0);
 const catalogRefreshKey=computed(()=>imageRefresh.value);
 // Presentation follows published reward types. Purchase rewards do not imply
 // a claimed voucher or a completed milestone; those have separate event data.
-function activityKind(activity:PublicPromotion):'gift'|'coupon'|'spark'|'plain' {
+function activityKind(activity:EntryPromotion):'gift'|'coupon'|'spark'|'plain' {
+  if ('displayOnly' in activity) return activity.kind;
   const rewards=activity.rewardRules.flatMap(rule=>[rule.buyerReward,...(rule.inviterReward?[rule.inviterReward]:[])]);
   if(rewards.some(reward=>reward.type==='DEVICE'))return 'gift';
   if(rewards.some(reward=>reward.type==='DISCOUNT_USDT'))return 'coupon';
   return rewards.length?'spark':'plain';
 }
-function activityArt(activity:PublicPromotion){const kind=activityKind(activity);return kind==='plain'?'spark':kind;}
-function promoSlots(activity:PublicPromotion) {
+function activityArt(activity:EntryPromotion){const kind=activityKind(activity);return kind==='plain'?'spark':kind;}
+function promoSlots(activity:EntryPromotion) {
   void app.accountKey;void app.accountBindingEpoch;void productCatalogState.revision;
   const ready=(productCatalogState.status==='ready'||(productCatalogState.status==='loading'&&productCatalogState.serverCanonical))&&!!sessionVault.read();
-  return promotionMachineSlots(activity).map(slot=>({...slot,imageUrl:ready?getProduct(slot.sku)?.imageUrl:undefined}));
+  return ('displayOnly' in activity ? activity.slots : promotionMachineSlots(activity)).map(slot=>({...slot,imageUrl:ready?getProduct(slot.sku)?.imageUrl:undefined}));
 }
 const fence=createPromotionReadFence();let visible=true,pendingTicket:number|null=null;
 // The published banner contract has no theme variants. In light mode use the
 // same published rules and catalog images in a theme-aware, readable layout.
-function bannerUrl(activity:PublicPromotion){return theme.resolved==='dark'&&activity.bannerImageUrl?apiRuntimeConfig.baseUrl.replace(/\/+$/,'')+activity.bannerImageUrl:null;}
-function bannerKey(activity:PublicPromotion){return JSON.stringify([app.accountKey,app.accountBindingEpoch,locale.code,activity.activityId,activity.version,bannerUrl(activity),imageRefresh.value]);}
-function bannerReady(activity:PublicPromotion){return !!bannerUrl(activity)&&loadedBanners.value.has(bannerKey(activity));}
-function bannerImageProps(activity:PublicPromotion){
+function bannerUrl(activity:EntryPromotion){return theme.resolved==='dark'&&activity.bannerImageUrl?apiRuntimeConfig.baseUrl.replace(/\/+$/,'')+activity.bannerImageUrl:null;}
+function bannerKey(activity:EntryPromotion){return JSON.stringify([app.accountKey,app.accountBindingEpoch,locale.code,activity.activityId,activity.version,bannerUrl(activity),imageRefresh.value]);}
+function bannerReady(activity:EntryPromotion){return !!bannerUrl(activity)&&loadedBanners.value.has(bannerKey(activity));}
+function bannerImageProps(activity:EntryPromotion){
   const key=bannerKey(activity);
   return {sku:activity.activityId,imageUrl:bannerUrl(activity),scopeKey:JSON.stringify([locale.code,activity.version]),refreshKey:imageRefresh.value,onReady:(ready:boolean)=>{
     if(!visible||!items.value.some(item=>bannerKey(item)===key))return;
     if(ready)loadedBanners.value.add(key);else loadedBanners.value.delete(key);
   }};
 }
-function clear(resetBanners=true){items.value=[];listRead.value=false;cursor.value=null;hasMore.value=false;activeIndex.value=0;termsActivity.value=null;if(resetBanners){imageRefresh.value++;loadedBanners.value.clear();}}
+function clear(resetBanners=true){liveItems.value=[];liveListRead.value=false;cursor.value=null;hasMore.value=false;activeIndex.value=0;termsActivity.value=null;if(resetBanners){imageRefresh.value++;loadedBanners.value.clear();}}
 function publicName(id:string){void productCatalogState.status;return sessionVault.read()?getProduct(id)?.name??id:id;}
-function homeRewardSummary(activity:PublicPromotion) {
+function homeRewardSummary(activity:EntryPromotion) {
+  if ('displayOnly' in activity) return activity.benefit;
   const reward=activity.rewardRules[0]?.buyerReward;
   if(!reward)return '';
   return localized(reward.disclosure.benefitDescription,locale.code)
     || rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName || (reward.type==='DEVICE'?publicName(reward.giftProductNo):null));
 }
-function homeRemaining(activity:PublicPromotion){return promotionRemaining(activity,t.value.promotion);}
+function homeRemaining(activity:EntryPromotion){return promotionRemaining(activity,t.value.promotion);}
 function cycleOffer(delta:number){if(items.value.length)activeIndex.value=(activeIndex.value+delta+items.value.length)%items.value.length;}
 // Home offers rotate on their own; any change of offer (auto or tapped) restarts the countdown.
 let autoplayTimer:ReturnType<typeof setInterval>|null=null;
@@ -160,14 +169,26 @@ function startAutoplay(){stopAutoplay();if(props.mode==='home'&&props.active&&vi
 const termsRules=computed(()=>termsActivity.value?promotionTermsRules(termsActivity.value,t.value.promotion,publicName):[]);
 const termsText=computed(()=>termsActivity.value?promotionTermsText(termsActivity.value,t.value.promotion,locale.code):'');
 // Purchase gift, first purchase and repurchase have a landing page; other offers keep the store filter.
-function offerHref(activity:PublicPromotion){return landingKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
-function eventLanding(activity:PublicPromotion){return props.mode==='events'?landingKind(activity):null;}
-function landingCards(activity:PublicPromotion){
+function offerHref(activity:EntryPromotion){if ('displayOnly' in activity) return activity.href;return landingKind(activity)?promotionLandingHref(activity.activityId):promotionStoreHref(activity.activityId);}
+function eventLanding(activity:EntryPromotion){return props.mode==='events'?landingKind(activity):null;}
+function landingCards(activity:EntryPromotion){
+  if ('displayOnly' in activity) return [];
   const kind=eventLanding(activity),rule=activity.rewardRules[0];
   if(!kind||!rule)return [];
   void app.accountKey;void app.accountBindingEpoch;
   const reward=rule.buyerReward,parts=rewardParts(activity,reward),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
   return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:rewardPartsText(parts,t.value.promotion),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
+}
+async function openTerms(activity:EntryPromotion){
+  if (!('displayOnly' in activity)) {termsActivity.value=activity;return;}
+  const identity=`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
+  try {
+    const current=await promotionApi.get(activity.activityId,!!sessionVault.read());
+    if(visible&&identity===`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`)termsActivity.value=current;
+  }catch(cause){if(visible&&identity===`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`){
+    if(!isTransientReadFailure(cause)){invalidateTabSnapshots(['promotions']);clear();}
+    toast.error(t.value.promotion.error);
+  }}
 }
 async function load(reset:boolean,preserveImages=false){
   if(!visible)return;
@@ -177,7 +198,7 @@ async function load(reset:boolean,preserveImages=false){
   // Join a shared read already in flight; otherwise explicitly revalidate the catalog.
   const catalogRead=reset&&remoteApiEnabled&&sessionVault.read()
     ?preserveImages?revalidateProductCatalog():refreshProductCatalog(productCatalogState.status!=='loading'):Promise.resolve();
-  if(props.activities!==undefined){fence.invalidate();items.value=props.activities.filter(isPromotionActive);listRead.value=true;cursor.value=null;hasMore.value=false;activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));status.value='ready';await catalogRead;return;}
+  if(props.activities!==undefined){fence.invalidate();liveItems.value=props.activities.filter(isPromotionActive);liveListRead.value=true;cursor.value=null;hasMore.value=false;activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));status.value='ready';await catalogRead;return;}
   const ticket=fence.next(),identity=`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
   pendingTicket=ticket;
   status.value='loading';
@@ -187,13 +208,13 @@ async function load(reset:boolean,preserveImages=false){
       :promotionApi.list({limit:20,cursor:reset?null:cursor.value,...(props.mode==='home'?{placement:'home.purchase-promotion' as const}:{})},!!sessionVault.read());
     const [page]=await Promise.all([read,catalogRead]);
     if(!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`)return;
-    const rows=reset?[]:items.value;
-    items.value=[...new Map([...rows,...page.items.filter(isPromotionActive)].map(item=>[item.activityId,item])).values()];
+    const rows=reset?[]:liveItems.value;
+    liveItems.value=[...new Map([...rows,...page.items.filter(isPromotionActive)].map(item=>[item.activityId,item])).values()];
     activeIndex.value=Math.min(activeIndex.value,Math.max(0,items.value.length-1));
     cursor.value=page.nextCursor;hasMore.value=page.hasMore;status.value='ready';
-    listRead.value=true;
+    liveListRead.value=true;
   }catch(cause){if(fence.current(ticket)&&identity===`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`){
-    if(cause instanceof Error && 'status' in cause && (cause.status===401||cause.status===403))clear();
+    if(!isTransientReadFailure(cause)){clear();if(props.mode==='home')invalidateTabSnapshots(['promotions']);}
     if(reset)status.value='error';else{status.value='ready';toast.error(t.value.promotion.error);}
   }}finally{if(pendingTicket===ticket)pendingTicket=null;}
 }

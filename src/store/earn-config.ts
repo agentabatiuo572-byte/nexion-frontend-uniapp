@@ -1,3 +1,5 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { computed, ref, watch } from "vue";
 import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { apiRuntimeConfig, earnConfigApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
@@ -56,6 +58,7 @@ async function readEarnConfig(): Promise<boolean> {
   if (!remoteApiEnabled) return true;
   if (environmentInvalidated) return false;
   const version = ++loadVersion;
+  const snapshotWrite = captureTabSnapshotWrite();
   status.value = "loading";
   error.value = "";
   try {
@@ -65,10 +68,13 @@ async function readEarnConfig(): Promise<boolean> {
     applyCanonicalPhoneTierYields(tiers.tiers);
     status.value = "ready";
     error.value = "";
+    const phone = tiers.tiers.find(tier => tier.tier === 3);
+    saveTabSnapshot(snapshotWrite, "phoneYield", phone ? { usd: phone.baseRateUsdt, nex: phone.baseRateNex } : null, phone?.effectiveAt ?? null);
     return true;
   } catch (cause) {
     if (version !== loadVersion) return false;
     phoneTiers.value = null;
+    if (!isTransientReadFailure(cause)) invalidateTabSnapshots(["phoneYield"], snapshotWrite);
     applyCanonicalPhoneTierYields([]);
     status.value = "error";
     error.value = cause instanceof Error ? cause.message : "E2_CONFIG_UNAVAILABLE";

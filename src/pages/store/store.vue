@@ -19,7 +19,7 @@
         <view v-if="voucherOffers.length&&!voucherContext.voucherId" class="store-voucher-ticket" data-testid="store-voucher-ticket" role="button" tabindex="0" @click="openStoreVouchers" @keydown.enter.prevent="openStoreVouchers" @keydown.space.prevent="openStoreVouchers">
           <view class="store-voucher-ticket__value"><text v-if="voucherBenefit.amount != null" class="store-voucher-ticket__currency">$</text><text>{{ voucherBenefit.amount != null ? fmtMoney(voucherBenefit.amount).replace(/^\$/, '').replace(/\.00$/, '') : voucherBenefit.percent != null ? voucherBenefit.percent + '%' : '–' }}</text></view>
           <view class="store-voucher-ticket__rule" aria-hidden="true" />
-          <view class="store-voucher-ticket__copy"><text class="store-voucher-ticket__title">{{ auditCopy.voucherShort }} · {{ fmt(auditCopy.voucherShortCount,{n:voucherOffers.length}) }}</text><view class="store-voucher-ticket__hint"><view v-if="voucherBenefit.amount == null">{{ auditCopy.voucherDiscount }}</view><view>{{ voucherClaimable.length ? auditCopy.claimToUse : auditCopy.autoApplyVoucher }}</view></view></view>
+          <view class="store-voucher-ticket__copy"><text class="store-voucher-ticket__title">{{ auditCopy.voucherShort }} · {{ fmt(auditCopy.voucherShortCount,{n:voucherOffers.length}) }}</text><view class="store-voucher-ticket__hint"><view v-if="voucherBenefit.amount == null">{{ auditCopy.voucherDiscount }}</view><view>{{ voucherClaimHint ? auditCopy.claimToUse : auditCopy.autoApplyVoucher }}</view></view></view>
           <image class="store-voucher-ticket__art" src="/static/img/home-glass-20260928/coupon.webp" mode="aspectFit" aria-hidden="true" />
         </view>
         <PromotionEntry v-if="!voucherContext.voucherId" class="store-campaign" mode="home" tinted />
@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
@@ -120,7 +121,7 @@ import NxSection from "@/components/ui/nx-section.vue";
 import NxListGroup from "@/components/ui/nx-list-group.vue";
 import NxListRow from "@/components/ui/nx-list-row.vue";
 import { PRODUCTS } from "@/mock/products";
-import { productCatalogState, productCatalogPresentation, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
+import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
@@ -288,7 +289,7 @@ const displayProducts = computed(() => {
   return activityId.value ? products.filter(p=>activity.value?.productNos.includes(p.id)) : products;
 });
 const catalogHasProducts = computed(() => displayProducts.value.length > 0);
-const yieldAuthority = computed(() => buildStoreYieldAuthority(
+const liveYield = computed(() => buildStoreYieldAuthority(
   displayProducts.value,
   earnConfig.phoneTiers.value?.tiers ?? [],
   {
@@ -298,6 +299,17 @@ const yieldAuthority = computed(() => buildStoreYieldAuthority(
     serverCanonical: displayCatalog.value?.serverCanonical ?? productCatalogState.serverCanonical,
   },
 ));
+const yieldAuthority = computed(() => {
+  if (!remoteApiEnabled) return liveYield.value;
+  const catalog = productCatalogDisplayProof.value ? liveYield.value : readTabSnapshot("catalogYield");
+  const phone = earnConfig.status.value === "ready" ? liveYield.value.phone : readTabSnapshot("phoneYield");
+  const entry = catalog?.entry ?? null, pro = catalog?.pro ?? null, rack = catalog?.rack ?? null;
+  const rows = liveYield.value.ladder.map(row => ({ ...row, amount: row.id === "phone" ? phone : catalog?.ladder.find(item => item.id === row.id)?.amount ?? null }));
+  const maximum = Math.max(0, ...rows.map(row => row.amount?.usd ?? 0));
+  return { phone, entry, pro, rack, multiplier: phone && entry && phone.usd > 0 ? Math.round(entry.usd / phone.usd) : null,
+    complete: [phone, entry, pro, rack].every(value => value !== null),
+    ladder: rows.map(row => ({ ...row, widthPct: row.amount && maximum > 0 ? Math.max(1, Math.round(row.amount.usd / maximum * 100)) : 0 })) };
+});
 const unlockedProducts = computed(() =>
   displayProducts.value.filter((p) => {
     if (!mounted.value) return false;
@@ -318,10 +330,14 @@ const upgradeBaseImageUrl = computed(() => {
 });
 const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentationClaimable : voucher.claimableVouchers).filter(offer => voucherSupportsSurface(offer, 'store')));
 const voucherOffers = computed(() => remoteApiEnabled
-  ? voucher.presentationOffers.filter(offer => !voucher.presentationClaimable.some(item => item.id === offer.id) || voucherSupportsSurface(offer, 'store'))
+  ? voucher.remoteStatus === "ready" || voucher.presentationOffers.length ? voucher.presentationOffers.filter(offer => !voucher.presentationClaimable.some(item => item.id === offer.id) || voucherSupportsSurface(offer, 'store'))
+    : (readTabSnapshot("vouchers") ?? []).map(offer => ({ ...offer, amountUSD: offer.amountUSD ?? undefined, percent: offer.percent ?? undefined, maxDiscountUSD: offer.maxDiscountUSD ?? undefined }))
   : [...new Map([...voucherClaimable.value, ...voucher.claimedUnused].map(offer => [offer.id, offer])).values()]);
 const voucherBenefit = computed(() => voucherBenefitSummary(voucherOffers.value));
-function openStoreVouchers() {
+const voucherClaimHint = computed(() => !remoteApiEnabled || voucher.remoteStatus === "ready" || voucher.presentationOffers.length
+  ? voucherClaimable.value.length > 0 : readTabSnapshot("vouchers")?.some(offer => offer.claimableOnStore) ?? false);
+async function openStoreVouchers() {
+  if (remoteApiEnabled && voucher.remoteStatus !== "ready") await voucher.refreshRemote();
   if (voucher.remoteStatus === 'ready' && voucher.claimableVouchers.some(offer => voucherSupportsSurface(offer, 'store'))) voucherClaimSheet.show('store');
   else if (voucherOffers.value.length) navTo('/pages/me/rewards-list?cat=voucher');
 }

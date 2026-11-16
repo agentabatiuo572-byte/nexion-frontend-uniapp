@@ -13,7 +13,7 @@ import { useDataVisibility } from "@/store/data-visibility";
  * not cut the count short; afterwards it is the source. A source that turns null still shows null
  * at once and ends the count.
  */
-export function useCountUp(source: MaybeRefOrGetter<number | null>, options: { follow?: boolean } = {}) {
+export function useCountUp(source: MaybeRefOrGetter<number | null>, options: { follow?: boolean; skip?: MaybeRefOrGetter<boolean> } = {}) {
   const visibility = useDataVisibility();
   const counting = ref<number | null>(null);
   const progress = ref<number | null>(null);
@@ -29,7 +29,7 @@ export function useCountUp(source: MaybeRefOrGetter<number | null>, options: { f
     }
     if (value === null) return;
     counted = true;
-    if (visibility.hidden || typeof requestAnimationFrame === "undefined" || typeof window === "undefined"
+    if (toValue(options.skip) || visibility.hidden || typeof requestAnimationFrame === "undefined" || typeof window === "undefined"
       || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const start = Date.now();
     if (options.follow) progress.value = 0; // start from 0 on this render, not one frame of the final value

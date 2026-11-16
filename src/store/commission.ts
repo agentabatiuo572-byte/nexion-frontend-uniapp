@@ -1,3 +1,4 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { defineStore } from "pinia";
@@ -402,6 +403,7 @@ export const useCommission = defineStore("commission", () => {
   async function readCanonicalEvents(scope: RequestScope) {
     if (!remoteApiEnabled) return;
     const generation = ++eventsRefreshGeneration;
+    const snapshotWrite = captureTabSnapshotWrite();
     events.value = [];
     // Keep the last confirmed aggregate during this account's read only.
     // Account/runtime resets and a failed read still remove its authority.
@@ -422,13 +424,15 @@ export const useCommission = defineStore("commission", () => {
       eventsRateLimited.value = false;
       eventsTransientFailure.value = false;
       eventsReadFailed.value = false;
+      const { totalUSDT, contributorCount, directUSDT, extendedUSDT, monthUSDT, monthNEX, unlockedUSDT, coolingUSDT } = snapshot.aggregate;
+      saveTabSnapshot(snapshotWrite, "commission", { totalUSDT, contributorCount, directUSDT, extendedUSDT, monthUSDT, monthNEX, unlockedUSDT, coolingUSDT }, snapshot.generatedAt);
     } catch (cause) {
       if (generation === eventsRefreshGeneration && isCurrentScope(scope)) {
 
         eventsRateLimited.value = isHttpReadRateLimit(cause);
         eventsTransientFailure.value = isTransientReadFailure(cause);
         eventsReadFailed.value = true;
-        if (!eventsTransientFailure.value) eventsLifetimeDisplayUSDT.value = null;
+        if (!eventsTransientFailure.value) { eventsLifetimeDisplayUSDT.value = null; invalidateTabSnapshots(["commission"], snapshotWrite); }
         if (isHttpReadRateLimit(cause)) eventsRetryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
         eventsEvidence.value = null;
         eventsStatus.value = "error";

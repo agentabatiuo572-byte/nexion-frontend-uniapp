@@ -77,8 +77,9 @@
 </template>
 
 <script setup lang="ts">
+import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-screen-snapshot";
 import { formatAmount } from "@/lib/amount-display";
-import { formatUsdOverviewParts } from "@/lib/usd-display";
+import { formatUsd, formatUsdOverviewParts } from "@/lib/usd-display";
 import { onUnmounted, computed, nextTick, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
@@ -205,9 +206,11 @@ function openExplainer() {
 const serverPeriod = computed(() => {
   // An explicit transient read failure may retain history; live guards still require ready.
   if (remoteApiEnabled && app.homeTruthStatus !== "ready" && app.homeTruthStatus !== "loading"
-    && !(app.homeTruthStatus === "error" && app.homeTruthTransientFailure)) return null;
-  const e = app.homeTruth?.earnings;
+    && !(app.homeTruthStatus === "error" && app.homeTruthTransientFailure) && !readTabSnapshot("home")) return null;
+  const e = app.homeTruth?.earnings ?? readTabSnapshot("home")?.earnings;
   if (!e) return null;
+  const period = range.value.toLowerCase() as "today" | "week" | "month" | "all";
+  if (!app.homeTruth && period !== "all" && !tabSnapshotPeriodCurrent("home", period)) return null;
   return range.value === "Today" ? e.today : range.value === "Week" ? e.week : range.value === "Month" ? e.month : e.all;
 });
 /**
@@ -223,7 +226,7 @@ const serverPeriodValue = computed(() => {
     return { usdt: 0, nex: 0, jobCount: 0 };
   }
   if (range.value !== "Today") return period;
-  const fleet = app.remoteRealizedToday;
+  const fleet = app.remoteRealizedToday ?? (tabSnapshotPeriodCurrent("wallet", "today") ? readTabSnapshot("wallet")?.today : null);
   return {
     ...period,
     usdt: period.usdt ?? fleet?.usdt ?? null,
@@ -237,14 +240,14 @@ const mockTotal = computed(() => {
 });
 const total = computed(() => remoteApiEnabled ? serverPeriodValue.value?.usdt ?? null : mockTotal.value);
 // Only the first figure counts up; a later period switch shows its value directly.
-const shownTotal = useCountUp(total);
+const shownTotal = useCountUp(total, { skip: remoteApiEnabled });
 const totalParts = computed(() => formatUsdOverviewParts(shownTotal.value));
 const totalKnown = computed(() => totalParts.value !== null);
 const totalPrefix = computed(() => totalParts.value?.prefix ?? "");
 const totalInt = computed(() => totalParts.value?.integer ?? "—");
 const totalCents = computed(() => totalParts.value?.fraction ?? "");
 const nexTotal = computed(() => remoteApiEnabled ? serverPeriodValue.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
-const shownNex = useCountUp(nexTotal);
+const shownNex = useCountUp(nexTotal, { skip: remoteApiEnabled });
 const nexFmt = computed(() => shownNex.value === null ? "—" : formatAmount(shownNex.value));
 const jobsCount = computed(() => {
   if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
@@ -253,7 +256,11 @@ const jobsCount = computed(() => {
 
 // Latest settlement = the first row of the ledger below (same source); the tile opens the same "View all" page.
 const { rows: ledgerRows, statusText: ledgerStatusText } = useEarningsLedger();
-const latest = computed(() => ledgerRows.value[0] ?? null);
+const latest = computed(() => {
+  if (app.homeTruth) return ledgerRows.value[0] ?? null;
+  const row = readTabSnapshot("home")?.latest;
+  return row ? { id: row.id, who: row.client, model: row.model, amt: formatUsd(row.rewardUsdt, "detail", !row.synthetic) } : null;
+});
 const latestLabel = computed(() => latest.value
   ? `${t.value.earn.latestSettlement} ${visibility.mask(latest.value.amt)}, ${latest.value.model} · ${latest.value.who}, ${t.value.home.earningsLedgerViewAll}`
   : `${t.value.earn.latestSettlement}, ${t.value.home.earningsLedgerViewAll}`);

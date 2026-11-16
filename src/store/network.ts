@@ -1,3 +1,4 @@
+import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { defineStore } from "pinia";
@@ -203,6 +204,7 @@ export const useNetwork = defineStore("network", () => {
   async function readCanonicalNetwork(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     const epoch = accountEpoch;
+    const snapshotWrite = captureTabSnapshotWrite();
     const request = ++refreshSequence;
     const runScope = captureRuntimeRevision();
     const current = () => epoch === accountEpoch && request === refreshSequence && isCurrentRuntimeRevision(runScope);
@@ -231,6 +233,7 @@ export const useNetwork = defineStore("network", () => {
       remoteRateLimited.value = false;
       remoteTransientFailure.value = false;
       hasRemoteSnapshot.value = true;
+      saveTabSnapshot(snapshotWrite, "network", { total: snapshot.totalMembers, direct: snapshot.directMembers }, snapshot.generatedAt);
       return true;
     } catch (cause) {
       if (!current()) return false;
@@ -241,7 +244,7 @@ export const useNetwork = defineStore("network", () => {
       if (isTransientReadFailure(cause)) {
         remoteRateLimited.value = isHttpReadRateLimit(cause);
         remoteTransientFailure.value = true;
-      } else clearRemoteNetwork();
+      } else { clearRemoteNetwork(); invalidateTabSnapshots(["network"], snapshotWrite); }
       remoteStatus.value = "error";
       return false;
     }

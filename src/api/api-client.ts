@@ -1,3 +1,4 @@
+import { captureTabSnapshotWrite, invalidateTabSnapshots } from "@/lib/tab-first-screen-snapshot";
 import { serverSessionContext, isUserSession, type ApiResult, type AuthSessionResponse } from "./contracts";
 import { ApiError, asApiError, parseRetryAfterMs } from "./errors";
 import type { RefreshCredentialMode, SessionSnapshot, SessionVault } from "./session-vault";
@@ -191,6 +192,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     request: HttpRequest,
     acceptedResponses: ApiRequest["acceptedResponses"] = [],
   ): Promise<T> {
+    const snapshotWrite = captureTabSnapshotWrite();
     const key = request.method === "GET" ? cooldownKey(request) : null;
     const cooldown = key ? readCooldowns.get(key) : undefined;
     if (cooldown && Date.now() < cooldown.until) throw new ApiError({ ...cooldown.error,
@@ -262,7 +264,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         retryAfterMs,
       });
     }
-    if (businessWrite(request)) invalidatePassiveTabReads();
+    if (businessWrite(request)) { invalidatePassiveTabReads(); invalidateTabSnapshots(undefined, snapshotWrite); }
     return envelope.data as T;
   }
 

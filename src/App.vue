@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
 import { refreshActivePage } from "@/lib/active-page-refresh";
 import { appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
@@ -130,6 +131,7 @@ function startTick() {
   lastTick = Date.now();
   tickTimer = setInterval(() => {
     const now = Date.now();
+    advanceTabSnapshotClock(now);
     useApp().tick(now - lastTick);
     lastTick = now;
   }, 1000);
@@ -669,6 +671,7 @@ function beginServerSessionRestore(): Promise<boolean> {
     const preserveCurrentRoute = preserveRouteDuringSessionRestore(route);
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
+      snapshotReason: "resume",
       returnTo: preserveCurrentRoute ? `/${route}` : "/pages/index/index",
       onboardingComplete: restored.user.onboardingComplete,
       serverProfile: restored.user,
@@ -811,6 +814,7 @@ function checkAuthGuard(): boolean {
  * Server task and settlement state stays untouched and is read after sign-in.
  */
 function clearInvalidRemoteSessionState(auth: ReturnType<typeof useAuth>): void {
+  forgetTabSnapshotAccount(auth.accountId);
   useConversations().suspendForReauthentication();
   try {
     sessionVault.clear();
@@ -1264,6 +1268,7 @@ onLaunch(() => {
   installFieldNaming();
   const auth = useAuth();
   installForegroundReadSignals();
+  installTabSnapshotLifecycle(sessionVault, () => ({ environment: apiRuntimeConfig.environment, baseUrl: apiRuntimeConfig.baseUrl, locale: useLocaleStore().code }));
   // #ifdef APP-PLUS
   installNativePush({ client: apiClient, vault: sessionVault,
     canNavigate: () => canRefreshRemoteAccount(useAuth())
@@ -1333,6 +1338,7 @@ onLaunch(() => {
   scheduleAccountSessionBootstrap();
 });
 onShow(() => {
+  advanceTabSnapshotClock();
   appReadForeground.value = true;
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();

@@ -5,6 +5,7 @@
         <!-- This month ledger -->
         <TeamLedgerCard
           :available="ledgerVisible"
+          :snapshot-display="restoredTabSnapshot('commission')"
           :loading="ledgerLoading"
           :failed="ledgerFailureFeedback"
           :total-u-s-d-t-lifetime="totalUSDTLifetime"
@@ -24,9 +25,10 @@
         <TeamSummaryCard
           :status="teamSummaryStatus"
           :has-snapshot="network.hasRemoteSnapshot && displayCatalogValid"
+          :display-available="networkDisplaySnapshot !== null"
           :transient-failure="network.remoteTransientFailure"
-          :total="network.totalMembers"
-          :direct="byLayerBuckets[1].length"
+          :total="networkReadable ? network.totalMembers : networkDisplaySnapshot?.total ?? 0"
+          :direct="networkReadable ? byLayerBuckets[1].length : networkDisplaySnapshot?.direct ?? 0"
           @invite="inviteCard?.openShare()"
           @open="go('/pages/team/tree')"
         />
@@ -36,7 +38,7 @@
         <view class="nx-team-rank-link team-rank nx-viz-press" role="link" tabindex="0" :aria-label="t.team.rankBenefits" @click="go('/pages/team/rank')" @keydown.enter.prevent="go('/pages/team/rank')">
           <view class="team-rank__header"><text class="team-rank__title">{{ designCopy.myRank }}</text><text class="team-rank__chev" aria-hidden="true">›</text></view>
           <view class="team-rank__identity">
-            <TeamRankEmblem v-if="!visibility.hidden && rankReadable" :rank="remoteApiEnabled ? rankPresentation : myRank" :size="52" />
+            <TeamRankEmblem v-if="!visibility.hidden && rankReadable" :rank="remoteApiEnabled ? selectedRank : myRank" :size="52" />
             <view class="team-rank__copy"><text class="team-rank__level">{{ visibility.mask(myRankDisplay) }}</text><text class="team-rank__hint">{{ visibility.mask(rankGapText) }}</text></view>
           </view>
           <view v-if="rankBars.length" ref="rankBarsEl" class="team-rank__bars" aria-hidden="true">
@@ -107,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import { readTabSnapshot, tabSnapshotPeriodCurrent, restoredTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
@@ -159,6 +162,9 @@ const commission = useCommission();
 type LedgerPresentation = Pick<TeamCommissionSnapshot["aggregate"], "totalUSDT" | "contributorCount" | "directUSDT" | "extendedUSDT" | "monthUSDT" | "monthNEX" | "unlockedUSDT" | "coolingUSDT">;
 const ledgerPresentation = ref<LedgerPresentation | null>(null);
 const rankPresentation = ref<number | null>(null);
+const displayLedger = computed(() => ledgerPresentation.value ?? readTabSnapshot("commission"));
+const networkDisplaySnapshot = computed(() => networkReadable.value ? null : readTabSnapshot("network"));
+const selectedRank = computed(() => rankPresentation.value ?? readTabSnapshot("rank")?.rank ?? null);
 const binaryPresentation = ref<Pick<CanonicalBinaryState, "estimatedAmountUsdt" | "trackA" | "trackB"> | null>(null);
 const displayEnvironmentInvalidated = ref(false);
 watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => { displayEnvironmentInvalidated.value = true; }, { flush: "sync" });
@@ -172,7 +178,7 @@ const ledgerLoading = computed(() => remoteApiEnabled && !ledgerFailed.value
 const ledgerStrictFailure = computed(() => (network.remoteStatus === "error" && !network.remoteTransientFailure)
   || (commission.eventsStatus === "error" && !commission.eventsTransientFailure));
 const ledgerVisible = computed(() => !remoteApiEnabled || (!ledgerStrictFailure.value
-  && network.hasRemoteSnapshot && ledgerPresentation.value !== null));
+  && (network.hasRemoteSnapshot || readTabSnapshot("network") !== null) && displayLedger.value !== null));
 const networkReadable = computed(() => !remoteApiEnabled || network.remoteStatus === "ready"
   || (displayCatalogValid.value && network.hasRemoteSnapshot && (network.remoteStatus === "loading"
     || (network.remoteStatus === "error" && network.remoteTransientFailure))));
@@ -227,15 +233,15 @@ watch([displayCatalogValid, () => vrank.remoteReady, () => vrank.remoteError, ()
 const designCopy = computed(() => teamRedesignCopy(locale.code));
 const myRank = computed(() => vrank.myRank);
 // 头衔显示名按语言取(中文界面出中文头衔),拼法收在 lib/v-rank-copy;远端档位未到仍显示 V—
-const myRankDisplay = computed(() => remoteApiEnabled ? rankPresentation.value === null ? "V—" : `V${rankPresentation.value}` : `V${myRank.value}`);
+const myRankDisplay = computed(() => remoteApiEnabled ? selectedRank.value === null ? "V—" : `V${selectedRank.value}` : `V${myRank.value}`);
 const members = computed(() => network.members);
 const localTotalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);
-const commissionAggregate = computed(() => ledgerPresentation.value ?? {
+const commissionAggregate = computed(() => displayLedger.value ?? {
   totalUSDT: 0, totalNEX: 0, directUSDT: 0, extendedUSDT: 0, contributorCount: 0,
 });
 
-const rankReadable = computed(() => !remoteApiEnabled || (rankPresentation.value !== null && vrank.remoteReady));
+const rankReadable = computed(() => !remoteApiEnabled || (rankPresentation.value !== null && vrank.remoteReady) || readTabSnapshot("rank") !== null);
 const rankProgress = computed(() => teamRankProgress({
   myRank: vrank.myRank,
   selfComputePoints: vrank.selfComputePoints,
@@ -245,6 +251,9 @@ const rankProgress = computed(() => teamRankProgress({
 }, vrank.ladder));
 const rankGapText = computed(() => {
   if (!rankReadable.value) return designCopy.value.benefitsAndRewards;
+  const snapshot = !vrank.remoteReady ? readTabSnapshot("rank") : null;
+  if (snapshot) return snapshot.next === null ? t.value.home.rankTopTier
+    : `${fmt(auditCopy.value.toRank, { rank: `V${snapshot.next}` })}${locale.code === "zh" ? " " : " · "}${fmt(auditCopy.value.remainingConditions, { n: snapshot.missing })}`;
   const next = rankProgress.value.next;
   if (!next) return t.value.home.rankTopTier;
   return `${fmt(auditCopy.value.toRank, { rank: `V${next.v}` })}${locale.code === "zh" ? " " : " · "}${fmt(auditCopy.value.remainingConditions, { n: rankProgress.value.missing.length })}`;
@@ -252,7 +261,7 @@ const rankGapText = computed(() => {
 // One short bar per condition of the next rank; unknown progress keeps an empty track.
 const rankBars = computed(() => {
   const next = rankProgress.value.next;
-  if (!rankReadable.value || !next) return [];
+  if (!rankReadable.value) return [];
   const short = ({
     zh: { selfComputePoints: "自购", directRefs: "好友", teamComputePoints: "团队" },
     en: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
@@ -264,6 +273,9 @@ const rankBars = computed(() => {
     kk: { selfComputePoints: "Жеке", directRefs: "Достар", teamComputePoints: "Команда" },
     uz: { selfComputePoints: "Shaxsiy", directRefs: "Doʻstlar", teamComputePoints: "Jamoa" },
   })[uiLocale(locale.code)];
+  const snapshot = !vrank.remoteReady ? readTabSnapshot("rank") : null;
+  if (snapshot) return snapshot.bars.map(row => ({ key: row.key, label: row.kind === "vDownlines" ? `V${row.vLevel}` : short[row.kind], percent: row.percent }));
+  if (!next) return [];
   return rankProgress.value.rows.filter(row => row.tier === next.v).map(row => ({
     key: row.key,
     label: row.kind === "vDownlines" ? `V${row.vLevel}` : short[row.kind],
@@ -275,16 +287,16 @@ const { elRef: rankBarsEl, inView: rankBarsInView } = useScrollGrowProgress();
 const byLayerBuckets = computed(() => network.byLayer());
 const directCountText = computed(() => {
   if (remoteApiEnabled) {
-    const count = referralRewards.snapshot?.invitedCount;
+    const count = referralRewards.snapshot?.invitedCount ?? readTabSnapshot("referral")?.invited;
     return count === undefined ? "—" : String(count);
   }
   return String(byLayerBuckets.value[1].length);
 });
 const extendedCountText = computed(() => {
-  if (!networkReadable.value) return "—";
+  if (!networkReadable.value) { const cached = readTabSnapshot("network"); return cached ? String(cached.total - cached.direct) : "—"; }
   return String(([2, 3, 4, 5, 6, 7] as const).reduce((s, L) => s + byLayerBuckets.value[L].length, 0));
 });
-const totalMembersCountText = computed(() => !networkReadable.value ? "—" : String(localTotalMembersCount.value));
+const totalMembersCountText = computed(() => !networkReadable.value ? networkDisplaySnapshot.value === null ? "—" : String(networkDisplaySnapshot.value.total) : String(localTotalMembersCount.value));
 
 // Calendar-month totals and lifetime direct/extended split.
 const ledger = computed(() => {
@@ -303,7 +315,7 @@ const ledger = computed(() => {
     else eU += e.amountUSDT;
   }
   if (remoteApiEnabled) {
-    return { monthUSDT: ledgerPresentation.value?.monthUSDT ?? 0, monthNEX: ledgerPresentation.value?.monthNEX ?? 0, unlockedUSDT: ledgerPresentation.value?.unlockedUSDT ?? 0, coolingUSDT: ledgerPresentation.value?.coolingUSDT ?? 0,
+    return { monthUSDT: ledgerPresentation.value?.monthUSDT ?? (tabSnapshotPeriodCurrent("commission", "month", "GROWTH_TEAM") ? displayLedger.value?.monthUSDT ?? null : null), monthNEX: ledgerPresentation.value?.monthNEX ?? (tabSnapshotPeriodCurrent("commission", "month", "GROWTH_TEAM") ? displayLedger.value?.monthNEX ?? null : null), unlockedUSDT: displayLedger.value?.unlockedUSDT ?? 0, coolingUSDT: displayLedger.value?.coolingUSDT ?? 0,
       totalUSDTLifetime: commissionAggregate.value.totalUSDT,
       directUSDT: commissionAggregate.value.directUSDT,
       extendedUSDT: commissionAggregate.value.extendedUSDT };
