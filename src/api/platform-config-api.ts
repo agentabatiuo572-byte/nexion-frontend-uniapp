@@ -236,7 +236,8 @@ export function parsePlatformExperienceConfig(value: unknown): {
       computeShareEnabled: typeof featureFlags.computeShareEnabled === "boolean" ? featureFlags.computeShareEnabled : false,
       homeNewcomerTasksEnabled: featureFlags.homeNewcomerTasksEnabled,
       homeWeeklyPromoEnabled: featureFlags.homeWeeklyPromoEnabled,
-      stakingVisible: featureFlags.stakingVisible !== false,
+      // Staking is withdrawn: H5 Lite hides it whatever the server flag says.
+      stakingVisible: false,
     },
     share: parsePlatformShareConfig(root.share),
   };
