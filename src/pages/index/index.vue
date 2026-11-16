@@ -49,19 +49,33 @@ import { readHomePromotions } from '@/store/home-promotions';
 import { registerActivePageRefresh } from '@/lib/active-page-refresh';
 import { useNexFaucet } from '@/store/nex-faucet';
 import { useProfile } from '@/store/profile';
+import { useVoucher } from '@/store/voucher';
+import { revalidateProductCatalog, settleProductCatalogRefresh } from '@/store/product-catalog';
+import { useTabFirstLoad } from '@/lib/tab-first-load';
 const t = useT(), locale = useLocaleStore(), config = useConfig(), app = useApp();
 const homePromotions = ref<PublicPromotion[]>([]);
 const homePromotionStatus = ref<'idle'|'loading'|'ready'|'error'>('idle');
 const homePromotionRead=ref(false);
 const fence = createPromotionReadFence();
-let visible = true;
+const visible = ref(true);
 let pendingTicket:number|null=null;
 let releaseActiveRefresh = () => {};
 const homeActions = ref<{ refresh: () => Promise<unknown> } | null>(null);
 const homeGrid = ref<{ refresh: () => Promise<unknown> } | null>(null);
 const homeTrust = ref<{ refresh: () => Promise<unknown> } | null>(null);
+useTabFirstLoad(visible, async current => {
+  await Promise.allSettled([
+    app.ensureHomeTruth(), useFreeTrial().refreshVisible(),
+    useNexFaucet().ensureRemote(10_000), useProfile().ensureAvatar(),
+    useVoucher().revalidateRemote(), config.revalidate(), homeActions.value?.refresh(),
+    (async () => {
+      const ready = await settleProductCatalogRefresh(revalidateProductCatalog());
+      if (ready && current()) await app.ensureRemoteFleet();
+    })(),
+  ]);
+});
 async function refreshVisibleHome() {
-  if (!visible) return;
+  if (!visible.value) return;
   fence.invalidate(); pendingTicket = null;
   await Promise.allSettled([
     refresh(), app.ensureHomeTruth(), app.ensureRemoteFleet(),
@@ -71,7 +85,7 @@ async function refreshVisibleHome() {
   ]);
 }
 async function refresh(passive=false) {
-  if (!visible) return;
+  if (!visible.value) return;
   if(pendingTicket!==null&&fence.current(pendingTicket))return;
   const ticket = fence.next(), scope = `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
   pendingTicket=ticket;
@@ -91,9 +105,9 @@ async function refresh(passive=false) {
     }
   } finally {if(pendingTicket===ticket)pendingTicket=null;}
 }
-onShow(() => { visible = true; releaseActiveRefresh(); releaseActiveRefresh = registerActivePageRefresh(refreshVisibleHome); app.setTaskReadPageVisible("home", true); void refresh(true); void useFreeTrial().refreshVisible(); });
-onHide(() => { releaseActiveRefresh(); visible = false; app.setTaskReadPageVisible("home", false); });
-onUnmounted(() => { releaseActiveRefresh(); visible = false; app.setTaskReadPageVisible("home", false); fence.invalidate(); });
+onShow(() => { visible.value = true; releaseActiveRefresh(); releaseActiveRefresh = registerActivePageRefresh(refreshVisibleHome); app.setTaskReadPageVisible("home", true); void refresh(true); void useFreeTrial().refreshVisible(); });
+onHide(() => { releaseActiveRefresh(); visible.value = false; app.setTaskReadPageVisible("home", false); });
+onUnmounted(() => { releaseActiveRefresh(); visible.value = false; app.setTaskReadPageVisible("home", false); fence.invalidate(); });
 onLoad(() => locale.ensureSystemDetected());
 watch(() => [app.accountKey, app.accountBindingEpoch, locale.code], () => { fence.invalidate(); homePromotions.value = []; homePromotionRead.value=false;void refresh(true); },{flush:'sync'});
 </script>

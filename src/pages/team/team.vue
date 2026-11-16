@@ -202,14 +202,14 @@ watch(() => {
   const snapshot = productCatalogPresentation.value;
   return snapshot && JSON.stringify([snapshot.source, snapshot.serverCanonical, snapshot.sourceEnvironment, snapshot.runId, snapshot.products.map(({ imageUrl: _imageUrl, ...product }) => product)]);
 }, () => { binaryPresentation.value = null; }, { flush: "sync" });
-watch([() => commission.binaryStatus, () => commission.binarySnapshot], () => {
+watch([displayCatalogValid, () => commission.binaryStatus, () => commission.binarySnapshot], () => {
   if (commission.binaryStatus === "error") { binaryPresentation.value = null; return; }
   const snapshot = commission.binarySnapshot;
   if (!displayCatalogValid.value || commission.binaryStatus !== "ready" || !snapshot) return;
   const { estimatedAmountUsdt, trackA, trackB } = snapshot;
   binaryPresentation.value = { estimatedAmountUsdt, trackA, trackB };
 }, { immediate: true, flush: "sync" });
-watch([() => commission.eventsStatus, () => commission.eventsEvidence, () => network.remoteStatus, () => network.remoteTransientFailure, () => commission.eventsTransientFailure], () => {
+watch([displayCatalogValid, () => commission.eventsStatus, () => commission.eventsEvidence, () => network.remoteStatus, () => network.remoteTransientFailure, () => commission.eventsTransientFailure], () => {
   if (ledgerStrictFailure.value) { ledgerPresentation.value = null; return; }
   const evidence = commission.eventsEvidence;
   if (!displayCatalogValid.value || commission.eventsStatus !== "ready" || !evidence?.serverCanonical
@@ -219,7 +219,7 @@ watch([() => commission.eventsStatus, () => commission.eventsEvidence, () => net
   if (Object.values(values).every(value => typeof value === "number" && Number.isFinite(value) && value >= 0)) ledgerPresentation.value = values;
   else ledgerPresentation.value = null;
 }, { immediate: true, flush: "sync" });
-watch([() => vrank.remoteReady, () => vrank.remoteError, () => vrank.myRank, () => vrank.remoteTransientFailure], () => {
+watch([displayCatalogValid, () => vrank.remoteReady, () => vrank.remoteError, () => vrank.myRank, () => vrank.remoteTransientFailure], () => {
   if (vrank.remoteError && !vrank.remoteTransientFailure) { rankPresentation.value = null; return; }
   if (displayCatalogValid.value && vrank.remoteReady) rankPresentation.value = vrank.myRank;
 }, { immediate: true, flush: "sync" });

@@ -229,9 +229,9 @@ onUnmounted(() => {
 });
 const phase = useProductPhase();
 
-// mounted guard: phase override persists in storage, rehydrates client-only —
-// mirror the source's mounted gate so locked/unlocked split is stable.
-const mounted = ref(false);
+// Only the mock phase override needs client hydration. Published remote data
+// is already readable in setup, including a prefetched catalog and phase.
+const mounted = ref(remoteApiEnabled);
 onMounted(() => {
   mounted.value = true;
 });

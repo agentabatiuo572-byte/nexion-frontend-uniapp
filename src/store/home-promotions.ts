@@ -1,4 +1,4 @@
-import { runPassiveTabRead, invalidateBeforePassiveTabRead } from "@/lib/passive-tab-read";
+import { runPassiveTabRead, invalidateBeforePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { apiRuntimeConfig, promotionApi } from '@/api/runtime';
 import { ApiError } from '@/api/errors';
 import type { PublicPromotionPage } from '@/api/promotion-contracts';
@@ -6,11 +6,16 @@ import type { PublicPromotionPage } from '@/api/promotion-contracts';
 // One first-page placement, shared by Home and the Store advert. No command uses it.
 let current: { key: string; page: PublicPromotionPage | null; at: number; retryAt: number;
   error: unknown; pending: Promise<PublicPromotionPage> | null } | null = null;
+/** Current display result only; never promotion eligibility or claim authority. */
+export function getHomePromotions(scope: string, authenticated: boolean): PublicPromotionPage | null {
+  const key = JSON.stringify([apiRuntimeConfig.baseUrl, apiRuntimeConfig.environment, scope, authenticated, passiveTabReadScope(false)]);
+  return current?.key === key ? current.page : null;
+}
 export function readHomePromotions(scope: string, authenticated: boolean, force = false): Promise<PublicPromotionPage> {
-  if (current?.key === JSON.stringify([apiRuntimeConfig.baseUrl, apiRuntimeConfig.environment, scope, authenticated]) && Date.now() < current.retryAt) return Promise.reject(current.error);
+  const key = JSON.stringify([apiRuntimeConfig.baseUrl, apiRuntimeConfig.environment, scope, authenticated, passiveTabReadScope(false)]);
+  if (current?.key === key && Date.now() < current.retryAt) return Promise.reject(current.error);
   if (!force) return runPassiveTabRead("home-promotions", () => readHomePromotions(scope, authenticated, true), [scope, authenticated]);
   invalidateBeforePassiveTabRead("home-promotions");
-  const key = JSON.stringify([apiRuntimeConfig.baseUrl, apiRuntimeConfig.environment, scope, authenticated]);
   if (current?.key !== key) current = { key, page: null, at: 0, retryAt: 0, error: null, pending: null };
   const state = current;
   if (state.pending) return state.pending;
