@@ -257,7 +257,7 @@ const heroStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
   padding: "16px",
   background: "var(--nx-glass-fill)",
 };
-const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-success)" };
+const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-success-ink)" };
 const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
 // Nested copy chip — soft surface-2 fill lifts it off the surface hero, no border.
 const copyBtnStyle: CSSProperties = {
