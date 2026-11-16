@@ -23,6 +23,9 @@ import { remoteAccountScope } from "./remote-account-epoch";
 // Process lifetime, including H5 Home reLaunch. Stage 0 settles Home; 1/2 are
 // the two idle batches. Ordinary refreshes and business writes do not restart it.
 const runs = reactive(new Map<string, { stage: number; pending: boolean }>());
+// #ifdef H5
+let tabPagesPreloaded = false;
+// #endif
 
 export function useTabFirstLoad(homeVisible: Ref<boolean>, settleHome: (current: () => boolean) => Promise<unknown>): void {
   const app = useApp(), auth = useAuth(), locale = useLocaleStore();
@@ -63,6 +66,17 @@ export function useTabFirstLoad(homeVisible: Ref<boolean>, settleHome: (current:
           await settleHome(current);
         }
         else {
+          // #ifdef H5
+          // The router imports these same modules. Attempt once per process,
+          // after Home settles; failures leave normal page loading in charge.
+          if (!tabPagesPreloaded) {
+            tabPagesPreloaded = true;
+            void Promise.allSettled([
+              import("@/pages/earn/earn.vue"), import("@/pages/store/store.vue"),
+              import("@/pages/team/team.vue"), import("@/pages/me/me.vue"),
+            ]);
+          }
+          // #endif
           // Same store methods, resource names and query keys as the visible
           // pages. No hidden page, observation, execution or polling lifecycle.
           const reads: (() => Promise<unknown>)[] = stage === 1 ? [
