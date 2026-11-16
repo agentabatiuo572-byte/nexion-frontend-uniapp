@@ -470,4 +470,8 @@ function confirmTerms(event?: Event) {
   font-weight: 600;
   color: var(--v5-on-brand);
 }
+@media (prefers-reduced-motion: reduce) {
+  .tos-cta { transition: none; }
+  .tos-cta:active { transform: none; }
+}
 </style>

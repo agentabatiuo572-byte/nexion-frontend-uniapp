@@ -73,7 +73,7 @@
       <view v-if="disclosure?.acknowledgmentToken || accepted" class="mx-4" :style="ackCardStyle">
         <!-- 反馈走 scale:同 P-058,inline style 里已有 opacity(未读完时 0.55),写 opacity 反馈会被压掉 -->
         <view
-          class="flex items-start active:scale-[0.98] transition-transform"
+          class="risk-ack-toggle flex items-start active:scale-[0.98] transition-transform"
           :style="{ gap: '10px', minHeight: '44px', alignItems: 'center', opacity: scrolledToBottom && !accepted ? 1 : 0.55 }"
           role="checkbox"
           tabindex="0"
@@ -494,5 +494,7 @@ const disclaimerStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", col
 .risk-scroll-surface--scrolled :deep(.spv-titlewrap) { opacity: 0; visibility: hidden; transform: translateY(-18px); }
 @media (prefers-reduced-motion: reduce) {
   .risk-scroll-surface--scrolled :deep(.spv-titlewrap) { transform: none; }
+  .risk-ack-toggle { transition: none; }
+  .risk-ack-toggle:active { transform: none; }
 }
 </style>
