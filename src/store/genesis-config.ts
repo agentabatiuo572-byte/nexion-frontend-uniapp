@@ -7,6 +7,7 @@ import { genesisApi, remoteApiEnabled } from "@/api/runtime";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 
 let publicSummaryPending: { owner: string; promise: ReturnType<typeof genesisApi.stateSummary> } | null = null;
+let accountSummaryPending: { owner: string; promise: ReturnType<typeof genesisApi.accountSummary> } | null = null;
 
 /** Fresh detail/config reads also join the same owner's public GET in flight. */
 export function readGenesisPublicSummary() {
@@ -23,6 +24,18 @@ export function readGenesisPublicSummary() {
 /** Config and first-screen facts share this public display read. */
 export function ensureGenesisPublicSummary() {
   return runPassiveTabRead("genesis-public-summary", readGenesisPublicSummary, captureRuntimeRevision());
+}
+
+/** Detail reads join an in-flight account GET, never a completed display cache. */
+export function readGenesisAccountSummary() {
+  const owner = JSON.stringify([passiveTabReadScope(), captureRuntimeRevision()]);
+  if (accountSummaryPending?.owner === owner) return accountSummaryPending.promise;
+  invalidateBeforePassiveTabRead("genesis-account-summary");
+  const promise = genesisApi.accountSummary().finally(() => {
+    if (accountSummaryPending?.promise === promise) accountSummaryPending = null;
+  });
+  accountSummaryPending = { owner, promise };
+  return promise;
 }
 
 /**

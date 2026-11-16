@@ -520,9 +520,9 @@ export function createGenesisApi(client: ApiClient, mode: ApiEnvironment = "prod
       ]);
       return { ...state, listings, transactions: transactions.items, transactionsNextCursor: transactions.nextCursor };
     },
-    account: async () => {
+    account: async (readSummary = accountSummary) => {
       const [state, orders, emissions] = await Promise.all([
-        accountSummary(), accountHistoryPage("orders", parseTransaction), accountHistoryPage("emissions", parseEmission),
+        readSummary(), accountHistoryPage("orders", parseTransaction), accountHistoryPage("emissions", parseEmission),
       ]);
       return { ...state, orders: orders.items, emissions: emissions.items,
         ordersNextCursor: orders.nextCursor, emissionsNextCursor: emissions.nextCursor };
