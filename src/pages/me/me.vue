@@ -337,7 +337,7 @@ const networkItems = computed(() => quickSections.value.find(section => section.
 const settingSections = computed(() => quickSections.value.filter(section => !['network','devices'].includes(section.key)).map(section => ({ ...section, items: section.items.filter(item => !frequentKeys.some(key => key === item.key) && item.key !== 'profile') })));
 
 async function refreshRemoteFunds() {
-  await runPassiveTabRead('deposits-bank-history', () => deposits.refreshRemoteVietQrDeposits(), undefined, () => deposits.serverStatus === 'ready' && deposits.remoteReceiptInitialStatus === 'ready');
+  await runPassiveTabRead('deposits-bank-history', () => deposits.refreshRemoteVietQrDeposits(), undefined, () => deposits.remoteReceiptInitialStatus === 'ready');
 }
 
 async function refreshRemoteOrders(passive: unknown = false) {

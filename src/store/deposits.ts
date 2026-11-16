@@ -1,5 +1,3 @@
-import { passiveTabReadScope } from "@/lib/passive-tab-read";
-import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { fundsServerEnabled, paymentApi, remoteApiEnabled } from "@/api/runtime";
@@ -143,7 +141,8 @@ export const useDeposits = defineStore("deposits", () => {
   let remotePollTimer: ReturnType<typeof setInterval> | undefined;
   let remoteGeneration = 0;
   let remotePollingActive = false;
-  let remoteRefreshPending: { owner: string; kind: "initial" | "more"; promise: Promise<void> } | null = null;
+  let remoteRefreshInFlight = false;
+  let remoteRefreshQueued = false;
 
   function syncRemoteReceiptPage(): void {
     remoteReceipts.value = remoteReceiptPage.items;
@@ -952,101 +951,98 @@ export const useDeposits = defineStore("deposits", () => {
     };
   }
 
-  function refreshRemoteVietQrDeposits(): Promise<void> {
-    if (!remoteApiEnabled) return Promise.resolve();
+  async function refreshRemoteVietQrDeposits(): Promise<void> {
+    if (!remoteApiEnabled) return;
+    if (remoteRefreshInFlight) {
+      // Account rebinds and a visible retry may arrive while an older account
+      // read is still unwinding. Run one fresh pass afterward; its page epoch
+      // prevents the old response from committing into the new view.
+      remoteRefreshQueued = true;
+      return;
+    }
+    remoteRefreshInFlight = true;
     const expectedAccountKey = serverAccountKey;
     const expectedGeneration = remoteGeneration;
-    const readScope = passiveTabReadScope();
-    const runScope = captureRuntimeRevision();
-    let owner = JSON.stringify([expectedAccountKey, expectedGeneration, remoteReceiptPage.epoch, readScope, runScope.epoch]);
-    if (remoteRefreshPending?.owner === owner) {
-      return remoteRefreshPending.kind === "initial" ? remoteRefreshPending.promise
-        : remoteRefreshPending.promise.then(() => refreshRemoteVietQrDeposits());
-    }
-    if (remoteReceiptPage.initial.status === "loading" || remoteReceiptPage.more.status === "loading") {
-      invalidateVietQrReceiptPageReads(remoteReceiptPage);
-      owner = JSON.stringify([expectedAccountKey, expectedGeneration, remoteReceiptPage.epoch, readScope, runScope.epoch]);
-    }
     const receiptRead = beginVietQrReceiptPageRead(remoteReceiptPage, "initial");
-    if (!receiptRead) return Promise.resolve();
+    if (!receiptRead) {
+      remoteRefreshInFlight = false;
+      return;
+    }
     syncRemoteReceiptPage();
-    const current = () => remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)
-      && readScope === passiveTabReadScope() && isCurrentRuntimeRevision(runScope) && receiptRead.epoch === remoteReceiptPage.epoch;
-    const promise = Promise.resolve().then(async () => {
-      if (!current()) return;
-      serverStatus.value = "loading";
-      serverError.value = "";
-      await Promise.all([
-        paymentApi.listVietQrIntents(50).then(snapshots => {
-          if (!current()) return;
-          intents.value = snapshots.map(remoteVietQrIntent);
-          records.value = snapshots.map(remoteVietQrRecord).filter((item): item is DepositRecord => item !== null);
-          snapshots.forEach(snapshot => {
-            if (snapshot.status !== "awaiting_payment" && snapshot.status !== "receipt_review") {
-              finishVietQrCommandByIntent(expectedAccountKey, snapshot.intentNo);
-            }
-          });
-        }).catch(cause => {
-          if (!current()) return;
-          serverStatus.value = "error";
-          serverError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
-        }),
-        paymentApi.listVietQrReceipts(50, 0).then(page => {
-          if (!current()) return;
-          if (succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, page.items, page.nextOffset)) syncRemoteReceiptPage();
-        }).catch(cause => {
-          if (!current()) return;
-          if (failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause)) {
-            syncRemoteReceiptPage();
-            serverStatus.value = "error";
-            serverError.value ||= cause instanceof Error ? cause.message : "VIETQR_RECEIPT_REFRESH_FAILED";
-          }
-        }),
-      ]);
-      // Each component commits independently. A failed component remains failed.
-      if (current() && serverStatus.value === "loading") serverStatus.value = "ready";
-    }).finally(() => { if (remoteRefreshPending?.promise === promise) remoteRefreshPending = null; });
-    remoteRefreshPending = { owner, kind: "initial", promise };
-    return promise;
+    serverStatus.value = "loading";
+    serverError.value = "";
+    try {
+      const snapshots = await paymentApi.listVietQrIntents(50);
+      if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        return;
+      }
+      intents.value = snapshots.map(remoteVietQrIntent);
+      records.value = snapshots.map(remoteVietQrRecord).filter((item): item is DepositRecord => item !== null);
+      const receiptPage = await paymentApi.listVietQrReceipts(50, 0);
+      if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        return;
+      }
+      if (!succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, receiptPage.items, receiptPage.nextOffset)) return;
+      syncRemoteReceiptPage();
+      snapshots.forEach((snapshot) => {
+        if (snapshot.status !== "awaiting_payment" && snapshot.status !== "receipt_review") {
+          finishVietQrCommandByIntent(expectedAccountKey, snapshot.intentNo);
+        }
+      });
+      serverStatus.value = "ready";
+    } catch (cause) {
+      const receiptReadIsCurrent = failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause);
+      syncRemoteReceiptPage();
+      if (receiptReadIsCurrent && remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        serverStatus.value = "error";
+        serverError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
+      }
+      // 权威不可达是常态输入,**不 reject**。
+      //   原来这里 `throw cause`,靠每个调用点各写一个 .catch 撑着 —— 而那正是
+      //   docs/changes/2026-08-13-remote-refresh-resilience.md 明确否决的做法:
+      //   每新增一个裸 void 调用点就漏一个,漏了就是生产环境的 unhandled rejection。
+      //   需要失败信号的消费方改读 serverStatus / serverError(deposit-bank-pane.vue 已改)。
+    } finally {
+      remoteRefreshInFlight = false;
+      if (remoteRefreshQueued) {
+        remoteRefreshQueued = false;
+        void refreshRemoteVietQrDeposits();
+      }
+    }
   }
 
-  function loadMoreRemoteVietQrReceipts(): Promise<void> {
-    if (!remoteApiEnabled) return Promise.resolve();
+  async function loadMoreRemoteVietQrReceipts(): Promise<void> {
+    if (!remoteApiEnabled || remoteRefreshInFlight) return;
+    const receiptRead = beginVietQrReceiptPageRead(remoteReceiptPage, "more");
+    if (!receiptRead) return;
+    syncRemoteReceiptPage();
+    remoteRefreshInFlight = true;
     const expectedAccountKey = serverAccountKey;
     const expectedGeneration = remoteGeneration;
-    const readScope = passiveTabReadScope();
-    const runScope = captureRuntimeRevision();
-    let owner = JSON.stringify([expectedAccountKey, expectedGeneration, remoteReceiptPage.epoch, readScope, runScope.epoch]);
-    if (remoteRefreshPending?.owner === owner) return remoteRefreshPending.promise;
-    if (remoteReceiptPage.initial.status === "loading" || remoteReceiptPage.more.status === "loading") {
-      invalidateVietQrReceiptPageReads(remoteReceiptPage);
-      owner = JSON.stringify([expectedAccountKey, expectedGeneration, remoteReceiptPage.epoch, readScope, runScope.epoch]);
-    }
-    const receiptRead = beginVietQrReceiptPageRead(remoteReceiptPage, "more");
-    if (!receiptRead) return Promise.resolve();
-    syncRemoteReceiptPage();
-    const current = () => remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)
-      && readScope === passiveTabReadScope() && isCurrentRuntimeRevision(runScope) && receiptRead.epoch === remoteReceiptPage.epoch;
-    const promise = Promise.resolve().then(async () => {
-      if (!current()) return;
-      serverStatus.value = "loading";
-      serverError.value = "";
-      try {
-        const page = await paymentApi.listVietQrReceipts(50, receiptRead.offset);
-        if (!current()) return;
-        if (!succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, page.items, page.nextOffset)) return;
-        syncRemoteReceiptPage();
-        serverStatus.value = "ready";
-      } catch (cause) {
-        if (current() && failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause)) {
-          syncRemoteReceiptPage();
-          serverStatus.value = "error";
-          serverError.value = cause instanceof Error ? cause.message : "VIETQR_RECEIPT_REFRESH_FAILED";
-        }
+    serverStatus.value = "loading";
+    serverError.value = "";
+    try {
+      const page = await paymentApi.listVietQrReceipts(50, receiptRead.offset);
+      if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        return;
       }
-    }).finally(() => { if (remoteRefreshPending?.promise === promise) remoteRefreshPending = null; });
-    remoteRefreshPending = { owner, kind: "more", promise };
-    return promise;
+      if (!succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, page.items, page.nextOffset)) return;
+      syncRemoteReceiptPage();
+      serverStatus.value = "ready";
+    } catch (cause) {
+      const receiptReadIsCurrent = failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause);
+      syncRemoteReceiptPage();
+      if (receiptReadIsCurrent && remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        serverStatus.value = "error";
+        serverError.value = cause instanceof Error ? cause.message : "VIETQR_RECEIPT_REFRESH_FAILED";
+      }
+    } finally {
+      remoteRefreshInFlight = false;
+      if (remoteRefreshQueued) {
+        remoteRefreshQueued = false;
+        void refreshRemoteVietQrDeposits();
+      }
+    }
   }
 
   function startRemoteVietQrPolling(): void {
