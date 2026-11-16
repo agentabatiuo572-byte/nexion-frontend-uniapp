@@ -143,14 +143,18 @@ const buckets = computed(() => ({
   bonusLockedUsdt: (liveBucketsReadable.value ? earningsReleaseSnapshot.value?.buckets.bonus_locked : readTabSnapshot("release")?.locked)
     ?? app.user.earningBuckets.bonusLockedUsdt,
 }));
-const todayEarnings = computed(() => !app.homeTruth && remoteApiEnabled
-  ? tabSnapshotPeriodCurrent("home", "today") ? readTabSnapshot("home")?.earnings.today.usdt ?? null : null
-  : resolveWalletTodayEarnings({
-  remoteApiEnabled,
-  homeTruthStatus: app.homeTruthStatus,
-  homeTodayUsdt: app.homeTruth?.earnings.today.usdt ?? null,
-  localTodayUsdt: app.earnings.today,
-}));
+const todayEarnings = computed(() => {
+  if (remoteApiEnabled) {
+    if (!app.homeTruth) return tabSnapshotPeriodCurrent("home", "today") ? readTabSnapshot("home")?.earnings.today.usdt ?? null : null;
+    if (app.homeTruthStatus === "loading" || (app.homeTruthStatus === "error" && app.homeTruthTransientFailure)) return app.homeTruth.earnings.today.usdt;
+  }
+  return resolveWalletTodayEarnings({
+    remoteApiEnabled,
+    homeTruthStatus: app.homeTruthStatus,
+    homeTodayUsdt: app.homeTruth?.earnings.today.usdt ?? null,
+    localTodayUsdt: app.earnings.today,
+  });
+});
 const todayEarningsText = computed(() => visibility.mask(todayEarnings.value === null ? "—" : `+$${formatAmount(todayEarnings.value)}`));
 const pendingReview = computed(() => buckets.value.pendingReviewUsdt);
 const lockedRewards = computed(() => buckets.value.bonusLockedUsdt);

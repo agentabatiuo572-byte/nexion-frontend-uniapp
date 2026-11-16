@@ -29,7 +29,7 @@ import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
-import { hasPersistedServerAuthenticatedAccountTrace, useAuth } from "@/store/auth";
+import { hasPersistedServerAuthenticatedAccountTrace, readPersistedServerAuthenticatedAccountId, useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useProfile } from "@/store/profile";
 import { useTheme } from "@/store/theme";
@@ -814,7 +814,12 @@ function checkAuthGuard(): boolean {
  * Server task and settlement state stays untouched and is read after sign-in.
  */
 function clearInvalidRemoteSessionState(auth: ReturnType<typeof useAuth>): void {
-  forgetTabSnapshotAccount(auth.accountId);
+  // A cold H5 restore starts with default auth and an empty vault. The old
+  // routing hint identifies only the row to delete, never an accepted session.
+  const candidateSession = sessionVault.read();
+  const snapshotAccount = auth.accountId !== "default" ? auth.accountId
+    : candidateSession ? `user:${candidateSession.user.userId}` : readPersistedServerAuthenticatedAccountId();
+  if (snapshotAccount) forgetTabSnapshotAccount(snapshotAccount);
   useConversations().suspendForReauthentication();
   try {
     sessionVault.clear();

@@ -226,7 +226,7 @@ const serverPeriodValue = computed(() => {
     return { usdt: 0, nex: 0, jobCount: 0 };
   }
   if (range.value !== "Today") return period;
-  const fleet = app.remoteRealizedToday ?? (tabSnapshotPeriodCurrent("wallet", "today") ? readTabSnapshot("wallet")?.today : null);
+  const fleet = app.remoteRealizedToday ?? (!app.homeTruth && tabSnapshotPeriodCurrent("wallet", "today") ? readTabSnapshot("wallet")?.today : null);
   return {
     ...period,
     usdt: period.usdt ?? fleet?.usdt ?? null,
