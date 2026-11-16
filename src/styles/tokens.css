@@ -280,8 +280,10 @@
      解法与 C1 一致:**base 填充档不动**(视觉零变化、其上 on-* 前景关系不变),
      另立文字档取同色相深色变体(二分压 HSL 明度,锁死色相与饱和度,色相偏移 ≤0.3°)。
      暗主题在 dark 块沿用 base(暗底本就达标),故风险只落在亮主题。 */
-  --v5-warning-ink: #966411;    /* AA 4.51(base #C68316 = 2.79) */
-  --v5-success-ink: #0D7F42;    /* AA 4.50(base #0E8E4A = 3.73) */
+  /* warning / success 文字档还要压在自己的浅底上(NxTag 状态标签,03 §3.8),按浅底取值:
+     浅底 4.74、页面底 4.72 / 4.80(BUG-392)。 */
+  --v5-warning-ink: #926111;    /* warning-soft 4.74 · 页面底 4.72 · 白 5.33 */
+  --v5-success-ink: #0D7A40;    /* success-soft 4.74 · 页面底 4.80 · 白 5.42 */
   --v5-tech-cyan-ink: #077A85;  /* AA 4.50(base #0CC4D6 = 1.88) */
   --v5-brand-2-ink: #CD3600;    /* AA 4.51(base #FF5A1F = 2.76) */
 
