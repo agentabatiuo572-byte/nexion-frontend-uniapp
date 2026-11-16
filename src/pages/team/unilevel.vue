@@ -282,6 +282,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 .nx-unilevel-source-label { display: block; margin-top: 2px; color: var(--v5-ink-3); font-size: 12px; line-height: 18px; }
 .nx-royalty-status { display: inline-flex; align-items: center; min-height: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-2); font: 500 11px/16px var(--font-v5); overflow-wrap: anywhere; }
 .nx-royalty-status--cooling { color: var(--v5-warning); background: color-mix(in srgb, var(--v5-warning) 16%, transparent); }
+/* Light: the status-tag pair (opaque warning-soft + warning-ink, 03 §3.8) so the text clears 4.5:1 on any card (BUG-392). */
+[data-theme="light"] .nx-royalty-status--cooling { color: var(--v5-warning-ink); background: var(--v5-warning-soft); }
 .nx-unilevel-recovery { display: block; margin: var(--v5-space-2) 0 0 48px; color: var(--v5-ink-2); font-size: 12px; line-height: 1.6; }
 .nx-unilevel-focus:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .nx-unilevel-details-toggle { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 12px; }
