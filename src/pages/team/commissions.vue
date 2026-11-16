@@ -313,7 +313,7 @@ function commissionAmountStyle(e: CommissionEvent, asset: "usdt" | "uvt"): CSSPr
         : "var(--v5-ink)";
   // Credited and pending money reads in the brand colour; settled-out or held rows stay neutral.
   const live = asset === "usdt" && color === "var(--v5-ink)" && ["unlocked", "cooling", "waiting_calculation"].includes(e.status);
-  const uvt = e.status === "frozen" ? "var(--v5-brand-2)" : "var(--v5-ink-3)";
+  const uvt = e.status === "frozen" ? "var(--v5-brand-2-ink)" : "var(--v5-ink-3)";
   return { fontSize: asset === "usdt" ? "15px" : "12px", fontWeight: asset === "usdt" ? 500 : 400, color: live ? "var(--v5-brand)" : asset === "uvt" ? uvt : color };
 }
 
