@@ -882,6 +882,8 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-meta { flex: none; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .dly-meta__b { font: 500 13px/18px var(--font-metric); color: var(--v5-ink); }
 .dly-pill { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; background: color-mix(in srgb, var(--v5-warning) 16%, transparent); font: 500 12px/16px var(--font-v5); color: var(--v5-warning-ink); white-space: nowrap; }
+/* Light: opaque warning-soft under warning-ink, like NxTag, so the pill clears 4.5:1 on the page floor (BUG-392). */
+[data-theme="light"] .dly-pill { background: var(--v5-warning-soft); }
 .dly-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Read failure (States C) */
