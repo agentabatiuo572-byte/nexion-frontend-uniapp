@@ -7,6 +7,7 @@ import {
   useGenesisConfig,
   ensureGenesisPublicSummary,
   readGenesisPublicSummary,
+  readGenesisAccountSummary,
   tierForSold,
   genesisPurchaseBlock,
   genesisSecondaryBlock,
@@ -457,7 +458,11 @@ export const useGenesis = defineStore("genesis", () => {
     // Public supply/market facts are readable without a user session. The
     // orchestrator independently fences protected account/eligibility reads
     // by bearer authority and account/RunID epoch.
-    const promise = readGenesisRemoteFacts({ ...genesisApi, state: () => genesisApi.state(readGenesisPublicSummary) }, {
+    const promise = readGenesisRemoteFacts({
+      ...genesisApi,
+      state: () => genesisApi.state(readGenesisPublicSummary),
+      account: () => genesisApi.account(readGenesisAccountSummary),
+    }, {
       hasAuthority: () => hasGenesisAuthorityForAccount(sessionVault.read(), boundKey),
       isCurrent: () => readGeneration === remoteReadGeneration && remoteScopeCurrent(request, runScope) && readScope === passiveTabReadScope(),
       clear: clearRemoteFacts,
@@ -499,7 +504,7 @@ export const useGenesis = defineStore("genesis", () => {
       const hasAccount = hasGenesisAuthorityForAccount(sessionVault.read(), boundKey);
       const [publicResult, accountResult] = await Promise.allSettled([
         ensureGenesisPublicSummary(),
-        hasAccount ? runPassiveTabRead("genesis-account-summary", () => genesisApi.accountSummary(), runScope) : Promise.resolve(null),
+        hasAccount ? runPassiveTabRead("genesis-account-summary", readGenesisAccountSummary, runScope) : Promise.resolve(null),
       ]);
       if (generation !== summaryReadGeneration || !remoteScopeCurrent(request, runScope) || readScope !== passiveTabReadScope()) return false;
       // These are display summaries only. Full read states, success evidence,
