@@ -18,7 +18,7 @@
         <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="loadNarrative(true)" @keydown.enter.prevent="loadNarrative(true)" @keydown.space.prevent="loadNarrative(true)">{{ t.ui.retry }}</text>
       </view>
 
-      <template v-if="narrative.state !== 'error'">
+      <template v-if="narrative.state !== 'error' && narrative.state !== 'unpublished'">
       <HowHero :label="narrative.state === 'ready' ? `${w.heroLabel} · ${narrative.version}` : w.heroLabel" :title="narrative.state === 'ready' ? narrative.hero : '—'" :sub="narrative.state === 'ready' ? narrative.subhero ?? '' : ''" accent="purple" />
 
       <HowSection :title="w.s1Title" accent="purple">

@@ -25,12 +25,12 @@ export function refreshPublishedTrust(force = false): Promise<boolean> {
   inflight = trustSectionApi.current().then((next) => {
     if (generation !== authorityGeneration) return false;
     sections.value = next;
-    status.value = next.length ? "ready" : "error";
-    return status.value === "ready";
+    status.value = "ready";
+    return true;
   }).catch(() => {
     if (generation !== authorityGeneration) return false;
-    // current() validates all six sections before resolving. Keep the last
-    // complete snapshot only within this runtime generation; never merge rows.
+    // Keep the last validated snapshot on failure within this runtime
+    // generation. Successful reads replace it, including absent sections.
     status.value = "error";
     return false;
   });

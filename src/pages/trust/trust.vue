@@ -112,7 +112,7 @@
           </view>
         </view>
 
-        <view class="trust-block">
+        <view v-if="categories.length" class="trust-block">
           <view class="trust-block__head"><text class="trust-block__title">{{ center.servicesTitle }}</text></view>
           <view class="trust-categories trust-surface">
             <view v-for="item in categories" :key="item.key" class="trust-category">
@@ -234,9 +234,9 @@ const auditRows = computed(() => trustNumberedRows(auditSection.value?.fields ??
 const verifiedAuditRows = computed(() => auditRows.value.filter((row) => row.Primary));
 const leadershipRows = computed(() => trustNumberedRows(leadershipSection.value?.fields ?? [], "leader", ["Name", "Role", "Previous", "Url"] as const, language.value));
 const verifiedLeadershipRows = computed(() => leadershipRows.value.filter((row) => safeHref(row.Url)));
-// Audits only appear once an audit document is published; the other commitments always link onwards.
+// Missing sections supply no service material; keep existing loading/error handling.
 const categories = computed(() => resources.value.categories
-  .filter(item => item.key !== "audit" || verifiedAuditRows.value.length > 0)
+  .filter(item => item.key === "audit" ? verifiedAuditRows.value.length > 0 : loading.value || hasError.value || !!section("nexNarrative"))
   .map(item => ({ ...item, material: trustCategoryMaterial(sections.value, item.key, language.value, safeHref) })));
 
 const profile = computed(() => documents.value?.profile ?? null);
