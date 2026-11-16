@@ -96,7 +96,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatGroupedAmount as formatAmount } from "@/lib/amount-display";
 import { navTo, navReset } from "@/lib/route";
 import { useConfig } from "@/store/config";
-import { onShow, onHide } from "@dcloudio/uni-app";
+import { onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -129,11 +129,13 @@ onShow(() => {
   if (visibilityTimer) clearInterval(visibilityTimer);
   if (remoteApiEnabled) visibilityTimer = setInterval(refreshVisibility, 15_000);
 });
-onHide(() => {
+function hidePage() {
   pageVisible = false;
   if (visibilityTimer) clearInterval(visibilityTimer);
   visibilityTimer = null;
-});
+}
+onHide(hidePage);
+onUnload(hidePage);
 const w = computed(() => ({ ...t.value.stakingHowItWorks, ...copy.value.rules }));
 const staking = useStaking();
 const retrying = ref(false);
