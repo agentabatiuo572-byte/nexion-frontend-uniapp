@@ -161,13 +161,13 @@ function parsePools(value: unknown, mode: ApiEnvironment): StakingPool[] {
     "nx_staking_product + nx_config_item + nx_emergency_control_setting")
     ? { sourceEnvironment: row.sourceEnvironment, runId: row.runId } : null;
   if (!row || !source || row.serverCanonical !== true
-      || !Array.isArray(row.pools) || row.pools.length !== 4) {
+      || !Array.isArray(row.pools) || row.pools.length > 4) {
     return invalid("STAKING_POOLS_RESPONSE_INVALID");
   }
   const pools = row.pools.map((pool) => parsePool(pool, source)).sort((a, b) => a.termDays - b.termDays);
   const terms = pools.map((pool) => pool.termDays);
   const ids = pools.map((pool) => pool.poolId);
-  if (new Set(terms).size !== 4 || new Set(ids).size !== 4 || terms.join(",") !== "30,90,180,365") {
+  if (new Set(terms).size !== pools.length || new Set(ids).size !== pools.length) {
     return invalid("STAKING_POOLS_RESPONSE_INVALID");
   }
   return pools;
