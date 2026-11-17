@@ -154,6 +154,12 @@ export class VietQrCommandKeyRegistry {
     private readonly createClientNonce: () => string = defaultClientNonce,
   ) {}
 
+  hasPending(accountKey: string): boolean {
+    const normalizedAccount = accountKey.trim().toLowerCase();
+    return Object.values(parse(this.storage.read(), this.createClientNonce).pending)
+      .some(command => command.accountKey === normalizedAccount);
+  }
+
   getOrCreate(identity: VietQrCommandIdentity): string {
     const scope = identityScope(identity);
     const state = parse(this.storage.read(), this.createClientNonce);
@@ -212,6 +218,7 @@ const registry = new VietQrCommandKeyRegistry({
 });
 
 export const vietQrCommandKey = (identity: VietQrCommandIdentity) => registry.getOrCreate(identity);
+export const hasPendingVietQrCommand = (accountKey: string) => registry.hasPending(accountKey);
 export const bindVietQrIntent = (identity: VietQrCommandIdentity, key: string, intentNo: string) =>
   registry.bindIntent(identity, key, intentNo);
 export const finishVietQrCommand = (identity: VietQrCommandIdentity, key: string) => registry.finish(identity, key);
