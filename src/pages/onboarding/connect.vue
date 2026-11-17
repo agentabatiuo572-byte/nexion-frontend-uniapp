@@ -833,7 +833,7 @@ onUnmounted(() => {
 .cn-score__ring--halo { stroke: color-mix(in oklab, var(--v5-brand) 18%, transparent); stroke-width: 8; }
 .cn-score__ring--edge { stroke: var(--v5-brand); stroke-width: 3.4; filter: drop-shadow(0 0 9px color-mix(in oklab, var(--v5-brand) 48%, transparent)); }
 .cn-score--hex .cn-score__num { grid-area: 1 / 1; z-index: 1; margin: 0; }
-.cn-policy-float { position: fixed; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 38px); z-index: 20; }
+.cn-policy-float { position: fixed; right: 20px; bottom: var(--nx-overlay-bottom); z-index: 20; }
 .cn-policy-float__button { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); background: var(--v5-surface); }
 .cn-policy-float__list { position: absolute; right: 0; bottom: 54px; width: min(280px, calc(100vw - 40px)); box-sizing: border-box; padding: 16px; border-radius: 14px; background: var(--v5-surface-2); display: flex; flex-direction: column; gap: 8px; }
 .cn-policy-float__title { color: var(--v5-ink); font-size: 12px; font-weight: 600; }

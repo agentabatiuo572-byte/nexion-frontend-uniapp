@@ -254,7 +254,7 @@ useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
   background: var(--nx-glass-fill);
   border-top: 1px solid var(--v5-border);
   padding: 18px 16px;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
+  padding-bottom: var(--nx-overlay-bottom);
   animation: sas-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes sas-fade {

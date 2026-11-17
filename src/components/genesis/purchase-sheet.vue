@@ -330,7 +330,7 @@ async function handlePurchase() {
 const panelStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
   borderTop: "none",
-  padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
+  padding: "18px 16px var(--nx-overlay-bottom)",
 };
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

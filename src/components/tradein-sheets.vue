@@ -1630,7 +1630,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   background: var(--nx-glass-fill);
   border: none;
   padding: 18px 16px;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
+  padding-bottom: var(--nx-overlay-bottom);
   animation: tradein-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes tradein-fade {

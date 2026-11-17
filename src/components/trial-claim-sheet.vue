@@ -190,7 +190,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 <style scoped>
 .tcs-root { position:fixed;inset:0;z-index:790; }
 .tcs-backdrop { position:absolute;inset:0;background:var(--v5-bg-color-mask);backdrop-filter:blur(8px) saturate(150%);-webkit-backdrop-filter:blur(8px) saturate(150%);animation:tcs-fade .24s ease-out; }
-.tcs-panel { position:absolute;left:0;right:0;bottom:0;z-index:800;box-sizing:border-box;max-height:calc(100% - var(--nx-overlay-top));overflow-y:auto;border-radius:var(--nx-glass-radius) var(--nx-glass-radius) 0 0;box-shadow:var(--nx-glass-edge);background:var(--nx-glass-fill);border:none;padding:20px 16px calc(env(safe-area-inset-bottom) + 38px);animation:tcs-slide-up .36s cubic-bezier(.16,1,.3,1); }
+.tcs-panel { position:absolute;left:0;right:0;bottom:0;z-index:800;box-sizing:border-box;max-height:calc(100% - var(--nx-overlay-top));overflow-y:auto;border-radius:var(--nx-glass-radius) var(--nx-glass-radius) 0 0;box-shadow:var(--nx-glass-edge);background:var(--nx-glass-fill);border:none;padding:20px 16px var(--nx-overlay-bottom);animation:tcs-slide-up .36s cubic-bezier(.16,1,.3,1); }
 @keyframes tcs-fade { from { opacity:0; } to { opacity:1; } }
 @keyframes tcs-slide-up { from { transform:translateY(100%); } to { transform:translateY(0); } }
 .tcs-head { display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding-right:56px;margin-bottom:16px; }

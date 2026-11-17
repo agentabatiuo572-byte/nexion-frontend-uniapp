@@ -689,7 +689,7 @@ export default countUpView;
   background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge);
 
   padding: 20px 16px;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
+  padding-bottom: var(--nx-overlay-bottom);
   box-sizing: border-box;
   max-height: calc(100% - var(--nx-overlay-top));
   overflow-y: auto;

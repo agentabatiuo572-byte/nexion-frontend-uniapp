@@ -150,7 +150,7 @@ const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxS
   maxHeight: "calc(100vh - var(--nx-overlay-top))",
   overflowY: "auto",
   overscrollBehavior: "contain",
-  padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
+  padding: "18px 16px var(--nx-overlay-bottom)",
 };
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

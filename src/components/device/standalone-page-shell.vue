@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
   topInset: 0,
   reserveBottom: true,
 });
-const BOTTOM_SAFE_PADDING = "calc(env(safe-area-inset-bottom, 0px) + 38px)";
+const BOTTOM_SAFE_PADDING = "var(--nx-overlay-safe-bottom)";
 
 const statusBarHeight = computed(() => {
   try {

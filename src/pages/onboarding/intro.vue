@@ -337,7 +337,7 @@ function goPrivacy() {
   z-index: 800;
   background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge);
 
-  padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 38px);
+  padding: 10px 16px var(--nx-overlay-bottom);
   box-sizing: border-box;
   max-height: calc(100% - var(--nx-overlay-top));
   overflow-y: auto;
