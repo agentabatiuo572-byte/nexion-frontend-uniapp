@@ -132,7 +132,7 @@ const server=http.createServer(async(req,res)=>{
       }
       return sendJson(res,{state,options:demoOptions,simulation:true});
     }
-    if(url.pathname==='/preview-language'){locale=['zh','en','vi'].includes(url.searchParams.get('code'))?url.searchParams.get('code'):'zh';if(state.profile)state.profile.language=locale;return res.end('OK');}
+    if(url.pathname==='/preview-language'){locale=['zh','en','vi'].includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=locale;return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}
     const trustFile=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(incorporation|msb|ein)\/file$/);
     if(trustFile&&process.env.DEMO_TRUST_DOCUMENTS_DIR){

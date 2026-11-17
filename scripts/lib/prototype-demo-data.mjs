@@ -135,7 +135,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
     const dailyEarn=monthlyEstimateUsdt/30,b=.1;
     return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,vram,power:watts?watts+' W':null,hashRate:null,
-      tagline:PRODUCT_HOSTING_COPY[locale][share?'share':tier==='Flagship'?'rack':'device'],badge:index===0?localized(locale,'推荐','Recommended','Đề xuất'):index===1?localized(locale,'热销','Best seller','Bán chạy'):null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
+      tagline:PRODUCT_HOSTING_COPY[locale==='zh'||locale==='vi'?locale:'en'][share?'share':tier==='Flagship'?'rack':'device'],badge:index===0?localized(locale,'推荐','Recommended','Đề xuất'):index===1?localized(locale,'热销','Best seller','Bán chạy'):null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock:share?null:state.catalogState==='soldout'&&index===0?0:60-index*7,sold:42+index*13,
       features:[],ai:null,datacenter:localized(locale,'新加坡','Singapore','Singapore'),uptime:'99.9%',warranty:share?undefined:localized(locale,'36 个月','36 months','36 tháng'),status:'active',available:!upcoming,
       releaseState:upcoming?'LOCKED':'RELEASED',releasePhaseId:upcoming?'phase-next':'phase-current',unlocksAtPhase:null,purchaseGate:null,
