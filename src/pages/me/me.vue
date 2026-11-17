@@ -5,8 +5,7 @@
       <ProfileRow />
 
       <WalletCard compact />
-      <!-- WalletOverview has two roots (card + sheet); one wrapper lets CardStagger enter it with its neighbours. -->
-      <view><WalletOverview /></view>
+      <WalletOverview />
 
       <NxSection :title="t.me.frequentFunctions" :action="t.me.deviceAddLabel" class="me-shortcuts" @action="navTo('/pages/store/store')">
         <view class="me-shortcut-grid">

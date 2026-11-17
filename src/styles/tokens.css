@@ -591,13 +591,6 @@ body {
   .nx-viz-motion, .nx-viz-motion * { transition: none !important; }
 }
 
-/* CardStagger entrance — fade + slide-up, replayed via animation-delay per
-   nth-child (replaces framer-motion staggerChildren). Honors reduced-motion. */
-@keyframes nx-card-stagger-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 /* TrialHeroBanner coupon — 3D Y-flip entrance (IntersectionObserver-gated),
    diagonal shimmer sweep, and scarcity-dot pulse. Ported from prototype globals
    @keyframes v5-ticket-enter / v5-ticket-shimmer / v5-hb-pulse. */
