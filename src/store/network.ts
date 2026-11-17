@@ -212,7 +212,11 @@ export const useNetwork = defineStore("network", () => {
     try {
       const snapshot = await teamNetworkApi.snapshot();
       if (!current()) return false;
-      members.value = snapshot.members.map((member) => ({
+      // The server pages members by user id, which is random for new accounts; restore join order so pages
+      // that sort by compute points keep earlier members first on ties.
+      members.value = [...snapshot.members].sort((a, b) =>
+        Date.parse(a.joinedAt) - Date.parse(b.joinedAt) || a.id.localeCompare(b.id, undefined, { numeric: true }),
+      ).map((member) => ({
         id: member.id, name: member.name, avatar: member.avatarUrl ?? member.name.slice(0, 1).toUpperCase(),
         vRank: member.vRank as VRank, layer: member.layer,
         binary: member.leg === "A" ? "left" : member.leg === "B" ? "right" : "unassigned",
