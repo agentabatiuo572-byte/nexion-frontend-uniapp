@@ -373,7 +373,7 @@ export const id: Messages = {
     otpRateLimited: "Terlalu banyak permintaan SMS atau batas harian tercapai. Coba lagi nanti.",
     type: "Rekening bank",
     accountLabel: "Nomor rekening penerima",
-    accountPlaceholder: "Masukkan nomor rekening penerima",
+   
     accountHint: "Nomor ini bisa berbeda dengan nomor di kartu.",
     holderLabel: "Nama pemilik rekening",
     holderPlaceholder: "Nama lengkap sesuai data bank",
@@ -2760,7 +2760,7 @@ export const id: Messages = {
     ffCardholder: "Nama pemegang kartu",
     ffCountry: "Negara",
     ffZip: "Kode pos",
-    cardNamePlaceholder: "NAMA DI KARTU",
+    cardNamePlaceholder: "Sesuai kartu, mis. BUDI SANTOSO",
   },
   cards: {
     bindingEntryNote: "Masukkan detail kartu bank Anda",
@@ -4889,7 +4889,7 @@ export const id: Messages = {
     inviteFriendsHint: "Anda dapat +{inviterNex} UVT per undangan; teman Anda dapat hadiah daftar +{nex} UVT",
   },
   agent: {
-    chooseEventDate: "Pilih tanggal acara",
+    chooseEventDate: "Pilih",
     supportTypes: "Jenis dukungan",
     previewForm: "Pratinjau formulir",
     closePreview: "Tutup pratinjau formulir",

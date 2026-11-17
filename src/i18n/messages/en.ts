@@ -57,7 +57,7 @@ export const en = {
     otpRateLimited: "Too many SMS requests or the daily limit was reached. Try later.",
 
     type: "Bank account",
-    accountLabel: "Receiving account number", accountPlaceholder: "Enter the receiving account number", accountHint: "This may differ from the number on the card.",
+    accountLabel: "Receiving account number", accountHint: "This may differ from the number on the card.",
     holderLabel: "Account holder name", holderPlaceholder: "Full name as registered with the bank", required: "Required", continue: "Confirm binding",
     accountRoutedLabel: "Receiving account", reviewTitle: "Review receiving account", reviewHint: "Check the account number and holder name before saving.", confirmSave: "Confirm and save", editDetails: "Edit details",
     accountRoutedNotice: "Check the account number and name. Funds are paid to this account number.",
@@ -2357,7 +2357,7 @@ rankBenefits: "View rank benefits",
     ffCardholder: "Cardholder name",
     ffCountry: "Country",
     ffZip: "ZIP / Postal",
-    cardNamePlaceholder: "NAME ON CARD",
+    cardNamePlaceholder: "As on the card, e.g. JOHN SMITH",
 
 },
   cards: {
@@ -4617,7 +4617,7 @@ timeHoursAgo: "{n}h ago",
   },
 
   agent: {
-    chooseEventDate: "Choose event date",
+    chooseEventDate: "Select",
     supportTypes: "Support type",
     previewForm: "Preview application",
     closePreview: "Close application preview",

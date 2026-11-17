@@ -373,7 +373,7 @@ export const ru: Messages = {
     otpRateLimited: "Слишком много запросов SMS или исчерпан дневной лимит. Повторите позже.",
     type: "Банковский счёт",
     accountLabel: "Номер счёта получателя",
-    accountPlaceholder: "Введите номер счёта получателя",
+   
     accountHint: "Может отличаться от номера на карте.",
     holderLabel: "Имя владельца счёта",
     holderPlaceholder: "Полное имя, как в банке",
@@ -2760,7 +2760,7 @@ export const ru: Messages = {
     ffCardholder: "Имя владельца",
     ffCountry: "Страна",
     ffZip: "Индекс",
-    cardNamePlaceholder: "ИМЯ НА КАРТЕ",
+    cardNamePlaceholder: "Как на карте, напр. IVAN PETROV",
   },
   cards: {
     bindingEntryNote: "Введите данные банковской карты",
@@ -4889,7 +4889,7 @@ export const ru: Messages = {
     inviteFriendsHint: "Вам +{inviterNex} UVT за приглашение; другу — подарок +{nex} UVT при регистрации",
   },
   agent: {
-    chooseEventDate: "Выберите дату",
+    chooseEventDate: "Выберите",
     supportTypes: "Тип поддержки",
     previewForm: "Просмотр заявки",
     closePreview: "Скрыть заявку",

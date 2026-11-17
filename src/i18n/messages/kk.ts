@@ -373,7 +373,7 @@ export const kk: Messages = {
     otpRateLimited: "SMS сұраулары тым көп немесе күндік шекке жеттіңіз. Кейінірек қайталаңыз.",
     type: "Банк шоты",
     accountLabel: "Ақша түсетін шот нөмірі",
-    accountPlaceholder: "Ақша түсетін шот нөмірін енгізіңіз",
+   
     accountHint: "Бұл картадағы нөмірден өзгеше болуы мүмкін.",
     holderLabel: "Шот иесінің аты-жөні",
     holderPlaceholder: "Банкте тіркелген толық аты-жөні",
@@ -2760,7 +2760,7 @@ export const kk: Messages = {
     ffCardholder: "Карта иесінің аты",
     ffCountry: "Ел",
     ffZip: "Пошта индексі",
-    cardNamePlaceholder: "КАРТАДАҒЫ АТЫ",
+    cardNamePlaceholder: "Картадағыдай, мыс. ASKAR NURLANOV",
   },
   cards: {
     bindingEntryNote: "Банк картасы деректерін енгізіңіз",
@@ -4889,7 +4889,7 @@ export const kk: Messages = {
     inviteFriendsHint: "Әр шақыруға +{inviterNex} UVT аласыз; досыңыз тіркелгенде +{nex} UVT сыйлық алады",
   },
   agent: {
-    chooseEventDate: "Іс-шара күнін таңдаңыз",
+    chooseEventDate: "Таңдаңыз",
     supportTypes: "Қолдау түрі",
     previewForm: "Өтінімді алдын ала қарау",
     closePreview: "Өтінімді алдын ала қарауды жабу",

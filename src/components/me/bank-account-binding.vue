@@ -90,7 +90,7 @@
         <view class="group">
           <view class="field-row">
             <text class="field-label">{{ c.accountLabel }}</text>
-            <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :placeholder="c.accountPlaceholder" placeholder-style="color: var(--v5-ink-4)" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
+            <input v-model="state.account" class="field mono" type="text" inputmode="numeric" maxlength="32" autocomplete="off" required aria-required="true" :disabled="fieldsDisabled" :aria-label="`${c.accountLabel} · ${c.required}`" data-testid="bank-account" />
             <text class="hint field-hint">{{ c.accountHint }}</text>
           </view>
           <view class="field-row">
