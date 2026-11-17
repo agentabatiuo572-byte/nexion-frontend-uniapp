@@ -151,7 +151,8 @@ function goStore() {
 @keyframes dc-arc-draw { from { clip-path:inset(0 64% 0 0); } to { clip-path:inset(0 39% 0 0); } }
 @keyframes dc-multiplier-pop { from { opacity:0; transform:translateX(-50%) scale(.55); } }
 @keyframes dc-fade-up { from { opacity:0; transform:translateY(6px); } }
-@keyframes dc-sweep { 0% { left:-70%; } 15%,100% { left:130%; } }
+/* The band crosses 200% of the pillar (left −70% → 130%); translateX counts its own 45% width, so 200 / 45 = 444.44%. */
+@keyframes dc-sweep { 0% { transform:translateX(0) skewX(-18deg); } 15%,100% { transform:translateX(444.444%) skewX(-18deg); } }
 @media (max-width:339px) {
   .dc-device { width:74px; height:74px; margin-bottom:-12px; }
   .dc-pillar { width:54px; }
