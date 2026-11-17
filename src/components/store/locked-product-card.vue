@@ -16,7 +16,7 @@
       <view class="flex items-start" style="gap: 12px">
         <view class="shrink-0 grid place-items-center relative" :style="lockBoxStyle">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-          <view aria-hidden :style="lockDotStyle" />
+          <view aria-hidden class="locked-card__dot" :class="{ 'is-paused': !auroraLoop.running.value }" :style="lockDotStyle" />
         </view>
         <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" :aria-expanded="detailsOpen" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
@@ -287,7 +287,7 @@ const notifyBtnStyle: CSSProperties = {
     radial-gradient(35% 45% at 15% 85%, var(--v5-tech-cyan-soft) 0%, transparent 60%);
   animation: v5-aurora-drift 14s ease-in-out infinite;
 }
-.locked-card__aurora.is-paused { animation-play-state: paused; }
+.locked-card__aurora.is-paused, .locked-card__dot.is-paused, .nx-chassis[data-scrolling="true"] :is(.locked-card__aurora, .locked-card__dot) { animation-play-state: paused; }
 /* Grid lines follow ink so the texture shows on the themed card surface in both themes. */
 .locked-card__grid {
   position: absolute; inset: 0; pointer-events: none; background-size: 24px 24px;

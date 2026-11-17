@@ -1,5 +1,5 @@
 <template>
-  <view v-if="presentation.active.value" class="trial-device-row" :class="[`trial-device-row--${variant}`, { 'nx-glass-card': variant === 'inventory' }]" data-trial-device-row="true" data-device-key="trial:current">
+  <view v-if="presentation.active.value" ref="loopRef" class="trial-device-row" :class="[`trial-device-row--${variant}`, { 'nx-glass-card': variant === 'inventory', 'nx-loops-paused': !loops.running.value }]" data-trial-device-row="true" data-device-key="trial:current">
     <view class="trial-device-row__heading" :role="variant === 'inventory' ? undefined : 'button'" :tabindex="variant === 'inventory' ? undefined : '0'" :aria-label="`${copy.details}: ${presentation.deviceName.value || '—'} · ${statusText} · ${presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining} ${remainingText}`" :aria-expanded="variant === 'earn' ? isExpanded : undefined" :aria-controls="variant === 'earn' ? `trial-device-details-${variant}` : undefined" @click="onRowClick" @keydown.enter.stop.prevent="onRowClick" @keydown.space.stop.prevent="onRowClick">
       <view class="trial-device-row__main">
         <view class="trial-device-row__art" aria-hidden="true"><image v-if="productMedia" class="trial-device-row__image" :src="productMedia.src" mode="aspectFit" /><text class="trial-device-row__image-badge">{{ copy.imageBadge }}</text></view>
@@ -35,6 +35,7 @@ import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { computed, ref } from "vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { useT } from "@/i18n/use-t";
 import { formatTrialRemaining } from "@/i18n/trial-lifecycle";
@@ -47,6 +48,9 @@ const visibility = useDataVisibility();
 const hidePersonalData = computed(() => props.variant !== "inventory" && visibility.hidden);
 const emit = defineEmits<{ (event: "cancel"): void; (event: "toggle"): void }>();
 const presentation = useTrialPresentation();
+// The online dot pauses while this card is off-screen or its page is hidden.
+const loops = useLoopsInView(".trial-device-row");
+const loopRef = loops.elRef;
 useAutoRecovery({ failed: () => remoteApiEnabled && props.variant === "inventory" && !useTrialClaimSheet().open && useFreeTrial().authorityStatus === "error", retry: () => presentation.refresh() });
 const copy = useTrialFleetCopy();
 const t = useT();

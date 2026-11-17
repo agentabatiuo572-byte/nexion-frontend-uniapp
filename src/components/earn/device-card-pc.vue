@@ -1000,7 +1000,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__eq { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 10px; height: 10px; flex: none; }
 .earn-stage__eq > view { width: 2.2px; height: 10px; border-radius: 1px; background: var(--v5-brand); transform-origin: bottom; transform: scaleY(.55); }
 .earn-stage__eq--running > view { animation: earn-stage-eq .9s ease-in-out infinite; }
-.nx-loops-paused .earn-stage__eq--running > view { animation-play-state: paused; }
+:is(.nx-loops-paused, .nx-chassis[data-scrolling="true"]) .earn-stage__eq--running > view { animation-play-state: paused; }
 .earn-stage__eq--running > view:nth-child(2) { animation-delay: -.3s; }
 .earn-stage__eq--running > view:nth-child(3) { animation-delay: -.6s; }
 .earn-stage__pct { font: 500 30px/34px var(--font-metric); color: var(--v5-ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }

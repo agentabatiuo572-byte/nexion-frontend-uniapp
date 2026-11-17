@@ -144,7 +144,8 @@ function goStore() {
 .dc-card :deep(.dc-foot__action .nx-button__surface) { min-height:32px; height:32px; padding:0 14px; }
 /* The entrance waits at its first frame until the stage is seen (same contract as v-viz-inview). */
 .dc-card:not(.dc-card--entered) .dc-device, .dc-card:not(.dc-card--entered) .dc-pillar, .dc-card:not(.dc-card--entered) .dc-arc,
-.dc-card:not(.dc-card--entered) .dc-multiplier, .dc-card:not(.dc-card--entered) .dc-legend, .dc-card--paused .dc-pillar__sweep { animation-play-state:paused; }
+.dc-card:not(.dc-card--entered) .dc-multiplier, .dc-card:not(.dc-card--entered) .dc-legend, .dc-card--paused .dc-pillar__sweep,
+.nx-chassis[data-scrolling="true"] .dc-pillar__sweep { animation-play-state:paused; }
 @keyframes dc-pillar-rise { from { transform:scaleY(0); } }
 @keyframes dc-device-drop { from { opacity:0; transform:translateY(-20px); } }
 @keyframes dc-arc-draw { from { clip-path:inset(0 64% 0 0); } to { clip-path:inset(0 39% 0 0); } }

@@ -1,5 +1,5 @@
 <template>
-  <view class="daily-check-in-row" data-home-section="check-in">
+  <view ref="loopRef" class="daily-check-in-row" :class="{ 'nx-loops-paused': !loops.running.value }" data-home-section="check-in">
     <view v-if="rewardFeedback" class="daily-check-in-row__reward-flight" role="status" aria-live="polite" :aria-label="rewardFeedback.title + ' · ' + rewardFeedback.body" @animationend="rewardFeedback = null">
       <text class="daily-check-in-row__reward">{{ rewardFeedback.title }}</text>
     </view>
@@ -49,7 +49,11 @@ import { dailyCheckInSuccessCopy } from '@/pages/daily/daily-success-copy';
 import { dailyBaseReward, dailyMilestoneRewardText, dailyRewardLabels } from '@/pages/daily/daily-reward-view';
 import type { CanonicalDailyMilestone } from '@/api/points-api';
 import NxButton from '@/components/ui/nx-button.vue';
+import { useLoopsInView } from '@/composables/use-loops-in-view';
 const faucet = useNexFaucet(), app = useApp(), copy = useAuditUiCopy(), t = useT();
+// Today's ping runs only while the row is on screen and its page is shown.
+const loops = useLoopsInView('.daily-check-in-row');
+const loopRef = loops.elRef;
 const submitting = ref(false);
 const rewardFeedback = ref<{ title: string; body: string } | null>(null);
 // The today node fills once after a confirmed check-in; it resets when the page is left.
@@ -178,6 +182,7 @@ async function checkIn() {
 @keyframes check-in-rail-grow { from { transform:scaleX(0); } }
 @keyframes check-in-node-fill { from { transform:scale(.4); opacity:.3; } }
 @keyframes check-in-ping { 0% { transform:scale(1); opacity:.45; } 70%,100% { transform:scale(1.65); opacity:0; } }
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .daily-check-in-row__today::after { animation-play-state:paused; }
 @media (max-width:339px) {
   .daily-check-in-row { padding:12px 12px 10px 14px; }
 }

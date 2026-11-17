@@ -989,6 +989,8 @@ body {
 .nx-home-art { background-image: url('@/static/img/home-glass-20260928/coupon.webp'); background-size: 100% 100%; background-repeat: no-repeat; }
 .nx-home-art-float { animation: nx-home-art-drift 6s ease-in-out var(--home-art-delay, 0s) infinite; }
 @keyframes nx-home-art-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+/* Paused while its owner is off-screen (useLoopsInView / LoopScope), the page is hidden, or the chassis scrolls. */
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .nx-home-art-float { animation-play-state: paused; }
 .nx-home-arrow { display: grid; place-items: center; border-radius: var(--v5-radius-full); background: var(--v5-surface-2); color: var(--v5-ink-2); box-shadow:var(--ui-glass-edge-shadow); }
 /* Shared capsule material: soft rim and broad inner refraction, like the wallet edge. */
 .nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow, .nx-glass-bar, .nx-soft-glass, .nx-glass-sheet, .nx-tint {
