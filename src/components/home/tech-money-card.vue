@@ -58,7 +58,7 @@ const staking = useStaking();
 // NEX 展示），非每日 USD 现金，故从首页每日聚合移除（去旧「平台交易量日分红」雷）。
 const todayTotal = computed(() => app.earnings.today + commission.todayUSDT() + staking.todayAccruedUSDT());
 const remoteToday = computed<number | null>(() => remoteApiEnabled
-  ? app.homeTruthStatus === 'error' ? null : app.homeTruth?.earnings.today.usdt ?? null
+  ? app.homeTruthStatus === 'error' && !app.homeTruthTransientFailure ? null : app.homeTruth?.earnings.today.usdt ?? null
   : null);
 
 // Today minus yesterday comes only from the server field; it is never derived from the percentage.
