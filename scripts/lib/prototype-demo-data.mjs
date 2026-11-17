@@ -122,16 +122,21 @@ const PRODUCT_HOSTING_COPY = {
 export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
   return skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
-    const dailyEarn=monthlyEstimateUsdt/30,b=.1;
-    return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,vram,power:watts?watts+' W':null,hashRate:null,
+    const dailyEarn=monthlyEstimateUsdt/30,b=.1,stock=share?null:state.catalogState==='soldout'&&index===0?0:60-index*7;
+    // AppProductCatalogService projects release and stock gates independently.
+    // The phased preset models a valid E1 phase id that has not been reached.
+    return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,
+      vram:share?'不适用（虚拟算力份额）':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'不适用（非独立设备）',hashRate:null,
       tagline:PRODUCT_HOSTING_COPY[locale==='zh'||locale==='vi'?locale:'en'][share?'share':tier==='Flagship'?'rack':'device'],badge:index===0?localized(locale,'推荐','Recommended','Đề xuất'):index===1?localized(locale,'热销','Best seller','Bán chạy'):null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
-      productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock:share?null:state.catalogState==='soldout'&&index===0?0:60-index*7,sold:42+index*13,
-      features:[],ai:null,datacenter:localized(locale,'新加坡','Singapore','Singapore'),uptime:'99.9%',warranty:share?undefined:localized(locale,'36 个月','36 months','36 tháng'),status:'active',available:!upcoming,
-      releaseState:upcoming?'LOCKED':'RELEASED',releasePhaseId:upcoming?'phase-next':'phase-current',unlocksAtPhase:null,purchaseGate:null,
-      ...(share?{dailyEstimateLowUsdt:monthlyEstimateUsdt*(1-b)/30,dailyEstimateHighUsdt:monthlyEstimateUsdt*(1+b)/30,
-        shareYieldMin:Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)),shareYieldMax:Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4))}:{}),
+      videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
+      productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13,
+      features:[],taskLevels:[],ai:null,datacenter:localized(locale,'新加坡','Singapore','Singapore'),uptime:'99.9%',warranty:share?'unavailable':localized(locale,'36 个月','36 months','36 tháng'),status:'active',available:!upcoming,
+      releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,purchaseGate:null,
+      purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
+      dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
+      shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
     };
-  }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?undefined:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
+  }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
 }
 
 // The disclosure PromotionPublicService projects for an order discount: it comes off the order at checkout, so nothing
