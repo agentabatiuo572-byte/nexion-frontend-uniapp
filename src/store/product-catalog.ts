@@ -85,7 +85,7 @@ watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => {
 function publishCatalogRuntime(): boolean {
   let published: RuntimeRevisionScope | null = null;
   try {
-    advanceRuntimeRevision(null, scope => {
+    advanceRuntimeRevision("catalog", scope => {
       publishing = published = scope;
       if (displayProof.value) displayProof.value = { ...displayProof.value, runtimeEpoch: scope.epoch };
     });

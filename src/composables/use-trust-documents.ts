@@ -3,18 +3,23 @@ import { trustDocumentApi } from "@/api/runtime";
 import type { TrustDocuments } from "@/api/trust-document-api";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 
-// Shared by the trust centre and the white paper page; one read per runtime generation.
+// Shared by the home card, trust centre and white paper page.
 const documents = ref<TrustDocuments | null>(null);
 const status = ref<"idle" | "loading" | "ready" | "error">("idle");
 let inflight: Promise<boolean> | null = null;
 let authorityGeneration = 0;
 
-// A new runtime generation re-reads once something has asked for the documents;
-// the last list stays on screen until the new one arrives.
-subscribeRuntimeRevision(() => {
+// Catalog updates preserve the confirmed snapshot; identity/environment changes
+// clear it before any consumer can request the new authority's documents.
+subscribeRuntimeRevision((_scope, reason) => {
+  const requested = status.value !== "idle";
   authorityGeneration += 1;
   inflight = null;
-  if (status.value !== "idle") void refreshTrustDocuments();
+  if (reason !== "catalog") {
+    documents.value = null;
+    status.value = "idle";
+  }
+  if (requested) void refreshTrustDocuments();
 });
 
 export function refreshTrustDocuments(): Promise<boolean> {
