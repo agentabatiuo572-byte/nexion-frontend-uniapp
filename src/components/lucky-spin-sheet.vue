@@ -566,7 +566,7 @@ useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
   background: var(--nx-glass-fill);
   border: none;
   padding: 18px 16px;
-  padding-bottom: max(calc(env(safe-area-inset-bottom, 0px) + 32px), var(--nx-overlay-bottom));
+  padding-bottom: var(--nx-overlay-bottom);
 }
 
 /* header */

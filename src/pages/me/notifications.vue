@@ -410,7 +410,7 @@ watch(filter, value => {
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }
 .message-center .notification-important { height:24px; background:var(--v5-warning-soft); font-size:12px; line-height:16px; padding:0 var(--v5-space-2); border-radius:var(--v5-radius-full); }
 .message-center .notification-detail { padding:0 16px 14px 68px; background:var(--v5-surface); }
-.notification-management { position:absolute; right:16px; bottom:38px; padding:0; }
+.notification-management { position:absolute; right:16px; bottom:var(--nx-overlay-bottom); padding:0; }
 :global([data-theme="dark"] .message-center .notification-important) { background:color-mix(in srgb,var(--v5-warning) 16%,transparent); }
 :global([data-theme="light"] .message-center .notification-row) { box-shadow:var(--v5-glass-shadow); }
 </style>
