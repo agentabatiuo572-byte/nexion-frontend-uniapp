@@ -425,6 +425,7 @@ import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSID
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
 import { useTradeinStrip } from "@/composables/use-tradein-strip";
+import { useDialogScrollLock } from "@/composables/use-dialog-a11y";
 import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
 import { canShowLivePhoneHashpower, computeLiveHashpower, isDeviceOnline, deviceOnlineState } from "@/lib/hashpower";
@@ -750,6 +751,7 @@ const menuOpen = ref(false);
 const deactivation = useDeviceDeactivation();
 const tradein = useTradeinStrip(() => menuOpen.value);
 const tradeinRow = computed(() => tradein.tradeinStrip(props.device));
+useDialogScrollLock(menuOpen);
 const pressFiredMenu = ref(false);
 let navigatingToStatistics = false;
 let longPress: ReturnType<typeof setTimeout> | null = null;

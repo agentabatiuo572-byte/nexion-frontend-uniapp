@@ -64,6 +64,26 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
  */
 export const DIALOG_SCROLL_LOCK: InjectionKey<() => () => void> = Symbol("nx-dialog-scroll-lock");
 
+/** Holds the chassis scroll lock while `open` is true. Dialogs that manage focus themselves call this alone. */
+export function useDialogScrollLock(open: Ref<boolean>): void {
+  const acquireScrollLock = inject(DIALOG_SCROLL_LOCK, null);
+  if (!acquireScrollLock) return;
+  // The native tab host shares one chassis across tabs: a dialog left open in a hidden tab
+  // must not lock the tab on screen.
+  const inTab = !!inject(TAB_LIFECYCLE, null);
+  const shown = ref(!inTab);
+  if (inTab) {
+    onTabShow(() => { shown.value = true; });
+    onTabHide(() => { shown.value = false; });
+  }
+  let release: (() => void) | null = null;
+  watch([open, shown], ([isOpen, isShown]) => {
+    release?.();
+    release = isOpen && isShown ? acquireScrollLock() : null;
+  }, { immediate: true, flush: "sync" });
+  onBeforeUnmount(() => { release?.(); release = null; });
+}
+
 /**
  * 弹层的键盘可用性:焦点移入 → Tab 只在层内循环 → Esc 关闭 → 关闭后焦点归还。
  *
@@ -104,23 +124,7 @@ export function useDialogA11y(
   // #ifdef APP-PLUS
   registerNativeDialog(open, close, nativeBack, nativePriority);
   // #endif
-  const acquireScrollLock = inject(DIALOG_SCROLL_LOCK, null);
-  if (acquireScrollLock) {
-    // The native tab host shares one chassis across tabs: a dialog left open in a hidden tab
-    // must not lock the tab on screen.
-    const inTab = !!inject(TAB_LIFECYCLE, null);
-    const shown = ref(!inTab);
-    if (inTab) {
-      onTabShow(() => { shown.value = true; });
-      onTabHide(() => { shown.value = false; });
-    }
-    let release: (() => void) | null = null;
-    watch([open, shown], ([isOpen, isShown]) => {
-      release?.();
-      release = isOpen && isShown ? acquireScrollLock() : null;
-    }, { immediate: true, flush: "sync" });
-    onBeforeUnmount(() => { release?.(); release = null; });
-  }
+  useDialogScrollLock(open);
   let previousFocus: HTMLElement | SVGElement | null = null;
 
   const rootEl = (): HTMLElement | null | undefined =>
