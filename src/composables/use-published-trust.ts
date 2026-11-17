@@ -11,9 +11,13 @@ const refreshError = computed(() => hasSnapshot.value && status.value === "error
 let inflight: Promise<boolean> | null = null;
 let authorityGeneration = 0;
 
-subscribeRuntimeRevision(() => {
+subscribeRuntimeRevision((_scope, reason) => {
   authorityGeneration += 1;
   inflight = null;
+  if (reason === "catalog") {
+    if (status.value !== "idle") void refreshPublishedTrust(true);
+    return;
+  }
   sections.value = [];
   hasSnapshot.value = false;
   status.value = "idle";

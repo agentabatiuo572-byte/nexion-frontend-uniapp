@@ -164,7 +164,8 @@ export interface OrderApi {
 
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
 let currentRuntimeRevision = 0;
-const runtimeRevisionListeners = new Set<(scope: RuntimeRevisionScope) => void>();
+export type RuntimeRevisionReason = "authority" | "catalog";
+const runtimeRevisionListeners = new Set<(scope: RuntimeRevisionScope, reason: RuntimeRevisionReason) => void>();
 
 export interface RuntimeRevisionScope {
   runId: null;
@@ -172,17 +173,17 @@ export interface RuntimeRevisionScope {
 }
 
 /** Invalidate responses captured before a catalogue or account refresh. */
-export function advanceRuntimeRevision(_reason?: unknown, beforeNotify?: (scope: RuntimeRevisionScope) => void): void {
+export function advanceRuntimeRevision(reason: RuntimeRevisionReason | null = null, beforeNotify?: (scope: RuntimeRevisionScope) => void): void {
   currentRuntimeRevision += 1;
   const scope = captureRuntimeRevision();
   // Stamp derived display context after the epoch moves, before observers run.
   beforeNotify?.(scope);
-  runtimeRevisionListeners.forEach((listener) => listener(scope));
+  runtimeRevisionListeners.forEach((listener) => listener(scope, reason ?? "authority"));
 }
 
 /** Notify account-scoped stores after a canonical runtime revision changes. */
 export function subscribeRuntimeRevision(
-  listener: (scope: RuntimeRevisionScope) => void,
+  listener: (scope: RuntimeRevisionScope, reason: RuntimeRevisionReason) => void,
 ): () => void {
   runtimeRevisionListeners.add(listener);
   return () => runtimeRevisionListeners.delete(listener);
