@@ -2256,6 +2256,7 @@ flowchart TD
 - Legend:Direct friends / Extended network
 - 不暴露 L1-L7 / 左右翼 / 4 色 layer 编码 / Spillover ring;内部数据仍保留 layer 字段供数学层使用,可视化层只呈现 Direct(L1) vs Extended(L2-L7 合并)
 - SVG cx/cy 计算后 `Math.round(n*100)/100` 规整精度,避免 SSR/CSR 浮点字符串化漂移
+- 成员数据:服务端按用户 id 分页(新用户 UID 为随机数,id 不代表加入先后),App 取齐全部分页后按加入时间排好;团队各页按算力排序时,同分的成员加入早的在前(2026-11-17,BUG-448)
 
 ### 8.8 族谱树 `/team/tree`
 
