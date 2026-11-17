@@ -99,12 +99,13 @@ export function visibleChannels(): ShareChannelDef[] {
     (c) => c.intentType !== "system" || (typeof navigator !== "undefined" && typeof navigator.share === "function"),
   );
   // #endif
-  // #ifndef H5
+  // #ifdef APP-PLUS
   // ponytail: App 壳 v1 按配置默认序展示;已装检测(plus.runtime)接入时在此过滤。
-  // system 项暂隐藏:activateChannel 的 system 分支仅 H5 实现,App 端展示即死按钮
-  // (审计 P1);接 uni.share/plus 原生分享时一并放开。
-  return list.filter((c) => c.intentType !== "system");
+  // system 项走 uni.shareWithSystem(见 activateChannel)。
+  return list;
   // #endif
+  // Other platforms have no system share implementation.
+  return list.filter((c) => c.intentType !== "system");
 }
 
 export function copyText(data: string): Promise<boolean> {
@@ -233,6 +234,23 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
       } catch (error) {
         // Dismissal is silent; a real failure leaves a useful local recovery path.
         if (current() && (error as { name?: string } | null)?.name !== "AbortError") toast.info(t.value.share.actionFailed);
+      }
+      // #endif
+      // #ifdef APP-PLUS
+      {
+        // Same rule as the web branch: only a reported success counts as a share; a dismissal is silent.
+        const result = await new Promise<true | string>((resolve) => {
+          uni.shareWithSystem({
+            type: "text",
+            summary: text,
+            href: text.includes(link) ? undefined : link,
+            success: () => resolve(true),
+            fail: (error: { errMsg?: string } | undefined) => resolve(error?.errMsg ?? ""),
+          });
+        });
+        if (!current()) return;
+        if (result === true) await recordShareEvent(def.key, surface);
+        else if (!/cancel/i.test(result)) toast.info(t.value.share.actionFailed);
       }
       // #endif
       break;

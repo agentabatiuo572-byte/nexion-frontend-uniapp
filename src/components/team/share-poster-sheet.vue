@@ -113,7 +113,7 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useProfile } from "@/store/profile";
 import { toast } from "@/store/ui";
-import { activateChannel, buildShareLink, copyText, currentShareReferralCode, notifyUnavailableShareLink } from "@/lib/share";
+import { activateChannel, buildShareLink, copyText, currentShareReferralCode, notifyUnavailableShareLink, visibleChannels } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
@@ -179,12 +179,17 @@ const availableTpls = computed(() => {
   return list;
 });
 
-// 渠道行的链接渠道 = 配置里 web/scheme 型(与渠道面板同一 intent 实现)。
-const linkChannels = computed<ShareChannelDef[]>(() =>
-  cfg.config.share.channels.filter((c) => c.enabled && (c.intentType === "web" || c.intentType === "scheme")).slice(0, 4),
-);
+// 渠道行 = 配置里前 4 个 web/scheme 型渠道,再接配置开启且当前端支持系统分享时的「更多」(visibleChannels 判定)。
+const linkChannels = computed<ShareChannelDef[]>(() => {
+  const visible = visibleChannels();
+  return [
+    ...visible.filter((c) => c.intentType === "web" || c.intentType === "scheme").slice(0, 4),
+    ...visible.filter((c) => c.intentType === "system"),
+  ];
+});
 function channelLabel(key: ShareChannelKey): string {
   if (key === "sms") return t.value.share.smsLabel;
+  if (key === "system") return t.value.share.more;
   return { zalo: "Zalo", telegram: "Telegram", whatsapp: "WhatsApp", messenger: "Messenger", x: "X" }[key as string] ?? key;
 }
 function channelIcon(key: ShareChannelKey): string {
@@ -201,6 +206,8 @@ function channelIcon(key: ShareChannelKey): string {
       return wrap('<path d="M4 4l16 16" /><path d="M20 4 4 20" />');
     case "messenger":
       return wrap('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /><path d="m8 12 3-3 2 2 3-3" />');
+    case "system":
+      return wrap('<circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />');
     default:
       return wrap('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /><path d="M9 10h6l-6 4h6" />');
   }
