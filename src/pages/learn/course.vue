@@ -680,7 +680,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .course-lesson__meta { display:flex; align-items:center; flex-wrap:wrap; gap:var(--v5-space-2); margin-top:10px; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }
 .course-lesson__reward { padding: var(--v5-space-1) 8px; border-radius: var(--v5-radius-full); color: var(--v5-nex); background: color-mix(in srgb,var(--v5-nex) 18%,transparent); }
 .course-lesson__body { display:block; white-space:pre-line; margin-top:var(--v5-space-5); font:400 15px/24px var(--font-v5); color:var(--v5-ink-2); }
-.course-sticky { position:absolute; left:0; right:0; bottom:0; z-index:36; display:flex; padding:var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); }.course-sticky > * { flex:1; }
+.course-sticky { position:absolute; left:0; right:0; bottom:0; z-index:36; display:flex; padding:var(--v5-space-3) 16px var(--nx-overlay-safe-bottom); }.course-sticky > * { flex:1; }
 .course-lesson [role="radio"] { position:relative; padding:var(--v5-space-3); border-radius:14px; background:color-mix(in srgb,var(--v5-ink) 6%,transparent); }.course-lesson [role="radio"][aria-checked="true"] { --ui-button-fill:color-mix(in srgb,var(--v5-brand) 14%,transparent); color:var(--v5-brand); }
 
 /* Approved growth board geometry and material. */
@@ -690,7 +690,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && serverCompleted.value && nex
 .learning-course :deep(.spv), .learning-course :deep(.spv-titlewrap) { min-width:0; max-width:100%; }
 .course-lesson__body, .course-lesson__body :deep(span) { white-space:pre-wrap; overflow-wrap:anywhere; word-break:normal; }
 .course-read-progress { width:calc(100% - 32px); max-width:calc(100% - 32px); box-sizing:border-box; }
-.course-sticky { position:fixed; inset:auto 0 0; box-sizing:border-box; width:100%; max-width:100vw; min-width:0; padding:12px 16px 30px; }
+.course-sticky { position:fixed; inset:auto 0 0; box-sizing:border-box; width:100%; max-width:100vw; min-width:0; padding:12px 16px var(--nx-overlay-safe-bottom); }
 .course-sticky .course-submit { width:100%; min-width:0; }
 
 

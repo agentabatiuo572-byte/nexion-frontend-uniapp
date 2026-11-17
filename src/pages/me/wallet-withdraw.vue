@@ -1686,7 +1686,7 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-quota__pip { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .wd-quota__pip--used { background: var(--v5-ink-3); box-shadow: none; }
 .wd-bar-space { height: 120px; }
-.wd-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
+.wd-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
 .wd-bar__why { position: absolute; left: 16px; right: 16px; top: -28px; text-align: center; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
 .wd-submit--on { opacity: 1; cursor: pointer; }

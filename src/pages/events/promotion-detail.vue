@@ -710,7 +710,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 
 /* Bottom action bar (DS-30), shared soft glass: the last line sits about 30px above it. */
 .lp-bar-space { height: calc(80px + env(safe-area-inset-bottom)); }
-.lp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px calc(30px + env(safe-area-inset-bottom)); animation: lp-bar .45s cubic-bezier(.2,.8,.2,1) .2s backwards; }
+.lp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px var(--nx-overlay-safe-bottom); animation: lp-bar .45s cubic-bezier(.2,.8,.2,1) .2s backwards; }
 .lp-bar__info { flex: 1; min-width: 0; }
 .lp-bar__hint { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-bar .lp-price { margin-top: 2px; }

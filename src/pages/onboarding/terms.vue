@@ -341,7 +341,7 @@ function confirmTerms(event?: Event) {
 
 /* Body */
 .tos-wrap {
-  padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 40px);
+  padding: 0 20px var(--nx-overlay-safe-bottom);
 }
 .tos-hero {
   margin-bottom: 18px;
