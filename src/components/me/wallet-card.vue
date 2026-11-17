@@ -20,7 +20,8 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
         </view>
       </view>
-      <view :id="usdtCount.hostId" class="nx-wallet-total" :style="usdtFitStyle" :aria-label="t.me.usdtBalance + ': ' + visibility.mask('$' + usdtLabel)" :count-up="usdtCount.config.value" :change:count-up="countUp.update">
+      <text class="nx-sr-only">{{ t.me.usdtBalance + ': ' + visibility.mask('$' + usdtLabel) }}</text>
+      <view :id="usdtCount.hostId" class="nx-wallet-total" :style="usdtFitStyle" aria-hidden="true" :count-up="usdtCount.config.value" :change:count-up="countUp.update">
         <text v-if="!visibility.hidden" class="nx-wallet-currency">$</text><text v-if="visibility.hidden" class="tabular-nums nx-wallet-amount">••••</text><text v-else-if="usdtBalanceReadable" class="tabular-nums nx-wallet-amount"><text class="nx-count--int">{{ intPart }}</text><text class="nx-wallet-fraction nx-count--frac">.{{ fracPart }}</text></text><text v-else class="tabular-nums nx-wallet-amount">—</text>
       </view>
       <view class="nx-wallet-nex" role="link" tabindex="0" @click="goNex" @keydown.enter.prevent="goNex" :aria-label="t.uiChrome.nexBalance + ': ' + nexLabel + ' UVT'">

@@ -699,6 +699,8 @@ body {
 /* Numeric roles (design system 01 §1.2, DS-27). */
 .nx-num-amount { font-family: var(--font-amount); font-variant-numeric: tabular-nums; }
 .nx-num-metric { font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
+/* Read by screen readers only, e.g. the final text of a figure whose visible digits count up (aria-hidden). */
+.nx-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 /* Monospace only for addresses, hashes and codes read character by character. */
 .font-mono-code {
   font-family: var(--font-jet-mono);

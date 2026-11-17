@@ -7,7 +7,8 @@
         <text>{{ copy.details }}</text><text aria-hidden="true">›</text>
       </view>
     </view>
-    <view :id="monthCount.hostId" class="team-ledger__amount tabular-nums" :count-up="monthCount.config.value" :change:count-up="countUp.update"><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__currency nx-count--prefix">{{ monthUSDTParts.prefix }}</text><text class="nx-count--int">{{ visibility.mask(intPart) }}</text><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__fraction nx-count--frac">.{{ fracPart }}</text></view>
+    <text class="nx-sr-only">{{ visibility.hidden || !monthUSDTParts ? visibility.mask(intPart) : `${monthUSDTParts.prefix}${intPart}.${fracPart}` }}</text>
+    <view :id="monthCount.hostId" class="team-ledger__amount tabular-nums" aria-hidden="true" :count-up="monthCount.config.value" :change:count-up="countUp.update"><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__currency nx-count--prefix">{{ monthUSDTParts.prefix }}</text><text class="nx-count--int">{{ visibility.mask(intPart) }}</text><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__fraction nx-count--frac">.{{ fracPart }}</text></view>
     <text class="team-ledger__nex tabular-nums">{{ visibility.mask(hasAmounts && props.monthNEX !== null ? '+' + formatAmount(props.monthNEX) : '—') }} UVT</text>
     <view class="team-ledger__settlement" :aria-label="copy.settlementScope">
       <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot" aria-hidden="true" /><text>{{ t.teamV3.settled }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(props.unlockedUSDT) : '—') }}</text></view>

@@ -29,13 +29,15 @@
             <view class="earn-hero__label"><text>{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text><DataVisibilityToggle class="earn-hero__eye" /></view>
             <text class="earn-scope">{{ auditCopy.revenueScope }}</text>
           </view>
-          <view :id="totalCount.hostId" class="earn-hero__amount" :count-up="totalCount.config.value" :change:count-up="countUp.update">
+          <view :id="totalCount.hostId" class="earn-hero__amount" aria-hidden="true" :count-up="totalCount.config.value" :change:count-up="countUp.update">
             <text v-if="!visibility.hidden" class="earn-hero__currency nx-count--prefix">{{ totalPrefix || '$' }}</text>
             <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(totalInt) }}</text>
             <text v-else class="earn-hero__int nx-count--int">{{ totalInt }}</text>
             <text v-if="totalKnown && !visibility.hidden" class="earn-hero__dec nx-count--frac">.{{ totalCents }}</text>
           </view>
-          <text :id="nexCount.hostId" class="earn-hero__nex" :count-up="nexCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}</text><text class="earn-hero__nex-unit">UVT</text></text>
+          <text class="nx-sr-only">{{ totalA11y }}</text>
+          <text :id="nexCount.hostId" class="earn-hero__nex" aria-hidden="true" :count-up="nexCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}</text><text class="earn-hero__nex-unit">UVT</text></text>
+          <text class="nx-sr-only">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }} UVT</text>
         </view>
         <view class="earn-tile earn-tile--half" role="group" :aria-label="t.earn.completedJobs">
           <view class="earn-half__label"><view class="earn-half__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg></view><text>{{ t.earn.completedJobs }}</text></view>
@@ -255,6 +257,9 @@ const totalKnown = computed(() => totalParts.value !== null);
 const totalPrefix = computed(() => totalParts.value?.prefix ?? "");
 const totalInt = computed(() => totalParts.value?.integer ?? "—");
 const totalCents = computed(() => totalParts.value?.fraction ?? "");
+// The visible digits count up in the view layer and are hidden from screen readers; this is the final text.
+const totalA11y = computed(() => visibility.hidden ? visibility.mask(totalInt.value)
+  : totalKnown.value ? `${totalPrefix.value || "$"}${totalInt.value}.${totalCents.value}` : "—");
 const nexTotal = computed(() => remoteApiEnabled ? serverPeriodValue.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
 const nexCount = useViewCountUp(nexTotal, "plus");
 const nexFmt = computed(() => nexTotal.value === null ? "—" : formatAmount(nexTotal.value));
