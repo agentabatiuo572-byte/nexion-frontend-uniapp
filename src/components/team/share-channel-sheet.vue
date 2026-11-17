@@ -5,17 +5,16 @@
       <view class="ss-grab" />
       <view class="ss-head"><text class="ss-head__t">{{ copy.inviteFriends }}</text><view class="ss-head__x" role="button" tabindex="0" :aria-label="t.ui.close" @click="emit('close')" @keydown.enter.prevent="emit('close')" @keydown.space.prevent="emit('close')"><LiquidGlass :radius="22" tone="control" /><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></view></view>
       <view class="ss-body">
-        <view class="ss-reward nx-tint"><TeamArt kind="invite" :size="100" /><view class="ss-reward__copy"><text class="ss-reward__t" :class="{ 'ss-reward__t--amount': rewardHint }">{{ rewardLineText }}</text><text v-if="rewardHint" class="ss-reward__hint">{{ rewardHint }}</text></view></view>
+        <view class="ss-reward nx-tint"><TeamArt kind="invite" :size="100" /><view class="ss-reward__copy"><view v-if="rewardAmount" class="ss-reward__amount"><text class="ss-reward__t ss-reward__t--amount">{{ rewardAmount }}</text><text class="ss-reward__unit">UVT</text></view><text v-else class="ss-reward__t">{{ rewardLineText }}</text><text v-if="rewardHint" class="ss-reward__hint">{{ rewardHint }}</text></view></view>
         <view v-if="statusMessage" class="ss-status" role="status" aria-live="polite" :aria-busy="loading"><text class="ss-status__text">{{ statusMessage }}</text><view v-if="!loading || retrying" class="ss-retry nx-frosted-button" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" :aria-busy="retrying" @click="retry" @keydown.enter.prevent="retry" @keydown.space.prevent="retry"><text>{{ t.share.retry }}</text></view></view>
         <view class="ss-actions">
           <view class="ss-code__copy" :class="{ 'ss-row--pending': loading }" role="button" :aria-label="t.share.copyCode" :tabindex="codeDisabled ? -1 : 0" :aria-disabled="codeDisabled" :aria-busy="channelBusy" @click="onCopyCode" @keydown.enter.prevent="onCopyCode" @keydown.space.prevent="onCopyCode"><text class="ss-code__label">{{ copy.myInviteCode }}</text><text class="ss-code__value">{{ referralCode || codePresentation || '—' }}</text><view class="ss-code__pill"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><text>{{ t.share.copyCode }}</text></view></view>
           <view class="ss-grid">
             <template v-for="c in displayChannels" :key="c.key">
-            <view class="ss-ch" :class="{ 'ss-row--pending': loading }" role="button" :aria-label="channelMeta(c.key).label" :tabindex="channelDisabled(c) ? -1 : 0" :aria-busy="channelBusy" :aria-disabled="channelDisabled(c)" @click="onChannel(c)" @keydown.enter.prevent="onChannel(c)" @keydown.space.prevent="onChannel(c)"><view class="ss-row__icon" aria-hidden="true" v-html="channelMeta(c.key).svg" /><text class="ss-row__label">{{ channelMeta(c.key).label }}</text><text v-if="channelHint(c.key)" class="ss-ch__hint">{{ channelHint(c.key) }}</text></view>
+            <view class="ss-ch" :class="{ 'ss-row--pending': loading, 'ss-ch--extra': c.intentType !== 'copy' && c.intentType !== 'poster' }" role="button" :aria-label="channelMeta(c.key).label" :tabindex="channelDisabled(c) ? -1 : 0" :aria-busy="channelBusy" :aria-disabled="channelDisabled(c)" @click="onChannel(c)" @keydown.enter.prevent="onChannel(c)" @keydown.space.prevent="onChannel(c)"><view class="ss-row__icon" aria-hidden="true" v-html="channelMeta(c.key).svg" /><text class="ss-row__label">{{ channelMeta(c.key).label }}</text><text v-if="channelHint(c.key)" class="ss-ch__hint">{{ channelHint(c.key) }}</text></view>
             </template>
           </view>
-          <view class="ss-rules-toggle ss-row" role="button" tabindex="0" :aria-label="copy.inviteRules" :aria-expanded="rulesOpen" aria-controls="share-invite-rules" @click="rulesOpen=!rulesOpen" @keydown.enter.prevent="rulesOpen=!rulesOpen" @keydown.space.prevent="rulesOpen=!rulesOpen"><svg class="ss-row__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 3h10l4 4v14H5ZM9 11h6M9 15h6" /></svg><text class="ss-row__label">{{ copy.inviteRules }}</text><text class="ss-row__arrow" aria-hidden="true">{{ rulesOpen ? '−' : '+' }}</text></view>
-          <view v-if="rulesOpen" id="share-invite-rules" class="ss-rules" role="region" :aria-label="copy.inviteRules"><InviteRuleContent /><view class="ss-rules-support" role="link" tabindex="0" @click="contactSupport" @keydown.enter.prevent="contactSupport"><text>{{ copy.contactSupport }}</text><text aria-hidden="true">›</text></view></view>
+          <view class="ss-rules-toggle" role="button" tabindex="0" @click="emit('openRules')" @keydown.enter.prevent="emit('openRules')" @keydown.space.prevent="emit('openRules')"><text class="ss-row__label">{{ copy.inviteRules }}</text><text class="ss-row__arrow" aria-hidden="true">›</text></view>
         </view>
       </view>
     </view>
@@ -24,13 +23,11 @@
 
 <script setup lang="ts">
 import TeamArt from './team-art.vue';
-import InviteRuleContent from './invite-rule-content.vue';
 import LiquidGlass from '@/components/liquid-glass.vue';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
 import { formatAmount } from "@/lib/amount-display";
-import { navTo } from '@/lib/route';
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -45,19 +42,17 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { uiLocale } from '@/i18n';
 
 const props = defineProps<{ open: boolean }>();
-const emit = defineEmits<{ (e: "close"): void; (e: "openPoster"): void }>();
+const emit = defineEmits<{ (e: "close"): void; (e: "openPoster"): void; (e: "openRules"): void }>();
 
 const t = useT();
 const app = useApp();
 const locale = useLocaleStore();
 const copy = computed(() => teamRedesignCopy(locale.code));
-const rulesOpen = ref(false);
-function contactSupport() { emit('close'); navTo('/pages/me/support'); }
 const channelBusy = ref(false);
 const retrying = ref(false);
 let actionEpoch = 0;
 let actionsOpen = props.open;
-function invalidateActions() { actionsOpen = false; actionEpoch++; channelBusy.value = false; retrying.value = false; rulesOpen.value = false; }
+function invalidateActions() { actionsOpen = false; actionEpoch++; channelBusy.value = false; retrying.value = false; }
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   invalidateActions();
   if (props.open) emit('close');
@@ -101,6 +96,9 @@ const rewardLineText = computed(() => {
   return `${base} · ${promo}`;
 });
 
+// P-42: an amount reads as a large figure with its unit beside it; any other state stays a sentence.
+const rewardAmount = computed(() => remoteApiEnabled && !rewards.error && rewardPresentation.value?.enabled === true
+  ? formatAmount(rewardPresentation.value.amount) : "");
 const rewardHint = computed(() => remoteApiEnabled && !rewards.error && rewardPresentation.value?.enabled
   ? copy.value.qualifiedFriendReward : '');
 const channels = computed<ShareChannelDef[]>(() => visibleChannels());
@@ -129,7 +127,6 @@ const statusMessage = computed(() => {
   if (cfg.configStatus === "failed") return t.value.share.channelsLoadFailed;
   if (!shareLink.value) return t.value.share.linkUnavailable;
   if (remoteApiEnabled && rewards.error) return t.value.team.settlementUnavailable;
-  if (!externalChannels.value.length) return t.value.share.channelsEmpty;
   return "";
 });
 watch(statusMessage, message => { if (!loading.value) statusPresentation.value = message; }, { immediate: true });
@@ -253,26 +250,26 @@ useDialogA11y(computed(() => props.open), ".ss-root", () => emit("close"));
 <style scoped>
 .ss-mask { position:fixed;inset:0;background:var(--v5-bg-color-mask);backdrop-filter:blur(3px);z-index:8000; }
 .ss-sheet { position:fixed;left:0;right:0;bottom:0;z-index:8001;display:flex;flex-direction:column;box-sizing:border-box;max-height:min(86vh,calc(100vh - var(--nx-overlay-top)));overflow:hidden;border-radius:24px 24px 0 0;background:var(--nx-glass-fill);box-shadow:var(--nx-glass-edge);padding-bottom:var(--nx-overlay-safe-bottom);animation:ss-up .25s ease; }
-.ss-grab { flex:none;width:36px;height:4px;border-radius:9px;background:var(--v5-surface-3);margin:var(--ui-space-row-y) auto 0; }.ss-head { flex:none;display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);padding:var(--ui-space-row-y) 20px; }.ss-head__t { font:600 20px/1.4 var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }
+.ss-grab { flex:none;width:40px;height:5px;border-radius:999px;background:var(--v5-surface-3);margin:var(--ui-space-row-y) auto 0; }.ss-head { flex:none;display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);padding:var(--ui-space-row-y) 20px; }.ss-head__t { font:600 20px/1.4 var(--font-v5);color:var(--v5-ink);overflow-wrap:anywhere; }
 .ss-head__x { position:relative;isolation:isolate;flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--v5-ink);cursor:pointer; }.ss-head__x svg { position:relative; }
 .ss-body { min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding:0 20px 12px;scrollbar-width:none; }.ss-body::-webkit-scrollbar {display:none;width:0;height:0;}.ss-reward { display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:4px 0 24px; }.ss-reward__t { font:400 var(--ui-type-list-subtitle)/1.6 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:anywhere; }.ss-reward__t--amount { font:600 30px/1.25 var(--font-v5);color:var(--v5-ink); }.ss-reward__hint { font:400 12px/1.5 var(--font-v5);color:var(--v5-ink-3); }
 .ss-status { display:flex;align-items:center;gap:var(--ui-space-inline);margin-bottom:var(--ui-space-inset); }.ss-status__text { flex:1;min-width:0;font:400 12px/1.6 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }.ss-retry { position:relative;isolation:isolate;flex:none;min-height:44px;padding:0 16px;display:flex;align-items:center;border-radius:999px;color:var(--v5-ink);font:600 13px/20px var(--font-v5); }.ss-retry text { position:relative; }
-.ss-row { display:flex;align-items:center;gap:var(--ui-space-inline);min-height:62px;padding:var(--ui-space-row-y) 0;border-bottom:1px solid var(--v5-border);color:var(--v5-ink);cursor:pointer; }.ss-row__icon,.ss-row__arrow { flex:none;display:flex;align-items:center;justify-content:center; }.ss-row__label { flex:1;min-width:0;font:500 14px/1.5 var(--font-v5);overflow-wrap:anywhere; }.ss-code__value { max-width:42%;font:500 12px/1.5 var(--font-v5);color:var(--v5-ink-2);text-align:right;overflow-wrap:anywhere; }
-.ss-row[aria-disabled="true"]:not(.ss-row--pending),.ss-retry[aria-disabled="true"] { opacity:.45;cursor:default; }.ss-rules { padding:var(--ui-space-inset) 0;border-bottom:1px solid var(--v5-border); }.ss-rules text { display:block;margin-bottom:6px;font:400 12px/1.7 var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }.ss-cancel { display:flex;align-items:center;justify-content:center;min-height:48px;margin-top:6px;font:400 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-ink-3);cursor:pointer; }
-.ss-rules-support { min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px; }
-.ss-rules-support text { margin:0;color:var(--v5-ink-2); }
+.ss-row__icon,.ss-row__arrow { flex:none;display:flex;align-items:center;justify-content:center; }.ss-row__label { flex:1;min-width:0;font:500 14px/1.5 var(--font-v5);overflow-wrap:anywhere; }.ss-code__value { max-width:42%;font:500 12px/1.5 var(--font-v5);color:var(--v5-ink-2);text-align:right;overflow-wrap:anywhere; }
+.ss-retry[aria-disabled="true"] { opacity:.45;cursor:default; }
 .ss-sheet [tabindex="0"]:focus-visible { outline:2px solid var(--v5-brand);outline-offset:2px; }
 /* P-42: reward strip, code card and two-column channel tiles. */
 .ss-reward { flex-direction:row !important;align-items:center !important;gap:14px !important;padding:14px 16px !important;margin-bottom:var(--ui-space-inset);border-radius:20px;--nx-tint:var(--v5-brand);text-align:left !important; }
 .ss-reward :deep(.team-art) { --team-art-size:88px; flex:none; }
 .ss-reward__copy { display:flex;flex-direction:column;gap:2px;min-width:0; }
-.ss-reward__copy .ss-reward__t--amount { font:600 28px/34px var(--font-amount);color:var(--v5-brand);white-space:nowrap; }
+.ss-reward__amount { display:flex;align-items:baseline;gap:6px; }
+.ss-reward__copy .ss-reward__t--amount { font:600 30px/34px var(--font-amount);color:var(--v5-brand);white-space:nowrap; }
+.ss-reward__unit { font:600 14px/20px var(--font-metric);color:var(--v5-brand); }
 .ss-ch__hint { margin-top:-6px;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:anywhere; }
 .ss-sheet { border-radius:28px 28px 0 0; }
 .ss-actions { display:flex;flex-direction:column;gap:var(--ui-space-inset); }
 .ss-code__copy { display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 16px;border-radius:20px;background:color-mix(in srgb,var(--v5-ink) 4%,transparent);box-shadow:inset 0 0 0 1px var(--v5-border);cursor:pointer; }
 .ss-code__label { font:400 12px/16px var(--font-v5);color:var(--v5-ink-3); }
-.ss-code__copy .ss-code__value { max-width:none;font:600 28px/36px var(--font-metric);letter-spacing:5px;white-space:nowrap;color:var(--v5-ink);overflow-wrap:anywhere;text-align:center; }
+.ss-code__copy .ss-code__value { max-width:none;font:600 30px/36px var(--font-metric);letter-spacing:6px;white-space:nowrap;color:var(--v5-ink);overflow-wrap:anywhere;text-align:center; }
 .ss-code__pill { display:flex;align-items:center;gap:6px;min-height:36px;padding:0 16px;border-radius:999px;color:var(--v5-brand);font:600 13px/18px var(--font-v5);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--v5-brand) 45%,transparent); }
 .ss-code__copy[aria-disabled="true"]:not(.ss-row--pending) { opacity:.45;cursor:default; }
 .ss-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }
@@ -281,8 +278,13 @@ useDialogA11y(computed(() => props.open), ".ss-root", () => emit("close"));
 .ss-grid > .ss-ch:nth-child(2n) .ss-row__icon { color:var(--ui-device-ink);background:color-mix(in srgb,var(--ui-device-ink) 16%,transparent); }
 .ss-ch .ss-row__label { font:600 15px/20px var(--font-v5);overflow-wrap:anywhere; }
 .ss-ch[aria-disabled="true"]:not(.ss-row--pending) { opacity:.45;cursor:default; }
-.ss-ch:active,.ss-code__copy:active { transform:scale(.98); }
-.ss-rules-toggle { border-top:1px solid var(--v5-border); }
+/* Channels a deployment adds beyond poster and link: compact full-width rows. */
+.ss-ch--extra { grid-column:1 / -1;flex-direction:row;align-items:center;gap:12px;min-height:64px;padding:12px 16px; }
+.ss-ch--extra .ss-row__icon { width:36px;height:36px;border-radius:12px; }
+.ss-grid > .ss-ch--extra:nth-child(n) .ss-row__icon { color:var(--v5-ink-2);background:color-mix(in srgb,var(--v5-ink) 8%,transparent); }
+.ss-rules-toggle { display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-inline);min-height:48px;padding:0 4px;border-top:1px solid var(--v5-border);color:var(--v5-ink-2);cursor:pointer; }
+.ss-rules-toggle .ss-row__label { font:400 14px/20px var(--font-v5); }
+.ss-rules-toggle .ss-row__arrow { color:var(--v5-ink-3);font:400 18px/1 var(--font-v5); }
 @keyframes ss-up { from { transform:translateY(100%); } to { transform:translateY(0); } }
 @media(prefers-reduced-motion:reduce) { .ss-sheet { animation:none; } }
 </style>

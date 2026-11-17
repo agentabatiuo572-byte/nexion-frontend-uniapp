@@ -15,7 +15,7 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- ══ Empty state (no seats) ══ -->
         <template v-if="!hasNodes">
-          <view class="gh-empty-card active:scale-[0.98]" :style="ctaCardStyle" role="button" tabindex="0" :aria-label="consumerCopy.learn" @click="goGenesis">
+          <view class="gh-empty-card" :style="ctaCardStyle" role="button" tabindex="0" :aria-label="consumerCopy.learn" @click="goGenesis">
             <view class="flex items-center" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="ctaIconStyle">
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 5 5 5-8 5 8 5-5-2 12H4z" /><path d="M4 21h16" /></svg>
@@ -205,13 +205,13 @@
           <view>
             <text class="block" :style="sectionLabelStyle">{{ t.genesisHolder.actionsLabel }}</text>
             <view class="grid grid-cols-2" style="gap: 8px">
-              <view :style="actionTileStyle" class="active:scale-[0.97]" @click="goGenesis">
+              <view :style="actionTileStyle" @click="goGenesis">
                 <view class="grid place-items-center" :style="actionIconStyle('var(--v5-brand-2)')">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
                 </view>
                 <text :style="actionLabelStyle">{{ t.genesisHolder.actions.buy }}</text>
               </view>
-              <view :style="actionTileStyle" class="active:scale-[0.97]" @click="goMarketplace">
+              <view :style="actionTileStyle" @click="goMarketplace">
                 <view class="grid place-items-center" :style="actionIconStyle('var(--v5-brand)')">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
                 </view>

@@ -53,7 +53,7 @@
 
         <!-- Quick actions 4-cell -->
         <view class="grid grid-cols-2" style="gap: 8px">
-          <view v-for="qc in quickCells" :key="qc.label" class="nx-glass-card active:scale-[0.97]" :style="quickCellStyle" role="link" tabindex="0" :aria-label="qc.label" @click="navTo(qc.href)">
+          <view v-for="qc in quickCells" :key="qc.label" class="nx-glass-card" :style="quickCellStyle" role="link" tabindex="0" :aria-label="qc.label" @click="navTo(qc.href)">
             <view class="grid place-items-center" :style="quickIconStyle(qc.tint)">
               <view v-html="qc.icon" />
             </view>
@@ -82,7 +82,7 @@
         <view :style="cardStyle">
           <text class="block" :style="[cardLabelStyle, { marginBottom: '12px' }]">{{ t.nexWallet.useNex.label }}</text>
           <view class="grid grid-cols-2" style="gap: 8px">
-            <view v-for="tile in useTiles" :key="tile.label" class="nx-glass-card active:scale-[0.98]" :style="useTileStyle" role="link" tabindex="0" :aria-label="`${tile.label} · ${tile.sub}`" @click="navTo(tile.href)">
+            <view v-for="tile in useTiles" :key="tile.label" class="nx-glass-card" :style="useTileStyle" role="link" tabindex="0" :aria-label="`${tile.label} · ${tile.sub}`" @click="navTo(tile.href)">
               <view class="flex items-center justify-between">
                 <view v-html="tile.icon" />
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>

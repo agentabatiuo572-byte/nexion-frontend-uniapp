@@ -30,7 +30,7 @@
     </view>
   </view>
   <SharePosterSheet :open="posterOpen" @close="posterOpen=false" />
-  <ShareChannelSheet :open="shareOpen" @close="shareOpen=false" @open-poster="shareOpen=false; posterOpen=true" />
+  <ShareChannelSheet :open="shareOpen" @close="shareOpen=false" @open-poster="shareOpen=false; posterOpen=true" @open-rules="shareOpen=false; detailMode='rules'; detailOpen=true" />
   <InviteDetailSheet :open="detailOpen" :mode="detailMode" @close="detailOpen=false" />
 </template>
 <script setup lang="ts">

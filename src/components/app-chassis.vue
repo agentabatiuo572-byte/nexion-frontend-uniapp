@@ -67,6 +67,7 @@
     <view
       ref="scrollEl"
       class="nx-content nx-scroll"
+      :class="{ 'nx-content--locked': scrollLocks > 0 }"
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
@@ -171,6 +172,7 @@ import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { formatUnreadBadge } from "@/lib/unread-badge";
 import { useRefresh, PULL_HEADER_HOLD_KEY } from "@/store/refresh";
+import { DIALOG_SCROLL_LOCK } from "@/composables/use-dialog-a11y";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { usePageHeader } from "@/store/page-header";
 import { useFreeTrial } from "@/store/free-trial";
@@ -331,9 +333,18 @@ let startY: number | null = null;
 const refreshing = computed(() => refresh.isRefreshing);
 const indicatorY = computed(() => (refreshing.value ? HOLD_PX : pullY.value));
 const refresherVisible = computed(() => refreshing.value || pullY.value > 6);
-const pullStyle = computed(() => (pullActive.value ? { y: indicatorY.value, transition: pulling.value ? "none" : "transform .28s cubic-bezier(.16,1,.3,1)" } : null));
+// Open dialogs (useDialogA11y) hold the page still: no scroll, no pull-to-refresh under the mask.
+const scrollLocks = ref(0);
+// A dialog opened during the refresh hold drops the content offset, so its fixed sheet is not shifted with it.
+const pullStyle = computed(() => (pullActive.value && scrollLocks.value === 0 ? { y: indicatorY.value, transition: pulling.value ? "none" : "transform .28s cubic-bezier(.16,1,.3,1)" } : null));
 const pullHeaderHeight = ref(0);
-provide(PULL_HEADER_HOLD_KEY, { pull: pullStyle, headerHeight: pullHeaderHeight });
+const pullHeaderMeasure = ref(0);
+provide(DIALOG_SCROLL_LOCK, () => {
+  scrollLocks.value += 1;
+  let held = true;
+  return () => { if (held) { held = false; scrollLocks.value -= 1; } };
+});
+provide(PULL_HEADER_HOLD_KEY, { pull: pullStyle, headerHeight: pullHeaderHeight, measureRequest: pullHeaderMeasure });
 
 // H5's uni <view> ref exposes the DOM element via $el. APP-PLUS page logic has
 // no document; its ref still serves scroll-memory reads, while writes use evalJS.
@@ -401,7 +412,7 @@ function touchY(e: TouchEvent): number | null {
   return tp ? tp.clientY : null;
 }
 function onTouchStart(e: TouchEvent) {
-  if (refreshing.value || currentScrollTop() > 0) { startY = null; return; }
+  if (scrollLocks.value > 0 || refreshing.value || currentScrollTop() > 0) { startY = null; return; }
   startY = touchY(e);
 }
 function onTouchMove(e: TouchEvent) {
@@ -410,6 +421,7 @@ function onTouchMove(e: TouchEvent) {
   if (y === null) return;
   const dy = y - startY;
   if (dy <= 0) { pullY.value = 0; pulling.value = false; return; }
+  if (!pulling.value) pullHeaderMeasure.value += 1;
   pulling.value = true;
   pullActive.value = true; // arm the transform layer only now (idle stays clean)
   if (deactivateTimer) { clearTimeout(deactivateTimer); deactivateTimer = null; }
@@ -911,6 +923,10 @@ export default chassisView;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
+}
+/* An open dialog keeps the page under its mask still. */
+.nx-content--locked {
+  overflow-y: hidden;
 }
 /* hide scrollbar (match the prototype's no-scrollbar utility) */
 .nx-content::-webkit-scrollbar {

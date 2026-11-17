@@ -570,7 +570,7 @@ body {
 .glow-green { animation: glow-green 1.8s ease-in-out infinite; }
 
 /* Data-visual motion (design system 07 · DS-29): rings sweep through this registered
-   number (0–100); podium crowns pop in after the pedestals land; pressed data cards dip. */
+   number (0–100); podium crowns pop in after the pedestals land. */
 @property --nx-viz-ring { syntax: "<number>"; inherits: false; initial-value: 0; }
 @keyframes nx-viz-pop { 0% { opacity: 0; transform: translateY(6px) scale(.6); } 70% { opacity: 1; transform: translateY(-2px) scale(1.08); } 100% { opacity: 1; transform: none; } }
 .nx-viz-pop { animation: nx-viz-pop 420ms cubic-bezier(.2, 1.4, .4, 1) both; }

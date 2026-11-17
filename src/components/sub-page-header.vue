@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, onMounted, onUnmounted } from "vue";
+import { computed, getCurrentInstance, inject, nextTick, ref, watch, onMounted, onUnmounted } from "vue";
 import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
 import { PULL_HEADER_HOLD_KEY } from "@/store/refresh";
 import { useMessageDrawer } from "@/store/message-drawer";
@@ -78,9 +78,17 @@ const t = useT();
 const unread = computed(() => drawer.actionableUnread);
 const rowH = computed(() => 56);
 // Pull-to-refresh moves the content; the row cancels that move so it stays pinned under the
-// status bar, and the chassis opens the gap below the row plus its 12px bottom margin.
+// status bar, and the chassis opens the gap below the row and its bottom margin. Both are
+// measured: pages change the margin, and a long title can wrap the row to two lines.
 const pullHold = inject(PULL_HEADER_HOLD_KEY, null);
-onMounted(() => { if (pullHold) pullHold.headerHeight.value = rowH.value + 12; });
+const instance = getCurrentInstance();
+function measureRow() {
+  if (!pullHold || !instance) return;
+  uni.createSelectorQuery().in(instance.proxy).select(".spv").fields({ size: true, computedStyle: ["marginBottom"] }, (box) => {
+    const row = box as { height?: number; marginBottom?: string } | null;
+    if (row?.height) pullHold.headerHeight.value = row.height + (parseFloat(row.marginBottom ?? "") || 0);
+  }).exec();
+}
 onUnmounted(() => { if (pullHold) pullHold.headerHeight.value = 0; });
 
 // Current uni route — last entry in getCurrentPages() (same readRoute() pattern
@@ -117,6 +125,7 @@ onUnmounted(() => {
   }
 });
 const displayTitle = computed(() => props.title ?? resolveHeaderTitleText(currentRoute.value, t.value.headerTitles));
+watch(() => [displayTitle.value, props.subtitle, pullHold?.measureRequest.value], () => { void nextTick(measureRow); }, { immediate: true });
 const statusBarHeight = computed(() => {
   try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); }
 });
