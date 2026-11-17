@@ -182,9 +182,8 @@ const showTradein = computed(() => !remoteApiEnabled && bestTradeinCredit.value 
 // Remote mode never evaluates the local V-rank/team snapshot. The server
 // eligibility response is the only source that can unlock this card.
 const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(() => props.product);
-const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
-// The artwork entrance and float follow their own on-screen state (a native observer on App, where cardInView stays
-// false); cardInView keeps gating only the eligibility read below.
+const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false, nativeSelector: ".product-card" });
+// Artwork visibility follows the media element; eligibility reads follow the whole card on App and H5.
 const { elRef: mediaRef, running: artInView } = useLoopsInView(".product-media");
 const entered = ref(false);
 watch(artInView, visible => { if (visible) entered.value = true; });

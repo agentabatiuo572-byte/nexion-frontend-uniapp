@@ -1,4 +1,4 @@
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { getCurrentInstance, ref, watch, onMounted, onUnmounted } from "vue";
 
 /**
  * useScrollGrowProgress — IntersectionObserver-driven progress-bar entrance
@@ -12,21 +12,35 @@ import { ref, watch, onMounted, onUnmounted } from "vue";
  *
  * Cross-end note: H5 webview has IntersectionObserver. On App webview where it
  * is unavailable, `inView` defaults to true (bars show final width, no grow
- * animation). Network readers pass `fallbackInView: false` and keep an explicit
- * per-item action when visibility cannot be observed.
+ * animation). Network readers pass `fallbackInView: false`; those with a
+ * `nativeSelector` observe their component through uni's native observer instead.
  */
-export function useScrollGrowProgress(options: { threshold?: number; fallbackInView?: boolean } = {}) {
+export function useScrollGrowProgress(options: { threshold?: number; fallbackInView?: boolean; nativeSelector?: string } = {}) {
   const threshold = options.threshold ?? 0.25;
   const fallbackInView = options.fallbackInView ?? true;
   const elRef = ref<HTMLElement | null>(null);
   const inView = ref(false);
   let observer: IntersectionObserver | null = null;
   let stopObserving: (() => void) | undefined;
+  const instance = getCurrentInstance();
 
   onMounted(() => {
     if (typeof IntersectionObserver === "undefined") {
-      // Progress bars keep their final state; network reads must stay opt-in.
-      inView.value = fallbackInView;
+      const selector = options.nativeSelector;
+      if (!selector) {
+        // Progress bars keep their final state; network reads must stay opt-in.
+        inView.value = fallbackInView;
+        return;
+      }
+      // App's logic layer has no DOM observer. Scope the selector to this component,
+      // including cards mounted after the page's initial catalog read.
+      stopObserving = watch(elRef, (element, _previous, onCleanup) => {
+        inView.value = false;
+        if (!element || !instance) return;
+        const nativeObserver = uni.createIntersectionObserver(instance.proxy, { thresholds: [0, threshold] }).relativeToViewport();
+        nativeObserver.observe(selector, (result) => { inView.value = result.intersectionRatio > 0; });
+        onCleanup(() => { nativeObserver.disconnect(); });
+      }, { immediate: true, flush: "post" });
       return;
     }
     // uni H5 PITFALL (P-019): a template ref on a <view> yields the component
