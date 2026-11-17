@@ -397,7 +397,6 @@ function goStore() {
 .device-bays { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
 .device-bay-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 112px; box-sizing: border-box; border-radius: var(--v5-radius-m); }
 .device-bay-slot--empty { border: 1.5px dashed var(--v5-border-strong); cursor: pointer; }
-.device-bay-slot--empty:active { transform: scale(.97); }
 .device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--v5-ink-3);
   backdrop-filter: none; -webkit-backdrop-filter: none; }
 /* Over the stage aura the shared frosted blur only applied during the page-enter animation (bright, then

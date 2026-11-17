@@ -526,23 +526,15 @@ const gateMetaStyle: CSSProperties = {
 
 </script>
 <style scoped>
-.product-card { transition: transform 180ms ease; }
-.product-card:active { transform: scale(.99); }
 .product-media:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -3px; }
 .product-art-entry { position: absolute; inset: 0; }
 .product-card--entered .product-art-entry { animation: product-enter 420ms ease-out both; }
 @keyframes product-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.product-media::after { content:''; position:absolute; inset:0 auto 0 -45%; width:38%; pointer-events:none; background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent); opacity:0; transform:translateX(0) skewX(-12deg); animation:product-auto-sheen 6.8s ease-out var(--product-sheen-delay, .6s) infinite; animation-play-state:paused; }
-.product-card--in-view .product-media::after { animation-play-state:running; }
-.product-card:nth-child(4n + 2) { --product-sheen-delay:1.7s; }
-.product-card:nth-child(4n + 3) { --product-sheen-delay:2.8s; }
-.product-card:nth-child(4n + 4) { --product-sheen-delay:3.9s; }
-@keyframes product-auto-sheen { 0% { transform:translateX(0) skewX(-12deg); opacity:0; } 2% { opacity:.85; } 15% { transform:translateX(480%) skewX(-12deg); opacity:0; } 100% { transform:translateX(480%) skewX(-12deg); opacity:0; } }
 .product-card:nth-child(even) .product-art { animation-delay: -1.5s; }
 .product-art { transform-origin: 50% 55%; animation: product-float 4s ease-in-out infinite; animation-play-state: paused; }
 .product-card--in-view .product-art { animation-play-state: running; }
 @keyframes product-float { 0%, 100% { transform: translateY(2px) scale(1); } 50% { transform: translateY(-4px) scale(1.015); } }
-@media (prefers-reduced-motion: reduce) { .product-card { transition: none; } .product-art, .product-card--entered .product-art-entry { animation: none; } .product-media::after { display: none; } }
+@media (prefers-reduced-motion: reduce) { .product-art, .product-card--entered .product-art-entry { animation: none; } }
 
 .promotion-buy { --v5-liquid-tint:transparent; }
 .promotion-buy :deep(.nx-liquid-glass[data-glass-strategy="solid"]),
@@ -552,7 +544,6 @@ const gateMetaStyle: CSSProperties = {
 
 <style scoped>
 .product-card--compact { display:flex; flex-direction:column; min-width:0; border:1px solid var(--v5-border); border-radius:22px; background:var(--ui-content-surface); cursor:pointer; }
-.product-card--compact:active { transform:scale(.98); }
 .product-card--compact:focus-visible { outline:2px solid var(--v5-brand); outline-offset:3px; }
 .product-card--compact .product-media { height:150px; aspect-ratio:auto !important; flex:none; }
 .product-card--compact .product-art-entry { display:flex; align-items:center; justify-content:center; padding:0; }
@@ -570,5 +561,5 @@ const gateMetaStyle: CSSProperties = {
 .product-card--compact:nth-child(2n) .product-art { animation-delay:-1.1s; }
 .product-card--compact:nth-child(3n) .product-art { animation-delay:-2.2s; }
 .product-card--compact:nth-child(4n) .product-art { animation-delay:-3.1s; }
-@media(prefers-reduced-motion:reduce) { .product-card--compact { transition:none; }.product-card:active,.product-card--compact:active,.product-footer [role="button"]:active { transform:none; }.product-card--compact .product-art,.product-card--compact .product-art-entry,.product-media::after { animation:none; } }
+@media(prefers-reduced-motion:reduce) { .product-footer [role="button"]:active { transform:none; }.product-card--compact .product-art,.product-card--compact .product-art-entry { animation:none; } }
 </style>

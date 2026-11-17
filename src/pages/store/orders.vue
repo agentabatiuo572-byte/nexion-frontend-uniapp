@@ -449,12 +449,11 @@ const browseBtnStyle: CSSProperties = {
 .orders-filter__badge { min-width: 18px; height: 18px; box-sizing: border-box; margin-left: 1px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); font: 600 11px/18px var(--font-v5); }
 /* Order cards (DS-28): solid surface, machine art as the anchor; the pending card adds one faint warning glow. */
 .orders-list { display: flex; flex-direction: column; gap: var(--ui-space-card-gap); margin: 0 16px; }
-.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); cursor: pointer; transition: transform 160ms ease; }
+.order-card { position: relative; overflow: hidden; padding: var(--ui-space-inset); border-radius: var(--ui-radius-surface); cursor: pointer; }
 .order-card:not(.nx-tint) { background: var(--v5-content-surface); }
 [data-theme="light"] .order-card:not(.nx-tint) { box-shadow: var(--v5-glass-shadow); }
 /* Awaiting payment: tinted warning (it used to be a corner glow). */
 .order-card--pending { --nx-tint: var(--v5-warning); }
-.order-card:active { transform: scale(.98); }
 .order-card:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .order-card__row { display: flex; gap: 14px; }
 .order-card__thumb { position: relative; flex: none; width: 72px; height: 72px; border-radius: 16px; background: var(--v5-surface-2); display: grid; place-items: center; overflow: hidden; }
@@ -476,6 +475,5 @@ const browseBtnStyle: CSSProperties = {
 .order-card__pending { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-top: 14px; padding-top: 2px; border-top: 1px solid var(--v5-border); }
 .order-card__countdown { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--v5-warning-ink); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .order-card__pay { flex: none; margin-left: auto; }
-@media (prefers-reduced-motion: reduce) { .order-card { transition: none; } .order-card:active { transform: none; } }
 .orders-filter-empty { display: block; padding: 32px 16px; text-align: center; color: var(--v5-ink-3); font: 400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 </style>

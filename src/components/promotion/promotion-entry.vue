@@ -46,7 +46,7 @@
       </view>
       <!-- Purchase gift, first purchase and repurchase open their own landing page; the
            terms link keeps opening the existing sheet. -->
-      <view v-for="card in landingCards(activity)" :key="card.kind" class="entry-card entry-press" :class="'entry-card--'+card.kind" :style="{ animationDelay: (index*0.06+0.06)+'s' }" role="link" tabindex="0" :aria-label="localized(activity.title,locale.code)" @click="navTo(promotionLandingHref(activity.activityId))" @keydown.enter.prevent="navTo(promotionLandingHref(activity.activityId))">
+      <view v-for="card in landingCards(activity)" :key="card.kind" class="entry-card" :class="'entry-card--'+card.kind" :style="{ animationDelay: (index*0.06+0.06)+'s' }" role="link" tabindex="0" :aria-label="localized(activity.title,locale.code)" @click="navTo(promotionLandingHref(activity.activityId))" @keydown.enter.prevent="navTo(promotionLandingHref(activity.activityId))">
         <template v-if="card.kind==='gift'">
           <view class="entry-card__copy"><text class="entry-card__buy">{{ fmt(landing.cardBuy,{name:card.buyName}) }}</text><text class="entry-card__get">{{ card.discount ? '' : landing.cardGet.split('{reward}')[0] }}<text class="entry-card__keep">{{ card.rewardText }}</text>{{ card.discount ? '' : landing.cardGet.split('{reward}')[1] }}</text></view>
           <view class="entry-card__main"><CatalogMachineImage class="entry-card__fill" :sku="card.buySku" :image-url="card.buyImage" :scope-key="activity.activityId+':card-main'" :refresh-key="catalogRefreshKey" /></view>
@@ -380,8 +380,6 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-card__bonus { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 3px; padding: 0 6px; }
 .entry-card__bonus-amount { font: 500 18px/22px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--v5-ink); overflow-wrap: anywhere; }
 .entry-pop { animation: entry-card-pop .45s cubic-bezier(.2,.8,.2,1) .5s backwards; }
-.entry-press { transition: transform 120ms ease-out; }
-.entry-press:active { transform: scale(.97); }
 @keyframes entry-card-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes entry-card-pop { 0% { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
 @media (max-width:374px) {
@@ -395,7 +393,5 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 }
 @media (prefers-reduced-motion: reduce) {
   .entry-card, .entry-pop { animation: none; }
-  .entry-press { transition: none; }
-  .entry-press:active { transform: none; }
 }
 </style>

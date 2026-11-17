@@ -11,7 +11,7 @@
           <view v-else-if="remoteApiEnabled && pageState.primary === 'loading' && !snapshot" class="binary-loading"
             role="status" aria-live="polite" aria-busy="true" />
             <view v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)" class="binary-comparison-section">
-            <view class="binary-hero nx-tint nx-viz-press">
+            <view class="binary-hero nx-tint">
               <view class="binary-hero-heading">
                 <text class="binary-label">{{ binaryCopy.contributions }}</text>
                 <view class="binary-rule-link" role="button" tabindex="0" :aria-label="t.binary.howItWorksEntry"
@@ -50,7 +50,7 @@
             <view v-if="wings.some(wing => wing.top) || pageState.memberDetails !== 'ready'" class="binary-leaders">
               <text class="binary-section-title">{{ binaryCopy.leadingMembers }}</text>
               <view class="reward-wings">
-                <view v-for="wing in wings" :key="wing.key" class="reward-wing nx-viz-press" :style="wingStyle(wing.isWeak)">
+                <view v-for="wing in wings" :key="wing.key" class="reward-wing" :style="wingStyle(wing.isWeak)">
                   <view v-if="wing.top" class="reward-wing-member" :style="topMemberStyle">
                       <view class="reward-wing-member__facts">
                         <VBadge v-if="!visibility.hidden" class="reward-wing-member__rank" :v="wing.top.vRank" size="lg" :show-title="false" />
@@ -70,7 +70,7 @@
             <view v-if="recentBinaries.length > 0" class="binary-recent" :style="recentBlockStyle">
               <text class="binary-section-title" :style="recentCapStyle">{{ t.binary.recentMatches }}</text>
               <view class="binary-recent-card" :style="recentGroupStyle">
-                <view v-for="(e, i) in recentBinaries" :key="e.id" class="binary-recent-row nx-viz-press" :style="recentRowStyle(i === recentBinaries.length - 1)">
+                <view v-for="(e, i) in recentBinaries" :key="e.id" class="binary-recent-row" :style="recentRowStyle(i === recentBinaries.length - 1)">
                   <view class="binary-record-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></view>
                   <view class="binary-recent-source"><text class="binary-record-name">{{ e.sourceUserName }}</text><text class="binary-note">{{ formatTrialDate(e.ts, dateLocale()) }}<template v-if="binaryStatusLabel(e.status)">{{ ' · ' + binaryStatusLabel(e.status) }}</template></text></view>
                   <view class="reward-match-amount"><text class="binary-record-value nx-num-metric" :style="{ color: binaryAmountColor(e.status) }">{{ visibility.mask(binaryAmountLabel(e)) }}</text><text v-if="'amountNEX' in e" class="binary-record-uvt">{{ visibility.mask(formatFinanceAmount(e.amountNEX)) }} UVT</text></view>

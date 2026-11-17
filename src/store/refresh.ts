@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, type InjectionKey, type Ref } from "vue";
 import { useApp } from "./app";
 import { trialReservesSlotNow } from "./free-trial";
 import { tickOrders } from "./orders";
@@ -26,6 +26,19 @@ import { toast } from "./ui";
  */
 
 const REFRESH_LATENCY_MS = 900;
+
+/**
+ * A sub-page header row that lives inside the scrolled content (SubPageHeader) stays put
+ * while the chassis pulls the content down: it cancels the pull offset and reports its
+ * height, so the gap and the spinner open below it, as on pages with a chassis header.
+ */
+export interface PullHeaderHold {
+  /** Current pull translate, or null when the content carries no transform. */
+  pull: Ref<{ y: number; transition: string } | null>;
+  /** Height of the in-content header row including its bottom spacing; 0 when none. */
+  headerHeight: Ref<number>;
+}
+export const PULL_HEADER_HOLD_KEY: InjectionKey<PullHeaderHold> = Symbol("nx-pull-header-hold");
 
 export const useRefresh = defineStore("refresh", () => {
   const isRefreshing = ref(false);

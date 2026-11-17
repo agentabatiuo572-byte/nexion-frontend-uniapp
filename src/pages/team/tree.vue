@@ -8,9 +8,9 @@
         <template v-else>
         <!-- P-41: three stat tiles, then a member search above the two roster cards. -->
         <view class="tree-stats">
-          <view class="tree-stat nx-tint nx-viz-press"><view class="tree-total"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : members.length) }}</text></view><text class="tree-stat__label">{{ t.tree.totalNetwork }}</text></view>
-          <view class="tree-stat nx-tint tree-stat--brand nx-viz-press"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : direct.length) }}</text><text class="tree-stat__label">{{ t.tree.directTitle }}</text></view>
-          <view class="tree-stat nx-tint tree-stat--cyan nx-viz-press"><text class="tree-points nx-num-metric" :aria-label="visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code))">{{ visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code).split(' ')[0]) }}</text><text class="tree-stat__label">{{ t.tree.monthlyVolume }}</text></view>
+          <view class="tree-stat nx-tint"><view class="tree-total"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : members.length) }}</text></view><text class="tree-stat__label">{{ t.tree.totalNetwork }}</text></view>
+          <view class="tree-stat nx-tint tree-stat--brand"><text class="nx-num-metric">{{ visibility.mask(!networkReadable ? '—' : direct.length) }}</text><text class="tree-stat__label">{{ t.tree.directTitle }}</text></view>
+          <view class="tree-stat nx-tint tree-stat--cyan"><text class="tree-points nx-num-metric" :aria-label="visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code))">{{ visibility.mask(!networkReadable ? '—' : formatComputePoints(network.totalMonthComputePoints, locale.code).split(' ')[0]) }}</text><text class="tree-stat__label">{{ t.tree.monthlyVolume }}</text></view>
         </view>
         <view v-if="networkReadable && members.length" class="tree-search">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>

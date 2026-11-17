@@ -39,7 +39,6 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 .device-bay__strip { position: absolute; left: 14px; right: 14px; bottom: 8px; height: 2px; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--v5-success) 22%, transparent); }
 .device-bay__strip > view { width: 36%; height: 100%; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--v5-success), transparent); animation: device-bay-flow 2.4s cubic-bezier(.45, 0, .55, 1) infinite; animation-delay: calc(var(--i, 0) * .3s); }
 [role="button"] { cursor: pointer; }
-[role="button"]:active { transform: scale(.97); }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @keyframes device-bay-flow { from { transform: translateX(-110%); } to { transform: translateX(290%); } }
 @media (prefers-reduced-motion: reduce) { .device-bay, .device-bay__strip > view { animation: none; } }

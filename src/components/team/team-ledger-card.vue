@@ -1,5 +1,5 @@
 <template>
-  <view class="team-ledger nx-viz-press" :aria-busy="loading && !failed">
+  <view class="team-ledger" :aria-busy="loading && !failed">
     <view class="team-ledger__header">
       <text class="team-ledger__title">{{ copy.monthIncome }}</text>
       <DataVisibilityToggle />

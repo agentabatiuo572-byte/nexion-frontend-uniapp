@@ -9,7 +9,7 @@
 
         <EmptyState v-if="remoteApiEnabled && !remotePool && (remoteState === 'error' || remoteState === 'hold')" kind="recoverable-error" :title="remoteState === 'hold' ? t.pool.settlementHold : t.pool.loadError" :cta-label="t.pool.retry" @cta="retryRemotePool" />
         <template v-else>
-        <view class="pool-hero nx-tint nx-viz-press">
+        <view class="pool-hero nx-tint">
           <view class="pool-share">
             <view ref="shareRingRef" class="pool-ring" :class="{ 'pool-ring--capped': !visibility.hidden && !(remoteApiEnabled && !remotePool) && myShare > 0 }" :style="{ '--nx-viz-ring': shareRingInView === false || visibility.hidden || (remoteApiEnabled && !remotePool) ? 0 : Math.min(100, Math.max(0, myShare * 100)), transition: shareRingInView === false || visibility.hidden ? 'none' : VIZ_RING_TRANSITION }"><view class="pool-ring__hole"><text class="pool-ring__pct">{{ visibility.mask(shareLabel) }}</text><text class="pool-ring__label">{{ t.pool.myShare }}</text></view></view>
             <view class="pool-share__copy">
@@ -21,7 +21,7 @@
           <view class="pool-payout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text>{{ payoutParts[0] }}</text><text v-if="payoutParts[1]" class="pool-payout__days nx-num-metric">{{ payoutParts[1] }}</text><text>{{ payoutParts[2] }}</text></view>
         </view>
 
-        <view class="pool-personal nx-viz-press" :style="statusStyle">
+        <view class="pool-personal" :style="statusStyle">
           <template v-if="remoteApiEnabled && !remotePool">
             <text class="block font-mono-tabular" :style="statusCapStyle('var(--v5-ink-2)')">{{ t.pool.projectedDividend }}</text>
             <text class="block font-display tabular-nums" :style="projectedStyle">{{ visibility.mask('—') }}</text>
@@ -59,7 +59,7 @@
           <view
             v-for="(h, i) in poolHistory"
             :key="h.weekId"
-            class="pool-history-row nx-viz-press"
+            class="pool-history-row"
             :style="historyRowStyle(i === poolHistory.length - 1)"
           >
             <view class="pool-record-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 5 4 5 5-7 5 7 4-5-3 13H6zM7 21h10" /></svg></view>
