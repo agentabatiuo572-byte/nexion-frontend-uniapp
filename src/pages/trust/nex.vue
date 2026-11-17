@@ -13,10 +13,7 @@
         <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeLoading }}</text>
       </view>
       <EmptyState v-else-if="narrative.state === 'error'" kind="recoverable-error" :title="t.trust.nexNarrativeError" :cta-label="t.ui.retry" @cta="loadNarrative(true)" />
-      <view v-else-if="narrative.state === 'unpublished'" class="mx-4" :style="stateCardStyle">
-        <text class="block" :style="stateTextStyle">{{ t.trust.nexNarrativeUnavailable }}</text>
-        <text class="block active:opacity-70" :style="retryStyle" role="button" tabindex="0" @click="loadNarrative(true)" @keydown.enter.prevent="loadNarrative(true)" @keydown.space.prevent="loadNarrative(true)">{{ t.ui.retry }}</text>
-      </view>
+      <EmptyState v-else-if="narrative.state === 'unpublished'" kind="empty-list" :title="t.trust.nexNarrativeUnavailable" :cta-label="w.ctaBack" @cta="goBack()" />
 
       <template v-if="narrative.state !== 'error' && narrative.state !== 'unpublished'">
       <HowHero :label="narrative.state === 'ready' ? `${w.heroLabel} · ${narrative.version}` : w.heroLabel" :title="narrative.state === 'ready' ? narrative.hero : '—'" :sub="narrative.state === 'ready' ? narrative.subhero ?? '' : ''" accent="purple" />
@@ -207,7 +204,6 @@ function goBack(event?: KeyboardEvent | PointerEvent) {
 
 const stateCardStyle: CSSProperties = { marginTop: "16px", padding: "16px", borderRadius: "16px", background: "var(--v5-surface)" };
 const stateTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.6 };
-const retryStyle: CSSProperties = { marginTop: "8px", minHeight: "44px", display: "inline-flex", alignItems: "center", font: "600 13px/20px var(--font-v5)", color: "var(--v5-brand)" };
 const paraStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const introStyle: CSSProperties = { fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const tableStyle: CSSProperties = {

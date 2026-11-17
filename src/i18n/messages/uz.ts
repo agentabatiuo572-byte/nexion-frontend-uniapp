@@ -4253,7 +4253,7 @@ export const uz: Messages = {
     errorUnavailable: "Hujjatlarni yuklab boʻlmadi. Keyinroq qayta urinib koʻring.",
     nexNarrativeLoading: "UVT maʼlumotlari yuklanmoqda…",
     nexNarrativeError: "UVT maʼlumotlarini yuklab boʻlmadi. Keyinroq qayta urinib koʻring.",
-    nexNarrativeUnavailable: "UVT maʼlumotlari hali eʼlon qilinmagan.",
+    nexNarrativeUnavailable: "UVT maʼlumotlari yoʻq",
   },
   genesisEligibility: {
     title: "Xarid huquqi",

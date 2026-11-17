@@ -155,7 +155,7 @@
         <view class="trust-block">
           <view class="trust-block__head"><text class="trust-block__title">{{ resources.resources }}</text></view>
           <view class="trust-surface">
-            <view v-for="resource in resources.items" :key="resource.href" class="trust-row" role="link" tabindex="0" @click="openHref(resource.href)" @keydown.enter.prevent="openHref(resource.href)">
+            <view v-for="resource in resourceItems" :key="resource.href" class="trust-row" role="link" tabindex="0" @click="openHref(resource.href)" @keydown.enter.prevent="openHref(resource.href)">
               <view class="min-w-0" style="flex: 1">
                 <text class="block trust-row__title">{{ resource.title }}</text>
                 <text class="block trust-row__body">{{ resource.body }}</text>
@@ -238,6 +238,9 @@ const verifiedLeadershipRows = computed(() => leadershipRows.value.filter((row) 
 const categories = computed(() => resources.value.categories
   .filter(item => item.key === "audit" ? verifiedAuditRows.value.length > 0 : loading.value || hasError.value || !!section("nexNarrative"))
   .map(item => ({ ...item, material: trustCategoryMaterial(sections.value, item.key, language.value, safeHref) })));
+// The UVT guide entry opens the published narrative; hide it once a read confirms there is none.
+const resourceItems = computed(() => resources.value.items
+  .filter(item => item.href !== "/pages/trust/nex" || loading.value || hasError.value || !!section("nexNarrative")));
 
 const profile = computed(() => documents.value?.profile ?? null);
 const profileFacts = computed(() => {

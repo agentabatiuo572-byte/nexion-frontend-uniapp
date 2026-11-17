@@ -3838,7 +3838,7 @@ timeHoursAgo: "{n}小时前",
     errorUnavailable: "公开披露暂不可用，请稍后重试。",
     nexNarrativeLoading: "正在加载 UVT 说明…",
     nexNarrativeError: "UVT 说明暂不可用，请稍后重试。",
-    nexNarrativeUnavailable: "UVT 说明尚未发布。",
+    nexNarrativeUnavailable: "暂无 UVT 说明",
   },
 
   genesisEligibility: {

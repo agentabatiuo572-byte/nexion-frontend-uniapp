@@ -4253,7 +4253,7 @@ export const ru: Messages = {
     errorUnavailable: "Опубликованные сведения временно недоступны. Повторите попытку позже.",
     nexNarrativeLoading: "Загружаем информацию об UVT…",
     nexNarrativeError: "Информация об UVT недоступна. Повторите попытку позже.",
-    nexNarrativeUnavailable: "Информация об UVT ещё не опубликована.",
+    nexNarrativeUnavailable: "Информации об UVT нет",
   },
   genesisEligibility: {
     title: "Доступ к покупке",

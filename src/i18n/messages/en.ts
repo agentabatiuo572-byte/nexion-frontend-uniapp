@@ -3905,7 +3905,7 @@ timeHoursAgo: "{n}h ago",
     errorUnavailable: "Disclosures are unavailable. Please try again later.",
     nexNarrativeLoading: "Loading UVT information…",
     nexNarrativeError: "UVT information is unavailable. Please try again later.",
-    nexNarrativeUnavailable: "UVT information has not been published.",
+    nexNarrativeUnavailable: "No UVT information available",
   },
 
   genesisEligibility: {

@@ -4253,7 +4253,7 @@ export const id: Messages = {
     errorUnavailable: "Pengungkapan tidak tersedia. Coba lagi nanti.",
     nexNarrativeLoading: "Memuat informasi UVT…",
     nexNarrativeError: "Informasi UVT tidak tersedia. Coba lagi nanti.",
-    nexNarrativeUnavailable: "Informasi UVT belum diterbitkan.",
+    nexNarrativeUnavailable: "Belum ada informasi UVT",
   },
   genesisEligibility: {
     title: "Akses pembelian",

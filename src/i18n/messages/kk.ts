@@ -4253,7 +4253,7 @@ export const kk: Messages = {
     errorUnavailable: "Ашық ақпарат қолжетімсіз. Кейінірек қайталап көріңіз.",
     nexNarrativeLoading: "UVT ақпараты жүктелуде…",
     nexNarrativeError: "UVT ақпараты қолжетімсіз. Кейінірек қайталап көріңіз.",
-    nexNarrativeUnavailable: "UVT ақпараты әлі жарияланбаған.",
+    nexNarrativeUnavailable: "UVT ақпараты жоқ",
   },
   genesisEligibility: {
     title: "Сатып алу құқығы",
