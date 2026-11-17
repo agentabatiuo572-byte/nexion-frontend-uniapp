@@ -110,7 +110,7 @@ function reasonText(reason: string): string {
 function emitClose() { emit("update:open", false); }
 function emitSubscribe() { emit("subscribe"); }
 
-const panelStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)", background: "var(--nx-glass-fill)", borderTop: "none", padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)" };
+const panelStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)", background: "var(--nx-glass-fill)", borderTop: "none", padding: "18px 16px var(--nx-overlay-bottom)" };
 const titleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: "var(--ui-type-card-title-weight)", letterSpacing: "-0.018em", color: "var(--v5-ink)", lineHeight: 1.2 };
 const subtitleStyle: CSSProperties = { marginTop: "4px", fontFamily: "var(--font-v5)", fontSize: "var(--ui-type-list-subtitle)", color: "var(--v5-ink-3)" };
 const closeBtnStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "999px", color: "var(--v5-ink-3)" };

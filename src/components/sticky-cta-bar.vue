@@ -45,7 +45,7 @@
         @keydown.space.prevent="onTap"
       >
         <text class="scb-cta-t">{{ cta.buttonLabel }}</text>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
   </view>
@@ -76,9 +76,9 @@ const outerStyle = computed<CSSProperties>(() => ({
   bottom: bottomOffset.value > 24 ? `${bottomOffset.value - 24}px` : "0",
 }));
 const barStyle = computed<CSSProperties>(() => ({
-  // SKILL Sheets > iOS home indicator safe area: bottom padding clears the
-  // 20px home indicator + finger margin = 38px.
-  padding: "14px 16px calc(env(safe-area-inset-bottom) + 38px)",
+  // Shared safe bottom (02 §2.5): the system inset on device, 24px in the H5
+  // preview where its own Home Indicator is drawn.
+  padding: "14px 16px var(--nx-overlay-safe-bottom)",
 }));
 const subtextStyle = computed<CSSProperties>(() => ({ color: subColor.value }));
 const ctaStyle = computed<CSSProperties>(() => ({ background: accentColor.value }));
@@ -111,45 +111,38 @@ function onTap() {
 }
 .scb-eyebrow {
   display: block;
-  font-family: var(--font-jet-mono), monospace;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font: 400 12px/16px var(--font-v5);
   color: var(--v5-ink-3);
-  text-transform: uppercase;
-  line-height: 1;
 }
 .scb-price {
   display: flex;
   align-items: baseline;
   margin-top: 2px;
   font-family: var(--font-v5);
-  letter-spacing: -0.02em;
   color: var(--v5-ink);
   white-space: nowrap;
-  line-height: 1.1;
 }
 .scb-price-dollar {
-  font-size: 15px;
+  font: 500 15px/20px var(--font-v5);
   color: var(--v5-ink-3);
-  font-weight: 500;
 }
 .scb-price-num {
-  font-size: 26px;
-  font-weight: 600;
+  font: 600 26px/32px var(--font-amount);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 .scb-subtext {
   display: block;
-  margin-top: 1px;
   font-size: 12px;
+  line-height: 16px;
 }
 .scb-cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 44px;
-  padding: 0 18px;
+  height: 52px;
+  padding: 0 20px;
   border-radius: 999px;
   flex-shrink: 0;
 }
@@ -164,16 +157,13 @@ function onTap() {
   color: var(--v5-ink-4);
 }
 .scb-cta-t {
-  font-family: var(--font-v5);
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: -0.005em;
+  font: 500 15px/20px var(--font-v5);
   color: var(--v5-on-brand);
   white-space: normal;
 }
-.scb-cta { max-width:100%; box-sizing:border-box; min-height:44px; height:auto; padding-block:10px; text-align:center; }
+.scb-cta { max-width:100%; box-sizing:border-box; min-height:52px; height:auto; padding-block:10px; text-align:center; }
 .scb-cta svg { flex:none; }
 @media(max-width:350px) { .scb-cta { flex:1 1 100%; } }
 </style>
 
-<style scoped>.scb-quantity { display:flex;align-items:center;gap:6px;color:var(--v5-ink);font-variant-numeric:tabular-nums; }.scb-bar:has(.scb-quantity) { flex-wrap:wrap;gap:12px; }.scb-bar:has(.scb-quantity) .scb-info { flex:1;min-width:110px; }.scb-bar:has(.scb-quantity) .scb-cta { width:100%; }</style>
+<style scoped>.scb-quantity { display:flex;align-items:center;gap:12px;color:var(--v5-ink);font:500 15px/20px var(--font-metric);font-variant-numeric:tabular-nums; }.scb-quantity :deep(.nx-button) { font:inherit; }.scb-quantity :deep(.nx-button__surface) { width:44px;min-height:36px;padding:0; }.scb-bar:has(.scb-quantity) { flex-wrap:wrap;gap:14px 12px; }.scb-bar:has(.scb-quantity) .scb-info { flex:1;min-width:110px; }.scb-bar:has(.scb-quantity) .scb-cta { width:100%; }</style>

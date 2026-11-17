@@ -883,7 +883,8 @@ const faqQStyle: CSSProperties = {
   .detail-hero :deep(.detail-product-render :is(image, uni-image)) { animation:none; transform:none; }
 }
 /* Keep the frosted glass on one stationary decoration layer, separate from
-   price/quantity/button paints. The outer clip also bounds its sampling edge. */
+   price/quantity/button paints. The outer clip also bounds its sampling edge.
+   P-66 buy bar: page floor 70%→94% down to the screen edge, 16px blur, one top hairline. */
 .product-detail-page :deep(.scb-outer) { overflow:hidden; }
 .product-detail-page :deep(.scb-bar) {
   position:relative;isolation:isolate;
@@ -892,9 +893,9 @@ const faqQStyle: CSSProperties = {
 }
 .product-detail-page :deep(.scb-bar::before) {
   content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
-  background:var(--v5-sticky-bar-bg);
-  backdrop-filter:blur(12px) saturate(125%);-webkit-backdrop-filter:blur(12px) saturate(125%);
-  box-shadow:var(--ui-glass-edge-shadow);
+  background:linear-gradient(to bottom,color-mix(in srgb,var(--v5-bg) 70%,transparent),color-mix(in srgb,var(--v5-bg) 94%,transparent));
+  backdrop-filter:blur(16px) saturate(125%);-webkit-backdrop-filter:blur(16px) saturate(125%);
+  box-shadow:inset 0 1px 0 var(--v5-border);
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .product-detail-page :deep(.scb-bar::before) { background:var(--v5-surface-2);backdrop-filter:none;-webkit-backdrop-filter:none; }

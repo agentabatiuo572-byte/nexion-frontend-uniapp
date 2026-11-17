@@ -184,7 +184,7 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   background: var(--nx-glass-fill);
   border: none;
   padding: 20px 16px;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
+  padding-bottom: var(--nx-overlay-bottom);
   animation: vcs-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes vcs-fade {

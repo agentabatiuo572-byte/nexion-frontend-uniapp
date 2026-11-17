@@ -1586,7 +1586,7 @@ const feeWhySheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) 
   borderTopRightRadius: "var(--nx-glass-radius)",
   background: "var(--nx-glass-fill)",
   borderTop: "none",
-  padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
+  padding: "18px 16px var(--nx-overlay-bottom)",
   boxSizing: "border-box",
   maxHeight: "calc(100% - var(--nx-overlay-top))",
   overflowY: "auto",

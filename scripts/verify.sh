@@ -677,13 +677,13 @@ for (const file of pages) {
 }
 const shell = fs.readFileSync("src/components/device/standalone-page-shell.vue", "utf8");
 if (!/DeviceStatusBar/.test(shell) || !/DeviceHomeIndicator/.test(shell)) throw new Error("standalone shell chrome incomplete");
-if (!/BOTTOM_SAFE_PADDING\s*=\s*"calc\(env\(safe-area-inset-bottom, 0px\) \+ 38px\)"/.test(shell)) throw new Error("standalone shell lost 38px bottom safe-area baseline");
+if (!/BOTTOM_SAFE_PADDING\s*=\s*"var\(--nx-overlay-safe-bottom\)"/.test(shell)) throw new Error("standalone shell bottom reserve must be var(--nx-overlay-safe-bottom), with no fixed px stacked on env()");
 if (!/paddingBottom:\s*props\.reserveBottom\s*\?\s*BOTTOM_SAFE_PADDING\s*:\s*"0px"/.test(shell)) throw new Error("standalone shell no longer applies its bottom safe-area baseline");
 const chassis = fs.readFileSync("src/components/app-chassis.vue", "utf8");
 if (!/<DeviceHomeIndicator\s*\/>/.test(chassis)) throw new Error("AppChassis no longer shares DeviceHomeIndicator");
 const success = fs.readFileSync("src/pages/register/success.vue", "utf8");
-if (!/\.rs-footer\s*\{[^}]*padding-bottom:\s*calc\(env\(safe-area-inset-bottom, 0px\) \+ 38px\)/.test(success)) {
-  throw new Error("register-success CTA lost 38px bottom baseline");
+if (!/\.rs-footer\s*\{[^}]*padding-bottom:\s*var\(--nx-overlay-safe-bottom\)\s*;/.test(success)) {
+  throw new Error("register-success CTA bottom must be var(--nx-overlay-safe-bottom), with no fixed px stacked on env()");
 }
 NODE
 then
