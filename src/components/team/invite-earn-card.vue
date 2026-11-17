@@ -22,7 +22,6 @@
         <text class="invite-card__code-value">{{ referralCode || '—' }}</text>
         <view class="invite-card__copy nx-team-copy-code" role="button" :tabindex="referralCode ? 0 : -1" :aria-disabled="!referralCode" :aria-label="t.team.inviteShareCode" @click="copyCode" @keydown.enter.prevent="copyCode" @keydown.space.prevent="copyCode"><svg v-if="!copiedCode" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><text v-else>{{ t.team.copied }}</text></view>
       </view>
-      <view class="invite-card__action invite-card__primary nx-team-share-now" role="button" :tabindex="referralCode ? 0 : -1" :aria-disabled="!referralCode" :aria-label="copy.inviteFriends" @click="openShare" @keydown.enter.prevent="openShare" @keydown.space.prevent="openShare"><text>{{ copy.inviteFriends }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view>
       <view class="invite-card__actions nx-invite-actions">
         <view class="invite-card__action nx-team-share-poster" role="button" :tabindex="referralCode ? 0 : -1" :aria-disabled="!referralCode" :aria-label="t.share.posterTitle" @click="openPoster" @keydown.enter.prevent="openPoster" @keydown.space.prevent="openPoster"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m4 17 5-6 4 4 3-3 5 6"/></svg><text>{{ t.share.posterTitle }}</text></view>
         <view class="invite-card__action nx-team-copy-link" role="button" :tabindex="referralCode ? 0 : -1" :aria-disabled="!referralCode" :aria-label="t.share.copyLink" @click="copyLink" @keydown.enter.prevent="copyLink" @keydown.space.prevent="copyLink"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8"/></svg><text>{{ copiedLink ? t.team.copied : t.share.copyLink }}</text></view>
@@ -30,7 +29,6 @@
     </view>
   </view>
   <SharePosterSheet :open="posterOpen" @close="posterOpen=false" />
-  <ShareChannelSheet :open="shareOpen" @close="shareOpen=false" @open-poster="shareOpen=false; posterOpen=true" @open-rules="shareOpen=false; detailMode='rules'; detailOpen=true" />
   <InviteDetailSheet :open="detailOpen" :mode="detailMode" @close="detailOpen=false" />
 </template>
 <script setup lang="ts">
@@ -38,17 +36,17 @@ import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatAmount } from '@/lib/amount-display';
 import { ref, computed, onUnmounted, watch } from 'vue';
 import { onShow, onHide } from '@/composables/use-tab-page-lifecycle';
-import ShareChannelSheet from './share-channel-sheet.vue';
 import SharePosterSheet from './share-poster-sheet.vue';
 import InviteDetailSheet from './invite-detail-sheet.vue';
 import TeamArt from './team-art.vue';
 import { useApp } from '@/store/app';
 import { useReferralReward } from '@/store/referral-reward';
+import { useConfig } from '@/store/config';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
 import { toast } from '@/store/ui';
-import { buildShareLink, copyText } from '@/lib/share';
+import { buildShareLink, copyText, notifyUnavailableShareLink } from '@/lib/share';
 import { apiRuntimeConfig, remoteApiEnabled } from '@/api/runtime';
 import { productCatalogState, productCatalogDisplayProof, isProductCatalogDisplayCurrent } from '@/store/product-catalog';
 import { subscribeRuntimeRevision } from '@/api/order-api';
@@ -85,7 +83,6 @@ const rewardCaption=computed(()=>rewards.error ? 'unknown' : !rewards.loading &&
 const copiedCode = ref(false);
 const copiedLink = ref(false);
 const posterOpen = ref(false);
-const shareOpen = ref(false);
 
 // FEAT-SHARE1:码为空四入口仍拒绝操作，不产出空码链接。
 function guardCode(): boolean {
@@ -95,9 +92,7 @@ function guardCode(): boolean {
 }
 function guardLink(): string {
   const link = buildShareLink(referralCode.value);
-  // Missing link data belongs in the recoverable sheet. The confirmed code
-  // remains useful there even while platform configuration is unavailable.
-  if (!link) shareOpen.value = true;
+  if (!link) notifyUnavailableShareLink();
   return link;
 }
 
@@ -140,15 +135,13 @@ function openPoster() {
   if (!guardLink()) return;
   posterOpen.value = true;
 }
-function openShare() {
-  if (!guardCode()) return;
-  shareOpen.value = true;
-}
-defineExpose({ openShare });
+// Other invitation entries (rank, quota, leaderboard, referral campaign) open the poster.
+defineExpose({ openPoster });
 
 
 let visible = false;
-onShow(()=>{visible = true; void rewards.ensure();});
+// The share link needs the public share config; nothing else on the page loads it.
+onShow(()=>{visible = true; void rewards.ensure(); void useConfig().ensureLoaded();});
 onHide(()=>{visible = false;});
 const stopRuntimeRefresh=subscribeRuntimeRevision(scope=>{
   if(!isProductCatalogDisplayCurrent(scope)){rewardPresentation.value=null;rewardRead.value=null;}
@@ -183,10 +176,7 @@ onUnmounted(stopRuntimeRefresh);
 .invite-card__code-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 17px/22px var(--font-metric); letter-spacing: 2px; }
 .invite-card__copy { flex: none; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--v5-brand); font: 600 12px/16px var(--font-v5); cursor: pointer; }
 .invite-card__action { position: relative; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: var(--v5-space-2); border-radius: 999px; font: 600 14px/20px var(--font-v5); color: var(--v5-ink); cursor: pointer; }
-.invite-card__primary { min-height: 52px; background: var(--v5-brand); color: var(--v5-on-brand); font-size: 16px; box-shadow: 0 8px 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
-.invite-card__primary > text { text-align: center; min-width: 0; overflow-wrap: anywhere; }
-.invite-card__primary > svg { flex: 0 0 auto; }
-.invite-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: calc(var(--v5-space-2) * -1); }
+.invite-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .invite-card__actions > .invite-card__action { background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 40%, transparent 64%, rgba(255,255,255,.05)), color-mix(in srgb, var(--v5-ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .invite-card__actions > .invite-card__action > text { min-width: 0; overflow-wrap: anywhere; text-align: center; }
 .invite-card__action[aria-disabled='true'],.invite-card__copy[aria-disabled='true'] { cursor: default; opacity: .55; }
