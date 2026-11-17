@@ -153,9 +153,10 @@
   --v5-glass-bg: rgba(255,255,255,0.55);
   --v5-glass-border: rgba(255,255,255,0.60);
   --v5-glass-shadow: 0 2px 8px rgba(20,16,8,0.05);
-  /* Toast surface: dark translucent in both themes, so ink and icons stay light. */
+  /* Toast surface: dark translucent in both themes, so ink and icons stay light. Like sheets, its edge is one 1px
+     highlight along the top only (the dark rim value in both themes); the soft drop shadow lifts it off pages that have no mask. */
   --v5-toast-bg: rgba(28,29,34,0.88);
-  --v5-toast-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), 0 12px 32px rgba(0,0,0,0.28);
+  --v5-toast-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 12px 32px rgba(0,0,0,0.28);
   --v5-toast-ink: #F5F7FA;
   --v5-toast-ink-2: rgba(245,247,250,0.72);
   --v5-toast-success: #9EDC1D;

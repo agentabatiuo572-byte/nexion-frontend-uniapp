@@ -1,6 +1,6 @@
 <template>
   <view v-if="open" class="nx-notice-mask nx-sheet-fade-in">
-    <view :id="id" class="nx-notice nx-dialog-pop-in" role="alertdialog" aria-modal="true" :aria-label="title" :class="`nx-notice--${tone}`">
+    <view :id="id" class="nx-glass-sheet nx-notice nx-dialog-pop-in" role="alertdialog" aria-modal="true" :aria-label="title" :class="`nx-notice--${tone}`">
       <view class="nx-notice__icon" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <template v-if="icon === 'clock'"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></template>
@@ -34,7 +34,7 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary 
 </script>
 <style scoped>
 .nx-notice-mask { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 24px 23px; box-sizing: border-box; background: var(--v5-bg-color-mask); }
-.nx-notice { width: 100%; max-width: 344px; max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; padding: 28px 24px 20px; border-radius: var(--v5-radius-2xl); background: var(--v5-surface); color: var(--v5-ink); text-align: center; }
+.nx-notice { width: 100%; max-width: 344px; max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; padding: 28px 24px 20px; border-radius: var(--v5-radius-2xl); background: var(--nx-glass-fill); box-shadow: var(--nx-glass-edge); color: var(--v5-ink); text-align: center; }
 .nx-notice__icon { flex: none; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--nx-notice-fill) var(--nx-notice-fill-amount), transparent); color: var(--nx-notice-tone); }
 /* Icon tone: brand = go ahead (pre-payment check), warning = attention, danger = failed, neutral = closed. */
 .nx-notice--warning { --nx-notice-tone: var(--v5-warning); --nx-notice-fill: var(--v5-warning); --nx-notice-fill-amount: 14%; }
