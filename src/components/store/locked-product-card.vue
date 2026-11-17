@@ -98,7 +98,7 @@ const queue = computed(() =>
 );
 const queueText = computed(() => (queue.value ?? 0).toLocaleString());
 
-const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
+const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false, nativeSelector: ".nx-glass-card" });
 const auroraLoop = useLoopsInView(".locked-card__aurora");
 const auroraRef = auroraLoop.elRef;
 
