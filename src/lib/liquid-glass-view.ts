@@ -11,14 +11,19 @@ export interface SegmentsConfiguration {
 type LensRect = { x: number; y: number; width: number; height: number };
 const axes = ["x", "y", "width", "height"] as const;
 const zeroVelocity = (): LensRect => ({ x: 0, y: 0, width: 0, height: 0 });
+type Motion = { rect: LensRect; velocity: LensRect; expansion: number; expansionVelocity: number };
+const frameMs = 1000 / 60;
 // A new H5 page resumes the outgoing lens, including velocity, instead of restarting.
-let navigationFlight: { from: string; value: string; sequence: number; rect: LensRect; velocity: LensRect; width: number; expansion: number; expansionVelocity: number } | undefined;
+let navigationFlight: { from: string; value: string; sequence: number; width: number; motion: () => Motion } | undefined;
 let navigationSequence = 0;
 
 function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   let config = initial, disposed = false, frame = 0, motionFrame = 0, lastTime = 0;
   let current: LensRect | undefined, target: LensRect | undefined, velocity = zeroVelocity();
   let transformLayer: Animation | undefined, trackLayer: Animation | undefined;
+  // A tap's whole spring is precomputed and played by the compositor, so a busy
+  // main thread (page switch) cannot drop its frames. Drag still follows per frame.
+  let flight: { steps: Motion[]; held: number; lens: Animation; track?: Animation } | undefined;
   let expansion = 0, expansionVelocity = 0;
   let maxTrackScroll = 0;
   let destination = initial.value, suppressClick = false;
@@ -32,12 +37,33 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   const track = root.querySelector<HTMLElement>(":scope > .nx-glass-backdrop, :scope > .nx-glass-track-viewport > .nx-glass-backdrop");
   const trackViewport = root.querySelector<HTMLElement>(":scope > .nx-glass-track-viewport");
   const enabled = (el: HTMLElement) => el.getAttribute("aria-disabled") !== "true";
+  function lensTransform(at: LensRect, speed: LensRect, size: LensRect) {
+    const stretch = reduced.matches ? 0 : Math.min(.18, Math.abs(speed.x) / 4200);
+    const squash = reduced.matches ? 0 : Math.min(.08, Math.abs(speed.y) / 3000);
+    const w = at.width * (1 + stretch - squash / 2), h = at.height * (1 - stretch / 2 + squash);
+    return `translate3d(${at.x - (w - at.width) / 2}px,${at.y - (h - at.height) / 2}px,0) scale(${w / size.width},${h / size.height})`;
+  }
+  function trackTransform(amount: number) {
+    // Rapid impulses remain continuous without growing beyond the safe gutters.
+    const limit = Math.min(.06, 18 / Math.max(1, config.layout === "vertical" ? root.clientHeight : root.clientWidth));
+    const scale = reduced.matches ? 0 : limit * Math.tanh(amount / limit);
+    return config.layout === "vertical" ? `scale(${1 - scale * .5},${1 + scale})` : `scale(${1 + scale},${1 - scale * .5})`;
+  }
+  function handOff(motion: () => Motion) {
+    if (config.variant === "navigation" && destination !== config.value && root.clientWidth > 0 && outgoingSequence === navigationSequence) {
+      navigationFlight = { from: config.value, value: destination, sequence: outgoingSequence, width: root.clientWidth, motion };
+    }
+  }
   function paint() {
     if (!current || !target) return;
-    const stretch = reduced.matches ? 0 : Math.min(.18, Math.abs(velocity.x) / 4200);
-    const squash = reduced.matches ? 0 : Math.min(.08, Math.abs(velocity.y) / 3000);
-    const w = current.width * (1 + stretch - squash / 2), h = current.height * (1 - stretch / 2 + squash);
-    const transform = `translate3d(${current.x - (w - current.width) / 2}px,${current.y - (h - current.height) / 2}px,0) scale(${w / target.width},${h / target.height})`;
+    // Clip only the scrolling rail's decoration. Its stretched child must not
+    // enlarge scrollWidth and feed its own overflow back into scrollLeft.
+    if (track && trackViewport) {
+      const offset = `translate3d(${Math.min(root.scrollLeft, maxTrackScroll)}px,0,0)`;
+      if (trackViewport.style.transform !== offset) trackViewport.style.transform = offset;
+    }
+    if (flight) return;
+    const transform = lensTransform(current, velocity, target);
     // Updating an effect avoids a DOM style mutation on every frame. WebKit's
     // background capture otherwise repeatedly snapshots the entire page mid-drag.
     if (lens.animate) {
@@ -48,19 +74,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     } else lens.style.transform = transform;
     // Only the material deforms. Its labels, focus rings and hit areas stay put.
     if (track) {
-      // Rapid impulses remain continuous without growing beyond the safe gutters.
-      const limit = Math.min(.06, 18 / Math.max(1, config.layout === "vertical" ? root.clientHeight : root.clientWidth));
-      const amount = reduced.matches ? 0 : limit * Math.tanh(expansion / limit);
-      const scale = config.layout === "vertical"
-        ? `scale(${1 - amount * .5},${1 + amount})`
-        : `scale(${1 + amount},${1 - amount * .5})`;
-      // Clip only the scrolling rail's decoration. Its stretched child must not
-      // enlarge scrollWidth and feed its own overflow back into scrollLeft.
-      if (trackViewport) {
-        const offset = `translate3d(${Math.min(root.scrollLeft, maxTrackScroll)}px,0,0)`;
-        if (trackViewport.style.transform !== offset) trackViewport.style.transform = offset;
-      }
-      const backdropTransform = scale;
+      const backdropTransform = trackTransform(expansion);
       if (track.animate) {
         if (!trackLayer) {
           trackLayer = track.animate([{ transform: backdropTransform }, { transform: backdropTransform }], { duration: 1, fill: "both" });
@@ -68,9 +82,69 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
         } else (trackLayer.effect as KeyframeEffect).setKeyframes([{ transform: backdropTransform }, { transform: backdropTransform }]);
       } else track.style.transform = backdropTransform;
     }
-    if (config.variant === "navigation" && destination !== config.value && root.clientWidth > 0 && outgoingSequence === navigationSequence) {
-      navigationFlight = { from: config.value, value: destination, sequence: outgoingSequence, rect: { ...current }, velocity: { ...velocity }, width: root.clientWidth, expansion, expansionVelocity };
+    const motion = { rect: { ...current }, velocity: { ...velocity }, expansion, expansionVelocity };
+    handOff(() => motion);
+  }
+  /** Where the compositor shows the flight now (or last showed it); keyframes are linear between steps. */
+  function sample(f: NonNullable<typeof flight>): Motion {
+    const at = Math.max(0, Number(f.lens.currentTime ?? f.held) / frameMs);
+    const i = Math.min(f.steps.length - 1, Math.floor(at)), a = f.steps[i], b = f.steps[Math.min(f.steps.length - 1, i + 1)];
+    const k = Math.min(1, at - i), mix = (x: number, y: number) => x + (y - x) * k;
+    const mixRect = (x: LensRect, y: LensRect) => ({ x: mix(x.x, y.x), y: mix(x.y, y.y), width: mix(x.width, y.width), height: mix(x.height, y.height) });
+    return { rect: mixRect(a.rect, b.rect), velocity: mixRect(a.velocity, b.velocity), expansion: mix(a.expansion, b.expansion), expansionVelocity: mix(a.expansionVelocity, b.expansionVelocity) };
+  }
+  /** Ends any flight; with a motion, the static layer takes over in the same task so nothing flashes. */
+  function ground(motion?: Motion) {
+    const f = flight;
+    flight = undefined;
+    // An H5 page that leaves mid-flight hands over the lens where it was last shown.
+    if (f) f.held = Number(f.lens.currentTime ?? f.held);
+    if (motion) {
+      current = { ...motion.rect }; velocity = { ...motion.velocity };
+      expansion = motion.expansion; expansionVelocity = motion.expansionVelocity;
+      paint();
     }
+    f?.lens.cancel(); f?.track?.cancel();
+  }
+  function fly() {
+    cancelAnimationFrame(motionFrame); motionFrame = 0; lastTime = 0;
+    if (!current || !target) return;
+    if (!lens.animate) { motionFrame = requestAnimationFrame(tick); return; }
+    // Same 1/60 s steps and settle thresholds as tick().
+    const steps: Motion[] = [{ rect: { ...current }, velocity: { ...velocity }, expansion, expansionVelocity }];
+    for (let moving = true; moving;) {
+      const prev = steps[steps.length - 1], rect = { ...prev.rect }, speed = { ...prev.velocity };
+      moving = false;
+      for (const axis of axes) {
+        const next = glassSpring(rect[axis], speed[axis], target[axis], 1 / 60);
+        rect[axis] = next.position; speed[axis] = next.velocity;
+        moving ||= Math.abs(next.position - target[axis]) > .08 || Math.abs(next.velocity) > .8;
+      }
+      const body = glassSpring(prev.expansion, prev.expansionVelocity, 0, 1 / 60);
+      const bodyMoving = Math.abs(body.position) > .0001 || Math.abs(body.velocity) > .002;
+      steps.push(moving
+        ? { rect, velocity: speed, expansion: bodyMoving ? body.position : 0, expansionVelocity: bodyMoving ? body.velocity : 0 }
+        : { rect: { ...target }, velocity: zeroVelocity(), expansion: bodyMoving ? body.position : 0, expansionVelocity: bodyMoving ? body.velocity : 0 });
+      moving ||= bodyMoving;
+    }
+    // Settled within one step, as tick() would: no animation, and the flag reads settled.
+    if (steps.length === 2) { ground(steps[1]); root.dataset.glassMoving = "false"; return; }
+    const size = target;
+    transformLayer?.cancel(); trackLayer?.cancel(); transformLayer = trackLayer = undefined;
+    const timing = { duration: (steps.length - 1) * frameMs, easing: "linear", fill: "forwards" as const };
+    const f = {
+      steps, held: 0,
+      lens: lens.animate(steps.map(step => ({ transform: lensTransform(step.rect, step.velocity, size) })), timing),
+      track: track?.animate(steps.map(step => ({ transform: trackTransform(step.expansion) })), timing),
+    };
+    flight = f;
+    f.lens.onfinish = () => {
+      if (flight !== f) return;
+      ground(steps[steps.length - 1]);
+      root.dataset.glassMoving = "false";
+    };
+    root.dataset.glassMoving = "true";
+    handOff(() => sample(f));
   }
   function tick(now: number) {
     motionFrame = 0;
@@ -100,6 +174,9 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     const next = rect(item);
     destination = value;
     const changed = !target || axes.some(axis => next[axis] !== target![axis]);
+    // Layout/config notifications re-measure the same tab; the running flight already lands there.
+    if (flight && !changed) return;
+    ground(flight && sample(flight));
     if (changed && current && !reduced.matches) expansionVelocity = Math.min(3, expansionVelocity + 2.8);
     if (!current) {
       const from = config.fromValue ? nodes()[config.values.indexOf(config.fromValue)] : undefined;
@@ -107,8 +184,9 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
       // The logic layer has already validated/consumed this navigation intent.
       // A second, shorter clock would discard a valid flight on a cold page.
       if (config.variant === "navigation" && config.fromValue && flight?.from === config.fromValue && flight.value === value && flight.sequence === navigationSequence && Math.abs(flight.width - root.clientWidth) < 1) {
-        current = { ...flight.rect }; velocity = { ...flight.velocity };
-        expansion = flight.expansion; expansionVelocity = flight.expansionVelocity;
+        const motion = flight.motion();
+        current = { ...motion.rect }; velocity = { ...motion.velocity };
+        expansion = motion.expansion; expansionVelocity = motion.expansionVelocity;
         navigationFlight = undefined;
       } else {
         current = from ? rect(from) : { ...next };
@@ -119,9 +197,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     Object.assign(lens.style, { visibility: "visible", width: next.width + "px", height: next.height + "px" });
     if (reduced.matches) { current = { ...next }; velocity = zeroVelocity(); expansion = expansionVelocity = 0; }
     paint();
-    if ((changed || axes.some(axis => Math.abs(current![axis] - next[axis]) > .08) || Math.abs(expansion) > .0001 || Math.abs(expansionVelocity) > .002) && !motionFrame && !drag?.engaged) {
-      lastTime = 0; motionFrame = requestAnimationFrame(tick);
-    }
+    if ((changed || axes.some(axis => Math.abs(current![axis] - next[axis]) > .08) || Math.abs(expansion) > .0001 || Math.abs(expansionVelocity) > .002) && !reduced.matches && !drag?.engaged) fly();
   }
   function measure() {
     frame = 0;
@@ -134,7 +210,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     maxTrackScroll = config.layout === "scroll" && last
       ? Math.max(0, last.offsetLeft + last.offsetWidth + parseFloat(getComputedStyle(root).paddingRight || "0") - root.clientWidth) : 0;
     if (!lens) return;
-    if (!item) { lens.style.visibility = "hidden"; current = target = undefined; return; }
+    if (!item) { ground(); lens.style.visibility = "hidden"; current = target = undefined; return; }
     if (!drag?.engaged) moveTo(item, selected);
     if (config.layout === "scroll" && (item.offsetLeft < root.scrollLeft || item.offsetLeft + item.offsetWidth > root.scrollLeft + root.clientWidth)) {
       root.scrollLeft = Math.max(0, item.offsetLeft - (root.clientWidth - item.offsetWidth) / 2);
@@ -170,6 +246,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
       if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) { drag = undefined; return; }
       if (Math.abs(dx) < 8) return;
       drag.engaged = true; root.setPointerCapture(event.pointerId);
+      ground(flight && sample(flight));
       cancelAnimationFrame(motionFrame); motionFrame = 0; lastTime = 0;
     }
     event.preventDefault();
@@ -234,6 +311,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   const resize = new ResizeObserver(schedule);
   function observe() { resize.disconnect(); resize.observe(root); nodes().forEach(el => resize.observe(el)); }
   const stopMotion = () => {
+    ground(flight && sample(flight));
     cancelAnimationFrame(motionFrame); motionFrame = 0; lastTime = 0;
     expansion = expansionVelocity = 0;
     if (target) { current = { ...target }; velocity = zeroVelocity(); paint(); }
@@ -262,7 +340,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
       config = value; observe(); schedule();
     },
     destroy() {
-      disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(motionFrame); transformLayer?.cancel(); trackLayer?.cancel(); resize.disconnect();
+      disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(motionFrame); ground(); transformLayer?.cancel(); trackLayer?.cancel(); resize.disconnect();
       root.removeEventListener("keydown", onArrow); root.removeEventListener("click", onClick, true);
       root.removeEventListener("scroll", paint);
       root.removeEventListener("pointerdown", onDown); root.removeEventListener("pointermove", onMove);
