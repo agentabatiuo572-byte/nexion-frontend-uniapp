@@ -793,8 +793,13 @@ export default chassisView;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
 }
-/* An open dialog keeps the page under its mask still. */
+/* An open dialog keeps the page under its mask still. iOS WebKit stacks a fixed dialog mounted
+   inside this scroller with the scroller itself, below the header (100) and the tab bar (30)
+   whatever its own z-index; raising the scroller puts every in-page dialog's mask over the chrome.
+   785 also keeps in-page dialogs above the milestone celebration (780), as on other engines, while
+   chassis sheets (790+) and the global overlay host stay above them. */
 .nx-content--locked {
+  z-index: 785;
   overflow-y: hidden;
 }
 /* hide scrollbar (match the prototype's no-scrollbar utility) */
