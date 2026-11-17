@@ -174,8 +174,7 @@ export function compactNumber(n: number): string {
 /** Public population display: floor validated counts to a shared approximate band. */
 export function networkPopulationBand(value: number, locale: LocaleCode): string {
   if (locale !== "zh" && value >= 10000) {
-    const band = Math.floor(value / 1000);
-    return value >= 1000000 ? `${band / 1000}M+` : `${band}K+`;
+    return value >= 1000000 ? `${Math.floor(value / 100000) / 10}M+` : `${Math.floor(value / 1000)}K+`;
   }
   return value >= 10000 ? `${Math.floor(value / 1000) / 10}W+`
     : value >= 1000 ? `${Math.floor(value / 100) / 10}K+`
