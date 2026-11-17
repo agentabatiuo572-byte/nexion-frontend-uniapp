@@ -18,7 +18,8 @@ import { mountAuthOtpDevBridge } from "@/store/auth-otp";
 import { useI18nRuntime } from "@/store/i18n-runtime";
 import { useLocaleStore } from "@/store/locale";
 import { useConfig } from "@/store/config";
-import { fallBackFromSwitchedOffLocale, syncExplicitProfileLocale } from "@/lib/locale-profile-sync-runtime";
+import { useApp } from "@/store/app";
+import { reconcileProfileLocaleAvailability, resetProfileLocaleSyncScope, syncExplicitProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { installH5PageReadActivation, installNativePageReadActivation, type PageReadRouter } from "@/lib/page-read-activation";
 import { notifyPageActivation } from "@/lib/passive-read-window";
 import "./styles/tokens.css";
@@ -85,19 +86,22 @@ export function createApp() {
   app.component("NexGridPageLoadError", PageLoadError);
   // #endif
   const locale = useLocaleStore(pinia);
+  const platformConfig = useConfig(pinia);
+  watch(() => useApp(pinia).accountKey, (key) => {
+    locale.setAccountScope(key);
+    resetProfileLocaleSyncScope();
+  }, { immediate: true, flush: "sync" });
+  // useLocaleStore restores eligibility and resolves all available inputs before the first refresh.
   const runtimeI18n = useI18nRuntime(pinia);
   runtimeI18n.prepare();
   void runtimeI18n.refresh(locale.code);
   watch(() => locale.code, (next) => {
     void runtimeI18n.refresh(next);
   });
-  watch(() => locale.explicitRevision, () => syncExplicitProfileLocale(locale.code), { flush: "sync" });
-  // A loaded platform config that switches off the current language shows its server projection (en);
-  // see fallBackFromSwitchedOffLocale. Nothing is written for it.
-  const platformConfig = useConfig(pinia);
-  watch(() => [locale.code, platformConfig.offeredLocales] as const, ([code, offered]) => {
-    if (!offered.some((entry) => entry.code === code)) fallBackFromSwitchedOffLocale(code);
-  });
+  watch(() => locale.explicitRevision, () => {
+    if (locale.explicitChoice) syncExplicitProfileLocale(locale.explicitChoice);
+  }, { flush: "sync" });
+  watch(() => platformConfig.offeredLocales, reconcileProfileLocaleAvailability, { flush: "sync" });
   if (import.meta.env.DEV) {
     // DEV-only: SPEC-7 演示桥(模拟后台处置下发)。
     mountSpec7DevBridge();

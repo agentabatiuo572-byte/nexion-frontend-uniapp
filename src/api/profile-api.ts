@@ -1,12 +1,12 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { serverLanguage, type LocaleCode } from "@/i18n";
+import { LOCALES, serverLanguage, type LocaleCode } from "@/i18n";
 
 export interface ProfileApi {
   profile(): Promise<ProfileProjection>;
   nicknameCandidates(): Promise<string[]>;
   updateNickname(expectedNickname: string, nickname: string, idempotencyKey: string): Promise<string>;
-  updateLanguage(language: string): Promise<string>;
+  updateLanguage(language: string): Promise<LocaleCode>;
   uploadAvatar(filePath: string, idempotencyKey: string): Promise<ProfileAvatar>;
 }
 
@@ -47,7 +47,7 @@ function key(value: string): string {
   return normalized;
 }
 
-const PROFILE_LANGUAGES = new Set<LocaleCode>(["en", "vi", "zh", "ja", "ko", "ru", "es", "pt", "ar", "de", "fr", "kk", "uz", "id", "ms", "fil"]);
+const PROFILE_LANGUAGES = new Set(LOCALES.map((locale) => locale.code));
 
 function isProfileLanguage(value: unknown): value is LocaleCode {
   return typeof value === "string" && PROFILE_LANGUAGES.has(value as LocaleCode);
@@ -122,17 +122,17 @@ export function createProfileApi(client: ApiClient): ProfileApi {
       return row.nickname;
     },
     updateLanguage: async (nextLanguage) => {
-      // The account stores zh/en/vi only; other interface languages are saved as English.
+      // Keep the client projection of the six additional interface languages to English.
       const expected = serverLanguage(language(nextLanguage));
       const row = record(await client.request({
         method: "PUT",
         path: "/api/app/profile/language",
         body: { language: expected },
       }));
-      if (!row || row.language !== expected || Object.keys(row).some((entry) => entry !== "language" && entry !== "status")) {
+      if (!row || !isProfileLanguage(row.language) || Object.keys(row).some((entry) => entry !== "language" && entry !== "status")) {
         throw new ApiError({ kind: "protocol", message: "PROFILE_LANGUAGE_RESPONSE_INVALID" });
       }
-      return expected;
+      return row.language;
     },
     uploadAvatar: async (filePath, idempotencyKey) => parseAvatar(await client.upload({
       path: "/api/app/profile/avatar",
