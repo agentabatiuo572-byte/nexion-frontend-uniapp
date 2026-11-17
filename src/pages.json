@@ -400,6 +400,7 @@
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "UVEL",
     "backgroundColor": "#000000",
-    "backgroundColorContent": "#000000"
+    "backgroundColorContent": "#000000",
+    "app-plus": { "bounce": "none" }
   }
 }
