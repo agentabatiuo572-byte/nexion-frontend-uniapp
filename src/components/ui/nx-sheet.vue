@@ -8,6 +8,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { computed, getCurrentInstance } from 'vue';
 import NxButton from './nx-button.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
@@ -17,6 +18,7 @@ const emit = defineEmits<{ (event: 'close'): void }>();
 const copy = useAuditUiCopy();
 const id = `nx-sheet-${getCurrentInstance()?.uid}`;
 useDialogA11y(computed(() => props.open), `#${id}`, () => emit('close'), props.nativeBack);
+useDiagnosticReader("D3 sheet", () => ({ open: props.open }));
 </script>
 <style scoped>
 .nx-sheet-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: #0008; }

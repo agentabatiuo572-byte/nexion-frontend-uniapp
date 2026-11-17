@@ -25,6 +25,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { formatDisplayDate } from "@/lib/display-date";
 import { computed, ref, watch } from 'vue';
 import { useApp } from '@/store/app';
@@ -77,6 +78,7 @@ watch([() => rewards.snapshot, () => rewards.loading, () => rewards.error], () =
 const title = computed(() => props.mode === 'rules' ? copy.value.inviteRules : copy.value.inviteRecords);
 function date(value: string) { return formatDisplayDate(value, dateLocale()); }
 useDialogA11y(computed(() => props.open), '.invite-detail', () => emit('close'));
+useDiagnosticReader("D3 invitation detail", () => ({ open: props.open, mode: props.mode }));
 </script>
 <style scoped>
 .invite-detail { position: fixed; inset: 0; z-index: 8100; color: var(--v5-ink); }

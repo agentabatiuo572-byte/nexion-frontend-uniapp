@@ -1,3 +1,6 @@
+import { diagnosticCounter } from "./ios-diagnostics-counter";
+import { diagnosticHref } from "./ios-diagnostics-route";
+import { registerChassisDiagnostics, mountDiagnosticView, type DiagnosticConfiguration } from "./ios-diagnostics-view";
 import { attachManualScrollLoadMore } from "./manual-scroll-load-more";
 import { mountLiquidGlass, type GlassConfiguration } from "./liquid-glass-renderer";
 import { glassSpring, glassLogoHidden } from "./liquid-glass-core";
@@ -367,6 +370,8 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   let pageTop = scroll.scrollTop;
   let pendingTop: number | null = null;
   let restoreFrame = 0;
+  const counters = { markScroll: diagnosticCounter(), layoutMutation: diagnosticCounter(), layoutResize: diagnosticCounter(),
+    layoutOther: diagnosticCounter(), restoreWrites: diagnosticCounter() };
   const tabPositions = new Map<string, { href: string; top: number }>();
   let hidden = scroll.scrollTop > 8;
   let idle: ReturnType<typeof setTimeout> | undefined;
@@ -389,6 +394,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     && (!root.getClientRects || root.getClientRects().length > 0)
     && (typeof document === "undefined" || document.visibilityState !== "hidden");
   const markScroll = () => {
+    counters.markScroll.hit();
     // The DOM marker changes with v-show, before the renderjs adapter's next rAF.
     // A short incoming page must not save its clamped zero against the old tab.
     if (!viewReady() || pendingTop !== null) return;
@@ -413,6 +419,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   function attemptRestore() {
     if (pendingTop === null || !viewReady()) return;
     const target = pendingTop;
+    counters.restoreWrites.hit();
     scroll.scrollTop = target;
     if (Math.abs(scroll.scrollTop - target) < 1) pendingTop = null;
     trace(pendingTop === null ? "restored" : "restore-pending");
@@ -451,7 +458,8 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   for (const event of cancelEvents) scroll.addEventListener(event, cancelRestore, { passive: true });
   scroll.addEventListener("uvel-scroll-to-top", requestTop);
   root.addEventListener?.("keydown", keyScroll);
-  const layoutChanged = () => {
+  const layoutChanged = (source: "mutation" | "resize" | "other") => {
+    counters[source === "mutation" ? "layoutMutation" : source === "resize" ? "layoutResize" : "layoutOther"].hit();
     // MutationObserver runs after the DOM commit and before paint. The renderjs
     // config may arrive a frame later; the DOM revision already owns this visit.
     const revision = Number(root.dataset.tabRevision);
@@ -462,9 +470,9 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     }
     attemptRestore(); onScroll(); scheduleRestore();
   };
-  const observer = typeof MutationObserver === "undefined" ? undefined : new MutationObserver(layoutChanged);
+  const observer = typeof MutationObserver === "undefined" ? undefined : new MutationObserver(() => layoutChanged("mutation"));
   observer?.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-page-visible", "data-tab-key", "data-tab-revision", "data-tab-content-key", "style", "class"] });
-  const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(layoutChanged);
+  const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(() => layoutChanged("resize"));
   resize?.observe(scroll);
   const body = scroll.querySelector?.<HTMLElement>(".nx-page-enter");
   if (body && body !== scroll) resize?.observe(body);
@@ -482,6 +490,16 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     });
   };
   bindPagination();
+  const detachDiagnostic = registerChassisDiagnostics(root.id, { read: () => ({
+    visible, tabKey: diagnosticHref(tabKey ?? ""), tabRevision, scrollKey, pageTop, pendingTop, restoreFrame,
+    rawTop: scroll.scrollTop, max: Math.max(0, scroll.scrollHeight - scroll.clientHeight),
+    pendingDifference: pendingTop === null ? null : pendingTop - scroll.scrollTop,
+    tabPositions: Array.from(tabPositions, ([key, value]) => ({ key, href: diagnosticHref(value.href), top: value.top })),
+    ready: { visible, pageVisible: root.dataset.pageVisible !== "false", tabKey: root.dataset.tabKey === undefined || root.dataset.tabKey === tabKey,
+      tabRevision: root.dataset.tabRevision === undefined || root.dataset.tabRevision === String(tabRevision),
+      tabLayoutReady: tabLayoutReady(), hasRects: root.getClientRects().length > 0, documentVisible: document.visibilityState !== "hidden", viewReady: viewReady() },
+    counters: Object.fromEntries(Object.entries(counters).map(([key, counter]) => [key, counter.read()])),
+  }), reset: () => { Object.values(counters).forEach(counter => counter.reset()); } });
   return { update(value: ChassisConfiguration = {}) {
     // A delayed logic-thread receipt must not reinstate an older navigation.
     if (value.tabRevision !== undefined && tabRevision !== undefined && value.tabRevision < tabRevision) return;
@@ -495,7 +513,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     }
     trace(visible ? "show-update" : "hide-update");
     onScroll();
-  }, destroy() { detachPagination(); clearTimeout(idle); if (restoreFrame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(restoreFrame); tabPositions.clear(); scroll.removeEventListener("scroll", markScroll); for (const event of cancelEvents) scroll.removeEventListener(event, cancelRestore); scroll.removeEventListener("uvel-scroll-to-top", requestTop); root.removeEventListener?.("keydown", keyScroll); observer?.disconnect(); resize?.disconnect(); if (typeof document !== "undefined") document.removeEventListener?.("visibilitychange", documentVisibility); } };
+  }, destroy() { detachDiagnostic(); detachPagination(); clearTimeout(idle); if (restoreFrame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(restoreFrame); tabPositions.clear(); scroll.removeEventListener("scroll", markScroll); for (const event of cancelEvents) scroll.removeEventListener(event, cancelRestore); scroll.removeEventListener("uvel-scroll-to-top", requestTop); root.removeEventListener?.("keydown", keyScroll); observer?.disconnect(); resize?.disconnect(); if (typeof document !== "undefined") document.removeEventListener?.("visibilitychange", documentVisibility); } };
 }
 
 // App renderjs mounts a separate empty Vue instance: its $el is a comment.
@@ -530,5 +548,14 @@ function viewAdapter<T extends { hostId?: string }>(mount: (host: HTMLElement, v
 }
 export default viewAdapter<GlassConfiguration>(mountLiquidGlass);
 export const segmentsView = viewAdapter<SegmentsConfiguration>(mountSegments);
-export const chassisView = viewAdapter<ChassisConfiguration>((host, value, instance) =>
+const chassisAdapter = viewAdapter<ChassisConfiguration>((host, value, instance) =>
   mountChassis(host, value, key => instance.$ownerInstance?.callMethod("onNativeScrollLoadMore", key)));
+
+const diagnosticAdapter = viewAdapter<DiagnosticConfiguration>((host, value, instance) =>
+  mountDiagnosticView(host, value, control => instance.$ownerInstance?.callMethod("onDiagnosticControl", control)));
+
+export const chassisView = {
+  mounted(this: object) { chassisAdapter.mounted.call(this); diagnosticAdapter.mounted.call(this); },
+  beforeUnmount(this: object) { diagnosticAdapter.beforeUnmount.call(this); chassisAdapter.beforeUnmount.call(this); },
+  methods: { update: chassisAdapter.methods.update, updateDiagnostics: diagnosticAdapter.methods.update },
+};

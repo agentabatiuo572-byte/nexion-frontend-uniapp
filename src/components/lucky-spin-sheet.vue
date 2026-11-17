@@ -151,6 +151,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
@@ -537,6 +538,9 @@ onUnmounted(() => clearSettleTimer());
 useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
 
 
+useDiagnosticReader("D3 lucky spin", () => ({ open: spin.open, phase: spin.phase, activeEventCode: spin.activeEventCode,
+  remoteLoading: spin.remoteLoading, remoteError: spin.remoteError, pendingSpin: !!spin.pendingSpin,
+  remoteFailureKind: spin.remoteFailure?.kind ?? null, settleTimer: settleTimer !== null }));
 </script>
 
 <style scoped>

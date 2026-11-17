@@ -4,6 +4,7 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader, diagnosticHref, diagnosticQuery } from "@/lib/ios-diagnostics";
 import { computed, onBeforeUnmount, provide, ref, shallowRef, watch } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -46,4 +47,7 @@ onLoad(options => {
 onShow(() => { notifyPageActivation(location.value.href); visible.value = true; });
 onHide(() => { visible.value = false; });
 onBeforeUnmount(() => { visible.value = false; unregister(); });
+useDiagnosticReader("D1 tabs", () => ({ location: { tab: location.value.tab, route: location.value.route,
+  href: diagnosticHref(location.value.href), query: diagnosticQuery(location.value.query) },
+  visited: visited.value.map(entry => diagnosticHref(entry.href)), visible: visible.value }));
 </script>

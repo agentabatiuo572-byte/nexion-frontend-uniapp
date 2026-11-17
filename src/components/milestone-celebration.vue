@@ -65,6 +65,8 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
+import { remoteApiEnabled } from "@/api/runtime";
 import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, watch, onMounted, onUnmounted } from "vue";
@@ -247,6 +249,8 @@ onUnmounted(() => {
 useDialogA11y(computed(() => m.active !== null), ".ms-overlay", () => m.dismiss());
 
 
+useDiagnosticReader("D3 milestones", () => ({ active: m.active ? { id: m.active.id, thresholdPresent: m.active.threshold !== undefined } : null,
+  pendingCelebrationIds: m.pendingCelebrations.map(item => item.id), autoDismissTimer: timer !== null, advTimer: advTimer !== null, remoteApiEnabled }));
 </script>
 
 <style scoped>

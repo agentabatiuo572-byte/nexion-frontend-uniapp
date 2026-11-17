@@ -21,6 +21,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { computed, getCurrentInstance } from 'vue';
 import NxButton from './nx-button.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
@@ -31,6 +32,7 @@ const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void 
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
 // Esc / Android back take the quiet action when there is one; a notice without one must be answered.
 useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && !props.busy) emit('secondary'); }, true, 6);
+useDiagnosticReader("D3 notice", () => ({ open: props.open, busy: !!props.busy, secondary: !!props.secondary }));
 </script>
 <style scoped>
 .nx-notice-mask { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 24px 23px; box-sizing: border-box; background: var(--v5-bg-color-mask); }

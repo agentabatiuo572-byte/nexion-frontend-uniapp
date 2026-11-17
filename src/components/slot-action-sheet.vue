@@ -84,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
@@ -226,6 +227,8 @@ function onGoStore() {
 useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
 
 
+useDiagnosticReader("D3 slots", () => ({ open: sheet.open, capacityReady: capacityReady.value, slotsFull: slotsFull.value,
+  inactiveDeviceCount: inactiveDevices.value.length, activationInFlight: activationInFlight.value.size }));
 </script>
 
 <style scoped>

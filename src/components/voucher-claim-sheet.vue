@@ -63,6 +63,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { formatDisplayDate } from "@/lib/display-date";
 import { formatAmount } from "@/lib/amount-display";
 import { computed } from "vue";
@@ -154,6 +155,7 @@ function onUse(v: VoucherDef) {
 useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
 
 
+useDiagnosticReader("D3 voucher", () => ({ open: sheet.open, surface: sheet.surface }));
 </script>
 
 <style scoped>

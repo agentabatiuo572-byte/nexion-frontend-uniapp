@@ -11,7 +11,7 @@
   `active` prop is an optional fallback for the very first frame.
 -->
 <template>
-  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" :lang="contentLang" :data-tab-key="tabHost ? tabLocationKey : undefined" :data-tab-revision="tabHost ? tabRevision : undefined" :data-page-visible="pageVisible && hostVisible ? 'true' : 'false'" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
+  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" :lang="contentLang" :data-tab-key="tabHost ? tabLocationKey : undefined" :data-tab-revision="tabHost ? tabRevision : undefined" :data-page-visible="pageVisible && hostVisible ? 'true' : 'false'" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update" :diagnostic-config="diagnosticConfiguration" :change:diagnostic-config="chromeView.updateDiagnostics">
     <!-- Status bar safe area (real on device, ~0 on desktop H5) -->
     <DeviceStatusBar />
 
@@ -164,7 +164,7 @@
 
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, getCurrentInstance } from "vue";
+import { ref, shallowRef, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, getCurrentInstance } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
 // #ifdef APP-PLUS
@@ -210,6 +210,8 @@ import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision, type RuntimeRevisionScope } from "@/api/order-api";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { DIAGNOSTIC_HOST, useDiagnosticReader, readLogicDiagnostics, readNativeDiagnostics, resetLogicDiagnostics, diagnosticHref } from "@/lib/ios-diagnostics";
+import { diagnosticCounter } from "@/lib/ios-diagnostics-counter";
 import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, onAcceptanceObservationModalOpened } from "@/services/behavior-analytics";
 
 // Uni forwards query parameters such as product `id` through the page root.
@@ -217,6 +219,7 @@ import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, o
 defineOptions({ inheritAttrs: false, methods: {
   // App-Plus callMethod resolves vm.proxy, which does not expose script-setup bindings.
   onNativeScrollLoadMore(this: { $: { exposed: { receiveNativeScrollLoadMore(key: string): void } | null } }, key: string) { this.$.exposed?.receiveNativeScrollLoadMore(key); },
+  onDiagnosticControl(this: { $: { exposed: { receiveDiagnosticControl(value: { action: "open" | "close" | "reset" }): void } | null } }, value: { action: "open" | "close" | "reset" }) { this.$.exposed?.receiveDiagnosticControl(value); },
 } });
 const taskCenterReceipt = ref<OpenTaskReceipt>(null);
 provide(taskCenterReceiptKey, taskCenterReceipt);
@@ -246,6 +249,9 @@ const voucher = useVoucher();
 const voucherClaimSheet = useVoucherClaimSheet();
 const pendingCheckout = usePendingCheckout();
 const popupArbiter = usePopupArbiter();
+const diagnosticCounters = { onChassisScroll: diagnosticCounter(), touchstart: diagnosticCounter(), touchmove: diagnosticCounter(),
+  touchend: diagnosticCounter(), touchcancel: diagnosticCounter(), pullEntries: diagnosticCounter(), refresh: diagnosticCounter() };
+let diagnosticPullEntryTop: number | null = null;
 
 type VoucherPopupRequestScope = {
   account: RemoteAccountRequest;
@@ -409,6 +415,7 @@ function markScrolling() {
   }, SCROLL_IDLE_MS);
 }
 function onChassisScroll() {
+  diagnosticCounters.onChassisScroll.hit();
   markScrolling();
   const el = chassisScrollDom();
   if (el) saveScrollPos(scrollMemKey, el.scrollTop);
@@ -430,10 +437,12 @@ function touchY(e: TouchEvent): number | null {
   return tp ? tp.clientY : null;
 }
 function onTouchStart(e: TouchEvent) {
+  diagnosticCounters.touchstart.hit();
   if (scrollLocks.value > 0 || refreshing.value || currentScrollTop() > 0) { startY = null; return; }
   startY = touchY(e);
 }
 function onTouchMove(e: TouchEvent) {
+  diagnosticCounters.touchmove.hit();
   if (startY === null || refreshing.value) return;
   const y = touchY(e);
   if (y === null) return;
@@ -441,16 +450,19 @@ function onTouchMove(e: TouchEvent) {
   if (dy <= 0) { pullY.value = 0; pulling.value = false; return; }
   if (!pulling.value) pullHeaderMeasure.value += 1;
   pulling.value = true;
+  if (!pullActive.value) { diagnosticCounters.pullEntries.hit(); diagnosticPullEntryTop = currentScrollTop(); }
   pullActive.value = true; // arm the transform layer only now (idle stays clean)
   if (deactivateTimer) { clearTimeout(deactivateTimer); deactivateTimer = null; }
   pullY.value = Math.min(MAX_PX, dy * DAMP);
 }
-async function onTouchEnd() {
+async function onTouchEnd(e: TouchEvent) {
+  diagnosticCounters[e.type === "touchcancel" ? "touchcancel" : "touchend"].hit();
   if (startY === null) return;
   const pulled = pullY.value;
   startY = null;
   pulling.value = false;
   if (pulled >= TRIGGER_PX && !refreshing.value) {
+    diagnosticCounters.refresh.hit();
     pullY.value = HOLD_PX;
     await refresh.refresh();
   }
@@ -702,6 +714,7 @@ import LiquidGlass from "@/components/liquid-glass.vue";
 import GlassSegments from "@/components/glass-segments.vue";
 
 const chassisHostId = `nx-chassis-host-${getCurrentInstance()!.uid}`;
+provide(DIAGNOSTIC_HOST, chassisHostId);
 const pageVisible = ref(true);
 const scrollVisit = ref(0);
 watch(() => props.scrollLoadKey, () => { scrollVisit.value++; }, { flush: "sync" });
@@ -716,12 +729,60 @@ scrollDiagnostics = import.meta.env.VITE_UVEL_SCROLL_DEBUG === "true";
 nativeScrollBridge = true;
 // #endif
 const chromeConfiguration = computed(() => ({ hostId: chassisHostId, tabKey: props.tabHost ? props.tabLocationKey : undefined, tabRevision: props.tabHost ? tabRevision.value : undefined, visible: pageVisible.value && props.hostVisible, debug: scrollDiagnostics, scrollKey: nativeScrollBridge && props.scrollLoadKey !== undefined ? `${scrollVisit.value}:${props.scrollLoadKey}` : undefined }));
+const diagnosticConfiguration = shallowRef<import("@/lib/ios-diagnostics-view").DiagnosticConfiguration>({ hostId: chassisHostId, snapshot: null });
+let diagnosticTimer: ReturnType<typeof setInterval> | undefined;
+let diagnosticAccessibilityTimer: ReturnType<typeof setInterval> | undefined;
+let diagnosticNative: unknown = null;
+let diagnosticSamples = 0;
+let diagnosticSession = 0;
+function pushDiagnosticSnapshot() {
+  const session = diagnosticSession;
+  readNativeDiagnostics(value => { if (session === diagnosticSession) diagnosticNative = value; });
+  const began = Date.now();
+  const logic = readLogicDiagnostics();
+  diagnosticSamples += 1;
+  diagnosticConfiguration.value = { hostId: chassisHostId, snapshot: { ...logic, native: diagnosticNative,
+    sampler: { hostId: chassisHostId, samples: diagnosticSamples, logicReadMs: Date.now() - began, intervalMs: diagnosticTimer === undefined ? 2000 : 500 } } };
+}
+function receiveDiagnosticControl(value: { action: "open" | "close" | "reset" }) {
+  if (value.action === "close") {
+    if (diagnosticTimer !== undefined) clearInterval(diagnosticTimer);
+    diagnosticTimer = undefined;
+    diagnosticSession += 1;
+    return;
+  }
+  if (value.action === "reset") { resetLogicDiagnostics(); pushDiagnosticSnapshot(); return; }
+  if (diagnosticTimer !== undefined) return;
+  diagnosticSession += 1;
+  diagnosticTimer = setInterval(pushDiagnosticSnapshot, 500);
+  pushDiagnosticSnapshot();
+}
+onMounted(() => {
+  const sample = () => { if (pageVisible.value && props.hostVisible && diagnosticTimer === undefined) pushDiagnosticSnapshot(); };
+  sample();
+  diagnosticAccessibilityTimer = setInterval(sample, 2000);
+});
+onUnmounted(() => {
+  receiveDiagnosticControl({ action: "close" });
+  if (diagnosticAccessibilityTimer !== undefined) clearInterval(diagnosticAccessibilityTimer);
+});
+useDiagnosticReader("D1/D2 chassis", () => ({ chassisHostId,
+  props: { tabHost: props.tabHost, logicalRoute: props.logicalRoute, tabLocationKey: diagnosticHref(props.tabLocationKey ?? ""), hostVisible: props.hostVisible },
+  route: diagnosticHref(route.value), activeTab: activeTab.value, pageVisible: pageVisible.value, scrollVisit: scrollVisit.value, tabRevision: tabRevision.value,
+  chrome: { ...chromeConfiguration.value, tabKey: diagnosticHref(chromeConfiguration.value.tabKey ?? ""), scrollKey: chromeConfiguration.value.scrollKey },
+  scrollLocks: scrollLocks.value, startY, pullY: pullY.value, pulling: pulling.value, pullActive: pullActive.value,
+  deactivateTimer: deactivateTimer !== null, refreshing: refreshing.value, indicatorY: indicatorY.value, pullStyle: pullStyle.value,
+  pullHeaderHeight: pullHeaderHeight.value, pullHeaderMeasure: pullHeaderMeasure.value, contentTop: contentTop.value, pendingBarInset: pendingBarInset.value,
+  pullEntryTop: diagnosticPullEntryTop, counters: Object.fromEntries(Object.entries(diagnosticCounters).map(([key, counter]) => [key, counter.read()])),
+  sampler: { active: diagnosticTimer !== undefined, samples: diagnosticSamples },
+  popupArbiter: { current: popupArbiter.current, visitClaimed: popupArbiter.visitClaimed },
+}), () => { Object.values(diagnosticCounters).forEach(counter => counter.reset()); diagnosticPullEntryTop = null; }, chassisHostId);
 // renderjs owns the real WebView scroller; only this visible list may consume its receipt.
 function receiveNativeScrollLoadMore(key: string) {
   if (nativeScrollBridge && pageVisible.value && props.hostVisible && key === chromeConfiguration.value.scrollKey) emit("scroll-load-more");
 }
-defineExpose({ receiveNativeScrollLoadMore });
-declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void };
+defineExpose({ receiveNativeScrollLoadMore, receiveDiagnosticControl });
+declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void; updateDiagnostics(value: import("@/lib/ios-diagnostics-view").DiagnosticConfiguration): void };
 const navigationOptions = computed(() => tabs.value.map(tab => ({ ...tab, value: tab.key })));
 const navigationFrom = consumeGlassNavigation(activeTab.value);
 let navigationPending = false;

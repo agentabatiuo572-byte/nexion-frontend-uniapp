@@ -1,14 +1,14 @@
-import { watch, nextTick, onBeforeUnmount, inject, ref, type Ref, type InjectionKey } from "vue";
+import { watch, nextTick, onBeforeUnmount, inject, ref, getCurrentInstance, type Ref, type InjectionKey } from "vue";
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { TAB_LIFECYCLE, onShow as onTabShow, onHide as onTabHide } from "./use-tab-page-lifecycle";
 // #ifdef APP-PLUS
-import { getCurrentInstance } from "vue";
 import { onBackPress, onShow as onPageShow, onHide as onPageHide } from "@dcloudio/uni-app";
 
-type Dialog = { close?: () => void; priority: number };
+type Dialog = { close?: () => void; priority: number; uid: number; root: string };
 type DialogPage = { stack: Dialog[]; visible: boolean; backRegistered: boolean };
 const dialogPages = new WeakMap<object, DialogPage>();
 
-export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number) {
+export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | undefined, nativeBack: boolean, priority: number, root = "unlabelled") {
   // Uni invokes page hooks on the page root, not on a nested sheet component.
   const owner = getCurrentInstance()?.root;
   if (!owner) return;
@@ -18,7 +18,13 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
     dialogPages.set(owner, page);
   }
   const dialogs = page;
-  const entry: Dialog = { close, priority };
+  const entry: Dialog = { close, priority, uid: getCurrentInstance()!.uid, root };
+  useDiagnosticReader("D2 native back", () => {
+    const top = dialogs.stack.reduce<Dialog | undefined>((current, item) => !current || item.priority >= current.priority ? item : current, undefined);
+    const describe = (item: Dialog) => ({ uid: item.uid, root: item.root, priority: item.priority, hasClose: !!item.close });
+    return { owner: owner.uid, visible: dialogs.visible, stackLength: dialogs.stack.length,
+      stack: dialogs.stack.map(describe), top: top ? describe(top) : null };
+  });
   const tab = inject(TAB_LIFECYCLE, null);
   const shown = ref(!tab);
   if (tab) {
@@ -102,19 +108,25 @@ export function useDialogA11y(
   nativePriority = 0,
 ): void {
   // #ifdef APP-PLUS
-  registerNativeDialog(open, close, nativeBack, nativePriority);
+  registerNativeDialog(open, close, nativeBack, nativePriority, typeof root === "string" ? root : "element callback");
   // #endif
   const acquireScrollLock = inject(DIALOG_SCROLL_LOCK, null);
+  const diagnosticInTab = !!inject(TAB_LIFECYCLE, null);
+  let diagnosticShown: (() => boolean) | null = null;
+  let release: (() => void) | null = null;
+  useDiagnosticReader("D2 dialog lock", () => ({ root: typeof root === "string" ? root : "element callback",
+    open: open.value, inTab: diagnosticInTab, shown: diagnosticShown ? diagnosticShown() : null,
+    providerPresent: !!acquireScrollLock, held: release !== null, nativeBack, nativePriority, hasClose: !!close }));
   if (acquireScrollLock) {
     // The native tab host shares one chassis across tabs: a dialog left open in a hidden tab
     // must not lock the tab on screen.
     const inTab = !!inject(TAB_LIFECYCLE, null);
     const shown = ref(!inTab);
+    diagnosticShown = () => shown.value;
     if (inTab) {
       onTabShow(() => { shown.value = true; });
       onTabHide(() => { shown.value = false; });
     }
-    let release: (() => void) | null = null;
     watch([open, shown], ([isOpen, isShown]) => {
       release?.();
       release = isOpen && isShown ? acquireScrollLock() : null;

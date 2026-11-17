@@ -61,6 +61,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import NxButton from "@/components/ui/nx-button.vue";
@@ -120,6 +121,8 @@ let timer: ReturnType<typeof setInterval>;
 onMounted(() => { timer = setInterval(pin.tick, 1000); if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
 onUnmounted(() => { clearInterval(timer); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
 useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
+useDiagnosticReader("D3 payment PIN", () => ({ visible: ui.visible, stage: ui.stage, busy: ui.busy, reading: ui.reading,
+  pendingOperation: ui.pendingOperation, revision: ui.revision, active: active.value, open: open.value }));
 </script>
 <style scoped>
 .payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden; padding: var(--nx-overlay-top) var(--v5-space-3) var(--nx-overlay-bottom); background: var(--v5-bg-color-mask); }

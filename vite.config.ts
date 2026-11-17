@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { defineConfig, loadEnv } from "vite";
 import uniPlugin from "@dcloudio/vite-plugin-uni";
@@ -39,6 +40,7 @@ export default defineConfig(({ mode }) => {
     // Worktrees share dependencies, but optimizer results depend on this source and mode.
     cacheDir: `${selfDir}/.cache/vite/${mode}`,
     define: {
+      __UVEL_DIAGNOSTIC_SOURCE__: JSON.stringify(execFileSync("git", ["rev-parse", "HEAD"], { cwd: selfDir, encoding: "utf8" }).trim()),
       __UVEL_RESOURCE_VERSION__: JSON.stringify({ versionName: manifest.versionName, versionCode: manifest.versionCode }),
     },
     plugins: [nativeSvgIcons(), uniH5PickerSnap(), uni(), UnoCSS(), {
