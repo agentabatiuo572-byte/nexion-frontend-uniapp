@@ -58,7 +58,7 @@ export const zh: Messages = {
     otpRateLimited: "验证码发送过于频繁或今日次数已用完，请稍后再试。",
 
     type: "银行账户",
-    accountLabel: "收款账号", accountPlaceholder: "请输入银行收款账号", accountHint: "收款账号可能与卡面卡号不同",
+    accountLabel: "收款账号", accountHint: "收款账号可能与卡面卡号不同",
     holderLabel: "收款户名", holderPlaceholder: "请填写银行登记的完整户名", required: "必填", continue: "确认绑定",
     accountRoutedLabel: "收款账号", reviewTitle: "核对收款账户", reviewHint: "请核对收款账号和户名后保存。", confirmSave: "确认并保存", editDetails: "返回修改",
     accountRoutedNotice: "请核对账号和户名，按收款账号入账。",
@@ -2327,7 +2327,7 @@ rankBenefits: "查看等级权益",
     ffCardholder: "持卡人姓名",
     ffCountry: "国家 / 地区",
     ffZip: "邮编",
-    cardNamePlaceholder: "持卡人姓名",
+    cardNamePlaceholder: "与卡面一致，如 ZHANG SAN",
 
 },
   cards: {
@@ -4534,7 +4534,7 @@ timeHoursAgo: "{n}小时前",
   },
 
   agent: {
-    chooseEventDate: "选择活动日期",
+    chooseEventDate: "请选择",
     supportTypes: "申请类别",
     previewForm: "预览申请表",
     closePreview: "收起申请表",

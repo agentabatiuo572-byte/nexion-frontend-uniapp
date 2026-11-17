@@ -373,7 +373,7 @@ export const fil: Messages = {
     otpRateLimited: "Sobrang daming SMS request o naabot na ang limit ngayong araw. Subukan mamaya.",
     type: "Account sa bangko",
     accountLabel: "Numero ng account ng tatanggap",
-    accountPlaceholder: "Ilagay ang numero ng account ng tatanggap",
+   
     accountHint: "Puwedeng iba ito sa number na nasa card.",
     holderLabel: "Pangalan ng may-ari",
     holderPlaceholder: "Buong pangalan ayon sa bangko",
@@ -2754,7 +2754,7 @@ export const fil: Messages = {
     ffCardholder: "Pangalan sa card",
     ffCountry: "Bansa",
     ffZip: "ZIP code",
-    cardNamePlaceholder: "PANGALAN SA CARD",
+    cardNamePlaceholder: "Gaya ng nasa card, hal. JUAN DELA CRUZ",
   },
   cards: {
     bindingEntryNote: "Ilagay ang detalye ng card mo",
@@ -4883,7 +4883,7 @@ export const fil: Messages = {
     inviteFriendsHint: "Kikita ka ng +{inviterNex} UVT bawat imbita; may +{nex} UVT na regalo sa pag-sign up ang kaibigan mo",
   },
   agent: {
-    chooseEventDate: "Petsa ng event",
+    chooseEventDate: "Pumili",
     supportTypes: "Uri ng suporta",
     previewForm: "I-preview ang application",
     closePreview: "Isara ang preview",

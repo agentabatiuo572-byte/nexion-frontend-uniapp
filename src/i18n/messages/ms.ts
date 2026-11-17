@@ -373,7 +373,7 @@ export const ms: Messages = {
     otpRateLimited: "Terlalu banyak permintaan SMS atau had harian dicapai. Cuba lagi nanti.",
     type: "Akaun bank",
     accountLabel: "Nombor akaun penerima",
-    accountPlaceholder: "Masukkan nombor akaun penerima",
+   
     accountHint: "Nombor ini mungkin berbeza daripada nombor pada kad.",
     holderLabel: "Nama pemegang akaun",
     holderPlaceholder: "Nama penuh seperti didaftarkan dengan bank",
@@ -2754,7 +2754,7 @@ export const ms: Messages = {
     ffCardholder: "Nama pemegang kad",
     ffCountry: "Negara/wilayah",
     ffZip: "Poskod",
-    cardNamePlaceholder: "NAMA PADA KAD",
+    cardNamePlaceholder: "Seperti pada kad, cth. AHMAD BIN ALI",
   },
   cards: {
     bindingEntryNote: "Masukkan butiran kad bank anda",
@@ -4883,7 +4883,7 @@ export const ms: Messages = {
     inviteFriendsHint: "Anda dapat +{inviterNex} UVT bagi setiap jemputan; rakan anda dapat hadiah pendaftaran +{nex} UVT",
   },
   agent: {
-    chooseEventDate: "Pilih tarikh acara",
+    chooseEventDate: "Pilih",
     supportTypes: "Jenis sokongan",
     previewForm: "Pratonton permohonan",
     closePreview: "Tutup pratonton permohonan",

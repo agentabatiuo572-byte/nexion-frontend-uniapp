@@ -373,7 +373,7 @@ export const uz: Messages = {
     otpRateLimited: "SMS soʻrovlari juda koʻp yoki kunlik limit tugadi. Keyinroq urining.",
     type: "Bank hisobi",
     accountLabel: "Qabul qiluvchi hisob raqami",
-    accountPlaceholder: "Qabul qiluvchi hisob raqamini kiriting",
+   
     accountHint: "Bu karta ustidagi raqamdan farq qilishi mumkin.",
     holderLabel: "Hisob egasining ismi",
     holderPlaceholder: "Bankda roʻyxatdan oʻtgan toʻliq ism",
@@ -2754,7 +2754,7 @@ export const uz: Messages = {
     ffCardholder: "Karta egasining ismi",
     ffCountry: "Mamlakat",
     ffZip: "Pochta indeksi",
-    cardNamePlaceholder: "KARTADAGI ISM",
+    cardNamePlaceholder: "Kartadagidek, masalan: ALISHER KARIMOV",
   },
   cards: {
     bindingEntryNote: "Karta maʼlumotlarini kiriting",
@@ -4883,7 +4883,7 @@ export const uz: Messages = {
     inviteFriendsHint: "Har bir taklif uchun +{inviterNex} UVT olasiz; doʻstingiz roʻyxatdan oʻtganda +{nex} UVT sovgʻa oladi",
   },
   agent: {
-    chooseEventDate: "Tadbir sanasi",
+    chooseEventDate: "Tanlang",
     supportTypes: "Yordam turi",
     previewForm: "Arizani koʻrish",
     closePreview: "Arizani yopish",

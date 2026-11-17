@@ -58,7 +58,7 @@ export const vi: Messages = {
     otpRateLimited: "Gửi mã quá thường xuyên hoặc đã đạt giới hạn ngày. Vui lòng thử lại sau.",
 
     type: "Tài khoản ngân hàng",
-    accountLabel: "Số tài khoản nhận tiền", accountPlaceholder: "Nhập số tài khoản nhận tiền", accountHint: "Số này có thể khác số trên thẻ.",
+    accountLabel: "Số tài khoản nhận tiền", accountHint: "Số này có thể khác số trên thẻ.",
     holderLabel: "Tên chủ tài khoản", holderPlaceholder: "Họ tên đầy đủ đã đăng ký tại ngân hàng", required: "Bắt buộc", continue: "Xác nhận liên kết",
     accountRoutedLabel: "Tài khoản nhận tiền", reviewTitle: "Kiểm tra tài khoản nhận tiền", reviewHint: "Vui lòng kiểm tra số tài khoản và tên chủ tài khoản trước khi lưu.", confirmSave: "Xác nhận và lưu", editDetails: "Sửa thông tin",
     accountRoutedNotice: "Vui lòng kiểm tra số tài khoản và tên chủ tài khoản. Tiền sẽ được chuyển vào số tài khoản này.",
@@ -2313,7 +2313,7 @@ rankBenefits: "Xem quyền lợi cấp bậc",
     ffCardholder: "Tên chủ thẻ",
     ffCountry: "Quốc gia",
     ffZip: "Mã bưu chính",
-    cardNamePlaceholder: "TÊN TRÊN THẺ",
+    cardNamePlaceholder: "Như trên thẻ, VD: NGUYEN VAN A",
 
 },
   cards: {
@@ -4520,7 +4520,7 @@ timeHoursAgo: "{n} giờ",
   },
 
   agent: {
-    chooseEventDate: "Chọn ngày tổ chức",
+    chooseEventDate: "Chọn",
     supportTypes: "Loại hỗ trợ",
     previewForm: "Xem trước đơn đề nghị",
     closePreview: "Thu gọn đơn đề nghị",
