@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { claimAutoPopupBudget } from '@/lib/auto-popup-budget';
@@ -161,11 +161,11 @@ export const useMilestones = defineStore("milestones", () => {
    * already-showing overlay is parked back at the FRONT of the queue
    * (programmatic redirect edge) so it replays in full after leaving; a busy
    * screen only blocks NEW promotions and never yanks a showing one.
-   * Called on a short interval by milestone-celebration.vue with the current
+   * Called on route, queue and visibility changes by milestone-celebration.vue with the current
    * route. Returns true when a celebration was promoted.
    */
   // dismiss 后的连播冷却时刻(CELEBRATION_GAP_MS 见模块顶部);park 路径不设值。
-  let coolUntil = 0;
+  const coolUntil = ref(0);
 
   function advance(route: string, screenBusy = false): boolean {
     if (isMoneyFlowRoute(route)) {
@@ -183,7 +183,7 @@ export const useMilestones = defineStore("milestones", () => {
     // 判据由调用方(宿主组件)传入而不是本 store 自己去读 —— 保持 store 不互 import(P-031)。
     if (screenBusy) return false;
     if (active.value || pendingCelebrations.value.length === 0) return false;
-    if (Date.now() < coolUntil) return false;
+    if (Date.now() < coolUntil.value) return false;
     if (!claimAutoPopupBudget(boundKey)) return false;
     const [next, ...rest] = pendingCelebrations.value;
     active.value = next;
@@ -193,13 +193,14 @@ export const useMilestones = defineStore("milestones", () => {
 
   /** Close the celebration overlay (auto-called after the duration, or on tap). */
   function dismiss() {
-    if (active.value) coolUntil = Date.now() + CELEBRATION_GAP_MS;
+    if (active.value) coolUntil.value = Date.now() + CELEBRATION_GAP_MS;
     active.value = null;
   }
 
   return {
     firedIds,
     active,
+    nextCelebrationAt: computed(() => coolUntil.value),
     pendingCelebrations,
     isFired,
     markFired,

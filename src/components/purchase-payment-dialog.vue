@@ -281,7 +281,7 @@ const qrImage = computed(() => { if (!s.intent?.address || !ready.value) return 
 
 const now = ref(Date.now());
 watch(() => active.value && s.open, open => { if (open) now.value = Date.now(); }, { flush: 'sync' });
-useVisibleInterval(() => { if (active.value && s.open) now.value = Date.now(); }, 1000);
+useVisibleInterval(() => { now.value = Date.now(); }, 1000, () => active.value && s.open);
 const deadlineLeft = computed(() => s.deadlineAt === null ? null : Math.max(0, s.deadlineAt - now.value));
 const quoteLeft = computed(() => s.quote ? Math.max(0, Date.parse(s.quote.expiresAt) - now.value) : null);
 // The payment page counts to whichever closes first: the intent or the order.

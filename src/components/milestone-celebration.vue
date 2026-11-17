@@ -65,10 +65,10 @@
 </template>
 
 <script setup lang="ts">
-import { logicalNativePage } from "@/lib/native-tab-navigation";
+import { useVisiblePageRoute } from "@/composables/use-visible-page-route";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, watch, onMounted, onUnmounted } from "vue";
-import { useMilestones } from "@/store/milestones";
+import { computed, watch, onUnmounted } from "vue";
+import { useMilestones, isMoneyFlowRoute } from "@/store/milestones";
 import { usePopupArbiter } from "@/store/popup-arbiter";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -78,7 +78,6 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const OVERLAY_DURATION_MS = 5_200;
 const PARTICLE_COUNT = 36;
-const ADVANCE_TICK_MS = 300;
 
 const m = useMilestones();
 const arbiter = usePopupArbiter();
@@ -86,52 +85,32 @@ const voucherClaimSheet = useVoucherClaimSheet();
 const trialClaimSheet = useTrialClaimSheet();
 const t = useT();
 
-// ── Queue pump — same route source as global-ui.vue readRoute / App.vue
-//    readCurrentRoute (getCurrentPages, no leading slash; H5 hash fallback). ──
-function readRoute(): string {
-  try {
-    const ps = getCurrentPages();
-    let route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
-    // #ifdef APP-PLUS
-    route = logicalNativePage(ps[ps.length - 1]).route;
-    // #endif
-    if (route) return route;
-  } catch {
-    // fall through to H5 hash fallback
-  }
-  // #ifdef H5
-  try {
-    return window.location.hash.replace(/^#\/?/, "").replace(/^\//, "");
-  } catch {
-    return "";
-  }
-  // #endif
-  return "";
-}
-
-// 令牌同步 —— 庆祝浮层与领取弹层共用一个「此刻谁占屏」的裁决点(store/popup-arbiter)。
-// 每一拍都把令牌对齐到真实状态,而不是在 promote / dismiss / park 三条出口上分别挂钩:
-// 出口漏接一个就会把令牌永久扣住,之后谁都再弹不出来;而对齐写法天然幂等,
-// 页面栈里 N 份宿主副本同时跑也收敛到同一结果(uni 不卸载被压住的页面)。
+const { route, visible } = useVisiblePageRoute();
+let advanceTimer: ReturnType<typeof setTimeout> | undefined;
 function pumpCelebrationQueue() {
-  const route = readRoute();
-  // 🔴 「屏上有没有别人」不能只问令牌:领取弹层可以被用户从 banner 手动打开,那条路径
-  // 不经仲裁(申请失败也照开),令牌因此会与屏幕真实状态背离。独立审计实测的后果是
-  // 庆祝在弹层背后播完 5.2s 被 dismiss 消耗掉,而 markFired 早已落盘 —— 用户永远
-  // 看不到这一级奖励通知。所以直接问弹层开没开。
+  clearTimeout(advanceTimer);
+  advanceTimer = undefined;
+  if (!visible.value || !route.value) return;
   const sheetOpen = voucherClaimSheet.open || trialClaimSheet.open;
-  // B1「一次进首页只弹一个」:名额用掉后,本次进首页不再放新的庆祝上屏。
-  // 只拦首页、且只拦**新上屏**;已在放的那条不受影响(C1 永不顶替)。
-  const homeSlotUsed = route === "pages/index/index" && arbiter.visitClaimed;
-  m.advance(route, arbiter.busyForOthers("milestone") || sheetOpen || homeSlotUsed);
+  const homeSlotUsed = route.value === "pages/index/index" && arbiter.visitClaimed;
+  const busy = arbiter.busyForOthers("milestone") || sheetOpen || homeSlotUsed;
+  m.advance(route.value, busy);
   if (m.active) arbiter.acquire("milestone");
-  else arbiter.release("milestone"); // persist-verdict-ok: 弹层令牌释放(popup-arbiter),void 无判决,非资金 / 落盘原语
+  else arbiter.release("milestone"); // persist-verdict-ok: UI overlay token release
+  if (!m.active && m.pendingCelebrations.length && !busy && !isMoneyFlowRoute(route.value)) {
+    // Cooldown and the existing UTC daily budget are deadlines, not polling jobs.
+    const now = Date.now();
+    const wakeAt = m.nextCelebrationAt > now ? m.nextCelebrationAt
+      : Math.floor(now / 86_400_000) * 86_400_000 + 86_400_000;
+    advanceTimer = setTimeout(pumpCelebrationQueue, wakeAt - now);
+  }
 }
-
-let advTimer: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
-  advTimer = setInterval(pumpCelebrationQueue, ADVANCE_TICK_MS);
-});
+watch(
+  [route, visible, () => m.active, () => m.pendingCelebrations, () => m.nextCelebrationAt,
+    () => arbiter.current, () => arbiter.visitClaimed, () => voucherClaimSheet.open, () => trialClaimSheet.open],
+  pumpCelebrationQueue,
+  { immediate: true },
+);
 
 // ── Derived copy (i18n) ──
 const thresholdLabel = computed(() =>
@@ -232,10 +211,7 @@ watch(
 
 onUnmounted(() => {
   clearTimer();
-  if (advTimer !== null) {
-    clearInterval(advTimer);
-    advTimer = null;
-  }
+  clearTimeout(advanceTimer);
   // 宿主被摘掉时(如切到静态走查路由)必须还令牌,否则占屏状态会一直扣着,
   // 领取弹层此后永远拿不到令牌 —— 死锁比多弹一次严重得多。
   arbiter.release("milestone"); // persist-verdict-ok: 弹层令牌释放(popup-arbiter),void 无判决,非资金 / 落盘原语

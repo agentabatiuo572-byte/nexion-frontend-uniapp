@@ -292,6 +292,7 @@ import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-displa
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -723,16 +724,10 @@ function startNewTopup() {
 
 // ── 真倒计时(派生自 expireAt,与 store 过期引擎同源;到点 store 翻 expired 视图自换)──
 const nowTick = ref(mockServerNow());
-let tickTimer: ReturnType<typeof setInterval> | undefined;
 let hostedOpenTimer: ReturnType<typeof setTimeout> | undefined;
-onMounted(() => {
-  tickTimer = setInterval(() => {
-    nowTick.value = mockServerNow();
-  }, 1000);
-});
+useVisibleInterval(() => { nowTick.value = mockServerNow(); }, 1000);
 onUnmounted(() => {
   pageActive.value = false;
-  if (tickTimer) clearInterval(tickTimer);
   if (createTimer) clearTimeout(createTimer);
   if (hostedOpenTimer) clearTimeout(hostedOpenTimer);
   if (remoteApiEnabled) dep.stopRemoteVietQrPolling();

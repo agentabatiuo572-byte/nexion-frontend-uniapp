@@ -61,6 +61,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import NxButton from "@/components/ui/nx-button.vue";
@@ -116,9 +117,9 @@ function support() { pin.cancel(); navTo("/me/support"); }
 function hide() { if (active.value && ui.visible) pin.cancel(); active.value = false; password.value = ""; code.value = ""; }
 function visibility() { if (typeof document !== "undefined" && document.hidden) { if (active.value && ui.visible) pin.cancel(); password.value = ""; code.value = ""; } }
 onShow(() => { active.value = true; }); onHide(hide);
-let timer: ReturnType<typeof setInterval>;
-onMounted(() => { timer = setInterval(pin.tick, 1000); if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
-onUnmounted(() => { clearInterval(timer); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
+useVisibleInterval(pin.tick, 1000, () => open.value);
+onMounted(() => { if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
+onUnmounted(() => { if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
 useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
 </script>
 <style scoped>

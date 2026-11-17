@@ -68,7 +68,7 @@ import { useTrialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecy
 const sheet = useTrialClaimSheet();
 const freeTrial = useFreeTrial();
 useAutoRecovery({ failed: () => remoteApiEnabled && sheet.open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
-const trialView = useTrialPresentation();
+const trialView = useTrialPresentation(() => sheet.open);
 const app = useApp();
 const t = useT();
 const copy = useTrialLifecycleCopy();
