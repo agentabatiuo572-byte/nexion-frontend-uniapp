@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import { DEFAULT_LOCALE, LOCALES, serverLanguage, type LocaleCode } from "@/i18n";
+import { DEFAULT_LOCALE, LOCALES, type LocaleCode } from "@/i18n";
 import { useConfig } from "@/store/config";
 
 const STORAGE_KEY = "nexgrid-locale-v1";
@@ -28,16 +28,10 @@ export const useLocaleStore = defineStore("locale", () => {
   // Automatic resolution never increments this or persists the effective language.
   const explicitRevision = ref(0);
   const code = computed<LocaleCode>(() => {
-    const offered = platformConfig.offeredLocales;
-    const explicit = explicitChoice.value;
-    if (explicit && offered.some((entry) => entry.code === explicit)) return explicit;
-    const system = systemLanguage.value;
-    const availableSystem = system && offered.some((entry) => entry.code === system) ? system : null;
-    const account = accountLanguage.value;
-    if (account && offered.some((entry) => entry.code === account)) {
-      return availableSystem && serverLanguage(availableSystem) === account ? availableSystem : account;
+    for (const candidate of [explicitChoice.value, accountLanguage.value, systemLanguage.value]) {
+      if (candidate && platformConfig.offeredLocales.some((entry) => entry.code === candidate)) return candidate;
     }
-    return availableSystem ?? DEFAULT_LOCALE;
+    return DEFAULT_LOCALE;
   });
 
   function setLocale(next: LocaleCode) {

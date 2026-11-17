@@ -53,8 +53,7 @@ export function uiLocale(code: string): UiLocale {
   return UI_LOCALES.includes(code) ? code as UiLocale : "en";
 }
 
-/** The server accepts and publishes only zh, en and vi. Other interface languages are stored on
- *  the device and use English for every language sent to the server and every server-owned text. */
+/** Use English for other interface languages when requesting content served in zh/en/vi. */
 export type ServerLanguage = "zh" | "en" | "vi";
 
 export function serverLanguage(code: string): ServerLanguage {
