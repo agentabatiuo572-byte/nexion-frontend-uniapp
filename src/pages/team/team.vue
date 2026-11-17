@@ -47,7 +47,7 @@
 
         </view>
 
-        <ReferralProgress @share="inviteCard?.openShare()" />
+        <ReferralProgress @share="inviteCard?.openPoster()" />
 
         <!-- Rewards: one card per reward with its own accent and mini visual (P-41) -->
         <view>
@@ -573,7 +573,7 @@ const toolSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)"
 
 import TeamSummaryCard from "@/components/team/team-summary-card.vue";
 const inviteCard = ref<InstanceType<typeof InviteEarnCard> | null>(null);
-// Consume an explicit invitation intent once after the invite card has its code.
+// Consume an explicit invitation intent once the invite card has its code and share link.
 const pendingShareIntent = ref(false);
 const invitePageVisible = ref(false);
 onLoad((query) => {
@@ -583,11 +583,13 @@ onLoad((query) => {
 onShow(() => { invitePageVisible.value = true; });
 onHide(() => { invitePageVisible.value = false; pendingShareIntent.value = false; });
 watch(() => app.accountKey, () => { pendingShareIntent.value = false; });
-watch([pendingShareIntent, invitePageVisible, inviteCard, () => referralRewards.referralCode], () => {
+watch([pendingShareIntent, invitePageVisible, inviteCard, () => referralRewards.referralCode, () => useConfig().configStatus], () => {
   if (!pendingShareIntent.value || !invitePageVisible.value || !inviteCard.value) return;
   if (remoteApiEnabled && !referralRewards.referralCode) return;
+  // The poster needs the share link, which waits for the share config to settle.
+  if (remoteApiEnabled && ['idle', 'loading'].includes(useConfig().configStatus)) return;
   pendingShareIntent.value = false;
-  inviteCard.value.openShare();
+  inviteCard.value.openPoster();
 }, { flush: 'post' });
 const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus : "ready");
 // Shared card and sheet readers recover once per source on the Team page.
