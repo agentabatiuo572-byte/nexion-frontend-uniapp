@@ -1,8 +1,8 @@
-import { watch, nextTick, onBeforeUnmount, type Ref } from "vue";
-// #ifdef APP-PLUS
-import { getCurrentInstance, inject, ref } from "vue";
-import { onBackPress, onShow as onPageShow, onHide as onPageHide } from "@dcloudio/uni-app";
+import { watch, nextTick, onBeforeUnmount, inject, ref, type Ref, type InjectionKey } from "vue";
 import { TAB_LIFECYCLE, onShow as onTabShow, onHide as onTabHide } from "./use-tab-page-lifecycle";
+// #ifdef APP-PLUS
+import { getCurrentInstance } from "vue";
+import { onBackPress, onShow as onPageShow, onHide as onPageHide } from "@dcloudio/uni-app";
 
 type Dialog = { close?: () => void; priority: number };
 type DialogPage = { stack: Dialog[]; visible: boolean; backRegistered: boolean };
@@ -57,6 +57,14 @@ export function registerNativeDialog(open: Ref<boolean>, close: (() => void) | u
 // #endif
 
 /**
+ * AppChassis provides this. Dialogs render inside the page's own scroller, so without it a drag on
+ * the mask or sheet scrolled the page underneath and could start a pull-to-refresh, whose content
+ * transform then dragged the fixed sheet along with the page. Each open dialog holds a lock; the
+ * call returns its release.
+ */
+export const DIALOG_SCROLL_LOCK: InjectionKey<() => () => void> = Symbol("nx-dialog-scroll-lock");
+
+/**
  * 弹层的键盘可用性:焦点移入 → Tab 只在层内循环 → Esc 关闭 → 关闭后焦点归还。
  *
  * 【为什么要抽出来】
@@ -96,6 +104,23 @@ export function useDialogA11y(
   // #ifdef APP-PLUS
   registerNativeDialog(open, close, nativeBack, nativePriority);
   // #endif
+  const acquireScrollLock = inject(DIALOG_SCROLL_LOCK, null);
+  if (acquireScrollLock) {
+    // The native tab host shares one chassis across tabs: a dialog left open in a hidden tab
+    // must not lock the tab on screen.
+    const inTab = !!inject(TAB_LIFECYCLE, null);
+    const shown = ref(!inTab);
+    if (inTab) {
+      onTabShow(() => { shown.value = true; });
+      onTabHide(() => { shown.value = false; });
+    }
+    let release: (() => void) | null = null;
+    watch([open, shown], ([isOpen, isShown]) => {
+      release?.();
+      release = isOpen && isShown ? acquireScrollLock() : null;
+    }, { immediate: true, flush: "sync" });
+    onBeforeUnmount(() => { release?.(); release = null; });
+  }
   let previousFocus: HTMLElement | SVGElement | null = null;
 
   const rootEl = (): HTMLElement | null | undefined =>

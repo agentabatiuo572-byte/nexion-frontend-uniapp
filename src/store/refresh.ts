@@ -37,6 +37,8 @@ export interface PullHeaderHold {
   pull: Ref<{ y: number; transition: string } | null>;
   /** Height of the in-content header row including its bottom spacing; 0 when none. */
   headerHeight: Ref<number>;
+  /** Bumped when a pull may start, so the row re-measures: pages restyle it after data loads. */
+  measureRequest: Ref<number>;
 }
 export const PULL_HEADER_HOLD_KEY: InjectionKey<PullHeaderHold> = Symbol("nx-pull-header-hold");
 

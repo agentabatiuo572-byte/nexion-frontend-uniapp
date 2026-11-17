@@ -11,7 +11,6 @@
     · Footer: price + frosted Buy CTA.
 -->
 <template>
-  <!-- 《08》§2:tap 反馈 active:scale+opacity(禁 hover 做移动端反馈) -->
   <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': cardInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? (product.name) : undefined" @click="goDetail">
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
