@@ -14,8 +14,8 @@
   softens entering/exiting rows.
 -->
 <template>
-  <view v-if="remoteApiEnabled" ref="proofRef" class="absolute social-proof" :class="{ 'social-proof--visible': proofInView }" :style="rootStyle" :aria-label="remoteProof ? remoteProof.productName : w.unavailableLabel">
-    <view v-if="remoteProof" class="social-proof__track" :style="{ animationDuration: `${remoteRows.length * 2}s` }">
+  <view v-if="remoteApiEnabled" ref="proofRef" class="absolute social-proof" :style="rootStyle" :aria-label="remoteProof ? remoteProof.productName : w.unavailableLabel">
+    <view v-if="remoteProof" ref="trackRef" class="social-proof__track" :class="{ 'social-proof__track--running': trackRunning }" :style="{ animationDuration: `${remoteRows.length * 2}s` }">
       <view v-for="(r, i) in [...remoteRows, ...remoteRows]" :key="i" :aria-hidden="i >= remoteRows.length ? true : undefined" class="flex items-baseline" :style="rowStyle">
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
         <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.n.toLocaleString() }}</text>
@@ -49,6 +49,7 @@ import { productCatalogState } from "@/store/product-catalog";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from "@/mock/storefront-social-proof";
@@ -57,6 +58,8 @@ const props = defineProps<{ product: Product }>();
 const t = useT();
 const app = useApp();
 const { elRef: proofRef, inView: proofInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
+// The scroll loop has its own on-screen state (a native observer on App); proofInView keeps gating only the 4s read.
+const { elRef: trackRef, running: trackRunning } = useLoopsInView(".social-proof__track");
 const w = computed(() => t.value.store.liveProof);
 const remoteProof = ref<StorefrontSocialProof | null>(null);
 const remoteUnavailable = ref(false);
@@ -251,6 +254,6 @@ const labelStyle: CSSProperties = {
 </script>
 <style scoped>
 .social-proof__track { animation: dnk-scroll 6s linear infinite; animation-play-state: paused; }
-.social-proof--visible .social-proof__track { animation-play-state: running; }
+.social-proof__track--running { animation-play-state: running; }
 @media (prefers-reduced-motion: reduce) { .social-proof__track { animation: none; } }
 </style>

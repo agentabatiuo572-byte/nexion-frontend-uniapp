@@ -11,10 +11,10 @@
     · Footer: price + frosted Buy CTA.
 -->
 <template>
-  <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': cardInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? (product.name) : undefined" @click="goDetail">
+  <view ref="cardRef" class="product-card relative overflow-hidden block" :class="{ 'promotion-catalog-card': marketingPromotion, 'product-card--in-view': artInView, 'product-card--compact': compact, 'product-card--entered': entered }" :style="marketingPromotion ? promotionCardStyle : cardStyle" :role="compact ? 'link' : undefined" :tabindex="compact ? 0 : -1" :aria-label="compact ? (product.name) : undefined" @click="goDetail">
 
     <!-- ───── Catalog photo or neutral placeholder ───── -->
-    <view class="product-media relative overflow-hidden" :style="renderWrapStyle" :role="compact ? undefined : 'button'" :tabindex="compact ? -1 : 0" :aria-label="compact ? undefined : (product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
+    <view ref="mediaRef" class="product-media relative overflow-hidden" :style="renderWrapStyle" :role="compact ? undefined : 'button'" :tabindex="compact ? -1 : 0" :aria-label="compact ? undefined : (product.name)" @click.stop="goDetail"  @keydown.enter.prevent.stop="goDetail" @keydown.space.prevent.stop="goDetail">
       <view v-if="photo" class="product-art-entry"><image class="product-art" :style="{viewTransitionName:'catalog-'+product.id.replace(/[^a-zA-Z0-9_-]/g,'-')}" :key="photo.src" :src="photo.src" mode="aspectFit" style="position: absolute; inset: 0; width: 100%; height: 100%" @error="fallbackProductImage" /></view>
       <view v-else class="absolute inset-0 grid place-items-center" style="color: var(--v5-ink-3)">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
@@ -132,6 +132,7 @@ import { useProductImage } from "@/composables/use-product-image";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useRemotePurchaseEligibility } from "@/store/purchase-eligibility";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { productCatalogState } from "@/store/product-catalog";
 import type { PublicPromotion } from '@/api/promotion-contracts';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
@@ -182,8 +183,11 @@ const showTradein = computed(() => !remoteApiEnabled && bestTradeinCredit.value 
 // eligibility response is the only source that can unlock this card.
 const localPurchaseGate = remoteApiEnabled ? null : usePurchaseGate(() => props.product);
 const { elRef: cardRef, inView: cardInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
+// The artwork entrance and float follow their own on-screen state (a native observer on App, where cardInView stays
+// false); cardInView keeps gating only the eligibility read below.
+const { elRef: mediaRef, running: artInView } = useLoopsInView(".product-media");
 const entered = ref(false);
-watch(cardInView, visible => { if (visible) entered.value = true; });
+watch(artInView, visible => { if (visible) entered.value = true; });
 const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id, cardInView);
 useAutoRecovery({ failed: () => remoteApiEnabled && cardInView.value && eligibility.value.status === "error", retry: retryEligibility });
 const gate = computed(() => stockUnavailable.value
