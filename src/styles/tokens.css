@@ -1315,3 +1315,13 @@ uni-input .uni-input-placeholder {
 
 /* Keep authored image colors when Android WebView automatically darkens small images. */
 uni-image { color-scheme: only light; }
+
+/* Diagnostic build only (diag/ios-perf-2): three-finger tap toggles the card-background A/B test.
+   A makes the shell scroller a stacking context; B is the shipped behaviour. The badge shows the mode. */
+.nx-chassis[data-diag-card-background="A"] .nx-content { z-index: 0; }
+.nx-chassis[data-diag-card-background]::after {
+  content: attr(data-diag-card-background);
+  position: fixed; top: 48px; right: 6px; z-index: 2147483647;
+  padding: 2px 5px; border-radius: 4px; pointer-events: none;
+  font: 700 11px/1 -apple-system, system-ui, sans-serif; color: #fff; background: rgba(214, 0, 110, .85);
+}
