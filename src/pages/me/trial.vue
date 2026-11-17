@@ -49,7 +49,7 @@
         <view class="trial-earned trial-rise trial-rise--2">
           <text class="trial-earned__label">{{ isGrace ? detail.graceAmountLabel : lifecycle.accruedLabel }}</text>
           <view class="trial-earned__amount">
-            <text class="trial-earned__value">{{ earnedParts[0] }}<text v-if="earnedParts[1]" class="trial-dim">.{{ earnedParts[1] }}</text></text>
+            <text :id="earnedCount.hostId" class="trial-earned__value" :count-up="earnedCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ earnedParts[0] }}</text><text v-if="earnedParts[1]" class="trial-dim nx-count--frac">.{{ earnedParts[1] }}</text></text>
             <text class="trial-earned__unit">USDT</text>
           </view>
           <text class="trial-earned__uvt">+ {{ visibility.mask(formatGroupedAmount(shadowNEX)) }}<text class="trial-unit-small"> UVT</text></text>
@@ -67,7 +67,7 @@
               <text class="trial-total__breakdown">{{ totalBreakdown }}</text>
               <view class="trial-total__line">
                 <text class="trial-total__label">{{ detail.totalLabel }}</text>
-                <text class="trial-total__value">{{ totalParts[0] }}<text v-if="totalParts[1]" class="trial-total__dec">.{{ totalParts[1] }}</text></text>
+                <text :id="totalCount.hostId" class="trial-total__value" :count-up="totalCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ totalParts[0] }}</text><text v-if="totalParts[1]" class="trial-total__dec nx-count--frac">.{{ totalParts[1] }}</text></text>
                 <text class="trial-unit-small trial-total__unit">USDT</text>
                 <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small"> UVT</text></text>
               </view>
@@ -260,7 +260,7 @@ import { getProduct } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { useCountUp } from "@/composables/use-count-up";
+import { useViewCountUp } from "@/composables/use-count-up";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
@@ -370,17 +370,19 @@ const deadlineText = computed(() => {
   return fmt(isGrace.value ? detail.value.keptUntil : purchase.value.heroTermUntil, { time: formatTrialDeadline(at, dateLocale()) });
 });
 // Both counts follow the live source: a tick or quote re-read during the 900 ms entrance must not cut it short.
-const earnedShown = useCountUp(() => (isActiveCycle.value && !authorityScreenUnavailable.value ? shadowUSD.value : null), { follow: true });
-const earnedParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(earnedShown.value ?? 0)));
+const earnedSource = computed(() => (isActiveCycle.value && !authorityScreenUnavailable.value ? shadowUSD.value : null));
+const earnedCount = useViewCountUp(earnedSource, "grouped", { follow: true });
+const earnedParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(earnedSource.value ?? 0)));
 
 // ── Quote ticket ──
 const discountTotal = computed(() => {
   const quote = purchaseQuote.value;
   return quote ? cents(quote.promoDiscountUSD + quote.earlyDiscountUSD + quote.offsetUSD) : 0;
 });
-const totalShown = useCountUp(() => (purchaseQuote.value && !authorityScreenUnavailable.value
-  ? cents(discountTotal.value + purchaseQuote.value.remainderUSD) : null), { follow: true });
-const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalShown.value ?? 0)));
+const totalSource = computed(() => (purchaseQuote.value && !authorityScreenUnavailable.value
+  ? cents(discountTotal.value + purchaseQuote.value.remainderUSD) : null));
+const totalCount = useViewCountUp(totalSource, "grouped", { follow: true });
+const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalSource.value ?? 0)));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
 const deviceName = computed(() => trialProduct.value?.name ?? cfg.value.trialProductName);
 const buyTitle = computed(() => {
@@ -504,6 +506,12 @@ const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", border
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.value = false; }, true);
+</script>
+
+<script module="countUp" lang="renderjs">
+import { countUpView } from "@/lib/count-up-view";
+// @ts-expect-error vue-tsc 1.x treats uni's renderjs custom block as a second normal script.
+export default countUpView;
 </script>
 
 <style scoped>
