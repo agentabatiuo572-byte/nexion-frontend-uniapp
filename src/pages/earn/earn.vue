@@ -54,15 +54,23 @@
         <text class="earn-fleet-head__title" role="heading" aria-level="2">{{ t.home.myFleet }}</text>
         <SlotRing />
         <LoopScope class="earn-capacity-info" role="button" tabindex="0" aria-haspopup="dialog" :aria-label="t.earn.capExplainTitle" @click="openExplainer" @keydown.enter.stop.prevent="!$event.repeat && openExplainer()" @keydown.space.stop.prevent="!$event.repeat && openExplainer()">
-          <svg class="earn-capacity-info__glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <g class="earn-capacity-info__rocket">
-              <path d="M8 14 5 17v3l4-2m7-4 3 3v3l-4-2" />
-              <path d="M12 2c-3.3 2.7-4.7 7.5-3.5 13.5L10 18h4l1.5-2.5C16.7 9.5 15.3 4.7 12 2Z" fill="currentColor" fill-opacity=".12" />
-              <circle cx="12" cy="9" r="2" />
-              <path class="earn-capacity-info__flame" d="M10.2 18.5c-.7 1.5.2 3 1.8 4 1.6-1 2.5-2.5 1.8-4" fill="currentColor" stroke="none" />
-              <path class="earn-capacity-info__exhaust" d="M8 21v1m8-1v1" stroke-width="1.2" />
-            </g>
-          </svg>
+          <!-- The rocket body, flame and exhaust are separate HTML layers moved by transform and opacity alone, so the
+               compositor plays the loops without repainting the page under them. -->
+          <view class="earn-capacity-info__rocket" aria-hidden="true">
+            <view class="earn-capacity-info__layer">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 14 5 17v3l4-2m7-4 3 3v3l-4-2" />
+                <path d="M12 2c-3.3 2.7-4.7 7.5-3.5 13.5L10 18h4l1.5-2.5C16.7 9.5 15.3 4.7 12 2Z" fill="currentColor" fill-opacity=".12" />
+                <circle cx="12" cy="9" r="2" />
+              </svg>
+            </view>
+            <view class="earn-capacity-info__layer earn-capacity-info__flame">
+              <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.2 18.5c-.7 1.5.2 3 1.8 4 1.6-1 2.5-2.5 1.8-4" fill="currentColor" stroke="none" /></svg>
+            </view>
+            <view class="earn-capacity-info__layer earn-capacity-info__exhaust">
+              <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21v1m8-1v1" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg>
+            </view>
+          </view>
         </LoopScope>
       </view>
       <FleetStage />
@@ -322,16 +330,19 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 .earn-fleet-head__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
 .earn-block { margin-top: 32px; }
 .earn-capacity-info { width:44px; height:44px; margin-left:-8px; flex:none; display:grid; place-items:center; color:var(--v5-brand); background:transparent; cursor:pointer; }
+/* The glyph is drawn in a 24-unit viewBox at 22px: one unit is 22/24 px. */
+.earn-capacity-info__rocket { position:relative; width:22px; height:22px; animation:earn-rocket-hop 1.6s ease-in-out infinite; }
+.earn-capacity-info__layer { position:absolute; inset:0; display:flex; }
 /* App renders small SVGs through NxNativeSvg/v-html, so inner nodes need deep selectors. */
-.earn-capacity-info :deep(.earn-capacity-info__glyph) { display:block; overflow:visible; }
-.earn-capacity-info :deep(.earn-capacity-info__rocket) { animation:earn-rocket-hop 1.6s ease-in-out infinite; }
-.earn-capacity-info :deep(.earn-capacity-info__flame) { transform-origin:12px 18.5px; animation:earn-rocket-flame .72s ease-in-out infinite; }
-.earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:earn-rocket-exhaust .9s ease-out infinite; }
-.earn-capacity-info.nx-loops-paused :deep(.earn-capacity-info__rocket), .earn-capacity-info.nx-loops-paused :deep(.earn-capacity-info__flame), .earn-capacity-info.nx-loops-paused :deep(.earn-capacity-info__exhaust) { animation-play-state: paused; }
-@keyframes earn-rocket-hop { 0%,100% { transform:translateY(1px); } 50% { transform:translateY(-1.5px); } }
+.earn-capacity-info__layer :deep(svg) { display:block; overflow:visible; }
+/* Flame origin (12, 18.5) in glyph units. */
+.earn-capacity-info__flame { transform-origin:50% 77.0833%; animation:earn-rocket-flame .72s ease-in-out infinite; }
+.earn-capacity-info__exhaust { animation:earn-rocket-exhaust .9s ease-out infinite; }
+.earn-capacity-info.nx-loops-paused .earn-capacity-info__rocket, .earn-capacity-info.nx-loops-paused .earn-capacity-info__flame, .earn-capacity-info.nx-loops-paused .earn-capacity-info__exhaust { animation-play-state: paused; }
+@keyframes earn-rocket-hop { 0%,100% { transform:translateY(.9167px); } 50% { transform:translateY(-1.375px); } }
 @keyframes earn-rocket-flame { 0%,100% { transform:scaleY(.6); opacity:.55; } 50% { transform:scaleY(1.15); opacity:1; } }
-@keyframes earn-rocket-exhaust { 0% { transform:translateY(0); opacity:0; } 25% { opacity:.65; } 100% { transform:translateY(2.5px); opacity:0; } }
-@media (prefers-reduced-motion:reduce) { .earn-capacity-info :deep(.earn-capacity-info__rocket),.earn-capacity-info :deep(.earn-capacity-info__flame),.earn-capacity-info :deep(.earn-capacity-info__exhaust) { animation:none; }.earn-capacity-info :deep(.earn-capacity-info__exhaust) { opacity:0; } }
+@keyframes earn-rocket-exhaust { 0% { transform:translateY(0); opacity:0; } 25% { opacity:.65; } 100% { transform:translateY(2.2917px); opacity:0; } }
+@media (prefers-reduced-motion:reduce) { .earn-capacity-info__rocket,.earn-capacity-info__flame,.earn-capacity-info__exhaust { animation:none; }.earn-capacity-info__exhaust { opacity:0; } }
 .earn-capacity-info:focus-visible { outline:2px solid var(--v5-brand); outline-offset:-2px; border-radius:12px; }
 .earn-more-ways :deep(.nx-section__title) { font-size: 20px; line-height: 1.25; }
 /* The section heading box adds its own room above the title; 22px matches the board's gap. */
