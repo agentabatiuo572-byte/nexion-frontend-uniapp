@@ -294,7 +294,7 @@ async function retryOriginalLogin(captchaTicket?: string) {
     } else finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: result.user.onboardingComplete,
       serverProfile: result.user, serverSessionRevision: result.vaultRevision,
       recoveredRegistration: originalContext?.authMethod === "REGISTRATION" || !!result.registrationReceipt,
-      registrationReceipt: result.registrationReceipt, registrationLanguage: originalContext?.context.language });
+      registrationReceipt: result.registrationReceipt, originalAuthMethod: originalContext?.authMethod });
   } catch (cause) { if (mounted && flowVersion === otpFlowVersion) {
     syncLoginRecovery();
     if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") { captchaPurpose.value = "replay"; showCaptcha.value = true; }
@@ -318,7 +318,7 @@ async function recoverLoginResult() {
     if (result.kind === "authenticated") finishSignIn({ accountId: authenticatedAccountId(result.user),
       onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision,
       recoveredRegistration: originalContext?.authMethod === "REGISTRATION" || !!result.registrationReceipt,
-      registrationReceipt: result.registrationReceipt, registrationLanguage: originalContext?.context.language });
+      registrationReceipt: result.registrationReceipt, originalAuthMethod: originalContext?.authMethod });
   } catch (cause) {
     if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
@@ -588,7 +588,7 @@ function geoText(code: unknown): string | null {
 // return target or Home. Registration and device setup own their own routes.
 function finishSignIn(
   session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number;
-    recoveredRegistration?: boolean; registrationReceipt?: RegistrationReceipt | null; registrationLanguage?: string | null },
+    recoveredRegistration?: boolean; registrationReceipt?: RegistrationReceipt | null; originalAuthMethod?: string },
   context: OtpFlowContext | null = null,
 ) {
   signInTimer = undefined;
@@ -603,6 +603,8 @@ function finishSignIn(
     serverProfile: session.serverProfile,
     serverSessionRevision: session.serverSessionRevision,
     deferNavigation: session.recoveredRegistration,
+    initialOAuthLocale: session.originalAuthMethod === "OAUTH" && session.registrationReceipt
+      ? useLocaleStore().code : undefined,
   });
   if (result.ok && session.recoveredRegistration) {
     stageRemoteRegistrationReceipt(session.registrationReceipt, session.accountId);

@@ -1,6 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import { LOCALES, serverLanguage, type LocaleCode } from "@/i18n";
+import { LOCALES, type LocaleCode } from "@/i18n";
 
 export interface ProfileApi {
   profile(): Promise<ProfileProjection>;
@@ -122,12 +122,10 @@ export function createProfileApi(client: ApiClient): ProfileApi {
       return row.nickname;
     },
     updateLanguage: async (nextLanguage) => {
-      // Keep the client projection of the six additional interface languages to English.
-      const expected = serverLanguage(language(nextLanguage));
       const row = record(await client.request({
         method: "PUT",
         path: "/api/app/profile/language",
-        body: { language: expected },
+        body: { language: language(nextLanguage) },
       }));
       if (!row || !isProfileLanguage(row.language) || Object.keys(row).some((entry) => entry !== "language" && entry !== "status")) {
         throw new ApiError({ kind: "protocol", message: "PROFILE_LANGUAGE_RESPONSE_INVALID" });
