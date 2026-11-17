@@ -24,11 +24,12 @@
   box-shadow: var(--nx-glass-edge);
 }
 /* Sheets and dialogs float over content: the shared floating material — a uniform near-opaque fill so text behind
-   never shows, the shared soft edge and blur, no hairline (04 §4.0). */
+   never shows, blur, and one 1px highlight along the top edge only; the sides and bottom carry no rim or inner
+   shadow (04 §4.0, P42 sheet boards). The highlight is the shared button rim, so light takes its light value. */
 .nx-glass-sheet {
   --nx-glass-radius: 28px;
   --nx-glass-fill: color-mix(in srgb, var(--v5-surface) 98%, transparent);
-  --nx-glass-edge: var(--ui-glass-edge-shadow);
+  --nx-glass-edge: inset 0 1px 0 var(--ui-button-rim);
   backdrop-filter: blur(12px) saturate(125%);
   -webkit-backdrop-filter: blur(12px) saturate(125%);
 }
