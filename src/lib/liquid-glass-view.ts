@@ -13,8 +13,18 @@ const axes = ["x", "y", "width", "height"] as const;
 const zeroVelocity = (): LensRect => ({ x: 0, y: 0, width: 0, height: 0 });
 type Motion = { rect: LensRect; velocity: LensRect; expansion: number; expansionVelocity: number };
 const frameMs = 1000 / 60;
+type Flight = { steps: Motion[]; held: number; lens: Animation; track?: Animation };
+/** Where the compositor shows a flight now (or last showed it); keyframes are linear between steps. */
+function sampleFlight(f: Flight): Motion {
+  const at = Math.max(0, Number(f.lens.currentTime ?? f.held) / frameMs);
+  const i = Math.min(f.steps.length - 1, Math.floor(at)), a = f.steps[i], b = f.steps[Math.min(f.steps.length - 1, i + 1)];
+  const k = Math.min(1, at - i), mix = (x: number, y: number) => x + (y - x) * k;
+  const mixRect = (x: LensRect, y: LensRect) => ({ x: mix(x.x, y.x), y: mix(x.y, y.y), width: mix(x.width, y.width), height: mix(x.height, y.height) });
+  return { rect: mixRect(a.rect, b.rect), velocity: mixRect(a.velocity, b.velocity), expansion: mix(a.expansion, b.expansion), expansionVelocity: mix(a.expansionVelocity, b.expansionVelocity) };
+}
 // A new H5 page resumes the outgoing lens, including velocity, instead of restarting.
-let navigationFlight: { from: string; value: string; sequence: number; width: number; motion: () => Motion } | undefined;
+// It holds a running flight only while that flight is shown; grounding freezes it to one sample.
+let navigationFlight: { from: string; value: string; sequence: number; width: number; motion: Motion | Flight } | undefined;
 let navigationSequence = 0;
 
 function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
@@ -23,7 +33,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   let transformLayer: Animation | undefined, trackLayer: Animation | undefined;
   // A tap's whole spring is precomputed and played by the compositor, so a busy
   // main thread (page switch) cannot drop its frames. Drag still follows per frame.
-  let flight: { steps: Motion[]; held: number; lens: Animation; track?: Animation } | undefined;
+  let flight: Flight | undefined;
   let expansion = 0, expansionVelocity = 0;
   let maxTrackScroll = 0;
   let destination = initial.value, suppressClick = false;
@@ -49,7 +59,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     const scale = reduced.matches ? 0 : limit * Math.tanh(amount / limit);
     return config.layout === "vertical" ? `scale(${1 - scale * .5},${1 + scale})` : `scale(${1 + scale},${1 - scale * .5})`;
   }
-  function handOff(motion: () => Motion) {
+  function handOff(motion: Motion | Flight) {
     if (config.variant === "navigation" && destination !== config.value && root.clientWidth > 0 && outgoingSequence === navigationSequence) {
       navigationFlight = { from: config.value, value: destination, sequence: outgoingSequence, width: root.clientWidth, motion };
     }
@@ -82,23 +92,17 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
         } else (trackLayer.effect as KeyframeEffect).setKeyframes([{ transform: backdropTransform }, { transform: backdropTransform }]);
       } else track.style.transform = backdropTransform;
     }
-    const motion = { rect: { ...current }, velocity: { ...velocity }, expansion, expansionVelocity };
-    handOff(() => motion);
-  }
-  /** Where the compositor shows the flight now (or last showed it); keyframes are linear between steps. */
-  function sample(f: NonNullable<typeof flight>): Motion {
-    const at = Math.max(0, Number(f.lens.currentTime ?? f.held) / frameMs);
-    const i = Math.min(f.steps.length - 1, Math.floor(at)), a = f.steps[i], b = f.steps[Math.min(f.steps.length - 1, i + 1)];
-    const k = Math.min(1, at - i), mix = (x: number, y: number) => x + (y - x) * k;
-    const mixRect = (x: LensRect, y: LensRect) => ({ x: mix(x.x, y.x), y: mix(x.y, y.y), width: mix(x.width, y.width), height: mix(x.height, y.height) });
-    return { rect: mixRect(a.rect, b.rect), velocity: mixRect(a.velocity, b.velocity), expansion: mix(a.expansion, b.expansion), expansionVelocity: mix(a.expansionVelocity, b.expansionVelocity) };
+    handOff({ rect: { ...current }, velocity: { ...velocity }, expansion, expansionVelocity });
   }
   /** Ends any flight; with a motion, the static layer takes over in the same task so nothing flashes. */
   function ground(motion?: Motion) {
     const f = flight;
     flight = undefined;
     // An H5 page that leaves mid-flight hands over the lens where it was last shown.
-    if (f) f.held = Number(f.lens.currentTime ?? f.held);
+    if (f) {
+      f.held = Number(f.lens.currentTime ?? f.held);
+      if (navigationFlight?.motion === f) navigationFlight.motion = sampleFlight(f);
+    }
     if (motion) {
       current = { ...motion.rect }; velocity = { ...motion.velocity };
       expansion = motion.expansion; expansionVelocity = motion.expansionVelocity;
@@ -132,7 +136,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     const size = target;
     transformLayer?.cancel(); trackLayer?.cancel(); transformLayer = trackLayer = undefined;
     const timing = { duration: (steps.length - 1) * frameMs, easing: "linear", fill: "forwards" as const };
-    const f = {
+    const f: Flight = {
       steps, held: 0,
       lens: lens.animate(steps.map(step => ({ transform: lensTransform(step.rect, step.velocity, size) })), timing),
       track: track?.animate(steps.map(step => ({ transform: trackTransform(step.expansion) })), timing),
@@ -144,7 +148,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
       root.dataset.glassMoving = "false";
     };
     root.dataset.glassMoving = "true";
-    handOff(() => sample(f));
+    handOff(f);
   }
   function tick(now: number) {
     motionFrame = 0;
@@ -175,8 +179,9 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
     destination = value;
     const changed = !target || axes.some(axis => next[axis] !== target![axis]);
     // Layout/config notifications re-measure the same tab; the running flight already lands there.
-    if (flight && !changed) return;
-    ground(flight && sample(flight));
+    // A repeat tap or the drag-release click may have advanced the navigation sequence: re-record the handoff.
+    if (flight && !changed) { handOff(flight); return; }
+    ground(flight && sampleFlight(flight));
     if (changed && current && !reduced.matches) expansionVelocity = Math.min(3, expansionVelocity + 2.8);
     if (!current) {
       const from = config.fromValue ? nodes()[config.values.indexOf(config.fromValue)] : undefined;
@@ -184,7 +189,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
       // The logic layer has already validated/consumed this navigation intent.
       // A second, shorter clock would discard a valid flight on a cold page.
       if (config.variant === "navigation" && config.fromValue && flight?.from === config.fromValue && flight.value === value && flight.sequence === navigationSequence && Math.abs(flight.width - root.clientWidth) < 1) {
-        const motion = flight.motion();
+        const motion = "steps" in flight.motion ? sampleFlight(flight.motion) : flight.motion;
         current = { ...motion.rect }; velocity = { ...motion.velocity };
         expansion = motion.expansion; expansionVelocity = motion.expansionVelocity;
         navigationFlight = undefined;
@@ -246,7 +251,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
       if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) { drag = undefined; return; }
       if (Math.abs(dx) < 8) return;
       drag.engaged = true; root.setPointerCapture(event.pointerId);
-      ground(flight && sample(flight));
+      ground(flight && sampleFlight(flight));
       cancelAnimationFrame(motionFrame); motionFrame = 0; lastTime = 0;
     }
     event.preventDefault();
@@ -311,7 +316,7 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   const resize = new ResizeObserver(schedule);
   function observe() { resize.disconnect(); resize.observe(root); nodes().forEach(el => resize.observe(el)); }
   const stopMotion = () => {
-    ground(flight && sample(flight));
+    ground(flight && sampleFlight(flight));
     cancelAnimationFrame(motionFrame); motionFrame = 0; lastTime = 0;
     expansion = expansionVelocity = 0;
     if (target) { current = { ...target }; velocity = zeroVelocity(); paint(); }
