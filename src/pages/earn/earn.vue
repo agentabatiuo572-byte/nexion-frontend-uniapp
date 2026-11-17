@@ -24,21 +24,7 @@
 
       <!-- ===== Bento: device earnings, completed jobs, latest settlement ===== -->
       <view class="earn-bento">
-        <view class="earn-tile earn-tile--hero nx-tint" role="group" :aria-label="auditCopy.deviceRevenue">
-          <view class="earn-hero__row">
-            <view class="earn-hero__label"><text>{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text><DataVisibilityToggle class="earn-hero__eye" /></view>
-            <text class="earn-scope">{{ auditCopy.revenueScope }}</text>
-          </view>
-          <view :id="totalCount.hostId" class="earn-hero__amount" aria-hidden="true" :count-up="totalCount.config.value" :change:count-up="countUp.update">
-            <text v-if="!visibility.hidden" class="earn-hero__currency nx-count--prefix">{{ totalPrefix || '$' }}</text>
-            <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(totalInt) }}</text>
-            <text v-else class="earn-hero__int nx-count--int">{{ totalInt }}</text>
-            <text v-if="totalKnown && !visibility.hidden" class="earn-hero__dec nx-count--frac">.{{ totalCents }}</text>
-          </view>
-          <text class="nx-sr-only">{{ totalA11y }}</text>
-          <text :id="nexCount.hostId" class="earn-hero__nex" aria-hidden="true" :count-up="nexCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}</text><text class="earn-hero__nex-unit">UVT</text></text>
-          <text class="nx-sr-only">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }} UVT</text>
-        </view>
+        <EarnHeroTile :total="total" :nex="nexTotal" :period-label="rangeLabel(range)" />
         <view class="earn-tile earn-tile--half" role="group" :aria-label="t.earn.completedJobs">
           <view class="earn-half__label"><view class="earn-half__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg></view><text>{{ t.earn.completedJobs }}</text></view>
           <text class="earn-half__count">{{ visibility.mask(jobsCount === null ? '—' : jobsCount.toLocaleString()) }}<text v-if="jobsCount !== null && !visibility.hidden && t.earn.completedJobsUnit" class="earn-half__unit">{{ t.earn.completedJobsUnit }}</text></text>
@@ -88,8 +74,7 @@
 
 <script setup lang="ts">
 import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-screen-snapshot";
-import { formatAmount } from "@/lib/amount-display";
-import { formatUsd, formatUsdOverviewParts } from "@/lib/usd-display";
+import { formatUsd } from "@/lib/usd-display";
 import { onUnmounted, computed, nextTick, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
@@ -98,11 +83,10 @@ import { useEarnConfig } from "@/store/earn-config";
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
-import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { navTo } from "@/lib/route";
-import { useViewCountUp } from "@/composables/use-count-up";
 import GlassSegments from "@/components/glass-segments.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
+import EarnHeroTile from "@/components/earn/earn-hero-tile.vue";
 
 import FleetStage from "@/components/earn/fleet-stage.vue";
 import SlotRing from "@/components/slot-ring.vue";
@@ -118,7 +102,6 @@ import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { reportDayOnePageObservation } from "@/lib/day-one-page-observation";
 import { useDataVisibility } from "@/store/data-visibility";
-import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
 
 type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
@@ -126,7 +109,6 @@ const RANGES: Range[] = ["Today", "Week", "Month", "All"];
 const app = useApp();
 const t = useT();
 const visibility = useDataVisibility();
-const auditCopy = useAuditUiCopy();
 const range = ref<Range>("Today");
 const freeTrial = useFreeTrial();
 let earnPageVisible = false;
@@ -250,19 +232,7 @@ const mockTotal = computed(() => {
   return range.value === "Today" ? e.today : range.value === "Week" ? e.thisWeek : range.value === "Month" ? e.thisMonth : e.total;
 });
 const total = computed(() => remoteApiEnabled ? serverPeriodValue.value?.usdt ?? null : mockTotal.value);
-// Only the first figure counts up; a period switch during the count converges to the new value, a later one shows it directly.
-const totalCount = useViewCountUp(total, "usd");
-const totalParts = computed(() => formatUsdOverviewParts(total.value));
-const totalKnown = computed(() => totalParts.value !== null);
-const totalPrefix = computed(() => totalParts.value?.prefix ?? "");
-const totalInt = computed(() => totalParts.value?.integer ?? "—");
-const totalCents = computed(() => totalParts.value?.fraction ?? "");
-// The visible digits count up in the view layer and are hidden from screen readers; this is the final text.
-const totalA11y = computed(() => visibility.hidden ? visibility.mask(totalInt.value)
-  : totalKnown.value ? `${totalPrefix.value || "$"}${totalInt.value}.${totalCents.value}` : "—");
 const nexTotal = computed(() => remoteApiEnabled ? serverPeriodValue.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
-const nexCount = useViewCountUp(nexTotal, "plus");
-const nexFmt = computed(() => nexTotal.value === null ? "—" : formatAmount(nexTotal.value));
 const jobsCount = computed(() => {
   if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
   return serverPeriodValue.value?.jobCount ?? null;
@@ -283,31 +253,12 @@ function goLedger() { navTo("/pages/me/wallet-bills"); }
 const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLabel(value) })));
 </script>
 
-<script module="countUp" lang="renderjs">
-import { countUpView } from "@/lib/count-up-view";
-// @ts-expect-error vue-tsc 1.x treats uni's renderjs custom block as a second normal script.
-export default countUpView;
-</script>
-
 <style scoped>
 .earn-page > .earn-bento { margin-top: 16px; }
 .earn-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 16px; }
 .earn-tile { position: relative; min-width: 0; box-sizing: border-box; overflow: hidden; border-radius: 22px; }
 .earn-tile:not(.nx-tint) { background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .earn-tile:not(.nx-tint) { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-/* Earn's focal block: the big tile keeps its original amber as a tinted solid (01 §1.1.2); the other tiles stay neutral. */
-.earn-tile--hero { --nx-tint: var(--v5-warning); grid-column: 1 / -1; padding: 16px 18px 18px; border-radius: 24px; }
-.earn-hero__row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.earn-hero__label { display: flex; align-items: center; gap: 2px; min-width: 0; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
-.earn-hero__eye { margin: -12px 0; color: var(--v5-ink-3); }
-.earn-scope { color: var(--v5-ink-2); font: 400 12px/16px var(--font-v5); text-align: right; max-width: 50%; }
-.earn-hero__amount { position: relative; display: flex; align-items: baseline; gap: 4px; margin-top: 10px; font-family: var(--font-amount); font-weight: 600; letter-spacing: -.024em; line-height: 1; color: var(--v5-ink); font-variant-numeric: tabular-nums; }
-.earn-hero__currency { font-size: 20px; font-weight: 500; color: var(--v5-ink-3); }
-/* -0.024em is set on each part so it scales with that part's size (em letter-spacing inherits as a fixed length). */
-.earn-hero__int { font-size: 52px; letter-spacing: -.024em; }
-.earn-hero__dec { font-size: 34px; color: var(--v5-ink-3); letter-spacing: -.024em; }
-.earn-hero__nex { position: relative; display: block; margin-top: 10px; font: 600 15px/20px var(--font-metric); color: var(--v5-nex-ink); font-variant-numeric: tabular-nums; }
-.earn-hero__nex-unit { margin-left: 3px; font: 500 12px/16px var(--font-v5); letter-spacing: .04em; }
 .earn-tile--half { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 116px; padding: 14px 14px 12px; }
 .earn-tile--link { cursor: pointer; }
 .earn-tile--link:active { opacity: .85; }
@@ -344,6 +295,5 @@ export default countUpView;
 .earn-range :deep(.nx-glass-option__label) { white-space: nowrap; overflow-wrap: normal; }
 @media (max-width: 374px) {
   .earn-fleet-head, .earn-block { margin-top: 24px; }
-  .earn-hero__int { font-size: 46px; }
 }
 </style>
