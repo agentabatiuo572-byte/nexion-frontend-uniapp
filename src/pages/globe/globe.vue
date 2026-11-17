@@ -528,7 +528,7 @@ useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () =>
   box-sizing: border-box;
   overflow: hidden;
   overscroll-behavior-y: contain;
-  padding: 12px 12px calc(16px + max(env(safe-area-inset-bottom, 0px), 24px));
+  padding: 12px 12px var(--nx-overlay-bottom);
 }
 .nx-globe-scrim {
   position: absolute;
