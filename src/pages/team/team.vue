@@ -5,7 +5,6 @@
         <!-- This month ledger -->
         <TeamLedgerCard
           :available="ledgerVisible"
-          :snapshot-display="restoredTabSnapshot('commission')"
           :loading="ledgerLoading"
           :failed="ledgerFailureFeedback"
           :total-u-s-d-t-lifetime="totalUSDTLifetime"
@@ -108,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { readTabSnapshot, tabSnapshotPeriodCurrent, restoredTabSnapshot } from "@/lib/tab-first-screen-snapshot";
+import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";

@@ -7,7 +7,7 @@
         <text>{{ copy.details }}</text><text aria-hidden="true">›</text>
       </view>
     </view>
-    <view class="team-ledger__amount tabular-nums"><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__currency">{{ monthUSDTParts.prefix }}</text><text>{{ visibility.mask(intPart) }}</text><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__fraction">.{{ fracPart }}</text></view>
+    <view :id="monthCount.hostId" class="team-ledger__amount tabular-nums" :count-up="monthCount.config.value" :change:count-up="countUp.update"><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__currency nx-count--prefix">{{ monthUSDTParts.prefix }}</text><text class="nx-count--int">{{ visibility.mask(intPart) }}</text><text v-if="!visibility.hidden && monthUSDTParts" class="team-ledger__fraction nx-count--frac">.{{ fracPart }}</text></view>
     <text class="team-ledger__nex tabular-nums">{{ visibility.mask(hasAmounts && props.monthNEX !== null ? '+' + formatAmount(props.monthNEX) : '—') }} UVT</text>
     <view class="team-ledger__settlement" :aria-label="copy.settlementScope">
       <view><view class="team-ledger__settlement-label"><view class="team-ledger__dot" aria-hidden="true" /><text>{{ t.teamV3.settled }}</text></view><text class="tabular-nums">{{ visibility.mask(hasAmounts ? formatUsd(props.unlockedUSDT) : '—') }}</text></view>
@@ -33,7 +33,6 @@
 </template>
 
 <script setup lang="ts">
-import { remoteApiEnabled } from "@/api/runtime";
 import { formatAmount } from "@/lib/amount-display";
 import { formatUsd, formatUsdOverviewParts } from '@/lib/usd-display';
 import { navTo } from "@/lib/route";
@@ -44,11 +43,10 @@ import { teamRedesignCopy } from '@/i18n/team-redesign';
 import { useDataVisibility } from '@/store/data-visibility';
 import DataVisibilityToggle from '@/components/ui/data-visibility-toggle.vue';
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, vizStagger } from '@/composables/use-scroll-grow-progress';
-import { useCountUp } from '@/composables/use-count-up';
+import { useViewCountUp } from '@/composables/use-count-up';
 
 const props = withDefaults(defineProps<{
   available?: boolean;
-  snapshotDisplay?: boolean;
   loading?: boolean;
   failed?: boolean;
   totalUSDTLifetime: number;
@@ -70,8 +68,8 @@ const hasAmounts = computed(() => props.available);
 
 
 // Only the month USDT headline counts up once when it first becomes readable; the sub-figures and lifetime composition stay static.
-const shownMonthUSDT = useCountUp(() => hasAmounts.value ? props.monthUSDT : null, { skip: () => remoteApiEnabled || props.snapshotDisplay });
-const monthUSDTParts = computed(() => hasAmounts.value ? formatUsdOverviewParts(shownMonthUSDT.value) : null);
+const monthCount = useViewCountUp(() => hasAmounts.value ? props.monthUSDT : null, "usd");
+const monthUSDTParts = computed(() => hasAmounts.value ? formatUsdOverviewParts(props.monthUSDT) : null);
 const intPart = computed(() => monthUSDTParts.value?.integer ?? '—');
 const fracPart = computed(() => monthUSDTParts.value?.fraction ?? '');
 const splitTotal = computed(() => hasAmounts.value ? Math.max(0, props.directUSDT + props.extendedUSDT) : 0);
@@ -82,6 +80,12 @@ function goCommissions() {
   navTo("/pages/team/commissions");
 }
 
+</script>
+
+<script module="countUp" lang="renderjs">
+import { countUpView } from "@/lib/count-up-view";
+// @ts-expect-error vue-tsc 1.x treats uni's renderjs custom block as a second normal script.
+export default countUpView;
 </script>
 
 <style scoped>

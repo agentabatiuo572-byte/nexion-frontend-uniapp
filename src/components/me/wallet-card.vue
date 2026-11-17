@@ -20,8 +20,8 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
         </view>
       </view>
-      <view class="nx-wallet-total" :style="usdtFitStyle" :aria-label="t.me.usdtBalance + ': ' + visibility.mask('$' + usdtLabel)">
-        <text v-if="!visibility.hidden" class="nx-wallet-currency">$</text><text v-if="visibility.hidden" class="tabular-nums nx-wallet-amount">••••</text><text v-else-if="usdtBalanceReadable" class="tabular-nums nx-wallet-amount">{{ intPart }}<text class="nx-wallet-fraction">.{{ fracPart }}</text></text><text v-else class="tabular-nums nx-wallet-amount">—</text>
+      <view :id="usdtCount.hostId" class="nx-wallet-total" :style="usdtFitStyle" :aria-label="t.me.usdtBalance + ': ' + visibility.mask('$' + usdtLabel)" :count-up="usdtCount.config.value" :change:count-up="countUp.update">
+        <text v-if="!visibility.hidden" class="nx-wallet-currency">$</text><text v-if="visibility.hidden" class="tabular-nums nx-wallet-amount">••••</text><text v-else-if="usdtBalanceReadable" class="tabular-nums nx-wallet-amount"><text class="nx-count--int">{{ intPart }}</text><text class="nx-wallet-fraction nx-count--frac">.{{ fracPart }}</text></text><text v-else class="tabular-nums nx-wallet-amount">—</text>
       </view>
       <view class="nx-wallet-nex" role="link" tabindex="0" @click="goNex" @keydown.enter.prevent="goNex" :aria-label="t.uiChrome.nexBalance + ': ' + nexLabel + ' UVT'">
         <view class="nx-wallet-coin" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM8 15V9l8 6V9" /></svg></view>
@@ -88,7 +88,7 @@ import { remoteAuthorityStatus } from "@/lib/remote-authority-display";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import SectionHeader from "@/components/me/section-header.vue";
 import WalletActionBtn from "@/components/me/wallet-action-btn.vue";
-import { useCountUp } from "@/composables/use-count-up";
+import { useViewCountUp } from "@/composables/use-count-up";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const t = useT();
@@ -124,10 +124,9 @@ const buckets = computed(() => ({
 const usdt = computed(() => liveUsdtReadable.value ? app.user.usdtBalance : walletSnapshot.value?.usdt ?? 0);
 const usdtText = computed(() => formatAmount(usdt.value));
 // Only the shown digits count up; the label and fit size keep the final balance so the size does not jump.
-const shownUsdt = useCountUp(() => usdtBalanceReadable.value ? usdt.value : null, { skip: remoteApiEnabled });
-const shownUsdtText = computed(() => formatAmount(shownUsdt.value ?? usdt.value));
-const intPart = computed(() => shownUsdtText.value.split(".")[0]);
-const fracPart = computed(() => shownUsdtText.value.split(".")[1]);
+const usdtCount = useViewCountUp(() => usdtBalanceReadable.value ? usdt.value : null, "finance");
+const intPart = computed(() => usdtText.value.split(".")[0]);
+const fracPart = computed(() => usdtText.value.split(".")[1]);
 const auditCopy = useAuditUiCopy();
 const pendingLine = computed(() => {
   if (visibility.hidden) return `${auditCopy.value.confirming} •••• · ${auditCopy.value.locked} ••••`;
@@ -275,6 +274,12 @@ const usdtLabel = computed(() => usdtBalanceReadable.value ? usdtText.value : "�
 const usdtFitStyle = computed<CSSProperties>(() => ({
   "--nx-wallet-fit-size": `calc((100vw - 80px) / ${(visibility.mask(usdtLabel.value).length + 1) * 0.6})`,
 }));
+</script>
+
+<script module="countUp" lang="renderjs">
+import { countUpView } from "@/lib/count-up-view";
+// @ts-expect-error vue-tsc 1.x treats uni's renderjs custom block as a second normal script.
+export default countUpView;
 </script>
 
 <style scoped>

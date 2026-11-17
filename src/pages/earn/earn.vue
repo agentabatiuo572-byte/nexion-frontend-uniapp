@@ -29,13 +29,13 @@
             <view class="earn-hero__label"><text>{{ auditCopy.deviceRevenue }} · {{ rangeLabel(range) }}</text><DataVisibilityToggle class="earn-hero__eye" /></view>
             <text class="earn-scope">{{ auditCopy.revenueScope }}</text>
           </view>
-          <view class="earn-hero__amount">
-            <text v-if="!visibility.hidden" class="earn-hero__currency">{{ totalPrefix || '$' }}</text>
+          <view :id="totalCount.hostId" class="earn-hero__amount" :count-up="totalCount.config.value" :change:count-up="countUp.update">
+            <text v-if="!visibility.hidden" class="earn-hero__currency nx-count--prefix">{{ totalPrefix || '$' }}</text>
             <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(totalInt) }}</text>
-            <text v-else class="earn-hero__int">{{ totalInt }}</text>
-            <text v-if="totalKnown && !visibility.hidden" class="earn-hero__dec">.{{ totalCents }}</text>
+            <text v-else class="earn-hero__int nx-count--int">{{ totalInt }}</text>
+            <text v-if="totalKnown && !visibility.hidden" class="earn-hero__dec nx-count--frac">.{{ totalCents }}</text>
           </view>
-          <text class="earn-hero__nex">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}<text class="earn-hero__nex-unit">UVT</text></text>
+          <text :id="nexCount.hostId" class="earn-hero__nex" :count-up="nexCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ visibility.mask(nexTotal === null ? '—' : `+${nexFmt}`) }}</text><text class="earn-hero__nex-unit">UVT</text></text>
         </view>
         <view class="earn-tile earn-tile--half" role="group" :aria-label="t.earn.completedJobs">
           <view class="earn-half__label"><view class="earn-half__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg></view><text>{{ t.earn.completedJobs }}</text></view>
@@ -98,7 +98,8 @@ import CardStagger from "@/components/card-stagger.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { navTo } from "@/lib/route";
-import { useCountUp } from "@/composables/use-count-up";
+import { useViewCountUp } from "@/composables/use-count-up";
+import GlassSegments from "@/components/glass-segments.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 
 import FleetStage from "@/components/earn/fleet-stage.vue";
@@ -247,16 +248,16 @@ const mockTotal = computed(() => {
   return range.value === "Today" ? e.today : range.value === "Week" ? e.thisWeek : range.value === "Month" ? e.thisMonth : e.total;
 });
 const total = computed(() => remoteApiEnabled ? serverPeriodValue.value?.usdt ?? null : mockTotal.value);
-// Only the first figure counts up; a later period switch shows its value directly.
-const shownTotal = useCountUp(total, { skip: remoteApiEnabled });
-const totalParts = computed(() => formatUsdOverviewParts(shownTotal.value));
+// Only the first figure counts up; a period switch during the count converges to the new value, a later one shows it directly.
+const totalCount = useViewCountUp(total, "usd");
+const totalParts = computed(() => formatUsdOverviewParts(total.value));
 const totalKnown = computed(() => totalParts.value !== null);
 const totalPrefix = computed(() => totalParts.value?.prefix ?? "");
 const totalInt = computed(() => totalParts.value?.integer ?? "—");
 const totalCents = computed(() => totalParts.value?.fraction ?? "");
 const nexTotal = computed(() => remoteApiEnabled ? serverPeriodValue.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
-const shownNex = useCountUp(nexTotal, { skip: remoteApiEnabled });
-const nexFmt = computed(() => shownNex.value === null ? "—" : formatAmount(shownNex.value));
+const nexCount = useViewCountUp(nexTotal, "plus");
+const nexFmt = computed(() => nexTotal.value === null ? "—" : formatAmount(nexTotal.value));
 const jobsCount = computed(() => {
   if (!remoteApiEnabled) return range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247;
   return serverPeriodValue.value?.jobCount ?? null;
@@ -274,8 +275,13 @@ const latestLabel = computed(() => latest.value
   : `${t.value.earn.latestSettlement}, ${t.value.home.earningsLedgerViewAll}`);
 function goLedger() { navTo("/pages/me/wallet-bills"); }
 
-import GlassSegments from "@/components/glass-segments.vue";
 const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLabel(value) })));
+</script>
+
+<script module="countUp" lang="renderjs">
+import { countUpView } from "@/lib/count-up-view";
+// @ts-expect-error vue-tsc 1.x treats uni's renderjs custom block as a second normal script.
+export default countUpView;
 </script>
 
 <style scoped>

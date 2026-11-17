@@ -15,13 +15,13 @@
       <text class="earn-hero__currency">{{ t.home.techEarningsCurrency }}</text>
     </view>
 
-    <view class="earn-hero__amount" :class="{ 'earn-hero__amount--long': longAmount }">
+    <view :id="todayCount.hostId" class="earn-hero__amount" :class="{ 'earn-hero__amount--long': longAmount }" :count-up="todayCount.config.value" :change:count-up="countUp.update">
       <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(intPart) }}</text>
       <text v-else-if="remoteApiEnabled && remoteToday === null" class="earn-hero__int">—</text>
       <template v-else>
         <text class="earn-hero__cur">$</text>
-        <text class="earn-hero__int">{{ intPart }}</text>
-        <text class="earn-hero__dec">.{{ cents }}</text>
+        <text class="earn-hero__int nx-count--int">{{ intPart }}</text>
+        <text class="earn-hero__dec nx-count--frac">.{{ cents }}</text>
       </template>
     </view>
 
@@ -41,7 +41,7 @@ import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
-import { useCountUp } from "@/composables/use-count-up";
+import { useViewCountUp } from "@/composables/use-count-up";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useDataVisibility } from "@/store/data-visibility";
 import DataVisibilityToggle from "@/components/ui/data-visibility-toggle.vue";
@@ -74,15 +74,22 @@ const deltaText = computed(() => {
 const deltaTone = computed(() => visibility.hidden || vsYesterday.value === null ? "is-none" : vsYesterday.value < 0 ? "is-down" : "is-up");
 
 // Mock-only streaming number. Remote mode shows the exact server snapshot; the only motion is a
-// one-time entrance count from 0 to that snapshot (07 首页收益入场), skipped for reduced motion.
+// one-time entrance count from 0 to that snapshot (07 首页收益入场), played in the view layer and
+// skipped for reduced motion; the text below is always the final figure.
 const display = useTicker(() => remoteToday.value ?? Math.max(todayTotal.value, 0.06), 0.0009, 1100, !remoteApiEnabled);
-const shownToday = useCountUp(remoteToday);
+const todayCount = useViewCountUp(remoteToday, "grouped");
 
-const amountParts = computed(() => formatGroupedAmount(shownToday.value ?? display.value).split("."));
+const amountParts = computed(() => formatGroupedAmount(remoteToday.value ?? display.value).split("."));
 const intPart = computed(() => amountParts.value[0]);
 const cents = computed(() => amountParts.value[1]);
 // The masked amount keeps the 64px size so it does not reveal the magnitude.
 const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\D/g, "").length >= 4);
+</script>
+
+<script module="countUp" lang="renderjs">
+import { countUpView } from "@/lib/count-up-view";
+// @ts-expect-error vue-tsc 1.x treats uni's renderjs custom block as a second normal script.
+export default countUpView;
 </script>
 
 <style scoped>
