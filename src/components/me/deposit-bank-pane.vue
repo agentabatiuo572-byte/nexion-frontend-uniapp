@@ -292,7 +292,7 @@ import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-displa
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
-import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { onShow, onHide, onUnload, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -375,16 +375,25 @@ const paneView = computed<PaneView>(() => {
 });
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
+let pageUnloaded = false;
+onShow(() => { if (!pageUnloaded) pageActive.value = true; });
+onHide(() => { pageActive.value = false; });
+onUnload(() => { pageUnloaded = true; pageActive.value = false; });
 onMounted(() => {
-  pageActive.value = true;
+  if (!pageUnloaded) pageActive.value = true;
 });
 watch(
   () => [pageActive.value, paymentSessionReady.value, app.accountBindingEpoch] as const,
   ([active, ready]) => {
     if (!remoteApiEnabled) return;
-    if (!active || !ready) {
+    if (!ready) {
       readError.value = "";
       dep.stopRemoteVietQrPolling();
+      return;
+    }
+    if (!active) {
+      readError.value = "";
+      dep.startRemoteVietQrPolling(false);
       return;
     }
     const accountKey = app.accountKey;

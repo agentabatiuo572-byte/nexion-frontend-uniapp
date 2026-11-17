@@ -49,6 +49,7 @@ import {
   bindVietQrIntent,
   finishVietQrCommand,
   finishVietQrCommandByIntent,
+  hasPendingVietQrCommand,
   vietQrCommandKey,
   type VietQrCommandIdentity,
 } from "@/lib/vietqr-command-key";
@@ -141,6 +142,7 @@ export const useDeposits = defineStore("deposits", () => {
   let remotePollTimer: ReturnType<typeof setInterval> | undefined;
   let remoteGeneration = 0;
   let remotePollingActive = false;
+  let remotePollingVisible = false;
   let remoteRefreshInFlight = false;
   let remoteRefreshQueued = false;
 
@@ -258,7 +260,7 @@ export const useDeposits = defineStore("deposits", () => {
       //   (合并时我一度把远端那半 .catch 原样粘了回来,而它在本地这侧前一天刚被删掉,
       //    理由正是「缝内已自吞」;独立审计逐行比对两个父提交后指出来的。)
       void refreshRemoteVietQrDeposits();
-      if (remotePollingActive) startRemoteVietQrPolling();
+      if (remotePollingActive) startRemoteVietQrPolling(remotePollingVisible);
       return;
     }
     const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
@@ -1045,14 +1047,25 @@ export const useDeposits = defineStore("deposits", () => {
     }
   }
 
-  function startRemoteVietQrPolling(): void {
+  function hasPendingRemoteVietQrWork(): boolean {
+    return intents.value.some(intent => intent.status === "awaiting_payment"
+      || intent.status === "mismatch_review" || intent.status === "return_pending")
+      || hasPendingVietQrCommand(serverAccountKey);
+  }
+
+  function startRemoteVietQrPolling(visible = true): void {
     if (!remoteApiEnabled) return;
+    remotePollingVisible = visible;
+    // Empty lists and completed history are display reads. Unsettled funds and
+    // durable CREATE/CANCEL commands retain the existing confirmation cadence.
+    if (!visible && !hasPendingRemoteVietQrWork()) { stopRemoteVietQrPolling(); return; }
     remotePollingActive = true;
     if (remotePollTimer) return;
     const generation = remoteGeneration;
     const accountKey = serverAccountKey;
     remotePollTimer = setInterval(() => {
       if (!remoteGenerationMatches(accountKey, generation, serverAccountKey, remoteGeneration)) return;
+      if (!remotePollingVisible && !hasPendingRemoteVietQrWork()) { stopRemoteVietQrPolling(); return; }
       void refreshRemoteVietQrDeposits();
     }, 3000);
   }
