@@ -388,8 +388,8 @@ function goMarketplace() {
 .genesis-faq-question { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); min-height:52px; padding:0 16px; font-size:15px; line-height:22px; font-weight:500; }
 .genesis-faq-question svg { flex:none; }
 .genesis-faq-answer { display:block; padding:0 16px 14px; font-size:13px; line-height:20px; color:var(--v5-ink-2); }
-.nx-genesis-dock { position:fixed; left:0; right:0; bottom:0; padding:var(--v5-space-3) 16px var(--nx-overlay-safe-bottom); }
-.nx-genesis-dock .nx-button { width:100%; }
+.nx-genesis-dock { position:fixed; display:flex; }
+.nx-genesis-dock .nx-button { flex:1; }
 .genesis-dock-number { font-family:var(--font-metric); }
 @media(prefers-reduced-motion:reduce) { .genesis-meter > view > view { transition:none; } }
 </style>

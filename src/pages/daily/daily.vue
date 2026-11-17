@@ -215,11 +215,11 @@
     <template #pageFixed>
       <view class="dly-bar nx-glass-bar">
         <!-- The ring is scrolled away: the same reward rises above the bar instead. -->
-        <view v-if="successFx && !successFx.atRing" :key="`bf${successFx.key}`" class="dly-fly dly-fly--bar" role="status">
+        <view v-if="successFx && !successFx.atRing" :key="`bf${successFx.key}`" class="dly-fly dly-fly--bar nx-tray-overlay" role="status">
           <view class="dly-fly__pill"><text>+{{ successFx.amount }}</text><text class="dly-fly__u">UVT</text><text v-if="successFx.multiplier > 1" class="dly-fly__u">{{ successFx.multiplier }}×</text></view>
           <text class="dly-sr">{{ successFx.summary }}</text>
         </view>
-        <view v-if="dailyFactsVisible && lastSignedToday" class="dly-done nx-frosted-button" role="status">
+        <view v-if="dailyFactsVisible && lastSignedToday" class="dly-done nx-tray-status" role="status">
           <view class="dly-done__ok"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></view>
           <text class="dly-done__t">{{ t.daily.checkedInShort }}</text>
           <view class="dly-done__cd">
@@ -1054,14 +1054,14 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-hr__dl--p { color: var(--v5-success-ink); }
 
 /* Bottom action bar (DS-30) */
-.dly-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: 12px 16px var(--nx-overlay-safe-bottom); animation: dly-barup 520ms cubic-bezier(.16, 1, .3, 1) 300ms both; }
-.dly-cta { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; padding: 6px 20px; box-sizing: border-box; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); text-align: center; overflow: hidden; cursor: pointer; }
+.dly-bar { position: absolute; z-index: 36; display: flex; flex-direction: column; animation: dly-barup 520ms cubic-bezier(.16, 1, .3, 1) 300ms both; }
+.dly-cta { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; padding: 6px 20px; box-sizing: border-box; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); text-align: center; overflow: hidden; cursor: pointer; }
 .dly-cta svg { flex: none; }
 .dly-cta__sheen { position: absolute; top: 0; bottom: 0; left: 0; width: 60px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .28), transparent); transform: translateX(-120%) skewX(-18deg); animation: dly-sheen 1200ms ease-out 900ms 1 both; pointer-events: none; }
 .dly-cta__spin { flex: none; width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: dly-spin 800ms linear infinite; }
 .dly-cta--sync { background: none; color: var(--v5-ink); }
 .dly-cta--sync svg { color: var(--v5-warning-ink); }
-.dly-done { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 18px 0 8px; box-sizing: border-box; border-radius: 999px; }
+.dly-done { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px 0 8px; box-sizing: border-box; border-radius: 999px; }
 .dly-done__ok { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: color-mix(in srgb, var(--v5-success-ink) 16%, transparent); color: var(--v5-success-ink); }
 .dly-done__t { flex: 1; min-width: 0; font: 500 15px/20px var(--font-v5); color: var(--v5-ink); }
 .dly-done__cd { flex: none; display: flex; align-items: center; gap: 6px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }

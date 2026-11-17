@@ -143,8 +143,8 @@ onUnmounted(() => { clear(); unsubscribe?.(); if (typeof document !== "undefined
 /* Warning ink on its own soft chip falls under 4.5:1 on the light tint; the light chip uses primary ink. */
 :global([data-theme="light"] .payment-vault-status) { color:var(--v5-ink); }
 .payment-vault-purpose { margin-top:var(--v5-space-3); font-size:13px; line-height:20px; color:var(--v5-ink-3); }
-.payment-pin-page__dock { position:fixed; bottom:0; left:0; right:0; padding:var(--v5-space-3) 16px var(--nx-overlay-safe-bottom); }
-.payment-pin-page__dock > .nx-button { width:100%; }
+.payment-pin-page__dock { position:fixed; display:flex; }
+.payment-pin-page__dock > .nx-button { flex:1; }
 .payment-pin-page__primary { width:100%; padding:0; background:none; }
 @media(prefers-reduced-motion:reduce) { .payment-vault-lock,.payment-vault-dots > view { animation:none; } }
 </style>

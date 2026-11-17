@@ -187,7 +187,7 @@
 
     <template #pageFixed>
       <view v-if="bar" class="lp-bar nx-glass-bar" :class="{ 'lp-bar--wide': bar.wide }">
-        <view v-if="!bar.wide" class="lp-bar__info">
+        <view v-if="!bar.wide" class="lp-bar__info nx-tray-copy">
           <text v-if="bar.hint" class="lp-bar__hint">{{ bar.hint }}</text>
           <template v-else-if="barSummary">
             <text class="lp-field">{{ barSummary.label }}</text>
@@ -423,9 +423,9 @@ const bar = computed<Bar | null>(() => {
   const a = activity.value, k = kind.value, copy = c.value;
   if (!a || !k) return null;
   if (phase.value === 'scheduled') return { hint: copy.orderAfterStart, label: copy.notStarted, variant: 'primary', disabled: true };
-  if (phase.value === 'ended') return { wide: true, label: copy.otherOffers, variant: 'neutral', href: '/pages/events/events' };
+  if (phase.value === 'ended') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
   if (refused.value) {
-    if (k !== 'repurchase') return { wide: true, label: copy.otherOffers, variant: 'neutral', href: '/pages/events/events' };
+    if (k !== 'repurchase') return { wide: true, label: copy.otherOffers, variant: 'primary', href: '/pages/events/events' };
     return firstOfferId.value ? { hint: copy.firstHint, label: copy.seeFirst, variant: 'primary', href: promotionLandingHref(firstOfferId.value) } : { wide: true, label: copy.goStore, variant: 'primary', href: promotionStoreHref() };
   }
   if (signInNeeded.value) return { label: copy.signInBuy, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) };
@@ -710,7 +710,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 
 /* Bottom action bar (DS-30), shared soft glass: the last line sits about 30px above it. */
 .lp-bar-space { height: calc(80px + env(safe-area-inset-bottom)); }
-.lp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px var(--nx-overlay-safe-bottom); animation: lp-bar .45s cubic-bezier(.2,.8,.2,1) .2s backwards; }
+.lp-bar { position: absolute; z-index: 36; display: flex; align-items: center; justify-content: space-between; animation: lp-bar .45s cubic-bezier(.2,.8,.2,1) .2s backwards; }
 .lp-bar__info { flex: 1; min-width: 0; }
 .lp-bar__hint { font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lp-bar .lp-price { margin-top: 2px; }
@@ -720,9 +720,9 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-bar__unit { font: var(--ui-type-chip-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 /* Approved offer action (03.1): L size, button role type; primary is a solid brand fill, neutral the 7% glass, both with the shared rim. */
 .lp-cta.promotion-action { flex: none; min-width: min(172px, 50%); height: 48px; min-height: 48px; padding: 0 20px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: pointer; }
-.lp-cta--primary.promotion-action { background: var(--v5-brand); }
+.lp-cta--primary.promotion-action { background: var(--v5-brand); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .lp-cta--neutral.promotion-action { background: color-mix(in srgb, var(--v5-ink) 7%, transparent); }
-.lp-cta.promotion-action[aria-disabled=true], .lp-cta.promotion-action[aria-disabled=true]:active { opacity: .5; transform: none; cursor: default; }
+.lp-cta.promotion-action[aria-disabled=true], .lp-cta.promotion-action[aria-disabled=true]:active { transform: none; cursor: default; }
 .lp-bar--wide .lp-cta { flex: 1; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .lp-cta--neutral.promotion-action { background: var(--v5-surface-2); }

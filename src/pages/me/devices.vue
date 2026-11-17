@@ -446,7 +446,7 @@ function goStore() {
 .device-phone-card__floor { position: absolute; left: 20%; right: 20%; bottom: 2px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
 [data-theme="light"] .device-phone-card__floor { background: radial-gradient(closest-side, rgba(20,16,8,.20), transparent); }
 .device-page__bar-space { height: calc(110px + env(safe-area-inset-bottom)); }
-.device-page__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
+.device-page__bar { position: absolute; z-index: 36; display: flex; }
 .device-page__bar-btn { display: flex; flex: 1; }
 .device-page__bar-label { display: flex; align-items: center; gap: 6px; }
 @keyframes device-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }

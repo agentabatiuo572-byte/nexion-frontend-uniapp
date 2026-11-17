@@ -127,16 +127,16 @@
     </view>
     <template #pageFixed>
       <AmbassadorActionBar v-if="pack && row && editing">
+        <text v-if="submitError" class="amb-bar__why nx-tray-note detail-bar-error" role="alert">{{ submitError }}</text>
+        <text v-else-if="submitBlocker || pack.materialRevision > 0" class="amb-bar__why nx-tray-note">{{ submitBlocker || c.resubmitHint }}</text>
         <view class="amb-bar__row">
           <NxButton v-if="editedBeyondCategory || editRequested" variant="secondary" :label="c.discard" :disabled="saving || picking || !!pendingSubmission" @click="discardChanges" />
           <NxButton class="amb-bar__main" variant="primary" :label="saving ? c.saving : c.submit" :disabled="!!submitBlocker" :busy="saving" @click="save" />
         </view>
-        <text v-if="submitError" class="amb-bar__why detail-bar-error" role="alert">{{ submitError }}</text>
-        <text v-else-if="submitBlocker || pack.materialRevision > 0" class="amb-bar__why">{{ submitBlocker || c.resubmitHint }}</text>
       </AmbassadorActionBar>
       <AmbassadorActionBar v-else-if="pack && row && editable">
+        <text class="amb-bar__why nx-tray-note">{{ c.replaceHint }}</text>
         <NxButton variant="secondary" :label="c.replace" @click="enterEdit" />
-        <text class="amb-bar__why">{{ c.replaceHint }}</text>
       </AmbassadorActionBar>
       <AmbassadorActionBar v-else-if="pack && row && row.status === 'APPROVED'">
         <NxButton variant="secondary" :label="c.newApplication" @click="openAgent" />

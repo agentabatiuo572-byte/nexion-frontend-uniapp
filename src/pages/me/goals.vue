@@ -652,7 +652,7 @@ const emptyStateStyle: CSSProperties = {
 .goal-intro { margin-top: var(--v5-space-8); }.goal-deadlines { padding: var(--v5-space-1); border-radius: var(--v5-radius-full); position: relative; }
 .nx-goal-target-preset, .nx-goal-deadline-preset { position: relative; cursor: pointer; }.nx-goal-target-preset::after, .nx-goal-deadline-preset::after { content:''; position:absolute; inset:-6px 0; }
 .nx-goal-target-preset:focus-visible, .nx-goal-deadline-preset:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.goal-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) 16px var(--nx-overlay-safe-bottom); }.goal-sticky > * { flex: 1; }
+.goal-sticky { position: absolute; z-index: 36; display: flex; }.goal-sticky > * { flex: 1; }
 .goal-daily { display:block; margin-top:6px; font:500 24px/30px var(--font-metric); letter-spacing:-.01em; }.goal-device-name { flex:1; font:500 15px/22px var(--font-v5); color:var(--v5-ink); }
 .goal-device-name {margin-right:12px;}.goal-builder ~ view [aria-label] .goal-device-name {font-weight:500;}
 

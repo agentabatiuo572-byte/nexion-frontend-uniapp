@@ -49,13 +49,12 @@
           <template v-else>
             <view class="payment-pin-notes"><view v-if="standalone && !confirming" class="payment-pin-note payment-pin-note--info"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-9h.01"/></svg><text>{{ t.paymentPin.firstNotice }}</text></view><view v-if="!confirming" class="payment-pin-note payment-pin-note--info"><svg v-if="standalone" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-9h.01"/></svg><text>{{ t.paymentPin.rule }}</text></view></view>
             <text v-if="!completePin" class="payment-pin-note payment-pin-incomplete">{{ t.paymentPin.incomplete }}</text>
-            <NxButton variant="primary" class="payment-pin-primary payment-pin-next" :disabled="!canContinue" @click="submit">{{ ui.busy ? (ui.stage.startsWith('reset') ? t.paymentPin.resetting : t.paymentPin.setting) : confirming ? (ui.stage === 'reset-confirm' ? t.paymentPin.confirmReset : t.paymentPin.confirmSetup) : t.paymentPin.next }}</NxButton>
+            <NxButton variant="primary" class="payment-pin-primary payment-pin-next" :class="{ 'nx-tray-float': standalone }" :disabled="!canContinue" @click="submit">{{ ui.busy ? (ui.stage.startsWith('reset') ? t.paymentPin.resetting : t.paymentPin.setting) : confirming ? (ui.stage === 'reset-confirm' ? t.paymentPin.confirmReset : t.paymentPin.confirmSetup) : t.paymentPin.next }}</NxButton>
             <view v-if="confirming" class="payment-pin-link" role="button" tabindex="0" :aria-disabled="ui.busy" @click="!ui.busy && pin.restart()">{{ t.paymentPin.startAgain }}</view>
           </template>
         </template>
         <text v-if="errorMessage" class="payment-pin-error" role="alert">{{ errorMessage }}</text>
         <view v-if="!standalone" class="payment-pin-link payment-pin-link--muted" role="button" tabindex="0" @click="pin.cancel">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
-        <view v-else class="payment-pin-bar nx-glass-bar" aria-hidden="true" />
       </view>
     </view>
   </view>
@@ -172,12 +171,13 @@ useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
 .payment-pin-mask--standalone .payment-pin-note--info { display:flex; gap:var(--v5-space-2); font-size:12px; line-height:18px; color:var(--v5-ink-3); }
 .payment-pin-mask--standalone .payment-pin-note--info > svg { flex:none; margin-top:2px; }
 .payment-pin-mask--standalone .payment-pin-incomplete { position:absolute; width:1px; height:1px; clip-path:inset(50%); overflow:hidden; }
-.payment-pin-mask--standalone .payment-pin-next { position:absolute; left:16px; right:16px; bottom:var(--nx-overlay-safe-bottom); margin:0; padding:0; background:none; }
+/* The page's "next" is a lone button: the floating button form of the bottom action bar (04 §4.0), placed like the nav
+   pill; .nx-tray-float gives it the shared disabled glass and light shadow. */
+.payment-pin-mask--standalone .payment-pin-next { position:absolute; left:12px; right:12px; bottom:var(--nx-tray-bottom); margin:0; padding:0; background:none; }
 .payment-pin-mask--standalone .payment-pin-error { margin:var(--v5-space-4) 20px; }
 </style>
 
 <style scoped>
-.payment-pin-mask--standalone .payment-pin-bar { position:absolute; left:0; right:0; bottom:0; height:calc(var(--nx-overlay-safe-bottom) + 67px); box-sizing:border-box; z-index:0; pointer-events:none; }
 .payment-pin-mask--standalone .payment-pin-next { z-index:1; }
 .payment-pin-mask--standalone .payment-pin-close { box-shadow:var(--ui-glass-edge-shadow); }
 </style>
