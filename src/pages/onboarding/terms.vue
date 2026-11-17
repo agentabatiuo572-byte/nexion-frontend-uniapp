@@ -269,7 +269,7 @@ function isCurrentRefreshContinuation(expected: LegalTermsSessionFence | null): 
     && sessionVault.isRefreshContinuation(expected.sessionRevision ?? -1);
 }
 function switchTermsLanguage(next: LocaleCode) {
-  if (next !== locale.code) locale.setLocale(next);
+  locale.setLocale(next);
 }
 /** 单选组的左右方向键:移一格并选上,焦点跟到新选中项(zentao #94,与 earn.vue moveRange 同形)。 */
 function moveTermsLanguage(index: number, delta: number): void {

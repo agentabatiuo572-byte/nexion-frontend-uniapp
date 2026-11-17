@@ -60,7 +60,8 @@ export const useLocaleStore = defineStore("locale", () => {
     systemLanguage.value = null;
     for (const language of languages) {
       const base = language.trim().toLowerCase().split(/[-_]/)[0];
-      const candidate = LOCALES.find((locale) => locale.code === base)?.code;
+      const normalized = base === "in" ? "id" : base === "tl" ? "fil" : base;
+      const candidate = LOCALES.find((locale) => locale.code === normalized)?.code;
       if (candidate) {
         systemLanguage.value = candidate;
         break;

@@ -1,5 +1,6 @@
 // Loopback demonstration only; never imported into the production application.
 import { randomUUID } from 'node:crypto';
+import { previewInterfaceLanguages } from './design-review-fixture.mjs';
 
 // One wallet fact for every read used by the account-deletion journey.
 export function accountDeletionWallet(state) {
@@ -80,8 +81,9 @@ export function accountDemo(url, locale, state, request) {
       nicknameChangeAvailableAt: nextChange(nicknameChangedAt), avatarChangeAvailableAt: null };
   }
   if (path === '/api/app/profile/language' && method === 'PUT') {
-    const language = body().language;
-    if (!['en','vi','zh','ja','ko','ru','es','pt','ar','de','fr'].includes(language)) reject('PROFILE_LANGUAGE_INVALID', 400);
+    const requested = body().language;
+    if (!previewInterfaceLanguages().includes(requested)) reject('PROFILE_LANGUAGE_INVALID', 422);
+    const language = previewInterfaceLanguages(state.interfaceLanguagesState).includes(requested) ? requested : 'en';
     state.profile ??= { nickname: 'Alex', avatarUrl: new URL('/static/img/demo/profile-woman.jpg', url).href, avatarRevision: 'demo-profile-woman', language: locale, nicknameChangedAt: null };
     state.profile.language = language;
     return { status: 'UPDATED', language };
