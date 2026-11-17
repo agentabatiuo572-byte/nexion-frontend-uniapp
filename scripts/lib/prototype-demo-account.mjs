@@ -18,7 +18,7 @@ export function accountDemo(url, locale, state, request) {
   const nextChange = (changedAt) => changedAt && changedAt + interval > Date.now() ? changedAt + interval : null;
   if (path === '/auth/users/login' && method === 'POST') {
     const input = body();
-    if (input.phone !== '13800000000' || input.password !== 'Local404Pass!') reject('USER_PASSWORD_INVALID', 422);
+    if (input.countryCode !== '+86' || input.phone !== '13800000000' || input.password !== 'Local404Pass!') reject('USER_CREDENTIAL_INVALID', 401);
     return { accessToken: 'formal-probe-access-token', refreshToken: null, tokenType: 'Bearer',
       user: { userId: 900001, countryCode: '+86', phone: '13800000000', nickname: 'Formal Probe', onboardingComplete: true } };
   }

@@ -2,6 +2,7 @@
 // c44d6526 scripts/oauth-provider.h5.e2e.mjs; no real provider or SMS is contacted.
 import { randomBytes } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
+import { accountDemo } from './prototype-demo-account.mjs';
 
 export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',registrationState:'normal',phoneBindingState:'normal',savedAttemptState:'none'};
 export const authDemoOptions = {
@@ -165,7 +166,10 @@ export function createAuthDemo(state) {
         const challengeNo=prefix+'-'+randomBytes(16).toString('hex');otps.set(challengeNo,body.countryCode+body.phone);
         return ok({challengeNo,resendAfterSec:1,deliveryHint:'***'+body.phone.slice(-4)});
       }
-      if(path==='/auth/users/login')return session(existing);
+      if(path==='/auth/users/login') {
+        accountDemo(url, 'en', state, {method:()=>method,postDataJSON:()=>body});
+        return session(existing);
+      }
       if(['/auth/users/register','/auth/users/register/otp/verify','/auth/users/login/otp/verify','/auth/users/password-reset/otp/verify','/auth/users/password-reset/otp/complete'].includes(path)) {
         if(otps.get(body.challengeNo)!==body.countryCode+body.phone||body.code!=='123456')return fail(422,'USER_REGISTRATION_OTP_INVALID');
         if(path==='/auth/users/register') {
