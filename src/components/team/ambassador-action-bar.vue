@@ -4,7 +4,7 @@
 </template>
 
 <style scoped>
-.amb-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-direction: column; gap: var(--v5-space-2); box-sizing: border-box; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); color: var(--v5-ink); }
+.amb-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-direction: column; gap: var(--v5-space-2); box-sizing: border-box; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); color: var(--v5-ink); }
 .amb-bar :deep(.amb-bar__row) { display: flex; gap: var(--v5-space-3); }
 .amb-bar :deep(.amb-bar__row > *) { flex: 1 1 40px; min-width: 0; }
 .amb-bar :deep(.amb-bar__row > .amb-bar__main) { flex: 2 1 40px; }

@@ -165,12 +165,12 @@ useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
 .payment-pin-mask--standalone .payment-pin-note--info { display:flex; gap:var(--v5-space-2); font-size:12px; line-height:18px; color:var(--v5-ink-3); }
 .payment-pin-mask--standalone .payment-pin-note--info > svg { flex:none; margin-top:2px; }
 .payment-pin-mask--standalone .payment-pin-incomplete { position:absolute; width:1px; height:1px; clip-path:inset(50%); overflow:hidden; }
-.payment-pin-mask--standalone .payment-pin-next { position:absolute; left:16px; right:16px; bottom:calc(30px + env(safe-area-inset-bottom)); margin:0; padding:0; background:none; }
+.payment-pin-mask--standalone .payment-pin-next { position:absolute; left:16px; right:16px; bottom:var(--nx-overlay-safe-bottom); margin:0; padding:0; background:none; }
 .payment-pin-mask--standalone .payment-pin-error { margin:var(--v5-space-4) 20px; }
 </style>
 
 <style scoped>
-.payment-pin-mask--standalone .payment-pin-bar { position:absolute; left:0; right:0; bottom:0; height:91px; box-sizing:border-box; z-index:0; pointer-events:none; }
+.payment-pin-mask--standalone .payment-pin-bar { position:absolute; left:0; right:0; bottom:0; height:calc(var(--nx-overlay-safe-bottom) + 67px); box-sizing:border-box; z-index:0; pointer-events:none; }
 .payment-pin-mask--standalone .payment-pin-next { z-index:1; }
 .payment-pin-mask--standalone .payment-pin-close { box-shadow:var(--ui-glass-edge-shadow); }
 </style>

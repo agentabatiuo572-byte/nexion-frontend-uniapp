@@ -1054,7 +1054,7 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-hr__dl--p { color: var(--v5-success-ink); }
 
 /* Bottom action bar (DS-30) */
-.dly-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: 12px 16px max(34px, calc(env(safe-area-inset-bottom) + 14px)); animation: dly-barup 520ms cubic-bezier(.16, 1, .3, 1) 300ms both; }
+.dly-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: 12px 16px var(--nx-overlay-safe-bottom); animation: dly-barup 520ms cubic-bezier(.16, 1, .3, 1) 300ms both; }
 .dly-cta { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; padding: 6px 20px; box-sizing: border-box; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); text-align: center; overflow: hidden; cursor: pointer; }
 .dly-cta svg { flex: none; }
 .dly-cta__sheen { position: absolute; top: 0; bottom: 0; left: 0; width: 60px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .28), transparent); transform: translateX(-120%) skewX(-18deg); animation: dly-sheen 1200ms ease-out 900ms 1 both; pointer-events: none; }

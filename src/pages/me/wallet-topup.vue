@@ -210,7 +210,7 @@ const segmentOptions = computed(() => visibleSegments.value.map(({ id }) => ({
 .topup-order__d { display: block; margin-top: 6px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .topup-order__b { font-weight: 500; color: var(--v5-ink); }
 .topup-order__cd { display: flex; align-items: center; gap: 6px; margin-top: var(--v5-space-2); color: var(--v5-warning); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.topup-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
+.topup-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
 .topup-sticky { gap: 12px; }
 .topup-sticky__btn { display: flex; flex: 1 1 0; }
 .topup-sticky__label { display: inline-flex; align-items: center; gap: 8px; }

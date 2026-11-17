@@ -1118,7 +1118,7 @@ const sectionLabelStyle: CSSProperties = {
 /* Buttons sit side by side while their labels fit, otherwise each takes a full row. */
 /* 40px basis = the L button's side padding, so a 1:2 pair splits the remaining width like the design. */
 .order-hero__pay { flex-grow: 2; }
-.order-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-wrap: wrap; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
+.order-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; flex-wrap: wrap; gap: var(--v5-space-3); padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
 .order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
 .order-sticky :deep(.nx-button__surface) { padding-inline: 16px; }
 /* Paired buttons share a card row, so they take the M side padding (16px) to fit two labels. */

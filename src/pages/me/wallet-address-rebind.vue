@@ -993,7 +993,7 @@ const successRowValStyle: CSSProperties = {
 .rb-lock { display: flex; align-items: center; gap: 8px; margin: 12px 4px 0; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
 .rb-lock > svg { flex: none; }
 .rb-bar-space { height: 110px; }
-.rb-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) calc(30px + env(safe-area-inset-bottom)); }
+.rb-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; gap: 12px; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
 .rb-bar__btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
 .rb-bar__btn--on, .rb-bar__btn--ghost { opacity: 1; cursor: pointer; }
 .rb-bar__btn--ghost.nx-frosted-button { background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-ink) 7%, transparent); box-shadow: var(--ui-glass-edge-shadow); color: var(--v5-ink); }

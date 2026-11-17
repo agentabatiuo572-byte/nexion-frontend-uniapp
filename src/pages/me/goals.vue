@@ -652,7 +652,7 @@ const emptyStateStyle: CSSProperties = {
 .goal-intro { margin-top: var(--v5-space-8); }.goal-deadlines { padding: var(--v5-space-1); border-radius: var(--v5-radius-full); position: relative; }
 .nx-goal-target-preset, .nx-goal-deadline-preset { position: relative; cursor: pointer; }.nx-goal-target-preset::after, .nx-goal-deadline-preset::after { content:''; position:absolute; inset:-6px 0; }
 .nx-goal-target-preset:focus-visible, .nx-goal-deadline-preset:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.goal-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) 16px calc(30px + env(safe-area-inset-bottom)); }.goal-sticky > * { flex: 1; }
+.goal-sticky { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) 16px var(--nx-overlay-safe-bottom); }.goal-sticky > * { flex: 1; }
 .goal-daily { display:block; margin-top:6px; font:500 24px/30px var(--font-metric); letter-spacing:-.01em; }.goal-device-name { flex:1; font:500 15px/22px var(--font-v5); color:var(--v5-ink); }
 .goal-device-name {margin-right:12px;}.goal-builder ~ view [aria-label] .goal-device-name {font-weight:500;}
 
@@ -664,7 +664,7 @@ const emptyStateStyle: CSSProperties = {
 .goal-device-copy { flex:1; min-width:0; }.goal-device-label { display:block; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.goal-device-name { display:block; margin:0; font:500 15px/22px var(--font-v5); }
 .goal-list-row { display:flex; align-items:center; gap:12px; box-sizing:border-box; min-height:86px; padding:14px 16px !important; }
 .goal-list-row__body { flex:1; min-width:0; }.goal-list-row__heading { display:flex; align-items:center; gap:8px; min-height:22px; }.goal-list-row__heading > text { margin-top:0 !important; }.goal-achieved { padding:4px 8px; border-radius:var(--v5-radius-full); background:var(--v5-success-soft); color:var(--v5-success-ink); font:500 12px/16px var(--font-v5); }
-.goal-delete { flex:none; width:36px; height:36px; border-radius:50%; color:var(--v5-ink-3); }.goal-sticky :deep(.nx-button--disabled) { opacity:1; }.goal-sticky { padding-bottom:30px; }
+.goal-delete { flex:none; width:36px; height:36px; border-radius:50%; color:var(--v5-ink-3); }.goal-sticky :deep(.nx-button--disabled) { opacity:1; }
 
 .growth-goals--featured :deep(.spv) { margin-bottom:0; padding-bottom:13px; }
 .goal-hero {margin-top:8px;}.goal-recommendation {min-height:167.5px;box-sizing:border-box;}
