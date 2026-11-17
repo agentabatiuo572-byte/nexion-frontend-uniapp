@@ -25,7 +25,7 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-export const demoDefaults = {accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
@@ -43,6 +43,7 @@ export const demoOptions = {
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
+  trustSectionsState:[['all','信任资料 · 六个版块'],['missing-narrative','信任资料 · 缺 UVT 说明'],['missing-audits','信任资料 · 缺审计'],['leadership','信任资料 · 仅管理团队'],['none','信任资料 · 无版块']],
   stakingState:[['delisted','功能下架'],['error','质押读取失败（其他正常）']],
   stakingOpenState:[['unmodeled','开仓未配置（演示拒绝）'],['disclosure','开仓拒绝·需风险确认（HTTP 200 / code 409）']],
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
@@ -591,18 +592,31 @@ export function demoFixture(url,locale,state,request) {
     ]};
   }
   if(pathname==='/api/content/trust/sections/current') {
-    const example=localized(locale,'原型演示资料，非真实资质或认证。','Prototype sample, not a real credential or certification.','Dữ liệu mẫu, không phải chứng nhận thực tế.');
+    const exampleFor=code=>localized(code,'原型演示资料，非真实资质或认证。','Prototype sample, not a real credential or certification.','Dữ liệu mẫu, không phải chứng nhận thực tế.');
     // Leadership and service notes follow the company records and the white paper; registrations come from /api/content/trust/documents.
-    const maps={financials:{overview:example},
+    const mapsFor=(locale)=>({financials:{overview:exampleFor(locale)},
       leadership:{leader1Name:'Jordan Nicholas Parkhurst',leader1Role:localized(locale,'总裁兼首席执行官 · President & CEO','President & Chief Executive Officer','Chủ tịch kiêm Tổng giám đốc điều hành'),leader1Url:'https://apps.dos.ny.gov/publicInquiry/'},
-      nexNarrative:{hero:'UVT',subhero:example,
+      nexNarrative:{hero:'UVT',subhero:exampleFor(locale),
         hostingContent:localized(locale,'Uvel Node 与 Uvel Rack 部署在专业数据中心，运行环境、网络配置和现场维护统一管理，无需寄送实体设备。购买后在 App 中激活和管理设备，订单与设备记录随时可查。','Uvel Node and Uvel Rack run in professional data centres, where the operating environment, network and on-site maintenance are managed for you; nothing is shipped. Activate and manage devices in the App, with order and device records always available.','Uvel Node và Uvel Rack được đặt tại trung tâm dữ liệu chuyên nghiệp; môi trường vận hành, mạng và bảo trì tại chỗ đều được quản lý tập trung, không cần giao thiết bị vật lý. Bạn kích hoạt và quản lý thiết bị trong App, hồ sơ đơn hàng và thiết bị luôn sẵn sàng tra cứu.'),
         warrantyContent:localized(locale,'设备故障、更换或重新配置、退款均按下单时的服务条款处理。遇到问题时，在 App 内联系专属客服并提供订单号，处理进度全程可查。','Faults, replacements or reconfiguration and refunds follow the service terms agreed when you ordered. Contact your dedicated advisor in the App with the order number and follow progress at every step.','Sự cố thiết bị, thay thế hoặc cấu hình lại và hoàn tiền được xử lý theo điều khoản dịch vụ khi đặt hàng. Khi cần hỗ trợ, hãy liên hệ chuyên viên riêng trong App kèm mã đơn hàng và theo dõi tiến độ xử lý.'),
         securityContent:localized(locale,'参与算力任务无需提供钱包私钥或助记词。登录、修改收款地址、提现等重要操作都需要身份确认并留有操作记录；处理中、锁定与可用资金分开显示。','Taking part in compute tasks never requires your wallet private key or recovery phrase. Sign-in, receiving-address changes and withdrawals all require identity confirmation and are recorded; funds in progress, locked and available are shown separately.','Tham gia tác vụ điện toán không bao giờ yêu cầu khóa riêng tư hay cụm từ khôi phục ví. Đăng nhập, thay đổi địa chỉ nhận và rút tiền đều cần xác minh danh tính và được ghi nhật ký; số tiền đang xử lý, bị khóa và khả dụng được hiển thị riêng.')},
-      complianceBadges:{badge1Label:localized(locale,'合规资料示例','Compliance sample','Mẫu tuân thủ'),badge1Body:example},
-      auditsReserves:{homepageProof:''},
-      listings:{overview:example}};
-    return {...authority,source:'nx_trust_section_version:published',sections:Object.entries(maps).map(([sectionKey,values])=>({sectionKey,version:'v1',description:example,structure:'Published resources',fields:Object.entries(values).map(([key,value])=>({key,label:key,value:empty?'':value}))}))};
+      complianceBadges:{badge1Label:localized(locale,'合规资料示例','Compliance sample','Mẫu tuân thủ'),badge1Body:exampleFor(locale)},
+      auditsReserves:{homepageProof:localized(locale,'原型审计资料','Prototype audit sample','Tài liệu kiểm toán mẫu')},
+      listings:{overview:exampleFor(locale)}});
+    const languages=['zh','vi','en'];
+    const maps=languages.map(code=>mapsFor(code));
+    const keys=empty||state.trustSectionsState==='none'?[]:Object.keys(maps[0]).filter(key=>
+      state.trustSectionsState==='missing-narrative'?key!=='nexNarrative':
+      state.trustSectionsState==='missing-audits'?key!=='auditsReserves':
+      state.trustSectionsState==='leadership'?key==='leadership':true);
+    return {...authority,source:'nx_trust_section_version:published',sections:keys.map(sectionKey=>({
+      sectionKey,version:'v1',description:exampleFor(locale),structure:'Published resources',
+      fields:Object.keys(maps[0][sectionKey]).flatMap(key=>key.endsWith('Url')?
+        [{key,label:key,value:maps[0][sectionKey][key]}]:
+        languages.map((code,index)=>({key:`${key}.${code}`,label:key,
+          // Production withholds these section claims and audit fields without a safe document1Url.
+          value:['financials','complianceBadges','listings','auditsReserves'].includes(sectionKey)?'':maps[index][sectionKey][key]})))
+    }))};
   }
   if(pathname==='/api/promotion-rewards'||/^\/api\/promotion-rewards\/demo-reward-\d+$/.test(pathname)){
     // A discount lives on the quote and the order: it creates no reward obligation, and history keeps its gift.

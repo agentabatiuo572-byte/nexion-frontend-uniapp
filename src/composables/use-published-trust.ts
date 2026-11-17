@@ -4,9 +4,10 @@ import type { PublishedTrustSection, TrustLocale } from "@/api/trust-section-api
 import { subscribeRuntimeRevision } from "@/api/order-api";
 
 const sections = ref<PublishedTrustSection[]>([]);
+const hasSnapshot = ref(false);
 const status = ref<"idle" | "loading" | "ready" | "error">("idle");
-const refreshing = computed(() => sections.value.length > 0 && status.value === "loading");
-const refreshError = computed(() => sections.value.length > 0 && status.value === "error");
+const refreshing = computed(() => hasSnapshot.value && status.value === "loading");
+const refreshError = computed(() => hasSnapshot.value && status.value === "error");
 let inflight: Promise<boolean> | null = null;
 let authorityGeneration = 0;
 
@@ -14,6 +15,7 @@ subscribeRuntimeRevision(() => {
   authorityGeneration += 1;
   inflight = null;
   sections.value = [];
+  hasSnapshot.value = false;
   status.value = "idle";
 });
 
@@ -25,6 +27,7 @@ export function refreshPublishedTrust(force = false): Promise<boolean> {
   inflight = trustSectionApi.current().then((next) => {
     if (generation !== authorityGeneration) return false;
     sections.value = next;
+    hasSnapshot.value = true;
     status.value = "ready";
     return true;
   }).catch(() => {
@@ -46,5 +49,5 @@ export function recordPublishedTrustViews(sectionKeys: string[], locale: TrustLo
 }
 
 export function usePublishedTrust() {
-  return { sections, status, refreshing, refreshError, refresh: refreshPublishedTrust };
+  return { sections, status, hasSnapshot, refreshing, refreshError, refresh: refreshPublishedTrust };
 }
