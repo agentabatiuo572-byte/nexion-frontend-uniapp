@@ -412,7 +412,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 </script>
 <style scoped>
 .pp-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: var(--v5-bg-color-mask); }
-.pp-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) calc(var(--nx-overlay-safe-bottom) + 10px); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; color: var(--v5-ink); }
+.pp-sheet { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100% - var(--nx-overlay-top)); box-sizing: border-box; padding: var(--v5-space-5) var(--v5-space-5) var(--nx-overlay-bottom); border-radius: var(--v5-radius-2xl) var(--v5-radius-2xl) 0 0; color: var(--v5-ink); }
 .pp-head { flex: none; display: flex; align-items: center; gap: var(--v5-space-3); }
 .pp-head__text { flex: 1; min-width: 0; }
 .pp-title { display: block; font: 600 var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
