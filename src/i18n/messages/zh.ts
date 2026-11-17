@@ -2327,7 +2327,7 @@ rankBenefits: "查看等级权益",
     ffCardholder: "持卡人姓名",
     ffCountry: "国家 / 地区",
     ffZip: "邮编",
-    cardNamePlaceholder: "与卡面一致，如 ZHANG SAN",
+    cardNamePlaceholder: "与卡面一致，如 JOHN SMITH",
 
 },
   cards: {
