@@ -15,7 +15,7 @@
       <text class="earn-hero__currency">{{ t.home.techEarningsCurrency }}</text>
     </view>
 
-    <view :id="todayCount.hostId" class="earn-hero__amount" :class="{ 'earn-hero__amount--long': longAmount }" :count-up="todayCount.config.value" :change:count-up="countUp.update">
+    <view :id="todayCount.hostId" class="earn-hero__amount" :class="{ 'earn-hero__amount--long': longAmount }" aria-hidden="true" :count-up="todayCount.config.value" :change:count-up="countUp.update">
       <text v-if="visibility.hidden" class="earn-hero__int">{{ visibility.mask(intPart) }}</text>
       <text v-else-if="remoteApiEnabled && remoteToday === null" class="earn-hero__int">—</text>
       <template v-else>
@@ -24,6 +24,7 @@
         <text class="earn-hero__dec nx-count--frac">.{{ cents }}</text>
       </template>
     </view>
+    <text class="nx-sr-only">{{ amountA11y }}</text>
 
     <view class="earnings-feedback">
       <text class="earnings-feedback__key">{{ t.home.techVsYesterdaySamePeriod }}</text>
@@ -83,6 +84,9 @@ const amountParts = computed(() => formatGroupedAmount(remoteToday.value ?? disp
 const intPart = computed(() => amountParts.value[0]);
 const cents = computed(() => amountParts.value[1]);
 // The masked amount keeps the 64px size so it does not reveal the magnitude.
+// The visible digits count up in the view layer and are hidden from screen readers; this is the final text.
+const amountA11y = computed(() => visibility.hidden ? visibility.mask(intPart.value)
+  : remoteApiEnabled && remoteToday.value === null ? "—" : `$${intPart.value}.${cents.value}`);
 const longAmount = computed(() => !visibility.hidden && intPart.value.replace(/\D/g, "").length >= 4);
 </script>
 

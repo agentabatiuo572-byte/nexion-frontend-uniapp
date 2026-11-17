@@ -49,7 +49,8 @@
         <view class="trial-earned trial-rise trial-rise--2">
           <text class="trial-earned__label">{{ isGrace ? detail.graceAmountLabel : lifecycle.accruedLabel }}</text>
           <view class="trial-earned__amount">
-            <text :id="earnedCount.hostId" class="trial-earned__value" :count-up="earnedCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ earnedParts[0] }}</text><text v-if="earnedParts[1]" class="trial-dim nx-count--frac">.{{ earnedParts[1] }}</text></text>
+            <text class="nx-sr-only">{{ earnedParts[1] ? `${earnedParts[0]}.${earnedParts[1]}` : earnedParts[0] }}</text>
+            <text :id="earnedCount.hostId" class="trial-earned__value" aria-hidden="true" :count-up="earnedCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ earnedParts[0] }}</text><text v-if="earnedParts[1]" class="trial-dim nx-count--frac">.{{ earnedParts[1] }}</text></text>
             <text class="trial-earned__unit">USDT</text>
           </view>
           <text class="trial-earned__uvt">+ {{ visibility.mask(formatGroupedAmount(shadowNEX)) }}<text class="trial-unit-small"> UVT</text></text>
@@ -67,7 +68,8 @@
               <text class="trial-total__breakdown">{{ totalBreakdown }}</text>
               <view class="trial-total__line">
                 <text class="trial-total__label">{{ detail.totalLabel }}</text>
-                <text :id="totalCount.hostId" class="trial-total__value" :count-up="totalCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ totalParts[0] }}</text><text v-if="totalParts[1]" class="trial-total__dec nx-count--frac">.{{ totalParts[1] }}</text></text>
+                <text class="nx-sr-only">{{ totalParts[1] ? `${totalParts[0]}.${totalParts[1]}` : totalParts[0] }}</text>
+                <text :id="totalCount.hostId" class="trial-total__value" aria-hidden="true" :count-up="totalCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ totalParts[0] }}</text><text v-if="totalParts[1]" class="trial-total__dec nx-count--frac">.{{ totalParts[1] }}</text></text>
                 <text class="trial-unit-small trial-total__unit">USDT</text>
                 <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small"> UVT</text></text>
               </view>
