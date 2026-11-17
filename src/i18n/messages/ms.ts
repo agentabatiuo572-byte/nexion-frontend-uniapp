@@ -2330,6 +2330,8 @@ export const ms: Messages = {
     specWarranty: "Waranti",
     specWarrantyMonths: "{n} bulan",
     specWarrantyYears: "{n} tahun",
+    specShareVramNotApplicable: "Tidak berkenaan",
+    specSharePowerNotApplicable: "Tidak berkenaan",
     specValueUnavailable: "Tiada data",
     specUnavailable: "Produk ini tidak boleh dibeli sehingga spesifikasi perkakasan dan perkhidmatannya diperakui.",
     faq: {

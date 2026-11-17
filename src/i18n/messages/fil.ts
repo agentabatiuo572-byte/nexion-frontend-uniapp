@@ -2330,6 +2330,8 @@ export const fil: Messages = {
     specWarranty: "Warranty",
     specWarrantyMonths: "{n} buwan",
     specWarrantyYears: "{n} taon",
+    specShareVramNotApplicable: "Hindi naaangkop",
+    specSharePowerNotApplicable: "Hindi naaangkop",
     specValueUnavailable: "Hindi available",
     specUnavailable: "Hindi mabibili ang produktong ito hangga't hindi na-certify ang hardware at service specs nito.",
     faq: {

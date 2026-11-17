@@ -1868,6 +1868,8 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     specWarranty: "Bảo hành",
     specWarrantyMonths: "{n} tháng",
     specWarrantyYears: "{n} năm",
+    specShareVramNotApplicable: "Không áp dụng",
+    specSharePowerNotApplicable: "Không áp dụng",
     specValueUnavailable: "Chưa có dữ liệu",
     specUnavailable: "Sản phẩm chưa được chứng nhận đầy đủ thông số nên tạm thời không thể mua.",
     faq: {
