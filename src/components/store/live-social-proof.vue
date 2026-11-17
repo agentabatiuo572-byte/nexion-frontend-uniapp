@@ -57,8 +57,8 @@ import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from
 const props = defineProps<{ product: Product }>();
 const t = useT();
 const app = useApp();
-const { elRef: proofRef, inView: proofInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false });
-// The scroll loop has its own on-screen state (a native observer on App); proofInView keeps gating only the 4s read.
+const { elRef: proofRef, inView: proofInView } = useScrollGrowProgress({ threshold: 0.01, fallbackInView: false, nativeSelector: ".social-proof" });
+// The scroll loop observes its track; proofInView gates the enclosing block's 4s read on App and H5.
 const { elRef: trackRef, running: trackRunning } = useLoopsInView(".social-proof__track");
 const w = computed(() => t.value.store.liveProof);
 const remoteProof = ref<StorefrontSocialProof | null>(null);
