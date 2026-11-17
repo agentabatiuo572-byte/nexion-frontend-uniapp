@@ -34,7 +34,7 @@
       />
 
       <!-- Slot chassis: a liquid-glass panel whose bays show which device holds each compute slot. -->
-      <view v-if="!inventoryError" class="device-stage mx-4">
+      <LoopScope v-if="!inventoryError" class="device-stage mx-4">
         <view class="device-stage__aura" aria-hidden="true"><view /><view /></view>
         <view class="device-hero nx-tint" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
           <view class="device-hero__top">
@@ -66,7 +66,7 @@
             </view>
           </view>
         </view>
-      </view>
+      </LoopScope>
 
       <view v-if="inventoryReady" class="mx-4">
         <!-- 空库存:《06》no-owned-asset 插画 + 引导(只在库存读完后出现,加载中不冒充空态)。
@@ -196,6 +196,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import DeviceBay from "@/components/me/device-bay.vue";
+import LoopScope from "@/components/loop-scope.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";

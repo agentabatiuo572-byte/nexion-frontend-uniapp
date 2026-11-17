@@ -16,7 +16,7 @@
       <view class="flex items-start" style="gap: 12px">
         <view class="shrink-0 grid place-items-center relative" :style="lockBoxStyle">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-          <view aria-hidden :style="lockDotStyle" />
+          <view aria-hidden class="locked-card__dot" :class="{ 'is-paused': !auroraLoop.running.value }" :style="lockDotStyle" />
         </view>
         <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" :aria-expanded="detailsOpen" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
@@ -223,7 +223,6 @@ const lockDotStyle: CSSProperties = {
   borderRadius: "50%",
   background: "var(--v5-tech-cyan)",
   border: "2px solid var(--v5-surface)",
-  animation: "v5-hb-pulse 2.4s ease-in-out infinite",
 };
 
 const stageChipStyle: CSSProperties = {
@@ -287,7 +286,13 @@ const notifyBtnStyle: CSSProperties = {
     radial-gradient(35% 45% at 15% 85%, var(--v5-tech-cyan-soft) 0%, transparent 60%);
   animation: v5-aurora-drift 14s ease-in-out infinite;
 }
-.locked-card__aurora.is-paused { animation-play-state: paused; }
+.locked-card__aurora.is-paused, .nx-chassis[data-scrolling="true"] .locked-card__aurora { animation-play-state: paused; }
+/* Lock-dot heartbeat: a pre-drawn halo animated by transform/opacity only retraces the former 0→8px box-shadow
+   pulse (50% → 0 cyan by 70%); a copy of the dot drawn above it keeps the halo outside the dot, as a shadow was. */
+.locked-card__dot::before { content: ""; position: absolute; inset: -10px; border-radius: 50%; background: rgb(12, 196, 214); opacity: 0; transform: scale(.3333); animation: locked-card-dot-pulse 2.4s ease-in-out infinite; }
+.locked-card__dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--v5-tech-cyan); border: 2px solid var(--v5-surface); }
+.locked-card__dot.is-paused::before, .nx-chassis[data-scrolling="true"] .locked-card__dot::before { animation-play-state: paused; }
+@keyframes locked-card-dot-pulse { 0% { opacity: .5; transform: scale(.3333); } 70%, 100% { opacity: 0; transform: none; } }
 /* Grid lines follow ink so the texture shows on the themed card surface in both themes. */
 .locked-card__grid {
   position: absolute; inset: 0; pointer-events: none; background-size: 24px 24px;
@@ -295,5 +300,5 @@ const notifyBtnStyle: CSSProperties = {
     linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px),
     linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px);
 }
-@media (prefers-reduced-motion: reduce) { .locked-card__aurora { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .locked-card__aurora, .locked-card__dot::before { animation: none; } }
 </style>

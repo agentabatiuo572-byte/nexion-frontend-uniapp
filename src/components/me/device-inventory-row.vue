@@ -1,7 +1,7 @@
 <!-- Device warehouse card (P-43): device art, live state, today's earnings, the current job and the card actions in one view. -->
 <template>
   <DeviceUnclassifiedCard v-if="device.kind === 'unknown'" :device="device" />
-  <view v-else class="device-inventory-row" :class="{ 'device-inventory-row--idle': !active }" :id="`device-card-${device.id}`" :data-device-key="`device:${device.id}`">
+  <view v-else ref="loopRef" class="device-inventory-row" :class="{ 'device-inventory-row--idle': !active, 'nx-loops-paused': !loops.running.value }" :id="`device-card-${device.id}`" :data-device-key="`device:${device.id}`">
     <view class="device-inventory-row__head">
       <view class="device-inventory-row__art" :class="{ 'device-inventory-row__art--inactive': !active }">
         <image v-if="imageSrc" class="device-inventory-row__image" :src="imageSrc" mode="aspectFit" @error="imageError" />
@@ -83,11 +83,15 @@ import { deviceTaskRecovering, deviceTaskRunning, taskProgressPercent } from "@/
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
 import { remoteApiEnabled } from "@/api/runtime";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const t = useT();
 const computeCopy = useComputeV2Copy();
 const recovering = computed(() => deviceTaskRecovering(props.device));
 const visibility = useDataVisibility();
+// The running equalizer and online dot pause while this card is off-screen or its page is hidden.
+const loops = useLoopsInView(".device-inventory-row");
+const loopRef = loops.elRef;
 const props = withDefaults(
   defineProps<{
     device: Device;
@@ -167,6 +171,7 @@ function onAction() {
 .device-inventory-row__eq > view { width: 2.6px; height: 12px; border-radius: 1px; background: var(--v5-brand); transform-origin: bottom; animation: device-eq .9s ease-in-out infinite; }
 .device-inventory-row__eq > view:nth-child(2) { animation-delay: -.3s; }
 .device-inventory-row__eq > view:nth-child(3) { animation-delay: -.6s; }
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .device-inventory-row__eq > view { animation-play-state: paused; }
 .device-inventory-row__task-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 13px/18px var(--font-v5); }
 .device-inventory-row__task-name .device-inventory-row__label { margin-right: 6px; }
 .device-inventory-row__pct { font: 500 12px/16px var(--font-metric, var(--font-jet-mono)); }

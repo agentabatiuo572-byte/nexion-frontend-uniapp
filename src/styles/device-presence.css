@@ -12,8 +12,9 @@
   animation: device-online-breathe 2.4s ease-in-out infinite;
   transform-origin: center;
 }
-/* Owners of off-screen or hidden content add nx-loops-paused (useLoopsInView). */
-.nx-loops-paused .nx-online-dot { animation-play-state: paused; }
+/* Paused while the owner is off-screen (nx-loops-paused from useLoopsInView), its page is hidden, or the chassis scrolls. */
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) :is(.nx-device-row[data-online="true"] .hf-status-dot, .device-inventory-row__dot, .device-hero__dot, .device-bay__led, .trial-detail__online, .home-benefits__online, .nx-online-dot),
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) :is(.device-status-online, .device-inventory-row__status--online, .trial-device-row__status--online)::before { animation-play-state: paused; }
 @keyframes device-online-breathe {
   0%, 100% { opacity: .58; transform: scale(.86); }
   50% { opacity: 1; transform: scale(1); }

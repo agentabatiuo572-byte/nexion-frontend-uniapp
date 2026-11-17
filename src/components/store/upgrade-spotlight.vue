@@ -1,5 +1,5 @@
 <template>
-  <view class="upgrade-spotlight" :data-images-ready="baseReady && targetReady">
+  <view ref="loopRef" class="upgrade-spotlight" :class="{ 'nx-loops-paused': !loops.running.value }" :data-images-ready="baseReady && targetReady">
     <text class="upgrade-eyebrow">{{ copy.upgrade }}</text>
     <view class="upgrade-title"><text class="upgrade-title__base">{{ base.name }}</text><text class="upgrade-title__target">→ {{ target.name }}</text></view>
     <view class="upgrade-art" aria-hidden="true">
@@ -32,7 +32,11 @@ import NxButton from '@/components/ui/nx-button.vue';
 import type { Device } from '@/store/types';
 import { getLifecycleSummary } from '@/store/device-lifecycle';
 import { uiLocale } from '@/i18n';
+import { useLoopsInView } from '@/composables/use-loops-in-view';
 const props = defineProps<{ base: Device; baseImageUrl?: string | null; target: { id: string; name: string; imageUrl?: string | null; dailyEarn: number } }>();
+// The upgraded device floats only while the card is on screen and its page is shown.
+const loops = useLoopsInView('.upgrade-spotlight');
+const loopRef = loops.elRef;
 const baseDaily = computed(() => getLifecycleSummary(props.base).dailyRateNow);
 const copy = useAuditUiCopy(), t = useT();
 const locale = useLocaleStore();
@@ -94,6 +98,7 @@ function open() { navTo('/pages/store/detail?id=' + encodeURIComponent(props.tar
 .upgrade-spotlight .upgrade-action { display:flex; margin-top:14px; min-height:44px; padding:0; }
 .upgrade-action :deep(.nx-button__surface) { min-height:44px; }
 @keyframes upgrade-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .upgrade-art__target--ready { animation-play-state:paused; }
 @media(max-width:350px) { .upgrade-art__base { left:0; width:min(84px,34%); }.upgrade-art__target { width:min(136px,50%); }.upgrade-art__arrow { left:42%; width:42px; height:29px; } }
 @media(prefers-reduced-motion:reduce) { .upgrade-art__target { animation:none; } }
 </style>

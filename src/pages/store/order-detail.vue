@@ -54,7 +54,7 @@
       <template v-else-if="order">
         <!-- Status hero (DS-28): the progress track is the page's main visual;
              the card's next step sits at its foot. -->
-        <view class="order-hero nx-tint" :style="{ '--order-tone': statusColor }" data-testid="order-hero">
+        <LoopScope class="order-hero nx-tint" :style="{ '--order-tone': statusColor }" data-testid="order-hero">
           <view class="order-hero__top">
             <view class="order-hero__text">
               <NxTag :tone="statusTone" :label="statusLabel(order.status)" />
@@ -85,7 +85,7 @@
           </view>
 
           <text v-if="needsRecovery" class="order-hero__note" data-testid="order-recovery">{{ recoveryHint }}</text>
-        </view>
+        </LoopScope>
 
         <!-- Pending remote orders can retry only the idempotent UVEL wallet debit. -->
         <view v-if="(orderAction || orderCommandUnavailable) && !externalPayment" class="order-block" role="status">
@@ -199,6 +199,7 @@ import { orderPaymentRejection } from '@/lib/order-payment-rejection';
 import { getOrderProductMedia } from "@/lib/product-media";
 import { revalidateProductCatalog } from "@/store/product-catalog";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
+import LoopScope from "@/components/loop-scope.vue";
 import { useT } from "@/i18n/use-t";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { fmt } from "@/i18n/format";
@@ -1133,7 +1134,13 @@ const sectionLabelStyle: CSSProperties = {
 .order-track__dot--done { background: var(--v5-brand); color: var(--v5-on-brand); }
 .order-track__dot--current { background: transparent; border: 2px solid var(--order-tone); box-shadow: 0 0 0 4px color-mix(in srgb, var(--order-tone) 18%, transparent); }
 .order-track__dot--current::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--order-tone); }
-.order-track__dot--live { animation: order-track-pulse 1.8s ease-in-out infinite; }
+/* The live halo is one pre-drawn ring animated by transform/opacity only; it retraces the 4px/18% → 7px/8% spread pulse.
+   Its hole sits under the opaque 2px border at every scale, so the dot's centre stays clear. */
+@media (prefers-reduced-motion: no-preference) {
+  .order-track__dot--live { box-shadow: none; }
+  .order-track__dot--live::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle closest-side, transparent 12px, var(--order-tone) 12px); opacity: .18; transform: scale(.8421); animation: order-track-pulse 1.8s ease-in-out infinite; }
+}
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .order-track__dot--live::before { animation-play-state: paused; }
 .order-track__dot--failed { background: var(--v5-danger); color: var(--v5-on-brand); }
 [data-theme="light"] .order-track__dot--failed { color: #fff; }
 /* Break between words; a single word wider than its column is hyphenated (the page sets <html lang>). */
@@ -1141,8 +1148,7 @@ const sectionLabelStyle: CSSProperties = {
 /* A step that waits on the user (unpaid) reads as not done yet; server-side progress stays in primary ink. */
 .order-track__label--stopped, .order-track__label--waiting { color: var(--v5-ink-3); font-weight: 400; }
 .order-track__label--failed { color: var(--v5-danger); }
-@keyframes order-track-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--order-tone) 8%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .order-track__dot--live { animation: none; } }
+@keyframes order-track-pulse { 50% { opacity: .08; transform: none; } }
 /* Order summary: total first (DS-27 amount), then field rows; one divider before the record. */
 .order-summary__title { display: block; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .order-summary__total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding-bottom: 4px; }

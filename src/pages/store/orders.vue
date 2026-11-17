@@ -41,10 +41,10 @@
           @click="goOrder(o)"
         >
           <view class="order-card__row">
-            <view class="order-card__thumb" aria-hidden="true">
+            <LoopScope class="order-card__thumb" aria-hidden="true">
               <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="orderImage(o)" :scope-key="o.id" />
               <image v-else class="order-card__image nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
-            </view>
+            </LoopScope>
             <view class="order-card__info">
               <view class="order-card__top">
                 <text class="order-card__title">{{ commerceOrderTitle(o,locale.code) }}</text>
@@ -103,6 +103,7 @@ import { commerceAmount as formatAmount } from "@/lib/commerce-review";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import { revalidateProductCatalog } from "@/store/product-catalog";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
+import LoopScope from "@/components/loop-scope.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import GlassSegments from "@/components/glass-segments.vue";

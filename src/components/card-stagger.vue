@@ -7,20 +7,20 @@
   you'd give the parent <view>; the cadence is driven by --nx-cs-step (the
   `stagger` prop, seconds) via per-nth-child animation-delay.
 
-  Retained pages skip repeat entrance after their first hide. The flag belongs
-  to this instance, so a newly opened page keeps its first entrance.
+  Each instance plays its entrance on first entry only — a page or a native tab
+  (whose content stays mounted) skips it after its first hide, so returning to a
+  tab or refreshing in place does not replay it.
   prefers-reduced-motion is honored via CSS (animation disabled).
 -->
 <template>
-  <view class="nx-card-stagger" :class="{ 'nx-card-stagger--instant': hosted || returned }" :style="staggerVar">
+  <view class="nx-card-stagger" :class="{ 'nx-card-stagger--instant': returned }" :style="staggerVar">
     <slot />
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref } from "vue";
-import { onHide, TAB_HOST } from "@/composables/use-tab-page-lifecycle";
-const hosted = inject(TAB_HOST, false);
+import { computed, ref } from "vue";
+import { onHide } from "@/composables/use-tab-page-lifecycle";
 const returned = ref(false);
 onHide(() => { returned.value = true; });
 

@@ -16,7 +16,7 @@
       </view>
       <template v-else-if="!publicOnly">
         <view v-if="voucherContext.voucherId" class="promotion promotion-flat"><text class="promotion-title">{{ t.promotion.eventVoucher }}</text><text class="promotion-copy">{{ t.promotion.eventVoucherTerms }}</text><view class="promotion-link" role="button" tabindex="0" @click="clearPromotion" @keydown.enter.prevent="clearPromotion" @keydown.space.prevent="clearPromotion"><text>{{ t.promotion.scopeClear }}</text></view></view>
-        <view v-if="voucherOffers.length&&!voucherContext.voucherId" class="store-voucher-ticket" data-testid="store-voucher-ticket" role="button" tabindex="0" @click="openStoreVouchers" @keydown.enter.prevent="openStoreVouchers" @keydown.space.prevent="openStoreVouchers">
+        <view v-if="voucherOffers.length&&!voucherContext.voucherId" ref="voucherLoopRef" class="store-voucher-ticket" :class="{ 'nx-loops-paused': !voucherLoops.running.value }" data-testid="store-voucher-ticket" role="button" tabindex="0" @click="openStoreVouchers" @keydown.enter.prevent="openStoreVouchers" @keydown.space.prevent="openStoreVouchers">
           <view class="store-voucher-ticket__value"><text v-if="voucherBenefit.amount != null" class="store-voucher-ticket__currency">$</text><text>{{ voucherBenefit.amount != null ? fmtMoney(voucherBenefit.amount).replace(/^\$/, '').replace(/\.00$/, '') : voucherBenefit.percent != null ? voucherBenefit.percent + '%' : '–' }}</text></view>
           <view class="store-voucher-ticket__rule" aria-hidden="true" />
           <view class="store-voucher-ticket__copy"><text class="store-voucher-ticket__title">{{ auditCopy.voucherShort }} · {{ fmt(auditCopy.voucherShortCount,{n:voucherOffers.length}) }}</text><view class="store-voucher-ticket__hint"><view v-if="voucherBenefit.amount == null">{{ auditCopy.voucherDiscount }}</view><view>{{ voucherClaimHint ? auditCopy.claimToUse : auditCopy.autoApplyVoucher }}</view></view></view>
@@ -98,6 +98,7 @@ import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSPropert
 import AppChassis from "@/components/tab-page-frame.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import UpgradeSpotlight from "@/components/store/upgrade-spotlight.vue";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 import ProductCard from "@/components/store/product-card.vue";
 import PromotionEntry from '@/components/promotion/promotion-entry.vue';
 import PromotionProduct from '@/components/promotion/promotion-product.vue';
@@ -142,6 +143,9 @@ import { behaviorTracker, createStoreViewEvent } from "@/services/behavior-analy
 const t = useT();
 const auditCopy = useAuditUiCopy(), voucher = useVoucher(), comingSoonOpen = ref(false);
 const voucherClaimSheet = useVoucherClaimSheet();
+// The voucher art bobs only while the ticket is on screen and the page is shown.
+const voucherLoops = useLoopsInView(".store-voucher-ticket");
+const voucherLoopRef = voucherLoops.elRef;
 const app = useApp();
 const locale=useLocaleStore();
 const activityId=ref('');
