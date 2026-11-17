@@ -2,24 +2,24 @@
   <text v-if="loading && listRead && !activities.length" class="referral-refresh-status" role="status" aria-live="polite">{{ t.promotion.loading }}</text>
   <view v-if="(loading && !listRead) || activities.length || error || hasMore" class="promotion referral-progress" data-testid="referral-progress">
     <text v-if="loading && !listRead && !activities.length" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
-    <view v-for="activity in activities" :key="activity.activityId" class="referral-activity nx-tint" :data-activity-id="activity.activityId">
+    <view v-for="activity in activities" :key="activity.activityId" class="referral-activity referral-activity--footer nx-tint" :data-activity-id="activity.activityId">
       <view class="referral-meta">
         <text v-if="deadlineText(activity)" class="referral-deadline">{{ deadlineText(activity) }}</text>
-        <view class="referral-rule-pill" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><text aria-hidden="true">›</text></view>
+        <view class="nx-card-link referral-rule-pill" role="button" tabindex="0" @click="termsActivity=activity" @keydown.enter.prevent="termsActivity=activity" @keydown.space.prevent="termsActivity=activity"><text>{{ t.promotion.rulesLink }}</text><svg class="nx-card-link__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view>
       </view>
       <view class="referral-hero">
         <view class="referral-copy">
           <text class="referral-title">{{ localized(activity.title,locale.code) || copy.firstPurchase }}</text>
           <view class="referral-count" aria-live="polite"><text class="referral-number">{{ visibility.mask(qualifyingCount(activity.activityId)) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
         </view>
-        <view class="referral-art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /></view>
+        <view class="referral-art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /><image class="referral-bow" src="/static/img/team-20261025/gift-bow.png" mode="aspectFit" /></view>
       </view>
-      <view class="referral-actions"><NxButton class="referral-cta referral-progress-link" variant="secondary" :disabled="progressBusy[activity.activityId] || !auth.isAuthenticated" :aria-expanded="expandedActivity===activity.activityId" :label="copy.viewProgress" @click="showProgress(activity.activityId)"><text>{{ copy.viewProgress }}</text><text aria-hidden="true">→</text></NxButton></view>
+      <view class="nx-card-footer referral-actions"><text class="nx-card-footer__note">{{ copy.giftRule }}</text><view class="nx-card-action referral-progress-link" role="button" :tabindex="progressBusy[activity.activityId] || !auth.isAuthenticated ? -1 : 0" :aria-disabled="progressBusy[activity.activityId] || !auth.isAuthenticated" :aria-expanded="expandedActivity===activity.activityId" @click="showProgress(activity.activityId)" @keydown.enter.prevent="!$event.repeat && showProgress(activity.activityId)" @keydown.space.prevent="!$event.repeat && showProgress(activity.activityId)"><text>{{ copy.viewProgress }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view></view>
       <!-- Progress opens as a sheet; expandedActivity stays the single source of which one is open. -->
       <NxSheet :open="expandedActivity===activity.activityId" :title="localized(activity.title,locale.code) || copy.firstPurchase" @close="expandedActivity=null">
         <view class="referral-details">
           <view class="referral-summary nx-tint">
-            <view class="referral-art referral-summary__art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /></view>
+            <view class="referral-art referral-summary__art" aria-hidden="true"><CatalogMachineImage class="referral-gift" v-bind="referralImageProps(activity)" /><image class="referral-bow" src="/static/img/team-20261025/gift-bow.png" mode="aspectFit" /></view>
             <text v-if="deadlineText(activity)" class="referral-deadline">{{ deadlineText(activity) }}</text>
             <view class="referral-count"><text class="referral-number">{{ visibility.mask(qualifyingCount(activity.activityId)) }}</text><text class="referral-caption">{{ copy.orderUnit }}{{ locale.code === 'zh' ? '' : ' · ' }}{{ copy.firstPurchaseCount }}</text></view>
             <text class="referral-summary__rule">{{ copy.giftRule }}</text>
@@ -141,13 +141,13 @@ useAutoRecovery({
 .referral-refresh-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Both cards keep their original brand-2 hue as a tinted solid with its shared rim (01 §1.1.2). */
 .referral-activity { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: var(--v5-space-5); border-radius: 28px; }
+/* The footer row's 44px target supplies the bottom spacing on the campaign card (P-67). */
+.referral-activity--footer { padding-bottom: 4px; }
 .referral-activity + .referral-activity { margin-top: var(--ui-space-inset); }
 .referral-hero { position: relative; display: flex; align-items: center; min-height: 84px; margin-top: -4px; }
-.referral-meta { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--v5-space-2); }
+.referral-meta { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-2); min-height: 24px; }
 .referral-deadline { height: 24px; padding: 0 10px; display: flex; align-items: center; border-radius: 999px; font: 600 11px/1 var(--font-v5); color: var(--v5-brand-2-ink); background: color-mix(in srgb, var(--v5-brand-2) 16%, transparent); }
-.referral-rule-pill { position: relative; isolation: isolate; display: flex; align-items: center; gap: 4px; min-height: 44px; margin-block: -8px; padding: 0 10px; color: var(--v5-ink-2); font: 600 12px/16px var(--font-v5); }
-.referral-rule-pill::before { content: ""; position: absolute; inset: 8px 0; z-index: -1; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
-.referral-rule-pill:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.referral-rule-pill { margin: -10px -4px -10px auto; padding: 0 4px; }
 .referral-copy { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .referral-title { display: block; max-width: 60%; font: 600 17px/24px var(--font-v5); overflow-wrap: anywhere; }
 .referral-count { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-top: var(--v5-space-1); }
@@ -156,9 +156,9 @@ useAutoRecovery({
 .referral-caption { color: var(--v5-ink-2); font: 400 13px/18px var(--font-v5); }
 .referral-art { position: absolute; top: -40px; right: -16px; width: 150px; height: 150px; pointer-events: none; }
 .referral-gift { position: absolute; inset: 0; width: 100%; height: 100%; }
-.referral-actions { display: flex; }
-.referral-actions > .referral-progress-link { flex: 1; }
-.referral-progress-link { max-width: 100%; }
+/* A fixed bow over the configured machine (P-67): the machine follows the activity, the bow marks it as a gift. */
+.referral-bow { position: absolute; left: 56%; top: 36%; width: 40%; height: 34%; pointer-events: none; }
+.referral-actions { position: relative; z-index: 1; }
 .referral-details { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .referral-summary { --nx-tint: var(--v5-brand-2); position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 132px; box-sizing: border-box; padding: var(--v5-space-4); border-radius: 20px; }
 .referral-share { margin-top: var(--v5-space-2); box-shadow: 0 8px 24px color-mix(in srgb, var(--v5-brand) 30%, transparent); }
