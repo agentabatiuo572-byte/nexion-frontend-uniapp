@@ -604,7 +604,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   const detachDiagnostic = registerChassisDiagnostics(initial.hostId ?? root.id, {
     read: () => ({ visible, viewReady: viewReady(), tabKey: diagnosticHref(tabKey ?? ""), tabRevision, pageTop, pendingTop, restoreFrame: !!restoreFrame,
       tabPositions: Array.from(tabPositions, ([key, value]) => ({ key, href: diagnosticHref(value.href), top: value.top })),
-      startY, pullY, pulling, pullActive, awaitingRefresh, deactivateTimer: deactivate !== undefined, headerHeight, pullEntryTop,
+      startY, pullY, pulling, pullActive, awaitingRefresh, deactivateHandlePresent: deactivate !== undefined, headerHeight, pullEntryTop,
       scrolling, touching, hidden, counters: Object.fromEntries(Object.entries(counters).map(([key, counter]) => [key, counter.read()])) }),
     reset: () => { Object.values(counters).forEach(counter => counter.reset()); pullEntryTop = null; },
   });

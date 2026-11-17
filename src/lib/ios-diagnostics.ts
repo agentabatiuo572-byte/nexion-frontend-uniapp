@@ -17,7 +17,7 @@ export function useDiagnosticReader(section: string, read: () => unknown, reset?
   onBeforeUnmount(() => { readers.delete(reader); });
 }
 
-// Diagnostic-only error log for the logic layer (kept: first error plus the latest five).
+// Diagnostic-only error log for the logic layer (kept: first five plus the latest three).
 const logicErrors: { id: number; at: string; kind: string; message: string }[] = [];
 let logicErrorTotal = 0;
 function recordLogicError(kind: string, value: unknown) {
