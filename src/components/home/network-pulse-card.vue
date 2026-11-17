@@ -62,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import { useLocaleStore } from "@/store/locale";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
@@ -79,6 +80,7 @@ import NxSheet from "@/components/ui/nx-sheet.vue";
 import { navTo } from "@/lib/route";
 
 const t = useT();
+const locale = useLocaleStore();
 const app = useApp();
 const cfg = useConfig();
 const remoteRank = useNetworkRank();
@@ -171,7 +173,7 @@ const metrics = computed<Cell[]>(() => {
   // H9 supplies the published counts and the server supplies the device estimate.
   const displayCell = (label: string, value: number | null | undefined, color: string): Cell => {
     if (value === null || value === undefined || !Number.isSafeInteger(value) || value < 0) return placeholderCell(label);
-    return { k: label, v: props.compactView ? networkPopulationBand(value) : compact(value), tone: "var(--v5-ink)", sub: "", data: null, color };
+    return { k: label, v: props.compactView ? networkPopulationBand(value, locale.code) : compact(value), tone: "var(--v5-ink)", sub: "", data: null, color };
   };
   const memberValue = props.compactView && props.estimated ? props.registeredDisplay : pulse?.registeredUsers;
   const members = displayCell(t.value.home.networkMembers, memberValue, "var(--v5-brand)");

@@ -1,3 +1,4 @@
+import { useLocaleStore } from "@/store/locale";
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { apiClient } from "@/api/runtime";
 import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
@@ -14,6 +15,7 @@ import { useConfig } from "@/store/config";
  * paid-out total. Each value is "-" while unavailable, never a real aggregate.
  */
 export function usePublishedNetworkStats() {
+  const locale = useLocaleStore();
   const cfg = useConfig();
   const registeredCount = useRegisteredUsersEstimate();
   const paid = ref<number | null>(null);
@@ -35,11 +37,11 @@ export function usePublishedNetworkStats() {
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", syncVisibility);
   });
 
-  const registered = computed(() => registeredCount.value === null ? "-" : networkPopulationBand(registeredCount.value));
+  const registered = computed(() => registeredCount.value === null ? "-" : networkPopulationBand(registeredCount.value, locale.code));
   const online = computed(() => {
     const value = cfg.config.networkPulse?.onlineDevices;
     return !cfg.syncFailed && typeof value === "number" && Number.isSafeInteger(value) && value >= 0
-      ? networkPopulationBand(value) : "-";
+      ? networkPopulationBand(value, locale.code) : "-";
   });
   const paidOut = computed(() => paid.value === null ? "-" : `$${formatGroupedAmount(paid.value)}`);
   return { registered, online, paidOut };

@@ -206,6 +206,7 @@
 </template>
 
 <script setup lang="ts">
+import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useConfig } from "@/store/config";
 import { useApp } from "@/store/app";
@@ -229,6 +230,7 @@ import { onBackPress } from "@dcloudio/uni-app";
 import { globeSimulation, GLOBE_CENTERS } from "@/lib/globe-simulation";
 
 const t = useT();
+const locale = useLocaleStore();
 const cfg = useConfig();
 const app = useApp();
 // #ifndef APP-PLUS
@@ -306,7 +308,7 @@ function nativeNodeStyle(r: GlobeRegion): CSSProperties {
 // #endif
 
 function regionName(r: GlobeRegion): string { return r.displayName; }
-function regionNodeDisplay(r: GlobeRegion): string { return r.devices === null ? '—' : networkPopulationBand(r.devices); }
+function regionNodeDisplay(r: GlobeRegion): string { return r.devices === null ? '—' : networkPopulationBand(r.devices, locale.code); }
 onMounted(() => {
   watch(() => globeSettings.value?.intervalMs, interval => {
     if (pulseTimer) clearInterval(pulseTimer);
