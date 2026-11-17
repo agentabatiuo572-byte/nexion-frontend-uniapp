@@ -212,10 +212,10 @@ const language = computed<TrustLocale>(() => serverLanguage(locale.code));
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const resources = computed(() => trustResources(locale.code));
 const center = computed(() => trustCenterCopy(locale.code));
-const { sections, status, refresh } = usePublishedTrust();
+const { sections, status, hasSnapshot, refresh } = usePublishedTrust();
 const { documents, status: documentsStatus, refresh: refreshDocuments } = useTrustDocuments();
-const loading = computed(() => remoteApiEnabled && !sections.value.length && (status.value === "idle" || status.value === "loading"));
-const hasError = computed(() => !remoteApiEnabled || (!sections.value.length && status.value === "error"));
+const loading = computed(() => remoteApiEnabled && !hasSnapshot.value && (status.value === "idle" || status.value === "loading"));
+const hasError = computed(() => !remoteApiEnabled || (!hasSnapshot.value && status.value === "error"));
 
 function section(key: PublishedTrustSection["sectionKey"]) {
   return sections.value.find((item) => item.sectionKey === key);

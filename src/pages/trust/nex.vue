@@ -132,8 +132,8 @@ const t = useT();
 const w = computed(() => t.value.nexHowItWorks);
 const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => serverLanguage(locale.code));
-const { sections, status, refresh } = usePublishedTrust();
-const narrative = computed(() => resolvePublishedNexNarrative(sections.value, status.value, language.value));
+const { sections, status, hasSnapshot, refresh } = usePublishedTrust();
+const narrative = computed(() => resolvePublishedNexNarrative(sections.value, status.value, hasSnapshot.value, language.value));
 
 let narrativePageVisible = false;
 let narrativeVisibleEpoch = 0;

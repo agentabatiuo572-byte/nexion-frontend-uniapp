@@ -186,8 +186,8 @@
               <text class="block" :style="trustDisclosureTitleStyle">{{ productSpecDocument.title }}</text>
               <text class="block" :style="trustLinkStyle">{{ t.store.viewRelatedMaterial }} ↗</text>
             </view>
-            <text v-else-if="trustStatus === 'loading' || trustStatus === 'idle'" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
-            <template v-else-if="trustStatus === 'ready' && productAuditRows.length">
+            <text v-else-if="!hasTrustSnapshot && (trustStatus === 'loading' || trustStatus === 'idle')" class="block" :style="trustBodyStyle">{{ t.trust.loadingDisclosure }}</text>
+            <template v-else-if="hasTrustSnapshot && productAuditRows.length">
               <view v-for="row in productAuditRows" :key="row.Primary" class="active:opacity-70" :style="trustDisclosureRowStyle"
                 role="link" tabindex="0" :aria-label="row.Primary"
                 @click="openTrustUrl(row.Url)" @keydown.enter.prevent="openTrustUrl(row.Url)">
@@ -197,7 +197,7 @@
               </view>
             </template>
             <template v-else>
-              <text class="block" :style="trustBodyStyle">{{ trustStatus === 'error' ? '—' : t.store.relatedMaterialsEmpty }}</text>
+              <text class="block" :style="trustBodyStyle">{{ !hasTrustSnapshot && trustStatus === 'error' ? '—' : t.store.relatedMaterialsEmpty }}</text>
 
             </template>
           </view>
@@ -276,7 +276,7 @@ const t = useT();
 const locale = useLocaleStore();
 const phase = useProductPhase();
 const trustLanguage = computed<TrustLocale>(() => serverLanguage(locale.code));
-const { sections: trustSections, status: trustStatus, refresh: refreshTrust } = usePublishedTrust();
+const { sections: trustSections, status: trustStatus, hasSnapshot: hasTrustSnapshot, refresh: refreshTrust } = usePublishedTrust();
 function refreshTrustMaterial() { if (trustStatus.value === 'error') void refreshTrust(true); }
 useAutoRecovery({ failed: () => trustStatus.value === "error", retry: () => refreshTrust(true) });
 
