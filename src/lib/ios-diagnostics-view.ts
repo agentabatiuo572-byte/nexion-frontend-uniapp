@@ -53,15 +53,15 @@ function ancestry(element: Element | null) {
   }
   return ancestors;
 }
-function elementEvidence(element: HTMLElement, full = true) {
+function elementEvidence(element: HTMLElement) {
   const style = getComputedStyle(element);
   const tab = element.closest<HTMLElement>(".nx-tab-content");
   return { ...identity(element), hostId: element.closest(".nx-chassis")?.id ?? null,
     tab: tab ? { key: diagnosticHref(tab.dataset.tabContentKey ?? ""), rect: geometry(tab), display: getComputedStyle(tab).display } : null,
     rect: geometry(element), style: Object.fromEntries(styleKeys.map(key => [key, style.getPropertyValue(key)])),
     inlineMotion: { transform: element.style.transform, transition: element.style.transition },
-    ancestors: full ? ancestry(element) : undefined,
-    animations: full && typeof element.getAnimations === "function" ? element.getAnimations().map(animation => ({
+    ancestors: ancestry(element),
+    animations: typeof element.getAnimations === "function" ? element.getAnimations().map(animation => ({
       name: (animation as CSSAnimation).animationName ?? null, currentTime: animation.currentTime, playState: animation.playState })) : null };
 }
 function hitEvidence(points: { x: number; y: number }[]) {
@@ -70,7 +70,7 @@ function hitEvidence(points: { x: number; y: number }[]) {
     stack: document.elementsFromPoint(point.x, point.y).map(element => identity(element)),
   })) };
 }
-function readViewDiagnostics(full = true) {
+function readViewDiagnostics() {
   return { sampledAt: new Date().toISOString(), fingers: { count: fingerCount, noFingerSince }, visibility: document.visibilityState,
     viewport: { width: innerWidth, height: innerHeight, visual: window.visualViewport ? {
       width: visualViewport!.width, height: visualViewport!.height, offsetTop: visualViewport!.offsetTop,
@@ -79,13 +79,13 @@ function readViewDiagnostics(full = true) {
       tabKey: diagnosticHref(root.dataset.tabKey ?? ""), tabRevision: root.dataset.tabRevision, pageVisible: root.dataset.pageVisible,
       rect: geometry(root), tabs: Array.from(root.querySelectorAll<HTMLElement>(".nx-tab-content"), tab => ({
         key: diagnosticHref(tab.dataset.tabContentKey ?? ""), rect: geometry(tab), display: getComputedStyle(tab).display })),
-      scroll: Array.from(root.querySelectorAll<HTMLElement>(".nx-content"), scroll => ({ ...elementEvidence(scroll, full),
+      scroll: Array.from(root.querySelectorAll<HTMLElement>(".nx-content"), scroll => ({ ...elementEvidence(scroll),
         rawTop: scroll.scrollTop, scrollHeight: scroll.scrollHeight, clientHeight: scroll.clientHeight,
         max: Math.max(0, scroll.scrollHeight - scroll.clientHeight),
         wrappers: Array.from(scroll.querySelectorAll<HTMLElement>(".nx-page-enter"), page => ({
-          page: elementEvidence(page, full), wrapper: page.parentElement ? elementEvidence(page.parentElement, full) : null })) })),
+          page: elementEvidence(page), wrapper: page.parentElement ? elementEvidence(page.parentElement) : null })) })),
     })),
-    overlays: Array.from(document.querySelectorAll<HTMLElement>(selectors.join(",")), element => elementEvidence(element, full)),
+    overlays: Array.from(document.querySelectorAll<HTMLElement>(selectors.join(",")), element => elementEvidence(element)),
     restore: Array.from(chassisReaders, ([hostId, reader]) => ({ hostId, state: reader.read() })),
   };
 }
@@ -201,7 +201,7 @@ export function mountDiagnosticView(root: HTMLElement, initial: DiagnosticConfig
       for (const [prefix, nodes] of accessibleNodes) if (prefix.startsWith("diag-incident:")) {
         nodes.forEach(node => { if (node.parentElement !== root) root.appendChild(node); });
       }
-      const view = readViewDiagnostics(false);
+      const view = readViewDiagnostics();
       latestSnapshot = { logic: value.snapshot, view };
       const reasons: string[] = [];
       const panels = Array.from(document.querySelectorAll<HTMLElement>(maskPairs.map(pair => pair[2]).concat(["#pp-page", ".pp-cashier"]).join(",")));

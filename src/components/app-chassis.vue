@@ -732,17 +732,18 @@ const chromeConfiguration = computed(() => ({ hostId: chassisHostId, tabKey: pro
 const diagnosticConfiguration = shallowRef<import("@/lib/ios-diagnostics-view").DiagnosticConfiguration>({ hostId: chassisHostId, snapshot: null });
 let diagnosticTimer: ReturnType<typeof setInterval> | undefined;
 let diagnosticAccessibilityTimer: ReturnType<typeof setInterval> | undefined;
-let diagnosticNative: unknown = null;
 let diagnosticSamples = 0;
 let diagnosticSession = 0;
 function pushDiagnosticSnapshot() {
   const session = diagnosticSession;
-  readNativeDiagnostics(value => { if (session === diagnosticSession) diagnosticNative = value; });
-  const began = Date.now();
-  const logic = readLogicDiagnostics();
-  diagnosticSamples += 1;
-  diagnosticConfiguration.value = { hostId: chassisHostId, snapshot: { ...logic, native: diagnosticNative,
-    sampler: { hostId: chassisHostId, samples: diagnosticSamples, logicReadMs: Date.now() - began, intervalMs: diagnosticTimer === undefined ? 2000 : 500 } } };
+  readNativeDiagnostics(native => {
+    if (session !== diagnosticSession) return;
+    const began = Date.now();
+    const logic = readLogicDiagnostics();
+    diagnosticSamples += 1;
+    diagnosticConfiguration.value = { hostId: chassisHostId, snapshot: { ...logic, native,
+      sampler: { hostId: chassisHostId, samples: diagnosticSamples, logicReadMs: Date.now() - began, intervalMs: diagnosticTimer === undefined ? 2000 : 500 } } };
+  });
 }
 function receiveDiagnosticControl(value: { action: "open" | "close" | "reset" }) {
   if (value.action === "close") {
