@@ -59,7 +59,7 @@
             <view class="nx-bank-chips">
               <view
                 v-for="preset in quickAmounts" :key="preset.value"
-                class="nx-bank-chip" :class="{ 'nx-bank-chip--on nx-frosted-button': amount === String(preset.value) }"
+                class="nx-bank-chip" :class="{ 'nx-bank-chip--on': amount === String(preset.value) }"
                 role="button" :tabindex="preset.enabled ? 0 : -1" :aria-disabled="!preset.enabled" :aria-pressed="amount === String(preset.value)"
                 @click="pickAmount(preset)"
               ><text>{{ preset.label }}</text></view>
@@ -1074,7 +1074,9 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-chip { position: relative; height: 36px; display: grid; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent);
   color: var(--v5-ink-2); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
 .nx-bank-chip::after { content: ""; position: absolute; inset: -4px 0; }
-.nx-bank-chip--on { color: var(--v5-brand); background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-brand) 14%, transparent); }
+/* Selected preset: flat brand tint, no glass rim or sheen inside the tinted slab (P-67). */
+.nx-bank-chip--on { color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
+@media (forced-colors: active) { .nx-bank-chip--on { outline: 2px solid ButtonText; outline-offset: -2px; } }
 .nx-bank-chip[aria-disabled="true"] { opacity: .45; cursor: default; }
 .nx-bank-chip:not([aria-disabled="true"]):active { transform: scale(.97); }
 .nx-bank-chip:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }

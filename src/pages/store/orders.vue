@@ -65,7 +65,7 @@
             </view>
             <!-- Stops the tap here so the card does not also open the plain detail. -->
             <view class="order-card__pay" @click.stop>
-              <NxButton variant="brand" size="small" :label="t.orders.pendingContinue" @click="goOrderPayment(o)" />
+              <view class="nx-card-action" role="button" tabindex="0" @click="goOrderPayment(o)" @keydown.enter.prevent="!$event.repeat && goOrderPayment(o)" @keydown.space.prevent="!$event.repeat && goOrderPayment(o)"><text>{{ t.orders.pendingContinue }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view>
             </view>
           </view>
         </view>
@@ -108,7 +108,6 @@ import EmptyState from "@/components/empty-state.vue";
 import GlassSegments from "@/components/glass-segments.vue";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import NxButton from "@/components/ui/nx-button.vue";
 import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";
