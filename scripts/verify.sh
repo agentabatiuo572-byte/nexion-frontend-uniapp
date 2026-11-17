@@ -165,16 +165,16 @@ store_unreachable_gate() {
 }
 store_unreachable_gate
 
-# ── Tab 页 renderjs 门(2026-11-18):tab-page-frame 在 Tab 宿主里是 Fragment,页面级 renderjs 会让 App 视图层整批丢操作 ──
-tab_frame_renderjs_gate() {
-  if "$NODE_BIN" scripts/tab-frame-renderjs-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-tab-frame-renderjs.log" 2>&1; then
-    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-tab-frame-renderjs.log")"
+# ── renderjs 根元素门(2026-11-18):声明 renderjs 的 .vue 根必须是单个原生元素(Fragment / 组件根会让 App 视图层丢操作或覆盖 owner)──
+renderjs_root_gate() {
+  if "$NODE_BIN" scripts/renderjs-root-gate.mjs > "${VERIFY_LOG_PREFIX}-uniapp-renderjs-root.log" 2>&1; then
+    ok "$(tail -1 "${VERIFY_LOG_PREFIX}-uniapp-renderjs-root.log")"
   else
-    bad "Tab 页声明了 renderjs — 移到单根子组件"
-    tail -8 "${VERIFY_LOG_PREFIX}-uniapp-tab-frame-renderjs.log" | sed 's/^/        /'
+    bad "renderjs 声明在非单原生根的组件或页面上 — 移到以原生元素为根的子组件"
+    tail -8 "${VERIFY_LOG_PREFIX}-uniapp-renderjs-root.log" | sed 's/^/        /'
   fi
 }
-tab_frame_renderjs_gate
+renderjs_root_gate
 
 echo -e "${C}[1.5] i18n mirror${N}"
 if "$NODE_BIN" scripts/i18n-key-mirror.mjs >"${VERIFY_LOG_PREFIX}-uni-i18n-mirror.log" 2>&1; then

@@ -50,7 +50,7 @@
           <text class="trial-earned__label">{{ isGrace ? detail.graceAmountLabel : lifecycle.accruedLabel }}</text>
           <view class="trial-earned__amount">
             <text class="nx-sr-only">{{ earnedParts[1] ? `${earnedParts[0]}.${earnedParts[1]}` : earnedParts[0] }}</text>
-            <text :id="earnedCount.hostId" class="trial-earned__value" aria-hidden="true" :count-up="earnedCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ earnedParts[0] }}</text><text v-if="earnedParts[1]" class="trial-dim nx-count--frac">.{{ earnedParts[1] }}</text></text>
+            <TrialCountAmount :config="earnedCount.config.value" :parts="earnedParts" tone="earned" />
             <text class="trial-earned__unit">USDT</text>
           </view>
           <text class="trial-earned__uvt">+ {{ visibility.mask(formatGroupedAmount(shadowNEX)) }}<text class="trial-unit-small"> UVT</text></text>
@@ -69,7 +69,7 @@
               <view class="trial-total__line">
                 <text class="trial-total__label">{{ detail.totalLabel }}</text>
                 <text class="nx-sr-only">{{ totalParts[1] ? `${totalParts[0]}.${totalParts[1]}` : totalParts[0] }}</text>
-                <text :id="totalCount.hostId" class="trial-total__value" aria-hidden="true" :count-up="totalCount.config.value" :change:count-up="countUp.update"><text class="nx-count--int">{{ totalParts[0] }}</text><text v-if="totalParts[1]" class="trial-total__dec nx-count--frac">.{{ totalParts[1] }}</text></text>
+                <TrialCountAmount :config="totalCount.config.value" :parts="totalParts" tone="total" />
                 <text class="trial-unit-small trial-total__unit">USDT</text>
                 <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small"> UVT</text></text>
               </view>
@@ -264,6 +264,7 @@ import { productCatalogState, refreshProductCatalog } from "@/store/product-cata
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useViewCountUp } from "@/composables/use-count-up";
+import TrialCountAmount from "@/components/me/trial-count-amount.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
@@ -501,12 +502,6 @@ const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", border
 useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.value = false; }, true);
 </script>
 
-<script module="countUp" lang="renderjs">
-import { countUpView } from "@/lib/count-up-view";
-// @ts-expect-error vue-tsc 1.x treats uni's renderjs custom block as a second normal script.
-export default countUpView;
-</script>
-
 <style scoped>
 .trial-read-state { display:flex;flex-direction:column;gap:16px;padding:24px 0;color:var(--v5-ink-3);font-size:13px; }
 .trial-read-skeleton { display:flex;flex-direction:column;gap:14px; }
@@ -556,7 +551,6 @@ export default countUpView;
 .trial-earned { display:flex;flex-direction:column;align-items:center;margin-top:24px;padding:0 16px;text-align:center; }
 .trial-earned__label { color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .trial-earned__amount { display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:4px; }
-.trial-earned__value { font:600 44px/50px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.024em;white-space:nowrap; }
 .trial-earned__unit { color:var(--v5-ink-3);font:500 15px/20px var(--font-v5); }
 .trial-earned__uvt { margin-top:4px;color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-earned__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
@@ -576,8 +570,6 @@ export default countUpView;
 .trial-total__breakdown { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
 .trial-total__line { display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;margin-top:6px; }
 .trial-total__label { font:500 13px/18px var(--font-v5); }
-.trial-total__value { color:var(--v5-brand);font:600 32px/38px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.02em;white-space:nowrap; }
-.trial-total__dec { opacity:.72; }
 .trial-total__unit { color:var(--v5-ink-3);font-weight:500; }
 .trial-total__uvt { color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .trial-rows { display:flex;flex-direction:column;gap:10px;margin-top:16px; }
