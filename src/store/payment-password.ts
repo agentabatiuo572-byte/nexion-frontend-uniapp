@@ -254,6 +254,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   }
   function unavailableRecovery() { clearSecrets(); ui.stage = "recovery"; ui.error = "recoveryUnavailable"; }
   async function sendChallenge() {
+    tick();
     if (ui.busy || ui.resendAt > ui.now) return;
     const token = generation; ui.busy = true; ui.error = "";
     try {

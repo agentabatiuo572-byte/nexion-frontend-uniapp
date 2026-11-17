@@ -132,7 +132,8 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { dateLocale } from "@/i18n/format";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { navTo } from "@/lib/route";
-import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -164,16 +165,7 @@ watch([() => bills.summary, () => bills.summaryStatus], () => {
 }, { immediate: true, flush: 'sync' });
 const summaryForDisplay = computed(() => !summaryEnvironmentInvalidated.value && bills.summaryStatus !== 'error' && summaryReadScope.value === summaryScope.value ? bills.summary : null);
 
-let priceTimer: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
-  if (!market.isMockMode) {
-    void market.syncRemote();
-  }
-  priceTimer = setInterval(() => market.tickPrice(), 3000);
-});
-onUnmounted(() => {
-  if (priceTimer) clearInterval(priceTimer);
-});
+useVisibleInterval(() => { void market.tickPrice(); }, 3000);
 async function refreshNexSummary() {
   if (!remoteApiEnabled) return;
   await Promise.all([app.refreshRemoteFleet(), bills.refreshSummary()]);

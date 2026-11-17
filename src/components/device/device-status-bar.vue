@@ -31,7 +31,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
 const barHeight = computed(() => {
@@ -48,14 +49,7 @@ function updateStatusTime() {
   const now = new Date();
   statusTime.value = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
-let statusClockTimer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  updateStatusTime();
-  statusClockTimer = setInterval(updateStatusTime, 30_000);
-});
-onUnmounted(() => {
-  if (statusClockTimer) clearInterval(statusClockTimer);
-});
+useVisibleInterval(updateStatusTime, 30_000);
 </script>
 
 <style scoped>

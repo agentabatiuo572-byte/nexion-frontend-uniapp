@@ -125,7 +125,7 @@ const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableIn
 }));
 const unconfirmedDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && requiresActivationConfirmation(d)));
 const activeCount = computed(() => app.activeSlotCount);
-const trialPresentation = useTrialPresentation();
+const trialPresentation = useTrialPresentation(() => sheet.open);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => app.remoteSlotsUsed ?? activeCount.value + reservedSlots.value);
 const slotsFull = computed(() => slotsUsed.value >= app.slotCap);

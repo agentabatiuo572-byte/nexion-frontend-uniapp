@@ -77,8 +77,8 @@
 </template>
 
 <script setup lang="ts">
-import { logicalNativePage } from "@/lib/native-tab-navigation";
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useVisiblePageRoute } from "@/composables/use-visible-page-route";
+import { computed } from "vue";
 import ToastHost from "@/components/toast-host.vue";
 import { useUI } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -97,42 +97,8 @@ function amountAnatomy(value: string): [string, string, string] {
   return match ? [match[1], match[2], match[3] ?? ""] : ["", value, ""];
 }
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
-const route = ref(readRoute());
-let routeTimer: ReturnType<typeof setInterval> | undefined;
+const { route } = useVisiblePageRoute();
 const showBusinessOverlays = computed(() => !!route.value && !isStaticReviewRoute(route.value));
-
-function readRoute(): string {
-  try {
-    const ps = getCurrentPages();
-    let route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
-    // #ifdef APP-PLUS
-    route = logicalNativePage(ps[ps.length - 1]).route;
-    // #endif
-    if (route) return route;
-  } catch {
-    // fall through to H5 hash fallback
-  }
-  // #ifdef H5
-  try {
-    return window.location.hash.replace(/^#\/?/, "").replace(/^\//, "");
-  } catch {
-    return "";
-  }
-  // #endif
-  return "";
-}
-
-onMounted(() => {
-  routeTimer = setInterval(() => {
-    route.value = readRoute();
-  }, 250);
-});
-onUnmounted(() => {
-  if (routeTimer) {
-    clearInterval(routeTimer);
-    routeTimer = undefined;
-  }
-});
 
 function onRetry() {
   const cb = ui.netError.onRetry;

@@ -1,4 +1,4 @@
-import { getCurrentInstance, inject, onBeforeMount, onBeforeUnmount, onMounted, type InjectionKey } from "vue";
+import { getCurrentInstance, inject, onBeforeMount, onBeforeUnmount, onMounted, watch, type InjectionKey } from "vue";
 import { onLoad as pageLoad, onShow as pageShow, onHide as pageHide, onUnload as pageUnload } from "@dcloudio/uni-app";
 import type { TabQuery } from "@/lib/native-tab-navigation";
 
@@ -52,12 +52,21 @@ export function onHide(hook: () => void) { register("hide", hook, pageHide); }
 export function onUnload(hook: () => void) { register("unload", hook, pageUnload); }
 
 /** Tab children stay mounted; their display clocks belong to visible visits. */
-export function useVisibleInterval(tick: () => void, delay: number) {
+export function useVisibleInterval(tick: () => void, delay: number, active: () => boolean = () => true) {
   let timer: ReturnType<typeof setInterval> | undefined;
+  let shown = false;
   const stop = () => { if (timer !== undefined) clearInterval(timer); timer = undefined; };
-  const start = () => { tick(); if (timer === undefined) timer = setInterval(tick, delay); };
-  if (inject(TAB_LIFECYCLE, null)) { onShow(start); onHide(stop); }
+  const sync = () => {
+    if (!shown || !active()) { stop(); return; }
+    if (timer !== undefined) return;
+    tick();
+    timer = setInterval(tick, delay);
+  };
+  const show = () => { shown = true; sync(); };
+  const hide = () => { shown = false; stop(); };
+  watch(active, sync, { flush: "sync" });
+  if (inject(TAB_LIFECYCLE, null)) { onShow(show); onHide(hide); }
   // Ordinary H5 pages: the clock follows the visible page.
-  else { onShow(start); onHide(stop); onMounted(start); }
+  else { onShow(show); onHide(hide); onMounted(show); }
   onBeforeUnmount(stop);
 }

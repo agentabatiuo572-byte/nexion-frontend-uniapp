@@ -177,6 +177,7 @@
 </template>
 
 <script setup lang="ts">
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { dateLocale } from "@/i18n/format";
 import { commerceOrderTitle, commerceCopy } from "@/lib/commerce-review";
 import { useLocaleStore } from "@/store/locale";
@@ -451,13 +452,13 @@ useSetPageHeader(() => ({
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 const detailNow = ref(Date.now());
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
+useVisibleInterval(() => { detailNow.value = Date.now(); }, 3000);
 function startTick() {
   if (tickTimer) clearInterval(tickTimer);
   tickTimer = setInterval(() => {
-    detailNow.value = Date.now();
     if (id.value) orders.advanceOrder(id.value, reservedSlots.value);
     if (remoteApiEnabled && detailVisible && liveOrder.value?.status === 'placed'
-        && liveOrder.value.expiresAt != null && liveOrder.value.expiresAt <= detailNow.value
+        && liveOrder.value.expiresAt != null && liveOrder.value.expiresAt <= Date.now()
         && !payingFromWallet.value && !cancellingOrder.value) {
       paymentSheetOpen.value = false;
       void refreshOrder();

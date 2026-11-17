@@ -7,11 +7,11 @@ import type { TrialRowSnapshot } from "@/store/trial-boundary";
 import { useNow } from "./use-now";
 
 /** A retained row is presentation only. Mutations must still require a fresh authority. */
-export function useTrialPresentation() {
+export function useTrialPresentation(displayActive?: () => boolean) {
   const app = useApp();
   const trial = useFreeTrial();
   const trialConfig = useTrialConfig();
-  const now = useNow();
+  const now = useNow(displayActive);
   const retained = shallowRef<(TrialRowSnapshot & { config: TrialConfig }) | null>(null);
   let binding = `${app.accountKey}:${app.accountBindingEpoch}`;
   const presentationReady = computed(() => !remoteApiEnabled || trial.authorityServerState !== null);
