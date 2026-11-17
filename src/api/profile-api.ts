@@ -34,7 +34,7 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 function validNickname(value: unknown): value is string {
-  return typeof value === "string" && /^[A-Za-z]+ [A-Za-z]+ [1-9][0-9]$/.test(value);
+  return typeof value === "string" && /^[A-Za-z]+ [A-Za-z]+ (?=[A-Z2-9]*[A-Z])(?=[A-Z2-9]*[2-9])[A-HJ-NP-Z2-9]{2,3}$/.test(value);
 }
 
 function validExistingNickname(value: unknown): value is string {

@@ -67,7 +67,7 @@ export function accountDemo(url, locale, state, request) {
     state.profile ??= { nickname: 'Alex', avatarUrl: new URL('/static/img/demo/profile-woman.jpg', url).href, avatarRevision: 'demo-profile-woman', language: locale, nicknameChangedAt: null };
     if (method === 'PUT') {
       const update = body();
-      if (!/^[A-Za-z]+ [A-Za-z]+ [1-9][0-9]$/.test(update.nickname || '')) reject('PROFILE_NICKNAME_INVALID', 400);
+      if (!/^[A-Za-z]+ [A-Za-z]+ (?=[A-Z2-9]*[A-Z])(?=[A-Z2-9]*[2-9])[A-HJ-NP-Z2-9]{2,3}$/.test(update.nickname || '')) reject('PROFILE_NICKNAME_INVALID', 400);
       if (state.profile.nickname === update.nickname) return { status: 'UNCHANGED', nickname: update.nickname };
       if (state.profile.nickname !== update.expectedNickname) reject('PROFILE_NICKNAME_CONFLICT');
       if (nextChange(state.profile.nicknameChangedAt)) reject('USER_NICKNAME_CHANGE_TOO_SOON');
