@@ -133,9 +133,6 @@
       </view>
 
       <!-- Footer -->
-      <!-- #ifdef APP-PLUS -->
-      <InviteScanEntry v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" :disabled="loading" />
-      <!-- #endif -->
       <view class="lg-footer">
         <text v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister">{{ t.login.signUp }}</text></text>
       </view>
@@ -153,7 +150,6 @@
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 // #ifdef APP-PLUS
-import InviteScanEntry from "@/components/team/invite-scan-entry.vue";
 // #endif
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, nextTick, watch, onUnmounted } from "vue";
