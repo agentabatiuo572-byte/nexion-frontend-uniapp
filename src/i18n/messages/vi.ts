@@ -271,7 +271,7 @@ export const vi: Messages = {
     genesisMarketplace: "Chợ chuyển nhượng",
     genesisHolder: "Chủ sở hữu Genesis",
     // Trust subtree
-    trustNex: "UVT Trust",
+    trustNex: "Tin cậy UVT",
     // Tx
     tx: "Giao dịch",
     // How-it-works suffix

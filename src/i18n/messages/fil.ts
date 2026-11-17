@@ -636,7 +636,7 @@ export const fil: Messages = {
     storeBundle: "Bundle",
     genesisMarketplace: "Market ng resale",
     genesisHolder: "Genesis holder",
-    trustNex: "UVT Trust",
+    trustNex: "Tiwala sa UVT",
     tx: "Transaksyon",
     howItWorksSuffix: " · Gabay",
   },
