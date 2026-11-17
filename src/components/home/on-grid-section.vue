@@ -35,6 +35,7 @@
 </template>
 
 <script setup lang="ts">
+import { useLocaleStore } from "@/store/locale";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount } from "@/lib/amount-display";
 import { networkPopulationBand } from "@/lib/platform-stats";
@@ -48,6 +49,7 @@ import { onShow, onHide } from "@/composables/use-tab-page-lifecycle";
 import { computed, ref, onMounted, onUnmounted } from "vue";
 
 const t = useT();
+const locale = useLocaleStore();
 const app = useApp();
 const cfg = useConfig();
 const displayValue = ref<ReturnType<typeof homeDisplayAt>>(null);
@@ -94,7 +96,7 @@ defineExpose({ refresh: () => player.refresh() });
 const gridClients = computed(() => (app.homeTruth?.onGrid.clients ?? [])
   .map((client) => ({ ...client, color: "var(--v5-brand)" })));
 const activeDevicesText = computed(() => {
-  return devicesBad.value ? "—" : networkPopulationBand(cfg.config.networkPulse!.onlineDevices!);
+  return devicesBad.value ? "—" : networkPopulationBand(cfg.config.networkPulse!.onlineDevices!, locale.code);
 });
 
 function companyInitial(value: string | null) {
