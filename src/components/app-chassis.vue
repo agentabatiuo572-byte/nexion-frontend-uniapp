@@ -11,7 +11,7 @@
   `active` prop is an optional fallback for the very first frame.
 -->
 <template>
-  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" :lang="contentLang" :data-tab-key="tabHost ? tabLocationKey : undefined" :data-tab-revision="tabHost ? tabRevision : undefined" :data-page-visible="pageVisible && hostVisible ? 'true' : 'false'" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
+  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" :lang="contentLang" :data-tab-key="tabHost ? tabLocationKey : undefined" :data-tab-revision="tabHost ? tabRevision : undefined" :data-page-visit="pageVisit" :data-page-visible="pageVisible && hostVisible ? 'true' : 'false'" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
     <!-- Status bar safe area (real on device, ~0 on desktop H5) -->
     <DeviceStatusBar />
 
@@ -82,18 +82,14 @@
       ref="scrollEl"
       class="nx-content nx-scroll"
       :class="{ 'nx-content--locked': scrollLocks > 0 }"
-      @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
-      @touchcancel="onTouchEnd"
     >
       <!-- themed pull-to-refresh indicator — anchored just below the header,
            centered in the pull gap. -->
       <view
         class="nx-refresher"
-        :style="{ top: (contentTop + pendingBarInset + pullHeaderHeight) + 'px', transform: `translate(-50%, ${indicatorY / 2 - 18}px)`, opacity: refresherVisible ? 1 : 0, transition: pulling ? 'opacity .15s' : 'transform .28s cubic-bezier(.16,1,.3,1), opacity .2s' }"
+        :style="{ top: (contentTop + pendingBarInset) + 'px' }" style="transform: translate(-50%, -18px); opacity: 0; transition: transform .28s cubic-bezier(.16,1,.3,1), opacity .2s"
       >
-        <view class="nx-refresher-icon" :class="{ 'nx-spinning': refreshing }" :style="{ transform: refreshing ? '' : `rotate(${Math.min(1, pullY / 70) * 270}deg)` }">
+        <view class="nx-refresher-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" /><path d="M21 3v6h-6" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </view>
       </view>
@@ -103,7 +99,7 @@
            backdrop-filter cannot sample → the frosted glass shows nothing (looks
            opaque). Mirrors the prototype PullableContent ("transform must be
            ABSENT, not translateY(0), when idle"). (P-041) -->
-      <view :style="pullStyle ? { transform: `translateY(${pullStyle.y}px)`, transition: pullStyle.transition, willChange: 'transform' } : {}">
+      <view>
         <!-- Padded so content sits BELOW the header / ABOVE the tabbar, while the
              scroll container (.nx-content) spans the FULL chassis (top:0/bottom:0).
              This is the crux: content then scrolls BEHIND the frosted chrome and
@@ -164,7 +160,7 @@
 
 <script setup lang="ts">
 import { rememberGlassNavigation, consumeGlassNavigation } from "@/lib/liquid-glass-core";
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick, provide, getCurrentInstance } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, provide, getCurrentInstance } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import BrandLockup from "@/components/brand-lockup.vue";
 // #ifdef APP-PLUS
@@ -189,7 +185,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { formatUnreadBadge } from "@/lib/unread-badge";
-import { useRefresh, PULL_HEADER_HOLD_KEY } from "@/store/refresh";
+import { useRefresh } from "@/store/refresh";
 import { DIALOG_SCROLL_LOCK } from "@/composables/use-dialog-a11y";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { usePageHeader } from "@/store/page-header";
@@ -204,7 +200,6 @@ import { navBack as navBackTo, navTo } from "@/lib/route";
 import { isCurrentNativeTab } from "@/lib/native-tab-navigation";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
-import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
 import { resolveChassisScrollElement, scrollCurrentTabToTop, scrollNativeCurrentTabToTop } from "@/lib/chassis-scroll";
 import { createVoucherPopupScheduler } from "@/lib/voucher-popup-scheduler";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -216,6 +211,8 @@ import { isAcceptanceObservationModalOpen, onAcceptanceObservationModalClosed, o
 // Bind fallthrough attrs explicitly so they cannot replace the view adapter's ID.
 defineOptions({ inheritAttrs: false, methods: {
   // App-Plus callMethod resolves vm.proxy, which does not expose script-setup bindings.
+  onChassisScrolling(this: { $: { exposed: { receiveChassisScrolling(value: boolean): void } | null } }, value: boolean) { this.$.exposed?.receiveChassisScrolling(value); },
+  onChassisRefresh(this: { $: { exposed: { receiveChassisRefresh(visit: string): void } | null } }, visit: string) { this.$.exposed?.receiveChassisRefresh(visit); },
   onNativeScrollLoadMore(this: { $: { exposed: { receiveNativeScrollLoadMore(key: string): void } | null } }, key: string) { this.$.exposed?.receiveNativeScrollLoadMore(key); },
 } });
 const taskCenterReceipt = ref<OpenTaskReceipt>(null);
@@ -323,139 +320,20 @@ watch(
   { immediate: true },
 );
 
-// ── Pull-to-refresh — touch gesture ported from the prototype's PullToRefresh
-// (lib/store/refresh + ui/pull-to-refresh.tsx). The plain overflow:auto view
-// (see template) needs its own gesture since we dropped <scroll-view>. Only
-// fires when scrolled to top + not already refreshing. Brand-themed spinner.
-const TRIGGER_PX = 70; // pull distance (damped) needed to fire
-const MAX_PX = 110; // visual ceiling
-const HOLD_PX = 56; // parked spinner position while loading
-const DAMP = 0.5; // iOS-like resistance
-const pullY = ref(0);
-const pulling = ref(false);
-// pullActive gates whether the content wrapper carries a transform at all. It
-// stays true during the pull + ~340ms after release (so the spring-back still
-// animates) then drops to false → transform removed → chrome backdrop-filter
-// can frost the content again. (P-041)
-const pullActive = ref(false);
-let deactivateTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleDeactivate() {
-  if (deactivateTimer) clearTimeout(deactivateTimer);
-  deactivateTimer = setTimeout(() => {
-    if (pullY.value === 0 && !refresh.isRefreshing) pullActive.value = false;
-  }, 340);
-}
+// Real DOM scrolling, position memory and pull gestures belong to renderjs on
+// both App and H5. Only scrolling edges and an explicit refresh intent cross back.
 const scrollEl = ref<unknown>(null);
-let startY: number | null = null;
-
-const refreshing = computed(() => refresh.isRefreshing);
-const indicatorY = computed(() => (refreshing.value ? HOLD_PX : pullY.value));
-const refresherVisible = computed(() => refreshing.value || pullY.value > 6);
-// Open dialogs (useDialogA11y) hold the page still: no scroll, no pull-to-refresh under the mask.
+const scrolling = ref(false);
 const scrollLocks = ref(0);
-// A dialog opened during the refresh hold drops the content offset, so its fixed sheet is not shifted with it.
-const pullStyle = computed(() => (pullActive.value && scrollLocks.value === 0 ? { y: indicatorY.value, transition: pulling.value ? "none" : "transform .28s cubic-bezier(.16,1,.3,1)" } : null));
-const pullHeaderHeight = ref(0);
-const pullHeaderMeasure = ref(0);
 provide(DIALOG_SCROLL_LOCK, () => {
   scrollLocks.value += 1;
   let held = true;
   return () => { if (held) { held = false; scrollLocks.value -= 1; } };
 });
-provide(PULL_HEADER_HOLD_KEY, { pull: pullStyle, headerHeight: pullHeaderHeight, measureRequest: pullHeaderMeasure });
 
-// H5's uni <view> ref exposes the DOM element via $el. APP-PLUS page logic has
-// no document; its ref still serves scroll-memory reads, while writes use evalJS.
+// H5-only DOM access for the existing same-tab return-to-top action.
 function chassisScrollDom(): HTMLElement | null {
-  const raw = scrollEl.value as { $el?: HTMLElement } | HTMLElement | null;
-  // #ifdef APP-PLUS
-  return (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
-  // #endif
-  return resolveChassisScrollElement(raw, () => null);
-}
-function currentScrollTop(): number {
-  return chassisScrollDom()?.scrollTop ?? 0;
-}
-
-// ── scroll-position restore on back-navigation — uni hides stacked pages with
-// display:none (zeroing this inner container's scrollTop) and only auto-restores
-// PAGE-level scroll, so every navigateBack used to land the parent page at the
-// top. Record continuously, restore on keep-alive re-activation; a fresh mount
-// (forward navigation / reLaunch) intentionally starts clean at the top. ──
-let scrollMemKey = "";
-function pageScrollKey(): string {
-  if (props.tabHost) return props.tabLocationKey ?? props.logicalRoute ?? "";
-  try {
-    const ps = getCurrentPages();
-    const top = ps.length ? (ps[ps.length - 1] as { $page?: { fullPath?: string }; route?: string }) : undefined;
-    return top?.$page?.fullPath ?? top?.route ?? route.value;
-  } catch {
-    return route.value;
-  }
-}
-// ── 客服浮标让路 —— 滚动中淡出,停下再淡回 ──
-// 浮标锚定导航上方；滚动时让出正在阅读的内容，停下后淡回。
-// 页尾另加空间，确保最后一个操作可以完整滚过浮标。
-// 复位靠 debounce 而非 scrollend:后者 Safari / uni webview 都还没有。
-const SCROLL_IDLE_MS = 200;
-const scrolling = ref(false);
-let scrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
-function markScrolling() {
-  scrolling.value = true;
-  if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
-  scrollIdleTimer = setTimeout(() => {
-    scrolling.value = false;
-    scrollIdleTimer = null;
-  }, SCROLL_IDLE_MS);
-}
-function onChassisScroll() {
-  markScrolling();
-  const el = chassisScrollDom();
-  if (el) saveScrollPos(scrollMemKey, el.scrollTop);
-}
-function restoreChassisScroll() {
-  const saved = getScrollPos(scrollMemKey);
-  if (saved === undefined || saved <= 0) return;
-  void nextTick(() => {
-    const el = chassisScrollDom();
-    if (el) el.scrollTop = saved;
-  });
-}
-onActivated(() => {
-  scrollMemKey = pageScrollKey();
-  restoreChassisScroll();
-});
-function touchY(e: TouchEvent): number | null {
-  const tp = e.touches?.[0] ?? e.changedTouches?.[0];
-  return tp ? tp.clientY : null;
-}
-function onTouchStart(e: TouchEvent) {
-  if (scrollLocks.value > 0 || refreshing.value || currentScrollTop() > 0) { startY = null; return; }
-  startY = touchY(e);
-}
-function onTouchMove(e: TouchEvent) {
-  if (startY === null || refreshing.value) return;
-  const y = touchY(e);
-  if (y === null) return;
-  const dy = y - startY;
-  if (dy <= 0) { pullY.value = 0; pulling.value = false; return; }
-  if (!pulling.value) pullHeaderMeasure.value += 1;
-  pulling.value = true;
-  pullActive.value = true; // arm the transform layer only now (idle stays clean)
-  if (deactivateTimer) { clearTimeout(deactivateTimer); deactivateTimer = null; }
-  pullY.value = Math.min(MAX_PX, dy * DAMP);
-}
-async function onTouchEnd() {
-  if (startY === null) return;
-  const pulled = pullY.value;
-  startY = null;
-  pulling.value = false;
-  if (pulled >= TRIGGER_PX && !refreshing.value) {
-    pullY.value = HOLD_PX;
-    await refresh.refresh();
-  }
-  pullY.value = 0;
-  scheduleDeactivate(); // drop the transform after the spring-back finishes
+  return resolveChassisScrollElement(scrollEl.value, () => null);
 }
 
 // ── route self-detection (mirrors the prototype root layout) ──
@@ -494,15 +372,6 @@ onMounted(() => {
     if (readRoute() === "pages/index/index") voucherPopupScheduler.schedule();
   });
   route.value = readRoute();
-  // Fresh mount = fresh landing: start at top and wipe stale memory; only a
-  // keep-alive re-activation (back-navigation) restores. H5-only listener —
-  // App-side pages live in their own webview, which keeps scroll natively.
-  scrollMemKey = pageScrollKey();
-  dropScrollPos(scrollMemKey);
-  const scrollDom = chassisScrollDom();
-  if (scrollDom && typeof scrollDom.addEventListener === "function") {
-    scrollDom.addEventListener("scroll", onChassisScroll, { passive: true });
-  }
   const closeTransient = (trialClaimSheet as { closeTransient?: () => void }).closeTransient;
   if (typeof closeTransient === "function") closeTransient();
   else trialClaimSheet.open = false;
@@ -534,9 +403,6 @@ function beginHomeAutoPush(newVisit: boolean) {
 watch(() => [props.logicalRoute, props.tabLocationKey], () => {
   if (!props.tabHost) return;
   route.value = readRoute();
-  scrollMemKey = pageScrollKey();
-  dropScrollPos(scrollMemKey);
-  startY = null; pullY.value = 0; pulling.value = false; pullActive.value = false;
   // The view controller restores each tab after its retained content is visible.
 });
 watch(() => [route.value, props.hostVisible], ([current], [previous]) => {
@@ -551,11 +417,6 @@ onUnmounted(() => {
   stopObservationOpened = null;
   stopObservationClosed?.();
   stopObservationClosed = null;
-  const scrollDom = chassisScrollDom();
-  if (scrollDom && typeof scrollDom.removeEventListener === "function") {
-    scrollDom.removeEventListener("scroll", onChassisScroll);
-  }
-  if (scrollIdleTimer) { clearTimeout(scrollIdleTimer); scrollIdleTimer = null; }
   stopAutoPush();
 });
 
@@ -704,10 +565,11 @@ import GlassSegments from "@/components/glass-segments.vue";
 const chassisHostId = `nx-chassis-host-${getCurrentInstance()!.uid}`;
 const pageVisible = ref(true);
 const scrollVisit = ref(0);
+const pageVisit = ref(0);
 watch(() => props.scrollLoadKey, () => { scrollVisit.value++; }, { flush: "sync" });
 const tabRevision = ref(0);
 watch(() => props.tabLocationKey, () => { tabRevision.value += 1; }, { flush: "sync" });
-onShow(() => { scrollVisit.value++; pageVisible.value = true; });
+onShow(() => { scrollVisit.value++; pageVisit.value++; pageVisible.value = true; });
 onHide(() => { scrollVisit.value++; pageVisible.value = false; });
 let scrollDiagnostics = false;
 let nativeScrollBridge = false;
@@ -715,12 +577,19 @@ let nativeScrollBridge = false;
 scrollDiagnostics = import.meta.env.VITE_UVEL_SCROLL_DEBUG === "true";
 nativeScrollBridge = true;
 // #endif
-const chromeConfiguration = computed(() => ({ hostId: chassisHostId, tabKey: props.tabHost ? props.tabLocationKey : undefined, tabRevision: props.tabHost ? tabRevision.value : undefined, visible: pageVisible.value && props.hostVisible, debug: scrollDiagnostics, scrollKey: nativeScrollBridge && props.scrollLoadKey !== undefined ? `${scrollVisit.value}:${props.scrollLoadKey}` : undefined }));
+const chromeConfiguration = computed(() => ({ hostId: chassisHostId, tabKey: props.tabHost ? props.tabLocationKey : undefined, tabRevision: props.tabHost ? tabRevision.value : undefined, visible: pageVisible.value && props.hostVisible, pageVisit: pageVisit.value, memoryKey: !props.tabHost && isTabRoute.value ? route.value || props.active : undefined, visit: `${scrollVisit.value}:${tabRevision.value}`, isRefreshing: refresh.isRefreshing, scrollLocks: scrollLocks.value, pullInset: contentTop.value + pendingBarInset.value, debug: scrollDiagnostics, scrollKey: nativeScrollBridge && props.scrollLoadKey !== undefined ? `${scrollVisit.value}:${props.scrollLoadKey}` : undefined }));
 // renderjs owns the real WebView scroller; only this visible list may consume its receipt.
 function receiveNativeScrollLoadMore(key: string) {
   if (nativeScrollBridge && pageVisible.value && props.hostVisible && key === chromeConfiguration.value.scrollKey) emit("scroll-load-more");
 }
-defineExpose({ receiveNativeScrollLoadMore });
+function receiveChassisScrolling(value: boolean) {
+  scrolling.value = value;
+}
+function receiveChassisRefresh(visit: string) {
+  if (pageVisible.value && props.hostVisible && visit === chromeConfiguration.value.visit
+    && scrollLocks.value === 0 && !refresh.isRefreshing) void refresh.refresh();
+}
+defineExpose({ receiveNativeScrollLoadMore, receiveChassisScrolling, receiveChassisRefresh });
 declare const chromeView: { update(value: import("@/lib/liquid-glass-view").ChassisConfiguration): void };
 const navigationOptions = computed(() => tabs.value.map(tab => ({ ...tab, value: tab.key })));
 const navigationFrom = consumeGlassNavigation(activeTab.value);

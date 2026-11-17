@@ -1,21 +1,14 @@
-// Chassis scroll-position memory — uni H5 keeps stacked pages alive but hides
-// them with display:none, which zeroes any INNER container's scrollTop, and
-// uni's own back-restore only covers page-level (window) scroll. AppChassis owns
-// the real scroll container, so it records its position per page here and
-// restores it when the page is re-activated (navigateBack reveal).
-// Module-level so it survives page instance teardown; session-scoped by design.
-
-const positions = new Map<string, number>();
-
-export function saveScrollPos(key: string, top: number): void {
-  positions.set(key, top);
+// Normalize saved coordinates, never the live scroller: iOS elastic scrolling
+// can report positions outside the physical content range.
+export function normalizedScrollTop(top: number, max: number): number {
+  return Math.max(0, Math.min(top, Math.max(0, max)));
 }
 
+// H5 recreates Tab shells; their view-layer memory survives those mounts.
+const positions = new Map<string, number>();
+export function saveScrollPos(key: string, top: number, max: number): void {
+  positions.set(key, normalizedScrollTop(top, max));
+}
 export function getScrollPos(key: string): number | undefined {
   return positions.get(key);
-}
-
-/** Fresh forward-navigation lands at top — clear any stale memory for the key. */
-export function dropScrollPos(key: string): void {
-  positions.delete(key);
 }
