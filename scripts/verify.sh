@@ -374,9 +374,11 @@ fi
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
 # 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
-# Bottom spacing keeps P-065 (inset + at least 22px). The shared overlay
-# tokens retain their declared contract; a consumer with a smaller offset
-# needs separate context evidence. Height calculations are a different concern.
+# Bottom spacing (P-065, design system 02 §2.5): bottom bars, sheets and floating
+# buttons take --nx-overlay-safe-bottom / --nx-overlay-bottom as their whole bottom
+# value; a fixed amount stacked on env() or on a token is red. The shared tokens keep
+# their declared contract. Named exceptions (chat input, content scroll reserves)
+# are listed in SAFE_AREA_EXEMPT. Height calculations are a different concern.
 if ! sa_bad=$("$NODE_BIN" <<'NODE' 2>&1
 const fs=require("fs"),path=require("path"),ts=require("typescript");
 const {parse}=require("@vue/compiler-sfc"),postcss=require("postcss");
@@ -393,6 +395,30 @@ const overlayDefined=safeValues.length>0&&bottomValues.length>0
   && safeValues.every(value=>value==="SAFE24")
   && bottomValues.every(value=>value==="calc(16px+var(--nx-overlay-safe-bottom))");
 const insetSource=/safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/;
+// Named exceptions to the shared-token rule (file, rule selector). Each one is not the bottom
+// distance of a bar, sheet or floating button, so a stacked value is intended there:
+// - chat input containers own their safe area (02 §2.5); the composer is also proven above.
+// - content scroll reserves (page padding-bottom / bar-space) keep the last row clear of a fixed
+//   bar and only add scroll room.
+// - the pending-payment card floats above the tab bar or a bottom bar; its 64px is that clearance.
+// - the full-screen document preview pads its image area, which has no bottom control.
+// The tab bar keeps its own Home Indicator spacer and declares no inset, so it never reaches here.
+const SAFE_AREA_EXEMPT=[
+  ["src/components/support/conversation-thread.vue",".nx-conv-composer"],
+  ["src/components/support/conversation-thread.vue",".nx-conv-recovery-actions"],
+  ["src/components/support/conversation-thread.vue",".nx-conv-closedbar"],
+  ["src/pages/daily/daily.vue",".dly"],
+  ["src/pages/learn/course.vue",".learning-course"],
+  ["src/pages/me/goals.vue",".growth-goals"],
+  ["src/pages/me/payment-password.vue",".payment-pin-page"],
+  ["src/pages/me/trial.vue",".trial-bar-space"],
+  ["src/pages/register/success.vue",".rs-wrap"],
+  ["src/pages/register/success.vue",".rs-wrap--web-setup"],
+  ["src/pages/register/success.vue",".rs-wrap--gift"],
+  ["src/pages/team/agent-applications.vue",".records-content"],
+  ["src/components/purchase-payment-dialog.vue",".purchase-payment-resume"],
+  ["src/pages/team/agent-application.vue",".detail-preview__stage"],
+];
 const bad=[];
 const files=[];
 (function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f),s=fs.statSync(p);
@@ -619,24 +645,14 @@ for(const declaration of source.split(";")){
       value=depth===0&&sides.length<=(logical?2:4)?(sides[bottomAt]??""):"";
       if(value&&!/INSET|SAFE24|safe-area-inset-bottom|--nx-overlay-(?:safe-bottom|bottom)/.test(value))continue;
     }
+    // 02 §2.5: a bottom bar, sheet or floating button takes a shared token as its whole bottom value.
+    // A fixed amount stacked on env() or on a token is red, whatever its size.
     if(overlayDefined&&/^var\(--nx-overlay-(?:safe-bottom|bottom)\)$/.test(value))continue;
-    if(overlayDefined){
-      const shared=value.replace(/var\(--nx-overlay-safe-bottom(?:,(?:0|24)px)?\)/g,"SHARED_SAFE");
-      if(shared==="calc(16px+SHARED_SAFE)"||shared==="calc(SHARED_SAFE+16px)")continue;
-      value=shared.replace(/SHARED_SAFE/g,"SAFE24");
-    }
-    // Existing sheets take the larger of inset+24px and the shared overlay
-    // bottom. Both complete branches must retain their declared shapes.
-    const maximum=value.match(/^max\((calc\([^()]*\)),var\(--nx-overlay-bottom\)\)$/);
-    if(maximum&&overlayDefined)value=maximum[1];
-    const body=value.match(/^calc\(([^()]*)\)$/)?.[1];
-    const terms=body?.split("+")??[];
-    const insets=terms.filter(term=>term==="INSET"||term==="SAFE24");
-    const pixels=terms.filter(term=>/^\d+(?:\.\d+)?px$/.test(term));
-    const known=insets.length===1&&pixels.length+1===terms.length;
-    const base=known?pixels.reduce((sum,term)=>sum+parseFloat(term),0):null;
-    if(base!==null&&base>=22)continue;
-    bad.push(p.split(path.sep).join("/")+":"+line+" base="+(base===null||insets[0]==="SAFE24"?"unknown":base+"px"));
+    const where=p.split(path.sep).join("/");
+    const before=source.slice(0,start+match.index),open=before.lastIndexOf("{");
+    const selector=open>before.lastIndexOf("}")?before.slice(before.lastIndexOf("}")+1,open).replace(/^[\s\S]*<style[^>]*>/,"").replace(/\/\*[\s\S]*?\*\//g,"").split("{").pop().trim():"";
+    if(SAFE_AREA_EXEMPT.some(([file,rule])=>file===where&&rule===selector))continue;
+    bad.push(where+":"+line+" "+(selector&&!/[;\n=]/.test(selector)?selector:match[1])+" bottom must be var(--nx-overlay-safe-bottom) or var(--nx-overlay-bottom), got "+value);
 }}}
 if(!files.length)throw new Error("no safe-area source files scanned");
 if(bad.length)console.log([...new Set(bad)].join("\n"));
@@ -645,10 +661,10 @@ NODE
   bad "safe-area scanner failed"
   printf "%s\n" "$sa_bad" | sed 's/^/        /'
 elif [ -n "$sa_bad" ]; then
-  bad "safe-area bottom spacing failed (P-065 / overlay contract)"
+  bad "safe-area bottom spacing failed (P-065 / 02 §2.5 shared tokens)"
   printf "%s\n" "$sa_bad" | sed 's/^/        /'
 else
-  ok "safe-area bottom padding (P-065 / current overlay contract)"
+  ok "safe-area bottom spacing uses the shared tokens (P-065 / 02 §2.5)"
 fi
 # Auth/onboarding bare pages must use one system-chrome owner. This catches the
 # orthogonal failure where a new flow page looks fine but forgets the status bar,

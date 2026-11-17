@@ -517,7 +517,7 @@ function iconChipStyle(type: BillType): CSSProperties {
 .bills-end { display:block;padding:0 0 4px;text-align:center;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-4); }
 .bills-sheet-root { position:fixed;inset:0;z-index:790;display:flex;align-items:flex-end; }
 .bills-sheet-scrim { position:absolute;inset:0;background:var(--v5-bg-color-mask); }
-.bills-sheet { position:relative;display:flex;flex-direction:column;gap:var(--ui-space-inset);width:100%;box-sizing:border-box;padding:var(--v5-space-2) 16px calc(16px + var(--nx-overlay-safe-bottom, 0px));border-radius:28px 28px 0 0;background:var(--v5-surface); }
+.bills-sheet { position:relative;display:flex;flex-direction:column;gap:var(--ui-space-inset);width:100%;box-sizing:border-box;padding:var(--v5-space-2) 16px var(--nx-overlay-bottom);border-radius:28px 28px 0 0;background:var(--v5-surface); }
 .bills-sheet__handle { align-self:center;width:36px;height:4px;border-radius:999px;background:color-mix(in srgb,var(--v5-ink) 18%,transparent); }
 .bills-sheet__head { display:flex;flex-direction:column;align-items:center;gap:var(--v5-space-2);padding:var(--v5-space-2) 0 6px; }
 .bills-sheet__icon { display:grid;place-items:center;width:48px;height:48px;border-radius:14px; }
