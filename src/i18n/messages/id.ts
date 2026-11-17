@@ -636,7 +636,7 @@ export const id: Messages = {
     storeBundle: "Paket",
     genesisMarketplace: "Pasar jual kembali",
     genesisHolder: "Pemegang Genesis",
-    trustNex: "UVT Trust",
+    trustNex: "Kepercayaan UVT",
     tx: "Transaksi",
     howItWorksSuffix: " · Cara kerja",
   },

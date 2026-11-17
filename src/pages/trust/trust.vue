@@ -144,7 +144,7 @@
                     <text v-if="row.metadata" class="block">{{ row.metadata }}</text>
                   </view>
                 </template>
-                <text v-else>{{ resources.pending }}</text>
+                <text v-else>{{ t.store.relatedMaterialsEmpty }}</text>
                 <NxButton v-if="item.key === 'warranty'" variant="text" :label="auditCopy.afterSales" @click="navTo('/pages/me/notifications?section=service')" />
                 <NxButton v-if="item.key === 'security'" variant="text" :label="auditCopy.securitySettings" @click="openHref('/pages/me/security')" />
               </view>
