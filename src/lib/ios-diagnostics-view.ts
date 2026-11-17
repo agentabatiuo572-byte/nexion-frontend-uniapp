@@ -80,6 +80,28 @@ function recordViewError(kind: string, value: unknown, limit = 600) {
   viewErrors.push({ at: new Date().toISOString(), kind, message });
   if (viewErrors.length > 6) viewErrors.splice(1, 1);
 }
+// Finds the first vdSync action whose target node is missing or lacks the method the view is about to call.
+function locateFailedAction(actions: unknown[][]) {
+  const lookup = (window as unknown as { __$__?: (id: unknown) => Record<string, unknown> & { $?: Node } | undefined }).__$__;
+  const first = actions[0];
+  const dictionary = Array.isArray(first) && first[0] === 0 && Array.isArray(first[1]) ? first[1] as unknown[] : [];
+  const word = (value: unknown) => typeof value === "number" ? dictionary[value] ?? value : value;
+  const methods: Record<number, string> = { 4: "insert", 5: "remove", 6: "setAttr", 7: "removeAttr", 8: "addEvent", 9: "addWxsEvent", 10: "setText" };
+  const describe = (node: Node | null | undefined) => node ? { name: node.nodeName, class: (node as Element).getAttribute?.("class") ?? null, id: (node as Element).id || null } : null;
+  for (let index = 0; index < actions.length; index += 1) {
+    const action = actions[index];
+    const method = methods[action[0] as number];
+    if (!method || !lookup) continue;
+    const node = lookup(action[1]);
+    if (node && typeof node[method] === "function") continue;
+    const created = actions.find(item => item[0] === 3 && item[1] === action[1]);
+    const element = node?.$;
+    return { index, method, id: action[1], args: action.slice(2, 4).map(word), nodeName: element?.nodeName ?? null,
+      text: element?.textContent?.slice(0, 60) ?? null, parent: describe(element?.parentElement), previous: describe(element?.previousSibling),
+      next: describe(element?.nextSibling), created: created ? { index: actions.indexOf(created), tag: word(created[2]), parent: created[3], ref: created[4] } : null };
+  }
+  return null;
+}
 function captureViewErrors() {
   // window.onerror only sees "Script error." for the uni view bundle; catching at the bridge entry keeps the real error.
   const bridge = (window as unknown as { UniViewJSBridge?: { subscribeHandler?: (name: string, data: unknown, pageId: unknown) => unknown } }).UniViewJSBridge;
@@ -87,8 +109,8 @@ function captureViewErrors() {
   if (bridge && subscribe) bridge.subscribeHandler = (name, data, pageId) => {
     try { return subscribe(name, data, pageId); }
     catch (error) {
-      const actions = Array.isArray(data) ? data : [];
-      recordViewError(`bridge:${name} n=${actions.length} ${JSON.stringify(actions.slice(0, 2))?.slice(0, 300) ?? ""}`, error, 1500);
+      const actions = Array.isArray(data) ? data as unknown[][] : [];
+      recordViewError(`bridge:${name} n=${actions.length} culprit=${JSON.stringify(locateFailedAction(actions))}`, error, 1500);
       throw error;
     }
   };

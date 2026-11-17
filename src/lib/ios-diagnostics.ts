@@ -40,7 +40,7 @@ export function readLogicDiagnostics() {
     sampledAt: new Date().toISOString(),
     sourceSha: __UVEL_DIAGNOSTIC_SOURCE__,
     sourceBaseline: "b39422619d934ded7277dcb1053c2b3a8731fd27",
-    diagnosticRevision: "ios-perf-accessibility-v3-bridge",
+    diagnosticRevision: "ios-perf-accessibility-v4-culprit",
     compiledResourceVersion,
     pages: pages.map(page => ({ route: page.route, id: (page as { $page?: { id?: number } }).$page?.id })),
     logicalPage: { route: logical.route, options: diagnosticQuery(logical.options) },
