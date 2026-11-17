@@ -194,7 +194,7 @@
     <template #pageFixed>
       <view v-if="!authorityScreenUnavailable" class="trial-bar nx-glass-bar" :class="{ 'trial-bar--pair': conversionRefunded }">
         <template v-if="isActiveCycle || (status === 'ended' && !claimVisible)">
-          <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
+          <text v-if="barNote" class="trial-bar__note nx-tray-note">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
           <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialProductUnavailable && !trialCatalogLoading" :busy="trialCatalogLoading" @click="goCheckout">
             <svg v-if="isActiveCycle" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
@@ -203,7 +203,7 @@
         </template>
         <template v-else-if="claimVisible">
           <!-- Ineligible → concrete reason above the disabled CTA (异常2) -->
-          <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
+          <text v-if="barNote" class="trial-bar__note nx-tray-note">{{ barNote }}</text>
           <NxButton class="trial-bar__main" variant="primary" :label="t.trial.idleCta" :disabled="!canStartNow" @click="claim" />
         </template>
         <template v-else-if="conversionRefunded">
@@ -621,10 +621,10 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-terminal-copy__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-wrap:pretty; }
 
 /* ── Bottom action bar (DS-30): the shared glass bar ── */
-.trial-bar { position:absolute;left:0;right:0;bottom:0;z-index:36;display:flex;flex-direction:column;padding:12px 16px var(--nx-overlay-safe-bottom);animation:trial-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
-.trial-bar--pair { flex-direction:row;flex-wrap:wrap;gap:12px; }
-.trial-bar__note { margin:0 0 10px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;text-wrap:pretty; }
-.trial-bar__retry { display:flex;justify-content:center;margin:-6px 0 4px; }
+.trial-bar { position:absolute;z-index:36;display:flex;flex-direction:column;animation:trial-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
+.trial-bar--pair { flex-direction:row;flex-wrap:wrap; }
+.trial-bar__note { margin:0;padding-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;text-wrap:pretty; }
+.trial-bar__retry { display:flex;justify-content:center;margin:-8px 0 -4px; }
 /* In-flow twin of the bar: 12 top + 48 button + 30 bottom (+ safe area) + a 20px gap, less the 40px the chassis already pads. */
 .trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 16px calc(70px + env(safe-area-inset-bottom)); }
 .trial-bar-space__retry { height:44px; }

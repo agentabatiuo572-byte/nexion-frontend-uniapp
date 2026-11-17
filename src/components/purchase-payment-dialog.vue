@@ -507,7 +507,7 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 .pp-wait.is-paused { justify-content: center; text-align: center; }
 .pp-wait.is-paused .pp-wait__s { text-align: center; }
 .pp-pay.has-bar { padding-bottom: 120px; }
-.pp-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
+.pp-bar { position: absolute; z-index: 2; display: flex; }
 .pp-reopen { display: flex; flex: 1; }
 .pp-div { height: 1px; margin: 6px 0; background: var(--v5-border); }
 .pp-warn { display: flex; gap: var(--v5-space-2); padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m); background: color-mix(in srgb, var(--v5-warning-soft) 60%, transparent); color: var(--v5-warning); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }

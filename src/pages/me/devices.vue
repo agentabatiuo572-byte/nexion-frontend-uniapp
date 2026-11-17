@@ -416,7 +416,7 @@ function goStore() {
 .device-phone-card__art { position: relative; width: 84px; height: 72px; }
 .device-phone-card__img { position: absolute; left: 3px; top: 2px; width: 78px; height: 64px; }
 .device-page__bar-space { height: calc(110px + env(safe-area-inset-bottom)); }
-.device-page__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; display: flex; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
+.device-page__bar { position: absolute; z-index: 36; display: flex; }
 .device-page__bar-btn { display: flex; flex: 1; }
 .device-page__bar-label { display: flex; align-items: center; gap: 6px; }
 @keyframes device-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }

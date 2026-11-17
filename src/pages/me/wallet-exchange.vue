@@ -1146,9 +1146,9 @@ const historyEmptyStyle: CSSProperties = {
 .ex-row__ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--ui-radius-icon); background: var(--v5-nex-soft); color: var(--v5-nex-ink); }
 .ex-row__p { display: block; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; }
 .ex-bar-space { height: 110px; }
-.ex-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
-.ex-confirm { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
-.ex-confirm--on { opacity: 1; cursor: pointer; }
+.ex-bar { position: absolute; z-index: 36; }
+.ex-confirm { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
+.ex-confirm--on { cursor: pointer; }
 .ex-confirm--on:active { transform: scale(.98); }
 @media (prefers-reduced-motion: reduce) { .ex-swap > svg, .ex-ring__val { animation: none; } .ex-swap:active, .ex-confirm--on:active { transform: none; } .ex-fresh__val { transition: none; } }
 </style>

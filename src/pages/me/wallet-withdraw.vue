@@ -276,7 +276,7 @@
     <!-- 主操作在底部固定栏(DS-30);不可提交时原因写在按钮上方。 -->
     <template #pageFixed>
       <view class="wd-bar nx-glass-bar">
-        <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why">{{ submitDisabledReason }}</text>
+        <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why nx-tray-note">{{ submitDisabledReason }}</text>
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
         <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
@@ -1686,10 +1686,9 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-quota__pip { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .wd-quota__pip--used { background: var(--v5-ink-3); box-shadow: none; }
 .wd-bar-space { height: 120px; }
-.wd-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 36; padding: var(--v5-space-3) var(--v5-space-4) var(--nx-overlay-safe-bottom); }
-.wd-bar__why { position: absolute; left: 16px; right: 16px; top: -28px; text-align: center; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); opacity: .5; cursor: default; }
-.wd-submit--on { opacity: 1; cursor: pointer; }
+.wd-bar { position: absolute; z-index: 36; display: flex; flex-direction: column; }
+.wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
+.wd-submit--on { cursor: pointer; }
 .wd-submit--on:active { transform: scale(.98); }
 @media (prefers-reduced-motion: reduce) { .wd-submit--on:active { transform: none; } }
 </style>
