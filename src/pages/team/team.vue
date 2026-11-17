@@ -29,7 +29,6 @@
           :transient-failure="network.remoteTransientFailure"
           :total="networkReadable ? network.totalMembers : networkDisplaySnapshot?.total ?? 0"
           :direct="networkReadable ? byLayerBuckets[1].length : networkDisplaySnapshot?.direct ?? 0"
-          @invite="inviteCard?.openShare()"
           @open="go('/pages/team/tree')"
         />
 

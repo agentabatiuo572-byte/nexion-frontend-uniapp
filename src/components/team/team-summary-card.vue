@@ -3,7 +3,7 @@
     <view class="team-summary__header"><text class="team-summary__title">{{ copy.myTeam }}</text><text class="team-summary__arrow" :style="{ visibility: canOpen ? 'visible' : 'hidden' }" aria-hidden="true">›</text></view>
     <view class="team-summary__body" :class="{ 'team-summary__body--long-count': readable && !visibility.hidden && String(total).length > 6 }"><TeamArt kind="members" :size="56" /><view class="team-summary__metrics"><text class="team-summary__number" :style="{ '--team-summary-count-units': countUnits }">{{ totalText }}</text><text class="team-summary__label">{{ copy.peopleUnit }}</text></view></view>
     <view class="team-summary__direct"><text>{{ copy.directInvited }}</text><text>{{ visibility.mask(readable ? direct : '—') }}</text><text v-if="readable && total > direct" class="team-summary__team">{{ teamLabel }} <text>{{ visibility.mask(total - direct) }}</text></text></view>
-    <view v-if="readable && !total && status !== 'error'" class="team-summary__empty"><text v-if="!visibility.hidden">{{ t.team.summaryEmpty }}</text><NxButton class="team-summary__action" :label="copy.inviteFriends" variant="secondary" size="medium" @click="$emit('invite')" /></view>
+    <view v-if="readable && !total && status !== 'error'" class="team-summary__empty"><text v-if="!visibility.hidden">{{ t.team.summaryEmpty }}</text></view>
   </view>
 </template>
 <script setup lang="ts">
@@ -12,11 +12,10 @@ import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
 import { teamRedesignCopy } from '@/i18n/team-redesign';
 import TeamArt from './team-art.vue';
-import NxButton from '@/components/ui/nx-button.vue';
 import { useDataVisibility } from '@/store/data-visibility';
 import { uiLocale } from '@/i18n';
 const props=defineProps<{status:'idle'|'loading'|'ready'|'error'; total:number; direct:number; hasSnapshot?:boolean;transientFailure?:boolean;displayAvailable?:boolean}>();
-const emit=defineEmits<{(event:'invite'):void;(event:'open'):void;(event:'retry'):void}>();
+const emit=defineEmits<{(event:'open'):void;(event:'retry'):void}>();
 const t=useT(), locale=useLocaleStore(), copy=computed(()=>teamRedesignCopy(locale.code));
 const visibility=useDataVisibility();
 const teamLabel=computed(()=>({zh:'团队',en:'Team',vi:'Nhóm',id:'Tim',ms:'Pasukan',fil:'Team',ru:'Команда',kk:'Команда',uz:'Jamoa'})[uiLocale(locale.code)]);
@@ -45,7 +44,6 @@ function open(){if(canOpen.value)emit('open');}
 .team-summary__number,.team-summary__direct > text:last-child { overflow-y: hidden; scrollbar-width: none; }
 .team-summary__number::-webkit-scrollbar,.team-summary__direct > text:last-child::-webkit-scrollbar { display: none; }
 .team-summary__empty,.team-summary__status { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: var(--ui-space-inline); color: var(--v5-ink-3); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
-.team-summary__action { max-width: 100%; }
 .team-summary__status .team-summary__action { font: 600 13px/20px var(--font-v5); }
 .team-summary[role='link'] { cursor: pointer; }
 .team-summary:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
