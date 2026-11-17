@@ -37,7 +37,7 @@ export function secondaryDemo(url,state,request){
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now);
   const page=Number(url.searchParams.get('page')||1),pageSize=Number(url.searchParams.get('pageSize')||20);
   const paginate=items=>({page,pageSize,totalRows:items.length,events:items.slice((page-1)*pageSize,page*pageSize)});
-  if(p==='/api/app/profile/nickname-candidates')return {candidates:['Bright Fox 21','Calm Star 32','Swift Owl 43','Lunar Wolf 54','Amber Moon 65','Quiet Pine 76']};
+  if(p==='/api/app/profile/nickname-candidates')return {candidates:['Bright Fox K7','Calm Comet 4R','Swift Owl M8','Lunar Wolf 6T','Amber River P3','Silent Harbor 9H']};
   if(p==='/api/payout-addresses')return {...proof,addresses:[],serverNowEpochMs:now,changeCooldownDays:30,effectiveDelayHours:24,inFlightWithdrawalBlocked:true};
   if(p==='/api/me/notification-preferences'){
     state.notificationPreferences??={commission:true,team:true,staking:true,market:true,genesis:true,system:true};
