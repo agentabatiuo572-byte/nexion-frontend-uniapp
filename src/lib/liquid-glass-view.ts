@@ -1,6 +1,7 @@
 import { attachManualScrollLoadMore } from "./manual-scroll-load-more";
 import { mountLiquidGlass, type GlassConfiguration } from "./liquid-glass-renderer";
 import { glassSpring, glassLogoHidden } from "./liquid-glass-core";
+import { normalizedScrollTop, saveScrollPos, getScrollPos } from "./scroll-memory";
 
 export interface SegmentsConfiguration {
   hostId: string; value: string; values: string[]; fromValue?: string;
@@ -355,23 +356,40 @@ function mountSegments(root: HTMLElement, initial: SegmentsConfiguration) {
   };
 }
 
-export interface ChassisConfiguration { hostId?: string; tabKey?: string; tabRevision?: number; visible?: boolean; debug?: boolean; scrollKey?: string }
+export interface ChassisConfiguration {
+  hostId?: string; tabKey?: string; tabRevision?: number; visible?: boolean; debug?: boolean; scrollKey?: string;
+  memoryKey?: string; pageVisit?: number; visit?: string; isRefreshing?: boolean; scrollLocks?: number; pullInset?: number;
+}
 
-export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = {}, notifyScrollBottom?: (key: string) => void) {
+export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = {}, notifyScrollBottom?: (key: string) => void,
+  notifyScrolling?: (value: boolean) => void, notifyRefresh?: (visit: string) => void) {
   const scroll = root.querySelector<HTMLElement>(".nx-content")!;
+  const indicator = scroll.querySelector<HTMLElement>(".nx-refresher")!;
+  const icon = indicator.querySelector<HTMLElement>(".nx-refresher-icon")!;
+  const wrapper = indicator.nextElementSibling as HTMLElement;
+  let config = initial;
   let tabKey = initial.tabKey;
   let tabRevision = initial.tabRevision;
   let visible = initial.visible ?? true;
   let scrollKey = initial.scrollKey;
   let detachPagination = () => {};
-  let pageTop = scroll.scrollTop;
+  const physicalTop = () => normalizedScrollTop(scroll.scrollTop, scroll.scrollHeight - scroll.clientHeight);
+  let pageTop = initial.memoryKey ? getScrollPos(initial.memoryKey) ?? physicalTop() : physicalTop();
   let pendingTop: number | null = null;
   let restoreFrame = 0;
   const tabPositions = new Map<string, { href: string; top: number }>();
   let hidden = scroll.scrollTop > 8;
+  let scrolling = false;
+  let touching = false;
   let idle: ReturnType<typeof setTimeout> | undefined;
+  let startY: number | null = null;
+  let pullY = 0, pulling = false, pullActive = false, awaitingRefresh = false;
+  let deactivate: ReturnType<typeof setTimeout> | undefined;
+  let pullHeader: HTMLElement | null = null;
+  let headerHeight = 0;
+  const spring = "transform .28s cubic-bezier(.16,1,.3,1)";
   const trace = (event: string) => {
-    if (initial.debug) console.info("UvelScroll", JSON.stringify({ event, visible, pending: pendingTop !== null,
+    if (config.debug) console.info("UvelScroll", JSON.stringify({ event, visible, pending: pendingTop !== null,
       target: pendingTop, top: scroll.scrollTop, max: Math.max(0, scroll.scrollHeight - scroll.clientHeight) }));
   };
   const tabLayoutReady = () => {
@@ -381,29 +399,64 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     return shown.length === 1 && shown[0].dataset.tabContentKey === tabKey;
   };
   const viewReady = () => visible && root.dataset.pageVisible !== "false"
+    && (root.dataset.pageVisit === undefined || root.dataset.pageVisit === String(config.pageVisit))
     && (root.dataset.tabKey === undefined || root.dataset.tabKey === tabKey)
     && (root.dataset.tabRevision === undefined || root.dataset.tabRevision === String(tabRevision))
-    // App can deliver the host marker and v-show in separate view patches.
-    // Restore only against the incoming content's real layout, never the old tab.
-    && tabLayoutReady()
-    && (!root.getClientRects || root.getClientRects().length > 0)
-    && (typeof document === "undefined" || document.visibilityState !== "hidden");
-  const markScroll = () => {
-    // The DOM marker changes with v-show, before the renderjs adapter's next rAF.
-    // A short incoming page must not save its clamped zero against the old tab.
-    if (!viewReady() || pendingTop !== null) return;
-    pageTop = scroll.scrollTop;
-    if (tabKey) tabPositions.set(tabKey.split("?")[0], { href: tabKey, top: scroll.scrollTop });
-    root.dataset.scrolling = "true";
+    && tabLayoutReady() && root.getClientRects().length > 0 && document.visibilityState !== "hidden";
+  function paintPull() {
+    const refreshing = config.isRefreshing || awaitingRefresh;
+    const y = refreshing ? 56 : pullY;
+    const active = pullActive && !config.scrollLocks;
+    indicator.style.top = `${(config.pullInset ?? 0) + headerHeight}px`;
+    indicator.style.transform = `translate(-50%, ${y / 2 - 18}px)`;
+    indicator.style.opacity = refreshing || pullY > 6 ? "1" : "0";
+    indicator.style.transition = pulling ? "opacity .15s" : `${spring}, opacity .2s`;
+    icon.classList.toggle("nx-spinning", !!refreshing);
+    icon.style.transform = refreshing ? "" : `rotate(${Math.min(1, pullY / 70) * 270}deg)`;
+    wrapper.style.transform = active ? `translateY(${y}px)` : "";
+    wrapper.style.transition = active ? (pulling ? "none" : spring) : "";
+    wrapper.style.willChange = active ? "transform" : "";
+    if (pullHeader) {
+      pullHeader.style.transform = active ? `translateY(${-y}px)` : "";
+      pullHeader.style.transition = active ? (pulling ? "none" : spring) : "";
+    }
+  }
+  function resetPull(immediate = false) {
+    startY = null; pullY = 0; pulling = false; awaitingRefresh = false;
+    clearTimeout(deactivate);
+    if (immediate) pullActive = false;
+    else deactivate = setTimeout(() => { pullActive = false; paintPull(); }, 340);
+    paintPull();
+  }
+  function setScrolling(value: boolean) {
+    if (scrolling === value) return;
+    scrolling = value;
+    root.dataset.scrolling = String(value);
+    notifyScrolling?.(value);
+  }
+  function scheduleIdle() {
     clearTimeout(idle);
-    idle = setTimeout(() => { root.dataset.scrolling = "false"; trace("capture"); }, 200);
+    idle = setTimeout(() => { if (!touching) { setScrolling(false); trace("capture"); } }, 200);
+  }
+  function finishTouch() { touching = false; if (scrolling) scheduleIdle(); }
+  function stopScrolling() { touching = false; clearTimeout(idle); setScrolling(false); }
+  const remember = () => {
+    if (!viewReady() || pendingTop !== null) return;
+    pageTop = physicalTop();
+    if (config.memoryKey) saveScrollPos(config.memoryKey, pageTop, scroll.scrollHeight - scroll.clientHeight);
+    if (tabKey) tabPositions.set(tabKey.split("?")[0], { href: tabKey, top: pageTop });
+  };
+  const markScroll = () => {
+    if (!viewReady()) return;
+    remember();
+    setScrolling(true);
+    scheduleIdle();
     onScroll();
   };
   function onScroll() {
-    const top = Math.max(0, Math.min(scroll.scrollTop, scroll.scrollHeight - scroll.clientHeight));
+    const top = physicalTop();
     root.dataset.scrolled = String(top > 16);
     hidden = glassLogoHidden(top, hidden);
-    // Query again for headers that mount after a product or route resolves.
     for (const title of Array.from(root.querySelectorAll<HTMLElement>(".nx-header__l, .spv-titlewrap, .nx-nav-titlewrap"))) {
       const value = String(hidden && title.dataset.persistent !== "true");
       if (title.dataset.hidden !== value) title.dataset.hidden = value;
@@ -413,6 +466,9 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   function attemptRestore() {
     if (pendingTop === null || !viewReady()) return;
     const target = pendingTop;
+    // A short first layout can still be waiting for data or image dimensions.
+    // Keep its saved destination without repeatedly writing an unreachable top.
+    if (target > Math.max(0, scroll.scrollHeight - scroll.clientHeight)) return;
     scroll.scrollTop = target;
     if (Math.abs(scroll.scrollTop - target) < 1) pendingTop = null;
     trace(pendingTop === null ? "restored" : "restore-pending");
@@ -420,57 +476,101 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   }
   function scheduleRestore() {
     if (pendingTop === null || restoreFrame) return;
-    if (typeof requestAnimationFrame === "undefined") { attemptRestore(); return; }
     restoreFrame = requestAnimationFrame(() => { restoreFrame = 0; attemptRestore(); });
   }
   const restore = () => {
     const saved = tabKey ? tabPositions.get(tabKey.split("?")[0]) : undefined;
     pendingTop = tabKey ? (saved && saved.href === tabKey ? saved.top : 0) : pageTop;
     if (tabKey && (!saved || saved.href !== tabKey)) tabPositions.set(tabKey.split("?")[0], { href: tabKey, top: pendingTop });
-    attemptRestore();
-    scheduleRestore();
+    attemptRestore(); scheduleRestore();
   };
   const cancelRestore = () => {
     if (pendingTop === null) return;
     pendingTop = null;
-    if (restoreFrame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(restoreFrame);
-    restoreFrame = 0;
-    markScroll(); trace("user-cancel");
+    cancelAnimationFrame(restoreFrame); restoreFrame = 0;
+    remember(); trace("user-cancel");
   };
   const requestTop = () => {
     if (!viewReady()) return;
     cancelRestore();
-    // The helper writes scrollTop after this intent. Persist zero now: a rapid
-    // departure can fence its later scroll event behind the next tab's marker.
     pageTop = 0;
+    if (config.memoryKey) saveScrollPos(config.memoryKey, 0, scroll.scrollHeight - scroll.clientHeight);
     if (tabKey) tabPositions.set(tabKey.split("?")[0], { href: tabKey, top: 0 });
   };
   const keyScroll = (event: KeyboardEvent) => { if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) cancelRestore(); };
+  const inside = (touch: Touch) => {
+    const rect = scroll.getBoundingClientRect();
+    return touch.clientX >= rect.left && touch.clientX <= rect.right && touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+  };
+  const touchStart = (event: TouchEvent) => {
+    touching = true;
+    cancelRestore();
+    if (!viewReady() || config.scrollLocks || config.isRefreshing || awaitingRefresh || scroll.scrollTop > 0 || event.touches.length !== 1) { startY = null; return; }
+    startY = event.touches[0].clientY;
+  };
+  const touchMove = (event: TouchEvent) => {
+    if (startY === null) return;
+    if (!viewReady() || config.scrollLocks || event.touches.length !== 1 || !inside(event.touches[0])) { resetPull(); return; }
+    const dy = event.touches[0].clientY - startY;
+    if (dy <= 0) { pullY = 0; pulling = false; paintPull(); return; }
+    if (!pulling) {
+      pullHeader = Array.from(scroll.querySelectorAll<HTMLElement>(".spv")).find(header => header.getClientRects().length > 0) ?? null;
+      headerHeight = pullHeader ? pullHeader.getBoundingClientRect().height + (parseFloat(getComputedStyle(pullHeader).marginBottom) || 0) : 0;
+    }
+    clearTimeout(deactivate);
+    pulling = true; pullActive = true; pullY = Math.min(110, dy * 0.5);
+    paintPull();
+  };
+  const touchEnd = (event: TouchEvent) => {
+    finishTouch();
+    if (startY === null) return;
+    const touch = event.changedTouches[0];
+    if (!touch || !inside(touch) || !viewReady() || config.scrollLocks || config.isRefreshing || pullY < 70) { resetPull(); return; }
+    startY = null; pulling = false; awaitingRefresh = true;
+    paintPull();
+    notifyRefresh?.(config.visit ?? "");
+  };
+  const touchCancel = () => { finishTouch(); if (startY !== null) resetPull(); };
   scroll.addEventListener("scroll", markScroll, { passive: true });
-  const cancelEvents = ["wheel", "touchstart", "pointerdown"];
+  scroll.addEventListener("touchstart", touchStart, { passive: true });
+  scroll.addEventListener("touchmove", touchMove, { passive: true });
+  scroll.addEventListener("touchend", touchEnd, { passive: true });
+  scroll.addEventListener("touchcancel", touchCancel, { passive: true });
+  const cancelEvents = ["wheel", "pointerdown"];
   for (const event of cancelEvents) scroll.addEventListener(event, cancelRestore, { passive: true });
   scroll.addEventListener("uvel-scroll-to-top", requestTop);
-  root.addEventListener?.("keydown", keyScroll);
+  root.addEventListener("keydown", keyScroll);
   const layoutChanged = () => {
-    // MutationObserver runs after the DOM commit and before paint. The renderjs
-    // config may arrive a frame later; the DOM revision already owns this visit.
     const revision = Number(root.dataset.tabRevision);
     if (root.dataset.tabKey !== undefined && root.dataset.tabRevision !== undefined
       && (tabRevision === undefined || revision >= tabRevision)
       && (root.dataset.tabKey !== tabKey || revision !== tabRevision)) {
+      resetPull(true); stopScrolling();
       tabKey = root.dataset.tabKey; tabRevision = revision; restore();
     }
+    if (!viewReady()) { resetPull(true); stopScrolling(); }
     attemptRestore(); onScroll(); scheduleRestore();
   };
-  const observer = typeof MutationObserver === "undefined" ? undefined : new MutationObserver(layoutChanged);
-  observer?.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-page-visible", "data-tab-key", "data-tab-revision", "data-tab-content-key", "style", "class"] });
+  const observer = new MutationObserver(records => {
+    // Pull styles are owned here; they must not trigger full-shell layout work
+    // on every finger movement (nor observe their own writes in a loop).
+    if (records.some(record => record.type !== "attributes"
+      || ![indicator, icon, wrapper, pullHeader].includes(record.target as HTMLElement))) layoutChanged();
+  });
+  observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-page-visible", "data-page-visit", "data-tab-key", "data-tab-revision", "data-tab-content-key", "style", "class"] });
   const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(layoutChanged);
   resize?.observe(scroll);
-  const body = scroll.querySelector?.<HTMLElement>(".nx-page-enter");
-  if (body && body !== scroll) resize?.observe(body);
-  onScroll();
-  const documentVisibility = () => { if (document.visibilityState === "visible" && visible) restore(); };
-  if (typeof document !== "undefined") document.addEventListener?.("visibilitychange", documentVisibility);
+  const body = scroll.querySelector<HTMLElement>(".nx-page-enter");
+  if (body) resize?.observe(body);
+  if (initial.memoryKey && getScrollPos(initial.memoryKey) !== undefined) restore();
+  onScroll(); paintPull();
+  const documentVisibility = () => {
+    if (document.visibilityState === "visible" && visible) restore();
+    else { resetPull(true); stopScrolling(); }
+  };
+  const interrupted = () => { finishTouch(); if (startY !== null) resetPull(); };
+  document.addEventListener("visibilitychange", documentVisibility);
+  window.addEventListener("blur", interrupted);
   const bindPagination = () => {
     detachPagination();
     const key = scrollKey;
@@ -483,19 +583,34 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   };
   bindPagination();
   return { update(value: ChassisConfiguration = {}) {
-    // A delayed logic-thread receipt must not reinstate an older navigation.
     if (value.tabRevision !== undefined && tabRevision !== undefined && value.tabRevision < tabRevision) return;
-    const shown = (value.visible ?? true) && !visible;
+    const shown = (value.visible ?? true) && (!visible || value.pageVisit !== config.pageVisit);
+    const changed = value.tabKey !== tabKey || value.tabRevision !== tabRevision;
+    const finished = config.isRefreshing && !value.isRefreshing;
+    const interrupted = value.visit !== config.visit || changed || !(value.visible ?? true) || !!value.scrollLocks;
+    config = value;
     visible = value.visible ?? true;
+    if (interrupted) { resetPull(true); stopScrolling(); }
+    else if (finished) resetPull();
+    else if (value.isRefreshing) { awaitingRefresh = false; paintPull(); }
+    else paintPull();
     if (value.scrollKey !== scrollKey) { scrollKey = value.scrollKey; bindPagination(); }
-    if (value.tabKey !== tabKey || value.tabRevision !== tabRevision || shown) {
-      tabKey = value.tabKey;
-      tabRevision = value.tabRevision;
-      restore();
+    if (changed || shown) {
+      tabKey = value.tabKey; tabRevision = value.tabRevision; restore();
     }
     trace(visible ? "show-update" : "hide-update");
     onScroll();
-  }, destroy() { detachPagination(); clearTimeout(idle); if (restoreFrame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(restoreFrame); tabPositions.clear(); scroll.removeEventListener("scroll", markScroll); for (const event of cancelEvents) scroll.removeEventListener(event, cancelRestore); scroll.removeEventListener("uvel-scroll-to-top", requestTop); root.removeEventListener?.("keydown", keyScroll); observer?.disconnect(); resize?.disconnect(); if (typeof document !== "undefined") document.removeEventListener?.("visibilitychange", documentVisibility); } };
+  }, destroy() {
+    detachPagination(); clearTimeout(idle); clearTimeout(deactivate); cancelAnimationFrame(restoreFrame);
+    tabPositions.clear();
+    scroll.removeEventListener("scroll", markScroll);
+    scroll.removeEventListener("touchstart", touchStart); scroll.removeEventListener("touchmove", touchMove);
+    scroll.removeEventListener("touchend", touchEnd); scroll.removeEventListener("touchcancel", touchCancel);
+    for (const event of cancelEvents) scroll.removeEventListener(event, cancelRestore);
+    scroll.removeEventListener("uvel-scroll-to-top", requestTop); root.removeEventListener("keydown", keyScroll);
+    observer.disconnect(); resize?.disconnect();
+    document.removeEventListener("visibilitychange", documentVisibility); window.removeEventListener("blur", interrupted);
+  } };
 }
 
 // App renderjs mounts a separate empty Vue instance: its $el is a comment.
@@ -531,4 +646,7 @@ function viewAdapter<T extends { hostId?: string }>(mount: (host: HTMLElement, v
 export default viewAdapter<GlassConfiguration>(mountLiquidGlass);
 export const segmentsView = viewAdapter<SegmentsConfiguration>(mountSegments);
 export const chassisView = viewAdapter<ChassisConfiguration>((host, value, instance) =>
-  mountChassis(host, value, key => instance.$ownerInstance?.callMethod("onNativeScrollLoadMore", key)));
+  mountChassis(host, value,
+    key => instance.$ownerInstance?.callMethod("onNativeScrollLoadMore", key),
+    scrolling => instance.$ownerInstance?.callMethod("onChassisScrolling", scrolling),
+    visit => instance.$ownerInstance?.callMethod("onChassisRefresh", visit)));
