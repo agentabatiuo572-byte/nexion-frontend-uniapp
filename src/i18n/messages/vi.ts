@@ -3818,7 +3818,7 @@ timeHoursAgo: "{n} giờ",
     errorUnavailable: "Công bố tạm thời không khả dụng. Vui lòng thử lại sau.",
     nexNarrativeLoading: "Đang tải thông tin UVT…",
     nexNarrativeError: "Thông tin UVT tạm thời chưa khả dụng. Vui lòng thử lại sau.",
-    nexNarrativeUnavailable: "Thông tin UVT chưa được phát hành.",
+    nexNarrativeUnavailable: "Chưa có thông tin UVT",
   },
 
   genesisEligibility: {

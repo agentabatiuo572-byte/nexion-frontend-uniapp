@@ -4247,7 +4247,7 @@ export const fil: Messages = {
     errorUnavailable: "Hindi available ang disclosure. Subukan ulit mamaya.",
     nexNarrativeLoading: "Nilo-load ang info ng UVT…",
     nexNarrativeError: "Hindi available ang impormasyon ng UVT. Subukan ulit mamaya.",
-    nexNarrativeUnavailable: "Hindi pa nailalathala ang impormasyon ng UVT.",
+    nexNarrativeUnavailable: "Walang impormasyon ng UVT",
   },
   genesisEligibility: {
     title: "Kwalipikasyon sa pagbili",

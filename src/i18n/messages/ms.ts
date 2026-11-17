@@ -4247,7 +4247,7 @@ export const ms: Messages = {
     errorUnavailable: "Pendedahan tidak tersedia. Sila cuba lagi nanti.",
     nexNarrativeLoading: "Memuatkan maklumat UVT…",
     nexNarrativeError: "Maklumat UVT tidak tersedia. Sila cuba lagi nanti.",
-    nexNarrativeUnavailable: "Maklumat UVT belum diterbitkan.",
+    nexNarrativeUnavailable: "Tiada maklumat UVT",
   },
   genesisEligibility: {
     title: "Akses langganan",
