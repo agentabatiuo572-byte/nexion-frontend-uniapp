@@ -373,8 +373,10 @@ useAutoRecovery({ failed: () => remoteApiEnabled && status.value === "error", re
 .trust-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border-radius: var(--v5-radius-m); background: var(--v5-border); }
 .trust-fact { display: flex; flex-direction: column; gap: 2px; padding: var(--v5-space-3); background: var(--v5-surface-2); min-width: 0; }
 .trust-fact__label { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }
-.trust-fact__value { font: 600 15px/20px var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.trust-fact__value { font: 600 15px/20px var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .trust-fact__value--small { font-size: 13px; line-height: 18px; }
+/* Below 360px "US$50,000,000" no longer fits a half-width cell at 15px; the facts drop to the small size so no figure breaks mid-number. */
+@media (max-width: 359px) { .trust-fact__value { font-size: 13px; line-height: 18px; } }
 .trust-block { display: flex; flex-direction: column; gap: var(--v5-space-3); }
 .trust-block__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--v5-space-3); }
 .trust-block__title { font: 700 15px/20px var(--font-v5); color: var(--v5-ink); }
@@ -389,11 +391,13 @@ useAutoRecovery({ failed: () => remoteApiEnabled && status.value === "error", re
 .trust-credential__issuer { margin-top: 2px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
 .trust-credential__note { font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
 .trust-credential__facts { display: flex; flex-direction: column; gap: 6px; padding: var(--v5-space-3); border-radius: var(--v5-radius-s); background: var(--v5-surface-2); }
-.trust-credential__fact { display: flex; justify-content: space-between; gap: var(--v5-space-3); font: 400 13px/18px var(--font-v5); }
+.trust-credential__fact { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px var(--v5-space-3); font: 400 13px/18px var(--font-v5); }
 .trust-credential__fact-label { color: var(--v5-ink-3); }
-.trust-credential__fact-value { font-weight: 600; color: var(--v5-ink); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
-.trust-credential__actions { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); min-height: 44px; }
-.trust-view { position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand-deep); font: 600 13px/18px var(--font-v5); cursor: pointer; }
+/* A reference number is never split: when it does not fit beside its label it moves, whole, to the right of the next line. */
+.trust-credential__fact-value { margin-left: auto; font-weight: 600; color: var(--v5-ink); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+/* The pill never wraps its label; when it does not fit beside the lookup link it moves to the right of the next line. 6px row gap keeps the two 44px hit areas apart. */
+.trust-credential__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px var(--v5-space-3); min-height: 44px; }
+.trust-view { position: relative; display: inline-flex; margin-left: auto; white-space: nowrap; align-items: center; height: 32px; padding: 0 14px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand-deep); font: 600 13px/18px var(--font-v5); cursor: pointer; }
 /* The pill stays 32px tall as drawn; the hit area grows to 44px. */
 .trust-view::after { content: ""; position: absolute; inset: -6px 0; }
 .trust-view:active, .trust-contact__cta:active { opacity: .85; }
