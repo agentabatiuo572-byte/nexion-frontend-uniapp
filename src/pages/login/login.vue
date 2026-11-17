@@ -162,6 +162,7 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
+import type { LocaleCode } from "@/i18n";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
@@ -303,6 +304,7 @@ async function retryOriginalLogin(captchaTicket?: string) {
 async function recoverLoginResult() {
   if (loading.value || !authApi.pendingLogin()) return;
   const flowVersion = otpFlowVersion;
+  const originalContext = retryContext.value;
   error.value = null;
   loading.value = true;
   try {
@@ -313,7 +315,8 @@ async function recoverLoginResult() {
     }
     syncLoginRecovery();
     if (result.kind === "authenticated") finishSignIn({ accountId: authenticatedAccountId(result.user),
-      onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+      onboardingComplete: result.user.onboardingComplete, serverProfile: result.user, serverSessionRevision: result.vaultRevision,
+      initialOAuthLocale: originalContext?.authMethod === "OAUTH" && result.registrationReceipt ? useLocaleStore().code : undefined });
   } catch (cause) {
     if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
@@ -582,7 +585,7 @@ function geoText(code: unknown): string | null {
 // snapshot, claims this carrier's session, then enters only a safe business
 // return target or Home. Registration and device setup own their own routes.
 function finishSignIn(
-  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number },
+  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number; initialOAuthLocale?: LocaleCode },
   context: OtpFlowContext | null = null,
 ) {
   signInTimer = undefined;
@@ -595,6 +598,7 @@ function finishSignIn(
     onboardingComplete: session.onboardingComplete,
     serverProfile: session.serverProfile,
     serverSessionRevision: session.serverSessionRevision,
+    initialOAuthLocale: session.initialOAuthLocale,
   });
   if (!result.ok) {
     loading.value = false;
