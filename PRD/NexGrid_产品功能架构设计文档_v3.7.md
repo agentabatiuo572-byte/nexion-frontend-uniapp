@@ -1407,6 +1407,7 @@ APP 普通登录及冷启动会话恢复直接进入首页或既有合法返回�
 
 - 已上架产品(`unlocksAtPhase` 未设 / 已 reached)→ 渲染常规 `<ProductCard>`
 - 未上架产品 → 过滤出主列表,聚合到底部 **"Coming soon"(即将上架)section**,每张以 `<LockedProductCard inline>` 渲染(名称 + tagline + ETA + "上线时通知我" pill)
+- **通知订阅状态读取（2026-11-17）**：原生 App 与 H5 均在锁定卡进入可视范围后读取服务端订阅状态；展开卡片和通知按钮的显式状态重读保持。读取本身不订阅或取消，订阅及取消仍由用户操作触发，失败保留原有重试入口。
 - SSR 阶段(mounted=false)默认把 `unlocksAtPhase` 产品视为锁定,与 first paint hydration 对齐(参 §16.5);client mount 后按真实 phase 重算
 
 **购买门(等级门 + 锁额门)**(`Product.purchaseGate`):
