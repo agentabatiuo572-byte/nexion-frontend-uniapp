@@ -141,8 +141,9 @@ function writeAccessible(root: HTMLElement, prefix: string, value: unknown) {
     let node = nodes[index];
     if (!node) {
       node = document.createElement("div");
-      node.setAttribute("role", "note");
-      node.style.cssText = "position:absolute;width:1px;height:1px;top:0;left:0;opacity:0;overflow:hidden;pointer-events:none";
+      // iOS exposes only leaf elements: a labelled img is read, a note container or opacity:0 node is not.
+      node.setAttribute("role", "img");
+      node.style.cssText = "position:absolute;width:1px;height:1px;top:0;left:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);pointer-events:none";
       nodes.push(node);
     }
     if (node.parentElement !== root) root.appendChild(node);
