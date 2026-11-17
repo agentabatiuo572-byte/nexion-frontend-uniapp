@@ -446,7 +446,7 @@ const usdtFitStyle = computed<CSSProperties>(() => ({
 @media (prefers-reduced-motion: reduce) {
   .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc { animation: none; transform: rotate(-22deg); }
   .nx-wallet--compact .nx-wallet-glow,
-  .nx-wallet--compact .nx-wallet-glow-shape { animation: none; }
+  .nx-wallet--compact .nx-wallet-glow > .nx-wallet-glow-shape { animation: none; }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .nx-wallet--compact > .nx-wallet-summary { background: var(--v5-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
