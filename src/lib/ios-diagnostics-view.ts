@@ -73,14 +73,25 @@ function hitEvidence(points: { x: number; y: number }[]) {
 // Diagnostic-only error log: the view layer drops the rest of a sync batch when it throws, so record why.
 const viewErrors: { at: string; kind: string; message: string }[] = [];
 let viewErrorTotal = 0;
-function recordViewError(kind: string, value: unknown) {
+function recordViewError(kind: string, value: unknown, limit = 600) {
   viewErrorTotal += 1;
   const error = value as { message?: string; stack?: string } | undefined;
-  const message = `${error?.message ?? String(value)} ${error?.stack ?? ""}`.slice(0, 600);
+  const message = `${error?.message ?? String(value)} ${error?.stack ?? ""}`.slice(0, limit);
   viewErrors.push({ at: new Date().toISOString(), kind, message });
   if (viewErrors.length > 6) viewErrors.splice(1, 1);
 }
 function captureViewErrors() {
+  // window.onerror only sees "Script error." for the uni view bundle; catching at the bridge entry keeps the real error.
+  const bridge = (window as unknown as { UniViewJSBridge?: { subscribeHandler?: (name: string, data: unknown, pageId: unknown) => unknown } }).UniViewJSBridge;
+  const subscribe = bridge?.subscribeHandler;
+  if (bridge && subscribe) bridge.subscribeHandler = (name, data, pageId) => {
+    try { return subscribe(name, data, pageId); }
+    catch (error) {
+      const actions = Array.isArray(data) ? data : [];
+      recordViewError(`bridge:${name} n=${actions.length} ${JSON.stringify(actions.slice(0, 2))?.slice(0, 300) ?? ""}`, error, 1500);
+      throw error;
+    }
+  };
   window.addEventListener("error", event => recordViewError("error", event.error ?? `${event.message} @${event.filename}:${event.lineno}:${event.colno}`), true);
   window.addEventListener("unhandledrejection", event => recordViewError("rejection", event.reason));
   for (const level of ["error", "warn"] as const) {
