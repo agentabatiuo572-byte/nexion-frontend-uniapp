@@ -428,6 +428,11 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     else deactivate = setTimeout(() => { pullActive = false; paintPull(); }, 340);
     paintPull();
   }
+  function cancelPull() {
+    // A second finger can invalidate the origin while feedback is still drawn.
+    // Submitted refresh holds are released only by the business refresh state.
+    if (!awaitingRefresh && !config.isRefreshing && (startY !== null || pullActive)) resetPull();
+  }
   function setScrolling(value: boolean) {
     if (scrolling === value) return;
     scrolling = value;
@@ -505,7 +510,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   const touchStart = (event: TouchEvent) => {
     touching = true;
     cancelRestore();
-    if (!viewReady() || config.scrollLocks || config.isRefreshing || awaitingRefresh || scroll.scrollTop > 0 || event.touches.length !== 1) { startY = null; return; }
+    if (!viewReady() || config.scrollLocks || config.isRefreshing || awaitingRefresh || scroll.scrollTop > 0 || event.touches.length !== 1) { cancelPull(); startY = null; return; }
     startY = event.touches[0].clientY;
   };
   const touchMove = (event: TouchEvent) => {
@@ -523,14 +528,14 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   };
   const touchEnd = (event: TouchEvent) => {
     finishTouch();
-    if (startY === null) return;
+    if (startY === null) { cancelPull(); return; }
     const touch = event.changedTouches[0];
     if (!touch || !inside(touch) || !viewReady() || config.scrollLocks || config.isRefreshing || pullY < 70) { resetPull(); return; }
     startY = null; pulling = false; awaitingRefresh = true;
     paintPull();
     notifyRefresh?.(config.visit ?? "");
   };
-  const touchCancel = () => { finishTouch(); if (startY !== null) resetPull(); };
+  const touchCancel = () => { finishTouch(); cancelPull(); };
   scroll.addEventListener("scroll", markScroll, { passive: true });
   scroll.addEventListener("touchstart", touchStart, { passive: true });
   scroll.addEventListener("touchmove", touchMove, { passive: true });
@@ -568,7 +573,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     if (document.visibilityState === "visible" && visible) restore();
     else { resetPull(true); stopScrolling(); }
   };
-  const interrupted = () => { finishTouch(); if (startY !== null) resetPull(); };
+  const interrupted = () => { finishTouch(); cancelPull(); };
   document.addEventListener("visibilitychange", documentVisibility);
   window.addEventListener("blur", interrupted);
   const bindPagination = () => {
