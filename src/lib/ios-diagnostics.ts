@@ -17,6 +17,22 @@ export function useDiagnosticReader(section: string, read: () => unknown, reset?
   onBeforeUnmount(() => { readers.delete(reader); });
 }
 
+// Diagnostic-only error log for the logic layer (kept: first error plus the latest five).
+const logicErrors: { at: string; kind: string; message: string }[] = [];
+let logicErrorTotal = 0;
+function recordLogicError(kind: string, value: unknown) {
+  logicErrorTotal += 1;
+  const error = value as { message?: string; stack?: string } | undefined;
+  logicErrors.push({ at: new Date().toISOString(), kind, message: `${error?.message ?? String(value)} ${error?.stack ?? ""}`.slice(0, 600) });
+  if (logicErrors.length > 6) logicErrors.splice(1, 1);
+}
+for (const level of ["error", "warn"] as const) {
+  const original = console[level].bind(console);
+  console[level] = (...args: unknown[]) => { recordLogicError(`console.${level}`, args.map(arg => arg instanceof Error ? `${arg.message} ${arg.stack ?? ""}` : typeof arg === "string" ? arg : JSON.stringify(arg) ?? String(arg)).join(" ")); original(...args); };
+}
+const uniOnError = (uni as unknown as { onError?: (hook: (error: unknown) => void) => void }).onError;
+if (typeof uniOnError === "function") uniOnError(error => recordLogicError("uni.onError", error));
+
 export function readLogicDiagnostics() {
   const pages = getCurrentPages();
   const logical = logicalNativePage(pages[pages.length - 1]);
@@ -24,10 +40,11 @@ export function readLogicDiagnostics() {
     sampledAt: new Date().toISOString(),
     sourceSha: __UVEL_DIAGNOSTIC_SOURCE__,
     sourceBaseline: "b39422619d934ded7277dcb1053c2b3a8731fd27",
-    diagnosticRevision: "ios-perf-accessibility-v1",
+    diagnosticRevision: "ios-perf-accessibility-v2-errors",
     compiledResourceVersion,
     pages: pages.map(page => ({ route: page.route, id: (page as { $page?: { id?: number } }).$page?.id })),
     logicalPage: { route: logical.route, options: diagnosticQuery(logical.options) },
+    errors: { total: logicErrorTotal, first: logicErrors[0] ?? null, recent: logicErrors.slice(1) },
     readers: Array.from(readers, reader => ({ section: reader.section, uid: reader.uid, owner: reader.owner, hostId: reader.hostId, state: reader.read() })),
   };
 }

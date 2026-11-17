@@ -70,8 +70,26 @@ function hitEvidence(points: { x: number; y: number }[]) {
     stack: document.elementsFromPoint(point.x, point.y).map(element => identity(element)),
   })) };
 }
+// Diagnostic-only error log: the view layer drops the rest of a sync batch when it throws, so record why.
+const viewErrors: { at: string; kind: string; message: string }[] = [];
+let viewErrorTotal = 0;
+function recordViewError(kind: string, value: unknown) {
+  viewErrorTotal += 1;
+  const error = value as { message?: string; stack?: string } | undefined;
+  const message = `${error?.message ?? String(value)} ${error?.stack ?? ""}`.slice(0, 600);
+  viewErrors.push({ at: new Date().toISOString(), kind, message });
+  if (viewErrors.length > 6) viewErrors.splice(1, 1);
+}
+function captureViewErrors() {
+  window.addEventListener("error", event => recordViewError("error", event.error ?? `${event.message} @${event.filename}:${event.lineno}:${event.colno}`), true);
+  window.addEventListener("unhandledrejection", event => recordViewError("rejection", event.reason));
+  for (const level of ["error", "warn"] as const) {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => { recordViewError(`console.${level}`, args.map(arg => arg instanceof Error ? `${arg.message} ${arg.stack ?? ""}` : typeof arg === "string" ? arg : JSON.stringify(arg) ?? String(arg)).join(" ")); original(...args); };
+  }
+}
 function readViewDiagnostics() {
-  return { sampledAt: new Date().toISOString(), fingers: { count: fingerCount, noFingerSince }, visibility: document.visibilityState,
+  return { sampledAt: new Date().toISOString(), errors: { total: viewErrorTotal, first: viewErrors[0] ?? null, recent: viewErrors.slice(1) }, fingers: { count: fingerCount, noFingerSince }, visibility: document.visibilityState,
     viewport: { width: innerWidth, height: innerHeight, visual: window.visualViewport ? {
       width: visualViewport!.width, height: visualViewport!.height, offsetTop: visualViewport!.offsetTop,
       offsetLeft: visualViewport!.offsetLeft, scale: visualViewport!.scale } : null },
@@ -185,6 +203,7 @@ export function mountDiagnosticView(root: HTMLElement, initial: DiagnosticConfig
   let previousReasons = new Set<string>();
   hosts.set(initial.hostId, { root, notify, resetIncident() { lockedSince.clear(); pendingSince.clear(); previousReasons.clear(); lastAccessibleAt = 0; } });
   if (hosts.size === 1) {
+    captureViewErrors();
     document.addEventListener("touchstart", touchStart, { capture: true, passive: true });
     document.addEventListener("touchend", touchEnd, { capture: true, passive: true });
     document.addEventListener("touchcancel", touchEnd, { capture: true, passive: true });
