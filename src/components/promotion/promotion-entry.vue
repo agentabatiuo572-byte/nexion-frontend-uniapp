@@ -1,5 +1,5 @@
 <template>
-  <view v-if="items.length || (!listRead && status !== 'ready') || status === 'error' || mode !== 'home'" class="promotion promotion-entry" :class="{'promotion-entry-home':mode==='home'}" :data-testid="'promotion-entry-'+mode">
+  <view v-if="items.length || (!listRead && status !== 'ready') || status === 'error' || mode !== 'home'" ref="loopRef" class="promotion promotion-entry" :class="{'promotion-entry-home':mode==='home','nx-loops-paused':!loops.running.value}" :data-testid="'promotion-entry-'+mode">
     <view v-if="mode==='events'" class="entry-navigation">
       <text class="promotion-title">{{ t.promotion.promotionList }}</text>
       <view class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion')" @keydown.space.prevent="navTo('/pages/me/rewards-list?cat=promotion')"><text>{{ t.promotion.rewards }}</text><text aria-hidden="true">›</text></view>
@@ -104,10 +104,14 @@ import TeamArt from '@/components/team/team-art.vue';
 import PromotionTerms from './promotion-terms.vue';
 import CatalogMachineImage from '@/components/catalog-machine-image.vue';
 import { promotionMachineSlots } from '@/components/catalog-machine-image';
+import { useLoopsInView } from '@/composables/use-loops-in-view';
 import { getHomePromotions,readHomePromotions } from '@/store/home-promotions';
 import { landingCopy } from '@/i18n/promotion-landing';
 import { landingKind,landingProductImage,landingProductName,promotionLandingHref,promotionRemaining,promotionTermsRules,promotionTermsText,rewardParts,rewardPartsText } from '@/lib/promotion-landing';
 const props=withDefaults(defineProps<{mode?:'home'|'events';activities?:PublicPromotion[];active?:boolean;tinted?:boolean}>(),{mode:'home',active:true,tinted:false});
+// The fallback product art floats only while the entry is on screen and its page is shown.
+const loops=useLoopsInView('.promotion-entry');
+const loopRef=loops.elRef;
 const app=useApp(),locale=useLocaleStore(),theme=useTheme(),t=useT();
 const landing=computed(()=>landingCopy(locale.code));
 const initialPage=props.activities===undefined&&props.mode==='home'?getHomePromotions(`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`,!!sessionVault.read()):null;
@@ -291,6 +295,7 @@ onBeforeUnmount(()=>{visible=false;stopAutoplay();fence.invalidate();clear();});
 .entry-main-image { position: absolute; right: 34px; top: 30px; width: 108px; height: 108px; animation: promotion-float 4.2s ease-in-out infinite; }
 .entry-gift-image { position: absolute; right: 12px; bottom: 10px; width: 76px; height: 76px; animation: promotion-float 4.2s ease-in-out -1.6s infinite; }
 @keyframes promotion-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) :is(.entry-main-image,.entry-gift-image) { animation-play-state: paused; }
 @media(prefers-reduced-motion:reduce) { .entry-main-image,.entry-gift-image { animation: none; } }
 .entry-event { display: grid; grid-template-columns: minmax(0,1fr) 128px; padding: var(--ui-space-section); gap: var(--ui-space-inset) 0; }
 .entry-event-copy { position: relative; z-index: 1; grid-column: 1; grid-row: 1; }

@@ -12,11 +12,11 @@
       <svg class="quota-product__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
     </view>
     <view class="quota-actions" :class="{ 'quota-pending-action': actionBlocked }">
-      <NxButton v-if="pending" class="quota-pending-action" variant="secondary" :label="fmt(t.quota.buyCta, { name: displayName })" :disabled="true"><text>{{ fmt(t.quota.buyCta, { name: displayName }) }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></NxButton>
+      <view v-if="pending" class="nx-card-footer quota-text-action"><text class="nx-card-action" aria-disabled="true">{{ fmt(t.quota.buyCta, { name: displayName }) }}</text></view>
       <NxButton v-else-if="unlocked && stockLeft > 0 && tier.available !== false" class="quota-buy" variant="primary" :label="fmt(t.quota.buyCta, { name: displayName })" :disabled="actionBlocked" @click="openAction"><text>{{ t.quota.buy }}</text></NxButton>
       <text v-else-if="stockLeft <= 0" class="quota-unavailable" aria-disabled="true">{{ t.quota.stockUnavailable }}</text>
       <text v-else-if="unlocked && tier.available === false" class="quota-unavailable" aria-disabled="true">{{ auditCopy.quotaUnavailable }}</text>
-      <NxButton v-else variant="secondary" :label="t.store.purchaseEligibilityIneligible" :disabled="actionBlocked" @click="openAction"><text>{{ t.store.purchaseEligibilityIneligible }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></NxButton>
+      <view v-else class="nx-card-footer quota-text-action"><view class="nx-card-action nx-card-action--muted" role="button" :tabindex="actionBlocked ? -1 : 0" :aria-disabled="actionBlocked" @click="!actionBlocked && openAction()" @keydown.enter.prevent="!$event.repeat && !actionBlocked && openAction()" @keydown.space.prevent="!$event.repeat && !actionBlocked && openAction()"><text>{{ t.store.purchaseEligibilityIneligible }}</text><svg class="nx-card-link__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></view></view>
     </view>
     <view v-if="tier.conditions.length" class="quota-conditions">
       <text class="quota-section-label">{{ tier.unlockKind === 'either' ? t.quota.unlockEither : t.quota.unlockAll }}</text>
@@ -102,6 +102,8 @@ function openAction() { if (!props.pending && !props.actionBlocked) openProduct(
 </script>
 <style scoped>
 .quota-pending-action :deep(.nx-button--disabled), .quota-pending-action { opacity: 1; }
+/* The conditions block below already draws the divider; the text action row adds none (P-67). */
+.quota-text-action { min-height: 44px; border-top: 0; }
 /* P-41 tinted tier card: the shared tinted solid in brand (it used to be a top glow). */
 .quota-tier { --nx-tint:var(--v5-brand);padding:var(--ui-space-section) 18px 22px;margin-bottom:18px;border:1px solid var(--v5-border);border-radius:24px;color:var(--v5-ink); }
 .quota-product { display:flex;align-items:center;gap:14px;min-height:80px;cursor:pointer; }

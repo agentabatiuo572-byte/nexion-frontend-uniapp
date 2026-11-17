@@ -1,6 +1,6 @@
 <template>
   <view v-if="ui.visible && active" class="payment-pin-mask" :class="{ 'payment-pin-mask--standalone': standalone }" :style="{ ...viewportStyle, '--pin-status-height': statusHeight + 'px' }" role="dialog" aria-modal="true" :aria-label="title">
-    <view class="payment-pin-sheet" @click.stop>
+    <view class="payment-pin-sheet" :class="{ 'nx-glass-sheet': !standalone }" @click.stop>
       <view class="payment-pin-header">
         <text class="payment-pin-title" role="heading" aria-level="2" aria-live="polite">{{ title }}</text>
         <view class="payment-pin-close" :class="{ 'nx-frosted-button': standalone }" role="button" tabindex="0" :aria-label="t.paymentPin.close" @click="pin.cancel">
@@ -62,6 +62,7 @@
 </template>
 <script setup lang="ts">
 import { useDiagnosticReader } from "@/lib/ios-diagnostics";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import NxButton from "@/components/ui/nx-button.vue";
@@ -117,20 +118,22 @@ function support() { pin.cancel(); navTo("/me/support"); }
 function hide() { if (active.value && ui.visible) pin.cancel(); active.value = false; password.value = ""; code.value = ""; }
 function visibility() { if (typeof document !== "undefined" && document.hidden) { if (active.value && ui.visible) pin.cancel(); password.value = ""; code.value = ""; } }
 onShow(() => { active.value = true; }); onHide(hide);
-let timer: ReturnType<typeof setInterval>;
-onMounted(() => { timer = setInterval(pin.tick, 1000); if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
-onUnmounted(() => { clearInterval(timer); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
+useVisibleInterval(pin.tick, 1000, () => open.value);
+onMounted(() => { if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
+onUnmounted(() => { if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
 useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
 useDiagnosticReader("D3 payment PIN", () => ({ visible: ui.visible, stage: ui.stage, busy: ui.busy, reading: ui.reading,
   pendingOperation: ui.pendingOperation, revision: ui.revision, active: active.value, open: open.value }));
 </script>
 <style scoped>
-.payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden; padding: var(--nx-overlay-top) var(--v5-space-3) var(--nx-overlay-bottom); background: var(--v5-bg-color-mask); }
-.payment-pin-sheet { display: flex; flex-direction: column; width: 100%; max-width: 440px; max-height: 100%; min-height: 0; overflow: hidden; padding: var(--v5-space-5); background: var(--v5-surface); color: var(--v5-ink); border-radius: var(--v5-radius-m); box-shadow: 0 16px 48px var(--v5-bg-color-mask); }
+/* A phone-width sheet sits flush on the screen bottom on the shared floating material. The bottom inset lives inside the scrolling body,
+   so content scrolls to the screen edge and the last action rests above the Home Indicator. */
+.payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden; padding: var(--nx-overlay-top) 0 0; background: var(--v5-bg-color-mask); }
+.payment-pin-sheet { display: flex; flex-direction: column; width: 100%; max-width: 440px; max-height: 100%; min-height: 0; overflow: hidden; padding: var(--v5-space-5) var(--v5-space-5) 0; background: var(--nx-glass-fill); color: var(--v5-ink); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); }
 .payment-pin-header { flex: none; display: flex; align-items: flex-start; gap: var(--v5-space-3); margin-bottom: var(--v5-space-4); }
 .payment-pin-title { flex: 1; font-size: var(--ui-type-section); font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
 .payment-pin-close { width: 44px; min-height: 44px; flex: 0 0 44px; margin-top: -10px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); }
-.payment-pin-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(-1 * var(--v5-space-2)); padding-inline: var(--v5-space-2); display: flex; flex-direction: column; gap: var(--v5-space-2); }
+.payment-pin-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(-1 * var(--v5-space-2)); padding-inline: var(--v5-space-2); padding-bottom: var(--nx-overlay-bottom); display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .payment-pin-body > * { flex-shrink: 0; }
 .payment-pin-note { display: block; color: var(--v5-ink-2); font-size: var(--ui-type-list-subtitle); line-height: 1.65; }
 .payment-pin-note--important { color: var(--v5-ink); }
@@ -148,7 +151,11 @@ useDiagnosticReader("D3 payment PIN", () => ({ visible: ui.visible, stage: ui.st
 .payment-pin-phone { display: block; font-weight: 600; margin-top: var(--v5-space-2); }
 .payment-pin-code { width: 100%; min-height: 48px; padding: var(--v5-space-3); border-radius: var(--v5-radius-s); color: var(--v5-ink); background: var(--v5-surface-2); border: 1px solid var(--v5-border); }
 .payment-pin-error { display: block; color: var(--v5-danger); font-size: var(--ui-type-list-subtitle); line-height: 1.5; }
-@media (min-width: 500px) { .payment-pin-mask { align-items: center; } }
+@media (min-width: 500px) {
+  .payment-pin-mask { align-items: center; padding: var(--nx-overlay-top) var(--v5-space-3) var(--nx-overlay-bottom); }
+  .payment-pin-sheet { padding: var(--v5-space-5); border-radius: var(--nx-glass-radius); }
+  .payment-pin-body { padding-bottom: 0; }
+}
 </style>
 
 <style scoped>

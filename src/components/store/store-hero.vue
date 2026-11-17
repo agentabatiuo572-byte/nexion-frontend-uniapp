@@ -73,6 +73,6 @@ const titleStyle: CSSProperties = {
     radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.25) 0%, transparent 60%);
   animation: v5-aurora-drift 14s ease-in-out infinite alternate;
 }
-.store-hero__aurora.is-paused { animation-play-state: paused; }
+.store-hero__aurora.is-paused, .nx-chassis[data-scrolling="true"] .store-hero__aurora { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .store-hero__aurora { animation: none; } }
 </style>

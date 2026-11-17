@@ -63,7 +63,8 @@ import { formatAmount } from "@/lib/amount-display";
 import { formatTaskReward } from "@/lib/task-reward-display";
 import { taskProgressPercent } from "@/lib/task-progress";
 import { projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
-import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { computed, ref, type CSSProperties } from "vue";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import type { Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
@@ -78,20 +79,13 @@ const t = useT();
 const computeCopy = useComputeV2Copy();
 useDialogA11y(computed(() => props.device !== null), ".nx-device-deactivate-root", () => emit("dismiss"));
 
-// Local epoch-ms clock so the task progress bar / ETA tick once a second while
-// the sheet is open. Component lifecycle (not page) → onMounted/onUnmounted (P-021).
+// Re-read both clocks whenever this visible sheet opens; never accumulate hidden ticks.
 const nowMs = ref(Date.now());
 const monotonicNow = ref(readMonotonicNowMs());
-let clock: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  clock = setInterval(() => {
-    nowMs.value = Date.now();
-    monotonicNow.value = readMonotonicNowMs();
-  }, 1000);
-});
-onUnmounted(() => {
-  if (clock) clearInterval(clock);
-});
+useVisibleInterval(() => {
+  nowMs.value = Date.now();
+  monotonicNow.value = readMonotonicNowMs();
+}, 1000, () => props.device !== null);
 
 const task = computed(() => props.device?.currentTask ?? null);
 const taskNow = computed(() => props.device?.taskServerNow != null && props.device.taskServerNowReceivedAt != null
@@ -136,14 +130,12 @@ const scrimStyle: CSSProperties = {
   background: "rgba(8,8,12,0.45)",
   backdropFilter: "blur(8px) saturate(150%)",
 };
-const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+const sheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0", boxShadow: "var(--nx-glass-edge)",
   position: "fixed",
   left: 0,
   right: 0,
   bottom: 0,
   zIndex: 800,
-  borderTopLeftRadius: "var(--nx-glass-radius)",
-  borderTopRightRadius: "var(--nx-glass-radius)",
   background: "var(--nx-glass-fill)",
   borderTop: "none",
   boxSizing: "border-box",

@@ -11,6 +11,7 @@
 .store-voucher-ticket:focus-visible { outline:2px solid var(--v5-brand); outline-offset:3px; }
 
 @keyframes ticket-bob { 0%,100% { transform:translateY(0) rotate(-10deg); } 50% { transform:translateY(-3px) rotate(-8deg); } }
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .store-voucher-ticket__art { animation-play-state:paused; }
 @media(max-width:350px) { .store-voucher-ticket { gap:8px; padding-inline:14px; }.store-voucher-ticket__art { width:54px; height:54px; }.store-voucher-ticket__value { font-size:26px; } }
 @media(prefers-reduced-motion:reduce) { .store-voucher-ticket__art { animation:none; } }
 

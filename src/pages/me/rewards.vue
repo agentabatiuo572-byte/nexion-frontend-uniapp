@@ -35,7 +35,7 @@
             <view v-if="c.key === 'voucher'" class="reward-perf" aria-hidden="true" />
             <text class="reward-tile__desc">{{ c.desc }}</text>
           </view>
-          <view v-if="c.key === 'usdt' || c.key === 'promotion'" class="reward-arrow" :class="{'nx-frosted-button': c.key === 'usdt'}" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path v-if="c.key === 'usdt'" d="M5 12h14M13 6l6 6-6 6" /><path v-else d="m9 5 7 7-7 7" /></svg></view>
+          <view v-if="c.key === 'usdt' || c.key === 'promotion'" class="reward-arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path v-if="c.key === 'usdt'" d="M5 12h14M13 6l6 6-6 6" /><path v-else d="m9 5 7 7-7 7" /></svg></view>
         </view>
       </view>
 
@@ -300,7 +300,7 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-tile--usdt .reward-tile__amount { font-size: 40px; line-height: 48px; margin-top: 6px; padding-right: 28px; }
 .reward-tile--usdt .reward-tile__desc { font-size: 13px; line-height: 20px; }
 .reward-arrow { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; }
-.reward-tile--usdt .reward-arrow { position: absolute; top: 14px; right: 14px; background: color-mix(in srgb,var(--v5-ink) 7%,transparent); box-shadow: var(--ui-glass-edge-shadow); }
+.reward-tile--usdt .reward-arrow { position: absolute; top: 14px; right: 14px; color: var(--v5-ink-2); }
 .reward-tile--uvt, .reward-tile--voucher { min-height: 168px; box-sizing: border-box; animation-delay: 70ms; }
 .reward-tile--uvt { box-shadow: inset 0 1px 0 var(--v5-nex); }.reward-tile--uvt .reward-tile__amount, .reward-tile--uvt .reward-tile__unit { color: var(--v5-nex); }
 .reward-tile--voucher::before, .reward-tile--voucher::after { content: ''; position: absolute; top: 50%; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-bg); transform: translateY(-50%); left: -10px; }.reward-tile--voucher::after { left: auto; right: -10px; }
@@ -315,7 +315,6 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
  .amount-cur { font-size:.55em; color:var(--v5-ink-3); margin-right:2px; letter-spacing:0; }.amount-dec { color:var(--v5-ink-3); }
 .reward-tile { box-shadow:var(--v5-glass-shadow); }
 .reward-tile--usdt { box-shadow:var(--ui-glass-edge-shadow); padding:18px; }
-.reward-tile--usdt .reward-arrow { box-shadow:var(--ui-glass-edge-shadow); background:linear-gradient(145deg,var(--ui-button-sheen),transparent 38%,transparent 66%,var(--ui-button-sheen)),color-mix(in srgb,var(--v5-ink) 7%,transparent); }
 .reward-tile--uvt { box-shadow:var(--v5-glass-shadow); }
 .reward-tile--uvt::before { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; background:conic-gradient(from 210deg,transparent 0 45%,color-mix(in srgb,var(--v5-warning) 85%,transparent) 70%,transparent 92%); -webkit-mask:linear-gradient(var(--v5-ink) 0 0) content-box,linear-gradient(var(--v5-ink) 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
 .reward-tile--voucher .reward-tile__amount { font-family:var(--font-amount); }
@@ -329,13 +328,9 @@ const summaryErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "10px
 .reward-tile__amount { font-variant-numeric:tabular-nums; }
 .reward-tile__unit { letter-spacing:0; }
 
-.reward-tile--usdt .reward-arrow { isolation:isolate; background:color-mix(in srgb,var(--v5-ink) 7%,transparent); }
-.reward-tile--usdt .reward-arrow::before { content:""; position:absolute; inset:0; border-radius:inherit; z-index:-1; background:var(--v5-surface); opacity:.3; }
 
 .reward-tile--promotion .reward-tile__desc { font-size:13px; line-height:20px; margin-top:1px; }
 .reward-tile--promotion .reward-arrow { margin-right:-8px; }
 .reward-voucher-unit { font-weight:400; }
-:global([data-theme="light"] .reward-tile--usdt .reward-arrow) { background:color-mix(in srgb,var(--v5-ink) 8.5%,var(--v5-surface)); }
-:global([data-theme="light"] .reward-tile--usdt .reward-arrow::before) { opacity:0; }
 
 </style>

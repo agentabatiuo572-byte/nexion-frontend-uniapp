@@ -126,7 +126,7 @@ const inactiveDevices = computed(() => app.visibleDevices.filter(isActivatableIn
 }));
 const unconfirmedDevices = computed(() => app.visibleDevices.filter(requiresActivationConfirmation));
 const activeCount = computed(() => app.activeSlotCount);
-const trialPresentation = useTrialPresentation();
+const trialPresentation = useTrialPresentation(() => sheet.open);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => app.remoteSlotsUsed ?? activeCount.value + reservedSlots.value);
 const slotsFull = computed(() => slotsUsed.value >= app.slotCap);
@@ -253,9 +253,8 @@ useDiagnosticReader("D3 slots", () => ({ open: sheet.open, capacityReady: capaci
   box-sizing: border-box;
   max-height: calc(100% - var(--nx-overlay-top));
   overflow-y: auto;
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0;
   background: var(--nx-glass-fill);
-  border-top: 1px solid var(--v5-border);
   padding: 18px 16px;
   padding-bottom: var(--nx-overlay-bottom);
   animation: sas-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);

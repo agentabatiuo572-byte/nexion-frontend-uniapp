@@ -548,11 +548,12 @@ useDiagnosticReader("D3 poster", () => ({ open: props.open, genState: genState.v
 
 <style scoped>
 .ps-mask { position: fixed; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); z-index: 8000; }
-.ps-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--nx-glass-fill); border: none; display: flex; flex-direction: column; max-height: min(92vh, calc(100vh - var(--nx-overlay-top))); overflow: hidden; box-sizing: border-box; padding-bottom: var(--nx-overlay-safe-bottom); animation: ps-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.ps-sheet { border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--nx-glass-fill); border: none; display: flex; flex-direction: column; max-height: min(92vh, calc(100vh - var(--nx-overlay-top))); overflow: hidden; box-sizing: border-box; animation: ps-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ps-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .ps-grab { flex-shrink: 0; width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: var(--ui-space-row-y) auto 0; }
 .ps-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: var(--ui-space-row-y) 20px; }
-.ps-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: 8px; }
+/* The safe-area inset sits inside the scroller, so the list scrolls down to the screen edge instead of being cut by an opaque band. */
+.ps-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: calc(8px + var(--nx-overlay-safe-bottom)); }
 .ps-head__t { font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-ink); }
 /* 44×44 点按区(移动端最小触控标准,对齐 tradein-ladder-sheet 既有修法)。 */
 .ps-head__x { position: relative; isolation: isolate; flex: none; width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }

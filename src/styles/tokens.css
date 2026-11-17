@@ -153,9 +153,10 @@
   --v5-glass-bg: rgba(255,255,255,0.55);
   --v5-glass-border: rgba(255,255,255,0.60);
   --v5-glass-shadow: 0 2px 8px rgba(20,16,8,0.05);
-  /* Toast surface: dark translucent in both themes, so ink and icons stay light. */
+  /* Toast surface: dark translucent in both themes, so ink and icons stay light. Like sheets, its edge is one 1px
+     highlight along the top only (the dark rim value in both themes); the soft drop shadow lifts it off pages that have no mask. */
   --v5-toast-bg: rgba(28,29,34,0.88);
-  --v5-toast-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), 0 12px 32px rgba(0,0,0,0.28);
+  --v5-toast-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 12px 32px rgba(0,0,0,0.28);
   --v5-toast-ink: #F5F7FA;
   --v5-toast-ink-2: rgba(245,247,250,0.72);
   --v5-toast-success: #9EDC1D;
@@ -591,13 +592,6 @@ body {
   .nx-viz-motion, .nx-viz-motion * { transition: none !important; }
 }
 
-/* CardStagger entrance — fade + slide-up, replayed via animation-delay per
-   nth-child (replaces framer-motion staggerChildren). Honors reduced-motion. */
-@keyframes nx-card-stagger-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 /* TrialHeroBanner coupon — 3D Y-flip entrance (IntersectionObserver-gated),
    diagonal shimmer sweep, and scarcity-dot pulse. Ported from prototype globals
    @keyframes v5-ticket-enter / v5-ticket-shimmer / v5-hb-pulse. */
@@ -989,6 +983,8 @@ body {
 .nx-home-art { background-image: url('/static/img/home-glass-20260928/coupon.webp'); background-size: 100% 100%; background-repeat: no-repeat; }
 .nx-home-art-float { animation: nx-home-art-drift 6s ease-in-out var(--home-art-delay, 0s) infinite; }
 @keyframes nx-home-art-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+/* Paused while its owner is off-screen (useLoopsInView / LoopScope), the page is hidden, or the chassis scrolls. */
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .nx-home-art-float { animation-play-state: paused; }
 .nx-home-arrow { display: grid; place-items: center; border-radius: var(--v5-radius-full); background: var(--v5-surface-2); color: var(--v5-ink-2); box-shadow:var(--ui-glass-edge-shadow); }
 /* Shared capsule material: soft rim and broad inner refraction, like the wallet edge. */
 .nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow, .nx-glass-bar, .nx-soft-glass, .nx-glass-sheet, .nx-tint {
@@ -1319,3 +1315,13 @@ uni-input .uni-input-placeholder {
 
 /* Keep authored image colors when Android WebView automatically darkens small images. */
 uni-image { color-scheme: only light; }
+
+/* Diagnostic build only (diag/ios-perf-2): three-finger tap toggles the card-background A/B test.
+   A makes the shell scroller a stacking context; B is the shipped behaviour. The badge shows the mode. */
+.nx-chassis[data-diag-card-background="A"] .nx-content { z-index: 0; }
+.nx-chassis[data-diag-card-background]::after {
+  content: attr(data-diag-card-background);
+  position: fixed; top: 48px; right: 6px; z-index: 2147483647;
+  padding: 2px 5px; border-radius: 4px; pointer-events: none;
+  font: 700 11px/1 -apple-system, system-ui, sans-serif; color: #fff; background: rgba(214, 0, 110, .85);
+}

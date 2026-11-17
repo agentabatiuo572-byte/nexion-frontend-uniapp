@@ -243,7 +243,8 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
-import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
+import { computed, ref, onMounted, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -287,18 +288,8 @@ const cfg = computed(() => trialConfig.config);
 const status = computed(() => freeTrial.status);
 
 const now = ref(Date.now());
-let ticker: ReturnType<typeof setInterval> | null = null;
-
-onMounted(() => {
-  void refreshProductCatalog(true);
-  ticker = setInterval(() => {
-    now.value = Date.now();
-  }, 1000);
-});
-onUnmounted(() => {
-  if (ticker) clearInterval(ticker);
-  ticker = null;
-});
+useVisibleInterval(() => { now.value = Date.now(); }, 1000);
+onMounted(() => { void refreshProductCatalog(true); });
 
 const isActiveCycle = computed(() => status.value === "active" || status.value === "grace");
 const isGrace = computed(() => status.value === "grace");

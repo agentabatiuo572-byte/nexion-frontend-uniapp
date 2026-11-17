@@ -49,6 +49,7 @@ import {
   bindVietQrIntent,
   finishVietQrCommand,
   finishVietQrCommandByIntent,
+  hasPendingVietQrCommand,
   vietQrCommandKey,
   type VietQrCommandIdentity,
 } from "@/lib/vietqr-command-key";
@@ -140,7 +141,9 @@ export const useDeposits = defineStore("deposits", () => {
   const remoteReceiptMoreError = ref(remoteReceiptPage.more.error);
   let remotePollTimer: ReturnType<typeof setInterval> | undefined;
   let remoteGeneration = 0;
+  // The page/session may still own polling while an empty hidden list pauses its timer.
   let remotePollingActive = false;
+  let remotePollingVisible = false;
   let remoteRefreshInFlight = false;
   let remoteRefreshQueued = false;
 
@@ -258,7 +261,7 @@ export const useDeposits = defineStore("deposits", () => {
       //   (合并时我一度把远端那半 .catch 原样粘了回来,而它在本地这侧前一天刚被删掉,
       //    理由正是「缝内已自吞」;独立审计逐行比对两个父提交后指出来的。)
       void refreshRemoteVietQrDeposits();
-      if (remotePollingActive) startRemoteVietQrPolling();
+      if (remotePollingActive) startRemoteVietQrPolling(remotePollingVisible);
       return;
     }
     const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
@@ -978,6 +981,7 @@ export const useDeposits = defineStore("deposits", () => {
       }
       intents.value = snapshots.map(remoteVietQrIntent);
       records.value = snapshots.map(remoteVietQrRecord).filter((item): item is DepositRecord => item !== null);
+      syncRemoteVietQrPolling();
       const receiptPage = await paymentApi.listVietQrReceipts(50, 0);
       if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
         return;
@@ -989,6 +993,7 @@ export const useDeposits = defineStore("deposits", () => {
           finishVietQrCommandByIntent(expectedAccountKey, snapshot.intentNo);
         }
       });
+      syncRemoteVietQrPolling();
       serverStatus.value = "ready";
     } catch (cause) {
       const receiptReadIsCurrent = failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause);
@@ -1028,6 +1033,7 @@ export const useDeposits = defineStore("deposits", () => {
       }
       if (!succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, page.items, page.nextOffset)) return;
       syncRemoteReceiptPage();
+      syncRemoteVietQrPolling();
       serverStatus.value = "ready";
     } catch (cause) {
       const receiptReadIsCurrent = failVietQrReceiptPageRead(remoteReceiptPage, receiptRead, cause);
@@ -1045,22 +1051,41 @@ export const useDeposits = defineStore("deposits", () => {
     }
   }
 
-  function startRemoteVietQrPolling(): void {
+  function hasPendingRemoteVietQrWork(): boolean {
+    return intents.value.some(intent => intent.status === "awaiting_payment"
+      || intent.status === "mismatch_review" || intent.status === "return_pending")
+      || hasPendingVietQrCommand(serverAccountKey);
+  }
+
+  function startRemoteVietQrPolling(visible = true): void {
     if (!remoteApiEnabled) return;
+    remotePollingVisible = visible;
     remotePollingActive = true;
+    syncRemoteVietQrPolling();
+  }
+
+  function syncRemoteVietQrPolling(): void {
+    // Empty lists and completed history are display reads. Unsettled funds and
+    // durable CREATE/CANCEL commands retain the existing confirmation cadence.
+    // Pausing an empty list must leave this lifecycle eligible for a late readback.
+    if (!remotePollingActive || (!remotePollingVisible && !hasPendingRemoteVietQrWork())) {
+      if (remotePollTimer) clearInterval(remotePollTimer);
+      remotePollTimer = undefined;
+      return;
+    }
     if (remotePollTimer) return;
     const generation = remoteGeneration;
     const accountKey = serverAccountKey;
     remotePollTimer = setInterval(() => {
       if (!remoteGenerationMatches(accountKey, generation, serverAccountKey, remoteGeneration)) return;
-      void refreshRemoteVietQrDeposits();
+      syncRemoteVietQrPolling();
+      if (remotePollTimer) void refreshRemoteVietQrDeposits();
     }, 3000);
   }
 
   function stopRemoteVietQrPolling(): void {
     remotePollingActive = false;
-    if (remotePollTimer) clearInterval(remotePollTimer);
-    remotePollTimer = undefined;
+    syncRemoteVietQrPolling();
   }
 
   async function createRemoteBankIntent(amount: number, rawExpectedAccountKey: string): Promise<DepositIntent | null> {

@@ -37,6 +37,7 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { onHide, onShow, onUnload } from "@dcloudio/uni-app";
@@ -107,9 +108,9 @@ const unsubscribe = sessionVault.subscribe?.((_previous, next, continuation) => 
 function hide() { pageGeneration++; active.value = false; clear(); }
 function visibility() { if (typeof document !== "undefined" && document.hidden) hide(); }
 onShow(() => { active.value = true; void load(); }); onHide(hide); onUnload(hide);
-let timer: ReturnType<typeof setInterval>;
-onMounted(() => { timer = setInterval(pin.tick, 1000); if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
-onUnmounted(() => { clear(); clearInterval(timer); unsubscribe?.(); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
+useVisibleInterval(pin.tick, 1000, () => active.value && !ui.visible);
+onMounted(() => { if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
+onUnmounted(() => { clear(); unsubscribe?.(); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
 </script>
 <style scoped>
 .payment-pin-page { padding: var(--v5-space-4) var(--v5-space-5) calc(var(--v5-space-6) + var(--v5-space-1) + env(safe-area-inset-bottom)); max-width: 480px; margin: 0 auto; color: var(--v5-ink); }

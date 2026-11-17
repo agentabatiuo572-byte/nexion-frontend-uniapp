@@ -89,7 +89,7 @@
   </view>
   <view v-else-if="open && term !== null" class="nx-staking-sheet-root" role="dialog" aria-modal="true" :aria-label="t.staking.remoteUnavailableClosed">
     <view class="nx-sheet-backdrop nx-sheet-fade-in" @click="emitClose" />
-    <view class="nx-staking-sheet-panel nx-sheet-panel nx-sheet-slide-up" :style="panelStyle" @click.stop>
+    <view class="nx-glass-sheet nx-staking-sheet-panel nx-sheet-panel nx-sheet-slide-up" :style="panelStyle" @click.stop>
       <view class="flex items-start justify-between" style="gap: 12px">
         <text class="block" :style="titleStyle">{{ t.staking.remoteUnavailableClosed }}</text>
         <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" :aria-label="t.ui.close" @click="emitClose"  @keydown.enter.prevent="emitClose" @keydown.space.prevent="emitClose">
@@ -398,7 +398,7 @@ async function submit() {
   emitClose();
 }
 
-const panelStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
+const panelStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0", boxShadow: "var(--nx-glass-edge)",
   background: "var(--nx-glass-fill)",
   borderTop: "none",
   padding: "18px 16px var(--nx-overlay-bottom)",

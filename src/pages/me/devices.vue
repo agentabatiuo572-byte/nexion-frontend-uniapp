@@ -34,7 +34,7 @@
       />
 
       <!-- Slot chassis: a liquid-glass panel whose bays show which device holds each compute slot. -->
-      <view v-if="!inventoryError" class="device-stage mx-4">
+      <LoopScope v-if="!inventoryError" class="device-stage mx-4">
         <view class="device-stage__aura" aria-hidden="true"><view /><view /></view>
         <view class="device-hero nx-tint" role="group" :aria-label="inventoryLoading ? t.earn.deviceLoading : slotMeterLabel" :aria-busy="inventoryLoading">
           <view class="device-hero__top">
@@ -60,13 +60,13 @@
                 <view class="device-hero__spin device-hero__spin--lg" aria-hidden="true" /><text>{{ t.orders.statusProvisioning }}</text>
               </view>
               <view v-else-if="bay.kind === 'empty'" class="device-bay-slot device-bay-slot--empty" role="button" tabindex="0" :aria-label="t.myDevices.inventoryCtaGoStore" @click="goStore">
-                <view class="device-bay-slot__plus nx-frosted-button" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view>
+                <view class="device-bay-slot__plus" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view>
               </view>
               <view v-else class="device-bay-slot device-bay-slot--loading" aria-hidden="true" />
             </view>
           </view>
         </view>
-      </view>
+      </LoopScope>
 
       <view v-if="inventoryReady" class="mx-4">
         <!-- 空库存:《06》no-owned-asset 插画 + 引导(只在库存读完后出现,加载中不冒充空态)。
@@ -196,6 +196,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import DeviceBay from "@/components/me/device-bay.vue";
+import LoopScope from "@/components/loop-scope.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
@@ -425,11 +426,8 @@ function goStore() {
 .device-bays { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
 .device-bay-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 112px; box-sizing: border-box; border-radius: var(--v5-radius-m); }
 .device-bay-slot--empty { border: 1.5px dashed var(--v5-border-strong); cursor: pointer; }
-.device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--v5-ink-3);
-  backdrop-filter: none; -webkit-backdrop-filter: none; }
-/* Over the stage aura the shared frosted blur only applied during the page-enter animation (bright, then
-   dim); a fixed, slightly denser fill keeps the brighter look without the flash. */
-[data-theme="dark"] .device-bay-slot__plus { --ui-button-fill: color-mix(in srgb, var(--v5-ink) 14%, transparent); }
+/* The dashed slot is the control; its plus carries no glass surface inside the tinted hero (P-67). */
+.device-bay-slot__plus { display: grid; place-items: center; width: 36px; height: 36px; color: var(--v5-ink-3); }
 .device-bay-slot--reserved { border: 1.5px dashed color-mix(in srgb, var(--v5-brand) 60%, transparent); background: color-mix(in srgb, var(--v5-brand) 5%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .device-bay-slot--loading { background: linear-gradient(100deg, color-mix(in srgb, var(--v5-ink) 4%, transparent) 30%, color-mix(in srgb, var(--v5-ink) 10%, transparent) 50%, color-mix(in srgb, var(--v5-ink) 4%, transparent) 70%); background-size: 300% 100%; animation: device-shimmer 1.6s linear infinite; }
 .device-inventory-section { margin-top: var(--ui-space-section-gap, 32px); min-width: 0; }

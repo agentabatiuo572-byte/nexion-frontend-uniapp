@@ -233,7 +233,7 @@ const sheetStyle: CSSProperties = {
   boxShadow: "var(--nx-glass-edge)", width: "100%", maxWidth: "520px",
   maxHeight: "min(80vh, calc(100% - var(--nx-overlay-top)))", overflowY: "auto", boxSizing: "border-box",
   background: "var(--nx-glass-fill)", backdropFilter: "blur(24px)",
-  borderRadius: "28px 28px 0 0", border: "1px solid var(--v5-border)",
+  borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0",
   padding: "12px 24px var(--nx-overlay-bottom)",
 };
 const sheetCloseStyle: CSSProperties = { width: "44px", height: "44px", flexShrink: 0, fontSize: "24px", color: "var(--v5-ink-2)" };

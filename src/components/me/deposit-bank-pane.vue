@@ -59,7 +59,7 @@
             <view class="nx-bank-chips">
               <view
                 v-for="preset in quickAmounts" :key="preset.value"
-                class="nx-bank-chip" :class="{ 'nx-bank-chip--on nx-frosted-button': amount === String(preset.value) }"
+                class="nx-bank-chip" :class="{ 'nx-bank-chip--on': amount === String(preset.value) }"
                 role="button" :tabindex="preset.enabled ? 0 : -1" :aria-disabled="!preset.enabled" :aria-pressed="amount === String(preset.value)"
                 @click="pickAmount(preset)"
               ><text>{{ preset.label }}</text></view>
@@ -292,6 +292,7 @@ import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-displa
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow, onHide, onUnload, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -374,16 +375,25 @@ const paneView = computed<PaneView>(() => {
 });
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
+let pageUnloaded = false;
+onShow(() => { if (!pageUnloaded) pageActive.value = true; });
+onHide(() => { pageActive.value = false; });
+onUnload(() => { pageUnloaded = true; pageActive.value = false; });
 onMounted(() => {
-  pageActive.value = true;
+  if (!pageUnloaded) pageActive.value = true;
 });
 watch(
   () => [pageActive.value, paymentSessionReady.value, app.accountBindingEpoch] as const,
   ([active, ready]) => {
     if (!remoteApiEnabled) return;
-    if (!active || !ready) {
+    if (!ready) {
       readError.value = "";
       dep.stopRemoteVietQrPolling();
+      return;
+    }
+    if (!active) {
+      readError.value = "";
+      dep.startRemoteVietQrPolling(false);
       return;
     }
     const accountKey = app.accountKey;
@@ -723,16 +733,10 @@ function startNewTopup() {
 
 // ── 真倒计时(派生自 expireAt,与 store 过期引擎同源;到点 store 翻 expired 视图自换)──
 const nowTick = ref(mockServerNow());
-let tickTimer: ReturnType<typeof setInterval> | undefined;
 let hostedOpenTimer: ReturnType<typeof setTimeout> | undefined;
-onMounted(() => {
-  tickTimer = setInterval(() => {
-    nowTick.value = mockServerNow();
-  }, 1000);
-});
+useVisibleInterval(() => { nowTick.value = mockServerNow(); }, 1000);
 onUnmounted(() => {
   pageActive.value = false;
-  if (tickTimer) clearInterval(tickTimer);
   if (createTimer) clearTimeout(createTimer);
   if (hostedOpenTimer) clearTimeout(hostedOpenTimer);
   if (remoteApiEnabled) dep.stopRemoteVietQrPolling();
@@ -1084,7 +1088,9 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-chip { position: relative; height: 36px; display: grid; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent);
   color: var(--v5-ink-2); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
 .nx-bank-chip::after { content: ""; position: absolute; inset: -4px 0; }
-.nx-bank-chip--on { color: var(--v5-brand); background: linear-gradient(145deg, var(--ui-button-sheen), transparent 38%, transparent 66%, var(--ui-button-sheen)), color-mix(in srgb, var(--v5-brand) 14%, transparent); }
+/* Selected preset: flat brand tint, no glass rim or sheen inside the tinted slab (P-67). */
+.nx-bank-chip--on { color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
+@media (forced-colors: active) { .nx-bank-chip--on { outline: 2px solid ButtonText; outline-offset: -2px; } }
 .nx-bank-chip[aria-disabled="true"] { opacity: .45; cursor: default; }
 .nx-bank-chip:not([aria-disabled="true"]):active { transform: scale(.97); }
 .nx-bank-chip:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }

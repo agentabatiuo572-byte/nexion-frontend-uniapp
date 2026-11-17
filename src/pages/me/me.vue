@@ -61,7 +61,7 @@ import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
-import { onHide, onShow, onUnload } from "@/composables/use-tab-page-lifecycle";
+import { onHide, onShow, onUnload, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import AppChassis from "@/components/tab-page-frame.vue";
@@ -145,6 +145,7 @@ const locale = useLocaleStore();
 const trial = useFreeTrial();
 const security = useSecurity();
 const paymentPassword = usePaymentPassword();
+useVisibleInterval(paymentPassword.tick, 1000, () => !!paymentPassword.display.state?.lockedUntil && !paymentPassword.ui.visible);
 const paymentPasswordSummary = computed(() => !paymentPassword.display.state ? paymentPassword.display.loading ? "…" : t.value.paymentPin.unavailable : paymentPassword.display.state.configured ? t.value.paymentPin.configured + (paymentPassword.displayLocked() ? ` · ${t.value.paymentPin.lockedLabel}` : "") : t.value.paymentPin.notConfigured);
 async function refreshPaymentPassword() { await paymentPassword.ensureStatus(); }
 const notifications = useNotifications();

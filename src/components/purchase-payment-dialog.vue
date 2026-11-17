@@ -135,7 +135,7 @@
         <text class="pp-hero__lab">{{ conclusion ? copy.total : copy.payable }}</text>
         <view class="pp-hero__row">
           <CheckoutAmount class="pp-hero__amt" :value="fees?.totalUsdt ?? null" :currency="isBank ? 'USD' : 'USDT'" />
-          <view v-if="!isBank && !conclusion" class="pp-copy nx-frosted-button" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
+          <view v-if="!isBank && !conclusion" class="pp-copy pp-copy--plain" role="button" tabindex="0" :aria-label="copy.copyAmount" @click="copyAmount" @keydown.enter.prevent="copyAmount">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
         </view>
@@ -282,7 +282,7 @@ const qrImage = computed(() => { if (!s.intent?.address || !ready.value) return 
 
 const now = ref(Date.now());
 watch(() => active.value && s.open, open => { if (open) now.value = Date.now(); }, { flush: 'sync' });
-useVisibleInterval(() => { if (active.value && s.open) now.value = Date.now(); }, 1000);
+useVisibleInterval(() => { now.value = Date.now(); }, 1000, () => active.value && s.open);
 const deadlineLeft = computed(() => s.deadlineAt === null ? null : Math.max(0, s.deadlineAt - now.value));
 const quoteLeft = computed(() => s.quote ? Math.max(0, Date.parse(s.quote.expiresAt) - now.value) : null);
 // The payment page counts to whichever closes first: the intent or the order.
@@ -493,6 +493,9 @@ useDiagnosticReader("D3 purchase payment/cashier", () => {
 .pp-hero .pp-cd { margin-top: 10px; }
 .pp-hero__meta { display: block; margin-top: var(--v5-space-3); padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .pp-copy { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); }
+/* Inside the tinted amount card the copy control is a bare icon with a 44px target (P-67). */
+.pp-copy--plain { width: 44px; height: 44px; margin-right: -10px; cursor: pointer; }
+.pp-copy--plain:active { opacity: .6; }
 .pp-wait { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-bottom: 14px; padding: 0 2px 14px; border-bottom: 1px solid var(--v5-border); }
 .pp-wait__spin { flex: none; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--pp-st) 22%, transparent); border-top-color: var(--pp-st); border-right-color: var(--pp-st); animation: pp-spin 1s linear infinite; }
 @keyframes pp-spin { to { transform: rotate(360deg); } }

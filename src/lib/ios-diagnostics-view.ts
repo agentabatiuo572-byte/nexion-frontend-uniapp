@@ -7,7 +7,7 @@ export function registerChassisDiagnostics(hostId: string, reader: Reader) {
   return () => { chassisReaders.delete(hostId); };
 }
 
-export interface DiagnosticConfiguration { hostId: string; snapshot: unknown; }
+export interface DiagnosticConfiguration { hostId: string; snapshot: unknown; failures?: { id: number; at: string; kind: string; message: string }[]; }
 type Control = { action: "open" | "close" | "reset" };
 const hosts = new Map<string, { root: HTMLElement; notify(value: Control): void; resetIncident(): void }>();
 let activeHost: string | null = null;
@@ -18,6 +18,9 @@ let latestHost: string | null = null;
 let latestSnapshot: unknown = null;
 let fingerCount = 0;
 let noFingerSince = Date.now();
+let cardBackgroundMode: "A" | "B" = "B";
+let cardBackgroundSwitches = 0;
+let threeFingerHeld = false;
 let incidentSerial = 0;
 const incidents: { id: number; snapshot: unknown }[] = [];
 const accessibleNodes = new Map<string, HTMLElement[]>();
@@ -70,47 +73,154 @@ function hitEvidence(points: { x: number; y: number }[]) {
     stack: document.elementsFromPoint(point.x, point.y).map(element => identity(element)),
   })) };
 }
-// Diagnostic-only error log: the view layer drops the rest of a sync batch when it throws, so record why.
-const viewErrors: { at: string; kind: string; message: string }[] = [];
+// Match the installed uni-app-view.umd.js db switch: 9 removes an event; 12 adds WXS.
+// wp (#text/#comment and id 0) supplies insert/remove/setText/addWxsEvent.
+// Yp/E_ add attributes and ordinary events. In particular comments CAN setText.
+type ViewNode = { tag: string; pid: number; $: Node; $children?: ViewNode[]; id: number; [method: string]: unknown };
+type NodeHistory = { tag: string; createdBatch: number; parentId: number; removedBatch?: number };
+type Failure = { id: number; at: string; kind: string; details: unknown };
+const nodeHistory = new Map<number, NodeHistory>();
+const recentBatches: { batch: number; length: number; create: number; remove: number; setAttr: number; at: string }[] = [];
+const failures: Failure[] = [];
+let batchSerial = 0;
+let failureSerial = 0;
+let removedActionTotal = 0;
+let lastRemovedAction: unknown = null;
 let viewErrorTotal = 0;
-function recordViewError(kind: string, value: unknown, limit = 600) {
+let lastViewError: { at: string; kind: string; message: string } | null = null;
+let lastLogicFailure = 0;
+let errorsCaptured = false;
+const methods: Record<number, string> = { 4: "insert", 5: "remove", 6: "setAttr", 7: "removeAttr", 8: "addEvent", 9: "removeEvent", 10: "setText", 12: "addWxsEvent" };
+function recordFailure(kind: string, details: unknown) {
+  const failure = { id: ++failureSerial, at: new Date().toISOString(), kind, details };
+  failures.push(failure);
+  const root = Array.from(hosts.values()).reverse().find(host => host.root.dataset.pageVisible !== "false")?.root ?? document.body;
+  writeAccessible(root, `diag-fail:${failure.id}:`, failure);
+  if (failures.length > 8) {
+    const old = failures.splice(5, 1)[0];
+    const prefix = `diag-fail:${old.id}:`;
+    accessibleNodes.get(prefix)?.forEach(node => node.remove());
+    accessibleNodes.delete(prefix);
+  }
+}
+function recordViewError(kind: string, value: unknown, context?: unknown) {
   viewErrorTotal += 1;
   const error = value as { message?: string; stack?: string } | undefined;
-  const message = `${error?.message ?? String(value)} ${error?.stack ?? ""}`.slice(0, limit);
-  viewErrors.push({ at: new Date().toISOString(), kind, message });
-  if (viewErrors.length > 6) viewErrors.splice(1, 1);
+  const entry = { at: new Date().toISOString(), kind, message: `${error?.message ?? String(value)} ${error?.stack ?? ""}`.slice(0, 1500) };
+  lastViewError = { ...entry, message: entry.message.slice(0, 200) };
+  recordFailure(kind, { ...entry, context });
 }
-// Finds the first vdSync action whose target node is missing or lacks the method the view is about to call.
-function locateFailedAction(actions: unknown[][]) {
-  const lookup = (window as unknown as { __$__?: (id: unknown) => Record<string, unknown> & { $?: Node } | undefined }).__$__;
-  const first = actions[0];
-  const dictionary = Array.isArray(first) && first[0] === 0 && Array.isArray(first[1]) ? first[1] as unknown[] : [];
-  const word = (value: unknown) => typeof value === "number" ? dictionary[value] ?? value : value;
-  const methods: Record<number, string> = { 4: "insert", 5: "remove", 6: "setAttr", 7: "removeAttr", 8: "addEvent", 9: "addWxsEvent", 10: "setText" };
-  const describe = (node: Node | null | undefined) => node ? { name: node.nodeName, class: (node as Element).getAttribute?.("class") ?? null, id: (node as Element).id || null } : null;
+function prevalidateSync(actions: unknown[][]) {
+  const lookup = (window as unknown as { __$__?: (id: number) => ViewNode | undefined }).__$__;
+  if (!lookup) return actions;
+  const batch = ++batchSerial;
+  recentBatches.push({ batch, length: actions.length, create: actions.filter(action => action[0] === 3).length,
+    remove: actions.filter(action => action[0] === 5).length, setAttr: actions.filter(action => action[0] === 6).length, at: new Date().toISOString() });
+  if (recentBatches.length > 8) recentBatches.shift();
+  const dictionary = actions[0]?.[0] === 0 ? actions[0][1] as unknown[] : [];
+  const word = (value: unknown, decodeValues = true): unknown => {
+    if (!dictionary.length) return value;
+    if (typeof value === "number") return dictionary[value];
+    if (Array.isArray(value)) return Object.fromEntries(value.map(([key, item]) => [String(word(key)), decodeValues ? word(item) : item]));
+    return value;
+  };
+  const properties = (value: unknown) => value ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key,
+    key === "e" ? word(item, false) : key === "w" && Array.isArray(item)
+      ? Object.fromEntries(item.map(([event, [handler, flags]]) => [String(word(event)), [word(handler), flags]])) : word(item)])) : value;
+  const created = new Map<number, { tag: string; parentId: number; ownerId: number }>();
+  const removed = new Set<number>();
+  const get = (id: number) => removed.has(id) ? undefined : created.get(id) ?? lookup(id);
+  const parentOf = (id: number) => created.get(id)?.parentId ?? nodeHistory.get(id)?.parentId ?? lookup(id)?.pid;
+  const supports = (id: number, method: string) => {
+    if (removed.has(id)) return false;
+    const fresh = created.get(id);
+    if (fresh) return !["#text", "#comment"].includes(fresh.tag) || ["insert", "remove", "setText", "addWxsEvent"].includes(method);
+    const node = lookup(id);
+    return !!node && typeof node[method] === "function";
+  };
+  const canContain = (id: number) => {
+    const node = get(id);
+    return !!node && !["#text", "#comment"].includes(node.tag);
+  };
+  const markRemoved = (id: number) => {
+    if (removed.has(id)) return;
+    removed.add(id);
+    const history = nodeHistory.get(id);
+    const node = lookup(id);
+    if (history) history.removedBatch = batch;
+    else if (node) nodeHistory.set(id, { tag: node.tag, createdBatch: 0, parentId: node.pid, removedBatch: batch });
+    for (const child of node?.$children ?? []) markRemoved(child.id);
+    for (const [childId, child] of created) if (child.ownerId === id) markRemoved(childId);
+  };
+  const describe = (node: Node | null | undefined) => node ? { tag: node.nodeName,
+    class: (node as Element).getAttribute?.("class")?.slice(0, 200) ?? null, id: (node as Element).id || null } : null;
+  const filtered: unknown[][] = [];
   for (let index = 0; index < actions.length; index += 1) {
     const action = actions[index];
-    const method = methods[action[0] as number];
-    if (!method || !lookup) continue;
-    const node = lookup(action[1]);
-    if (node && typeof node[method] === "function") continue;
-    const created = actions.find(item => item[0] === 3 && item[1] === action[1]);
-    const element = node?.$;
-    return { index, method, id: action[1], args: action.slice(2, 4).map(word), nodeName: element?.nodeName ?? null,
-      text: element?.textContent?.slice(0, 60) ?? null, parent: describe(element?.parentElement), previous: describe(element?.previousSibling),
-      next: describe(element?.nextSibling), created: created ? { index: actions.indexOf(created), tag: word(created[2]), parent: created[3], ref: created[4] } : null };
+    const op = action[0] as number, id = action[1] as number;
+    const method = methods[op];
+    let reason = method && !get(id) ? "missing target" : method && !supports(id, method) ? `unsupported ${method}` : "";
+    if (!reason && (op === 3 || op === 4)) {
+      const parentId = (op === 3 ? action[3] === -1 ? 0 : action[3] : action[2]) as number;
+      const refId = (op === 3 ? action[4] : action[3]) as number;
+      if (!canContain(parentId)) reason = "missing or non-container insertion parent";
+      else if (refId !== -1 && (!get(refId) || parentOf(refId) !== parentId)) reason = "missing or misplaced insertion reference";
+    }
+    // wp.remove dereferences parentNode; a detached wrapper would also abort the batch.
+    if (!reason && op === 5 && !created.has(id) && lookup(id)?.$ && !lookup(id)!.$.parentNode) reason = "detached remove target";
+    if (reason) {
+      const node = lookup(id), element = node?.$;
+      const parentId = parentOf(id) ?? null;
+      const args = op === 3 ? { tag: word(action[2]), parentId: action[3], refId: action[4], properties: properties(action[5]) }
+        : op === 4 ? { parentId: action[2], refId: action[3], properties: properties(action[4]) }
+        : op === 6 ? { name: word(action[2]), value: word(action[3]) }
+        : op === 8 ? { name: word(action[2]), flags: action[3] }
+        : op === 12 ? { name: word(action[2]), handler: word(action[3]), flags: action[4] }
+        : op === 10 ? { text: word(action[2]) } : { name: word(action[2]) };
+      // Snapshot copies prevent later batches from changing retained failure history.
+      const details = JSON.parse(JSON.stringify({ batch, batchLength: actions.length, index, op, method, id, reason, args,
+        nodeName: element?.nodeName ?? created.get(id)?.tag ?? null, textContent: element?.textContent?.slice(0, 60) ?? null,
+        parent: describe(element?.parentElement), previous: describe(element?.previousSibling), next: describe(element?.nextSibling),
+        history: nodeHistory.get(id) ?? null, parentId, parentHistory: parentId === null ? null : nodeHistory.get(parentId) ?? null,
+        recentBatches }, (_key, value) => typeof value === "string" ? value.slice(0, 200) : value));
+      removedActionTotal += 1;
+      lastRemovedAction = { batch, index, op, id, reason };
+      recordFailure("vdSync:skipped", details);
+      continue;
+    }
+    filtered.push(action);
+    if (op === 3) {
+      const parentId = action[3] === -1 ? 0 : action[3] as number;
+      const tag = String(word(action[2]));
+      removed.delete(id);
+      created.set(id, { tag, parentId, ownerId: parentId });
+      nodeHistory.delete(id);
+      nodeHistory.set(id, { tag, createdBatch: batch, parentId });
+    } else if (op === 4) {
+      const parentId = action[2] as number;
+      const fresh = created.get(id);
+      if (fresh) fresh.parentId = parentId;
+      const history = nodeHistory.get(id);
+      if (history) history.parentId = parentId;
+      else nodeHistory.set(id, { tag: lookup(id)!.tag, createdBatch: 0, parentId });
+    } else if (op === 5) markRemoved(id);
   }
-  return null;
+  while (nodeHistory.size > 5000) nodeHistory.delete(nodeHistory.keys().next().value!);
+  return filtered.length === actions.length ? actions : filtered;
 }
 function captureViewErrors() {
-  // window.onerror only sees "Script error." for the uni view bundle; catching at the bridge entry keeps the real error.
+  if (errorsCaptured) return;
+  errorsCaptured = true;
   const bridge = (window as unknown as { UniViewJSBridge?: { subscribeHandler?: (name: string, data: unknown, pageId: unknown) => unknown } }).UniViewJSBridge;
   const subscribe = bridge?.subscribeHandler;
-  if (bridge && subscribe) bridge.subscribeHandler = (name, data, pageId) => {
-    try { return subscribe(name, data, pageId); }
+  if (bridge && subscribe) bridge.subscribeHandler = function(name, data, pageId) {
+    let actions = data;
+    try {
+      if (name === "vdSync" && Array.isArray(data)) actions = prevalidateSync(data as unknown[][]);
+      return subscribe.call(this, name, actions, pageId);
+    }
     catch (error) {
-      const actions = Array.isArray(data) ? data as unknown[][] : [];
-      recordViewError(`bridge:${name} n=${actions.length} culprit=${JSON.stringify(locateFailedAction(actions))}`, error, 1500);
+      recordViewError(`bridge:${name}`, error, { batch: batchSerial, length: Array.isArray(actions) ? actions.length : null, recentBatches });
       throw error;
     }
   };
@@ -122,7 +232,9 @@ function captureViewErrors() {
   }
 }
 function readViewDiagnostics() {
-  return { sampledAt: new Date().toISOString(), errors: { total: viewErrorTotal, first: viewErrors[0] ?? null, recent: viewErrors.slice(1) }, fingers: { count: fingerCount, noFingerSince }, visibility: document.visibilityState,
+  return { sampledAt: new Date().toISOString(), errors: { total: viewErrorTotal, latest: lastViewError },
+    sync: { batches: batchSerial, skippedActions: removedActionTotal, latest: lastRemovedAction, recentBatches, historySize: nodeHistory.size, failures: failureSerial },
+    cardBackground: { mode: cardBackgroundMode, switches: cardBackgroundSwitches }, fingers: { count: fingerCount, noFingerSince }, visibility: document.visibilityState,
     viewport: { width: innerWidth, height: innerHeight, visual: window.visualViewport ? {
       width: visualViewport!.width, height: visualViewport!.height, offsetTop: visualViewport!.offsetTop,
       offsetLeft: visualViewport!.offsetLeft, scale: visualViewport!.scale } : null },
@@ -162,7 +274,11 @@ function reset() {
 }
 function touchStart(event: TouchEvent) {
   fingerCount = event.touches.length; noFingerSince = 0;
-  if (event.touches.length !== 3) return;
+  if (event.touches.length !== 3 || threeFingerHeld) return;
+  threeFingerHeld = true;
+  cardBackgroundMode = cardBackgroundMode === "B" ? "A" : "B";
+  cardBackgroundSwitches += 1;
+  hosts.forEach(host => { host.root.dataset.diagCardBackground = cardBackgroundMode; });
   if (opened) { close(); return; }
   const host = Array.from(hosts.entries()).reverse().find(([, entry]) => entry.root.dataset.pageVisible !== "false" && entry.root.getClientRects().length > 0);
   if (!host) return;
@@ -178,7 +294,7 @@ function touchStart(event: TouchEvent) {
 
 function touchEnd(event: TouchEvent) {
   fingerCount = event.touches.length;
-  if (!fingerCount) noFingerSince = Date.now();
+  if (!fingerCount) { noFingerSince = Date.now(); threeFingerHeld = false; }
 }
 
 // Follow-up 1 explicitly prescribes invisible, accessibility-readable output.
@@ -234,6 +350,7 @@ export function mountDiagnosticView(root: HTMLElement, initial: DiagnosticConfig
   const lockedSince = new Map<string, number>();
   const pendingSince = new Map<string, number>();
   let previousReasons = new Set<string>();
+  root.dataset.diagCardBackground = cardBackgroundMode;
   hosts.set(initial.hostId, { root, notify, resetIncident() { lockedSince.clear(); pendingSince.clear(); previousReasons.clear(); lastAccessibleAt = 0; } });
   if (hosts.size === 1) {
     captureViewErrors();
@@ -242,16 +359,20 @@ export function mountDiagnosticView(root: HTMLElement, initial: DiagnosticConfig
     document.addEventListener("touchcancel", touchEnd, { capture: true, passive: true });
     (window as Window & { __uvelIosDiagnostics?: unknown }).__uvelIosDiagnostics = {
       get open() { return opened; }, get snapshot() { return snapshot; }, get liveSnapshot() { return latestSnapshot; },
-      get incidents() { return incidents; }, get statistics() { return statistics; }, close, reset,
+      get incidents() { return incidents; }, get failures() { return failures; }, get statistics() { return statistics; }, close, reset,
     };
   }
   return { update(value: DiagnosticConfiguration) {
+    for (const failure of value.failures ?? []) if (failure.id > lastLogicFailure) {
+      lastLogicFailure = failure.id;
+      recordFailure(`logic:${failure.kind}`, failure);
+    }
     if (!value.snapshot) return;
     const now = Date.now();
     if (root.dataset.pageVisible !== "false" && root.getClientRects().length && now - lastAccessibleAt >= 1900) {
       const began = performance.now();
       latestHost = value.hostId;
-      for (const [prefix, nodes] of accessibleNodes) if (prefix.startsWith("diag-incident:")) {
+      for (const [prefix, nodes] of accessibleNodes) if (prefix.startsWith("diag-incident:") || prefix.startsWith("diag-fail:")) {
         nodes.forEach(node => { if (node.parentElement !== root) root.appendChild(node); });
       }
       const view = readViewDiagnostics();
@@ -276,8 +397,7 @@ export function mountDiagnosticView(root: HTMLElement, initial: DiagnosticConfig
         if (locked && now - lockedSince.get(chassis.id)! > 3000 && !anyPanel) reasons.push(`b:${chassis.id}`);
         const wrapper = scroll.querySelector<HTMLElement>(".nx-page-enter")?.parentElement;
         const transform = wrapper ? getComputedStyle(wrapper).transform : "none";
-        const pull = (value.snapshot as { readers: { section: string; state: { chassisHostId?: string; pullActive?: boolean } }[] }).readers
-          .find(reader => reader.section === "D1/D2 chassis" && reader.state.chassisHostId === chassis.id)?.state.pullActive;
+        const pull = (chassisReaders.get(chassis.id)?.read() as { pullActive?: boolean } | undefined)?.pullActive;
         if ((pull || (transform !== "none" && !new DOMMatrixReadOnly(transform).isIdentity)) && fingerCount === 0 && noFingerSince && now - noFingerSince > 2000) reasons.push(`d:${chassis.id}`);
       }
       const center = document.elementFromPoint(innerWidth / 2, innerHeight / 2);

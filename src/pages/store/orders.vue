@@ -41,10 +41,10 @@
           @click="goOrder(o)"
         >
           <view class="order-card__row">
-            <view class="order-card__thumb" aria-hidden="true">
+            <LoopScope class="order-card__thumb" aria-hidden="true">
               <CatalogMachineImage v-if="o.kind === 'commerce'" class="order-card__image nx-home-art-float" :sku="o.lineItems?.[0]?.sku ?? o.productId" :image-url="orderImage(o)" :scope-key="o.id" />
               <image v-else class="order-card__image nx-home-art-float" :src="GENESIS_MEDIA.showcase" mode="aspectFit" />
-            </view>
+            </LoopScope>
             <view class="order-card__info">
               <view class="order-card__top">
                 <text class="order-card__title">{{ commerceOrderTitle(o,locale.code) }}</text>
@@ -65,7 +65,7 @@
             </view>
             <!-- Stops the tap here so the card does not also open the plain detail. -->
             <view class="order-card__pay" @click.stop>
-              <NxButton variant="brand" size="small" :label="t.orders.pendingContinue" @click="goOrderPayment(o)" />
+              <view class="nx-card-action" role="button" tabindex="0" @click="goOrderPayment(o)" @keydown.enter.prevent="!$event.repeat && goOrderPayment(o)" @keydown.space.prevent="!$event.repeat && goOrderPayment(o)"><text>{{ t.orders.pendingContinue }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view>
             </view>
           </view>
         </view>
@@ -103,12 +103,12 @@ import { commerceAmount as formatAmount } from "@/lib/commerce-review";
 import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
 import { revalidateProductCatalog } from "@/store/product-catalog";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
+import LoopScope from "@/components/loop-scope.vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import GlassSegments from "@/components/glass-segments.vue";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import NxButton from "@/components/ui/nx-button.vue";
 import { GENESIS_MEDIA, getOrderProductMedia } from "@/lib/product-media";
 import { useT } from "@/i18n/use-t";
 import { formatTrialDate } from "@/lib/trial-date";

@@ -41,5 +41,7 @@ const src = computed(() => props.image ?? (props.device ? imageSrc.value : undef
 [role="button"] { cursor: pointer; }
 [role="button"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 @keyframes device-bay-flow { from { transform: translateX(-110%); } to { transform: translateX(290%); } }
+/* Paused while the warehouse stage is off-screen (its LoopScope), the page is hidden, or the chassis scrolls. */
+:is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .device-bay__strip > view { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .device-bay, .device-bay__strip > view { animation: none; } }
 </style>

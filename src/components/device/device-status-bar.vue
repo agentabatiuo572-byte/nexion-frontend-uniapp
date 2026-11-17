@@ -31,7 +31,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed } from "vue";
+import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
 const barHeight = computed(() => {
@@ -48,14 +49,7 @@ function updateStatusTime() {
   const now = new Date();
   statusTime.value = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
-let statusClockTimer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  updateStatusTime();
-  statusClockTimer = setInterval(updateStatusTime, 30_000);
-});
-onUnmounted(() => {
-  if (statusClockTimer) clearInterval(statusClockTimer);
-});
+useVisibleInterval(updateStatusTime, 30_000);
 </script>
 
 <style scoped>
@@ -68,7 +62,9 @@ onUnmounted(() => {
   pointer-events: none;
 }
 /* The material continues below the safe area behind navigation (z50/z100).
-   Four successively shorter blur bands avoid a uniform blur ending at 54px. */
+   Four successively shorter blur bands avoid a uniform blur ending at 54px.
+   Each band's box ends where its mask reaches transparent, so the GPU samples
+   and blurs only rows that can show; mask stops are rescaled to the shorter box. */
 .nx-statusbar-material {
   position: absolute;
   top: 0;
@@ -90,24 +86,27 @@ onUnmounted(() => {
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
 }
 .nx-statusbar-material > view:nth-child(2) {
+  bottom: 15%;
   backdrop-filter: blur(4px) saturate(125%);
   -webkit-backdrop-filter: blur(4px) saturate(125%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 85%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 85%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 35.29%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 35.29%, transparent 100%);
 }
 .nx-statusbar-material > view:nth-child(3) {
+  bottom: 30%;
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 15%, transparent 70%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 15%, transparent 70%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 21.43%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 21.43%, transparent 100%);
 }
 .nx-statusbar-material > view:nth-child(4) {
+  bottom: 45%;
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 55%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 55%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
 }
-/* Uniform page-colour tint; its lower edge fades with the same mask as the 10px blur layer. */
+/* Uniform page-colour tint; its lower edge fades over the same rows as the 10px blur band. */
 .nx-statusbar-material::after {
   content: "";
   background: color-mix(in srgb, var(--v5-bg) 56%, transparent);
