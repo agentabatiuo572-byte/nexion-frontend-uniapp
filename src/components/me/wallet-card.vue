@@ -1,8 +1,13 @@
 <!-- Balances retain their existing sources; the summary follows the approved wallet design. -->
 <template>
-  <view class="nx-wallet" :class="{'nx-wallet--compact': compact}">
-    <view class="nx-glass-card nx-glass-hero nx-wallet-summary">
-      <view class="nx-wallet-arc" aria-hidden="true" />
+  <view class="nx-wallet" :class="{'nx-wallet--compact': compact, 'nx-wallet--glow-paused': !glowLoops.running.value}">
+    <view ref="glowRef" class="nx-glass-card nx-glass-hero nx-wallet-summary">
+      <view class="nx-wallet-arc" aria-hidden="true">
+        <template v-if="compact">
+          <view class="nx-wallet-glow nx-wallet-glow--violet"><view class="nx-wallet-glow-shape" /></view>
+          <view class="nx-wallet-glow nx-wallet-glow--teal"><view class="nx-wallet-glow-shape" /></view>
+        </template>
+      </view>
       <view class="nx-wallet-particles" aria-hidden="true">
         <view v-for="(dot, i) in DATA_DOTS" :key="i" class="nx-wallet-particle" data-wallet-particle :style="dotStyle(dot)" />
       </view>
@@ -84,6 +89,7 @@ import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import SectionHeader from "@/components/me/section-header.vue";
 import WalletActionBtn from "@/components/me/wallet-action-btn.vue";
 import { useCountUp } from "@/composables/use-count-up";
+import { useLoopsInView } from "@/composables/use-loops-in-view";
 
 const t = useT();
 const visibility = useDataVisibility();
@@ -92,6 +98,9 @@ const app = useApp();
 const bills = useBills();
 const market = useMarket();
 const trial = useFreeTrial();
+// The glow layers pause while the card is off-screen, clipped by the scroller, or its page is hidden.
+const glowLoops = useLoopsInView(".nx-wallet-summary");
+const glowRef = glowLoops.elRef;
 const fundsReadable = computed(() => remoteAuthorityStatus({
   remoteApiEnabled,
   hasSnapshot: app.remoteFleetHasSnapshot,
@@ -344,27 +353,40 @@ const usdtFitStyle = computed<CSSProperties>(() => ({
   transform: none;
   animation: wallet-color-current 40s linear infinite;
 }
-.nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::before,
-.nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::after {
-  content: "";
+/* Each color is a fixed irregular soft shape, blurred once while still. Only transforms move it, so WebKit and
+   Chromium play it on the compositor without repainting: the glow layer shares the edge pressure, the shape layer
+   turns and stretches unevenly (28s / 34s) so its outline appears to change. */
+.nx-wallet--compact .nx-wallet-glow {
   position: absolute;
   --wallet-contact-direction: -1;
+  --wallet-glow-color: var(--wallet-glow-violet);
   left: -2%;
   top: 8%;
   width: 61%;
   height: 84%;
+  animation: wallet-edge-pressure 24s ease-in-out infinite;
+}
+.nx-wallet--compact .nx-wallet-glow--teal {
+  --wallet-contact-direction: 1;
+  --wallet-glow-color: var(--wallet-glow-teal);
+  left: 41%;
+}
+.nx-wallet--compact .nx-wallet-glow-shape {
+  position: absolute;
+  inset: 0;
+  animation: wallet-color-morph 28s ease-in-out infinite;
+}
+.nx-wallet--compact .nx-wallet-glow--teal > .nx-wallet-glow-shape { animation: wallet-color-morph 34s ease-in-out -12s infinite reverse; }
+.nx-wallet--compact .nx-wallet-glow-shape::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   border-radius: 32% 68% 55% 45% / 64% 36% 64% 36%;
-  background: var(--wallet-glow-violet);
+  background: var(--wallet-glow-color);
   opacity: .65;
   filter: blur(42px);
-  animation: wallet-color-morph 28s ease-in-out infinite, wallet-edge-pressure 24s ease-in-out infinite;
 }
-.nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::after {
-  --wallet-contact-direction: 1;
-  left: 41%;
-  background: var(--wallet-glow-teal);
-  animation: wallet-color-morph 34s ease-in-out -12s infinite reverse, wallet-edge-pressure 24s ease-in-out infinite;
-}
+.nx-wallet--compact .nx-wallet-glow--teal > .nx-wallet-glow-shape::before { border-radius: 41% 59% 72% 28% / 72% 29% 71% 28%; }
 .nx-wallet--compact > .nx-wallet-summary::before {
   content: "";
   position: absolute;
@@ -402,10 +424,10 @@ const usdtFitStyle = computed<CSSProperties>(() => ({
   to { transform: rotate(338deg); }
 }
 @keyframes wallet-color-morph {
-  0%, 100% { border-radius: 32% 68% 55% 45% / 64% 36% 64% 36%; }
-  23% { border-radius: 68% 32% 27% 73% / 38% 68% 32% 62%; }
-  47% { border-radius: 41% 59% 72% 28% / 72% 29% 71% 28%; }
-  71% { border-radius: 73% 27% 41% 59% / 29% 57% 43% 71%; }
+  0%, 100% { transform: rotate(0deg) scale(1, 1); }
+  23% { transform: rotate(16deg) scale(1.08, .92); }
+  47% { transform: rotate(-10deg) scale(.93, 1.07); }
+  71% { transform: rotate(9deg) scale(1.06, .95); }
 }
 /* The two cores stay apart. Their shared edge yields and stretches together. */
 @keyframes wallet-edge-pressure {
@@ -414,14 +436,17 @@ const usdtFitStyle = computed<CSSProperties>(() => ({
 }
 :global(.nx-chassis[data-page-visible="false"] .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc),
 :global(.nx-chassis[data-scrolling="true"] .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc),
-:global(.nx-chassis[data-page-visible="false"] .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::before),
-:global(.nx-chassis[data-page-visible="false"] .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::after),
-:global(.nx-chassis[data-scrolling="true"] .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::before),
-:global(.nx-chassis[data-scrolling="true"] .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::after) { animation-play-state: paused; }
+:global(.nx-chassis[data-page-visible="false"] .nx-wallet--compact .nx-wallet-glow),
+:global(.nx-chassis[data-page-visible="false"] .nx-wallet--compact .nx-wallet-glow-shape),
+:global(.nx-chassis[data-scrolling="true"] .nx-wallet--compact .nx-wallet-glow),
+:global(.nx-chassis[data-scrolling="true"] .nx-wallet--compact .nx-wallet-glow-shape),
+.nx-wallet--compact.nx-wallet--glow-paused > .nx-wallet-summary > .nx-wallet-arc,
+.nx-wallet--compact.nx-wallet--glow-paused .nx-wallet-glow,
+.nx-wallet--compact.nx-wallet--glow-paused .nx-wallet-glow-shape { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc { animation: none; transform: rotate(-22deg); }
-  .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::before,
-  .nx-wallet--compact > .nx-wallet-summary > .nx-wallet-arc::after { animation: none; }
+  .nx-wallet--compact .nx-wallet-glow,
+  .nx-wallet--compact .nx-wallet-glow-shape { animation: none; }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .nx-wallet--compact > .nx-wallet-summary { background: var(--v5-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
