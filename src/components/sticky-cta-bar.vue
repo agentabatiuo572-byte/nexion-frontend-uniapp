@@ -106,8 +106,8 @@ function onTap() {
   flex-wrap: wrap;
 }
 .scb-info {
-  flex: 1;
-  min-width: max-content;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .scb-eyebrow {
   display: block;
@@ -142,9 +142,6 @@ function onTap() {
   display: block;
   margin-top: 1px;
   font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .scb-cta {
   display: inline-flex;
