@@ -2324,6 +2324,8 @@ export const uz: Messages = {
     specWarranty: "Kafolat",
     specWarrantyMonths: "{n} oy",
     specWarrantyYears: "{n} yil",
+    specShareVramNotApplicable: "Tatbiq etilmaydi",
+    specSharePowerNotApplicable: "Tatbiq etilmaydi",
     specValueUnavailable: "Maʼlumot yoʻq",
     specUnavailable: "Qurilma va xizmat xususiyatlari sertifikatlanmaguncha bu mahsulotni sotib olib boʻlmaydi.",
     faq: {

@@ -1866,6 +1866,8 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     specWarranty: "质保",
     specWarrantyMonths: "{n} 个月",
     specWarrantyYears: "{n} 年",
+    specShareVramNotApplicable: "不适用（虚拟算力份额）",
+    specSharePowerNotApplicable: "不适用（非独立设备）",
     specValueUnavailable: "暂无数据",
     specUnavailable: "商品硬件与服务规格尚未完成认证，暂不可购买。",
     faq: {

@@ -2324,6 +2324,8 @@ export const ru: Messages = {
     specWarranty: "Гарантия",
     specWarrantyMonths: "{n} мес.",
     specWarrantyYears: "{n} г.",
+    specShareVramNotApplicable: "Не применимо",
+    specSharePowerNotApplicable: "Не применимо",
     specValueUnavailable: "Нет данных",
     specUnavailable: "Этот товар нельзя купить, пока характеристики оборудования и сервиса не сертифицированы.",
     faq: {

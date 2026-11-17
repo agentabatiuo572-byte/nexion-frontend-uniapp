@@ -2324,6 +2324,8 @@ export const id: Messages = {
     specWarranty: "Garansi",
     specWarrantyMonths: "{n} bulan",
     specWarrantyYears: "{n} tahun",
+    specShareVramNotApplicable: "Tidak berlaku",
+    specSharePowerNotApplicable: "Tidak berlaku",
     specValueUnavailable: "Tidak tersedia",
     specUnavailable: "Produk ini belum bisa dibeli sampai spesifikasi perangkat keras dan layanannya tersertifikasi.",
     faq: {

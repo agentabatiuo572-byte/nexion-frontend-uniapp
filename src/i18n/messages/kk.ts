@@ -2324,6 +2324,8 @@ export const kk: Messages = {
     specWarranty: "Кепілдік",
     specWarrantyMonths: "{n} ай",
     specWarrantyYears: "{n} жыл",
+    specShareVramNotApplicable: "Қолданылмайды",
+    specSharePowerNotApplicable: "Қолданылмайды",
     specValueUnavailable: "Дерек жоқ",
     specUnavailable: "Жабдық пен қызмет сипаттамалары сертификатталмайынша бұл тауарды сатып алу мүмкін емес.",
     faq: {
