@@ -1,3 +1,5 @@
+import type { LocaleCode } from "@/i18n";
+
 export interface LocaleProfileScope {
   accountId: string;
   revision: number;
@@ -5,7 +7,9 @@ export interface LocaleProfileScope {
 
 interface LocaleProfileSyncDependencies {
   currentScope(): LocaleProfileScope | null;
-  write(language: string): Promise<unknown>;
+  write(language: string): Promise<LocaleCode>;
+  isEnabled(language: string): boolean;
+  onSaved(language: LocaleCode, scope: LocaleProfileScope): void;
   onState?(state: "idle" | "syncing" | "failed"): void;
 }
 
@@ -42,11 +46,14 @@ export function createLocaleProfileSync(dependencies: LocaleProfileSyncDependenc
     while (queued) {
       const job = queued;
       queued = null;
-      if (!current(job)) continue;
+      if (!current(job) || !dependencies.isEnabled(job.language)) continue;
       dependencies.onState?.("syncing");
       try {
-        await dependencies.write(job.language);
-        if (current(job)) dependencies.onState?.("idle");
+        const saved = await dependencies.write(job.language);
+        if (current(job)) {
+          dependencies.onSaved(saved, job.scope);
+          dependencies.onState?.("idle");
+        }
       } catch {
         // Preserve only a failure for the still-current session. The next
         // locale change or accepted sign-in is a deliberate retry trigger.
@@ -87,6 +94,18 @@ export function createLocaleProfileSync(dependencies: LocaleProfileSyncDependenc
     discardInactive(): void {
       if (queued && !current(queued)) queued = null;
       if (retry && !current(retry)) retry = null;
+    },
+    discardDisabled(): boolean {
+      let discarded = false;
+      if (queued && current(queued) && !dependencies.isEnabled(queued.language)) {
+        queued = null;
+        discarded = true;
+      }
+      if (retry && current(retry) && !dependencies.isEnabled(retry.language)) {
+        retry = null;
+        discarded = true;
+      }
+      return discarded;
     },
   };
 }

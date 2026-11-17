@@ -6,14 +6,21 @@ import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
 import { apiRuntimeConfig, apiRuntimeClientOrigin, platformConfigApi, remoteApiEnabled } from "@/api/runtime";
-import type { PlatformPublicStatsAuthority } from "@/api/platform-config-api";
-import { LOCALES } from "@/i18n";
+import { parseInterfaceLanguages, type PlatformPublicStatsAuthority } from "@/api/platform-config-api";
+import { LOCALES, type UiLocale } from "@/i18n";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 const CONFIG_REFRESH_MS = 30 * 60_000;
 const CONFIG_INVALIDATION_MS = 90_000;
 const CONFIG_RETRY_MS = 60_000;
+function restoreInterfaceLanguages(cacheKey: string): UiLocale[] | null {
+  try {
+    return parseInterfaceLanguages(uni.getStorageSync(cacheKey));
+  } catch {
+    return null;
+  }
+}
 
 // Platform config / feature-flag store. Single source for client-side feature
 // flags + tunable platform config across all carriers (signed APP / H5 /
@@ -21,6 +28,7 @@ const CONFIG_RETRY_MS = 60_000;
 //
 // Remote builds read a versioned platform snapshot; demo builds retain their seed.
 export const useConfig = defineStore("config", () => {
+  const interfaceLanguagesCacheKey = `nexgrid-interface-languages-v1:${JSON.stringify([apiRuntimeClientOrigin.environment, apiRuntimeClientOrigin.baseUrl])}`;
   const mockConfig = completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG);
   // Remote mode never exposes plausible server-owned seed values while the
   // authority request is pending or failed. The full structural shape keeps
@@ -128,15 +136,12 @@ export const useConfig = defineStore("config", () => {
   const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
   const publicStatsAuthority = ref<PlatformPublicStatsAuthority | null>(null);
   const configStatus = ref<"idle" | "loading" | "ready" | "failed">(remoteApiEnabled ? "idle" : "ready");
-  // Interface languages from the last successful platform read; null = not configured, so every
-  // launched language is offered. Before the first successful read it is null. A failed refresh
-  // keeps the last list, so a switched-off language never reappears because a read failed; a
-  // successful read that omits or invalidates the field, or an API environment change, resets it.
-  const interfaceLanguages = ref<readonly string[] | null>(null);
-  /** Launched languages the loaded configuration switches on, in registry order; zh/en/vi always. */
+  // Language eligibility alone is cached, without restoring platform readiness, version or timers.
+  const interfaceLanguages = ref<readonly UiLocale[] | null>(restoreInterfaceLanguages(interfaceLanguagesCacheKey));
+  /** Until this source has a confirmed list, only the mandatory English language is offered. */
   const offeredLocales = computed(() => {
     const switchedOn = interfaceLanguages.value;
-    return switchedOn ? LOCALES.filter((locale) => ["zh", "en", "vi"].includes(locale.code) || switchedOn.includes(locale.code)) : LOCALES;
+    return LOCALES.filter((locale) => (switchedOn ?? ["en"]).some((code) => code === locale.code));
   });
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
@@ -308,7 +313,14 @@ export const useConfig = defineStore("config", () => {
           };
           if (!current()) return;
           publicStatsAuthority.value = remote.publicStatsAuthority;
-          interfaceLanguages.value = remote.interfaceLanguages;
+          if (remote.interfaceLanguages) {
+            interfaceLanguages.value = remote.interfaceLanguages;
+            try {
+              uni.setStorageSync(interfaceLanguagesCacheKey, remote.interfaceLanguages);
+            } catch {
+              // A storage failure must not invalidate the successful in-memory platform read.
+            }
+          }
         }
         if (!current()) return;
         snapshotVersion = version;

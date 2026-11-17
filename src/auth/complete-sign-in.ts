@@ -14,7 +14,6 @@ import { apiRuntimeConfig, authApi, remoteApiEnabled, sessionVault } from "@/api
 import { hydrateCurrentProfileLocale } from "@/lib/locale-profile-sync-runtime";
 import { afterLegalTermsAcknowledged } from "@/lib/legal-terms-gate-runtime";
 import type { UserSession } from "@/api/contracts";
-import type { LocaleCode } from "@/i18n";
 import { resolvePostSignInRoute } from "@/auth/post-sign-in-route";
 
 interface CompleteSignInOptions {
@@ -30,8 +29,6 @@ interface CompleteSignInOptions {
   serverSessionRevision?: number;
   /** Registration needs to show its success interstitial before onboarding routing. */
   deferNavigation?: boolean;
-  /** Only a registration uses its form language to initialize the new profile. */
-  registrationLocale?: LocaleCode;
 }
 
 interface CompletedSignIn {
@@ -179,7 +176,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     // Account language is hydrated before any server write. An explicit picker
     // selection made during this read wins; a device default never overwrites
     // the account preference merely because the user signed in.
-    hydrateCurrentProfileLocale(options.registrationLocale);
+    hydrateCurrentProfileLocale();
     const confirmedSession = sessionVault.read();
     if (confirmedSession?.accessToken && auth.isAuthenticated && auth.accountId === options.identity
       && app.accountKey === options.identity && options.identity === `user:${confirmedSession.user.userId}`) {

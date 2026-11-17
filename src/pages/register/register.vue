@@ -855,7 +855,6 @@ async function finish() {
       serverSessionRevision: registration.vaultRevision,
       deferNavigation: true,
       returnTo: registrationCompletionDestination(),
-      registrationLocale: useLocaleStore().code,
     });
     if (!completed.ok) {
       // Registration succeeded; its login attempt is complete. Require an explicit new sign-in.

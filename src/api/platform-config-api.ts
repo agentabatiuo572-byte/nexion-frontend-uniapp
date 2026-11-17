@@ -417,11 +417,11 @@ export function parsePlatformPublicStats(value: unknown, mode: ApiEnvironment = 
   };
 }
 
-// Optional: a missing or malformed list means "not configured" and never fails the platform read.
-function parseInterfaceLanguages(value: unknown): UiLocale[] | null {
+// Missing/malformed values provide no new language authority; keep the last confirmed list.
+export function parseInterfaceLanguages(value: unknown): UiLocale[] | null {
   if (!Array.isArray(value) || !value.every((code) => typeof code === "string" && uiLocale(code) === code)) return null;
   const codes = value as UiLocale[];
-  return new Set(codes).size === codes.length && (["zh", "en", "vi"] as const).every((code) => codes.includes(code)) ? codes : null;
+  return new Set(codes).size === codes.length && codes.includes("en") ? codes : null;
 }
 
 function parseNetworkPulse(value: unknown): PlatformConfig["networkPulse"] {

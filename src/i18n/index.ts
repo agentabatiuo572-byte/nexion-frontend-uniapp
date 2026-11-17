@@ -61,7 +61,7 @@ export function serverLanguage(code: string): ServerLanguage {
   return code === "zh" || code === "vi" ? code : "en";
 }
 
-export const DEFAULT_LOCALE: LocaleCode = "zh";
+export const DEFAULT_LOCALE: LocaleCode = "en";
 
 export function getLocale(code: LocaleCode): LocaleEntry {
   return LOCALES.find((l) => l.code === code) ?? LOCALES[0];

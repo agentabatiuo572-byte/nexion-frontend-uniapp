@@ -1344,6 +1344,7 @@ window.addEventListener("hashchange", () => {
 // #endif
 onShow(() => {
   advanceTabSnapshotClock();
+  useLocaleStore().ensureSystemDetected();
   appReadForeground.value = true;
   // #ifdef APP-PLUS
   useTheme().refreshSystemTheme();
