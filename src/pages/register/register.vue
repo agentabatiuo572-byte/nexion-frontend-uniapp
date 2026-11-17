@@ -64,7 +64,6 @@
           </view>
           <text id="register-phone-format" data-testid="auth-phone-hint" class="rg-phone-hint" :class="{ 'rg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <view class="rg-invite">
-            <text class="rg-invite__lbl">{{ t.register.inviteLabel }} <text class="rg-invite__opt">{{ lockedRef ? t.register.inviteLockedLabel : t.register.inviteOptional }}</text></text>
             <!-- [FEAT-SHARE4] 链接来源码锁定置灰:不可修改不可删除(主人 2026-07-08 拍板);
                  无码自然进入才渲染可手输框。 -->
             <view v-if="lockedRef">
@@ -1095,8 +1094,6 @@ onUnmounted(() => cleanup());
 .rg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
 .rg-resend__btn { color: var(--v5-brand); font-weight: 500; }
 .rg-invite { margin-top: 20px; }
-.rg-invite__lbl { display: block; font-size: 12px; color: var(--v5-ink-3); margin-bottom: 6px; padding: 0 4px; }
-.rg-invite__opt { color: var(--v5-ink-4); }
 /* [FEAT-SHARE4] 链接来源码锁定态:同 rg-field 形制但压暗 + 锁标,无输入交互。 */
 .rg-locked { display: flex; align-items: center; gap: 8px; background: #0A0A0A; border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; opacity: 0.9; }
 .rg-locked__code { flex: 1; font-size: 15px; color: var(--text-muted); font-family: var(--font-jet-mono), ui-monospace, monospace; letter-spacing: 0.04em; }
