@@ -61,7 +61,8 @@ export const useLocaleStore = defineStore("locale", () => {
       // language/hostLanguage describe the device/browser; appLanguage may be uni's own UI locale.
       const language = info.language || info.hostLanguage || info.appLanguage || "";
       const base = language.trim().toLowerCase().split(/[-_]/)[0];
-      systemLanguage.value = LOCALES.find((locale) => locale.code === base)?.code ?? null;
+      const normalized = base === "in" ? "id" : base === "tl" ? "fil" : base;
+      systemLanguage.value = LOCALES.find((locale) => locale.code === normalized)?.code ?? null;
     } catch {
       systemLanguage.value = null;
     }

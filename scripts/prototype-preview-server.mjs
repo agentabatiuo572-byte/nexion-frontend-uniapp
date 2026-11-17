@@ -4,6 +4,7 @@ import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoOptions } from './lib/prototype-demo-data.mjs';
+import { previewInterfaceLanguages } from './lib/design-review-fixture.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
@@ -23,7 +24,7 @@ const fixtureFor=(url,request)=>demoFixture(url,locale,state,request);
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
 await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push('('+fn.toString()+')('+JSON.stringify(arg)+');'),route:async(matcher,handler)=>routes.push({matcher,handler}),routeWebSocket:realtime.routeWebSocket},{responseFor:fixtureFor});
-const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{code:'zh',userSet:true}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
+const seed='<script>'+init.join('\n')+"for(const [key,data] of [['nexgrid-locale-v1',{explicitChoice:'zh'}],['nexgrid-theme-v1',{mode:'dark'}]]){if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({type:'object',data}));}</script>";
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
@@ -120,7 +121,7 @@ const server=http.createServer(async(req,res)=>{
       }
       return sendJson(res,{state,options:demoOptions,simulation:true});
     }
-    if(url.pathname==='/preview-language'){locale=['zh','en','vi'].includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=locale;return res.end('OK');}
+    if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}
     const trustFile=req.method==='GET'&&url.pathname.match(/^\/api\/content\/trust\/documents\/(incorporation|msb|ein)\/file$/);
     if(trustFile&&process.env.DEMO_TRUST_DOCUMENTS_DIR){

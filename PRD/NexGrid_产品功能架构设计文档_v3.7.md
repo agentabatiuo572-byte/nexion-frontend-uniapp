@@ -875,9 +875,9 @@ CTA "激活手机算力 →" 在服务端确认绑定成功后路由到 `/`(Home
 首个 i18n 刷新和页面挂载前，同步恢复当前 API 来源（environment + baseUrl）的最近有效语言列表，再按以下单一规则确定显示语言：
 
 1. 依次取「本机明确选择 → 当前账号语言 → 手机系统语言」中第一个在已确认可用列表内的语言；全部不匹配则 `en`。
-2. 系统语言通过 `uni.getSystemInfoSync()` 的设备语言字段读取，兼容 `language`、`hostLanguage`、`appLanguage`；区域及脚本后缀归一为上线代码（如 `zh-Hans-CN → zh`、`vi-VN → vi`、`en-US → en`、`kk-KZ → kk`、`uz-UZ → uz`）。H5 使用 uni 提供的浏览器语言；回到前台时重新检测。
+2. 系统语言通过 `uni.getSystemInfoSync()` 的设备语言字段读取，兼容 `language`、`hostLanguage`、`appLanguage`；区域及脚本后缀归一为上线代码（如 `zh-Hans-CN → zh`、`vi-VN → vi`、`en-US → en`、`kk-KZ → kk`、`uz-UZ → uz`），兼容旧安卓别名 `in → id`、`tl → fil`。H5 使用 uni 提供的浏览器语言；回到前台时重新检测。
 3. 没有同来源有效列表缓存时，只确认英文；读到有效配置后重算，允许从英文切换到已开启的系统语言。账号资料尚未读取时不预判账号语言，hydration 到达后重算。
-4. `nexgrid-locale-v1` 单独保存 `explicitChoice`，仅用户在语言页、引导页或条款页明确选择时改变；兼容旧 `{code,userSet:true}`，旧 `userSet=false` 不生成明确选择。自动显示结果不覆盖明确选择、不增长明确操作版本、不写账号。账号语言仅按当前账号作用域留在内存，退出或换账号即清除。
+4. `nexgrid-locale-v1` 单独保存 `explicitChoice`，仅用户在语言页、引导页或条款页明确选择时改变（包括点击当前自动显示的语言）；兼容旧 `{code,userSet:true}`，旧 `userSet=false` 不生成明确选择。自动显示结果不覆盖明确选择、不增长明确操作版本、不写账号。账号语言仅按当前账号作用域留在内存，退出或换账号即清除。
 5. 任一候选或已确认列表变化都重算；明确选择暂时被关时保留，重开后自动恢复。首帧不得使用本机已确认列表排除的语言；旧有效缓存仍可沿用至下次有效读取，不能据此承诺立即采用运营最新开关。
 
 #### 4.7.5 服务条款页 `/onboarding/terms`
