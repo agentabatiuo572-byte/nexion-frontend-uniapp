@@ -22,6 +22,9 @@ export function mountLiquidGlass(host: HTMLElement, initial: GlassConfiguration)
   const contrast = matchMedia("(prefers-contrast: more)");
   const ua = navigator.userAgent;
   const svgBackdrop = /(?:Chrome|Chromium|Edg|OPR)\//.test(ua) && !/iPhone|iPad|iPod/.test(ua);
+  // WebKit has no SVG backdrop filter. Its WebGL path clones the page backdrop
+  // on every content change, which stalls iOS tab switches; it keeps CSS glass.
+  const webkitCssGlass = !svgBackdrop && /AppleWebKit\//.test(ua);
 
   function release() {
     stopWatchingSource(); stopWatchingSource = () => {};
@@ -116,6 +119,7 @@ export function mountLiquidGlass(host: HTMLElement, initial: GlassConfiguration)
         mark("svg");
         return;
       }
+      if (webkitCssGlass) { mark("frosted", "webkit-css-material"); return; }
       // WebGL is reserved for the exterior navigation. Capturing an ancestor of
       // an in-content selector would recursively capture the glass itself.
       const scope = host.closest(".nx-chassis") ?? host.closest(".cp-root");
