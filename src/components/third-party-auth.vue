@@ -39,6 +39,7 @@ import { completeSignIn } from "@/auth/complete-sign-in";
 import { stageRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
 import { navReset } from "@/lib/route";
 import { toast } from "@/store/ui";
+import { useLocaleStore } from "@/store/locale";
 import { ApiError } from "@/api/errors";
 import { validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth-browser-return";
 
@@ -225,6 +226,7 @@ async function complete(captchaTicket?: string) {
         serverProfile: result.user, onboardingComplete: result.user.onboardingComplete,
         serverSessionRevision: result.vaultRevision,
         deferNavigation: !!result.registrationReceipt,
+        initialOAuthLocale: result.registrationReceipt ? useLocaleStore().code : undefined,
       });
       if (!completed.ok) throw new Error("SIGN_IN_FAILED");
       if (result.registrationReceipt) {

@@ -2,6 +2,7 @@ import { profileApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
+import type { LocaleCode } from "@/i18n";
 import { ref } from "vue";
 import { canHydrateProfileLocale, trackProfileLocaleHydration } from "./locale-profile-hydration";
 import { createLocaleProfileSync, type LocaleProfileScope } from "./locale-profile-sync";
@@ -68,8 +69,8 @@ export function reconcileProfileLocaleAvailability(): void {
   if (sync.discardDisabled()) hydrateCurrentProfileLocale();
 }
 
-/** A completed sign-in reads the account language unless an eligible anonymous choice is pending. */
-export function hydrateCurrentProfileLocale(): void {
+/** A completed sign-in reads the account language unless it has an eligible choice to save. */
+export function hydrateCurrentProfileLocale(initialOAuthLocale?: LocaleCode): void {
   const scope = currentScope();
   if (!scope) {
     profileLocaleSyncState.value = "idle";
@@ -78,10 +79,10 @@ export function hydrateCurrentProfileLocale(): void {
   resetProfileLocaleSyncScope();
   const locale = useLocaleStore();
   const explicitRevision = locale.explicitRevision;
-  const chosenBeforeSignIn = pendingAnonymousSelection;
+  const languageToSave = initialOAuthLocale ?? pendingAnonymousSelection;
   pendingAnonymousSelection = null;
-  if (chosenBeforeSignIn && isEnabled(chosenBeforeSignIn)) {
-    requestProfileLocale(chosenBeforeSignIn, scope);
+  if (languageToSave && isEnabled(languageToSave)) {
+    requestProfileLocale(languageToSave, scope);
     return;
   }
   // A disabled anonymous preference is still stored locally, but never skips the account GET.
