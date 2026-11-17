@@ -1,3 +1,6 @@
+import { diagnosticCounter } from "./ios-diagnostics-counter";
+import { diagnosticHref } from "./ios-diagnostics-route";
+import { registerChassisDiagnostics, mountDiagnosticView, type DiagnosticConfiguration } from "./ios-diagnostics-view";
 import { attachManualScrollLoadMore } from "./manual-scroll-load-more";
 import { mountLiquidGlass, type GlassConfiguration } from "./liquid-glass-renderer";
 import { glassSpring, glassLogoHidden } from "./liquid-glass-core";
@@ -377,6 +380,8 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   let pageTop = initial.memoryKey ? getScrollPos(initial.memoryKey) ?? physicalTop() : physicalTop();
   let pendingTop: number | null = null;
   let restoreFrame = 0;
+  const counters = Object.fromEntries(["markScroll", "layoutMutation", "layoutResize", "layoutOther", "restoreWrites", "touchstart", "touchmove", "touchend", "touchcancel", "pullEntries", "refresh"].map(key => [key, diagnosticCounter()]));
+  let pullEntryTop: number | null = null;
   const tabPositions = new Map<string, { href: string; top: number }>();
   let hidden = scroll.scrollTop > 8;
   let scrolling = false;
@@ -452,6 +457,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     if (tabKey) tabPositions.set(tabKey.split("?")[0], { href: tabKey, top: pageTop });
   };
   const markScroll = () => {
+    counters.markScroll.hit();
     if (!viewReady()) return;
     remember();
     setScrolling(true);
@@ -474,6 +480,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     // A short first layout can still be waiting for data or image dimensions.
     // Keep its saved destination without repeatedly writing an unreachable top.
     if (target > Math.max(0, scroll.scrollHeight - scroll.clientHeight)) return;
+    counters.restoreWrites.hit();
     scroll.scrollTop = target;
     if (Math.abs(scroll.scrollTop - target) < 1) pendingTop = null;
     trace(pendingTop === null ? "restored" : "restore-pending");
@@ -508,12 +515,14 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     return touch.clientX >= rect.left && touch.clientX <= rect.right && touch.clientY >= rect.top && touch.clientY <= rect.bottom;
   };
   const touchStart = (event: TouchEvent) => {
+    counters.touchstart.hit();
     touching = true;
     cancelRestore();
     if (!viewReady() || config.scrollLocks || config.isRefreshing || awaitingRefresh || scroll.scrollTop > 0 || event.touches.length !== 1) { cancelPull(); startY = null; return; }
     startY = event.touches[0].clientY;
   };
   const touchMove = (event: TouchEvent) => {
+    counters.touchmove.hit();
     if (startY === null) return;
     if (!viewReady() || config.scrollLocks || event.touches.length !== 1 || !inside(event.touches[0])) { resetPull(); return; }
     const dy = event.touches[0].clientY - startY;
@@ -523,19 +532,22 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
       headerHeight = pullHeader ? pullHeader.getBoundingClientRect().height + (parseFloat(getComputedStyle(pullHeader).marginBottom) || 0) : 0;
     }
     clearTimeout(deactivate);
+    if (!pullActive) { counters.pullEntries.hit(); pullEntryTop = scroll.scrollTop; }
     pulling = true; pullActive = true; pullY = Math.min(110, dy * 0.5);
     paintPull();
   };
   const touchEnd = (event: TouchEvent) => {
+    counters.touchend.hit();
     finishTouch();
     if (startY === null) { cancelPull(); return; }
     const touch = event.changedTouches[0];
     if (!touch || !inside(touch) || !viewReady() || config.scrollLocks || config.isRefreshing || pullY < 70) { resetPull(); return; }
     startY = null; pulling = false; awaitingRefresh = true;
     paintPull();
+    counters.refresh.hit();
     notifyRefresh?.(config.visit ?? "");
   };
-  const touchCancel = () => { finishTouch(); cancelPull(); };
+  const touchCancel = () => { counters.touchcancel.hit(); finishTouch(); cancelPull(); };
   scroll.addEventListener("scroll", markScroll, { passive: true });
   scroll.addEventListener("touchstart", touchStart, { passive: true });
   scroll.addEventListener("touchmove", touchMove, { passive: true });
@@ -546,6 +558,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
   scroll.addEventListener("uvel-scroll-to-top", requestTop);
   root.addEventListener("keydown", keyScroll);
   const layoutChanged = () => {
+    counters.layoutOther.hit();
     const revision = Number(root.dataset.tabRevision);
     if (root.dataset.tabKey !== undefined && root.dataset.tabRevision !== undefined
       && (tabRevision === undefined || revision >= tabRevision)
@@ -557,13 +570,14 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     attemptRestore(); onScroll(); scheduleRestore();
   };
   const observer = new MutationObserver(records => {
+    counters.layoutMutation.hit();
     // Pull styles are owned here; they must not trigger full-shell layout work
     // on every finger movement (nor observe their own writes in a loop).
     if (records.some(record => record.type !== "attributes"
       || ![indicator, icon, wrapper, pullHeader].includes(record.target as HTMLElement))) layoutChanged();
   });
   observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-page-visible", "data-page-visit", "data-tab-key", "data-tab-revision", "data-tab-content-key", "style", "class"] });
-  const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(layoutChanged);
+  const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(() => { counters.layoutResize.hit(); layoutChanged(); });
   resize?.observe(scroll);
   const body = scroll.querySelector<HTMLElement>(".nx-page-enter");
   if (body) resize?.observe(body);
@@ -587,6 +601,13 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     });
   };
   bindPagination();
+  const detachDiagnostic = registerChassisDiagnostics(initial.hostId ?? root.id, {
+    read: () => ({ visible, viewReady: viewReady(), tabKey: diagnosticHref(tabKey ?? ""), tabRevision, pageTop, pendingTop, restoreFrame: !!restoreFrame,
+      tabPositions: Array.from(tabPositions, ([key, value]) => ({ key, href: diagnosticHref(value.href), top: value.top })),
+      startY, pullY, pulling, pullActive, awaitingRefresh, deactivateTimer: deactivate !== undefined, headerHeight, pullEntryTop,
+      scrolling, touching, hidden, counters: Object.fromEntries(Object.entries(counters).map(([key, counter]) => [key, counter.read()])) }),
+    reset: () => { Object.values(counters).forEach(counter => counter.reset()); pullEntryTop = null; },
+  });
   return { update(value: ChassisConfiguration = {}) {
     if (value.tabRevision !== undefined && tabRevision !== undefined && value.tabRevision < tabRevision) return;
     const shown = (value.visible ?? true) && (!visible || value.pageVisit !== config.pageVisit);
@@ -606,6 +627,7 @@ export function mountChassis(root: HTMLElement, initial: ChassisConfiguration = 
     trace(visible ? "show-update" : "hide-update");
     onScroll();
   }, destroy() {
+    detachDiagnostic();
     detachPagination(); clearTimeout(idle); clearTimeout(deactivate); cancelAnimationFrame(restoreFrame);
     tabPositions.clear();
     scroll.removeEventListener("scroll", markScroll);
@@ -650,8 +672,16 @@ function viewAdapter<T extends { hostId?: string }>(mount: (host: HTMLElement, v
 }
 export default viewAdapter<GlassConfiguration>(mountLiquidGlass);
 export const segmentsView = viewAdapter<SegmentsConfiguration>(mountSegments);
-export const chassisView = viewAdapter<ChassisConfiguration>((host, value, instance) =>
+const chassisAdapter = viewAdapter<ChassisConfiguration>((host, value, instance) =>
   mountChassis(host, value,
     key => instance.$ownerInstance?.callMethod("onNativeScrollLoadMore", key),
     scrolling => instance.$ownerInstance?.callMethod("onChassisScrolling", scrolling),
     visit => instance.$ownerInstance?.callMethod("onChassisRefresh", visit)));
+
+const diagnosticAdapter = viewAdapter<DiagnosticConfiguration>((host, value, instance) =>
+  mountDiagnosticView(host, value, control => instance.$ownerInstance?.callMethod("onDiagnosticControl", control)));
+export const chassisView = {
+  mounted(this: object) { chassisAdapter.mounted.call(this); diagnosticAdapter.mounted.call(this); },
+  beforeUnmount(this: object) { diagnosticAdapter.beforeUnmount.call(this); chassisAdapter.beforeUnmount.call(this); },
+  methods: { update: chassisAdapter.methods.update, updateDiagnostics: diagnosticAdapter.methods.update },
+};

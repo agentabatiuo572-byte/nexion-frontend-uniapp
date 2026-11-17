@@ -261,6 +261,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { runPassiveTabRead, invalidatePassiveTabRead } from "@/lib/passive-tab-read";
@@ -1600,6 +1601,7 @@ useDialogA11y(computed(() => props.active && state.value.kind !== "none"
   && (state.value.kind !== "tradein" || !!tradeinView.value || purchaseRecovery.value !== "none")), ".tis-root", hide);
 
 
+useDiagnosticReader("D3 tradein", () => ({ kind: state.value.kind, active: props.active, tradeinView: !!tradeinView.value, purchaseRecovery: purchaseRecovery.value }));
 </script>
 
 <style scoped>

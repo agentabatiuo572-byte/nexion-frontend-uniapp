@@ -61,6 +61,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
@@ -121,6 +122,8 @@ useVisibleInterval(pin.tick, 1000, () => open.value);
 onMounted(() => { if (typeof document !== "undefined") document.addEventListener("visibilitychange", visibility); });
 onUnmounted(() => { if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
 useDialogA11y(open, ".payment-pin-mask", pin.cancel, true, 5);
+useDiagnosticReader("D3 payment PIN", () => ({ visible: ui.visible, stage: ui.stage, busy: ui.busy, reading: ui.reading,
+  pendingOperation: ui.pendingOperation, revision: ui.revision, active: active.value, open: open.value }));
 </script>
 <style scoped>
 /* A phone-width sheet sits flush on the screen bottom on the shared floating material. The bottom inset lives inside the scrolling body,

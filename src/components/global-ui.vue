@@ -77,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { useVisiblePageRoute } from "@/composables/use-visible-page-route";
 import { computed } from "vue";
 import ToastHost from "@/components/toast-host.vue";
@@ -123,6 +124,9 @@ useDialogA11y(
 useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined, true, 11);
 
 
+useDiagnosticReader("D3 global confirm/network", () => ({ confirmQueue: ui.confirmQueue.map(item => ({ id: item.id, owner: item.owner, hideCancel: !!item.hideCancel })),
+  confirmCount: ui.confirmQueue.length, topConfirmId: topConfirm.value?.id ?? null, canCancel: !!topConfirm.value && !topConfirm.value.hideCancel,
+  netError: { visible: ui.netError.visible, titlePresent: !!ui.netError.title, retryAfterMs: ui.netError.retryAfterMs, onRetry: !!ui.netError.onRetry } }));
 </script>
 
 <style scoped>

@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { formatDisplayDate, formatDisplayDateTime } from "@/lib/display-date";
 import LiquidGlass from '@/components/liquid-glass.vue';
 import { useLocaleStore } from '@/store/locale';
@@ -542,6 +543,7 @@ useDialogA11y(computed(() => props.open), ".ps-root", () => emit("close"));
 
 import GlassSegments from "@/components/glass-segments.vue";
 const templateOptions = computed(() => availableTpls.value.map(item => ({ value: item.key, label: item.label, className: "ps-thumb" })));
+useDiagnosticReader("D3 poster", () => ({ open: props.open, genState: genState.value, genToken, generating: genState.value === "generating" }));
 </script>
 
 <style scoped>

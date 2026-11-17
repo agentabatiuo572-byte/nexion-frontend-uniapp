@@ -41,6 +41,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import{computed,ref,watch,onBeforeUnmount}from'vue';import{promotionApi,remoteApiEnabled,sessionVault}from'@/api/runtime';import type{PublicPromotion,ReferralProgress}from'@/api/promotion-contracts';import{useApp}from'@/store/app';import{useAuth}from'@/store/auth';import{useT}from'@/i18n/use-t';import{useLocaleStore}from'@/store/locale';import{localized}from'@/lib/promotion-display';import RewardRows from'./reward-rows.vue';
@@ -134,6 +135,9 @@ useAutoRecovery({
   failed: () => remoteApiEnabled && auth.isAuthenticated && !loading.value && Object.keys(progressErrors.value).some(id => progressErrors.value[id] && !progressBusy.value[id]),
   retry: () => Promise.all(Object.keys(progressErrors.value).filter(id => progressErrors.value[id] && !progressBusy.value[id]).map(id => loadProgress(id, true))),
 });
+useDiagnosticReader("D3 referral progress/terms", () => ({ expandedActivity: expandedActivity.value,
+  activityIds: activities.value.map(activity => activity.activityId), visible, generation, loading: loading.value,
+  progressBusy: expandedActivity.value ? !!progressBusy.value[expandedActivity.value] : false, termsActivity: termsActivity.value?.activityId ?? null }));
 </script>
 <style src="./promotion.css"></style>
 <style scoped>

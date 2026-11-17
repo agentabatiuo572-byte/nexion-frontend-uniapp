@@ -32,6 +32,7 @@
   <InviteDetailSheet :open="detailOpen" :mode="detailMode" @close="detailOpen=false" />
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { formatAmount } from '@/lib/amount-display';
 import { ref, computed, onUnmounted, watch } from 'vue';
@@ -148,6 +149,7 @@ const stopRuntimeRefresh=subscribeRuntimeRevision(scope=>{
   if(remoteApiEnabled && visible)void rewards.ensure();
 });
 onUnmounted(stopRuntimeRefresh);
+useDiagnosticReader("D3 invitation card", () => ({ posterOpen: posterOpen.value, detailOpen: detailOpen.value, detailMode: detailMode.value, visible }));
 </script>
 <style scoped>
 /* The team page's focal card: tinted brand (it used to come from a corner glow). */

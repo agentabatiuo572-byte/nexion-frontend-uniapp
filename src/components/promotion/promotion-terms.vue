@@ -9,6 +9,7 @@
   </NxSheet>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import NxSheet from '@/components/ui/nx-sheet.vue';
 import { computed } from 'vue';
 import { useT } from '@/i18n/use-t';
@@ -24,6 +25,7 @@ const uniqueTerms = computed(() => {
   const value = props.terms?.trim() ?? '';
   return uniquePromotionParagraphs(value, uniqueDisclosures.value.flatMap(entry => [localized(entry.terms,locale.code),localized(entry.refundTerms,locale.code),localized(entry.benefitDescription,locale.code)]));
 });
+useDiagnosticReader("D3 promotion terms", () => ({ open: props.open }));
 </script>
 <style src="./promotion.css"></style>
 

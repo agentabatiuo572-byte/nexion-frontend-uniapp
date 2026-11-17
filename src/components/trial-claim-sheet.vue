@@ -49,6 +49,7 @@
   </view>
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -185,6 +186,7 @@ watch(() => sheet.open, open => {
 useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 
 
+useDiagnosticReader("D3 trial", () => ({ open: sheet.open, claiming: claiming.value, activated: activated.value }));
 </script>
 
 <style scoped>

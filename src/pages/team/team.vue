@@ -107,6 +107,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
@@ -598,6 +599,8 @@ useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === 
 useAutoRecovery({ failed: () => remoteApiEnabled && !!vrank.remoteError, retry: () => vrank.refreshCanonicalVRank() });
 useAutoRecovery({ failed: () => remoteApiEnabled && !!referralRewards.error && !referralRewards.loading, retry: () => referralRewards.refresh() });
 useAutoRecovery({ failed: () => recoveryConfig.configStatus === "failed" && !recoveryConfig.loading, retry: () => recoveryConfig.load() });
+useDiagnosticReader("D3 share intent", () => ({ pendingShareIntent: pendingShareIntent.value, invitePageVisible: invitePageVisible.value,
+  inviteCardMounted: !!inviteCard.value, referralCodePresent: !!referralRewards.referralCode, configStatus: recoveryConfig.configStatus }));
 </script>
 
 <style scoped>

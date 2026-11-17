@@ -223,6 +223,7 @@
     :icon="notice.icon" :tone="notice.tone" :busy="s.busy" @primary="notice.onPrimary" @secondary="notice.onSecondary" />
 </template>
 <script setup lang="ts">
+import { useDiagnosticReader } from "@/lib/ios-diagnostics";
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
@@ -409,6 +410,15 @@ onHide(() => {
 });
 onMounted(() => { uni.onAppHide(appHide); uni.onAppShow(appShow); if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visibility); });
 onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active.value && s.open) payment.close(); if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibility); });
+useDiagnosticReader("D3 purchase payment/cashier", () => {
+  let nativeCashierPresent: boolean | null = null;
+  // #ifdef APP-PLUS
+  nativeCashierPresent = cashierView !== null;
+  // #endif
+  return { open: s.open, pending: !!s.pending, concluded: s.concluded, step: s.step, cashier: s.cashier, notice: s.notice,
+    loading: s.loading, retrying: s.retrying, busy: s.busy, active: active.value, sheetOpen: sheetOpen.value, pageOpen: pageOpen.value,
+    appHidden, cashierUrlValid: !!cashierUrl.value, canPay: timing.value.canPay, nativeCashierPresent };
+});
 </script>
 <style scoped>
 .pp-mask { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: var(--v5-bg-color-mask); }
