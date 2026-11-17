@@ -51,7 +51,7 @@
             <text v-if="formOffered" class="agent-section__sub">{{ c.chooseOne }}</text>
           </view>
           <view v-if="formOffered" class="agent-tiles" role="radiogroup" :aria-label="t.agent.supportTypes" @keydown.right.prevent="moveBucketFocus($event, 1)" @keydown.down.prevent="moveBucketFocus($event, 1)" @keydown.left.prevent="moveBucketFocus($event, -1)" @keydown.up.prevent="moveBucketFocus($event, -1)">
-            <view v-for="(b, i) in BUCKETS" :key="b.id" class="agent-tile nx-viz-press" :class="{ 'agent-tile--selected': selectedBucketId === b.id }" :style="{ '--tint-ink': b.ink }"
+            <view v-for="(b, i) in BUCKETS" :key="b.id" class="agent-tile" :class="{ 'agent-tile--selected': selectedBucketId === b.id }" :style="{ '--tint-ink': b.ink }"
               role="radio" :tabindex="bucketTabStop(b.id, i) ? 0 : -1" :aria-checked="selectedBucketId === b.id" :aria-label="b.title" :aria-disabled="selectionLocked"
               @click="selectBucket(b)" @keydown.enter.prevent="selectBucket(b)" @keydown.space.prevent="selectBucket(b)">
               <AmbassadorBucketIcon :bucket="b.id" />

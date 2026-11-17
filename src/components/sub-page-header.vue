@@ -10,7 +10,7 @@
   bright under the controls.
 -->
 <template>
-  <view class="spv" :class="{ 'spv--plain': plain, 'spv--design': design, 'spv--solid': solid }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', minHeight: rowH + 'px' }">
+  <view class="spv" :class="{ 'spv--plain': plain, 'spv--design': design, 'spv--solid': solid }" :style="{ top: (statusBarHeight + pendingBarInset) + 'px', minHeight: rowH + 'px', ...(pullHold?.pull.value ? { transform: `translateY(${-pullHold.pull.value.y}px)`, transition: pullHold.pull.value.transition } : {}) }">
     <view
       class="spv-side spv-back"
       role="button"
@@ -61,6 +61,7 @@
 <script setup lang="ts">
 import { computed, inject, ref, onMounted, onUnmounted } from "vue";
 import { PENDING_BAR_INSET_KEY } from "@/store/pending-checkout-core";
+import { PULL_HEADER_HOLD_KEY } from "@/store/refresh";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { useT } from "@/i18n/use-t";
 import { resolveHeaderTitleText, routeFromH5Hash } from "@/lib/header-title";
@@ -76,6 +77,11 @@ const drawer = useMessageDrawer();
 const t = useT();
 const unread = computed(() => drawer.actionableUnread);
 const rowH = computed(() => 56);
+// Pull-to-refresh moves the content; the row cancels that move so it stays pinned under the
+// status bar, and the chassis opens the gap below the row plus its 12px bottom margin.
+const pullHold = inject(PULL_HEADER_HOLD_KEY, null);
+onMounted(() => { if (pullHold) pullHold.headerHeight.value = rowH.value + 12; });
+onUnmounted(() => { if (pullHold) pullHold.headerHeight.value = 0; });
 
 // Current uni route — last entry in getCurrentPages() (same readRoute() pattern
 // as app-chassis.vue). Used to derive a route-based title when none is passed.

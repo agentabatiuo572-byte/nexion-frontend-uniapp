@@ -1,5 +1,5 @@
 <template>
-  <view class="quota-tier nx-tint nx-viz-press nx-viz-motion" :aria-busy="pending">
+  <view class="quota-tier nx-tint nx-viz-motion" :aria-busy="pending">
     <view class="quota-tier__top">
       <text class="quota-product__qualification" :class="{ 'quota-product__qualification--met': !visibility.hidden && !pending && unlocked }"><svg v-if="!visibility.hidden && !pending && unlocked" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>{{ visibility.mask(pending ? '—' : unlocked ? t.quota.unlocked : t.quota.locked) }}</text>
       <view ref="stockBarRef" class="quota-stock" :aria-label="`${fmt(t.quota.leftLabel, { n: pending ? '—' : stockLeft })} · ${fmt(t.quota.soldPct, { pct: pending ? '—' : Math.round(stockPct * 100) })}`">

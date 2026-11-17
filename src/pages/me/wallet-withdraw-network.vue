@@ -93,8 +93,7 @@ function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/page
 <style scoped>
 .withdraw-networks { padding: 0 var(--v5-space-4) var(--v5-space-8); color: var(--v5-ink); }
 .intro { display: block; margin: -1px 4px 12px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
-.method { position: relative; display: block; margin-bottom: var(--v5-space-3); padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
-.method:active { transform: scale(.97); }
+.method { position: relative; display: block; margin-bottom: var(--v5-space-3); padding: var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); cursor: pointer; }
 .method-top { display: flex; align-items: center; gap: 14px; }
 .method-icon { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: var(--v5-radius-m); background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); }
 .method-copy { flex: 1; min-width: 0; }
@@ -113,5 +112,4 @@ function open(id: SupportedWithdrawalNetwork) { if (!loading.value) navTo(`/page
 .method[aria-disabled="true"] { opacity: .5; cursor: default; }
 .method[aria-disabled="true"]:active { transform: none; }
 .method:focus-visible, .reload:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) { .method { transition: none; } .method:active { transform: none; } }
 </style>

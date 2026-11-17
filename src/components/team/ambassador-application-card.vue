@@ -1,5 +1,5 @@
 <template>
-  <view class="amb-card nx-viz-press" :class="glass ? 'nx-soft-glass' : 'amb-card--solid'" role="link" tabindex="0" :aria-label="fmt(c.openDetail, { title: application.city ?? '', status: statusText })"
+  <view class="amb-card" :class="glass ? 'nx-soft-glass' : 'amb-card--solid'" role="link" tabindex="0" :aria-label="fmt(c.openDetail, { title: application.city ?? '', status: statusText })"
     @click="open" @keydown.enter.prevent="open">
     <view class="amb-card__head">
       <AmbassadorBucketIcon :bucket="application.bucket" />

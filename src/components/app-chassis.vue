@@ -90,7 +90,7 @@
            centered in the pull gap. -->
       <view
         class="nx-refresher"
-        :style="{ top: contentTop + 'px', transform: `translate(-50%, ${indicatorY / 2 - 18}px)`, opacity: refresherVisible ? 1 : 0, transition: pulling ? 'opacity .15s' : 'transform .28s cubic-bezier(.16,1,.3,1), opacity .2s' }"
+        :style="{ top: (contentTop + pendingBarInset + pullHeaderHeight) + 'px', transform: `translate(-50%, ${indicatorY / 2 - 18}px)`, opacity: refresherVisible ? 1 : 0, transition: pulling ? 'opacity .15s' : 'transform .28s cubic-bezier(.16,1,.3,1), opacity .2s' }"
       >
         <view class="nx-refresher-icon" :class="{ 'nx-spinning': refreshing }" :style="{ transform: refreshing ? '' : `rotate(${Math.min(1, pullY / 70) * 270}deg)` }">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" /><path d="M21 3v6h-6" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -102,7 +102,7 @@
            backdrop-filter cannot sample → the frosted glass shows nothing (looks
            opaque). Mirrors the prototype PullableContent ("transform must be
            ABSENT, not translateY(0), when idle"). (P-041) -->
-      <view :style="pullActive ? { transform: `translateY(${indicatorY}px)`, transition: pulling ? 'none' : 'transform .28s cubic-bezier(.16,1,.3,1)', willChange: 'transform' } : {}">
+      <view :style="pullStyle ? { transform: `translateY(${pullStyle.y}px)`, transition: pullStyle.transition, willChange: 'transform' } : {}">
         <!-- Padded so content sits BELOW the header / ABOVE the tabbar, while the
              scroll container (.nx-content) spans the FULL chassis (top:0/bottom:0).
              This is the crux: content then scrolls BEHIND the frosted chrome and
@@ -188,7 +188,7 @@ import { useLocaleStore } from "@/store/locale";
 import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
 import { formatUnreadBadge } from "@/lib/unread-badge";
-import { useRefresh } from "@/store/refresh";
+import { useRefresh, PULL_HEADER_HOLD_KEY } from "@/store/refresh";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { usePageHeader } from "@/store/page-header";
 import { useFreeTrial } from "@/store/free-trial";
@@ -349,6 +349,9 @@ let startY: number | null = null;
 const refreshing = computed(() => refresh.isRefreshing);
 const indicatorY = computed(() => (refreshing.value ? HOLD_PX : pullY.value));
 const refresherVisible = computed(() => refreshing.value || pullY.value > 6);
+const pullStyle = computed(() => (pullActive.value ? { y: indicatorY.value, transition: pulling.value ? "none" : "transform .28s cubic-bezier(.16,1,.3,1)" } : null));
+const pullHeaderHeight = ref(0);
+provide(PULL_HEADER_HOLD_KEY, { pull: pullStyle, headerHeight: pullHeaderHeight });
 
 // H5's uni <view> ref exposes the DOM element via $el. APP-PLUS page logic has
 // no document; its ref still serves scroll-memory reads, while writes use evalJS.

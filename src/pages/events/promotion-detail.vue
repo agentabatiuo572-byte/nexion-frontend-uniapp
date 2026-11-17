@@ -159,7 +159,7 @@
         <!-- Eligible devices: each opens the product page with this offer attached. -->
         <template v-if="kind === 'first' || kind === 'repurchase'">
           <view class="lp-section lp-section-head lp-section-head--start lp-rise lp-d4"><text class="lp-section-title">{{ kind === 'first' ? c.devicesTitle : c.addableTitle }}</text><text class="lp-count">{{ products.length }}</text></view>
-          <view v-for="item in products" :key="item.sku" class="lp-product lp-card lp-press lp-rise lp-d4" role="link" tabindex="0" :aria-label="item.name" @click="navTo(promotionDetailHref(item.sku, activity.activityId))" @keydown.enter.prevent="navTo(promotionDetailHref(item.sku, activity.activityId))">
+          <view v-for="item in products" :key="item.sku" class="lp-product lp-card lp-rise lp-d4" role="link" tabindex="0" :aria-label="item.name" @click="navTo(promotionDetailHref(item.sku, activity.activityId))" @keydown.enter.prevent="navTo(promotionDetailHref(item.sku, activity.activityId))">
             <view class="lp-product__art"><CatalogMachineImage class="lp-fill" :sku="item.sku" :image-url="productImage(item.sku)" :scope-key="activity.activityId + ':product'" /></view>
             <view class="lp-product__copy">
               <text class="lp-product__name">{{ item.name }}</text>
@@ -749,8 +749,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 .lp-slot { animation: lp-slot .5s cubic-bezier(.2,.8,.2,1) .42s backwards; }
 .lp-slot .lp-pop { animation-delay: .7s; }
 .lp-tick { animation: lp-tick 1s steps(1) infinite; }
-.lp-press { transition: transform 120ms ease-out; }
-.lp-press:active { transform: scale(.97); }
 
 @media (max-width: 374px) {
   .lp-stage, .lp-stage--signin { height: calc(46px + 58vw); }
@@ -770,7 +768,6 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!activityId && status.value
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-rise, .lp-enter-main, .lp-enter-gift, .lp-pop, .lp-own, .lp-slot, .lp-bar, .lp-tick { animation: none; }
-  .lp-press { transition: none; }
-  .lp-press:active, .lp-cta.promotion-action:active { transform: none; }
+  .lp-cta.promotion-action:active { transform: none; }
 }
 </style>
