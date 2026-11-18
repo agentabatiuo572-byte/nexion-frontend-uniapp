@@ -166,6 +166,9 @@ const pageState = computed(() => binaryPageState({
 }));
 const memberDetailsReadable = computed(() => pageState.value.memberDetails === 'ready'
   || (pageState.value.memberDetails === 'loading' && network.hasRemoteSnapshot));
+// Group counts show only from a healthy read: a retry after a failed read must not bring back the cached count.
+const memberCountReadable = computed(() => pageState.value.memberDetails === 'ready'
+  || (pageState.value.memberDetails === 'loading' && network.hasRemoteSnapshot && !network.remoteTransientFailure));
 const remoteTrackA = computed(() => snapshot.value?.trackA ?? 0);
 const remoteTrackB = computed(() => snapshot.value?.trackB ?? 0);
 const settlePeriod = computed(() => remoteApiEnabled ? snapshot.value?.settlePeriod ?? "monthly" : BINARY_SETTLE_PERIOD);
@@ -206,6 +209,11 @@ const recentBinaries = computed(() =>
 );
 const spilloverCount = computed(() => remoteApiEnabled ? snapshot.value?.autoPlacedMembers ?? 0 : network.members.filter((m) => m.isSpillover).length);
 
+// The team network stops at layer 7, so a group reaching it may have deeper members it cannot count (F3-BE-07).
+function wholeGroupCount(members: NetworkMember[]): number | null {
+  return memberCountReadable.value && !members.some((member) => member.layer >= 7) ? members.length : null;
+}
+
 function topOf(members: NetworkMember[]): NetworkMember | undefined {
   return [...members].sort((a, b) => (b.monthComputePoints ?? -1) - (a.monthComputePoints ?? -1))[0];
 }
@@ -223,7 +231,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "left",
     name: t.value.binary.leftWing,
-    count: memberDetailsReadable.value ? sides.value.left.length : null,
+    count: wholeGroupCount(sides.value.left),
     monthVol: leftMonthVol.value,
     isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "left",
     color: "var(--v5-ink)",
@@ -232,7 +240,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "right",
     name: t.value.binary.rightWing,
-    count: memberDetailsReadable.value ? sides.value.right.length : null,
+    count: wholeGroupCount(sides.value.right),
     monthVol: rightMonthVol.value,
     isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "right",
     color: "var(--v5-ink)",
