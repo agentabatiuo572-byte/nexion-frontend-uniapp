@@ -136,7 +136,6 @@ const server=http.createServer(async(req,res)=>{
         if(update.eventState)delete state.raffleEntries;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         const now=Date.now();
-        if(update.catalogState==='available')state.catalogPresetAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
         if(update.eventState||scenarioChange){
           setDemoH4Scene(state,now);

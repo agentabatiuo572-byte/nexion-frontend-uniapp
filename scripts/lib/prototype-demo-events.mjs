@@ -106,7 +106,8 @@ export function demoH4TeamMembers(state,now) {
   const members=[];
   const names=['Maya','Linh','Sam','Rin','Jo','Noah','Mina','Leo'];
   if(state.highestRank)names.push('Ari','Binh','Chau','Dan','Eli');
-  const currentCatalog=['available','soldout'].includes(state.catalogState)&&(!state.walletLegacySeed||state.catalogPresetAt!=null);
+  // A catalog selection changes the offer, not an order already paid by a member.
+  const hasCatalogPurchase=!state.walletLegacySeed||state.catalogPresetAt!=null;
   for(const [i,name] of names.entries()){
     const parent=members[[null,null,null,1,0,1,4,5][i]];
     const joinedAt=createdAt+(i+2)*day;
@@ -116,7 +117,7 @@ export function demoH4TeamMembers(state,now) {
         amountUsdt:i===0&&!state.walletLegacySeed?100:1299},
       {orderNo:`DEMO-TEAM-${name.toUpperCase()}-2`,paidAt:sampleAt,points,amountUsdt:points},
     ];
-    if(currentCatalog&&i===0)paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1',
+    if(hasCatalogPurchase&&i===0)paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1',
       paidAt:state.catalogPresetAt??sampleAt,points:state.catalogPresetAt==null?4800:6400,amountUsdt:1299});
     if(state.highestRank&&!parent)paidOrders.push({orderNo:`DEMO-TEAM-${name.toUpperCase()}-V8`,
       paidAt:joinedAt+day,points:400000,amountUsdt:40000});
@@ -137,15 +138,36 @@ export function demoH4TeamMembers(state,now) {
   return members;
 }
 
-export function demoTeamNetworkMembers(state,now,{withOrders=false}={}) {
+export function demoTeamNetworkMembers(state,now) {
   const members=[];
   const eligibleSponsors=new Set(['900001']);
   for(const {sponsorUserId,paidOrders,...member} of demoH4TeamMembers(state,now)){
     if(member.status!=='ACTIVE'||!eligibleSponsors.has(sponsorUserId))continue;
-    members.push(withOrders?{...member,paidOrders}:member);
+    members.push(member);
     eligibleSponsors.add(member.id);
   }
   return members;
+}
+
+// F3 whole-leg counts walk valid parent edges from the assigned direct roots.
+export function demoBinaryLegMembers(members) {
+  const children=new Map();
+  for(const member of members){
+    if(!children.has(member.sponsorUserId))children.set(member.sponsorUserId,[]);
+    children.get(member.sponsorUserId).push(member);
+  }
+  const direct=children.get('900001')??[];
+  const legs={A:[],B:[]};
+  for(const leg of ['A','B']){
+    const queue=direct.filter(member=>member.leg===leg),seen=new Set(['900001']);
+    for(const member of queue){
+      if(seen.has(member.id))continue;
+      seen.add(member.id);
+      legs[leg].push(member);
+      queue.push(...(children.get(member.id)??[]));
+    }
+  }
+  return legs;
 }
 
 function phase(startsAt,endsAt,now) {
