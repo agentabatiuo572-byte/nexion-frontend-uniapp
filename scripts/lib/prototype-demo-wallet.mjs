@@ -1,6 +1,6 @@
 // The loopback account's visible ledger and wallet summaries.
 import { accountDeletionWallet } from './prototype-demo-account.mjs';
-import { demoH4Credits } from './prototype-demo-events.mjs';
+import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 
 const day=86400000;
 const timeZone='Asia/Shanghai';
@@ -69,6 +69,36 @@ export function demoWalletNex(state,now) {
   return money(demoH4Credits(state,now).reduce((balance,row)=>balance+(row.includedInBalance?0:row.amount),savedNexBalance(state)));
 }
 
+export const demoHasOpeningMilestone=state=>demoHasEarningsHistory(state)&&state.streakState==='normal';
+
+export function demoStreakFacts(state,now) {
+  const anchor=state.streakSeedAt??state.previewFactsAt??now;
+  const today=demoTeamBusinessDate(now),yesterday=demoTeamBusinessDate(now-day);
+  const normal=demoHasEarningsHistory(state)&&state.streakState==='normal';
+  const broken=demoHasEarningsHistory(state)&&state.streakState==='broken';
+  const last=state.walletMovements?.findLast(row=>row.bizType==='DAILY_CHECK_IN'
+    &&row.at>=(state.streakSeedAt??0));
+  let longestStreak=normal?12:broken?7:0;
+  let streakDays=longestStreak;
+  let lastCheckInDate=normal?demoTeamBusinessDate(anchor-day):broken?demoTeamBusinessDate(anchor-3*day):null;
+  if(state.saverUsed){
+    streakDays=state.saverRestoredStreak??7;
+    lastCheckInDate=demoTeamBusinessDate((state.saverUsedAt??anchor)-day);
+  }
+  if(state.checkedIn&&!last&&!state.streakSeedAt){
+    streakDays=(normal?12:state.saverUsed?7:0)+1;
+    lastCheckInDate=demoTeamBusinessDate(anchor);
+  }
+  if(last&&(!state.saverUsedAt||last.at>=state.saverUsedAt)){
+    streakDays=last.detail.streakDays;
+    lastCheckInDate=last.detail.checkInDate;
+  }
+  longestStreak=Math.max(longestStreak,streakDays,last?.detail.longestStreak??0);
+  return {currentStreak:[today,yesterday].includes(lastCheckInDate)?streakDays:0,longestStreak,
+    streakSavers:Math.max(0,Number(normal||broken)+demoH4Savers(state)-Number(Boolean(state.saverUsed))),
+    lastCheckInDate,checkedInToday:lastCheckInDate===today};
+}
+
 export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt)) {
   initializeDemoWalletCheckpoint(state);
   const commissions=demoCommissionEvents(seedAt).filter(event=>['unlocked','withdrawn'].includes(event.status));
@@ -80,6 +110,8 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
     ['COMPUTE_EARNING','USDT','IN',128.5,'earn',seedAt-4*day],
     ['COMPUTE_EARNING','USDT','IN',.00032,'earn',seedAt-5*day],
     ['TEAM_COMMISSION','UVT','IN',10,'refer',seedAt-day,'PENDING'],
+    ...(demoHasOpeningMilestone(state)&&!state.walletLegacySeed?[['DAILY_MILESTONE','UVT','IN',5,'achievement',
+      (state.streakSeedAt??seedAt)-10*day,'SUCCESS','DAILY-MS:900001:1']]:[]),
     ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
     ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].map(([asset,amount])=>
       ['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-${asset}-RELEASE`])),
@@ -118,7 +150,7 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
     const key=`${row.batchNo}:${row.asset}`;
     batchTotals.set(key,(batchTotals.get(key)??0)+signed(row));
   }
-  return rows.map(({at,includedInBalance,batchNo,...row})=>{
+  return rows.map(({at,includedInBalance,batchNo,detail,commandKey,...row})=>{
     const key=batchNo&&`${batchNo}:${row.asset}`;
     if(row.balanceAfter!==undefined)balances[row.asset]=row.balanceAfter;
     else if(settled(row)&&(!key||!batchBalances.has(key))){

@@ -24,11 +24,11 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
     const onlineDevices=devices.filter(device=>device.activatedAt!==null
       &&['ONLINE','BUSY','ACTIVE','RUNNING'].includes(device.runtimeStatus??device.status)).length;
     return {...proof,serverCanonical:true,generatedAt:iso,serverTime:iso,asOf:demoTeamBusinessDate(now),
-      provenance:{source:'server',environment:'PRODUCTION',runId:'',timeZone:'Asia/Ho_Chi_Minh',streakRule:'PROTOTYPE_SAMPLE',percentileRule:'PROTOTYPE_SAMPLE'},
+      provenance:{source:'server',environment:'PRODUCTION',runId:'',timeZone:'Asia/Ho_Chi_Minh',businessDateBoundary:'Vietnam business date at Asia/Ho_Chi_Minh (UTC+07:00)',streakRule:'A missing business date breaks the current streak',percentileRule:'PROTOTYPE_SAMPLE'},
       joinedAt,activeDays:Math.max(0,Math.floor((now-Date.parse(joinedAt))/day)),onlineDevices,
-      currentStreak:streak.currentStreak,longestStreak:streak.longestStreak,topPercentile:empty?null:7,earningsTotalUsdt,
+      currentStreak:!streak.lastCheckInDate?null:streak.currentStreak,longestStreak:!streak.lastCheckInDate?null:streak.longestStreak,topPercentile:empty?null:7,earningsTotalUsdt,
       referralCode,referral:{invitedCount,lifetimeInviterNex},team:{totalMembers,activeMembers},
-      availability:empty?{status:'PARTIAL',percentile:'UNAVAILABLE'}:{status:'READY'}};
+      availability:empty||!streak.lastCheckInDate?{status:'PARTIAL',...(!streak.lastCheckInDate&&{streak:'UNAVAILABLE'}),...(empty&&{percentile:'UNAVAILABLE'})}:{status:'READY'}};
   }
   if(p==='/api/config/commission/direct-referral')return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',nexUsdtPrice:empty?null:.128,purchase:{enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays:7},deviceEarning:{enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,coolingDays:0}};
   if(p==='/api/app/team/insights/direct-referral') {

@@ -14,7 +14,10 @@ const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirna
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
 // An optional local handoff preserves demo conversations across a preview rebuild.
-if(process.env.DEMO_STATE_FILE)Object.assign(state,JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state);
+if(process.env.DEMO_STATE_FILE){
+  const saved=JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state;
+  Object.assign(state,saved,{walletLegacySeed:saved.walletLegacySeed??!saved.walletMovements});
+}
 const startedAt=Date.now();
 if(process.env.DEMO_STATE_FILE)initializeDemoH4State(state,startedAt);
 initializeDemoPreviewAccount(state,startedAt);
@@ -107,7 +110,7 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletNexCheckpoint','walletMovements','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -119,7 +122,11 @@ const server=http.createServer(async(req,res)=>{
         if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
-        if(update.streakState){delete state.saverUsed;state.checkedIn=false;state.milestoneClaims=[];}
+        if(update.streakState||scenarioChange){
+          for(const key of ['saverUsed','saverUsedAt','saverRestoredStreak'])delete state[key];
+          state.streakSeedAt=Date.now();state.checkedIn=false;
+          if(scenarioChange)state.milestoneClaims=[];
+        }
         if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}
         if(update.ambassadorState)delete state.ambassadorDemo;
         if(update.eventState)delete state.raffleEntries;
