@@ -17,7 +17,7 @@ import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
 import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt } from './prototype-demo-wallet.mjs';
+import { creditDemoDailyMilestone, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt } from './prototype-demo-wallet.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
@@ -27,6 +27,8 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
+const demoMilestoneClaimed=(state,id)=>state.milestoneClaims?.includes(id)
+  ||state.milestoneClaimReceipts?.some(({result})=>result.milestoneId===id);
 export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -370,13 +372,14 @@ export function demoFixture(url,locale,state,request) {
     const fleet=demoFleetFacts(url,locale,state);
     return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,products);
   }
+  const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
   const remember=(operation,targetId,response,order)=>{
     if(commandKey){state.commands??={};state.commands[commandKey]={idempotencyKey:commandKey,operation,targetId,status:'SUCCEEDED',order:structuredClone(order),response:structuredClone(response)};}
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
-  if(request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  if(!milestoneClaim&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.interfaceLanguages=previewInterfaceLanguages(state.interfaceLanguagesState);
@@ -713,7 +716,7 @@ export function demoFixture(url,locale,state,request) {
   if(questClaim){const code=decodeURIComponent(questClaim[1]);if(code.startsWith('demo-week-')){state.weekClaims||=[];state.weekClaims.push(Number(code.split('-').pop()));}else state.dayOneClaimed=true;return {...authority,questId:code,rewardNex:code.startsWith('demo-week-')?100+Number(code.split('-').pop())*25:500,status:'CLAIMED',instanceKey:code.startsWith('demo-week-')?'WEEK:demo':'DAY_ONE:design-review'};}
   if(pathname==='/api/events'||pathname.startsWith('/api/events/')){
     const spinTickets=demoStreakMilestones.reduce((count,[,type,amount],index)=>
-      count+(type==='SPIN'&&state.milestoneClaims?.includes(index+1)?amount:0),0);
+      count+(type==='SPIN'&&demoMilestoneClaimed(state,index+1)?amount:0),0);
     const eventResponse=demoH4EventResponse(url,contentLocale,state,request,now,{
       fleet:()=>demoFleetFacts(url,locale,state),
       promotion:id=>demoFixture(new URL('/api/promotions/'+id,url.origin),locale,state,request),
@@ -734,7 +737,7 @@ export function demoFixture(url,locale,state,request) {
     data.streak.streakSavers+=demoH4Savers(state);
     // Mirrors the backend seeds (nx_growth_checkin_rule / nx_streak_milestone / nx_streak_power_up); day 3 is already claimed in the 12-day scenario.
     data.rules=[['baseline','1'],['bonus7','5'],['luckyMultiplierMax','2'],['p15','15'],['p2','5'],['broken','48'],['revive','1']].map(([key,value])=>({key,value}));
-    data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:state.milestoneClaims?.includes(i+1)||state.streakState==='normal'&&milestoneDay===3?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
+    data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:demoMilestoneClaimed(state,i+1)||state.streakState==='normal'&&milestoneDay===3?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
     data.earningMilestones=[10,100,1000].map((amount,i)=>({milestoneId:'demo-earning-'+i,thresholdUsdt:amount,rewardNex:amount,lifetimeEarningsUsdt:128.5,status:i===0||i===1&&state.earningClaimed?'FIRED':i===1?'CLAIMABLE':'LOCKED',achievedAt:i===0||i===1&&state.earningClaimed?iso:null}));
     const badgeLocale=(url.searchParams.get('locale')||request.headers?.()['x-preview-locale']||locale).trim().toLowerCase().split('-')[0];
     const names=localized(badgeLocale,['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星'],['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'],['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']);
@@ -746,15 +749,24 @@ export function demoFixture(url,locale,state,request) {
     data.topStreakers=[{name:'Daniel_K',countryCode:'US',streak:412},{name:'Mei_C',countryCode:'SG',streak:387},{name:'Lukas_F',countryCode:'DE',streak:341},{name:'Carlos_M',countryCode:'BR',streak:298},{name:'Priya_S',countryCode:'IN',streak:256}];
     return data;
   }
-  const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
   if(milestoneClaim&&request.method()==='POST'){
     const id=Number(milestoneClaim[1]);
     if(id<=0)throw Object.assign(new Error('MILESTONE_ID_REQUIRED'),{status:422});
+    const key=commandKey?.trim();
+    if(!key)throw Object.assign(new Error('IDEMPOTENCY_KEY_REQUIRED'),{status:422});
+    if(key.length>128)throw Object.assign(new Error('IDEMPOTENCY_KEY_INVALID'),{status:422});
+    const previous=state.milestoneClaimReceipts?.find(receipt=>receipt.key===key);
+    if(previous){
+      if(previous.result.milestoneId!==id)refuse('IDEMPOTENCY_KEY_CONFLICT');
+      return previous.result;
+    }
     const milestone=read('/api/points/state').dailyMilestones?.find(row=>row.milestoneId===id);
     if(milestone?.status!=='CLAIMABLE')refuse('DAILY_MILESTONE_NOT_CLAIMABLE');
     const {milestoneDay,rewardType,rewardAmount,badgeCode}=milestone;
-    (state.milestoneClaims??=[]).push(id);
-    return {...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};
+    const result={...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};
+    creditDemoDailyMilestone(state,rewardType,rewardAmount);
+    (state.milestoneClaimReceipts??=[]).push({key,at:now,result});
+    return result;
   }
   const powerUpActivate=pathname.match(/^\/api\/points\/power-ups\/([1-4])\/activate$/);
   if(powerUpActivate){const id=Number(powerUpActivate[1]);state.powerUps||=[];state.powerUps.push(id);return {...authority,powerUpId:id,powerUpCode:['ROYALTY_BOOST','STREAK_BADGE','CHECKIN_BOOST','GENESIS_ALLOWLIST'][id-1],badgeCode:null,status:'ACTIVATED'};}

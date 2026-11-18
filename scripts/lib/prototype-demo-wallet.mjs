@@ -40,6 +40,11 @@ export function demoWalletNex(state,now) {
   return money(demoH4Credits(state,now).reduce((balance,row)=>balance+(row.includedInBalance?0:row.amount),savedNexBalance(state)));
 }
 
+export function creditDemoDailyMilestone(state,asset,amount) {
+  if(asset==='UVT')state.walletNexBalance=money(savedNexBalance(state)+amount);
+  if(asset==='USDT')state.walletBalance=money(demoWalletUsdt(state)+amount);
+}
+
 export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt)) {
   const commissions=demoCommissionEvents(seedAt).filter(event=>['unlocked','withdrawn'].includes(event.status));
   const seeds=state.dataState==='empty'||accountDeletionWallet(state)?[]:[
@@ -59,6 +64,13 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
   const credits=demoH4Credits(state,now).map(({id,type,amount,at,includedInBalance})=>({
     id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
+  for(const {at,result} of state.milestoneClaimReceipts??[]){
+    const {milestoneId,rewardType:asset,rewardAmount:amount}=result;
+    if(asset!=='UVT'&&asset!=='USDT')continue;
+    const bizNo=`DAILY-MS:900001:${milestoneId}`;
+    credits.push({id:bizNo,bizNo,bizType:'DAILY_MILESTONE',asset,direction:'IN',amount,at,
+      includedInBalance:true,status:'SUCCESS',remark:'H5 daily milestone claim',category:'achievement',presentationCode:'achievement'});
+  }
   // Saved balances already include the seed history and any imported credits marked as included.
   // Derive the opening balances from that checkpoint and replay the combined dated ledger once.
   const balances={USDT:demoWalletUsdt(state),UVT:savedNexBalance(state)};
