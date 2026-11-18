@@ -5,7 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages } from './lib/design-review-fixture.mjs';
-import { initializeLegacyStreakSavers } from './lib/prototype-demo-wallet.mjs';
+import { initializeDemoWalletHistory, initializeLegacyStreakSavers } from './lib/prototype-demo-wallet.mjs';
 import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
@@ -29,6 +29,7 @@ if(process.env.DEMO_STATE_FILE){
   if(state.computeTaskSnapshots)state.computeResumeAt=startedAt;
 }
 initializeDemoPreviewAccount(state,startedAt);
+initializeDemoWalletHistory(state,state.previewFactsAt);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
@@ -126,7 +127,7 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','walletOpeningMilestoneAt','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -135,7 +136,10 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange&&state.bankDemo){Object.assign(state.bankDemo,{quotes:{},orders:{},commands:{},addresses:{}});delete state.bankDemo.addressOtp;}
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
         else if(scenarioChange&&state.paymentState==='low-balance')state.walletBalance=820.64;
-        if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
+        if(update.reset||scenarioChange){
+          state.scenarioEpoch=++scenarioEpoch;
+          initializeDemoWalletHistory(state,state.previewFactsAt??startedAt);
+        }
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         if(update.streakState||scenarioChange){
