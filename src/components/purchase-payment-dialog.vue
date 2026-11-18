@@ -334,6 +334,9 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     case 'orderMissing': return s.coldResume
       ? { ...refused, title: c.orderMissingTitle, body: c.orderMissing, primary: c.close, secondary: undefined, onPrimary: payment.close }
       : { ...refused, title: c.orderMissingTitle, body: c.orderMissing, secondary: c.close, onSecondary: payment.close };
+    case 'existing': return order
+      ? { icon: 'info', tone: 'warning', title: c.existingTitle, body: c.existing, primary: c.viewOrder, secondary: c.support, onPrimary: payment.openOrder, onSecondary: payment.support }
+      : { icon: 'info', tone: 'warning', title: c.existingTitle, body: c.existing, primary: c.ok, secondary: c.support, onPrimary: payment.close, onSecondary: payment.support };
     case 'gone': return order
       ? { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
       : { icon: 'info', tone: 'warning', title: c.goneTitle, body: c.gone, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
