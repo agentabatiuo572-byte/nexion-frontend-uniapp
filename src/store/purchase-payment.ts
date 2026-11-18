@@ -17,7 +17,7 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
   orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string) => void };
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
-  intentNo?: string; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
+  intentNo?: string; lookupOnly?: boolean; summary: string; lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
@@ -252,7 +252,9 @@ async function query() {
     const result = pending.intentNo ? await api.get(pending.intentNo) : await api.find(pending.kind, pending.commandKey);
     if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
-    if (result) accept(result, pending); else state.unavailable = true;
+    if (result) accept(result, pending);
+    else if (pending.lookupOnly) { state.error = true; failed = true; }
+    else state.unavailable = true;
   } catch (error) {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
@@ -273,6 +275,7 @@ async function query() {
 async function submitOriginal() {
   const pending = state.pending;
   if (!pending || state.busy || state.concluded) return;
+  if (pending.lookupOnly) return query();
   const version = requestVersion, accountKey = state.accountKey;
   let failed = false, requote = false;
   state.busy = true; state.unavailable = false;
@@ -285,6 +288,14 @@ async function submitOriginal() {
       // A definite HTTP/business refusal before an intent exists permits a new review;
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
+      if (isApiRefusal(cause, 409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED')) {
+        // Another command may own this quote. Never retry its POST or release either fence on an empty read.
+        const lookup = { ...pending, lookupOnly: true };
+        state.pending = lookup;
+        state.error = true;
+        try { save(lookup); } catch { /* Keep read-only recovery for this session even if storage fails. */ }
+        return;
+      }
       const unavailable = channelUnavailable(cause, pending.paymentMethod ?? state.method);
       const rejectedQuote = unavailable || cause.kind === 'http' && cause.status === cause.code
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
