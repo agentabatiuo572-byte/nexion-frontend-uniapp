@@ -18,7 +18,7 @@ import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
 import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { demoHasOpeningMilestone, demoLifetimeEarningsUsdt, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoReferralLedger, demoHasOpeningMilestone, demoLifetimeEarningsUsdt, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -541,7 +541,13 @@ export function demoFixture(url,locale,state,request) {
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
   const walletBills=()=>demoWalletBills(state,now,state.previewFactsAt,settledTasks());
-  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices);if(auxiliary!==undefined)return auxiliary;
+  const referralFacts=(limit=10)=>{
+    const rewards=demoReferralLedger(walletBills(),limit);
+    const invitedCount=demoH4TeamMembers(state,now).filter(member=>member.layer===1).length;
+    return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,
+      invitedCount,pendingCount:state.accountDeletionState==='clear'?0:Math.max(0,invitedCount-rewards.settledCount),...rewards};
+  };
+  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
   if(computeMode&&['/api/devices/earnings','/api/earnings/release-status'].includes(pathname))computeFacts();
@@ -579,7 +585,9 @@ export function demoFixture(url,locale,state,request) {
     return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,autoPlacedMembers:0,
       matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:blockedReason?0:Math.min(periodCap,Math.min(trackA,trackB)*matchRate),
       settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
-      recentMatches:empty||state.accountDeletionState==='clear'?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'UNLOCKED',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
+      recentMatches:demoCommissionEvents(state,state.previewFactsAt).filter(event=>event.kind==='binary')
+        .map(event=>({id:event.id,amountUsdt:event.amountUSDT,status:event.status.toUpperCase(),
+          createdAt:new Date(event.ts).toISOString(),unlockAt:new Date(event.unlockAt).toISOString()}))};
   }
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
   if(pathname==='/auth/users/oauth/provider/linked')return [...new Set(['GOOGLE',...(state.linkedProviders??[])])];
@@ -1009,7 +1017,13 @@ export function demoFixture(url,locale,state,request) {
     return remember('earningMilestone',id,{...authority,fired:[{milestoneId:id,thresholdUsd,rewardNex,lifetimeEarningsUsd}],count:1},null);
   }
   if(pathname==='/api/app/security') return {twoFactorEnabled:state.twoFactorEnabled??true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};
-  if(pathname==='/api/app/referral-rewards') return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,invitedCount:empty?0:12,pendingCount:empty?0:2,settledCount:empty?0:10,lifetimeInviterNex:empty?0:100,walletNexAvailable:demoWalletNex(state,now),limit:10,source:'ledger',sourceEnvironment:'PRODUCTION',runId:null,factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso,recentRewards:empty?[]:[{settlementNo:'DEMO-REF-1',amountNex:10,ledgerStatus:'SUCCESS',balanceAfter:1280,releaseBucket:'withdrawable',sourceEnvironment:'PRODUCTION',settledAt:iso}]};
+  if(pathname==='/api/app/referral-rewards'){
+    if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
+    const limit=Number(url.searchParams.get('limit')??10);
+    return {...referralFacts(limit),walletNexAvailable:demoWalletNex(state,now),limit,
+      source:'ledger',sourceEnvironment:'PRODUCTION',runId:null,
+      factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso};
+  }
   if(pathname==='/api/app/team/network') {
     const members=demoTeamNetworkMembers(state,now);
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};

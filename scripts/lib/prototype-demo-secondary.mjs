@@ -1,7 +1,7 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet } from './prototype-demo-account.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoCommissionEvents, demoHasEarningsHistory, demoSettledTasks, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 // The panel's terminal result applies to every withdrawal read, not just the bank detail page.
@@ -69,9 +69,13 @@ export function secondaryDemo(url,state,request){
   if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
   if(p==='/api/app/team/insights/commissions'){
     const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other'];
-    const events=!demoHasEarningsHistory(state)?[]:demoCommissionEvents(state.previewFactsAt??now);
+    if(!Number.isInteger(page)||page<1||!Number.isInteger(pageSize)||pageSize<1||pageSize>100){
+      throw Object.assign(new Error('TEAM_COMMISSIONS_PAGE_INVALID'),{status:422});
+    }
+    const window=demoTeamPeriod('all',now,url.searchParams.get('snapshotAt'));
+    const events=demoCommissionEvents(state,state.previewFactsAt??now).filter(event=>window.contains(event.ts));
     const total=(rows,asset='amountUSDT')=>rows.reduce((sum,row)=>sum+row[asset],0);
-    const today=demoTeamBusinessDate(now),month=today.slice(0,7);
+    const today=demoTeamBusinessDate(Date.parse(window.snapshotAt)),month=today.slice(0,7);
     const thisMonth=events.filter(event=>demoTeamBusinessDate(event.ts).slice(0,7)===month);
     const unlocked=events.filter(event=>event.status==='unlocked'),cooling=events.filter(event=>event.status==='cooling');
     const totalUSDT=total(events),directUSDT=total(events.filter(event=>event.layer===1));
@@ -79,8 +83,8 @@ export function secondaryDemo(url,state,request){
       const rows=events.filter(event=>event.kind===kind);
       return [kind,{usdt:total(rows),nex:total(rows,'amountNEX'),count:rows.length}];
     }));
-    return {...proof,...paginate(events),generatedAt:iso,snapshotAt:iso,aggregate:{totalUSDT,totalNEX:total(events,'amountNEX'),
-      directUSDT,extendedUSDT:totalUSDT-directUSDT,contributorCount:events.length,monthUSDT:total(thisMonth),
+    return {...proof,...paginate(events),generatedAt:iso,snapshotAt:window.snapshotAt,aggregate:{totalUSDT,totalNEX:total(events,'amountNEX'),
+      directUSDT,extendedUSDT:totalUSDT-directUSDT,contributorCount:new Set(events.filter(event=>event.layer>0).map(event=>event.sourceUserName)).size,monthUSDT:total(thisMonth),
       monthNEX:total(thisMonth,'amountNEX'),todayUSDT:total(events.filter(event=>demoTeamBusinessDate(event.ts)===today)),
       unlockedUSDT:total(unlocked),unlockedNEX:total(unlocked,'amountNEX'),coolingUSDT:total(cooling),eventCount:events.length,
       nextUnlockAt:cooling[0]?.unlockAt??null,byKind}};
@@ -93,10 +97,23 @@ export function secondaryDemo(url,state,request){
     return {...proof,period,rankingMetric:'COMPUTE_POINTS',rows:rows.slice((page-1)*pageSize,page*pageSize),page,pageSize,totalRows:rows.length,myRank:empty?null:3,gapToNext:empty?0:520,gapToNextComputePoints:empty?null:points[1]-points[2],poolUsd:empty?0:5000,topN:10,generatedAt:iso,snapshotAt:iso,snapshotVersion:'d'.repeat(64)};
   }
   if(p==='/api/app/team/insights/unilevel'){
-    const all=empty||state.accountDeletionState==='clear'?[]:[1,2,3].map((layer,i)=>({id:'demo-unilevel-'+i,source:'device_purchase',sourceUserName:['Maya','Linh','Sam'][i],cycle:'2026-10',layer,orderId:'DEMO-ORDER-004',orderAmountUSD:1299,amountUSDT:30-i*10,amountNEX:5,currency:'USDT',status:i===0?'unlocked':'cooling',ts:now-i*day,unlockAt:now+day}));
-    const filter=url.searchParams.get('filter')||'all',events=all.filter(e=>filter==='all'||(filter==='direct'?e.layer===1:e.layer>1));
-    const sum=rows=>({amountUSDT:rows.reduce((a,e)=>a+e.amountUSDT,0),amountNEX:rows.reduce((a,e)=>a+e.amountNEX,0),count:rows.length});
-    return {...proof,period:url.searchParams.get('period')||'month',...paginate(events),split:{direct:sum(all.filter(e=>e.layer===1)),extended:sum(all.filter(e=>e.layer>1))},generatedAt:iso,snapshotAt:iso};
+    const filter=url.searchParams.get('filter')?.trim().toLowerCase()??'all';
+    const version=Number(url.searchParams.get('schemaVersion')??1);
+    const period=url.searchParams.get('period')?.trim().toLowerCase()??'week';
+    const invalid=message=>{throw Object.assign(new Error(message),{status:422});};
+    if(![1,2].includes(version)||version===1&&filter!=='all')invalid('TEAM_SCHEMA_VERSION_UNSUPPORTED');
+    if(!['all','direct','extended'].includes(filter))invalid('TEAM_UNILEVEL_FILTER_INVALID');
+    if(!['today','week','month','all'].includes(period))invalid('TEAM_UNILEVEL_PERIOD_INVALID');
+    if(!Number.isInteger(page)||page<1||!Number.isInteger(pageSize)||pageSize<1||pageSize>100)invalid('TEAM_UNILEVEL_PAGE_INVALID');
+    const window=demoTeamPeriod(period,now,url.searchParams.get('snapshotAt'));
+    const all=demoCommissionEvents(state,state.previewFactsAt??now)
+      .filter(event=>(event.kind==='unilevel'||version===2&&event.kind==='direct_purchase')&&window.contains(event.ts))
+      .map(event=>({...event,source:'network',cycle:demoTeamBusinessDate(event.ts).slice(0,7),currency:'DUAL'}));
+    const direct=all.filter(row=>row.layer===1),extended=all.filter(row=>row.layer>1);
+    const events=filter==='direct'?direct:filter==='extended'?extended:all;
+    return {...proof,period,...paginate(events),split:{direct:demoCommissionTotals(direct),extended:demoCommissionTotals(extended)},
+      ...(version===2&&{schemaVersion:2,settlementMode:'DIRECT_ONLY_V1',filter,summary:demoCommissionTotals(events)}),
+      generatedAt:iso,snapshotAt:window.snapshotAt};
   }
   if(p==='/api/app/team/insights/leadership-pool'){
     const myRank=state.highestRank?8:2,distribution=empty?[]:[2,4,6,8].map(vRank=>({vRank,people:2,votes:vRank})),totalVotes=distribution.reduce((s,r)=>s+r.people*r.votes,0),myVotes=empty?0:myRank,mySharePct=totalVotes?myVotes/totalVotes:0;
