@@ -1,5 +1,5 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
-import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
+import { accountDeletionWallet, demoDeletionHistory, demoWithdrawalLimitSampleAt } from './prototype-demo-account.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -64,13 +64,12 @@ export function demoWithdrawals(state, now = Date.now()) {
   settleDemoBankWithdrawals(state);
   const sampleAt = state.withdrawalSamplesAt ??= now;
   const history = demoDeletionHistory(state);
-  const limited = state.withdrawLimitState === 'used';
   // A rejected reserve that was returned is REFUNDED. Keep the original fee and net quote.
   const chainOrders = history?.withdrawals ?? (state.dataState === 'empty' ? [] :
     ['CONFIRMED', 'REFUNDED'].map((status, i) => ({
       withdrawalNo: 'WD-DEMO-' + (i + 1), amount: 100, netReceive: 99, fee: 1, status,
-      at: limited && i === 0 ? (state.withdrawLimitCreatedAt ??= now) : sampleAt - (i + 2) * day,
-      holdUntil: sampleAt - day,
+      at: (i===0?demoWithdrawalLimitSampleAt(state):null)??sampleAt-(i+2)*day,
+      holdUntil: i===0?(demoWithdrawalLimitSampleAt(state)??sampleAt-day):sampleAt-day,
     })));
   const chainRows = chainOrders.map(({ at, holdUntil = at, ...order }) => ({
     ...order, targetAddress: `0x${'1'.repeat(40)}`, chain: 'USDT-BEP20',
@@ -154,7 +153,8 @@ export function secondaryDemo(url,state,request,walletBills){
       throw Object.assign(new Error('TEAM_COMMISSIONS_PAGE_INVALID'),{status:422});
     }
     const window=demoTeamPeriod('all',now,url.searchParams.get('snapshotAt'));
-    const events=demoCommissionEvents(state,state.previewFactsAt??now).filter(event=>window.contains(event.ts));
+    const events=demoCommissionEvents(state,state.previewFactsAt??now).filter(event=>window.contains(event.ts))
+      .map(({sourceRef,...event})=>({...event,...(event.kind.startsWith('direct_')&&{sourceRef})}));
     const total=(rows,asset='amountUSDT')=>rows.reduce((sum,row)=>sum+row[asset],0);
     const today=demoTeamBusinessDate(Date.parse(window.snapshotAt)),month=today.slice(0,7);
     const thisMonth=events.filter(event=>demoTeamBusinessDate(event.ts).slice(0,7)===month);

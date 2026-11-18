@@ -17,8 +17,8 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
-import { demoBinaryLegMembers, demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { demoCommissionGroups, demoReferralLedger, demoHasOpeningMilestone, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoBinaryLegMembers, demoH4Account, demoH4CheckInBonus, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
+import { demoCommissionGroups, demoStreakMilestones, demoReferralLedger, demoHasOpeningMilestone, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -28,7 +28,6 @@ const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? 
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
-const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
 const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||state.milestoneClaims?.includes(id)
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
@@ -294,13 +293,15 @@ function demoScenarioOrders(products,state,now,device41) {
     .map(order=>order.orderNo==='DEMO-ORDER-004'?{...order,computePoints:state.highestRank?64000:1280,placedAt:device41.activatedAt-samplePaidAfter,paidAt:device41.activatedAt,activatedAt:device41.activatedAt}:order)
     .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
 }
+const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>orderNo==='DEMO-ORDER-004'
+  ?'REVIEW-S1':`${orderNo}-${line}-${unit}`;
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
   if(!state.fleetSeed)demoFleetFacts(url,locale,state);
   return demoScenarioOrders(demoProducts(state,url.origin,locale),state,now,state.fleetSeed.find(device=>device.id===41))
     .map(order=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
-      targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?'REVIEW-S1':order.orderNo+'-0-0',
+      targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
     }:order);
 }
 // Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.
@@ -395,7 +396,7 @@ export function demoFleetFacts(url,locale,state) {
   for(const order of orders)if(order.orderNo!=='DEMO-ORDER-004'&&['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
     // A paid unit is a device even if its SKU has left the catalog: fall back to the order line instead of dropping it.
     const product=products.find(p=>p.id===line.sku)??{id:line.sku,name:line.name??line.sku,price:Number(line.unitPriceUsdt)||0,dailyEarn:0,dailyEarnNEX:0};
-    const instanceNo=order.orderNo+'-'+i+'-'+unit,tradein=order.orderType==='TRADE_IN';
+    const instanceNo=demoOrderDeviceInstance(order.orderNo,i,unit),tradein=order.orderType==='TRADE_IN';
     state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
     if(retired.includes(state.deviceIds[instanceNo]))continue;
     // A session device starts its own purchase history at its paid order.
@@ -723,10 +724,12 @@ export function demoFixture(url,locale,state,request) {
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
     postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
       amount:quote.payableUsdt,at:now,category:'purchase',remark:'E3 trade-in upgrade wallet payment'});
-    const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;(state.deviceIds??={})[orderNo+'-0-0']=targetDeviceId;
+    const targetDeviceInstanceNo=demoOrderDeviceInstance(orderNo);
+    const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;
+    (state.deviceIds??={})[targetDeviceInstanceNo]=targetDeviceId;
     const canonicalStatus=active?'activated':'inventory';
     const order={...demoOrders(products,state,now)[0],orderNo,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:'WALLET',orderType:'TRADE_IN',itemCount:1,
-      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo:orderNo+'-0-0',
+      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}],tradeinNo:'DEMO-TRADEIN-'+sequence,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceInstanceNo,
       paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:active?'ACTIVATED':'INVENTORY',canonicalStatus,placedAt:now,expiresAt:null,paidAt:now,quotaUsedAt:now,activatedAt:active?now:null};
     (state.createdOrders||=[]).unshift(order);
     return remember('tradeinSubmit',orderNo,{tradeinNo:order.tradeinNo,orderNo,sourceDeviceId:quote.sourceDeviceId,targetDeviceId,targetDeviceStatus:quote.targetDeviceStatus,applicationStatus:'COMPLETED',orderStatus:'COMPLETED',discountUsdt:quote.discountUsdt,walletDebitUsdt:quote.payableUsdt,walletBalanceAfterUsdt:state.walletBalance},order);
@@ -1019,7 +1022,8 @@ export function demoFixture(url,locale,state,request) {
     const data=base();
     data.serverDate=demoTeamBusinessDate(now);
     data.nextResetAtUtc=new Date(Date.parse(data.serverDate)+day-7*3600000).toISOString();
-    data.streak=demoStreakFacts(state,now);
+    const {badgeUnlockedAt,...streak}=demoStreakFacts(state,now);
+    data.streak=streak;
     const unlocked=state.taskState==='claimed'||state.taskState==='complete';
     // Mirrors the backend seeds (nx_growth_checkin_rule / nx_streak_milestone / nx_streak_power_up); day 3 is already claimed in the 12-day scenario.
     data.rules=[['baseline','1'],['bonus7','5'],['luckyMultiplierMax','2'],['p15','15'],['p2','5'],['broken','48'],['revive','1']].map(([key,value])=>({key,value}));
@@ -1038,7 +1042,13 @@ export function demoFixture(url,locale,state,request) {
     if(empty)return data;
     const badgeLocale=(url.searchParams.get('locale')||request.headers?.()['x-preview-locale']||locale).trim().toLowerCase().split('-')[0];
     const names=localized(badgeLocale,['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星'],['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'],['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']);
-    data.badgeAchievements=names.map((name,i)=>({achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],rewardPoints:50*(i+1),status:i<2||unlocked?'UNLOCKED':'LOCKED',unlockedAt:i<2||unlocked?iso:null}));
+    data.badgeAchievements=names.map((name,i)=>{
+      const unlockedAt=i<2?badgeUnlockedAt[i]:unlocked?now:null;
+      return {achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],
+        iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],
+        rewardPoints:50*(i+1),status:unlockedAt===null?'LOCKED':'UNLOCKED',
+        unlockedAt:unlockedAt===null?null:new Date(unlockedAt).toISOString()};
+    });
     // Route badges keep the seeded Chinese name (the App localizes them); the check-in boost is the B17 multiplier.
     data.powerUps=[[1,'ROYALTY_BOOST','团队成长徽章','/team',7,'ROUTE_BADGE','连续签到 7 天可查看团队成长权益',null],[2,'STREAK_BADGE','连续签到徽章','/me/rewards',14,'ROUTE_BADGE','连续签到 14 天解锁专属徽章',null],[3,'CHECKIN_BOOST',localized(badgeLocale,'签到加成','Check-in boost','Thưởng điểm danh'),'/daily',30,'CHECKIN_MULTIPLIER','1.5',null],[4,'GENESIS_ALLOWLIST','Genesis 资格入口','/market/genesis',60,'ROUTE_BADGE','连续签到 60 天解锁 Genesis 资格入口',true],
       ...(state.powerUpState==='staking'?[[5,'STAKING_APY','质押活动入口','/wallet/staking',21,'ROUTE_BADGE','连续签到 21 天解锁质押活动入口',true]]:[])]
@@ -1077,22 +1087,30 @@ export function demoFixture(url,locale,state,request) {
     return result;
   }
   const powerUpActivate=pathname.match(/^\/api\/points\/power-ups\/([1-4])\/activate$/);
-  if(powerUpActivate){const id=Number(powerUpActivate[1]);state.powerUps||=[];state.powerUps.push(id);return {...authority,powerUpId:id,powerUpCode:['ROYALTY_BOOST','STREAK_BADGE','CHECKIN_BOOST','GENESIS_ALLOWLIST'][id-1],badgeCode:null,status:'ACTIVATED'};}
+  if(powerUpActivate){
+    const id=Number(powerUpActivate[1]),powerUp=read('/api/points/state').powerUps?.find(row=>row.powerUpId===id);
+    if(!powerUp||powerUp.status==='LOCKED')refuse('DAILY_POWER_UP_NOT_UNLOCKED');
+    if(powerUp.status==='AVAILABLE')(state.powerUps??=[]).push(id);
+    return {...authority,powerUpId:id,powerUpCode:['ROYALTY_BOOST','STREAK_BADGE','CHECKIN_BOOST','GENESIS_ALLOWLIST'][id-1],badgeCode:null,status:'ACTIVATED'};}
   if(pathname==='/api/points/sign-in'){
     const checkInDate=demoTeamBusinessDate(now),key=commandKey?.trim(),bizNo='DAILY:900001:'+checkInDate;
     if(!key)throw Object.assign(new Error('IDEMPOTENCY_KEY_REQUIRED'),{status:422});
     const previous=state.walletMovements?.find(row=>row.bizType==='DAILY_CHECK_IN'&&row.commandKey===key);
     if(previous){
       if(previous.bizNo!==bizNo)refuse('IDEMPOTENCY_KEY_CONFLICT');
-      const {longestStreak,...receipt}=previous.detail;
+      const {longestStreak,eventBonusNex,...receipt}=previous.detail;
       return receipt;
     }
     const streak=demoStreakFacts(state,now);
     if(streak.checkedInToday||state.walletMovements?.some(row=>row.bizNo===bizNo))refuse('DAILY_ALREADY_CLAIMED');
     const streakDays=streak.currentStreak+1,streakBonusNex=streakDays%7===0?5:0;
-    const result={...authority,checkInDate,baseNex:1,rewardNex:1+streakBonusNex,streakBonusNex,multiplier:1,streakDays};
+    if(streakDays===1&&streak.lastCheckInDate&&state.powerUps)state.powerUps=state.powerUps.filter(id=>id!==3);
+    const powerUpMultiplier=state.powerUps?.includes(3)?1.5:1;
+    const baseReward=Math.floor((1+streakBonusNex)*powerUpMultiplier);
+    const eventBonusNex=demoH4CheckInBonus(state,now,baseReward);
+    const result={...authority,checkInDate,baseNex:1,rewardNex:baseReward+eventBonusNex,streakBonusNex,multiplier:1,streakDays};
     postDemoWalletEntries(state,{bizType:'DAILY_CHECK_IN',bizNo,asset:'UVT',direction:'IN',amount:result.rewardNex,
-      at:now,category:'bonus',commandKey:key,detail:{...result,longestStreak:Math.max(streakDays,streak.longestStreak)}});
+      at:now,category:'bonus',commandKey:key,detail:{...result,eventBonusNex,longestStreak:Math.max(streakDays,streak.longestStreak)}});
     return result;
   }
   if(pathname==='/api/points/streak-saver/use'){

@@ -10,7 +10,7 @@ const rulesByCode={
   upgrade:{promotionActivityId:'demo-promo-0'},
   invite:{targetInvites:5,windowDays:7,giftProductNo:'stellarbox-pro',giftQuantity:1},
   spin:{},
-  weekend:{action:'CHECKIN_MULTIPLIER',multiplier:2,timeZone:'UTC',weekdays:[6,7]},
+  weekend:{action:'CHECKIN_MULTIPLIER',multiplier:2,timeZone:'UTC',weekdays:[6,7],budgetNex:100},
   season:{voucherId:'demo-season-voucher'},
   welcome:{windowDays:7,minRank:5,rewardNex:100,streakSavers:1},
 };
@@ -210,6 +210,17 @@ function eventWindow(code,state,now) {
     }
   }
   return {startsAt,endsAt,state:phase(startsAt,endsAt,now)};
+}
+
+export function demoH4CheckInBonus(state,now,amount) {
+  if(['empty','error'].includes(state.eventState)||eventWindow('weekend',state,now).state!=='ongoing')return 0;
+  const {multiplier,timeZone,weekdays,budgetNex}=rulesByCode.weekend;
+  const date=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  if(!weekdays.includes(new Date(date).getUTCDay()||7))return 0;
+  const spent=(state.walletMovements??[]).filter(row=>row.bizType==='DAILY_CHECK_IN')
+    .reduce((sum,row)=>sum+(row.detail.eventBonusNex??0),0);
+  const extra=amount*(multiplier-1);
+  return spent+extra<=budgetNex?extra:0;
 }
 
 function inviteCount(state,window,now) {

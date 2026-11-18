@@ -1,7 +1,7 @@
 // Loopback demonstration only; never imported into the production application.
 import { randomUUID } from 'node:crypto';
 import { previewInterfaceLanguages } from './design-review-fixture.mjs';
-import { demoH4Account } from './prototype-demo-events.mjs';
+import { demoH4Account, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 
 const pendingWithdrawalAmount = 100;
 
@@ -13,6 +13,16 @@ export function accountDeletionWallet(state) {
   return { usdtAvailable: state.walletBalance, nexAvailable: state.walletNexBalance,
     pendingWithdraw: state.accountDeletionState === 'withdrawal' ? pendingWithdrawalAmount : 0 };
 }
+// A retained bank order can already use the day selected by the panel.
+export function demoWithdrawalLimitSampleAt(state, otherSampleAt) {
+  const at=state.withdrawLimitCreatedAt;
+  if(at==null)return null;
+  const date=demoTeamBusinessDate(at);
+  const used=otherSampleAt!=null&&demoTeamBusinessDate(otherSampleAt)===date
+    ||Object.values(state.bankDemo?.orders??{}).some(order=>demoTeamBusinessDate(order.createdAt)===date);
+  return used?null:at;
+}
+
 // Retained accounts share the spent funds that explain their small closing balances.
 export function demoDeletionHistory(state) {
   if (!state.accountDeletionState || state.accountDeletionState === 'follow') return null;
@@ -27,7 +37,8 @@ export function demoDeletionHistory(state) {
     fee: 1, status: 'PROCESSING', at,
   });
   if (hasHistory) withdrawals.push({
-    withdrawalNo: pending ? 'WD-DEMO-2' : 'WD-DEMO-1', amount: 250, netReceive: 249, fee: 1, status: 'CONFIRMED', at,
+    withdrawalNo: pending ? 'WD-DEMO-2' : 'WD-DEMO-1', amount: 250, netReceive: 249, fee: 1, status: 'CONFIRMED',
+    at:demoWithdrawalLimitSampleAt(state,pending?at:null)??(pending?at-86400000:at),
   });
   return { swap, withdrawals };
 }

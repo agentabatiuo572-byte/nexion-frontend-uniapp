@@ -111,14 +111,14 @@ export function computeDemo(url, locale, state, request, now, facts) {
   };
   const status = ({ queued: 'QUEUED', verifying: 'VERIFYING', recovering: 'RECOVERING', failed: 'FAILED', cancelled: 'CANCELLED' })[mode] || 'RUNNING';
   const v2=path==='/api/tasks/v2/assignments';
-  if(v2&&(simulated||!devices.length))
+  if(v2&&(simulated||!facts.heldDevices.some(device=>device.activatedAt!==null)))
     throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
   if(path==='/api/tasks/assignments'&&!simulated)return undefined;
   if (path === '/api/tasks/assignments' || v2) return { ...proof, protocolVersion: version, serverNow: now,
     pendingEarned: [{ asset: 'USDT', amount: pending ? total : '0.000000', taskCount: pending ? devices.length : 0 }],
     devices: facts.heldDevices.map(({id:deviceId,instanceNo,deviceType:type}) => ({ deviceId, instanceNo, deviceType:type, lockUntil: null,
-      recoveryPending: mode === 'recovering', recoveryReason: mode === 'recovering' ? 'LEGACY_COMPLETE_OUTCOME_UNKNOWN' : null,
-      simulationState: state.stoppedDevices?.includes(deviceId) ? 'STOPPED' : 'RUNNING',
+      recoveryPending: mode === 'recovering' && devices.includes(deviceId), recoveryReason: mode === 'recovering' && devices.includes(deviceId) ? 'LEGACY_COMPLETE_OUTCOME_UNKNOWN' : null,
+      simulationState: state.stoppedDevices?.includes(deviceId) ? 'STOPPED' : devices.includes(deviceId) ? 'RUNNING' : 'WAITING_CONFIG',
       currentTask: !devices.includes(deviceId) || state.stoppedDevices?.includes(deviceId) || mode === 'recovering' ? null : task(deviceId, status), recentTasks: pending&&devices.includes(deviceId)&&!snapshots[deviceId].deliveryCycle?[task(deviceId,'COMPLETED')]:
         postedTasks.filter(row=>row.deviceId===deviceId).slice(0,5).map(row=>task(deviceId,'COMPLETED',row)) })) };
   if(path==='/api/tasks/v2/settlements'||path.startsWith('/api/tasks/v2/settlements/')){

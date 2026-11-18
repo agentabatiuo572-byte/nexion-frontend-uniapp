@@ -153,13 +153,19 @@ export function postDemoActivityRewards(state,now) {
   }
 }
 
+export const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],
+  [30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
+
 export function initializeDemoWalletHistory(state,accountAt) {
   state.walletLegacySeed??=false;
-  // The opening milestone is already in the balance checkpoint. Keep its
-  // original place in the ledger when the sign-in presentation changes.
+  const days=demoHasEarningsHistory(state)?({normal:12,broken:7}[state.streakState]??0):0;
+  const anchor=days===12&&state.walletOpeningMilestoneAt!=null?state.walletOpeningMilestoneAt+10*day:
+    state.streakSeedAt??accountAt;
+  state.walletOpeningStreak??={days,lastAt:days?anchor-(days===12?1:3)*day:null,
+    checkedInAt:state.checkedIn&&demoHasEarningsHistory(state)?anchor:null};
+  // Preserve the opening milestone's position before any recorded outflow.
   if(state.walletOpeningMilestoneAt===undefined){
-    state.walletOpeningMilestoneAt=demoHasEarningsHistory(state)&&state.streakState==='normal'
-      ?accountAt-10*day:null;
+    state.walletOpeningMilestoneAt=days===12?state.walletOpeningStreak.lastAt-9*day:null;
   }
 }
 
@@ -172,31 +178,27 @@ export function initializeLegacyStreakSavers(state) {
   state.streakSaverBalance=demoHasEarningsHistory(state)?Number(starter)+demoH4Savers(state):0;
 }
 
+function openingCheckIns(state) {
+  const {days,lastAt,checkedInAt}=state.walletOpeningStreak;
+  const rows=Array.from({length:days},(_,index)=>({at:lastAt-(days-1-index)*day,streakDays:index+1}));
+  if(checkedInAt!==null)rows.push({at:checkedInAt,streakDays:days===12?13:state.saverUsed?8:1});
+  return rows.map(row=>({...row,checkInDate:demoTeamBusinessDate(row.at)}));
+}
+
 export function demoStreakFacts(state,now) {
-  const anchor=state.streakSeedAt??state.previewFactsAt??now;
   const today=demoTeamBusinessDate(now),yesterday=demoTeamBusinessDate(now-day);
-  const normal=demoHasEarningsHistory(state)&&state.streakState==='normal';
-  const broken=demoHasEarningsHistory(state)&&state.streakState==='broken';
-  const last=state.walletMovements?.findLast(row=>row.bizType==='DAILY_CHECK_IN'
-    &&row.at>=(state.streakSeedAt??0));
-  let longestStreak=normal?12:broken?7:0;
-  let streakDays=longestStreak;
-  let lastCheckInDate=normal?demoTeamBusinessDate(anchor-day):broken?demoTeamBusinessDate(anchor-3*day):null;
-  if(state.saverUsed){
+  const checkIns=[...openingCheckIns(state),...(state.walletMovements??[]).filter(row=>row.bizType==='DAILY_CHECK_IN')
+    .map(row=>({...row.detail,at:row.at}))];
+  const last=checkIns.at(-1);
+  let lastCheckInDate=last?.checkInDate??null,streakDays=last?.streakDays??0;
+  if(state.saverUsed&&(!last||last.at<=(state.saverUsedAt??state.previewFactsAt))){
     streakDays=state.saverRestoredStreak??7;
-    lastCheckInDate=demoTeamBusinessDate((state.saverUsedAt??anchor)-day);
+    lastCheckInDate=demoTeamBusinessDate((state.saverUsedAt??state.previewFactsAt)-day);
   }
-  if(state.checkedIn&&!last&&!state.streakSeedAt){
-    streakDays=(normal?12:state.saverUsed?7:0)+1;
-    lastCheckInDate=demoTeamBusinessDate(anchor);
-  }
-  if(last&&(!state.saverUsedAt||last.at>=state.saverUsedAt)){
-    streakDays=last.detail.streakDays;
-    lastCheckInDate=last.detail.checkInDate;
-  }
-  longestStreak=Math.max(longestStreak,streakDays,last?.detail.longestStreak??0);
-  return {currentStreak:[today,yesterday].includes(lastCheckInDate)?streakDays:0,longestStreak,
-    streakSavers:state.streakSaverBalance??Math.max(0,Number(normal||broken)+demoH4Savers(state)-Number(Boolean(state.saverUsed))),
+  const longestStreak=Math.max(streakDays,...checkIns.map(row=>row.longestStreak??row.streakDays));
+  const badgeUnlockedAt=[1,7].map(days=>checkIns.find(row=>row.streakDays>=days)?.at??null);
+  return {currentStreak:[today,yesterday].includes(lastCheckInDate)?streakDays:0,longestStreak,badgeUnlockedAt,
+    streakSavers:state.streakSaverBalance??Math.max(0,Number(state.walletOpeningStreak.days>0)+demoH4Savers(state)-Number(Boolean(state.saverUsed))),
     lastCheckInDate,checkedInToday:lastCheckInDate===today};
 }
 
@@ -207,16 +209,19 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
   const cooling=events.find(event=>event.kind==='direct_device_earning');
   const movements=state.walletMovements??[];
   const posted=new Set(movements.map(row=>row.bizNo));
-  const firstMilestoneRecorded=posted.has('DAILY-MS:900001:1')
-    ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===1);
+  const openingMilestones=new Set(state.milestoneClaims??[]);
+  if(demoHasOpeningMilestone(state))openingMilestones.add(1);
+  for(const {result} of state.milestoneClaimReceipts??[])if(result)openingMilestones.delete(result.milestoneId);
+  const checkIns=openingCheckIns(state).filter(row=>!posted.has('DAILY:900001:'+row.checkInDate));
   const deposit=demoCreditedDeposit(state);
   const seeds=!demoHasEarningsHistory(state)?[]:[
     ['COMPUTE_EARNING','UVT','IN',15,'earn',seedAt],
-    ...(deposit?[['CRYPTO_DEPOSIT','USDT','IN',deposit.creditedUsdt,'deposit',deposit.createdAt,'SUCCESS',deposit.depositId]]:[]),
+    ...(deposit?[['CHAIN_TOPUP','USDT','IN',deposit.creditedUsdt,'topup',deposit.createdAt,'SUCCESS',deposit.depositId]]:[]),
     ['REFERRAL_REWARD','UVT','IN',10,'bonus',seedAt-day,'SUCCESS',
       state.walletLegacySeed?undefined:'REF-000000000000000000000001:INVITER'],
     ['DEVICE_PURCHASE','USDT','OUT',1299,'purchase',seedAt-2*day],
-    ['DAILY_CHECK_IN','UVT','IN',5,'bonus',seedAt-3*day],
+    ...checkIns.map(({at,streakDays,checkInDate})=>['DAILY_CHECK_IN','UVT','IN',1+(streakDays%7===0?5:0),
+      'bonus',at,'SUCCESS','DAILY:900001:'+checkInDate]),
     ['COMPUTE_EARNING','USDT','IN',128.5,'earn',seedAt-4*day],
     ['COMPUTE_EARNING','USDT','IN',.00032,'earn',seedAt-5*day],
     // Saved legacy ledgers keep their original pending row and identity.
@@ -224,9 +229,16 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
     ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
     ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].filter(([,amount])=>amount>0)
       .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-RELEASE`])),
-    ...(demoHasOpeningMilestone(state)&&!state.walletLegacySeed&&!firstMilestoneRecorded?[
-      ['DAILY_MILESTONE','UVT','IN',5,'achievement',state.walletOpeningMilestoneAt,'SUCCESS','DAILY-MS:900001:1'],
-    ]:[]),
+    ...demoStreakMilestones.flatMap(([milestoneDay,asset,amount],index)=>{
+      const id=index+1,bizNo='DAILY-MS:900001:'+id;
+      if(!openingMilestones.has(id)||posted.has(bizNo)||!['USDT','UVT'].includes(asset))return [];
+      const at=(id===1?state.walletOpeningMilestoneAt:null)??checkIns.find(row=>row.streakDays===milestoneDay)?.at??seedAt;
+      return [['DAILY_MILESTONE',asset,'IN',amount,'achievement',at,'SUCCESS',bizNo]];
+    }),
+    ...(state.walletLegacySeed?[10,...(state.earningClaimed?[100]:[])].flatMap((amount,index)=>{
+      const bizNo='EARNING-MS:900001:demo-earning-'+index;
+      return posted.has(bizNo)?[]:[['EARNING_MILESTONE','UVT','IN',amount,'achievement',seedAt,'SUCCESS',bizNo]];
+    }):[]),
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo])=>({
     id:`seed:${asset}:${bizNo??`${bizType}:${direction}:${amount}`}`,bizNo:bizNo??`DEMO-${bizType}-${amount}`,bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
