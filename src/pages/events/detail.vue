@@ -92,6 +92,8 @@ async function load() {
     if (current()) {
       detail.value = value;
       if ((unconfirmedAction === "join" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(value.userStatus)) || (unconfirmedAction === "claim" && value.userStatus === "CLAIMED") || (unconfirmedAction === "remind" && value.reminderSubscribed)) {
+        // A claim confirmed only by this read lost its receipt; a device it issued still has to reach the fleet.
+        if (unconfirmedAction === "claim" && value.rewards.some((reward) => reward.type === "DEVICE")) void app.refreshRemoteFleet(app.captureRemoteAccountRequest());
         commandError.value = false; unconfirmedAction = null;
       }
     }
