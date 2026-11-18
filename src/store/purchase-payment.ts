@@ -308,7 +308,9 @@ async function submitOriginal() {
       state.error = !definiteRefusal;
       if (definiteRefusal) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
-        const refusal = pending.kind === 'ORDER_PAY' ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined;
+        // Another open payment ends every kind of purchase here; it must not fall back to quoting again.
+        const refusal = pending.kind === 'ORDER_PAY' || cause.message === 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'
+          ? ORDER_REFUSALS[cause.message] : TRIAL_REFUSALS.includes(cause.message) ? 'changed' : undefined;
         let existing: PurchasePaymentIntent | null;
         try { existing = await api.find(pending.kind, pending.commandKey); }
         catch {
