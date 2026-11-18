@@ -1,5 +1,6 @@
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
+import { createHash } from 'node:crypto';
 import { fixture as reviewFixture, previewCapacity, previewInterfaceLanguages } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
@@ -29,7 +30,8 @@ const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||state.milestoneClaims?.includes(id)
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
-export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+// Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
+export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'MANUAL_REVIEW',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
@@ -62,6 +64,8 @@ export const demoOptions = {
   sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
   promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
   promotionRewardType:[['reward','首购 / 复购发 UVT'],['discount','首购 / 复购为订单立减'],['gift-discount','购机赠礼为订单立减']],
+  promotionRewardState:[['PENDING','待处理'],['READY','待发放'],['PROCESSING','处理中'],['ISSUED','已发放'],
+    ['RETRYABLE_FAILED','可重试失败'],['CANCELLED','已取消'],['MANUAL_REVIEW','人工审核中']],
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
   fleetState:[['normal','默认设备'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位']],
@@ -77,6 +81,7 @@ const skuDefinitions = [
   ['stellarrack-p2','UVELRack P2','Flagship',19999,2250,50,'8 × H100','1,024 GB',4000],
   ['cloud-share','Cloud Share','Share',19.9,18,3,'Distributed','—',0],
 ];
+const demoPromotionGift={orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',obligationId:'demo-reward-3',productNo:'stellarbox-s1',quantity:1};
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
   return skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
@@ -329,16 +334,19 @@ export function demoFleetFacts(url,locale,state) {
   const reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
   const roster=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
-  const gift=demoH4Gift(state);
-  if(gift){
-    const {productNo,instances}=gift.result.receipt;
+  const eventGift=demoH4Gift(state);
+  const gifts=[eventGift&&{...eventGift.result.receipt,at:eventGift.at,deviceIds:eventGift.deviceIds},state.promotionGift];
+  for(const gift of gifts){
+    if(!gift)continue;
+    const {productNo,instances}=gift;
     const product=products.find(item=>item.id===productNo);
     for(const [index,id] of gift.deviceIds.entries()){
       if(retired.includes(id))continue;
       roster.push({...template,id,instanceNo:instances[index],name:product.name,productCode:productNo.toUpperCase(),
         gpuModel:product.gpu,vramTotalGb:Number.parseInt(product.vram,10),basePowerW:Number.parseInt(product.power,10),location:product.datacenter,
         dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:0,activatedAt:gift.at,purchasedAt:gift.at,
-        todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0});
+        todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
+        ...(gift===state.promotionGift&&{sourceChannel:'PROMOTION_GIFT',sourceOrderNo:demoPromotionGift.orderNo})});
     }
   }
   const devices=roster.map(seedDevice=>{
@@ -350,6 +358,27 @@ export function demoFleetFacts(url,locale,state) {
   });
   // serverNow is this read's time: the shared review fixture's clock stops at server start.
   return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
+}
+
+// Apply a selected preview preset once. Reads and saved-state imports never issue a gift.
+export function setDemoPromotionReward(url,locale,state,now) {
+  state.promotionRewardAt=now;
+  if(state.promotionRewardState!=='ISSUED'){
+    delete state.promotionGift;
+    return;
+  }
+  if(state.promotionGift)return;
+  const {orderNo,obligationId,productNo,quantity}=demoPromotionGift;
+  const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===orderNo);
+  if(state.dataState==='empty'||order?.paymentStatus!=='PAID')return;
+  const {slotsUsed,slotCap}=demoFleetFacts(url,locale,state);
+  if(slotsUsed+quantity>slotCap){
+    state.promotionRewardState='RETRYABLE_FAILED';
+    return;
+  }
+  const id=state.deviceSequence=(state.deviceSequence??1000)+1;
+  const instanceNo='PG-'+createHash('sha256').update(obligationId+':0').digest('hex').slice(0,48);
+  state.promotionGift={productNo,at:now,deviceIds:[id],instances:[instanceNo]};
 }
 
 export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
@@ -610,7 +639,7 @@ export function demoFixture(url,locale,state,request) {
   }
   const tradeinQuote=(sourceDeviceId,targetProductNo)=>{
     const product=products.find(p=>p.id===targetProductNo)||products[0];
-    const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices.find(d=>d.id===sourceDeviceId);
+    const device=demoFixture(new URL('/api/devices/earnings',url.origin),locale,state,request).devices.find(d=>d.id===sourceDeviceId&&d.sourceChannel!=='PROMOTION_GIFT');
     if(!device)throw new Error('Unknown demo trade-in source');
     const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
     const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
@@ -740,7 +769,8 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
     const sample=base('/api/promotions').items[0];
-    const configs=[['SKU_GIFT','买 S1，送 Cloud Share','Buy S1, get Cloud Share','Mua S1, tặng Cloud Share','stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
+    const giftName=products.find(product=>product.id===demoPromotionGift.productNo).name;
+    const configs=[['SKU_GIFT','买 S1，送 '+giftName,'Buy S1, get '+giftName,'Mua S1, tặng '+giftName,'stellarbox-s1'],['FIRST_PURCHASE','首购成长礼','First purchase reward','Quà mua lần đầu','stellarbox-s1'],['DIRECT_REFERRAL','邀请好友购机礼','Referral purchase reward','Quà giới thiệu','stellarbox-pro'],['MULTI_PRODUCT','算力组合礼','Compute bundle offer','Ưu đãi kết hợp','stellarrack-p1'],['REPURCHASE','老用户加购礼','Returning member offer','Ưu đãi mua thêm','cloud-share']];
     const items=empty||state.eventState==='empty'?[]:configs.map(([template,zh,en,vi,productNo],i)=>{
       const item=structuredClone(sample);item.activityId='demo-promo-'+i;item.template=template;item.title={zh,en,vi};item.productNos=template==='MULTI_PRODUCT'?['stellarbox-pro','stellarrack-p1','stellarbox-s1']:[productNo];item.placement=[0,1,4].includes(i)?'home.purchase-promotion':null;
       item.rewardRules[0].productNo=productNo;item.rewardRules[0].ruleId='demo-rule-'+i;
@@ -752,13 +782,12 @@ export function demoFixture(url,locale,state,request) {
         const window=demoH4PromotionWindow(state,now);
         Object.assign(item,{state:window.state==='ongoing'?'ACTIVE':window.state==='upcoming'?'SCHEDULED':'ENDED',
           startsAt:new Date(window.startsAt).toISOString(),endsAt:new Date(window.endsAt).toISOString()});
-        const giftName='Cloud Share';
-        const reward=item.rewardRules[0].buyerReward;reward.giftProductNo='cloud-share';reward.quantity=1;
+        const reward=item.rewardRules[0].buyerReward;reward.giftProductNo=demoPromotionGift.productNo;reward.quantity=demoPromotionGift.quantity;
         reward.disclosure.deviceName=giftName;
         reward.disclosure.benefitDescription={zh:'送 '+giftName+' 1 份',en:'Get 1 '+giftName,vi:'Tặng 1 '+giftName};
         reward.disclosure.terms={zh:'订单付款完成后，赠品发放到你的设备仓库。',en:'Once the order is paid, the gift is added to your device inventory.',vi:'Sau khi đơn hàng được thanh toán, quà tặng sẽ vào kho thiết bị của bạn.'};
         reward.disclosure.refundTerms={zh:'整单退款时，赠品随订单一并撤销。',en:'If the whole order is refunded, the gift is withdrawn with it.',vi:'Khi hoàn tiền toàn bộ đơn hàng, quà tặng sẽ bị thu hồi cùng đơn.'};
-        reward.disclosure.deviceRights={activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:365,taskEnabled:true,countsAsDeviceHolding:true,countsForRank:false,transferable:false,exchangeable:false,revocationMode:'REVOKE_IF_UNUSED'};
+        reward.disclosure.deviceRights={activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:null,taskEnabled:true,countsAsDeviceHolding:true,countsForRank:false,transferable:false,exchangeable:false,revocationMode:'MANUAL_IF_USED'};
         if(state.promotionRewardType==='gift-discount')item.rewardRules[0].buyerReward={rewardRuleId:reward.rewardRuleId,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:'100',disclosure:orderDiscountDisclosure(100)};
       }
       if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
@@ -816,11 +845,22 @@ export function demoFixture(url,locale,state,request) {
     }))};
   }
   if(pathname==='/api/promotion-rewards'||/^\/api\/promotion-rewards\/demo-reward-\d+$/.test(pathname)){
-    // A discount lives on the quote and the order: it creates no reward obligation, and history keeps its gift.
-    const offer=demoFixture(new URL('/api/promotions/demo-promo-0',url.origin),locale,{...state,eventState:'mixed',dataState:'normal',promotionRewardType:'reward'},request),spec=offer.rewardRules[0].buyerReward,{disclosure,...reward}=spec;
-    // The rows belong to sample order 004 and share its timeline; without that order there are none.
-    const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo==='DEMO-ORDER-004'),issuedAt=order&&new Date(order.activatedAt).toISOString();
-    const items=empty||!order?[]:['PENDING','READY','PROCESSING','ISSUED','RETRYABLE_FAILED','OUTCOME_UNKNOWN','CANCELLED','REVERSAL_PENDING','REVERSED','MANUAL_REVIEW'].map((status,i)=>({obligationId:'demo-reward-'+i,orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',orderLineId:'demo-line-0',updatedAt:issuedAt,reward,disclosure,refundHold:status==='REVERSAL_PENDING',beneficiaryRole:'BUYER',state:status,refundRequestIds:[],assetReceipt:status==='ISSUED'?{deviceIds:[41],instanceNos:['REVIEW-S1'],source:'PROMOTION_GIFT',issuedAt,ledgerBizNo:null,earningsEntryNo:null}:null}));
+    // This sample order keeps the original gift even when the live offer is set to an order discount.
+    const {orderNo,activityId,obligationId}=demoPromotionGift;
+    const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===orderNo);
+    const items=[];
+    if(!empty&&order){
+      const offer=demoFixture(new URL('/api/promotions/'+activityId,url.origin),locale,{...state,eventState:'mixed',dataState:'normal',promotionRewardType:'reward'},request);
+      const {ruleId,buyerReward:{disclosure,...reward}}=offer.rewardRules[0];
+      const gift=state.promotionGift;
+      const selectedState=state.promotionRewardState??demoDefaults.promotionRewardState;
+      const status=gift?'ISSUED':selectedState==='ISSUED'?demoDefaults.promotionRewardState:selectedState;
+      const updatedAt=new Date(state.promotionRewardAt??Math.max(order.paidAt,state.previewFactsAt??now)).toISOString();
+      items.push({obligationId,orderNo,activityId,version:offer.version,orderLineId:'demo-line-0',ruleId,rewardRuleId:reward.rewardRuleId,
+        unitSeq:0,updatedAt,reward,disclosure,refundHold:false,beneficiaryRole:'BUYER',state:status,refundRequestIds:[],
+        assetReceipt:gift?{deviceIds:gift.deviceIds,instanceNos:gift.instances,source:'PROMOTION_GIFT',
+          issuedAt:new Date(gift.at).toISOString(),ledgerBizNo:null,earningsEntryNo:null}:null});
+    }
     if(pathname!=='/api/promotion-rewards')return items.find(r=>r.obligationId===pathname.split('/').pop())||{};
     return {items:items.filter(r=>['state','activityId','orderNo'].every(key=>!url.searchParams.get(key)||r[key]===url.searchParams.get(key))),nextCursor:null,hasMore:false};
   }
