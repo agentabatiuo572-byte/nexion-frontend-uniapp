@@ -107,7 +107,11 @@ async function run() {
   busy.value = true; commandError.value = false;
   try {
     if (selectedAction === "remind") await api.remind(code, `h4-event-reminder:${code}`);
-    else await eventsApi[selectedAction](code, selectedAction === "claim" ? eventClaimCommandKey(code, detail.value.claimKeys) : `h4-event-join:${code}`);
+    else if (selectedAction === "claim") {
+      const fleetRequest = app.captureRemoteAccountRequest();
+      const claim = await eventsApi.claim(code, eventClaimCommandKey(code, detail.value.claimKeys));
+      if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
+    } else await eventsApi.join(code, `h4-event-join:${code}`);
     if (current()) { busy.value = false; await load(); }
   } catch {
     if (current()) { busy.value = false; commandError.value = true; unconfirmedAction = selectedAction; await load(); }
