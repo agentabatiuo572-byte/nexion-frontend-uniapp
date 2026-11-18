@@ -5,7 +5,7 @@ import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
 import { learningDemo } from './prototype-demo-learning.mjs';
 import { financeDemo } from './prototype-demo-finance.mjs';
-import { rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
+import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
 import { auxiliaryDemo } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
@@ -16,7 +16,7 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
-import { demoH4Account, demoH4Credits, demoH4EventResponse, demoH4Gift, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers } from './prototype-demo-events.mjs';
+import { demoH4Account, demoH4Credits, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers } from './prototype-demo-events.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
@@ -26,8 +26,8 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-const demoH4CreditTotal=(state,now)=>demoH4Credits(state,now).reduce((total,row)=>total+row.amount,0);
-const demoWalletNex=(state,now)=>(accountDeletionWallet(state)?.nexAvailable??(state.dataState==='empty'?0:1280))+demoH4CreditTotal(state,now);
+const demoH4CreditTotal=(state,now)=>demoH4Credits(state,now).reduce((total,row)=>total+(row.includedInBalance?0:row.amount),0);
+const demoWalletNex=(state,now)=>(accountDeletionWallet(state)?.nexAvailable??state.walletNexBalance??(state.dataState==='empty'?0:1280))+demoH4CreditTotal(state,now);
 export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -126,7 +126,7 @@ const PRODUCT_HOSTING_COPY = {
 export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
   return skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
-    const dailyEarn=monthlyEstimateUsdt/30,b=.1,stock=share?null:state.catalogState==='soldout'&&index===0?0:60-index*7;
+    const dailyEarn=monthlyEstimateUsdt/30,b=.1,stock=share?null:state.catalogState==='soldout'&&index===0?0:60-index*7-demoH4GiftQuantity(state,id);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
     return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,
@@ -277,13 +277,14 @@ export function demoFleetFacts(url,locale,state) {
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
   const roster=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
   const used=roster.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount;
-  const gift=demoH4Gift(state,now,slotCap-used);
+  const gift=demoH4Gift(state,now,slotCap-used,products);
   if(gift){
     const {productNo,instances}=gift.result.receipt;
     const product=products.find(item=>item.id===productNo);
     for(const [index,id] of gift.deviceIds.entries()){
       if(retired.includes(id))continue;
       roster.push({...template,id,instanceNo:instances[index],name:product.name,productCode:productNo.toUpperCase(),
+        gpuModel:product.gpu,vramTotalGb:Number.parseInt(product.vram,10),basePowerW:Number.parseInt(product.power,10),location:product.datacenter,
         dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,actualPaidUsdt:0,activatedAt:gift.at,purchasedAt:gift.at,
         todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0});
     }
@@ -434,14 +435,15 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/config/v-ranks') {
     const data=structuredClone(base());
-    const own=[0,320,640,2000,4000,8000,16000,32000,64000],team=[0,1280,6400,20000,64000,160000,480000,1280000,3200000];
+    const own=[0,demoV1SelfComputePoints,640,2000,4000,8000,16000,32000,64000],team=[0,1280,6400,20000,64000,160000,480000,1280000,3200000];
     data.ranks=data.ranks.map((rank,index)=>({...rank,cultivationBonus:rank.rewards.filter(reward=>reward.type==='UVT').reduce((sum,reward)=>sum+reward.amount,0),selfComputePoints:own[index],teamComputePoints:team[index]}));
     return data;
   }
   if(pathname==='/api/team/rank') {
     const data=structuredClone(base());
     const {rank}=demoH4Account(state);
-    const directRefs=demoH4TeamMembers(state,now).filter(member=>member.layer===1).length;
+    const directRefs=demoH4TeamMembers(state,now)
+      .filter(member=>member.layer===1&&member.lifetimeComputePoints>=demoV1SelfComputePoints).length;
     return {...data,rankCode:'V'+rank,progress:{...data.progress,directRefs,selfComputePoints:empty?0:state.highestRank?64000:1280,teamComputePoints:empty?0:state.highestRank?3200000:12800}};
   }
   if(pathname==='/api/team/binary')return {...authority,source:'server',runId:null,asOfDate:iso.slice(0,10),trackA:empty?0:2800,trackB:empty?0:2400,trackAMembers:empty?0:4,trackBMembers:empty?0:4,autoPlacedMembers:0,matchRate:.1,threshold:1000,dailyCap:5000,periodCap:150000,estimatedAmountUsdt:empty?0:240,settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason:empty?'BOTH_TRACKS_BELOW_THRESHOLD':'',recentMatches:empty?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'unlocked',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
@@ -452,7 +454,7 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/store/purchase-eligibility') return {...authority,runId:null,productNo:url.searchParams.get('productNo'),eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',policies:[{policy:'E1',eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',mode:'ALL',conditions:state.catalogState==='restricted'?[{kind:'rank',required:3,current:2,gap:1,met:false}]:[]},{policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]}],evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
   if(pathname==='/api/app/team/quota'){
     const direct=demoH4TeamMembers(state,now).filter(member=>member.layer===1);
-    return {...authority,source:'server',generatedAt:iso,facts:{rank:demoH4Account(state).rank,directRefs:direct.length,directInvites:direct.length,activeDirect:direct.filter(member=>member.status==='ACTIVE').length,teamComputePoints:12800},tiers:products.filter(p=>p.productType==='DEVICE').map(p=>({productId:p.id,quotaCode:p.id.toUpperCase(),name:p.name,price:p.price,monthlyStock:60,soldThisMonth:p.sold,unlockKind:'ALL',conditions:[{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:empty?0:12800},...(state.catalogState==='restricted'?[{kind:'rank',required:3,current:2}]:[])],perks:[],available:p.available&&state.catalogState!=='restricted'}))};
+    return {...authority,source:'server',generatedAt:iso,facts:{rank:demoH4Account(state).rank,directRefs:direct.filter(member=>member.lifetimeComputePoints>=demoV1SelfComputePoints).length,directInvites:direct.length,activeDirect:direct.filter(member=>member.status==='ACTIVE').length,teamComputePoints:12800},tiers:products.filter(p=>p.productType==='DEVICE').map(p=>({productId:p.id,quotaCode:p.id.toUpperCase(),name:p.name,price:p.price,monthlyStock:60,soldThisMonth:p.sold,unlockKind:'ALL',conditions:[{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:empty?0:12800},...(state.catalogState==='restricted'?[{kind:'rank',required:3,current:2}]:[])],perks:[],available:p.available&&state.catalogState!=='restricted'}))};
   }
   const tradeinCuts=[25,50,75,100],tradeinRates=[75,60,45,30,15];
   if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'OPEN',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:7,source:'server'};
@@ -670,7 +672,7 @@ export function demoFixture(url,locale,state,request) {
     const eventResponse=demoH4EventResponse(url,contentLocale,state,request,now,{
       fleet:()=>demoFleetFacts(url,locale,state),
       promotion:id=>demoFixture(new URL('/api/promotions/'+id,url.origin),locale,state,request),
-      spinTickets,
+      products,spinTickets,
     });
     if(eventResponse!==undefined)return eventResponse;
   }
@@ -727,12 +729,21 @@ export function demoFixture(url,locale,state,request) {
     const bills=empty?[]:[['COMPUTE_EARNING','UVT','IN',15,'earn'],['REFERRAL_REWARD','UVT','IN',10,'refer'],['DEVICE_PURCHASE','USDT','OUT',1299,'purchase'],['CHECK_IN','UVT','IN',5,'bonus'],['COMPUTE_EARNING','USDT','IN',128.5,'earn'],['COMPUTE_EARNING','USDT','IN',0.00032,'earn']].map(([bizType,asset,direction,amount,category],i)=>({id:'demo-bill-'+i,bizNo:'DEMO-'+(1000+i),bizType,asset,direction,amount,balanceAfter:asset==='UVT'?1280:5280.64,status:'SUCCESS',remark:'',createdAt:new Date(now-i*day).toISOString(),category}));
     const credits=demoH4Credits(state,now),total=credits.reduce((sum,credit)=>sum+credit.amount,0);
     let balance=demoWalletNex(state,now)-total;
-    for(const {id,type,amount,at} of credits){
+    for(const {id,type,status,amount,at} of credits){
       balance+=amount;
       bills.unshift({id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,balanceAfter:balance,
-        status:'SUCCESS',remark:'',createdAt:new Date(at).toISOString(),category:'earn'});
+        status,remark:'',createdAt:new Date(at).toISOString(),category:'bonus'});
     }
-    if(pathname.endsWith('/summary')) return {source:'server',sourceEnvironment:'PRODUCTION',timeZone:'UTC',asOf:iso,rewardsUsdt:empty?0:128.5,rewardsNex:empty?0:150+total,settledRewardsNex:empty?0:140+total,withdrawalOffsetNexSpent:empty?0:10,latestRewardAt:empty?null:iso,todayNexEarn:empty?0:15,pendingNex:empty?0:10,monthBillCount:bills.length,recentNexBills:bills.filter(b=>b.asset==='UVT')};
+    bills.sort((left,right)=>right.createdAt.localeCompare(left.createdAt));
+    if(pathname.endsWith('/summary')){
+      const todayNexEarn=bills.filter(bill=>bill.asset==='UVT'&&bill.createdAt.slice(0,10)===iso.slice(0,10))
+        .reduce((sum,bill)=>sum+(bill.direction==='IN'?bill.amount:-bill.amount),0);
+      const latestRewardAt=bills.find(bill=>bill.direction==='IN'&&['bonus','refer','achievement'].includes(bill.category))?.createdAt??null;
+      return {source:'server',sourceEnvironment:'PRODUCTION',timeZone:'UTC',asOf:iso,rewardsUsdt:empty?0:128.5,
+        rewardsNex:empty?0:150+total,settledRewardsNex:empty?0:140+total,withdrawalOffsetNexSpent:empty?0:10,latestRewardAt,todayNexEarn,
+        pendingNex:empty?0:10,monthBillCount:bills.filter(bill=>bill.createdAt.slice(0,7)===iso.slice(0,7)).length,
+        recentNexBills:bills.filter(bill=>bill.asset==='UVT')};
+    }
     const filtered=bills.filter(bill=>['asset','direction'].every(key=>!url.searchParams.get(key)||url.searchParams.get(key)===bill[key])&&(url.searchParams.get('category')!=='REWARD'||bill.direction==='IN'));
     return {source:'server',sourceEnvironment:'PRODUCTION',bills:filtered,page:1,pageSize:20,total:filtered.length,nextPage:null,nextCursor:null};
   }

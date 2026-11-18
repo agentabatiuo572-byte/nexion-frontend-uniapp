@@ -5,6 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoOptions } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages } from './lib/design-review-fixture.mjs';
+import { initializeDemoH4State } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
@@ -14,6 +15,7 @@ const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
 // An optional local handoff preserves demo conversations across a preview rebuild.
 if(process.env.DEMO_STATE_FILE)Object.assign(state,JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state);
+initializeDemoH4State(state);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
@@ -90,7 +92,11 @@ const server=http.createServer(async(req,res)=>{
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','urgent','late'].includes(value)?value:'';
         const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState),wasTrialQuote=state.trialQuoteState;
-        if(update.reset){for(const key of Object.keys(state))delete state[key];Object.assign(state,structuredClone(demoDefaults));}
+        if(update.reset){
+          const accountCreatedAt=state.accountCreatedAt;
+          for(const key of Object.keys(state))delete state[key];
+          Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
+        }
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
         // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
         // trade-ins, trial and payment intents go, and the next read seeds the fleet. Entering or leaving the empty
