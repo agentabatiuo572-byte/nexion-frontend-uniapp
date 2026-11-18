@@ -100,7 +100,7 @@ export function computeDemo(url, locale, state, request, now, facts) {
       : cloud ? { executionMode: 'RULE_CYCLE', proofKind: 'RULE_SETTLEMENT', modelExecuted: false }
         : { executionMode: 'MODEL', proofKind: 'MODEL_EXECUTION', modelExecuted: true };
     return { ...proof, ...execution, protocolVersion: version, taskNo:posted?.taskNo??`DEMO-TASK-${deviceId}-${start}`, deviceId,
-      taskId: cloud ? 'cloud-cycle' : 'image-gen', taskName: ['PHONE','MOBILE'].includes(deviceType(deviceId))?`${deviceType(deviceId)} ${text('任务周期','task cycle','chu kỳ tác vụ')}`:names[index], taskClass: 'IG', model: simulated ? '' : cloud ? 'Cloud reward' : 'SDXL', client: 'UVEL', status,
+      taskId: cloud ? 'cloud-cycle' : 'image-gen', taskName: ['PHONE','MOBILE'].includes(deviceType(deviceId))?`${deviceType(deviceId)} task cycle`:names[index], taskClass: 'IG', model: simulated ? '' : cloud ? 'Cloud reward' : 'SDXL', client: 'UVEL', status,
       rewardUsdt: Number(amount(deviceId)), ...(simulated ? { rewardAsset: 'USDT', rewardAmount: amount(deviceId) } : {}),
       requiredSeconds: 60, queuedAt: posted?.queuedAt??Math.max(history?snapshot.device.activatedAt:snapshot.liveActivatedAt,start-1000), startedAt: status === 'QUEUED' ? null : start, completableAt: ['QUEUED', 'RECOVERING'].includes(status) ? null : start + 60000,
       completedAt: history ? start + 60000 : null, actualDurationSec: status === 'QUEUED' ? null : history ? 60 : 30,

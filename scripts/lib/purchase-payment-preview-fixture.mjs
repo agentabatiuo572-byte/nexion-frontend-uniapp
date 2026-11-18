@@ -114,7 +114,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity})), intent.orderNo))
       return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CAPACITY_REPLACEMENT_REQUIRED'});
     try {
-      requireDemoPurchase(state,demoProducts(state,intent.origin,locale()),
+      requireDemoPurchase(state,demoProducts(state,intent.origin),
         order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),now,true);
     } catch (error) {
       if(error.status!==409&&error.status!==404)throw error;
@@ -161,7 +161,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (body.kind === 'ORDER_PAY' && !order) return {status: 404, message: 'ORDER_NOT_FOUND', data: null};
       if (body.kind === 'ORDER_PAY' && (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT')) return {status: 409, message: 'ORDER_NOT_PAYABLE', data: null};
       if(body.kind==='ORDER_PAY'){
-        requireDemoPurchase(state,demoProducts(state,url.origin,locale()),
+        requireDemoPurchase(state,demoProducts(state,url.origin),
           order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),Date.now());
       }
       if (!commandKinds[body.kind] || (body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : body.kind !== 'ORDER_PAY' && !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};

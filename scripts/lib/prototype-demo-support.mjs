@@ -119,7 +119,7 @@ export function supportDemo(url,locale,state,request) {
   // B16 registration welcome: one copy per language, the same for every new account.
   const welcome=text('你好，欢迎加入 UVEL！设备、收益或充值提现有任何问题，直接在这里给我们留言，我们会尽快回复你。','Hi, welcome to UVEL! If you have any questions about your devices, earnings, deposits or withdrawals, just message us here and we\'ll get back to you soon.','Xin chào, chào mừng bạn đến với UVEL! Nếu bạn có câu hỏi về thiết bị, thu nhập, nạp hoặc rút tiền, hãy nhắn cho chúng tôi tại đây, chúng tôi sẽ phản hồi sớm nhất.');
   if(p===root+'/advisor'&&state.messageState==='welcome-unassigned')return {assignmentId:null,currentAdvisorId:null,currentAdvisorName:null,assignmentState:'UNBOUND',availability:'UNBOUND'};
-  if(p===root+'/advisor')return {assignmentId:1,currentAdvisorId:state.supportAdvisorId??1,currentAdvisorName:text('演示顾问','Demo advisor','Cố vấn mẫu'),assignmentState:'ASSIGNED',availability:'BUSY'};
+  if(p===root+'/advisor')return {assignmentId:1,currentAdvisorId:state.supportAdvisorId??1,currentAdvisorName:'Demo advisor',assignmentState:'ASSIGNED',availability:'BUSY'};
   if(p===root+'/conversation-management')return {clearUserHistory:true,
     clearedPeers:(state.supportUserClearMarkers||[]).filter(row=>row.accountId===supportAccountId(state)).map(({accountId,...marker})=>structuredClone(marker))};
   if(p===root+'/attachments/policy')return {available:false,allowedMimeTypes:[],maxBytes:null,maxPixels:null,ttlSeconds:null,unavailableReason:text('演示暂不上传附件','Attachments are unavailable in this demo','Bản mẫu chưa hỗ trợ tệp đính kèm')};
@@ -129,8 +129,8 @@ export function supportDemo(url,locale,state,request) {
     // The demo account's advisor conversation opens with the registration welcome.
     const content=welcome;
     // Replacement scenarios start directly at message 1, retaining their existing pages.
-    const messages=['history','timeline','receipts'].includes(scenario)?[]:[{id:1,senderType:'agent',senderName:text('演示客服','Demo support','Hỗ trợ mẫu'),content,createdAt:now}];
-    state.supportConversations=[{conversation:{id:1,conversationNo:'DEMO-SUPPORT-1',conversationType:'advisor',status:'OPEN',version:1,ownerAgentId:'1',ownerAgentName:text('演示客服','Demo support','Hỗ trợ mẫu'),unreadCount:1,lastMessage:content,lastMessageAt:now,lastPublicMessageId:messages.length},messages,historyTruncated:false,nextCursor:null}];
+    const messages=['history','timeline','receipts'].includes(scenario)?[]:[{id:1,senderType:'agent',senderName:'Demo support',content,createdAt:now}];
+    state.supportConversations=[{conversation:{id:1,conversationNo:'DEMO-SUPPORT-1',conversationType:'advisor',status:'OPEN',version:1,ownerAgentId:'1',ownerAgentName:'Demo support',unreadCount:1,lastMessage:content,lastMessageAt:now,lastPublicMessageId:messages.length},messages,historyTruncated:false,nextCursor:null}];
   }
   // These legacy DEMO rows were all authored for the one demo advisor. Retain
   // their cids/messages and add its identity; never infer identity from a name.
@@ -145,7 +145,7 @@ export function supportDemo(url,locale,state,request) {
   if(state.supportScenario!==scenario&&state.supportConversations.length) {
     const detail=state.supportConversations[0];
     // Leaving the unassigned welcome returns the conversation to the demo advisor.
-    if(scenario!=='welcome-unassigned'&&!detail.conversation.ownerAgentId)Object.assign(detail.conversation,{ownerAgentId:'1',ownerAgentName:text('演示客服','Demo support','Hỗ trợ mẫu')});
+    if(scenario!=='welcome-unassigned'&&!detail.conversation.ownerAgentId)Object.assign(detail.conversation,{ownerAgentId:'1',ownerAgentName:'Demo support'});
     state.supportHistory=['history','timeline'].includes(scenario)||scenario==='incoming'&&state.supportHistory;
     if(['history','timeline'].includes(scenario)) {
       detail.messages=Array.from({length:24},(_,index)=>({id:nextMessageId(),senderType:index%2?'user':'agent',content:text('第'+(index+1)+'条历史消息。这里保留设备查询与服务沟通的完整内容，方便检查长正文换行。','History message '+(index+1)+'. The full device and service discussion remains available for checking long text wrapping.','Tin nhắn lịch sử '+(index+1)+'. Nội dung đầy đủ về thiết bị và hỗ trợ được giữ lại để kiểm tra văn bản dài.'),createdAt:new Date(Date.now()-(25-index)*60000).toISOString(),receiptStatus:index%2?'read':'sent'}));
@@ -175,17 +175,17 @@ export function supportDemo(url,locale,state,request) {
         ['agent',text('这条消息未提供回执。','No receipt was provided for this message.','Tin nhắn này không có thông tin xác nhận.'),null],
         ['user',text('谢谢，我稍后查看。','Thank you. I will check shortly.','Cảm ơn, tôi sẽ kiểm tra sau.'),'sent'],
       ];
-      detail.messages=samples.map(([senderType,content,receiptStatus],index)=>({id:nextMessageId(),senderType,content,createdAt:new Date(Date.now()-(samples.length-index)*60000).toISOString(),...(receiptStatus?{receiptStatus}:{}),...(senderType==='agent'?{senderName:text('演示客服','Demo support','Hỗ trợ mẫu')}:{})}));
+      detail.messages=samples.map(([senderType,content,receiptStatus],index)=>({id:nextMessageId(),senderType,content,createdAt:new Date(Date.now()-(samples.length-index)*60000).toISOString(),...(receiptStatus?{receiptStatus}:{}),...(senderType==='agent'?{senderName:'Demo support'}:{})}));
       Object.assign(detail.conversation,{unreadCount:2,lastMessage:detail.messages.at(-1).content,lastMessageAt:detail.messages.at(-1).createdAt,lastPublicMessageId:detail.messages.at(-1).id});
     } else if(scenario==='incoming') {
       const lastUser=detail.messages.filter(item=>item.senderType==='user').at(-1);if(lastUser)lastUser.receiptStatus='read';
       const id=nextMessageId();
       const content=text('已收到你的消息，我会继续跟进。','I have received your message and will follow up.','Tôi đã nhận được tin nhắn và sẽ tiếp tục hỗ trợ.');
-      detail.messages.push({id,senderType:'agent',senderName:text('演示客服','Demo support','Hỗ trợ mẫu'),content,createdAt:now,receiptStatus:'sent'});
+      detail.messages.push({id,senderType:'agent',senderName:'Demo support',content,createdAt:now,receiptStatus:'sent'});
       Object.assign(detail.conversation,{unreadCount:detail.conversation.unreadCount+1,lastMessage:content,lastMessageAt:now,lastPublicMessageId:id});
     } else if(scenario==='author-photo') {
       // Verified messages from owner 1 carry its avatar reference; the photo is served by the preview server.
-      const author={senderId:1,authorConfidence:'VERIFIED',senderAvatar:{assetId:'5b0f3c2e-8d4a-4c71-9e26-0a7d3f19b4c8',version:1},senderName:text('演示客服','Demo support','Hỗ trợ mẫu')};
+      const author={senderId:1,authorConfidence:'VERIFIED',senderAvatar:{assetId:'5b0f3c2e-8d4a-4c71-9e26-0a7d3f19b4c8',version:1},senderName:'Demo support'};
       const samples=[
         ['agent',text('你好，我是你的专属客服，有问题随时找我。','Hi, I am your dedicated advisor. Reach out any time.','Xin chào, tôi là cố vấn riêng của bạn. Cứ liên hệ khi cần nhé.')],
         ['user',text('好的，谢谢。','Great, thanks.','Vâng, cảm ơn.')],
@@ -207,13 +207,13 @@ export function supportDemo(url,locale,state,request) {
         {kind:'SKU',content:product+'UVELBox Pro',skuId:'stellarbox-pro',skuName:'UVELBox Pro',targetAvailability:'UNAVAILABLE'},
         {senderType:'user',content:text('好的，我看看。','Thanks, I will take a look.','Cảm ơn, tôi sẽ xem.'),receiptStatus:'read'},
       ];
-      const agent={senderType:'agent',senderName:text('演示客服','Demo support','Hỗ trợ mẫu')};
+      const agent={senderType:'agent',senderName:'Demo support'};
       detail.messages=samples.map((row,index)=>({id:nextMessageId(),...(row.senderType?{}:agent),createdAt:new Date(Date.now()-(samples.length-index)*60000).toISOString(),...row}));
       Object.assign(detail.conversation,{unreadCount:1,lastMessage:detail.messages.at(-1).content,lastMessageAt:detail.messages.at(-1).createdAt,lastPublicMessageId:detail.messages.at(-1).id});
     } else if(scenario==='agent-switch') {
       // B15: the server writes AGENT_SWITCH in the same transaction as the new agent's first message.
       // It carries only the new agent's display name (or none) and never moves the list preview or unread count.
-      const demo=text('演示客服','Demo support','Hỗ trợ mẫu'),next=text('林悦','Lin Yue','Lin Yue');
+      const demo='Demo support',next='Lin Yue';
       const samples=[
         ['agent',demo,text('你好，请问需要什么帮助？','Hello, how can I help?','Xin chào, bạn cần hỗ trợ gì?'),'read'],
         ['user',null,text('我的设备今天收益没有更新。','My device earnings did not update today.','Thu nhập thiết bị hôm nay chưa cập nhật.'),'read'],
@@ -235,7 +235,7 @@ export function supportDemo(url,locale,state,request) {
       // Just registered: the welcome is the account's only message, in a fresh
       // conversation so no earlier history merges in. Unassigned accounts get it
       // with no author (the server projects the owner as 待分配).
-      const advisor=text('演示顾问','Demo advisor','Cố vấn mẫu'),assigned=scenario==='welcome-assigned';
+      const advisor='Demo advisor',assigned=scenario==='welcome-assigned';
       const id=++state.supportConversationSequence;
       const message={id:nextMessageId(),senderType:'agent',kind:'TEXT',content:welcome,createdAt:now,...(assigned?{senderId:1,authorConfidence:'VERIFIED',senderName:advisor}:{})};
       state.supportConversations=[{conversation:{id,conversationNo:'DEMO-SUPPORT-'+id,conversationType:'advisor',status:'OPEN',version:1,
