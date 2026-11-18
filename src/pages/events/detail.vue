@@ -17,10 +17,9 @@
         <text class="event-heading">{{ copy.rewards }}</text>
         <text v-for="(reward, index) in detail.rewards" :key="index" class="event-copy">{{ reward.type === 'USDT' ? `${reward.pool ? `${copy.labels.poolUsdt} · ` : ''}${formatUsd(reward.quantity ?? reward.amount, 'detail')}` : eventDetailReward(reward, copy) }}</text>
       </view>
-      <view class="event-section event-section--plain">
+      <view v-if="ruleRows.length" class="event-section event-section--plain">
         <text class="event-heading">{{ copy.rules }}</text>
         <view v-for="row in ruleRows" :key="row.label" class="event-row" :class="{'event-rule-paragraph':[copy.labels.description,copy.labels.terms].includes(row.label)}"><text>{{ row.label }}</text><text>{{ row.value }}</text></view>
-        <template v-if="!ruleRows.length"><text class="event-copy">{{ copy.rulesUnavailable }}</text><view class="event-action" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text class="event-read-retry-label">{{ copy.retry }}</text></view></template>
       </view>
       <view v-if="detail.event.kind !== 'regional' && detail.targetValue > 0" class="event-section event-section--plain">
         <view class="event-row"><text class="event-heading">{{ copy.progress }}</text><text>{{ formatAmount(detail.progressValue) }} / {{ formatAmount(detail.targetValue) }}</text></view>
@@ -148,8 +147,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.valu
 .event-progress { margin-top:12px; height:5px; border-radius:5px; overflow:hidden; background:var(--v5-brand-soft); }
 .event-progress > view { height:100%; background:var(--v5-brand); }
 .event-result + .event-result { margin-top:14px; border-top:1px solid var(--v5-border); }
-.event-action, .event-primary { display:flex; justify-content:center; margin-top:16px; padding:13px 16px; border-radius:24px; font-size:13px; font-weight:600; color:var(--v5-brand); }
-.event-read-retry-label { font: 600 13px/20px var(--font-v5); }
+.event-primary { display:flex; justify-content:center; margin-top:16px; padding:13px 16px; border-radius:24px; font-size:13px; font-weight:600; color:var(--v5-brand); }
 .event-primary { background:var(--v5-brand); color:var(--v5-on-brand); }
 .event-navigate { margin-top:16px; width:100%; }
 .event-rule-paragraph { display:block; }
