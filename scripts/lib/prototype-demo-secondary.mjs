@@ -130,7 +130,7 @@ export function secondaryDemo(url,state,request,walletBills){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
-    const items=demoSettledTasks(state,state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
+    const items=demoSettledTasks(state,state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['Image generation','Language inference','Video generation'][i],proofHash:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts')return demoReceiptPage(url.searchParams,items);
     const receipt=items.find(r=>r.receiptNo===p.split('/').pop());
     if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
