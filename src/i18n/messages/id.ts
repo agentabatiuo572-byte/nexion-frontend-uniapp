@@ -1159,6 +1159,7 @@ export const id: Messages = {
     slotsUsed: "slot terpakai",
     deviceCount: "{n}/{max} perangkat",
     noCurrentTask: "Tidak ada tugas berjalan. Menunggu tugas baru.",
+    taskStatusUnavailable: "Status tugas tidak tersedia",
     phoneWaitingTask: "Menunggu tugas…",
     phoneTaskPaused: "Tugas dijeda",
     phoneTaskPausedHint: "Kembali ke aplikasi dan biarkan tetap terbuka di layar, dengan baterai minimal 20% dan koneksi internet. Penghitung waktu berlanjut setelah status diperbarui.",

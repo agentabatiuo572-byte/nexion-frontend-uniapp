@@ -1159,6 +1159,7 @@ export const kk: Messages = {
     slotsUsed: "орын бос емес",
     deviceCount: "{n}/{max} құрылғы",
     noCurrentTask: "Орындалып жатқан жұмыс жоқ. Жаңа жұмыс күтілуде.",
+    taskStatusUnavailable: "Жұмыс күйі қолжетімсіз",
     phoneWaitingTask: "Жұмыс алу күтілуде…",
     phoneTaskPaused: "Жұмыс кідіртілді",
     phoneTaskPausedHint: "Телефон қолданбасын алдыңғы экранға шығарыңыз: заряд кемінде 20%, интернет қосулы болсын. Күй жаңарғаннан кейін таймер жалғасады.",

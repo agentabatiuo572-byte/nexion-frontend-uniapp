@@ -30,7 +30,7 @@
     </view>
     <view v-else-if="active && (!remoteApiEnabled || device.kind !== 'phone')" class="device-inventory-row__task device-inventory-row__task--idle">
       <view class="device-inventory-row__wait" aria-hidden="true" />
-      <text>{{ recovering ? computeCopy.statuses.RECOVERING : runtimeConfirmed ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text>
+      <text>{{ recovering ? computeCopy.statuses.RECOVERING : !runtimeConfirmed ? t.earn.runtimeUnknown : tasksConfirmed ? t.earn.noCurrentTask : t.earn.taskStatusUnavailable }}</text>
     </view>
     <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" style="margin:12px 0 0" />
 
@@ -97,6 +97,8 @@ const props = withDefaults(
     device: Device;
     active: boolean;
     runtimeConfirmed?: boolean;
+    /** False when the task read failed, so an idle-looking card must not claim it is waiting for a job. */
+    tasksConfirmed?: boolean;
     showAction?: boolean;
     disabled?: boolean;
     actionDisabled?: boolean;
@@ -112,7 +114,7 @@ const props = withDefaults(
     tradeinCtaLabel?: string;
     tradeinDisabledText?: string;
   }>(),
-  { disabled: false, actionDisabled: false, showAction: true, runtimeConfirmed: true, quoteInfoOpen: false },
+  { disabled: false, actionDisabled: false, showAction: true, runtimeConfirmed: true, tasksConfirmed: true, quoteInfoOpen: false },
 );
 const emit = defineEmits<{ (e: "toggle"): void; (e: "tradein"): void; (e: "quote-info", open: boolean): void }>();
 const quoteInfoId = computed(() => `device-inventory-details-${encodeURIComponent(props.device.id)}-quote-info`);

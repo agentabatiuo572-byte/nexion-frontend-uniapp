@@ -1159,6 +1159,7 @@ export const fil: Messages = {
     slotsUsed: "slot na gamit",
     deviceCount: "{n}/{max} device",
     noCurrentTask: "Walang job na tumatakbo. Naghihintay ng bagong job.",
+    taskStatusUnavailable: "Hindi available ang status ng job",
     phoneWaitingTask: "Naghihintay ng job…",
     phoneTaskPaused: "Naka-pause ang job",
     phoneTaskPausedHint: "Buksan ulit ang app sa phone sa foreground, na may hindi bababa sa 20% na baterya at may koneksyon sa network. Magpapatuloy ang timer pagka-update ng status.",

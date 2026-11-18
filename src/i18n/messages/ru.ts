@@ -1159,6 +1159,7 @@ export const ru: Messages = {
     slotsUsed: "слотов занято",
     deviceCount: "Устройств: {n}/{max}",
     noCurrentTask: "Сейчас задач нет. Ждём новую.",
+    taskStatusUnavailable: "Статус задачи недоступен",
     phoneWaitingTask: "Ожидание задачи…",
     phoneTaskPaused: "Задача на паузе",
     phoneTaskPausedHint: "Откройте приложение на телефоне: заряд не ниже 20% и подключение к сети. Отсчёт продолжится после обновления статуса.",

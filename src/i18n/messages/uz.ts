@@ -1159,6 +1159,7 @@ export const uz: Messages = {
     slotsUsed: "slot band",
     deviceCount: "{n}/{max} qurilma",
     noCurrentTask: "Bajarilayotgan ish yoʻq. Yangi ish kutilmoqda.",
+    taskStatusUnavailable: "Ish holatini yuklab boʻlmadi",
     phoneWaitingTask: "Ish olinishi kutilmoqda…",
     phoneTaskPaused: "Ish toʻxtatildi",
     phoneTaskPausedHint: "Telefonda ilovani ochiq holda qoldiring: batareya kamida 20% va internet ulangan boʻlsin. Holat yangilangach, taymer davom etadi.",

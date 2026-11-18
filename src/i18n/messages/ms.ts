@@ -1159,6 +1159,7 @@ export const ms: Messages = {
     slotsUsed: "slot digunakan",
     deviceCount: "{n}/{max} peranti",
     noCurrentTask: "Tiada kerja sedang berjalan. Menunggu kerja baharu.",
+    taskStatusUnavailable: "Status kerja tidak tersedia",
     phoneWaitingTask: "Menunggu untuk ambil kerja…",
     phoneTaskPaused: "Kerja dijeda",
     phoneTaskPausedHint: "Buka semula app telefon di latar depan dengan bateri sekurang-kurangnya 20% dan sambungan rangkaian. Pemasa bersambung selepas status dikemas kini.",

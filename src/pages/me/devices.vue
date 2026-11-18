@@ -86,6 +86,7 @@
               :device="d"
               :active="true"
               :runtime-confirmed="!remoteApiEnabled || app.remoteFleetStatus === 'ready' || app.remoteFleetStatus === 'loading'"
+              :tasks-confirmed="!remoteApiEnabled || app.remoteAssignmentStatus === 'ready' || (app.remoteAssignmentStatus === 'loading' && app.remoteAssignmentHasSnapshot)"
               :show-action="canControlDevice(d)"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
