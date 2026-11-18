@@ -107,17 +107,20 @@ async function run() {
   const scope = identity(), request = generation;
   const current = () => visible && request === generation && scope === identity();
   busy.value = true; commandError.value = false;
+  const fleetRequest = selectedAction === "claim" ? app.captureRemoteAccountRequest() : undefined;
+  const deviceClaim = selectedAction === "claim" && detail.value.rewards.some((reward) => reward.type === "DEVICE");
   try {
     if (selectedAction === "remind") await api.remind(code, `h4-event-reminder:${code}`);
     else if (selectedAction === "claim") {
-      const fleetRequest = app.captureRemoteAccountRequest();
       // A lost claim receipt can leave the warehouse refresh to onShow.
-      if (detail.value.rewards.some((reward) => reward.type === "DEVICE")) app.invalidateRemoteFleet(fleetRequest);
+      if (deviceClaim) app.invalidateRemoteFleet(fleetRequest);
       const claim = await eventsApi.claim(code, eventClaimCommandKey(code, detail.value.claimKeys));
       if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
     } else await eventsApi.join(code, `h4-event-join:${code}`);
     if (current()) { busy.value = false; await load(); }
   } catch {
+    // The outcome is unknown even if this page is gone: a fleet read started during the claim may predate the device.
+    if (deviceClaim) app.invalidateRemoteFleet(fleetRequest);
     if (current()) { busy.value = false; commandError.value = true; unconfirmedAction = selectedAction; await load(); }
   }
 }
