@@ -2,9 +2,10 @@
 import { createHash } from 'node:crypto';
 import { fixture } from './design-review-fixture.mjs';
 const proof = { serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '' };
-export function learningDemo(url, locale, state, request) {
+export function learningDemo(url, state, request) {
   const prefix = '/api/content/learning/courses';
   if (!url.pathname.startsWith(prefix)) return undefined;
+  const locale = (url.searchParams.get('language')?.trim() || 'vi').toLowerCase().split('-')[0];
   const overview = fixture(new URL(prefix, url.origin), locale, state, request);
   const zh = locale === 'zh', vi = locale === 'vi';
   const questions = [

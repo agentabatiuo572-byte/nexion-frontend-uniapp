@@ -36,16 +36,41 @@ export function auxiliaryDemo(url,locale,state,request) {
     if(p.endsWith('/DEMO-BATCH-1'))return {...proof,serverCanonical:true,...batch,items:[{taskNo:'DEMO-TASK-1',receiptNo:'DEMO-RECEIPT-1',deviceId:41,taskType:'IG',amount:'2.340000',completedAt:now-3600000}]};
     return {...proof,serverCanonical:true,records:empty?[]:[batch],nextCursor:null};
   }
-  if(p==='/api/app/support/faqs/page') {
+  if(p==='/api/app/support/faqs'||p==='/api/app/support/faqs/page') {
+    const surface=(url.searchParams.get('surface')??'Help Center').trim().toLowerCase();
+    if(surface!=='help center') throw Object.assign(new Error('SUPPORT_FAQ_SURFACE_UNSUPPORTED'),{status:422});
     const questions=[
-      ['account','如何查看账户信息？','Where can I view account details?','Xem thông tin tài khoản ở đâu?','在“我的”中打开账户资料；修改后可返回核对。','Open your profile from Me, then return to verify any changes.','Mở hồ sơ từ Tôi và kiểm tra lại sau thay đổi.'],
-      ['earning','预估收益和已结算有什么区别？','How do estimates differ from settled earnings?','Ước tính khác thu nhập đã ghi nhận thế nào?','预估不是到账承诺。已结算金额以收益明细为准。','Estimates are not payment commitments. Settled amounts follow the earnings record.','Ước tính không phải cam kết trả tiền. Số đã quyết toán theo chi tiết thu nhập.'],
-      ['device','在哪里查看设备作业？','Where can I view device jobs?','Xem tác vụ thiết bị ở đâu?','打开设备详情，查看当前作业和完成记录。','Open device details for current jobs and completed records.','Mở chi tiết thiết bị để xem tác vụ hiện tại và lịch sử.'],
-      ['team','算力点是美元吗？','Are compute points dollars?','Điểm tính toán có phải USD?','不是。平台算力点用于统计算力；价格和奖励使用各自货币单位。','No. Platform compute points count compute; prices and rewards use their stated currency.','Không. Điểm nền tảng đếm năng lực; giá và thưởng dùng đơn vị tiền tương ứng.'],
+      ['account-details','account','如何查看账户信息？','Where can I view account details?','Xem thông tin tài khoản ở đâu?','在“我的”中打开账户资料；修改后可返回核对。','Open your profile from Me, then return to verify any changes.','Mở hồ sơ từ Tôi và kiểm tra lại sau thay đổi.'],
+      ['earning-estimates','earnings','预估收益和已结算有什么区别？','How do estimates differ from settled earnings?','Ước tính khác thu nhập đã ghi nhận thế nào?','预估不是到账承诺。已结算金额以收益明细为准。','Estimates are not payment commitments. Settled amounts follow the earnings record.','Ước tính không phải cam kết trả tiền. Số đã quyết toán theo chi tiết thu nhập.'],
+      ['device-jobs','hardware','在哪里查看设备作业？','Where can I view device jobs?','Xem tác vụ thiết bị ở đâu?','打开设备详情，查看当前作业和完成记录。','Open device details for current jobs and completed records.','Mở chi tiết thiết bị để xem tác vụ hiện tại và lịch sử.'],
+      ['compute-points','general','算力点是美元吗？','Are compute points dollars?','Điểm tính toán có phải USD?','不是。平台算力点用于统计算力；价格和奖励使用各自货币单位。','No. Platform compute points count compute; prices and rewards use their stated currency.','Không. Điểm nền tảng đếm năng lực; giá và thưởng dùng đơn vị tiền tương ứng.'],
     ];
-    const category=url.searchParams.get('category'),pageNum=Number(url.searchParams.get('pageNum')||1),pageSize=Number(url.searchParams.get('pageSize')||20);
-    const all=empty?[]:questions.filter(r=>!category||category==='all'||r[0]===category).map((r,i)=>({id:'demo-faq-'+i,category:r[0],question:text(r[1],r[2],r[3]),answer:text(r[4],r[5],r[6]),language:url.searchParams.get('language')||lang,sortOrder:i,version:1,updatedAt:iso}));
-    return {records:all.slice((pageNum-1)*pageSize,pageNum*pageSize),total:all.length,pageNum,pageSize};
+    const published=questions.flatMap(([key,category,zh,en,vi,zhAnswer,enAnswer,viAnswer],sortOrder)=>[
+      ['zh-CN',zh,zhAnswer], ['en-US',en,enAnswer], ['vi-VN',vi,viAnswer],
+    ].map(([language,question,answer])=>({id:`demo-faq-${key}-${language}`,category,surface:'Help Center',
+      status:'PUBLISHED',language,question,answer,sortOrder,version:1,updatedAt:iso})));
+    const category=url.searchParams.get('category')?.trim().toLowerCase();
+    const requested=url.searchParams.get('language')?.trim().toLowerCase()??'';
+    const baseLanguage=/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(requested)?requested.split('-')[0]:'en';
+    const extended=['id','ms','fil','ru','kk','uz'].includes(baseLanguage);
+    const language=extended?baseLanguage:({zh:'zh-CN',vi:'vi-VN',en:'en-US'}[baseLanguage]??'en-US');
+    const matching=empty?[]:published.filter(row=>row.surface.toLowerCase()===surface&&(!category||row.category===category));
+    let rows=matching.filter(row=>row.language===language||(extended&&row.language==='en-US'));
+    if(language==='vi-VN'&&!rows.length) rows=matching.filter(row=>row.language==='en-US');
+    rows.sort((left,right)=>left.sortOrder-right.sortOrder||left.id.localeCompare(right.id));
+    const paginated=p.endsWith('/page');
+    const pageNum=paginated?Math.max(1,Number(url.searchParams.get('pageNum')||1)):1;
+    const pageSize=paginated?Math.max(1,Math.min(50,Number(url.searchParams.get('pageSize')||20))):50;
+    const offset=(pageNum-1)*pageSize;
+    if(!Number.isSafeInteger(offset)||offset>2147483647||!Number.isInteger(pageSize)) {
+      throw Object.assign(new Error('SUPPORT_FAQ_PAGE_INVALID'),{status:422});
+    }
+    if(!paginated&&rows.length>pageSize) throw Object.assign(new Error('SUPPORT_FAQ_PAGE_REQUIRED'),{status:409});
+    const records=rows.slice(offset,offset+pageSize).map(({translations,...row})=>{
+      const translated=extended&&row.language==='en-US'?translations?.[language]:null;
+      return translated?{...row,...translated,language}:row;
+    });
+    return paginated?{records,total:rows.length,pageNum,pageSize}:records;
   }
   if(p==='/api/app/network/regions') {
     const regions=empty?[]:[['sg','Singapore',1.35,103.82,40,12],['jp','Tokyo',35.68,139.69,20,6],['vn','Ho Chi Minh City',10.82,106.63,10,3]].map(([id,name,latitude,longitude,activeNodes,activeJobs],i)=>({id,displayName:name,location:name,latitude,longitude,activeNodes,activeJobs,jobsPerHour:activeJobs*5,isUserRegion:i===0}));
