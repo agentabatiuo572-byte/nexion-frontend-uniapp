@@ -4204,6 +4204,7 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 - **入口**:IOSFrame Header 右上角 Search icon,所有 tab 路由可见
 - **索引**:20+ 静态路由 + Store products + 用户设备 + 网络成员 + FAQ 条目
 - **结果**:实时过滤(input change)+ 5 组分类(route / product / device / member / faq)+ 跳转 ChevronUpRight 图标
+- **商品结果**(2026-11-18):副标题为价格加 GPU、显存;规格值与商品详情硬件区同一映射,份额类商品后端固定的「不适用（虚拟算力份额）」在中文保持原文,其它八语显示各自的「不适用」;搜索按结果里显示的文字匹配
 - **i18n**:`search.*` namespace ~10 keys
 
 #### 11.12.6 长按设备菜单(Sprint P-full / P4)
