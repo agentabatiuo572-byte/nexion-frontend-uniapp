@@ -75,6 +75,8 @@ export interface ApiRequest {
 export interface ApiClient {
   /** Holds the current authentication identity across a multi-request operation. */
   captureSessionGuard?(): () => void;
+  /** Absolute Retry-After deadline for the current account and GET path. */
+  readCooldownUntil?(path: string): number | undefined;
   request<T>(request: ApiRequest): Promise<T>;
   upload<T>(request: ApiUploadRequest): Promise<T>;
   download?(request: { path: string; signal?: AbortSignal }): Promise<string>;
@@ -174,8 +176,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   const refreshCredentialMode = options.refreshCredentialMode ?? "token";
   let refreshInFlight: Promise<SessionSnapshot> | null = null;
   const readCooldowns = new Map<string, { until: number; error: ApiError }>();
-  const cooldownKey = (request: HttpRequest) => JSON.stringify([request.url,
+  const requestUrl = (path: string) => `${baseUrl}/${path.replace(/^\/+/, "")}`;
+  const cooldownKey = (url: string) => JSON.stringify([url,
     remoteAccountScope.snapshot(), options.vault.read()?.user.userId ?? null]);
+  const readCooldownUntil = (path: string) => readCooldowns.get(cooldownKey(requestUrl(path)))?.until;
 
   function businessWrite(request: HttpRequest): boolean {
     if (request.method === "GET") return false;
@@ -194,7 +198,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     acceptedResponses: ApiRequest["acceptedResponses"] = [],
   ): Promise<T> {
     const snapshotWrite = captureTabSnapshotWrite();
-    const key = request.method === "GET" ? cooldownKey(request) : null;
+    const key = request.method === "GET" ? cooldownKey(request.url) : null;
     const cooldown = key ? readCooldowns.get(key) : undefined;
     if (cooldown && Date.now() < cooldown.until) throw new ApiError({ ...cooldown.error,
       message: cooldown.error.message, retryAfterMs: Math.max(0, cooldown.until - Date.now()) });
@@ -439,7 +443,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     if (apiRequest.idempotencyKey) headers["Idempotency-Key"] = apiRequest.idempotencyKey;
 
     const httpRequest: HttpRequest = {
-      url: `${baseUrl}/${apiRequest.path.replace(/^\/+/, "")}`,
+      url: requestUrl(apiRequest.path),
       method: apiRequest.method ?? "GET",
       headers,
       timeoutMs: apiRequest.timeoutMs ?? 12_000,
@@ -627,7 +631,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       }
     };
   }
-  return { request, upload, download, refreshSession, captureSessionGuard };
+  return { request, upload, download, refreshSession, captureSessionGuard, readCooldownUntil };
 }
 
 export function createUniHttpTransport(): HttpTransport {
