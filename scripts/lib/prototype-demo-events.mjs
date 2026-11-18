@@ -21,6 +21,7 @@ const events=[
   ['welcome','onboarding','新用户成长礼','New member rewards','Quà thành viên mới','/pages/missions/missions'],
 ];
 const wheelSegments=[5,10,20,50,100,200].map((amount,index)=>({tierId:'demo-tier-'+index,rewardType:'UVT',rewardAmount:amount,rewardName:amount+' UVT',realOutflow:false,displayOrder:index}));
+const joinedPresetEvents=['upgrade','invite','weekend','season'];
 
 export function demoH4Account(state,now=Date.now(),presetDates=[]) {
   if(state.accountCreatedAt==null){
@@ -47,7 +48,7 @@ function scene(state,now) {
   // These presets provide prior participation, timed referrals or a completed
   // spin. They never grant onboarding eligibility or set a projected status.
   const candidates=['joined','claimable','claimed'].includes(mode)
-    ? ['upgrade','invite','weekend','season'] : mode==='mixed'?['invite']:[];
+    ? joinedPresetEvents : mode==='mixed'?['invite']:[];
   const spins=mode==='ended'?[{result:wheelAward(now-2*day,'DAILY'),at:now-2*day}]:[];
   const record=state.h4Events={at:now,joined:[],spins,reminders:[],claims:{}};
   record.joined=candidates.filter(code=>eventWindow(code,state,now).state!=='upcoming');
@@ -62,17 +63,21 @@ export function setDemoH4Scene(state,now) {
 export function initializeDemoH4State(state,now=Date.now()) {
   // An imported scene uses saved evidence. The panel can still explicitly
   // supply sample spins, referrals and receipts by selecting a new scene.
+  const restoreJoinedPreset=!state.h4Events&&state.eventState==='joined';
   const record=state.h4Events??={at:now,joined:
     state.eventState==='mixed'&&!state.eventStatuses?.['demo-invite']?['invite']:[],
     spins:[],reminders:[],claims:{},sampleInvites:false};
   if(record.legacyClaims?.includes('invite')&&!record.claims.invite)record.sampleInvites=false;
   delete record.legacyClaims;
-  const known=events.map(([code])=>code);
-  for(const code of known){
+  for(const [code] of events){
     const status=state.eventStatuses?.['demo-'+code];
-    if(status==='JOINED'&&eventWindow(code,state,now).state!=='upcoming'&&!record.joined.includes(code))record.joined.push(code);
+    const joined=status==='JOINED'||restoreJoinedPreset&&joinedPresetEvents.includes(code);
+    if(joined&&eventWindow(code,state,now).state!=='upcoming'&&!record.joined.includes(code))record.joined.push(code);
     if(state.reminders?.includes('demo-'+code)&&!record.reminders.includes(code))record.reminders.push(code);
   }
+  // An open legacy scene saved no start time. Its dated spins still anchor
+  // that window, but a scheduled wheel has a start and cannot award earlier.
+  const scheduledWheelStart=state.eventState==='upcoming'?eventWindow('spin',state,now).startsAt:null;
   for(const {awardedAt,...result} of state.spinHistory??[]){
     // A bare "spun" flag has no day. Only a dated record for this wheel
     // establishes participation or consumes a daily opportunity.
@@ -81,8 +86,9 @@ export function initializeDemoH4State(state,now=Date.now()) {
         ||!['DAILY','BONUS'].includes(result.sourceType)||result.rewardType!=='UVT'
         ||!Number.isFinite(result.rewardAmount)||result.rewardAmount<0
         ||record.spins.some(spin=>spin.result.spinId===result.spinId))continue;
-    const at=Date.parse(awardedAt);
-    record.spins.push({result,at:Number.isFinite(at)?at:spinDay,historyOnly:true});
+    const awardedAtMs=Date.parse(awardedAt),at=Number.isFinite(awardedAtMs)?awardedAtMs:spinDay;
+    if(scheduledWheelStart!==null&&at<scheduledWheelStart)continue;
+    record.spins.push({result,at,historyOnly:true});
   }
   record.spins.sort((left,right)=>right.at-left.at);
   for(const key of ['eventStatuses','reminders','spun','spinHistory'])delete state[key];
