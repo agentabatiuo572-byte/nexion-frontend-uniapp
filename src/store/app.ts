@@ -1058,6 +1058,8 @@ export const useApp = defineStore("app", () => {
     request: RemoteAccountRequest = remoteAccountEpoch.snapshot(),
     options: RemoteFleetRefreshOptions = {},
   ): Promise<boolean> {
+    // A request captured for a previous account must not disturb the current account's fleet reads.
+    if (!remoteAccountEpoch.isCurrent(request)) return false;
     if (options.coalesce && Date.now() < remoteFleetRetryAt) return false;
     invalidateBeforePassiveTabRead("remote-fleet");
     if (!remoteApiEnabled) return true;
