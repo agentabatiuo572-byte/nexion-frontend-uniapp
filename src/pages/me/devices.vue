@@ -269,11 +269,14 @@ const slotMeterLabel = computed(() =>
 type Bay = { key: string; kind: "device" | "trial" | "reserved" | "hidden" | "empty" | "loading"; device?: Device; image?: string;
   name: string; online: boolean; label: string; target: string };
 const deviceOnline = (d: Device) => deviceOnlineState(d, Date.now(), !remoteApiEnabled || app.remoteFleetStatus === "ready" || app.remoteFleetStatus === "loading") === "online";
-const onlineCount = computed(() => activeDevices.value.filter(deviceOnline).length + (trialPresentation.active.value && trial.status === "active" ? 1 : 0));
+// With a known count the tag counts the drawn bays, so it matches the grid.
+const onlineCount = computed(() => slotsUsed.value === null
+  ? activeDevices.value.filter(deviceOnline).length + (trialPresentation.active.value && trial.status === "active" ? 1 : 0)
+  : bays.value.filter((bay) => bay.online).length);
 const bays = computed<Bay[]>(() => {
   const blank = (kind: Bay["kind"], i: number): Bay => ({ key: `${kind}:${i}`, kind, name: "", online: false, label: "", target: "" });
   if (slotsUsed.value === null) return Array.from({ length: app.slotCap }, (_, i) => blank("loading", i));
-  const list: Bay[] = [];
+  let list: Bay[] = [];
   if (trialPresentation.active.value) {
     const name = trialPresentation.deviceName.value || "—";
     const online = trial.status === "active";
@@ -284,10 +287,14 @@ const bays = computed<Bay[]>(() => {
     const name = deviceName(t.value, d), online = deviceOnline(d);
     list.push({ key: d.id, kind: "device", device: d, name, online, label: online ? `${name} · ${t.value.earn.online}` : name, target: d.id });
   }
-  const reserved = app.remoteSlotUsage?.reservedSlotCount ?? 0;
-  for (let i = 0; i < reserved && list.length < app.slotCap; i++) list.push(blank("reserved", i));
-  // Hidden phones keep their server slots: those bays stay occupied without showing the phone.
-  while (list.length < Math.min(slotsUsed.value, app.slotCap)) list.push(blank("hidden", list.length));
+  // The fleet's count decides exactly how many bays are free, in both directions (as in use-fleet-slots).
+  // More drawn items than used slots means a stale snapshot: the separately read trial goes first.
+  const used = Math.min(slotsUsed.value, app.slotCap);
+  if (list.length > used) list = list.filter((bay) => bay.kind !== "trial").slice(0, used);
+  const reserved = Math.min(app.remoteSlotUsage?.reservedSlotCount ?? 0, used - list.length);
+  for (let i = 0; i < reserved; i++) list.push(blank("reserved", i));
+  // Hidden phones and slots not yet classified (e.g. the trial read is pending) stay occupied, never clickable.
+  while (list.length < used) list.push(blank("hidden", list.length));
   while (list.length < app.slotCap) list.push(blank("empty", list.length));
   return list;
 });
