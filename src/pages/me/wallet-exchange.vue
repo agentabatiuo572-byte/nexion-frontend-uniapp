@@ -711,7 +711,7 @@ function notifyRemoteSwapResult(
   if (order.status === "QUEUED") {
     toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(
       t.value.exchange.queuedToastTitle,
-      fmt(t.value.exchange.queuedToastBody, { amount: formatAmount(order.fromAsset === "USDT" ? order.fromAmount : order.toAmount), zone: businessOffsetLabel("LEGACY") }),
+      order.queueEstimate?.copy ?? t.value.exchange.queuedToastBody,
     ));
     return;
   }
@@ -848,7 +848,7 @@ async function handleConfirm() {
           v3.enqueue({ amountUSD: snap.usd, direction: snap.direction });
           toastIfRemoteScopeCurrent(requestScope, requestRunScope, () => toast.info(
             t.value.exchange.queuedToastTitle,
-            fmt(t.value.exchange.queuedToastBody, { amount: formatAmount(snap.usd), zone: businessOffsetLabel("LEGACY") }),
+            t.value.exchange.queuedToastBody,
           ));
         }
         return;
