@@ -598,7 +598,7 @@ export function demoFixture(url,locale,state,request) {
     else if(Math.min(trackA,trackB)<threshold)blockedReason='BINARY_THRESHOLD_NOT_MET';
     else if(Number(asOfDate.slice(8))!==monthEnd)blockedReason='F3_SETTLEMENT_NOT_DUE';
     return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,autoPlacedMembers:0,
-      matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:blockedReason?0:Math.min(periodCap,Math.min(trackA,trackB)*matchRate),
+      matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:blockedReason?0:Number(Math.min(periodCap,Math.min(trackA,trackB)*matchRate).toFixed(6)),
       settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
       recentMatches:matches
         .map(event=>({id:event.id,amountUsdt:event.amountUSDT,status:event.status.toUpperCase(),
