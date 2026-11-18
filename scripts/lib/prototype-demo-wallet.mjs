@@ -32,6 +32,20 @@ export function demoWalletUsdt(state) {
   return accountDeletionWallet(state)?.usdtAvailable??state.walletBalance??(state.dataState==='empty'?0:52800.64);
 }
 
+export const demoHasEarningsHistory=state=>state.dataState!=='empty'
+  &&(!state.accountDeletionState||state.accountDeletionState==='follow');
+
+export function initializeDemoWalletCheckpoint(state) {
+  // An imported wallet already includes its old orders and any saved milestone credits.
+  state.walletUsdtCheckpoint??=money(demoWalletUsdt(state)-(state.milestoneClaimReceipts??[])
+    .filter(({result})=>result?.rewardType==='USDT').reduce((total,{result})=>total+result.rewardAmount,0));
+}
+
+export function postDemoWalletUsdt(state,amount) {
+  initializeDemoWalletCheckpoint(state);
+  state.walletBalance=money(demoWalletUsdt(state)+amount);
+}
+
 function savedNexBalance(state) {
   return accountDeletionWallet(state)?.nexAvailable??state.walletNexBalance??(state.dataState==='empty'?0:1280);
 }
@@ -42,12 +56,13 @@ export function demoWalletNex(state,now) {
 
 export function creditDemoDailyMilestone(state,asset,amount) {
   if(asset==='UVT')state.walletNexBalance=money(savedNexBalance(state)+amount);
-  if(asset==='USDT')state.walletBalance=money(demoWalletUsdt(state)+amount);
+  if(asset==='USDT')postDemoWalletUsdt(state,amount);
 }
 
 export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt)) {
+  initializeDemoWalletCheckpoint(state);
   const commissions=demoCommissionEvents(seedAt).filter(event=>['unlocked','withdrawn'].includes(event.status));
-  const seeds=state.dataState==='empty'||accountDeletionWallet(state)?[]:[
+  const seeds=!demoHasEarningsHistory(state)?[]:[
     ['COMPUTE_EARNING','UVT','IN',15,'earn',seedAt],
     ['REFERRAL_REWARD','UVT','IN',10,'bonus',seedAt-day],
     ['DEVICE_PURCHASE','USDT','OUT',1299,'purchase',seedAt-2*day],
@@ -55,29 +70,48 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
     ['COMPUTE_EARNING','USDT','IN',128.5,'earn',seedAt-4*day],
     ['COMPUTE_EARNING','USDT','IN',.00032,'earn',seedAt-5*day],
     ['TEAM_COMMISSION','UVT','IN',10,'refer',seedAt-day,'PENDING'],
-    ...tasks.map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo]),
+    ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
     ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].map(([asset,amount])=>
       ['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-${asset}-RELEASE`])),
-  ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo],index)=>({
-    id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',
+  ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo],index)=>({
+    id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
   const credits=demoH4Credits(state,now).map(({id,type,amount,at,includedInBalance})=>({
     id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
   for(const {at,result} of state.milestoneClaimReceipts??[]){
+    if(!result)continue;
     const {milestoneId,rewardType:asset,rewardAmount:amount}=result;
     if(asset!=='UVT'&&asset!=='USDT')continue;
     const bizNo=`DAILY-MS:900001:${milestoneId}`;
     credits.push({id:bizNo,bizNo,bizType:'DAILY_MILESTONE',asset,direction:'IN',amount,at,
-      includedInBalance:true,status:'SUCCESS',remark:'H5 daily milestone claim',category:'achievement',presentationCode:'achievement'});
+      includedInBalance:asset==='UVT',status:'SUCCESS',remark:'H5 daily milestone claim',category:'achievement',presentationCode:'achievement'});
   }
-  // Saved balances already include the seed history and any imported credits marked as included.
-  // Derive the opening balances from that checkpoint and replay the combined dated ledger once.
-  const balances={USDT:demoWalletUsdt(state),UVT:savedNexBalance(state)};
+  const debits=(state.walletPurchaseDebits??[]).map(({orderNo,amount,at})=>({
+    id:orderNo,bizNo:orderNo,bizType:'ORDER_PURCHASE',asset:'USDT',direction:'OUT',amount,at,
+    status:'SUCCESS',category:'purchase',remark:'UVEL wallet order settlement',
+  }));
+  const deliveries=tasks.filter(task=>task.deliveryCycle).map(({taskNo,amount,postedAt,batchNo})=>({
+    id:taskNo,bizNo:taskNo,bizType:'COMPUTE_TASK_REWARD',asset:'USDT',direction:'IN',amount,at:postedAt,
+    status:'SUCCESS',category:'bonus',remark:'',batchNo,
+  }));
+  // The USDT checkpoint predates newly modeled movements. Historic seed credits
+  // were already included. UVT still uses the saved balance and import markers.
+  const balances={USDT:state.walletUsdtCheckpoint,UVT:savedNexBalance(state)};
   for(const row of [...seeds.filter(settled),...credits.filter(row=>row.includedInBalance)])balances[row.asset]-=signed(row);
-  return [...seeds,...credits].sort((left,right)=>left.at-right.at).map(({at,includedInBalance,...row})=>{
-    if(settled(row))balances[row.asset]=money(balances[row.asset]+signed(row));
-    return {...row,balanceAfter:money(balances[row.asset]),createdAt:new Date(at).toISOString()};
+  const rows=[...seeds,...credits,...debits,...deliveries].sort((left,right)=>left.at-right.at);
+  const batchTotals=new Map(),batchBalances=new Map();
+  for(const row of rows)if(row.batchNo&&settled(row)){
+    const key=`${row.batchNo}:${row.asset}`;
+    batchTotals.set(key,(batchTotals.get(key)??0)+signed(row));
+  }
+  return rows.map(({at,includedInBalance,batchNo,...row})=>{
+    const key=batchNo&&`${batchNo}:${row.asset}`;
+    if(settled(row)&&(!key||!batchBalances.has(key))){
+      balances[row.asset]=money(balances[row.asset]+(key?batchTotals.get(key):signed(row)));
+      if(key)batchBalances.set(key,balances[row.asset]);
+    }
+    return {...row,balanceAfter:money(batchBalances.get(key)??balances[row.asset]),createdAt:new Date(at).toISOString()};
   }).reverse();
 }
 
