@@ -253,15 +253,22 @@ const samplePlacedAgo={urgent:paymentWindow-(4*60000+50000),late:paymentWindow-6
 const deadlineTaskDelay=60000;
 export const demoTimedOutOrder={canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'};
 export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'&&order.expiresAt+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo];
-function demoOrders(products,state,now) {
+function demoOrders(products,state,now,device41) {
   if (state.accountDeletionState === 'clear') return [];
   const at=state.sampleOrdersAt??=now;
-  return Object.entries(orderStates).map(([original,statuses],i)=>{
+  return Object.entries(orderStates).map(([original],i)=>{
     const orderNo='DEMO-ORDER-'+String(i+1).padStart(3,'0'),canonicalStatus=state.orderStatuses?.[orderNo]||original;
-    const [paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus],product=products[i%products.length];
-    const placedAt=original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
-    return {orderNo,productId:i%products.length+1,productNo:product.id,productName:product.name,quantity:1,computePoints:product.computePoints,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:0,amountUsdt:product.price,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?at-3600000:null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:original==='activated'?'REVIEW-S1':null,itemCount:1,
-      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:product.price,lineAmountUsdt:product.price}]};
+    const [paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus];
+    const device=original==='activated'?device41:null;
+    const product=device?products.find(item=>item.id===device.productCode.toLowerCase()):products[i%products.length];
+    const unitPrice=device?device.actualPaidUsdt:product.price;
+    // The legacy and V8 scenarios retain the points credited on their historical purchase.
+    let computePoints=product.computePoints;
+    if(device&&state.highestRank)computePoints=64000;
+    else if(device&&state.walletLegacySeed)computePoints=1280;
+    const placedAt=device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
+    return {orderNo,productId:products.indexOf(product)+1,productNo:product.id,productName:product.name,quantity:1,computePoints,subtotalUsdt:unitPrice,unitPriceUsdt:unitPrice,discountUsdt:0,amountUsdt:unitPrice,paymentMethod:'WALLET',paymentStatus,orderStatus,activationStatus,canonicalStatus,orderType:'SINGLE',placedAt,expiresAt:['placed','expired'].includes(canonicalStatus)?placedAt+paymentWindow:null,paidAt:['paid','provisioning','activated','provisioning_failed','refunded','chargeback'].includes(canonicalStatus)?placedAt+samplePaidAfter:null,activatedAt:canonicalStatus==='activated'?(device?.activatedAt??at-3600000):null,refundedAt:canonicalStatus==='refunded'?at-3600000:null,refundAmountUsdt:canonicalStatus==='refunded'?product.price:null,refundChannel:canonicalStatus==='refunded'?'WALLET':null,refundBillNo:canonicalStatus==='refunded'?'DEMO-REFUND-1':null,refundReasonCode:canonicalStatus==='refunded'?'DELIVERY_UNAVAILABLE':null,closeReasonCode:{cancelled:'USER_CANCELLED',expired:'PAYMENT_TIMEOUT',payment_failed:'PAYMENT_NOT_RECEIVED',provisioning_failed:'DELIVERY_UNAVAILABLE',chargeback:'PAYMENT_DISPUTED'}[canonicalStatus]??null,dataCenter:'Singapore',tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:device?.instanceNo??null,itemCount:1,
+      lineItems:[{sku:product.id,name:product.name,quantity:1,unitPriceUsdt:unitPrice,lineAmountUsdt:unitPrice}]};
   }).filter(order=>!accountDeletionWallet(state)||(['COMPLETED','CANCELLED','CLOSED','FAILED','REFUNDED'].includes(order.orderStatus)&&['PAID','FAILED','CANCELLED','REFUNDED','EXPIRED'].includes(order.paymentStatus)));
 }
 
@@ -287,21 +294,19 @@ const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
 // closed reads as expired, as that task (modelled for session orders by the checkout fixture) leaves it.
 function demoScenarioOrders(products,state,now,device41) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
-  return [...own,...demoOrders(products,state,now).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
+  return [...own,...demoOrders(products,state,now,device41).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
     &&(device41||order.orderNo!=='DEMO-ORDER-004'))
-    .map(order=>order.orderNo==='DEMO-ORDER-004'?{...order,computePoints:state.highestRank?64000:1280,placedAt:device41.activatedAt-samplePaidAfter,paidAt:device41.activatedAt,activatedAt:device41.activatedAt}:order)
     .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
 }
-const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>orderNo==='DEMO-ORDER-004'
-  ?'REVIEW-S1':`${orderNo}-${line}-${unit}`;
+const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${unit}`;
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
   if(!state.fleetSeed)demoFleetFacts(url,locale,state);
   return demoScenarioOrders(demoProducts(state,url.origin,locale),state,now,state.fleetSeed.find(device=>device.id===41))
     .map(order=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
-      targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
+      targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?order.targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
     }:order);
 }
 // Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.

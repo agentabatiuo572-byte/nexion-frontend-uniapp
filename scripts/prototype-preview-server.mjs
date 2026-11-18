@@ -29,7 +29,8 @@ if(process.env.DEMO_STATE_FILE){
   if(state.computeTaskSnapshots)state.computeResumeAt=startedAt;
 }
 initializeDemoPreviewAccount(state,startedAt);
-if(state.withdrawLimitState==='used')state.withdrawLimitCreatedAt??=startedAt;
+if(state.dataState==='empty')state.withdrawLimitState='open';
+else if(state.withdrawLimitState==='used')state.withdrawLimitCreatedAt??=startedAt;
 initializeDemoWalletHistory(state,state.previewFactsAt);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
@@ -117,6 +118,7 @@ const server=http.createServer(async(req,res)=>{
           Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
         }
         for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
+        if(state.dataState==='empty')state.withdrawLimitState='open';
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.authState)delete state.scopeCalls;
@@ -172,7 +174,10 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];
         realtime.stateChanged(update);
       }
-      return sendJson(res,{state,options:demoOptions,simulation:true});
+      const options=state.dataState==='empty'
+        ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}
+        : demoOptions;
+      return sendJson(res,{state,options,simulation:true});
     }
     if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}

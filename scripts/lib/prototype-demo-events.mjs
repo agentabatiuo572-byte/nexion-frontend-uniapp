@@ -117,8 +117,22 @@ export function demoH4TeamMembers(state,now) {
         amountUsdt:i===0&&!state.walletLegacySeed?100:1299},
       {orderNo:`DEMO-TEAM-${name.toUpperCase()}-2`,paidAt:sampleAt,points,amountUsdt:points},
     ];
-    if(hasCatalogPurchase&&i===0)paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1',
-      paidAt:state.catalogPresetAt??sampleAt,points:state.catalogPresetAt==null?4800:6400,amountUsdt:1299});
+    if(hasCatalogPurchase&&i===0){
+      const firstPurchaseAt=state.catalogPresetAt??sampleAt;
+      paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1',paidAt:firstPurchaseAt,
+        points:state.catalogPresetAt==null?4800:6400,amountUsdt:1299});
+      // The ordinary team buys again on the first of each Vietnam business month.
+      // Each order keeps its own date and continues to count toward lifetime volume.
+      if(!state.walletLegacySeed){
+        const [year,firstMonth]=demoTeamBusinessDate(firstPurchaseAt).split('-').map(Number);
+        for(let nextMonth=firstMonth; ; nextMonth++){
+          const paidAt=Date.UTC(year,nextMonth,1,-7);
+          if(paidAt>now)break;
+          paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1-'+demoTeamBusinessDate(paidAt).slice(0,7),
+            paidAt,points:6400,amountUsdt:1299});
+        }
+      }
+    }
     if(state.highestRank&&!parent)paidOrders.push({orderNo:`DEMO-TEAM-${name.toUpperCase()}-V8`,
       paidAt:joinedAt+day,points:400000,amountUsdt:40000});
     members.push({id:String(i<8?100+i:120+i-8),name,avatarUrl:null,vRank:state.highestRank&&!parent?7:i%4,layer:parent?parent.layer+1:1,
