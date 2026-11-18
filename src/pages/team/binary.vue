@@ -164,10 +164,8 @@ const pageState = computed(() => binaryPageState({
   binaryStatus: commission.binaryStatus,
   networkStatus: network.remoteStatus,
 }));
+// Member details show only from a healthy read: a retry after a failed read must not bring back cached members.
 const memberDetailsReadable = computed(() => pageState.value.memberDetails === 'ready'
-  || (pageState.value.memberDetails === 'loading' && network.hasRemoteSnapshot));
-// Group counts show only from a healthy read: a retry after a failed read must not bring back the cached count.
-const memberCountReadable = computed(() => pageState.value.memberDetails === 'ready'
   || (pageState.value.memberDetails === 'loading' && network.hasRemoteSnapshot && !network.remoteTransientFailure));
 const remoteTrackA = computed(() => snapshot.value?.trackA ?? 0);
 const remoteTrackB = computed(() => snapshot.value?.trackB ?? 0);
@@ -211,7 +209,7 @@ const spilloverCount = computed(() => remoteApiEnabled ? snapshot.value?.autoPla
 
 // The team network stops at layer 7, so a group reaching it may have deeper members it cannot count (F3-BE-07).
 function wholeGroupCount(members: NetworkMember[]): number | null {
-  return memberCountReadable.value && !members.some((member) => member.layer >= 7) ? members.length : null;
+  return memberDetailsReadable.value && !members.some((member) => member.layer >= 7) ? members.length : null;
 }
 
 function topOf(members: NetworkMember[]): NetworkMember | undefined {
