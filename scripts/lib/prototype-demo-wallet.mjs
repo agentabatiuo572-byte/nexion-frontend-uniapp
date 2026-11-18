@@ -134,7 +134,17 @@ export function postDemoActivityRewards(state,now) {
   }
 }
 
-export const demoHasOpeningMilestone=state=>demoHasEarningsHistory(state)&&state.streakState==='normal';
+export function initializeDemoWalletHistory(state,accountAt) {
+  state.walletLegacySeed??=false;
+  // The opening milestone is already in the balance checkpoint. Keep its
+  // original place in the ledger when the sign-in presentation changes.
+  if(state.walletOpeningMilestoneAt===undefined){
+    state.walletOpeningMilestoneAt=demoHasEarningsHistory(state)&&state.streakState==='normal'
+      ?accountAt-10*day:null;
+  }
+}
+
+export const demoHasOpeningMilestone=state=>state.walletOpeningMilestoneAt!=null;
 
 export function initializeLegacyStreakSavers(state) {
   if(!state.walletLegacySeed||state.streakSaverBalance!=null)return;
@@ -194,7 +204,7 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
     ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].filter(([,amount])=>amount>0)
       .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-${asset}-RELEASE`])),
     ...(demoHasOpeningMilestone(state)&&!state.walletLegacySeed&&!firstMilestoneRecorded?[
-      ['DAILY_MILESTONE','UVT','IN',5,'achievement',(state.streakSeedAt??seedAt)-10*day,'SUCCESS','DAILY-MS:900001:1'],
+      ['DAILY_MILESTONE','UVT','IN',5,'achievement',state.walletOpeningMilestoneAt,'SUCCESS','DAILY-MS:900001:1'],
     ]:[]),
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo],index)=>({
     id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
