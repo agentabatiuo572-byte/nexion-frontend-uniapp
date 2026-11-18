@@ -61,18 +61,22 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
       // one wallet balance and settles stock, capacity, receipt and fleet; the command is recorded only after it.
       const authorization = pin.authorize(request.postDataJSON());
       if (authorization.status !== 200) return authorization;
-      if (sample) { state.createdOrders ??= []; state.createdOrders.push(order); }
+      const firstPayment=order.paymentStatus==='PENDING';
+      if (sample&&firstPayment) { state.createdOrders ??= []; state.createdOrders.push(order); }
       let settled;
       try { settled = demoFixture(url,locale(),state,request); }
       catch (error) {
-        if (sample) state.createdOrders.splice(state.createdOrders.indexOf(order),1);
+        if (sample&&firstPayment) state.createdOrders.splice(state.createdOrders.indexOf(order),1);
         const refusal = {status:error.status??409,message:error.message,data:null};
         if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
         return refusal;
       }
-      Object.assign(order,{paymentNo:settled.paymentNo,targetDeviceId:order.targetDeviceId??90301,targetDeviceInstanceNo:order.targetDeviceInstanceNo??orderNo+'-0-0'});
+      if(firstPayment){
+        Object.assign(order,{paymentNo:settled.paymentNo,targetDeviceId:order.targetDeviceId??90301,
+          targetDeviceInstanceNo:order.targetDeviceInstanceNo??orderNo+'-0-0'});
+        pin.state.payWrites++;
+      }
       if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
-      pin.state.payWrites++;
       return {...ok(settled),drop:pin.state.dropNextPayment?(pin.state.dropNextPayment=false,true):false};
     }
     return ok(demoFixture(url,locale(),state,request));
