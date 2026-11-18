@@ -111,6 +111,8 @@ async function run() {
     if (selectedAction === "remind") await api.remind(code, `h4-event-reminder:${code}`);
     else if (selectedAction === "claim") {
       const fleetRequest = app.captureRemoteAccountRequest();
+      // A lost claim receipt can leave the warehouse refresh to onShow.
+      if (detail.value.rewards.some((reward) => reward.type === "DEVICE")) app.invalidateRemoteFleet(fleetRequest);
       const claim = await eventsApi.claim(code, eventClaimCommandKey(code, detail.value.claimKeys));
       if (claim.rewardType === "DEVICE") await app.refreshRemoteFleet(fleetRequest);
     } else await eventsApi.join(code, `h4-event-join:${code}`);
