@@ -106,33 +106,23 @@ export function demoH4TeamMembers(state,now) {
   const members=[];
   const names=['Maya','Linh','Sam','Rin','Jo','Noah','Mina','Leo'];
   if(state.highestRank)names.push('Ari','Binh','Chau','Dan','Eli');
-  // A catalog selection changes the offer, not an order already paid by a member.
+  // Older handoffs may carry their original catalog purchase date and point allocation.
+  const catalogPaidAt=state.catalogAvailableAt??state.catalogPresetAt;
   const hasCatalogPurchase=!state.walletLegacySeed||state.catalogPresetAt!=null;
+  const splitCatalogPoints=hasCatalogPurchase&&state.catalogAvailableAt!=null&&state.catalogPresetAt==null;
   for(const [i,name] of names.entries()){
     const parent=members[[null,null,null,1,0,1,4,5][i]];
     const joinedAt=createdAt+(i+2)*day;
     const points=[160,240,320,360,440,480,560,640][i]??160;
+    // The six active opening orders share 400 points; the selectable S1 holds the other 6400.
+    const openingPoints=splitCatalogPoints&&i<6?points/5:points;
     const paidOrders=[
       {orderNo:`DEMO-TEAM-${name.toUpperCase()}-1`,paidAt:joinedAt,points:3*points,
         amountUsdt:i===0&&!state.walletLegacySeed?100:1299},
-      {orderNo:`DEMO-TEAM-${name.toUpperCase()}-2`,paidAt:sampleAt,points,amountUsdt:points},
+      {orderNo:`DEMO-TEAM-${name.toUpperCase()}-2`,paidAt:sampleAt,points:openingPoints,amountUsdt:points},
     ];
-    if(hasCatalogPurchase&&i===0){
-      const firstPurchaseAt=state.catalogPresetAt??sampleAt;
-      paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1',paidAt:firstPurchaseAt,
-        points:state.catalogPresetAt==null?4800:6400,amountUsdt:1299});
-      // The ordinary team buys again on the first of each Vietnam business month.
-      // Each order keeps its own date and continues to count toward lifetime volume.
-      if(!state.walletLegacySeed){
-        const [year,firstMonth]=demoTeamBusinessDate(firstPurchaseAt).split('-').map(Number);
-        for(let nextMonth=firstMonth; ; nextMonth++){
-          const paidAt=Date.UTC(year,nextMonth,1,-7);
-          if(paidAt>now)break;
-          paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1-'+demoTeamBusinessDate(paidAt).slice(0,7),
-            paidAt,points:6400,amountUsdt:1299});
-        }
-      }
-    }
+    if(hasCatalogPurchase&&i===0)paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1',
+      paidAt:catalogPaidAt??sampleAt,points:catalogPaidAt==null?4800:6400,amountUsdt:1299});
     if(state.highestRank&&!parent)paidOrders.push({orderNo:`DEMO-TEAM-${name.toUpperCase()}-V8`,
       paidAt:joinedAt+day,points:400000,amountUsdt:40000});
     members.push({id:String(i<8?100+i:120+i-8),name,avatarUrl:null,vRank:state.highestRank&&!parent?7:i%4,layer:parent?parent.layer+1:1,

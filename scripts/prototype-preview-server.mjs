@@ -27,7 +27,7 @@ if(process.env.DEMO_STATE_FILE){
   initializeDemoH4State(state,startedAt);
   initializeLegacyStreakSavers(state);
   if(state.computeTaskSnapshots)state.computeResumeAt=startedAt;
-}
+}else state.catalogAvailableAt=startedAt;
 initializeDemoPreviewAccount(state,startedAt);
 if(state.dataState==='empty')state.withdrawLimitState='open';
 else if(state.withdrawLimitState==='used')state.withdrawLimitCreatedAt??=startedAt;
@@ -161,6 +161,8 @@ const server=http.createServer(async(req,res)=>{
         if(update.eventState)delete state.raffleEntries;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         const now=Date.now();
+        if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
+          state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
         if(update.eventState||scenarioChange){
           setDemoH4Scene(state,now);
