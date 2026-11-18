@@ -249,8 +249,9 @@ const inventoryEmpty = computed(() => activeDevices.value.length === 0
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = trialPresentation.reservedSlots;
-const slotsUsed = computed(() => remoteApiEnabled && app.remoteFleetStatus !== "ready"
-  && app.remoteFleetStatus !== "loading" ? null : app.remoteSlotsUsed
+// Without this account's confirmed fleet snapshot the occupancy is unknown, not zero.
+const slotsUsed = computed(() => remoteApiEnabled && (!app.remoteFleetHasSnapshot || app.remoteFleetStatus !== "ready"
+  && app.remoteFleetStatus !== "loading") ? null : app.remoteSlotsUsed
     ?? (trialReserved.value === null ? null : app.activeSlotCount + trialReserved.value));
 const slotsFull = computed(() => slotsUsed.value === null || slotsUsed.value >= app.slotCap);
 const activationReady = computed(() => !remoteApiEnabled
