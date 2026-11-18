@@ -17,8 +17,8 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
-import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
+import { demoHasOpeningMilestone, demoLifetimeEarningsUsdt, demoStreakFacts, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -29,7 +29,7 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-const demoMilestoneClaimed=(state,id)=>state.milestoneClaims?.includes(id)
+const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||state.milestoneClaims?.includes(id)
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id);
 export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
@@ -397,6 +397,7 @@ function demoLiveActivity(product,now) {
 /** Mutable state belongs only to the loopback demonstration server. */
 export function demoFixture(url,locale,state,request) {
   state.previewFactsAt??=demoStartedAt;
+  state.walletLegacySeed??=false;
   const now=Date.now(),iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin,locale);
@@ -468,7 +469,7 @@ export function demoFixture(url,locale,state,request) {
     return response;
   };
   if(pathname.startsWith('/api/promotion-commands/'))return state.commands?.[decodeURIComponent(pathname.split('/').pop())]||{idempotencyKey:decodeURIComponent(pathname.split('/').pop()),operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),status:'NOT_FOUND',order:null};
-  if(!milestoneClaim&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
+  if(!milestoneClaim&&pathname!=='/api/points/sign-in'&&request.method()==='POST'&&commandKey&&state.commands?.[commandKey])return structuredClone(state.commands[commandKey].response);
   if(pathname==='/api/config/platform'){
     const config=structuredClone(base());
     config.interfaceLanguages=previewInterfaceLanguages(state.interfaceLanguagesState);
@@ -908,19 +909,23 @@ export function demoFixture(url,locale,state,request) {
   }
   if(pathname==='/api/points/state') {
     const data=base();
-    if(empty) return data;
+    data.serverDate=demoTeamBusinessDate(now);
+    data.nextResetAtUtc=new Date(Date.parse(data.serverDate)+day-7*3600000).toISOString();
+    data.streak=demoStreakFacts(state,now);
     const unlocked=state.taskState==='claimed'||state.taskState==='complete';
-    // Like the design boards: a 12-day streak (13 once checked in today), one saver in hand.
-    const dayOf=t=>new Date(t).toISOString().slice(0,10);
-    if(state.streakState==='normal')data.streak={...data.streak,currentStreak:state.checkedIn?13:12,longestStreak:state.checkedIn?13:12,streakSavers:1,lastCheckInDate:dayOf(state.checkedIn?now:now-day),checkedInToday:!!state.checkedIn};
-    if(state.streakState==='first')data.streak={...data.streak,currentStreak:state.checkedIn?1:0,longestStreak:state.checkedIn?1:0,streakSavers:0,lastCheckInDate:state.checkedIn?dayOf(now):null,checkedInToday:!!state.checkedIn};
-    if(state.streakState==='broken'&&!state.saverUsed)data.streak={...data.streak,currentStreak:state.checkedIn?1:0,longestStreak:7,streakSavers:state.checkedIn?0:1,lastCheckInDate:new Date(state.checkedIn?now:now-3*day).toISOString().slice(0,10),checkedInToday:!!state.checkedIn};
-    if(state.saverUsed)data.streak={...data.streak,currentStreak:state.checkedIn?8:7,longestStreak:state.checkedIn?8:7,streakSavers:0,lastCheckInDate:new Date(state.checkedIn?now:now-day).toISOString().slice(0,10),checkedInToday:!!state.checkedIn};
-    data.streak.streakSavers+=demoH4Savers(state);
     // Mirrors the backend seeds (nx_growth_checkin_rule / nx_streak_milestone / nx_streak_power_up); day 3 is already claimed in the 12-day scenario.
     data.rules=[['baseline','1'],['bonus7','5'],['luckyMultiplierMax','2'],['p15','15'],['p2','5'],['broken','48'],['revive','1']].map(([key,value])=>({key,value}));
-    data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:demoMilestoneClaimed(state,i+1)||state.streakState==='normal'&&milestoneDay===3?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
-    data.earningMilestones=[10,100,1000].map((amount,i)=>({milestoneId:'demo-earning-'+i,thresholdUsdt:amount,rewardNex:amount,lifetimeEarningsUsdt:128.5,status:i===0||i===1&&state.earningClaimed?'FIRED':i===1?'CLAIMABLE':'LOCKED',achievedAt:i===0||i===1&&state.earningClaimed?iso:null}));
+    data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:demoMilestoneClaimed(state,i+1)?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
+    const lifetimeEarningsUsdt=demoLifetimeEarningsUsdt(walletBills());
+    data.earningMilestones=[10,100,1000].map((thresholdUsdt,i)=>{
+      const milestoneId='demo-earning-'+i,bizNo='EARNING-MS:900001:'+milestoneId;
+      const achieved=state.walletMovements?.find(row=>row.bizNo===bizNo);
+      const historical=state.walletLegacySeed&&!empty&&(i===0||i===1&&state.earningClaimed);
+      return {milestoneId,thresholdUsdt,rewardNex:thresholdUsdt,lifetimeEarningsUsdt,
+        status:achieved||historical?'FIRED':lifetimeEarningsUsdt>=thresholdUsdt?'CLAIMABLE':'LOCKED',
+        achievedAt:achieved?new Date(achieved.at).toISOString():historical?new Date(state.previewFactsAt).toISOString():null};
+    });
+    if(empty)return data;
     const badgeLocale=(url.searchParams.get('locale')||request.headers?.()['x-preview-locale']||locale).trim().toLowerCase().split('-')[0];
     const names=localized(badgeLocale,['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星'],['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'],['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']);
     data.badgeAchievements=names.map((name,i)=>({achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],rewardPoints:50*(i+1),status:i<2||unlocked?'UNLOCKED':'LOCKED',unlockedAt:i<2||unlocked?iso:null}));
@@ -963,10 +968,44 @@ export function demoFixture(url,locale,state,request) {
   }
   const powerUpActivate=pathname.match(/^\/api\/points\/power-ups\/([1-4])\/activate$/);
   if(powerUpActivate){const id=Number(powerUpActivate[1]);state.powerUps||=[];state.powerUps.push(id);return {...authority,powerUpId:id,powerUpCode:['ROYALTY_BOOST','STREAK_BADGE','CHECKIN_BOOST','GENESIS_ALLOWLIST'][id-1],badgeCode:null,status:'ACTIVATED'};}
-  if(pathname==='/api/points/sign-in'&&(state.saverUsed||state.streakState!=='normal')){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:1,rewardNex:1,streakBonusNex:0,multiplier:1,streakDays:state.saverUsed?8:1};}
-  if(pathname==='/api/points/sign-in'){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:1,rewardNex:1,streakBonusNex:0,multiplier:1,streakDays:13};}
-  if(pathname==='/api/points/streak-saver/use'){if(state.streakState!=='broken'||state.saverUsed||state.checkedIn)throw new Error('No interrupted streak to restore');state.saverUsed=true;return {...authority,restoredStreak:7,streakSavers:demoH4Savers(state),effectiveLastCheckInDate:new Date(now-day).toISOString().slice(0,10)};}
-  if(pathname==='/api/earnings/milestones/evaluate'){const fired=state.earningClaimed?[]:[{milestoneId:'demo-earning-1',thresholdUsd:100,rewardNex:100,lifetimeEarningsUsd:128.5}];state.earningClaimed=true;return {...authority,fired,count:fired.length};}
+  if(pathname==='/api/points/sign-in'){
+    const checkInDate=demoTeamBusinessDate(now),key=commandKey?.trim(),bizNo='DAILY:900001:'+checkInDate;
+    if(!key)throw Object.assign(new Error('IDEMPOTENCY_KEY_REQUIRED'),{status:422});
+    const previous=state.walletMovements?.find(row=>row.bizType==='DAILY_CHECK_IN'&&row.commandKey===key);
+    if(previous){
+      if(previous.bizNo!==bizNo)refuse('IDEMPOTENCY_KEY_CONFLICT');
+      const {longestStreak,...receipt}=previous.detail;
+      return receipt;
+    }
+    const streak=demoStreakFacts(state,now);
+    if(streak.checkedInToday||state.walletMovements?.some(row=>row.bizNo===bizNo))refuse('DAILY_ALREADY_CLAIMED');
+    const streakDays=streak.currentStreak+1,streakBonusNex=streakDays%7===0?5:0;
+    const result={...authority,checkInDate,baseNex:1,rewardNex:1+streakBonusNex,streakBonusNex,multiplier:1,streakDays};
+    postDemoWalletEntries(state,{bizType:'DAILY_CHECK_IN',bizNo,asset:'UVT',direction:'IN',amount:result.rewardNex,
+      at:now,category:'bonus',commandKey:key,detail:{...result,longestStreak:Math.max(streakDays,streak.longestStreak)}});
+    return result;
+  }
+  if(pathname==='/api/points/streak-saver/use'){
+    const streak=demoStreakFacts(state,now);
+    if(!streak.streakSavers)refuse('DAILY_STREAK_SAVER_EMPTY');
+    if(!streak.lastCheckInDate||streak.currentStreak>0||streak.checkedInToday)refuse('DAILY_STREAK_NOT_BROKEN');
+    state.saverUsed=true;state.saverUsedAt=now;
+    const result={...authority,restoredStreak:Math.max(1,Math.min(30,streak.longestStreak)),
+      streakSavers:streak.streakSavers-1,effectiveLastCheckInDate:demoTeamBusinessDate(now-day)};
+    state.saverRestoredStreak=result.restoredStreak;
+    return remember('streakSaver',result.effectiveLastCheckInDate,result,null);
+  }
+  if(pathname==='/api/earnings/milestones/evaluate'){
+    const {milestoneId}=request.postDataJSON();
+    const milestone=read('/api/points/state').earningMilestones.find(row=>
+      row.status==='CLAIMABLE'&&(!milestoneId||row.milestoneId===milestoneId));
+    if(milestoneId&&!milestone)refuse('EARNING_MILESTONE_NOT_CLAIMABLE');
+    if(!milestone)return {...authority,fired:[],count:0};
+    const {milestoneId:id,rewardNex,thresholdUsdt:thresholdUsd,lifetimeEarningsUsdt:lifetimeEarningsUsd}=milestone;
+    postDemoWalletEntries(state,{bizNo:'EARNING-MS:900001:'+id,bizType:'EARNING_MILESTONE',asset:'UVT',
+      direction:'IN',amount:rewardNex,at:now,category:'achievement'});
+    return remember('earningMilestone',id,{...authority,fired:[{milestoneId:id,thresholdUsd,rewardNex,lifetimeEarningsUsd}],count:1},null);
+  }
   if(pathname==='/api/app/security') return {twoFactorEnabled:state.twoFactorEnabled??true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};
   if(pathname==='/api/app/referral-rewards') return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,invitedCount:empty?0:12,pendingCount:empty?0:2,settledCount:empty?0:10,lifetimeInviterNex:empty?0:100,walletNexAvailable:demoWalletNex(state,now),limit:10,source:'ledger',sourceEnvironment:'PRODUCTION',runId:null,factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso,recentRewards:empty?[]:[{settlementNo:'DEMO-REF-1',amountNex:10,ledgerStatus:'SUCCESS',balanceAfter:1280,releaseBucket:'withdrawable',sourceEnvironment:'PRODUCTION',settledAt:iso}]};
   if(pathname==='/api/app/team/network') {
