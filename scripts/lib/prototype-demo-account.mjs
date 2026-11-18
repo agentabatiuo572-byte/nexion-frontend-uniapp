@@ -1,6 +1,7 @@
 // Loopback demonstration only; never imported into the production application.
 import { randomUUID } from 'node:crypto';
 import { previewInterfaceLanguages } from './design-review-fixture.mjs';
+import { demoH4Account } from './prototype-demo-events.mjs';
 
 // One wallet fact for every read used by the account-deletion journey.
 export function accountDeletionWallet(state) {
@@ -77,7 +78,7 @@ export function accountDemo(url, locale, state, request) {
       return { status: 'UPDATED', nickname: update.nickname };
     }
     const { nicknameChangedAt, ...profile } = state.profile;
-    return { ...profile, profileChangeIntervalDays: 7,
+    return { ...profile, createdAt: new Date(demoH4Account(state).createdAt).toISOString(), profileChangeIntervalDays: 7,
       nicknameChangeAvailableAt: nextChange(nicknameChangedAt), avatarChangeAvailableAt: null };
   }
   if (path === '/api/app/profile/language' && method === 'PUT') {

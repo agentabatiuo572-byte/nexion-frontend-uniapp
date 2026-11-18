@@ -30,8 +30,9 @@ const rows = [
   ["faq-rank",["团队算力点减少后会怎样？", "What if my team compute points go down?", "Nếu điểm của nhóm giảm thì sao?"],["{protection}", "{protection}", "{protection}"]],
   ["faq-rewards",["在哪里看进度和奖励？", "Where can I see progress and rewards?", "Xem tiến độ và phần thưởng ở đâu?"],["等级页可查看当前进度和差距，奖励到账情况见奖励明细。", "The rank page shows your progress and gaps; see your reward history for payouts.", "Trang hạng hiển thị tiến độ và phần còn thiếu; xem khoản thưởng đã nhận trong lịch sử thưởng."]],
 ];
+export const demoV1SelfComputePoints=320;
 export function rankPolicyDemo(url,locale) {
   if(url.pathname!=='/api/config/v-rank-policy')return undefined;
   const lang=url.searchParams.get('locale')||locale,index=lang==='zh'?0:lang==='vi'?2:1;
-  return {status:'PUBLISHED',version:'default-2026.10.29',locale:lang,hero:["等级越高，可获得的奖励越多。", "The higher your rank, the more rewards you can earn.", "Hạng càng cao, phần thưởng bạn có thể nhận càng nhiều."][index],source:'server',sourceEnvironment:'PRODUCTION',runId:'',rules:{permanentProtection:true,qualifiedReferralSelfComputePoints:100,leadershipConfigured:true},sections:rows.map(([id,titles,bodies],order)=>({id,title:titles[index],body:bodies[index],order}))};
+  return {status:'PUBLISHED',version:'default-2026.10.29',locale:lang,hero:["等级越高，可获得的奖励越多。", "The higher your rank, the more rewards you can earn.", "Hạng càng cao, phần thưởng bạn có thể nhận càng nhiều."][index],source:'server',sourceEnvironment:'PRODUCTION',runId:'',rules:{permanentProtection:true,qualifiedReferralSelfComputePoints:demoV1SelfComputePoints,leadershipConfigured:true},sections:rows.map(([id,titles,bodies],order)=>({id,title:titles[index],body:bodies[index],order}))};
 }
