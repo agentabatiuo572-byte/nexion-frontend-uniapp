@@ -23,7 +23,7 @@ export function demoSettledTasks(state,at) {
   });
 }
 
-export function demoCommissionEvents(state,at) {
+export function demoCommissionGroups(state,at) {
   if(!demoHasEarningsHistory(state))return [];
   const [year,month]=demoTeamBusinessDate(at).split('-').map(Number);
   const matchedAt=Date.UTC(year,month-1,1)-7*3600000-1;
@@ -53,6 +53,25 @@ export function demoCommissionEvents(state,at) {
   };
   return [purchase,device,network,binary].sort((a,b)=>b.ts-a.ts);
 }
+
+export function demoCommissionEvents(state,at) {
+  return demoCommissionGroups(state,at).flatMap(group=>
+    [['USDT',group.amountUSDT],['NEX',group.amountNEX]].filter(([,amount])=>amount>0).map(([currency,amount])=>({
+      ...group,id:`CM-${group.id}-${currency}`,currency,
+      amountUSDT:currency==='USDT'?amount:0,amountNEX:currency==='NEX'?amount:0,
+      settlementState:'CANONICAL',withdrawable:group.status==='unlocked',
+    })));
+}
+
+export function demoTeamWeek(at) {
+  const thursday=new Date(demoTeamBusinessDate(at));
+  thursday.setUTCDate(thursday.getUTCDate()+3-(thursday.getUTCDay()+6)%7);
+  const year=thursday.getUTCFullYear(),week=Math.floor((thursday-Date.UTC(year,0,1))/(7*day))+1;
+  return `${year}-W${String(week).padStart(2,'0')}`;
+}
+
+export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
+  ?{depositId:'CR-77',grossAmountUsdt:50.123456,creditedUsdt:50,createdAt:state.previewFactsAt}:null;
 
 export function demoTeamPeriod(period,now,snapshotAt) {
   const end=snapshotAt?.trim()?Date.parse(snapshotAt):now;
@@ -183,15 +202,17 @@ export function demoStreakFacts(state,now) {
 
 export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,seedAt)) {
   initializeDemoWalletCheckpoint(state);
-  const events=demoCommissionEvents(state,seedAt);
+  const events=demoCommissionGroups(state,seedAt);
   const commissions=events.filter(event=>['unlocked','withdrawn'].includes(event.status));
   const cooling=events.find(event=>event.kind==='direct_device_earning');
   const movements=state.walletMovements??[];
   const posted=new Set(movements.map(row=>row.bizNo));
   const firstMilestoneRecorded=posted.has('DAILY-MS:900001:1')
     ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===1);
+  const deposit=demoCreditedDeposit(state);
   const seeds=!demoHasEarningsHistory(state)?[]:[
     ['COMPUTE_EARNING','UVT','IN',15,'earn',seedAt],
+    ...(deposit?[['CRYPTO_DEPOSIT','USDT','IN',deposit.creditedUsdt,'deposit',deposit.createdAt,'SUCCESS',deposit.depositId]]:[]),
     ['REFERRAL_REWARD','UVT','IN',10,'bonus',seedAt-day,'SUCCESS',
       state.walletLegacySeed?undefined:'REF-000000000000000000000001:INVITER'],
     ['DEVICE_PURCHASE','USDT','OUT',1299,'purchase',seedAt-2*day],
@@ -202,12 +223,12 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
     ...(state.walletLegacySeed?[['TEAM_COMMISSION','UVT','IN',cooling.amountNEX,'refer',cooling.ts,'PENDING']]:[]),
     ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
     ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].filter(([,amount])=>amount>0)
-      .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-${asset}-RELEASE`])),
+      .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-RELEASE`])),
     ...(demoHasOpeningMilestone(state)&&!state.walletLegacySeed&&!firstMilestoneRecorded?[
       ['DAILY_MILESTONE','UVT','IN',5,'achievement',state.walletOpeningMilestoneAt,'SUCCESS','DAILY-MS:900001:1'],
     ]:[]),
-  ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo],index)=>({
-    id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
+  ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo])=>({
+    id:`seed:${asset}:${bizNo??`${bizType}:${direction}:${amount}`}`,bizNo:bizNo??`DEMO-${bizType}-${amount}`,bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
   const history=demoDeletionHistory(state);
   const swap=history?.swap;
@@ -314,25 +335,33 @@ export function demoWalletBillList(bills,params) {
     ||(params.has('category')&&category!=='REWARD')){
     throw Object.assign(new Error('WALLET_BILLS_FILTER_INVALID'),{status:400});
   }
-  const filtered=bills.filter(row=>(!asset||row.asset===asset)&&(!direction||row.direction===direction&&row.amount>0)
-    &&(category!=='REWARD'||reward(row)));
+  const matches=row=>(!asset||row.asset===asset)&&(!direction||row.direction===direction&&row.amount>0)
+    &&(category!=='REWARD'||reward(row));
+  const filtered=bills.filter(matches);
   const page=Number(params.get('page')??1),pageSize=Number(params.get('pageSize')??20);
   if(!Number.isSafeInteger(page)||page<1||!Number.isSafeInteger(pageSize)||pageSize<1||pageSize>100
     ||(page-1)*pageSize>2147483647){
     throw Object.assign(new Error('WALLET_BILLS_PAGE_INVALID'),{status:400});
   }
   const cursor=params.get('cursor');
-  let start=(page-1)*pageSize;
-  if(cursor==='start')start=0;
+  const token=row=>Buffer.from(JSON.stringify([row.createdAt,row.id])).toString('base64url');
+  let eligible=filtered.slice((page-1)*pageSize);
+  if(cursor==='start')eligible=filtered;
   else if(cursor!==null){
-    const boundary=filtered.findIndex(row=>Buffer.from(row.id).toString('base64url')===cursor);
-    if(boundary===-1)throw Object.assign(new Error('WALLET_BILLS_CURSOR_INVALID'),{status:400});
-    start=boundary+1;
+    const boundary=bills.findIndex(row=>token(row)===cursor);
+    if(boundary>=0)eligible=bills.slice(boundary+1).filter(matches);
+    else {
+      let decoded;
+      try{decoded=JSON.parse(Buffer.from(cursor,'base64url').toString());}
+      catch(error){if(!(error instanceof SyntaxError))throw error;}
+      if(!Array.isArray(decoded)||decoded.length!==2||!Number.isFinite(Date.parse(decoded[0]))||typeof decoded[1]!=='string')
+        throw Object.assign(new Error('WALLET_BILLS_CURSOR_INVALID'),{status:400});
+      eligible=filtered.filter(row=>row.createdAt<decoded[0]);
+    }
   }
-  const pageRows=filtered.slice(start,start+pageSize);
-  const more=start+pageSize<filtered.length;
+  const pageRows=eligible.slice(0,pageSize),more=eligible.length>pageSize;
   return {...source,bills:pageRows,page,pageSize,total:filtered.length,nextPage:more?page+1:null,
-    nextCursor:cursor!==null&&more?Buffer.from(pageRows.at(-1).id).toString('base64url'):null};
+    nextCursor:cursor!==null&&more?token(pageRows.at(-1)):null};
 }
 
 export function demoLifetimeEarningsUsdt(bills) {
