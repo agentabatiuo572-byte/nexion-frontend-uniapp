@@ -109,6 +109,14 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   const conclusion = purchaseConclusion(intent);
   if (conclusion) state.notice = conclusion;
 }
+/** The server holds no payment for this command: release it and its fences. Only the user may start another one, from the order. */
+function gone(pending: PendingExternal, accountKey: string) {
+  release(pending);
+  releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+  releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
+  Object.assign(state, { pending: null, intent: null, quote: null, error: false });
+  conclude('gone');
+}
 /** The payment ended with an answer: nothing of it stays behind the notice and no further read or write runs. */
 function conclude(notice: PurchaseNotice) { stopTimers(); Object.assign(state, { notice, concluded: true, cashier: false }); }
 function stopTimers() { clearTimeout(quoteTimer); clearTimeout(pollTimer); quoteTimer = pollTimer = undefined; }
@@ -253,20 +261,16 @@ async function query() {
     if (!owns(version, accountKey) || state.concluded) return;
     state.error = false;
     if (result) accept(result, pending);
-    else if (pending.lookupOnly) { state.error = true; failed = true; }
+    // The quote's 409 proved this command created no intent, and the server's own not-found agrees.
+    else if (pending.lookupOnly) gone(pending, accountKey);
     else state.unavailable = true;
   } catch (error) {
     failed = true;
     if (owns(version, accountKey) && !state.concluded) {
       const cause = asApiError(error);
       // The server no longer holds a payment it has shown us. Only the user may start another one, from the order.
-      if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') {
-        release(pending);
-        releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
-        releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
-        Object.assign(state, { pending: null, intent: null, quote: null, error: false });
-        conclude('gone');
-      } else state.error = true;
+      if (pending.intentNo && cause.status === 404 && cause.message === 'PURCHASE_PAYMENT_INTENT_NOT_FOUND') gone(pending, accountKey);
+      else state.error = true;
     }
   }
   finally { if (owns(version, accountKey)) { state.busy = false; schedule(version, accountKey, failed); } }
@@ -277,7 +281,7 @@ async function submitOriginal() {
   if (!pending || state.busy || state.concluded) return;
   if (pending.lookupOnly) return query();
   const version = requestVersion, accountKey = state.accountKey;
-  let failed = false, requote = false;
+  let failed = false, requote = false, lookup = false;
   state.busy = true; state.unavailable = false;
   try {
     const intent = await api.create(pending.paymentQuoteId, pending.commandKey);
@@ -289,11 +293,10 @@ async function submitOriginal() {
       // ambiguous transport outcomes keep the original key and quote for read-only query.
       const cause = asApiError(error);
       if (isApiRefusal(cause, 409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED')) {
-        // Another command may own this quote. Never retry its POST or release either fence on an empty read.
-        const lookup = { ...pending, lookupOnly: true };
-        state.pending = lookup;
-        state.error = true;
-        try { save(lookup); } catch { /* Keep read-only recovery for this session even if storage fails. */ }
+        // Another command owns this quote. Never retry its POST; only the server's own not-found releases this one.
+        const readOnly = { ...pending, lookupOnly: true };
+        state.pending = readOnly; lookup = true;
+        try { save(readOnly); } catch { /* Keep read-only recovery for this session even if storage fails. */ }
         return;
       }
       const unavailable = channelUnavailable(cause, pending.paymentMethod ?? state.method);
@@ -342,6 +345,7 @@ async function submitOriginal() {
     if (owns(version, accountKey)) {
       state.busy = false;
       if (requote) { if (available(state.method)) void select(state.method); else reconcileChannel(); }
+      else if (lookup) void query();
       else schedule(version, accountKey, failed);
     }
   }
