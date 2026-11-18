@@ -3,9 +3,9 @@ import http from 'node:http';
 import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
-import { demoDefaults, demoFixture, demoOptions } from './lib/prototype-demo-data.mjs';
+import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages } from './lib/design-review-fixture.mjs';
-import { initializeDemoH4State } from './lib/prototype-demo-events.mjs';
+import { initializeDemoH4State, seedDemoH4Gift, setDemoH4PromotionTiming, setDemoH4Scene } from './lib/prototype-demo-events.mjs';
 import { ambassadorBinaryRoute, ambassadorBinaryResponse } from './lib/prototype-demo-ambassador.mjs';
 import { createPrototypeMessages } from './lib/prototype-message-demo.mjs';
 import { createPrototypeRealtime } from './lib/prototype-realtime.mjs';
@@ -15,7 +15,9 @@ const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
 // An optional local handoff preserves demo conversations across a preview rebuild.
 if(process.env.DEMO_STATE_FILE)Object.assign(state,JSON.parse(await readFile(process.env.DEMO_STATE_FILE,'utf8')).state);
-initializeDemoH4State(state);
+const startedAt=Date.now();
+if(process.env.DEMO_STATE_FILE)initializeDemoH4State(state,startedAt);
+initializeDemoPreviewAccount(state,startedAt);
 let locale='zh';
 // Purchases need the payment PIN and order commands, so the preview models them
 // unless DEMO_CHECKOUT_FLOW=0.
@@ -121,9 +123,16 @@ const server=http.createServer(async(req,res)=>{
         if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}
         if(update.ambassadorState)delete state.ambassadorDemo;
         if(update.eventState)delete state.raffleEntries;
-        if(update.eventState||scenarioChange)delete state.h4Events;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
-        if(update.promotionTiming)state.promotionTimingAt=Date.now();
+        const now=Date.now();
+        if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
+        if(update.eventState||scenarioChange){
+          setDemoH4Scene(state,now);
+          if(state.eventState==='claimed'&&state.dataState!=='empty'){
+            const {slotCap,slotsUsed}=demoFleetFacts(url,locale,state);
+            seedDemoH4Gift(state,now,slotCap-slotsUsed,demoProducts(state,url.origin,locale));
+          }
+        }
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];

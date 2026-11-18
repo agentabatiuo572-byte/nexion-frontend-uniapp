@@ -22,14 +22,16 @@ const events=[
 ];
 const wheelSegments=[5,10,20,50,100,200].map((amount,index)=>({tierId:'demo-tier-'+index,rewardType:'UVT',rewardAmount:amount,rewardName:amount+' UVT',realOutflow:false,displayOrder:index}));
 
-export function demoH4Account(state) {
+export function demoH4Account(state,now=Date.now(),presetDates=[]) {
   if(state.accountCreatedAt==null){
-    const now=Date.now();
-    const facts=[...(state.fleetSeed??[]).flatMap(device=>[device.purchasedAt,device.activatedAt]),
+    const facts=[...presetDates,...(state.fleetSeed??[]).flatMap(device=>[device.purchasedAt,device.activatedAt]),
       ...(state.createdOrders??[]).flatMap(order=>[order.placedAt,order.paidAt,order.activatedAt])];
+    // The ordinary team sample joins after registration. A saved invitation
+    // sample has its own clock and can be older than the current process.
+    if(state.h4Events&&hasInviteSample(state))facts.push(state.h4Events.at-day);
     const dates=facts.map(value=>typeof value==='number'?value:Date.parse(value))
       .filter(at=>Number.isFinite(at)&&at>0&&at<=now);
-    state.accountCreatedAt=dates.length?Math.min(...dates):now-42*day;
+    state.accountCreatedAt=Math.min(now-42*day,...dates.map(at=>at-1));
   }
   return {createdAt:state.accountCreatedAt,rank:state.dataState==='empty'?0:state.ambassadorRank==='v5'?5:state.highestRank?8:2};
 }
@@ -52,19 +54,23 @@ function scene(state,now) {
   return record;
 }
 
+export function setDemoH4Scene(state,now) {
+  delete state.h4Events;
+  scene(state,now);
+}
+
 export function initializeDemoH4State(state,now=Date.now()) {
-  demoH4Account(state);
-  if(!['eventStatuses','reminders','spun','spinHistory'].some(key=>key in state))return;
-  const record=scene(state,now);
+  // An imported scene uses saved evidence. The panel can still explicitly
+  // supply sample spins, referrals and receipts by selecting a new scene.
+  const record=state.h4Events??={at:now,joined:
+    state.eventState==='mixed'&&!state.eventStatuses?.['demo-invite']?['invite']:[],
+    spins:[],reminders:[],claims:{},sampleInvites:false};
+  if(record.legacyClaims?.includes('invite')&&!record.claims.invite)record.sampleInvites=false;
+  delete record.legacyClaims;
   const known=events.map(([code])=>code);
-  const balancesRetained=Number.isFinite(state.walletNexBalance);
   for(const code of known){
     const status=state.eventStatuses?.['demo-'+code];
     if(status==='JOINED'&&eventWindow(code,state,now).state!=='upcoming'&&!record.joined.includes(code))record.joined.push(code);
-    if(status==='CLAIMED'&&!record.claims[code]){
-      const prior=record.legacyClaims??=[];
-      if(!prior.includes(code))prior.push(code);
-    }
     if(state.reminders?.includes('demo-'+code)&&!record.reminders.includes(code))record.reminders.push(code);
   }
   for(const {awardedAt,...result} of state.spinHistory??[]){
@@ -76,11 +82,13 @@ export function initializeDemoH4State(state,now=Date.now()) {
         ||!Number.isFinite(result.rewardAmount)||result.rewardAmount<0
         ||record.spins.some(spin=>spin.result.spinId===result.spinId))continue;
     const at=Date.parse(awardedAt);
-    record.spins.push({result,at:Number.isFinite(at)?at:spinDay,includedInBalance:balancesRetained});
+    record.spins.push({result,at:Number.isFinite(at)?at:spinDay,historyOnly:true});
   }
   record.spins.sort((left,right)=>right.at-left.at);
   for(const key of ['eventStatuses','reminders','spun','spinHistory'])delete state[key];
 }
+
+const hasInviteSample=state=>['claimable','claimed'].includes(state.eventState)&&state.h4Events?.sampleInvites!==false;
 
 export function demoH4TeamMembers(state,now) {
   if(state.dataState==='empty')return [];
@@ -90,7 +98,7 @@ export function demoH4TeamMembers(state,now) {
     joinedAt:date(createdAt+(i+2)*day),monthComputePoints:[160,240,320,360,440,480,560,640][i],
     lifetimeComputePoints:[640,960,1280,1440,1760,1920,2240,2560][i],status:i===6?'OFFLINE':i===7?'IDLE':'ACTIVE',region:['SG','VN','JP'][i%3],
   }));
-  if(['claimable','claimed'].includes(state.eventState)){
+  if(hasInviteSample(state)){
     const {at}=scene(state,now);
     members.push(...['An','Bao','Chi','Dara','Emi'].map((name,i)=>({
       id:String(108+i),name,avatarUrl:null,vRank:0,layer:1,leg:i%2?'A':'B',
@@ -120,11 +128,25 @@ export function demoH4PromotionWindow(state,now) {
   return {startsAt,endsAt,state:phase(startsAt,endsAt,now)};
 }
 
+export function setDemoH4PromotionTiming(state,now) {
+  state.promotionTimingAt=now;
+  const record=state.h4Events;
+  if(record?.joined.includes('upgrade')&&demoH4PromotionWindow(state,now).state==='upcoming'){
+    record.joined=record.joined.filter(code=>code!=='upgrade');
+  }
+}
+
 function eventWindow(code,state,now) {
   if(code==='upgrade')return demoH4PromotionWindow(state,now);
-  const {at}=scene(state,now);
-  const startsAt=state.eventState==='upcoming'||state.eventState==='mixed'&&code==='season'?at+day:at-3*day;
-  const endsAt=state.eventState==='ended'?at-day:at+7*day;
+  const {at,spins}=scene(state,now);
+  let startsAt=state.eventState==='upcoming'||state.eventState==='mixed'&&code==='season'?at+day:at-3*day;
+  let endsAt=state.eventState==='ended'?at-day:at+7*day;
+  if(code==='spin'&&state.eventState!=='upcoming'){
+    for(const spin of spins){
+      startsAt=Math.min(startsAt,spin.at);
+      endsAt=Math.max(endsAt,spin.at+1);
+    }
+  }
   return {startsAt,endsAt,state:phase(startsAt,endsAt,now)};
 }
 
@@ -179,9 +201,9 @@ function project(entry,locale,state,now) {
     qualified=ongoing&&inWindow&&rank>=targetValue;
   }
   const claimed=!!record.claims[code];
-  const userStatus=claimed?'CLAIMED':qualified&&!record.legacyClaims?.includes(code)?'CLAIMABLE'
+  const userStatus=claimed?'CLAIMED':qualified?'CLAIMABLE'
     :spun||started&&record.joined.includes(code)?'JOINED':'AVAILABLE';
-  const eligible=qualified||ongoing&&!rules.voucherId&&(kind!=='onboarding'||inWindow);
+  const eligible=userStatus==='CLAIMABLE'||ongoing&&!rules.voucherId&&(kind!=='onboarding'||inWindow);
   return {code,rules,eligible,event:{
     eventCode:'demo-'+code,kind,state:window.state,title:localized(locale,zh,en,vi),
     subtitle:localized(locale,'完成活动条件，查看进度并领取奖励。','Complete the activity goals and claim your reward.','Hoàn thành mục tiêu và nhận thưởng.'),
@@ -206,25 +228,24 @@ function award(state,code,now,key) {
   return result;
 }
 
-// Fleet reads seed the "already claimed" sample just like the activity view.
-// The same slot count also guards the real claim command.
+export function demoH4Gift(state) {
+  return state.dataState==='empty'||state.eventState==='empty'?undefined:state.h4Events?.claims.invite;
+}
+
 export function demoH4GiftQuantity(state,productNo) {
-  const receipt=state.h4Events?.claims.invite?.result.receipt;
+  const receipt=demoH4Gift(state)?.result.receipt;
   return receipt?.productNo===productNo?receipt.quantity:0;
 }
 
 const hasGiftStock=(product,rules)=>product?.inventoryMode==='FINITE'&&product.stock>=rules.giftQuantity;
 
-export function demoH4Gift(state,now,freeSlots,products) {
-  if(state.dataState==='empty'||state.eventState==='empty')return undefined;
-  const record=scene(state,now);
+export function seedDemoH4Gift(state,now,freeSlots,products) {
   const rules=rulesByCode.invite;
-  if(state.eventState==='claimed'&&!record.claims.invite&&!record.legacyClaims?.includes('invite')&&freeSlots>=rules.giftQuantity
+  if(!demoH4Gift(state)&&freeSlots>=rules.giftQuantity
       &&hasGiftStock(products.find(product=>product.id===rules.giftProductNo),rules)
       &&inviteCount(state,eventWindow('invite',state,now),now)>=rules.targetInvites){
     award(state,'invite',now);
   }
-  return record.claims.invite;
 }
 
 export function demoH4Credits(state,now) {
@@ -233,7 +254,7 @@ export function demoH4Credits(state,now) {
   const welcome=claims.welcome;
   return [
     ...(welcome?[{id:'DEMO-WELCOME',type:'EVENT_REWARD',status:'SUCCESS',amount:welcome.result.rewardAmount,at:welcome.at}]:[]),
-    ...spins.map(({result,at,includedInBalance})=>({id:result.spinId,type:'WHEEL_REWARD',status:'POSTED',amount:result.rewardAmount,at,includedInBalance})),
+    ...spins.filter(spin=>!spin.historyOnly).map(({result,at,includedInBalance})=>({id:result.spinId,type:'WHEEL_REWARD',status:'POSTED',amount:result.rewardAmount,at,includedInBalance})),
   ].sort((a,b)=>a.at-b.at);
 }
 
@@ -258,7 +279,6 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
     if(!commandKey)reject('IDEMPOTENCY_KEY_REQUIRED',422);
     if(commandKey.length>128)reject('IDEMPOTENCY_KEY_INVALID',422);
   }
-  if(state.eventState==='claimed')fleet();
   if(list)return {events:events.map(entry=>project(entry,locale,state,now).event),serverTimeUtc:date(now),source:'nx_event + nx_user_event'};
 
   const {code,rules,event,eligible}=project(entry,locale,state,now);
@@ -297,7 +317,7 @@ export function demoH4EventResponse(url,locale,state,request,now,{fleet,promotio
     const previous=record.claims[code];
     if(commandKey&&previous?.key===commandKey)return previous.result;
     if(event.state==='upcoming')reject('EVENT_NOT_OPEN');
-    if(previous||record.legacyClaims?.includes(code))reject('EVENT_ALREADY_CLAIMED');
+    if(previous)reject('EVENT_ALREADY_CLAIMED');
     if(event.userStatus!=='CLAIMABLE')reject('EVENT_NOT_CLAIMABLE');
     if(code==='invite'){
       const {slotsUsed,slotCap}=fleet();

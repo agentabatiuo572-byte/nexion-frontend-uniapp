@@ -20,6 +20,18 @@ import { demoH4Account, demoH4Credits, demoH4EventResponse, demoH4Gift, demoH4Gi
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
+const walletBusinessTimeZone='Asia/Shanghai';
+const walletBusinessDate=new Intl.DateTimeFormat('en-CA',{
+  timeZone:walletBusinessTimeZone,year:'numeric',month:'2-digit',day:'2-digit',
+});
+function walletBillStatus(status) {
+  switch(status.trim().toUpperCase()){
+    case 'SUCCESS': case 'POSTED': case 'COMPLETED': case 'CONFIRMED': return 'SUCCESS';
+    case 'PENDING': return 'PENDING';
+    case 'FAILED': case 'REJECTED': case 'CANCELLED': return 'FAILED';
+    default: throw new Error('WALLET_LEDGER_STATUS_INVALID');
+  }
+}
 const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
@@ -229,6 +241,20 @@ const demoOrderSlots=(orders,orderNo)=>orders
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
 // full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
 // Nothing ever exceeds the cap and the cap is never raised.
+function decayedS1PurchasedAt(now) {
+  const purchased=new Date(now);
+  purchased.setDate(1);
+  purchased.setMonth(purchased.getMonth()-3);
+  return purchased.getTime();
+}
+export function initializeDemoPreviewAccount(state,now=Date.now()) {
+  // The activated sample order is placed three minutes before the seed device.
+  const device41=state.fleetSeed?.find(device=>device.id===41);
+  const earliestDeviceOrderAt=Math.min(decayedS1PurchasedAt(now),device41?.activatedAt??Infinity)-samplePaidAfter;
+  const orderDates=state.sampleOrdersAt==null?[]:demoOrders(demoProducts(state),{...state},now).map(order=>order.placedAt);
+  demoH4Account(state,now,[earliestDeviceOrderAt,...orderDates]);
+}
+
 function demoSeedFleet(state,template,products,capacitySchedule,cap,occupied,retired) {
   const clone=(id,code,name,daily,paid,extra)=>({...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,
     dailyNex:products.find(product=>product.id.toUpperCase()===code).dailyEarnNEX*previewCapacity({...template,productCode:code,...extra},capacitySchedule,Date.now()).capacityPct/100,
@@ -238,8 +264,8 @@ function demoSeedFleet(state,template,products,capacitySchedule,cap,occupied,ret
   let devices=state.fleetState==='none'?[]:[template,{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}];
   if(state.fleetState==='inventory')devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='decayed'){
-    const purchased=new Date();purchased.setDate(1);purchased.setMonth(purchased.getMonth()-3);
-    const older={purchasedAt:purchased.getTime(),activatedAt:purchased.getTime()};
+    const purchasedAt=decayedS1PurchasedAt(Date.now());
+    const older={purchasedAt,activatedAt:purchasedAt};
     devices=[clone(41,'STELLARBOX-S1','UVELBox S1',6.2,1299,older),
       clone(43,'STELLARBOX-S1','UVELBox S1',6.2,1299,{...older,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}),
       clone(51,'CLOUD-SHARE','Cloud Share',.6,19.9,{deviceType:'SHARE',capacityConfigKey:'capacityApplyToCloudShare',status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',purchasedAt:Date.now()})];
@@ -276,8 +302,7 @@ export function demoFleetFacts(url,locale,state) {
   const reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
   const roster=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
-  const used=roster.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount;
-  const gift=demoH4Gift(state,now,slotCap-used,products);
+  const gift=demoH4Gift(state);
   if(gift){
     const {productNo,instances}=gift.result.receipt;
     const product=products.find(item=>item.id===productNo);
@@ -728,21 +753,27 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
     const bills=empty?[]:[['COMPUTE_EARNING','UVT','IN',15,'earn'],['REFERRAL_REWARD','UVT','IN',10,'refer'],['DEVICE_PURCHASE','USDT','OUT',1299,'purchase'],['CHECK_IN','UVT','IN',5,'bonus'],['COMPUTE_EARNING','USDT','IN',128.5,'earn'],['COMPUTE_EARNING','USDT','IN',0.00032,'earn']].map(([bizType,asset,direction,amount,category],i)=>({id:'demo-bill-'+i,bizNo:'DEMO-'+(1000+i),bizType,asset,direction,amount,balanceAfter:asset==='UVT'?1280:5280.64,status:'SUCCESS',remark:'',createdAt:new Date(now-i*day).toISOString(),category}));
     const credits=demoH4Credits(state,now),total=credits.reduce((sum,credit)=>sum+credit.amount,0);
-    let balance=demoWalletNex(state,now)-total;
+    const baseNexBalance=demoWalletNex(state,now)-total;
+    if(credits.length)for(const bill of bills){
+      if(bill.asset==='UVT')bill.balanceAfter=baseNexBalance+credits
+        .filter(credit=>credit.at<=Date.parse(bill.createdAt)).reduce((sum,credit)=>sum+credit.amount,0);
+    }
+    let balance=baseNexBalance;
     for(const {id,type,status,amount,at} of credits){
       balance+=amount;
       bills.unshift({id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,balanceAfter:balance,
-        status,remark:'',createdAt:new Date(at).toISOString(),category:'bonus'});
+        status:walletBillStatus(status),remark:'',createdAt:new Date(at).toISOString(),category:'bonus'});
     }
     bills.sort((left,right)=>right.createdAt.localeCompare(left.createdAt));
     if(pathname.endsWith('/summary')){
-      const todayNexEarn=bills.filter(bill=>bill.asset==='UVT'&&bill.createdAt.slice(0,10)===iso.slice(0,10))
+      const today=walletBusinessDate.format(now),month=today.slice(0,7);
+      const todayNexEarn=bills.filter(bill=>bill.asset==='UVT'&&walletBusinessDate.format(new Date(bill.createdAt))===today)
         .reduce((sum,bill)=>sum+(bill.direction==='IN'?bill.amount:-bill.amount),0);
       const latestRewardAt=bills.find(bill=>bill.direction==='IN'&&['bonus','refer','achievement'].includes(bill.category))?.createdAt??null;
-      return {source:'server',sourceEnvironment:'PRODUCTION',timeZone:'UTC',asOf:iso,rewardsUsdt:empty?0:128.5,
+      return {source:'server',sourceEnvironment:'PRODUCTION',timeZone:walletBusinessTimeZone,asOf:iso,rewardsUsdt:empty?0:128.5,
         rewardsNex:empty?0:150+total,settledRewardsNex:empty?0:140+total,withdrawalOffsetNexSpent:empty?0:10,latestRewardAt,todayNexEarn,
-        pendingNex:empty?0:10,monthBillCount:bills.filter(bill=>bill.createdAt.slice(0,7)===iso.slice(0,7)).length,
-        recentNexBills:bills.filter(bill=>bill.asset==='UVT')};
+        pendingNex:empty?0:10,monthBillCount:bills.filter(bill=>walletBusinessDate.format(new Date(bill.createdAt)).slice(0,7)===month).length,
+        recentNexBills:bills.filter(bill=>bill.asset==='UVT').slice(0,10)};
     }
     const filtered=bills.filter(bill=>['asset','direction'].every(key=>!url.searchParams.get(key)||url.searchParams.get(key)===bill[key])&&(url.searchParams.get('category')!=='REWARD'||bill.direction==='IN'));
     return {source:'server',sourceEnvironment:'PRODUCTION',bills:filtered,page:1,pageSize:20,total:filtered.length,nextPage:null,nextCursor:null};
