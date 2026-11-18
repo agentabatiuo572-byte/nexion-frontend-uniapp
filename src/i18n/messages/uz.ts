@@ -3379,6 +3379,7 @@ export const uz: Messages = {
     historyTruncated: "Faqat soʻnggi 100 ta xabar koʻrsatiladi. Oldingi xabarlar saqlanadi.",
     loadEarlier: "Oldingi xabarlarni yuklash",
     sessionTransferred: "Bu suhbat boshqa joyga oʻtkazildi va endi javob qabul qilmaydi. Yangi suhbat boshlang.",
+    sessionTransferredOpenCurrent: "Bu suhbat boshqa joyga oʻtkazildi va endi javob qabul qilmaydi. Joriy suhbatda muloqotni davom ettiring.",
     title: "Xabarlar",
     back: "Orqaga",
     typeAdvisor: "Shaxsiy menejer",

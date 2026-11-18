@@ -3379,6 +3379,7 @@ export const id: Messages = {
     historyTruncated: "Hanya 100 pesan terbaru yang ditampilkan. Pesan sebelumnya tetap disimpan.",
     loadEarlier: "Muat pesan sebelumnya",
     sessionTransferred: "Percakapan ini sudah dialihkan dan tidak bisa dibalas lagi. Mulai percakapan baru.",
+    sessionTransferredOpenCurrent: "Percakapan ini sudah dialihkan dan tidak bisa dibalas lagi. Silakan lanjutkan di percakapan saat ini.",
     title: "Pesan",
     back: "Kembali",
     typeAdvisor: "CS pribadi",

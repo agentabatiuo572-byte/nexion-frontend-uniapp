@@ -689,6 +689,8 @@ const writableConversationNo = computed(() => {
   const target = conv.value?.writeState?.writableConversationNo;
   return isTransferredSession.value && target && target !== cid.value ? target : null;
 });
+const transferredSessionNotice = computed(() => writableConversationNo.value
+  ? t.value.conversations.sessionTransferredOpenCurrent : t.value.conversations.sessionTransferred);
 const isReplyAllowed = computed(() => !isTransferredSession.value && (!conv.value || replyAllowedStatuses.has(conv.value.status)));
 const isClosedSession = computed(() => !!conv.value && !isReplyAllowed.value);
 // Account advisor identity belongs to new composition. Existing conversation
@@ -737,7 +739,7 @@ const headerRole = computed(() => {
   if (startType.value && advisorApplies.value && convStore.advisor?.availability === "BUSY") return t.value.conversations.image.busyAdvisor;
   if (startType.value) return t.value.conversations.startConversation;
   if (!conv.value) return "";
-  if (isTransferredSession.value) return t.value.conversations.sessionTransferred;
+  if (isTransferredSession.value) return transferredSessionNotice.value;
   if (isClosedSession.value) return t.value.conversations.sessionEnded;
   if (!remoteApiEnabled) return t.value.conversations[conv.value.roleKey];
   if (advisorApplies.value && convStore.advisor?.assignmentState === "ADVISOR_DISABLED") return t.value.conversations.image.disabledAdvisor;
@@ -1007,7 +1009,7 @@ async function sendHumanMessage(text: string, attachmentId?: string, restore?: (
   }
   if (!isReplyAllowed.value) {
     restore?.();
-    toast.info(isTransferredSession.value ? t.value.conversations.sessionTransferred : t.value.conversations.sessionEnded, "");
+    toast.info(isTransferredSession.value ? transferredSessionNotice.value : t.value.conversations.sessionEnded, "");
     return;
   }
   const replyBinding = app.accountBindingEpoch;

@@ -3379,6 +3379,7 @@ export const fil: Messages = {
     historyTruncated: "Ang pinakabagong 100 mensahe lang ang ipinapakita. Nakatabi pa rin ang mga mas luma.",
     loadEarlier: "I-load ang mas lumang mensahe",
     sessionTransferred: "Nailipat na ang usapang ito at hindi na makakatanggap ng reply. Magsimula ng bagong usapan.",
+    sessionTransferredOpenCurrent: "Nailipat na ang usapang ito at hindi na makakatanggap ng reply. Magpatuloy sa kasalukuyang usapan.",
     title: "Mga mensahe",
     back: "Bumalik",
     typeAdvisor: "Nakatalagang support",
