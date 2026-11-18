@@ -449,9 +449,6 @@ export const useApp = defineStore("app", () => {
   }
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
-  // Passive display recovery must honour the server's read throttling even
-  // though this store converts API errors into section status instead of throwing.
-  let remoteFleetRetryAt = 0;
   const remoteFleetHasSnapshot = ref(!remoteApiEnabled);
   /**
    * The fleet's own "today" total, which the backend defines as zero-safe
@@ -1066,7 +1063,9 @@ export const useApp = defineStore("app", () => {
   ): Promise<boolean> {
     // A request captured for a previous account must not disturb the current account's fleet reads.
     if (!remoteAccountEpoch.isCurrent(request)) return false;
-    if (options.coalesce && Date.now() < remoteFleetRetryAt) return false;
+    // Let an active load settle across catalog revisions. The API client still guards its GET.
+    if (options.coalesce && remoteFleetStatus.value !== "loading"
+      && Date.now() < (deviceE3Api.fleetReadCooldownUntil() ?? 0)) return false;
     invalidateBeforePassiveTabRead("remote-fleet");
     if (!remoteApiEnabled) return true;
     if (homeTruthEnvironmentInvalidated) return false;
@@ -1116,12 +1115,7 @@ export const useApp = defineStore("app", () => {
           remoteAssignmentHasSnapshot.value = true;
           rememberTaskAssignments(request, assignmentResult.value);
         }
-        if (fleetResult.status === "rejected") {
-          if (isHttpReadRateLimit(fleetResult.reason)) {
-            remoteFleetRetryAt = Date.now() + (fleetResult.reason.retryAfterMs ?? 30_000);
-          }
-          throw fleetResult.reason;
-        }
+        if (fleetResult.status === "rejected") throw fleetResult.reason;
         const fleet = fleetResult.value;
         slotCap.value = fleet.slotCap;
         installCanonicalLifecycleConfig(fleet.capacitySchedule);
@@ -1207,7 +1201,6 @@ export const useApp = defineStore("app", () => {
       lastCloudSnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
-      remoteFleetRetryAt = 0;
       remoteFleetHasSnapshot.value = false;
       remoteRealizedToday.value = null;
       slotCap.value = MAX_DEVICES;

@@ -173,8 +173,11 @@ export interface CanonicalCapacityReplaceQuote {
   decisionSource: "server";
 }
 
+const FLEET_PATH = "/api/devices/earnings";
+
 export interface DeviceE3Api {
   fleet(): Promise<CanonicalE3Fleet>;
+  fleetReadCooldownUntil(): number | undefined;
   tradeinConfig(): Promise<CanonicalTradeinConfig>;
   eligibility(targetProductNo: string): Promise<CanonicalTradeinEligibility>;
   quote(sourceDeviceId: number, targetProductNo: string): Promise<CanonicalTradeinQuote>;
@@ -644,7 +647,10 @@ async function sendCapacityKeep(client: ApiClient, targetProductNo: string, idem
 export function createDeviceE3Api(client: ApiClient, mode: ApiEnvironment = "prod"): DeviceE3Api {
   return {
     async fleet() {
-      return fleet(await client.request<unknown>({ path: "/api/devices/earnings" }), mode);
+      return fleet(await client.request<unknown>({ path: FLEET_PATH }), mode);
+    },
+    fleetReadCooldownUntil() {
+      return client.readCooldownUntil?.(FLEET_PATH);
     },
     async tradeinConfig() {
       return config(await client.request<unknown>({ path: "/api/app/trade-in/config" }));
