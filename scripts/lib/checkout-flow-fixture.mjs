@@ -72,8 +72,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh') {
         return refusal;
       }
       if(firstPayment){
-        Object.assign(order,{paymentNo:settled.paymentNo,targetDeviceId:order.targetDeviceId??90301,
-          targetDeviceInstanceNo:order.targetDeviceInstanceNo??orderNo+'-0-0'});
+        order.paymentNo=settled.paymentNo;
         pin.state.payWrites++;
       }
       if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});

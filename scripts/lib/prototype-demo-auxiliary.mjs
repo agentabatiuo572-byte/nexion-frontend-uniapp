@@ -1,6 +1,6 @@
 // Read-only samples for auxiliary screens. Never imported by production source.
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoCommissionEvents, demoCommissionTotals, demoLifetimeEarningsUsdt, demoSettledTasks, demoTeamPeriod } from './prototype-demo-wallet.mjs';
+import { demoCommissionGroups, demoCommissionTotals, demoLifetimeEarningsUsdt, demoSettledTasks, demoTeamPeriod } from './prototype-demo-wallet.mjs';
 
 import { demoBatchPage } from './prototype-demo-secondary.mjs';
 
@@ -44,13 +44,15 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       throw Object.assign(new Error('DIRECT_REFERRAL_QUERY_INVALID'),{status:422});
     }
     const window=demoTeamPeriod(period,now,url.searchParams.get('snapshotAt'));
-    const all=demoCommissionEvents(state,state.previewFactsAt??now).filter(event=>
+    const all=demoCommissionGroups(state,state.previewFactsAt??now).filter(event=>
       event.kind.startsWith('direct_')&&window.contains(event.ts));
     const kind=filter==='purchase'?'direct_purchase':'direct_device_earning';
     const selected=filter==='all'?all:all.filter(event=>event.kind===kind);
     const events=selected.slice((page-1)*pageSize,page*pageSize).map(event=>({...event,settlementNo:event.id,
       sourceDeviceId:event.sourceDeviceId??null,basisUsdt:event.orderAmountUSD,policyVersion:3,nexUsdtPrice:.128,
-      recoveryPendingUSDT:0,recoveryPendingNEX:0,
+      recoveryPendingUSDT:0,recoveryPendingNEX:0,cancelledUSDT:0,cancelledNEX:0,
+      creditedUSDTAt:event.status==='unlocked'?new Date(event.unlockAt).toISOString():null,
+      creditedNEXAt:event.status==='unlocked'?new Date(event.unlockAt).toISOString():null,
     }));
     return {...proof,serverCanonical:true,period,page,pageSize,totalRows:selected.length,events,
       split:{purchase:demoCommissionTotals(selected.filter(row=>row.kind==='direct_purchase')),

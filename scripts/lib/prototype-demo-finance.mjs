@@ -2,6 +2,7 @@
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import {randomUUID} from 'node:crypto';
 import {demoWithdrawalFacts} from './prototype-demo-secondary.mjs';
+import { demoCreditedDeposit } from './prototype-demo-wallet.mjs';
 const day=86400000;
 const exchangeDay = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -21,19 +22,24 @@ export function financeDemo(url,state,request){const p=url.pathname,method=reque
 const caps = { ...proof, source: "G2/G3 server configuration", asset: "UVT", currency: "USDT", currentPrice: .125, userDailyCapUsdt: 5000, platformDailyCapUsdt: 100000, feePct: .1, feeMinUsdt: .1, minUsdt: .1, minNex: 1, queueMode: "QUEUE", swapEnabled: true };
 const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_item + nx_emergency_control_setting" };
   if (p === "/api/config/exchange/caps") return caps;
-  const history=p==='/api/exchange'?demoDeletionHistory(state):null;
-  if(history){
-    const orders=history.swap?[history.swap]:[];
+  if(p==='/api/exchange'){
+    const history=demoDeletionHistory(state);
+    const orders=history?(history.swap?[history.swap]:[]):empty?[]:[{exchangeNo:'EX-DEMO123456',
+      fromAsset:'USDT',toAsset:'UVT',fromAmount:50.123456,toAmount:400.987648,rate:.125,
+      status:'COMPLETED',at:state.previewFactsAt}];
     const settled=orders.filter(order=>['COMPLETED','SUCCESS'].includes(order.status));
     const sumUsdt=rows=>rows.reduce((sum,order)=>sum+(order.toAsset==='USDT'?order.toAmount:order.fromAmount),0);
     const today=exchangeDay.format(now);
-    return {...proof,caps,wallet:{usdtAvailable:walletAmount,nexAvailable:accountDeletionWallet(state).nexAvailable},
+    const requestedPage=Number(url.searchParams.get('pageNum')??1),requestedSize=Number(url.searchParams.get('pageSize')??20);
+    if(!Number.isInteger(requestedPage)||!Number.isInteger(requestedSize))
+      throw Object.assign(new Error('EXCHANGE_PAGE_INVALID'),{status:400});
+    const pageNum=Math.max(1,requestedPage),pageSize=Math.max(1,Math.min(requestedSize,100));
+    return {...proof,caps,wallet:{usdtAvailable:walletAmount,nexAvailable:0},
       todayUserUsedUsdt:sumUsdt(settled.filter(order=>exchangeDay.format(order.at)===today)),
       todayPlatformUsedUsdt:1000,lifetimeExchangedUsdt:sumUsdt(settled),
-      ordersPage:{total:orders.length,pageNum:Number(url.searchParams.get('pageNum')||1),pageSize:Number(url.searchParams.get('pageSize')||20)},
-      orders:orders.map(({at,...order})=>({...order,createdAt:new Date(at).toISOString()}))};
+      ordersPage:{total:orders.length,pageNum,pageSize},
+      orders:orders.slice((pageNum-1)*pageSize,pageNum*pageSize).map(({at,...order})=>({...order,createdAt:new Date(at).toISOString()}))};
   }
-  if (p === "/api/exchange") return { ...proof, caps, wallet: { usdtAvailable: walletAmount, nexAvailable: accountDeletionWallet(state)?.nexAvailable ?? 789.000001 }, todayUserUsedUsdt: 50, todayPlatformUsedUsdt: 1000, lifetimeExchangedUsdt: 50.123456, ordersPage: { total: empty ? 0 : 1, pageNum: Number(url.searchParams.get("pageNum") || 1), pageSize: Number(url.searchParams.get("pageSize") || 20) }, orders: empty ? [] : [{ exchangeNo: "EX-DEMO123456", fromAsset: "USDT", toAsset: "UVT", fromAmount: 50.123456, toAmount: 400.987648, rate: .125, status: "COMPLETED", createdAt: iso }] };
   if (p === "/api/config/repurchase") return { ...repurchaseProof, product: "repurchase", asset: "USDT", pointsReward: false, apyPct: 35, lockDays: 90, nurtureMultiplier: 1, h1ReinvestMultiplier: 1, effectiveNurtureMultiplier: 1, ticketPerOrder: 1, presets: [50, 200, 1000], earlyPenaltyPct: 10, minAmountUsdt: 50, enabled: true, disclosureRequired: false, currentNexPriceUsdt: .125, g4LotteryCapacity: 1000, g4TicketsIssuedThisMonth: 1 };
   if (p === "/api/repurchase/orders") return { ...repurchaseProof, walletBalanceUsdt: walletAmount, serverTime: iso, ordersPage: { total: accountDeletionWallet(state)||empty ? 0 : 1, pageNum: 1, pageSize: 50 }, orders: accountDeletionWallet(state)||empty ? [] : [{ orderNo: "RPS-DEMO123456", amountUsdt: 50.123456, apyPct: 35, earlyPenaltyPct: 10, lockDays: 90, lockedAt: new Date(now - 86400000).toISOString(), unlockAt: new Date(now + 89 * 86400000).toISOString(), estimatedInterestUsdt: 4.325671, status: "ACTIVE" }] };
   const {withdrawals}=facts;
@@ -140,5 +146,8 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       feeUsdt: policy.feeUsdt, feeUsdtExact: policy.feeUsdtExact, minDepositUsdt: policy.minDepositUsdt,
       minDepositUsdtExact: policy.minDepositUsdtExact, confirmations: policy.confirmations };
   }
-  if (p === "/api/deposits") return empty || state.accountDeletionState === 'clear' ? [] : [{ depositId: "CR-77", network: "BEP20", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdt: 50.123456, grossAmountUsdtExact: "50.123456", creditedUsdt: 50, creditedUsdtExact: "50", confirmations: 15, status: "CREDITED", createdAt: now }];
+  if(p==='/api/deposits'){
+    const deposit=demoCreditedDeposit(state);
+    return deposit?[{ ...deposit, network: "BEP20", txHash: `0x${"a".repeat(64)}`, address: `0x${"1".repeat(40)}`, grossAmountUsdtExact: "50.123456", creditedUsdtExact: "50", confirmations: 15, status: "CREDITED" }]:[];
+  }
 };

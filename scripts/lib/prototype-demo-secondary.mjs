@@ -1,7 +1,7 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoCommissionEvents, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 // Receipt cursors retain the issuance cutoff while ordering by completion.
@@ -107,7 +107,7 @@ export function demoWithdrawalFacts(state,now=Date.now()){
   return {withdrawals,walletUsdt,pendingReview,bonusLocked,balanceMaxRatio,released,maxWithdrawableUsdt:Math.round(released*balanceMaxRatio*1e6)/1e6,dailyLimitCount,
     dailyRemainingCount:Math.max(0,dailyLimitCount-used),dailyCountResetAt};
 }
-export function secondaryDemo(url,state,request){
+export function secondaryDemo(url,state,request,walletBills){
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now);
   const page=Number(url.searchParams.get('page')||1),pageSize=Number(url.searchParams.get('pageSize')||20);
   const paginate=items=>({page,pageSize,totalRows:items.length,events:items.slice((page-1)*pageSize,page*pageSize)});
@@ -136,7 +136,16 @@ export function secondaryDemo(url,state,request){
     if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     return receipt;
   }
-  if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},assets:{USDT:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},UVT:{withdrawable:accountDeletionWallet(state)?.nexAvailable??(empty?0:1280),pending_review:accountDeletionWallet(state)||empty?0:10,bonus_locked:0}},releaseMode:'manual_only',attestedOnlineSeconds:0,requiredAttestationSeconds:0,clusterRestricted:false};
+  if(p==='/api/earnings/release-status'){
+    const entries=walletBills().filter(row=>row.status==='SUCCESS'&&row.direction==='IN'
+      &&['TEAM_COMMISSION','REFERRAL_REWARD','DAILY_CHECK_IN','DAILY_MILESTONE','EARNING_MILESTONE',
+        'EVENT_REWARD','WHEEL_REWARD','GENESIS_EMISSION','TRIAL_BONUS'].includes(row.bizType));
+    const released=asset=>Number(entries.filter(row=>row.asset===asset).reduce((sum,row)=>sum+row.amount,0).toFixed(6));
+    const assets={USDT:{withdrawable:released('USDT'),pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},
+      UVT:{withdrawable:released('UVT'),pending_review:accountDeletionWallet(state)||empty?0:10,bonus_locked:0}};
+    return {serverCanonical:true,buckets:assets.USDT,assets,releaseMode:'manual_only',attestedOnlineSeconds:0,
+      requiredAttestationSeconds:0,clusterRestricted:false};
+  }
   if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
   if(p==='/api/app/team/insights/commissions'){
     const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other'];
@@ -177,9 +186,16 @@ export function secondaryDemo(url,state,request){
     if(!['today','week','month','all'].includes(period))invalid('TEAM_UNILEVEL_PERIOD_INVALID');
     if(!Number.isInteger(page)||page<1||!Number.isInteger(pageSize)||pageSize<1||pageSize>100)invalid('TEAM_UNILEVEL_PAGE_INVALID');
     const window=demoTeamPeriod(period,now,url.searchParams.get('snapshotAt'));
-    const all=demoCommissionEvents(state,state.previewFactsAt??now)
-      .filter(event=>(event.kind==='unilevel'||version===2&&event.kind==='direct_purchase')&&window.contains(event.ts))
-      .map(event=>({...event,source:'network',cycle:demoTeamBusinessDate(event.ts).slice(0,7),currency:'DUAL'}));
+    const seedAt=state.previewFactsAt??now;
+    const commissionRows=demoCommissionEvents(state,seedAt).filter(row=>row.kind==='unilevel');
+    const purchases=version===2?demoCommissionGroups(state,seedAt)
+      .filter(row=>row.kind==='direct_purchase').map(row=>({...row,currency:'DUAL',policyVersion:3,nexUsdtPrice:.128})):[];
+    const all=[...commissionRows,...purchases].filter(row=>window.contains(row.ts)).sort((a,b)=>b.ts-a.ts||b.id.localeCompare(a.id))
+      .map(row=>({...row,source:'network',sourceRef:row.sourceRef??row.orderId,cycle:demoTeamWeek(row.ts),
+        settlementState:'CANONICAL',withdrawable:version===1&&row.status==='unlocked',
+        ...(version===2&&{policyVersion:row.policyVersion??null,nexUsdtPrice:row.nexUsdtPrice??null,
+          recoveryPendingUSDT:0,recoveryPendingNEX:0,
+          ...(row.amountUSDT>0&&{statusUSDT:row.status}),...(row.amountNEX>0&&{statusNEX:row.status})})}));
     const direct=all.filter(row=>row.layer===1),extended=all.filter(row=>row.layer>1);
     const events=filter==='direct'?direct:filter==='extended'?extended:all;
     return {...proof,period,...paginate(events),split:{direct:demoCommissionTotals(direct),extended:demoCommissionTotals(extended)},
