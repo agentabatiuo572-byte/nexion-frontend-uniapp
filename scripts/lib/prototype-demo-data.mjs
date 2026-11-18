@@ -77,54 +77,7 @@ const skuDefinitions = [
   ['stellarrack-p2','UVELRack P2','Flagship',19999,2250,50,'8 × H100','1,024 GB',4000],
   ['cloud-share','Cloud Share','Share',19.9,18,3,'Distributed','—',0],
 ];
-const PRODUCT_HOSTING_COPY = {
-  "zh": {
-    "device": "全托管设备",
-    "rack": "全托管机架",
-    "share": "云端托管份额"
-  },
-  "en": {
-    "device": "Fully managed device",
-    "rack": "Fully managed rack",
-    "share": "Cloud-hosted share"
-  },
-  "vi": {
-    "device": "Thiết bị được quản lý toàn diện",
-    "rack": "Hệ thống rack được quản lý toàn diện",
-    "share": "Phần tài nguyên đám mây"
-  },
-  "ru": {
-    "device": "Устройство с полным обслуживанием",
-    "rack": "Стойка с полным обслуживанием",
-    "share": "Доля облачных ресурсов"
-  },
-  "kk": {
-    "device": "Толық қызмет көрсетілетін құрылғы",
-    "rack": "Толық қызмет көрсетілетін серверлік сөре",
-    "share": "Бұлттық ресурстар үлесі"
-  },
-  "uz": {
-    "device": "Toʻliq xizmat koʻrsatiladigan qurilma",
-    "rack": "Toʻliq xizmat koʻrsatiladigan server shkafi",
-    "share": "Bulut resurslari ulushi"
-  },
-  "id": {
-    "device": "Perangkat yang dikelola penuh",
-    "rack": "Rak yang dikelola penuh",
-    "share": "Porsi sumber daya cloud"
-  },
-  "ms": {
-    "device": "Peranti diurus sepenuhnya",
-    "rack": "Rak diurus sepenuhnya",
-    "share": "Bahagian sumber awan"
-  },
-  "fil": {
-    "device": "Device na ganap na pinamamahalaan",
-    "rack": "Rack na ganap na pinamamahalaan",
-    "share": "Bahagi ng kapasidad sa cloud"
-  }
-};
-export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
+export function demoProducts(state,origin='http://127.0.0.1:5190') {
   return skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
     const bought=(state.createdOrders??[]).filter(order=>order.quotaUsedAt!=null&&demoPaidPurchase(order))
@@ -134,12 +87,12 @@ export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
-    return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu:share?localized(locale,'分布式','Distributed','Phân tán'):gpu,
+    return {id,name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
       vram:share?'不适用（虚拟算力份额）':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'不适用（非独立设备）',hashRate:null,
-      tagline:PRODUCT_HOSTING_COPY[locale==='zh'||locale==='vi'?locale:'en'][share?'share':tier==='Flagship'?'rack':'device'],badge:index===0?localized(locale,'推荐','Recommended','Đề xuất'):index===1?localized(locale,'热销','Best seller','Bán chạy'):null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
+      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',badge:index===0?'Recommended':index===1?'Best seller':null,imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
-      features:[],taskLevels:[],ai:null,datacenter:localized(locale,'新加坡','Singapore','Singapore'),uptime:'99.9%',warranty:share?'unavailable':localized(locale,'36 个月','36 months','36 tháng'),status:'active',available:!upcoming,
+      features:[],taskLevels:[],ai:null,datacenter:'Singapore',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
       releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,purchaseGate:null,
       purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
       dailyEstimateLowUsdt:share?monthlyEstimateUsdt*(1-b)/30:null,dailyEstimateHighUsdt:share?monthlyEstimateUsdt*(1+b)/30:null,
@@ -263,7 +216,7 @@ function genesisPublic(now) {
 // quote): occupied = activated formal devices + slots held by paid orders awaiting a device + one effective trial
 // (ACTIVE/GRACE) <= cap. demoFleetFacts computes it from the retained state; reads and commands all use it.
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
-  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,demoProducts(state,url.origin,locale)).state)?1:0;
+  &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,demoProducts(state,url.origin)).state)?1:0;
 // Session orders plus the state-sample rows that belong to the scenario. The paid (002) and provisioning (003)
 // samples hold slots, so they appear only in fleetState=reserved, where they are its reservations. The activated
 // sample (004) is the order of seeded device 41 and is listed only while the seed holds that device, on that device's
@@ -282,7 +235,7 @@ const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${uni
 // The account's one order list, used by the order list, wallet pay, external payments and notifications.
 export function demoAccountOrders(url,locale,state,now=Date.now()) {
   if(!state.fleetSeed)demoFleetFacts(url,locale,state);
-  return demoScenarioOrders(demoProducts(state,url.origin,locale),state,now,state.fleetSeed.find(device=>device.id===41))
+  return demoScenarioOrders(demoProducts(state,url.origin),state,now,state.fleetSeed.find(device=>device.id===41))
     .map(order=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
       targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?order.targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
@@ -356,7 +309,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
 export function demoFleetFacts(url,locale,state) {
   // Read the trial first: a converted trial books its order, which then lists as a device below.
   const trialSlotCount=demoTrialSlots(url,locale,state);
-  const now=Date.now(),products=demoProducts(state,url.origin,locale),orders=demoScenarioOrders(products,state,now,false);
+  const now=Date.now(),products=demoProducts(state,url.origin),orders=demoScenarioOrders(products,state,now,false);
   const seed=reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
   const template={...seed.devices[0],runtimeStatus:'ONLINE'};
   const slotCap=6,retired=state.retiredDeviceIds||[],session=[];
@@ -400,7 +353,7 @@ export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrd
   const requested=lines.reduce((count,line)=>count+line.quantity,0);
   const fleet=demoFleetFacts(url,locale,state);
   // Paying an existing order reuses the slots it already holds.
-  return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(demoScenarioOrders(products??demoProducts(state,url.origin,locale),state,Date.now(),false),excludeOrderNo):0)+requested<=fleet.slotCap;
+  return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(demoScenarioOrders(products??demoProducts(state,url.origin),state,Date.now(),false),excludeOrderNo):0)+requested<=fleet.slotCap;
 }
 
 // Detail-page live activity (PRD §7.2.2; the backend follows the same rule, uvel-docs B24). Derived from
@@ -426,7 +379,7 @@ export function demoFixture(url,locale,state,request) {
   state.walletLegacySeed??=false;
   const now=Date.now(),iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
-  const products=demoProducts(state,url.origin,locale);
+  const products=demoProducts(state,url.origin);
   if (pathname === '/api/config/phone-tiers') return { tiers: [1,2,3,4,5].map(tier => ({
     tier, name:`Tier ${tier}`, baseRateUsdt:[.02,.04,.06,.09,.12][tier-1], baseRateNex:tier*.1, effectiveAt:iso,
   })), sources:['Local prototype demo'] };

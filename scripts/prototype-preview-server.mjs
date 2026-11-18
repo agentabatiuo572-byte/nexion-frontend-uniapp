@@ -149,7 +149,7 @@ const server=http.createServer(async(req,res)=>{
           setDemoH4Scene(state,now);
           if(state.eventState==='claimed'&&state.dataState!=='empty'){
             const {slotCap,slotsUsed}=demoFleetFacts(url,locale,state);
-            seedDemoH4Gift(state,now,slotCap-slotsUsed,demoProducts(state,url.origin,locale));
+            seedDemoH4Gift(state,now,slotCap-slotsUsed,demoProducts(state,url.origin));
           }
         }
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
