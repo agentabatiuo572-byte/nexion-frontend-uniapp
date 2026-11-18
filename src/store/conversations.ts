@@ -700,7 +700,7 @@ export const useConversations = defineStore("conversations", () => {
   }
   function get(id: string): Conversation | undefined { return conversations.value.find((row) => row.id === id); }
 
-  async function open(id: string, active: () => boolean = () => true): Promise<Conversation> {
+  async function open(id: string, active: () => boolean = () => true, onDetailApplied?: () => void): Promise<Conversation> {
     const epoch = accountEpoch;
     const accountKey = accountKeyValue;
     const requestGeneration = (openGeneration.get(id) ?? 0) + 1;
@@ -733,7 +733,10 @@ export const useConversations = defineStore("conversations", () => {
         error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATION_READ_FAILED";
       }
     }
-    if (epoch === accountEpoch && accountKey === accountKeyValue && runId === pendingRunId && openGeneration.get(id) === requestGeneration && active()) replace(conversation);
+    if (current()) {
+      replace(conversation);
+      onDetailApplied?.();
+    }
     return conversation;
   }
 
