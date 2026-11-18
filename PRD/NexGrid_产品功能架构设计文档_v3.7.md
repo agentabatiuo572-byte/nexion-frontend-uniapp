@@ -2145,12 +2145,12 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 #### 8.4.3 UI 规格
 
 - 本周期(默认本月)Balance Match 预计 hero(大字,金额随结算周期联动,见 §8.4.1.2)+ 公式(min(Track A, Track B) × 10% · 日上限 · {周期}结算)
-- 阻塞警告(若任一轨 < $1,000)
-- Track A / Track B 双轨卡(月算力额 + 成员数 + Top member)
+- 阻塞提示(服务端双轨快照给出不可结算原因 `blockedReason` 时显示原因与恢复建议;非远端演示按任一轨 < $1,000)
+- Track A / Track B 双轨卡(月算力额 + 成员数 + Top member)。组内成员数为整组下游人数(该轨道全部下游成员,§8.4.1.1,与团队网络按组汇总一致);成员明细不可读时不显示成员数,也不用双轨快照的 `trackAMembers` / `trackBMembers`(只数分到该组的直属成员,供结算资格使用)代替;各组领先成员此时显示「—」
 - 较大 vs 较小差距比较条
 - 自动分配记录(`↳` 图标)
 - 最近匹配历史
-- hero 上方 entry chip `📖 New here? Learn how the program works →` 链 `/team/binary/how-it-works`
+- hero 标题右侧「玩法说明 ›」入口,链 `/team/binary/how-it-works`
 
 #### 8.4.4 玩法说明页 `/team/binary/how-it-works`
 

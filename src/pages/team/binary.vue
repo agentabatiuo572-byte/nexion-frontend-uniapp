@@ -23,7 +23,7 @@
                   <view class="binary-contribution-track" aria-hidden="true"><view v-if="contributionWidths && !visibility.hidden" class="binary-contribution-fill" :class="{ 'binary-contribution-fill--other': index === 1 }" :style="{ height: (comparisonInView === false ? 0 : contributionWidths[index]) + '%', transition: comparisonInView === false ? 'none' : VIZ_GROW_HEIGHT_TRANSITION, transitionDelay: comparisonInView === false ? '0ms' : vizStagger(index, 120) }" /></view>
                   <text class="binary-group-name">{{ wing.name }}</text>
                   <text class="binary-points tabular-nums">{{ visibility.mask('$' + formatFinanceAmount(wing.monthVol)) }}</text>
-                  <text class="binary-note">{{ wingMembersText(wing.count) }}</text>
+                  <text v-if="wing.count !== null" class="binary-note">{{ wingMembersText(wing.count) }}</text>
                 </view>
                 <view class="binary-rate"><text class="nx-num-metric">×{{ rateLabel }}%</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><text class="binary-note">{{ t.binary.weakBadge }}</text></view>
               </view>
@@ -213,7 +213,7 @@ function topOf(members: NetworkMember[]): NetworkMember | undefined {
 interface Wing {
   key: string;
   name: string;
-  count: number;
+  count: number | null;
   monthVol: number;
   isWeak: boolean;
   color: string;
@@ -223,8 +223,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "left",
     name: t.value.binary.leftWing,
-    count: remoteApiEnabled && !memberDetailsReadable.value
-      ? snapshot.value?.trackAMembers ?? 0 : sides.value.left.length,
+    count: memberDetailsReadable.value ? sides.value.left.length : null,
     monthVol: leftMonthVol.value,
     isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "left",
     color: "var(--v5-ink)",
@@ -233,8 +232,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "right",
     name: t.value.binary.rightWing,
-    count: remoteApiEnabled && !memberDetailsReadable.value
-      ? snapshot.value?.trackBMembers ?? 0 : sides.value.right.length,
+    count: memberDetailsReadable.value ? sides.value.right.length : null,
     monthVol: rightMonthVol.value,
     isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "right",
     color: "var(--v5-ink)",
