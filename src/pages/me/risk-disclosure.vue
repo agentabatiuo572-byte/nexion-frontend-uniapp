@@ -131,7 +131,6 @@ import { canAcknowledgeRiskDisclosure, canCompleteRiskDisclosureReadingFromScrol
 import { toast } from "@/store/ui";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { safeReturnTo } from "@/routing/safe-return-to";
-import { serverLanguage } from "@/i18n";
 
 const SCROLL_THRESHOLD_PX = 24;
 
@@ -139,20 +138,22 @@ const t = useT();
 const locale = useLocaleStore();
 const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
-const accepted = computed(() => risk.accepted);
-const disclosure = computed(() => risk.current);
+const displayLanguage = computed(() => risk.current
+  ? resolveRiskDisclosureDisplayLanguage(locale.code, risk.current.languageScope)
+  : null);
+const disclosure = computed(() => displayLanguage.value ? risk.current : null);
+const accepted = computed(() => !!disclosure.value && risk.accepted);
 // BUG #60: an unprovisioned/ambiguous region mapping is a configuration fact, not a
 // transient failure. Telling the user to retry (and offering the retry CTA) hides the
 // real, diagnosable cause behind a network-style message.
-const loadError = computed(() => !risk.error || disclosure.value ? "" : risk.jurisdictionUnmapped
-  ? w.value.jurisdictionUnmapped
-  : risk.publicationUnavailable ? w.value.publicationUnavailable : w.value.loadErrorRegion);
+const loadError = computed(() => {
+  if (disclosure.value) return "";
+  if (risk.current || risk.publicationUnavailable) return w.value.publicationUnavailable;
+  if (!risk.error) return "";
+  return risk.jurisdictionUnmapped ? w.value.jurisdictionUnmapped : w.value.loadErrorRegion;
+});
 const canRetryLoad = computed(() => !risk.jurisdictionUnmapped);
-const displayLanguage = computed(() => disclosure.value
-  ? resolveRiskDisclosureDisplayLanguage(serverLanguage(locale.code), disclosure.value.languageScope)
-  : null);
-// The note compares with the interface language: id/ms/fil/ru/kk/uz always read a zh/en/vi publication.
-const languageFallback = computed(() => (displayLanguage.value?.fallback ?? false) || (!!displayLanguage.value && displayLanguage.value.language !== locale.code));
+const languageFallback = computed(() => !!displayLanguage.value && displayLanguage.value !== locale.code);
 const disclosureContext = computed(() => disclosure.value ? fmt(w.value.publishedContext, {
   jurisdiction: disclosure.value.jurisdiction === "CN" ? w.value.mainlandChina : disclosure.value.jurisdictionName,
   version: disclosure.value.version,
@@ -320,11 +321,14 @@ onUnmounted(() => {
   scrollEventIdentity.value = null;
 });
 
-const blocks = computed(() => disclosure.value?.chapters.map((chapter) => ({
-  n: Number(chapter.no),
-  title: platformDisplayText(riskDisclosureChapterCopy(chapter, displayLanguage.value?.language ?? "zh").title),
-  body: platformDisplayText(riskDisclosureChapterCopy(chapter, displayLanguage.value?.language ?? "zh").body),
-})) ?? []);
+const blocks = computed(() => {
+  const language = displayLanguage.value;
+  if (!language || !disclosure.value) return [];
+  return disclosure.value.chapters.map((chapter) => {
+    const { title, body } = riskDisclosureChapterCopy(chapter, language);
+    return { n: Number(chapter.no), title: platformDisplayText(title), body: platformDisplayText(body) };
+  });
+});
 
 function sectionSelectedLabel(n: number): string {
   return fmt(w.value.sectionSelected, { n: String(n).padStart(2, "0") });

@@ -4000,7 +4000,9 @@ sequenceDiagram
 
 **入口**:结算页「购买、退款与售后说明」弹层的「风险提示书」(§7.3)、信任中心「规则与资料」的「风险披露」(§11.3)、服务条款页「另见:平台风险披露」(§4.7.5,未登录可读)。个人中心不设入口;提现与质押不再在提交前拦截。
 
-**数据**:Store `src/store/risk-disclosure.ts`(`useRiskDisclosure`,随账号切换重绑)。已登录读 `GET /api/legal/risk-disclosure/current`,未登录(带 `country`)读 `GET /api/legal/risk-disclosure/public/current`;确认写 `POST /api/legal/risk-disclosure/acknowledgment`,是否已确认以服务端返回为准。章节按当前语言显示已发布原文,缺该语言时显示可用语言并提示。
+**数据**:Store `src/store/risk-disclosure.ts`(`useRiskDisclosure`,随账号切换重绑)。已登录读 `GET /api/legal/risk-disclosure/current`,未登录(带 `country`)读 `GET /api/legal/risk-disclosure/public/current`;确认写 `POST /api/legal/risk-disclosure/acknowledgment`,是否已确认以服务端返回为准。确认提交当前所展示的版本及其读令牌。
+
+**章节语言**：中文界面显示中文，越南语界面显示越南语。英文和其余六种界面语言在当前发布版本的 `languageScope` 包含 `en` 时显示英文，其余六种界面语言沿用现有的语言提示。当前发布版本缺英文时，英文和其余六种界面语言显示现有的「暂不可用」状态，无章节和确认按钮，阅读门不计时。
 
 **页面结构**:
 1. 顶部返回头 + 标题
@@ -5459,7 +5461,7 @@ App 和 H5 Lite 提供 9 种界面语言，语言页（我的 → 语言，`/pag
   - 当前进程使用最近有效列表，同时持久化到 environment + baseUrl 对应的本机缓存；冷启动按同一合同校验缓存，无有效缓存只提供英文。缓存不代表整个平台配置 ready，不恢复 snapshotVersion 或刷新计时。
   - 响应缺字段、字段无效或请求失败均保留已有列表及缓存。API 环境失效时清当前语言资格并暂回英文，不复活旧来源缓存；新进程仅恢复自己的来源。
   - 运营改动在客户端下次成功取得有效配置后生效，沿用现有 30 分钟调度和主动刷新；没有新增实时同步。关闭当前语言时重跑候选优先级，不写账户；重开后恢复仍保留的明确选择。
-- 内容语言投影、英文内容缺失时的既有回退、站内信/推送/短信按账号语言交付规则保持；本项只控制可选择与显示的界面语言。
+- 界面语言开关控制可选择与显示的界面语言。风险提示书缺英文时的展示见 §11.4a。站内信、推送、短信按账号语言交付。
 - 这些市场的手机号注册暂不开放（短信服务商尚未覆盖），与界面语言无关。
 
 ### 14.5 i18n 验收规则

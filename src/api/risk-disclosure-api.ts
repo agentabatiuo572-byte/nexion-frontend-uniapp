@@ -87,8 +87,10 @@ function current(value: unknown, publicRead = false): RiskDisclosureCurrent {
     return invalid();
   }
   const languageScope = requiredText(row.languageScope);
-  if (languageScope !== "zh+vi" && languageScope !== "zh+vi+en") return invalid();
-  const chapters = row.chapters.map((entry) => chapter(entry, languageScope.includes("en")));
+  const languages = languageScope.split("+");
+  if (!languages.includes("zh") || !languages.includes("vi")) return invalid();
+  const requireEnglish = languages.includes("en");
+  const chapters = row.chapters.map((entry) => chapter(entry, requireEnglish));
   if (chapters.map((entry) => entry.no).sort().join(",") !== "01,02,03,04,05,06,07") return invalid();
   const parsed: RiskDisclosureCurrent = {
     source,
