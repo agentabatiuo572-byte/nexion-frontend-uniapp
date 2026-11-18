@@ -39,6 +39,7 @@ export interface ExchangeOrder {
   toAmount: number;
   rate: number;
   status: ExchangeOrderStatus;
+  queueEstimate?: { hours: number; copy: string };
   createdAt?: number;
 }
 
@@ -177,6 +178,12 @@ function parseOrder(value: unknown): ExchangeOrder {
       || !status || !ORDER_STATUSES.has(status)) {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
+  const estimate = record(row.queueEstimate);
+  const hours = estimate?.hours;
+  const copy = text(estimate?.copy);
+  const queueEstimate = status === "QUEUED" && typeof hours === "number"
+    && Number.isInteger(hours) && hours >= 1 && hours <= 999 && copy && !copy.includes("{hours}")
+    ? { hours, copy } : undefined;
   let createdAt: number | undefined;
   if ("createdAt" in row && row.createdAt !== null) {
     const parsed = parseServerTimestamp(row.createdAt);
@@ -191,6 +198,7 @@ function parseOrder(value: unknown): ExchangeOrder {
     toAmount,
     rate,
     status,
+    ...(queueEstimate ? { queueEstimate } : {}),
     createdAt,
   };
 }
