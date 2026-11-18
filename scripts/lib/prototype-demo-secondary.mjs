@@ -153,7 +153,8 @@ export function secondaryDemo(url,state,request,walletBills){
       throw Object.assign(new Error('TEAM_COMMISSIONS_PAGE_INVALID'),{status:422});
     }
     const window=demoTeamPeriod('all',now,url.searchParams.get('snapshotAt'));
-    const events=demoCommissionEvents(state,state.previewFactsAt??now).filter(event=>window.contains(event.ts));
+    const events=demoCommissionEvents(state,state.previewFactsAt??now).filter(event=>window.contains(event.ts))
+      .map(({sourceRef,...event})=>({...event,...(event.kind.startsWith('direct_')&&{sourceRef})}));
     const total=(rows,asset='amountUSDT')=>rows.reduce((sum,row)=>sum+row[asset],0);
     const today=demoTeamBusinessDate(Date.parse(window.snapshotAt)),month=today.slice(0,7);
     const thisMonth=events.filter(event=>demoTeamBusinessDate(event.ts).slice(0,7)===month);

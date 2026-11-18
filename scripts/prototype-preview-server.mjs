@@ -101,7 +101,7 @@ const server=http.createServer(async(req,res)=>{
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','urgent','late'].includes(value)?value:'';
-        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState),wasTrialQuote=state.trialQuoteState;
+        const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasPayment=accountPayment(state.paymentState),wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState;
         if(update.reset){
           const accountCreatedAt=state.accountCreatedAt;
           for(const key of Object.keys(state))delete state[key];
@@ -115,7 +115,7 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(state.paymentState)!==wasPayment;
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','walletOpeningMilestoneAt','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','deviceIds','deviceSequence','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -124,16 +124,20 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange&&state.bankDemo){Object.assign(state.bankDemo,{quotes:{},orders:{},commands:{},addresses:{}});delete state.bankDemo.addressOtp;}
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
         else if(scenarioChange&&state.paymentState==='low-balance')state.walletBalance=820.64;
-        if(update.reset||scenarioChange){
-          state.scenarioEpoch=++scenarioEpoch;
-          initializeDemoWalletHistory(state,state.previewFactsAt??startedAt);
-        }
+        if(update.reset||scenarioChange)state.scenarioEpoch=++scenarioEpoch;
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
-        if(update.streakState||scenarioChange){
-          for(const key of ['saverUsed','saverUsedAt','saverRestoredStreak'])delete state[key];
-          state.streakSeedAt=Date.now();state.checkedIn=false;
-          if(scenarioChange)state.milestoneClaims=[];
+        // Install a different opening streak before the user records a streak or milestone command.
+        const replaceStreak=wasStreak!==state.streakState&&!state.walletLegacySeed
+          &&!state.walletMovements?.some(row=>row.bizType==='DAILY_CHECK_IN'||row.bizType==='DAILY_MILESTONE')
+          &&!state.milestoneClaimReceipts?.some(({result})=>result)&&!state.saverUsed;
+        if(update.reset||scenarioChange||replaceStreak){
+          for(const key of ['saverUsed','saverUsedAt','saverRestoredStreak','walletOpeningStreak','walletOpeningMilestoneAt',
+            'streakSaverBalance','powerUps'])delete state[key];
+          state.streakSeedAt=Date.now();
+          state.checkedIn=false;
+          state.milestoneClaims=[];
+          initializeDemoWalletHistory(state,state.previewFactsAt??startedAt);
         }
         if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}
         if(update.ambassadorState)delete state.ambassadorDemo;
