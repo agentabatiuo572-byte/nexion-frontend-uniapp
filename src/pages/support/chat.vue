@@ -64,7 +64,7 @@
       :typing-label="t.conversations.agentTyping"
       :reveal-tick="revealTick"
       :closed="isClosedSession"
-      :restart-label="t.conversations.restartSession"
+      :restart-label="writableConversationNo ? t.conversations.openCurrentConversation : t.conversations.restartSession"
       :composer-key="app.accountBindingEpoch + ':' + convStore.scopeInvalidated + ':' + (cid || startType || '')"
       :initial-draft="draftText"
       :max-input-length="MESSAGE_MAX_LENGTH"
@@ -76,7 +76,7 @@
       :attachment-preview-src="imageDraft?.filePath"
       :failed-send-label="failedHumanLabel"
       :can-discard-send="failedHumanSend?.settled"
-      :can-retry-send="supportSessionReady && failedHumanSend?.retryable !== false && !humanSendBusy"
+      :can-retry-send="isReplyAllowed && supportSessionReady && failedHumanSend?.retryable !== false && !humanSendBusy"
       :send-blocked="!supportSessionReady || !!failedHumanSend || humanSendBusy"
       @send="onSend"
       @draft-change="draftText = $event"
@@ -161,7 +161,7 @@ const humanShowRevision = ref(0);
 let chatDisposed = false;
 const locale = useLocaleStore();
 type ImageDraft = { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean };
-type FailedHumanSend = { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number };
+type FailedHumanSend = NonNullable<HumanComposer["failedSend"]>;
 const imageDraft = ref<ImageDraft | null>(null);
 const failedHumanSend = ref<FailedHumanSend | null>(null);
 const humanSendBusy = ref(false);
@@ -381,11 +381,11 @@ function retryPrivateImage(id: string) {
   void loadPrivateImages();
 }
 async function retryHumanSend() {
-  if (!supportSessionReady.value) return;
+  if (!isReplyAllowed.value || !supportSessionReady.value) return;
   const failed = failedHumanSend.value;
   if (!failed?.retryable || humanSendBusy.value) return;
   const binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
-  const current = () => binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated
+  const current = () => isReplyAllowed.value && binding === app.accountBindingEpoch && scope === convStore.scopeInvalidated
     && key === humanComposerKey.value && failedHumanSend.value === failed;
   if (!failed.settled) {
     try {
@@ -681,9 +681,14 @@ const humanType = computed<Exclude<ConversationType, "ai"> | null>(() =>
 );
 
 // The App only permits replies to the same states accepted by AppSupportService.
-// A transferred thread is history: a restart creates a new user-owned conversation.
+// A transferred thread remains readable and the service can point to its successor.
 const replyAllowedStatuses = new Set(["open", "resolved", "closed"]);
-const isTransferredSession = computed(() => conv.value?.status === "transferred" || convStore.peerChangedIds[cid.value] === true);
+const isTransferredSession = computed(() => conv.value?.status === "transferred"
+  || conv.value?.writeState?.canReply === false || !!convStore.peerChangedReadbacks[cid.value]);
+const writableConversationNo = computed(() => {
+  const target = conv.value?.writeState?.writableConversationNo;
+  return isTransferredSession.value && target && target !== cid.value ? target : null;
+});
 const isReplyAllowed = computed(() => !isTransferredSession.value && (!conv.value || replyAllowedStatuses.has(conv.value.status)));
 const isClosedSession = computed(() => !!conv.value && !isReplyAllowed.value);
 // Account advisor identity belongs to new composition. Existing conversation
@@ -866,12 +871,19 @@ async function loadEarlierHumanHistory() {
   } finally { if(request===historyRetryGeneration)humanEarlierBusy.value=false; }
 }
 
-// Restart returns to the same server-backed compose path. A durable conversation
-// is created only after the user submits the opening message.
-function onRestart() {
-  const type = humanType.value;
-  if (!type) return;
-  navTo("/pages/support/chat?start=advisor");
+let continuingConversation = false;
+async function onRestart() {
+  if (!humanType.value || continuingConversation) return;
+  const id = cid.value, binding = app.accountBindingEpoch;
+  continuingConversation = true;
+  try {
+    const readback = convStore.peerChangedReadbacks[id];
+    if (readback) await readback;
+    if (!pageVisible || !supportSessionReady.value || binding !== app.accountBindingEpoch || cid.value !== id) return;
+    const target = writableConversationNo.value;
+    convStore.continueRejectedReply(`conversation:${id}`, target ? `conversation:${target}` : "start:advisor");
+    await navTo(target ? `/pages/support/chat?cid=${encodeURIComponent(target)}` : "/pages/support/chat?start=advisor");
+  } finally { continuingConversation = false; }
 }
 
 function cleanup() {
@@ -1051,15 +1063,19 @@ function humanSendFailed(text: string, attachmentId: string | undefined, cause: 
   if (cause instanceof ApiError && cause.retryAfterMs !== undefined) sendLimiter().defer(cause.retryAfterMs);
   const expired = isSupportAttachmentNotReady(cause);
   const settled = expired || !isConversationDeliveryAmbiguous(cause);
-  const draft = imageDraft.value;
+  const peerChanged = isConversationPeerChanged(cause);
+  const rejectedReply = !!cid.value && peerChanged;
+  const key = humanComposerKey.value;
+  // Assignment invalidation clears the page preview while the reply is in flight.
+  const draft = imageDraft.value ?? (rejectedReply ? convStore.composer(key).imageDraft : null);
   if (expired && draft && draft.attachmentId === attachmentId) {
     draft.state = "failed";
     draft.error = "expired";
     draft.replaceOnly = true;
   }
-  failedHumanSend.value = { text, attachmentId, settled, retryable: !expired && !isConversationPeerChanged(cause), attempts,
-    kind: expired ? "expired" : settled ? "failed" : "unknown" };
-  if (humanComposerKey.value) convStore.saveComposer(humanComposerKey.value, { text: draftText.value, imageDraft: imageDraft.value, failedSend: failedHumanSend.value });
+  failedHumanSend.value = { text, attachmentId, settled, retryable: !expired && !peerChanged, attempts,
+    kind: expired ? "expired" : settled ? "failed" : "unknown", ...(rejectedReply ? { peerChanged: true } : {}) };
+  if (key) convStore.saveComposer(key, { text: draftText.value, imageDraft: draft, failedSend: failedHumanSend.value });
 }
 
 let humanConvertRequest: { binding: number; id: string } | null = null;

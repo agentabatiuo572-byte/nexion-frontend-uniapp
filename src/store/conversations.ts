@@ -18,6 +18,7 @@ import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { useConfig } from "@/store/config";
 import { passiveTabReadScope } from "@/lib/passive-tab-read";
 import { captureRuntimeRevision } from "@/api/order-api";
+import { MESSAGE_MAX_LENGTH } from "@/lib/message-length-policy";
 
 /** The server asks for a customer reply before this send; not an ambiguous delivery. */
 function isSupportReplyRequired(cause: unknown): boolean {
@@ -38,7 +39,7 @@ export type CategoryAvailabilityStatus = "loading" | "ready" | "failed";
 export type HumanComposer = {
   text: string;
   imageDraft: { filePath: string; clientUploadId: string; key: string; state: "uploading" | "ready" | "failed"; attachmentId?: string; error?: "tooLarge" | "unsupported" | "uploadFailed" | "expired"; replaceOnly?: boolean } | null;
-  failedSend: { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number } | null;
+  failedSend: { text: string; attachmentId?: string; kind: "unknown" | "failed" | "expired"; settled: boolean; retryable: boolean; attempts: number; peerChanged?: true } | null;
   recoveredId?: string;
   retainDraft?: boolean;
   /** Visibility boundary already observed when this draft/unknown was saved. */
@@ -76,22 +77,25 @@ function restoreHumanOutbox(account: string): Record<string, HumanComposer> {
     const restored: Record<string, HumanComposer> = {};
     for (const [key, value] of Object.entries(rows)) {
       if (!/^(start:(advisor|support)|conversation:[A-Za-z0-9_-]{1,80})$/.test(key) || !value || typeof value !== "object") continue;
-      const saved = value as { text?: unknown; failedSend?: HumanComposer["failedSend"]; userClearThrough?: number };
+      const saved = value as { text?: unknown; failedSend?: HumanComposer["failedSend"]; userClearThrough?: number; recoveredId?: unknown; retainDraft?: unknown };
+      const text = typeof saved.text === "string" ? saved.text.slice(0, MESSAGE_MAX_LENGTH) : "";
       const clearVersion = Number.isSafeInteger(saved.userClearThrough) && saved.userClearThrough! >= 0
         ? { userClearThrough: saved.userClearThrough } : {};
       const failed = saved.failedSend;
-      const recoveredId = (value as { recoveredId?: unknown }).recoveredId;
+      const recoveredId = saved.recoveredId;
       if (typeof recoveredId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(recoveredId) && key.startsWith("start:")) {
-        restored[key] = { ...clearVersion, text: typeof saved.text === "string" ? saved.text.slice(0, 140) : "", imageDraft: null, failedSend: null, recoveredId, retainDraft: true };
+        restored[key] = { ...clearVersion, text, imageDraft: null, failedSend: null, recoveredId, retainDraft: true };
         continue;
       }
-      if ((value as { retainDraft?: unknown }).retainDraft === true && typeof saved.text === "string" && saved.text && !failed) {
-        restored[key] = { ...clearVersion, text: saved.text.slice(0, 140), imageDraft: null, failedSend: null, retainDraft: true };
+      if (saved.retainDraft === true && text && !failed) {
+        restored[key] = { ...clearVersion, text, imageDraft: null, failedSend: null, retainDraft: true };
         continue;
       }
-      if (!failed || failed.settled || typeof failed.text !== "string" || !["unknown", "failed", "expired"].includes(failed.kind) || typeof failed.attempts !== "number"
+      const peerChanged = key.startsWith("conversation:") && failed?.peerChanged === true
+        && failed.settled === true && failed.kind === "failed" && failed.retryable === false;
+      if (!failed || (failed.settled && !peerChanged) || typeof failed.text !== "string" || !["unknown", "failed", "expired"].includes(failed.kind) || typeof failed.attempts !== "number"
         || (failed.attachmentId !== undefined && typeof failed.attachmentId !== "string")) continue;
-      restored[key] = { ...clearVersion, text: typeof saved.text === "string" ? saved.text.slice(0, 140) : "", imageDraft: null, failedSend: failed };
+      restored[key] = { ...clearVersion, text, imageDraft: null, failedSend: failed };
     }
     return restored;
   } catch { return {}; }
@@ -213,7 +217,7 @@ export const useConversations = defineStore("conversations", () => {
   const realtimeReady = ref(false);
   const realtimeFallback = ref(false);
   const scopeInvalidated = ref(0);
-  const peerChangedIds = ref<Record<string, boolean>>({});
+  const peerChangedReadbacks = ref<Record<string, Promise<void>>>({});
   const advisor = ref<CurrentAdvisor | null>(null);
   const advisorLoading = ref(false);
   const advisorError = ref(false);
@@ -226,7 +230,7 @@ export const useConversations = defineStore("conversations", () => {
   function persistHumanOutbox(required = false) {
     if (!accountKeyValue.startsWith("user:")) return;
     const rows = Object.fromEntries(Object.entries(humanComposers.value)
-      .filter(([key, composer]) => (composer.failedSend && !composer.failedSend.settled) || (key.startsWith("start:") && composer.recoveredId) || (composer.retainDraft && composer.text))
+      .filter(([key, composer]) => (composer.failedSend && (!composer.failedSend.settled || composer.failedSend.peerChanged)) || (key.startsWith("start:") && composer.recoveredId) || (composer.retainDraft && composer.text))
       .map(([key, composer]) => [key, { text: composer.text, failedSend: composer.failedSend, recoveredId: composer.recoveredId, retainDraft: composer.retainDraft, userClearThrough: composer.userClearThrough }]));
     try {
       const storage = humanOutboxStorage();
@@ -268,6 +272,18 @@ export const useConversations = defineStore("conversations", () => {
     delete humanComposers.value[key];
     if (throughMessageId !== undefined) clearedComposerThrough.value[key] = throughMessageId;
     persistHumanOutbox();
+  }
+  function continueRejectedReply(sourceKey: string, targetKey: string) {
+    const source = composer(sourceKey), failed = source.failedSend;
+    if (!failed?.peerChanged) return;
+    const target = composer(targetKey);
+    // Leave the destination's draft and any unresolved command intact.
+    if (target.text || target.imageDraft || target.failedSend || target.recoveredId) return;
+    const image = source.imageDraft;
+    const attachment = image?.state === "ready" && image.attachmentId && image.attachmentId === failed.attachmentId ? image : null;
+    if (!failed.text && !attachment) return;
+    saveComposer(targetKey, { ...target, text: failed.text, imageDraft: attachment, retainDraft: true });
+    saveComposer(sourceKey, { ...source, imageDraft: attachment ? null : image, failedSend: null });
   }
   function suspendForReauthentication() {
     if (!remoteApiEnabled || !accountKeyValue.startsWith("user:")) return;
@@ -665,13 +681,13 @@ export const useConversations = defineStore("conversations", () => {
     return categoryAvailabilityStatus.value === "ready" && categoryAvailability.value[type === "support" ? "advisor" : type] === true;
   }
 
-  /** Older pages may only prepend immutable messages; they never replace the live header/window. */
+  /** Older pages prepend immutable messages; their write state describes the current assignment. */
   function prependHistory(current: Conversation, older: Conversation): Conversation {
     const messages = [...older.messages, ...current.messages]
       .sort((left, right) => left.ts - right.ts || Number(left.id) - Number(right.id))
       .filter((message, index, all) => index === 0 || all[index - 1].id !== message.id);
     const clearedThrough = Math.max(current.userClearedThroughMessageId ?? -1, older.userClearedThroughMessageId ?? -1);
-    return { ...current, messages, historyTruncated: older.historyTruncated,
+    return { ...current, writeState: older.writeState ?? current.writeState, messages, historyTruncated: older.historyTruncated,
       historyNextCursor: older.historyNextCursor ?? null,
       ...(clearedThrough >= 0 ? { userClearedThroughMessageId: clearedThrough } : {}) };
   }
@@ -859,7 +875,7 @@ export const useConversations = defineStore("conversations", () => {
         }, account, undefined, onDispatch);
     } catch (cause) {
       if (accountScopeIsCurrent(account) && isConversationPeerChanged(cause)) {
-        peerChangedIds.value[id] = true;
+        peerChangedReadbacks.value[id] = reconcile(id, account);
         void refreshAdvisor();
       }
       if (accountScopeIsCurrent(account) && mustReadBack(cause)) void reconcile(id, account);
@@ -874,7 +890,7 @@ export const useConversations = defineStore("conversations", () => {
     advisorRequestGeneration += 1;
     accountEpoch += 1; conversations.value = []; error.value = null; loading.value = false; typingIds.value = {};
     advisor.value = null; advisorLoading.value = false; advisorError.value = false;
-    peerChangedIds.value = {};
+    peerChangedReadbacks.value = {};
     humanComposers.value = {};
     clearedComposerThrough.value = {};
     dismissedThrough.value = {}; dismissingIds.value = {};
@@ -910,5 +926,5 @@ export const useConversations = defineStore("conversations", () => {
     if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
-  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedIds,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,clearComposer,suspendForReauthentication,discardHumanOutbox,hasPendingHumanSend,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
+  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,hasPendingHumanSend,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
 });
