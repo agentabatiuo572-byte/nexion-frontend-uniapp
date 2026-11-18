@@ -126,7 +126,8 @@ const server=http.createServer(async(req,res)=>{
         if(update.withdrawLimitState)delete state.withdrawLimitCreatedAt;
         if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}
         if(update.ambassadorState)delete state.ambassadorDemo;
-        if(update.eventState)for(const key of ['eventStatuses','reminders','spun','spinHistory','raffleEntries'])delete state[key];
+        if(update.eventState)delete state.raffleEntries;
+        if(update.eventState||scenarioChange)delete state.h4Events;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         if(update.promotionTiming)state.promotionTimingAt=Date.now();
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
