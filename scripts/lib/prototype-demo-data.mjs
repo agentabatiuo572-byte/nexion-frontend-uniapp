@@ -499,7 +499,7 @@ export function demoFixture(url,locale,state,request) {
   // Reconcile due cycles before any fixture response can read or change the wallet.
   const computeFacts=(state.computeState??'app')==='app'?null:demoComputeFacts(state,now,fleetDevices);
   if(computeFacts){
-    const compute=computeDemo(url,locale,state,request,now,computeFacts);
+    const compute=computeDemo(url,state,request,now,computeFacts);
     if(compute!==undefined)return compute;
   }
   // USER_ONBOARDING_REQUIRED is the backend's shared write gate (HTTP 428, code 428).

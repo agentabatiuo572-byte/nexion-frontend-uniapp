@@ -78,13 +78,11 @@ export function demoComputeFacts(state,now,fleetDevices) {
   return {snapshots:displaySnapshots,devices:fleet.map(device=>device.id),heldDevices,pending,postedTasks};
 }
 
-export function computeDemo(url, locale, state, request, now, facts) {
+export function computeDemo(url, state, request, now, facts) {
   const path = url.pathname;
   if (!path.startsWith('/api/tasks/')) return undefined;
   const mode = state.computeState || 'cycles';
   const simulated = mode === 'cycles', version = simulated ? 3 : 2;
-  const text = (zh, en, vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
-  const names = [text('图像生成周期', 'Image generation cycle', 'Chu kỳ tạo ảnh'), text('Cloud Share 收益周期', 'Cloud Share reward cycle', 'Chu kỳ thu nhập Cloud Share')];
   const { snapshots, devices, pending, postedTasks } = facts;
   const byId = new Map(Object.values(snapshots).map(snapshot=>[snapshot.device.id,snapshot.device]));
   const deviceType=id=>byId.get(id).deviceType;
@@ -93,14 +91,15 @@ export function computeDemo(url, locale, state, request, now, facts) {
   const amount=id=>snapshots[id].amount;
   const total=(devices.reduce((sum,id)=>sum+Math.round(Number(amount(id))*1e6),0)/1e6).toFixed(6);
   const task = (deviceId,status,posted=null) => {
-    const cloud = deviceType(deviceId) === 'CLOUD', index = cloud ? 1 : 0;
+    const type=deviceType(deviceId),cloud=type==='CLOUD';
+    const taskName=['PHONE','MOBILE'].includes(type)?type+' task cycle':cloud?'Cloud Share reward cycle':'Image generation cycle';
     const snapshot=snapshots[deviceId],history=status==='COMPLETED';
     const start=posted?.startedAt??(history?snapshot.completedStartedAt:snapshot.startedAt);
     const execution = simulated ? { executionMode: 'SIMULATED', proofKind: 'TASK_RECEIPT', modelExecuted: false }
       : cloud ? { executionMode: 'RULE_CYCLE', proofKind: 'RULE_SETTLEMENT', modelExecuted: false }
         : { executionMode: 'MODEL', proofKind: 'MODEL_EXECUTION', modelExecuted: true };
     return { ...proof, ...execution, protocolVersion: version, taskNo:posted?.taskNo??`DEMO-TASK-${deviceId}-${start}`, deviceId,
-      taskId: cloud ? 'cloud-cycle' : 'image-gen', taskName: ['PHONE','MOBILE'].includes(deviceType(deviceId))?`${deviceType(deviceId)} task cycle`:names[index], taskClass: 'IG', model: simulated ? '' : cloud ? 'Cloud reward' : 'SDXL', client: 'UVEL', status,
+      taskId: cloud ? 'cloud-cycle' : 'image-gen', taskName, taskClass: 'IG', model: simulated ? '' : cloud ? 'Cloud reward' : 'SDXL', client: 'UVEL', status,
       rewardUsdt: Number(amount(deviceId)), ...(simulated ? { rewardAsset: 'USDT', rewardAmount: amount(deviceId) } : {}),
       requiredSeconds: 60, queuedAt: posted?.queuedAt??Math.max(history?snapshot.device.activatedAt:snapshot.liveActivatedAt,start-1000), startedAt: status === 'QUEUED' ? null : start, completableAt: ['QUEUED', 'RECOVERING'].includes(status) ? null : start + 60000,
       completedAt: history ? start + 60000 : null, actualDurationSec: status === 'QUEUED' ? null : history ? 60 : 30,
