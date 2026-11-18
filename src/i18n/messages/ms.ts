@@ -1164,6 +1164,7 @@ export const ms: Messages = {
     slotsUsed: "slot digunakan",
     deviceCount: "{n}/{max} peranti",
     noCurrentTask: "Tiada kerja sedang berjalan. Menunggu kerja baharu.",
+    taskStatusUnavailable: "Status kerja tidak tersedia",
     phoneWaitingTask: "Menunggu untuk ambil kerja…",
     phoneWaitingHint: "UVEL sedang memadankan telefon anda dengan beban kerja AI yang tersedia.",
     phoneTaskPaused: "Kerja dijeda",

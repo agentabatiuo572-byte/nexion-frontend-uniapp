@@ -1164,6 +1164,7 @@ export const fil: Messages = {
     slotsUsed: "slot na gamit",
     deviceCount: "{n}/{max} device",
     noCurrentTask: "Walang job na tumatakbo. Naghihintay ng bagong job.",
+    taskStatusUnavailable: "Hindi available ang status ng job",
     phoneWaitingTask: "Naghihintay ng job…",
     phoneWaitingHint: "Hinahanapan ng UVEL ng available na AI workload ang iyong phone.",
     phoneTaskPaused: "Naka-pause ang job",

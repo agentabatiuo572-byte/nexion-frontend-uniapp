@@ -1164,6 +1164,7 @@ export const id: Messages = {
     slotsUsed: "slot terpakai",
     deviceCount: "{n}/{max} perangkat",
     noCurrentTask: "Tidak ada tugas berjalan. Menunggu tugas baru.",
+    taskStatusUnavailable: "Status tugas tidak tersedia",
     phoneWaitingTask: "Menunggu tugas…",
     phoneWaitingHint: "UVEL sedang mencocokkan ponsel Anda dengan tugas AI yang tersedia.",
     phoneTaskPaused: "Tugas dijeda",

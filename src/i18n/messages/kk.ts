@@ -1164,6 +1164,7 @@ export const kk: Messages = {
     slotsUsed: "орын бос емес",
     deviceCount: "{n}/{max} құрылғы",
     noCurrentTask: "Орындалып жатқан жұмыс жоқ. Жаңа жұмыс күтілуде.",
+    taskStatusUnavailable: "Жұмыс күйі қолжетімсіз",
     phoneWaitingTask: "Жұмыс алу күтілуде…",
     phoneWaitingHint: "UVEL телефоныңызға қолжетімді AI жұмысын іздеп жатыр.",
     phoneTaskPaused: "Жұмыс кідіртілді",

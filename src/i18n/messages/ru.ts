@@ -1164,6 +1164,7 @@ export const ru: Messages = {
     slotsUsed: "слотов занято",
     deviceCount: "Устройств: {n}/{max}",
     noCurrentTask: "Сейчас задач нет. Ждём новую.",
+    taskStatusUnavailable: "Статус задачи недоступен",
     phoneWaitingTask: "Ожидание задачи…",
     phoneWaitingHint: "UVEL подбирает для вашего телефона доступную AI-задачу.",
     phoneTaskPaused: "Задача на паузе",

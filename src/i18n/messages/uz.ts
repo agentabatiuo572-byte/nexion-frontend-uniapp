@@ -1164,6 +1164,7 @@ export const uz: Messages = {
     slotsUsed: "slot band",
     deviceCount: "{n}/{max} qurilma",
     noCurrentTask: "Bajarilayotgan ish yoʻq. Yangi ish kutilmoqda.",
+    taskStatusUnavailable: "Ish holatini yuklab boʻlmadi",
     phoneWaitingTask: "Ish olinishi kutilmoqda…",
     phoneWaitingHint: "UVEL telefoningiz uchun mavjud AI ishini tanlamoqda.",
     phoneTaskPaused: "Ish toʻxtatildi",
