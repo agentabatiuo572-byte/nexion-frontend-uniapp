@@ -322,15 +322,16 @@ function state(value: unknown, mode: ApiEnvironment, requireV2 = false): {
   if ((requireV2 && source.protocolVersion !== 2) || (source.protocolVersion !== undefined && source.protocolVersion !== 2 && source.protocolVersion !== 3)) return invalid();
   if (!Array.isArray(source.devices)) return invalid();
   const version = source.protocolVersion === 3 ? 3 : source.protocolVersion === 2 ? 2 : 1;
-  const devices = source.devices.map((entry) => device(entry, mode, version)).filter(entry => !["PHONE", "MOBILE"].includes(entry.deviceType.toUpperCase()));
-  if (new Set(devices.map((entry) => entry.deviceId)).size !== devices.length) return invalid();
+  const serverDevices = source.devices.map((entry) => device(entry, mode, version));
+  if (new Set(serverDevices.map((entry) => entry.deviceId)).size !== serverDevices.length) return invalid();
+  const devices = serverDevices.filter((entry) => !["PHONE", "MOBILE"].includes(entry.deviceType.toUpperCase()));
   if (version === 2 && !Array.isArray(source.pendingEarned)) return invalid();
   if (source.pendingEarned != null && !Array.isArray(source.pendingEarned)) return invalid();
   const pendingEarned = Array.isArray(source.pendingEarned) ? source.pendingEarned.map(pendingEarning) : undefined;
   if (pendingEarned && new Set(pendingEarned.map((row) => row.asset)).size !== pendingEarned.length) return invalid();
   return {
     assignments: { serverNow: timestamp(source.serverNow) as number, devices, ...(version >= 2 ? { protocolVersion: version as 2 | 3, pendingEarned } : {}), ...proof },
-    hasServerDevices: source.devices.length > 0,
+    hasServerDevices: serverDevices.length > 0,
   };
 }
 
