@@ -17,7 +17,7 @@ export function demoSettledTasks(state,at) {
   return [['IG',2.34],['LL',8.5],['VG',5.4]].map(([taskClass,amount],index)=>{
     const completedAt=at-(index+1)*3600000;
     return {taskNo:'DEMO-TASK-'+(index+1),receiptNo:'DEMO-RECEIPT-'+(index+1),
-      batchNo:index===0?'DEMO-BATCH-1':null,deviceId:41,taskClass,amount,
+      batchNo:index<2?'DEMO-BATCH-'+(index+1):null,deviceId:41,taskClass,amount,
       nex:0,completedAt,postedAt:completedAt+600000,
       client:'Demo Studio',model:['SDXL','Llama 3.1','Video generation'][index]};
   });

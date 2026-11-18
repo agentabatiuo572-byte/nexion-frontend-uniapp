@@ -2,6 +2,8 @@
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionEvents, demoCommissionTotals, demoLifetimeEarningsUsdt, demoSettledTasks, demoTeamPeriod } from './prototype-demo-wallet.mjs';
 
+import { demoBatchPage } from './prototype-demo-secondary.mjs';
+
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
 export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts) {
@@ -57,32 +59,29 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       generatedAt:iso,snapshotAt:window.snapshotAt};
   }
   // Like the backend, v2 is the v1 read plus settlement fields and the unposted totals; with no devices it is 404.
-  if(p==='/api/tasks/v2/assignments'&&fleetDevices().length===0)throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
   if(p==='/api/tasks/assignments'||p==='/api/tasks/v2/assignments') {
     const v2=p.includes('/v2/'),[settlement]=demoSettledTasks(state,state.previewFactsAt??now);
-    const current=fleetDevices().find(device=>device.id===41&&device.activatedAt!==null);
-    if(!current||!settlement)return {...proof,serverCanonical:true,serverNow:iso,devices:[],
-      ...(v2&&{protocolVersion:2,pendingEarned:[]})};
-    const posted=new Date(settlement.postedAt).toISOString();
+    const devices=fleetDevices();
+    if(v2&&!devices.some(device=>device.activatedAt!==null))
+      throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
+    const posted=settlement?new Date(settlement.postedAt).toISOString():null;
     const task=(id,status,taskClass)=>({...proof,serverCanonical:true,...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,settlementStatus:status==='COMPLETED'?'POSTED':'NONE',settlementBatchNo:status==='COMPLETED'?settlement.batchNo:null,settledAt:status==='COMPLETED'?posted:null}),taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:text('图像生成','Image generation','Tạo hình ảnh'),taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:settlement.amount,requiredSeconds:600,startedAt:new Date(status==='RUNNING'?now-300000:settlement.completedAt-600000).toISOString(),completableAt:new Date(status==='RUNNING'?now+300000:settlement.completedAt).toISOString(),completedAt:status==='COMPLETED'?new Date(settlement.completedAt).toISOString():null,receiptNo:status==='COMPLETED'?settlement.receiptNo:null,proofNonce:null,proofExpiresAt:null});
-    return {...proof,serverCanonical:true,serverNow:iso,devices:[{deviceId:41,instanceNo:current.instanceNo,deviceType:current.deviceType,lockUntil:null,currentTask:task(4,'RUNNING','IG'),recentTasks:[task(1,'COMPLETED','IG')],...(v2&&{recoveryPending:false,recoveryReason:null})}],
-      ...(v2&&{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]})};
+    return {...proof,serverCanonical:true,serverNow:iso,devices:devices.map(device=>{
+      const hasSample=device.id===settlement?.deviceId;
+      return {deviceId:device.id,instanceNo:device.instanceNo,deviceType:device.deviceType,lockUntil:null,
+        currentTask:hasSample&&device.activatedAt!==null?task(4,'RUNNING','IG'):null,
+        recentTasks:hasSample?[task(1,'COMPLETED','IG')]:[],...(v2&&{recoveryPending:false,recoveryReason:null})};
+    }),...(v2&&{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]})};
   }
-  // P-62 Task Center: one posted settlement batch so the "Settlement batch" entry can be previewed.
   if(p==='/api/tasks/v2/settlements'||p.startsWith('/api/tasks/v2/settlements/')) {
-    const [task]=demoSettledTasks(state,state.previewFactsAt??now);
-    if(!task){
-      if(p!=='/api/tasks/v2/settlements')throw Object.assign(new Error('COMPUTE_V2_SETTLEMENT_NOT_FOUND'),{status:404});
-      return {...proof,serverCanonical:true,records:[],nextCursor:null};
-    }
-    const batch={batchNo:task.batchNo,asset:'USDT',amount:task.amount.toFixed(6),taskCount:1,status:'POSTED',
-      windowStart:task.completedAt-3600000,windowEnd:task.completedAt,postedAt:task.postedAt};
-    if(p!=='/api/tasks/v2/settlements'){
-      if(!p.endsWith('/'+task.batchNo))throw Object.assign(new Error('COMPUTE_V2_SETTLEMENT_NOT_FOUND'),{status:404});
-      return {...proof,serverCanonical:true,...batch,items:[{taskNo:task.taskNo,receiptNo:task.receiptNo,
-        deviceId:41,taskType:'IG',amount:batch.amount,completedAt:task.completedAt}]};
-    }
-    return {...proof,serverCanonical:true,records:[batch],nextCursor:null};
+    const tasks=demoSettledTasks(state,state.previewFactsAt??now).filter(task=>task.batchNo);
+    const records=tasks.map(task=>({batchNo:task.batchNo,asset:'USDT',amount:task.amount.toFixed(6),taskCount:1,status:'POSTED',
+      windowStart:task.completedAt-3600000,windowEnd:task.completedAt,postedAt:task.postedAt}));
+    if(p==='/api/tasks/v2/settlements')return demoBatchPage(url.searchParams,records);
+    const index=records.findIndex(batch=>p.endsWith('/'+batch.batchNo));
+    if(index<0)throw Object.assign(new Error('COMPUTE_V2_SETTLEMENT_NOT_FOUND'),{status:404});
+    const {taskNo,receiptNo,deviceId,taskClass:taskType,completedAt}=tasks[index];
+    return {...proof,serverCanonical:true,...records[index],items:[{taskNo,receiptNo,deviceId,taskType,amount:records[index].amount,completedAt}]};
   }
   if(p==='/api/app/support/faqs'||p==='/api/app/support/faqs/page') {
     const surface=(url.searchParams.get('surface')??'Help Center').trim().toLowerCase();

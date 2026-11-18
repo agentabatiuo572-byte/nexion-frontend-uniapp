@@ -4,6 +4,48 @@ import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionEvents, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
+// Receipt cursors retain the issuance cutoff while ordering by completion.
+export function demoReceiptPage(params, receipts) {
+  const offset=Number(params.get('offset')??0),limit=Number(params.get('limit')??20);
+  const cursor=params.get('cursor')?.trim();
+  const invalid=(message)=>{throw Object.assign(new Error(message),{status:422});};
+  if(!Number.isInteger(offset)||offset<0||offset>1000000||!Number.isInteger(limit)||limit<1||limit>50)
+    invalid('TASK_RECEIPT_PAGE_INVALID');
+  const ordering=(a,b)=>b.completedAt-a.completedAt||b.receiptNo.localeCompare(a.receiptNo);
+  const issuance=(a,b)=>b.settledAt-a.settledAt||b.receiptNo.localeCompare(a.receiptNo);
+  const rows=receipts.slice().sort(ordering);
+  let highWater=receipts.slice().sort(issuance)[0],eligible=rows.slice(offset);
+  if(cursor){
+    let boundary;
+    try{
+      const ids=JSON.parse(Buffer.from(cursor,'base64url').toString());
+      if(Array.isArray(ids)&&ids.length===2){
+        boundary=rows.find(row=>row.receiptNo===ids[0]);
+        highWater=rows.find(row=>row.receiptNo===ids[1]);
+      }
+    }catch(error){
+      if(!(error instanceof SyntaxError))throw error;
+    }
+    if(!boundary||!highWater||issuance(boundary,highWater)<0)invalid('TASK_RECEIPT_CURSOR_INVALID');
+    eligible=rows.filter(row=>issuance(row,highWater)>=0&&ordering(row,boundary)>0);
+  }
+  const items=eligible.slice(0,limit),more=eligible.length>limit;
+  return {...proof,items,nextOffset:more?offset+limit:null,
+    nextCursor:more?Buffer.from(JSON.stringify([items.at(-1).receiptNo,highWater.receiptNo])).toString('base64url'):null};
+}
+
+export function demoBatchPage(params, batches) {
+  const cursor=params.get('cursor'),limit=Number(params.get('limit')??20);
+  if(!Number.isInteger(limit)||limit<1||limit>50)
+    throw Object.assign(new Error('COMPUTE_V2_PAGE_INVALID'),{status:422});
+  const rows=batches.slice().sort((a,b)=>b.postedAt-a.postedAt||b.batchNo.localeCompare(a.batchNo));
+  const boundary=cursor===null?-1:rows.findIndex(row=>row.batchNo===cursor);
+  if(cursor!==null&&boundary===-1)
+    throw Object.assign(new Error('COMPUTE_V2_CURSOR_INVALID'),{status:422});
+  const records=rows.slice(boundary+1,boundary+1+limit);
+  return {...proof,records,nextCursor:rows.length>boundary+1+limit?records.at(-1).batchNo:null};
+}
+
 // The panel's terminal result applies to every withdrawal read, not just the bank detail page.
 export function settleDemoBankWithdrawals(state) {
   if (!['settled', 'rejected'].includes(state.bankState)) return;
@@ -90,7 +132,7 @@ export function secondaryDemo(url,state,request){
   }
   if(p.startsWith('/api/tasks/receipts')){
     const items=demoSettledTasks(state,state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
-    if(p==='/api/tasks/receipts')return {...proof,items,nextOffset:null,nextCursor:null,total:items.length};
+    if(p==='/api/tasks/receipts')return demoReceiptPage(url.searchParams,items);
     const receipt=items.find(r=>r.receiptNo===p.split('/').pop());
     if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
     return receipt;

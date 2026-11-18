@@ -1,14 +1,17 @@
 // Loopback-only task-cycle, v2 and receipt scenarios. Never imported by src.
 import { demoHasEarningsHistory, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 
+import { demoBatchPage, demoReceiptPage } from './prototype-demo-secondary.mjs';
+
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };
 const cycleMs = 60000;
 const maxBatchItems = 200;
 export function demoComputeFacts(state,now,fleetDevices) {
   const mode=state.computeState,simulated=mode==='cycles',pending=['pending','blocked'].includes(mode);
-  if(!demoHasEarningsHistory(state))return {snapshots:{},devices:[],pending,postedTasks:[]};
+  const heldDevices=fleetDevices();
+  if(!demoHasEarningsHistory(state))return {snapshots:{},devices:[],heldDevices,pending,postedTasks:[]};
   const anchor=state.computeAnchor??=now;
-  const fleet=fleetDevices().filter(device=>device.activatedAt!==null&&device.activatedAt<=now
+  const fleet=heldDevices.filter(device=>device.activatedAt!==null&&device.activatedAt<=now
     ||state.stoppedDevices?.includes(device.id));
   const snapshots=state.computeTaskSnapshots??={};
   const starts=state.computeCycleStarts??={};
@@ -72,7 +75,7 @@ export function demoComputeFacts(state,now,fleetDevices) {
   const postedTasks=pending?[]:[...opening,...posted].sort((a,b)=>b.completedAt-a.completedAt);
   const displaySnapshots=Object.fromEntries(Object.entries(snapshots).map(([id,snapshot])=>[id,{...snapshot,startedAt:starts[id]??snapshot.startedAt,
     liveActivatedAt:state.deviceActivations?.[id]?.activatedAt??snapshot.device.activatedAt}]));
-  return {snapshots:displaySnapshots,devices:fleet.map(device=>device.id),pending,postedTasks};
+  return {snapshots:displaySnapshots,devices:fleet.map(device=>device.id),heldDevices,pending,postedTasks};
 }
 
 export function computeDemo(url, locale, state, request, now, facts) {
@@ -107,12 +110,16 @@ export function computeDemo(url, locale, state, request, now, facts) {
       settledAt: posted?.postedAt??null, configVersion: 'compute-demo-3', proofNonce: null, proofExpiresAt: null, pausedAt: null, pausedSeconds: 0 };
   };
   const status = ({ queued: 'QUEUED', verifying: 'VERIFYING', recovering: 'RECOVERING', failed: 'FAILED', cancelled: 'CANCELLED' })[mode] || 'RUNNING';
-  if (path === '/api/tasks/assignments' || path === '/api/tasks/v2/assignments') return { ...proof, protocolVersion: version, serverNow: now,
+  const v2=path==='/api/tasks/v2/assignments';
+  if(v2&&(simulated||!devices.length))
+    throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
+  if(path==='/api/tasks/assignments'&&!simulated)return undefined;
+  if (path === '/api/tasks/assignments' || v2) return { ...proof, protocolVersion: version, serverNow: now,
     pendingEarned: [{ asset: 'USDT', amount: pending ? total : '0.000000', taskCount: pending ? devices.length : 0 }],
-    devices: devices.map(deviceId => ({ deviceId, instanceNo: instance(deviceId), deviceType: deviceType(deviceId), lockUntil: null,
+    devices: facts.heldDevices.map(({id:deviceId,instanceNo,deviceType:type}) => ({ deviceId, instanceNo, deviceType:type, lockUntil: null,
       recoveryPending: mode === 'recovering', recoveryReason: mode === 'recovering' ? 'LEGACY_COMPLETE_OUTCOME_UNKNOWN' : null,
       simulationState: state.stoppedDevices?.includes(deviceId) ? 'STOPPED' : 'RUNNING',
-      currentTask: state.stoppedDevices?.includes(deviceId) || mode === 'recovering' ? null : task(deviceId, status), recentTasks: pending&&!snapshots[deviceId].deliveryCycle?[task(deviceId,'COMPLETED')]:
+      currentTask: !devices.includes(deviceId) || state.stoppedDevices?.includes(deviceId) || mode === 'recovering' ? null : task(deviceId, status), recentTasks: pending&&devices.includes(deviceId)&&!snapshots[deviceId].deliveryCycle?[task(deviceId,'COMPLETED')]:
         postedTasks.filter(row=>row.deviceId===deviceId).slice(0,5).map(row=>task(deviceId,'COMPLETED',row)) })) };
   if(path==='/api/tasks/v2/settlements'||path.startsWith('/api/tasks/v2/settlements/')){
     const grouped=Object.groupBy(postedTasks.filter(task=>task.batchNo),task=>task.batchNo);
@@ -120,7 +127,7 @@ export function computeDemo(url, locale, state, request, now, facts) {
       amount:tasks.reduce((sum,entry)=>sum+entry.amount,0).toFixed(6),taskCount:tasks.length,status:'POSTED',
       windowStart:Math.min(...tasks.map(entry=>entry.completedAt-cycleMs)),windowEnd:Math.max(...tasks.map(entry=>entry.completedAt)),
       postedAt:tasks[0].postedAt})).sort((left,right)=>right.postedAt-left.postedAt);
-    if(path==='/api/tasks/v2/settlements')return {...proof,records:batches,nextCursor:null};
+    if(path==='/api/tasks/v2/settlements')return demoBatchPage(url.searchParams,batches);
     const batch=batches.find(entry=>entry.batchNo===path.split('/').at(-1));
     if(!batch)throw Object.assign(new Error('COMPUTE_V2_SETTLEMENT_NOT_FOUND'),{status:404});
     return {...proof,...batch,items:grouped[batch.batchNo].map(({taskNo,receiptNo,deviceId,completedAt})=>({
@@ -133,8 +140,7 @@ export function computeDemo(url, locale, state, request, now, facts) {
     return { ...done, receiptNo:posted.receiptNo, deviceInstanceNo: instance(deviceId), deviceName: deviceName(deviceId), deviceType: deviceType(deviceId), deviceGpu: byId.get(deviceId).gpuModel, vramTotalGb: byId.get(deviceId).vramTotalGb,
       rewardNex: 0, earningStatus: 'POSTED', proofHash: simulated ? null : 'a'.repeat(64), durationSec: 60 };
   });
-  // Current summary DTO omits posting time; direct simulated receipt details carry it.
-  if (path === '/api/tasks/receipts') return { ...proof, items: receipts.map(({settledAt,...summary})=>summary), total: receipts.length, nextOffset: null, nextCursor: null };
+  if (path === '/api/tasks/receipts') return demoReceiptPage(url.searchParams,receipts);
   if(path.startsWith('/api/tasks/receipts/')){
     const receipt=receipts.find(row=>row.receiptNo===decodeURIComponent(path.split('/').pop()));
     if(!receipt)throw Object.assign(new Error('TASK_RECEIPT_NOT_FOUND'),{status:404});
