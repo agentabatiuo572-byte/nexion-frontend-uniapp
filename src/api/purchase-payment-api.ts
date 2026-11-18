@@ -1,5 +1,5 @@
 import type { ApiClient } from './api-client';
-import { ApiError, asApiError } from './errors';
+import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
 
@@ -124,7 +124,8 @@ export function createPurchasePaymentApi(client: ApiClient) {
     async get(intentNo: string) { return parsePurchaseIntent(await client.request({ path: `${base}-intents/${encodeURIComponent(intentNo)}` })); },
     async find(kind: PurchaseKind, commandKey: string) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents?kind=${encodeURIComponent(kind)}&commandKey=${encodeURIComponent(commandKey)}` })); }
-      catch (error) { if (asApiError(error).status === 404) return null; throw error; }
+      // Only the server's own not-found proves there is no intent; any other 404 keeps the original command.
+      catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
     },
   };
 }
