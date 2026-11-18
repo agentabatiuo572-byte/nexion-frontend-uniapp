@@ -575,7 +575,7 @@ function recoverPendingExchange(): Promise<void> {
         remoteError.value = null;
         remoteSnapshotReceivedAt.value = Date.now();
         refreshCommittedExchangeWalletProjection(result.order as ExchangeOrder, scope, runScope);
-        notifyRemoteSwapResult(result.order as ExchangeOrder, scope, runScope);
+        notifyRemoteSwapResult(result.order as ExchangeOrder, result.snapshot, scope, runScope);
       } catch (cause) {
         if (!(cause instanceof ExchangeRejectedError)) throw cause;
         if (current()) toast.error(t.value.exchange.swapFailedReason);
@@ -700,6 +700,7 @@ function goHowItWorks() {
 
 function notifyRemoteSwapResult(
   order: ExchangeOrder,
+  snapshot: ExchangeSnapshot,
   scope: ReturnType<typeof captureExchangeScope>,
   runScope: RuntimeRevisionScope,
 ) {
@@ -709,9 +710,11 @@ function notifyRemoteSwapResult(
     return;
   }
   if (order.status === "QUEUED") {
+    // The recovery receipt names the order without its estimate; the account read taken with it carries one.
+    const estimate = order.queueEstimate ?? snapshot.orders.find((row) => row.exchangeNo === order.exchangeNo)?.queueEstimate;
     toastIfRemoteScopeCurrent(scope, runScope, () => toast.info(
       t.value.exchange.queuedToastTitle,
-      order.queueEstimate?.copy ?? t.value.exchange.queuedToastBody,
+      estimate?.copy ?? t.value.exchange.queuedToastBody,
     ));
     return;
   }
@@ -826,7 +829,7 @@ async function handleConfirm() {
       if (["COMPLETED", "SUCCESS", "QUEUED"].includes(result.order.status)) input.value = "";
       if (!remoteScopeCurrent(requestScope, requestRunScope)) return;
       refreshCommittedExchangeWalletProjection(result.order as ExchangeOrder, requestScope, requestRunScope);
-      notifyRemoteSwapResult(result.order as ExchangeOrder, requestScope, requestRunScope);
+      notifyRemoteSwapResult(result.order as ExchangeOrder, result.snapshot, requestScope, requestRunScope);
       return;
     }
     // v3 gate: cap / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
