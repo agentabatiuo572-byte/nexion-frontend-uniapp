@@ -33,7 +33,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'MANUAL_REVIEW',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
@@ -75,7 +75,7 @@ export const demoOptions = {
   sessionState:[['signed-in','已登录'],['signed-out','未登录（刷新会话被拒）']],
   promotionTiming:[['live','跟随活动场景'],['starting','切换后 1 分钟开始'],['ending','切换后 1 分钟结束']],
   promotionRewardType:[['reward','首购 / 复购发 UVT'],['discount','首购 / 复购为订单立减'],['gift-discount','购机赠礼为订单立减']],
-  promotionRewardState:[['PENDING','待处理'],['READY','待发放'],['PROCESSING','处理中'],['ISSUED','已发放'],
+  promotionRewardState:[['PENDING','待处理'],['READY','待发放'],['ISSUED','已发放'],
     ['RETRYABLE_FAILED','可重试失败'],['CANCELLED','已取消'],['MANUAL_REVIEW','人工审核中']],
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 1,000']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
@@ -93,6 +93,17 @@ const skuDefinitions = [
   ['cloud-share','Cloud Share','Share',19.9,18,3,'Distributed','—',0],
 ];
 const demoPromotionGift={orderNo:'DEMO-ORDER-004',activityId:'demo-promo-0',obligationId:'demo-reward-3',productNo:'stellarbox-s1',quantity:1};
+// The paid order keeps the gift terms of its published version even after the live offer changes.
+function promotionDeviceReward(giftName) {
+  return {rewardRuleId:'review-gift',beneficiaryRole:'BUYER',type:'DEVICE',giftProductNo:demoPromotionGift.productNo,
+    quantity:demoPromotionGift.quantity,disclosure:{
+      title:{zh:'设备赠礼',en:'Device gift',vi:'Quà thiết bị'},deviceName:giftName,
+      benefitDescription:{zh:'送 '+giftName+' 1 份',en:'Get 1 '+giftName,vi:'Tặng 1 '+giftName},
+      terms:{zh:'订单付款完成后，赠品发放到你的设备仓库。',en:'Once the order is paid, the gift is added to your device inventory.',vi:'Sau khi đơn hàng được thanh toán, quà tặng sẽ vào kho thiết bị của bạn.'},
+      refundTerms:{zh:'整单退款时，赠品随订单一并撤销。',en:'If the whole order is refunded, the gift is withdrawn with it.',vi:'Khi hoàn tiền toàn bộ đơn hàng, quà tặng sẽ bị thu hồi cùng đơn.'},
+      deviceRights:{activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:null,taskEnabled:true,countsAsDeviceHolding:true,
+        countsForRank:false,transferable:false,exchangeable:false,revocationMode:'MANUAL_IF_USED'}}};
+}
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
   const products=skuDefinitions.map(([id,name,tier,price,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
@@ -242,7 +253,7 @@ function genesisPublic(now) {
 }
 
 // One slot rule for every fixture read and command (PRD §5.6 / §9.11; backend fleet read and trade-in capacity
-// quote): occupied = activated formal devices + slots held by paid orders awaiting a device + one effective trial
+// quote): occupied = activated formal devices + order and promotion reservations + one effective trial
 // (ACTIVE/GRACE) <= cap. demoFleetFacts computes it from the retained state; reads and commands all use it.
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
   &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,demoProducts(state,url.origin)).state)?1:0;
@@ -370,8 +381,11 @@ export function demoFleetFacts(url,locale,state) {
       activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
       ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null})});
   }
-  const reservedSlotCount=demoOrderSlots(orders);
+  let reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
+  // Payment committed the DEVICE reservation. Its receipt or cancellation releases that reservation.
+  if(!state.promotionGift&&state.promotionRewardState!=='CANCELLED'&&demoAccountOrders(url,locale,state,now)
+      .some(order=>order.orderNo===demoPromotionGift.orderNo&&order.paymentStatus==='PAID'))reservedSlotCount+=demoPromotionGift.quantity;
   const roster=[...structuredClone(state.fleetSeed),...session].filter(device=>!retired.includes(device.id));
   const eventGift=demoH4Gift(state);
   const gifts=[eventGift&&{...eventGift.result.receipt,at:eventGift.at,deviceIds:eventGift.deviceIds},state.promotionGift];
@@ -407,19 +421,24 @@ export function demoFleetFacts(url,locale,state) {
 // Apply a selected preview preset once. Reads and saved-state imports never issue a gift.
 export function setDemoPromotionReward(url,locale,state,now) {
   state.promotionRewardAt=now;
-  if(state.promotionRewardState!=='ISSUED'){
-    delete state.promotionGift;
-    return;
-  }
-  if(state.promotionGift)return;
-  const {orderNo,obligationId,productNo,quantity}=demoPromotionGift;
+  if(state.promotionRewardState!=='ISSUED')delete state.promotionGift;
+  if(state.promotionRewardState==='CANCELLED'||state.promotionGift)return;
+  const {orderNo,obligationId,productNo}=demoPromotionGift;
   const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===orderNo);
-  if(state.dataState==='empty'||order?.paymentStatus!=='PAID')return;
-  const {slotsUsed,slotCap}=demoFleetFacts(url,locale,state);
-  if(slotsUsed+quantity>slotCap){
-    state.promotionRewardState='RETRYABLE_FAILED';
-    return;
+  if(order?.paymentStatus!=='PAID')return;
+  const {slotsUsed,slotCap,devices}=demoFleetFacts(url,locale,state);
+  if(slotsUsed>slotCap){
+    // A full preset fills unused slots with sample devices. For the alternative paid history,
+    // its last filler gives way to the slot that 004 already reserved at payment.
+    const filler=devices.findLast(device=>[44,45,46,48,49,50].includes(device.id)&&device.activatedAt!==null);
+    if(!filler){
+      // All slots belong to actual orders, claims or the trial. An additional reservation could not have been made.
+      state.promotionRewardState='CANCELLED';
+      return;
+    }
+    state.fleetSeed=state.fleetSeed.filter(device=>device.id!==filler.id);
   }
+  if(state.promotionRewardState!=='ISSUED')return;
   const id=state.deviceSequence=(state.deviceSequence??1000)+1;
   const instanceNo='PG-'+createHash('sha256').update(obligationId+':0').digest('hex').slice(0,48);
   state.promotionGift={productNo,at:now,deviceIds:[id],instances:[instanceNo]};
@@ -849,12 +868,9 @@ export function demoFixture(url,locale,state,request) {
         const window=demoH4PromotionWindow(state,now);
         Object.assign(item,{state:window.state==='ongoing'?'ACTIVE':window.state==='upcoming'?'SCHEDULED':'ENDED',
           startsAt:new Date(window.startsAt).toISOString(),endsAt:new Date(window.endsAt).toISOString()});
-        const reward=item.rewardRules[0].buyerReward;reward.giftProductNo=demoPromotionGift.productNo;reward.quantity=demoPromotionGift.quantity;
-        reward.disclosure.deviceName=giftName;
-        reward.disclosure.benefitDescription={zh:'送 '+giftName+' 1 份',en:'Get 1 '+giftName,vi:'Tặng 1 '+giftName};
-        reward.disclosure.terms={zh:'订单付款完成后，赠品发放到你的设备仓库。',en:'Once the order is paid, the gift is added to your device inventory.',vi:'Sau khi đơn hàng được thanh toán, quà tặng sẽ vào kho thiết bị của bạn.'};
-        reward.disclosure.refundTerms={zh:'整单退款时，赠品随订单一并撤销。',en:'If the whole order is refunded, the gift is withdrawn with it.',vi:'Khi hoàn tiền toàn bộ đơn hàng, quà tặng sẽ bị thu hồi cùng đơn.'};
-        reward.disclosure.deviceRights={activationMode:'AUTO',effectiveOn:'ISSUED',durationDays:null,taskEnabled:true,countsAsDeviceHolding:true,countsForRank:false,transferable:false,exchangeable:false,revocationMode:'MANUAL_IF_USED'};
+        item.version=2;
+        const reward=promotionDeviceReward(giftName);
+        item.rewardRules[0].buyerReward=reward;
         if(state.promotionRewardType==='gift-discount')item.rewardRules[0].buyerReward={rewardRuleId:reward.rewardRuleId,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:'100',disclosure:orderDiscountDisclosure(100)};
       }
       if(i>0){const d=item.rewardRules[0].buyerReward.disclosure;d.deviceName=null;d.title={zh:'购机奖励',en:'Purchase reward',vi:'Thưởng mua hàng'};d.benefitDescription={zh:'领取 '+(i*50)+' UVT',en:'Receive '+(i*50)+' UVT',vi:'Nhận '+(i*50)+' UVT'};item.rewardRules[0].buyerReward=state.promotionRewardType==='discount'&&orderDiscounts[i]?{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'DISCOUNT_USDT',calculation:'FIXED',amount:String(orderDiscounts[i]),disclosure:orderDiscountDisclosure(orderDiscounts[i])}:{rewardRuleId:'demo-reward-'+i,beneficiaryRole:'BUYER',type:'UVT',amount:String(i*50),disclosure:d};}
@@ -933,12 +949,14 @@ export function demoFixture(url,locale,state,request) {
     const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===orderNo);
     const items=[];
     if(!empty&&order){
-      const offer=demoFixture(new URL('/api/promotions/'+activityId,url.origin),locale,{...state,eventState:'mixed',dataState:'normal',promotionRewardType:'reward'},request);
-      const {ruleId,buyerReward:{disclosure,...reward}}=offer.rewardRules[0];
+      const offer=state.promotionGiftVersion??={activityId,version:1,startsAt:new Date(order.placedAt-day).toISOString(),
+        endsAt:new Date(order.paidAt+day).toISOString(),ruleId:'demo-rule-0',
+        buyerReward:promotionDeviceReward(products.find(product=>product.id===demoPromotionGift.productNo).name)};
+      const {ruleId,buyerReward:{disclosure,...reward}}=offer;
       const gift=state.promotionGift;
       const selectedState=state.promotionRewardState??demoDefaults.promotionRewardState;
       const status=gift?'ISSUED':selectedState==='ISSUED'?demoDefaults.promotionRewardState:selectedState;
-      const updatedAt=new Date(state.promotionRewardAt??Math.max(order.paidAt,state.previewFactsAt??now)).toISOString();
+      const updatedAt=new Date(state.promotionRewardAt??Math.min(order.paidAt+day,now)).toISOString();
       items.push({obligationId,orderNo,activityId,version:offer.version,orderLineId:'demo-line-0',ruleId,rewardRuleId:reward.rewardRuleId,
         unitSeq:0,updatedAt,reward,disclosure,refundHold:false,beneficiaryRole:'BUYER',state:status,refundRequestIds:[],
         assetReceipt:gift?{deviceIds:gift.deviceIds,instanceNos:gift.instances,source:'PROMOTION_GIFT',
