@@ -16,8 +16,8 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
-import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { demoCommissionEvents, demoReferralLedger, demoHasOpeningMilestone, demoLifetimeEarningsUsdt, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
+import { demoCommissionEvents, demoReferralLedger, demoHasOpeningMilestone, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
@@ -445,7 +445,9 @@ export function demoFixture(url,locale,state,request) {
     if(!Number.isInteger(deviceId)||deviceId<=0)fail(422,'DEVICE_ID_REQUIRED');
     if(!Number.isInteger(expectedVersion)||expectedVersion<0)fail(422,'DEVICE_VERSION_REQUIRED');
     const key=request.headers?.()['idempotency-key']?.trim();
-    const command=key&&`activate:${key}`;
+    if(!key)fail(422,'IDEMPOTENCY_KEY_REQUIRED');
+    if(key.length>128)fail(422,'IDEMPOTENCY_KEY_INVALID');
+    const command=`activate:${key}`;
     const identity=JSON.stringify([deviceId,expectedVersion,clientMaxDevices]);
     const prior=state.deviceActivationReceipts?.[command];
     if(prior){
@@ -465,7 +467,7 @@ export function demoFixture(url,locale,state,request) {
     const receipt={deviceId,instanceNo:device.instanceNo,status:alreadyActive?device.status:'ACTIVE',
       activeCount:fleet.slotsUsed-fleet.reservedSlotCount-fleet.trialSlotCount+Number(!alreadyActive),
       slotCap:fleet.slotCap,rowVersion:expectedVersion+Number(!alreadyActive),alreadyActive};
-    if(command)(state.deviceActivationReceipts??={})[command]={identity,receipt};
+    (state.deviceActivationReceipts??={})[command]={identity,receipt};
     return receipt;
   }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
@@ -742,7 +744,7 @@ export function demoFixture(url,locale,state,request) {
     const paymentNo='DEMO-PAY-'+orderNo,paymentMethod=amount===0?'VOUCHER':'WALLET';
     if(replay){
       if(order.orderStatus!=='COMPLETED'||order.activationStatus!=='ACTIVATED')refuse('ORDER_NOT_PAYABLE');
-      if(order.paymentNo&&order.paymentNo!==paymentNo)refuse('ORDER_PAYMENT_STATE_CONFLICT');
+      if(order.paymentNo!==paymentNo)refuse('ORDER_PAYMENT_STATE_CONFLICT');
     }else{
       if(order.paymentStatus!=='PENDING')refuse('ORDER_NOT_PAYABLE');
       const lines=order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity}));
@@ -759,7 +761,7 @@ export function demoFixture(url,locale,state,request) {
           activationStatus:'ACTIVATED',quotaUsedAt:now,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
       }
     }
-    const balanceAfter=state.walletMovements?.find(row=>row.bizNo===orderNo)?.balanceAfter??demoWalletUsdt(state);
+    const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,
       paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',
       amountUsdt:order.promotionQuoteId?amount.toFixed(2):amount,paymentMethod,
@@ -870,12 +872,14 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/events'||pathname.startsWith('/api/events/')){
     const spinTickets=demoStreakMilestones.reduce((count,[,type,amount],index)=>
       count+(type==='SPIN'&&demoMilestoneClaimed(state,index+1)?amount:0),0);
+    const cardGrantBefore=state.streakSaverBalance==null?0:demoH4Savers(state);
     const eventResponse=demoH4EventResponse(url,contentLocale,state,request,now,{
       fleet:()=>demoFleetFacts(url,locale,state),
       promotion:id=>demoFixture(new URL('/api/promotions/'+id,url.origin),locale,state,request),
       products,spinTickets,
     });
     if(eventResponse!==undefined){
+      if(state.streakSaverBalance!=null)state.streakSaverBalance+=demoH4Savers(state)-cardGrantBefore;
       if(request.method()==='POST'&&/\/(claim|spin)$/.test(pathname))postDemoActivityRewards(state,now);
       return eventResponse;
     }
@@ -889,7 +893,9 @@ export function demoFixture(url,locale,state,request) {
     // Mirrors the backend seeds (nx_growth_checkin_rule / nx_streak_milestone / nx_streak_power_up); day 3 is already claimed in the 12-day scenario.
     data.rules=[['baseline','1'],['bonus7','5'],['luckyMultiplierMax','2'],['p15','15'],['p2','5'],['broken','48'],['revive','1']].map(([key,value])=>({key,value}));
     data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:demoMilestoneClaimed(state,i+1)?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
-    const lifetimeEarningsUsdt=demoLifetimeEarningsUsdt(walletBills());
+    // Growth milestones count posted earning events. Wallet-only credits can still appear on proof.
+    const lifetimeEarningsUsdt=Number(settledTasks().filter(task=>task.postedAt<=now)
+      .reduce((sum,task)=>sum+task.amount,0).toFixed(6));
     data.earningMilestones=[10,100,1000].map((thresholdUsdt,i)=>{
       const milestoneId='demo-earning-'+i,bizNo='EARNING-MS:900001:'+milestoneId;
       const achieved=state.walletMovements?.find(row=>row.bizNo===bizNo);
@@ -963,6 +969,7 @@ export function demoFixture(url,locale,state,request) {
     const result={...authority,restoredStreak:Math.max(1,Math.min(30,streak.longestStreak)),
       streakSavers:streak.streakSavers-1,effectiveLastCheckInDate:demoTeamBusinessDate(now-day)};
     state.saverRestoredStreak=result.restoredStreak;
+    if(state.streakSaverBalance!=null)state.streakSaverBalance=result.streakSavers;
     return remember('streakSaver',result.effectiveLastCheckInDate,result,null);
   }
   if(pathname==='/api/earnings/milestones/evaluate'){

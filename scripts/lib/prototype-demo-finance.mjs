@@ -1,5 +1,5 @@
 // Isolated loopback financial models. No real network or financial submissions.
-import { accountDeletionWallet } from './prototype-demo-account.mjs';
+import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import {randomUUID} from 'node:crypto';
 import {demoWithdrawalFacts, settleDemoBankWithdrawals} from './prototype-demo-secondary.mjs';
 const day=86400000;
@@ -22,16 +22,25 @@ export function demoWithdrawals(state, now = Date.now()) {
   // Like the backend, retain the submission's fee/net-receive quote; it is not a successful payout or a new UVT refund.
   const withdrawals=state.dataState==='empty'&&!accountDeletionWallet(state)?[]:['CONFIRMED','REFUNDED'].map((status,i)=>({withdrawalNo:'WD-DEMO-'+(i+1),targetAddress:`0x${'1'.repeat(40)}`,amount:100,chain:'USDT-BEP20',status,holdUntil:new Date(sampleAt-day).toISOString(),createdAt:new Date(sampleAt-(i+2)*day).toISOString(),fee:1,networkConfirmUsd:1,networkFee:1,penaltyFee:0,grossFee:1,nexBurned:0,nexRefunded:0,nexRefundedAt:null,feeWaived:0,actualFee:1,netReceive:99,policyVersion:'money-policy',useNexFeeOffset:false,riskRoute:'fast-pass',idSource:'server'}));
   withdrawals.unshift(...Object.values(state.bankDemo?.orders??{}).map(row=>({withdrawalNo:row.withdrawalNo,targetAddress:'BANK-VND:'+row.beneficiaryNo,amount:row.bank.amountUsdt,chain:'BANK-VND',status:row.outcome==='settled'?'CONFIRMED':row.outcome==='rejected'?'REFUNDED':'PROCESSING',holdUntil:new Date(row.createdAt).toISOString(),createdAt:new Date(row.createdAt).toISOString(),networkConfirmUsd:row.bank.feeUsdt,networkFee:row.bank.feeUsdt,penaltyFee:0,grossFee:row.bank.feeUsdt,nexBurned:0,feeWaived:0,actualFee:row.bank.feeUsdt,netReceive:row.bank.netUsdt,policyVersion:'money-policy',useNexFeeOffset:false,riskRoute:'fast-pass',idSource:'server'})));
+  const history=demoDeletionHistory(state);
   const wallet = accountDeletionWallet(state);
   if (wallet) return state.accountDeletionState === 'withdrawal'
     ? [{...withdrawals[0],status:'PROCESSING'}]
-    : state.accountDeletionState === 'history' ? [withdrawals[0]] : [];
+    : history ? [{...withdrawals.find(row=>row.withdrawalNo===history.withdrawal.withdrawalNo),
+      ...history.withdrawal,createdAt:new Date(history.at).toISOString(),holdUntil:new Date(history.at).toISOString()}] : [];
   return withdrawals;
 }
 export function financeDemo(url,state,request){const p=url.pathname,method=request.method(),bankIntent=p.match(/^\/api\/app\/deposits\/vietqr\/intents(?:\/([^/]+)(\/cancel)?)?$/);if(method!=='GET'&&p!=='/api/withdrawals/eligibility'&&!(method==='POST'&&bankIntent))return undefined;const now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now),walletAmount=facts.walletUsdt; const proof={source:"server",serverCanonical:true,sourceEnvironment:"PRODUCTION",runId:""};
 const caps = { ...proof, source: "G2/G3 server configuration", asset: "UVT", currency: "USDT", currentPrice: .125, userDailyCapUsdt: 5000, platformDailyCapUsdt: 100000, feePct: .1, feeMinUsdt: .1, minUsdt: .1, minNex: 1, queueMode: "QUEUE", swapEnabled: true };
 const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_item + nx_emergency_control_setting" };
   if (p === "/api/config/exchange/caps") return caps;
+  const history=p==='/api/exchange'?demoDeletionHistory(state):null;
+  if(history){
+    return {...proof,caps,wallet:{usdtAvailable:walletAmount,nexAvailable:accountDeletionWallet(state).nexAvailable},
+      todayUserUsedUsdt:0,todayPlatformUsedUsdt:1000,lifetimeExchangedUsdt:history.swap.toAmount,
+      ordersPage:{total:1,pageNum:Number(url.searchParams.get('pageNum')||1),pageSize:Number(url.searchParams.get('pageSize')||20)},
+      orders:[{...history.swap,createdAt:new Date(history.at).toISOString()}]};
+  }
   if (p === "/api/exchange") return { ...proof, caps, wallet: { usdtAvailable: walletAmount, nexAvailable: accountDeletionWallet(state)?.nexAvailable ?? 789.000001 }, todayUserUsedUsdt: 50, todayPlatformUsedUsdt: 1000, lifetimeExchangedUsdt: 50.123456, ordersPage: { total: empty ? 0 : 1, pageNum: Number(url.searchParams.get("pageNum") || 1), pageSize: Number(url.searchParams.get("pageSize") || 20) }, orders: empty ? [] : [{ exchangeNo: "EX-DEMO123456", fromAsset: "USDT", toAsset: "UVT", fromAmount: 50.123456, toAmount: 400.987648, rate: .125, status: "COMPLETED", createdAt: iso }] };
   if (p === "/api/config/repurchase") return { ...repurchaseProof, product: "repurchase", asset: "USDT", pointsReward: false, apyPct: 35, lockDays: 90, nurtureMultiplier: 1, h1ReinvestMultiplier: 1, effectiveNurtureMultiplier: 1, ticketPerOrder: 1, presets: [50, 200, 1000], earlyPenaltyPct: 10, minAmountUsdt: 50, enabled: true, disclosureRequired: false, currentNexPriceUsdt: .125, g4LotteryCapacity: 1000, g4TicketsIssuedThisMonth: 1 };
   if (p === "/api/repurchase/orders") return { ...repurchaseProof, walletBalanceUsdt: walletAmount, serverTime: iso, ordersPage: { total: accountDeletionWallet(state)||empty ? 0 : 1, pageNum: 1, pageSize: 50 }, orders: accountDeletionWallet(state)||empty ? [] : [{ orderNo: "RPS-DEMO123456", amountUsdt: 50.123456, apyPct: 35, earlyPenaltyPct: 10, lockDays: 90, lockedAt: new Date(now - 86400000).toISOString(), unlockAt: new Date(now + 89 * 86400000).toISOString(), estimatedInterestUsdt: 4.325671, status: "ACTIVE" }] };
