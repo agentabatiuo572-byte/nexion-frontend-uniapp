@@ -728,24 +728,42 @@ export function demoFixture(url,locale,state,request) {
   if(orderAction){
     const [,orderNo,action]=orderAction,order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);
     if(!order) return {};
-    const replay=order.paymentStatus==='PAID';
-    if(action==='pay'&&!['PENDING','PAID'].includes(order.paymentStatus)||action==='cancel'&&order.paymentStatus==='PAID')throw new Error('Demo order action unavailable');
-    if(action==='pay'&&!replay){
+    const replay=order.paymentStatus==='PAID',amount=Number(order.amountUsdt);
+    if(action==='cancel'){
+      if(replay)refuse('ORDER_NOT_CANCELLABLE');
+      (state.orderStatuses??={})[orderNo]='cancelled';
+      if(state.createdOrders?.includes(order)){
+        Object.assign(order,{canonicalStatus:'cancelled',paymentStatus:'CANCELLED',orderStatus:'CANCELLED',
+          activationStatus:'WAITING_PAYMENT',paidAt:null,activatedAt:null});
+      }
+      return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',
+        orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:false},order);
+    }
+    const paymentNo='DEMO-PAY-'+orderNo,paymentMethod=amount===0?'VOUCHER':'WALLET';
+    if(replay){
+      if(order.orderStatus!=='COMPLETED'||order.activationStatus!=='ACTIVATED')refuse('ORDER_NOT_PAYABLE');
+      if(order.paymentNo&&order.paymentNo!==paymentNo)refuse('ORDER_PAYMENT_STATE_CONFLICT');
+    }else{
+      if(order.paymentStatus!=='PENDING')refuse('ORDER_NOT_PAYABLE');
       const lines=order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity}));
       if(!demoOrderFitsCapacity(url,locale,state,products,lines,orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
       requireDemoPurchase(state,products,lines,now,true);
-      const amount=Number(order.amountUsdt);
       if(amount>demoWalletUsdt(state))refuse('ORDER_WALLET_INSUFFICIENT');
       if(amount>0){
         postDemoWalletEntries(state,{bizNo:orderNo,bizType:'ORDER_PURCHASE',asset:'USDT',direction:'OUT',
           amount,at:now,category:'purchase',remark:'UVEL wallet order settlement'});
       }
+      (state.orderStatuses??={})[orderNo]='activated';
+      if(state.createdOrders?.includes(order)){
+        Object.assign(order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
+          activationStatus:'ACTIVATED',quotaUsedAt:now,paidAt:now,activatedAt:now,paymentNo,paymentMethod});
+      }
     }
-    state.orderStatuses||={};state.orderStatuses[orderNo]=action==='pay'?'activated':'cancelled';
-    const canonicalStatus=state.orderStatuses[orderNo],[paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus];
-    if(state.createdOrders?.includes(order))Object.assign(order,{canonicalStatus,paymentStatus,orderStatus,activationStatus,...(action==='pay'&&!replay&&{quotaUsedAt:now}),paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',paidAt:action==='pay'?(replay?order.paidAt:now):null,activatedAt:action==='pay'?(replay?order.activatedAt??now:now):null});
-    if(action==='cancel')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:false},order);
-    const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo:'DEMO-PAY-'+orderNo,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',amountUsdt:order.promotionQuoteId?Number(order.amountUsdt).toFixed(2):Number(order.amountUsdt),paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',walletBalanceAfterUsdt:Number(order.amountUsdt)===0?null:state.walletMovements?.find(row=>row.bizNo===orderNo)?.balanceAfter??demoWalletUsdt(state),idempotent:replay};
+    const balanceAfter=state.walletMovements?.find(row=>row.bizNo===orderNo)?.balanceAfter??demoWalletUsdt(state);
+    const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,
+      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',
+      amountUsdt:order.promotionQuoteId?amount.toFixed(2):amount,paymentMethod,
+      walletBalanceAfterUsdt:amount===0?null:balanceAfter,idempotent:replay};
     return remember('payOrder',orderNo,response,order);
   }
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
