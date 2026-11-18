@@ -207,8 +207,8 @@ const recentBinaries = computed(() =>
 );
 const spilloverCount = computed(() => remoteApiEnabled ? snapshot.value?.autoPlacedMembers ?? 0 : network.members.filter((m) => m.isSpillover).length);
 
-// The team network stops at layer 7, so a group reaching it may have deeper members it cannot count (F3-BE-07).
-function wholeGroupCount(members: NetworkMember[]): number | null {
+// Older backends omit the snapshot totals. A network group reaching layer 7 may have deeper members.
+function fallbackGroupCount(members: NetworkMember[]): number | null {
   return memberDetailsReadable.value && !members.some((member) => member.layer >= 7) ? members.length : null;
 }
 
@@ -229,7 +229,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "left",
     name: t.value.binary.leftWing,
-    count: wholeGroupCount(sides.value.left),
+    count: snapshot.value?.trackATotalMembers ?? fallbackGroupCount(sides.value.left),
     monthVol: leftMonthVol.value,
     isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "left",
     color: "var(--v5-ink)",
@@ -238,7 +238,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "right",
     name: t.value.binary.rightWing,
-    count: wholeGroupCount(sides.value.right),
+    count: snapshot.value?.trackBTotalMembers ?? fallbackGroupCount(sides.value.right),
     monthVol: rightMonthVol.value,
     isWeak: leftMonthVol.value !== rightMonthVol.value && weakSide.value === "right",
     color: "var(--v5-ink)",
