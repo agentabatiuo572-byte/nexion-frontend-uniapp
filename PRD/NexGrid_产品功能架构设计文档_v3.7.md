@@ -3796,7 +3796,8 @@ flowchart LR
 **Actions**:
 - `激活`:远端提交设备激活命令并回读确认，后端校验槽位、归属与版本；本地预览调 `useApp.activateDevice(id)`；成功 toast `已激活 {name}`。
 - `取消激活`:**根据当前任务状态分支**
-  - 若设备 `currentTask === null`(空闲态)→ `confirm()` 二次确认("取消后该设备停止贡献收益与任务进度,可随时重新激活"),确认后提交停用命令并回读；本地预览调 `useApp.deactivateDevice(id)`。
+  - 若没有当前作业且任务分配状态未知，复用设备状态无法确认的重试提示，待状态确认后才可停用。
+  - 若已确认设备空闲（任务分配状态已确认且 `currentTask === null`）→ `confirm()` 二次确认("取消后该设备停止贡献收益与任务进度,可随时重新激活"),确认后提交停用命令并回读；本地预览调 `useApp.deactivateDevice(id)`。
   - 若设备 `currentTask !== null`(进行中任务)→ 弹专用 3 选 sheet(`useDeactivateSheet`):
     - **等任务完成后自动取消**(主 CTA):远端提交 `deactivate-after-task`；本地预览调 `useApp.scheduleDeactivation(id)`。等待期间设备保持激活并占槽，任务完成、服务端确认停用后出槽。
     - **强制取消(放弃当前任务奖励)**(次 CTA):SIM 任务沿用模拟任务停止命令；非 SIM 当前任务提交 `/api/device/{id}/deactivate`。直接停用接口的 `DEACTIVATED`（`alreadyDeactivated`）与 `PENDING_DEACTIVATE`（`alreadyPending`）均为成功。回读仍激活且 `pendingDeactivate=true` 时，复用「等任务完成后自动取消」的成功提示与等待 chip，保留当前任务、Online 和槽位占用，不提前宣称已停用；回读确认未激活后才显示已停用。本地预览仍立即停用并放弃当前任务奖励。（2026-11-09 F2）
