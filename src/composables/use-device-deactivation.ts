@@ -15,7 +15,7 @@ import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-comma
 
 /**
  * 取消激活(及仓库激活)的单一实现:设备仓库行与赚取页设备操作面板共用。
- * 无任务 → 二次确认;有任务 → `sheetDevice` 驱动 DeviceDeactivateSheet
+ * 确认无任务 → 二次确认；作业状态未知 → 提示重试；有任务 → `sheetDevice` 驱动 DeviceDeactivateSheet
  * (等任务完成 / 强制停用 / 返回),由调用方就地挂载该弹层。
  */
 export function useDeviceDeactivation() {
@@ -49,6 +49,12 @@ export function useDeviceDeactivation() {
     // Running task → dedicated sheet offering wait / force / cancel.
     if (d.currentTask) {
       sheetDevice.value = d;
+      return;
+    }
+    const tasksConfirmed = !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
+      || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot);
+    if (!tasksConfirmed) {
+      toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
       return;
     }
     const ok = await uiConfirm({
