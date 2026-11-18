@@ -3407,6 +3407,7 @@ export const ru: Messages = {
     agentSwitchedTo: "Теперь с вами общается {name}",
     agentSwitched: "Специалист поддержки сменился",
     restartSession: "Начать новый чат",
+    openCurrentConversation: "Открыть текущий чат",
     receiptSent: "Доставлено",
     receiptRead: "Прочитано",
     rateLimited: "Слишком часто",

@@ -10,6 +10,8 @@ export function mergeConversationMessages(prior:Conversation|undefined,next:Conv
       historyTruncated:keptOlder?prior.historyTruncated:next.historyTruncated,
       historyNextCursor:keptOlder?prior.historyNextCursor:next.historyNextCursor};
   }
+  // Inbox rows may omit the write state carried by conversation details.
+  if (!merged.writeState && prior?.writeState) merged={...merged,writeState:prior.writeState};
   const clearedThrough=Math.max(prior?.userClearedThroughMessageId??-1,next.userClearedThroughMessageId??-1);
   if(clearedThrough<0)return merged;
   const cursor=merged.historyNextCursor!=null&&merged.historyNextCursor>clearedThrough?merged.historyNextCursor:null;
@@ -34,7 +36,7 @@ export async function catchUpConversation(next:Conversation,prior:Conversation|u
     if(seen.has(cursor))throw new Error('SUPPORT_HISTORY_CURSOR_STALLED');seen.add(cursor);
     page=await fetchPage(next.id,cursor);
     const clearedThrough=Math.max(next.userClearedThroughMessageId??-1,page.userClearedThroughMessageId??-1);
-    next={...next,messages:[...page.messages,...next.messages],historyTruncated:page.historyTruncated,historyNextCursor:page.historyNextCursor,
+    next={...next,writeState:page.writeState??next.writeState,messages:[...page.messages,...next.messages],historyTruncated:page.historyTruncated,historyNextCursor:page.historyNextCursor,
       ...(clearedThrough>=0?{userClearedThroughMessageId:clearedThrough}:{})};
   }
   if(!active())throw new Error('SUPPORT_ACCOUNT_SCOPE_CHANGED');

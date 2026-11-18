@@ -3407,6 +3407,7 @@ export const kk: Messages = {
     agentSwitchedTo: "Енді сізбен сөйлесетін: {name}",
     agentSwitched: "Қолдау маманы ауысты",
     restartSession: "Жаңа сеанс бастау",
+    openCurrentConversation: "Ағымдағы әңгімені ашу",
     receiptSent: "Оқылмады",
     receiptRead: "Оқылды",
     rateLimited: "Тым жиі жіберілуде",

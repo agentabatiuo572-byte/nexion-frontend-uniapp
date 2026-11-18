@@ -29,6 +29,7 @@ export interface Conversation {
   agentName: string;
   /** Stable server staff identity. A display name must never identify a thread. */
   ownerAgentId?: string | null;
+  writeState?: { canReply: boolean; writableConversationNo: string | null };
   /** Server account/peer visibility boundary; never removes staff-side history. */
   userClearedThroughMessageId?: number;
   roleKey: ConvRoleKey;

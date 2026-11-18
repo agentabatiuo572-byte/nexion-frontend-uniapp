@@ -3407,6 +3407,7 @@ export const id: Messages = {
     agentSwitchedTo: "Anda sekarang mengobrol dengan {name}",
     agentSwitched: "Petugas CS Anda telah berganti",
     restartSession: "Mulai sesi baru",
+    openCurrentConversation: "Buka percakapan saat ini",
     receiptSent: "Terkirim",
     receiptRead: "Dibaca",
     rateLimited: "Terlalu cepat",

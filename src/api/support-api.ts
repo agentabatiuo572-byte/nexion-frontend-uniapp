@@ -124,7 +124,16 @@ function parseConversationMessage(value: unknown): ConvMessage {
 }
 function parseConversationDetail(value: unknown): Conversation {
   const v = row(value); const nextCursor = cursor(v?.nextCursor); if (!v || !Array.isArray(v.messages) || typeof v.historyTruncated !== "boolean" || (v.nextCursor !== null && v.nextCursor !== undefined && nextCursor === null)) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
-  return { ...parseConversationHeader(v.conversation), messages: v.messages.map(parseConversationMessage), historyTruncated: v.historyTruncated, historyNextCursor: nextCursor };
+  let writeState: Conversation["writeState"];
+  if (v.writeState !== undefined) {
+    const state = row(v.writeState);
+    const writableConversationNo = text(state?.writableConversationNo);
+    if (!state || typeof state.canReply !== "boolean" || (state.writableConversationNo !== null && writableConversationNo === null)) {
+      invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");
+    }
+    writeState = { canReply: state.canReply, writableConversationNo };
+  }
+  return { ...parseConversationHeader(v.conversation), writeState, messages: v.messages.map(parseConversationMessage), historyTruncated: v.historyTruncated, historyNextCursor: nextCursor };
 }
 function parseConversationPage(value: unknown): CursorPage<Conversation> {
   const v = row(value); const total = integer(v?.total); const pageSize = integer(v?.pageSize, 1);

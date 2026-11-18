@@ -3407,6 +3407,7 @@ export const fil: Messages = {
     agentSwitchedTo: "Kausap mo na ngayon si {name}",
     agentSwitched: "Napalitan ang agent ng support mo",
     restartSession: "Bagong session",
+    openCurrentConversation: "Buksan ang kasalukuyang session",
     receiptSent: "Naihatid",
     receiptRead: "Nabasa",
     rateLimited: "Masyadong mabilis",

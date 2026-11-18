@@ -3407,6 +3407,7 @@ export const uz: Messages = {
     agentSwitchedTo: "Endi siz bilan {name} suhbatlashmoqda",
     agentSwitched: "Operator almashdi",
     restartSession: "Yangi suhbat boshlash",
+    openCurrentConversation: "Joriy suhbatni ochish",
     receiptSent: "Oʻqilmagan",
     receiptRead: "Oʻqildi",
     rateLimited: "Juda tez yuboryapsiz",

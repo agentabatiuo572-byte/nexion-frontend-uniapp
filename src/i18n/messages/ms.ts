@@ -3407,6 +3407,7 @@ export const ms: Messages = {
     agentSwitchedTo: "Anda kini bersembang dengan {name}",
     agentSwitched: "Ejen bantuan anda telah bertukar",
     restartSession: "Mulakan sesi baharu",
+    openCurrentConversation: "Buka perbualan semasa",
     receiptSent: "Belum dibaca",
     receiptRead: "Dibaca",
     rateLimited: "Terlalu kerap hantar",
