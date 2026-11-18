@@ -2908,6 +2908,7 @@ autoDetect: "自动识别即将推出",
     historyTruncated: "仅显示最近 100 条消息，早期消息仍保留。",
     loadEarlier: "加载更早的消息",
     sessionTransferred: "此会话已转接，不能继续回复。请新建会话。",
+    sessionTransferredOpenCurrent: "此会话已转接，不能继续回复。请在当前会话里继续联系。",
     title: "会话中心",
     back: "返回",
     // 左侧类型栏短标签

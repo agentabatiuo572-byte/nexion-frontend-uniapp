@@ -2951,6 +2951,7 @@ autoDetect: "auto-detect coming soon",
     historyTruncated: "Only the latest 100 messages are shown. Earlier messages are retained.",
     loadEarlier: "Load earlier messages",
     sessionTransferred: "This conversation was transferred and can no longer receive replies. Start a new conversation.",
+    sessionTransferredOpenCurrent: "This conversation was transferred and can no longer receive replies. Continue in your current conversation.",
     title: "Messages",
     back: "Back",
     // Left type-rail short labels

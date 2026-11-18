@@ -3373,6 +3373,7 @@ export const ms: Messages = {
     historyTruncated: "Hanya 100 mesej terkini dipaparkan. Mesej lebih awal masih disimpan.",
     loadEarlier: "Muat mesej lebih awal",
     sessionTransferred: "Perbualan ini telah dipindahkan dan tidak lagi boleh menerima balasan. Mulakan perbualan baharu.",
+    sessionTransferredOpenCurrent: "Perbualan ini telah dipindahkan dan tidak lagi boleh menerima balasan. Teruskan dalam perbualan semasa anda.",
     title: "Mesej",
     back: "Kembali",
     typeAdvisor: "Ejen khusus",
