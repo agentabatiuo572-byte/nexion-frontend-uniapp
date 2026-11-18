@@ -2889,7 +2889,7 @@ NEX↔USDT 兑换确认必须展示 from/to amount、rate、fee、KYC/cap 状态
 | 每用户日 cap | $50 USDT 等值 |
 | 全平台日 cap | $20,000 USDT 等值 |
 | KYC 触发线 | 累计 ≥ $100 lifetime |
-| 排队 | 超 cap 进入下日队列 |
+| 排队 | 后台排队策略接受时进入人工队列，由平台确认后处理，不承诺固定执行时刻；处理前可取消（2026-11-19，BUG-480） |
 
 #### 9.4.3 Gate 决策
 
@@ -2898,8 +2898,8 @@ NEX↔USDT 兑换确认必须展示 from/to amount、rate、fee、KYC/cap 状态
 | Reason | 触发 | 用户操作 |
 |---|---|---|
 | `kyc-required` | 累计 > $100 且未 KYC | 引导到 `/me/wallet/topup?kyc=1` |
-| `user-cap` | 本日个人额度已满 | 弹窗 "Queue for tomorrow",可选排队 |
-| `platform-cap` | 全平台日额度已满 | toast 拒绝,提示明日重试 |
+| `user-cap` | 本日个人额度已满 | 弹窗「加入兑换队列」，可选排队；排队后提示「平台确认后处理，到账时间以实际处理为准」，排队单带运营配置的预计说法（`queueEstimate`）时显示该说法 |
+| `platform-cap` | 全平台日额度已满 | 提示「今日兑换额度已满」，不写恢复时刻 |
 
 #### 9.4.4 风控仪表盘 UI
 
@@ -2907,25 +2907,18 @@ NEX↔USDT 兑换确认必须展示 from/to amount、rate、fee、KYC/cap 状态
 - 用户日 cap 进度条($X/$50,超 85% 变红)
 - 平台日 cap 进度条($XK/$20K)
 - KYC 状态行(verified 绿 / 未验黄 + lifetime $Y)
-- Queue 列表(下一日待处理)
+- Queue 列表（待平台处理的排队单，处理前可取消）
 
 #### 9.4.5 玩法说明页 `/me/wallet/exchange/how-it-works`
 
 **页面结构**:
-1. iOS nav back + 标题 `How exchange works`
-2. Hero + 标签 `NEX ↔ USDT EXCHANGE` + 大标题 `Convert NEX to USDT (or back) at live market rate.`
-3. §1 Why a built-in exchange?(USDT 提现 vs NEX 持有的两种钱形态)
-4. §2 三步操作 StepRow(选方向金额 / 确认报价 / 资金即时结算)
-5. §3 三层风控限制 IconRow:
-   - 📅 用户日上限 $50/day(00:00 UTC 重置)
-   - 🌐 全平台日池 $20,000/day(满即排队)
-   - 🪪 KYC 门槛 $100 lifetime
-   + CalloutBox `💡 Why daily limits?`(FATF Travel Rule + MiCA 合规)
-6. §4 触及上限 3 步透明流程 + CalloutBox `✓ Your funds are never locked unilaterally`(排队随时可取消)
-7. §5 FAQ 4 问(汇率来源 / 是否收费 / 能否直接兑法币 / 超过 $50/日)
-8. 底部 CTA 回 `/me/wallet/exchange`
+1. 返回 + 标题 `How exchange works`；兑换暂停时先显示暂停说明
+2. Hero：标签、大标题、副标
+3. 三步操作：选方向和金额 / 确认报价 / 在「最近兑换」查看结果
+4. 每日额度：兑换受每日额度限制；平台接受排队时由平台确认后处理，处理前可以取消，不写固定执行时刻（2026-11-19，BUG-480）。下方「需要了解」说明报价随市场变化、以确认时为准，平台不承诺价格
+5. 底部 CTA 回 `/me/wallet/exchange`
 
-i18n keys 在 `exchangeHowItWorks.*` namespace ~35 keys。
+i18n keys 在 `exchangeHowItWorks.*` namespace。
 
 ### 9.5 锁定计划（已删除）
 
