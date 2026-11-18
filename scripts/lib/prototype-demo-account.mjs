@@ -3,22 +3,33 @@ import { randomUUID } from 'node:crypto';
 import { previewInterfaceLanguages } from './design-review-fixture.mjs';
 import { demoH4Account } from './prototype-demo-events.mjs';
 
+const pendingWithdrawalAmount = 100;
+
 // One wallet fact for every read used by the account-deletion journey.
 export function accountDeletionWallet(state) {
   if (!state.accountDeletionState || state.accountDeletionState === 'follow') return null;
   state.walletBalance ??= state.accountDeletionState === 'usdt' ? 12.34 : 0;
   state.walletNexBalance ??= state.accountDeletionState === 'nex' ? 0.000001 : 0;
   return { usdtAvailable: state.walletBalance, nexAvailable: state.walletNexBalance,
-    pendingWithdraw: state.accountDeletionState === 'withdrawal' ? 100 : 0 };
+    pendingWithdraw: state.accountDeletionState === 'withdrawal' ? pendingWithdrawalAmount : 0 };
 }
-// Completed transactions in the retained-history deletion account.
+// Retained accounts share the spent funds that explain their small closing balances.
 export function demoDeletionHistory(state) {
-  if(state.accountDeletionState!=='history'||state.dataState==='empty')return null;
-  return {
-    at:state.previewFactsAt,
-    swap:{exchangeNo:'EX-DEMO-HISTORY',fromAsset:'UVT',toAsset:'USDT',fromAmount:128,toAmount:15.9,rate:.125,status:'COMPLETED'},
-    withdrawal:{withdrawalNo:'WD-DEMO-1',amount:250,netReceive:249,fee:1},
-  };
+  if (!state.accountDeletionState || state.accountDeletionState === 'follow') return null;
+  const hasHistory = state.dataState !== 'empty' && state.accountDeletionState !== 'clear';
+  const at = state.previewFactsAt;
+  const swap = hasHistory ? { exchangeNo: 'EX-DEMO-HISTORY', fromAsset: 'UVT', toAsset: 'USDT',
+    fromAmount: 128, toAmount: 15.9, rate: .125, status: 'COMPLETED', at } : null;
+  const withdrawals = [];
+  const pending = state.accountDeletionState === 'withdrawal';
+  if (pending) withdrawals.push({
+    withdrawalNo: 'WD-DEMO-1', amount: pendingWithdrawalAmount, netReceive: pendingWithdrawalAmount - 1,
+    fee: 1, status: 'PROCESSING', at,
+  });
+  if (hasHistory) withdrawals.push({
+    withdrawalNo: pending ? 'WD-DEMO-2' : 'WD-DEMO-1', amount: 250, netReceive: 249, fee: 1, status: 'CONFIRMED', at,
+  });
+  return { swap, withdrawals };
 }
 export function accountDemo(url, locale, state, request) {
   const path = url.pathname;
