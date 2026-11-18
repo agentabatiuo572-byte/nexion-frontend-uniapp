@@ -27,6 +27,7 @@ const refuse=message=>{const error=new Error(message);error.status=409;throw err
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
+const demoWeekendRules={action:'CHECKIN_MULTIPLIER',multiplier:2,timeZone:'UTC',weekdays:[6,7]};
 export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -200,15 +201,18 @@ function demoEvents(locale,state,now) {
     ['upgrade','discount','设备升级礼','Device upgrade offer','Ưu đãi nâng cấp','AVAILABLE','ongoing',500,'/pages/store/store'],
     ['invite','referral','邀请好友挑战','Invitation challenge','Thử thách mời bạn','JOINED','ongoing',200,'/pages/team/team'],
     ['spin','wheel','每日幸运转盘','Daily lucky spin','Vòng quay mỗi ngày','AVAILABLE','ongoing',50,''],
-    ['weekend','boost','周末签到加成','Weekend check-in boost','Thưởng điểm danh cuối tuần','CLAIMABLE','ongoing',20,'/pages/daily/daily'],
+    ['weekend','boost','周末签到加成','Weekend check-in boost','Thưởng điểm danh cuối tuần','AVAILABLE','ongoing',0,'/pages/daily/daily'],
     ['season','seasonal','秋季算力季','Autumn compute season','Mùa tính toán thu','AVAILABLE','upcoming',800,'/pages/events/events'],
     ['welcome','onboarding','新用户成长礼','New member rewards','Quà thành viên mới','CLAIMABLE','ongoing',100,'/pages/missions/missions'],
   ];
   return entries.map(([code,kind,zh,en,vi,baseStatus,baseState,rewardAmount,href],i)=>{
     const mode=state.eventState, eventCode='demo-'+code;
     const eventState=['upcoming','ended'].includes(mode)?mode:mode==='mixed'?baseState:'ongoing';
-    const userStatus=state.eventStatuses?.[eventCode] || (['available','joined','claimable','claimed'].includes(mode)?mode.toUpperCase():baseStatus);
-    return {eventCode,kind,state:eventState,title:localized(locale,zh,en,vi),subtitle:localized(locale,'完成活动条件，查看进度并领取奖励。','Complete the activity goals and claim your reward.','Hoàn thành mục tiêu và nhận thưởng.'),rewardName:'UVT',rewardType:'UVT',rewardAmount,featured:i===0&&eventState==='ongoing',trackable:!['wheel','discount'].includes(kind),targetValue:5,progressValue:['CLAIMABLE','CLAIMED'].includes(userStatus)?5:userStatus==='JOINED'?2:0,userStatus,geo:'GLOBAL',href,startsAt:new Date(eventState==='upcoming'?now+day:now-3*day).toISOString(),endsAt:new Date(eventState==='ended'?now-day:now+7*day).toISOString()};
+    const requestedStatus=state.eventStatuses?.[eventCode] || (['available','joined','claimable','claimed'].includes(mode)?mode.toUpperCase():baseStatus);
+    const weekend=code==='weekend';
+    const userStatus=weekend&&['CLAIMABLE','CLAIMED'].includes(requestedStatus)?'JOINED':requestedStatus;
+    const rewardName=weekend?localized(locale,`签到奖励 × ${demoWeekendRules.multiplier}`,'Double check-in rewards',`Thưởng điểm danh × ${demoWeekendRules.multiplier}`):'UVT';
+    return {eventCode,kind,state:eventState,title:localized(locale,zh,en,vi),subtitle:localized(locale,'完成活动条件，查看进度并领取奖励。','Complete the activity goals and claim your reward.','Hoàn thành mục tiêu và nhận thưởng.'),rewardName,rewardType:weekend?'COMPOSITE':'UVT',rewardAmount,featured:i===0&&eventState==='ongoing',trackable:!weekend&&!['wheel','discount'].includes(kind),targetValue:weekend?1:5,progressValue:weekend?0:['CLAIMABLE','CLAIMED'].includes(userStatus)?5:userStatus==='JOINED'?2:0,userStatus,geo:'GLOBAL',href,startsAt:new Date(eventState==='upcoming'?now+day:now-3*day).toISOString(),endsAt:new Date(eventState==='ended'?now-day:now+7*day).toISOString()};
   });
 }
 
@@ -764,7 +768,6 @@ export function demoFixture(url,locale,state,request) {
     if(state.promoState==='phone') Object.assign(data.promoBanner,{targetDevice:'iphone15',productType:'DEVICE'});
     return data;
   }
-  if(pathname==='/api/content/learning/courses'&&empty)return {...authority,courses:[],completedCourses:0,totalCourses:0,earnedNex:0,rewardTitles:{}};
   const questClaim=pathname.match(/^\/api\/quests\/([^/]+)\/claim$/);
   if(questClaim){const code=decodeURIComponent(questClaim[1]);if(code.startsWith('demo-week-')){state.weekClaims||=[];state.weekClaims.push(Number(code.split('-').pop()));}else state.dayOneClaimed=true;return {...authority,questId:code,rewardNex:code.startsWith('demo-week-')?100+Number(code.split('-').pop())*25:500,status:'CLAIMED',instanceKey:code.startsWith('demo-week-')?'WEEK:demo':'DAY_ONE:design-review'};}
   const events=demoEvents(contentLocale,state,now);
@@ -773,9 +776,16 @@ export function demoFixture(url,locale,state,request) {
   if(eventRoute) {
     const [,id,action]=eventRoute,event=events.find(item=>item.eventCode===id);
     if(!event) return {};
-    if(action==='detail') return {event,rules:{description:event.subtitle,terms:localized(contentLocale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.')},enabled:event.state!=='ended',eligible:event.state==='ongoing',eligibilityReason:event.state==='upcoming'?'NOT_STARTED':event.state==='ended'?'ENDED':event.userStatus==='CLAIMED'?'CLAIMED':event.userStatus==='CLAIMABLE'?'READY':'IN_PROGRESS',progressValue:event.progressValue,targetValue:event.targetValue,rewards:[{type:'UVT',amount:event.rewardAmount}],results:[],userStatus:event.userStatus,claimKeys:[],reminderSubscribed:!!state.reminders?.includes(id)};
+    const weekend=id==='demo-weekend';
+    if(action==='detail') {
+      const eligible=event.state==='ongoing'&&(weekend||event.userStatus==='CLAIMABLE');
+      const eligibilityReason=event.userStatus==='CLAIMED'?'CLAIMED':event.state==='upcoming'?'NOT_STARTED':event.state==='ended'?'ENDED':event.userStatus==='CLAIMABLE'?'READY':'IN_PROGRESS';
+      return {event,rules:weekend?demoWeekendRules:{},enabled:true,eligible,eligibilityReason,
+        progressValue:event.progressValue,targetValue:event.targetValue,rewards:[],results:[],myRewardAmount:null,userStatus:event.userStatus,
+        ...(weekend?{claimKeys:['ONCE'],reminderSubscribed:!!state.reminders?.includes(id)}:{})};
+    }
     if(action==='join'){state.eventStatuses||={};state.eventStatuses[id]='JOINED';return {eventId:id,status:'JOINED'};}
-    if(action==='claim'){state.eventStatuses||={};state.eventStatuses[id]='CLAIMED';return {eventId:id,rewardType:'UVT',rewardAmount:event.rewardAmount,badgeCode:null};}
+    if(action==='claim'){if(weekend)refuse('EVENT_NOT_CLAIMABLE');state.eventStatuses||={};state.eventStatuses[id]='CLAIMED';return {eventId:id,rewardType:'UVT',rewardAmount:event.rewardAmount,badgeCode:null};}
     if(action==='reminder'){state.reminders||=[];state.reminders.push(id);return {eventId:id,status:'SUBSCRIBED'};}
     const segments=[5,10,20,50,100,200].map((amount,index)=>({tierId:'demo-tier-'+index,rewardType:'UVT',rewardAmount:amount,rewardName:amount+' UVT',realOutflow:false,displayOrder:index}));
     if(action==='spin/state') return {eventCode:id,eventId:id,serverDate:iso.slice(0,10),nextResetAtUtc:new Date(now+day).toISOString(),freeAvailable:!state.spun,bonusTickets:0,availableSpins:state.spun?0:1,segments,history:state.spinHistory||[],source:'nx_event_spin'};
@@ -795,7 +805,8 @@ export function demoFixture(url,locale,state,request) {
     data.rules=[['baseline','1'],['bonus7','5'],['luckyMultiplierMax','2'],['p15','15'],['p2','5'],['broken','48'],['revive','1']].map(([key,value])=>({key,value}));
     data.dailyMilestones=demoStreakMilestones.map(([milestoneDay,rewardType,rewardAmount,badgeCode],i)=>({milestoneId:i+1,milestoneDay,rewardType,rewardAmount,badgeCode,status:state.milestoneClaims?.includes(i+1)||state.streakState==='normal'&&milestoneDay===3?'CLAIMED':data.streak.currentStreak>=milestoneDay?'CLAIMABLE':'LOCKED'}));
     data.earningMilestones=[10,100,1000].map((amount,i)=>({milestoneId:'demo-earning-'+i,thresholdUsdt:amount,rewardNex:amount,lifetimeEarningsUsdt:128.5,status:i===0||i===1&&state.earningClaimed?'FIRED':i===1?'CLAIMABLE':'LOCKED',achievedAt:i===0||i===1&&state.earningClaimed?iso:null}));
-    const names=locale==='zh'?['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星']:locale==='vi'?['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']:['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'];
+    const badgeLocale=(url.searchParams.get('locale')||request.headers?.()['x-preview-locale']||locale).trim().toLowerCase().split('-')[0];
+    const names=localized(badgeLocale,['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星'],['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'],['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']);
     data.badgeAchievements=names.map((name,i)=>({achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],rewardPoints:50*(i+1),status:i<2||unlocked?'UNLOCKED':'LOCKED',unlockedAt:i<2||unlocked?iso:null}));
     // Route badges keep the seeded Chinese name (the App localizes them); the check-in boost is the B17 multiplier.
     data.powerUps=[[1,'ROYALTY_BOOST','团队成长徽章','/team',7,'ROUTE_BADGE','连续签到 7 天可查看团队成长权益',null],[2,'STREAK_BADGE','连续签到徽章','/me/rewards',14,'ROUTE_BADGE','连续签到 14 天解锁专属徽章',null],[3,'CHECKIN_BOOST',localized(locale,'签到加成','Check-in boost','Thưởng điểm danh'),'/daily',30,'CHECKIN_MULTIPLIER','1.5',null],[4,'GENESIS_ALLOWLIST','Genesis 资格入口','/market/genesis',60,'ROUTE_BADGE','连续签到 60 天解锁 Genesis 资格入口',true],

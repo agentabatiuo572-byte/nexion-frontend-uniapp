@@ -52,17 +52,20 @@ function previewScenarioPage(scenario,keys){
   Storage.prototype.setItem=function(key,value){if(stale(this,key)){location.reload();return;}return setItem.call(this,key,value);};
   Storage.prototype.removeItem=function(key){if(stale(this,key)){location.reload();return;}return removeItem.call(this,key);};
   addEventListener('storage',event=>{if(event.key==='uvel-preview-scenario')follow(event.newValue);});
-  const local=target=>{try{return new URL(target,location.href).origin===location.origin;}catch{return false;}};
+  const localPath=target=>{try{const url=new URL(target,location.href);return url.origin===location.origin?url.pathname:null;}catch{return null;}};
   const {open,send}=XMLHttpRequest.prototype;
-  XMLHttpRequest.prototype.open=function(method,target,...rest){this.previewLocal=local(target);return open.call(this,method,target,...rest);};
+  XMLHttpRequest.prototype.open=function(method,target,...rest){this.previewPath=localPath(target);return open.call(this,method,target,...rest);};
   XMLHttpRequest.prototype.send=function(body){
-    if(this.previewLocal){this.setRequestHeader('X-Preview-Scenario',scenario);this.addEventListener('loadend',()=>follow(this.getResponseHeader('X-Preview-Scenario')));}
+    if(this.previewPath){this.setRequestHeader('X-Preview-Scenario',scenario);this.addEventListener('loadend',()=>follow(this.getResponseHeader('X-Preview-Scenario')));}
+    if(this.previewPath==='/api/points/state') this.setRequestHeader('X-Preview-Locale',document.documentElement.lang);
     return send.call(this,body);
   };
   const nativeFetch=window.fetch;
   window.fetch=function(input,init){
-    if(!local(input instanceof Request?input.url:String(input)))return nativeFetch.call(this,input,init);
+    const pathname=localPath(input instanceof Request?input.url:String(input));
+    if(!pathname)return nativeFetch.call(this,input,init);
     const headers=new Headers(init?.headers??(input instanceof Request?input.headers:undefined));headers.set('X-Preview-Scenario',scenario);
+    if(pathname==='/api/points/state') headers.set('X-Preview-Locale',document.documentElement.lang);
     return nativeFetch.call(this,input,{...init,headers}).then(response=>{follow(response.headers.get('X-Preview-Scenario'));return response;});
   };
 }
