@@ -195,24 +195,48 @@ function demoOrders(products,state,now) {
   }).filter(order=>!accountDeletionWallet(state)||(['COMPLETED','CANCELLED','CLOSED','FAILED','REFUNDED'].includes(order.orderStatus)&&['PAID','FAILED','CANCELLED','REFUNDED','EXPIRED'].includes(order.paymentStatus)));
 }
 
+const demoRuleEvents={
+  upgrade:{
+    rewardNames:['焕新升级礼遇','Hardware Upgrade Perk','Ưu đãi đổi mới thiết bị'],
+    rules:{promotionActivityId:'demo-promo-0'},
+  },
+  invite:{
+    rewardNames:['好友同行设备礼','Invite-a-Friend Device Gift','Quà thiết bị khi mời bạn'],
+    rules:{targetInvites:5,windowDays:7,giftProductNo:'stellarbox-pro',giftQuantity:1},
+  },
+  weekend:{
+    rewardNames:['周末勤勉礼','Weekend Check-in Perk','Quà chuyên cần cuối tuần'],
+    rules:demoWeekendRules,
+  },
+  season:{
+    rewardNames:['金秋算力礼券','Autumn Compute Voucher','Phiếu ưu đãi công suất mùa thu'],
+    rules:{voucherId:'demo-season-voucher'},
+  },
+  welcome:{
+    rewardNames:['新手启程礼包','New Member Starter Pack','Gói quà khởi đầu cho thành viên mới'],
+    rules:{windowDays:7,minRank:5,rewardNex:100,streakSavers:1},
+  },
+};
+
 function demoEvents(locale,state,now) {
   if(state.dataState==='empty'||state.eventState==='empty') return [];
   const entries=[
-    ['upgrade','discount','设备升级礼','Device upgrade offer','Ưu đãi nâng cấp','AVAILABLE','ongoing',500,'/pages/store/store'],
-    ['invite','referral','邀请好友挑战','Invitation challenge','Thử thách mời bạn','JOINED','ongoing',200,'/pages/team/team'],
-    ['spin','wheel','每日幸运转盘','Daily lucky spin','Vòng quay mỗi ngày','AVAILABLE','ongoing',50,''],
-    ['weekend','boost','周末签到加成','Weekend check-in boost','Thưởng điểm danh cuối tuần','AVAILABLE','ongoing',0,'/pages/daily/daily'],
-    ['season','seasonal','秋季算力季','Autumn compute season','Mùa tính toán thu','AVAILABLE','upcoming',800,'/pages/events/events'],
-    ['welcome','onboarding','新用户成长礼','New member rewards','Quà thành viên mới','CLAIMABLE','ongoing',100,'/pages/missions/missions'],
+    ['upgrade','discount','设备升级礼','Device upgrade offer','Ưu đãi nâng cấp','AVAILABLE','ongoing','/pages/store/store'],
+    ['invite','referral','邀请好友挑战','Invitation challenge','Thử thách mời bạn','JOINED','ongoing','/pages/team/team'],
+    ['spin','wheel','每日幸运转盘','Daily lucky spin','Vòng quay mỗi ngày','AVAILABLE','ongoing',''],
+    ['weekend','boost','周末签到加成','Weekend check-in boost','Thưởng điểm danh cuối tuần','AVAILABLE','ongoing','/pages/daily/daily'],
+    ['season','seasonal','秋季算力季','Autumn compute season','Mùa tính toán thu','AVAILABLE','upcoming','/pages/events/events'],
+    ['welcome','onboarding','新用户成长礼','New member rewards','Quà thành viên mới','CLAIMABLE','ongoing','/pages/missions/missions'],
   ];
-  return entries.map(([code,kind,zh,en,vi,baseStatus,baseState,rewardAmount,href],i)=>{
+  return entries.map(([code,kind,zh,en,vi,baseStatus,baseState,href],i)=>{
     const mode=state.eventState, eventCode='demo-'+code;
     const eventState=['upcoming','ended'].includes(mode)?mode:mode==='mixed'?baseState:'ongoing';
     const requestedStatus=state.eventStatuses?.[eventCode] || (['available','joined','claimable','claimed'].includes(mode)?mode.toUpperCase():baseStatus);
     const weekend=code==='weekend';
     const userStatus=weekend&&['CLAIMABLE','CLAIMED'].includes(requestedStatus)?'JOINED':requestedStatus;
-    const rewardName=weekend?localized(locale,`签到奖励 × ${demoWeekendRules.multiplier}`,'Double check-in rewards',`Thưởng điểm danh × ${demoWeekendRules.multiplier}`):'UVT';
-    return {eventCode,kind,state:eventState,title:localized(locale,zh,en,vi),subtitle:localized(locale,'完成活动条件，查看进度并领取奖励。','Complete the activity goals and claim your reward.','Hoàn thành mục tiêu và nhận thưởng.'),rewardName,rewardType:weekend?'COMPOSITE':'UVT',rewardAmount,featured:i===0&&eventState==='ongoing',trackable:!weekend&&!['wheel','discount'].includes(kind),targetValue:weekend?1:5,progressValue:weekend?0:['CLAIMABLE','CLAIMED'].includes(userStatus)?5:userStatus==='JOINED'?2:0,userStatus,geo:'GLOBAL',href,startsAt:new Date(eventState==='upcoming'?now+day:now-3*day).toISOString(),endsAt:new Date(eventState==='ended'?now-day:now+7*day).toISOString()};
+    const wheel=kind==='wheel';
+    const rewardName=wheel?'UVT':localized(locale,...demoRuleEvents[code].rewardNames);
+    return {eventCode,kind,state:eventState,title:localized(locale,zh,en,vi),subtitle:localized(locale,'完成活动条件，查看进度并领取奖励。','Complete the activity goals and claim your reward.','Hoàn thành mục tiêu và nhận thưởng.'),rewardName,rewardType:wheel?'UVT':'COMPOSITE',rewardAmount:wheel?50:0,featured:i===0&&eventState==='ongoing',trackable:!weekend&&!['wheel','discount'].includes(kind),targetValue:weekend?1:5,progressValue:weekend?0:['CLAIMABLE','CLAIMED'].includes(userStatus)?5:userStatus==='JOINED'?2:0,userStatus,geo:'GLOBAL',href,startsAt:new Date(eventState==='upcoming'?now+day:now-3*day).toISOString(),endsAt:new Date(eventState==='ended'?now-day:now+7*day).toISOString()};
   });
 }
 
@@ -777,15 +801,33 @@ export function demoFixture(url,locale,state,request) {
     const [,id,action]=eventRoute,event=events.find(item=>item.eventCode===id);
     if(!event) return {};
     const weekend=id==='demo-weekend';
+    const rules=demoRuleEvents[id.slice('demo-'.length)]?.rules;
     if(action==='detail') {
       const eligible=event.state==='ongoing'&&(weekend||event.userStatus==='CLAIMABLE');
       const eligibilityReason=event.userStatus==='CLAIMED'?'CLAIMED':event.state==='upcoming'?'NOT_STARTED':event.state==='ended'?'ENDED':event.userStatus==='CLAIMABLE'?'READY':'IN_PROGRESS';
-      return {event,rules:weekend?demoWeekendRules:{description:event.subtitle,terms:localized(contentLocale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.')},enabled:true,eligible,eligibilityReason,
-        progressValue:event.progressValue,targetValue:event.targetValue,rewards:[],results:[],myRewardAmount:null,userStatus:event.userStatus,
+      const rewards=[];
+      if(rules?.rewardNex)rewards.push({type:'UVT',amount:rules.rewardNex});
+      if(rules?.streakSavers)rewards.push({type:'STREAK_SAVER',amount:0,quantity:rules.streakSavers});
+      if(rules?.giftProductNo)rewards.push({type:'DEVICE',amount:0,productNo:rules.giftProductNo,quantity:rules.giftQuantity});
+      return {event,rules:weekend?rules:{description:event.subtitle,terms:localized(contentLocale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.'),...rules},enabled:true,eligible,eligibilityReason,
+        progressValue:event.progressValue,targetValue:event.targetValue,rewards,results:[],myRewardAmount:null,userStatus:event.userStatus,
         ...(weekend?{claimKeys:['ONCE'],reminderSubscribed:!!state.reminders?.includes(id)}:{})};
     }
     if(action==='join'){state.eventStatuses||={};state.eventStatuses[id]='JOINED';return {eventId:id,status:'JOINED'};}
-    if(action==='claim'){if(weekend)refuse('EVENT_NOT_CLAIMABLE');state.eventStatuses||={};state.eventStatuses[id]='CLAIMED';return {eventId:id,rewardType:'UVT',rewardAmount:event.rewardAmount,badgeCode:null};}
+    if(action==='claim'){
+      if(event.kind==='wheel'){
+        state.eventStatuses||={};state.eventStatuses[id]='CLAIMED';
+        return {eventId:id,rewardType:event.rewardType,rewardAmount:event.rewardAmount,badgeCode:null};
+      }
+      if(!rules.rewardNex&&!rules.giftProductNo)refuse('EVENT_NOT_CLAIMABLE');
+      if(event.userStatus==='CLAIMED')refuse('EVENT_ALREADY_CLAIMED');
+      if(event.userStatus!=='CLAIMABLE'||event.state==='upcoming')refuse('EVENT_NOT_CLAIMABLE');
+      const receipt=rules.rewardNex
+        ? {rewardType:'UVT',rewardAmount:rules.rewardNex,streakSavers:rules.streakSavers}
+        : {rewardType:'DEVICE',quantity:rules.giftQuantity,productNo:rules.giftProductNo,receiptId:'DEMO-INVITE-GIFT',instances:['DEMO-INVITE-DEVICE']};
+      state.eventStatuses||={};state.eventStatuses[id]='CLAIMED';
+      return {eventId:id,rewardType:receipt.rewardType,rewardAmount:receipt.rewardAmount??receipt.quantity,receipt,badgeCode:null};
+    }
     if(action==='reminder'){state.reminders||=[];state.reminders.push(id);return {eventId:id,status:'SUBSCRIBED'};}
     const segments=[5,10,20,50,100,200].map((amount,index)=>({tierId:'demo-tier-'+index,rewardType:'UVT',rewardAmount:amount,rewardName:amount+' UVT',realOutflow:false,displayOrder:index}));
     if(action==='spin/state') return {eventCode:id,eventId:id,serverDate:iso.slice(0,10),nextResetAtUtc:new Date(now+day).toISOString(),freeAvailable:!state.spun,bonusTickets:0,availableSpins:state.spun?0:1,segments,history:state.spinHistory||[],source:'nx_event_spin'};
