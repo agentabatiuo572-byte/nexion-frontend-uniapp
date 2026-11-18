@@ -16,30 +16,17 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
-import { demoH4Account, demoH4Credits, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers } from './prototype-demo-events.mjs';
+import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
+import { demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt } from './prototype-demo-wallet.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
-const walletBusinessTimeZone='Asia/Shanghai';
-const walletBusinessDate=new Intl.DateTimeFormat('en-CA',{
-  timeZone:walletBusinessTimeZone,year:'numeric',month:'2-digit',day:'2-digit',
-});
-function walletBillStatus(status) {
-  switch(status.trim().toUpperCase()){
-    case 'SUCCESS': case 'POSTED': case 'COMPLETED': case 'CONFIRMED': return 'SUCCESS';
-    case 'PENDING': return 'PENDING';
-    case 'FAILED': case 'REJECTED': case 'CANCELLED': return 'FAILED';
-    default: throw new Error('WALLET_LEDGER_STATUS_INVALID');
-  }
-}
 const demoStartedAt = Date.now();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
 const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(state.voucherClaimed||['claimed','grace'].includes(state.benefitState))?Math.min(50,total):0;
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
-const demoH4CreditTotal=(state,now)=>demoH4Credits(state,now).reduce((total,row)=>total+(row.includedInBalance?0:row.amount),0);
-const demoWalletNex=(state,now)=>(accountDeletionWallet(state)?.nexAvailable??state.walletNexBalance??(state.dataState==='empty'?0:1280))+demoH4CreditTotal(state,now);
 export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -249,6 +236,7 @@ function decayedS1PurchasedAt() {
   return purchased.getTime();
 }
 export function initializeDemoPreviewAccount(state,now=Date.now()) {
+  state.previewFactsAt??=now;
   // The activated sample order is placed three minutes before the seed device.
   const device41=state.fleetSeed?.find(device=>device.id===41);
   const earliestDeviceOrderAt=Math.min(decayedS1PurchasedAt(),device41?.activatedAt??Infinity)-samplePaidAfter;
@@ -354,6 +342,7 @@ function demoLiveActivity(product,now) {
 
 /** Mutable state belongs only to the loopback demonstration server. */
 export function demoFixture(url,locale,state,request) {
+  state.previewFactsAt??=demoStartedAt;
   const now=Date.now(),iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin,locale);
@@ -454,7 +443,9 @@ export function demoFixture(url,locale,state,request) {
   const rankPolicy=rankPolicyDemo(url,locale);if(rankPolicy!==undefined)return rankPolicy;
   const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request));if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
-  const auxiliary=auxiliaryDemo(url,locale,state,request);if(auxiliary!==undefined)return auxiliary;
+  const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
+  const walletBills=()=>demoWalletBills(state,now,state.previewFactsAt);
+  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
   const secondary=secondaryDemo(url,state,request);
@@ -471,11 +462,28 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/team/rank') {
     const data=structuredClone(base());
     const {rank}=demoH4Account(state);
-    const directRefs=demoH4TeamMembers(state,now)
-      .filter(member=>member.layer===1&&member.lifetimeComputePoints>=demoV1SelfComputePoints).length;
-    return {...data,rankCode:'V'+rank,progress:{...data.progress,directRefs,selfComputePoints:empty?0:state.highestRank?64000:1280,teamComputePoints:empty?0:state.highestRank?3200000:12800}};
+    const members=demoH4TeamMembers(state,now);
+    const directRefs=members.filter(member=>member.layer===1&&member.lifetimeComputePoints>=demoV1SelfComputePoints).length;
+    const teamComputePoints=members.reduce((sum,member)=>sum+member.lifetimeComputePoints,0);
+    return {...data,rankCode:'V'+rank,progress:{...data.progress,directRefs,selfComputePoints:empty?0:state.highestRank?64000:1280,teamComputePoints:!empty&&state.highestRank?3200000:teamComputePoints}};
   }
-  if(pathname==='/api/team/binary')return {...authority,source:'server',runId:null,asOfDate:iso.slice(0,10),trackA:empty?0:2800,trackB:empty?0:2400,trackAMembers:empty?0:4,trackBMembers:empty?0:4,autoPlacedMembers:0,matchRate:.1,threshold:1000,dailyCap:5000,periodCap:150000,estimatedAmountUsdt:empty?0:240,settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason:empty?'BOTH_TRACKS_BELOW_THRESHOLD':'',recentMatches:empty?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'unlocked',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
+  if(pathname==='/api/team/binary'){
+    const direct=demoH4TeamMembers(state,now).filter(member=>member.layer===1);
+    const trackAMembers=direct.filter(member=>member.leg==='A').length;
+    const trackBMembers=direct.filter(member=>member.leg==='B').length;
+    const asOfDate=demoTeamBusinessDate(now);
+    const monthEnd=new Date(Date.UTC(Number(asOfDate.slice(0,4)),Number(asOfDate.slice(5,7)),0)).getUTCDate();
+    const trackA=empty?0:2800,trackB=empty?0:2400,threshold=1000,matchRate=.1,dailyCap=5000;
+    const periodCap=dailyCap*monthEnd;
+    let blockedReason='';
+    if(trackAMembers+trackBMembers!==direct.length||!trackAMembers||!trackBMembers)blockedReason='BINARY_LEG_ASSIGNMENT_INCOMPLETE';
+    else if(Math.min(trackA,trackB)<threshold)blockedReason='BINARY_THRESHOLD_NOT_MET';
+    else if(Number(asOfDate.slice(8))!==monthEnd)blockedReason='F3_SETTLEMENT_NOT_DUE';
+    return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,autoPlacedMembers:0,
+      matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:blockedReason?0:Math.min(periodCap,Math.min(trackA,trackB)*matchRate),
+      settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
+      recentMatches:empty?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'UNLOCKED',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
+  }
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
   if(pathname==='/auth/users/oauth/provider/linked')return ['GOOGLE'];
   if(pathname==='/api/store/catalog') return {...authority,source:'nx_product',revision:null,products:empty?[]:products};
@@ -483,7 +491,15 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/store/purchase-eligibility') return {...authority,runId:null,productNo:url.searchParams.get('productNo'),eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',policies:[{policy:'E1',eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',mode:'ALL',conditions:state.catalogState==='restricted'?[{kind:'rank',required:3,current:2,gap:1,met:false}]:[]},{policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]}],evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
   if(pathname==='/api/app/team/quota'){
     const direct=demoH4TeamMembers(state,now).filter(member=>member.layer===1);
-    return {...authority,source:'server',generatedAt:iso,facts:{rank:demoH4Account(state).rank,directRefs:direct.filter(member=>member.lifetimeComputePoints>=demoV1SelfComputePoints).length,directInvites:direct.length,activeDirect:direct.filter(member=>member.status==='ACTIVE').length,teamComputePoints:12800},tiers:products.filter(p=>p.productType==='DEVICE').map(p=>({productId:p.id,quotaCode:p.id.toUpperCase(),name:p.name,price:p.price,monthlyStock:60,soldThisMonth:p.sold,unlockKind:'ALL',conditions:[{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:empty?0:12800},...(state.catalogState==='restricted'?[{kind:'rank',required:3,current:2}]:[])],perks:[],available:p.available&&state.catalogState!=='restricted'}))};
+    const members=demoTeamNetworkMembers(state,now);
+    const teamComputePoints=members.reduce((sum,member)=>sum+member.monthComputePoints,0);
+    const required=state.catalogState==='restricted'?20000:6400;
+    return {...authority,source:'server',generatedAt:iso,facts:{rank:demoH4Account(state).rank,
+      directRefs:direct.filter(member=>member.lifetimeComputePoints>=demoV1SelfComputePoints).length,
+      directInvites:direct.length,activeDirect:members.filter(member=>member.layer===1).length,teamComputePoints},
+      tiers:products.filter(p=>p.productType==='DEVICE').map(p=>({productId:p.id,quotaCode:p.id.toUpperCase(),name:p.name,
+        price:p.price,monthlyStock:60,soldThisMonth:p.sold,unlockKind:'ALL',conditions:[{kind:'teamComputePoints',required,current:teamComputePoints}],
+        perks:[],available:p.available}))};
   }
   const tradeinCuts=[25,50,75,100],tradeinRates=[75,60,45,30,15];
   if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'OPEN',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:7,source:'server'};
@@ -731,7 +747,15 @@ export function demoFixture(url,locale,state,request) {
     return data;
   }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
-  if(milestoneClaim){const id=Number(milestoneClaim[1]),[milestoneDay,rewardType,rewardAmount,badgeCode]=demoStreakMilestones[id-1];state.milestoneClaims||=[];state.milestoneClaims.push(id);return {...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};}
+  if(milestoneClaim&&request.method()==='POST'){
+    const id=Number(milestoneClaim[1]);
+    if(id<=0)throw Object.assign(new Error('MILESTONE_ID_REQUIRED'),{status:422});
+    const milestone=read('/api/points/state').dailyMilestones?.find(row=>row.milestoneId===id);
+    if(milestone?.status!=='CLAIMABLE')refuse('DAILY_MILESTONE_NOT_CLAIMABLE');
+    const {milestoneDay,rewardType,rewardAmount,badgeCode}=milestone;
+    (state.milestoneClaims??=[]).push(id);
+    return {...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};
+  }
   const powerUpActivate=pathname.match(/^\/api\/points\/power-ups\/([1-4])\/activate$/);
   if(powerUpActivate){const id=Number(powerUpActivate[1]);state.powerUps||=[];state.powerUps.push(id);return {...authority,powerUpId:id,powerUpCode:['ROYALTY_BOOST','STREAK_BADGE','CHECKIN_BOOST','GENESIS_ALLOWLIST'][id-1],badgeCode:null,status:'ACTIVATED'};}
   if(pathname==='/api/points/sign-in'&&(state.saverUsed||state.streakState!=='normal')){state.checkedIn=true;return {...authority,checkInDate:iso.slice(0,10),baseNex:1,rewardNex:1,streakBonusNex:0,multiplier:1,streakDays:state.saverUsed?8:1};}
@@ -739,48 +763,23 @@ export function demoFixture(url,locale,state,request) {
   if(pathname==='/api/points/streak-saver/use'){if(state.streakState!=='broken'||state.saverUsed||state.checkedIn)throw new Error('No interrupted streak to restore');state.saverUsed=true;return {...authority,restoredStreak:7,streakSavers:demoH4Savers(state),effectiveLastCheckInDate:new Date(now-day).toISOString().slice(0,10)};}
   if(pathname==='/api/earnings/milestones/evaluate'){const fired=state.earningClaimed?[]:[{milestoneId:'demo-earning-1',thresholdUsd:100,rewardNex:100,lifetimeEarningsUsd:128.5}];state.earningClaimed=true;return {...authority,fired,count:fired.length};}
   if(pathname==='/api/app/security') return {twoFactorEnabled:true,passwordChangedAt:iso,sessions:[{id:'demo-session',deviceName:'iPhone · Safari',ipMasked:'192.0.2.*',lastActiveAt:iso,current:true}],nextCursor:null};
-  if(pathname==='/api/app/referral-rewards') return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,invitedCount:12,pendingCount:2,settledCount:10,lifetimeInviterNex:100,walletNexAvailable:demoWalletNex(state,now),limit:10,source:'ledger',sourceEnvironment:'PRODUCTION',runId:null,factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso,recentRewards:empty?[]:[{settlementNo:'DEMO-REF-1',amountNex:10,ledgerStatus:'SUCCESS',balanceAfter:1280,releaseBucket:'withdrawable',sourceEnvironment:'PRODUCTION',settledAt:iso}]};
+  if(pathname==='/api/app/referral-rewards') return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,invitedCount:empty?0:12,pendingCount:empty?0:2,settledCount:empty?0:10,lifetimeInviterNex:empty?0:100,walletNexAvailable:demoWalletNex(state,now),limit:10,source:'ledger',sourceEnvironment:'PRODUCTION',runId:null,factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso,recentRewards:empty?[]:[{settlementNo:'DEMO-REF-1',amountNex:10,ledgerStatus:'SUCCESS',balanceAfter:1280,releaseBucket:'withdrawable',sourceEnvironment:'PRODUCTION',settledAt:iso}]};
   if(pathname==='/api/app/team/network') {
-    const members=demoH4TeamMembers(state,now);
+    const members=demoTeamNetworkMembers(state,now);
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
   }
   if(pathname==='/api/devices/earnings') {
     const facts=demoFleetFacts(url,locale,state);
     const active=facts.devices.filter(device=>device.activatedAt!==null);
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
-    const wallet=accountDeletionWallet(state);
-    const data=base();data.walletUsdt=wallet?.usdtAvailable??state.walletBalance??52800.64;data.walletNex=demoWalletNex(state,now);data.userJoinedAt=demoH4Account(state).createdAt;
+    const data=base();data.walletUsdt=demoWalletUsdt(state);data.walletNex=demoWalletNex(state,now);data.userJoinedAt=demoH4Account(state).createdAt;
     data.dailyUsdt=active.reduce((sum,device)=>sum+device.dailyUsdt,0);data.dailyNex=active.reduce((sum,device)=>sum+device.dailyNex,0);
     Object.assign(data,facts);
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
-    const bills=empty?[]:[['COMPUTE_EARNING','UVT','IN',15,'earn'],['REFERRAL_REWARD','UVT','IN',10,'refer'],['DEVICE_PURCHASE','USDT','OUT',1299,'purchase'],['CHECK_IN','UVT','IN',5,'bonus'],['COMPUTE_EARNING','USDT','IN',128.5,'earn'],['COMPUTE_EARNING','USDT','IN',0.00032,'earn']].map(([bizType,asset,direction,amount,category],i)=>({id:'demo-bill-'+i,bizNo:'DEMO-'+(1000+i),bizType,asset,direction,amount,balanceAfter:asset==='UVT'?1280:5280.64,status:'SUCCESS',remark:'',createdAt:new Date(now-i*day).toISOString(),category}));
-    const credits=demoH4Credits(state,now),total=credits.reduce((sum,credit)=>sum+credit.amount,0);
-    const baseNexBalance=demoWalletNex(state,now)-total;
-    if(credits.length)for(const bill of bills){
-      if(bill.asset==='UVT')bill.balanceAfter=baseNexBalance+credits
-        .filter(credit=>credit.at<=Date.parse(bill.createdAt)).reduce((sum,credit)=>sum+credit.amount,0);
-    }
-    let balance=baseNexBalance;
-    for(const {id,type,status,amount,at} of credits){
-      balance+=amount;
-      bills.unshift({id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,balanceAfter:balance,
-        status:walletBillStatus(status),remark:'',createdAt:new Date(at).toISOString(),category:'bonus'});
-    }
-    bills.sort((left,right)=>right.createdAt.localeCompare(left.createdAt));
-    if(pathname.endsWith('/summary')){
-      const today=walletBusinessDate.format(now),month=today.slice(0,7);
-      const todayNexEarn=bills.filter(bill=>bill.asset==='UVT'&&walletBusinessDate.format(new Date(bill.createdAt))===today)
-        .reduce((sum,bill)=>sum+(bill.direction==='IN'?bill.amount:-bill.amount),0);
-      const latestRewardAt=bills.find(bill=>bill.direction==='IN'&&['bonus','refer','achievement'].includes(bill.category))?.createdAt??null;
-      return {source:'server',sourceEnvironment:'PRODUCTION',timeZone:walletBusinessTimeZone,asOf:iso,rewardsUsdt:empty?0:128.5,
-        rewardsNex:empty?0:150+total,settledRewardsNex:empty?0:140+total,withdrawalOffsetNexSpent:empty?0:10,latestRewardAt,todayNexEarn,
-        pendingNex:empty?0:10,monthBillCount:bills.filter(bill=>walletBusinessDate.format(new Date(bill.createdAt)).slice(0,7)===month).length,
-        recentNexBills:bills.filter(bill=>bill.asset==='UVT').slice(0,10)};
-    }
-    const filtered=bills.filter(bill=>['asset','direction'].every(key=>!url.searchParams.get(key)||url.searchParams.get(key)===bill[key])&&(url.searchParams.get('category')!=='REWARD'||bill.direction==='IN'));
-    return {source:'server',sourceEnvironment:'PRODUCTION',bills:filtered,page:1,pageSize:20,total:filtered.length,nextPage:null,nextCursor:null};
+    const bills=walletBills();
+    return pathname.endsWith('/summary')?demoWalletBillSummary(bills,now):demoWalletBillList(bills,url.searchParams);
   }
   if(pathname==='/api/vouchers') {
     const data=structuredClone(reviewFixture(url,locale,{...state,offers:!empty&&!state.voucherUsed&&state.benefitState!=='finished'},request));

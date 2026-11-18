@@ -1,5 +1,7 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet } from './prototype-demo-account.mjs';
+import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
+import { demoCommissionEvents, demoSettledTasks } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 // The panel's terminal result applies to every withdrawal read, not just the bank detail page.
@@ -52,17 +54,29 @@ export function secondaryDemo(url,state,request){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
-    const items=empty?[]:['IG','LL','VG'].map((taskClass,i)=>({...proof,receiptNo:'DEMO-RECEIPT-'+(i+1),taskNo:'DEMO-TASK-'+(i+1),taskClass,model:['SDXL','Llama 3.1','Video generation'][i],client:'Demo Studio',rewardUsdt:[2.34,8.5,5.4][i],rewardNex:1,earningStatus:'SETTLED',completedAt:now-(i+1)*3600000,startedAt:now-(i+1)*3600000-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
+    const items=empty||accountDeletionWallet(state)?[]:demoSettledTasks(state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:['SDXL','Llama 3.1','Video generation'][i],client:'Demo Studio',rewardUsdt:task.amount,rewardNex:1,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts')return {...proof,items,nextOffset:null,nextCursor:null,total:items.length};
     return items.find(r=>r.receiptNo===p.split('/').pop());
   }
-  if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},assets:{USDT:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},UVT:{withdrawable:accountDeletionWallet(state)?.nexAvailable??(empty?0:1280),pending_review:accountDeletionWallet(state)||empty?0:10,bonus_locked:0}},releaseMode:'attest_or_manual',attestedOnlineSeconds:3600,requiredAttestationSeconds:86400,clusterRestricted:false};
+  if(p==='/api/earnings/release-status')return {serverCanonical:true,buckets:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},assets:{USDT:{withdrawable:facts.released,pending_review:facts.pendingReview,bonus_locked:facts.bonusLocked},UVT:{withdrawable:accountDeletionWallet(state)?.nexAvailable??(empty?0:1280),pending_review:accountDeletionWallet(state)||empty?0:10,bonus_locked:0}},releaseMode:'manual_only',attestedOnlineSeconds:0,requiredAttestationSeconds:0,clusterRestricted:false};
   if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
   if(p==='/api/app/team/insights/commissions'){
     const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other'];
-    const events=empty?[]:['unlocked','cooling','withdrawn','frozen'].map((status,i)=>({id:'demo-commission-'+i,kind:kinds[i],sourceUserName:['Maya','Linh','Sam','Rin'][i],layer:i===0?1:2,orderId:'DEMO-ORDER-004',orderAmountUSD:1299,amountUSDT:25*(i+1),amountNEX:10,ts:now-i*day,unlockAt:status==='cooling'?now+day:now-day,status}));
-    const byKind=Object.fromEntries(kinds.map(kind=>{const rows=events.filter(e=>e.kind===kind);return [kind,{usdt:rows.reduce((a,e)=>a+e.amountUSDT,0),nex:rows.reduce((a,e)=>a+e.amountNEX,0),count:rows.length}]}));
-    return {...proof,...paginate(events),generatedAt:iso,snapshotAt:iso,aggregate:{totalUSDT:empty?0:250,totalNEX:empty?0:40,directUSDT:empty?0:75,extendedUSDT:empty?0:175,contributorCount:events.length,monthUSDT:empty?0:250,monthNEX:empty?0:40,todayUSDT:empty?0:25,unlockedUSDT:empty?0:25,unlockedNEX:empty?0:10,coolingUSDT:empty?0:50,eventCount:events.length,nextUnlockAt:empty?null:now+day,byKind}};
+    const events=empty?[]:demoCommissionEvents(state.previewFactsAt??now);
+    const total=(rows,asset='amountUSDT')=>rows.reduce((sum,row)=>sum+row[asset],0);
+    const today=demoTeamBusinessDate(now),month=today.slice(0,7);
+    const thisMonth=events.filter(event=>demoTeamBusinessDate(event.ts).slice(0,7)===month);
+    const unlocked=events.filter(event=>event.status==='unlocked'),cooling=events.filter(event=>event.status==='cooling');
+    const totalUSDT=total(events),directUSDT=total(events.filter(event=>event.layer===1));
+    const byKind=Object.fromEntries(kinds.map(kind=>{
+      const rows=events.filter(event=>event.kind===kind);
+      return [kind,{usdt:total(rows),nex:total(rows,'amountNEX'),count:rows.length}];
+    }));
+    return {...proof,...paginate(events),generatedAt:iso,snapshotAt:iso,aggregate:{totalUSDT,totalNEX:total(events,'amountNEX'),
+      directUSDT,extendedUSDT:totalUSDT-directUSDT,contributorCount:events.length,monthUSDT:total(thisMonth),
+      monthNEX:total(thisMonth,'amountNEX'),todayUSDT:total(events.filter(event=>demoTeamBusinessDate(event.ts)===today)),
+      unlockedUSDT:total(unlocked),unlockedNEX:total(unlocked,'amountNEX'),coolingUSDT:total(cooling),eventCount:events.length,
+      nextUnlockAt:cooling[0]?.unlockAt??null,byKind}};
   }
   if(p==='/api/app/team/insights/leaderboard'){
     const period=url.searchParams.get('period')||'month';
