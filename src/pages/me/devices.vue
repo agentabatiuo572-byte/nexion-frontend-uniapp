@@ -214,7 +214,10 @@ import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/
 const t = useT();
 const app = useApp();
 const trial = useFreeTrial();
-onShow(() => { void trial.refreshVisible(); });
+onShow(() => {
+  void trial.refreshVisible();
+  if (remoteApiEnabled) void app.refreshRemoteFleet(undefined, { coalesce: true });
+});
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
