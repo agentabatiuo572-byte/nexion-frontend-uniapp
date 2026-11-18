@@ -9,7 +9,7 @@ const source={source:'server',sourceEnvironment:'PRODUCTION'};
 const money=value=>Number(value.toFixed(6));
 const signed=row=>row.direction==='IN'?row.amount:-row.amount;
 const settledBill=row=>row.status==='SUCCESS';
-const reward=row=>row.direction==='IN'&&row.amount>0&&['bonus','refer','achievement'].includes(row.category);
+const reward=row=>row.direction==='IN'&&row.amount>0&&!(row.bizType==='TEAM_COMMISSION'&&row.status==='CANCELLED')&&['bonus','refer','achievement'].includes(row.category);
 
 export function demoSettledTasks(state,at) {
   if(!demoHasEarningsHistory(state))return [];
@@ -105,10 +105,12 @@ export function postDemoWalletEntries(state,...entries) {
   for(const entry of entries)balances[entry.asset]=money(balances[entry.asset]+signed(entry));
   if(entries.some(entry=>entry.asset==='USDT'))state.walletBalance=balances.USDT;
   if(entries.some(entry=>entry.asset==='UVT'))state.walletNexBalance=balances.UVT;
-  const uvt=entries.some(entry=>entry.asset==='UVT')?demoWalletNex(state,entries[0].at):balances.UVT;
-  for(const entry of entries)(state.walletMovements??=[]).push({
-    id:entry.bizNo,status:'SUCCESS',remark:'',...entry,balanceAfter:entry.asset==='USDT'?balances.USDT:uvt,
-  });
+  const rows=entries.map(entry=>({id:entry.bizNo,status:'SUCCESS',remark:'',...entry,balanceAfter:balances[entry.asset]}));
+  (state.walletMovements??=[]).push(...rows);
+  if(entries.some(entry=>entry.asset==='UVT')){
+    const uvt=demoWalletNex(state,entries[0].at);
+    for(const row of rows)if(row.asset==='UVT')row.balanceAfter=uvt;
+  }
   return balances;
 }
 
@@ -117,7 +119,18 @@ function savedNexBalance(state) {
 }
 
 export function demoWalletNex(state,now) {
-  return money(demoH4Credits(state,now).reduce((balance,row)=>balance+(row.includedInBalance?0:row.amount),savedNexBalance(state)));
+  const posted=new Set(state.walletMovements?.map(row=>row.bizNo));
+  return money(demoH4Credits(state,now).reduce((balance,row)=>
+    balance+(row.includedInBalance||posted.has(row.id)?0:row.amount),savedNexBalance(state)));
+}
+
+export function postDemoActivityRewards(state,now) {
+  const posted=new Set(state.walletMovements?.map(row=>row.bizNo));
+  for(const credit of demoH4Credits(state,now)){
+    if(credit.includedInBalance||posted.has(credit.id))continue;
+    postDemoWalletEntries(state,{bizType:credit.type,bizNo:credit.id,asset:'UVT',direction:'IN',
+      amount:credit.amount,at:credit.at,category:'bonus'});
+  }
 }
 
 export const demoHasOpeningMilestone=state=>demoHasEarningsHistory(state)&&state.streakState==='normal';
@@ -152,7 +165,9 @@ export function demoStreakFacts(state,now) {
 
 export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,seedAt)) {
   initializeDemoWalletCheckpoint(state);
-  const commissions=demoCommissionEvents(state,seedAt).filter(event=>['unlocked','withdrawn'].includes(event.status));
+  const events=demoCommissionEvents(state,seedAt);
+  const commissions=events.filter(event=>['unlocked','withdrawn'].includes(event.status));
+  const cooling=events.find(event=>event.kind==='direct_device_earning');
   const seeds=!demoHasEarningsHistory(state)?[]:[
     ['COMPUTE_EARNING','UVT','IN',15,'earn',seedAt],
     ['REFERRAL_REWARD','UVT','IN',10,'bonus',seedAt-day,'SUCCESS',
@@ -161,7 +176,8 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
     ['DAILY_CHECK_IN','UVT','IN',5,'bonus',seedAt-3*day],
     ['COMPUTE_EARNING','USDT','IN',128.5,'earn',seedAt-4*day],
     ['COMPUTE_EARNING','USDT','IN',.00032,'earn',seedAt-5*day],
-    ['TEAM_COMMISSION','UVT','IN',10,'refer',seedAt-day,'PENDING'],
+    ['TEAM_COMMISSION','UVT','IN',cooling.amountNEX,'refer',cooling.ts,'PENDING',
+      state.walletLegacySeed?undefined:cooling.id+'-UVT-PENDING'],
     ...(demoHasOpeningMilestone(state)&&!state.walletLegacySeed?[['DAILY_MILESTONE','UVT','IN',5,'achievement',
       (state.streakSeedAt??seedAt)-10*day,'SUCCESS','DAILY-MS:900001:1']]:[]),
     ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
@@ -169,12 +185,14 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
       .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-${asset}-RELEASE`])),
     ...tasks.filter(task=>task.nex>0&&!task.deliveryCycle).map(task=>
       ['COMPUTE_TASK_REWARD','UVT','IN',task.nex,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
+    ...(!state.walletLegacySeed?[['TEAM_COMMISSION','USDT','IN',cooling.amountUSDT,'refer',cooling.ts,'PENDING',
+      cooling.id+'-USDT-PENDING']]:[]),
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo],index)=>({
     id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
   const movements=state.walletMovements??[];
   const posted=new Set(movements.map(row=>row.bizNo));
-  const credits=demoH4Credits(state,now).map(({id,type,amount,at,includedInBalance})=>({
+  const credits=demoH4Credits(state,now).filter(row=>!posted.has(row.id)).map(({id,type,amount,at,includedInBalance})=>({
     id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
   for(const {at,result} of state.milestoneClaimReceipts??[]){
@@ -264,8 +282,22 @@ export function demoWalletBillList(bills,params) {
   const filtered=bills.filter(row=>(!asset||row.asset===asset)&&(!direction||row.direction===direction&&row.amount>0)
     &&(category!=='REWARD'||reward(row)));
   const page=Number(params.get('page')??1),pageSize=Number(params.get('pageSize')??20);
-  return {...source,bills:filtered.slice((page-1)*pageSize,page*pageSize),page,pageSize,total:filtered.length,
-    nextPage:filtered.length>page*pageSize?page+1:null,nextCursor:null};
+  if(!Number.isSafeInteger(page)||page<1||!Number.isSafeInteger(pageSize)||pageSize<1||pageSize>100
+    ||(page-1)*pageSize>2147483647){
+    throw Object.assign(new Error('WALLET_BILLS_PAGE_INVALID'),{status:400});
+  }
+  const cursor=params.get('cursor');
+  let start=(page-1)*pageSize;
+  if(cursor==='start')start=0;
+  else if(cursor!==null){
+    const boundary=filtered.findIndex(row=>Buffer.from(row.id).toString('base64url')===cursor);
+    if(boundary===-1)throw Object.assign(new Error('WALLET_BILLS_CURSOR_INVALID'),{status:400});
+    start=boundary+1;
+  }
+  const pageRows=filtered.slice(start,start+pageSize);
+  const more=start+pageSize<filtered.length;
+  return {...source,bills:pageRows,page,pageSize,total:filtered.length,nextPage:more?page+1:null,
+    nextCursor:cursor!==null&&more?Buffer.from(pageRows.at(-1).id).toString('base64url'):null};
 }
 
 export function demoLifetimeEarningsUsdt(bills) {

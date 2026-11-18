@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoFixture,demoOrderFitsCapacity,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoFixture,demoOrderFitsCapacity,demoProducts,demoTimedOutOrder,paymentWindow,requireDemoPurchase} from './prototype-demo-data.mjs';
 import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
 
 const base = '/api/app/purchase-payment';
@@ -44,7 +44,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!order) return null;
       (state.createdOrders ||= []).push(order);
     }
-    if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: intent.paidAt, activatedAt: Date.now()});
+    if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: intent.paidAt, activatedAt: Date.now(), quotaUsedAt: Date.now()});
     else Object.assign(order, demoTimedOutOrder);
     return order;
   }
@@ -113,6 +113,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (!demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
       order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity})), intent.orderNo))
       return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CAPACITY_REPLACEMENT_REQUIRED'});
+    try {
+      requireDemoPurchase(state,demoProducts(state,intent.origin,locale()),
+        order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),now,true);
+    } catch (error) {
+      if(error.status!==409&&error.status!==404)throw error;
+      return Object.assign(intent,{status:'MANUAL_REVIEW',reason:error.message});
+    }
     settle(intent.orderNo, 'activated', intent);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
       ...(order?.promotionQuoteId ? order : {}),
@@ -153,6 +160,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       // one has already been closed by the deadline task, so it is not payable either.
       if (body.kind === 'ORDER_PAY' && !order) return {status: 404, message: 'ORDER_NOT_FOUND', data: null};
       if (body.kind === 'ORDER_PAY' && (order.paymentStatus !== 'PENDING' || order.orderStatus !== 'PENDING_PAYMENT')) return {status: 409, message: 'ORDER_NOT_PAYABLE', data: null};
+      if(body.kind==='ORDER_PAY'){
+        requireDemoPurchase(state,demoProducts(state,url.origin,locale()),
+          order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),Date.now());
+      }
       if (!commandKinds[body.kind] || (body.kind === 'TRIAL_CONVERT' ? !body.payload?.productNo : body.kind !== 'ORDER_PAY' && !body.payload?.targetProductNo)) return {status: 409, message: 'PURCHASE_PAYMENT_PRICING_CHANGED', data: null};
       const bank = body.paymentMethod === 'HDPAY_BANK', erc20 = body.paymentMethod === 'CREGIS_USDT_ERC20';
       const trial = body.kind === 'TRIAL_CONVERT'

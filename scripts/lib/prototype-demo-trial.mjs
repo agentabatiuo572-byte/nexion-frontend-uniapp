@@ -10,7 +10,7 @@ const min=(a,b)=>a<b?a:b,max=(a,b)=>a>b?a:b;
 const capped=(amount,cap)=>String(cap??'').trim()===''?amount:min(amount,units(cap));
 const day=86400000,proof={sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
-export function trialDemo(url,locale,state,request,capacityFull,products){
+export function trialDemo(url,locale,state,request,capacityFull,products,requirePurchase){
   if(!url.pathname.startsWith('/api/trial/'))return undefined;
   const now=Date.now(),mode=state.trialState||'follow';
   const data=structuredClone(fixture(new URL('/api/trial/state',url.origin),locale,{offers:true},request));
@@ -136,6 +136,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products){
     if((units(amount)+5000n)/10000n>units(expected,2))refuse('TRIAL_AMOUNT_MISMATCH');
     if(body.quoteVersion&&body.quoteVersion!==quote.quoteVersion)refuse('TRIAL_QUOTE_CHANGED');
     state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
+    requirePurchase(body.productNo);
     if(!paid&&demoWalletUsdt(state)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
     const orderNo='TRC-DEMO'+now;
     if(!paid&&amount>0)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRIAL_CHARGE',
@@ -144,7 +145,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products){
       asset:'USDT',direction:'IN',amount:quote.remainderUsdt,at:now,category:'bonus'});
     if(quote.rewardNex>0)postDemoWalletEntries(state,{bizNo:orderNo+':NEX',bizType:'TRIAL_BONUS',
       asset:'UVT',direction:'IN',amount:quote.rewardNex,at:now,category:'bonus'});
-    state.createdOrders??=[];state.createdOrders.unshift({...conversionOrder(orderNo,now,quote),...(paid&&{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt})});state.trialOrderNo=orderNo;
+    state.createdOrders??=[];state.createdOrders.unshift({...conversionOrder(orderNo,now,quote),quotaUsedAt:now,...(paid&&{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt})});state.trialOrderNo=orderNo;
     Object.assign(row,{state:'REDEEMED',finishedAt:now,version:(row.version||1)+1});
     const source='nx_trial_claim + nx_order + nx_order_item';
     return remember({...proof,orderNo,productNo:cfg.trialProductId,amountUsdt:amount,discountUsdt:number(units(current.priceUsdt)-units(amount)),paymentStatus:'PAID',orderStatus:'PAID',

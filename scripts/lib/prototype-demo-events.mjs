@@ -104,35 +104,45 @@ export function demoH4TeamMembers(state,now) {
   const sampleAt=state.previewFactsAt??now;
   const month=demoTeamBusinessDate(now).slice(0,7);
   const members=[];
-  for(const [i,name] of ['Maya','Linh','Sam','Rin','Jo','Noah','Mina','Leo'].entries()){
+  const names=['Maya','Linh','Sam','Rin','Jo','Noah','Mina','Leo'];
+  if(state.highestRank)names.push('Ari','Binh','Chau','Dan','Eli');
+  const currentCatalog=['available','soldout'].includes(state.catalogState)&&(!state.walletLegacySeed||state.catalogPresetAt!=null);
+  for(const [i,name] of names.entries()){
     const parent=members[[null,null,null,1,0,1,4,5][i]];
     const joinedAt=createdAt+(i+2)*day;
-    // Both point fields come from the member's paid self-purchases. The older purchase still counts for rank.
-    const points=[160,240,320,360,440,480,560,640][i];
-    const orders=[{paidAt:joinedAt,points:3*points},{paidAt:sampleAt,points}];
-    members.push({id:String(100+i),name,avatarUrl:null,vRank:i%4,layer:parent?parent.layer+1:1,
-      sponsorUserId:parent?.id??'900001',leg:parent?.leg??(i%2?'A':'B'),joinedAt:date(joinedAt),
-      monthComputePoints:orders.filter(order=>demoTeamBusinessDate(order.paidAt).slice(0,7)===month)
+    const points=[160,240,320,360,440,480,560,640][i]??160;
+    const paidOrders=[
+      {orderNo:`DEMO-TEAM-${name.toUpperCase()}-1`,paidAt:joinedAt,points:3*points,
+        amountUsdt:i===0&&!state.walletLegacySeed?100:1299},
+      {orderNo:`DEMO-TEAM-${name.toUpperCase()}-2`,paidAt:sampleAt,points,amountUsdt:points},
+    ];
+    if(currentCatalog&&i===0)paidOrders.push({orderNo:'DEMO-TEAM-CATALOG-S1',
+      paidAt:state.catalogPresetAt??sampleAt,points:state.catalogPresetAt==null?4800:6400,amountUsdt:1299});
+    if(state.highestRank&&!parent)paidOrders.push({orderNo:`DEMO-TEAM-${name.toUpperCase()}-V8`,
+      paidAt:joinedAt+day,points:400000,amountUsdt:40000});
+    members.push({id:String(i<8?100+i:120+i-8),name,avatarUrl:null,vRank:state.highestRank&&!parent?7:i%4,layer:parent?parent.layer+1:1,
+      sponsorUserId:parent?.id??'900001',leg:parent?.leg??(i%2?'A':'B'),joinedAt:date(joinedAt),paidOrders,
+      monthComputePoints:paidOrders.filter(order=>order.paidAt<=now&&demoTeamBusinessDate(order.paidAt).slice(0,7)===month)
         .reduce((sum,order)=>sum+order.points,0),
-      lifetimeComputePoints:orders.reduce((sum,order)=>sum+order.points,0),
-      status:i<6?'ACTIVE':'FROZEN',region:['SG','VN','JP'][i%3]});
+      lifetimeComputePoints:paidOrders.filter(order=>order.paidAt<=now).reduce((sum,order)=>sum+order.points,0),
+      status:i===6||i===7?'FROZEN':'ACTIVE',region:['SG','VN','JP'][i%3]});
   }
   if(hasInviteSample(state)){
     const {at}=scene(state,now);
     members.push(...['An','Bao','Chi','Dara','Emi'].map((name,i)=>({
       id:String(108+i),name,avatarUrl:null,vRank:0,layer:1,sponsorUserId:'900001',leg:i%2?'A':'B',
-      joinedAt:date(at-day+i*3600000),monthComputePoints:0,lifetimeComputePoints:0,status:'ACTIVE',region:['SG','VN','JP'][i%3],
+      joinedAt:date(at-day+i*3600000),paidOrders:[],monthComputePoints:0,lifetimeComputePoints:0,status:'ACTIVE',region:['SG','VN','JP'][i%3],
     })));
   }
   return members;
 }
 
-export function demoTeamNetworkMembers(state,now) {
+export function demoTeamNetworkMembers(state,now,{withOrders=false}={}) {
   const members=[];
   const eligibleSponsors=new Set(['900001']);
-  for(const {sponsorUserId,...member} of demoH4TeamMembers(state,now)){
+  for(const {sponsorUserId,paidOrders,...member} of demoH4TeamMembers(state,now)){
     if(member.status!=='ACTIVE'||!eligibleSponsors.has(sponsorUserId))continue;
-    members.push(member);
+    members.push(withOrders?{...member,paidOrders}:member);
     eligibleSponsors.add(member.id);
   }
   return members;
