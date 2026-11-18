@@ -1,7 +1,7 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet } from './prototype-demo-account.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoCommissionEvents, demoHasEarningsHistory, demoSettledTasks } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoHasEarningsHistory, demoSettledTasks, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 // The panel's terminal result applies to every withdrawal read, not just the bank detail page.
@@ -12,8 +12,9 @@ export function settleDemoBankWithdrawals(state) {
     row.outcome = state.bankState;
     // Once ended, keep that outcome and return a rejected withdrawal's reserve exactly once.
     if (row.outcome === 'rejected') {
-      const walletUsdt = state.dataState === 'empty' ? 0 : state.walletBalance ?? 52800.64;
-      state.walletBalance = Math.round((walletUsdt + row.bank.amountUsdt) * 1e6) / 1e6;
+      postDemoWalletEntries(state, { bizNo: row.withdrawalNo + ':PAYOUT:USDT:REFUND',
+        bizType: 'WITHDRAW_PAYOUT_REFUND', asset: 'USDT', direction: 'IN', amount: row.bank.amountUsdt,
+        at: Date.now(), category: 'withdraw' });
     }
   }
 }

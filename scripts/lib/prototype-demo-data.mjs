@@ -18,7 +18,7 @@ import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
 import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { creditDemoDailyMilestone, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletUsdt } from './prototype-demo-wallet.mjs';
+import { demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -638,9 +638,10 @@ export function demoFixture(url,locale,state,request) {
     const input=request.postDataJSON(),quote=tradeinQuote(input.sourceDeviceId,input.targetProductNo),product=products.find(p=>p.id===quote.targetProductNo);
     if(input.expectedSourceVersion!==quote.sourceRowVersion||Math.abs(input.expectedPayableUsdt-quote.payableUsdt)>0.000001||Math.abs(input.expectedDiscountUsdt-quote.discountUsdt)>0.000001)throw new Error('Demo trade-in quote changed');
     if(!quote.sufficientFunds)refuse('TRADEIN_INSUFFICIENT_FUNDS');
-    state.walletBalance=Math.round((quote.walletBalanceUsdt-quote.payableUsdt)*100)/100;
     (state.retiredDeviceIds||=[]).push(quote.sourceDeviceId);
     const active=quote.targetDeviceStatus==='ACTIVE',sequence=state.nextOrderNo=(state.nextOrderNo??now)+1,orderNo='DEMO-ORDER-'+sequence;
+    postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRADE_IN_PURCHASE',asset:'USDT',direction:'OUT',
+      amount:quote.payableUsdt,at:now,category:'purchase',remark:'E3 trade-in upgrade wallet payment'});
     const targetDeviceId=state.deviceSequence=(state.deviceSequence||1000)+1;(state.deviceIds??={})[orderNo+'-0-0']=targetDeviceId;
     const canonicalStatus=active?'activated':'inventory';
     const order={...demoOrders(products,state,now)[0],orderNo,productNo:product.id,productName:product.name,quantity:1,subtotalUsdt:product.price,unitPriceUsdt:product.price,discountUsdt:quote.discountUsdt,amountUsdt:quote.payableUsdt,paymentMethod:'WALLET',orderType:'TRADE_IN',itemCount:1,
@@ -725,15 +726,15 @@ export function demoFixture(url,locale,state,request) {
       const amount=Number(order.amountUsdt);
       if(amount>demoWalletUsdt(state))refuse('ORDER_WALLET_INSUFFICIENT');
       if(amount>0){
-        postDemoWalletUsdt(state,-amount);
-        (state.walletPurchaseDebits??=[]).push({orderNo,amount,at:now});
+        postDemoWalletEntries(state,{bizNo:orderNo,bizType:'ORDER_PURCHASE',asset:'USDT',direction:'OUT',
+          amount,at:now,category:'purchase',remark:'UVEL wallet order settlement'});
       }
     }
     state.orderStatuses||={};state.orderStatuses[orderNo]=action==='pay'?'activated':'cancelled';
     const canonicalStatus=state.orderStatuses[orderNo],[paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus];
     if(state.createdOrders?.includes(order))Object.assign(order,{canonicalStatus,paymentStatus,orderStatus,activationStatus,paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',paidAt:action==='pay'?(replay?order.paidAt:now):null,activatedAt:action==='pay'?(replay?order.activatedAt??now:now):null});
     if(action==='cancel')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:false},order);
-    const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo:'DEMO-PAY-'+orderNo,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',amountUsdt:order.promotionQuoteId?Number(order.amountUsdt).toFixed(2):Number(order.amountUsdt),paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',walletBalanceAfterUsdt:Number(order.amountUsdt)===0?null:state.walletBalance??52800.64,idempotent:replay};
+    const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo:'DEMO-PAY-'+orderNo,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',amountUsdt:order.promotionQuoteId?Number(order.amountUsdt).toFixed(2):Number(order.amountUsdt),paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',walletBalanceAfterUsdt:Number(order.amountUsdt)===0?null:state.walletMovements?.find(row=>row.bizNo===orderNo)?.balanceAfter??demoWalletUsdt(state),idempotent:replay};
     return remember('payOrder',orderNo,response,order);
   }
   if(pathname==='/api/promotions'||/^\/api\/promotions\/demo-promo-\d+$/.test(pathname)) {
@@ -953,7 +954,10 @@ export function demoFixture(url,locale,state,request) {
     }
     const {milestoneDay,rewardType,rewardAmount,badgeCode}=milestone;
     const result={...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};
-    creditDemoDailyMilestone(state,rewardType,rewardAmount);
+    if(['USDT','UVT'].includes(rewardType)){
+      postDemoWalletEntries(state,{bizNo:`DAILY-MS:900001:${id}`,bizType:'DAILY_MILESTONE',
+        asset:rewardType,direction:'IN',amount:rewardAmount,at:now,category:'achievement',remark:'H5 daily milestone claim'});
+    }
     (state.milestoneClaimReceipts??=[]).push({key,at:now,result});
     return result;
   }

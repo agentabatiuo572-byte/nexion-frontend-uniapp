@@ -33,7 +33,7 @@ export function demoWalletUsdt(state) {
 }
 
 export const demoHasEarningsHistory=state=>state.dataState!=='empty'
-  &&(!state.accountDeletionState||state.accountDeletionState==='follow');
+  &&state.accountDeletionState!=='clear';
 
 export function initializeDemoWalletCheckpoint(state) {
   // An imported wallet already includes its old orders and any saved milestone credits.
@@ -46,17 +46,27 @@ export function postDemoWalletUsdt(state,amount) {
   state.walletBalance=money(demoWalletUsdt(state)+amount);
 }
 
+// Store the resulting balance at the write, including movements earlier in the same millisecond.
+export function postDemoWalletEntries(state,...entries) {
+  initializeDemoWalletCheckpoint(state);
+  state.walletNexCheckpoint??=savedNexBalance(state);
+  const balances={USDT:demoWalletUsdt(state),UVT:savedNexBalance(state)};
+  for(const entry of entries)balances[entry.asset]=money(balances[entry.asset]+signed(entry));
+  if(entries.some(entry=>entry.asset==='USDT'))state.walletBalance=balances.USDT;
+  if(entries.some(entry=>entry.asset==='UVT'))state.walletNexBalance=balances.UVT;
+  const uvt=entries.some(entry=>entry.asset==='UVT')?demoWalletNex(state,entries[0].at):balances.UVT;
+  for(const entry of entries)(state.walletMovements??=[]).push({
+    id:entry.bizNo,status:'SUCCESS',remark:'',...entry,balanceAfter:entry.asset==='USDT'?balances.USDT:uvt,
+  });
+  return balances;
+}
+
 function savedNexBalance(state) {
   return accountDeletionWallet(state)?.nexAvailable??state.walletNexBalance??(state.dataState==='empty'?0:1280);
 }
 
 export function demoWalletNex(state,now) {
   return money(demoH4Credits(state,now).reduce((balance,row)=>balance+(row.includedInBalance?0:row.amount),savedNexBalance(state)));
-}
-
-export function creditDemoDailyMilestone(state,asset,amount) {
-  if(asset==='UVT')state.walletNexBalance=money(savedNexBalance(state)+amount);
-  if(asset==='USDT')postDemoWalletUsdt(state,amount);
 }
 
 export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt)) {
@@ -76,6 +86,8 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo],index)=>({
     id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
+  const movements=state.walletMovements??[];
+  const posted=new Set(movements.map(row=>row.bizNo));
   const credits=demoH4Credits(state,now).map(({id,type,amount,at,includedInBalance})=>({
     id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
@@ -84,6 +96,7 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
     const {milestoneId,rewardType:asset,rewardAmount:amount}=result;
     if(asset!=='UVT'&&asset!=='USDT')continue;
     const bizNo=`DAILY-MS:900001:${milestoneId}`;
+    if(posted.has(bizNo))continue;
     credits.push({id:bizNo,bizNo,bizType:'DAILY_MILESTONE',asset,direction:'IN',amount,at,
       includedInBalance:asset==='UVT',status:'SUCCESS',remark:'H5 daily milestone claim',category:'achievement',presentationCode:'achievement'});
   }
@@ -97,9 +110,9 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
   }));
   // The USDT checkpoint predates newly modeled movements. Historic seed credits
   // were already included. UVT still uses the saved balance and import markers.
-  const balances={USDT:state.walletUsdtCheckpoint,UVT:savedNexBalance(state)};
+  const balances={USDT:state.walletUsdtCheckpoint,UVT:state.walletNexCheckpoint??savedNexBalance(state)};
   for(const row of [...seeds.filter(settled),...credits.filter(row=>row.includedInBalance)])balances[row.asset]-=signed(row);
-  const rows=[...seeds,...credits,...debits,...deliveries].sort((left,right)=>left.at-right.at);
+  const rows=[...seeds,...credits,...debits,...deliveries,...movements].sort((left,right)=>left.at-right.at);
   const batchTotals=new Map(),batchBalances=new Map();
   for(const row of rows)if(row.batchNo&&settled(row)){
     const key=`${row.batchNo}:${row.asset}`;
@@ -107,7 +120,8 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(seedAt))
   }
   return rows.map(({at,includedInBalance,batchNo,...row})=>{
     const key=batchNo&&`${batchNo}:${row.asset}`;
-    if(settled(row)&&(!key||!batchBalances.has(key))){
+    if(row.balanceAfter!==undefined)balances[row.asset]=row.balanceAfter;
+    else if(settled(row)&&(!key||!batchBalances.has(key))){
       balances[row.asset]=money(balances[row.asset]+(key?batchTotals.get(key):signed(row)));
       if(key)batchBalances.set(key,balances[row.asset]);
     }
@@ -135,6 +149,11 @@ export function demoWalletBillList(bills,params) {
   const asset=params.get('asset')?.trim().toUpperCase();
   const direction=params.get('direction')?.trim().toUpperCase();
   const category=params.get('category')?.trim().toUpperCase();
+  if((params.has('asset')&&!['USDT','UVT'].includes(asset))
+    ||(params.has('direction')&&!['IN','OUT'].includes(direction))
+    ||(params.has('category')&&category!=='REWARD')){
+    throw Object.assign(new Error('WALLET_BILLS_FILTER_INVALID'),{status:400});
+  }
   const filtered=bills.filter(row=>(!asset||row.asset===asset)&&(!direction||row.direction===direction&&row.amount>0)
     &&(category!=='REWARD'||reward(row)));
   const page=Number(params.get('page')??1),pageSize=Number(params.get('pageSize')??20);

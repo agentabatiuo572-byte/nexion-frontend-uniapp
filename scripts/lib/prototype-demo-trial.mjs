@@ -1,3 +1,4 @@
+import { demoWalletUsdt, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 // Loopback-only lifecycle fixture. Never imported by src or an App build.
 import { createHash } from 'node:crypto';
 import { fixture } from './design-review-fixture.mjs';
@@ -135,9 +136,14 @@ export function trialDemo(url,locale,state,request,capacityFull,products){
     if((units(amount)+5000n)/10000n>units(expected,2))refuse('TRIAL_AMOUNT_MISMATCH');
     if(body.quoteVersion&&body.quoteVersion!==quote.quoteVersion)refuse('TRIAL_QUOTE_CHANGED');
     state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
-    if(!paid&&(state.walletBalance??52800.64)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
+    if(!paid&&demoWalletUsdt(state)<amount)refuse('TRIAL_WALLET_INSUFFICIENT');
     const orderNo='TRC-DEMO'+now;
-    state.walletBalance=number(units(state.walletBalance??52800.64)-(paid?0n:units(amount))+units(quote.remainderUsdt));
+    if(!paid&&amount>0)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRIAL_CHARGE',
+      asset:'USDT',direction:'OUT',amount,at:now,category:'purchase'});
+    if(quote.remainderUsdt>0)postDemoWalletEntries(state,{bizNo:orderNo+':REMAINDER',bizType:'TRIAL_BONUS',
+      asset:'USDT',direction:'IN',amount:quote.remainderUsdt,at:now,category:'bonus'});
+    if(quote.rewardNex>0)postDemoWalletEntries(state,{bizNo:orderNo+':NEX',bizType:'TRIAL_BONUS',
+      asset:'UVT',direction:'IN',amount:quote.rewardNex,at:now,category:'bonus'});
     state.createdOrders??=[];state.createdOrders.unshift({...conversionOrder(orderNo,now,quote),...(paid&&{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt})});state.trialOrderNo=orderNo;
     Object.assign(row,{state:'REDEEMED',finishedAt:now,version:(row.version||1)+1});
     const source='nx_trial_claim + nx_order + nx_order_item';

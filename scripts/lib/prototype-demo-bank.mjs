@@ -1,3 +1,4 @@
+import { postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
@@ -107,8 +108,11 @@ export function bankDemo(url, state, request) {
       const facts = demoWithdrawalFacts(state, now);
       if (facts.dailyRemainingCount === 0) fail('WITHDRAWAL_DAILY_LIMIT_EXCEEDED');
       if (row.quote.amountUsdt > facts.maxWithdrawableUsdt) fail('WITHDRAWAL_BALANCE_LIMIT_EXCEEDED');
-      state.walletBalance = Math.round((facts.walletUsdt - row.quote.amountUsdt) * 1e6) / 1e6;
       const withdrawalNo = 'WD-DEMO' + (Object.keys(demo.orders).length + 1);
+      const reserve = { asset: 'USDT', direction: 'OUT', at: now, category: 'withdraw' };
+      postDemoWalletEntries(state,
+        { ...reserve, bizNo: withdrawalNo + ':USDT:PRINCIPAL', bizType: 'WITHDRAW_NET_PRINCIPAL', amount: row.quote.netUsdt },
+        { ...reserve, bizNo: withdrawalNo + ':USDT:BANK_FEE', bizType: 'WITHDRAW_BANK_FEE', amount: row.quote.feeUsdt });
       row.order = { state: 'COMMITTED', withdrawalNo, createdAt: now, beneficiaryNo: config().beneficiary.beneficiaryNo, withdrawal: { withdrawalNo, chain: 'BANK-VND', status: 'PROCESSING' }, providerState: 'PENDING', bank: snapshot(row.quote) };
       demo.orders[withdrawalNo] = row.order;
       return orderView(row.order);
