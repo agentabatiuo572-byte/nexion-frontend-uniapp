@@ -215,8 +215,11 @@ function demoOrders(products,state,now,device41) {
     const device=original==='activated'?device41:null;
     const product=device?products.find(item=>item.id===device.productCode.toLowerCase()):products[i%products.length];
     const unitPrice=device?device.actualPaidUsdt:product.price;
-    // The legacy and V8 scenarios retain the points credited on their historical purchase.
+    // The ordinary V2 account bought its two paid S1 samples at 640 points each.
+    // Rank counts both orders, including the paid order whose delivery failed.
     let computePoints=product.computePoints;
+    if(!state.walletLegacySeed&&!state.highestRank&&product.id==='stellarbox-s1'
+      &&(original==='activated'||original==='provisioning_failed'))computePoints=640;
     if(device&&state.highestRank)computePoints=64000;
     else if(device&&state.walletLegacySeed)computePoints=1280;
     const placedAt=device?device.activatedAt-samplePaidAfter:original==='placed'?at-(samplePlacedAgo[state.paymentState]??0):at-(i+1)*day;
