@@ -265,8 +265,9 @@ const demoOrderSlots=(orders,orderNo)=>orders
 // trial's own lifecycle, so a freed slot stays free. full, the capacity-full trial preset and replace seed exactly
 // full: formal devices fill what the trial, paid orders and session devices leave; retired devices never count.
 // Nothing ever exceeds the cap and the cap is never raised.
-function decayedS1PurchasedAt(now) {
-  const purchased=new Date(now);
+function decayedS1PurchasedAt() {
+  const purchased=new Date(demoStartedAt);
+  purchased.setHours(0,0,0,0);
   purchased.setDate(1);
   purchased.setMonth(purchased.getMonth()-3);
   return purchased.getTime();
@@ -274,12 +275,15 @@ function decayedS1PurchasedAt(now) {
 export function initializeDemoPreviewAccount(state,now=Date.now()) {
   // The activated sample order is placed three minutes before the seed device.
   const device41=state.fleetSeed?.find(device=>device.id===41);
-  const earliestDeviceOrderAt=Math.min(decayedS1PurchasedAt(now),device41?.activatedAt??Infinity)-samplePaidAfter;
+  const earliestDeviceOrderAt=Math.min(decayedS1PurchasedAt(),device41?.activatedAt??Infinity)-samplePaidAfter;
   const orderDates=state.sampleOrdersAt==null?[]:demoOrders(demoProducts(state),{...state},now).map(order=>order.placedAt);
   demoH4Account(state,now,[earliestDeviceOrderAt,...orderDates]);
 }
 
-function demoSeedFleet(state,template,products,capacitySchedule,cap,occupied,retired) {
+function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,retired) {
+  const minimumPurchaseAt=demoH4Account(state).createdAt+samplePaidAfter+1;
+  const purchasedAt=Math.max(baseDevice.purchasedAt,minimumPurchaseAt);
+  const template={...baseDevice,purchasedAt,activatedAt:Math.max(baseDevice.activatedAt,purchasedAt)};
   const clone=(id,code,name,daily,paid,extra)=>{
     const product=products.find(product=>product.id.toUpperCase()===code);
     return {...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,
@@ -301,8 +305,8 @@ function demoSeedFleet(state,template,products,capacitySchedule,cap,occupied,ret
   let devices=state.fleetState==='none'?[]:[template,...phones,second];
   if(state.fleetState==='inventory')devices.push(clone(51,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='decayed'){
-    const purchasedAt=decayedS1PurchasedAt(Date.now());
-    const older={purchasedAt,activatedAt:purchasedAt};
+    const decayedPurchaseAt=Math.max(decayedS1PurchasedAt(),minimumPurchaseAt);
+    const older={purchasedAt:decayedPurchaseAt,activatedAt:decayedPurchaseAt};
     devices=[clone(41,'STELLARBOX-S1','UVELBox S1',6.2,1299,older),...phones,
       clone(53,'STELLARBOX-S1','UVELBox S1',6.2,1299,{...older,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}),
       clone(51,'CLOUD-SHARE','Cloud Share',.6,19.9,{deviceType:'CLOUD',capacityConfigKey:'capacityApplyToCloudShare',status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE',purchasedAt:Date.now()})];
