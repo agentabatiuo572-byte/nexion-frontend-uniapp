@@ -2,8 +2,8 @@ import { postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 // Loopback-only demo state. No SMS, bank transfer or outbound request is made.
 // Shapes are checked by the same parsers used by the App. Demo OTP: 123456.
 import { randomBytes } from 'node:crypto';
-import { demoWithdrawalFacts, secondaryDemo, settleDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
-import { demoPayoutAddresses, demoWithdrawalNetworks, demoWithdrawals } from './prototype-demo-finance.mjs';
+import { demoWithdrawalFacts, demoWithdrawals, secondaryDemo, settleDemoBankWithdrawals } from './prototype-demo-secondary.mjs';
+import { demoPayoutAddresses, demoWithdrawalNetworks } from './prototype-demo-finance.mjs';
 
 const DAY = 86400000;
 const proof = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '', serverCanonical: true };

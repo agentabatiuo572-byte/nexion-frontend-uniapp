@@ -1,5 +1,5 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
-import { accountDeletionWallet } from './prototype-demo-account.mjs';
+import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoCommissionEvents, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
@@ -18,23 +18,53 @@ export function settleDemoBankWithdrawals(state) {
     }
   }
 }
+export function demoWithdrawals(state, now = Date.now()) {
+  settleDemoBankWithdrawals(state);
+  const sampleAt = state.withdrawalSamplesAt ??= now;
+  const history = demoDeletionHistory(state);
+  const limited = state.withdrawLimitState === 'used';
+  // A rejected reserve that was returned is REFUNDED. Keep the original fee and net quote.
+  const chainOrders = history?.withdrawals ?? (state.dataState === 'empty' ? [] :
+    ['CONFIRMED', 'REFUNDED'].map((status, i) => ({
+      withdrawalNo: 'WD-DEMO-' + (i + 1), amount: 100, netReceive: 99, fee: 1, status,
+      at: limited && i === 0 ? (state.withdrawLimitCreatedAt ??= now) : sampleAt - (i + 2) * day,
+      holdUntil: sampleAt - day,
+    })));
+  const chainRows = chainOrders.map(({ at, holdUntil = at, ...order }) => ({
+    ...order, targetAddress: `0x${'1'.repeat(40)}`, chain: 'USDT-BEP20',
+    holdUntil: new Date(holdUntil).toISOString(), createdAt: new Date(at).toISOString(),
+    networkConfirmUsd: order.fee, networkFee: order.fee, penaltyFee: 0, grossFee: order.fee,
+    nexBurned: 0, nexRefunded: 0, nexRefundedAt: null, feeWaived: 0, actualFee: order.fee,
+    policyVersion: 'money-policy', useNexFeeOffset: false,
+    riskRoute: order.amount <= 100 ? 'fast-pass' : 'manual', idSource: 'server',
+  }));
+  const bankRows = Object.values(state.bankDemo?.orders ?? {}).map(row => ({
+    withdrawalNo: row.withdrawalNo, targetAddress: 'BANK-VND:' + row.beneficiaryNo, amount: row.bank.amountUsdt,
+    chain: 'BANK-VND', status: row.outcome === 'settled' ? 'CONFIRMED' : row.outcome === 'rejected' ? 'REFUNDED' : 'PROCESSING',
+    holdUntil: new Date(row.createdAt).toISOString(), createdAt: new Date(row.createdAt).toISOString(),
+    networkConfirmUsd: row.bank.feeUsdt, networkFee: row.bank.feeUsdt, penaltyFee: 0, grossFee: row.bank.feeUsdt,
+    nexBurned: 0, feeWaived: 0, actualFee: row.bank.feeUsdt, netReceive: row.bank.netUsdt,
+    policyVersion: 'money-policy', useNexFeeOffset: false, riskRoute: 'fast-pass', idSource: 'server',
+  }));
+  return [...bankRows, ...chainRows];
+}
+
 // One rule for every withdrawal read (EarningsReleaseService.withdrawableAmount, AppWithdrawalService.maximumWithdrawable
 // and bankCapacity): every earnings bucket is credited to the wallet, so pending and locked amounts sit inside the balance
 // and come off it before the ratio. USDT and bank withdrawals are rows of one table, so they share one daily count.
 export function demoWithdrawalFacts(state,now=Date.now()){
-  settleDemoBankWithdrawals(state);
+  const withdrawals=demoWithdrawals(state,now);
   const wallet=accountDeletionWallet(state);
-  const empty=state.dataState==='empty',walletUsdt=wallet?.usdtAvailable??(empty?0:state.walletBalance??52800.64),pendingReview=wallet||empty?0:12.5,bonusLocked=wallet||empty?0:50,balanceMaxRatio=1;
-  // The used-limit scene seeds one USDT withdrawal; its fixed creation time also controls the bank count.
-  const limitUsed=state.withdrawLimitState==='used',dailyLimitCount=limitUsed?1:2;
+  const empty=state.dataState==='empty',walletUsdt=wallet?.usdtAvailable??(empty?0:state.walletBalance??52800.64),pendingReview=wallet||empty?0:12.5,bonusLocked=wallet||empty?0:50,balanceMaxRatio=1,dailyLimitCount=state.withdrawLimitState==='used'?1:2;
   const released=Math.max(0,Math.round((walletUsdt-pendingReview-bonusLocked)*1e6)/1e6);
   // WithdrawalDayWindow: Vietnam UTC+7 midnight, with an inclusive start and exclusive end.
   const start=Math.floor((now+7*3600000)/day)*day-7*3600000,dailyCountResetAt=start+day;
-  const sampleWithdrawalCreatedAt=limitUsed?(state.withdrawLimitCreatedAt??=now):null;
-  const usedBefore=limitUsed&&!empty&&sampleWithdrawalCreatedAt>=start&&sampleWithdrawalCreatedAt<dailyCountResetAt?1:0;
-  const used=Object.values(state.bankDemo?.orders??{}).filter(row=>row.createdAt>=start&&row.createdAt<dailyCountResetAt).length;
-  return {walletUsdt,pendingReview,bonusLocked,balanceMaxRatio,released,maxWithdrawableUsdt:Math.round(released*balanceMaxRatio*1e6)/1e6,dailyLimitCount,
-    dailyRemainingCount:Math.max(0,dailyLimitCount-usedBefore-used),dailyCountResetAt,sampleWithdrawalCreatedAt};
+  const used=withdrawals.filter(row=>{
+    const createdAt=Date.parse(row.createdAt);
+    return createdAt>=start&&createdAt<dailyCountResetAt;
+  }).length;
+  return {withdrawals,walletUsdt,pendingReview,bonusLocked,balanceMaxRatio,released,maxWithdrawableUsdt:Math.round(released*balanceMaxRatio*1e6)/1e6,dailyLimitCount,
+    dailyRemainingCount:Math.max(0,dailyLimitCount-used),dailyCountResetAt};
 }
 export function secondaryDemo(url,state,request){
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty',facts=demoWithdrawalFacts(state,now);

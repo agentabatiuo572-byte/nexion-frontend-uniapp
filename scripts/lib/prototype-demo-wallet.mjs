@@ -1,6 +1,7 @@
 // The loopback account's visible ledger and wallet summaries.
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
+import { demoDeletionStake } from './prototype-demo-staking.mjs';
 
 const day=86400000;
 const timeZone='Asia/Shanghai';
@@ -199,16 +200,21 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
     id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
   const history=demoDeletionHistory(state);
-  if(history){
-    const {at,swap,withdrawal}=history;
-    seeds.push(...[
-      [swap.exchangeNo+'-OUT','UVT','OUT',swap.fromAmount,'EXCHANGE_SWAP','swap'],
-      [swap.exchangeNo+'-IN','USDT','IN',swap.toAmount,'EXCHANGE_SWAP','swap'],
-      [withdrawal.withdrawalNo+':USDT:PRINCIPAL','USDT','OUT',withdrawal.netReceive,'WITHDRAW_NET_PRINCIPAL','withdraw'],
-      [withdrawal.withdrawalNo+':USDT:NETWORK_FEE','USDT','OUT',withdrawal.fee,'WITHDRAW_NETWORK_FEE','withdraw'],
-    ].map(([bizNo,asset,direction,amount,bizType,category])=>
-      ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
-  }
+  const swap=history?.swap;
+  const stake=demoDeletionStake(state);
+  const deletionEntries=[
+    ...(swap?[
+      [swap.exchangeNo+'-OUT','UVT','OUT',swap.fromAmount,'EXCHANGE_SWAP','swap',swap.at],
+      [swap.exchangeNo+'-IN','USDT','IN',swap.toAmount,'EXCHANGE_SWAP','swap',swap.at],
+    ]:[]),
+    ...(history?.withdrawals??[]).flatMap(withdrawal=>[
+      [withdrawal.withdrawalNo+':USDT:PRINCIPAL','USDT','OUT',withdrawal.netReceive,'WITHDRAW_NET_PRINCIPAL','withdraw',withdrawal.at],
+      [withdrawal.withdrawalNo+':USDT:NETWORK_FEE','USDT','OUT',withdrawal.fee,'WITHDRAW_NETWORK_FEE','withdraw',withdrawal.at],
+    ]),
+    ...(stake?[[stake.positionNo+'-OPEN','USDT','OUT',stake.amountUsdt,'STAKING_OPEN','stake',Date.parse(stake.lockedAt)]]:[]),
+  ];
+  seeds.push(...deletionEntries.map(([bizNo,asset,direction,amount,bizType,category,at])=>
+    ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
   const credits=demoH4Credits(state,now).filter(row=>!posted.has(row.id)).map(({id,type,amount,at,includedInBalance})=>({
     id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
