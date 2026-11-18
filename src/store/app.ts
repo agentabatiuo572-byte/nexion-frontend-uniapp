@@ -1123,8 +1123,8 @@ export const useApp = defineStore("app", () => {
   ): Promise<boolean> {
     // A request captured for a previous account must not disturb the current account's fleet reads.
     if (!remoteAccountEpoch.isCurrent(request)) return false;
-    // Let an active load settle across catalog revisions. The API client still guards its GET.
-    if (options.coalesce && remoteFleetStatus.value !== "loading"
+    // A cooldown recorded by another caller must reach this store's error path once.
+    if (options.coalesce && remoteFleetStatus.value === "error"
       && Date.now() < (deviceE3Api.fleetReadCooldownUntil() ?? 0)) return false;
     invalidateBeforePassiveTabRead("remote-fleet");
     if (!remoteApiEnabled) return true;
