@@ -17,7 +17,7 @@ import { bankDemo } from './prototype-demo-bank.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
 import { trialDemo } from './prototype-demo-trial.mjs';
 import { demoH4Account, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers } from './prototype-demo-events.mjs';
-import { creditDemoDailyMilestone, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt } from './prototype-demo-wallet.mjs';
+import { creditDemoDailyMilestone, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoWalletUsdt } from './prototype-demo-wallet.mjs';
 
 const authority = {sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day = 86400000;
@@ -28,7 +28,7 @@ const voucherDiscount=(state,id,total)=>id==='V-DESIGN'&&!state.voucherUsed&&(st
 const bundleRate=count=>count>=4?.11:count===3?.07:count===2?.04:0;
 const demoStreakMilestones=[[3,'UVT',5,null],[7,'UVT',15,null],[14,'USDT',1,null],[21,'UVT',100,null],[30,'SPIN',1,null],[60,'USDT',10,null],[100,'BADGE',0,'STREAK_MASTER']];
 const demoMilestoneClaimed=(state,id)=>state.milestoneClaims?.includes(id)
-  ||state.milestoneClaimReceipts?.some(({result})=>result.milestoneId===id);
+  ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id);
 export const demoDefaults = {interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',trialState:'follow',realtimeState:'online',messageSendState:'normal',messageState:'normal',machineImageState:'normal',catalogState:'available',taskState:'pending',eventState:'mixed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionTiming:'live',promotionRewardType:'reward',sessionState:'signed-in',jobsBaseState:'unpublished',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -144,6 +144,14 @@ export function demoProducts(state,origin='http://127.0.0.1:5190',locale='zh') {
   }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
 }
 
+function demoHardwareQuota(product,state,points){
+  const monthlyStock=60;
+  return {productId:product.id,quotaCode:product.id.toUpperCase(),name:product.name,price:product.price,
+    monthlyStock,soldThisMonth:monthlyStock-product.stock,unlockKind:'ALL',
+    conditions:[{kind:'teamComputePoints',required:state.catalogState==='restricted'?20000:6400,current:points}],
+    perks:[],available:product.available};
+}
+
 // The disclosure PromotionPublicService projects for an order discount: it comes off the order at checkout, so nothing
 // is issued later and a refund follows the amount paid.
 // Each amount fits its campaign's product: promo 1 is the S1, promo 4 the 19.90 Cloud Share.
@@ -239,6 +247,7 @@ function decayedS1PurchasedAt() {
 }
 export function initializeDemoPreviewAccount(state,now=Date.now()) {
   state.previewFactsAt??=now;
+  initializeDemoWalletCheckpoint(state);
   // The activated sample order is placed three minutes before the seed device.
   const device41=state.fleetSeed?.find(device=>device.id===41);
   const earliestDeviceOrderAt=Math.min(decayedS1PurchasedAt(),device41?.activatedAt??Infinity)-samplePaidAfter;
@@ -448,7 +457,7 @@ export function demoFixture(url,locale,state,request) {
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
   const walletBills=()=>demoWalletBills(state,now,state.previewFactsAt);
-  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills);if(auxiliary!==undefined)return auxiliary;
+  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,()=>demoFleetFacts(url,locale,state).devices);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
   const secondary=secondaryDemo(url,state,request);
@@ -485,24 +494,39 @@ export function demoFixture(url,locale,state,request) {
     return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,autoPlacedMembers:0,
       matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:blockedReason?0:Math.min(periodCap,Math.min(trackA,trackB)*matchRate),
       settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
-      recentMatches:empty?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'UNLOCKED',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
+      recentMatches:empty||state.accountDeletionState==='clear'?[]:[{id:'DEMO-MATCH-1',amountUsdt:120,status:'UNLOCKED',createdAt:new Date(now-day).toISOString(),unlockAt:new Date(now-day).toISOString()}]};
   }
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
   if(pathname==='/auth/users/oauth/provider/linked')return ['GOOGLE'];
   if(pathname==='/api/store/catalog') return {...authority,source:'nx_product',revision:null,products:empty?[]:products};
   if(pathname==='/api/product/phase') return {phase:'P2',source:'H1_GROWTH_RHYTHM',devOverrideAllowed:false};
-  if(pathname==='/api/store/purchase-eligibility') return {...authority,runId:null,productNo:url.searchParams.get('productNo'),eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',policies:[{policy:'E1',eligible:state.catalogState!=='restricted',decisionCode:state.catalogState==='restricted'?'PURCHASE_GATE_NOT_MET':'ELIGIBLE',mode:'ALL',conditions:state.catalogState==='restricted'?[{kind:'rank',required:3,current:2,gap:1,met:false}]:[]},{policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]}],evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
-  if(pathname==='/api/app/team/quota'){
-    const direct=demoH4TeamMembers(state,now).filter(member=>member.layer===1);
+  if(pathname==='/api/store/purchase-eligibility'||pathname==='/api/app/team/quota'){
     const members=demoTeamNetworkMembers(state,now);
     const teamComputePoints=members.reduce((sum,member)=>sum+member.monthComputePoints,0);
-    const required=state.catalogState==='restricted'?20000:6400;
+    if(pathname==='/api/store/purchase-eligibility'){
+      const productNo=url.searchParams.get('productNo');
+      const product=products.find(item=>item.id===productNo);
+      if(!product)throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
+      const e1={policy:'E1',eligible:product.available,decisionCode:product.available?'ELIGIBLE':'PRODUCT_NOT_RELEASED',mode:'ALL',conditions:[]};
+      const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
+      if(product.productType==='DEVICE'){
+        const quota=demoHardwareQuota(product,state,teamComputePoints);
+        const [condition]=quota.conditions;
+        const gap=Math.max(0,condition.required-condition.current),remaining=quota.monthlyStock-quota.soldThisMonth;
+        f4b.conditions=[{...condition,gap,met:gap===0},
+          {kind:'monthlyQuota',required:quota.monthlyStock,current:quota.soldThisMonth,gap:remaining,met:remaining>0}];
+        f4b.eligible=gap===0&&remaining>0;
+        f4b.decisionCode=remaining===0?'F4B_MONTHLY_QUOTA_EXHAUSTED':gap>0?'F4B_REQUIREMENTS_NOT_MET':'ELIGIBLE';
+      }
+      return {...authority,runId:null,productNo,eligible:e1.eligible&&f4b.eligible,
+        decisionCode:e1.eligible?f4b.eligible?'ELIGIBLE':f4b.decisionCode:e1.decisionCode,
+        policies:[e1,f4b],evaluatedAt:now,source:'nx_product + nx_admin_device_sku + nx_user'};
+    }
+    const direct=demoH4TeamMembers(state,now).filter(member=>member.layer===1);
     return {...authority,source:'server',generatedAt:iso,facts:{rank:demoH4Account(state).rank,
       directRefs:direct.filter(member=>member.lifetimeComputePoints>=demoV1SelfComputePoints).length,
       directInvites:direct.length,activeDirect:members.filter(member=>member.layer===1).length,teamComputePoints},
-      tiers:products.filter(p=>p.productType==='DEVICE').map(p=>({productId:p.id,quotaCode:p.id.toUpperCase(),name:p.name,
-        price:p.price,monthlyStock:60,soldThisMonth:p.sold,unlockKind:'ALL',conditions:[{kind:'teamComputePoints',required,current:teamComputePoints}],
-        perks:[],available:p.available}))};
+      tiers:products.filter(product=>product.productType==='DEVICE').map(product=>demoHardwareQuota(product,state,teamComputePoints))};
   }
   const tradeinCuts=[25,50,75,100],tradeinRates=[75,60,45,30,15];
   if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'OPEN',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:7,source:'server'};
@@ -605,10 +629,17 @@ export function demoFixture(url,locale,state,request) {
     const replay=order.paymentStatus==='PAID';
     if(action==='pay'&&!['PENDING','PAID'].includes(order.paymentStatus)||action==='cancel'&&order.paymentStatus==='PAID')throw new Error('Demo order action unavailable');
     if(action==='pay'&&!replay&&!demoOrderFitsCapacity(url,locale,state,products,order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity})),orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
-    if(action==='pay'&&!replay){if(Number(order.amountUsdt)>(state.walletBalance??52800.64))refuse('ORDER_WALLET_INSUFFICIENT');state.walletBalance=(state.walletBalance??52800.64)-Number(order.amountUsdt);}
+    if(action==='pay'&&!replay){
+      const amount=Number(order.amountUsdt);
+      if(amount>demoWalletUsdt(state))refuse('ORDER_WALLET_INSUFFICIENT');
+      if(amount>0){
+        postDemoWalletUsdt(state,-amount);
+        (state.walletPurchaseDebits??=[]).push({orderNo,amount,at:now});
+      }
+    }
     state.orderStatuses||={};state.orderStatuses[orderNo]=action==='pay'?'activated':'cancelled';
     const canonicalStatus=state.orderStatuses[orderNo],[paymentStatus,orderStatus,activationStatus]=orderStates[canonicalStatus];
-    if(state.createdOrders?.includes(order))Object.assign(order,{canonicalStatus,paymentStatus,orderStatus,activationStatus,paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',paidAt:action==='pay'?now:null,activatedAt:action==='pay'?now:null});
+    if(state.createdOrders?.includes(order))Object.assign(order,{canonicalStatus,paymentStatus,orderStatus,activationStatus,paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',paidAt:action==='pay'?(replay?order.paidAt:now):null,activatedAt:action==='pay'?(replay?order.activatedAt??now:now):null});
     if(action==='cancel')return remember('cancelOrder',orderNo,{...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,orderStatus:'CANCELLED',paymentStatus:'CANCELLED',idempotent:false},order);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo:'DEMO-PAY-'+orderNo,paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',amountUsdt:order.promotionQuoteId?Number(order.amountUsdt).toFixed(2):Number(order.amountUsdt),paymentMethod:Number(order.amountUsdt)===0?'VOUCHER':'WALLET',walletBalanceAfterUsdt:Number(order.amountUsdt)===0?null:state.walletBalance??52800.64,idempotent:replay};
     return remember('payOrder',orderNo,response,order);
@@ -757,11 +788,16 @@ export function demoFixture(url,locale,state,request) {
     if(key.length>128)throw Object.assign(new Error('IDEMPOTENCY_KEY_INVALID'),{status:422});
     const previous=state.milestoneClaimReceipts?.find(receipt=>receipt.key===key);
     if(previous){
-      if(previous.result.milestoneId!==id)refuse('IDEMPOTENCY_KEY_CONFLICT');
+      if((previous.result?.milestoneId??previous.milestoneId)!==id)refuse('IDEMPOTENCY_KEY_CONFLICT');
+      if(previous.error)refuse(previous.error);
       return previous.result;
     }
     const milestone=read('/api/points/state').dailyMilestones?.find(row=>row.milestoneId===id);
-    if(milestone?.status!=='CLAIMABLE')refuse('DAILY_MILESTONE_NOT_CLAIMABLE');
+    if(milestone?.status!=='CLAIMABLE'){
+      const error='DAILY_MILESTONE_NOT_CLAIMABLE';
+      (state.milestoneClaimReceipts??=[]).push({key,milestoneId:id,error});
+      refuse(error);
+    }
     const {milestoneDay,rewardType,rewardAmount,badgeCode}=milestone;
     const result={...authority,milestoneId:id,milestoneDay,rewardType,rewardAmount,badgeCode,spinTickets:rewardType==='SPIN'?rewardAmount:0};
     creditDemoDailyMilestone(state,rewardType,rewardAmount);

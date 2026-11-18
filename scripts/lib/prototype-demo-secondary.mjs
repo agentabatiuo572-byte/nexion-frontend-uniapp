@@ -1,7 +1,7 @@
 // Secondary presentation snapshots, served only by the loopback demo server.
 import { accountDeletionWallet } from './prototype-demo-account.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoCommissionEvents, demoSettledTasks } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoHasEarningsHistory, demoSettledTasks } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 // The panel's terminal result applies to every withdrawal read, not just the bank detail page.
@@ -54,7 +54,7 @@ export function secondaryDemo(url,state,request){
     if(p.endsWith('/status')&&goal){goal.achieved=request.postDataJSON().achieved;goal.achievedAt=goal.achieved?now:null;return goal;}
   }
   if(p.startsWith('/api/tasks/receipts')){
-    const items=empty||accountDeletionWallet(state)?[]:demoSettledTasks(state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:['SDXL','Llama 3.1','Video generation'][i],client:'Demo Studio',rewardUsdt:task.amount,rewardNex:1,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
+    const items=!demoHasEarningsHistory(state)?[]:demoSettledTasks(state.previewFactsAt??now).map((task,i)=>({...proof,receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:['SDXL','Llama 3.1','Video generation'][i],client:'Demo Studio',rewardUsdt:task.amount,rewardNex:1,earningStatus:'SETTLED',completedAt:task.completedAt,startedAt:task.completedAt-600000,durationSec:600,deviceId:41,deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,taskId:'demo-'+task.taskClass.toLowerCase(),taskName:['图像生成','语言推理','视频生成'][i],proofHash:String(i+1).repeat(64)}));
     if(p==='/api/tasks/receipts')return {...proof,items,nextOffset:null,nextCursor:null,total:items.length};
     return items.find(r=>r.receiptNo===p.split('/').pop());
   }
@@ -62,7 +62,7 @@ export function secondaryDemo(url,state,request){
   if(p==='/api/config/market/nex')return {...proof,source:'G3 weekly_curve + nx_price_index sampled history',asset:'UVT',currency:'USDT',currentPrice:.128,costBasis:.1,historyMaxDays:30,sparkline:[.118,.12,.117,.122,.124,.126,.128],history:[.118,.12,.117,.122,.124,.126,.128].map((price,i)=>({price,sampledAt:new Date(now-(6-i)*4*3600000).toISOString(),sampledAtEpochMs:now-(6-i)*4*3600000}))};
   if(p==='/api/app/team/insights/commissions'){
     const kinds=['direct_purchase','direct_device_earning','unilevel','binary','peer','cultivation','leadership','genesis','promotion','other'];
-    const events=empty?[]:demoCommissionEvents(state.previewFactsAt??now);
+    const events=!demoHasEarningsHistory(state)?[]:demoCommissionEvents(state.previewFactsAt??now);
     const total=(rows,asset='amountUSDT')=>rows.reduce((sum,row)=>sum+row[asset],0);
     const today=demoTeamBusinessDate(now),month=today.slice(0,7);
     const thisMonth=events.filter(event=>demoTeamBusinessDate(event.ts).slice(0,7)===month);
@@ -86,7 +86,7 @@ export function secondaryDemo(url,state,request){
     return {...proof,period,rankingMetric:'COMPUTE_POINTS',rows:rows.slice((page-1)*pageSize,page*pageSize),page,pageSize,totalRows:rows.length,myRank:empty?null:3,gapToNext:empty?0:520,gapToNextComputePoints:empty?null:points[1]-points[2],poolUsd:empty?0:5000,topN:10,generatedAt:iso,snapshotAt:iso,snapshotVersion:'d'.repeat(64)};
   }
   if(p==='/api/app/team/insights/unilevel'){
-    const all=empty?[]:[1,2,3].map((layer,i)=>({id:'demo-unilevel-'+i,source:'device_purchase',sourceUserName:['Maya','Linh','Sam'][i],cycle:'2026-10',layer,orderId:'DEMO-ORDER-004',orderAmountUSD:1299,amountUSDT:30-i*10,amountNEX:5,currency:'USDT',status:i===0?'unlocked':'cooling',ts:now-i*day,unlockAt:now+day}));
+    const all=empty||state.accountDeletionState==='clear'?[]:[1,2,3].map((layer,i)=>({id:'demo-unilevel-'+i,source:'device_purchase',sourceUserName:['Maya','Linh','Sam'][i],cycle:'2026-10',layer,orderId:'DEMO-ORDER-004',orderAmountUSD:1299,amountUSDT:30-i*10,amountNEX:5,currency:'USDT',status:i===0?'unlocked':'cooling',ts:now-i*day,unlockAt:now+day}));
     const filter=url.searchParams.get('filter')||'all',events=all.filter(e=>filter==='all'||(filter==='direct'?e.layer===1:e.layer>1));
     const sum=rows=>({amountUSDT:rows.reduce((a,e)=>a+e.amountUSDT,0),amountNEX:rows.reduce((a,e)=>a+e.amountNEX,0),count:rows.length});
     return {...proof,period:url.searchParams.get('period')||'month',...paginate(events),split:{direct:sum(all.filter(e=>e.layer===1)),extended:sum(all.filter(e=>e.layer>1))},generatedAt:iso,snapshotAt:iso};

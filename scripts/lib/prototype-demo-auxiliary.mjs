@@ -1,10 +1,10 @@
 // Read-only samples for auxiliary screens. Never imported by production source.
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
-import { demoLifetimeEarningsUsdt, demoSettledTasks } from './prototype-demo-wallet.mjs';
+import { demoHasEarningsHistory, demoLifetimeEarningsUsdt, demoSettledTasks } from './prototype-demo-wallet.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
-export function auxiliaryDemo(url,locale,state,request,read,walletBills) {
+export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices) {
   if(request.method()!=='GET')return undefined;
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty';
   const lang=(url.searchParams.get('locale')||url.searchParams.get('language')||locale).split('-')[0];
@@ -16,7 +16,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills) {
   const sample=text('原型演示资料，正式内容以发布版本为准。','Prototype sample. Refer to the published version for formal content.','Tài liệu nguyên mẫu. Nội dung chính thức theo phiên bản công bố.');
   if(p==='/api/app/proof') {
     const {createdAt:joinedAt}=read('/api/app/profile');
-    const {devices}=read('/api/devices/earnings');
+    const devices=fleetDevices();
     const {totalMembers,activeMembers}=read('/api/app/team/network');
     const {streak}=read('/api/points/state');
     const {referralCode,invitedCount,lifetimeInviterNex}=read('/api/app/referral-rewards');
@@ -33,8 +33,8 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills) {
   if(p==='/api/config/commission/direct-referral')return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',nexUsdtPrice:empty?null:.128,purchase:{enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays:7},deviceEarning:{enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,coolingDays:0}};
   if(p==='/api/app/team/insights/direct-referral') {
     const kind=url.searchParams.get('kind')==='device_earning'?'direct_device_earning':'direct_purchase';
-    const events=empty?[]:[{id:'DEMO-DIRECT-1',kind,sourceUserName:'Maya',sourceRef:'DEMO-ORDER-004',sourceDeviceId:kind==='direct_device_earning'?'REVIEW-S1':null,policyVersion:3,basisUsdt:100,nexUsdtPrice:.128,amountUSDT:3.5,amountNEX:11.71875,ts:now-day,unlockAt:now-day,status:'unlocked',recoveryPendingUSDT:0,recoveryPendingNEX:0}];
-    const totals={amountUSDT:empty?0:3.5,amountNEX:empty?0:11.71875,count:events.length},zero={amountUSDT:0,amountNEX:0,count:0};
+    const events=empty||state.accountDeletionState==='clear'?[]:[{id:'DEMO-DIRECT-1',kind,sourceUserName:'Maya',sourceRef:'DEMO-ORDER-004',sourceDeviceId:kind==='direct_device_earning'?'REVIEW-S1':null,policyVersion:3,basisUsdt:100,nexUsdtPrice:.128,amountUSDT:3.5,amountNEX:11.71875,ts:now-day,unlockAt:now-day,status:'unlocked',recoveryPendingUSDT:0,recoveryPendingNEX:0}];
+    const totals={amountUSDT:events[0]?.amountUSDT??0,amountNEX:events[0]?.amountNEX??0,count:events.length},zero={amountUSDT:0,amountNEX:0,count:0};
     return {...proof,serverCanonical:true,period:url.searchParams.get('period')||'month',page:Number(url.searchParams.get('page')||1),pageSize:Number(url.searchParams.get('pageSize')||20),totalRows:events.length,events,split:{purchase:kind==='direct_purchase'?totals:zero,deviceEarning:kind==='direct_device_earning'?totals:zero},generatedAt:iso,snapshotAt:url.searchParams.get('snapshotAt')||iso};
   }
   // Like the backend, v2 is the v1 read plus settlement fields and the unposted totals; with no devices it is 404.
@@ -43,13 +43,13 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills) {
     const v2=p.includes('/v2/'),[settlement]=demoSettledTasks(state.previewFactsAt??now);
     const posted=new Date(settlement.postedAt).toISOString();
     const task=(id,status,taskClass)=>({...proof,serverCanonical:true,...(v2&&{protocolVersion:2,queuedAt:null,actualDurationSec:null,pausedAt:null,pausedSeconds:0,configVersion:null,settlementStatus:status==='COMPLETED'?'POSTED':'NONE',settlementBatchNo:status==='COMPLETED'?settlement.batchNo:null,settledAt:status==='COMPLETED'?posted:null}),taskNo:'DEMO-TASK-'+id,deviceId:41,taskId:'demo-'+taskClass.toLowerCase(),taskName:text('图像生成','Image generation','Tạo hình ảnh'),taskClass,model:'SDXL',client:'Demo Studio',status,rewardUsdt:settlement.amount,requiredSeconds:600,startedAt:new Date(status==='RUNNING'?now-300000:settlement.completedAt-600000).toISOString(),completableAt:new Date(status==='RUNNING'?now+300000:settlement.completedAt).toISOString(),completedAt:status==='COMPLETED'?new Date(settlement.completedAt).toISOString():null,receiptNo:status==='COMPLETED'?settlement.receiptNo:null,proofNonce:null,proofExpiresAt:null});
-    return {...proof,serverCanonical:true,serverNow:iso,devices:empty?[]:[{deviceId:41,instanceNo:'REVIEW-S1',deviceType:'GPU',lockUntil:null,currentTask:task(4,'RUNNING','IG'),recentTasks:[task(1,'COMPLETED','IG')],...(v2&&{recoveryPending:false,recoveryReason:null})}],
+    return {...proof,serverCanonical:true,serverNow:iso,devices:!demoHasEarningsHistory(state)?[]:[{deviceId:41,instanceNo:'REVIEW-S1',deviceType:'GPU',lockUntil:null,currentTask:task(4,'RUNNING','IG'),recentTasks:[task(1,'COMPLETED','IG')],...(v2&&{recoveryPending:false,recoveryReason:null})}],
       ...(v2&&{protocolVersion:2,pendingEarned:[{asset:'USDT',amount:'0.000000',taskCount:0},{asset:'NEX',amount:'0.000000',taskCount:0}]})};
   }
   // P-62 Task Center: one posted settlement batch so the "Settlement batch" entry can be previewed.
   if(p==='/api/tasks/v2/settlements'||p==='/api/tasks/v2/settlements/DEMO-BATCH-1') {
     const [task]=demoSettledTasks(state.previewFactsAt??now);
-    const hasSettlement=!empty&&(!state.accountDeletionState||state.accountDeletionState==='follow');
+    const hasSettlement=demoHasEarningsHistory(state);
     const batch={batchNo:task.batchNo,asset:'USDT',amount:task.amount.toFixed(6),taskCount:1,status:'POSTED',
       windowStart:task.completedAt-3600000,windowEnd:task.completedAt,postedAt:task.postedAt};
     if(p.endsWith('/DEMO-BATCH-1')){
