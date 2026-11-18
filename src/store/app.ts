@@ -898,6 +898,12 @@ export const useApp = defineStore("app", () => {
       if (readEpoch !== taskAssignmentReadEpoch) throw new Error("REMOTE_ASSIGNMENT_READ_SUPERSEDED");
       taskAssignmentSnapshot = { key, receivedAt: Date.now(), receivedMonotonicAt: readMonotonicNowMs(), state };
       return state;
+    }, (cause: unknown) => {
+      if (taskAssignmentSnapshotInFlight?.request === pending && isHttpReadRateLimit(cause)) {
+        // The API client owns Retry-After for this endpoint. Do not cache the 429 for the snapshot interval.
+        taskAssignmentSnapshotInFlight = null;
+      }
+      throw cause;
     });
     taskAssignmentSnapshotInFlight = { key, startedAt: now, request: pending };
     return pending;
@@ -1162,9 +1168,6 @@ export const useApp = defineStore("app", () => {
         }
         const assignmentReadCurrent = assignmentReadEpochAtStart === taskAssignmentReadEpoch;
         if (assignmentReadCurrent && assignmentResult.status === "rejected") {
-          if (isHttpReadRateLimit(assignmentResult.reason)) {
-            remoteFleetRetryAt = Date.now() + (assignmentResult.reason.retryAfterMs ?? 30_000);
-          }
           remoteAssignmentStatus.value = "error";
           remoteAssignmentError.value = assignmentResult.reason instanceof Error
             ? assignmentResult.reason.message : "TASK_ASSIGNMENT_STATE_UNAVAILABLE";
@@ -1173,7 +1176,12 @@ export const useApp = defineStore("app", () => {
           remoteAssignmentHasSnapshot.value = true;
           rememberTaskAssignments(request, assignmentResult.value);
         }
-        if (fleetResult.status === "rejected") throw fleetResult.reason;
+        if (fleetResult.status === "rejected") {
+          if (isHttpReadRateLimit(fleetResult.reason)) {
+            remoteFleetRetryAt = Date.now() + (fleetResult.reason.retryAfterMs ?? 30_000);
+          }
+          throw fleetResult.reason;
+        }
         const fleet = fleetResult.value;
         slotCap.value = fleet.slotCap;
         if (fleet.devices.length > 0) installCanonicalLifecycleConfig(fleet.capacitySchedule);
@@ -1227,7 +1235,6 @@ export const useApp = defineStore("app", () => {
           && refreshSequence === remoteFleetRefreshSequence) {
           remoteFleetStatus.value = "error";
           remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
-          if (isHttpReadRateLimit(cause)) remoteFleetRetryAt = Date.now() + (cause.retryAfterMs ?? 30_000);
           if (!isTransientReadFailure(cause)) {
             invalidateTabSnapshots(["wallet"], snapshotWrite);
             remoteFleetHasSnapshot.value = false;
