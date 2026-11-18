@@ -120,7 +120,8 @@ async function run() {
     if (current()) { busy.value = false; await load(); }
   } catch {
     // The outcome is unknown even if this page is gone: a fleet read started during the claim may predate the device.
-    if (deviceClaim) app.invalidateRemoteFleet(fleetRequest);
+    // Invalidate it, then read again so a warehouse already on screen does not keep the pre-claim fleet.
+    if (deviceClaim) { app.invalidateRemoteFleet(fleetRequest); void app.refreshRemoteFleet(fleetRequest, { coalesce: true }); }
     if (current()) { busy.value = false; commandError.value = true; unconfirmedAction = selectedAction; await load(); }
   }
 }
