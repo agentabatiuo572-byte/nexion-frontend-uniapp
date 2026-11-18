@@ -663,7 +663,7 @@ export function demoFixture(url,locale,state,request) {
     if(action==='detail') {
       const eligible=event.state==='ongoing'&&(weekend||event.userStatus==='CLAIMABLE');
       const eligibilityReason=event.userStatus==='CLAIMED'?'CLAIMED':event.state==='upcoming'?'NOT_STARTED':event.state==='ended'?'ENDED':event.userStatus==='CLAIMABLE'?'READY':'IN_PROGRESS';
-      return {event,rules:weekend?demoWeekendRules:{},enabled:true,eligible,eligibilityReason,
+      return {event,rules:weekend?demoWeekendRules:{description:event.subtitle,terms:localized(contentLocale,'完成对应活动条件即可领取；每个账号限领一次。','Complete the activity goals. One reward per account.','Hoàn thành mục tiêu. Mỗi tài khoản nhận một lần.')},enabled:true,eligible,eligibilityReason,
         progressValue:event.progressValue,targetValue:event.targetValue,rewards:[],results:[],myRewardAmount:null,userStatus:event.userStatus,
         ...(weekend?{claimKeys:['ONCE'],reminderSubscribed:!!state.reminders?.includes(id)}:{})};
     }
@@ -692,7 +692,7 @@ export function demoFixture(url,locale,state,request) {
     const names=localized(badgeLocale,['首次签到','连续签到一周','第一台设备','学习达人','邀请伙伴','算力新星'],['First check-in','One-week streak','First device','Dedicated learner','Invite a partner','Compute rising star'],['Điểm danh đầu tiên','Chuỗi một tuần','Thiết bị đầu tiên','Người học giỏi','Mời bạn bè','Ngôi sao tính toán']);
     data.badgeAchievements=names.map((name,i)=>({achievementCode:'demo-achievement-'+i,name,description:name,category:['STREAK','STREAK','EARNING','LEARNING','SOCIAL','EARNING'][i],iconKey:['flame','calendar','cpu','book','users','zap'][i],accentColor:['#9EDC1D','#B47FFF','#FFCB4D'][i%3],rewardPoints:50*(i+1),status:i<2||unlocked?'UNLOCKED':'LOCKED',unlockedAt:i<2||unlocked?iso:null}));
     // Route badges keep the seeded Chinese name (the App localizes them); the check-in boost is the B17 multiplier.
-    data.powerUps=[[1,'ROYALTY_BOOST','团队成长徽章','/team',7,'ROUTE_BADGE','连续签到 7 天可查看团队成长权益',null],[2,'STREAK_BADGE','连续签到徽章','/me/rewards',14,'ROUTE_BADGE','连续签到 14 天解锁专属徽章',null],[3,'CHECKIN_BOOST',localized(locale,'签到加成','Check-in boost','Thưởng điểm danh'),'/daily',30,'CHECKIN_MULTIPLIER','1.5',null],[4,'GENESIS_ALLOWLIST','Genesis 资格入口','/market/genesis',60,'ROUTE_BADGE','连续签到 60 天解锁 Genesis 资格入口',true],
+    data.powerUps=[[1,'ROYALTY_BOOST','团队成长徽章','/team',7,'ROUTE_BADGE','连续签到 7 天可查看团队成长权益',null],[2,'STREAK_BADGE','连续签到徽章','/me/rewards',14,'ROUTE_BADGE','连续签到 14 天解锁专属徽章',null],[3,'CHECKIN_BOOST',localized(badgeLocale,'签到加成','Check-in boost','Thưởng điểm danh'),'/daily',30,'CHECKIN_MULTIPLIER','1.5',null],[4,'GENESIS_ALLOWLIST','Genesis 资格入口','/market/genesis',60,'ROUTE_BADGE','连续签到 60 天解锁 Genesis 资格入口',true],
       ...(state.powerUpState==='staking'?[[5,'STAKING_APY','质押活动入口','/wallet/staking',21,'ROUTE_BADGE','连续签到 21 天解锁质押活动入口',true]]:[])]
       .map(([powerUpId,powerUpCode,name,targetPath,unlockStreakDays,effectType,effectValue,businessAvailable])=>({powerUpId,powerUpCode,name,unlockStreakDays,targetPath,effectType,effectValue,status:state.powerUps?.includes(powerUpId)?'ACTIVATED':data.streak.currentStreak>=unlockStreakDays?'AVAILABLE':'LOCKED',businessAvailable}));
     data.topStreakers=[{name:'Daniel_K',countryCode:'US',streak:412},{name:'Mei_C',countryCode:'SG',streak:387},{name:'Lukas_F',countryCode:'DE',streak:341},{name:'Carlos_M',countryCode:'BR',streak:298},{name:'Priya_S',countryCode:'IN',streak:256}];
