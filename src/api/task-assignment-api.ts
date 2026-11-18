@@ -313,7 +313,10 @@ function device(value: unknown, mode: ApiEnvironment, version = 1): CanonicalTas
   };
 }
 
-function state(value: unknown, mode: ApiEnvironment, requireV2 = false): CanonicalTaskAssignments {
+function state(value: unknown, mode: ApiEnvironment, requireV2 = false): {
+  assignments: CanonicalTaskAssignments;
+  hasServerDevices: boolean;
+} {
   const source = record(value);
   const proof = provenance(source, mode);
   if ((requireV2 && source.protocolVersion !== 2) || (source.protocolVersion !== undefined && source.protocolVersion !== 2 && source.protocolVersion !== 3)) return invalid();
@@ -325,7 +328,10 @@ function state(value: unknown, mode: ApiEnvironment, requireV2 = false): Canonic
   if (source.pendingEarned != null && !Array.isArray(source.pendingEarned)) return invalid();
   const pendingEarned = Array.isArray(source.pendingEarned) ? source.pendingEarned.map(pendingEarning) : undefined;
   if (pendingEarned && new Set(pendingEarned.map((row) => row.asset)).size !== pendingEarned.length) return invalid();
-  return { serverNow: timestamp(source.serverNow) as number, devices, ...(version >= 2 ? { protocolVersion: version as 2 | 3, pendingEarned } : {}), ...proof };
+  return {
+    assignments: { serverNow: timestamp(source.serverNow) as number, devices, ...(version >= 2 ? { protocolVersion: version as 2 | 3, pendingEarned } : {}), ...proof },
+    hasServerDevices: source.devices.length > 0,
+  };
 }
 
 function simulationState(value: unknown): SimulationState {
@@ -454,10 +460,10 @@ function receiptPage(value: unknown, mode: ApiEnvironment): CanonicalComputeRece
 export function createTaskAssignmentApi(client: ApiClient, mode: ApiEnvironment): TaskAssignmentApi {
   return {
     async state(preferV2 = false) {
-      const current = state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
+      const { assignments: current, hasServerDevices } = state(await client.request<unknown>({ path: "/api/tasks/assignments" }), mode);
       if (current.protocolVersion === 3) return current;
-      if (preferV2) {
-        try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments" }), mode, true); }
+      if (preferV2 && hasServerDevices) {
+        try { return state(await client.request<unknown>({ path: "/api/tasks/v2/assignments" }), mode, true).assignments; }
         catch (cause) {
           if (!(cause instanceof ApiError) || cause.kind !== "http" || (cause.status !== 404 && cause.status !== 501)) throw cause;
         }
