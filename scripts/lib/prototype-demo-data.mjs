@@ -220,8 +220,7 @@ function genesisPublic(now) {
 const demoTrialSlots=(url,locale,state)=>state.trialState!=='read-error'
   &&['ACTIVE','GRACE'].includes(trialDemo(new URL('/api/trial/state',url.origin),locale,state,{method:()=>'GET'},false,demoProducts(state,url.origin,locale)).state)?1:0;
 // Session orders plus the state-sample rows that belong to the scenario. The paid (002) and provisioning (003)
-// samples hold slots, so they appear only in fleetState=reserved, where they are its reservations; replace's
-// two-slot cap keeps one of them (002), leaving a slot for a device, the trial or its conversion. The activated
+// samples hold slots, so they appear only in fleetState=reserved, where they are its reservations. The activated
 // sample (004) is the order of seeded device 41 and is listed only while the seed holds that device, on that device's
 // timeline: paid and activated when the device was, placed 3 minutes before. A sample paid
 // in this session is adopted into createdOrders by the checkout or payment fixture and listed once. The empty
@@ -231,7 +230,6 @@ function demoScenarioOrders(products,state,now,device41) {
   const own=state.createdOrders||[],ids=new Set(own.map(order=>order.orderNo));
   return [...own,...demoOrders(products,state,now).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
-    &&(state.checkoutState!=='replace'||order.orderNo!=='DEMO-ORDER-003')
     &&(device41||order.orderNo!=='DEMO-ORDER-004'))
     .map(order=>order.orderNo==='DEMO-ORDER-004'?{...order,placedAt:device41.activatedAt-samplePaidAfter,paidAt:device41.activatedAt,activatedAt:device41.activatedAt}:order)
     .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
@@ -245,7 +243,7 @@ export function demoAccountOrders(url,locale,state,now=Date.now()) {
 const demoOrderSlots=(orders,orderNo)=>orders
   .filter(order=>(orderNo===undefined||order.orderNo===orderNo)&&['paid','provisioning'].includes(order.canonicalStatus))
   .reduce((total,order)=>total+order.lineItems.reduce((count,line)=>count+line.quantity,0),0);
-// Preview design rule. SCENARIO knobs (fleetState, checkoutState with its two-slot replace cap, trialState and
+// Preview design rule. SCENARIO knobs (fleetState, checkoutState, trialState and
 // benefitState presets, entering or leaving dataState=empty or paymentState=low-balance / urgent / late, Lite's scopeState,
 // whose mixed scope owns a hidden phone, and Lite's computeState, whose compute modes own a Cloud Share) start a fresh,
 // coherent scenario: the preview server clears every record the old scenario owns (session orders, purchases,
@@ -328,7 +326,7 @@ export function demoFleetFacts(url,locale,state) {
   const now=Date.now(),products=demoProducts(state,url.origin,locale),orders=demoScenarioOrders(products,state,now,false);
   const seed=reviewFixture(new URL('/api/devices/earnings',url.origin),locale,state,{method:()=>'GET'});
   const template={...seed.devices[0],runtimeStatus:'ONLINE'};
-  const slotCap=state.checkoutState==='replace'?2:6,retired=state.retiredDeviceIds||[],session=[];
+  const slotCap=6,retired=state.retiredDeviceIds||[],session=[];
   // DEMO-ORDER-004 is seeded device 41's own order, also once checkout has adopted it: it never adds a device.
   for(const order of orders)if(order.orderNo!=='DEMO-ORDER-004'&&['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
     // A paid unit is a device even if its SKU has left the catalog: fall back to the order line instead of dropping it.
@@ -357,6 +355,7 @@ export function demoFleetFacts(url,locale,state) {
     }
   }
   const devices=roster
+    .map(device=>({...device,...state.deviceActivations?.[device.id]}))
     // Lite's stop action (compute scenarios) is a lifecycle event: a stopped device frees its slot.
     .map(device=>state.stoppedDevices?.includes(device.id)?{...device,status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}:device)
     .map(device=>{
@@ -431,6 +430,36 @@ export function demoFixture(url,locale,state,request) {
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
     return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,products);
+  }
+  if(pathname==='/api/devices/activate'&&request.method()==='POST'){
+    const {deviceId,expectedVersion,clientMaxDevices=null}=request.postDataJSON();
+    const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
+    if(!Number.isInteger(deviceId)||deviceId<=0)fail(422,'DEVICE_ID_REQUIRED');
+    if(!Number.isInteger(expectedVersion)||expectedVersion<0)fail(422,'DEVICE_VERSION_REQUIRED');
+    const key=request.headers?.()['idempotency-key']?.trim();
+    const command=key&&`activate:${key}`;
+    const identity=JSON.stringify([deviceId,expectedVersion,clientMaxDevices]);
+    const prior=state.deviceActivationReceipts?.[command];
+    if(prior){
+      if(prior.identity!==identity)refuse('IDEMPOTENCY_KEY_CONFLICT');
+      return prior.receipt;
+    }
+    const fleet=demoFleetFacts(url,locale,state);
+    const device=fleet.devices.find(row=>row.id===deviceId);
+    if(!device)fail(404,'DEVICE_NOT_FOUND');
+    if(device.rowVersion!==expectedVersion)refuse('DEVICE_VERSION_CONFLICT');
+    if(['PHONE','MOBILE'].includes(device.deviceType))refuse('PHONE_CALIBRATION_ACTIVATION_REQUIRED');
+    const alreadyActive=device.activatedAt!==null;
+    if(!alreadyActive){
+      if(clientMaxDevices>fleet.slotCap||fleet.slotsUsed>=fleet.slotCap)refuse('DEVICE_SLOT_CAP_EXCEEDED');
+      (state.deviceActivations??={})[deviceId]={status:'ACTIVE',activatedAt:now,rowVersion:expectedVersion+1,runtimeStatus:'ONLINE'};
+      if(state.stoppedDevices)state.stoppedDevices=state.stoppedDevices.filter(id=>id!==deviceId);
+    }
+    const receipt={deviceId,instanceNo:device.instanceNo,status:alreadyActive?device.status:'ACTIVE',
+      activeCount:fleet.slotsUsed-fleet.reservedSlotCount-fleet.trialSlotCount+Number(!alreadyActive),
+      slotCap:fleet.slotCap,rowVersion:expectedVersion+Number(!alreadyActive),alreadyActive};
+    if(command)(state.deviceActivationReceipts??={})[command]={identity,receipt};
+    return receipt;
   }
   const milestoneClaim=pathname.match(/^\/api\/points\/milestones\/(\d+)\/claim$/);
   const commandKey=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
