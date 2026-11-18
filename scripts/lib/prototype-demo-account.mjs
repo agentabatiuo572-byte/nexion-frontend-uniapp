@@ -11,6 +11,15 @@ export function accountDeletionWallet(state) {
   return { usdtAvailable: state.walletBalance, nexAvailable: state.walletNexBalance,
     pendingWithdraw: state.accountDeletionState === 'withdrawal' ? 100 : 0 };
 }
+// Completed transactions in the retained-history deletion account.
+export function demoDeletionHistory(state) {
+  if(state.accountDeletionState!=='history'||state.dataState==='empty')return null;
+  return {
+    at:state.previewFactsAt,
+    swap:{exchangeNo:'EX-DEMO-HISTORY',fromAsset:'UVT',toAsset:'USDT',fromAmount:128,toAmount:15.9,rate:.125,status:'COMPLETED'},
+    withdrawal:{withdrawalNo:'WD-DEMO-1',amount:250,netReceive:249,fee:1},
+  };
+}
 export function accountDemo(url, locale, state, request) {
   const path = url.pathname;
   const method = request.method();

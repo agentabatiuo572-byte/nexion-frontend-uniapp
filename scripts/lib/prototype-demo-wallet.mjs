@@ -1,5 +1,5 @@
 // The loopback account's visible ledger and wallet summaries.
-import { accountDeletionWallet } from './prototype-demo-account.mjs';
+import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 
 const day=86400000;
@@ -17,7 +17,7 @@ export function demoSettledTasks(state,at) {
     const completedAt=at-(index+1)*3600000;
     return {taskNo:'DEMO-TASK-'+(index+1),receiptNo:'DEMO-RECEIPT-'+(index+1),
       batchNo:index===0?'DEMO-BATCH-1':null,deviceId:41,taskClass,amount,
-      nex:state.walletLegacySeed?0:1,completedAt,postedAt:completedAt+600000,
+      nex:0,completedAt,postedAt:completedAt+600000,
       client:'Demo Studio',model:['SDXL','Llama 3.1','Video generation'][index]};
   });
 }
@@ -36,7 +36,7 @@ export function demoCommissionEvents(state,at) {
   const device={
     id:'demo-commission-1',kind:'direct_device_earning',sourceUserName:'Linh',layer:1,
     sourceRef:'DEMO-TEAM-EARNING-1',sourceDeviceId:'DEMO-LINH-S1',orderAmountUSD:100,
-    amountUSDT:legacy?50:3.5,amountNEX:legacy?10:11.71875,status:'cooling',
+    amountUSDT:legacy?50:3.5,amountNEX:legacy?10:11.71875,status:legacy?'cooling':'unlocked',
     ts:at-day,unlockAt:legacy?at+day:at-day,
   };
   const network={
@@ -135,6 +135,13 @@ export function postDemoActivityRewards(state,now) {
 
 export const demoHasOpeningMilestone=state=>demoHasEarningsHistory(state)&&state.streakState==='normal';
 
+export function initializeLegacyStreakSavers(state) {
+  if(!state.walletLegacySeed||state.streakSaverBalance!=null)return;
+  const starter=!state.saverUsed&&(state.streakState==='normal'
+    ||state.streakState==='broken'&&!state.checkedIn);
+  state.streakSaverBalance=demoHasEarningsHistory(state)?Number(starter)+demoH4Savers(state):0;
+}
+
 export function demoStreakFacts(state,now) {
   const anchor=state.streakSeedAt??state.previewFactsAt??now;
   const today=demoTeamBusinessDate(now),yesterday=demoTeamBusinessDate(now-day);
@@ -159,7 +166,7 @@ export function demoStreakFacts(state,now) {
   }
   longestStreak=Math.max(longestStreak,streakDays,last?.detail.longestStreak??0);
   return {currentStreak:[today,yesterday].includes(lastCheckInDate)?streakDays:0,longestStreak,
-    streakSavers:Math.max(0,Number(normal||broken)+demoH4Savers(state)-Number(Boolean(state.saverUsed))),
+    streakSavers:state.streakSaverBalance??Math.max(0,Number(normal||broken)+demoH4Savers(state)-Number(Boolean(state.saverUsed))),
     lastCheckInDate,checkedInToday:lastCheckInDate===today};
 }
 
@@ -168,6 +175,10 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
   const events=demoCommissionEvents(state,seedAt);
   const commissions=events.filter(event=>['unlocked','withdrawn'].includes(event.status));
   const cooling=events.find(event=>event.kind==='direct_device_earning');
+  const movements=state.walletMovements??[];
+  const posted=new Set(movements.map(row=>row.bizNo));
+  const firstMilestoneRecorded=posted.has('DAILY-MS:900001:1')
+    ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===1);
   const seeds=!demoHasEarningsHistory(state)?[]:[
     ['COMPUTE_EARNING','UVT','IN',15,'earn',seedAt],
     ['REFERRAL_REWARD','UVT','IN',10,'bonus',seedAt-day,'SUCCESS',
@@ -176,22 +187,28 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
     ['DAILY_CHECK_IN','UVT','IN',5,'bonus',seedAt-3*day],
     ['COMPUTE_EARNING','USDT','IN',128.5,'earn',seedAt-4*day],
     ['COMPUTE_EARNING','USDT','IN',.00032,'earn',seedAt-5*day],
-    ['TEAM_COMMISSION','UVT','IN',cooling.amountNEX,'refer',cooling.ts,'PENDING',
-      state.walletLegacySeed?undefined:cooling.id+'-UVT-PENDING'],
-    ...(demoHasOpeningMilestone(state)&&!state.walletLegacySeed?[['DAILY_MILESTONE','UVT','IN',5,'achievement',
-      (state.streakSeedAt??seedAt)-10*day,'SUCCESS','DAILY-MS:900001:1']]:[]),
+    // Saved legacy ledgers keep their original pending row and identity.
+    ...(state.walletLegacySeed?[['TEAM_COMMISSION','UVT','IN',cooling.amountNEX,'refer',cooling.ts,'PENDING']]:[]),
     ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
     ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].filter(([,amount])=>amount>0)
       .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-${asset}-RELEASE`])),
-    ...tasks.filter(task=>task.nex>0&&!task.deliveryCycle).map(task=>
-      ['COMPUTE_TASK_REWARD','UVT','IN',task.nex,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
-    ...(!state.walletLegacySeed?[['TEAM_COMMISSION','USDT','IN',cooling.amountUSDT,'refer',cooling.ts,'PENDING',
-      cooling.id+'-USDT-PENDING']]:[]),
+    ...(demoHasOpeningMilestone(state)&&!state.walletLegacySeed&&!firstMilestoneRecorded?[
+      ['DAILY_MILESTONE','UVT','IN',5,'achievement',(state.streakSeedAt??seedAt)-10*day,'SUCCESS','DAILY-MS:900001:1'],
+    ]:[]),
   ].map(([bizType,asset,direction,amount,category,at,status='SUCCESS',bizNo,batchNo],index)=>({
     id:'demo-bill-'+index,bizNo:bizNo??'DEMO-'+(1000+index),bizType,asset,direction,amount,category,at,status,remark:'',batchNo,
   }));
-  const movements=state.walletMovements??[];
-  const posted=new Set(movements.map(row=>row.bizNo));
+  const history=demoDeletionHistory(state);
+  if(history){
+    const {at,swap,withdrawal}=history;
+    seeds.push(...[
+      [swap.exchangeNo+'-OUT','UVT','OUT',swap.fromAmount,'EXCHANGE_SWAP','swap'],
+      [swap.exchangeNo+'-IN','USDT','IN',swap.toAmount,'EXCHANGE_SWAP','swap'],
+      [withdrawal.withdrawalNo+':USDT:PRINCIPAL','USDT','OUT',withdrawal.netReceive,'WITHDRAW_NET_PRINCIPAL','withdraw'],
+      [withdrawal.withdrawalNo+':USDT:NETWORK_FEE','USDT','OUT',withdrawal.fee,'WITHDRAW_NETWORK_FEE','withdraw'],
+    ].map(([bizNo,asset,direction,amount,bizType,category])=>
+      ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
+  }
   const credits=demoH4Credits(state,now).filter(row=>!posted.has(row.id)).map(({id,type,amount,at,includedInBalance})=>({
     id,bizNo:id,bizType:type,asset:'UVT',direction:'IN',amount,at,includedInBalance,status:'SUCCESS',remark:'',category:'bonus',
   }));
@@ -234,24 +251,26 @@ export function demoWalletBills(state,now,seedAt,tasks=demoSettledTasks(state,se
 }
 
 export function demoTaskPeriods(tasks,now) {
-  const asOf=demoTeamBusinessDate(now);
-  const start=Date.parse(asOf);
-  const yesterday=new Date(start-day).toISOString().slice(0,10);
-  const weekStart=new Date(start-((new Date(start).getUTCDay()+6)%7)*day).toISOString().slice(0,10);
-  const dates=tasks.map(task=>({task,date:demoTeamBusinessDate(task.completedAt)}));
+  // Home and wallet task summaries use the legacy Shanghai business calendar.
+  const date=businessDate.format(now);
+  const dayStart=Date.parse(date)-8*3600000;
+  const weekStart=dayStart-((new Date(Date.parse(date)).getUTCDay()+6)%7)*day;
+  const monthStart=Date.parse(date.slice(0,7)+'-01')-8*3600000;
   const periods={today:[],week:[],month:[],all:[],yesterday:[]};
-  for(const {task,date} of dates){
+  for(const task of tasks){
+    const at=task.completedAt;
+    if(at>=now)continue;
     periods.all.push(task);
-    if(date>=weekStart)periods.week.push(task);
-    if(date.startsWith(asOf.slice(0,7)))periods.month.push(task);
-    if(date===asOf)periods.today.push(task);
-    if(date===yesterday)periods.yesterday.push(task);
+    if(at>=weekStart)periods.week.push(task);
+    if(at>=monthStart)periods.month.push(task);
+    if(at>=dayStart)periods.today.push(task);
+    if(at>=dayStart-day&&at<now-day)periods.yesterday.push(task);
   }
   const totals=rows=>({usdt:money(rows.reduce((sum,task)=>sum+task.amount,0)),
     nex:money(rows.reduce((sum,task)=>sum+(task.nex??0),0)),jobCount:rows.length});
   const {yesterday:previous,...views}=Object.fromEntries(Object.entries(periods).map(([name,rows])=>[name,totals(rows)]));
   const delta=money(views.today.usdt-previous.usdt);
-  return {...views,todayVsYesterdayUsdt:delta,todayVsYesterdayPct:previous.usdt?money(delta/previous.usdt*100):0};
+  return {...views,todayVsYesterdayUsdt:delta,todayVsYesterdayPct:views.today.jobCount&&previous.usdt>0?Number((delta/previous.usdt*100).toFixed(2)):null};
 }
 
 export function demoWalletBillSummary(bills,now) {
