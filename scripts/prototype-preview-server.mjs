@@ -117,7 +117,7 @@ const server=http.createServer(async(req,res)=>{
           for(const key of Object.keys(state))delete state[key];
           Object.assign(state,structuredClone(demoDefaults),{accountCreatedAt});
         }
-        for(const [key,options] of Object.entries(demoOptions)) if(options.some(([value])=>value===update[key]))state[key]=update[key];
+        for(const [key,options] of Object.entries(demoOptions)) if(key!=='promotionRewardState'&&options.some(([value])=>value===update[key]))state[key]=update[key];
         if(state.dataState==='empty')state.withdrawLimitState='open';
         if(update.reset||update.authState||update.savedAttemptState)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
@@ -164,15 +164,16 @@ const server=http.createServer(async(req,res)=>{
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
-        if(update.eventState||scenarioChange){
-          setDemoH4Scene(state,now);
-          if(state.eventState==='claimed'&&state.dataState!=='empty'){
-            const {slotCap,slotsUsed}=demoFleetFacts(url,locale,state);
-            seedDemoH4Gift(state,now,slotCap-slotsUsed,demoProducts(state,url.origin));
-          }
+        if(update.eventState||scenarioChange)setDemoH4Scene(state,now);
+        const rewardSelection=demoOptions.promotionRewardState.find(([value])=>value===update.promotionRewardState);
+        if(rewardSelection||update.reset||scenarioChange){
+          if(!setDemoPromotionReward(url,locale,state,now,rewardSelection?.[0]??state.promotionRewardState))
+            return sendJson(res,{state,options:demoOptions,simulation:true,message:'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE'},409);
         }
-        if(demoOptions.promotionRewardState.some(([value])=>value===update.promotionRewardState)
-            ||update.reset||scenarioChange)setDemoPromotionReward(url,locale,state,now);
+        if((update.eventState||scenarioChange)&&state.eventState==='claimed'&&state.dataState!=='empty'){
+          const {slotCap,slotsUsed}=demoFleetFacts(url,locale,state);
+          seedDemoH4Gift(state,now,slotCap-slotsUsed,demoProducts(state,url.origin));
+        }
         if(update.benefitState)for(const key of ['trialStarted','voucherClaimed','voucherUsed'])delete state[key];
         if(typeof update.highestRank==='boolean')state.highestRank=update.highestRank;
         if(typeof update.allCoursesDone==='boolean')state.completed=update.allCoursesDone?[1,2,3]:[];

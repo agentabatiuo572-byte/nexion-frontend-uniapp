@@ -419,29 +419,29 @@ export function demoFleetFacts(url,locale,state) {
 }
 
 // Apply a selected preview preset once. Reads and saved-state imports never issue a gift.
-export function setDemoPromotionReward(url,locale,state,now) {
-  state.promotionRewardAt=now;
-  if(state.promotionRewardState!=='ISSUED')delete state.promotionGift;
-  if(state.promotionRewardState==='CANCELLED'||state.promotionGift)return;
+export function setDemoPromotionReward(url,locale,state,now,selection) {
   const {orderNo,obligationId,productNo}=demoPromotionGift;
-  const order=demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===orderNo);
-  if(order?.paymentStatus!=='PAID')return;
-  const {slotsUsed,slotCap,devices}=demoFleetFacts(url,locale,state);
-  if(slotsUsed>slotCap){
-    // A full preset fills unused slots with sample devices. For the alternative paid history,
-    // its last filler gives way to the slot that 004 already reserved at payment.
-    const filler=devices.findLast(device=>[44,45,46,48,49,50].includes(device.id)&&device.activatedAt!==null);
-    if(!filler){
-      // All slots belong to actual orders, claims or the trial. An additional reservation could not have been made.
-      state.promotionRewardState='CANCELLED';
-      return;
+  const needsReservation=selection!=='CANCELLED'&&!(selection==='ISSUED'&&state.promotionGift);
+  if(needsReservation&&demoAccountOrders(url,locale,state,now).some(row=>row.orderNo===orderNo&&row.paymentStatus==='PAID')){
+    // Size the selected paid history before changing the retained order, timestamp or receipt.
+    const reserved={...state,promotionRewardState:selection,promotionGift:null};
+    const {slotsUsed,slotCap,devices}=demoFleetFacts(url,locale,reserved);
+    if(slotsUsed>slotCap){
+      // Only a full preset's synthetic filler can give way to the reservation.
+      const filler=devices.findLast(device=>[44,45,46,48,49,50].includes(device.id)&&device.activatedAt!==null);
+      if(!filler)return false;
+      state.fleetSeed=state.fleetSeed.filter(device=>device.id!==filler.id);
     }
-    state.fleetSeed=state.fleetSeed.filter(device=>device.id!==filler.id);
+    if(selection==='ISSUED'){
+      const id=state.deviceSequence=(state.deviceSequence??1000)+1;
+      const instanceNo='PG-'+createHash('sha256').update(obligationId+':0').digest('hex').slice(0,48);
+      state.promotionGift={productNo,at:now,deviceIds:[id],instances:[instanceNo]};
+    }
   }
-  if(state.promotionRewardState!=='ISSUED')return;
-  const id=state.deviceSequence=(state.deviceSequence??1000)+1;
-  const instanceNo='PG-'+createHash('sha256').update(obligationId+':0').digest('hex').slice(0,48);
-  state.promotionGift={productNo,at:now,deviceIds:[id],instances:[instanceNo]};
+  if(selection!=='ISSUED')delete state.promotionGift;
+  state.promotionRewardState=selection;
+  state.promotionRewardAt=now;
+  return true;
 }
 
 export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrderNo) {
