@@ -145,6 +145,7 @@
       <textarea
         class="nx-conv-input"
         :value="draft"
+        :disabled="inputDisabled"
         :maxlength="-1"
         :style="{ height: inputHeight + 'px' }"
         :auto-height="false"
@@ -199,6 +200,7 @@ const props = defineProps<{
   entranceReady?: boolean;
   timeLocale?: string;
   inputPlaceholder: string;
+  inputDisabled?: boolean;
   /** 输入框的**名称**(稳定),与 inputPlaceholder(提示,随可用性变)分开。
       见 lib/a11y-field-label.ts 的契约:placeholder 在输入后就消失,不是稳定的名称,
       名称不能跟着提示走。 */
@@ -352,7 +354,7 @@ function openPreview(src: string) {
 }
 function closePreview() { previewImage.value = ""; }
 useDialogA11y(computed(() => !!previewImage.value), ".nx-conv-image-overlay", closePreview);
-const canSend = computed(() => !props.sendBlocked && draft.value.trim().length <= inputLimit.value && (Boolean(draft.value.trim()) || props.attachmentDraft?.state === "ready") && props.attachmentDraft?.state !== "failed" && props.attachmentDraft?.state !== "uploading");
+const canSend = computed(() => !props.inputDisabled && !props.sendBlocked && draft.value.trim().length <= inputLimit.value && (Boolean(draft.value.trim()) || props.attachmentDraft?.state === "ready") && props.attachmentDraft?.state !== "failed" && props.attachmentDraft?.state !== "uploading");
 const edits = ref<Record<string, string>>({});
 watch(() => props.composerKey, () => { draft.value = props.initialDraft ?? ""; edits.value = {}; previewImage.value = ""; });
 watch(() => props.revealTick, () => { previewImage.value = ""; });
@@ -384,6 +386,7 @@ function onEditInput(turnId: string, e: Event) {
 }
 
 function onDraft(e: Event) {
+  if (props.inputDisabled) return;
   sounds.unlock();
   draft.value = (e as unknown as { detail: { value: string } }).detail.value;
   emit("draft-change", draft.value);

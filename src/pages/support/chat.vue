@@ -55,6 +55,7 @@
       :entrance-ready="humanOpenRequest === null && !humanHistoryRetryBusy && !humanEarlierBusy"
 	      :input-placeholder="inputPlaceholder"
 	      :input-label="inputLabel"
+	      :input-disabled="awaitingHumanDetail"
 	      :send-label="t.conversations.send"
       :status-labels="t.conversations.delivery"
       :send-success-revision="sendSuccessRevision"
@@ -70,7 +71,7 @@
       :max-input-length="MESSAGE_MAX_LENGTH"
       :input-limit-hint="fmt(t.conversations.messageTooLong, { n: MESSAGE_MAX_LENGTH })"
       :image-labels="t.conversations.image"
-      :attach-disabled="!supportSessionReady || attachmentPolicy?.available !== true"
+      :attach-disabled="awaitingHumanDetail || !supportSessionReady || attachmentPolicy?.available !== true"
       :attach-unavailable="attachmentPolicy?.available !== true ? (!remoteApiEnabled || attachmentPolicyError || attachmentPolicy?.available === false ? t.conversations.image.unavailable : t.conversations.image.checkingPolicy) : undefined"
       :attachment-draft="attachmentDisplay"
       :attachment-preview-src="imageDraft?.filePath"
@@ -265,7 +266,7 @@ const failedHumanLabel = computed(() => failedHumanSend.value
   : undefined);
 
 async function chooseSupportImage() {
-  if (chatDisposed || !pageVisible || !supportSessionReady.value || supportImagePicker) return;
+  if (chatDisposed || !pageVisible || !supportSessionReady.value || awaitingHumanDetail.value || supportImagePicker) return;
   if (imageDraft.value || failedHumanSend.value) return;
   const account = app.accountKey, binding = app.accountBindingEpoch, scope = convStore.scopeInvalidated, key = humanComposerKey.value;
   const current = () => !chatDisposed && supportSessionReady.value && account === app.accountKey && binding === app.accountBindingEpoch
@@ -508,6 +509,8 @@ function restoreCompletedHumanCreate(activateRealtime = false) {
 
 function stopHumanThreadPolling() {
   humanOpenRequest.value = null;
+  humanDetailRead.value = null;
+  humanDetailInterrupted.value = false;
   humanRealtime.stop();
 }
 
@@ -518,6 +521,12 @@ function startHumanThreadPolling(openEpoch: number, openId: string) {
 // The thread must observe history readiness even when no message/draft changes.
 // Keep the request object unproxied so cancellation can still compare identity.
 const humanOpenRequest = shallowRef<{ epoch: number; id: string; binding: number; scope: number } | null>(null);
+const humanDetailRead = shallowRef<{ id: string; binding: number } | null>(null);
+const humanDetailInterrupted = ref(false);
+const awaitingHumanDetail = computed(() => {
+  const detail = humanDetailRead.value;
+  return !!cid.value && (detail?.id !== cid.value || detail.binding !== app.accountBindingEpoch);
+});
 async function openHumanConversation(epoch: number, id: string) {
   if (!supportSessionReady.value) return;
   const request = { epoch, id, binding: app.accountBindingEpoch, scope: convStore.scopeInvalidated };
@@ -525,12 +534,20 @@ async function openHumanConversation(epoch: number, id: string) {
   const current = () => humanOpenRequest.value === request && request.binding === app.accountBindingEpoch
     && humanRealtime.isCurrent(request.epoch, request.id);
   try {
-    await convStore.open(id, current);
-    if (current()) startHumanThreadPolling(epoch, id);
+    await convStore.open(id, current, () => {
+      humanDetailRead.value = { id, binding: request.binding };
+    });
+    if (current()) {
+      humanDetailInterrupted.value = awaitingHumanDetail.value;
+      startHumanThreadPolling(epoch, id);
+    }
   } catch (cause) {
     if (cause instanceof Error && !(cause instanceof ApiError) && cause.message === "SUPPORT_ACCOUNT_SCOPE_CHANGED"
         && request.scope === convStore.scopeInvalidated) {
-      if (current()) startHumanThreadPolling(epoch, id);
+      if (current()) {
+        humanDetailInterrupted.value = awaitingHumanDetail.value;
+        startHumanThreadPolling(epoch, id);
+      }
       return;
     }
     if (current()) navBack("/pages/support/messages");
@@ -552,8 +569,9 @@ async function activateHumanPage() {
   restoreCompletedHumanCreate();
   restoreRecoveredComposer(convStore.composer(humanComposerKey.value), humanComposerKey.value);
   const id = cid.value, type = startType.value;
-  const current = () => pageVisible && supportSessionReady.value && binding === app.accountBindingEpoch
-    && scope === convStore.scopeInvalidated && id === cid.value && type === startType.value;
+  const currentPage = () => pageVisible && supportSessionReady.value && binding === app.accountBindingEpoch
+    && id === cid.value && type === startType.value;
+  const current = () => currentPage() && scope === convStore.scopeInvalidated;
   revealTick.value += 1;
   const savedCreate = type && !id ? convStore.composer(`start:${type}`).failedSend : null;
   let originalPending = false;
@@ -574,7 +592,14 @@ async function activateHumanPage() {
       toast.info(t.value.conversations.categoryDisabled, ""); navBack("/pages/support/messages"); return;
     }
   }
-  if (current() && id) { try { await convStore.refresh(current); if(current()) humanHistoryListError.value=false; } catch { if(current()) humanHistoryListError.value=true; } if (!current()) return; await openHumanConversation(epoch, id); if (current()) void loadPrivateImages(); }
+  if (id) {
+    const opening = () => currentPage() && humanRealtime.isCurrent(epoch, id);
+    try { await convStore.refresh(current); if (current()) humanHistoryListError.value = false; }
+    catch { if (current()) humanHistoryListError.value = true; }
+    if (!opening()) return;
+    await openHumanConversation(epoch, id);
+    if (opening()) void loadPrivateImages();
+  }
 }
 
 // Bare full-screen page (no AppChassis), so it must reserve the device status-bar
@@ -644,6 +669,8 @@ async function retryHumanHistory() {
     await convStore.refresh(current);
     if(current()) {
       humanHistoryListError.value=false; humanHistoryRetry.value++;
+      const opening = humanDetailInterrupted.value && !humanOpenRequest.value ? humanRealtime.capture(id) : null;
+      if (opening) await openHumanConversation(opening.epoch, opening.id);
       await nextTick();
       await humanHistoryRead;
     }
@@ -691,8 +718,9 @@ const writableConversationNo = computed(() => {
 });
 const transferredSessionNotice = computed(() => writableConversationNo.value
   ? t.value.conversations.sessionTransferredOpenCurrent : t.value.conversations.sessionTransferred);
-const isReplyAllowed = computed(() => !isTransferredSession.value && (!conv.value || replyAllowedStatuses.has(conv.value.status)));
-const isClosedSession = computed(() => !!conv.value && !isReplyAllowed.value);
+const isReplyAllowed = computed(() => !awaitingHumanDetail.value && !isTransferredSession.value
+  && (!conv.value || replyAllowedStatuses.has(conv.value.status)));
+const isClosedSession = computed(() => !!conv.value && !awaitingHumanDetail.value && !isReplyAllowed.value);
 // Account advisor identity belongs to new composition. Existing conversation
 // headers and waiting state use the server's owner for that exact conversation id.
 const advisorApplies = computed(() => !isClosedSession.value && !cid.value && !!startType.value);
@@ -732,7 +760,7 @@ const humanPresence = computed(() => {
   };
 });
 const headerRole = computed(() => {
-  if (!supportSessionReady.value) return t.value.conversations.connecting;
+  if (!supportSessionReady.value || awaitingHumanDetail.value) return t.value.conversations.connecting;
   if (advisorApplies.value && convStore.advisorError) return "";
   if (startType.value && advisorApplies.value && convStore.advisor?.assignmentState === "UNBOUND") return t.value.conversations.waitingAgent;
   if (startType.value && advisorApplies.value && convStore.advisor?.assignmentState === "ADVISOR_DISABLED") return t.value.conversations.image.disabledAdvisor;
@@ -779,7 +807,7 @@ const inputPlaceholder = computed(() => t.value.conversations.inputPlaceholder);
 const inputLabel = computed(() => t.value.conversations.inputPlaceholder);
 const emptyHint = computed(() => {
   if (advisorApplies.value && convStore.advisorError) return "";
-  if (!supportSessionReady.value) return t.value.conversations.connecting;
+  if (!supportSessionReady.value || awaitingHumanDetail.value) return t.value.conversations.connecting;
   if (waitingForAgent.value) return t.value.conversations.image.unassignedHint;
   return humanType.value === "advisor" ? t.value.conversations.listEmptyAdvisor : t.value.conversations.listEmptySupport;
 });
@@ -927,6 +955,7 @@ function acquireSendSlot(): boolean {
 async function onSend(text: string, restore?: () => void, settled?: (accepted?: boolean) => void) {
   let accepted = false;
   try {
+  if (awaitingHumanDetail.value) { restore?.(); return; }
   try { text = normalizeMessageText(text, { allowEmpty: imageDraft.value?.state === 'ready' }); }
   catch { restore?.(); toast.warn(fmt(t.value.conversations.messageTooLong, { n: MESSAGE_MAX_LENGTH })); return; }
   if (!supportSessionReady.value) { restore?.(); return; }
@@ -1139,7 +1168,8 @@ const theme = useTheme();
 useAutoRecovery({ failed: () => remoteApiEnabled && supportSessionReady.value && attachmentPolicyError.value, retry: loadAttachmentPolicy, repeatMs: 30_000 });
 useAutoRecovery({ failed: () => remoteApiEnabled && advisorApplies.value && convStore.advisorError && !convStore.advisorLoading, retry: () => convStore.refreshAdvisor(), repeatMs: 30_000 });
 useAutoRecovery({
-  failed: () => remoteApiEnabled && supportSessionReady.value && !humanHistoryRetryBusy.value && !humanEarlierBusy.value && !humanHistoryLoading.value && (humanHistoryError.value || humanHistoryListError.value),
+  failed: () => remoteApiEnabled && supportSessionReady.value && !humanHistoryRetryBusy.value && !humanEarlierBusy.value && !humanHistoryLoading.value
+    && (humanHistoryError.value || humanHistoryListError.value || (humanDetailInterrupted.value && !humanOpenRequest.value)),
   retry: retryHumanHistory,
   repeatMs: 30_000,
 });
