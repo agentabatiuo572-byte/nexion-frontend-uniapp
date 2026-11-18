@@ -45,6 +45,8 @@ export interface CanonicalBinaryState {
   trackB: number;
   trackAMembers: number;
   trackBMembers: number;
+  trackATotalMembers?: number;
+  trackBTotalMembers?: number;
   autoPlacedMembers: number;
   matchRate: number;
   threshold: number;
@@ -234,6 +236,8 @@ function parseBinary(value: unknown, mode: ApiEnvironment): CanonicalBinaryState
     trackB,
     trackAMembers: integer(source.trackAMembers),
     trackBMembers: integer(source.trackBMembers),
+    trackATotalMembers: source.trackATotalMembers === undefined ? undefined : integer(source.trackATotalMembers),
+    trackBTotalMembers: source.trackBTotalMembers === undefined ? undefined : integer(source.trackBTotalMembers),
     autoPlacedMembers: integer(source.autoPlacedMembers),
     matchRate,
     threshold,
